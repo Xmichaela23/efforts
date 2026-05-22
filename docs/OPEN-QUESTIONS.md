@@ -221,6 +221,20 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
+## Q-020 — Ankle band as a §8.1 equipment enum addition (deferred — wizard scope decision needed first)
+
+- **Status:** intentional (deferred — coaching value confirmed; engine surface requires wizard scope decision).
+- **Why it exists:** Coaching research (Swim Smooth, Tri Training Harder) identifies the pull buoy + ankle band combination as a meaningful beginner body-position teaching tool — distinct from the "buoy as fitness crutch" pattern this spec rightly warns against (§5.5). With ankles bound, the swimmer cannot use a kick to compensate for poor alignment; they're FORCED to hold horizontal posture through core engagement + balanced rotation. Documented in `docs/SWIM-PROTOCOL.md §6.4` (2026-05-22) but **not surfaced in athlete copy** because `ankle_band` is not in the §8.1 equipment enum.
+- **Why not fixed in the 2026-05-22 spec revision:** Adding the enum entry has wider blast radius than the rest of the revision and depends on a wizard scope decision. Required changes if approved:
+  1. **Wizard:** new chip + label in `src/components/TrainingBaselines.tsx` swim equipment list (`swimmingEquipmentOptions` array) AND/OR `ArcSetupWizard.tsx` equipment step (whichever surface the wizard uses for swim gear).
+  2. **Equipment normalization:** `equipment.swimming` array now carries an extra string; `swimGearNormalized` in `src/lib/plan-tokens/swim-drill-tokens.ts` needs to recognize "ankle band" / "ankle_band" / similar variants.
+  3. **Drill-token equipment map:** new entry mapping the buoy+band coaching pattern to a drill modifier (e.g. `buoy_band_freeswim` or a `band:` suffix on existing pull buoy drills); engine-side surfacing path TBD with the coaching slice.
+  4. **Chip surface:** `materialize-plan: inferSwimEquipmentPack` recognition for `req:band` / `optional:band` / `recommended:band` so the calendar/drawer chips render correctly.
+- **Coaching judgment call deferred to wizard scope:** does the existing wizard need a separate "ankle band" chip, or should it be grouped with "Pull buoy" as "Pull buoy + ankle band" (single entry, both implied)? Bundling reduces wizard friction but limits the engine's ability to surface beginner-specific buoy+band drills only when the athlete actually owns the band.
+- **Cross-ref:** SWIM-PROTOCOL §6.4 (the coaching note that surfaces the value), §8.1 (the enum hosting the deferred decision); separate from Q-019 (wetsuit) which is a different missing wizard signal.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

@@ -147,18 +147,47 @@ No long sets. No threshold work. Final swim 2-3 days before race.
 - **Coaching emphasis:** Drill execution > distance. *"This is a technique session first. If you lose form on a repeat, take longer rest before the next one."* Quality over volume — if the stroke breaks down, cut the main-set count rather than push through.
 - **Total yardage:** Same band as intermediate (~2000-2500yd post-D-022 cap); volume drops within the band via `protocolMidVolumeMultiplier`. Drill block grows; main set shrinks proportionally.
 - Foundation-drill bias per §6.3 fitness-tier biasing (D-020 Slice 3d): catchup, fingertipdrag, singlearm, 616 favored.
+- **Equipment (per §8.4 2026-05-22 revision):** **Fins are recommended when owned** — they hold the swimmer horizontal so the drill cue (catch, recovery, rotation) lands without the athlete fighting to stay afloat. Surfaced as `recommended:fins` when athlete owns fins. Snorkel optional. Paddles suppressed (catch-feel bypass).
 
 ### 5.2 CSS Aerobic
 **Purpose:** Build CSS-specific aerobic capacity.
-**Structure:** WU 300 → Short drill block (100-150yd) → 12-16×100yd at CSS pace, 15s rest → CD 200.
+**Structure:** WU 300 → Short drill block (100-150yd) → 12-16×100yd at CSS pace, **rest per tier table below** → CD 200.
 **Phase use:** Base late, Build.
+
+**Rest by fitness tier (LOCKED 2026-05-22 per 220 Triathlon CSS progression):**
+
+| Tier | Rest interval (week 1 of phase) | Rationale |
+|---|---|---|
+| Beginner | 25s | Form reset between repeats; under-recovered beginners lose stroke quality fast. |
+| Intermediate | 15s | Standard CSS prescription (220 Triathlon). |
+| Advanced | 15s | Standard density; tightens via §5.2.1 across the phase ramp. |
+
+The week-1 rest above is the **START** of the within-phase progression in §5.2.1. Single flat rest across the phase is incorrect — rest should tighten as the athlete adapts.
 
 **Beginner variant (`swim_fitness === 'beginner'`):**
 - **Drill block:** 2-3 drills, 200-300yd (promotes the §5.2 session from Path B single-drill to Path A multi-drill for the learner population). **One stroke-phase focus per session** (per §6.5 — drill block smaller than §5.1, main set is the real work; don't pair a catch drill with a rotation drill here). Foundation-biased per §6.3 (catchup OR fingertipdrag OR singlearm, not mixed).
-- **Main set:** Simpler repeats — `6-8 × 100yd at CSS + 5s (Z2-Z3 boundary, conversational-effort), 20-25s rest` (vs intermediate's `12-16 × 100yd at CSS, 15s rest`). Slower target pace, longer rest, fewer reps — keeps the session aerobic and form-sustainable.
+- **Main set:** Simpler repeats — `6-8 × 100yd at CSS + 5s (Z2-Z3 boundary, conversational-effort), rest per §5.2.1 (25→20s across phase ramp)`. Slower target pace, fewer reps — keeps the session aerobic and form-sustainable.
 - **Coaching emphasis:** Pace consistency > pace target. *"Hit the same 100yd time on every repeat — if the last one is more than 3 sec slower than the first, you started too fast."*
 - **Total yardage:** Capped at 2500yd per D-022. With the larger drill block, main set lands at ~1800-2000yd.
 - CSS pace itself is conservative for learners; if no CSS test on file, the fallback cue from §7.5 replaces the numeric pace target in session copy.
+
+### 5.2.1 CSS rest-interval progression across the phase ramp (LOCKED 2026-05-22)
+
+Rest tightens within each phase as the athlete adapts — the standard 220 Triathlon CSS progression. Same `weekInPhase` mechanism as the §4.5 volume ramp; same ADR-0002 footgun applies.
+
+**Endpoints (rest seconds, lerp START → PEAK across the phase ramp window):**
+
+| Tier | base (6-wk ramp) | build (4-wk ramp) | race_specific (4-wk ramp) |
+|---|---|---|---|
+| Beginner | 25 → 20 | 20 (flat — beginner band) | n/a (beginners receive technique_aerobic in race_specific per §10.3) |
+| Intermediate | 15 → 12 | 12 → 10 | 10 (flat) |
+| Advanced | 15 → 12 | 12 → 10 | 10 (flat) |
+
+**Mechanism:** `restSec = round(lerp(START_REST_TIER, PEAK_REST_TIER, phaseProgress(weekInPhase, rampWeeks)))`. Rounded to integer seconds. `weekInPhase` MUST be `weekInPhaseForTimeline(phaseBlocks, weekNum, block)` — the recovery-non-resetting in-phase index. **NEVER `weekInBlock`** (always 1 per ADR-0002 — same anti-regression rule as the §4.5 volume ramp).
+
+**Validator-floor implication:** swim rest is a within-session prescription, NOT a weekly-volume floor. No D-027-style two-layer Math.max trap applies. Single-layer fix at the session-factory site; no validator parity needed.
+
+**Rationale:** the athlete's CSS rises across the phase AND density rises within the same target pace, compounding aerobic adaptation. Flat rest leaves training stimulus on the table. Per 220 Triathlon CSS progression guide + Swim Smooth tier-tiered rest tables.
 
 ### 5.3 Threshold
 **Purpose:** Develop sustainable pace at and above CSS.
@@ -241,18 +270,20 @@ When executed in open water OR when the athlete has open-water access during rac
 
 ### 6.1 Drill library mapped to stroke phase
 
-| Drill | Stroke phase targeted | Teaching point | Equipment |
-|---|---|---|---|
-| Catch-Up | Timing / front-quadrant | Hand enters before exit hand stops | None |
-| Fingertip Drag | Recovery / high elbow | Maintain high-elbow recovery, relax forearm | None |
-| Fist Swim | Catch / early vertical forearm | Find pull pressure without hand surface area | None |
-| Single-Arm Freestyle | Rotation / body roll | Isolate stroke side, develop independent rotation | None |
-| 6-3-6 Rotation | Rotation / breathing | Six kicks on side, three strokes, six kicks other side | None |
-| Zipper Drill | Recovery / shoulder position | Recovery hand traces side from hip to ear | None |
-| Sculling (front) | Catch / feel for water | Hand pressure forward of head, feel grip | None |
-| Sighting Drill | Race-specific / navigation | Head-up sight every 6 strokes, then breathe | None |
-| Kick on Side | Body position / rotation | Hold side position kicking, head down | Optional fins |
-| Pull with Buoy | Upper-body isolation | Remove kick, focus on catch and pull | Pull buoy required |
+Equipment column lists **required** gear only. Soft-recommend gear (body-position aids per coaching research) lives in §6.6.
+
+| Drill | Stroke phase targeted | Teaching point | Equipment (required) | Tier gate |
+|---|---|---|---|---|
+| Catch-Up | Timing / front-quadrant | Hand enters before exit hand stops | — | all |
+| Fingertip Drag | Recovery / high elbow | Maintain high-elbow recovery, relax forearm | — | all |
+| Fist Swim | Catch / early vertical forearm | Find pull pressure without hand surface area | — | all |
+| Single-Arm Freestyle | Rotation / body roll | Isolate stroke side, develop independent rotation | — | all |
+| 6-3-6 Rotation | Rotation / breathing | Six kicks on side, three strokes, six kicks other side | — | all |
+| Zipper Drill | Recovery / shoulder position | Recovery hand traces side from hip to ear | — | all |
+| Sculling (front) | Catch / feel for water | Hand pressure forward of head, feel grip | — | **intermediate+ ONLY** — hard-banned from beginner inset (beginners lack catch fluency to feel pressure changes; the drill teaches nothing without that baseline). |
+| Sighting Drill | Race-specific / navigation | Head-up sight every 6 strokes, then breathe | — | all (race-specific phase) |
+| Kick on Side | Body position / rotation | Hold side position kicking, head down | — | all |
+| Pull with Buoy | Upper-body isolation | Remove kick, focus on catch and pull | Pull buoy (required) | all |
 
 ### 6.2 Drill selection by phase
 
@@ -290,6 +321,8 @@ Selection rules:
 
 **Honest acknowledgment:** For Learning-level athletes, the system surfaces a Masters swim recommendation. Drill progression is sound, but individual stroke correction requires either Form goggle video analysis or human coaching.
 
+**Beginner body-position teaching: pull buoy + ankle band.** A pull buoy paired with an ankle band is a strong body-position teaching tool for beginners — distinct from "buoy as fitness crutch" which this spec rightly warns against (§5.5). With ankles bound, the swimmer cannot use a kick to compensate for poor alignment; they're FORCED to hold horizontal posture through core engagement + balanced rotation. Sources: Swim Smooth, Tri Training Harder. Currently NOT surfaced in athlete copy because **ankle band is not in the §8.1 equipment enum** — filed as Q-020 for a separate slice (wizard scope decision first).
+
 ### 6.5 Drill volume by fitness tier
 
 Per-session drill block size is gated by `swim_fitness` tier, in addition to the per-§5 prescriptions. This subsection codifies the tier-level scaling that the picker (`pickSwimDrillInset`) currently encodes loosely via foundation-vs-race biasing (D-020 Slice 3d).
@@ -318,6 +351,36 @@ Per-session drill block size is gated by `swim_fitness` tier, in addition to the
 - Beginners learn movements by repetition. One drill focus per CSS Aerobic / Pull-Focused / Recovery session lets the learner grok the cue before adding the next phase the following session.
 - Technique Aerobic is the exception because the drill block IS large (300-450yd) and IS the work — Path A pairing across 2-3 phases is appropriate at that volume.
 - Advanced athletes who pile drills onto every session dilute the work — the protocol explicitly minimizes drill volume in hard sessions for the competitive tier.
+
+### 6.6 Drill-level equipment recommendations (LOCKED 2026-05-22)
+
+Soft-recommend layer ABOVE the §8.4 session-level equipment rules. When a drill is selected for the inset, the athlete's gear is checked; recommended gear surfaces in the session description's drill block copy and via a NEW `recommended:*` tag class (parallel to existing `optional:*` but with distinct semantics — "recommended" = "this helps, grab it"; "optional" = "fine either way").
+
+| Drill | Recommended (when owned) | Optional (when owned) | Notes |
+|---|---|---|---|
+| Fingertip Drag | Fins | Snorkel | Fins keep hips up so the recovery focus isn't fighting drift. |
+| Catch-Up | — | Fins, Snorkel | Body-position aid optional. |
+| Single-Arm Freestyle | — | Fins | Body-position aid optional. |
+| Sculling (front) | — | Pull buoy OR Fins (light support) | **Advanced drill — beginners hard-banned from inset per §6.1 tier gate. Surfacing applies to intermediate+ only.** |
+| Fist Drill / Closed-Fist | Fins | — | Fins maintain swim speed while the catch is compromised. **NO paddles** (defeats purpose). |
+| 6-3-6 / Kick-Switch | Fins (beginner tier only) | Snorkel | Body-position aid critical for learners; intermediate+ may not need fins. |
+| Zipper Drill | — | — | No equipment. |
+| Sighting Drill | — | — | Race-specific; no equipment. |
+| Kick on Side | — | Fins | Kick-led; fins help if struggling. |
+| Pull with Buoy | (Pull buoy required per §6.1) | — | Per §8.2 substitution if no buoy. |
+
+**Surfacing rule:** when a drill in the inset has a recommended gear that the athlete owns, append the drill copy: *"…(use fins if you have them)."* When the athlete does NOT own the recommended gear, the recommendation is silent (no nag).
+
+**Stacking with §8.4:** session-level optionals from §8.4 are emitted independently. The drill-level recommendation is additive and must dedupe against session-level optionals — same gear listed twice would be ugly.
+
+**Tag class semantics:**
+- `req:<gear>` — required (current behavior; e.g. `req:buoy` for pull-focused).
+- `recommended:<gear>` — NEW. Body-position or technique aid the spec actively encourages when owned. Renders distinctly from optional (e.g. "Recommended: Fins" vs "Optional: Snorkel").
+- `optional:<gear>` — current behavior; gear is "fine either way" given the athlete's tier and session type.
+
+**Implementation note:** `recommended:*` is a new tag class. The chip-renderer (`materialize-plan: inferSwimEquipmentPack`) and the description-text path (`session-factory: appendPoolGearLine` → `buildSwimGearLine`) both need to handle it. Same shape as `optional:*` — a separate slice will wire it.
+
+**Sources:** Swim Smooth (fins for body-position drills), Tri Training Harder (fin/paddle split for beginners), Better Triathlete (closed-fist + fins), Organic Coaching (drill equipment guidance), MyMottiv (beginner-fins consensus).
 
 ---
 
@@ -407,6 +470,8 @@ Wizard collects athlete's swim equipment:
 - Kickboard
 - Fins
 
+**Candidate enum addition: ankle band.** Coaching research (§6.4) identifies pull buoy + ankle band as a meaningful beginner body-position drill that the current enum cannot surface. Adding `ankle_band` would require: (a) wizard chip + label, (b) `equipment.swimming` normalization, (c) drill-token equipment map entry, (d) `inferSwimEquipmentPack` recognition for chip surfacing. **Filed as Q-020 — decision deferred to a separate slice (wizard scope decision first).** Until added, the buoy+band drill is referenced in §6.4 coaching prose but not engine-surfaced.
+
 ### 8.2 Session generation by equipment
 
 | Session type | Required equipment | Substitution if missing |
@@ -438,7 +503,7 @@ Every swim session emits the "Pool gear" line (already shipped):
 | **Paddles** | CSS Aerobic, Threshold, Mixed/Fartlek, Pull-Focused — `swim_fitness !== 'beginner'` AND athlete owns | Optional | NEW — session-factory adds `optional:paddles` tag for these session types. Beginner sessions OMIT (per §5.5 rationale — finger-tip sensitivity needed for catch development). |
 | **Snorkel** | Technique Aerobic, CSS Aerobic, Pull-Focused — all tiers, when athlete owns | Optional | NEW — session-factory adds `optional:snorkel` tag for these session types. Currently surfaces only when a snorkel-using drill is in the inset (e.g., `snorkel_freeswim`); the new rule surfaces it across all listed types regardless of drill content. |
 | **Kickboard** | Kick-Focused only | Required (or `fins` substitute per §8.2 sprint/oly rule) | Already shipped — kick-focused tags `req:kickboard` or `req:fins`. |
-| **Fins** | Kick-Focused (required for 70.3/full per §8.2); drill-optional everywhere else (e.g., kick-on-side drill) | Required (kick-focused) / Optional (drill-implied) | Already shipped — kick-focused tags + drill-token map. |
+| **Fins** (revised 2026-05-22) | Kick-Focused (required for 70.3/full per §8.2). **Beginner Technique Aerobic + Beginner CSS Aerobic — surfaced as RECOMMENDED when owned.** Drill-implied via §6.6 (catchup, fingertipdrag, fist, 616 beginner) — surfaced as `recommended:fins` across all tiers when the drill is in the inset and athlete owns fins. | Required (kick-focused) / **Recommended** (beginner technique work) / Optional elsewhere | Already shipped: kick-focused tags + drill-token map (REQUIRED path). NEW: `recommended:fins` tag class for beginner technique and §6.6 drill-implied surfacing. **Fins are encouraged for beginners — opposite the paddles rule. Sources: Better Triathlete, Organic Coaching, MyMottiv, Swim Smooth.** |
 
 **Display semantics:**
 
@@ -446,14 +511,18 @@ Every swim session emits the "Pool gear" line (already shipped):
 - Chip surfaces (calendar / drawer) read the structured `computed.swim_equipment_suggested` field — driven by `req:*` / `optional:*` tags. Both surfaces must align: the description text and the chip must never disagree.
 - When the athlete owns NO listed equipment AND no session-required gear → omit the "Pool gear" line entirely (current behavior, unchanged).
 
-**Beginner-specific carve-outs (per §10 fitness-tier rules):**
+**Beginner-specific carve-outs (per §10 fitness-tier rules — revised 2026-05-22 for fins/paddles split):**
 
-- §5.5 Pull-Focused for beginners: surfaces "Required: Pull buoy" only — NO "Optional: Paddles" hint. Beginners need raw-hand feedback on pull repeats per §5.5 coaching rationale.
-- §5.2 CSS Aerobic for beginners: surfaces "Optional: Snorkel" only (when owned) — NO buoy / paddles hints. Hands-only swimming is the spec.
-- §5.1 Technique Aerobic for beginners: surfaces "Optional: Snorkel" only (when owned). Drill-implied gear from §6.1 drill tokens passes through (e.g., kick-on-side → optional fins) if the drill block contains that drill.
-- §5.11 Recovery: no equipment hint regardless of inventory — the session is movement-quality-focused; gear bypasses that intent.
+The core rule for beginners is **fins/paddles are NOT equivalent**: fins AID stroke acquisition by holding the swimmer horizontal so they can focus on arm mechanics (catch, recovery, rotation) without fighting to stay afloat; paddles AMPLIFY catch error and shoulder load on an undeveloped stroke. For beginners, fins are encouraged on technique work and paddles suppressed.
 
-**Anti-regression:** the description-text Pool gear line for pull-focused / kick-focused sessions is **unchanged**. Only NEW gear-hint surfacing on CSS Aerobic / Technique Aerobic / Pull-Focused (intermediate+) is added by this subsection.
+- §5.5 Pull-Focused for beginners: surfaces "Required: Pull buoy" only. **NO paddles hint** — catch-feel bypass (per §5.5 coaching rationale). **NO fins hint** — pull-focused work is leg-isolated by design; fins would defeat the purpose.
+- §5.2 CSS Aerobic for beginners: surfaces "Optional: Snorkel" + **"Recommended: Fins"** (when owned). NO buoy / paddles hints. Fins maintain body position so the learner can hold form across the 100yd repeats; paddles bypass catch development.
+- §5.1 Technique Aerobic for beginners: surfaces "Optional: Snorkel" + **"Recommended: Fins"** (when owned). Fins are a near-essential body-position aid for beginner drill work. Drill-implied gear from §6.6 still passes through (e.g., fingertipdrag, fist → `recommended:fins`) if the drill block contains that drill — dedupe against the session-level recommendation.
+- §5.11 Recovery: **no equipment hint regardless of inventory** — the session is movement-quality-focused; gear bypasses that intent. Beginners receive the same gear-free treatment here per the existing coaching rule.
+
+**Anti-regression:** the description-text Pool gear line for pull-focused / kick-focused sessions is **unchanged**. Optional surfacing for CSS Aerobic / Technique Aerobic / Pull-Focused (intermediate+) added by the original §8.4 (Slice 2, 2026-05-21) is **unchanged**. NEW in 2026-05-22:
+- `recommended:fins` tag class on beginner Technique Aerobic + beginner CSS Aerobic.
+- §6.6 drill-level `recommended:*` surfacing (parallel to existing `optional:*`).
 
 ---
 
