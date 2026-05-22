@@ -168,15 +168,30 @@ function derivePlannedCellLabel(w: any): string | null {
       }
       // Always include duration for bikes when available
       let label = '';
+      // 2026-05-22: tag-first dispatch. The session-factory emits authoritative
+      // classification via tags (long_ride, brick, easy, recovery, group_ride, etc.).
+      // Tags are unambiguous; the older token/text regex dispatch matched broad
+      // shared terms ("z2", "endurance") that the Easy Ride + Long Ride both carry,
+      // so a Friday Easy Ride rendered as "BK-LR" — same chip as the Saturday Long
+      // Ride. Tag dispatch fixes that. Token/text regex remains as a fallback for
+      // legacy plans materialized before specific tags were emitted.
+      const tagsLower = tags.map(String).map((t: string) => t.toLowerCase());
+      const hasTag = (t: string) => tagsLower.includes(t);
       const isGroupRideAnchor =
-        has(/group_ride|group\s*ride/i) ||
-        tags.map(String).some((t: string) => t.toLowerCase() === 'group_ride' || t.toLowerCase() === 'anchor');
+        hasTag('group_ride') || hasTag('anchor') || has(/group_ride|group\s*ride/i);
+
       if (isGroupRideAnchor) label = 'Group Ride';
+      // Tag-first dispatch (authoritative).
+      else if (hasTag('brick')) label = `BK-BRK${durStr ? ` ${durStr}` : ''}`.trim();
+      else if (hasTag('openers')) label = `BK-OPN${durStr ? ` ${durStr}` : ''}`.trim();
+      else if (hasTag('long_ride')) label = `BK-LR${durStr ? ` ${durStr}` : ''}`.trim();
+      else if (hasTag('recovery') || hasTag('easy')) label = `BK-EZ${durStr ? ` ${durStr}` : ''}`.trim();
+      // Token / text fallback (legacy plans without authoritative tags).
       else if (has(/bike_vo2_/i) || has(/vo2/i)) label = `BK-VO2${durStr ? ` ${durStr}` : ''}`.trim();
       else if (has(/bike_thr_/i)) label = `BK-THR${durStr ? ` ${durStr}` : ''}`.trim();
       else if (has(/bike_ss_/i)) label = `BK-SS${durStr ? ` ${durStr}` : ''}`.trim();
-      else if (has(/endurance|z2|long\s*ride/i)) label = `BK-LR${durStr ? ` ${durStr}` : ''}`.trim();
-      else if (has(/recovery/i)) label = `BK-REC${durStr ? ` ${durStr}` : ''}`.trim();
+      else if (has(/long\s*ride|long_ride/i)) label = `BK-LR${durStr ? ` ${durStr}` : ''}`.trim();
+      else if (has(/recovery|easy/i)) label = `BK-EZ${durStr ? ` ${durStr}` : ''}`.trim();
       else label = `BK${durStr ? ` ${durStr}` : ''}`.trim();
       return label;
     }
