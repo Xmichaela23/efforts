@@ -201,7 +201,23 @@ Deno.serve(async (req) => {
       .eq('user_id', userId)
       .maybeSingle()
     if (goalErr) return json({ error: goalErr.message }, 500)
-    if (!goalRow) return json({ error: 'goal_not_found' }, 404)
+    // Idempotent on already-gone goals (2026-05-22): the wizard's
+    // rollbackInsertedGoals (useArcSetupComplete.ts:74-98) races with the
+    // create-goal-and-materialize-plan outer catch (index.ts:2890), which
+    // already deletes the primary goal on failure. The wizard re-tries the
+    // delete, and a 404 here gets read as `error` by supabase.functions.invoke
+    // — false-failure that triggers the misleading "Some goals could not be
+    // removed automatically — open Goals and delete any duplicates." message.
+    // The desired post-condition for delete-goal is "goal is gone"; if it was
+    // never there or already deleted, that's the desired state. Return success.
+    if (!goalRow) {
+      return json({
+        success: true,
+        noop: true,
+        reason: 'goal_already_deleted',
+        goal_id: goalId,
+      }, 200)
+    }
     const goalName = String(goalRow.name || 'Race')
 
     // 2) Find every plan that mentions this goal — either as `goal_id` or inside
