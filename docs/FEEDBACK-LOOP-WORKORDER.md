@@ -17,17 +17,32 @@
 
 ## Cross-cutting principle: adaptive ≠ jumpy
 
-Every phase's spec MUST address: **what happens on the next plan regenerate after one anomalous week.** A single bad workout, a single training session missed, or a one-week injury should not destabilize the plan. Where the spec concludes a loop is better left display-only than wired reflexively, the spec should say so explicitly with reasoning — not wire it because the audit said it was open.
+Every phase MUST address: **what happens on the next plan regenerate after one anomalous week.** A single bad workout, a single training session missed, or a one-week injury should not destabilize the plan. Where the work order concludes a loop is better left display-only than wired reflexively, the work order says so explicitly — phases don't wire reflexively because the audit said the loop was open.
 
-Concrete anti-volatility patterns to consider per phase (not exhaustive):
-- **Confidence-weighted blends.** Observed signal blended with baseline by sample-count confidence; single workout has minimal weight.
-- **Trailing windows.** Use 4-6 week rolling averages instead of last-week-only.
-- **Divergence threshold.** Observed value only displaces baseline when it diverges past a non-trivial margin (e.g. >5% sustained).
+**Division of responsibility — architecture vs. parameters:**
+
+The work order LOCKS the architectural SHAPE of the anti-volatility approach per phase. Each phase's per-phase spec then tunes the numerical parameters (window length, divergence threshold %, N for sustained evidence, etc.) within that committed pattern. This keeps cross-phase consistency at the architectural level; phases don't re-litigate the volatility question from scratch.
+
+**The toolbox** (each phase below commits to a specific combination):
+
+- **Confidence-weighted blend.** Observed signal blended with baseline by sample-count confidence; single workout has minimal weight.
+- **Trailing window.** N-week rolling average; the spec picks N within the committed shape.
+- **Divergence threshold.** Observed value only displaces baseline when it diverges past a non-trivial margin sustained over the trailing window.
 - **Hysteresis.** Once observed displaces baseline, requires reverse divergence to swing back — no oscillation around a boundary.
-- **One-way ratchets** where appropriate. Strength load increases require sustained evidence; load decreases require less evidence (safety-asymmetric).
+- **One-way ratchet (safety-asymmetric).** Load increases require sustained evidence; load decreases require less evidence. The asymmetry favors the safe direction (which differs by phase — Phase 1's safe direction is "tighten in response to fatigue"; Phase 2's safe direction is "decrease load on regression").
 - **Outlier rejection.** Single sessions that deviate >2σ from the trailing distribution are excluded from the trend.
+- **N-consistent-sessions gate.** A signal change must show across N consecutive (or N-of-M) sessions before it propagates to the plan.
 
-The right pattern depends on the discipline + signal. Each phase's spec proposes one and argues why.
+**Per-phase pattern commitments are made in the phase sections below.** Specs do not re-pick the architecture — they tune the numbers within it.
+
+**Fast-reference summary:**
+
+| Phase | Discipline | Pattern (LOCKED at work-order level) | What flows to plan |
+|---|---|---|---|
+| 1 | Run pace | Threshold-triggered displacement + trailing window + asymmetric ratchet (worsening picked up faster than improving) | Observed threshold pace only |
+| 2 | Strength | One-way ratchet + outlier rejection + N-consistent-sessions gate (decreases pull faster than increases) | Observed 1RM trend; fixed rule remains default |
+| 3 | Cycling | **If closure chosen:** trailing form band ONLY (never raw TSB / raw CTL). **If display-only wins:** no pattern needed | Form band → power-target hysteresis transitions (or nothing if display-only) |
+| 4 | Swim | Confidence-weighted blend + trailing window; observed CSS pace ONLY (SWOLF + adherence + drill-completion locked display-only) | Observed CSS pace only |
 
 ---
 
@@ -81,14 +96,21 @@ The right pattern depends on the discipline + signal. Each phase's spec proposes
 - `arc-context.ts` exposes `learned_fitness.run_threshold_pace_sec_per_km` (baselines + offline learning) and `run_pace_for_coach` (formatter). Does NOT expose `athlete_snapshot.run_*`.
 - `generate-combined-plan` reads from `athleteState` (baseline-derived) for run pace targets. No Arc consumption.
 
-### Scope (subject to spec)
+### Anti-volatility pattern (LOCKED at work-order level)
+
+**Threshold-triggered displacement + trailing window + asymmetric ratchet.**
+
+- **Threshold-triggered displacement.** Observed pace does NOT continuously blend into the baseline. It displaces the baseline only when the divergence exceeds a sustained margin across the trailing window. Below the threshold, baseline holds. Spec tunes the divergence % and the sustained-margin definition.
+- **Trailing window.** Multi-week rolling — spec tunes N (likely 4-6 weeks to match within-phase ramp granularity).
+- **Asymmetric ratchet.** Fatigue and fitness loss are picked up faster than fitness gains. A worsening signal (observed pace > baseline pace) tightens the plan sooner than an improving signal (observed pace < baseline pace) loosens it. This protects against locking-in a deload week as the new baseline; it also stops single-PR weeks from auto-prescribing harder paces. The asymmetry direction is **safety-favored**: the plan defaults to conservative.
+
+Specs tune the numbers (window N, divergence %, asymmetric ratchet ratio); the SHAPE above is locked.
+
+### Scope (subject to spec for numbers)
 
 - **Expose** `snapshot.run_*` in `arc-context.ts` under a new field (e.g. `run_observed_fitness`). Confidence-weighted by sample count.
-- **Decide** how the engine reconciles observed pace with manual baseline. Three candidate patterns (the spec recommends one and argues why):
-  - **Replace** — observed wins when confidence high enough.
-  - **Blend** — weighted average baseline × `(1 - w)` + observed × `w`, where `w` is confidence-scaled.
-  - **Threshold-triggered** — observed only displaces baseline when divergence > N% sustained over M weeks.
-- **Anti-volatility guardrail**: spec must specify the trailing-window length, minimum sample count, and divergence threshold. A single workout PR or a single bad day cannot swing the plan's prescribed pace.
+- **Implement** the locked pattern above as a reconciliation helper in `generate-combined-plan/science.ts` (e.g. `resolveRunPaceTarget(baseline, observed, trailingWindow)`).
+- **Per-distance scoping.** Observed threshold pace from 5K-style intervals reconciles separately from the 70.3 race pace prescription; spec defines the discipline-effort-tier map.
 
 ### Files
 
@@ -104,13 +126,14 @@ The right pattern depends on the discipline + signal. Each phase's spec proposes
 - **Direction risk:** observed pace drops because athlete is fatigued, not because fitness changed. The reconciliation helper must not "lock in" a deload as the new baseline. Mitigation: trailing window + asymmetric ratcheting (paces tighten faster than they loosen, conditional on ACWR readiness).
 - **Per-distance coupling:** observed threshold pace from 5K-style intervals shouldn't dictate 70.3 race pace prescription. Mitigation: spec scopes the reconciliation to the appropriate effort tier; different lerp targets per race distance read different reconciled values.
 
-### Open questions for the Phase 1 spec
+### Open questions for the Phase 1 spec (numbers within the locked shape)
 
-1. **Replace vs. blend vs. threshold** — three candidate patterns. Spec recommends and argues.
-2. **Window length.** 4 weeks? 6? 8? The 70.3 / IM build phase is 4-6 weeks; window needs to match the granularity of within-phase ramps without lagging behind real-time adaptation.
+1. **Window length.** 4 weeks? 6? 8? The 70.3 / IM build phase is 4-6 weeks; window needs to match the granularity of within-phase ramps without lagging behind real-time adaptation.
+2. **Divergence threshold.** What sustained % divergence triggers displacement? Likely 3-7% range; spec argues with coaching reference.
 3. **Confidence threshold for engagement.** `learned_fitness.confidence_band` exists today (`high/medium/low`); spec defines when the engine actually uses observed pace vs. defaults to baseline.
-4. **Display vs. plan-adaptive.** Some signals are better left in Arc + display (athlete sees their trend on State page) without feeding the planner. Spec articulates which run signals are display-only and which feed targets.
-5. **Reverse direction.** Does the engine respond when observed pace WORSENS? Or only when it improves? Asymmetric ratchet trade-offs.
+4. **Asymmetric ratchet ratio.** How much faster does the ratchet tighten vs. loosen? E.g. tighten triggers at 3% divergence; loosen requires 5%. Spec picks the asymmetry.
+5. **Per-tier scoping.** Which run pace targets does observed pace influence? Threshold lerps yes; race-pace prescription maybe; long-run pace probably not. Spec maps signals to consumers.
+6. **Display vs. plan-adaptive.** Confirm: efficiency index and interval-adherence % are display-only (Arc surfaces them; planner does not consume). Only threshold pace feeds targets.
 
 ### Decision: D-033 (proposed)
 
@@ -128,10 +151,22 @@ The right pattern depends on the discipline + signal. Each phase's spec proposes
 - `adapt-plan/index.ts:231-308` reads `exercise_log` and generates progression suggestions stored in `plan_adjustments`. Suggestions are user-gated; they do NOT auto-apply to the next plan generation.
 - `generate-combined-plan` strength session generation uses fixed protocol + phase rules (e.g. 2.5%/week linear progression default). Does NOT read `exercise_log` or `plan_adjustments`.
 
-### Scope (subject to spec)
+### Anti-volatility pattern (LOCKED at work-order level)
 
-- **Read** `exercise_log` 1RM trends in the strength session generator. Replace or augment the fixed protocol-rule progression with observed 1RM-driven progression.
-- **Reconcile** with the existing `adapt-plan` suggestion layer. Three candidate architectures (the spec recommends one):
+**One-way ratchet + outlier rejection + N-consistent-sessions gate.**
+
+- **One-way ratchet (safety-asymmetric).** Strength is the case where the asymmetry favors the **conservative direction in both ways**, but the speeds differ:
+  - **Load increases require sustained evidence** across N consecutive (or N-of-M) sessions of stable 1RM gains. The fixed 2.5%/week progression remains the default; observed evidence must EXCEED it before the generator increases load beyond the rule.
+  - **Load decreases can pull faster.** If observed 1RM regresses (sustained, not single-session), the generator drops load more readily than it raises. Regression → safety → recover sooner.
+- **Outlier rejection.** Single-session 1RM spikes (the "bad rep log" risk — athlete records 200lb × 5 when they did 200lb × 1) are rejected by ≥2σ deviation from the trailing distribution. `avg_rir` provides a sanity gate (a 1RM spike with RIR=0 inconsistent with prior sessions is suspect).
+- **N-consistent-sessions gate.** A signal change (up or down) must show across N consecutive sessions before propagating to the plan. This is the strongest anti-volatility layer for strength because logged data has higher noise than sensor-derived pace/HR.
+
+Specs tune N, the trailing window length, the outlier σ threshold, and the regression-vs-progression speed asymmetry; the SHAPE above is locked.
+
+### Scope (subject to spec for numbers + architecture decision)
+
+- **Read** `exercise_log` 1RM trends in the strength session generator. Augment (not replace) the fixed protocol-rule progression with observed 1RM-driven progression per the locked pattern above. The fixed rule remains the default; observed evidence shifts load only when the gates fire.
+- **Reconcile** with the existing `adapt-plan` suggestion layer. Three candidate architectures (the spec recommends one). The anti-volatility pattern applies regardless of which architecture wins:
   - **Generator-only.** Generator reads `exercise_log` directly; `adapt-plan` deprecates progression suggestions (becomes a notification-only layer for other adaptation kinds like deload triggers).
   - **adapt-plan as canonical source.** Generator reads `plan_adjustments` (the suggestion layer's output). adapt-plan is the canonical reconciliation point. Generator doesn't query `exercise_log` directly.
   - **Layered.** Generator reads `exercise_log` for the baseline progression; adapt-plan's user-confirmed adjustments override on top.
@@ -151,14 +186,16 @@ The right pattern depends on the discipline + signal. Each phase's spec proposes
 - **Load progression for accessories.** `adapt-plan` already separates compound progression (load-driven) from accessory progression (qualitative). The generator's new logic must respect the same split. Mitigation: the helper accepts an exercise-classification flag.
 - **Deload weeks.** If observed 1RM drops during a deload, the next non-deload week shouldn't read that as fitness loss. Mitigation: respect phase context; deload weeks excluded from the trailing trend.
 
-### Open questions for the Phase 2 spec
+### Open questions for the Phase 2 spec (numbers + architecture within the locked shape)
 
 1. **Architecture: generator-only, adapt-plan-canonical, or layered.** Spec recommends.
-2. **Compound vs. accessory split.** Already in `adapt-plan`; reaffirm or revise.
+2. **N for the consistent-sessions gate.** 3 consecutive? 4-of-5? Per-exercise sample size matters; squat probably has more frequent sessions than power clean.
 3. **Trailing window** for 1RM trend. Adapt-plan uses 4 weeks; reconcile or specify per-phase.
-4. **Phase context.** Deload weeks excluded? Rebuild weeks treated specially? The existing strength protocol has phase multipliers; ensure the observed-1RM logic respects them.
-5. **Conservative direction.** Strength load increases must be conservative; load decreases (e.g. observed regression) can be more aggressive. Asymmetric ratchet spec.
-6. **Existing `plan_adjustments` overrides.** Spec confirms whether they layer on top of observed-driven progression or replace it.
+4. **Outlier σ threshold.** 2σ is the default; spec confirms or refines per exercise type.
+5. **Asymmetry ratio.** How much faster do load decreases propagate vs. increases? E.g. 1 regression-session sufficient to trigger a 2.5% load drop; 4 progression-sessions required to trigger a 2.5% load increase above the fixed rule.
+6. **Compound vs. accessory split.** Already in `adapt-plan`; reaffirm or revise.
+7. **Phase context.** Deload weeks excluded from the trailing window? Rebuild weeks treated specially? The existing strength protocol has phase multipliers; ensure the observed-1RM logic respects them.
+8. **Existing `plan_adjustments` overrides.** Spec confirms whether user-confirmed adjustments layer on top of observed-driven progression or replace it.
 
 ### Decision: D-034 (proposed)
 
@@ -179,19 +216,29 @@ The right pattern depends on the discipline + signal. Each phase's spec proposes
 
 This is the **only fully-closed analyze-to-Arc loop**. The question is whether closing it further (Arc-to-plan) is desirable.
 
-### Scope (subject to spec)
+### Anti-volatility pattern (LOCKED at work-order level — conditional)
+
+**If closure is chosen: trailing form band ONLY, never raw TSB or raw CTL.**
+
+The work-order-level commitment: raw TSB and raw CTL **never** touch a plan target. The only admissible signal from cycling fitness to plan generation is the **smoothed form band** (the `fresh / neutral / fatigued` categorical that `cycling_fitness` already exposes). Day-to-day TSB swings of ±20 are real and they CANNOT propagate to power-target adjustments. The form band's smoothing is the floor of acceptable noise.
+
+If display-only wins, no pattern is needed — the loop stays as it is today (coach reads `cycling_fitness`, planner doesn't).
+
+Specs tune which form-band transitions trigger which target adjustments, and the hysteresis around band boundaries (preventing oscillation between fresh→neutral→fresh on consecutive regenerates).
+
+### Scope (subject to spec for closure-or-display-only decision)
 
 The spec must argue **both sides** before recommending:
 
-- **For closure:** plan power targets adjust based on observed cycling fitness. An athlete trending up in CTL gets harder workouts on the next regenerate.
-- **Against closure (display-only):** cycling fitness drives the coach's readiness display ("you're fresh — good day for VO2") but plan generation uses fixed power-percentage targets (FTP × phase multiplier). Athlete-controlled.
+- **For closure:** plan power targets adjust based on observed cycling form band. An athlete with a sustained `fresh` band may get incrementally harder workouts; sustained `fatigued` may unlock deeper recovery without waiting for the validator.
+- **Against closure (display-only):** cycling fitness drives the coach's readiness display ("you're fresh — good day for VO2") but plan generation uses fixed power-percentage targets (FTP × phase multiplier). Athlete-controlled. The within-phase rep ramps (D-028) already adjust intensity progressively; the form band may be redundant signal.
 
 Either outcome is acceptable. The deliverable is a documented architectural decision, not necessarily code.
 
 If closure is chosen:
-- Add reconciliation helper for cycling power targets (mirror the run-pace helper from Phase 1).
-- Anti-volatility: TSB swings can be large day-to-day. Use a trailing form band, not single-week TSB.
-- Per-discipline-distinction: VO2 reps shouldn't increase because CTL ramped; that's the rep-formula's job (D-028). Power targets within reps could shift.
+- Add reconciliation helper using the form band as the input (not TSB, not CTL).
+- Hysteresis required: spec defines minimum sustained-band duration before the transition takes effect.
+- Per-discipline-distinction: VO2 reps shouldn't increase because CTL ramped; that's the rep-formula's job (D-028). Power targets within reps could shift; rep counts stay formula-driven.
 
 ### Files
 
@@ -206,13 +253,14 @@ If closure is chosen:
 - **Phase context.** Build phase: ramping CTL is the design intent. Race-specific: peak CTL with fresh TSB. Each phase has different reconciliation rules. Mitigation: phase-keyed reconciliation.
 - **Conservative default.** Recommend display-only by default unless there's strong coaching evidence for closure. CTL/ATL/TSB are well-suited to readiness display; their role in target adjustment is less clear-cut than run pace or strength 1RM.
 
-### Open questions for the Phase 3 spec
+### Open questions for the Phase 3 spec (architecture decision + numbers if closure)
 
 1. **Closure or display-only?** This is the decision the spec must reach. Both arguments deserve serious treatment.
-2. **What target adjusts?** If closure: power target (FTP %), interval duration, rep count, or all three?
-3. **TSB vs. CTL vs. form band as the signal.** Form band (fresh/neutral/fatigued) is the most stable; raw TSB is noisy; CTL is slow-moving. Spec picks one.
-4. **Phase-keyed rules.** Build vs. race-specific have different fitness contexts.
-5. **Athlete-control trade-off.** Cycling athletes often have their own opinions about FTP. Auto-adjusting power targets without their input may erode trust. Spec considers the UX impact.
+2. **If closure: what target adjusts?** Power target (FTP %), interval duration, rep count, or all three? Rep count likely stays formula-driven (D-028); power % and interval duration are the candidates.
+3. **Sustained-band duration before transition.** How many consecutive weeks of `fatigued` or `fresh` band before the plan responds? Spec sets the hysteresis.
+4. **Phase-keyed rules.** Build phase ramping CTL is the design intent (form band trending toward neutral/fatigued is normal); race-specific peak CTL with fresh TSB is the design intent. The form band's MEANING is phase-keyed. Spec handles per-phase reconciliation.
+5. **Athlete-control trade-off.** Cycling athletes often have their own opinions about FTP. Auto-adjusting power targets without their input may erode trust. Spec considers the UX impact — possibly tying any plan-target adjustment to a notification (deferred to the out-of-scope notifications work).
+6. **TSB / CTL as direct inputs are PROHIBITED at work-order level.** Spec confirms it uses form band only.
 
 ### Decision: D-035 (proposed)
 
@@ -233,15 +281,29 @@ If closure is chosen:
 
 This phase is the **most new work** because the aggregation infrastructure doesn't exist. Run + bike had `workout_facts` aggregation; swim has no equivalent.
 
-### Scope (subject to spec)
+### Anti-volatility pattern (LOCKED at work-order level)
 
-- **Build** `swim_facts` aggregation in `compute-facts` or `compute-snapshot` (decision in spec).
-- **Aggregate** per-week swim metrics: pace per 100yd (per session-type), SWOLF when available, adherence-to-prescribed-yardage, drill-block-completed-as-prescribed.
-- **Expose** in Arc under `swim_observed_fitness` (or similar; spec names).
-- **Decide** which metrics drive plan adaptation:
-  - **Likely drives:** observed CSS pace from threshold sessions (analog of run's threshold pace feedback).
-  - **Likely display-only:** SWOLF (technique signal, not load), adherence (no clean adaptation signal — under-adherence could be many causes).
-  - **Open:** drill completion (could drive technique-emphasis rotation).
+**Confidence-weighted blend + trailing window — observed CSS pace ONLY.**
+
+The work-order-level commitments:
+
+- **Only observed CSS pace feeds plan targets.** SWOLF, adherence, drill completion, and stroke rate stay **display-only**. SWOLF is a technique signal not a load signal; adherence is ambiguous (under-adherence could be many causes — bad prescription, athlete cut early, equipment issue, water-quality day). Locking these as display-only at the work-order level prevents the spec from drifting into wiring them reflexively.
+- **Confidence-weighted blend** for observed CSS pace. Sample-count drives the blend weight; a single threshold session has near-zero weight; a 4-week trailing average converges toward the observed value. The blend is the right shape (not threshold-triggered like Phase 1) because swim threshold work is less frequent than run threshold work — sample count is lower so the engine should integrate observations smoothly rather than wait for a discrete divergence event.
+- **Trailing window** sized to swim threshold session frequency. Run has weekly threshold work; swim has 1-2 CSS-anchored sessions per week. Window must be long enough to accumulate evidence without lagging behind real adaptation.
+- **Pool vs. open-water distinction.** OW pace is environmental (current, chop, water temp), not pure fitness signal. OW sessions are excluded from the CSS-pace trailing window; included in adherence display only.
+
+Specs tune the blend-weight formula, the trailing window length, and the per-session-type scoping (which session types contribute to the observed CSS estimate); the SHAPE above is locked.
+
+### Scope (subject to spec for numbers)
+
+- **Build** `swim_facts` aggregation in `compute-facts` or `compute-snapshot` (decision in spec — likely mirror run/bike split: per-workout facts → weekly snapshot).
+- **Aggregate** per-week swim metrics:
+  - Pace per 100yd (per session-type, pool-only) — **drives plan via locked pattern above**.
+  - SWOLF (when available) — **display-only, locked**.
+  - Adherence-to-prescribed-yardage — **display-only, locked**.
+  - Drill-block-completion — **display-only, locked**.
+- **Expose** in Arc under `swim_observed_fitness` (or similar; spec names). All four metrics surfaced for display; only pace flows into the reconciliation helper.
+- **Implement** the locked pattern as a reconciliation helper in `generate-combined-plan/swim-protocol-v21.ts` (e.g. `resolveSwimCssTarget(baseline, observed, trailingWindow)`).
 
 ### Files
 
@@ -259,13 +321,14 @@ This phase is the **most new work** because the aggregation infrastructure doesn
 - **Open-water swims have no lap-level data.** Pace data exists; per-length data doesn't. Aggregation must distinguish pool vs. OW swims.
 - **Adherence ambiguity.** Athlete swims 1800yd of a prescribed 2200yd session. Was the prescription wrong, or did the athlete cut early? Adherence as a plan-adaptation signal is brittle. Mitigation: spec recommends display-only for adherence; only pace drives targets.
 
-### Open questions for the Phase 4 spec
+### Open questions for the Phase 4 spec (numbers within the locked shape)
 
 1. **Where does aggregation live — `compute-facts` or `compute-snapshot`?** Run/bike split this between facts (per-workout) and snapshot (per-week); swim should mirror.
-2. **Which metrics drive plan adaptation vs. stay display?** Pace yes; SWOLF probably no; adherence probably no; drill completion open question.
-3. **Pool vs. open-water distinction.** Aggregation must handle both; OW pace is environmental (current, chop), not pure fitness signal.
-4. **Sensor-data degradation.** Aggregation behavior when SWOLF/per-length data is absent (which is the common case).
-5. **Threshold session frequency.** Run has weekly threshold work; swim has weekly CSS work. Both should give enough sample size for a 4-week trailing window. Confirm or adjust the window.
+2. **Trailing window length.** Probably 4-6 weeks (mirroring run pace); spec confirms or adjusts based on actual swim threshold session frequency.
+3. **Confidence-weight formula.** Linear in sample count? Sigmoid? Capped at 1.0 once N sessions accumulated? Spec picks.
+4. **Per-session-type scoping.** Which session types contribute to the observed CSS estimate? Threshold yes; CSS Aerobic yes; technique-aerobic probably no (drill-heavy, pace contaminated); recovery no.
+5. **Sensor-data degradation.** Aggregation behavior when per-length data is absent (the common case for many pool swimmers). Pace from total-distance / total-time is still meaningful and feeds the trailing window.
+6. **Drill-completion driver scope.** Confirmed display-only at work-order level — the spec confirms this and does NOT relitigate.
 
 ### Decision: D-036 (proposed)
 
