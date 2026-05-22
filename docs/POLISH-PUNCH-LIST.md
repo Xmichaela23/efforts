@@ -101,10 +101,16 @@ For each numbered item:
 
 ## 3. Cycling 100% — stop calling Z2 weekday rides "long rides"
 
-**Status:** 0% — not yet audited
+**Status:** Phase 0 spec + Phase 1 volume ramp shipped (2026-05-21, `42b2d2c3` + `61faf828`). Phase 2+ open — intensity/structure axis (brick-bike race-pace, bikeOpeners race-week gating) + limiter dial.
+
+### Done
+- [x] Write CYCLING-PROTOCOL.md spec doc — 2026-05-21 (`42b2d2c3`), 412 lines structurally parallel to RUN-PROTOCOL.md / SWIM-PROTOCOL.md
+- [x] **Cycling arc Phase 1 — within-phase volume ramp** — 2026-05-21 (`61faf828`, D-028). `longRideHoursForWeek` lerp helper (§4.5 endpoints LOCKED: base 0.65→0.75, build 0.75→0.85, RS 0.85→1.00); sweet-spot / threshold / VO2max rep ramps per §10.4 + §5.6; validator parity (`effectiveLongRideFloorHours` within-phase-aware, mirrors D-027). 15 new pin tests; 285/0 in generate-combined-plan suite.
 
 ### Open
-- [ ] Write CYCLING-PROTOCOL.md spec doc
+- [ ] **Cycling arc Phase 2** — race-specific brick-bike race-pace closing block (§4.4); audit + implement.
+- [ ] **Cycling arc Phase 3** — `bikeOpeners` race-week-only gating (closes §9.1 footgun: currently fires every taper week, not just race week — line 222 below tracks this as a deliberate follow-up; Phase 3 closes it).
+- [ ] **Cycling arc Phase 4 (deferred)** — `limiter_sport='bike'` intensity dial; same shape as `limiter_sport='run'` Phase 4 deferred work.
 - [ ] Audit cycling session naming — "Long Ride" only the genuine weekly long session
 - [ ] Distinguish Easy / Endurance / Long / Quality / Brick rides
 - [ ] Verify cycling power zones (read from athlete FTP)
@@ -194,9 +200,9 @@ Reference corpus: `~/Downloads/ironman-70.3-santa-cruz-+-ironman-70.3-northern-c
 - [ ] Cross-check swim session generation against the documented protocol; identify drift.
 
 ### Item 3 — Cycling protocol audit (CYCLING-PROTOCOL.md missing)
-- [ ] **Cycling protocol arc** — author `docs/CYCLING-PROTOCOL.md` (session generation spec parallel to RUN-PROTOCOL.md / SWIM-PROTOCOL.md), then audit cycling session generation against it and fix gaps. Same phased pattern as swim and run arcs. **Unblocked 2026-05-21 — run arc Phases 0-3 closed (D-023).** Phase 4 (`limiter_sport='run'` dial) deferred to its own arc; does not gate the cycling arc.
-- [ ] Write `CYCLING-PROTOCOL.md` spec doc — currently 0% (per §3 above).
-- [ ] Distinguish Easy / Endurance / Long / Quality / Brick rides; stop calling Z2 weekday rides "long rides."
+- [x] **Cycling protocol arc Phase 0 + Phase 1** — `docs/CYCLING-PROTOCOL.md` authored 2026-05-21 (`42b2d2c3`); Phase 1 within-phase volume ramp shipped 2026-05-21 (`61faf828`, D-028). Phases 2-4 remain (see §3 above for breakdown).
+- [x] Write `CYCLING-PROTOCOL.md` spec doc — 2026-05-21 (`42b2d2c3`, 412 lines, structurally parallel to RUN-PROTOCOL.md / SWIM-PROTOCOL.md). §3 Phase 0 line item closed.
+- [ ] Distinguish Easy / Endurance / Long / Quality / Brick rides; stop calling Z2 weekday rides "long rides." (Phase 2 territory — naming audit follows the brick-bike race-pace work.)
 - [ ] Verify cycling power zones flow from FTP correctly.
 - [ ] Confirm Wednesday group ride anchor threading.
 
