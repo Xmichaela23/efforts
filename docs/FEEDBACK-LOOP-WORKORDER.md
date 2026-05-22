@@ -40,7 +40,7 @@ The work order LOCKS the architectural SHAPE of the anti-volatility approach per
 | Phase | Discipline | Pattern (LOCKED at work-order level) | What flows to plan |
 |---|---|---|---|
 | 1 | Run pace | Threshold-triggered displacement + trailing window + asymmetric ratchet (worsening picked up faster than improving) | Observed threshold pace only |
-| 2 | Strength | One-way ratchet + outlier rejection + N-consistent-sessions gate (decreases pull faster than increases) | Observed 1RM trend; fixed rule remains default |
+| 2 | Strength | Asymmetric ratchet + outlier rejection + N-consistent-sessions gate (decreases pull faster than increases; fixed rule is no-signal default, not floor) | Observed 1RM trend (both directions); fixed rule fills the gap when signal is inconclusive |
 | 3 | Cycling | **If closure chosen:** trailing form band ONLY (never raw TSB / raw CTL). **If display-only wins:** no pattern needed | Form band → power-target hysteresis transitions (or nothing if display-only) |
 | 4 | Swim | Confidence-weighted blend + trailing window; observed CSS pace ONLY (SWOLF + adherence + drill-completion locked display-only) | Observed CSS pace only |
 
@@ -153,15 +153,20 @@ Specs tune the numbers (window N, divergence %, asymmetric ratchet ratio); the S
 
 ### Anti-volatility pattern (LOCKED at work-order level)
 
-**One-way ratchet + outlier rejection + N-consistent-sessions gate.**
+**Asymmetric ratchet + outlier rejection + N-consistent-sessions gate.**
 
-- **One-way ratchet (safety-asymmetric).** Strength is the case where the asymmetry favors the **conservative direction in both ways**, but the speeds differ:
-  - **Load increases require sustained evidence** across N consecutive (or N-of-M) sessions of stable 1RM gains. The fixed 2.5%/week progression remains the default; observed evidence must EXCEED it before the generator increases load beyond the rule.
-  - **Load decreases can pull faster.** If observed 1RM regresses (sustained, not single-session), the generator drops load more readily than it raises. Regression → safety → recover sooner.
-- **Outlier rejection.** Single-session 1RM spikes (the "bad rep log" risk — athlete records 200lb × 5 when they did 200lb × 1) are rejected by ≥2σ deviation from the trailing distribution. `avg_rir` provides a sanity gate (a 1RM spike with RIR=0 inconsistent with prior sessions is suspect).
-- **N-consistent-sessions gate.** A signal change (up or down) must show across N consecutive sessions before propagating to the plan. This is the strongest anti-volatility layer for strength because logged data has higher noise than sensor-derived pace/HR.
+The fixed 2.5%/week progression rule is the **no-signal default** (the fallback when observed evidence is inconclusive). It is NOT a floor. Observed evidence can drive load in either direction relative to the default:
 
-Specs tune N, the trailing window length, the outlier σ threshold, and the regression-vs-progression speed asymmetry; the SHAPE above is locked.
+- **Sustained progression evidence** (1RM gains stable across N consecutive sessions, exceeding what the fixed rule predicts) → generator pushes load **above** the rule. This direction requires the most evidence — strength gains lock in conservatively.
+- **Sustained regression evidence** (1RM declines stable across N consecutive sessions — illness, overreaching, a bad block) → generator pulls load **below** the rule. This direction propagates faster — N for regression is smaller than N for progression. The safety-asymmetric direction: when in doubt, deload sooner.
+- **No clear signal** (noisy logs, mixed sessions, insufficient sample count) → generator uses the 2.5%/week default. The rule is fallback, not floor.
+
+Additional gates protecting against bad data:
+
+- **Outlier rejection.** Single-session 1RM spikes (the "bad rep log" risk — athlete records 200lb × 5 when they did 200lb × 1) are rejected by ≥2σ deviation from the trailing distribution. `avg_rir` provides a sanity gate (a 1RM spike with RIR=0 inconsistent with prior sessions is suspect). This rejection is symmetric — outlier-low data is also rejected; you don't drop load because of one missed lift any more than you raise it because of one PR.
+- **N-consistent-sessions gate.** A signal change (up or down) must show across N consecutive sessions before propagating to the plan. This is the strongest anti-volatility layer for strength because logged data has higher noise than sensor-derived pace/HR. The asymmetry is in N itself: N for regression < N for progression.
+
+Specs tune N (separately for progression vs. regression), the trailing window length, and the outlier σ threshold; the SHAPE above is locked.
 
 ### Scope (subject to spec for numbers + architecture decision)
 
