@@ -76,7 +76,7 @@ A future Phase 1.5 or separate work order can add direct threshold-pace aggregat
   - 8:00/mi pace × 0.96 = 7:41/mi (19s faster). Plausibly a real fitness gain.
 - "Sustained" = the **trailing-window MEDIAN** is outside the ±4% band. Median over 4 weeks is robust to a single anomalous week (one outlier doesn't move the median).
 
-### 4.3 Asymmetric ratchet: **consecutive-week count**
+### 4.3 Asymmetric ratchet: **consecutive-week count + ACWR gate**
 
 **Same divergence threshold (4%) but different consecutive-week requirements** for engagement:
 
@@ -86,6 +86,32 @@ A future Phase 1.5 or separate work order can add direct threshold-pace aggregat
 **Asymmetry ratio: 2× slower-to-engage for improvement vs. worsening.** Documented; spec adjusts only this ratio if real-world feedback shows the conservative direction is too aggressive or too slow.
 
 **Safety-favored tie-break:** when both directions could plausibly engage (e.g. data flicker around the threshold), worsening wins. The plan tightens; it does not loosen on ambiguous data.
+
+### 4.3.1 Fatigue-vs-fitness-decline distinction (ACWR gate on worsening)
+
+**The problem:** easy pace slowing at a given HR can mean fitness loss OR accumulated fatigue from a hard training block. These need different responses:
+- **Fitness loss** (true regression): reconciler should engage — tighten the plan's prescribed pace.
+- **Accumulated fatigue** (build-block overload doing its job): reconciler must NOT engage — locking in the slowdown as new baseline would tighten the plan in response to the very fatigue the plan was designed to create. Self-defeating.
+
+The pace signal alone cannot distinguish these. The system already has the discriminating signal: **`athlete_snapshot.acwr`** (Acute-to-Chronic Workload Ratio), computed weekly at `compute-snapshot:357-359` as `current_workload / 4-week_chronic_load`. Sports-science convention:
+- **0.8–1.3:** optimal training zone.
+- **1.3–1.5:** caution (functional overreach territory).
+- **> 1.5:** high accumulated load (non-functional overreach / fatigue tail).
+
+**Rule (LOCKED at spec level):**
+
+The worsening path engages ONLY when **every week in the 2-consecutive-week worsening window has `acwr ≤ 1.3`**. If any of those weeks has `acwr > 1.3` OR `acwr` is null/missing for both weeks, the worsening signal is treated as fatigue-attributable and the reconciler returns BASELINE.
+
+**Why this rule shape:**
+- A single elevated-ACWR week in the worsening window is enough to flag ambiguity — fatigue from a hard week can tail into the next week's easy runs. Conservative: don't lock in a slowdown that might just be carry-over fatigue.
+- Null ACWR in BOTH weeks (no chronic-load data — new athlete, no prior 4 weeks of workouts) blocks engagement. We can't distinguish; falling back to baseline is safe.
+- Null ACWR in ONE week (mixed data availability) is permitted to engage as long as the available week is ≤ 1.3. The reconciler isn't blocked by partial data.
+
+**The improving path does NOT need an ACWR gate.** A faster-pace signal during a hard block is unambiguous: fitness improving despite high load. That's the strongest possible fitness signal; engaging when ACWR is elevated is correct.
+
+**Display vs. plan-adaptive interaction:** ACWR is already used by the coach context for readiness display. Phase 1 adds a SECOND consumer (the run-pace reconciler), reading the same field. No change to ACWR computation; no change to existing coach display. The new consumer is additive.
+
+**Anti-regression invariant:** the ACWR gate is non-negotiable on the worsening path. Removing it would re-introduce the "deload block misread as fitness decline" failure mode. Pin tests in section 6 lock the gate.
 
 ### 4.4 Confidence gating
 
@@ -145,13 +171,23 @@ export interface RunObservedFitness {
    */
   weekly_easy_paces_sec_per_km: (number | null)[];
 
+  /**
+   * Weekly ACWR values (newest first), parallel array to `weekly_easy_paces_sec_per_km`.
+   * The engine's worsening-path reconciler consults this to distinguish accumulated
+   * fatigue (ACWR > 1.3) from genuine fitness decline (ACWR ≤ 1.3). See spec section
+   * 4.3.1. Null entries permitted; the worsening gate handles partial-data cases.
+   * Improving path does NOT consult this field — fitness gains during high load are
+   * unambiguous and engagement is correct.
+   */
+  weekly_acwr: (number | null)[];
+
   /** Trailing window length in weeks. Locked at 4 for Phase 1 (see spec 4.1). */
   window_weeks: 4;
 
   /**
    * Display-only fields. Engine does NOT consume these. Carried for State page render
-   * and future debugging; the reconciler reads only `median_easy_pace_sec_per_km` and
-   * `weekly_easy_paces_sec_per_km`.
+   * and future debugging; the reconciler reads only `median_easy_pace_sec_per_km`,
+   * `weekly_easy_paces_sec_per_km`, and `weekly_acwr`.
    */
   efficiency_index: number | null;
   interval_adherence_pct: number | null;
@@ -171,7 +207,7 @@ async function buildRunObservedFitness(supabase, user_id): Promise<RunObservedFi
   const fourWeeksAgo = new Date(Date.now() - 28 * 86400 * 1000).toISOString().slice(0, 10);
   const { data: snapshots } = await supabase
     .from('athlete_snapshot')
-    .select('week_start, run_easy_pace_at_hr, run_efficiency, run_interval_adherence, run_long_run_duration')
+    .select('week_start, run_easy_pace_at_hr, run_efficiency, run_interval_adherence, run_long_run_duration, acwr')
     .eq('user_id', user_id)
     .gte('week_start', fourWeeksAgo)
     .order('week_start', { ascending: false })
@@ -181,12 +217,14 @@ async function buildRunObservedFitness(supabase, user_id): Promise<RunObservedFi
   const padded: (any | null)[] = new Array(4).fill(null);
   for (let i = 0; i < Math.min(snapshots.length, 4); i++) padded[i] = snapshots[i];
   const weekly = padded.map(s => (s?.run_easy_pace_at_hr ?? null));
+  const weeklyAcwr = padded.map(s => (typeof s?.acwr === 'number' ? s.acwr : null));
   const nonNull = weekly.filter((v): v is number => typeof v === 'number');
   if (nonNull.length < 3) return null; // insufficient data; per 4.1
   const median = nonNull.slice().sort((a, b) => a - b)[Math.floor(nonNull.length / 2)];
   return {
     median_easy_pace_sec_per_km: median,
     weekly_easy_paces_sec_per_km: weekly,
+    weekly_acwr: weeklyAcwr,
     window_weeks: 4,
     efficiency_index: padded[0]?.run_efficiency ?? null,
     interval_adherence_pct: padded[0]?.run_interval_adherence ?? null,
@@ -204,7 +242,12 @@ A new pure helper in `generate-combined-plan/science.ts`:
 ```ts
 export type ResolvedRunEasyPace = {
   paceSecPerKm: number;
-  source: 'baseline' | 'reconciled_worse' | 'reconciled_better' | 'observed_no_baseline';
+  source:
+    | 'baseline'
+    | 'reconciled_worse'
+    | 'reconciled_better'
+    | 'observed_no_baseline'
+    | 'baseline_acwr_gated';  // worsening signal suppressed because ACWR > 1.3 in window — see 4.3.1
   reasoning: string;  // for log-line debug only; not athlete-facing
 };
 
@@ -212,14 +255,21 @@ export function resolveRunEasyPace(
   baseline: { value: number; confidence: string; sample_count: number } | null,
   observed: RunObservedFitness | null,
 ): ResolvedRunEasyPace | null {
-  // Decision tree per spec section 4.4.
+  // Decision tree per spec sections 4.3, 4.3.1, 4.4.
   // 1. Both missing → null (caller falls back to whatever default exists today).
   // 2. Baseline usable, observed missing → baseline.
   // 3. Baseline unusable, observed present (≥3 weeks) → observed_no_baseline.
   // 4. Both present, observed median within ±4% of baseline → baseline.
-  // 5. Both present, observed median >4% slower for 2+ consecutive weeks → reconciled_worse.
-  // 6. Both present, observed median >4% faster for 4+ consecutive weeks → reconciled_better.
-  // 7. Else (ambiguous data) → baseline (safety-favored tie-break).
+  // 5. Both present, observed median >4% slower for 2+ consecutive weeks AND
+  //    ACWR ≤ 1.3 for EVERY week in that 2-consecutive-week window (per 4.3.1) →
+  //    reconciled_worse.
+  // 6. Both present, observed median >4% slower for 2+ consecutive weeks BUT
+  //    ACWR > 1.3 in ANY of those weeks (or null in BOTH weeks) → baseline
+  //    (attributed to accumulated fatigue per 4.3.1). New source value:
+  //    `baseline_acwr_gated`.
+  // 7. Both present, observed median >4% faster for 4+ consecutive weeks →
+  //    reconciled_better (no ACWR gate on improving path per 4.3.1).
+  // 8. Else (ambiguous data) → baseline (safety-favored tie-break).
   ...
 }
 ```
@@ -313,6 +363,52 @@ Baseline unusable (low confidence). Observed present + sufficient.
 
 **Assertion:** `run_observed_fitness === null` (per wrapper's 3-of-4 minimum). Engine never sees observed data → falls back to baseline.
 
+### 6.7 Scenario: worsening signal during high-ACWR build block → ACWR gate suppresses (LOAD-BEARING)
+
+**Same fixture, baseline easy pace 360 sec/km.**
+
+**Observed (newest first):**
+- Week 1: 380 sec/km (+5.6%, slower); `acwr = 1.45` (elevated — overload territory).
+- Week 2: 378 sec/km (+5.0%, slower); `acwr = 1.55` (further elevated).
+- Week 3: 360 sec/km; `acwr = 1.20`.
+- Week 4: 358 sec/km; `acwr = 1.10`.
+
+Pace signal: 2 consecutive weeks (1+2) both >+4% slow. **Pre-gate, this would trigger `reconciled_worse`.**
+
+ACWR check: Week 1 ACWR = 1.45 > 1.3 AND Week 2 ACWR = 1.55 > 1.3. Both weeks in the worsening window have elevated ACWR.
+
+**Assertion:** `resolveRunEasyPace(baseline, observed).source === 'baseline_acwr_gated'`. Reconciled pace = baseline (360 sec/km). The slowdown is attributed to accumulated training load, not fitness decline. **The plan does NOT tighten in response to fatigue the plan was designed to create.**
+
+This is the load-bearing scenario for the fatigue-vs-fitness distinction. If this test ever passes with `source === 'reconciled_worse'`, the ACWR gate has regressed.
+
+### 6.8 Scenario: worsening signal with NORMAL ACWR → reconciler engages (genuine regression)
+
+**Same fixture.**
+
+**Observed (newest first):**
+- Week 1: 380 sec/km (+5.6%); `acwr = 0.95` (under-loading — perhaps post-taper / illness).
+- Week 2: 378 sec/km (+5.0%); `acwr = 1.05`.
+- Week 3: 360 sec/km; `acwr = 1.10`.
+- Week 4: 358 sec/km; `acwr = 1.00`.
+
+Pace signal: 2 consecutive weeks slow. ACWR check: both weeks ≤ 1.3.
+
+**Assertion:** `resolveRunEasyPace(baseline, observed).source === 'reconciled_worse'`. Reconciled pace = median (369 sec/km). Genuine fitness loss / illness / extended deload — plan tightens. Distinguishes from 6.7 by ACWR signal alone.
+
+### 6.9 Scenario: improving signal during high ACWR → reconciler STILL engages (no gate on improving path)
+
+**Same fixture.**
+
+**Observed (newest first):**
+- Week 1: 340 sec/km (-5.6%); `acwr = 1.45` (high load).
+- Week 2: 342 sec/km (-5.0%); `acwr = 1.55`.
+- Week 3: 340 sec/km (-5.6%); `acwr = 1.35`.
+- Week 4: 338 sec/km (-6.1%); `acwr = 1.40`.
+
+Pace signal: 4 consecutive weeks faster than baseline by >4%. ACWR is elevated throughout — high training load.
+
+**Assertion:** `resolveRunEasyPace(baseline, observed).source === 'reconciled_better'`. The improving path has no ACWR gate (per 4.3.1) — fitness gains during high load are unambiguous and engagement is correct. Reconciled pace = 340 sec/km (median).
+
 ### 6.7 Hash test update (Phase 0 → Phase 1 transition)
 
 The Phase 0 hash test (`arc-channel.test.ts`) asserts byte-identical output between `arc: undefined` and `arc: populated`. With Phase 1's consumer wired, this is no longer universally true: a fixture where the reconciler ENGAGES will produce different output between modes.
@@ -335,7 +431,7 @@ Specifically:
 | `generate-combined-plan/index.ts` | After request validation, call `resolveRunEasyPace` once. If result is non-null and `source !== 'baseline'`, override `state.learned_fitness.run_easy_pace_sec_per_km.value` on the derived in-memory state. Existing `buildWeek` calls read the overridden state naturally. |
 | `create-goal-and-materialize-plan/index.ts` | Add `buildRunObservedFitness(supabase, user_id)` helper. Populate `arc.run_observed_fitness` at the existing `invokeFunction` call site. |
 | `arc-channel.test.ts` | Update to assert byte-identical when `run_observed_fitness === null` only. Phase 0's broader assertion narrows. |
-| NEW `run-pace-feedback.test.ts` | 6 e2e scenarios from section 6 + unit tests for `resolveRunEasyPace`. |
+| NEW `run-pace-feedback.test.ts` | 9 e2e scenarios from section 6 (including 3 ACWR-gate scenarios 6.7 / 6.8 / 6.9 LOAD-BEARING for the fatigue-vs-fitness distinction) + unit tests for `resolveRunEasyPace`. |
 
 ---
 
@@ -346,20 +442,16 @@ Specifically:
 - **Phase 1 reconciles ONLY `learned_fitness.run_easy_pace_sec_per_km`.** `performance_numbers.*` is untouched. Race-pace + interval-pace prescriptions remain anchored to manual athlete entries.
 - **Display-only fields stay display-only.** The hash test asserts `efficiency_index`, `interval_adherence_pct`, `longest_run_minutes` do NOT change plan output even when populated with extreme values.
 - **Asymmetric ratchet shape is locked.** Worsening triggers at 2 consecutive weeks; improving at 4. Spec adjusts only the ratio if real-world feedback warrants; the asymmetry direction (worsening faster than improving) is non-negotiable.
+- **ACWR gate on worsening path is locked.** The fatigue-vs-fitness distinction is structural; removing the gate re-introduces the "deload block misread as fitness decline" failure mode (and the self-defeating "plan tightens in response to its own training stimulus" loop). The improving path is gate-free by design; fitness gains during high load are unambiguous. Pin tests 6.7, 6.8, 6.9 lock both halves.
 
 ---
 
-## 9. Open questions for user (final)
+## 9. Open questions — resolved
 
-The spec resolves all 6 parameter questions from the work order. Two minor judgment calls that I made explicitly — flag for confirmation:
-
-1. **Easy pace instead of threshold pace as the reconciliation signal.** Work order said "observed threshold pace" but the data reality is observed easy pace at HR (threshold pace isn't aggregated in compute-snapshot today). I chose to reconcile easy pace and document threshold pace as derived via existing Daniels-style ratios. Alternative: defer Phase 1 until threshold-pace aggregation lands in compute-snapshot. **Recommend proceeding with easy pace.**
-
-2. **Asymmetric ratchet ratio: 2× (worsening 2 weeks vs. improving 4 weeks).** Plausible alternatives: 1.5× (3 vs. 4.5 rounded), 3× (1 vs. 3), etc. 2× feels right because 2 weeks is the minimum credible signal for fatigue and 4 weeks matches the within-phase ramp window. **Confirm or amend.**
-
-3. **`performance_numbers.fiveK_pace` stays untouched.** Race-pace prescriptions remain athlete-controlled via manual race-time entry. **Confirm this is the right scope boundary** — if you want Phase 1 to also reconcile `performance_numbers`, scope expands significantly and the anti-cross-pollination rule changes.
-
-Once all three are confirmed, implementation proceeds per section 7.
+1. **Easy pace as the reconciliation signal** — ✅ confirmed (user note: "actually the better signal, not a compromise" — easy pace at HR is the cleanest read on aerobic fitness; threshold prescriptions inherit via Daniels ratios; don't wait for threshold-pace aggregation).
+2. **Asymmetric ratchet 2× (2 weeks worsening / 4 weeks improving)** — ✅ confirmed (safety-favored is the correct bias for a training plan).
+3. **`performance_numbers.fiveK_pace` untouched** — ✅ confirmed (race-pace prescription is athlete-owned goal-setting; anti-cross-pollination rule is correct).
+4. **Fatigue-vs-fitness distinction on the worsening path** — ✅ resolved (per amendment 4.3.1): ACWR gate on worsening path. A worsening signal during high-ACWR weeks is suppressed; the reconciler returns `baseline_acwr_gated`. Locked via pin tests 6.7 / 6.8 / 6.9. The improving path has no ACWR gate by design.
 
 ---
 
