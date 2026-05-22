@@ -635,14 +635,36 @@ export function easyBike(day: string, hours: number, goalId: string): PlannedSes
  * Mid-week quality bike anchor (e.g. group ride Wednesday). Same periodization intent as run `intervalRun`:
  * base → sweet spot 2×15; build → FTP threshold 3×20; race_specific → VO2 6×5. Taper: `bikeOpeners` at call site.
  */
-export function groupRideQualityBikeSession(day: string, phase: Phase, goalId: string): PlannedSession {
+/**
+ * Anchor-driven quality-bike session selector by phase. CYCLING-PROTOCOL §10.4 within-phase
+ * ramps (LOCKED 2026-05-21): rep counts ramp across `weekInPhase` rather than landing flat
+ * at peak from week 1.
+ *
+ * - base → Sweet Spot: `clamp(2, 4, 2 + floor((wip-1)/2))` × 15 min — slower ramp, longer
+ *   plateau at 3 reps (sweet spot is not supposed to spike early per §10.4 + user 2026-05-21).
+ * - build → Threshold: `clamp(2, 4, 2 + floor((wip-1)/2))` × 20 min — same shape as sweet spot.
+ * - race_specific → VO2max: `clamp(3, 6, 3 + (wip-1))` reps × 5 min — faster ramp per §5.6.
+ *
+ * `weekInPhase` MUST be `weekInPhaseForTimeline(phaseBlocks, weekNum, block)` (the
+ * recovery-non-resetting in-phase index). NEVER `weekInBlock` per ADR-0002.
+ */
+export function groupRideQualityBikeSession(
+  day: string,
+  phase: Phase,
+  weekInPhase: number,
+  goalId: string,
+): PlannedSession {
+  const wip = Math.max(1, Math.round(weekInPhase));
   let inner: PlannedSession;
   if (phase === 'race_specific') {
-    inner = vo2Bike(day, 6, goalId);
+    const reps = Math.max(3, Math.min(6, 3 + (wip - 1)));
+    inner = vo2Bike(day, reps, goalId);
   } else if (phase === 'build') {
-    inner = thresholdBike(day, 3, 20, goalId);
+    const intervals = Math.max(2, Math.min(4, 2 + Math.floor((wip - 1) / 2)));
+    inner = thresholdBike(day, intervals, 20, goalId);
   } else {
-    inner = sweetSpotBike(day, 2, 15, goalId);
+    const intervals = Math.max(2, Math.min(4, 2 + Math.floor((wip - 1) / 2)));
+    inner = sweetSpotBike(day, intervals, 15, goalId);
   }
   return { ...inner, session_kind: 'quality_bike' };
 }

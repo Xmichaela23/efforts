@@ -51,7 +51,8 @@ import {
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
   rampThresholds, estimateSessionTSS, weightedTSS, TSS_PER_HOUR,
   expectedBikeDurationHours, brickRunTargetMiles, longRunFloorMiles,
-  longRunMilesForWeek, brickRunMilesForWeek, rampWeeksForPhase, racePacePeakMiles,
+  longRunMilesForWeek, longRideHoursForWeek, brickRunMilesForWeek,
+  rampWeeksForPhase, racePacePeakMiles,
   raceDaySessionSpec,
   PHASE_TSS_RANGES,
   type TriRaceDistance,
@@ -908,13 +909,33 @@ export function buildWeek(
     longRunMinutes = Math.round(longRunMiles * 9.5);
   }
 
-  // Long ride hours
-  let longRideMinutes = isRecovery
-    ? Math.min(75, Math.round(bikeTotalMin * 0.60))
-    : phase === 'taper'
-      ? Math.min(90, Math.round(bikeTotalMin * 0.55))
-      : Math.min(240, Math.round(bikeTotalMin * 0.65));
-  let longRideHours = Math.max(0.75, Math.round(longRideMinutes / 15) * 0.25);
+  // Long ride hours.
+  // CYCLING-PROTOCOL §4.5 within-phase ramp (LOCKED 2026-05-21): for base/build/race_specific
+  // the long-ride hours are the canonical lerp source (`longRideHoursForWeek`), mirror of the
+  // run-side `longRunMilesForWeek` (D-026). Other phases (rebuild/taper/recovery) keep the
+  // legacy TSS-derived value — those windows are short / capped externally, same delegation
+  // pattern as `longRunMilesForWeek`. ADR-0002 footgun: pass `runWeekInPhase` (calendar-week-based,
+  // sport-agnostic — equals the bike weekInPhase for the same plan week), NOT `weekInBlock`.
+  const bikeWeekInPhase = runWeekInPhase;
+  const bikeRampWeeks = runRampWeeks;
+  const longRidePhaseKey = String(phase ?? '').toLowerCase();
+  const hasLongRideLerp =
+    longRidePhaseKey === 'base' ||
+    longRidePhaseKey === 'build' ||
+    longRidePhaseKey === 'race_specific';
+  let longRideMinutes: number;
+  let longRideHours: number;
+  if (hasLongRideLerp && !isRecovery) {
+    longRideHours = longRideHoursForWeek(primaryGoal.distance, phase, bikeWeekInPhase, bikeRampWeeks);
+    longRideMinutes = Math.round(longRideHours * 60);
+  } else {
+    longRideMinutes = isRecovery
+      ? Math.min(75, Math.round(bikeTotalMin * 0.60))
+      : phase === 'taper'
+        ? Math.min(90, Math.round(bikeTotalMin * 0.55))
+        : Math.min(240, Math.round(bikeTotalMin * 0.65));
+    longRideHours = Math.max(0.75, Math.round(longRideMinutes / 15) * 0.25);
+  }
 
   if (raceThisWeek) {
     longRideHours = Math.min(longRideHours, 1.0);
@@ -1411,7 +1432,7 @@ export function buildWeek(
             ),
           );
         } else {
-          bikeQualitySlot!.sessions.push(groupRideQualityBikeSession(bq, phase, servedGoal));
+          bikeQualitySlot!.sessions.push(groupRideQualityBikeSession(bq, phase, bikeWeekInPhase, servedGoal));
         }
       }
     }

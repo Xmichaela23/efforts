@@ -406,6 +406,48 @@ export function longRideFloorHours(distance: TriRaceDistance, phase: Phase): num
   return Math.round(peak * multiplier * 4) / 4;
 }
 
+/**
+ * CYCLING-PROTOCOL §4.5 ramp endpoints (LOCKED 2026-05-21). Long-ride within-phase
+ * ramp: `hours = lerp(START × peak, PEAK × peak, phaseProgress(weekInPhase, rampWeeks))`.
+ * START/PEAK multipliers from CYCLING-PROTOCOL.md §4.5; only base/build/race_specific
+ * have within-phase ramps. Rebuild/Taper/Recovery delegate to `longRideFloorHours`
+ * (peak-of-phase semantics — those phases are short windows / capped externally).
+ * Mirror of the run-side {@link LONG_RUN_RAMP_ENDPOINTS}.
+ */
+const LONG_RIDE_RAMP_ENDPOINTS: Record<'base' | 'build' | 'race_specific', { start: number; peak: number }> = {
+  base:          { start: 0.65, peak: 0.75 },
+  build:         { start: 0.75, peak: 0.85 },
+  race_specific: { start: 0.85, peak: 1.00 },
+};
+
+/**
+ * Long-ride within-phase RAMP (CYCLING-PROTOCOL §4.5). For base/build/race_specific
+ * phases, lerps from `START × peak` to `PEAK × peak` across `rampWeeks`. Peak target
+ * reuses {@link expectedBikeDurationHours} so a 70.3 in race-specific lands at 3.0h.
+ * Other phases delegate to {@link longRideFloorHours} (peak-of-phase semantics).
+ *
+ * `weekInPhase` MUST be `weekInPhaseForTimeline(phaseBlocks, weekNum, block)` — the
+ * recovery-non-resetting in-phase index. NEVER `weekInBlock` (always 1 per ADR 0002).
+ *
+ * Mirror of {@link longRunMilesForWeek}; rounded to 0.25hr precision to match
+ * `longRideFloorHours` and the `longRide()` session-factory token granularity.
+ */
+export function longRideHoursForWeek(
+  distance: TriRaceDistance,
+  phase: Phase,
+  weekInPhase: number,
+  rampWeeks: number,
+): number {
+  const phaseKey = String(phase ?? '').toLowerCase() as 'base' | 'build' | 'race_specific';
+  const endpoints = LONG_RIDE_RAMP_ENDPOINTS[phaseKey];
+  if (!endpoints) return longRideFloorHours(distance, phase);
+  const peak = expectedBikeDurationHours(distance);
+  const start = peak * endpoints.start;
+  const target = peak * endpoints.peak;
+  const t = runPhaseProgress(weekInPhase, rampWeeks);
+  return Math.round(lerp(start, target, t) * 4) / 4;
+}
+
 // For a run-only event, all non-strength budget goes to run.
 export const RUN_SPORT_DIST: Record<string, Record<Sport, number>> = {
   marathon:      { run: 0.82, bike: 0.00, swim: 0.00, strength: 0.10, race: 0 },

@@ -12,6 +12,7 @@ import {
   DAYS_OF_WEEK,
   estimateSessionTSS,
   longRideFloorHours,
+  longRideHoursForWeek,
   longRunFloorMiles,
   longRunMilesForWeek,
   rampWeeksForPhase,
@@ -399,13 +400,25 @@ export function effectiveLongRunFloorMiles(
  * {@link nextPhaseForLongDayFloorCap}) and rounded to the nearest 0.25 hr (matching the spec-floor
  * precision). Taper / recovery short-circuit to 0 (validators skip these phases anyway, but the 0
  * sentinel makes "no floor here" explicit).
+ *
+ * D-NNN (CYCLING-PROTOCOL Phase 1, 2026-05-21): within-phase-aware spec floor.
+ * When BOTH `weekInPhase` AND `rampWeeks` are provided, the spec floor routes
+ * through `longRideHoursForWeek` — the same canonical lerp the week-builder
+ * uses post-Phase 1. Mirror of the run-side D-027 fix. Without this, the hard
+ * enforcer would bump rides back to peak-of-phase even after the week-builder
+ * lerps the canonical hours (same two-layer Math.max trap that motivated D-027).
+ * History-aware `fromRecent` path is unchanged.
  */
 export function effectiveLongRideFloorHours(
   distance: TriRaceDistance,
   phase: Phase,
   recentLongestRideHr: number,
+  weekInPhase?: number,
+  rampWeeks?: number,
 ): number {
-  const spec = longRideFloorHours(distance, phase);
+  const spec = weekInPhase != null && rampWeeks != null
+    ? longRideHoursForWeek(distance, phase, weekInPhase, rampWeeks)
+    : longRideFloorHours(distance, phase);
   if (spec <= 0) return 0; // taper / recovery — skipped by validators anyway
   const peakCap = longRideFloorHours(distance, nextPhaseForLongDayFloorCap(phase));
   const fromRecent = Math.max(0, recentLongestRideHr) * 0.5;
@@ -507,6 +520,8 @@ export function evaluateLongDayVolumeFloors(
         opts.primaryDistance,
         w.phase,
         opts.recentLongestRideHr ?? 0,
+        wipSoft,
+        rwSoft,
       );
       if (lrideFloorH > 0) {
         const lrideMin = maxLongRideMinutes(w);
@@ -727,6 +742,8 @@ export function enforceLongDayFloors(
         opts.primaryDistance,
         w.phase,
         opts.recentLongestRideHr ?? 0,
+        wipHard,
+        rwHard,
       );
       if (lrideFloorH > 0) {
         const lrideSession = findLongRideSessionInWeek(w);
