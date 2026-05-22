@@ -1484,7 +1484,7 @@ function Step3Swim({
       </ChoiceBtn>
       {state.swimExperience === 'learning' && (
         <ArcHint>
-          <strong>No CSS test?</strong> Swim a 200yd time trial at sustainable hard effort in your first week or two, divide the time by 2, add 5 seconds. That&rsquo;s your starting CSS pace. Update your profile once you&rsquo;ve got the number — your plan will recalibrate.
+          <strong>No swim pace baseline?</strong> Swim a 200yd time trial at sustainable hard effort in your first week or two, divide the time by 2, add 5 seconds. That&rsquo;s your starting 100yd pace. Add it to your profile and your plan will recalibrate on the next regenerate.
         </ArcHint>
       )}
       <ChoiceBtn active={state.swimExperience === 'steady'} onClick={() => setState({ ...state, swimExperience: 'steady' })}>

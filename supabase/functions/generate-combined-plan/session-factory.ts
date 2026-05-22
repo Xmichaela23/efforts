@@ -106,9 +106,9 @@ function appendPoolGearLine(
  */
 function swimCssFallbackCue(): string {
   return (
-    `If you don't have a CSS pace yet, swim at a pace where you can hold a ` +
+    `If you don't have a 100yd pace baseline yet, swim at an effort where you can hold a ` +
     `short conversation but feel like you're working. Aim for the same effort ` +
-    `on every repeat — pace consistency is more important than hitting a specific number.`
+    `on every repeat — consistency matters more than hitting a specific number.`
   );
 }
 
@@ -1091,7 +1091,7 @@ export function cssAerobicSwim(
   for (const g of sessionRecommended) tags.push(`recommended:${g}`);
   const name = raceSupport
     ? `Race-Specific Aerobic Swim — ${totalYards} yd`
-    : `CSS Aerobic Swim — ${totalYards} yd`;
+    : `Moderate Aerobic Swim — ${totalYards} yd`;
   // §5.2 tier-adjusted rest (Slice 1, Fix 3) + §5.2.1 within-phase lerp (Slice 2,
   // Fix 4). When both `weekInPhase` AND `rampWeeks` are threaded AND `raceSupport`
   // is false, route through the lerp; otherwise fall back to the tier helper
@@ -1102,7 +1102,7 @@ export function cssAerobicSwim(
     : cssRestSecByTier(options?.athleteFitness);
   const mainSet = raceSupport
     ? `${reps}×100 yd at sustainable race-swim rhythm (15 sec rest). Where the lane allows, merge into longer unbroken 200–400 yd pieces. Sight every 6–8 strokes; practice breathing to both sides for chop or sun glare. Swim these repeats hands-only by default; paddles optional for a few repeats only if shoulders feel good—not the entire main set.`
-    : `${reps}×100 yd at comfortable CSS pace (${cssRestSec} sec rest — sustainable, not maximal). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume CSS blocks.`;
+    : `${reps}×100 yd at moderate effort — sustainable and conversational (${cssRestSec} sec rest). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume aerobic blocks.`;
   const cssRestToken = raceSupport ? 15 : cssRestSec;
   return session(
     day, 'swim',
@@ -1119,7 +1119,7 @@ export function cssAerobicSwim(
     dur, 'MODERATE',
     [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_css_${reps}x100yd_r${cssRestToken}`, `swim_cooldown_${cd}yd`],
     tags,
-    'Z3 CSS aerobic', goalId,
+    'Z3 moderate aerobic', goalId,
   );
 }
 

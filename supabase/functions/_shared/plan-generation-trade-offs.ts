@@ -264,9 +264,12 @@ export const PLAN_GENERATION_MESSAGE_TEMPLATES: Record<string, string> = {
     'Strength landed on different days than the usual default so the week still respects spacing around your bike and run quality sessions. {{placement_note}}',
   anchor_pin_not_kept:
     'A day you pinned in setup could not stay exactly where it was while keeping the schedule valid. {{detail}}',
-  // SWIM-PROTOCOL §7.5 — surfaced when athlete has tri swim sessions but no usable CSS / threshold pace on file.
+  // SWIM-PROTOCOL §7.5 — surfaced when athlete has tri swim sessions but no usable
+  // per-100yd pace on file. Athlete-facing copy avoids the "CSS" engineering term
+  // per §0.5 (LOCKED 2026-05-22); the athlete enters a 100yd pace, the engine
+  // derives the internal threshold-pace value.
   no_swim_threshold_pace:
-    'No swim pace data — your CSS pace targets are conservative defaults. Complete a 200yd time trial in Week 1-2 and update your profile to recalibrate.',
+    'No swim pace data — sessions are running with conservative defaults. Add your 100yd pace to your profile and the plan will refine on the next regenerate.',
 };
 
 export function renderPlanGenerationMessage(

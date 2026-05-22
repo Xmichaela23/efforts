@@ -3,7 +3,10 @@
  * https://www.formswim.com/blogs/all/introducing-script-your-instant-workout-creator
  *
  * Uses Warm-up / Main / Cool-down headings and simple lines parsers expect
- * (e.g. "10 x 100 yd moderate CSS pace", "15 sec rest").
+ * (e.g. "10 x 100 yd moderate", "15 sec rest"). Per SWIM-PROTOCOL §0.5 (LOCKED
+ * 2026-05-22), step labels use the three-tier vocabulary (easy / moderate /
+ * hard) — internal session-type words ("css", "threshold", "aerobic") never
+ * appear in the athlete-facing script.
  */
 
 function num(v: unknown): number | undefined {
@@ -94,9 +97,8 @@ function describeSwimStep(st: any): string {
     // materialize-plan's swimTokenIntensity helper. "Moderate" reads as effort,
     // not session-type — what the athlete actually feels per repeat.
     parts.push(intensity)
-  } else if (/css/.test(l)) parts.push('moderate CSS pace')
-  else if (/threshold/.test(l)) parts.push('threshold')
-  else if (/aerobic/.test(l)) parts.push('moderate aerobic')
+  } else if (/threshold/.test(l)) parts.push('hard')
+  else if (/css/.test(l) || /aerobic/.test(l)) parts.push('moderate')
   else if (/easy|steady|recovery/.test(l)) parts.push('easy')
   else if (/moderate/.test(l)) parts.push('moderate')
   else if (/hard|fast|sprint|zipper/.test(l)) parts.push('hard')

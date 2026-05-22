@@ -25,7 +25,7 @@ import {
 } from '../_shared/plan-generation-trade-offs.ts';
 
 const VALID_PACE = '1:40'; // 100s/100yd → in [40, 600] window
-const FALLBACK_FRAGMENT = "If you don't have a CSS pace yet";
+const FALLBACK_FRAGMENT = "If you don't have a 100yd pace baseline yet";
 
 // ── hasValidSwimThresholdPace helper ────────────────────────────────────────
 
@@ -144,8 +144,9 @@ Deno.test('§7.5 buildCombinedPlanGenerationTradeOffs emits no_swim_threshold_pa
 
 Deno.test('§7.5 no_swim_threshold_pace template renders the spec-prescribed message', () => {
   const msg = renderPlanGenerationMessage('no_swim_threshold_pace', {});
-  assert(/200yd time trial/.test(msg), `expected 200yd TT mention; got: ${msg}`);
+  assert(/100yd pace/.test(msg), `expected 100yd pace mention; got: ${msg}`);
   assert(/conservative defaults/.test(msg), `expected "conservative defaults" framing; got: ${msg}`);
+  assert(!/CSS/i.test(msg), `template must NOT carry "CSS" jargon per §0.5; got: ${msg}`);
 });
 
 Deno.test('§7.5 no_swim_threshold_pace omitted when flag false / undefined', () => {
@@ -163,5 +164,6 @@ Deno.test('§7.5 no_swim_threshold_pace omitted when flag false / undefined', ()
 Deno.test('§7.5 PLAN_GENERATION_MESSAGE_TEMPLATES has no_swim_threshold_pace entry', () => {
   const tpl = PLAN_GENERATION_MESSAGE_TEMPLATES['no_swim_threshold_pace'];
   assert(tpl, 'expected template entry; got undefined');
-  assert(/CSS pace targets/.test(tpl), `template must mention CSS pace targets; got: ${tpl}`);
+  assert(/100yd pace/.test(tpl), `template must point at the 100yd pace baseline; got: ${tpl}`);
+  assert(!/CSS/i.test(tpl), `template body must NOT carry "CSS" jargon per §0.5; got: ${tpl}`);
 });

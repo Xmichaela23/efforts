@@ -104,8 +104,8 @@ Deno.test('§5.4 Race-Specific Aerobic + missing CSS pace → both OW elements A
   });
   assert(s.description.includes(BILATERAL_FRAGMENT), '§5.4 OW elements expected');
   assert(
-    s.description.includes("If you don't have a CSS pace yet"),
-    '§7.5 CSS fallback cue expected',
+    s.description.includes("If you don't have a 100yd pace baseline yet"),
+    '§7.5 100yd-pace fallback cue expected',
   );
 });
 

@@ -208,7 +208,7 @@ export function categorizeSwimTokensForDisplay(tokens: string[]): SwimTokenBucke
       const reps = parseInt(m[1], 10);
       const dist = parseInt(m[2], 10);
       const r = m[4] ? ` @ :${parseInt(m[4], 10)}r` : '';
-      aerobics.push(`CSS ${reps}x${dist}${r}`);
+      aerobics.push(`${reps}x${dist}${r}`);
       continue;
     }
     m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
