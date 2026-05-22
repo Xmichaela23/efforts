@@ -17,7 +17,12 @@ import {
 } from '../_shared/strength-equipment-tier.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from './exercise-config.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
-import { swimDrillDisplayName } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
+import {
+  swimDrillDisplayName,
+  swimDrillEquipmentFromTokens,
+  swimGearLabelForDisplay,
+  swimGearNormalized,
+} from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 
 // Type for plan adjustments
@@ -351,33 +356,84 @@ export function adjustPerformanceWorkingLoadLb(
 }
 
 /**
- * SWIM-PROTOCOL effort-tier mapping by token kind (2026-05-22 swim arc).
+ * SWIM-PROTOCOL §0.5 effort-tier mapping (2026-05-22 swim arc, LOCKED).
  *
- * Maps each swim token kind to its athlete-facing effort tier — easy / moderate / hard.
- * Used by both the Garmin export (`send-workout-to-garmin`) and the Form Goggles
- * narrator (`src/utils/formGogglesSwimScript.ts`) so per-step labels show the
- * intensity tier athletes actually feel, not the internal session-type tag.
+ * Maps each swim token kind — combined with the parent session's tags — to the
+ * athlete-facing effort tier (easy / moderate / hard). Used by both the Garmin
+ * export (`send-workout-to-garmin`) and the Form Goggles narrator
+ * (`src/utils/formGogglesSwimScript.ts`) so per-step labels show the intensity
+ * tier athletes actually feel, not internal session-type tags ("css", "threshold").
  *
- * Mapping (per SWIM-PROTOCOL §5 + §10 zone prescriptions):
- *  - CSS Aerobic (Z3) → moderate
- *  - Threshold (Z4) → hard
- *  - Plain aerobic / easy aerobic (Z1-Z2) → easy
- *  - Pull-focused (CSS-anchored Z3) → moderate
- *  - Kick-focused (Z1-Z2) → easy
- *  - Drills (technique work, not intensity work) → easy
+ * Step-kind rules (always win, independent of session tags):
  *  - Warmup / Cooldown → easy
+ *  - Drill steps → easy (drill IS the work, not the intensity)
+ *
+ * Work-step rules (token + session tags):
+ *  - Threshold token (`swim_threshold_*`) → hard
+ *  - CSS Aerobic token (`swim_aerobic_css_*`) → moderate
+ *  - Plain aerobic / pull / kick token → derived from session tags per the
+ *    §0.5 mapping table:
+ *      - css_aerobic / endurance / pull_focused / kick_focused / technique → moderate
+ *      - threshold / speed / race_specific / time_trial / race_pace → hard
+ *      - recovery / easy → easy
  *
  * Unknown / unrecognized tokens fall back to 'easy' — defensive default (a step
  * labeled 'easy' when the intent was harder is safer than vice versa).
  */
-export function swimTokenIntensity(token: string): 'easy' | 'moderate' | 'hard' {
+export function swimTokenIntensity(
+  token: string,
+  sessionTags?: string[],
+): 'easy' | 'moderate' | 'hard' {
   const s = String(token || '').toLowerCase();
-  if (s.startsWith('swim_aerobic_css_')) return 'moderate';
+  // Step-kind rules — always win
+  if (s.startsWith('swim_warmup_') || s.startsWith('swim_cooldown_')) return 'easy';
+  if (s.startsWith('swim_drills_') || s.startsWith('swim_drill_')) return 'easy';
+
+  // Token-keyed work-step rules (deterministic regardless of session)
   if (s.startsWith('swim_threshold_')) return 'hard';
+  if (s.startsWith('swim_aerobic_css_')) return 'moderate';
+
+  // Session-tag-driven work-step rules — for plain aerobic / pull / kick tokens
+  // whose intensity depends on the surrounding session context.
+  const tags = (sessionTags ?? []).map((t) => String(t).toLowerCase());
+  const hasTag = (t: string) => tags.includes(t);
+  // Hard tier: §5.3 / §5.4 / §5.8 / §5.10 / §7.1
+  if (
+    hasTag('threshold') ||
+    hasTag('speed_swim') ||
+    hasTag('race_specific_swim') ||
+    hasTag('time_trial') ||
+    hasTag('race_pace_sustained')
+  ) {
+    if (s.startsWith('swim_pull_') || s.startsWith('swim_kick_') || s.startsWith('swim_aerobic_')) {
+      return 'hard';
+    }
+  }
+  // Moderate tier: §5.2 / §5.4 (substitution path) / §5.5 / §5.6 / §5.1 main set / endurance
+  if (
+    hasTag('css_aerobic') ||
+    hasTag('endurance_swim') ||
+    hasTag('pull_focused') ||
+    hasTag('kick_focused') ||
+    hasTag('technique_swim')
+  ) {
+    if (s.startsWith('swim_pull_') || s.startsWith('swim_kick_') || s.startsWith('swim_aerobic_')) {
+      return 'moderate';
+    }
+  }
+  // Easy tier: §5.11 / plain Easy Swim
+  if (hasTag('recovery_swim')) {
+    if (s.startsWith('swim_pull_') || s.startsWith('swim_kick_') || s.startsWith('swim_aerobic_')) {
+      return 'easy';
+    }
+  }
+
+  // Token-only fallback (no session context, or unrecognized tags):
+  //  - swim_pull_* → moderate (Z3-anchored per §5.5)
+  //  - swim_kick_* → easy (Z1-Z2 per §5.6 main; session-tag path overrides for Kick-Focused)
+  //  - swim_aerobic_* → easy (Z2 aerobic-recovery shape between hard sets)
   if (s.startsWith('swim_pull_')) return 'moderate';
   if (s.startsWith('swim_kick_')) return 'easy';
-  if (s.startsWith('swim_drills_') || s.startsWith('swim_drill_')) return 'easy';
-  if (s.startsWith('swim_warmup_') || s.startsWith('swim_cooldown_')) return 'easy';
   if (s.startsWith('swim_aerobic_')) return 'easy';
   return 'easy';
 }
@@ -1872,13 +1928,44 @@ function expandTokensForRow(
       // 2026-05-22 swim arc: per-token effort tier (easy/moderate/hard) attached to
       // each swim work + drill step so Garmin export + Form Goggles narrator render
       // the intensity athletes actually feel, not the internal session-type tag.
-      const swimIntensity = swimTokenIntensity(s);
+      // Session-tag-aware so a `swim_kick_*` token inside a Kick-Focused session
+      // (tag `kick_focused`) reads as 'moderate' per §0.5, while the same token
+      // shape elsewhere falls back to 'easy'.
+      const swimSessionTags: string[] = Array.isArray((row as any)?.tags)
+        ? (row as any).tags.map((t: any) => String(t))
+        : [];
+      const swimIntensity = swimTokenIntensity(s, swimSessionTags);
+      // §6.6 (2026-05-22) — athlete's owned swim gear, derived once per row from
+      // baselines for use in drill step labels (Step 4 of the CSS-kill arc).
+      const athleteOwnedSwimGear = swimGearNormalized(
+        Array.isArray((baselines as any)?.equipment?.swimming)
+          ? (baselines as any).equipment.swimming
+          : null,
+      );
+      // §6.6 drill-label equipment hint (2026-05-22, Step 4 of CSS-kill arc).
+      // When the athlete owns the drill's §6.6 recommended gear, append it to the
+      // step label so Garmin + Form Goggles render "Drill — Fingertip Drag (fins)"
+      // instead of just "Drill — Fingertip Drag". Required equipment still flows
+      // via the separate `equipment` field on the step (attachSwimMeta in Garmin
+      // export, formatEquipment in Form Goggles).
+      const drillLabelWithGear = (drillToken: string, baseName: string): string => {
+        const eq = swimDrillEquipmentFromTokens([drillToken]);
+        const ownedRec: string[] = [];
+        for (const r of eq.recommended ?? []) {
+          if (athleteOwnedSwimGear.has(String(r).toLowerCase())) {
+            const lbl = swimGearLabelForDisplay(r);
+            if (lbl) ownedRec.push(lbl.toLowerCase());
+          }
+        }
+        return ownedRec.length ? `Drill — ${baseName} (${ownedRec.join(', ')})` : `Drill — ${baseName}`;
+      };
       // Drill (name first): swim_drill_<name>_4x50yd(_r15)?(_equipment)?
       m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) {
         const name = swimDrillDisplayName(m[1]); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(m[1]);
         const distM = unit==='yd'? ydToM(dist) : dist;
-        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`Drill — ${name}`, equipment: equip||undefined, intensity: swimIntensity }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        const drillLabel = drillLabelWithGear(s, name);
+        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label: drillLabel, equipment: equip||undefined, intensity: swimIntensity }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
         continue;
       }
       // Drill (count first): swim_drills_6x50yd_fingertipdrag (optional _r15, optional equipment)
@@ -1888,8 +1975,9 @@ function expandTokensForRow(
         const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const name = swimDrillDisplayName(m[4]); const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(m[4]);
         console.log(`  ✅ Matched drill (count first): name="${name}", reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${equip}`);
         const distM = unit==='yd'? ydToM(dist) : dist;
+        const drillLabel = drillLabelWithGear(s, name);
         for(let i=0;i<reps;i++) {
-          steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`Drill — ${name}`, equipment: equip||undefined, intensity: swimIntensity });
+          steps.push({ id: uid(), kind:'drill', distance_m: distM, label: drillLabel, equipment: equip||undefined, intensity: swimIntensity });
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
@@ -1899,6 +1987,8 @@ function expandTokensForRow(
         continue;
       }
       // CSS-paced aerobic main set: swim_aerobic_css_15x100yd_r15 (label segment breaks naive aerobic regex)
+      // §0.5 (2026-05-22): step label is the athlete-facing tier word — same as `intensity`.
+      // Internal kind ('css_aerobic' in session tags) NEVER reaches the athlete export surface.
       m = s.match(/^swim_aerobic_css_(\d+)x(\d+)(yd|m)(?:_r(\d+))?$/);
       if (m) {
         const reps = parseInt(m[1], 10);
@@ -1906,9 +1996,9 @@ function expandTokensForRow(
         const unit = m[3];
         const rest = parseInt(m[4] || '0', 10);
         const distM = unit === 'yd' ? ydToM(dist) : dist;
-        console.log(`  ✅ Matched CSS aerobic: reps=${reps}, dist=${dist}${unit}, rest=${rest}s`);
+        console.log(`  ✅ Matched aerobic-moderate: reps=${reps}, dist=${dist}${unit}, rest=${rest}s`);
         for (let i = 0; i < reps; i++) {
-          steps.push({ id: uid(), kind: 'work', distance_m: distM, label: 'css', intensity: swimIntensity });
+          steps.push({ id: uid(), kind: 'work', distance_m: distM, label: swimIntensity, intensity: swimIntensity });
           if (rest && i < reps - 1) {
             steps.push({ id: uid(), kind: 'recovery', duration_s: rest });
             console.log(`    🔄 Added recovery step: ${rest}s`);
@@ -1919,10 +2009,10 @@ function expandTokensForRow(
       // Aerobic sets: swim_aerobic_6x150yd[_easy](_r20)?
       m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_([a-z]+?))?(?:_r(\d+))?$/);
       if (m) {
-        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const label=m[4]||'aerobic'; const rest=parseInt(m[5]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
-        console.log(`  ✅ Matched aerobic: reps=${reps}, dist=${dist}${unit}, label="${label}", rest=${rest}s`);
+        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const rest=parseInt(m[5]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
+        console.log(`  ✅ Matched aerobic: reps=${reps}, dist=${dist}${unit}, intensity="${swimIntensity}", rest=${rest}s`);
         for(let i=0;i<reps;i++){
-          steps.push({ id: uid(), kind:'work', distance_m: distM, label, intensity: swimIntensity });
+          steps.push({ id: uid(), kind:'work', distance_m: distM, label: swimIntensity, intensity: swimIntensity });
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
@@ -1935,9 +2025,9 @@ function expandTokensForRow(
       m = s.match(/swim_threshold_(\d+)x(\d+)(yd|m)(?:_r(\d+))?$/);
       if (m) {
         const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const rest=parseInt(m[4]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
-        console.log(`  ✅ Matched threshold: reps=${reps}, dist=${dist}${unit}, rest=${rest}s`);
+        console.log(`  ✅ Matched threshold-hard: reps=${reps}, dist=${dist}${unit}, rest=${rest}s`);
         for(let i=0;i<reps;i++){
-          steps.push({ id: uid(), kind:'work', distance_m: distM, label:'threshold', intensity: swimIntensity });
+          steps.push({ id: uid(), kind:'work', distance_m: distM, label: swimIntensity, intensity: swimIntensity });
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
@@ -1956,9 +2046,9 @@ function expandTokensForRow(
         const rest=parseInt(m[5]||'0',10);
         const eq=m[6]|| (kind==='pull'?'buoy': (kind==='kick'?'board':null));
         const distM=unit==='yd'? ydToM(dist):dist;
-        console.log(`  ✅ Matched ${kind}: reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${eq}`);
+        console.log(`  ✅ Matched ${kind}: reps=${reps}, dist=${dist}${unit}, intensity="${swimIntensity}", rest=${rest}s, equip=${eq}`);
         for(let i=0;i<reps;i++){
-          steps.push({ id: uid(), kind:'work', distance_m: distM, label:kind, equipment:eq||undefined, intensity: swimIntensity });
+          steps.push({ id: uid(), kind:'work', distance_m: distM, label: swimIntensity, equipment:eq||undefined, intensity: swimIntensity });
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
