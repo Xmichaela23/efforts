@@ -60,7 +60,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: CombinedPlanRequest = await req.json();
-    const { user_id, goals, athlete_state, athlete_memory, start_date, generation_trade_offs } = body;
+    const { user_id, goals, athlete_state, athlete_memory, start_date, generation_trade_offs, arc } = body;
     const preview = body.preview === true;
     const persistedTradeOffs = Array.isArray(generation_trade_offs) ? generation_trade_offs : [];
 
@@ -209,6 +209,10 @@ Deno.serve(async (req: Request) => {
           totalWeeks,
           raceAnchors,
           phaseBlocks: blocksArg,
+          // D-032 (Phase 0, 2026-05-22) — Arc channel. Engine is behavior-neutral
+          // with respect to this field; Phase 1-4 consumers destructure as they
+          // need fields. Undefined when caller omits `arc` from the request body.
+          arc,
           ...(rebuild === 'deep'
             ? { physiologicalFloorRebuild: true, physiologicalFloorRebuildDeep: true }
             : rebuild === 'normal'

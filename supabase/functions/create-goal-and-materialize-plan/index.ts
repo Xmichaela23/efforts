@@ -1565,6 +1565,17 @@ async function buildCombinedPlan(
     goals: goalsForCombined,
     start_date: combinedPlanStartDate,
     generation_trade_offs,
+    // D-032 / Phase 0 (2026-05-22) — Arc channel. The wrapper already fetched
+    // `arcForCombined` at line 1201; here we channel the curated 4-field dynamic
+    // subset into the engine for Phase 1-4 consumers. Phase 0 is behavior-neutral;
+    // no engine code path reads these fields today. See
+    // `docs/PHASE-0-ARC-CHANNEL-SPEC.md`.
+    arc: {
+      latest_snapshot: arcForCombined.latest_snapshot,
+      cycling_fitness: arcForCombined.cycling_fitness,
+      swim_training_from_workouts: arcForCombined.swim_training_from_workouts,
+      longitudinal_signals: arcForCombined.longitudinal_signals,
+    },
     athlete_state: {
       current_ctl: currentCTL,
       weekly_hours_available: weeklyHours,

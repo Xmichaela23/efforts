@@ -26,6 +26,7 @@ import type {
   PlannedSession, GeneratedWeek, Phase, PhaseBlock, GoalInput,
   AthleteState, AthleteMemory, RaceAnchor,
   ConflictEvent, ConflictType, WeekStateReason,
+  ArcChannelPayload,
 } from './types.ts';
 import type { Sport, Intensity } from './types.ts';
 import { brickCapForPhaseWeek } from '../../../src/lib/session-frequency-defaults.ts';
@@ -625,6 +626,17 @@ export function buildWeek(
     physiologicalFloorRebuild?: boolean;
     /** Final compressor — tighter LR share + weekly budget after repeated rebuild failures. */
     physiologicalFloorRebuildDeep?: boolean;
+    /**
+     * D-032 / Phase 0 (2026-05-22) — Arc channel. Curated subset of dynamic Arc
+     * data for Phase 1-4 consumers. Phase 0 is BEHAVIOR-NEUTRAL: no code path
+     * in `buildWeek` or its callees reads `options.arc`. The field is threaded
+     * through so subsequent phases (run pace, strength, cycling, swim feedback)
+     * can destructure fields they need at their consumer call sites. See
+     * `docs/PHASE-0-ARC-CHANNEL-SPEC.md`. Engine read pattern:
+     *   const observedPace = options.arc?.latest_snapshot?.run_threshold_pace_sec_per_km;
+     * Falls back to baseline (athlete_state.learned_fitness) when undefined.
+     */
+    arc?: ArcChannelPayload;
   },
 ): GeneratedWeek {
   console.log('[buildWeek] ===== FUNCTION ENTRY ===== week', weekNum);

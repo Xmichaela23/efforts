@@ -5,6 +5,8 @@ import type { PlanGenerationTradeOff } from '../_shared/plan-generation-trade-of
 import type { GroupRideRouteSnapshot } from '../_shared/group-ride-route-snapshot.ts';
 import type { SwimCutoffPressureV1 } from '../_shared/swim-cutoff-pressure.ts';
 import type { SessionFrequencyDefaults } from '../../../src/lib/session-frequency-defaults.ts';
+import type { AthleteSnapshot, SwimTrainingFromWorkouts } from '../_shared/arc-context.ts';
+import type { LongitudinalSignals } from '../_shared/longitudinal-signals.ts';
 
 export type Sport = 'run' | 'bike' | 'swim' | 'strength' | 'race';
 export type Intensity = 'HARD' | 'MODERATE' | 'EASY';
@@ -307,6 +309,62 @@ export interface AthleteMemory {
   historical_peak_ctl?: number;
 }
 
+/**
+ * Phase 0 / D-032 (2026-05-22) — curated subset of `ArcContext` channeled into the
+ * engine so Phases 1-4 can consume dynamic Arc data per discipline. Phase 0 is
+ * **behavior-neutral**: the engine never reads these fields. Subsequent phases
+ * add consumers as the relevant loops close.
+ *
+ * **Conservative-curated:** only the fields a Phase 1-4 consumer explicitly needs.
+ * Forward-looking fields (`recent_completed_events`, `arc_narrative_context`,
+ * `five_k_nudge`) are intentionally excluded — they get added in the commit that
+ * introduces their first consumer, keeping every payload field traceable to a
+ * reason.
+ *
+ * **No re-fetch inside the engine.** The wrapper (`create-goal-and-materialize-plan`)
+ * already calls `getArcContext()`; it populates this field at the
+ * `invokeFunction('generate-combined-plan', { arc, ... })` site. The engine never
+ * fetches Arc directly — preserves the pure-function-of-inputs contract that the
+ * preview-mode + test-fixture paths rely on.
+ *
+ * **Engine read pattern (per the spec):** consumers use the optional-chain pattern
+ * `arc?.latest_snapshot?.run_threshold_pace_sec_per_km` and fall back to baselines
+ * when undefined. Never `arc.field.subfield` without the `?.` chain.
+ *
+ * See `docs/PHASE-0-ARC-CHANNEL-SPEC.md` for the full architecture decision +
+ * `docs/FEEDBACK-LOOP-WORKORDER.md` for cross-phase context.
+ */
+export interface ArcChannelPayload {
+  /**
+   * Phase 1 (run pace), Phase 3 (cycling fitness), Phase 4 (swim) all read the
+   * weekly aggregate snapshot. Run reads `run_*` fields (easy pace, efficiency,
+   * adherence); cycling reads CTL/ATL/TSB; swim will read aggregated yardage +
+   * pace per Phase 4 build. Null when no snapshot exists for this user.
+   */
+  latest_snapshot: AthleteSnapshot | null;
+
+  /**
+   * Phase 3 — cycling form band derived from snapshot CTL/ATL/TSB. Per the
+   * work-order Phase 3 commitment, plan-target adjustments (if closure is
+   * chosen) consume ONLY the smoothed `form` band — raw `ctl` / `atl` / `tsb`
+   * are channeled for display use but MUST NOT touch plan targets directly.
+   */
+  cycling_fitness: { ctl: number; atl: number; tsb: number; form: 'fresh' | 'neutral' | 'fatigued' } | null;
+
+  /**
+   * Phase 4 — swim session counts from completed workouts. Full swim aggregation
+   * (pace, SWOLF, adherence) pending Phase 4's `compute-snapshot` build-out;
+   * this field exposes what Arc has today (session counts + last date).
+   */
+  swim_training_from_workouts: SwimTrainingFromWorkouts | null;
+
+  /**
+   * Cross-cutting — multi-week pattern detectors. Available to any phase whose
+   * spec calls for longitudinal signal consumption. Null when computation failed.
+   */
+  longitudinal_signals: LongitudinalSignals | null;
+}
+
 export interface CombinedPlanRequest {
   user_id: string;
   goals: GoalInput[];
@@ -323,6 +381,13 @@ export interface CombinedPlanRequest {
    * Response includes `plan_contract_v1`, `sessions_by_week`, and `preview_mode: true`.
    */
   preview?: boolean;
+  /**
+   * D-032 / Phase 0 — curated subset of `ArcContext` for Phase 1-4 consumers.
+   * Optional. Engine is behavior-neutral with respect to this field in Phase 0;
+   * subsequent phases add consumers. Legacy callers that omit `arc` get
+   * baseline-only behavior (the existing semantics). See {@link ArcChannelPayload}.
+   */
+  arc?: ArcChannelPayload;
 }
 
 // ── Internal phase timeline ──────────────────────────────────────────────────
