@@ -104,7 +104,7 @@ For each numbered item:
 - [ ] Add missing session types: Swim Time Trial, Open Water Skills, Mixed/Fartlek, Race-Pace Sustained
 - [ ] **Q-020 ankle band enum addition** — pull buoy + ankle band as beginner body-position tool. §6.4 prose references the coaching value; engine surface blocked on wizard scope decision (separate chip vs grouped with Pull buoy). Filed in `docs/OPEN-QUESTIONS.md`.
 - [ ] Standardize all swim intensity references to CSS percentages
-- [ ] **CSS terminology strip (PARKED 2026-05-22)** — replace "CSS" in athlete-facing copy with plain effort words (easy/moderate/hard). Separate decision from D-029; revisit when prioritized.
+- [x] **CSS terminology strip + per-step drill equipment in exports** *(D-030, 2026-05-22 — spec `3833024f`, Step 2 `22642fa4`, Steps 3+4 `9d178ca9`)* — athlete-facing copy uses easy/moderate/hard tier vocabulary; internal session-type words stripped from session names + descriptions + trade-off + wizard + Garmin step labels + Form Goggles narrator + zone strings. SWIM-PROTOCOL §0.5 defines the canonical mapping table + anti-regression rule. Drill steps surface owned recommended gear via parenthetical hint (e.g. "Drill — Fingertip Drag (fins)"). 36 new pin tests across 3 new files; full sweep 899/0.
 
 ---
 
