@@ -1354,6 +1354,13 @@ export function buildWeek(
       yards >= 4500 &&
       swimDistance === 'full' &&
       swimFitness === 'advanced',
+    // §5.2.1 within-phase rest lerp (Slice 2, Fix 4). `swimWeekInPhase` is the
+    // recovery-non-resetting in-phase index per ADR-0002. CSS Aerobic routes
+    // its 100yd rest through `cssRestSecByPhaseWeek` when these are threaded.
+    // Race-Spec Aerobic substitution short-circuits to the inline 15s string
+    // (Slice 1 scope decision).
+    weekInPhase: swimWeekInPhase,
+    rampWeeks: rampWeeksForPhase(phase),
   });
   // ── Bike quality + easy (defaults Tue / Wed; from Arc `preferred_days.quality_bike` / `easy_bike`) ──
   const bikeQualIdxBase =

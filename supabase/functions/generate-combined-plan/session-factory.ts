@@ -864,21 +864,75 @@ export function thresholdSwim(
 /**
  * SWIM-PROTOCOL §5.2 tier-adjusted rest interval for CSS Aerobic 100yd repeats.
  * Slice 1 (Fix 3, 2026-05-22) — emits the START of phase (week 1) rest per tier.
- * Slice 2 (Fix 4) will layer the within-phase lerp on top via §5.2.1.
+ * Slice 2 (Fix 4) layers the within-phase lerp on top via §5.2.1.
  *
  * - Beginner: 25s (per §5.2.1 START, lerps to 20s across base ramp)
  * - Intermediate: 15s (per §5.2.1 START, lerps to 12s across base ramp)
  * - Advanced: 15s (same as intermediate at START; §5.2.1 lerp tightens to 12s/10s)
  *
- * Race-Specific Aerobic substitution (`raceSupport=true`) bypasses this helper —
- * its rest is set in-place in the raceSupport main-set string and is unchanged
- * by Slice 1 per the scope decision (Slice 2 §5.2.1 will route race-spec phase
- * progression through the same lerp).
+ * Used as the within-phase fallback when `weekInPhase`/`rampWeeks` aren't threaded
+ * (legacy callers; rebuild/taper/recovery phases that don't get the lerp).
+ *
+ * Race-Specific Aerobic substitution (`raceSupport=true`) bypasses BOTH this
+ * helper and the §5.2.1 lerp — its rest is set in-place in the raceSupport
+ * main-set string and stays at 15s (the Slice 1 scope decision; revisit if
+ * the spec extends §5.2.1 to race-spec substitution copy).
  */
 export function cssRestSecByTier(
   athleteFitness: 'beginner' | 'intermediate' | 'advanced' | undefined,
 ): number {
   return athleteFitness === 'beginner' ? 25 : 15;
+}
+
+/**
+ * SWIM-PROTOCOL §5.2.1 within-phase rest-interval lerp (LOCKED 2026-05-22).
+ * Slice 2 (Fix 4) — rest tightens across the phase ramp as the athlete adapts
+ * (220 Triathlon CSS progression). Same `phaseProgress` mechanism as the run-
+ * arc §4.5 volume ramp (D-026 / D-027); same ADR-0002 footgun applies —
+ * `weekInPhase` MUST be `weekInPhaseForTimeline(phaseBlocks, weekNum, block)`,
+ * NEVER `weekInBlock` (always 1).
+ *
+ * Endpoints per spec §5.2.1 (rest seconds, START → PEAK across the ramp window):
+ *
+ *   |              | base (6wk) | build (4wk) | race_specific (4wk) |
+ *   | beginner     |  25 → 20   |  20 (flat)  |  n/a (D-025 sub)    |
+ *   | intermediate |  15 → 12   |  12 → 10    |  10 (flat)          |
+ *   | advanced     |  15 → 12   |  12 → 10    |  10 (flat)          |
+ *
+ * Non-ramp phases (rebuild / taper / recovery) fall back to {@link cssRestSecByTier} —
+ * cssAerobicSwim isn't typically called for these phases in normal flow, but the
+ * fallback keeps the helper total-coverage for safety.
+ *
+ * Validator-floor implication: swim rest is a within-session prescription, NOT a
+ * weekly-volume floor. No D-027-style two-layer Math.max trap applies; single-
+ * layer fix at the session-factory site only.
+ */
+export function cssRestSecByPhaseWeek(
+  tier: 'beginner' | 'intermediate' | 'advanced' | undefined,
+  phase: string | undefined,
+  weekInPhase: number,
+  rampWeeks: number,
+): number {
+  const phaseKey = String(phase ?? '').trim().toLowerCase().replace(/-/g, '_');
+  const endpoints = ((): { start: number; peak: number } | null => {
+    if (tier === 'beginner') {
+      if (phaseKey === 'base') return { start: 25, peak: 20 };
+      if (phaseKey === 'build') return { start: 20, peak: 20 };
+      return null; // race_specific n/a per D-025; rebuild/taper/recovery → tier fallback
+    }
+    // intermediate / advanced / undefined (defaults to intermediate)
+    if (phaseKey === 'base') return { start: 15, peak: 12 };
+    if (phaseKey === 'build') return { start: 12, peak: 10 };
+    if (phaseKey === 'race_specific' || phaseKey === 'racespecific') return { start: 10, peak: 10 };
+    return null;
+  })();
+  if (!endpoints) return cssRestSecByTier(tier);
+  // Local phaseProgress + lerp — same shape as `science.ts:runPhaseProgress` / `lerp`,
+  // inlined here to avoid a cross-module import for two trivial helpers.
+  const w = Math.max(1, Math.round(weekInPhase));
+  const rw = Math.max(1, Math.round(rampWeeks));
+  const t = rw <= 1 ? 1 : Math.min(1, Math.max(0, (w - 1) / (rw - 1)));
+  return Math.round(endpoints.start + (endpoints.peak - endpoints.start) * t);
 }
 
 /** Caps ×100 main-set reps when yards/main budget are large (slow-swimmer bumps, ceilings). */
@@ -907,6 +961,16 @@ export function cssAerobicSwim(
     athleteFitness?: 'beginner' | 'intermediate' | 'advanced';
     /** §7.5 — when missing/invalid, session appends the RPE fallback cue. */
     swimThresholdPace?: string | null;
+    /**
+     * §5.2.1 within-phase rest-interval lerp (Slice 2, Fix 4). When BOTH
+     * `weekInPhase` AND `rampWeeks` are provided AND `raceSupport=false`,
+     * rest routes through `cssRestSecByPhaseWeek` (tightens across the
+     * phase ramp). When either is omitted, falls back to `cssRestSecByTier`
+     * (START of phase per Slice 1). `weekInPhase` MUST be
+     * `weekInPhaseForTimeline(phaseBlocks, weekNum, block)` per ADR-0002.
+     */
+    weekInPhase?: number;
+    rampWeeks?: number;
   },
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
@@ -962,10 +1026,14 @@ export function cssAerobicSwim(
   const name = raceSupport
     ? `Race-Specific Aerobic Swim — ${totalYards} yd`
     : `CSS Aerobic Swim — ${totalYards} yd`;
-  // §5.2 tier-adjusted rest (Slice 1, Fix 3, 2026-05-22). Race-spec branch stays at
-  // 15s per Slice 1 scope; Slice 2's within-phase lerp will route race-spec phase
-  // progression through §5.2.1 separately.
-  const cssRestSec = cssRestSecByTier(options?.athleteFitness);
+  // §5.2 tier-adjusted rest (Slice 1, Fix 3) + §5.2.1 within-phase lerp (Slice 2,
+  // Fix 4). When both `weekInPhase` AND `rampWeeks` are threaded AND `raceSupport`
+  // is false, route through the lerp; otherwise fall back to the tier helper
+  // (START of phase). raceSupport branch keeps the inline 15s string unchanged
+  // per the Slice 1 scope decision.
+  const cssRestSec = (options?.weekInPhase != null && options?.rampWeeks != null && !raceSupport)
+    ? cssRestSecByPhaseWeek(options.athleteFitness, phase, options.weekInPhase, options.rampWeeks)
+    : cssRestSecByTier(options?.athleteFitness);
   const mainSet = raceSupport
     ? `${reps}×100 yd at sustainable race-swim rhythm (15 sec rest). Where the lane allows, merge into longer unbroken 200–400 yd pieces. Sight every 6–8 strokes; practice breathing to both sides for chop or sun glare. Swim these repeats hands-only by default; paddles optional for a few repeats only if shoulders feel good—not the entire main set.`
     : `${reps}×100 yd at comfortable CSS pace (${cssRestSec} sec rest — sustainable, not maximal). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume CSS blocks.`;
@@ -1408,6 +1476,12 @@ export function swimSessionFromTemplate(
      *  threshold→activation substitution to the actual race week (a multi-week
      *  A-taper's earlier week(s) must keep Race-Spec Light, not de-load early). */
     isRaceWeek?: boolean;
+    /** §5.2.1 within-phase rest-interval lerp (Slice 2). MUST be
+     *  `weekInPhaseForTimeline(phaseBlocks, weekNum, block)` per ADR-0002. */
+    weekInPhase?: number;
+    /** §5.2.1 within-phase rest-interval lerp (Slice 2). Companion to `weekInPhase`;
+     *  typically `rampWeeksForPhase(phase)` from science.ts. */
+    rampWeeks?: number;
   },
 ): PlannedSession {
   const dk: SwimDistanceKey = opts?.swimRaceDistanceKey ?? '70.3';
@@ -1463,6 +1537,8 @@ export function swimSessionFromTemplate(
           swimEquipment,
           athleteFitness: opts?.athleteFitness,
           swimThresholdPace: opts?.swimThresholdPace,
+          weekInPhase: opts?.weekInPhase,
+          rampWeeks: opts?.rampWeeks,
         });
       case 'technique_aerobic':
         return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, true, swimEquipment, opts?.athleteFitness);
