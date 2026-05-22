@@ -807,6 +807,13 @@ export type SwimSessionGearLineOpts = {
   /** Athlete's swim equipment chips from baselines.equipment.swimming (raw labels). Optional gear
    *  is filtered to what the athlete actually owns — no point naming a snorkel they don't have. */
   athleteGearLabels?: string[] | null;
+  /**
+   * SWIM-PROTOCOL §8.4 — session-type-specific OPTIONAL gear (e.g. `['snorkel']` on CSS Aerobic
+   * when athlete owns snorkel; `['buoy', 'paddles']` on intermediate CSS Aerobic). Pre-filtered
+   * to athlete inventory by the caller (session-factory's `swimSessionOptionalGear` helper).
+   * Mirror channel of `sessionRequired` — caller controls the per-session-type / per-tier rules.
+   */
+  sessionOptional?: string[];
 };
 
 /**
@@ -842,6 +849,17 @@ export function buildSwimGearLine(opts: SwimSessionGearLineOpts): string | null 
     const lbl = swimGearLabelForDisplay(o);
     if (!lbl) continue;
     if (required.has(lbl)) continue; // de-dupe against required
+    optional.add(lbl);
+  }
+
+  // SWIM-PROTOCOL §8.4 — session-type-specific optionals (e.g. snorkel on Technique
+  // Aerobic / CSS Aerobic / Pull-Focused; buoy on intermediate+ CSS Aerobic; paddles
+  // on intermediate+ Threshold). Caller pre-filters to athlete inventory and applies
+  // per-tier rules; we just merge + dedupe against required.
+  for (const o of opts.sessionOptional ?? []) {
+    const lbl = swimGearLabelForDisplay(o);
+    if (!lbl) continue;
+    if (required.has(lbl)) continue;
     optional.add(lbl);
   }
 

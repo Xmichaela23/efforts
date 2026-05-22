@@ -1346,7 +1346,16 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
   return out;
 }
 
-/** Session gear hints from planner tags only (`req:*`, `optional:*`). Never mirrors athlete baseline inventory — that caused bogus full gear lists on CSS/threshold/easy swims. */
+/**
+ * Session gear hints from planner tags only (`req:*`, `optional:*`). Never mirrors athlete
+ * baseline inventory — that caused bogus full gear lists on CSS/threshold/easy swims.
+ *
+ * **Upstream emission contract (SWIM-PROTOCOL §8.4):** the inventory + per-tier filtering
+ * happens at session-factory tag-emission time (`swimSessionOptionalGear` helper). When
+ * an `optional:<gear>` tag appears on a row, the session-factory has already verified
+ * the athlete owns that gear AND that §8.4 prescribes it for that session-type × tier.
+ * So this function safely surfaces the tag as-is without re-checking inventory.
+ */
 function inferSwimEquipmentPack(row: any): {
   suggestedRequired: string[];
   suggestedOptional: string[];
@@ -1377,6 +1386,12 @@ function inferSwimEquipmentPack(row: any): {
       }
       if (t === 'optional:fins') {
         addO('fins');
+        continue;
+      }
+      if (t === 'optional:buoy') {
+        // §8.4 — CSS Aerobic / Technique Aerobic non-beginner buoy hint. Upstream
+        // session-factory emits this only when athlete owns a pull buoy AND tier !== beginner.
+        addO('buoy');
         continue;
       }
       if (/req:board|req:kickboard/.test(t)) addR('board');

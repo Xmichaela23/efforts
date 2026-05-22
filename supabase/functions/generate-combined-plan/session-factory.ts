@@ -23,6 +23,7 @@ import {
   pickSwimDrillInset,
   resolveSwimSessionTypeForGear,
   swimDrillBlockAthleteCopy,
+  swimGearNormalized,
   swimSessionPhilosophyLead,
 } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 import {
@@ -53,13 +54,87 @@ function appendPoolGearLine(
   drillTokens: string[],
   swimEquipment: string[] | null | undefined,
   sessionRequired?: string[],
+  sessionOptional?: string[],
 ): string {
   const line = buildSwimGearLine({
     drillTokens,
     athleteGearLabels: swimEquipment,
     sessionRequired: sessionRequired ?? [],
+    sessionOptional: sessionOptional ?? [],
   });
   return line ? `${description} ${line}` : description;
+}
+
+/**
+ * SWIM-PROTOCOL §8.4 — session-type-specific optional gear, filtered to athlete inventory.
+ *
+ * **Upstream emission contract:** this helper applies the §8.4 per-session-type / per-tier
+ * rules and pre-filters against athlete inventory BEFORE returning gear keys for tag
+ * emission and description-line surfacing. The downstream `materialize-plan: inferSwimEquipmentPack`
+ * just reads the resulting `optional:*` tags — it deliberately never inspects athlete inventory
+ * directly (see `:1349` docstring there). Putting the inventory + tier filtering here keeps the
+ * tags themselves the source-of-truth for both surfaces (description text and chip).
+ *
+ * Returns canonical gear keys (`'snorkel'`, `'buoy'`, `'paddles'`) ready to be:
+ *   - Emitted as `optional:<key>` tags on the session.
+ *   - Passed as `sessionOptional` to `appendPoolGearLine` for the description text.
+ *
+ * Per-§8.4 rules:
+ *   - Snorkel: technique_aerobic / css_aerobic / pull_focused — ALL tiers (when owned).
+ *   - Pull buoy: css_aerobic / technique_aerobic — non-beginner ONLY (when owned).
+ *     (pull_focused already emits `req:buoy` — required, not optional.)
+ *   - Paddles: css_aerobic / threshold — non-beginner ONLY (when owned).
+ *     (pull_focused already emits `optional:paddles` directly; this helper skips it to avoid dupe.)
+ *   - Recovery: no equipment hint regardless of inventory (§8.4 explicit carve-out).
+ */
+function swimSessionOptionalGear(
+  sessionType:
+    | 'css_aerobic'
+    | 'technique_aerobic'
+    | 'pull_focused'
+    | 'threshold'
+    | 'recovery'
+    | 'easy'
+    | 'speed'
+    | 'endurance'
+    | 'kick_focused'
+    | 'race_specific_aerobic'
+    | string,
+  athleteFitness: 'beginner' | 'intermediate' | 'advanced' | undefined,
+  swimEquipment: string[] | null | undefined,
+): string[] {
+  if (!swimEquipment) return [];
+  const owned = swimGearNormalized(swimEquipment);
+  const isBeginner = athleteFitness === 'beginner';
+  const out: string[] = [];
+  // §8.4 snorkel — all tiers on technique_aerobic / css_aerobic / pull_focused.
+  if (
+    (sessionType === 'css_aerobic' ||
+      sessionType === 'technique_aerobic' ||
+      sessionType === 'pull_focused') &&
+    owned.has('snorkel')
+  ) {
+    out.push('snorkel');
+  }
+  // §8.4 pull buoy — non-beginner on css_aerobic / technique_aerobic.
+  // (pull_focused already emits req:buoy independently — required, not optional.)
+  if (
+    !isBeginner &&
+    (sessionType === 'css_aerobic' || sessionType === 'technique_aerobic') &&
+    owned.has('pull buoy')
+  ) {
+    out.push('buoy');
+  }
+  // §8.4 paddles — non-beginner on css_aerobic / threshold.
+  // (pull_focused already emits optional:paddles directly — skip here to avoid dupe.)
+  if (
+    !isBeginner &&
+    (sessionType === 'css_aerobic' || sessionType === 'threshold') &&
+    owned.has('paddles')
+  ) {
+    out.push('paddles');
+  }
+  return out;
 }
 
 function shiftWeekday(day: string, delta: number): string {
@@ -702,8 +777,11 @@ export function thresholdSwim(
     drillTokens.length > 0
       ? `${swimSessionPhilosophyLead('threshold')}${swimDrillBlockAthleteCopy(drillTokens)} `
       : '';
+  // §8.4 — Threshold session-level optional gear (paddles for non-beginner when owned).
+  const sessionOptional = swimSessionOptionalGear('threshold', athleteFitness, swimEquipment);
   const tags: string[] = ['quality', 'threshold', 'swim'];
   if (drillTokens.length) tags.push('swim_drills');
+  for (const g of sessionOptional) tags.push(`optional:${g}`);
   return session(
     day, 'swim',
     `Swim Threshold — ${totalYards} yd`,
@@ -711,6 +789,8 @@ export function thresholdSwim(
       `Warm up ${wu} yd easy. ${drillLead}${threshReps}×100 yd at threshold (Zone 4 — maximal sustainable effort) with 15 sec rest. ${aeroReps}×150 yd aerobic. Cool down ${cd} yd.`,
       drillTokens,
       swimEquipment,
+      undefined,
+      sessionOptional,
     ),
     dur, 'HARD',
     [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_threshold_${threshReps}x100yd_r15`, `swim_aerobic_${aeroReps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],
@@ -772,9 +852,18 @@ export function cssAerobicSwim(
     drillTokens.length > 0
       ? `${swimSessionPhilosophyLead('css_aerobic')}${swimDrillBlockAthleteCopy(drillTokens)} `
       : '';
+  // §8.4 — CSS Aerobic session-level optional gear: snorkel (all tiers when owned);
+  // buoy + paddles (non-beginner only when owned). Race-spec aerobic substitution
+  // routes through this same function; per §8.4 spec, race-spec is NOT in the optional
+  // gear table, so when raceSupport=true we suppress the session-level optionals
+  // (the description text already lists "paddles optional for a few repeats" inline).
+  const sessionOptional = raceSupport
+    ? []
+    : swimSessionOptionalGear('css_aerobic', options?.athleteFitness, options?.swimEquipment);
   const tags: string[] = ['quality', 'css_aerobic', 'swim'];
   if (drillTokens.length) tags.push('swim_drills');
   if (raceSupport) tags.push('race_specific_swim');
+  for (const g of sessionOptional) tags.push(`optional:${g}`);
   const name = raceSupport
     ? `Race-Specific Aerobic Swim — ${totalYards} yd`
     : `CSS Aerobic Swim — ${totalYards} yd`;
@@ -788,6 +877,8 @@ export function cssAerobicSwim(
       `Warm up ${wu} yd. ${drillLead}${mainSet} Cool down ${cd} yd.`,
       drillTokens,
       options?.swimEquipment,
+      undefined,
+      sessionOptional,
     ),
     dur, 'MODERATE',
     [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_css_${reps}x100yd_r15`, `swim_cooldown_${cd}yd`],
@@ -906,9 +997,16 @@ export function easySwim(
     drillTokens.length > 0
       ? `${swimSessionPhilosophyLead('easy')}${swimDrillBlockAthleteCopy(drillTokens)} `
       : '';
+  // §8.4 — Technique Aerobic session-level optional gear (snorkel all tiers, buoy
+  // non-beginner). Only emit when techniqueDrillEmphasis=true (the Technique Aerobic
+  // session); plain easy_swim doesn't carry §8.4 optionals.
+  const sessionOptional = techniqueDrillEmphasis
+    ? swimSessionOptionalGear('technique_aerobic', athleteFitness, swimEquipment)
+    : [];
   const tags: string[] = ['easy', 'aerobic', 'swim'];
   if (drillTokens.length) tags.push('swim_drills');
   if (techniqueDrillEmphasis) tags.push('technique_swim');
+  for (const g of sessionOptional) tags.push(`optional:${g}`);
   const title = techniqueDrillEmphasis
     ? `Technique Aerobic Swim — ${totalYards} yd`
     : `Easy Swim — ${totalYards} yd`;
@@ -919,6 +1017,8 @@ export function easySwim(
       `Warm up ${wu} yd easy. ${drillLead}${reps}×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down ${cd} yd.`,
       drillTokens,
       swimEquipment,
+      undefined,
+      sessionOptional,
     ),
     dur, 'EASY',
     [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_${reps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],
@@ -1058,9 +1158,15 @@ export function pullFocusedSwim(
       : 'Small paddles optional for upper-body overload if comfortable (skip if shoulders feel tight). ';
   const formCue = 'Keep core engaged so hips do not sag.';
 
+  // §8.4 — Pull-Focused session-level optional gear (snorkel all tiers when owned).
+  // Pull buoy is already req:buoy; paddles is emitted directly below per the existing
+  // non-beginner rule. swimSessionOptionalGear returns only `snorkel` for pull_focused
+  // (it intentionally skips paddles to avoid duping the explicit emission here).
+  const sessionOptional = swimSessionOptionalGear('pull_focused', athleteFitness, swimEquipment);
   const tags: string[] = ['quality', 'pull_focus_swim', 'swim', 'moderate', 'req:buoy'];
   if (athleteFitness !== 'beginner') tags.push('optional:paddles');
   if (drillTokens.length) tags.push('swim_drills');
+  for (const g of sessionOptional) tags.push(`optional:${g}`);
 
   const drillLead =
     drillTokens.length > 0
@@ -1070,6 +1176,14 @@ export function pullFocusedSwim(
   const integrateCopy =
     '4×100 yd full stroke easy aerobic — reconnect kick and rotation after pull isolation.';
 
+  // §8.4 — surface the snorkel optional in the description text. Paddles already
+  // flows in via the existing `optional:paddles` tag → drill-equipment / sessionOptional
+  // path; we pass it explicitly here too so the line reads "Optional: Paddles, Snorkel"
+  // for an intermediate athlete owning both, matching the chip surface.
+  const pullSessionOptionalForLine =
+    athleteFitness !== 'beginner' && swimGearNormalized(swimEquipment).has('paddles')
+      ? ['paddles', ...sessionOptional]
+      : sessionOptional;
   const ps = session(
     day,
     'swim',
@@ -1079,6 +1193,7 @@ export function pullFocusedSwim(
       drillTokens,
       swimEquipment,
       ['pull buoy'],
+      pullSessionOptionalForLine,
     ),
     dur,
     'MODERATE',
