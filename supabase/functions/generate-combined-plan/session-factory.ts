@@ -902,6 +902,17 @@ export function cssAerobicSwim(
   const cssFallbackCue = !hasValidSwimThresholdPace(options?.swimThresholdPace)
     ? ` ${swimCssFallbackCue()}`
     : '';
+  // §5.4 — open-water race-specific elements layer onto Race-Specific Aerobic
+  // sessions in race_specific phase only. Beginners never reach this branch (D-025
+  // routes them to technique_aerobic). Build/base raceSupport sessions keep the
+  // standard race-rhythm copy; race-spec adds bilateral-breathing prescription +
+  // drafting awareness on top of the existing sighting cadence.
+  const phaseNorm = String(phase ?? '').trim().toLowerCase().replace(/-/g, '_');
+  const isRaceSpecificPhase = phaseNorm === 'race_specific' || phaseNorm === 'racespecific';
+  const owElementsCue =
+    raceSupport && isRaceSpecificPhase
+      ? ` Bilateral breathing on at least half the repeats (alternate sides every 3rd or 5th stroke) so race-day chop or sun glare doesn't dictate which side you're stuck on. If you have access to swim with a group, practice both lead (no draft) and feet/hip-side draft positions — drafting can save ~10–15% of your effort on race day.`
+      : '';
   const tags: string[] = ['quality', 'css_aerobic', 'swim'];
   if (drillTokens.length) tags.push('swim_drills');
   if (raceSupport) tags.push('race_specific_swim');
@@ -916,7 +927,7 @@ export function cssAerobicSwim(
     day, 'swim',
     name,
     appendPoolGearLine(
-      `Warm up ${wu} yd. ${drillLead}${mainSet} Cool down ${cd} yd.${cssFallbackCue}`,
+      `Warm up ${wu} yd. ${drillLead}${mainSet} Cool down ${cd} yd.${owElementsCue}${cssFallbackCue}`,
       drillTokens,
       options?.swimEquipment,
       undefined,
