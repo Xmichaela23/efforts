@@ -1482,6 +1482,11 @@ function Step3Swim({
         <span className="block font-semibold text-white">Learning or rebuilding</span>
         <span className="block text-[13px] text-white/55 mt-0.5">Newer to structured laps, stroke still coming together, or long time out of the pool.</span>
       </ChoiceBtn>
+      {state.swimExperience === 'learning' && (
+        <ArcHint>
+          <strong>No CSS test?</strong> Swim a 200yd time trial at sustainable hard effort in your first week or two, divide the time by 2, add 5 seconds. That&rsquo;s your starting CSS pace. Update your profile once you&rsquo;ve got the number — your plan will recalibrate.
+        </ArcHint>
+      )}
       <ChoiceBtn active={state.swimExperience === 'steady'} onClick={() => setState({ ...state, swimExperience: 'steady' })}>
         <span className="block font-semibold text-white">Steady</span>
         <span className="block text-[13px] text-white/55 mt-0.5">Comfortable swimming continuous laps; mostly building fitness and pacing.</span>
