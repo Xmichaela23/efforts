@@ -19,6 +19,59 @@ This protocol delivers:
 - Open water skills integrated in race-specific phase
 - Masters swim recommendation surfaced for Learning-level athletes
 
+### 0.5 Athlete-facing effort vocabulary (LOCKED 2026-05-22)
+
+Athlete-facing copy — session titles, descriptions, step labels in Garmin / Form Goggles exports, wizard hints, trade-off messages — uses **three tier words and nothing else**:
+
+| Tier | Meaning |
+|---|---|
+| **easy** | Z1–Z2 aerobic; conversational; sustainable forever. |
+| **moderate** | Z3 sustainable race-effort rhythm; conversational in short bursts; the bulk of aerobic + CSS-anchored work. |
+| **hard** | Z4–Z5 threshold + speed work; not maximal, but unsustainable past the prescribed interval. |
+
+**Session-type → effort-tier mapping (canonical):**
+
+| Session type (internal kind) | Tier word in athlete copy |
+|---|---|
+| `easy` / Easy Swim | easy |
+| `recovery` / Recovery Swim | easy |
+| `kick_focused` / Kick-Focused | easy (kick-led; Z1–Z2 main set) |
+| `technique_aerobic` / Technique Aerobic | easy → moderate (drill block is easy; main set rides at moderate) |
+| `css_aerobic` / Aerobic Swim | moderate (this is the §5.2 / Z3 CSS-anchored session — title and copy NEVER mention "CSS") |
+| `endurance` | moderate |
+| `pull_focused` / Pull-Focused | moderate |
+| `mixed_fartlek` / Mixed/Fartlek | moderate → hard (alternates) |
+| `threshold` / Threshold Swim | hard |
+| `speed` / Speed Swim | hard |
+| `race_specific_aerobic` / Race-Specific Aerobic | hard (Z3–Z4 race-rhythm density per §5.4) |
+| `race_pace_sustained` / Race-Pace Sustained | hard |
+| `time_trial` / Time Trial | hard |
+
+**Anti-regression rule (LOCKED 2026-05-22):** internal session-type identifiers — `css_aerobic`, `threshold`, `aerobic`, `pull`, `kick`, the word **"CSS"** itself, "Critical Swim Speed", "Z3 CSS aerobic", and any other engine-internal naming — must **NEVER** appear in athlete-facing surfaces:
+
+- Session titles (`PlannedSession.name`)
+- Session descriptions (`PlannedSession.description`)
+- Trade-off messages (`generation_trade_offs[*].message`)
+- Wizard hints / labels / tooltips / option copy
+- Per-step labels in the Garmin workout export (`effortLabel`)
+- Per-step labels in the Form Goggles plain-text export (the narrator output)
+- Calendar drawer copy
+- Coach narrative
+
+Internal identifiers stay untouched in code (programmatic):
+
+- `css_aerobic` session kind discriminator
+- `cssAerobicSwim` function name
+- `swim_threshold_pace` athlete-state field
+- `swim_aerobic_css_*x100yd_r*` token grammar key (parser keys on the literal)
+- `'css_aerobic'` tags on the session
+- Internal helper names (`cssRestSecByTier`, `cssRestSecByPhaseWeek`, etc.)
+- Code comments documenting the spec §7.5 RPE fallback path
+
+The tier word is the athlete's surface vocabulary. The internal name is the engineering identifier. These never collide.
+
+**Wizard implication:** the §7.5 prompt for learning swimmers points at the per-100yd pace baseline directly, not at a "CSS test" — the athlete enters a 100yd / 100m pace number; the engine internally derives `swim_threshold_pace`. "CSS" is engineering jargon and stays out of the chat.
+
 ---
 
 ## 1. Inputs
