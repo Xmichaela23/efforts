@@ -503,13 +503,56 @@ export function getSwimSlotTemplates(
   phase: string,
   distance: string,
   weekInPhase: number,
-  opts?: { athleteFitness?: 'beginner' | 'intermediate' | 'advanced'; planWeekNumber?: number },
+  opts?: {
+    athleteFitness?: 'beginner' | 'intermediate' | 'advanced';
+    planWeekNumber?: number;
+    /**
+     * D-031 (amends D-029 swim arc 2026-05-22): rebuild-mode throttle. When
+     * `loadThrottle < 1.0`, each anchor's yards are scaled by the throttle and
+     * floored at the base-peak value per anchor (=`BASE_VS_BUILD_YARD_SCALE × build_START`).
+     * Default `1.0` preserves D-026 / D-029 canonical-lerp behavior for normal
+     * generation; only `tightenPhaseBlocksForFloorRebuild` passes throttle < 1.0.
+     * Only fires for base/build/race_specific load phases — taper/recovery keep
+     * their existing phase-multiplier logic unchanged.
+     */
+    loadThrottle?: number;
+  },
 ): SwimSlotTemplate[] {
   const ph = normalizePhase(phase);
   if (ph === 'recovery') return [];
 
   const distanceKey = normalizeSwimProgramDistance(distance);
   const athleteFitness: SwimFitnessKey = opts?.athleteFitness ?? 'intermediate';
+  // D-031 throttle is only applied within base/build/race_specific dispatches below.
+  // The throttle helper floors at the per-anchor base-peak (smallest "real" swim base
+  // session for that intent + distance).
+  const loadThrottle = typeof opts?.loadThrottle === 'number' && Number.isFinite(opts.loadThrottle)
+    ? Math.min(1.0, Math.max(0, opts.loadThrottle))
+    : 1.0;
+  const focusFloorYds: [number, number, number] = [
+    roundYards(FOCUS_70_3_BUILD_START_YDS[0] * BASE_VS_BUILD_YARD_SCALE),
+    roundYards(FOCUS_70_3_BUILD_START_YDS[1] * BASE_VS_BUILD_YARD_SCALE),
+    roundYards(FOCUS_70_3_BUILD_START_YDS[2] * BASE_VS_BUILD_YARD_SCALE),
+  ];
+  const raceFloorYds: [number, number] = [
+    roundYards(RACE_70_3_BUILD_START_YDS[0] * BASE_VS_BUILD_YARD_SCALE),
+    roundYards(RACE_70_3_BUILD_START_YDS[1] * BASE_VS_BUILD_YARD_SCALE),
+  ];
+  const applyFocusThrottle = (yds: [number, number, number]): [number, number, number] => {
+    if (loadThrottle >= 1.0) return yds;
+    return [
+      Math.max(focusFloorYds[0], roundYards(yds[0] * loadThrottle)),
+      Math.max(focusFloorYds[1], roundYards(yds[1] * loadThrottle)),
+      Math.max(focusFloorYds[2], roundYards(yds[2] * loadThrottle)),
+    ];
+  };
+  const applyRaceThrottle = (yds: [number, number]): [number, number] => {
+    if (loadThrottle >= 1.0) return yds;
+    return [
+      Math.max(raceFloorYds[0], roundYards(yds[0] * loadThrottle)),
+      Math.max(raceFloorYds[1], roundYards(yds[1] * loadThrottle)),
+    ];
+  };
 
   // SWIM-PROTOCOL §10 dispatch — beginner gets type-substituted variants for
   // both intents (race / focus) and across all phases including taper.
@@ -542,6 +585,10 @@ export function getSwimSlotTemplates(
     if (ph === 'base' || ph === 'build' || ph === 'race_specific') {
       const mult = protocolMidVolumeMultiplier(ph, distanceKey, athleteFitness);
       yards = yards.map((y) => roundYards(y * mult)) as [number, number, number];
+      // D-031 rebuild-mode throttle: applied AFTER the protocol multiplier so the floor
+      // binds against a comparable value. Only active when caller (rebuild path) passes
+      // loadThrottle < 1.0; otherwise yards pass through unchanged.
+      yards = applyFocusThrottle(yards);
     }
     const slots = isBeginner ? focusTemplatesFromYardsBeginner(yards) : focusTemplatesFromYards(yards);
     // Build: pull (even week_in_phase) alternates with kick (odd). Race-specific: ~10% pull — week 2 each RS block plus week_in_phase divisible by 10 for long blocks.
@@ -618,6 +665,8 @@ export function getSwimSlotTemplates(
   if (ph === 'base' || ph === 'build' || ph === 'race_specific') {
     const mult = protocolMidVolumeMultiplier(ph, distanceKey, athleteFitness);
     yardsR = yardsR.map((y) => roundYards(y * mult)) as [number, number];
+    // D-031 rebuild-mode throttle — see focus-intent dispatch above.
+    yardsR = applyRaceThrottle(yardsR);
   }
   const rotationWeek = opts?.planWeekNumber ?? weekInPhase;
   const meta = isBeginner

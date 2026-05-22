@@ -857,6 +857,18 @@ export function buildWeek(
     training_intent: athleteState.training_intent,
   });
 
+  // D-031 (amends D-026 + D-028 + D-029 swim arc 2026-05-22): rebuild-mode throttle.
+  // When the rebuild loop has shrunk `block.tssMultiplier` below 1.0 for a load
+  // phase, pass it as `loadThrottle` to the canonical lerps so the long sessions
+  // throttle alongside the rest of the budget. Floor inside the lerp is the
+  // peak-of-base value (distance-aware) — the smallest "real" long session for
+  // the race distance, the durability-anchor minimum. Closes the failure mode
+  // where the rebuild loop couldn't converge because canonical lerps emitted
+  // peak values regardless of the budget shrinkage applied to other sessions.
+  // Only base/build/race_specific phases throttle; rebuild/taper/recovery keep
+  // their existing phase-multiplier logic unchanged (don't compound).
+  const isLoadPhase = phase === 'base' || phase === 'build' || phase === 'race_specific';
+  const loadThrottle = isLoadPhase ? Math.min(1.0, block.tssMultiplier) : 1.0;
   if (hasTri && !raceThisWeek && !isRecovery) {
     // Long-run within-phase ramp (RUN-PROTOCOL §4.5). The lerp is the
     // CANONICAL value for base/build/race_specific phases — the protocol's
@@ -871,8 +883,8 @@ export function buildWeek(
     // naturally hits the lerp's PEAK endpoint every week, so `Math.max`
     // collapsed the ramp to a flat peak-of-phase value (Plan #78 audit).
     // Post-fix the lerp IS canonical; long-run volume is anchored to race
-    // distance, not budget. See D-NNN.
-    longRunMiles = longRunMilesForWeek(primaryGoal.distance, phase, runWeekInPhase, runRampWeeks);
+    // distance, not budget. See D-026. D-031 adds the rebuild-mode throttle.
+    longRunMiles = longRunMilesForWeek(primaryGoal.distance, phase, runWeekInPhase, runRampWeeks, loadThrottle);
     longRunMinutes = Math.round(longRunMiles * 9.5);
   }
 
@@ -893,11 +905,15 @@ export function buildWeek(
   }
 
   if (options?.physiologicalFloorRebuild && !raceThisWeek) {
-    const floorMi = hasTri ? longRunFloorMiles(primaryGoal.distance, phase) : 3;
-    longRunMiles = Math.max(floorMi, Math.round(longRunMiles * 0.86));
-    longRunMinutes = Math.round(longRunMiles * 9.5);
-    // Tri long-run floors can exceed 30% of weekly raw TSS when the whole week is scaled down
-    // for floor rebuild — cap miles vs budget proxy (matches `validateTrainingFloors`).
+    // D-031 (2026-05-22): the canonical lerp at line 875 is now throttled via
+    // `loadThrottle = block.tssMultiplier` and floored at peak-of-base. The
+    // previous `Math.max(longRunFloorMiles(distance, phase), longRunMiles * 0.86)`
+    // line is removed because:
+    //  (a) it double-throttled with the lerp-side D-031 throttle, and
+    //  (b) its floor was peak-of-CURRENT-phase (e.g. 70.3 RS → 13mi) which prevented
+    //      the rebuild loop from ever shrinking the long-run below peak-of-phase.
+    // That was the convergence-failure root cause for the Week 9→10 25.5% spike.
+    // The TSS-share cap below stays — it's a separate share-of-budget invariant.
     const lrIntensity: Intensity = phase === 'race_specific' ? 'MODERATE' : 'EASY';
     const tssPerMin = TSS_PER_HOUR.run[lrIntensity] / 60;
     const lrShareCap = options?.physiologicalFloorRebuildDeep
@@ -926,7 +942,9 @@ export function buildWeek(
   let longRideMinutes: number;
   let longRideHours: number;
   if (hasLongRideLerp && !isRecovery) {
-    longRideHours = longRideHoursForWeek(primaryGoal.distance, phase, bikeWeekInPhase, bikeRampWeeks);
+    // D-031: pass loadThrottle (block.tssMultiplier for load phases, capped at 1.0)
+    // so the lerp throttles + floors at peak-of-base when the rebuild loop runs.
+    longRideHours = longRideHoursForWeek(primaryGoal.distance, phase, bikeWeekInPhase, bikeRampWeeks, loadThrottle);
     longRideMinutes = Math.round(longRideHours * 60);
   } else {
     longRideMinutes = isRecovery
@@ -1045,6 +1063,12 @@ export function buildWeek(
         brickPhaseForSession,
         runWeekInPhase,
         rampWeeksForPhase(brickPhaseForSession),
+        // D-031: pass the load throttle for the brick-session-phase (not the
+        // current week's phase) so the brick-run mileage tracks the same
+        // shrinkage as the long-run during rebuild.
+        (brickPhaseForSession === 'base' || brickPhaseForSession === 'build' || brickPhaseForSession === 'race_specific')
+          ? loadThrottle
+          : 1.0,
       );
       const [bkBike, bkRun] = brick(longRideDay, rideHoursForSat, brickRunMi, brickPhaseForSession, servedGoal);
       longRideSlot!.sessions.push(bkBike, bkRun);
@@ -1252,6 +1276,10 @@ export function buildWeek(
     swimTemplates = getSwimSlotTemplates(swimTemplatesIntent, phase, swimDistance, swimWeekInPhase, {
       athleteFitness: swimFitness,
       planWeekNumber: weekNum,
+      // D-031: rebuild-mode throttle. Swim yards lerp throttles + floors at
+      // anchor-keyed base-peak (per intent + distance) when block.tssMultiplier
+      // shrinks below 1.0 in a load phase.
+      loadThrottle,
     });
     console.log('[buildWeek] swim templates selected', weekNum, {
       swimIntent: swimTemplatesIntent,

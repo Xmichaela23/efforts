@@ -383,9 +383,18 @@ export function effectiveLongRunFloorMiles(
    */
   weekInPhase?: number,
   rampWeeks?: number,
+  /**
+   * D-031 (2026-05-22): rebuild-mode throttle. When `loadThrottle < 1.0`, the
+   * spec floor follows the throttled lerp (with the peak-of-base floor applied
+   * inside `longRunMilesForWeek`). Required for the validator to agree with the
+   * week-builder when the rebuild loop runs — without it, the validator would
+   * read the un-throttled peak-of-phase value and re-bump the throttled long
+   * sessions back up, defeating the rebuild loop.
+   */
+  loadThrottle?: number,
 ): number {
   const spec = weekInPhase != null && rampWeeks != null
-    ? longRunMilesForWeek(distance, phase, weekInPhase, rampWeeks)
+    ? longRunMilesForWeek(distance, phase, weekInPhase, rampWeeks, loadThrottle ?? 1.0)
     : longRunFloorMiles(distance, phase);
   const peakCap = longRunFloorMiles(distance, nextPhaseForLongDayFloorCap(phase));
   const fromRecent = Math.max(0, recentLongestRunMi) * 0.5;
@@ -415,9 +424,15 @@ export function effectiveLongRideFloorHours(
   recentLongestRideHr: number,
   weekInPhase?: number,
   rampWeeks?: number,
+  /**
+   * D-031 (2026-05-22): rebuild-mode throttle. Same contract as
+   * {@link effectiveLongRunFloorMiles}. Required for the validator to agree
+   * with the throttled lerp during rebuild.
+   */
+  loadThrottle?: number,
 ): number {
   const spec = weekInPhase != null && rampWeeks != null
-    ? longRideHoursForWeek(distance, phase, weekInPhase, rampWeeks)
+    ? longRideHoursForWeek(distance, phase, weekInPhase, rampWeeks, loadThrottle ?? 1.0)
     : longRideFloorHours(distance, phase);
   if (spec <= 0) return 0; // taper / recovery — skipped by validators anyway
   const peakCap = longRideFloorHours(distance, nextPhaseForLongDayFloorCap(phase));
@@ -485,12 +500,19 @@ export function evaluateLongDayVolumeFloors(
     // Long run — applies to both single-sport (run) and tri.
     // D-027: thread weekInPhase + rampWeeks when phaseBlocks are available so
     // the soft validator floor follows the lerp instead of peak-of-phase.
+    // D-031: thread loadThrottle (block.tssMultiplier capped at 1.0 for load phases)
+    // so the validator's effective floor agrees with the throttled week-builder
+    // output during rebuild.
     let wipSoft: number | undefined;
     let rwSoft: number | undefined;
+    let throttleSoft: number | undefined;
     if (opts.phaseBlocks?.length) {
       const blk = blockForWeek(opts.phaseBlocks, w.weekNum);
       wipSoft = weekInPhaseInline(opts.phaseBlocks, w.weekNum, blk);
       rwSoft = rampWeeksForPhase(w.phase);
+      throttleSoft = (w.phase === 'base' || w.phase === 'build' || w.phase === 'race_specific')
+        ? Math.min(1.0, blk.tssMultiplier)
+        : 1.0;
     }
     const lrFloorMi = effectiveLongRunFloorMiles(
       opts.primaryDistance,
@@ -498,6 +520,7 @@ export function evaluateLongDayVolumeFloors(
       opts.recentLongestRunMi ?? 0,
       wipSoft,
       rwSoft,
+      throttleSoft,
     );
     if (lrFloorMi > 0) {
       const lrMin = maxLongRunMinutes(w);
@@ -522,6 +545,7 @@ export function evaluateLongDayVolumeFloors(
         opts.recentLongestRideHr ?? 0,
         wipSoft,
         rwSoft,
+        throttleSoft,
       );
       if (lrideFloorH > 0) {
         const lrideMin = maxLongRideMinutes(w);
@@ -712,12 +736,20 @@ export function enforceLongDayFloors(
     // this enforcer was the second `Math.max` floor that flattened the §4.5
     // within-phase ramp to peak-of-phase even after Bundle B made the
     // week-builder canonical.
+    // D-031: thread loadThrottle so the hard enforcer floors at the throttled
+    // value (peak-of-base via the lerp's internal floor) instead of un-throttled
+    // peak-of-phase — without this, the enforcer re-bumps throttled long sessions
+    // back up and defeats the rebuild loop.
     let wipHard: number | undefined;
     let rwHard: number | undefined;
+    let throttleHard: number | undefined;
     if (opts.phaseBlocks?.length) {
       const blk = blockForWeek(opts.phaseBlocks, w.weekNum);
       wipHard = weekInPhaseInline(opts.phaseBlocks, w.weekNum, blk);
       rwHard = rampWeeksForPhase(w.phase);
+      throttleHard = (w.phase === 'base' || w.phase === 'build' || w.phase === 'race_specific')
+        ? Math.min(1.0, blk.tssMultiplier)
+        : 1.0;
     }
     const lrFloorMi = effectiveLongRunFloorMiles(
       opts.primaryDistance,
@@ -725,6 +757,7 @@ export function enforceLongDayFloors(
       opts.recentLongestRunMi ?? 0,
       wipHard,
       rwHard,
+      throttleHard,
     );
     if (lrFloorMi > 0) {
       const lrSession = findLongRunSessionInWeek(w);
@@ -744,6 +777,7 @@ export function enforceLongDayFloors(
         opts.recentLongestRideHr ?? 0,
         wipHard,
         rwHard,
+        throttleHard,
       );
       if (lrideFloorH > 0) {
         const lrideSession = findLongRideSessionInWeek(w);

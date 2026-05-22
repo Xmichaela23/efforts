@@ -293,12 +293,25 @@ function raceRunDistanceMiles(distance: TriRaceDistance): number {
  *
  * `weekInPhase` MUST be `weekInPhaseForTimeline(phaseBlocks, weekNum, block)` — the
  * recovery-non-resetting in-phase index. NEVER `weekInBlock` (always 1 per ADR 0002).
+ *
+ * **Rebuild-mode throttle (D-031, amends D-026 2026-05-22):** when `loadThrottle < 1.0`,
+ * the lerp output is multiplied by the throttle factor and floored at the peak-of-base
+ * value for the distance. This lets `tightenPhaseBlocksForFloorRebuild` shrink the
+ * canonical lerp alongside the rest of the budget — the D-026 "lerp is canonical, not
+ * budget-anchored" contract holds for normal generation (default `loadThrottle = 1.0`),
+ * but rebuild mode is the explicit exception where every load source throttles together
+ * (was the failure mode behind the Week 9→10 spike that couldn't converge). Floor source
+ * is `longRunFloorMiles(distance, 'base')` — distance-aware peak-of-base = the smallest
+ * "real" long run the spec ratifies for each race distance (e.g. 70.3 → 10mi, full IM →
+ * 13.5mi, Olympic → 5.25mi → roundHalfMile 5.0mi, Sprint → 3.0mi). A throttled plan
+ * still ships with a defensible durability anchor.
  */
 export function longRunMilesForWeek(
   distance: TriRaceDistance,
   phase: Phase,
   weekInPhase: number,
   rampWeeks: number,
+  loadThrottle: number = 1.0,
 ): number {
   const phaseKey = String(phase ?? '').toLowerCase() as 'base' | 'build' | 'race_specific';
   const endpoints = LONG_RUN_RAMP_ENDPOINTS[phaseKey];
@@ -307,18 +320,27 @@ export function longRunMilesForWeek(
   const start = peak * endpoints.start;
   const target = peak * endpoints.peak;
   const t = runPhaseProgress(weekInPhase, rampWeeks);
-  return roundHalfMile(lerp(start, target, t));
+  const lerped = lerp(start, target, t);
+  if (loadThrottle >= 1.0) return roundHalfMile(lerped);
+  const floor = longRunFloorMiles(distance, 'base');
+  return Math.max(floor, roundHalfMile(lerped * loadThrottle));
 }
 
 /**
  * Brick-run within-phase RAMP (RUN-PROTOCOL §4.3 / §5.7). Same lerp pattern as
  * `longRunMilesForWeek`. Other phases delegate to `brickRunTargetMiles`.
+ *
+ * **Rebuild-mode throttle (D-031, amends D-026 2026-05-22):** mirror of the long-run
+ * throttle. Floor source is `brickRunTargetMiles(distance, 'base')` — distance-aware
+ * peak-of-base (e.g. 70.3 → 2.5mi, full IM → 5.0mi, Sprint/Olympic → 1.5mi via the
+ * existing clamp floor inside `brickRunTargetMiles`).
  */
 export function brickRunMilesForWeek(
   distance: TriRaceDistance,
   phase: Phase | string,
   weekInPhase: number,
   rampWeeks: number,
+  loadThrottle: number = 1.0,
 ): number {
   const phaseKey = String(phase ?? '').toLowerCase() as 'base' | 'build' | 'race_specific';
   const endpoints = BRICK_RUN_RAMP_ENDPOINTS[phaseKey];
@@ -328,7 +350,9 @@ export function brickRunMilesForWeek(
   const target = raceRun * endpoints.peak;
   const t = runPhaseProgress(weekInPhase, rampWeeks);
   const raw = lerp(start, target, t);
-  return Math.min(8, Math.max(1.5, roundHalfMile(raw)));
+  if (loadThrottle >= 1.0) return Math.min(8, Math.max(1.5, roundHalfMile(raw)));
+  const floor = brickRunTargetMiles(distance, 'base');
+  return Math.min(8, Math.max(floor, roundHalfMile(raw * loadThrottle)));
 }
 
 /**
@@ -437,6 +461,7 @@ export function longRideHoursForWeek(
   phase: Phase,
   weekInPhase: number,
   rampWeeks: number,
+  loadThrottle: number = 1.0,
 ): number {
   const phaseKey = String(phase ?? '').toLowerCase() as 'base' | 'build' | 'race_specific';
   const endpoints = LONG_RIDE_RAMP_ENDPOINTS[phaseKey];
@@ -445,7 +470,13 @@ export function longRideHoursForWeek(
   const start = peak * endpoints.start;
   const target = peak * endpoints.peak;
   const t = runPhaseProgress(weekInPhase, rampWeeks);
-  return Math.round(lerp(start, target, t) * 4) / 4;
+  const lerped = lerp(start, target, t);
+  if (loadThrottle >= 1.0) return Math.round(lerped * 4) / 4;
+  // D-031: rebuild-mode throttle. Floor source is `longRideFloorHours(distance, 'base')` —
+  // distance-aware peak-of-base = the smallest "real" long ride per race distance
+  // (70.3 → 2.25h, full IM → 4.5h, Olympic → 1.125h → 0.25-round 1.25h, Sprint → 0.75h).
+  const floor = longRideFloorHours(distance, 'base');
+  return Math.max(floor, Math.round(lerped * loadThrottle * 4) / 4);
 }
 
 // For a run-only event, all non-strength budget goes to run.
