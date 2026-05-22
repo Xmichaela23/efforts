@@ -720,7 +720,18 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             } else {
               // For strides, preserve the label so Garmin shows "Stride" not just "interval"
               const isStride = /stride/i.test(label)
-              const effortLabel = isStride ? 'Stride' : (label || (isSwim ? 'interval' : 'interval'))
+              // 2026-05-22 swim arc: swim steps prefer the effort tier (easy / moderate /
+              // hard) attached by materialize-plan's swimTokenIntensity helper. Athletes
+              // feel intensity, not session-type tags — "moderate" reads better than
+              // "css" on a watch face. Falls back to label when intensity is missing
+              // (legacy steps prior to the 2026-05-22 swim arc).
+              const swimIntensity = isSwim ? String((st as any)?.intensity || '').toLowerCase() : ''
+              const swimEffortLabel = isSwim && (swimIntensity === 'easy' || swimIntensity === 'moderate' || swimIntensity === 'hard')
+                ? swimIntensity
+                : ''
+              const effortLabel = isStride
+                ? 'Stride'
+                : (swimEffortLabel || label || 'interval')
               const main: any = { effortLabel }
               if (typeof meters === 'number' && meters > 0) main.distanceMeters = Math.round(meters)
               if (((!isRun) && typeof seconds === 'number' && seconds > 0) || (!(typeof meters === 'number' && meters > 0) && typeof seconds === 'number' && seconds > 0)) {

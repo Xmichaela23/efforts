@@ -350,6 +350,38 @@ export function adjustPerformanceWorkingLoadLb(
   return weightLb;
 }
 
+/**
+ * SWIM-PROTOCOL effort-tier mapping by token kind (2026-05-22 swim arc).
+ *
+ * Maps each swim token kind to its athlete-facing effort tier — easy / moderate / hard.
+ * Used by both the Garmin export (`send-workout-to-garmin`) and the Form Goggles
+ * narrator (`src/utils/formGogglesSwimScript.ts`) so per-step labels show the
+ * intensity tier athletes actually feel, not the internal session-type tag.
+ *
+ * Mapping (per SWIM-PROTOCOL §5 + §10 zone prescriptions):
+ *  - CSS Aerobic (Z3) → moderate
+ *  - Threshold (Z4) → hard
+ *  - Plain aerobic / easy aerobic (Z1-Z2) → easy
+ *  - Pull-focused (CSS-anchored Z3) → moderate
+ *  - Kick-focused (Z1-Z2) → easy
+ *  - Drills (technique work, not intensity work) → easy
+ *  - Warmup / Cooldown → easy
+ *
+ * Unknown / unrecognized tokens fall back to 'easy' — defensive default (a step
+ * labeled 'easy' when the intent was harder is safer than vice versa).
+ */
+export function swimTokenIntensity(token: string): 'easy' | 'moderate' | 'hard' {
+  const s = String(token || '').toLowerCase();
+  if (s.startsWith('swim_aerobic_css_')) return 'moderate';
+  if (s.startsWith('swim_threshold_')) return 'hard';
+  if (s.startsWith('swim_pull_')) return 'moderate';
+  if (s.startsWith('swim_kick_')) return 'easy';
+  if (s.startsWith('swim_drills_') || s.startsWith('swim_drill_')) return 'easy';
+  if (s.startsWith('swim_warmup_') || s.startsWith('swim_cooldown_')) return 'easy';
+  if (s.startsWith('swim_aerobic_')) return 'easy';
+  return 'easy';
+}
+
 type Baselines = { 
   ftp?: number; 
   fiveK_pace?: any; fiveKPace?: any; fiveK?: any; 
@@ -1769,7 +1801,7 @@ function expandTokensForRow(
       const ydToM = (yd:number)=> Math.round(yd*0.9144);
       const pushWUCD = (n:number, unit:string, warm:boolean) => {
         const distM = unit==='yd'? ydToM(n) : n;
-        steps.push({ id: uid(), kind: warm?'warmup':'cooldown', distance_m: distM });
+        steps.push({ id: uid(), kind: warm?'warmup':'cooldown', distance_m: distM, intensity: 'easy' });
       };
       let m: RegExpMatchArray | null = null;
       // Warmup/Cooldown distance tokens: swim_warmup_300yd_easy / swim_cooldown_200yd
@@ -1808,12 +1840,16 @@ function expandTokensForRow(
         if (/scull/.test(name)) return 'buoy';
         return null;
       };
+      // 2026-05-22 swim arc: per-token effort tier (easy/moderate/hard) attached to
+      // each swim work + drill step so Garmin export + Form Goggles narrator render
+      // the intensity athletes actually feel, not the internal session-type tag.
+      const swimIntensity = swimTokenIntensity(s);
       // Drill (name first): swim_drill_<name>_4x50yd(_r15)?(_equipment)?
       m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) {
         const name = swimDrillDisplayName(m[1]); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(m[1]);
         const distM = unit==='yd'? ydToM(dist) : dist;
-        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`Drill — ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`Drill — ${name}`, equipment: equip||undefined, intensity: swimIntensity }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
         continue;
       }
       // Drill (count first): swim_drills_6x50yd_fingertipdrag (optional _r15, optional equipment)
@@ -1823,8 +1859,8 @@ function expandTokensForRow(
         const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const name = swimDrillDisplayName(m[4]); const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(m[4]);
         console.log(`  ✅ Matched drill (count first): name="${name}", reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${equip}`);
         const distM = unit==='yd'? ydToM(dist) : dist;
-        for(let i=0;i<reps;i++) { 
-          steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`Drill — ${name}`, equipment: equip||undefined });
+        for(let i=0;i<reps;i++) {
+          steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`Drill — ${name}`, equipment: equip||undefined, intensity: swimIntensity });
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
@@ -1843,7 +1879,7 @@ function expandTokensForRow(
         const distM = unit === 'yd' ? ydToM(dist) : dist;
         console.log(`  ✅ Matched CSS aerobic: reps=${reps}, dist=${dist}${unit}, rest=${rest}s`);
         for (let i = 0; i < reps; i++) {
-          steps.push({ id: uid(), kind: 'work', distance_m: distM, label: 'css' });
+          steps.push({ id: uid(), kind: 'work', distance_m: distM, label: 'css', intensity: swimIntensity });
           if (rest && i < reps - 1) {
             steps.push({ id: uid(), kind: 'recovery', duration_s: rest });
             console.log(`    🔄 Added recovery step: ${rest}s`);
@@ -1856,8 +1892,8 @@ function expandTokensForRow(
       if (m) {
         const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const label=m[4]||'aerobic'; const rest=parseInt(m[5]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
         console.log(`  ✅ Matched aerobic: reps=${reps}, dist=${dist}${unit}, label="${label}", rest=${rest}s`);
-        for(let i=0;i<reps;i++){ 
-          steps.push({ id: uid(), kind:'work', distance_m: distM, label }); 
+        for(let i=0;i<reps;i++){
+          steps.push({ id: uid(), kind:'work', distance_m: distM, label, intensity: swimIntensity });
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
@@ -1871,8 +1907,8 @@ function expandTokensForRow(
       if (m) {
         const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const rest=parseInt(m[4]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
         console.log(`  ✅ Matched threshold: reps=${reps}, dist=${dist}${unit}, rest=${rest}s`);
-        for(let i=0;i<reps;i++){ 
-          steps.push({ id: uid(), kind:'work', distance_m: distM, label:'threshold' }); 
+        for(let i=0;i<reps;i++){
+          steps.push({ id: uid(), kind:'work', distance_m: distM, label:'threshold', intensity: swimIntensity });
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
@@ -1883,24 +1919,24 @@ function expandTokensForRow(
       }
       // Pull/Kick sets: swim_pull_4x100yd_r20_buoy
       m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?$/);
-      if (m) { 
-        const kind=m[1]; 
-        const reps=parseInt(m[2],10); 
-        const dist=parseInt(m[3],10); 
-        const unit=m[4]; 
-        const rest=parseInt(m[5]||'0',10); 
-        const eq=m[6]|| (kind==='pull'?'buoy': (kind==='kick'?'board':null)); 
-        const distM=unit==='yd'? ydToM(dist):dist; 
+      if (m) {
+        const kind=m[1];
+        const reps=parseInt(m[2],10);
+        const dist=parseInt(m[3],10);
+        const unit=m[4];
+        const rest=parseInt(m[5]||'0',10);
+        const eq=m[6]|| (kind==='pull'?'buoy': (kind==='kick'?'board':null));
+        const distM=unit==='yd'? ydToM(dist):dist;
         console.log(`  ✅ Matched ${kind}: reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${eq}`);
-        for(let i=0;i<reps;i++){ 
-          steps.push({ id: uid(), kind:'work', distance_m: distM, label:kind, equipment:eq||undefined }); 
+        for(let i=0;i<reps;i++){
+          steps.push({ id: uid(), kind:'work', distance_m: distM, label:kind, equipment:eq||undefined, intensity: swimIntensity });
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
             console.log(`    🔄 Added recovery step: ${rest}s`);
           }
-        } 
-        continue; 
+        }
+        continue;
       }
       // Fallback distance/time
       if (/\d+yd/.test(s)) { const mm=s.match(/(\d+)yd/); const yd=mm?parseInt(mm[1],10):0; const mtr=ydToM(yd); steps.push({ id: uid(), kind:'work', distance_m: mtr }); continue; }

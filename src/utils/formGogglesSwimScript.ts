@@ -80,13 +80,20 @@ function describeSwimStep(st: any): string {
   const kind = String(st?.kind ?? st?.type ?? '').toLowerCase()
   const label = String(st?.label ?? '').trim()
   const l = label.toLowerCase()
+  const intensity = String(st?.intensity ?? '').toLowerCase()
   const parts: string[] = []
 
   if (kind === 'warmup' || kind === 'cooldown') {
     parts.push('easy')
   } else if (kind === 'drill' || /^drill\b/i.test(label)) {
+    // Drill steps describe by drill name, not intensity (drill IS the work).
     const nm = label.replace(/^drill\s*/i, '').trim()
     parts.push(nm ? `${nm} drill` : 'drill')
+  } else if (intensity === 'easy' || intensity === 'moderate' || intensity === 'hard') {
+    // 2026-05-22 swim arc: prefer the step-level effort tier when set by
+    // materialize-plan's swimTokenIntensity helper. "Moderate" reads as effort,
+    // not session-type — what the athlete actually feels per repeat.
+    parts.push(intensity)
   } else if (/css/.test(l)) parts.push('moderate CSS pace')
   else if (/threshold/.test(l)) parts.push('threshold')
   else if (/aerobic/.test(l)) parts.push('moderate aerobic')

@@ -861,6 +861,26 @@ export function thresholdSwim(
  * Not maximal CSS threshold — just sustainable race pace.
  * Develops comfort at finish-line speed without lactate stress.
  */
+/**
+ * SWIM-PROTOCOL §5.2 tier-adjusted rest interval for CSS Aerobic 100yd repeats.
+ * Slice 1 (Fix 3, 2026-05-22) — emits the START of phase (week 1) rest per tier.
+ * Slice 2 (Fix 4) will layer the within-phase lerp on top via §5.2.1.
+ *
+ * - Beginner: 25s (per §5.2.1 START, lerps to 20s across base ramp)
+ * - Intermediate: 15s (per §5.2.1 START, lerps to 12s across base ramp)
+ * - Advanced: 15s (same as intermediate at START; §5.2.1 lerp tightens to 12s/10s)
+ *
+ * Race-Specific Aerobic substitution (`raceSupport=true`) bypasses this helper —
+ * its rest is set in-place in the raceSupport main-set string and is unchanged
+ * by Slice 1 per the scope decision (Slice 2 §5.2.1 will route race-spec phase
+ * progression through the same lerp).
+ */
+export function cssRestSecByTier(
+  athleteFitness: 'beginner' | 'intermediate' | 'advanced' | undefined,
+): number {
+  return athleteFitness === 'beginner' ? 25 : 15;
+}
+
 /** Caps ×100 main-set reps when yards/main budget are large (slow-swimmer bumps, ceilings). */
 export function cssHundredsRepHardCap(
   athleteFitness: 'beginner' | 'intermediate' | 'advanced' | undefined,
@@ -942,9 +962,14 @@ export function cssAerobicSwim(
   const name = raceSupport
     ? `Race-Specific Aerobic Swim — ${totalYards} yd`
     : `CSS Aerobic Swim — ${totalYards} yd`;
+  // §5.2 tier-adjusted rest (Slice 1, Fix 3, 2026-05-22). Race-spec branch stays at
+  // 15s per Slice 1 scope; Slice 2's within-phase lerp will route race-spec phase
+  // progression through §5.2.1 separately.
+  const cssRestSec = cssRestSecByTier(options?.athleteFitness);
   const mainSet = raceSupport
     ? `${reps}×100 yd at sustainable race-swim rhythm (15 sec rest). Where the lane allows, merge into longer unbroken 200–400 yd pieces. Sight every 6–8 strokes; practice breathing to both sides for chop or sun glare. Swim these repeats hands-only by default; paddles optional for a few repeats only if shoulders feel good—not the entire main set.`
-    : `${reps}×100 yd at comfortable CSS pace (15 sec rest — sustainable, not maximal). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume CSS blocks.`;
+    : `${reps}×100 yd at comfortable CSS pace (${cssRestSec} sec rest — sustainable, not maximal). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume CSS blocks.`;
+  const cssRestToken = raceSupport ? 15 : cssRestSec;
   return session(
     day, 'swim',
     name,
@@ -956,7 +981,7 @@ export function cssAerobicSwim(
       sessionOptional,
     ),
     dur, 'MODERATE',
-    [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_css_${reps}x100yd_r15`, `swim_cooldown_${cd}yd`],
+    [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_css_${reps}x100yd_r${cssRestToken}`, `swim_cooldown_${cd}yd`],
     tags,
     'Z3 CSS aerobic', goalId,
   );
