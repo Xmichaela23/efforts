@@ -436,6 +436,16 @@ MIXED-EFFORT MODE — when the user message includes an INTERVAL EXECUTION block
 - USE GAP when "grade-adjusted" is noted on the pace adherence line. The interval paces in INTERVAL EXECUTION are already GAP-corrected when that flag is set — anchor the effort read on those values, not raw pace.
 - DO NOT say "HR ran higher than recent similar efforts" or any whole-workout comparison sentence. There is no honest steady comparison to make.
 
+UNPLANNED MODE — when the user message opens with "UNPLANNED SESSION" and there is NO "EXECUTION vs PLAN" block:
+- This workout has no linked plan. There was no prescribed target. Do NOT scold the athlete for "missing a target" or "running outside the prescribed range" — there was no range. Do NOT invent what the workout "should have been" from duration alone (a 40-min run is not necessarily a tempo).
+- INTERPRET the run on its own terms. Lead with the most interesting observation visible in the actual data, not with a verdict on plan compliance. Options in priority order:
+  • HR-to-pace efficiency. Did HR stay controlled for the pace held? Use the pace-normalized drift values; they already account for pace changes.
+  • Terrain-aware variance reading. When elevation data is present, read pace variance through the elevation profile. If raw pace swings track the climbs and descents — slow miles on climbs, fast miles on descents — that is TERRAIN, not effort variation. The GAP value is the truth: anchor the effort read there. Do NOT call out raw-pace fluctuation as if it were effort change on a rolling course. If GAP is roughly steady but raw pace swings, say so explicitly — "the climbs added work; flat-equivalent effort was steady."
+  • Conditions. Heat, humidity, wind contributions are still load signals.
+  • Route / segment history. When ROUTE or FAMILIAR SEGMENTS context is present, compare today against past efforts on the same ground.
+- The "vs similar" comparison, if present, IS legitimate signal here (same-category history is honest even without a plan). You may lead with it when sample size is sufficient.
+- The workout_type label (easy_run / tempo_run / long_run / interval_run) is a DESCRIPTIVE LABEL ONLY. It was inferred from duration; it is not a target the athlete chose. Do not treat it as a prescription or score against it.
+
 ATHLETE REPORTED FEELING:
 - When ATHLETE REPORTED data is present, it is ground truth for the athlete's subjective experience.
 - NEVER contradict the athlete's reported feeling. If they reported RPE 4/10 and feeling "good", do NOT say the workout "felt harder than it should have" or suggest they were struggling.
@@ -458,12 +468,20 @@ PACE vs PRESCRIBED RANGE:
 - Write in direct, professional prose. No idioms ('is real', 'nailed it', 'crushed it'). No motivational language ('stay patient', 'trust the process', 'you've got this'). State observations and recommendations plainly.
 - FORBIDDEN words/phrases: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "aligns well", "recovery-integrity cost", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts", "indicating", "should be monitored", "monitor closely", "overall", "nailed", "crushed", "is real", "trust the process", "you've got this", "stay patient", "felt harder than it should have".`;
 
-function buildUserMessage(dp: any): string {
+export function buildUserMessage(dp: any): string {
   const w = dp.workout || {};
   const sig = dp.signals || {};
   const sections: string[] = [];
 
   sections.push('Here is the workout data. Answer the athlete\'s unasked questions — don\'t summarize what they can already see.');
+
+  // D-035: unplanned-mode top-line. When signals.execution is null (the gate
+  // dropped it because there's no linked plan), tell the LLM up front and the
+  // UNPLANNED MODE prompt rule in the system prompt fires.
+  const isUnplanned = !sig.execution && !sig.interval_execution;
+  if (isUnplanned) {
+    sections.push('\nUNPLANNED SESSION — no linked plan. There was no prescribed pace target. Do NOT score against a target; interpret on the workout\'s own terms (see UNPLANNED MODE rule).');
+  }
 
   if (w.date) {
     sections.push(`\nWORKOUT DATE: ${w.date}`);
@@ -668,10 +686,11 @@ function computeGapTerrainBias(
   return 'flat';
 }
 
-function toDisplayFormatV1(
+export function toDisplayFormatV1(
   packet: FactPacketV1,
   flags: FlagV1[],
   varianceGate?: VarianceGateOptions | null,
+  unplannedGate?: UnplannedGateOptions | null,
 ) {
   const facts = packet?.facts as any;
   const derived = packet?.derived as any;
@@ -681,6 +700,10 @@ function toDisplayFormatV1(
   // the canonical signal. Fall back to the legacy in-display heuristic only when
   // the gate isn't wired (older callers that didn't pass varianceGate).
   const isMixedEffort = varianceGate?.isMixedEffort === true;
+  // D-035: when isUnplanned, drop the entire execution-vs-plan block from the
+  // LLM input. There was no plan, so a "pace vs prescribed range" signal would
+  // be a lie.
+  const isUnplanned = unplannedGate?.isUnplanned === true;
   const suppressHrDriftForIntervals = isMixedEffort || (() => {
     if (varianceGate) return false; // gate is authoritative when wired
     const ie = derived?.interval_execution;
@@ -762,7 +785,11 @@ function toDisplayFormatV1(
       };
     })(),
     signals: {
-      execution: derived?.execution
+      // D-035: drop the entire execution-vs-plan signal block when there's no
+      // linked plan. distance_deviation / pace_vs_range / "assessed against"
+      // notes all imply a prescription existed. Keeping them would invite the
+      // LLM to score adherence to a fiction.
+      execution: (isUnplanned ? null : derived?.execution)
         ? {
             distance_deviation: (coerceNumber(derived.execution.distance_deviation_pct) != null)
               ? `${Math.round(Number(derived.execution.distance_deviation_pct))}%`
@@ -906,7 +933,10 @@ function toDisplayFormatV1(
             partial_credit: derived.stimulus.partial_credit ?? null,
           }
         : null,
-      interval_execution: derived?.interval_execution
+      // D-035: drop interval_execution block when unplanned. Its fields
+      // (execution_score, pace_adherence, completed_steps) all describe
+      // adherence to a plan that doesn't exist.
+      interval_execution: (isUnplanned ? null : derived?.interval_execution)
         ? {
             execution_score: typeof derived.interval_execution.execution_score === 'number' ? `${Math.round(derived.interval_execution.execution_score)}%` : null,
             pace_adherence: typeof derived.interval_execution.pace_adherence === 'number' ? `${Math.round(derived.interval_execution.pace_adherence)}%` : null,
@@ -978,6 +1008,15 @@ export type VarianceGateOptions = {
   intervalBreakdown: { intervals?: any[]; available?: boolean } | null;
 };
 
+/**
+ * D-035: When isUnplanned is true, the LLM input drops the prescribed-range
+ * signal block (there was no prescription) and the buildUserMessage emits an
+ * UNPLANNED SESSION top-line so the LLM's UNPLANNED MODE prompt rule fires.
+ */
+export type UnplannedGateOptions = {
+  isUnplanned: boolean;
+};
+
 export async function generateAISummaryV1(
   factPacket: FactPacketV1,
   flags: FlagV1[],
@@ -985,13 +1024,14 @@ export async function generateAISummaryV1(
   _opts?: GenerateAISummaryV1Options | null,
   arcNarrative?: ArcNarrativeContextV1 | null,
   varianceGate?: VarianceGateOptions | null,
+  unplannedGate?: UnplannedGateOptions | null,
 ): Promise<string | null> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     console.warn('[ai-summary] ANTHROPIC_API_KEY not set — skipping narrative generation');
     return null;
   }
 
-  const displayPacket = toDisplayFormatV1(factPacket, flags, varianceGate ?? null);
+  const displayPacket = toDisplayFormatV1(factPacket, flags, varianceGate ?? null, unplannedGate ?? null);
 
   const arcFacts = arcNarrative ? arcNarrativeFactBlock(arcNarrative) : '';
   const userMessage =

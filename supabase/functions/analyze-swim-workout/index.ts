@@ -338,10 +338,39 @@ Deno.serve(async (req) => {
     });
 
     // Calculate overall adherence
+    // D-035: When no per-interval adherence is computable (no linked plan, or
+    // planned intervals lack pace_per_100 targets), return null — not 100.
+    // The prior 100 default lied about every unlinked swim being a perfect
+    // execution. Adherence requires a prescription to measure against.
     const intervalsWithAdherence = intervalAnalysis.filter((i: any) => i.adherence !== null);
-    const overallAdherence = intervalsWithAdherence.length > 0 ?
+    const overallAdherence: number | null = intervalsWithAdherence.length > 0 ?
       intervalsWithAdherence.reduce((sum: number, i: any) => sum + i.adherence, 0) / intervalsWithAdherence.length :
-      100;
+      null;
+
+    // D-035: Compute a real duration_adherence for linked swims. The prior
+    // hardcoded `100` was a TODO for linked swims AND a fake-perfect-score for
+    // unlinked. Both modes are now honest: linked → ratio-based score;
+    // unlinked → null.
+    const _swimDurationAdherence: number | null = (() => {
+      if (!plannedWorkout) return null;
+      const plannedSec = Number(
+        plannedWorkout?.total_duration_seconds ??
+        plannedWorkout?.computed?.total_duration_seconds ?? 0
+      );
+      const actualMv = Number(workout.moving_time ?? 0);
+      const actualSec = actualMv > 0 ? (actualMv < 1000 ? actualMv * 60 : actualMv) : 0;
+      if (!(plannedSec > 0 && actualSec > 0)) return null;
+      const ratio = actualSec / plannedSec;
+      let pct: number;
+      if (ratio >= 0.9 && ratio <= 1.1) {
+        pct = 100 - Math.abs(ratio - 1) * 100;
+      } else if (ratio < 0.9) {
+        pct = ratio * 100;
+      } else {
+        pct = (plannedSec / actualSec) * 100;
+      }
+      return Math.round(Math.max(0, Math.min(100, pct)));
+    })();
 
     // Generate AI insights if OpenAI key is available
     let narrativeInsights: string[] = [];
@@ -360,7 +389,7 @@ Deno.serve(async (req) => {
           max_heart_rate: workout.max_heart_rate || null,
           stroke_type: swimData.strokeType || 'Freestyle',
           intervals_completed: intervals.length,
-          overall_adherence: Math.round(overallAdherence)
+          overall_adherence: overallAdherence != null ? Math.round(overallAdherence) : null,
         };
 
         let prompt = `You are analyzing a swimming workout. Generate 3-4 concise, data-driven observations based on the metrics below.
@@ -388,7 +417,7 @@ Workout Profile:
 - Stroke Type: ${workoutContext.stroke_type}
 ${workoutContext.avg_heart_rate ? `- Avg HR: ${workoutContext.avg_heart_rate} bpm (Max: ${workoutContext.max_heart_rate} bpm)` : ''}
 ${intervals.length > 0 ? `- Intervals Completed: ${workoutContext.intervals_completed}` : ''}
-${plannedWorkout ? `- Overall Adherence: ${workoutContext.overall_adherence}%` : ''}
+${plannedWorkout && workoutContext.overall_adherence != null ? `- Overall Adherence: ${workoutContext.overall_adherence}%` : ''}
 `;
 
         if (planContext) {
@@ -468,13 +497,29 @@ Generate 3-4 observations about this swim workout:`;
     }
 
     // Build analysis result
+    // D-035: Adherence fields are null when there's nothing to measure against
+    // (unlinked) or per-interval data is absent. Linked swims get a real
+    // duration_adherence (no more hardcoded 100); execution_adherence blends
+    // pace + duration when both are available, mirrors run analyzer.
+    const _swimExecAdherence: number | null = (() => {
+      if (overallAdherence == null && _swimDurationAdherence == null) return null;
+      const pace = overallAdherence ?? null;
+      const dur = _swimDurationAdherence ?? null;
+      if (pace != null && dur != null) {
+        return Math.round((pace * 0.5) + (dur * 0.5));
+      }
+      // Only one component → use it as the execution score rather than halving.
+      if (pace != null) return Math.round(pace);
+      if (dur != null) return Math.round(dur);
+      return null;
+    })();
     const analysis = {
       status: 'success',
       performance: {
-        overall_adherence: Math.round(overallAdherence),
-        pace_adherence: Math.round(overallAdherence),
-        duration_adherence: 100, // TODO: Calculate based on planned vs actual duration
-        execution_adherence: Math.round(overallAdherence)
+        overall_adherence: overallAdherence != null ? Math.round(overallAdherence) : null,
+        pace_adherence: overallAdherence != null ? Math.round(overallAdherence) : null,
+        duration_adherence: _swimDurationAdherence,
+        execution_adherence: _swimExecAdherence,
       },
       detailed_analysis: {
         workout_summary: {

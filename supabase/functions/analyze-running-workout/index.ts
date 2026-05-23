@@ -501,40 +501,17 @@ Deno.serve(async (req) => {
       }
     }
 
+    // D-035: Do NOT synthesize a fake target for unlinked workouts. The prior
+    // block here invented a duration-derived pace target (tempo_run @ 10K pace
+    // for 30-60 min, etc.) and scored adherence against it — then INSIGHTS
+    // scolded the athlete for "missing" a target they never set. Unlinked
+    // workouts now flow through with empty intervals; adherence fields are
+    // null-overridden after computation (see D-035 guard below). Single-workout
+    // signals (GAP, HR drift, variability) still compute honestly on the actual
+    // ride/run data.
     if (!intervals || intervals.length === 0) {
-      // Create reasonable pace targets for unplanned workouts using user baselines
-      console.log('🏃 No planned workout found, creating pace targets from baselines');
-      
-      // Determine workout type based on duration and pace
-      const workoutDuration = workout.moving_time || workout.duration || 0;
-      const avgPace = workout.computed?.overall?.avg_pace_s_per_mi || 0;
-      
-      let targetPace = baselines.easyPace || 540; // Default to easy pace
-      let workoutType = 'easy_run';
-      
-      if (workoutDuration > 3600) { // > 1 hour
-        workoutType = 'long_run';
-        targetPace = baselines.marathon_pace || 600;
-      } else if (workoutDuration > 1800) { // 30-60 minutes
-        workoutType = 'tempo_run';
-        targetPace = baselines.tenK_pace || 480;
-      } else if (workoutDuration < 900) { // < 15 minutes
-        workoutType = 'interval_run';
-        targetPace = baselines.fiveK_pace || 450;
-      }
-      
-      // Create a single interval for the entire workout
-      intervals = [{
-        id: 'unplanned_interval',
-        type: workoutType,
-        duration_s: workoutDuration,
-        pace_range: {
-          lower: targetPace * 0.95, // 5% below target
-          upper: targetPace * 1.05  // 5% above target
-        }
-      }];
-      
-      console.log(`🎯 Created pace target for ${workoutType}: ${targetPace}s/mi (${Math.floor(targetPace/60)}:${String(targetPace%60).padStart(2,'0')}/mi)`);
+      console.log('🏃 No planned workout — adherence will be null (D-035)');
+      intervals = [];
     }
 
     // Extract sensor data - try different data sources
@@ -1457,6 +1434,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // D-035: Unlinked-workout null-override
+    // ─────────────────────────────────────────────────────────────────────────
+    // Adherence means "vs what was prescribed." Without a plan link, there is
+    // nothing to be measured against. Earlier in this function we deleted the
+    // duration-derived target synthesis; here we make sure no residual default
+    // (e.g., calculatePrescribedRangeAdherenceGranular returning 100% when no
+    // mainSegments exist) leaks through as a misleading adherence number.
+    const _hasLinkedPlan = !!plannedWorkout && getPlannedWorkSteps(plannedWorkout).length > 0;
+    if (!_hasLinkedPlan) {
+      performance.execution_adherence = null;
+      performance.pace_adherence = null;
+      performance.duration_adherence = null;
+      performance.completed_steps = null;
+      performance.total_steps = null;
+      performance.gap_adjusted = false;
+      console.log('🔓 [D-035] Unlinked workout — adherence fields nulled');
+    }
+
     console.log('✅ Performance calculated:', performance);
 
     // Attach performance to enhancedAnalysis so it's available in generateIntervalBreakdown
@@ -2096,6 +2092,9 @@ Deno.serve(async (req) => {
         ai_summary = await generateAISummaryV1(
           fact_packet_v1, flags_v1, null, null, arc_narrative_for_summary,
           { isMixedEffort: _varGate.is_mixed_effort, intervalBreakdown: detailedAnalysis?.interval_breakdown ?? null },
+          // D-035: pass unplanned flag so the LLM input drops prescribed-range
+          // signals and the UNPLANNED MODE prompt rule fires.
+          { isUnplanned: !isLinkedPlanSession },
         );
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
       }

@@ -773,7 +773,11 @@ export async function buildWorkoutFactPacketV1(args: {
         ? Math.round(((actual - planned) / planned) * 100)
         : null;
     const intentional = deviationPct != null ? Math.abs(deviationPct) >= 30 : false;
-    const assessed_against: 'plan' | 'actual' = intentional ? 'actual' : 'plan';
+    // D-035: When there's no planned workout at all, treat as 'actual' so the
+    // client's AdherenceChips guard (AdherenceChips.tsx:60) hides chips and the
+    // LLM input note ("assessed against actual execution") signals to the LLM
+    // not to compare against a prescription that doesn't exist.
+    const assessed_against: 'plan' | 'actual' = (!plannedWorkout || intentional) ? 'actual' : 'plan';
     const note =
       intentional && planned != null && actual != null
         ? `Plan modified: ${Math.round(actual * 10) / 10} mi vs ${Math.round(planned * 10) / 10} mi`

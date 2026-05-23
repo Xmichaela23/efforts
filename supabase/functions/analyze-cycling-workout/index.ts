@@ -1742,7 +1742,12 @@ Deno.serve(async (req) => {
     // Duration matters less than hitting your power targets
     const executionAdherence = Math.round((powerAdherence * 0.7) + (durationAdherenceValue * 0.3));
     
-    const performance = {
+    // D-035: Unlinked-ride null-override. Without a plan, "adherence" is
+    // meaningless — there's nothing to be measured against. power_variability
+    // (NP, CV, VI) keeps computing on actual ride data; those are honest
+    // single-workout signals that still feed the variance gate (D-034).
+    const _hasLinkedPlan = !!plannedWorkout;
+    const performance = _hasLinkedPlan ? {
       execution_adherence: executionAdherence,
       // Alias: downstream consumers (coach Tier 4 work, Tier 3 #10 cross-workout
       // queries, glance status_label) read `execution_score` to mirror running's
@@ -1754,7 +1759,17 @@ Deno.serve(async (req) => {
       duration_adherence: durationAdherenceValue,
       completed_steps: workIntervals.length,
       total_steps: intervals.length
+    } : {
+      execution_adherence: null,
+      execution_score: null,
+      power_adherence: null,
+      duration_adherence: null,
+      completed_steps: null,
+      total_steps: null,
     };
+    if (!_hasLinkedPlan) {
+      console.log('🔓 [D-035] Unlinked cycling workout — adherence fields nulled');
+    }
     
     console.log(`🎯 Cycling performance metrics:`);
     console.log(`  - Power adherence: ${powerAdherence}% (work intervals 2x weighted)`);
@@ -2394,7 +2409,11 @@ Deno.serve(async (req) => {
       }, arc_narrative_for_summary, {
         isMixedEffort: _varGateRide.is_mixed_effort,
         intervalBreakdown: (detailedAnalysis as any)?.interval_breakdown ?? null,
-      });
+      },
+      // D-035: cycling unplanned gate. cross_workout stays populated for
+      // unplanned rides (NP-vs-typical is honest history); the UNPLANNED MODE
+      // prompt rule fires on is_unplanned in the display packet.
+      { isUnplanned: !plannedWorkout });
       if (ai_summary) ai_summary_generated_at = new Date().toISOString();
     } catch (e) {
       console.log('⚠️ Cycling ai_summary generation failed:', e);

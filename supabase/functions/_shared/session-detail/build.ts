@@ -619,6 +619,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       is_mixed_effort: Boolean((sessionState as any)?.glance?.is_mixed_effort),
       variance_signal: ((sessionState as any)?.glance?.variance_signal as SessionDetailV1['classification']['variance_signal']) ?? null,
       classified_type_variance_override: Boolean((sessionState as any)?.glance?.classified_type_variance_override),
+      // D-035: server-computed unplanned flag. One canonical signal for chips
+      // (hide), LLM input (drop prescribed-range), and narrative (UNPLANNED MODE).
+      is_unplanned: !match?.planned_id,
     },
 
     splits_mi: splitsMi,

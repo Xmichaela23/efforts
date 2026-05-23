@@ -208,6 +208,14 @@ export type SessionDetailV1 = {
      * to exclude the row from steady comparisons without mutating classified_type.
      */
     classified_type_variance_override: boolean;
+    /**
+     * D-035: true when the workout has no linked planned session. Server-computed;
+     * client renders. When true: no adherence chips, no "missed target" narrative —
+     * INSIGHTS interprets the workout on its own terms (HR-to-pace efficiency,
+     * terrain via GAP, conditions, route history). Computed as
+     * `!plan_context.planned_id` in build.ts.
+     */
+    is_unplanned: boolean;
   };
 
   // ── Splits (SessionNarrative Speed insight) ───────────────────────────────

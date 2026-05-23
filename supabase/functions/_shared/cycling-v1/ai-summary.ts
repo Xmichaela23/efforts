@@ -229,6 +229,16 @@ export type CyclingVarianceGateOptions = {
   intervalBreakdown: { intervals?: any[]; available?: boolean } | null;
 };
 
+/**
+ * D-035: cycling unplanned gate. When true, the LLM input is annotated so the
+ * UNPLANNED MODE prompt rule fires. Unlike running, cross_workout (NP-vs-typical)
+ * IS kept for unplanned rides — same-classified-type comparisons are legitimate
+ * history, not prescription. Per user direction 2026-05-23.
+ */
+export type CyclingUnplannedGateOptions = {
+  isUnplanned: boolean;
+};
+
 function buildCyclingIntervalSummary(
   ib: { intervals?: any[]; available?: boolean } | null | undefined,
   fp: CyclingFactPacketV1,
@@ -273,7 +283,9 @@ function toDisplayPacket(
   flags: CyclingFlagV1[],
   crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any; fitness?: any } | null,
   varianceGate?: CyclingVarianceGateOptions | null,
+  unplannedGate?: CyclingUnplannedGateOptions | null,
 ): any {
+  const isUnplanned = unplannedGate?.isUnplanned === true;
   const f = fp.facts;
   const d = fp.derived;
   const tl = (d as any)?.training_load || null;
@@ -294,6 +306,11 @@ function toDisplayPacket(
   })();
   return {
     discipline: 'ride',
+    // D-035: surface is_unplanned so the cycling LLM prompt's UNPLANNED MODE
+    // rule can fire. Unlike running, cross_workout (NP-vs-typical) stays
+    // populated for unplanned rides — same-classified-type history is honest
+    // signal, not prescription. Per user direction 2026-05-23.
+    is_unplanned: isUnplanned,
     classified_type: f.classified_type,
     plan_intent: f.plan_intent,
     duration: f.total_duration_min != null ? `${Math.round(f.total_duration_min)} min` : null,
@@ -339,8 +356,9 @@ export async function generateCyclingAISummaryV1(
   crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any; fitness?: any } | null,
   arcNarrative?: ArcNarrativeContextV1 | null,
   varianceGate?: CyclingVarianceGateOptions | null,
+  unplannedGate?: CyclingUnplannedGateOptions | null,
 ): Promise<string | null> {
-  const display = toDisplayPacket(factPacket, flags, crossWorkout, varianceGate ?? null);
+  const display = toDisplayPacket(factPacket, flags, crossWorkout, varianceGate ?? null, unplannedGate ?? null);
   const packetStr = JSON.stringify(display, null, 2);
   // Temporal Arc frame (post-race recovery / taper / race proximity / plan
   // phase) — consumed the same way running does: fact block in the user
@@ -369,6 +387,7 @@ RULES:
 - If there is no planned intent, describe the ride physiologically; do not invent a prescription.
 - If plan.week_number is present, anchor it in at most a short clause (e.g. "Week 3, build") — do not spend a sentence on plan position.
 - MIXED-EFFORT MODE (when packet has interval_summary and cross_workout is null): this ride was structured/variable — DO NOT compare whole-ride NP/IF to your endurance baseline. Interpret the per-interval work: which work intervals held the target wattage, whether the work tightened or faded across the set, recovery quality. Lead with the ride's intent (sweet-spot, threshold, VO2) paired with NP and a plain intensity read; cite specific work intervals from interval_summary.work_intervals. Recoveries are context, not the lede.
+- UNPLANNED MODE (when packet has is_unplanned: true): this ride had no linked plan. There was no prescribed power target. DO NOT scold the athlete for "missing a target" — there was no target. Do NOT invent a prescription from classified_type alone; classified_type is a descriptive label (the analyzer's read of what kind of ride this looked like), not a target the athlete chose. INTERPRET on the ride's own terms: lead with NP and a plain intensity read for the actual output, then explain what drove it (terrain via VAM / ascent, group dynamics suggested by VI, conditions). When cross_workout.vs_similar has sample_size ≥ 3 and a meaningful np_delta_w, that comparison IS legitimate (history, not prescription) — you may lead with it. The athlete just rode; describe what they did, don't grade what they "should" have done.
 
 PACKET (authoritative; do not compute outside it):
 ${packetStr}
