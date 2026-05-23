@@ -135,9 +135,11 @@ Specs tune the numbers (window N, divergence %, asymmetric ratchet ratio); the S
 5. **Per-tier scoping.** Which run pace targets does observed pace influence? Threshold lerps yes; race-pace prescription maybe; long-run pace probably not. Spec maps signals to consumers.
 6. **Display vs. plan-adaptive.** Confirm: efficiency index and interval-adherence % are display-only (Arc surfaces them; planner does not consume). Only threshold pace feeds targets.
 
-### Decision: D-033 (proposed)
+### Decision: D-033 — SHIPPED 2026-05-22
 
-**Status:** unscheduled. Gated on Phase 0 ship.
+**Status:** **shipped.** Spec at `docs/PHASE-1-RUN-PACE-SPEC.md` (commit `b8f1e626` / `d87be8ef`); Path B amendment + implementation + close-out at this commit. Engine + wrapper deployed. Reconciler engages on three independent anti-volatility gates: streak (≥2 weeks worsening / ≥4 weeks improving outside ±4% band), median (4-week median outside ±4% band in matching direction), ACWR ≤ 1.3 (worsening path only). 22 pin tests in `run-pace-feedback.test.ts` (10 spec §6 scenarios incl. LOAD-BEARING ACWR-gate triad 6.7/6.8/6.9 + LOAD-BEARING §6.10 Path B regression pin + 12 unit tests). See DECISIONS-LOG D-033 + ENGINE-STATE Solid entry.
+
+**Workorder pauses here per user direction.** Phases 2 (strength) / 3 (cycling Arc-to-plan) / 4 (swim aggregation) remain queued — D-034 / D-035 / D-036 — but are NOT scheduled. Resumption is user-gated.
 
 ---
 

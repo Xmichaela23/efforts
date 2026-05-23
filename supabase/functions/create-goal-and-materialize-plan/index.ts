@@ -531,6 +531,108 @@ function logSwimSessionsMirrorFromCombined(
   }
 }
 
+/**
+ * D-033 / Phase 1 (2026-05-22) — build the `RunObservedFitness` slice for the
+ * Arc channel. Reads the last 4 athlete_snapshot rows (newest first) and emits
+ * the curated shape consumed by `generate-combined-plan` → `resolveRunEasyPace`.
+ *
+ * - Returns `null` if fewer than 3 weekly samples have `run_easy_pace_at_hr` set
+ *   (the reconciler's minimum-data gate; spec §4.2 confidence gating).
+ * - Weekly arrays are ordered newest → oldest, length up to 4.
+ * - `efficiency_index`: not stored on `athlete_snapshot` today; reserved as null
+ *   for future compute-snapshot extension. The reconciler does not depend on it.
+ * - `longest_run_minutes`: max of `run_long_run_duration` across window (minutes).
+ * - `interval_adherence_pct`: median of non-null values across window (percent).
+ *
+ * Failure-tolerant: any DB error or unexpected shape returns `null`. Caller
+ * propagates `null` into `arc.run_observed_fitness`; the reconciler short-
+ * circuits to baseline. Plan generation never blocks on this telemetry.
+ */
+async function buildRunObservedFitness(
+  supabase: ReturnType<typeof createClient>,
+  user_id: string,
+): Promise<{
+  median_easy_pace_sec_per_km: number | null;
+  weekly_easy_paces_sec_per_km: (number | null)[];
+  weekly_acwr: (number | null)[];
+  window_weeks: 4;
+  efficiency_index: number | null;
+  interval_adherence_pct: number | null;
+  longest_run_minutes: number | null;
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .from('athlete_snapshot')
+      .select('week_start, run_easy_pace_at_hr, run_long_run_duration, run_interval_adherence, acwr')
+      .eq('user_id', user_id)
+      .order('week_start', { ascending: false })
+      .limit(4);
+    if (error) {
+      console.warn('[create-goal] buildRunObservedFitness DB read failed:', error.message);
+      return null;
+    }
+    if (!Array.isArray(data) || data.length === 0) return null;
+
+    const rows = data.slice(0, 4) as Array<{
+      week_start: string;
+      run_easy_pace_at_hr: number | null;
+      run_long_run_duration: number | null;
+      run_interval_adherence: number | null;
+      acwr: number | null;
+    }>;
+
+    const weeklyEasy: (number | null)[] = rows.map((r) => {
+      const v = r.run_easy_pace_at_hr;
+      return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
+    });
+    const weeklyAcwr: (number | null)[] = rows.map((r) => {
+      const v = r.acwr;
+      return typeof v === 'number' && Number.isFinite(v) ? v : null;
+    });
+
+    const nonNullEasy = weeklyEasy.filter((v): v is number => v != null);
+    if (nonNullEasy.length < 3) return null; // confidence gate; reconciler also enforces
+
+    const sortedEasy = [...nonNullEasy].sort((a, b) => a - b);
+    const mid = Math.floor(sortedEasy.length / 2);
+    const medianEasy =
+      sortedEasy.length % 2 === 0
+        ? (sortedEasy[mid - 1]! + sortedEasy[mid]!) / 2
+        : sortedEasy[mid]!;
+
+    const adherenceVals = rows
+      .map((r) => r.run_interval_adherence)
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    let medianAdherence: number | null = null;
+    if (adherenceVals.length) {
+      const s = [...adherenceVals].sort((a, b) => a - b);
+      const m = Math.floor(s.length / 2);
+      medianAdherence = s.length % 2 === 0 ? (s[m - 1]! + s[m]!) / 2 : s[m]!;
+    }
+
+    const longestRunMinutes = rows.reduce<number | null>((acc, r) => {
+      const v = r.run_long_run_duration;
+      if (typeof v === 'number' && Number.isFinite(v) && v > 0) {
+        return acc == null || v > acc ? v : acc;
+      }
+      return acc;
+    }, null);
+
+    return {
+      median_easy_pace_sec_per_km: medianEasy,
+      weekly_easy_paces_sec_per_km: weeklyEasy,
+      weekly_acwr: weeklyAcwr,
+      window_weeks: 4,
+      efficiency_index: null,
+      interval_adherence_pct: medianAdherence,
+      longest_run_minutes: longestRunMinutes,
+    };
+  } catch (e) {
+    console.warn('[create-goal] buildRunObservedFitness exception:', e);
+    return null;
+  }
+}
+
 function inferLimiterSportFromArc(arc: ArcContext): 'swim' | 'bike' | 'run' {
   const swim = arc.swim_training_from_workouts;
   if (swim && swim.completed_swim_sessions_last_90_days === 0) return 'swim';
@@ -1559,6 +1661,11 @@ async function buildCombinedPlan(
   console.log(
     '[buildCombinedPlan] invoking HTTP edge function generate-combined-plan — filter Supabase logs by function name **generate-combined-plan** to see [buildWeek] / [session-factory] lines from that separate execution.',
   );
+  // D-033 / Phase 1 (2026-05-22) — run-pace feedback loop input. Built from
+  // last-4 athlete_snapshot rows; `null` when <3 weeks of `run_easy_pace_at_hr`
+  // data are available. Reconciler short-circuits to baseline when null.
+  const runObservedFitness = await buildRunObservedFitness(supabase, user_id);
+
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
     user_id,
@@ -1570,11 +1677,16 @@ async function buildCombinedPlan(
     // subset into the engine for Phase 1-4 consumers. Phase 0 is behavior-neutral;
     // no engine code path reads these fields today. See
     // `docs/PHASE-0-ARC-CHANNEL-SPEC.md`.
+    // D-033 / Phase 1 (2026-05-22) — `run_observed_fitness` added; the engine
+    // calls `resolveRunEasyPace(state.learned_fitness, arc.run_observed_fitness)`
+    // and overrides `learned_fitness.run_easy_pace_sec_per_km` in-memory when
+    // the reconciler displaces baseline. See `docs/PHASE-1-RUN-PACE-SPEC.md`.
     arc: {
       latest_snapshot: arcForCombined.latest_snapshot,
       cycling_fitness: arcForCombined.cycling_fitness,
       swim_training_from_workouts: arcForCombined.swim_training_from_workouts,
       longitudinal_signals: arcForCombined.longitudinal_signals,
+      run_observed_fitness: runObservedFitness,
     },
     athlete_state: {
       current_ctl: currentCTL,

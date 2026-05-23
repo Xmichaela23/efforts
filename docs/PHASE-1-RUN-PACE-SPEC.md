@@ -76,16 +76,29 @@ A future Phase 1.5 or separate work order can add direct threshold-pace aggregat
   - 8:00/mi pace × 0.96 = 7:41/mi (19s faster). Plausibly a real fitness gain.
 - "Sustained" = the **trailing-window MEDIAN** is outside the ±4% band. Median over 4 weeks is robust to a single anomalous week (one outlier doesn't move the median).
 
-### 4.3 Asymmetric ratchet: **consecutive-week count + ACWR gate**
+### 4.3 Asymmetric ratchet: **consecutive-week count + median gate + ACWR gate**
+
+> **Spec amendment 2026-05-22 (Path B):** the original spec phrasing in §5.3
+> implied streak alone could trigger engagement, while §4.3 + §6.2 implied
+> the same. Implementation showed that under moderate ACWR (1.1–1.2, well
+> within the optimal training zone), a 2-week 5%-slow streak with median
+> still inside the ±4% band would displace baseline. That is more aggressive
+> than the anti-volatility intent. Resolution: engagement requires BOTH the
+> streak AND the median to cross the band. The ACWR gate stays as the third
+> independent check. See §6.10 for the locked regression pin.
 
 **Same divergence threshold (4%) but different consecutive-week requirements** for engagement:
 
-- **Worsening (observed pace SLOWER than baseline by >4%):** triggers after **2 consecutive weeks** of weekly values outside the slow band. Fast recognition for fatigue, illness, overreaching, regression — when in doubt, conservative direction is to tighten the plan sooner.
-- **Improving (observed pace FASTER than baseline by >4%):** triggers after **4 consecutive weeks** of weekly values outside the fast band. Slow engagement for fitness gains — protects against single-PR weeks (or 2-3 PRs in a row from favorable conditions) auto-prescribing harder paces.
+- **Worsening (observed pace SLOWER than baseline by >4%):** triggers when BOTH conditions hold simultaneously: (1) ≥**2 consecutive weeks** of weekly values >+4% above baseline, AND (2) **4-week median is >+4% above baseline**. Streak alone is not sufficient. The streak gate provides fast detection at the leading edge; the median gate provides full-window confirmation. Fast recognition for fatigue, illness, overreaching, regression — when both gates fire, conservative direction is to tighten the plan sooner.
+- **Improving (observed pace FASTER than baseline by >4%):** triggers when BOTH conditions hold: (1) ≥**4 consecutive weeks** of weekly values <-4% below baseline, AND (2) **4-week median is <-4% below baseline**. Slow engagement for fitness gains — protects against single-PR weeks (or 2-3 PRs in a row from favorable conditions) auto-prescribing harder paces.
 
 **Asymmetry ratio: 2× slower-to-engage for improvement vs. worsening.** Documented; spec adjusts only this ratio if real-world feedback shows the conservative direction is too aggressive or too slow.
 
-**Safety-favored tie-break:** when both directions could plausibly engage (e.g. data flicker around the threshold), worsening wins. The plan tightens; it does not loosen on ambiguous data.
+**Safety-favored tie-break:** when both gates fire only marginally (e.g. data flicker around the threshold), the worsening direction's lower streak count (2) means it engages sooner than the improving direction (4). The plan tightens; it does not loosen on ambiguous data.
+
+**Why streak AND median, not streak OR median (or streak alone):**
+- Streak alone (the original §6.2 phrasing) allowed 2 weeks of moderate-ACWR noise to displace baseline. With the ACWR gate set at 1.3 (sports-science "optimal zone" boundary), a streak under ACWR 1.1–1.2 passes both available gates on insufficient evidence. The median gate adds a third independent constraint: the 2 anomalous weeks must also be representative of the full window. Two slow weeks among two baseline weeks → median stays in-band → no engagement.
+- Median alone (without the streak) would lag genuine regression by ~1 extra week: a single late-window slow week can pull the median across the band, but waiting for that crossing means missing the leading-edge signal. Requiring the streak ensures the displacement target (the new pace) is meaningful — the worsening is concentrated at the leading edge, not noise spread across the window.
 
 ### 4.3.1 Fatigue-vs-fitness-decline distinction (ACWR gate on worsening)
 
@@ -100,7 +113,7 @@ The pace signal alone cannot distinguish these. The system already has the discr
 
 **Rule (LOCKED at spec level):**
 
-The worsening path engages ONLY when **every week in the 2-consecutive-week worsening window has `acwr ≤ 1.3`**. If any of those weeks has `acwr > 1.3` OR `acwr` is null/missing for both weeks, the worsening signal is treated as fatigue-attributable and the reconciler returns BASELINE.
+The worsening path engages ONLY when (a) the streak gate has fired (§4.3), (b) the median gate has fired (§4.3), AND (c) **every week in the 2-consecutive-week worsening window has `acwr ≤ 1.3`**. If any of those weeks has `acwr > 1.3` OR `acwr` is null/missing for both weeks, the worsening signal is treated as fatigue-attributable and the reconciler returns BASELINE (with `source: 'baseline_acwr_gated'` for telemetry distinguishability from the in-band / streak-failed cases). The ACWR gate is checked AFTER the streak + median gates fire — if either of the first two gates fail, the result is `baseline`, not `baseline_acwr_gated`.
 
 **Why this rule shape:**
 - A single elevated-ACWR week in the worsening window is enough to flag ambiguity — fatigue from a hard week can tail into the next week's easy runs. Conservative: don't lock in a slowdown that might just be carry-over fatigue.
@@ -255,21 +268,27 @@ export function resolveRunEasyPace(
   baseline: { value: number; confidence: string; sample_count: number } | null,
   observed: RunObservedFitness | null,
 ): ResolvedRunEasyPace | null {
-  // Decision tree per spec sections 4.3, 4.3.1, 4.4.
+  // Decision tree per spec sections 4.3 (Path B), 4.3.1, 4.4.
   // 1. Both missing → null (caller falls back to whatever default exists today).
   // 2. Baseline usable, observed missing → baseline.
   // 3. Baseline unusable, observed present (≥3 weeks) → observed_no_baseline.
-  // 4. Both present, observed median within ±4% of baseline → baseline.
-  // 5. Both present, observed median >4% slower for 2+ consecutive weeks AND
-  //    ACWR ≤ 1.3 for EVERY week in that 2-consecutive-week window (per 4.3.1) →
-  //    reconciled_worse.
-  // 6. Both present, observed median >4% slower for 2+ consecutive weeks BUT
-  //    ACWR > 1.3 in ANY of those weeks (or null in BOTH weeks) → baseline
-  //    (attributed to accumulated fatigue per 4.3.1). New source value:
-  //    `baseline_acwr_gated`.
-  // 7. Both present, observed median >4% faster for 4+ consecutive weeks →
-  //    reconciled_better (no ACWR gate on improving path per 4.3.1).
-  // 8. Else (ambiguous data) → baseline (safety-favored tie-break).
+  // 4. Both present. Compute consecutive-week streaks (newest first) in each
+  //    direction, and the 4-week median divergence from baseline.
+  // 5. Worsening engagement requires BOTH:
+  //    (a) ≥2 consecutive weeks with weekly value > baseline × 1.04, AND
+  //    (b) 4-week median > baseline × 1.04 (median divergence > +4%).
+  //    If only one fires → baseline (per §6.10 regression pin: streak alone
+  //    is not sufficient under moderate ACWR).
+  //    If both fire, check ACWR gate over the worsening window:
+  //      - any week's acwr > 1.3 OR both weeks null → baseline_acwr_gated.
+  //      - else → reconciled_worse with pace = median.
+  // 6. Improving engagement requires BOTH:
+  //    (a) ≥4 consecutive weeks with weekly value < baseline × 0.96, AND
+  //    (b) 4-week median < baseline × 0.96 (median divergence < -4%).
+  //    No ACWR gate on improving path (fitness gains under load are
+  //    unambiguous; see §4.3.1).
+  //    Both fire → reconciled_better with pace = median. Else → baseline.
+  // 7. All other paths → baseline (safety-favored tie-break).
   ...
 }
 ```
@@ -306,21 +325,30 @@ Divergence: (358 - 360) / 360 = -0.56% → within ±4% band → reconciler retur
 
 **Assertion:** `resolveRunEasyPace(baseline, observed).source === 'baseline'`. Plan output uses baseline pace, NOT the PR-week-skewed value.
 
-### 6.2 Scenario: sustained worsening DOES engage (fast direction)
+### 6.2 Scenario: sustained worsening DOES engage (streak AND median both cross)
 
-**Same fixture, baseline.**
+**Same fixture, baseline 360 sec/km.**
 
 **Observed payload (newest first):**
-- Week 1: 380 sec/km (+5.6%, slower).
-- Week 2: 378 sec/km (+5.0%, slower).
-- Week 3: 360 sec/km (matches baseline).
-- Week 4: 358 sec/km (within noise).
+- Week 1: 380 sec/km (+5.6%, slower — clearly outside slow band).
+- Week 2: 378 sec/km (+5.0%, slower — outside slow band).
+- Week 3: 374 sec/km (+3.9%, trending slow — INSIDE band by 0.1pp; streak breaks at end of week 2).
+- Week 4: 372 sec/km (+3.3%, trending slow — inside band).
 
-Median = (358+360+378+380)/2 = (360+378)/2 = 369 sec/km. Divergence: (369 - 360) / 360 = +2.5% → within ±4% band overall, but...
+slowBound = 360 × 1.04 = 374.4 sec/km.
+- Week 1 (380) > 374.4 → counts toward slow streak.
+- Week 2 (378) > 374.4 → streak continues. consecutiveSlow = 2 ✓
+- Week 3 (374) NOT > 374.4 → streak breaks. consecutiveSlow stays at 2.
 
-Consecutive-week analysis: weeks 1 and 2 are BOTH >+4% (5.6%, 5.0%) → 2 consecutive weeks worsening → meets asymmetric-ratchet threshold for worsening.
+Median = sorted [372, 374, 378, 380] → (374+378)/2 = 376 sec/km. Divergence: (376 - 360)/360 = +4.44% → OUTSIDE ±4% band ✓
 
-**Assertion:** `resolveRunEasyPace(baseline, observed).source === 'reconciled_worse'`. Reconciled pace = median (369 sec/km) — the plan tightens easy-pace prescription.
+Both gates fire: streak (2 ≥ 2) AND median (+4.4% > +4%).
+
+ACWR (assumed all ≤ 1.3 for this scenario): gate passes.
+
+**Assertion:** `resolveRunEasyPace(baseline, observed).source === 'reconciled_worse'`. Reconciled pace = median (376 sec/km). The trailing window concentrates worsening at the leading edge AND the full-window median confirms a sustained shift — plan tightens easy-pace prescription.
+
+**Why this fixture is meaningful as the engage-case test:** the streak is a clean 2 (not 3+), the median is just barely over the band (+4.4%, not +6%), and the late-window weeks are still trending slow (3-4%). This is the realistic "genuine sustained worsening" pattern — not a single spike, not a 4-week obvious decline. Both anti-volatility gates fire at their minimum thresholds; either gate by itself would not.
 
 ### 6.3 Scenario: sustained improving DOES NOT engage at 2 consecutive weeks
 
@@ -370,16 +398,16 @@ Baseline unusable (low confidence). Observed present + sufficient.
 **Observed (newest first):**
 - Week 1: 380 sec/km (+5.6%, slower); `acwr = 1.45` (elevated — overload territory).
 - Week 2: 378 sec/km (+5.0%, slower); `acwr = 1.55` (further elevated).
-- Week 3: 360 sec/km; `acwr = 1.20`.
-- Week 4: 358 sec/km; `acwr = 1.10`.
+- Week 3: 374 sec/km (+3.9%); `acwr = 1.20`.
+- Week 4: 372 sec/km (+3.3%); `acwr = 1.10`.
 
-Pace signal: 2 consecutive weeks (1+2) both >+4% slow. **Pre-gate, this would trigger `reconciled_worse`.**
+Pace signal: streak gate fires (weeks 1+2 both > 374.4). Median = 376 (+4.4%) — median gate fires. **Pre-ACWR-gate, this would trigger `reconciled_worse`.**
 
 ACWR check: Week 1 ACWR = 1.45 > 1.3 AND Week 2 ACWR = 1.55 > 1.3. Both weeks in the worsening window have elevated ACWR.
 
 **Assertion:** `resolveRunEasyPace(baseline, observed).source === 'baseline_acwr_gated'`. Reconciled pace = baseline (360 sec/km). The slowdown is attributed to accumulated training load, not fitness decline. **The plan does NOT tighten in response to fatigue the plan was designed to create.**
 
-This is the load-bearing scenario for the fatigue-vs-fitness distinction. If this test ever passes with `source === 'reconciled_worse'`, the ACWR gate has regressed.
+This is the load-bearing scenario for the fatigue-vs-fitness distinction. If this test ever passes with `source === 'reconciled_worse'`, the ACWR gate has regressed. The fixture deliberately satisfies BOTH the streak and median gates (the first two anti-volatility layers) — ACWR is the third and final independent check.
 
 ### 6.8 Scenario: worsening signal with NORMAL ACWR → reconciler engages (genuine regression)
 
@@ -388,12 +416,12 @@ This is the load-bearing scenario for the fatigue-vs-fitness distinction. If thi
 **Observed (newest first):**
 - Week 1: 380 sec/km (+5.6%); `acwr = 0.95` (under-loading — perhaps post-taper / illness).
 - Week 2: 378 sec/km (+5.0%); `acwr = 1.05`.
-- Week 3: 360 sec/km; `acwr = 1.10`.
-- Week 4: 358 sec/km; `acwr = 1.00`.
+- Week 3: 374 sec/km (+3.9%); `acwr = 1.10`.
+- Week 4: 372 sec/km (+3.3%); `acwr = 1.00`.
 
-Pace signal: 2 consecutive weeks slow. ACWR check: both weeks ≤ 1.3.
+Pace signal: streak gate fires (2-week streak). Median = 376 (+4.4%) — median gate fires. ACWR check: both worsening-window weeks ≤ 1.3.
 
-**Assertion:** `resolveRunEasyPace(baseline, observed).source === 'reconciled_worse'`. Reconciled pace = median (369 sec/km). Genuine fitness loss / illness / extended deload — plan tightens. Distinguishes from 6.7 by ACWR signal alone.
+**Assertion:** `resolveRunEasyPace(baseline, observed).source === 'reconciled_worse'`. Reconciled pace = median (376 sec/km). Genuine fitness loss / illness / extended deload — plan tightens. Distinguishes from 6.7 by ACWR signal alone.
 
 ### 6.9 Scenario: improving signal during high ACWR → reconciler STILL engages (no gate on improving path)
 
@@ -409,7 +437,37 @@ Pace signal: 4 consecutive weeks faster than baseline by >4%. ACWR is elevated t
 
 **Assertion:** `resolveRunEasyPace(baseline, observed).source === 'reconciled_better'`. The improving path has no ACWR gate (per 4.3.1) — fitness gains during high load are unambiguous and engagement is correct. Reconciled pace = 340 sec/km (median).
 
-### 6.7 Hash test update (Phase 0 → Phase 1 transition)
+### 6.10 LOCKED regression pin — 2-week streak with median IN-band (Path B amendment, 2026-05-22)
+
+**This is the load-bearing test for the §4.3 Path B amendment.** It captures the exact scenario that motivated requiring BOTH streak AND median to fire: a 2-week worsening streak at the start of the window with the rest of the window at baseline, under ACWR well within the "optimal training zone" (so the ACWR gate alone would not catch it).
+
+**Same fixture, baseline 360 sec/km.**
+
+**Observed (newest first):**
+- Week 1: 380 sec/km (+5.6%, slower).
+- Week 2: 378 sec/km (+5.0%, slower).
+- Week 3: 360 sec/km (matches baseline).
+- Week 4: 358 sec/km (within noise).
+- ACWR: `[1.10, 1.15, 1.05, 1.00]` — entirely within sports-science "optimal training zone" (≤ 1.3). No overload signal.
+
+**Gate evaluation:**
+- Streak slow: weeks 1+2 both > 374.4 → `consecutiveSlow = 2` ✓ (gate fires).
+- Median: sorted [358, 360, 378, 380] → (360+378)/2 = 369. Divergence +2.5%. INSIDE ±4% band ✗ (gate does NOT fire).
+- ACWR: all ≤ 1.3 (gate would pass).
+
+Only one of the two engage-direction gates fires (streak). Per the Path B rule, both must fire for engagement.
+
+**Assertion:** `resolveRunEasyPace(baseline, observed).source === 'baseline'`. Reconciled pace = baseline (360 sec/km). Result is `'baseline'`, NOT `'baseline_acwr_gated'` — the ACWR gate is never reached because the median gate fails first. The plan does NOT tighten on two weeks of moderate slowdown when the trailing window does not confirm the shift.
+
+**Anti-regression invariant:** if this test ever returns `'reconciled_worse'` or `'baseline_acwr_gated'`, the Path B amendment has regressed and the reconciler has reverted to streak-alone engagement. The fixture is intentionally constructed so:
+- The streak count meets the worsening threshold (2).
+- The slow weeks are clearly slow (5%+, well above the +4% per-week threshold).
+- ACWR is well-behaved (no gate confusion).
+- ONLY the median gate fails.
+
+Any future change that lets this test engage means streak alone is sufficient — which was the bug the Path B amendment was designed to close.
+
+### 6.11 Hash test update (Phase 0 → Phase 1 transition)
 
 The Phase 0 hash test (`arc-channel.test.ts`) asserts byte-identical output between `arc: undefined` and `arc: populated`. With Phase 1's consumer wired, this is no longer universally true: a fixture where the reconciler ENGAGES will produce different output between modes.
 
@@ -431,7 +489,7 @@ Specifically:
 | `generate-combined-plan/index.ts` | After request validation, call `resolveRunEasyPace` once. If result is non-null and `source !== 'baseline'`, override `state.learned_fitness.run_easy_pace_sec_per_km.value` on the derived in-memory state. Existing `buildWeek` calls read the overridden state naturally. |
 | `create-goal-and-materialize-plan/index.ts` | Add `buildRunObservedFitness(supabase, user_id)` helper. Populate `arc.run_observed_fitness` at the existing `invokeFunction` call site. |
 | `arc-channel.test.ts` | Update to assert byte-identical when `run_observed_fitness === null` only. Phase 0's broader assertion narrows. |
-| NEW `run-pace-feedback.test.ts` | 9 e2e scenarios from section 6 (including 3 ACWR-gate scenarios 6.7 / 6.8 / 6.9 LOAD-BEARING for the fatigue-vs-fitness distinction) + unit tests for `resolveRunEasyPace`. |
+| NEW `run-pace-feedback.test.ts` | 10 e2e scenarios from section 6 (including 3 ACWR-gate scenarios 6.7 / 6.8 / 6.9 LOAD-BEARING for the fatigue-vs-fitness distinction, plus §6.10 LOAD-BEARING regression pin for Path B's streak-AND-median requirement) + unit tests for `resolveRunEasyPace`. |
 
 ---
 
@@ -442,7 +500,8 @@ Specifically:
 - **Phase 1 reconciles ONLY `learned_fitness.run_easy_pace_sec_per_km`.** `performance_numbers.*` is untouched. Race-pace + interval-pace prescriptions remain anchored to manual athlete entries.
 - **Display-only fields stay display-only.** The hash test asserts `efficiency_index`, `interval_adherence_pct`, `longest_run_minutes` do NOT change plan output even when populated with extreme values.
 - **Asymmetric ratchet shape is locked.** Worsening triggers at 2 consecutive weeks; improving at 4. Spec adjusts only the ratio if real-world feedback warrants; the asymmetry direction (worsening faster than improving) is non-negotiable.
-- **ACWR gate on worsening path is locked.** The fatigue-vs-fitness distinction is structural; removing the gate re-introduces the "deload block misread as fitness decline" failure mode (and the self-defeating "plan tightens in response to its own training stimulus" loop). The improving path is gate-free by design; fitness gains during high load are unambiguous. Pin tests 6.7, 6.8, 6.9 lock both halves.
+- **Streak AND median both required for engagement (Path B, 2026-05-22).** Streak alone is not sufficient. The median gate is the second independent anti-volatility layer alongside the streak gate; both must cross before the ACWR gate is even evaluated. Pin test 6.10 locks this — if a 2-week 5%-slow streak with median in-band ever engages, Path B has regressed. Removing the median requirement re-introduces the "moderate-ACWR 2-week noise tightens plan" failure mode.
+- **ACWR gate on worsening path is locked.** The fatigue-vs-fitness distinction is structural; removing the gate re-introduces the "deload block misread as fitness decline" failure mode (and the self-defeating "plan tightens in response to its own training stimulus" loop). The improving path is gate-free by design; fitness gains during high load are unambiguous. The ACWR gate is the THIRD independent check, evaluated only after streak+median both fire. Pin tests 6.7, 6.8, 6.9 lock both halves.
 
 ---
 
@@ -452,6 +511,7 @@ Specifically:
 2. **Asymmetric ratchet 2× (2 weeks worsening / 4 weeks improving)** — ✅ confirmed (safety-favored is the correct bias for a training plan).
 3. **`performance_numbers.fiveK_pace` untouched** — ✅ confirmed (race-pace prescription is athlete-owned goal-setting; anti-cross-pollination rule is correct).
 4. **Fatigue-vs-fitness distinction on the worsening path** — ✅ resolved (per amendment 4.3.1): ACWR gate on worsening path. A worsening signal during high-ACWR weeks is suppressed; the reconciler returns `baseline_acwr_gated`. Locked via pin tests 6.7 / 6.8 / 6.9. The improving path has no ACWR gate by design.
+5. **Streak-vs-median engagement requirement (Path B, 2026-05-22)** — ✅ resolved. The original §5.3 + §4.3 phrasing was internally contradictory: §5.3 implied "median > +4% slower for 2+ consecutive weeks" (a single conjoined gate), while §4.3 + §6.2 implied streak alone was sufficient. Implementation revealed the practical problem: under moderate ACWR (1.1–1.2, sports-science "optimal zone"), a 2-week 5%-slow streak with median in-band displaced baseline — too aggressive for the anti-volatility intent. Resolution: streak AND median are independent gates; both must fire for engagement. ACWR remains the third independent check (evaluated only after the first two). Locked via §6.10 regression pin.
 
 ---
 

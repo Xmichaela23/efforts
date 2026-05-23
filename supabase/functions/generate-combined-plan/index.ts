@@ -14,7 +14,7 @@ import { buildPhaseTimeline, applyLoadingPattern, blockForWeek } from './phase-s
 import { buildWeek, buildAssessmentWeekSessions } from './week-builder.ts';
 import { validatePlan, failedChecks, findMissingRaceDaySessions } from './validator.ts';
 import { classifyCombinedPlanError } from './classify-error.ts';
-import { scaledWeeklyTSS } from './science.ts';
+import { scaledWeeklyTSS, resolveRunEasyPace } from './science.ts';
 import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { resolveWeekConflicts, type WeekConflictContext } from '../_shared/week-conflict-resolver.ts';
 import { reconcileAthleteStateWithWeekOptimizer } from './reconcile-athlete-state-week-optimizer.ts';
@@ -84,6 +84,56 @@ Deno.serve(async (req: Request) => {
       ...athlete_state,
       rest_days: athlete_state.rest_days ?? [],
     };
+
+    // ── D-033 / Phase 1 (2026-05-22) — run easy pace feedback loop ──────────
+    // Reconcile baseline `state.learned_fitness.run_easy_pace_sec_per_km` against
+    // `arc.run_observed_fitness` (Arc-channel curated subset). The reconciler
+    // applies the LOCKED anti-volatility shape (4-week trailing window, ±4%
+    // divergence band, 2× asymmetric ratchet, ACWR ≤ 1.3 gate on worsening).
+    // When the resolved source != 'baseline', we mutate `state.learned_fitness`
+    // in-place so every downstream consumer (week-builder, validator, future
+    // phases) reads the reconciled value. Pure no-op when both inputs absent —
+    // see `docs/PHASE-1-RUN-PACE-SPEC.md` and `science.ts:resolveRunEasyPace`.
+    try {
+      const lfRec = (state.learned_fitness ?? null) as
+        | (Record<string, unknown> & { run_easy_pace_sec_per_km?: { value?: number; confidence?: string; sample_count?: number } })
+        | null;
+      const baseline = lfRec?.run_easy_pace_sec_per_km ?? null;
+      const observed = arc?.run_observed_fitness ?? null;
+      const resolved = resolveRunEasyPace(baseline, observed);
+      if (resolved && resolved.source !== 'baseline') {
+        // Mutate in-place; downstream code (and the state703Cutoff/scheduleState
+        // shallow spreads below) share this object reference.
+        const nextLf: Record<string, unknown> = { ...(lfRec ?? {}) };
+        const prev = (nextLf.run_easy_pace_sec_per_km ?? {}) as Record<string, unknown>;
+        nextLf.run_easy_pace_sec_per_km = {
+          ...prev,
+          value: resolved.paceSecPerKm,
+          // Provenance for debug / future audit trails. Does not displace existing
+          // `confidence` / `sample_count` — observed signal does not retroactively
+          // boost baseline confidence; the reconciler decides displacement.
+          phase1_source: resolved.source,
+          phase1_reasoning: resolved.reasoning,
+        };
+        state.learned_fitness = nextLf;
+        console.log('[generate-combined-plan] D-033 run-pace reconciler engaged:', {
+          source: resolved.source,
+          paceSecPerKm: resolved.paceSecPerKm,
+          baseline_value: baseline?.value ?? null,
+          observed_median: observed?.median_easy_pace_sec_per_km ?? null,
+          observed_weeks: observed?.weekly_easy_paces_sec_per_km?.length ?? 0,
+        });
+      } else if (resolved) {
+        console.log('[generate-combined-plan] D-033 run-pace reconciler held baseline:', {
+          source: resolved.source,
+          paceSecPerKm: resolved.paceSecPerKm,
+        });
+      }
+    } catch (e) {
+      // Reconciler is best-effort: any unexpected failure must NOT block plan
+      // generation. Log + fall through with the original baseline value.
+      console.warn('[generate-combined-plan] D-033 run-pace reconciler exception:', e);
+    }
 
     // History-aware long-day floors: read the longest run / ride from the last 30 days so the
     // physiological floor enforcement (`enforceLongDayFloors`) can scale up to match the athlete's

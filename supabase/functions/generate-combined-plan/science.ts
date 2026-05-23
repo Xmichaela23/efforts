@@ -4,7 +4,224 @@
 // Sources: Friel "Triathlete's Training Bible" 5e, Fitzgerald & Warden "80/20 Triathlon",
 // Seiler 2010, Hickson 1980, Couzens ramp rate tables.
 
-import type { Phase, Sport, Intensity, Priority } from './types.ts';
+import type { Phase, Sport, Intensity, Priority, RunObservedFitness } from './types.ts';
+
+// ── D-033 / Phase 1 — run pace reconciler (LOCKED parameters) ───────────────
+//
+// Per `docs/PHASE-1-RUN-PACE-SPEC.md`:
+//   - Trailing window: 4 weeks (sample-count gate at 3 of 4).
+//   - Divergence threshold: 4% sustained median (relative to baseline).
+//   - Asymmetric ratchet: worsening triggers at 2 consecutive weeks; improving at 4.
+//     2× safety-favored ratio.
+//   - **Engagement requires BOTH** (Path B, after spec amendment 2026-05-22):
+//       (1) consecutive-week streak above the per-direction threshold count, AND
+//       (2) 4-week median outside the ±4% band (in the matching direction).
+//     The streak alone is not sufficient — the median must confirm the signal
+//     across the full window. This is the load-bearing anti-volatility check;
+//     it prevents a 2-week noisy slow run (e.g. heat / new shoes / mild illness)
+//     from displacing baseline when the trailing window shows no sustained shift.
+//   - ACWR gate on worsening: independent third check. Even when streak+median
+//     both fire, the worsening engagement is suppressed (`baseline_acwr_gated`)
+//     if any week in the worsening window has acwr > 1.3, or both weeks are null.
+//     The improving path has NO acwr gate (fitness gains under load are
+//     unambiguous).
+//   - Confidence gating: mirrors arc-context.ts:learnedThresholdPaceUsable
+//     (`medium`/`high` + sample_count ≥ 2 to be usable; otherwise observed wins
+//     when sufficient or baseline-default when both insufficient).
+// All values locked at spec level. Specs do NOT relitigate; this helper is a pure
+// implementation of the locked decision tree.
+
+const RUN_PACE_DIVERGENCE_THRESHOLD = 0.04;            // ±4% sustained
+const RUN_PACE_WORSENING_CONSECUTIVE_WEEKS = 2;        // safety-favored fast trigger
+const RUN_PACE_IMPROVING_CONSECUTIVE_WEEKS = 4;        // slow trigger; protects against PR-week false positives
+const RUN_PACE_ACWR_GATE_THRESHOLD = 1.3;              // sports-science convention; >1.3 = caution / overload
+const RUN_PACE_MIN_SAMPLE_COUNT = 2;                   // baseline-side; mirrors learnedThresholdPaceUsable
+
+/**
+ * Resolution outcome from `resolveRunEasyPace`. Carries the chosen pace value
+ * plus a structured `source` enum + free-form `reasoning` for debug logs.
+ * Athlete-facing UI does NOT consume these fields; reasoning lives in plan
+ * trade-off messages emitted separately (future enhancement).
+ */
+export type ResolvedRunEasyPace = {
+  paceSecPerKm: number;
+  source:
+    | 'baseline'                  // baseline value held; observed within ±4% noise band or insufficient
+    | 'reconciled_worse'          // observed median slower; 2-week worsening; ACWR ≤ 1.3 → reconciliation engaged
+    | 'reconciled_better'         // observed median faster; 4-week improving streak → reconciliation engaged
+    | 'observed_no_baseline'      // baseline unusable (low confidence / sample_count); observed is the only signal
+    | 'baseline_acwr_gated';      // worsening signal suppressed because ACWR > 1.3 in worsening window (fatigue, not decline)
+  reasoning: string;
+};
+
+function runPaceMedian(values: (number | null)[]): number | null {
+  const nonNull = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  if (nonNull.length < 3) return null;
+  const sorted = [...nonNull].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1]! + sorted[mid]!) / 2
+    : sorted[mid]!;
+}
+
+function baselineUsable(
+  b: { value?: number; confidence?: string; sample_count?: number } | null | undefined,
+): b is { value: number; confidence: string; sample_count: number } {
+  if (!b || typeof b !== 'object') return false;
+  const v = b.value;
+  if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) return false;
+  if (b.confidence === 'low') return false;
+  const sc = typeof b.sample_count === 'number' ? Math.floor(b.sample_count) : 0;
+  if (sc < RUN_PACE_MIN_SAMPLE_COUNT) return false;
+  return true;
+}
+
+/**
+ * D-033 / Phase 1 run pace reconciler. Decision tree per spec §4.3 + §4.3.1 + §4.4.
+ * Pure function — no side effects, no DB access, no environment reads. Fully
+ * unit-testable in isolation.
+ *
+ *   1. Both missing → null. Caller falls back to existing default behavior.
+ *   2. Baseline usable, observed missing → 'baseline'.
+ *   3. Baseline unusable, observed present + ≥3 weeks of data → 'observed_no_baseline'.
+ *   4. Both present. Compute streaks (consecutive newest-first weeks outside
+ *      the ±4% band in each direction) and median divergence.
+ *   5. Worsening engagement requires BOTH (a) `consecutiveSlow ≥ 2` AND
+ *      (b) `median > +4%` above baseline. If only one fires, baseline holds.
+ *      When both fire, ACWR gate is consulted: every week in the worsening
+ *      window must have acwr ≤ 1.3 (or partial-data tolerance: null in one
+ *      week + other ≤ 1.3 permitted; null in BOTH blocks). Gate fails →
+ *      'baseline_acwr_gated'. Gate passes → 'reconciled_worse'.
+ *   6. Improving engagement requires BOTH (a) `consecutiveFast ≥ 4` AND
+ *      (b) `median < -4%` below baseline. No ACWR gate. Both fire →
+ *      'reconciled_better'. Otherwise baseline.
+ *   7. Else → 'baseline' (safety-favored tie-break).
+ *
+ * **Anti-volatility (three independent layers):**
+ *   - Streak gate: a single anomalous week cannot satisfy `consecutiveSlow ≥ 2`.
+ *   - Median gate: a 2-week noisy slow streak whose remaining 2 weeks are at
+ *     baseline produces an in-band 4-week median and is rejected. The full
+ *     trailing window must confirm the shift before the plan is displaced.
+ *   - ACWR gate: even when streak+median both fire on the worsening path, an
+ *     elevated workload ratio attributes the slowdown to accumulated training
+ *     load rather than fitness decline.
+ * See `docs/PHASE-1-RUN-PACE-SPEC.md` §4.3 + §4.3.1 + §6.2 + §6.10 for full reasoning.
+ */
+export function resolveRunEasyPace(
+  baseline: { value?: number; confidence?: string; sample_count?: number } | null,
+  observed: RunObservedFitness | null,
+): ResolvedRunEasyPace | null {
+  const baselineOk = baselineUsable(baseline);
+  const observedMedian = observed ? observed.median_easy_pace_sec_per_km : null;
+  const observedHasMedian = observedMedian != null && Number.isFinite(observedMedian) && observedMedian > 0;
+
+  // Case 1: both missing.
+  if (!baselineOk && !observedHasMedian) return null;
+
+  // Case 2: baseline usable, observed missing or insufficient.
+  if (baselineOk && !observedHasMedian) {
+    return {
+      paceSecPerKm: baseline!.value!,
+      source: 'baseline',
+      reasoning: 'observed run easy pace insufficient; baseline held',
+    };
+  }
+
+  // Case 3: baseline unusable, observed sufficient.
+  if (!baselineOk && observedHasMedian) {
+    return {
+      paceSecPerKm: observedMedian!,
+      source: 'observed_no_baseline',
+      reasoning: 'baseline low-confidence or insufficient samples; observed wins',
+    };
+  }
+
+  // Both present from here.
+  const baselineVal = baseline!.value!;
+  const median = observedMedian!;
+  const divergence = (median - baselineVal) / baselineVal;
+
+  const weekly = observed!.weekly_easy_paces_sec_per_km;
+  const weeklyAcwr = observed!.weekly_acwr;
+
+  // Count consecutive weeks (newest first) outside the band in the same direction.
+  // For worsening: weekly[i] > baseline × (1 + threshold).
+  // For improving: weekly[i] < baseline × (1 - threshold).
+  const slowBound = baselineVal * (1 + RUN_PACE_DIVERGENCE_THRESHOLD);
+  const fastBound = baselineVal * (1 - RUN_PACE_DIVERGENCE_THRESHOLD);
+
+  let consecutiveSlow = 0;
+  let consecutiveFast = 0;
+  for (let i = 0; i < weekly.length; i++) {
+    const v = weekly[i];
+    if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) break; // null breaks the streak
+    if (v > slowBound) consecutiveSlow++;
+    else break;
+  }
+  for (let i = 0; i < weekly.length; i++) {
+    const v = weekly[i];
+    if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) break;
+    if (v < fastBound) consecutiveFast++;
+    else break;
+  }
+
+  // Path B (spec amendment 2026-05-22): engagement requires BOTH streak AND
+  // median to cross. Streak alone is not sufficient; the 4-week median must
+  // confirm the signal across the trailing window. This protects against a
+  // 2-week noisy slow streak whose remaining 2 weeks at baseline yield an
+  // in-band median — a scenario where the ACWR gate alone (at moderate ACWR)
+  // would otherwise let the plan tighten on insufficient evidence. See
+  // `docs/PHASE-1-RUN-PACE-SPEC.md` §4.3 + §6.10.
+
+  const streakSlowMet = consecutiveSlow >= RUN_PACE_WORSENING_CONSECUTIVE_WEEKS;
+  const streakFastMet = consecutiveFast >= RUN_PACE_IMPROVING_CONSECUTIVE_WEEKS;
+  const medianAboveSlowBand = divergence > RUN_PACE_DIVERGENCE_THRESHOLD;
+  const medianBelowFastBand = divergence < -RUN_PACE_DIVERGENCE_THRESHOLD;
+
+  // Worsening — streak AND median both required, then ACWR gate.
+  if (streakSlowMet && medianAboveSlowBand) {
+    // ACWR gate: every week in the worsening window must have acwr ≤ 1.3.
+    // Null in BOTH weeks → block (can't distinguish; conservative).
+    // Null in ONE week + other ≤ 1.3 → permit (partial-data tolerance).
+    const worseningWindow = weeklyAcwr.slice(0, RUN_PACE_WORSENING_CONSECUTIVE_WEEKS);
+    const anyElevated = worseningWindow.some((a) => typeof a === 'number' && a > RUN_PACE_ACWR_GATE_THRESHOLD);
+    const allNull = worseningWindow.every((a) => a == null);
+    if (anyElevated || allNull) {
+      return {
+        paceSecPerKm: baselineVal,
+        source: 'baseline_acwr_gated',
+        reasoning: `worsening pace signal (streak=${consecutiveSlow}, median +${(divergence * 100).toFixed(1)}%) suppressed: ACWR ${worseningWindow.map((a) => a == null ? 'null' : a.toFixed(2)).join('/')} in window suggests accumulated fatigue, not fitness decline`,
+      };
+    }
+    return {
+      paceSecPerKm: median,
+      source: 'reconciled_worse',
+      reasoning: `${consecutiveSlow}wk consecutive worsening + median ${median.toFixed(0)} (+${(divergence * 100).toFixed(1)}% above baseline ${baselineVal.toFixed(0)}); both streak and median gates passed; ACWR ≤ ${RUN_PACE_ACWR_GATE_THRESHOLD}; plan tightens`,
+    };
+  }
+
+  // Improving — streak AND median both required. No ACWR gate.
+  if (streakFastMet && medianBelowFastBand) {
+    return {
+      paceSecPerKm: median,
+      source: 'reconciled_better',
+      reasoning: `${consecutiveFast}wk consecutive improving + median ${median.toFixed(0)} (${(divergence * 100).toFixed(1)}% below baseline ${baselineVal.toFixed(0)}); both streak and median gates passed; plan loosens`,
+    };
+  }
+
+  // Insufficient signal — one or both gates failed. Safety-favored → baseline.
+  // This includes:
+  //   - Median in-band + any streak count (case 4 in original spec; the spec §6.10
+  //     regression pin lives in this branch when streak alone met but median didn't).
+  //   - Median outside band + streak below threshold (single-week anomaly OR
+  //     mid-streak inception).
+  return {
+    paceSecPerKm: baselineVal,
+    source: 'baseline',
+    reasoning: `insufficient signal: streak slow=${consecutiveSlow} fast=${consecutiveFast}, median ${median.toFixed(0)} (${(divergence * 100).toFixed(1)}% vs baseline ${baselineVal.toFixed(0)}); requires BOTH ≥${RUN_PACE_WORSENING_CONSECUTIVE_WEEKS}wk slow streak AND median >+${(RUN_PACE_DIVERGENCE_THRESHOLD * 100).toFixed(0)}% (worsening), OR ≥${RUN_PACE_IMPROVING_CONSECUTIVE_WEEKS}wk fast streak AND median <-${(RUN_PACE_DIVERGENCE_THRESHOLD * 100).toFixed(0)}% (improving); baseline held`,
+  };
+}
+
 
 // ── §1.1  TSS impact multipliers ────────────────────────────────────────────
 // Normalize systemic recovery cost across sports.

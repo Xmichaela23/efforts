@@ -310,6 +310,56 @@ export interface AthleteMemory {
 }
 
 /**
+ * D-033 / Phase 1 (2026-05-22) — observed run fitness aggregated from the last 4
+ * weeks of `athlete_snapshot` rows. Consumed by the engine's run-pace reconciler
+ * (`resolveRunEasyPace`) to displace `learned_fitness.run_easy_pace_sec_per_km` when
+ * sustained divergence is detected per the asymmetric ratchet (worsening: 2 weeks;
+ * improving: 4 weeks) and the ACWR gate (worsening path requires every window-week
+ * to have acwr ≤ 1.3; protects fatigue from being misread as fitness decline).
+ *
+ * Wrapper-side aggregation in `create-goal-and-materialize-plan` from the
+ * `athlete_snapshot` table; engine treats the payload as read-only. Display-only
+ * fields (`efficiency_index`, `interval_adherence_pct`, `longest_run_minutes`) are
+ * carried for State page render but never consumed by the engine reconciler.
+ *
+ * See `docs/PHASE-1-RUN-PACE-SPEC.md` for parameter rationale (window length,
+ * divergence threshold, asymmetric ratchet ratio, ACWR gate).
+ */
+export interface RunObservedFitness {
+  /**
+   * Median observed easy pace at sub-threshold HR (sec/km) over the trailing window.
+   * Null when fewer than 3 weeks of `snapshot.run_easy_pace_at_hr` data is available.
+   */
+  median_easy_pace_sec_per_km: number | null;
+
+  /**
+   * Weekly raw values (newest first), one entry per week in the trailing window.
+   * Length always equals `window_weeks`. Null entries represent weeks with no
+   * qualifying easy-HR samples. The reconciler uses this for consecutive-week
+   * divergence counts per the asymmetric ratchet.
+   */
+  weekly_easy_paces_sec_per_km: (number | null)[];
+
+  /**
+   * Weekly ACWR values (newest first), parallel array to `weekly_easy_paces_sec_per_km`.
+   * The worsening-path reconciler consults this to distinguish accumulated fatigue
+   * (acwr > 1.3) from genuine fitness decline (acwr ≤ 1.3). Null entries permitted.
+   * Improving path does NOT consult this field.
+   */
+  weekly_acwr: (number | null)[];
+
+  /** Trailing window length in weeks. Locked at 4 for Phase 1. */
+  window_weeks: 4;
+
+  /**
+   * Display-only fields. Engine does NOT consume these. Carried for State page render.
+   */
+  efficiency_index: number | null;
+  interval_adherence_pct: number | null;
+  longest_run_minutes: number | null;
+}
+
+/**
  * Phase 0 / D-032 (2026-05-22) — curated subset of `ArcContext` channeled into the
  * engine so Phases 1-4 can consume dynamic Arc data per discipline. Phase 0 is
  * **behavior-neutral**: the engine never reads these fields. Subsequent phases
@@ -363,6 +413,14 @@ export interface ArcChannelPayload {
    * spec calls for longitudinal signal consumption. Null when computation failed.
    */
   longitudinal_signals: LongitudinalSignals | null;
+
+  /**
+   * D-033 / Phase 1 — trailing-window aggregate of observed run easy pace + ACWR
+   * for the engine's run-pace reconciler. Wrapper aggregates from `athlete_snapshot`
+   * (last 4 weeks) per spec section 5.2. Null when fewer than 3 weeks of data are
+   * available — engine falls back to baseline. See {@link RunObservedFitness}.
+   */
+  run_observed_fitness: RunObservedFitness | null;
 }
 
 export interface CombinedPlanRequest {

@@ -19,6 +19,15 @@
  * for the consumed field(s). The Phase 0 hash test is the contract;
  * consumers are explicit additions to it.
  *
+ * D-033 / Phase 1 (2026-05-22) — `run_observed_fitness` is now a Phase 1
+ * consumer. This test exercises `buildWeek` directly (not the full engine
+ * `index.ts` handler), and the run-pace reconciler runs in `index.ts`
+ * BEFORE `buildWeek`. So the byte-identical contract still holds at the
+ * buildWeek level even when `run_observed_fitness` is set, because
+ * buildWeek itself does not read that field. To make the contract explicit,
+ * `makePopulatedArc` sets `run_observed_fitness: null` — the Phase 1
+ * reconciler-level contract test lives in `run-pace-feedback.test.ts`.
+ *
  * Run from repo root:
  *   deno test --no-check --no-lock --allow-all \
  *     supabase/functions/generate-combined-plan/arc-channel.test.ts
@@ -109,6 +118,10 @@ function makePopulatedArc(): ArcChannelPayload {
       asOfYmd: '2026-05-22',
       signals: [],
     } as unknown as ArcChannelPayload['longitudinal_signals'],
+    // D-033 / Phase 1 — set to null so the contract assertion is unambiguous:
+    // `buildWeek` does not read `run_observed_fitness`. The reconciler-level
+    // test lives in `run-pace-feedback.test.ts`.
+    run_observed_fitness: null,
   };
 }
 
