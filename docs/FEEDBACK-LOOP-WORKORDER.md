@@ -139,7 +139,7 @@ Specs tune the numbers (window N, divergence %, asymmetric ratchet ratio); the S
 
 **Status:** **shipped.** Spec at `docs/PHASE-1-RUN-PACE-SPEC.md` (commit `b8f1e626` / `d87be8ef`); Path B amendment + implementation + close-out at this commit. Engine + wrapper deployed. Reconciler engages on three independent anti-volatility gates: streak (≥2 weeks worsening / ≥4 weeks improving outside ±4% band), median (4-week median outside ±4% band in matching direction), ACWR ≤ 1.3 (worsening path only). 22 pin tests in `run-pace-feedback.test.ts` (10 spec §6 scenarios incl. LOAD-BEARING ACWR-gate triad 6.7/6.8/6.9 + LOAD-BEARING §6.10 Path B regression pin + 12 unit tests). See DECISIONS-LOG D-033 + ENGINE-STATE Solid entry.
 
-**Workorder pauses here per user direction.** Phases 2 (strength) / 3 (cycling Arc-to-plan) / 4 (swim aggregation) remain queued — D-034 / D-035 / D-036 — but are NOT scheduled. Resumption is user-gated.
+**Workorder PAUSED as of 2026-05-22 — deferred, NOT cancelled.** Phases 2 (strength progression) / 3 (cycling Arc-to-plan) / 4 (swim aggregation) remain queued — D-034 / D-035 / D-036 — but are NOT scheduled. The anti-volatility patterns for each are LOCKED at work-order level (see each phase's §Anti-volatility section below); the docs are the record. **Resume by explicit user decision only.** Don't proactively roll into Phase 2 or any successor phase. Each phase's spec gate (investigate → spec → approval → implement) applies on resumption.
 
 ---
 
@@ -206,7 +206,7 @@ Specs tune N (separately for progression vs. regression), the trailing window le
 
 ### Decision: D-034 (proposed)
 
-**Status:** unscheduled. Gated on Phase 0 ship.
+**Status:** PAUSED 2026-05-22 — deferred, NOT cancelled. Phase 0 (D-032) dependency satisfied; user-gated resumption required.
 
 ---
 
@@ -271,7 +271,7 @@ If closure is chosen:
 
 ### Decision: D-035 (proposed)
 
-**Status:** unscheduled. Gated on Phase 0 ship. **May resolve as "no implementation, display-only is correct" with a documented D-NNN entry.**
+**Status:** PAUSED 2026-05-22 — deferred, NOT cancelled. Phase 0 (D-032) dependency satisfied; user-gated resumption required. **May resolve as "no implementation, display-only is correct" with a documented D-NNN entry.**
 
 ---
 
@@ -339,7 +339,7 @@ Specs tune the blend-weight formula, the trailing window length, and the per-ses
 
 ### Decision: D-036 (proposed)
 
-**Status:** unscheduled. Lowest priority of the four loops. Gated on Phase 0 ship.
+**Status:** PAUSED 2026-05-22 — deferred, NOT cancelled. Phase 0 (D-032) dependency satisfied; lowest priority of the four loops; user-gated resumption required.
 
 ---
 
@@ -386,3 +386,24 @@ These adjacent items are NOT in this work order:
 - `docs/ENGINE-STATE.md` — discipline-by-discipline current state of analyze → snapshot → Arc loops.
 - `docs/DECISIONS-LOG.md` — D-NNN entries for each phase as they ship.
 - `CLAUDE.md` — Topology section documents the four storage layers and ingest fan-out pattern.
+
+---
+
+## Work Order 2 — Presentation / context continuity (stub)
+
+**Status:** stub (2026-05-22) — not started. Scope and anti-volatility patterns to be decided at spec time when this work order opens.
+
+**Goal (provisional):** address the presentation / context-continuity layer that sits ABOVE the feedback-loop closure work. Where Work Order 1 (this doc) closes the analyze → snapshot → Arc → planner loop for each discipline, Work Order 2 addresses how the resulting plan-adaptive behavior is communicated, surfaced, and retained as athlete-facing context across sessions.
+
+**Provisional in-scope candidates** (to be confirmed at spec time):
+- **Plan-adaptation visibility.** When the engine displaces a baseline (e.g. D-033 run pace reconciler engages `reconciled_worse`), the athlete currently sees the resulting plan but not the reasoning. Whether to surface the displacement (with what copy, at what surface) is a UX decision separate from the engine logic.
+- **Cross-session continuity.** Context that should persist across plan regenerations — recent adaptation history, athlete-confirmed overrides, deferred-decision queues — and where it lives (`athlete_memory`, `plan_adjustments`, a new surface).
+- **Coach narrative ↔ plan narrative coherence.** The coach surface (`coach/`) and the plan surface (`generate-combined-plan/`) read different slices of the same underlying state today. Whether the two should converge on a shared narrative layer.
+- **State-page rendering completeness.** The 2026-05-22 feedback-loop audit found computed data (e.g. `snapshot.run_*`) that no surface displays. Surfacing computed-but-hidden data is a WO2 candidate — the engine has the signal, but the athlete can't see it.
+- **Source-of-truth consistency.** Baselines vs Arc — every surface should resolve which it reads consistently. The audit found Performance / State / Arc can disagree (e.g. live vs. cached vs. snapshot-aggregated reads of the same underlying field). WO2 scope includes auditing the read paths and picking a canonical authority per field.
+
+**Out of scope (provisional):** anything that's an in-loop engine adaptation — that's Work Order 1 territory. WO2 is the presentation / continuity layer over the top.
+
+**Sequencing:** WO2 is NOT gated on WO1 Phases 2-4 (which are paused). It can open at any time on user direction. The stub exists so future sessions don't "discover" the need and re-invent it.
+
+**Resumption:** explicit user decision. No proactive opening.

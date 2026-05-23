@@ -235,6 +235,20 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
+## Q-021 — Run threshold pace not aggregated weekly in `compute-snapshot` (Phase 1 reconciles easy pace as the proxy)
+
+- **Status:** intentional (deferred — Phase 1 / D-033 scope decision; revisit if easy-pace proxy proves insufficient).
+- **Why it exists:** the feedback-loop workorder phrasing ("observed threshold pace") implied a weekly aggregate of Z4 / threshold-effort pace from interval sessions. `compute-facts` derives `pace_at_easy_hr` per workout (`compute-facts:1075-1083` — heart-rate-gated below threshold × 0.78), and `compute-snapshot` aggregates that into the weekly `run_easy_pace_at_hr` field. **There is no symmetric threshold-pace aggregation** — `compute-snapshot:123-138` does not extract Z4 pace from interval sessions into a `run_threshold_pace` weekly field. The data is observable in per-workout `workout_analysis` interval extracts, just not aggregated at week granularity.
+- **Why not a bug:** Phase 1 (D-033) deliberately scoped to reconcile `learned_fitness.run_easy_pace_sec_per_km` instead. Per `docs/PHASE-1-RUN-PACE-SPEC.md` §2.4: easy pace at sub-threshold HR is the cleanest read on aerobic fitness; threshold prescriptions inherit via existing Daniels-style ratios applied to the reconciled easy pace. Reconciling at the input source means every downstream pace target (engine prescriptions, derived threshold, derived race pace, long-run pace) inherits naturally. Adding threshold-pace aggregation today would be a parallel pathway with no obvious additional signal.
+- **What "fixing" (Phase 1.5 candidate) would require:**
+  - **`compute-snapshot/index.ts`:** new aggregator pulling Z4-effort intervals (from `workout_analysis.intervals_v1` or similar) and computing weekly median Z4 pace. New `run_threshold_pace_at_z4` column on `athlete_snapshot` (migration).
+  - **Wrapper:** `buildRunObservedFitness` extended to populate a new field on `RunObservedFitness` (e.g. `median_threshold_pace_sec_per_km`).
+  - **Reconciler:** `resolveRunEasyPace` would either branch into a `resolveRunThresholdPace` sibling, or the reconciler shape would change to return both easy + threshold reconciliations. Spec amendment required for the per-distance / per-effort-tier map of which prescription consumes which signal — currently §4.6 anchors race pace + interval pace to `performance_numbers.fiveK_pace` (athlete-controlled). Threshold-pace reconciliation could touch that anchor or stay scoped to long-run / tempo prescriptions only.
+- **Verification owed:** none today — easy-pace reconciliation is the locked Phase 1 design. Phase 1.5 (or a future open question) would re-litigate this if real-world feedback shows the easy-pace proxy + Daniels-ratio derivation isn't responsive enough at threshold prescriptions specifically.
+- **Cross-ref:** D-033 (Phase 1 scope decision); `docs/PHASE-1-RUN-PACE-SPEC.md` §2.1 (data audit), §2.4 (scope decision rationale), §4.6 (per-distance scoping).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
