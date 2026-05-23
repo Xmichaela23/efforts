@@ -65,6 +65,52 @@ function getOverallPaceSecPerMi(row: any): number | null {
   return resolveOverallPaceSecPerMi(row);
 }
 
+/**
+ * D-NNN: Read grade-adjusted overall pace (sec/mi) when usable elevation data
+ * existed at analysis time. Null when GAP wasn't computed (no usable elevation
+ * series) or fields were never persisted.
+ */
+export function getOverallGapSecPerMi(row: any): number | null {
+  const overall = getComputedOverall(row)?.overall;
+  const v = coerceNumber(overall?.avg_gap_s_per_mi);
+  return v != null && v > 0 ? Math.round(v) : null;
+}
+
+/**
+ * D-NNN: Pace resolver for cross-workout comparisons. Returns GAP when BOTH the
+ * current workout and the candidate row carry it. Otherwise returns raw from
+ * both rows (matched basis). Never mixes a GAP value from one row with a raw
+ * value from another — that would be apples-to-pomegranates and worse than the
+ * raw-only baseline.
+ */
+export function resolvePaceForComparison(currentRow: any, candidateRow: any): {
+  current: number | null;
+  candidate: number | null;
+  basis: 'gap' | 'raw';
+} {
+  const curGap = getOverallGapSecPerMi(currentRow);
+  const candGap = getOverallGapSecPerMi(candidateRow);
+  if (curGap != null && candGap != null) {
+    return { current: curGap, candidate: candGap, basis: 'gap' };
+  }
+  return {
+    current: getOverallPaceSecPerMi(currentRow),
+    candidate: getOverallPaceSecPerMi(candidateRow),
+    basis: 'raw',
+  };
+}
+
+/**
+ * D-NNN: Variance gate flag from a historical row. True when the analyzer
+ * stamped this row as mixed-effort (intervals, fartlek, or plan-intent
+ * intervals). Steady comparison pools exclude these rows so a fartlek doesn't
+ * pollute the easy-run baseline.
+ */
+export function isMixedEffortRow(row: any): boolean {
+  const v = row?.workout_analysis?.session_state_v1?.glance?.is_mixed_effort;
+  return v === true;
+}
+
 function getOverallAvgHr(row: any): number | null {
   const overall = getComputedOverall(row)?.overall;
   const v = coerceNumber(overall?.avg_hr ?? overall?.avg_heart_rate ?? row?.avg_heart_rate);
@@ -170,12 +216,16 @@ export async function getSimilarWorkoutComparisons(
     workoutTypeKey: string | null;
     durationMin: number;
     currentAvgPaceSecPerMi: number | null;
+    /** D-NNN: current workout's GAP pace (sec/mi). Null when no usable
+     *  elevation. Triggers GAP-basis comparisons when historical rows also
+     *  have GAP; never mixes bases. */
+    currentAvgGapSecPerMi?: number | null;
     currentAvgHr: number | null;
     currentHrDriftBpm: number | null;
     currentTerrainClass?: 'flat' | 'rolling' | 'hilly' | null;
   }
-): Promise<VsSimilarV1 & { avg_pace_at_similar_hr: number | null; avg_hr_drift: number | null }> {
-  const { userId, currentWorkoutId, workoutTypeKey, durationMin, currentAvgPaceSecPerMi, currentAvgHr, currentHrDriftBpm, currentTerrainClass } = params;
+): Promise<VsSimilarV1 & { avg_pace_at_similar_hr: number | null; avg_hr_drift: number | null; pace_basis?: 'gap' | 'raw' }> {
+  const { userId, currentWorkoutId, workoutTypeKey, durationMin, currentAvgPaceSecPerMi, currentAvgGapSecPerMi, currentAvgHr, currentHrDriftBpm, currentTerrainClass } = params;
 
   try {
     const end = new Date().toISOString().slice(0, 10);
@@ -230,10 +280,24 @@ export async function getSimilarWorkoutComparisons(
     const comparableKeys = getComparableTypeKeys(workoutTypeKey);
     const notSelf = rows.filter((r) => String(r.id) !== String(currentWorkoutId));
     const completed = notSelf.filter((r) => String(r.workout_status || '').toLowerCase() === 'completed');
+    // D-NNN: variance-aware pool. When the current session is easy-like, exclude
+    // historical rows tagged is_mixed_effort (fartleks, plan-intent intervals on
+    // an "easy" classified_type) from the steady comparison pool. When the
+    // current session is interval-like, mixed-effort rows are eligible regardless
+    // of classified_type — they're the right comparison set.
+    const curKeyLow = String(workoutTypeKey || '').toLowerCase();
+    const easyLikeKeys = new Set(['recovery', 'easy', 'easy_run', 'steady_state', 'run', 'long', 'long_run', 'long_run_fast_finish']);
+    const currentIsEasyLike = easyLikeKeys.has(curKeyLow);
     const typeMatch = completed.filter((r) => {
-      if (!workoutTypeKey) return true;
       const inferred = inferWorkoutTypeKey(r);
-      return inferred != null && (comparableKeys.length > 0 ? comparableKeys.includes(inferred) : inferred === workoutTypeKey);
+      const typeOk = !workoutTypeKey
+        ? true
+        : (inferred != null && (comparableKeys.length > 0 ? comparableKeys.includes(inferred) : inferred === workoutTypeKey));
+      if (!typeOk) return false;
+      // Mixed-effort rows are excluded from the steady pool to stop type
+      // contagion (a fartlek mis-pooled with easy runs pulls the baseline).
+      if (currentIsEasyLike && isMixedEffortRow(r)) return false;
+      return true;
     });
     const durationMatch = typeMatch.filter((r) => {
       const d = getOverallDurationMin(r);
@@ -260,12 +324,32 @@ export async function getSimilarWorkoutComparisons(
       console.warn(`[fact-packet] route filter: terrainMatch=${terrainMatch.length} → routeFiltered=${routeFiltered.length} (using ${routeFiltered.length >= 3 ? 'route' : 'terrain'} pool)`);
     }
 
-    const withMetrics = routeMatch.map((r) => {
-      const pace = getOverallPaceSecPerMi(r);
+    // D-NNN: GAP-aware basis selection. When the current workout has GAP,
+    // prefer historical candidates that also have GAP (pair both on GAP).
+    // Otherwise fall back to raw across the whole pool. Never mix bases within
+    // a single comparison set — averaging GAP values with raw values would be
+    // apples + pomegranates.
+    const curHasGap = currentAvgGapSecPerMi != null && Number.isFinite(Number(currentAvgGapSecPerMi)) && Number(currentAvgGapSecPerMi) > 0;
+    type Metric = { r: any; pace: number | null; hr: number | null; drift: number | null };
+    const rowsWithGap: Metric[] = [];
+    const rowsRaw: Metric[] = [];
+    for (const r of routeMatch) {
+      const candGap = getOverallGapSecPerMi(r);
       const hr = getOverallAvgHr(r);
       const drift = getHrDriftBpmFromAnalysis(r);
-      return { r, pace, hr, drift };
-    });
+      if (candGap != null) {
+        rowsWithGap.push({ r, pace: candGap, hr, drift });
+      }
+      rowsRaw.push({ r, pace: getOverallPaceSecPerMi(r), hr, drift });
+    }
+    let paceBasis: 'gap' | 'raw' = 'raw';
+    let basisAnchorPaceSec: number | null = currentAvgPaceSecPerMi;
+    let withMetrics: Metric[] = rowsRaw;
+    if (curHasGap && rowsWithGap.filter((x) => x.pace != null && x.hr != null).length >= 3) {
+      paceBasis = 'gap';
+      basisAnchorPaceSec = Number(currentAvgGapSecPerMi);
+      withMetrics = rowsWithGap;
+    }
     const filtered = withMetrics.filter((x) => x.pace != null && x.hr != null);
 
     const sample_size = filtered.length;
@@ -308,18 +392,27 @@ export async function getSimilarWorkoutComparisons(
         : trendPoolSource === 'wideDurationMatch'
           ? applyTerrainFilter(wideDurationMatch)
           : typeMatch;
-    const trendWithPace = trendPool.filter((r) => r.date && getOverallPaceSecPerMi(r) != null);
-    console.warn(`[fact-packet] trend_points: pool=${trendPoolSource}(${trendPool.length}), withPace=${trendWithPace.length}, wideBand=${wideBandLo}-${wideBandHi}min(${wideDurationMatch.length} hits)`);
-    const trend_points = trendWithPace
+    // Trend pool uses the same basis preference: GAP when current has it AND ≥3
+    // historical points have it; otherwise raw across the trend pool.
+    const trendGapEligible = curHasGap
+      ? trendPool.filter((r) => r.date && getOverallGapSecPerMi(r) != null)
+      : [];
+    const useGapForTrend = trendGapEligible.length >= 3;
+    const trendWithPaceBase = useGapForTrend
+      ? trendGapEligible
+      : trendPool.filter((r) => r.date && getOverallPaceSecPerMi(r) != null);
+    console.warn(`[fact-packet] trend_points: pool=${trendPoolSource}(${trendPool.length}), withPace=${trendWithPaceBase.length}, basis=${useGapForTrend ? 'gap' : 'raw'}, wideBand=${wideBandLo}-${wideBandHi}min(${wideDurationMatch.length} hits)`);
+    const trend_points = trendWithPaceBase
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
       .slice(-8)
       .map((r) => {
-        const pace = getOverallPaceSecPerMi(r)!;
+        const pace = useGapForTrend ? getOverallGapSecPerMi(r)! : getOverallPaceSecPerMi(r)!;
         const hr = getOverallAvgHr(r);
         return {
           date: String(r.date),
           pace_sec_per_mi: Math.round(pace),
           avg_hr: hr != null ? Math.round(hr) : null,
+          pace_basis: useGapForTrend ? 'gap' as const : 'raw' as const,
         };
       })
       .filter((tp) =>
@@ -337,6 +430,7 @@ export async function getSimilarWorkoutComparisons(
         avg_pace_at_similar_hr: null,
         avg_hr_drift: null,
         trend_points,
+        pace_basis: paceBasis,
       };
     }
 
@@ -356,7 +450,8 @@ export async function getSimilarWorkoutComparisons(
       avgPaceAtSimilarHr = near.length >= 2 ? avg(near.map((x) => x.pace)) : null;
     }
 
-    const pace_delta_sec = (currentAvgPaceSecPerMi != null && avgPace != null) ? (currentAvgPaceSecPerMi - avgPace) : null;
+    // basisAnchorPaceSec carries the basis-matched current pace (GAP when basis === 'gap').
+    const pace_delta_sec = (basisAnchorPaceSec != null && avgPace != null) ? (basisAnchorPaceSec - avgPace) : null;
     const hr_delta_bpm = (currentAvgHr != null && avgHr != null) ? (currentAvgHr - avgHr) : null;
     const drift_delta_bpm = (currentHrDriftBpm != null && avgDrift != null) ? (currentHrDriftBpm - avgDrift) : null;
 
@@ -382,6 +477,7 @@ export async function getSimilarWorkoutComparisons(
       avg_pace_at_similar_hr: avgPaceAtSimilarHr != null ? Math.round(avgPaceAtSimilarHr) : null,
       avg_hr_drift: avgDrift != null ? Math.round(avgDrift) : null,
       trend_points,
+      pace_basis: paceBasis,
     };
   } catch {
     return {
@@ -393,6 +489,7 @@ export async function getSimilarWorkoutComparisons(
       avg_pace_at_similar_hr: null,
       avg_hr_drift: null,
       trend_points: [],
+      pace_basis: 'raw' as const,
     };
   }
 }

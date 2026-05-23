@@ -38,15 +38,36 @@ function shouldSuppressSessionHrDrift(factPacket: any, intervals?: IntervalRow[]
   return false;
 }
 
-function humanizePlannedSegmentLabel(raw: string, intervalType?: string): string {
+export function humanizePlannedSegmentLabel(
+  raw: string,
+  intervalType?: string,
+  numbers?: { intervalNumber?: number | null; recoveryNumber?: number | null },
+): string {
   const s = String(raw || '').trim();
   const it = String(intervalType || '').toLowerCase();
-  if (!s && it === 'recovery') return 'Recovery';
   const low = s.toLowerCase();
-  if (low === 'recovery') return 'Recovery';
-  if (low === 'warmup') return 'Warmup';
-  if (low === 'cooldown') return 'Cooldown';
-  if (low === 'work') return 'Work';
+  // Defense-in-depth: stale workout_analysis rows from before the analyzer fix
+  // may carry the legacy 'Overall session' literal. Collapse to 'Overall' so
+  // the table renders consistently without backfill.
+  if (low === 'overall session' || it === 'overall') return 'Overall';
+  const ivN = numbers?.intervalNumber;
+  const recN = numbers?.recoveryNumber;
+  const hasIvN = typeof ivN === 'number' && Number.isFinite(ivN) && ivN > 0;
+  const hasRecN = typeof recN === 'number' && Number.isFinite(recN) && recN > 0;
+  // Empty raw OR a bare kind word → synthesize from intervalType + number.
+  // Matches interval-breakdown.ts:980-983 so PACING and segments-table agree.
+  const isBareKind = low === '' || low === 'work' || low === 'recovery' || low === 'warmup' || low === 'cooldown';
+  if (isBareKind) {
+    if (it === 'warmup') return 'Warmup';
+    if (it === 'cooldown') return 'Cooldown';
+    if (it === 'recovery') return hasRecN ? `Recovery ${recN}` : 'Recovery';
+    if (it === 'work') return hasIvN ? `Interval ${ivN}` : 'Work';
+    // Unknown kind + no label: best we can do.
+    if (low === 'recovery') return hasRecN ? `Recovery ${recN}` : 'Recovery';
+    if (low === 'warmup') return 'Warmup';
+    if (low === 'cooldown') return 'Cooldown';
+    if (low === 'work') return hasIvN ? `Interval ${ivN}` : 'Work';
+  }
   return s;
 }
 
@@ -218,6 +239,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         planned_label: humanizePlannedSegmentLabel(
           String(iv?.planned_label ?? sr?.planned_label ?? iv?.interval_type ?? ''),
           ivType,
+          {
+            intervalNumber: typeof iv?.interval_number === 'number' ? iv.interval_number : null,
+            recoveryNumber: typeof iv?.recovery_number === 'number' ? iv.recovery_number : null,
+          },
         ),
         planned_duration_s: fin(iv?.planned_duration_s),
         planned_pace_range: hasRange ? { lower_sec_per_mi: Number(lower), upper_sec_per_mi: Number(upper) } : undefined,
@@ -243,15 +268,28 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     // Analysis sometimes omits interval_breakdown.intervals while session_state_v1.interval_rows
     // still has plan-aligned rows — smart server should still ship a renderable table.
     const dataRows = sessionRows.filter((r: any) => String(r?.kind || '').toLowerCase() !== 'overall');
+    // Number work and recovery rows so the label synthesizer can produce
+    // "Interval N" / "Recovery N" when the analyzer didn't ship a label.
+    let workCursor = 0;
+    let recoveryCursor = 0;
     for (let i = 0; i < dataRows.length; i++) {
       const r = dataRows[i];
       const ex = r?.executed || {};
       const paceS = fin(ex.avg_pace_s_per_mi) ?? fin(ex.pace_s_per_mi);
       const rowKind = normIntervalType(r?.kind);
+      const isWork = rowKind === 'work';
+      const isRecovery = rowKind === 'recovery';
+      const ivN = isWork ? (++workCursor) : null;
+      const recN = isRecovery ? (++recoveryCursor) : null;
       intervals.push({
         id: String(r.row_id || r.planned_step_id || i),
         interval_type: rowKind,
-        planned_label: humanizePlannedSegmentLabel(String(r.planned_label ?? ''), rowKind),
+        interval_number: ivN ?? undefined,
+        recovery_number: recN ?? undefined,
+        planned_label: humanizePlannedSegmentLabel(String(r.planned_label ?? ''), rowKind, {
+          intervalNumber: ivN,
+          recoveryNumber: recN,
+        }),
         planned_duration_s: null,
         planned_pace_display: typeof r.planned_pace_display === 'string' ? r.planned_pace_display : null,
         planned_pace_range: undefined,
@@ -575,10 +613,24 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       is_easy_like: isEasyLike,
       is_auto_lap_or_split: isAutoLapOrSplit,
       is_pool_swim: isPoolSwim,
+      // D-NNN: variance gate — surfaced from session_state_v1.glance (analyzer-computed).
+      // Client renders; never derives. Defaults to false when older rows lack
+      // the field (stale-until-touched, per spec §5).
+      is_mixed_effort: Boolean((sessionState as any)?.glance?.is_mixed_effort),
+      variance_signal: ((sessionState as any)?.glance?.variance_signal as SessionDetailV1['classification']['variance_signal']) ?? null,
+      classified_type_variance_override: Boolean((sessionState as any)?.glance?.classified_type_variance_override),
     },
 
     splits_mi: splitsMi,
-    pacing: { coefficient_of_variation: pacingCV },
+    pacing: {
+      coefficient_of_variation: pacingCV,
+      // D-NNN: extended variance numerics from analyzer glance. Client uses
+      // these to render (e.g., show a "GAP" badge on CV) but never recomputes.
+      coefficient_of_variation_basis: ((sessionState as any)?.glance?.pace_cv_basis as 'gap' | 'raw' | null) ?? null,
+      pace_spread_s_per_mi: null,
+      variability_index: ((sessionState as any)?.glance?.variability_index as number | null) ?? null,
+      power_cv_pct: ((sessionState as any)?.glance?.power_cv_pct as number | null) ?? null,
+    },
 
     trend: (() => {
       // Cycling: mode-aware TREND (design Build Order #1). The doc's resolved

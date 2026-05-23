@@ -2017,14 +2017,86 @@ Deno.serve(async (req) => {
     }
 
     // =========================================================================
+    // Variance gate — D-NNN (hoisted before ai_summary so it can gate the LLM
+    // input shape: when mixed-effort, drop vs_similar steady comparisons and
+    // hand the LLM an interval-summary block instead).
+    // =========================================================================
+    const _varGate = (() => {
+      const cvPct = Number(
+        (analysis as any)?.pacing_variability?.coefficient_of_variation
+      );
+      const cvValid = Number.isFinite(cvPct) && cvPct > 0;
+      const gapAdj = Boolean((analysis as any)?.gap_adjusted);
+      const cvBasis: 'gap' | 'raw' | null = cvValid ? (gapAdj ? 'gap' : 'raw') : null;
+      const terrainType = String((fact_packet_v1 as any)?.facts?.terrain_type || '').toLowerCase();
+      const isFlat = terrainType === 'flat';
+
+      const cvTripsGap = cvValid && cvBasis === 'gap' && cvPct >= 8;
+      const cvTripsRawFlat = cvValid && cvBasis === 'raw' && isFlat && cvPct >= 8;
+      // Spec §3.3 + user direction: "without grade data you can't separate
+      // terrain from effort, and a missed detection is the safer error." Raw
+      // CV on non-flat terrain is silently skipped.
+
+      const ieTotalSteps = Number(
+        (fact_packet_v1 as any)?.derived?.interval_execution?.total_steps
+      );
+      const ieTripsLinked = isLinkedPlanSession && Number.isFinite(ieTotalSteps) && ieTotalSteps >= 2;
+
+      const detectedKey = String(
+        detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout) || ''
+      ).toLowerCase().trim();
+      const detectedTripsUnplanned = !isLinkedPlanSession && detectedKey !== '' &&
+        detectedKey !== 'easy' && detectedKey !== 'steady_state' &&
+        detectedKey !== 'long' && detectedKey !== 'long_run' &&
+        detectedKey !== 'recovery';
+
+      const planIntentTripsLinked = isLinkedPlanSession && (() => {
+        const k = String(classifiedTypeKey || '').toLowerCase();
+        return k === 'intervals' || k === 'interval' || k === 'interval_run' ||
+          k === 'tempo' || k === 'tempo_run' || k === 'fartlek' || k === 'threshold' ||
+          k === 'vo2' || k === 'vo2max' || k === 'speed' || k === 'track';
+      })();
+
+      let signal:
+        | 'pace_cv' | 'interval_execution' | 'detected_intervals'
+        | 'plan_intent_intervals' | null = null;
+      if (ieTripsLinked) signal = 'interval_execution';
+      else if (planIntentTripsLinked) signal = 'plan_intent_intervals';
+      else if (detectedTripsUnplanned) signal = 'detected_intervals';
+      else if (cvTripsGap || cvTripsRawFlat) signal = 'pace_cv';
+
+      const is_mixed_effort = signal !== null;
+
+      const easyLikePlan = isLinkedPlanSession && (() => {
+        const k = String(classifiedTypeKey || '').toLowerCase();
+        return k === 'easy' || k === 'easy_run' || k === 'steady_state' ||
+          k === 'long' || k === 'long_run' || k === 'recovery';
+      })();
+      const classified_type_variance_override = is_mixed_effort && easyLikePlan;
+
+      return {
+        is_mixed_effort,
+        variance_signal: signal,
+        pace_cv_pct: cvValid ? Math.round(cvPct * 10) / 10 : null,
+        pace_cv_basis: cvBasis,
+        classified_type_variance_override,
+      };
+    })();
+
+    // =========================================================================
     // AI coaching paragraph (v1)
     // Fact packet + flags + holistic training context (deterministic layer).
+    // When is_mixed_effort, the summary builder drops steady-effort comparisons
+    // and interprets per-interval execution instead.
     // =========================================================================
     let ai_summary: string | null = null;
     let ai_summary_generated_at: string | null = null;
     try {
       if (fact_packet_v1 && flags_v1) {
-        ai_summary = await generateAISummaryV1(fact_packet_v1, flags_v1, null, null, arc_narrative_for_summary);
+        ai_summary = await generateAISummaryV1(
+          fact_packet_v1, flags_v1, null, null, arc_narrative_for_summary,
+          { isMixedEffort: _varGate.is_mixed_effort, intervalBreakdown: detailedAnalysis?.interval_breakdown ?? null },
+        );
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
       }
     } catch (e) {
@@ -2570,6 +2642,9 @@ Deno.serve(async (req) => {
 
     const race_debrief_text = raceDebriefNew ?? preservedRaceDebrief;
 
+    // Variance gate (_varGate) is hoisted above generateAISummaryV1 so it can
+    // gate the LLM input shape. The same values feed glance below.
+
     const sessionStateV1 = {
       version: 1,
       owner: 'analysis',
@@ -2579,6 +2654,12 @@ Deno.serve(async (req) => {
       glance: {
         status_label: adherenceSummary?.verdict?.label || null,
         execution_score: typeof performance?.execution_adherence === 'number' ? performance.execution_adherence : null,
+        // Variance gate (D-NNN). See _varGate computation above.
+        is_mixed_effort: _varGate.is_mixed_effort,
+        variance_signal: _varGate.variance_signal,
+        pace_cv_pct: _varGate.pace_cv_pct,
+        pace_cv_basis: _varGate.pace_cv_basis,
+        classified_type_variance_override: _varGate.classified_type_variance_override,
       },
       narrative: {
         // Goal race: suppress AI narrative so structured technical_insights render instead
@@ -3980,9 +4061,76 @@ function buildSessionIntervalRows(
   const plannedSteps: any[] = Array.isArray(plannedWorkout?.computed?.steps) ? plannedWorkout.computed.steps : [];
   const expectedWorkRows = getPlannedWorkSteps(plannedWorkout).length;
   const isStructuredIntervalSession = expectedWorkRows >= 2;
+
+  // Measured-evidence gate (Bug A.1 / D-NNN): when the analyzer's interval
+  // breakdown produced ≥2 measured intervals, surface them as a per-interval
+  // table regardless of plan link. The pre-fix gate insisted on a *planned*
+  // structured-interval shape and collapsed unlinked-but-real interval sessions
+  // to a single "Overall" row, hiding interval structure.
+  const _bd = detailedAnalysis?.interval_breakdown;
+  const _bdIntervals: any[] = Array.isArray(_bd?.intervals) ? _bd.intervals : [];
+  const _bdMeasured = _bdIntervals.filter((iv: any) => {
+    const dur = Number(iv?.actual_duration_s ?? iv?.executed?.duration_s ?? 0);
+    const dist = Number(iv?.actual_distance_m ?? iv?.executed?.distance_m ?? 0);
+    const pace = Number(iv?.actual_pace_min_per_mi ?? iv?.executed?.avg_pace_s_per_mi ?? 0);
+    return dur > 0 || dist > 0 || pace > 0;
+  });
+  const buildRowsFromBreakdown = (): any[] => _bdIntervals.map((iv: any, idx: number) => {
+    const kindRaw = String(iv?.interval_type || iv?.kind || '').toLowerCase();
+    const kind = /warm/.test(kindRaw) ? 'warmup'
+      : /cool/.test(kindRaw) ? 'cooldown'
+      : /recover|rest/.test(kindRaw) ? 'recovery'
+      : 'work';
+    const dur = Number(iv?.actual_duration_s ?? iv?.executed?.duration_s ?? 0);
+    const dist = Number(iv?.actual_distance_m ?? iv?.executed?.distance_m ?? 0);
+    const paceDirect = Number(
+      iv?.executed?.avg_pace_s_per_mi ??
+      (Number.isFinite(Number(iv?.actual_pace_min_per_mi)) ? Number(iv.actual_pace_min_per_mi) * 60 : 0)
+    );
+    const paceDerived = (dur > 0 && dist > 0) ? (dur / (dist / 1609.34)) : 0;
+    const pace = Number.isFinite(paceDirect) && paceDirect > 0
+      ? paceDirect
+      : (Number.isFinite(paceDerived) && paceDerived > 0 ? paceDerived : 0);
+    const hr = Number(iv?.avg_heart_rate_bpm ?? iv?.executed?.avg_hr ?? 0);
+    return {
+      row_id: String(iv?.interval_id || `bd_${idx}`),
+      planned_step_id: iv?.interval_id || null,
+      planned_index: idx,
+      kind,
+      interval_number: typeof iv?.interval_number === 'number' ? iv.interval_number : undefined,
+      recovery_number: typeof iv?.recovery_number === 'number' ? iv.recovery_number : undefined,
+      planned_label: (typeof iv?.planned_label === 'string' && iv.planned_label.trim())
+        ? iv.planned_label : null,
+      planned_pace_display: null,
+      adherence_pct: Number.isFinite(Number(iv?.pace_adherence_percent))
+        ? Math.round(Number(iv.pace_adherence_percent)) : null,
+      executed: {
+        pace_s_per_mi: Number.isFinite(pace) && pace > 0 ? Math.round(pace) : null,
+        avg_pace_s_per_mi: Number.isFinite(pace) && pace > 0 ? Math.round(pace) : null,
+        distance_m: Number.isFinite(dist) && dist > 0 ? Math.round(dist) : null,
+        duration_s: Number.isFinite(dur) && dur > 0 ? Math.round(dur) : null,
+        avg_hr: Number.isFinite(hr) && hr > 0 ? Math.round(hr) : null,
+      },
+    };
+  });
+
   if (!plannedSteps.length) {
     // No linked plan: empty steps are normal — show session totals, not a "planned workout" recompute state.
     if (!plannedWorkout) {
+      // Bug A.1: unplanned session with real interval structure (Garmin-detected
+      // intervals, fartlek, etc.) — surface the per-interval table instead of
+      // collapsing to one "Overall" row.
+      if (_bdMeasured.length >= 2) {
+        const rows = buildRowsFromBreakdown();
+        return {
+          rows,
+          mode: 'interval_compare_ready',
+          reason: 'unplanned_detected_intervals',
+          expected_work_rows: 0,
+          measured_work_rows: rows.filter((r: any) => r.kind === 'work').length,
+        };
+      }
+
       const overall = workout?.computed?.overall || {};
       const distM = Number(overall?.distance_m ?? ((Number(workout?.distance) > 0) ? Number(workout.distance) * 1000 : 0));
       const durS = Number(
@@ -4001,7 +4149,9 @@ function buildSessionIntervalRows(
             planned_step_id: null,
             planned_index: 0,
             kind: 'overall',
-            planned_label: 'Overall session',
+            // Bug A: never ship the literal 'Overall session'. Display layer
+            // (CompletedTotalsSegmentTable) renders 'Overall' for the single-row case.
+            planned_label: null,
             planned_pace_display: null,
             adherence_pct: null,
             executed: {
@@ -4196,7 +4346,8 @@ function buildSessionIntervalRows(
           planned_step_id: null,
           planned_index: 0,
           kind: 'overall',
-          planned_label: 'Overall session',
+          // Bug A: never ship the literal 'Overall session'. Display renders 'Overall'.
+          planned_label: null,
           planned_pace_display: null,
           adherence_pct: null,
           executed: {
@@ -4264,7 +4415,8 @@ function buildSessionIntervalRows(
         planned_step_id: null,
         planned_index: 0,
         kind: 'overall',
-        planned_label: 'Overall session',
+        // Bug A: never ship the literal 'Overall session'. Display renders 'Overall'.
+        planned_label: null,
         planned_pace_display: null,
         adherence_pct: null,
         executed: {

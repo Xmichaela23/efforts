@@ -430,6 +430,12 @@ HR DRIFT — USE PACE-NORMALIZED VALUES:
 - "hr_drift_raw_absolute" shows the total first-half vs second-half HR gap for transparency, but do NOT use it as a signal. It conflates pace changes, terrain, and actual drift.
 - STRUCTURED INTERVALS: If the workout has multiple planned work/recovery segments, HR differences between segments are expected (pace targets change). Do not describe that as "cardiac drift" or cite a single bpm drift figure unless the data explicitly says steady-state drift for the main work block.
 
+MIXED-EFFORT MODE — when the user message includes an INTERVAL EXECUTION block (and NO "COMPARED TO SIMILAR WORKOUTS" block), this was a structured interval session, fartlek, or detected mixed-effort run:
+- DO NOT compare whole-workout averages to easy-run history. The athlete didn't run at a single steady effort, so a single pace/HR delta vs steady history is meaningless. The packet correctly omits vs_similar in this mode; do not invent it.
+- INTERPRET the interval execution: which work intervals hit the prescribed range, where the athlete drifted, how recoveries went. Lead with the structure ("5 × 3 min at threshold"), the completion ratio, and one specific interval that tells the story (a fade on #4, a strong final).
+- USE GAP when "grade-adjusted" is noted on the pace adherence line. The interval paces in INTERVAL EXECUTION are already GAP-corrected when that flag is set — anchor the effort read on those values, not raw pace.
+- DO NOT say "HR ran higher than recent similar efforts" or any whole-workout comparison sentence. There is no honest steady comparison to make.
+
 ATHLETE REPORTED FEELING:
 - When ATHLETE REPORTED data is present, it is ground truth for the athlete's subjective experience.
 - NEVER contradict the athlete's reported feeling. If they reported RPE 4/10 and feeling "good", do NOT say the workout "felt harder than it should have" or suggest they were struggling.
@@ -514,17 +520,58 @@ function buildUserMessage(dp: any): string {
     sections.push('\nATHLETE REPORTED:\n' + parts.map((p) => `- ${p}`).join('\n'));
   }
 
-  // Similar workouts
+  // Similar workouts — only render the steady-effort comparison block when the
+  // session was steady. For mixed-effort sessions, vs_similar is null in the
+  // packet (D-NNN, ai-summary.ts:toDisplayFormatV1) and the interval_summary
+  // block below carries the read instead.
   const comp = sig.comparisons;
   if (comp?.vs_similar?.sample_size > 0 && comp.vs_similar.assessment !== 'insufficient_data') {
+    const basisNote = comp.vs_similar.pace_basis === 'gap'
+      ? ' (grade-adjusted pace; terrain neutralized)'
+      : '';
     sections.push([
       `\nCOMPARED TO SIMILAR WORKOUTS (n=${comp.vs_similar.sample_size}):`,
-      `- Pace vs similar: ${comp.vs_similar.assessment}${comp.vs_similar.pace_delta ? ` (${comp.vs_similar.pace_delta})` : ''}`,
+      `- Pace vs similar: ${comp.vs_similar.assessment}${comp.vs_similar.pace_delta ? ` (${comp.vs_similar.pace_delta}${basisNote})` : ''}`,
       comp.vs_similar.hr_delta ? `- HR vs similar: ${comp.vs_similar.hr_delta}` : null,
       comp.trend?.direction && comp.trend.direction !== 'insufficient_data'
         ? `- Trend: ${comp.trend.direction}${comp.trend.magnitude ? ` — ${comp.trend.magnitude}` : ''} (${comp.trend.data_points} data points)`
         : null,
     ].filter(Boolean).join('\n'));
+  }
+
+  // D-NNN: interval summary for mixed-effort sessions. Interpret per-interval
+  // execution; do not compare whole-workout averages to easy-run history.
+  const ivSum = sig.interval_summary;
+  if (ivSum && (Array.isArray(ivSum.work_intervals) && ivSum.work_intervals.length > 0)) {
+    const lines: string[] = [`\nINTERVAL EXECUTION (interpret per-interval; this was a ${ivSum.structure === 'planned' ? 'structured' : 'detected mixed-effort'} session — do NOT compare whole-workout averages to easy-run history):`];
+    if (ivSum.completed_steps != null && ivSum.total_steps != null) {
+      lines.push(`- Completed: ${ivSum.completed_steps}/${ivSum.total_steps} work steps`);
+    }
+    if (ivSum.execution_score) lines.push(`- Execution score: ${ivSum.execution_score}`);
+    if (ivSum.grade_adjusted) lines.push(`- Pace adherence is grade-adjusted (GAP) — use the GAP pace as the effort read`);
+    lines.push('- Work intervals:');
+    for (const iv of ivSum.work_intervals) {
+      const head = iv.n != null ? `  • Interval ${iv.n}` : '  •';
+      const parts: string[] = [];
+      if (iv.planned_label) parts.push(`planned ${iv.planned_label}`);
+      if (iv.actual_dur) parts.push(`actual ${iv.actual_dur}`);
+      if (iv.actual_pace) parts.push(`@ ${iv.actual_pace}${ivSum.grade_adjusted ? ' (GAP)' : ''}`);
+      if (iv.pace_adherence_pct != null) parts.push(`adherence ${iv.pace_adherence_pct}%`);
+      if (iv.hr_avg != null) parts.push(`HR ${iv.hr_avg}${iv.hr_max != null ? ` (max ${iv.hr_max})` : ''}`);
+      lines.push(`${head}: ${parts.join(', ')}`);
+    }
+    if (Array.isArray(ivSum.recovery_intervals) && ivSum.recovery_intervals.length > 0) {
+      lines.push('- Recoveries:');
+      for (const iv of ivSum.recovery_intervals) {
+        const head = iv.n != null ? `  • Recovery ${iv.n}` : '  •';
+        const parts: string[] = [];
+        if (iv.actual_dur) parts.push(`${iv.actual_dur}`);
+        if (iv.actual_pace) parts.push(`@ ${iv.actual_pace}${ivSum.grade_adjusted ? ' (GAP)' : ''}`);
+        if (iv.hr_avg != null) parts.push(`HR ${iv.hr_avg}`);
+        lines.push(`${head}: ${parts.join(', ')}`);
+      }
+    }
+    sections.push(lines.join('\n'));
   }
 
   // Flags — exclude fatigue/load flags: the narrative is session-scoped and has no
@@ -621,12 +668,21 @@ function computeGapTerrainBias(
   return 'flat';
 }
 
-function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
+function toDisplayFormatV1(
+  packet: FactPacketV1,
+  flags: FlagV1[],
+  varianceGate?: VarianceGateOptions | null,
+) {
   const facts = packet?.facts as any;
   const derived = packet?.derived as any;
   const segments = Array.isArray(facts?.segments) ? facts.segments : [];
 
-  const suppressHrDriftForIntervals = (() => {
+  // D-NNN: when the variance gate is active, the new is_mixed_effort flag is
+  // the canonical signal. Fall back to the legacy in-display heuristic only when
+  // the gate isn't wired (older callers that didn't pass varianceGate).
+  const isMixedEffort = varianceGate?.isMixedEffort === true;
+  const suppressHrDriftForIntervals = isMixedEffort || (() => {
+    if (varianceGate) return false; // gate is authoritative when wired
     const ie = derived?.interval_execution;
     if (typeof ie?.total_steps === 'number' && ie.total_steps > 2) return true;
     const paces = segments
@@ -766,14 +822,19 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
         : null,
       comparisons: derived?.comparisons
         ? {
-            vs_similar: {
+            // D-NNN: drop the steady-effort vs_similar comparison from the LLM
+            // input when this session is mixed-effort. Whole-workout pace/HR
+            // deltas vs an easy-run baseline are not honest for a fartlek or
+            // intervals; the interval_summary block below carries the true read.
+            vs_similar: isMixedEffort ? null : {
               assessment: derived.comparisons?.vs_similar?.assessment ?? null,
               sample_size: derived.comparisons?.vs_similar?.sample_size ?? 0,
               pace_delta: fmtDeltaSecPerMi(coerceNumber(derived.comparisons?.vs_similar?.pace_delta_sec)),
+              pace_basis: derived.comparisons?.vs_similar?.pace_basis ?? 'raw',
               hr_delta: (coerceNumber(derived.comparisons?.vs_similar?.hr_delta_bpm) != null) ? `${Math.round(Number(derived.comparisons.vs_similar.hr_delta_bpm))} bpm` : null,
               drift_delta: (coerceNumber(derived.comparisons?.vs_similar?.drift_delta_bpm) != null) ? `${Math.round(Number(derived.comparisons.vs_similar.drift_delta_bpm))} bpm` : null,
             },
-            trend: {
+            trend: isMixedEffort ? null : {
               direction: derived.comparisons?.trend?.direction ?? null,
               magnitude: derived.comparisons?.trend?.magnitude ?? null,
               data_points: derived.comparisons?.trend?.data_points ?? 0,
@@ -782,6 +843,60 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
               ? derived.comparisons.achievements.slice(0, 2).map((a: any) => String(a?.description || '')).filter(Boolean)
               : [],
           }
+        : null,
+      // D-NNN: interval_summary replaces the steady comparison when mixed-effort.
+      // Per-interval execution (planned label, actual GAP-aware pace, HR,
+      // adherence) lets the LLM interpret the structure instead of pretending it
+      // was a steady run. Built from analyzer's detailed_analysis.interval_breakdown.
+      interval_summary: (isMixedEffort && Array.isArray(varianceGate?.intervalBreakdown?.intervals) && varianceGate!.intervalBreakdown!.intervals!.length >= 2)
+        ? (() => {
+            const ivs = varianceGate!.intervalBreakdown!.intervals!;
+            const ie = derived?.interval_execution || {};
+            const fmtPace = (v: any) => {
+              const n = coerceNumber(v);
+              if (n == null || n <= 0) return null;
+              const m = Math.floor(n / 60);
+              const s = Math.round(n % 60);
+              return `${m}:${String(s).padStart(2, '0')}/mi`;
+            };
+            const fmtPaceMin = (v: any) => {
+              const n = coerceNumber(v);
+              if (n == null || n <= 0) return null;
+              return fmtPace(n * 60);
+            };
+            const fmtDur = (v: any) => {
+              const n = coerceNumber(v);
+              if (n == null || n <= 0) return null;
+              const m = Math.floor(n / 60);
+              const s = Math.round(n % 60);
+              return `${m}:${String(s).padStart(2, '0')}`;
+            };
+            const work = ivs.filter((iv: any) => String(iv?.interval_type || '').toLowerCase() === 'work');
+            const recovery = ivs.filter((iv: any) => String(iv?.interval_type || '').toLowerCase() === 'recovery');
+            return {
+              structure: (typeof ie?.total_steps === 'number' && ie.total_steps >= 2) ? 'planned' : 'detected_unplanned',
+              completed_steps: ie?.completed_steps ?? null,
+              total_steps: ie?.total_steps ?? work.length ?? null,
+              execution_score: typeof ie?.execution_score === 'number' ? `${Math.round(ie.execution_score)}%` : null,
+              grade_adjusted: !!ie?.gap_adjusted,
+              work_intervals: work.slice(0, 12).map((iv: any) => ({
+                n: iv?.interval_number ?? null,
+                planned_label: typeof iv?.planned_label === 'string' && iv.planned_label.trim() ? iv.planned_label : null,
+                actual_pace: fmtPaceMin(iv?.actual_pace_min_per_mi),
+                actual_dur: fmtDur(iv?.actual_duration_s),
+                pace_adherence_pct: typeof iv?.pace_adherence_percent === 'number' ? Math.round(iv.pace_adherence_percent) : null,
+                hr_avg: iv?.avg_heart_rate_bpm ?? null,
+                hr_max: iv?.max_heart_rate_bpm ?? null,
+              })),
+              recovery_intervals: recovery.slice(0, 12).map((iv: any) => ({
+                n: iv?.recovery_number ?? null,
+                planned_label: typeof iv?.planned_label === 'string' && iv.planned_label.trim() ? iv.planned_label : null,
+                actual_pace: fmtPaceMin(iv?.actual_pace_min_per_mi),
+                actual_dur: fmtDur(iv?.actual_duration_s),
+                hr_avg: iv?.avg_heart_rate_bpm ?? null,
+              })),
+            };
+          })()
         : null,
       stimulus: derived?.stimulus
         ? {
@@ -850,19 +965,33 @@ export type GenerateAISummaryV1Options = {
   narrativeCapsAppend?: string | null;
 };
 
+/**
+ * D-NNN variance-gate options. When isMixedEffort is true, the LLM input drops
+ * the steady-effort vs_similar comparison block and surfaces an interval
+ * summary instead. The intervalBreakdown is the analyzer's
+ * `detailed_analysis.interval_breakdown` (carries per-interval planned_label,
+ * actual pace, HR, pace_adherence_percent — already GAP-aware per
+ * granular-pace.ts).
+ */
+export type VarianceGateOptions = {
+  isMixedEffort: boolean;
+  intervalBreakdown: { intervals?: any[]; available?: boolean } | null;
+};
+
 export async function generateAISummaryV1(
   factPacket: FactPacketV1,
   flags: FlagV1[],
   _coachingContext?: string | null,
   _opts?: GenerateAISummaryV1Options | null,
   arcNarrative?: ArcNarrativeContextV1 | null,
+  varianceGate?: VarianceGateOptions | null,
 ): Promise<string | null> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     console.warn('[ai-summary] ANTHROPIC_API_KEY not set — skipping narrative generation');
     return null;
   }
 
-  const displayPacket = toDisplayFormatV1(factPacket, flags);
+  const displayPacket = toDisplayFormatV1(factPacket, flags, varianceGate ?? null);
 
   const arcFacts = arcNarrative ? arcNarrativeFactBlock(arcNarrative) : '';
   const userMessage =

@@ -189,6 +189,25 @@ export type SessionDetailV1 = {
     is_easy_like: boolean;
     is_auto_lap_or_split: boolean;
     is_pool_swim: boolean;
+    /**
+     * Variance gate (D-NNN). True when this session showed real effort variation —
+     * intervals, fartlek, mixed-effort. Server-computed; client never derives.
+     * When true, TREND/vs_similar comparisons exclude this row from steady pools,
+     * and INSIGHTS interprets the intervals rather than comparing whole-workout
+     * averages to easy history.
+     */
+    is_mixed_effort: boolean;
+    /** Which predicate tripped is_mixed_effort. null when false. */
+    variance_signal:
+      | 'pace_cv' | 'pace_spread' | 'interval_execution' | 'detected_intervals'
+      | 'power_cv' | 'variability_index' | 'plan_intent_intervals'
+      | null;
+    /**
+     * True when plan intent said 'easy' (or similar) but the variance gate tripped.
+     * Plan intent is preserved (never overwritten); this flag tells pool filters
+     * to exclude the row from steady comparisons without mutating classified_type.
+     */
+    classified_type_variance_override: boolean;
   };
 
   // ── Splits (SessionNarrative Speed insight) ───────────────────────────────
@@ -204,6 +223,19 @@ export type SessionDetailV1 = {
   // ── Pacing (EnduranceIntervalTable CV indicator) ──────────────────────────
   pacing: {
     coefficient_of_variation: number | null;
+    /**
+     * Which series fed the CV: 'gap' = grade-adjusted pace samples (preferred);
+     * 'raw' = raw pace samples (used only when GAP is unavailable AND terrain
+     * is flat, per the variance gate's conservative-on-non-flat-routes policy).
+     * null when CV is null.
+     */
+    coefficient_of_variation_basis: 'gap' | 'raw' | null;
+    /** Run: GAP-corrected pace spread across work segments (sec/mi). */
+    pace_spread_s_per_mi: number | null;
+    /** Cycling: NP/AP variability index. ≥1.05 indicates non-steady output. */
+    variability_index: number | null;
+    /** Cycling: coefficient of variation on power samples (percent). */
+    power_cv_pct: number | null;
   };
 
   // ── Trend sparkline (Performance screen "Am I getting fitter?") ──────────

@@ -373,6 +373,7 @@ export async function buildWorkoutFactPacketV1(args: {
   const hrDriftCurrent = coerceNumber(hrAnalysis?.hr_drift_bpm) ?? null;
   const terrainContributionBpm = coerceNumber(hrAnalysis?.terrain_contribution_bpm) ?? null;
 
+  const _overallGap = coerceNumber(overall?.avg_gap_s_per_mi);
   const [vsSimilar, trend, achievements, trainingLoad] = await Promise.all([
     getSimilarWorkoutComparisons(supabase, {
       userId: String(workout.user_id),
@@ -380,6 +381,9 @@ export async function buildWorkoutFactPacketV1(args: {
       workoutTypeKey: comparisonTypeKey,
       durationMin: overallDurMin || 0,
       currentAvgPaceSecPerMi: overallPace != null ? overallPace : null,
+      // D-NNN: thread GAP so cross-workout pace comparisons can pair on
+      // grade-adjusted basis when both sides have it.
+      currentAvgGapSecPerMi: _overallGap != null && _overallGap > 0 ? Math.round(_overallGap) : null,
       currentAvgHr: avgHr,
       currentHrDriftBpm: hrDriftCurrent,
       currentTerrainClass: terrain_type !== 'flat' ? terrain_type : null,
@@ -876,6 +880,9 @@ export async function buildWorkoutFactPacketV1(args: {
           hr_delta_bpm: vsSimilar.hr_delta_bpm,
           drift_delta_bpm: vsSimilar.drift_delta_bpm,
           assessment: vsSimilar.assessment,
+          // D-NNN: which basis fed the pace delta. 'gap' means both current and
+          // historical pool had grade-adjusted pace; 'raw' is the fallback.
+          pace_basis: (vsSimilar as any).pace_basis ?? 'raw',
           trend_points: (() => {
             const pts = Array.isArray((vsSimilar as any).trend_points) ? (vsSimilar as any).trend_points : [];
             const curDate = workout?.date ?? null;

@@ -217,10 +217,62 @@ export function cyclingCrossWorkoutDisplay(cw: {
   return Object.keys(out).length > 0 ? out : null;
 }
 
+/**
+ * D-NNN variance-gate options. When isMixedEffort is true, the LLM input drops
+ * the steady-effort cross_workout.vs_similar/trend comparison and surfaces a
+ * cycling interval summary (NP/IF/VI per-interval if available, plus structure
+ * notes) so the narrative interprets the structured work rather than comparing
+ * whole-ride averages to endurance history.
+ */
+export type CyclingVarianceGateOptions = {
+  isMixedEffort: boolean;
+  intervalBreakdown: { intervals?: any[]; available?: boolean } | null;
+};
+
+function buildCyclingIntervalSummary(
+  ib: { intervals?: any[]; available?: boolean } | null | undefined,
+  fp: CyclingFactPacketV1,
+): any | null {
+  const ivs = Array.isArray(ib?.intervals) ? ib!.intervals! : [];
+  if (ivs.length < 2) return null;
+  const work = ivs.filter((iv: any) => String(iv?.interval_type || iv?.kind || '').toLowerCase() === 'work');
+  const recovery = ivs.filter((iv: any) => String(iv?.interval_type || iv?.kind || '').toLowerCase() === 'recovery');
+  if (work.length < 2) return null;
+  const fmtDur = (v: any) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    const m = Math.floor(n / 60);
+    const s = Math.round(n % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+  return {
+    structure: 'planned',
+    completed_steps: work.filter((iv: any) => Number(iv?.actual_duration_s ?? 0) > 0).length,
+    total_steps: work.length,
+    work_intervals: work.slice(0, 12).map((iv: any) => ({
+      n: iv?.interval_number ?? null,
+      planned_label: typeof iv?.planned_label === 'string' && iv.planned_label.trim() ? iv.planned_label : null,
+      avg_power_w: iv?.avg_power_w != null ? Math.round(Number(iv.avg_power_w)) : null,
+      np_w: iv?.np_w != null ? Math.round(Number(iv.np_w)) : null,
+      actual_dur: fmtDur(iv?.actual_duration_s),
+      hr_avg: iv?.avg_heart_rate_bpm ?? null,
+    })),
+    recovery_intervals: recovery.slice(0, 12).map((iv: any) => ({
+      n: iv?.recovery_number ?? null,
+      avg_power_w: iv?.avg_power_w != null ? Math.round(Number(iv.avg_power_w)) : null,
+      actual_dur: fmtDur(iv?.actual_duration_s),
+      hr_avg: iv?.avg_heart_rate_bpm ?? null,
+    })),
+    ride_vi: fp.facts?.variability_index ?? null,
+    ride_if: fp.facts?.intensity_factor ?? null,
+  };
+}
+
 function toDisplayPacket(
   fp: CyclingFactPacketV1,
   flags: CyclingFlagV1[],
   crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any; fitness?: any } | null,
+  varianceGate?: CyclingVarianceGateOptions | null,
 ): any {
   const f = fp.facts;
   const d = fp.derived;
@@ -268,7 +320,15 @@ function toDisplayPacket(
       .sort((a, b) => Number(a.priority || 99) - Number(b.priority || 99))
       .slice(0, 3)
       .map((x) => ({ type: x.type, category: x.category, message: x.message, priority: x.priority })),
-    cross_workout: cyclingCrossWorkoutDisplay(crossWorkout),
+    // D-NNN: drop the steady-effort cross_workout block when this ride is
+    // mixed-effort. Whole-ride NP-delta vs endurance history misleads on a
+    // sweet-spot session; interval_summary below replaces it.
+    cross_workout: varianceGate?.isMixedEffort ? null : cyclingCrossWorkoutDisplay(crossWorkout),
+    // D-NNN: per-interval read for mixed-effort rides. Lets the LLM interpret
+    // structured work rather than comparing to endurance baselines.
+    interval_summary: varianceGate?.isMixedEffort
+      ? buildCyclingIntervalSummary(varianceGate.intervalBreakdown, fp)
+      : null,
   };
 }
 
@@ -278,8 +338,9 @@ export async function generateCyclingAISummaryV1(
   coachingContext?: string | null,
   crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any; fitness?: any } | null,
   arcNarrative?: ArcNarrativeContextV1 | null,
+  varianceGate?: CyclingVarianceGateOptions | null,
 ): Promise<string | null> {
-  const display = toDisplayPacket(factPacket, flags, crossWorkout);
+  const display = toDisplayPacket(factPacket, flags, crossWorkout, varianceGate ?? null);
   const packetStr = JSON.stringify(display, null, 2);
   // Temporal Arc frame (post-race recovery / taper / race proximity / plan
   // phase) — consumed the same way running does: fact block in the user
@@ -307,6 +368,7 @@ RULES:
 - CRITICAL: introduce NO numbers or percentages that are not in the packet verbatim. Translating IF/VI/decoupling/EF into words instead of numbers SATISFIES this — only normalized power, watts, and other packet figures should appear as numerals.
 - If there is no planned intent, describe the ride physiologically; do not invent a prescription.
 - If plan.week_number is present, anchor it in at most a short clause (e.g. "Week 3, build") — do not spend a sentence on plan position.
+- MIXED-EFFORT MODE (when packet has interval_summary and cross_workout is null): this ride was structured/variable — DO NOT compare whole-ride NP/IF to your endurance baseline. Interpret the per-interval work: which work intervals held the target wattage, whether the work tightened or faded across the set, recovery quality. Lead with the ride's intent (sweet-spot, threshold, VO2) paired with NP and a plain intensity read; cite specific work intervals from interval_summary.work_intervals. Recoveries are context, not the lede.
 
 PACKET (authoritative; do not compute outside it):
 ${packetStr}

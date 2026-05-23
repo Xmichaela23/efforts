@@ -2334,6 +2334,50 @@ Deno.serve(async (req) => {
       console.warn('[analyze-cycling-workout] arc_narrative_for_summary skipped:', arcSummErr);
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Variance gate — D-NNN (cycling). Hoisted before ai_summary so the LLM
+    // input can drop the steady cross-workout block and replace it with an
+    // interval-summary read for mixed-effort rides.
+    // ─────────────────────────────────────────────────────────────────────────
+    const _varGateRide = (() => {
+      const vi = Number((enhancedAnalysis as any)?.power_variability?.variability_index);
+      const cvPct = Number((enhancedAnalysis as any)?.power_variability?.coefficient_of_variation);
+      const viValid = Number.isFinite(vi) && vi > 0;
+      const cvValid = Number.isFinite(cvPct) && cvPct > 0;
+
+      const viTrips = viValid && vi >= 1.05;
+      const cvTrips = cvValid && cvPct >= 12;
+
+      const plannedIntervalsLinked = !!plannedWorkout && (() => {
+        const k = String((cyclingFactPacketV1 as any)?.facts?.classified_type || '').toLowerCase();
+        return k === 'vo2' || k === 'vo2max' || k === 'threshold' ||
+          k === 'sweet_spot' || k === 'intervals' || k === 'interval' ||
+          k === 'fartlek' || k === 'tempo';
+      })();
+
+      let signal:
+        | 'plan_intent_intervals' | 'variability_index' | 'power_cv' | null = null;
+      if (plannedIntervalsLinked) signal = 'plan_intent_intervals';
+      else if (viTrips) signal = 'variability_index';
+      else if (cvTrips) signal = 'power_cv';
+
+      const is_mixed_effort = signal !== null;
+
+      const easyLikePlan = !!plannedWorkout && (() => {
+        const k = String((cyclingFactPacketV1 as any)?.facts?.classified_type || '').toLowerCase();
+        return k === 'endurance' || k === 'recovery' || k === 'easy';
+      })();
+      const classified_type_variance_override = is_mixed_effort && easyLikePlan;
+
+      return {
+        is_mixed_effort,
+        variance_signal: signal,
+        variability_index: viValid ? Math.round(vi * 100) / 100 : null,
+        power_cv_pct: cvValid ? Math.round(cvPct * 10) / 10 : null,
+        classified_type_variance_override,
+      };
+    })();
+
     // Cycling ai_summary — generated here so the narrative can lead with the
     // cross-workout comparison/trend (parity with analyze-running-workout).
     try {
@@ -2347,7 +2391,10 @@ Deno.serve(async (req) => {
         pwr20Trend: pwr20TrendV1,
         limiter: cyclingLimiter,
         fitness: fitnessV1, // design #9 — CTL/ATL/TSB into the INSIGHTS narrative
-      }, arc_narrative_for_summary);
+      }, arc_narrative_for_summary, {
+        isMixedEffort: _varGateRide.is_mixed_effort,
+        intervalBreakdown: (detailedAnalysis as any)?.interval_breakdown ?? null,
+      });
       if (ai_summary) ai_summary_generated_at = new Date().toISOString();
     } catch (e) {
       console.log('⚠️ Cycling ai_summary generation failed:', e);
@@ -2414,6 +2461,9 @@ Deno.serve(async (req) => {
       console.log('[analyze-cycling-workout] preserved previous ai_summary (LLM did not produce a new one)');
     }
 
+    // _varGateRide is hoisted above generateCyclingAISummaryV1 so it can gate
+    // the LLM input shape. The same values feed glance below.
+
     const sessionStateV1 = {
       version: 1,
       owner: 'analysis',
@@ -2425,6 +2475,12 @@ Deno.serve(async (req) => {
           ? (performance.execution_score >= 85 ? 'Strong execution' : performance.execution_score >= 70 ? 'Solid execution' : 'Needs adjustment')
           : null,
         execution_score: typeof performance?.execution_score === 'number' ? performance.execution_score : null,
+        // Variance gate (D-NNN). See _varGateRide computation above.
+        is_mixed_effort: _varGateRide.is_mixed_effort,
+        variance_signal: _varGateRide.variance_signal,
+        variability_index: _varGateRide.variability_index,
+        power_cv_pct: _varGateRide.power_cv_pct,
+        classified_type_variance_override: _varGateRide.classified_type_variance_override,
       },
       narrative: {
         text: ai_summary || null,
