@@ -328,6 +328,13 @@ export interface EfficiencyMetrics {
     earlyRatio: number;         // Early pace/HR ratio
     lateRatio: number;          // Late pace/HR ratio
     assessment: 'excellent' | 'good' | 'moderate' | 'high';
+    /**
+     * D-036: which pace series fed the ratio.
+     * 'gap' when the input samples carried the raw_pace_s_per_mi marker (i.e.
+     * pace_s_per_mi was already grade-adjusted at the analyzer entry).
+     * 'raw' otherwise.
+     */
+    basis: 'gap' | 'raw';
   };
   
   // Overall efficiency
@@ -373,10 +380,19 @@ export interface HRSummaryMetrics {
   avgHr: number;
   maxHr: number;
   minHr: number;
-  
+
   // For trend tracking
   driftBpm: number | null;
   decouplingPct: number | null;
+  /**
+   * D-036: which pace series fed the decoupling ratio.
+   * 'gap' = grade-adjusted pace (terrain neutralized; honest fitness signal).
+   * 'raw' = raw pace (no usable elevation; treat decoupling as inconclusive).
+   * null = decoupling not computed (interval workout, < 20 min, etc.).
+   */
+  decouplingBasis: 'gap' | 'raw' | null;
+  /** D-036: excellent/good/moderate/high band from efficiency.ts:84-95. */
+  decouplingAssessment: 'excellent' | 'good' | 'moderate' | 'high' | null;
   efficiencyRatio: number | null;
   
   // For weekly zone aggregation

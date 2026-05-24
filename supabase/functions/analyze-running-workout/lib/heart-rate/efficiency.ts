@@ -97,12 +97,19 @@ export function calculateEfficiency(
   // Overall average efficiency
   const avgRatio = calculateEfficiencyRatio(samplesAfterWarmup);
   
+  // D-036: detect whether the input series was GAP-enriched at the analyzer
+  // entry. enrichSamplesWithGAP stamps `raw_pace_s_per_mi` on every sample
+  // when it applies grade adjustment; absence of that marker = raw input.
+  const basis: 'gap' | 'raw' = (sensorData[0] && typeof (sensorData[0] as any).raw_pace_s_per_mi !== 'undefined')
+    ? 'gap' : 'raw';
+
   return {
     decoupling: {
       percent: Math.round(decouplingPercent * 10) / 10,
       earlyRatio: Math.round(earlyRatio * 1000) / 1000,
       lateRatio: Math.round(lateRatio * 1000) / 1000,
-      assessment
+      assessment,
+      basis,
     },
     avgEfficiencyRatio: avgRatio !== null ? Math.round(avgRatio * 1000) / 1000 : 0
   };

@@ -622,6 +622,23 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       // D-035: server-computed unplanned flag. One canonical signal for chips
       // (hide), LLM input (drop prescribed-range), and narrative (UNPLANNED MODE).
       is_unplanned: !match?.planned_id,
+      // D-036: GAP-corrected aerobic decoupling. Sourced from analyzer's
+      // workout_analysis.heart_rate_summary (sample-level, warmup-skipped).
+      // Null when not computed (interval workout, < 20 min of paced-HR data,
+      // cycling/swim) — older rows without the fields render decoupling: null.
+      decoupling: (() => {
+        const hrs = (wa as any)?.heart_rate_summary;
+        if (!hrs || typeof hrs !== 'object') return null;
+        const pct = (hrs as any)?.decouplingPct;
+        const basis = (hrs as any)?.decouplingBasis ?? null;
+        const assessment = (hrs as any)?.decouplingAssessment ?? null;
+        if (pct == null && basis == null && assessment == null) return null;
+        return {
+          pct: typeof pct === 'number' && Number.isFinite(pct) ? Math.round(pct * 10) / 10 : null,
+          basis: (basis === 'gap' || basis === 'raw') ? basis : null,
+          assessment: (['excellent','good','moderate','high'] as const).includes(assessment as any) ? assessment : null,
+        };
+      })(),
     },
 
     splits_mi: splitsMi,

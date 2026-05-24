@@ -5,7 +5,7 @@
 
 import { getPaceToleranceForSegment } from './garmin-execution.ts';
 import { calculatePaceRangeAdherence, getIntervalType, type IntervalType } from './pace-adherence.ts';
-import { paceToGAP, computeSampleGrades, hasUsableElevation } from '../../../_shared/gap.ts';
+import { paceToGAP, computeSampleGrades, hasUsableElevation, enrichSamplesWithGAP } from '../../../_shared/gap.ts';
 
 // -----------------------------------------------------------------------------
 // Exported types
@@ -869,19 +869,14 @@ export function calculatePrescribedRangeAdherenceGranular(
 
   // GAP enrichment: when usable elevation data exists, replace pace_s_per_mi
   // with grade-adjusted pace so adherence is scored on effort, not raw speed.
-  const useGAP = hasUsableElevation(sensorData);
-  let effectiveSensorData = sensorData;
+  // D-036: enrichSamplesWithGAP is idempotent — when the run analyzer has
+  // already done the enrichment at top-level (to share with the HR analyzer),
+  // this call is a no-op via the raw_pace_s_per_mi marker check.
+  const _enriched = enrichSamplesWithGAP(sensorData);
+  const useGAP = _enriched.basis === 'gap';
+  const effectiveSensorData = _enriched.samples;
   if (useGAP) {
-    const grades = computeSampleGrades(sensorData);
-    effectiveSensorData = sensorData.map((s, i) => ({
-      ...s,
-      raw_pace_s_per_mi: s.pace_s_per_mi,
-      pace_s_per_mi: (s.pace_s_per_mi && s.pace_s_per_mi > 0)
-        ? paceToGAP(s.pace_s_per_mi, grades[i])
-        : s.pace_s_per_mi,
-      grade_percent: grades[i],
-    }));
-    console.log(`🏔️ GAP enabled: ${sensorData.length} samples enriched with grade-adjusted pace`);
+    console.log(`🏔️ GAP enabled: ${sensorData.length} samples (enriched or passed through)`);
   }
 
   const intervalsWithPaceTargets = intervals.filter(interval => {

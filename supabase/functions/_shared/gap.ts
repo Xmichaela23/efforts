@@ -145,3 +145,39 @@ export function hasUsableElevation(
 
   return true;
 }
+
+/**
+ * D-036: Enrich a sample series with grade-adjusted pace.
+ * - Returns the input array unchanged when no usable elevation exists.
+ * - Idempotent: detects an already-enriched series via the `raw_pace_s_per_mi`
+ *   marker field and returns it as-is. Lets multiple callers (run HR analyzer,
+ *   pace-adherence calculator) share the same enriched series without
+ *   double-applying paceToGAP.
+ *
+ * Returns: { samples, basis } where basis is 'gap' when enrichment was applied
+ * (or already present) and 'raw' when no usable elevation existed.
+ */
+export function enrichSamplesWithGAP(
+  samples: Array<any>,
+): { samples: Array<any>; basis: 'gap' | 'raw' } {
+  if (!Array.isArray(samples) || samples.length === 0) {
+    return { samples, basis: 'raw' };
+  }
+  // Idempotency: already enriched.
+  if (samples[0] && typeof samples[0].raw_pace_s_per_mi !== 'undefined') {
+    return { samples, basis: 'gap' };
+  }
+  if (!hasUsableElevation(samples)) {
+    return { samples, basis: 'raw' };
+  }
+  const grades = computeSampleGrades(samples);
+  const enriched = samples.map((s, i) => ({
+    ...s,
+    raw_pace_s_per_mi: s.pace_s_per_mi,
+    pace_s_per_mi: (s.pace_s_per_mi && s.pace_s_per_mi > 0)
+      ? paceToGAP(s.pace_s_per_mi, grades[i])
+      : s.pace_s_per_mi,
+    grade_percent: grades[i],
+  }));
+  return { samples: enriched, basis: 'gap' };
+}

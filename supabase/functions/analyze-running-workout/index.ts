@@ -15,6 +15,9 @@ import { fetchGoalRaceCompletionForWorkout, type GoalRaceCompletionMatch } from 
 import { buildMarathonGoalRaceAdherenceSummary } from './lib/analysis/marathon-race-narrative.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
+// D-036: GAP enrichment lifted to top-level so both pace-adherence and the
+// HR analyzer consume the same grade-adjusted sample series.
+import { enrichSamplesWithGAP } from '../_shared/gap.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 import {
   collapseCourseSegmentsToZones,
@@ -778,11 +781,19 @@ Deno.serve(async (req) => {
       paceRange: i.pace_range
     })));
     
+    // D-036: GAP enrichment lifted to top-level so the HR analyzer
+    // (calculateEfficiency) can score decoupling on grade-adjusted pace, not
+    // raw pace. enrichSamplesWithGAP is idempotent — granular-pace.ts's
+    // internal call sees the marker and short-circuits, so no double-apply.
+    const _enrichedRun = enrichSamplesWithGAP(sensorData);
+    const effectiveSensorData = _enrichedRun.samples;
+    const _runPaceBasis: 'gap' | 'raw' = _enrichedRun.basis;
+
     // Perform granular adherence analysis
     console.log('🔴🔴🔴 INDEX.TS VERSION 2026-02-02-D: HR DRIFT FIX ACTIVE');
     console.log('🚀 [TIMING] Starting calculatePrescribedRangeAdherenceGranular...');
-    const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervalsToAnalyze, workout, plannedWorkout, historicalDriftData, planContextForDrift);
-    console.log(`🏁 AFTER_GRANULAR +${Date.now()-_t0}ms heap=${_mem()}`);
+    const analysis = calculatePrescribedRangeAdherenceGranular(effectiveSensorData, intervalsToAnalyze, workout, plannedWorkout, historicalDriftData, planContextForDrift);
+    console.log(`🏁 AFTER_GRANULAR +${Date.now()-_t0}ms heap=${_mem()} pace_basis=${_runPaceBasis}`);
 
     // 💓 SINGLE SOURCE OF TRUTH: Consolidated HR Analysis
     // All HR metrics (drift, zones, efficiency, intervals) calculated here
@@ -1112,8 +1123,11 @@ Deno.serve(async (req) => {
       console.log(`💓 [HR CONTEXT] Computed timestamps for first interval: startTimeS=${firstInterval.startTimeS}, endTimeS=${firstInterval.endTimeS}, isMs=${isMilliseconds}`);
     }
     
-    const hrAnalysisResult = analyzeHeartRate(sensorData, hrAnalysisContext);
-    console.log(`🏁 AFTER_HR +${Date.now()-_t0}ms heap=${_mem()} drift=${hrAnalysisResult.drift?.driftBpm ?? 'N/A'}`);
+    // D-036: feed the HR analyzer the GAP-enriched samples (same series
+    // calculatePrescribedRangeAdherenceGranular consumes). calculateEfficiency
+    // now scores decoupling on grade-adjusted pace — terrain confound removed.
+    const hrAnalysisResult = analyzeHeartRate(effectiveSensorData, hrAnalysisContext);
+    console.log(`🏁 AFTER_HR +${Date.now()-_t0}ms heap=${_mem()} drift=${hrAnalysisResult.drift?.driftBpm ?? 'N/A'} pace_basis=${_runPaceBasis}`);
     
     // Update analysis.heart_rate_analysis with consolidated results
     {
@@ -1966,6 +1980,23 @@ Deno.serve(async (req) => {
           total_steps: performance.total_steps ?? null,
           gap_adjusted: !!performance.gap_adjusted,
         };
+      }
+
+      // D-036: replace segment-level cardiac_decoupling_pct (raw pace) with
+      // the sample-level decoupling from the run HR analyzer (now GAP-corrected
+      // because the analyzer reads effectiveSensorData per task #24). Surface
+      // basis so the LLM prompt rule can gate the fitness-claim translation.
+      // No-op when sample-level decoupling is null (intervals, < 20 min, etc.) —
+      // segment-level value stays in place for those cases.
+      if (fact_packet_v1) {
+        const fp = fact_packet_v1 as any;
+        if (!fp.derived) fp.derived = {};
+        const sampleLevelDecoupling = hrAnalysisResult.summary?.decouplingPct ?? null;
+        if (sampleLevelDecoupling != null) {
+          fp.derived.cardiac_decoupling_pct = Math.round(sampleLevelDecoupling * 10) / 10;
+        }
+        fp.derived.decoupling_basis = hrAnalysisResult.summary?.decouplingBasis ?? null;
+        fp.derived.decoupling_assessment = hrAnalysisResult.summary?.decouplingAssessment ?? null;
       }
     } catch (e) {
       console.warn('[analyze-running-workout] fact_packet_v1 build failed:', e);

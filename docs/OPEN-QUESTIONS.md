@@ -249,6 +249,16 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
+## Q-022 — `segment_progress_metrics` writer chain is broken; table has not been written to since ~2026-03-01
+
+- **Status:** bug (deferred — separate from D-036 within-workout decoupling scope).
+- **What's broken:** `compute-facts/index.ts:421-451 writeSegmentProgressMetric` references columns that don't exist on the live `segment_progress_metrics` table: `grade_adjusted_pace_sec_per_km` (`:666` — real column is `grade_adjusted_pace_s_per_km`), `metric_date` (Variant C `:446` — column doesn't exist), `avg_pace_sec_per_km` (Variant C `:447` — real column is `avg_pace_s_per_km`). PostgREST returns `42703 column does not exist`; the three-variant fallback's try/catches swallow the error silently. **All three variants are broken**, so no new writes succeed. Live query against the table (2026-05-23) returned 42 rows from 3 distinct workouts, all from 2026-02-26 through 2026-03-01 — historical backfill or older code path. No workouts after 2026-03-01 are represented.
+- **Why it's not blocking D-036:** within-workout decoupling (D-036) uses sample-level data directly from the analyzer, not from `segment_progress_metrics`. The per-segment HR-vs-history feature (which would consume this table) was therefore correctly scoped out of D-036.
+- **What "fixing" would require:** (a) correct the column names in all three Variants of `writeSegmentProgressMetric`, (b) replace the try/catch-eat-errors pattern with surfaced logging so future writer regressions don't silently rot, (c) decide whether to backfill `segment_progress_metrics` for workouts ingested after 2026-03-01 — without backfill the per-segment HR-vs-history surface would only see "new" workouts and have no comparison history for ~3 months. (d) Then the small wiring to surface GAP-adjusted segment comparisons (`build.ts:633-678` discards `todayGap`/`avgPastGap` after computing them).
+- **Cross-ref:** RUN-HR-DRIFT-SPEC.md §6 (out-of-scope rationale).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

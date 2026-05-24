@@ -176,6 +176,16 @@ export type FactPacketV1 = {
     drift_explanation: DriftExplanation | null;
     hr_drift_typical: number | null;
     cardiac_decoupling_pct: number | null;
+    /**
+     * D-036: which pace series fed cardiac_decoupling_pct.
+     * 'gap' = grade-adjusted pace (terrain-neutral; treat the value as a real
+     * cardiovascular efficiency signal).
+     * 'raw' = raw pace (terrain confound present; treat as inconclusive).
+     * null = decoupling not computed (interval workout, < 20 min, cycling).
+     */
+    decoupling_basis?: 'gap' | 'raw' | null;
+    /** D-036: 'excellent' (<3%) | 'good' (<5%) | 'moderate' (<8%) | 'high' (≥8%) | null. */
+    decoupling_assessment?: 'excellent' | 'good' | 'moderate' | 'high' | null;
     pace_fade_pct: number | null;
     pacing_pattern?: {
       speedups_note: string | null;

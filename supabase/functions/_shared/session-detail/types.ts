@@ -216,6 +216,20 @@ export type SessionDetailV1 = {
      * `!plan_context.planned_id` in build.ts.
      */
     is_unplanned: boolean;
+    /**
+     * D-036: within-workout aerobic decoupling — does HR climb while
+     * grade-adjusted pace holds steady? Server-computed; client renders.
+     *  • pct: decoupling percentage (sample-level, warmup-skipped).
+     *  • basis: 'gap' = terrain-neutral, treat as fitness signal;
+     *           'raw' = terrain-confounded, inconclusive;
+     *           null  = not computed (interval workout, < 20 min, etc.).
+     *  • assessment: 'excellent' (<3%) / 'good' (<5%) / 'moderate' (<8%) / 'high' (≥8%).
+     */
+    decoupling: {
+      pct: number | null;
+      basis: 'gap' | 'raw' | null;
+      assessment: 'excellent' | 'good' | 'moderate' | 'high' | null;
+    } | null;
   };
 
   // ── Splits (SessionNarrative Speed insight) ───────────────────────────────

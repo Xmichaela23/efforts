@@ -436,6 +436,19 @@ MIXED-EFFORT MODE — when the user message includes an INTERVAL EXECUTION block
 - USE GAP when "grade-adjusted" is noted on the pace adherence line. The interval paces in INTERVAL EXECUTION are already GAP-corrected when that flag is set — anchor the effort read on those values, not raw pace.
 - DO NOT say "HR ran higher than recent similar efforts" or any whole-workout comparison sentence. There is no honest steady comparison to make.
 
+AEROBIC DECOUPLING (RUN) — when signals.cardiac_decoupling is present AND signals.decoupling_basis === 'gap':
+- This is grade-adjusted: the pace input feeding the decoupling ratio used GAP, not raw pace. Terrain confound is removed. The number reflects real cardiovascular efficiency drift across the workout, not how the route happened to slope.
+- Translate the value to plain language; NEVER print the percentage:
+  • signals.decoupling_assessment === 'excellent' (<3%) → "heart rate stayed controlled as effort held — strong aerobic efficiency."
+  • 'good' (3–5%) → "modest efficiency drift over the second half — typical for the duration."
+  • 'moderate' (5–8%) → "noticeable efficiency drop — your body worked harder to maintain effort late."
+  • 'high' (≥8%) → "significant decoupling — this effort pushed your aerobic limits, or fatigue accumulated."
+- Decoupling and HR drift are distinct. Drift answers "did HR climb?" (can be terrain-driven; use the existing drift_explanation field). Decoupling at gap basis answers "did efficiency drop?" — fitness, not geography.
+- Treat the decoupling read as one observation among others; do not lead with it unless it's the most striking signal in the data.
+
+AEROBIC DECOUPLING (RUN) — when signals.decoupling_basis === 'raw' (no usable elevation data, decoupling computed on raw pace):
+- Treat the decoupling number as inconclusive. It mixes terrain and fitness; you cannot honestly attribute it to either. Do NOT use it to claim efficiency dropped or held. Describe what HR did in plain terms (drift_explanation, drift bpm vs typical) instead.
+
 UNPLANNED MODE — when the user message opens with "UNPLANNED SESSION" and there is NO "EXECUTION vs PLAN" block:
 - This workout has no linked plan. There was no prescribed target. Do NOT scold the athlete for "missing a target" or "running outside the prescribed range" — there was no range. Do NOT invent what the workout "should have been" from duration alone (a 40-min run is not necessarily a tempo).
 - INTERPRET the run on its own terms. Lead with the most interesting observation visible in the actual data, not with a verdict on plan compliance. Options in priority order:
@@ -832,6 +845,13 @@ export function toDisplayFormatV1(
         ? `${Math.round(Number(derived.hr_drift_typical))} bpm`
         : null,
       cardiac_decoupling: (coerceNumber(derived?.cardiac_decoupling_pct) != null) ? `${Math.round(Number(derived.cardiac_decoupling_pct))}%` : null,
+      // D-036: basis tells the LLM whether decoupling is a real fitness signal
+      // (terrain-neutral via GAP) or terrain-contaminated and inconclusive.
+      // Surfaced only when decoupling itself is present.
+      decoupling_basis: (coerceNumber(derived?.cardiac_decoupling_pct) != null)
+        ? ((derived?.decoupling_basis as 'gap' | 'raw' | null) ?? null) : null,
+      decoupling_assessment: (coerceNumber(derived?.cardiac_decoupling_pct) != null)
+        ? ((derived?.decoupling_assessment as 'excellent' | 'good' | 'moderate' | 'high' | null) ?? null) : null,
       pace_fade: (coerceNumber(derived?.pace_fade_pct) != null) ? `${Math.round(Number(derived.pace_fade_pct))}%` : null,
       training_load: derived?.training_load
         ? (() => {
