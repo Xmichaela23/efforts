@@ -2,7 +2,7 @@ import type { FactPacketV1, FlagV1 } from './types.ts';
 import { coerceNumber, secondsToPaceString } from './utils.ts';
 import { callLLM } from '../llm.ts';
 import type { ArcNarrativeContextV1, ArcNarrativeMode } from '../arc-narrative-state.ts';
-import { arcModeSystemAddon, arcNarrativeFactBlock } from '../arc-narrative-ai-appendix.ts';
+import { arcModeSystemAddon, arcNarrativeFactBlock, arcPostRaceComparisonAddon } from '../arc-narrative-ai-appendix.ts';
 
 function normalizeParagraph(text: string): string {
   return String(text || '')
@@ -711,6 +711,7 @@ export function toDisplayFormatV1(
   flags: FlagV1[],
   varianceGate?: VarianceGateOptions | null,
   unplannedGate?: UnplannedGateOptions | null,
+  arcNarrative?: ArcNarrativeContextV1 | null,
 ) {
   const facts = packet?.facts as any;
   const derived = packet?.derived as any;
@@ -805,6 +806,11 @@ export function toDisplayFormatV1(
       };
     })(),
     signals: {
+      // First-run-back gate from arc narrative. When true AND vs_similar.hr_delta
+      // is present, the POST-RACE COMPARISON prompt rule fires and suppresses
+      // "elevated HR vs similar efforts" narration — the pool spans pre-race
+      // peak-fitness runs, so the delta is structurally expected, not diagnostic.
+      is_first_post_race_run: arcNarrative?.is_first_post_race_run === true,
       // D-035: drop the entire execution-vs-plan signal block when there's no
       // linked plan. distance_deviation / pace_vs_range / "assessed against"
       // notes all imply a prescription existed. Keeping them would invite the
@@ -1062,14 +1068,16 @@ export async function generateAISummaryV1(
     return null;
   }
 
-  const displayPacket = toDisplayFormatV1(factPacket, flags, varianceGate ?? null, unplannedGate ?? null);
+  const displayPacket = toDisplayFormatV1(factPacket, flags, varianceGate ?? null, unplannedGate ?? null, arcNarrative ?? null);
 
   const arcFacts = arcNarrative ? arcNarrativeFactBlock(arcNarrative) : '';
   const userMessage =
     `${arcFacts ? `\nTEMPORAL ARC CONTEXT (do not contradict; paraphrase for athlete):\n${arcFacts}\n` : ''}` +
     buildUserMessage(displayPacket);
+  // arcPostRaceComparisonAddon emits empty string when is_first_post_race_run
+  // is false; safe to always append.
   const systemPrompt =
-    `${arcTemporalSystemPrefix(arcNarrative)}${COACHING_SYSTEM_PROMPT}${arcModeSystemAddon(arcNarrative)}`;
+    `${arcTemporalSystemPrefix(arcNarrative)}${COACHING_SYSTEM_PROMPT}${arcModeSystemAddon(arcNarrative)}${arcPostRaceComparisonAddon(arcNarrative)}`;
   const numericAllowAnchors =
     arcNarrative ? JSON.stringify(arcNarrative) : '';
 

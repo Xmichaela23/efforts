@@ -52,6 +52,17 @@ export type ArcNarrativeContextV1 = {
   plan_phase_normalized: ArcPlanPhaseBucket;
   /** Weeks assumed as “block lead” before next event for block-start estimate heuristics. */
   assumed_block_lead_weeks: number | null;
+  /**
+   * True when this is the athlete's first (or only) completed run since their
+   * last goal race AND that race is within the last 60 days. Derived:
+   *   (runs_since_last_race ?? 999) <= 1 && (days_since_last_goal_race ?? 999) <= 60
+   * The 60-day window is wider than `recovery_read` mode (~14d) and lets the
+   * post-race comparison rule fire on the first session back even when mode
+   * has rolled to `build_read` / `unstructured_read`. Used by the POST-RACE
+   * COMPARISON prompt rule to suppress "elevated HR vs similar efforts"
+   * narration when the comparison pool spans pre-race peak-fitness runs.
+   */
+  is_first_post_race_run: boolean;
 };
 
 function ymdToUtcMs(ymd: string): number {
@@ -302,18 +313,27 @@ export function buildArcNarrativeContextV1(inp: BuildArcNarrativeContextInput): 
     hasActiveTemporalPlan: inp.hasActiveTemporalPlan,
   });
 
+  const runs_since_last_race =
+    inp.runsSinceLastRace != null && Number.isFinite(inp.runsSinceLastRace) ? inp.runsSinceLastRace : null;
+
+  // First-run-back gate. Defaults of 999 mean a null on either field resolves
+  // to false (no race on record → not a post-race session; same for missing
+  // run count).
+  const is_first_post_race_run =
+    (runs_since_last_race ?? 999) <= 1 && (days_since_last_goal_race ?? 999) <= 60;
+
   return {
     version: 1,
     focus_date: focusYmd,
     mode,
     days_since_last_goal_race,
-    runs_since_last_race:
-      inp.runsSinceLastRace != null && Number.isFinite(inp.runsSinceLastRace) ? inp.runsSinceLastRace : null,
+    runs_since_last_race,
     days_until_next_block_start,
     days_until_next_goal_race,
     last_goal_race,
     next_primary_goal,
     plan_phase_normalized,
     assumed_block_lead_weeks,
+    is_first_post_race_run,
   };
 }

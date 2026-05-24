@@ -93,7 +93,32 @@ Avoid inventing prescriptions not evidenced in data.
 
 TEMPORAL ARC MODE: unstructured_read — temporal Arc stack is sparse on this WORKOUT DATE.
 Neutral observational synthesis; do not invent plan/program language or race proximity not present in FACTS or ARC block below.
-Prefer "what fitness signal does today show?" over "matched the workout."  
+Prefer "what fitness signal does today show?" over "matched the workout."
 `;
   }
+}
+
+/**
+ * POST-RACE COMPARISON prompt rule. Appended to the system prompt when the
+ * arc narrative flags this session as the first run back from a goal race
+ * within the 60-day window. Suppresses LLM narration that treats elevated HR
+ * vs the historical pool as fatigue or aerobic regression — the pool spans
+ * pre-race peak-fitness runs and the delta is structurally expected, not
+ * diagnostic. Empty string when the flag is false / context missing.
+ */
+export function arcPostRaceComparisonAddon(nc: ArcNarrativeContextV1 | null | undefined): string {
+  if (!nc?.is_first_post_race_run) return '';
+  const runN = nc.runs_since_last_race;
+  const firstRunPhrase = runN === 1
+    ? `If signals.is_first_post_race_run is true AND runs_since_race_estimate=1 in the ARC FACT BLOCK, say "first run back" explicitly in the narrative.`
+    : `If signals.is_first_post_race_run is true, the athlete has only completed ${runN ?? '?'} run(s) since their last goal race.`;
+  return `
+
+POST-RACE COMPARISON — fires when signals.is_first_post_race_run is true AND signals.comparisons.vs_similar.hr_delta is present:
+- The vs_similar comparison pool spans the last 120 days and is NOT filtered by race phase. It includes pre-race runs at peak fitness when the athlete was deepest into training. Elevated HR relative to that pool on a first-run-back is structurally expected; it does NOT indicate fatigue, regression, incomplete recovery, or aerobic elevation.
+- ${firstRunPhrase}
+- DO NOT interpret signals.comparisons.vs_similar.hr_delta as fatigue, fitness regression, "your aerobic system is still elevated", "your body hasn't fully recovered", "you're carrying race fatigue", or any equivalent framing.
+- DO describe what HR did in this session on its own terms (range, response to terrain/intervals, RPE alignment). You may note the pool limitation plainly — e.g. "your recent similar runs were mostly from before the race" — but leave the delta uninterpreted.
+- This rule takes PRIORITY over any general vs_similar HR interpretation guidance. The drift_explanation / pace-normalized drift fields remain valid for in-session HR behavior; only the cross-session hr_delta is gated.
+`;
 }
