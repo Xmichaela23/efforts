@@ -7,12 +7,23 @@
  *  • session_detail_v1.classification.decoupling shape (null when missing,
  *    populated when heart_rate_summary carries the fields)
  *
+ * Plus the mixed-effort follow-on (D-037 scope):
+ *  • calculateEfficiency forMixedEffort flag bypasses the steady-state guard
+ *    and forces basis='raw' regardless of GAP enrichment
+ *  • toDisplayFormatV1 vs_similar nulls pace fields under isMixedEffort but
+ *    preserves hr_delta / drift_delta / trend (HR at intensity is comparable
+ *    across effort types even when pace isn't)
+ *  • buildUserMessage suppresses the "Pace vs similar" line under mixed-effort
+ *    but keeps the "HR vs similar" line
+ *
  * Run from repo root:
  *   deno test supabase/functions/_shared/session-detail/decoupling.test.ts --no-check
  */
 import { assertEquals, assertNotEquals, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { enrichSamplesWithGAP } from '../gap.ts';
-import { toDisplayFormatV1 } from '../fact-packet/ai-summary.ts';
+import { toDisplayFormatV1, buildUserMessage } from '../fact-packet/ai-summary.ts';
+import { calculateEfficiency } from '../../analyze-running-workout/lib/heart-rate/efficiency.ts';
+import type { HRAnalysisContext, SensorSample } from '../../analyze-running-workout/lib/heart-rate/types.ts';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -145,4 +156,143 @@ Deno.test('D-036: toDisplayFormatV1 carries raw basis through (so prompt can tre
   const fp = makeFactPacketWithDecoupling({ pct: 3.1, basis: 'raw', assessment: 'good' });
   const dp = toDisplayFormatV1(fp, [], null, null);
   assertEquals(dp.signals.decoupling_basis, 'raw');
+});
+
+// ── calculateEfficiency: forMixedEffort flag ──────────────────────────────
+
+function makeBlankContext(): HRAnalysisContext {
+  return {
+    workoutType: 'intervals',
+    intervals: [],
+    terrain: { samples: [] },
+  };
+}
+
+function makeEffSamples(n: number, opts?: { gapMarker?: boolean; baseHr?: number; basePace?: number }): SensorSample[] {
+  const baseHr = opts?.baseHr ?? 145;
+  const basePace = opts?.basePace ?? 480; // 8:00/mi
+  return Array.from({ length: n }, (_, i) => {
+    const s: any = {
+      timestamp: i,
+      heart_rate: baseHr + Math.floor(i / 600), // tiny upward drift so ratios differ
+      pace_s_per_mi: basePace,
+    };
+    if (opts?.gapMarker) s.raw_pace_s_per_mi = basePace + 5; // simulates enrichSamplesWithGAP marker
+    return s as SensorSample;
+  });
+}
+
+Deno.test('D-037 mixed-effort: calculateEfficiency preserves existing skip on planned intervals (forMixedEffort=false)', () => {
+  // Planned interval sessions keep the existing skip — per-interval execution
+  // is the honest read, not a whole-session first-half/second-half ratio.
+  const samples = makeEffSamples(1400);
+  const out = calculateEfficiency(samples, samples, makeBlankContext(), 'intervals');
+  assertEquals(out, undefined);
+});
+
+Deno.test('D-037 mixed-effort: forMixedEffort=true bypasses the intervals/hill_repeats early-return', () => {
+  const samples = makeEffSamples(1400);
+  const out = calculateEfficiency(samples, samples, makeBlankContext(), 'intervals', { forMixedEffort: true });
+  assertNotEquals(out, undefined);
+  assertEquals(typeof out!.decoupling.percent, 'number');
+});
+
+Deno.test('D-037 mixed-effort: forMixedEffort=true forces basis="raw" on GAP-enriched samples (raw branch of prompt fires)', () => {
+  // Whole-session decoupling across heterogeneous efforts is inconclusive even
+  // when the sample series itself was grade-adjusted — force 'raw' so the
+  // AEROBIC DECOUPLING (RUN) raw-branch rule fires.
+  const samples = makeEffSamples(1400, { gapMarker: true });
+  const out = calculateEfficiency(samples, samples, makeBlankContext(), 'fartlek', { forMixedEffort: true });
+  assertNotEquals(out, undefined);
+  assertEquals(out!.decoupling.basis, 'raw');
+});
+
+Deno.test('D-037 mixed-effort: forMixedEffort=false on fartlek with GAP samples returns basis="gap" (steady-state path unchanged)', () => {
+  // Sanity: the non-mixed-effort path still respects the detected basis. This
+  // protects the D-036 steady-state contract from collateral.
+  const samples = makeEffSamples(1400, { gapMarker: true });
+  const out = calculateEfficiency(samples, samples, makeBlankContext(), 'fartlek');
+  assertNotEquals(out, undefined);
+  assertEquals(out!.decoupling.basis, 'gap');
+});
+
+// ── toDisplayFormatV1: vs_similar restructure under isMixedEffort ──────────
+
+function makeFactPacketWithComparisons(): any {
+  return {
+    version: 1,
+    generated_at: '2026-05-23T12:00:00Z',
+    facts: {
+      workout_date: '2026-05-23', workout_type: 'fartlek', total_distance_mi: 3.5,
+      total_duration_min: 33, avg_pace_sec_per_mi: 565, avg_gap_sec_per_mi: 560,
+      gap_adjusted: true, avg_hr: 150, max_hr: 167, segments: [],
+      weather: null, plan: null, athlete_reported: null,
+    },
+    derived: {
+      execution: null, hr_drift_bpm: 4, raw_hr_drift_bpm: 5,
+      terrain_contribution_bpm: 1, pace_normalized_drift_bpm: 3,
+      drift_explanation: 'cardiac_drift', hr_drift_typical: 5,
+      cardiac_decoupling_pct: null, decoupling_basis: null, decoupling_assessment: null,
+      pace_fade_pct: 1, pacing_pattern: null, training_load: null,
+      comparisons: {
+        vs_similar: { sample_size: 6, pace_delta_sec: -8, hr_delta_bpm: 4, drift_delta_bpm: 1, assessment: 'better_than_usual', pace_basis: 'gap' },
+        trend: { direction: 'improving', magnitude: '12 s/mi over 6 workouts', data_points: 6 },
+        achievements: [],
+      },
+      stimulus: null, interval_execution: null, primary_limiter: null, terrain_context: null,
+    },
+  };
+}
+
+Deno.test('D-037 mixed-effort: toDisplayFormatV1 with isMixedEffort=true nulls pace fields on vs_similar', () => {
+  const fp = makeFactPacketWithComparisons();
+  const dp = toDisplayFormatV1(fp, [], { isMixedEffort: true, intervalBreakdown: null }, null);
+  assertNotEquals(dp.signals.comparisons.vs_similar, null);
+  assertEquals(dp.signals.comparisons.vs_similar.pace_delta, null);
+  assertEquals(dp.signals.comparisons.vs_similar.pace_basis, null);
+  assertEquals(dp.signals.comparisons.vs_similar.assessment, null);
+});
+
+Deno.test('D-037 mixed-effort: toDisplayFormatV1 with isMixedEffort=true preserves hr_delta and drift_delta', () => {
+  const fp = makeFactPacketWithComparisons();
+  const dp = toDisplayFormatV1(fp, [], { isMixedEffort: true, intervalBreakdown: null }, null);
+  assertEquals(dp.signals.comparisons.vs_similar.hr_delta, '4 bpm');
+  assertEquals(dp.signals.comparisons.vs_similar.drift_delta, '1 bpm');
+  assertEquals(dp.signals.comparisons.vs_similar.sample_size, 6);
+});
+
+Deno.test('D-037 mixed-effort: toDisplayFormatV1 with isMixedEffort=true preserves the trend block', () => {
+  const fp = makeFactPacketWithComparisons();
+  const dp = toDisplayFormatV1(fp, [], { isMixedEffort: true, intervalBreakdown: null }, null);
+  assertNotEquals(dp.signals.comparisons.trend, null);
+  assertEquals(dp.signals.comparisons.trend.direction, 'improving');
+  assertEquals(dp.signals.comparisons.trend.data_points, 6);
+});
+
+Deno.test('D-037 mixed-effort: toDisplayFormatV1 with isMixedEffort=false preserves all fields (regression)', () => {
+  const fp = makeFactPacketWithComparisons();
+  const dp = toDisplayFormatV1(fp, [], null, null);
+  assertEquals(dp.signals.comparisons.vs_similar.assessment, 'better_than_usual');
+  assertEquals(dp.signals.comparisons.vs_similar.pace_basis, 'gap');
+  assertNotEquals(dp.signals.comparisons.vs_similar.pace_delta, null);
+  assertEquals(dp.signals.comparisons.vs_similar.hr_delta, '4 bpm');
+  assertEquals(dp.signals.comparisons.trend.direction, 'improving');
+});
+
+// ── buildUserMessage rendering under mixed-effort ─────────────────────────
+
+Deno.test('D-037 mixed-effort: buildUserMessage suppresses "Pace vs similar" line under isMixedEffort', () => {
+  const fp = makeFactPacketWithComparisons();
+  const dp = toDisplayFormatV1(fp, [], { isMixedEffort: true, intervalBreakdown: null }, null);
+  const msg = buildUserMessage(dp);
+  assertEquals(msg.includes('Pace vs similar'), false);
+});
+
+Deno.test('D-037 mixed-effort: buildUserMessage keeps "HR vs similar" and "Trend" lines under isMixedEffort', () => {
+  const fp = makeFactPacketWithComparisons();
+  const dp = toDisplayFormatV1(fp, [], { isMixedEffort: true, intervalBreakdown: null }, null);
+  const msg = buildUserMessage(dp);
+  assertStringIncludes(msg, 'COMPARED TO SIMILAR WORKOUTS');
+  assertStringIncludes(msg, 'HR vs similar');
+  assertStringIncludes(msg, 'Trend:');
 });

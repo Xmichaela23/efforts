@@ -430,11 +430,12 @@ HR DRIFT — USE PACE-NORMALIZED VALUES:
 - "hr_drift_raw_absolute" shows the total first-half vs second-half HR gap for transparency, but do NOT use it as a signal. It conflates pace changes, terrain, and actual drift.
 - STRUCTURED INTERVALS: If the workout has multiple planned work/recovery segments, HR differences between segments are expected (pace targets change). Do not describe that as "cardiac drift" or cite a single bpm drift figure unless the data explicitly says steady-state drift for the main work block.
 
-MIXED-EFFORT MODE — when the user message includes an INTERVAL EXECUTION block (and NO "COMPARED TO SIMILAR WORKOUTS" block), this was a structured interval session, fartlek, or detected mixed-effort run:
-- DO NOT compare whole-workout averages to easy-run history. The athlete didn't run at a single steady effort, so a single pace/HR delta vs steady history is meaningless. The packet correctly omits vs_similar in this mode; do not invent it.
+MIXED-EFFORT MODE — when the user message includes an INTERVAL EXECUTION block, this was a structured interval session, fartlek, or detected mixed-effort run:
+- DO NOT compare whole-workout PACE averages to easy-run history. The athlete didn't run at a single steady effort, so a single pace delta vs steady history is meaningless. The packet nulls vs_similar.assessment, vs_similar.pace_delta, and vs_similar.pace_basis in this mode; do not invent them.
+- HR COMPARISON IS VALID. vs_similar.hr_delta, vs_similar.drift_delta, and the trend block remain populated when the historical pool exists, because HR at intensity is comparable across sessions even when pace varies. "HR ran +N bpm vs similar efforts" is a legitimate read of cardiovascular load. The trend's direction/magnitude give aerobic context across the recent block.
 - INTERPRET the interval execution: which work intervals hit the prescribed range, where the athlete drifted, how recoveries went. Lead with the structure ("5 × 3 min at threshold"), the completion ratio, and one specific interval that tells the story (a fade on #4, a strong final).
 - USE GAP when "grade-adjusted" is noted on the pace adherence line. The interval paces in INTERVAL EXECUTION are already GAP-corrected when that flag is set — anchor the effort read on those values, not raw pace.
-- DO NOT say "HR ran higher than recent similar efforts" or any whole-workout comparison sentence. There is no honest steady comparison to make.
+- DO NOT say "you ran faster/slower than recent similar efforts" or any whole-workout pace comparison sentence. There is no honest steady pace comparison to make.
 
 AEROBIC DECOUPLING (RUN) — when signals.cardiac_decoupling is present AND signals.decoupling_basis === 'gap':
 - This is grade-adjusted: the pace input feeding the decoupling ratio used GAP, not raw pace. Terrain confound is removed. The number reflects real cardiovascular efficiency drift across the workout, not how the route happened to slope.
@@ -551,23 +552,29 @@ export function buildUserMessage(dp: any): string {
     sections.push('\nATHLETE REPORTED:\n' + parts.map((p) => `- ${p}`).join('\n'));
   }
 
-  // Similar workouts — only render the steady-effort comparison block when the
-  // session was steady. For mixed-effort sessions, vs_similar is null in the
-  // packet (D-NNN, ai-summary.ts:toDisplayFormatV1) and the interval_summary
-  // block below carries the read instead.
+  // Similar workouts comparison. For mixed-effort sessions, the pace line is
+  // suppressed (assessment + pace_delta nulled in toDisplayFormatV1) but the
+  // HR / drift / trend lines still render — HR at intensity remains
+  // comparable across effort types. The interval_summary block below carries
+  // the per-interval pace read.
   const comp = sig.comparisons;
   if (comp?.vs_similar?.sample_size > 0 && comp.vs_similar.assessment !== 'insufficient_data') {
     const basisNote = comp.vs_similar.pace_basis === 'gap'
       ? ' (grade-adjusted pace; terrain neutralized)'
       : '';
-    sections.push([
-      `\nCOMPARED TO SIMILAR WORKOUTS (n=${comp.vs_similar.sample_size}):`,
-      `- Pace vs similar: ${comp.vs_similar.assessment}${comp.vs_similar.pace_delta ? ` (${comp.vs_similar.pace_delta}${basisNote})` : ''}`,
-      comp.vs_similar.hr_delta ? `- HR vs similar: ${comp.vs_similar.hr_delta}` : null,
-      comp.trend?.direction && comp.trend.direction !== 'insufficient_data'
-        ? `- Trend: ${comp.trend.direction}${comp.trend.magnitude ? ` — ${comp.trend.magnitude}` : ''} (${comp.trend.data_points} data points)`
-        : null,
-    ].filter(Boolean).join('\n'));
+    // Pace line only when assessment is present — null in mixed-effort mode.
+    const paceLine = comp.vs_similar.assessment
+      ? `- Pace vs similar: ${comp.vs_similar.assessment}${comp.vs_similar.pace_delta ? ` (${comp.vs_similar.pace_delta}${basisNote})` : ''}`
+      : null;
+    const hrLine = comp.vs_similar.hr_delta ? `- HR vs similar: ${comp.vs_similar.hr_delta}` : null;
+    const driftLine = comp.vs_similar.drift_delta ? `- Drift vs similar: ${comp.vs_similar.drift_delta}` : null;
+    const trendLine = comp.trend?.direction && comp.trend.direction !== 'insufficient_data'
+      ? `- Trend: ${comp.trend.direction}${comp.trend.magnitude ? ` — ${comp.trend.magnitude}` : ''} (${comp.trend.data_points} data points)`
+      : null;
+    const bodyLines = [paceLine, hrLine, driftLine, trendLine].filter(Boolean);
+    if (bodyLines.length > 0) {
+      sections.push([`\nCOMPARED TO SIMILAR WORKOUTS (n=${comp.vs_similar.sample_size}):`, ...bodyLines].join('\n'));
+    }
   }
 
   // D-NNN: interval summary for mixed-effort sessions. Interpret per-interval
@@ -869,19 +876,23 @@ export function toDisplayFormatV1(
         : null,
       comparisons: derived?.comparisons
         ? {
-            // D-NNN: drop the steady-effort vs_similar comparison from the LLM
-            // input when this session is mixed-effort. Whole-workout pace/HR
-            // deltas vs an easy-run baseline are not honest for a fartlek or
-            // intervals; the interval_summary block below carries the true read.
-            vs_similar: isMixedEffort ? null : {
-              assessment: derived.comparisons?.vs_similar?.assessment ?? null,
+            // Mixed-effort scope: pace comparisons across heterogeneous
+            // efforts are invalid (a fartlek's whole-workout avg pace vs
+            // easy-run history is meaningless), so pace fields + the combined
+            // assessment null when isMixedEffort. HR at intensity remains
+            // comparable across sessions regardless of effort type — preserve
+            // hr_delta, drift_delta, and the trend block so the LLM keeps
+            // historical cardiovascular context. The interval_summary block
+            // below still carries the per-interval pace read.
+            vs_similar: {
+              assessment: isMixedEffort ? null : (derived.comparisons?.vs_similar?.assessment ?? null),
               sample_size: derived.comparisons?.vs_similar?.sample_size ?? 0,
-              pace_delta: fmtDeltaSecPerMi(coerceNumber(derived.comparisons?.vs_similar?.pace_delta_sec)),
-              pace_basis: derived.comparisons?.vs_similar?.pace_basis ?? 'raw',
+              pace_delta: isMixedEffort ? null : fmtDeltaSecPerMi(coerceNumber(derived.comparisons?.vs_similar?.pace_delta_sec)),
+              pace_basis: isMixedEffort ? null : (derived.comparisons?.vs_similar?.pace_basis ?? 'raw'),
               hr_delta: (coerceNumber(derived.comparisons?.vs_similar?.hr_delta_bpm) != null) ? `${Math.round(Number(derived.comparisons.vs_similar.hr_delta_bpm))} bpm` : null,
               drift_delta: (coerceNumber(derived.comparisons?.vs_similar?.drift_delta_bpm) != null) ? `${Math.round(Number(derived.comparisons.vs_similar.drift_delta_bpm))} bpm` : null,
             },
-            trend: isMixedEffort ? null : {
+            trend: {
               direction: derived.comparisons?.trend?.direction ?? null,
               magnitude: derived.comparisons?.trend?.magnitude ?? null,
               data_points: derived.comparisons?.trend?.data_points ?? 0,

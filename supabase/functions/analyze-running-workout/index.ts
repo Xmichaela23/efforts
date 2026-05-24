@@ -1024,6 +1024,10 @@ Deno.serve(async (req) => {
 
     const hrAnalysisContext: HRAnalysisContext = {
       workoutType: classifiedHrWorkoutType,
+      // D-035 canonical unplanned signal; consumed by the HR analyzer's
+      // interval-route decoupling gate (detected intervals on unplanned runs
+      // still compute decoupling, basis forced to 'raw').
+      isUnplanned: !isLinkedPlanSession,
       intervals: intervalsToAnalyze.map(interval => {
         // Compute timestamps from sample indices
         // Sample indices are roughly 1 sample per second

@@ -227,16 +227,26 @@ function analyzeIntervalWorkout(
   durationMinutes: number
 ): HRAnalysisResult {
   console.log('💓 [HR ANALYSIS] Analyzing as interval workout');
-  
+
   // Calculate interval-specific HR metrics
   const intervals = analyzeIntervalHR(sensorData, context.intervals);
-  
+
   // Build trends if historical data available
   const trends = buildIntervalTrends(intervals, context);
-  
+
   // Determine confidence
   const { confidence, reasons } = determineIntervalConfidence(intervals, context.intervals.length);
-  
+
+  // Whole-session decoupling for UNPLANNED interval sessions (detected via
+  // hasAlternatingPattern or work/recovery role split). Planned interval
+  // sessions keep the existing skip — per-interval execution is the honest
+  // read there, not a first-half/second-half ratio across heterogeneous bouts.
+  // Basis is forced to 'raw' inside calculateEfficiency so the prompt's
+  // raw-branch rule fires.
+  const efficiency = context.isUnplanned === true
+    ? calculateEfficiency(sensorData, validHRSamples, context, workoutType, { forMixedEffort: true })
+    : undefined;
+
   // Build interpretation narrative
   const interpretation = buildInterpretation({
     workoutType,
@@ -246,15 +256,16 @@ function analyzeIntervalWorkout(
     trends,
     context
   });
-  
+
   // Build summary for aggregation
-  const summary = buildIntervalSummary(validHRSamples, intervals, zones, workoutType, durationMinutes, confidence);
-  
+  const summary = buildIntervalSummary(validHRSamples, intervals, efficiency, zones, workoutType, durationMinutes, confidence);
+
   return {
     workoutType,
     analysisType: 'intervals',
     intervals,
     zones,
+    efficiency,
     trends,
     interpretation,
     summaryLabel: 'Interval Summary',
@@ -277,10 +288,16 @@ function analyzeMixedWorkout(
   durationMinutes: number
 ): HRAnalysisResult {
   console.log('💓 [HR ANALYSIS] Analyzing as mixed/fartlek workout');
-  
+
   // For mixed workouts, zone distribution is the main insight
   const { confidence, reasons } = determineMixedConfidence(validHRSamples.length);
-  
+
+  // Whole-session decoupling for fartlek / mixed sessions (planned or not).
+  // Basis is forced to 'raw' inside calculateEfficiency so the prompt's
+  // raw-branch rule fires and the number is treated as inconclusive — HR
+  // behavior gets described in plain language, fitness is not claimed.
+  const efficiency = calculateEfficiency(sensorData, validHRSamples, context, workoutType, { forMixedEffort: true });
+
   // Build interpretation narrative
   const interpretation = buildInterpretation({
     workoutType,
@@ -288,14 +305,15 @@ function analyzeMixedWorkout(
     zones,
     context
   });
-  
+
   // Build summary for aggregation
-  const summary = buildMixedSummary(validHRSamples, zones, workoutType, durationMinutes, confidence);
-  
+  const summary = buildMixedSummary(validHRSamples, efficiency, zones, workoutType, durationMinutes, confidence);
+
   return {
     workoutType,
     analysisType: 'zones',
     zones,
+    efficiency,
     interpretation,
     summaryLabel: 'Zone Summary',
     confidence,
@@ -532,22 +550,26 @@ function buildSummary(
 function buildIntervalSummary(
   validHRSamples: SensorSample[],
   intervals: any,
+  efficiency: any,
   zones: ZoneDistribution,
   workoutType: WorkoutType,
   durationMinutes: number,
   confidence: 'high' | 'medium' | 'low'
 ): HRSummaryMetrics {
   const hrValues = validHRSamples.map(s => s.heart_rate!);
-  
+
   return {
     avgHr: Math.round(hrValues.reduce((a, b) => a + b, 0) / hrValues.length),
     maxHr: Math.max(...hrValues),
     minHr: Math.min(...hrValues),
     driftBpm: null,
-    decouplingPct: null,
-    decouplingBasis: null,
-    decouplingAssessment: null,
-    efficiencyRatio: null,
+    // Decoupling populated only when the interval route ran efficiency
+    // (unplanned interval sessions, via forMixedEffort). Basis is always
+    // 'raw' on this path — see calculateEfficiency.
+    decouplingPct: efficiency?.decoupling?.percent ?? null,
+    decouplingBasis: efficiency?.decoupling?.basis ?? null,
+    decouplingAssessment: efficiency?.decoupling?.assessment ?? null,
+    efficiencyRatio: efficiency?.avgEfficiencyRatio ?? null,
     timeInZones: zonesToTimeInZones(zones),
     intervalHrCreepBpm: intervals?.hrCreep?.creepBpm ?? null,
     intervalRecoveryRate: intervals?.recovery?.recoveryRate ?? null,
@@ -559,22 +581,24 @@ function buildIntervalSummary(
 
 function buildMixedSummary(
   validHRSamples: SensorSample[],
+  efficiency: any,
   zones: ZoneDistribution,
   workoutType: WorkoutType,
   durationMinutes: number,
   confidence: 'high' | 'medium' | 'low'
 ): HRSummaryMetrics {
   const hrValues = validHRSamples.map(s => s.heart_rate!);
-  
+
   return {
     avgHr: Math.round(hrValues.reduce((a, b) => a + b, 0) / hrValues.length),
     maxHr: Math.max(...hrValues),
     minHr: Math.min(...hrValues),
     driftBpm: null,
-    decouplingPct: null,
-    decouplingBasis: null,
-    decouplingAssessment: null,
-    efficiencyRatio: null,
+    // Decoupling populated via forMixedEffort path; basis always 'raw' here.
+    decouplingPct: efficiency?.decoupling?.percent ?? null,
+    decouplingBasis: efficiency?.decoupling?.basis ?? null,
+    decouplingAssessment: efficiency?.decoupling?.assessment ?? null,
+    efficiencyRatio: efficiency?.avgEfficiencyRatio ?? null,
     timeInZones: zonesToTimeInZones(zones),
     intervalHrCreepBpm: null,
     intervalRecoveryRate: null,

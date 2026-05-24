@@ -50,6 +50,15 @@ export interface HRAnalysisContext {
     paceRanges?: { lower: number; upper: number }[];
     intent?: 'easy' | 'long' | 'tempo' | 'intervals' | 'recovery';
   };
+
+  /**
+   * True when the workout has no linked plan session (canonical D-035 signal:
+   * `!isLinkedPlanSession`). Used by the interval-route decoupling gate —
+   * detected intervals on an unplanned run still compute decoupling (basis
+   * forced to 'raw') so INSIGHTS can describe HR behavior; planned interval
+   * sessions keep the existing skip because per-interval read is the honest one.
+   */
+  isUnplanned?: boolean;
   
   // Execution metrics (from pace-adherence calculation)
   paceAdherencePct?: number;  // 0-100, overall pace adherence
