@@ -453,8 +453,17 @@ AEROBIC DECOUPLING (RUN) — when signals.cardiac_decoupling is present AND sign
 - Decoupling and HR drift are distinct. Drift answers "did HR climb?" (can be terrain-driven; use the existing drift_explanation field). Decoupling at gap basis answers "did efficiency drop?" — fitness, not geography.
 - Treat the decoupling read as one observation among others; do not lead with it unless it's the most striking signal in the data.
 
-AEROBIC DECOUPLING (RUN) — when signals.decoupling_basis === 'raw' (no usable elevation data, decoupling computed on raw pace):
-- Treat the decoupling number as inconclusive. It mixes terrain and fitness; you cannot honestly attribute it to either. Do NOT use it to claim efficiency dropped or held. Describe what HR did in plain terms (drift_explanation, drift bpm vs typical) instead.
+AEROBIC DECOUPLING (RUN) — when signals.decoupling_basis === 'raw' AND signals.is_mixed_effort === true (fartlek / detected interval session with no usable steady block):
+- Treat the decoupling number as inconclusive. The first-half / second-half ratio is dominated by where in the session the hard intervals fell, not by efficiency drift. Do NOT use the number to claim fitness or fatigue. Describe what HR did in plain terms across the variable efforts (drift_explanation, drift bpm vs typical) instead.
+
+AEROBIC DECOUPLING (RUN) — when signals.decoupling_basis === 'raw' AND signals.is_mixed_effort !== true (steady-state session, no usable GPS elevation but the effort was genuinely steady):
+- The decoupling number is meaningful here even at raw basis. The session was steady-effort (low CV passed the variance gate), so the pace:HR ratio split first/second half reflects real cardiovascular efficiency. The only caveat vs gap basis: terrain influence on raw pace isn't removed, but on a flat or treadmill session (the typical raw-basis case) terrain wasn't a factor anyway.
+- DO surface the assessment as you would for gap basis — translate, never print the percentage:
+  • signals.decoupling_assessment === 'excellent' (<3%) → "HR stayed controlled as effort held — strong aerobic efficiency for this duration."
+  • 'good' (3–5%) → "modest HR drift over the second half — typical for the duration."
+  • 'moderate' (5–8%) → "noticeable HR drift — your body worked harder to maintain pace late."
+  • 'high' (≥8%) → "significant drift — this effort pushed your aerobic limits, or fatigue accumulated."
+- Where possible, pair the assessment with the bpm drift number from drift_explanation / hr_drift for concreteness ("HR drifted +X bpm over the run — excellent for this duration").
 
 UNPLANNED MODE — when the user message opens with "UNPLANNED SESSION" and there is NO "EXECUTION vs PLAN" block:
 - This workout has no linked plan. There was no prescribed target. Do NOT scold the athlete for "missing a target" or "running outside the prescribed range" — there was no range. Do NOT invent what the workout "should have been" from duration alone (a 40-min run is not necessarily a tempo).
@@ -826,6 +835,13 @@ export function toDisplayFormatV1(
       // "elevated HR vs similar efforts" narration — the pool spans pre-race
       // peak-fitness runs, so the delta is structurally expected, not diagnostic.
       is_first_post_race_run: arcNarrative?.is_first_post_race_run === true,
+      // D-039 Fix 4: surface is_mixed_effort so the AEROBIC DECOUPLING (RUN)
+      // raw-branch can split: (a) mixed-effort + raw → inconclusive (D-037
+      // forces basis='raw' on fartleks; the first-half/second-half ratio is
+      // dominated by interval distribution); (b) steady-state + raw → drift
+      // is meaningful (no GPS elevation, but session is genuinely steady so
+      // the pace:HR ratio reflects real efficiency).
+      is_mixed_effort: isMixedEffort,
       // D-035: drop the entire execution-vs-plan signal block when there's no
       // linked plan. distance_deviation / pace_vs_range / "assessed against"
       // notes all imply a prescription existed. Keeping them would invite the
