@@ -2085,21 +2085,20 @@ Deno.serve(async (req) => {
     // Arc narrative mode (workout date slice, not "now")
     // =========================================================================
     let arc_narrative_for_summary: ArcNarrativeContextV1 | null = null;
-    // D-042 / D-043: weekly aerobic efficiency trend from athlete_snapshot.
+    // D-042 / D-043 / D-060: weekly aerobic efficiency trend from athlete_snapshot.
     // Variable name updated to reflect what the value actually is — a
     // pace-at-easy-HR delta vs chronic average, NOT an HR-over-time delta.
     // negative = faster pace at same HR = aerobic base building. Forwarded
     // into the LLM via signals.aerobic_efficiency_trend_pct + derived
-    // aerobic_direction. DB column athlete_snapshot.run_easy_hr_trend kept
-    // for back-compat (separate schema-migration ticket).
+    // aerobic_direction. D-060 (2026-05-25): DB column renamed
+    // run_easy_hr_trend → run_easy_pace_at_hr_trend to match.
     let arc_run_easy_pace_at_hr_trend: number | null = null;
     try {
       const wdSlice = String(workout.date || '').slice(0, 10);
       if (/^\d{4}-\d{2}-\d{2}$/.test(wdSlice) && workout.user_id) {
         const arc = await getArcContext(supabase, workout.user_id as string, `${wdSlice}T12:00:00.000Z`);
         arc_narrative_for_summary = arc.arc_narrative_context ?? null;
-        // DB column name kept; variable destructured into the renamed local.
-        const rEasyTrend = Number((arc.latest_snapshot as any)?.run_easy_hr_trend);
+        const rEasyTrend = Number((arc.latest_snapshot as any)?.run_easy_pace_at_hr_trend);
         arc_run_easy_pace_at_hr_trend = Number.isFinite(rEasyTrend) ? rEasyTrend : null;
         const lr = arc_narrative_for_summary?.last_goal_race;
         console.log(

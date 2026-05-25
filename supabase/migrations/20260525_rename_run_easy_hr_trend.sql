@@ -1,0 +1,29 @@
+-- D-060 / Item 12 — rename athlete_snapshot.run_easy_hr_trend → run_easy_pace_at_hr_trend.
+--
+-- The column stores pctChange of THIS week's pace-at-easy-HR vs the chronic
+-- average — not an HR trend. The code-side rename happened in D-043 (variables
+-- and types switched to runEasyPaceAtHrTrend / pace-at-hr semantics); the DB
+-- column kept the original name for backward compat. D-060 closes the
+-- cosmetic gap so the DB column matches the semantic.
+--
+-- IMPORTANT: this migration MUST be applied BEFORE deploying the matching
+-- function bundle that reads/writes the new column name. The atomic rename
+-- is instant (ALTER TABLE RENAME COLUMN takes a brief metadata-only lock,
+-- no row rewrite), so the deploy window is minimized — but old functions
+-- still in flight will fail with 42703 column-does-not-exist until they
+-- bounce. Acceptable for a cosmetic rename on a low-write-rate snapshot
+-- table.
+--
+-- Coordinated code updates (same commit as this migration):
+--   - compute-snapshot/index.ts (WRITE site)
+--   - coach/index.ts (SELECT column list)
+--   - analyze-running-workout/index.ts (snapshot field read)
+--   - _shared/longitudinal-signals.ts (multiple READ sites)
+--   - src/hooks/useAthleteSnapshot.ts (TS interface field)
+--
+-- Not touched: ai-summary.ts (comments only, no field refs);
+-- decoupling.test.ts (test names mention old column for D-042 lineage —
+-- harmless string literals); arc-context.ts (no refs — user's original
+-- coordinate list included it but grep confirmed no actual references).
+
+ALTER TABLE athlete_snapshot RENAME COLUMN run_easy_hr_trend TO run_easy_pace_at_hr_trend;

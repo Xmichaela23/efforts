@@ -2625,7 +2625,7 @@ Deno.serve(async (req) => {
     try {
       const { data: snapRows } = await supabase
         .from('athlete_snapshot')
-        .select('interference, run_easy_hr_trend, strength_volume_trend, strength_top_lifts, acwr, rpe_trend, intensity_distribution')
+        .select('interference, run_easy_pace_at_hr_trend, strength_volume_trend, strength_top_lifts, acwr, rpe_trend, intensity_distribution')
         .eq('user_id', userId)
         .order('week_start', { ascending: false })
         .limit(1);

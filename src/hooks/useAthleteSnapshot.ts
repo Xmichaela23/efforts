@@ -10,7 +10,10 @@ export interface AthleteSnapshotRow {
   session_count_planned: number | null;
   adherence_pct: number | null;
   run_easy_pace_at_hr: number | null;
-  run_easy_hr_trend: number | null;
+  // D-060 (2026-05-25): renamed from run_easy_hr_trend — pace-at-easy-HR
+  // delta vs chronic, not an HR-over-time delta. DB column renamed via
+  // migration 20260525_rename_run_easy_hr_trend.sql.
+  run_easy_pace_at_hr_trend: number | null;
   run_long_run_duration: number | null;
   run_interval_adherence: number | null;
   strength_volume_total: number | null;

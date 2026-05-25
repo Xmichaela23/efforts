@@ -371,10 +371,11 @@ serve(async (req: Request) => {
     // Run easy pace-at-HR trend (lower = faster = better, so negative trend = improving).
     // D-043: variable renamed runEasyHRTrend → runEasyPaceAtHrTrend to match what
     // the value actually represents (pace-at-easy-HR delta vs chronic, NOT an
-    // HR-over-time delta). DB column athlete_snapshot.run_easy_hr_trend KEPT
-    // for back-compat (renaming requires a schema migration coordinated with
-    // coach/index.ts:2628 and longitudinal-signals.ts:81 — deferred to a
-    // separate ticket).
+    // HR-over-time delta). D-060 (2026-05-25): DB column also renamed —
+    // `athlete_snapshot.run_easy_hr_trend` → `run_easy_pace_at_hr_trend` via
+    // migration `20260525_rename_run_easy_hr_trend.sql`. Coordinated update
+    // across compute-snapshot, coach, analyze-running-workout,
+    // longitudinal-signals, useAthleteSnapshot.
     const priorEasyPaces = priorAggs.map((a) => a.runEasyPaceAtHR).filter((v): v is number => v != null);
     const chronicEasyPace = avg(priorEasyPaces);
     const runEasyPaceAtHrTrend = pctChange(current.runEasyPaceAtHR, chronicEasyPace);
@@ -532,8 +533,8 @@ serve(async (req: Request) => {
       adherence_pct: adherencePct,
 
       run_easy_pace_at_hr: round(current.runEasyPaceAtHR),
-      // DB column name kept (schema migration deferred per D-043 comment at runEasyPaceAtHrTrend declaration).
-      run_easy_hr_trend: runEasyPaceAtHrTrend,
+      // D-060 (2026-05-25): DB column renamed to match variable semantic.
+      run_easy_pace_at_hr_trend: runEasyPaceAtHrTrend,
       run_long_run_duration: current.runLongRunDuration,
       run_interval_adherence: current.runIntervalAdherence,
 
