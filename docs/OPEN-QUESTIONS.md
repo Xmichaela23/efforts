@@ -311,10 +311,16 @@ but contextually misleading. Narrative correctly suppresses the claim via
 
 Real fix: derive TREND direction from pace-at-HR, not raw pace. Needs
 `pace_at_hr` on trend points (server) + new sparkline render (client).
-Spec required before implementation. Not scheduled.
+**Spec written 2026-05-25: `docs/PACE-AT-HR-TREND-SPEC.md`** — covers the
+server field shape, client render switch, label direction logic, and the
+5 implementation gates (formula calibration, slope-cutoff calibration,
+pool-filter interaction, pin tests, prompt-rule update). Not implemented
+yet; ship requires the calibration pulls + cutoff lock listed in §4 of
+the spec.
 
-Cross-ref: D-041 (the 60d exclusion window); POLISH-PUNCH-LIST §5 and
-Background open items.
+Cross-ref: D-041 (the 60d exclusion window); D-047 (symmetric
+`getOverallAvgHr` resolution — prerequisite); `docs/PACE-AT-HR-TREND-SPEC.md`;
+POLISH-PUNCH-LIST §5 and Background open items.
 
 ---
 
