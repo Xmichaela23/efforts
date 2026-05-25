@@ -746,6 +746,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           date: String(p.date),
           value: Number(p.pace_sec_per_mi),
           avg_hr: p.avg_hr != null ? Number(p.avg_hr) : null,
+          // D-050 / Q-025 — pace_at_hr per point. Null when avg_hr missing.
+          pace_at_hr: p.pace_at_hr != null && Number.isFinite(Number(p.pace_at_hr)) ? Number(p.pace_at_hr) : null,
           is_current: !!p.is_current,
           label: fmtPace(Number(p.pace_sec_per_mi)),
         }));
@@ -809,6 +811,13 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
                 ? `${absDelta}s/mi ${delta > 0 ? 'faster' : 'slower'}${efficiencyNote} (${points.length} workouts)`
                 : `Consistent across ${points.length} workouts`)
             : `${absDelta}s/mi ${direction === 'improving' ? 'faster' : 'slower'} over ${points.length} workouts`;
+        // D-050 / Q-025 — surface the pace-at-HR percentile classifier
+        // output. Client uses it as the primary direction signal when
+        // non-null and not 'insufficient_data'; falls back to the raw-pace
+        // `direction` above otherwise.
+        const vsSim = factPacket?.derived?.comparisons?.vs_similar as any;
+        const paceAtHrDirection = vsSim?.pace_at_hr_direction ?? null;
+        const paceAtHrBasis = vsSim?.pace_at_hr_basis ?? null;
         return {
           metric_label: 'Pace',
           unit: '/mi',
@@ -816,6 +825,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           direction,
           summary,
           lower_is_better: true,
+          pace_at_hr_direction: paceAtHrDirection,
+          pace_at_hr_basis: paceAtHrBasis,
         };
       } catch { return null; }
     })(),

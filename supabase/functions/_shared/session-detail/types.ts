@@ -277,6 +277,13 @@ export type SessionDetailV1 = {
       date: string;
       value: number;
       avg_hr: number | null;
+      /**
+       * D-050 / Q-025 — pace-at-HR (sec/mi per 100bpm). Null when the
+       * point's avg_hr is null. When present, the client can plot this as
+       * the primary line (auto-normalized against per-athlete percentile
+       * cutoffs from the classifier on `pace_at_hr_direction`).
+       */
+      pace_at_hr: number | null;
       is_current: boolean;
       label: string;
     }>;
@@ -284,6 +291,18 @@ export type SessionDetailV1 = {
     summary: string;
     /** True when lower values = better (pace). False when higher = better (power). */
     lower_is_better: boolean;
+    /**
+     * D-050 / Q-025 — pace-at-HR percentile classifier output. Client uses
+     * this as the PRIMARY direction signal when non-null and not
+     * `insufficient_data`; falls back to `direction` (raw-pace classifier)
+     * otherwise. `pace_at_hr_basis` says which pace basis the classifier
+     * used ('gap' = grade-adjusted; 'raw' = device pace).
+     *
+     * `null` when this trend block is for a non-pace metric (cycling power
+     * trend) or when no trend window is available.
+     */
+    pace_at_hr_direction?: 'improving' | 'stable' | 'declining' | 'insufficient_data' | null;
+    pace_at_hr_basis?: 'gap' | 'raw' | null;
   } | null;
 
   // ── Next session (forward-looking context) ────────────────────────────────
