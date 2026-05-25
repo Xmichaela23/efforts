@@ -137,6 +137,15 @@ export interface TriPlanPreview {
 export interface TriGeneratorParams {
   distance: TriDistance;
   fitness: 'beginner' | 'intermediate' | 'advanced';
+  /**
+   * D-043 item 5: swim-specific fitness tier (D-024 — `swim_experience='learning'`
+   * → `swim_fitness='beginner'`). When set to `'beginner'`, swim sessions
+   * substitute per SWIM-PROTOCOL §10.3 (threshold → css_aerobic). Optional;
+   * legacy callers that don't populate get back-compat behavior (`fitness`
+   * tier used wherever the swim-specific signal is needed). Mirrors
+   * generate-combined-plan's swim_fitness threading (D-024).
+   */
+  swim_fitness?: 'beginner' | 'intermediate' | 'advanced';
   goal: 'complete' | 'performance';
   approach: TriApproach;  // always resolved before generator receives it
   duration_weeks: number;

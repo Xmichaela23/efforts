@@ -938,6 +938,13 @@ export class TriathlonGenerator {
     if (phase.name === 'Race-Specific') {
       const wu = 300;
       const cd = 200;
+      // D-043 item 5 / D-025 §10.3: beginner swim_fitness substitutes
+      // threshold → css_aerobic on race_peak race-spec. Mirrors the
+      // base_first race-spec emission at lines 871-903 (already the
+      // beginner-substituted shape, by design). Falls through to threshold
+      // when swim_fitness is intermediate/advanced/unset.
+      const isBeginnerSwim = this.params.swim_fitness === 'beginner';
+      const sessionKind = isBeginnerSwim ? 'css_aerobic' : 'threshold';
       const { mainBudgetYd: main, drillTokens } = pickSwimDrillInset({
         totalYards: yd,
         wuYd: wu,
@@ -945,11 +952,30 @@ export class TriathlonGenerator {
         planWeek,
         drillSlotSalt: 2,
         phase: phase.name,
-        sessionKind: 'threshold',
+        sessionKind,
         swimGearLabels: this.params.swim_equipment,
-        athleteFitness: this.params.fitness,
+        athleteFitness: this.params.swim_fitness ?? this.params.fitness,
       });
-      const sets = Math.max(6, Math.round(main / 100));
+      const sets = Math.max(isBeginnerSwim ? 5 : 6, Math.round(main / 100));
+      if (isBeginnerSwim) {
+        const tags = ['css_aerobic', 'swim_intervals', 'race_specific'];
+        if (drillTokens.length) tags.push('swim_drills');
+        const drillLead =
+          drillTokens.length > 0
+            ? `${swimSessionPhilosophyLead('css_aerobic')}${swimDrillBlockAthleteCopy(drillTokens)} `
+            : '';
+        return {
+          day, type: 'swim', name: 'Race Pace CSS',
+          description: appendPoolGearLine(
+            `${yd} yards. ${drillLead}Warm-up 300, ${sets}×100 at comfortable race-pace CSS (15s rest) — sustainable, not maximal. Practice sighting between sets. Cool-down 200.`,
+            drillTokens,
+            this.params.swim_equipment,
+          ),
+          duration: Math.round(yd / 46),
+          steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_aerobic_css_${sets}x100yd_r15`, 'swim_cooldown_200yd'],
+          tags,
+        };
+      }
       const tags = ['css_threshold', 'swim_intervals', 'hard_swim', 'threshold'];
       if (drillTokens.length) tags.push('swim_drills');
       const drillLead =
