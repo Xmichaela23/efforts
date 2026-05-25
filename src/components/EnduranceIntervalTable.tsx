@@ -63,6 +63,10 @@ type EnduranceIntervalTableProps = {
       is_easy_like?: boolean;
       is_auto_lap_or_split?: boolean;
       is_pool_swim?: boolean;
+      /** D-040 Fix C: server-side variance gate flag (D-034). When false on a
+       * single-segment session, the segment is genuinely steady and the
+       * 'Interval 1' label + pace-range subtitle should be suppressed. */
+      is_mixed_effort?: boolean;
     };
     pacing?: { coefficient_of_variation?: number | null };
     display?: { show_adherence_chips?: boolean; has_measured_execution?: boolean };
@@ -97,6 +101,14 @@ export default function EnduranceIntervalTable({
   const isEasyLike = !!sd?.classification?.is_easy_like;
   const isGoalRace = !!sd?.race?.is_goal_race;
   const race = sd?.race;
+  // D-040 Fix C: detect single-segment steady-state sessions. When true,
+  // override per-row label to "Steady" and suppress the pace-range subtitle
+  // — both are redundant with the Pace + Time + Distance columns and the
+  // server-side 'Interval 1' label is wrong for a one-segment continuous
+  // effort.
+  const isMixedEffort = sd?.classification?.is_mixed_effort === true;
+  const singleSegmentSteady = !isMixedEffort &&
+    Array.isArray(sd?.intervals) && sd.intervals.length === 1;
   const displayMode = sd?.intervals_display?.mode ?? 'none';
   const displayReason = sd?.intervals_display?.reason ?? null;
   const allIntervals: IntervalRow[] = Array.isArray(sd?.intervals) ? sd!.intervals as IntervalRow[] : [];
@@ -297,6 +309,10 @@ export default function EnduranceIntervalTable({
             })();
 
             const showRangeSubtitle = (() => {
+              // D-040 Fix C: single-segment steady → no subtitle (the pace
+              // column already shows the actual pace; the planned range is
+              // redundant on a session that wasn't prescribed a range).
+              if (singleSegmentSteady) return false;
               if (useProj || useGoalTarget) return !!subtitlePace;
               if (idx === 0) return true;
               const prev = visibleIntervals[idx - 1];
@@ -317,7 +333,7 @@ export default function EnduranceIntervalTable({
                 <td className="px-2 py-1.5">
                   <div className="flex flex-col">
                     <div className="flex items-center justify-between w-full min-h-[2.1rem]">
-                      <span className="text-[13px] font-medium truncate pr-2">{String(iv.planned_label ?? '')}</span>
+                      <span className="text-[13px] font-medium truncate pr-2">{singleSegmentSteady ? 'Steady' : String(iv.planned_label ?? '')}</span>
                       {pct != null && !isGoalRace && hasPlanned && (
                         <div className="flex items-center gap-1">
                           <span className={`text-[11px] font-semibold whitespace-nowrap ${pctClass}`}>{pct}%</span>
