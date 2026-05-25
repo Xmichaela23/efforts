@@ -437,6 +437,12 @@ MIXED-EFFORT MODE — when the user message includes an INTERVAL EXECUTION block
 - USE GAP when "grade-adjusted" is noted on the pace adherence line. The interval paces in INTERVAL EXECUTION are already GAP-corrected when that flag is set — anchor the effort read on those values, not raw pace.
 - DO NOT say "you ran faster/slower than recent similar efforts" or any whole-workout pace comparison sentence. There is no honest steady pace comparison to make.
 
+POOL INTENSITY CONTEXT — when signals.comparisons.vs_similar is present AND vs_similar.pool_pace_context is populated, anchor any HR-delta interpretation against pool_pace_context.intensity_match:
+- "current_much_faster": the comparison pool was significantly easier than this session. HR running higher than the pool is structurally expected and reflects intensity, not fitness change. Say so plainly (e.g. "your recent similar runs were easier paces, so the higher HR today tracks with the harder effort"). Do NOT frame the HR delta as fatigue, post-race recovery, aerobic decline, cardiovascular elevation, or any longitudinal signal. Do NOT print or quote pool_pace_context.delta_pct or delta_sec — use the words.
+- "current_much_slower": pool was significantly harder than this session. HR running lower than the pool is structurally expected — easier effort. Do NOT frame this as a fitness improvement signal in isolation.
+- "matched": pool intensity comparable to current session. HR delta is a legitimate cross-session comparison; interpret normally (use drift signals, arc context, etc.).
+- This rule takes PRIORITY over generic vs_similar HR interpretation. It composes with POST-RACE COMPARISON and MIXED-EFFORT MODE — if any of them apply, all apply.
+
 AEROBIC DECOUPLING (RUN) — when signals.cardiac_decoupling is present AND signals.decoupling_basis === 'gap':
 - This is grade-adjusted: the pace input feeding the decoupling ratio used GAP, not raw pace. Terrain confound is removed. The number reflects real cardiovascular efficiency drift across the workout, not how the route happened to slope.
 - Translate the value to plain language; NEVER print the percentage:
@@ -571,7 +577,15 @@ export function buildUserMessage(dp: any): string {
     const trendLine = comp.trend?.direction && comp.trend.direction !== 'insufficient_data'
       ? `- Trend: ${comp.trend.direction}${comp.trend.magnitude ? ` — ${comp.trend.magnitude}` : ''} (${comp.trend.data_points} data points)`
       : null;
-    const bodyLines = [paceLine, hrLine, driftLine, trendLine].filter(Boolean);
+    // D-038 Piece 3: pool intensity context. Render only when intensity_match
+    // is non-matched — a balanced pool doesn't need extra LLM steering. The
+    // POOL INTENSITY CONTEXT prompt rule above keys off the enum, not the
+    // numbers; don't print delta_pct/delta_sec in the prompt input either.
+    const poolCtx = (comp.vs_similar as any).pool_pace_context;
+    const poolCtxLine = poolCtx && poolCtx.intensity_match && poolCtx.intensity_match !== 'matched'
+      ? `- Pool intensity vs this session: ${poolCtx.intensity_match}`
+      : null;
+    const bodyLines = [paceLine, hrLine, driftLine, trendLine, poolCtxLine].filter(Boolean);
     if (bodyLines.length > 0) {
       sections.push([`\nCOMPARED TO SIMILAR WORKOUTS (n=${comp.vs_similar.sample_size}):`, ...bodyLines].join('\n'));
     }
@@ -897,6 +911,14 @@ export function toDisplayFormatV1(
               pace_basis: isMixedEffort ? null : (derived.comparisons?.vs_similar?.pace_basis ?? 'raw'),
               hr_delta: (coerceNumber(derived.comparisons?.vs_similar?.hr_delta_bpm) != null) ? `${Math.round(Number(derived.comparisons.vs_similar.hr_delta_bpm))} bpm` : null,
               drift_delta: (coerceNumber(derived.comparisons?.vs_similar?.drift_delta_bpm) != null) ? `${Math.round(Number(derived.comparisons.vs_similar.drift_delta_bpm))} bpm` : null,
+              // D-038 Piece 3: pool_pace_context always-on (no isMixedEffort
+              // gating). The POOL INTENSITY CONTEXT prompt rule keys off
+              // intensity_match to suppress fatigue/recovery framing when the
+              // HR delta is driven by pace mismatch. Numeric fields stay on
+              // the packet for diagnostics — the prompt rule must NOT instruct
+              // the LLM to quote them (same defense as cardiac_decoupling's
+              // "translate, never print").
+              pool_pace_context: (derived.comparisons?.vs_similar as any)?.pool_pace_context ?? null,
             },
             trend: {
               direction: derived.comparisons?.trend?.direction ?? null,

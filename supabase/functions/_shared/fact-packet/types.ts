@@ -89,6 +89,35 @@ export type VsSimilarV1 = {
   hr_delta_bpm: number | null; // current - avg past
   drift_delta_bpm: number | null; // current - avg past
   assessment: SimilarAssessment;
+  /**
+   * D-038 Piece 2 — diagnostic: did the pace-proximity filter actually fire?
+   * Lets us inspect filter behavior on any session without re-running the
+   * pool. Tune the 15% threshold via this field's aggregate after 2 weeks
+   * of production observation.
+   */
+  pool_intensity_filter?: {
+    applied: boolean;
+    tolerance_pct: number;
+    basis: 'gap' | 'raw';
+    pool_size_before: number;
+    pool_size_after: number;
+  } | null;
+  /**
+   * D-038 Piece 3 — LLM-facing context: was the pool intensity comparable to
+   * the current session? Always populated when sample_size > 0. Enables the
+   * POOL INTENSITY CONTEXT prompt rule to suppress fatigue/recovery framing
+   * when the HR delta is driven by current/pool pace mismatch. The
+   * `intensity_match` enum is the primary LLM signal; numeric fields are
+   * diagnostic and must not be quoted in narrative output.
+   */
+  pool_pace_context?: {
+    current_avg_pace_sec: number;
+    pool_avg_pace_sec: number;
+    delta_sec: number;          // current - pool; negative = current faster
+    delta_pct: number;           // delta / pool, signed percentage
+    basis: 'gap' | 'raw';
+    intensity_match: 'matched' | 'current_much_faster' | 'current_much_slower';
+  } | null;
 };
 
 export type TrendV1 = {

@@ -78,8 +78,26 @@ export function analyzeHeartRate(
     return createInsufficientDataResult(avgHr, maxHr, minHr, durationMinutes, context.workoutType);
   }
   
-  // Detect/confirm workout type
-  const workoutType = context.workoutType || detectWorkoutType(context.intervals, context.plannedWorkout);
+  // Detect/confirm workout type.
+  //
+  // D-038 Piece 1B: one-way variance-gate override. When the run analyzer's
+  // upstream variance gate flagged this session as mixed-effort BUT
+  // detectWorkoutType returned `'steady_state'`, prefer the gate (it uses a
+  // stricter CV-on-GAP predicate). Override to `'fartlek'` so the route lands
+  // in analyzeMixedWorkout and D-037's forMixedEffort decoupling path engages.
+  // Only fires when detectWorkoutType returned `'steady_state'` — more specific
+  // verdicts (`'intervals'`, `'tempo_finish'`, `'progressive'`, `'hill_repeats'`)
+  // win on their own merits.
+  let workoutType = context.workoutType || detectWorkoutType(context.intervals, context.plannedWorkout);
+  // Override only fires when resolved workoutType is exactly 'steady_state' —
+  // more specific verdicts (intervals/tempo_finish/progressive/hill_repeats/
+  // fartlek/mixed) win on their own merits. The gate is authoritative
+  // regardless of source (caller-set `context.workoutType` or detected) because
+  // it uses a stricter CV-on-GAP predicate the analyzer already computed.
+  if (workoutType === 'steady_state' && context.varianceGate?.isMixedEffort === true) {
+    console.log('💓 [HR ANALYSIS] varianceGate override: steady_state → fartlek');
+    workoutType = 'fartlek';
+  }
   console.log('💓 [HR ANALYSIS] Workout type (final):', workoutType);
   
   // Calculate zone distribution (always done)

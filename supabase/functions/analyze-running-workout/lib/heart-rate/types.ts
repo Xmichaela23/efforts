@@ -59,6 +59,18 @@ export interface HRAnalysisContext {
    * sessions keep the existing skip because per-interval read is the honest one.
    */
   isUnplanned?: boolean;
+
+  /**
+   * Pre-HR variance-gate hint (D-038 Piece 1B). When `isMixedEffort: true` AND
+   * `detectWorkoutType` returns `'steady_state'`, route flips to
+   * `analyzeMixedWorkout` (workoutType override → `'fartlek'`). This catches
+   * unplanned interval-class sessions where `detectWorkoutType`'s
+   * planned-side heuristics miss the variance the run analyzer already
+   * detected via pace CV / detected intervals / plan intent. ONE-WAY override:
+   * if `detectWorkoutType` already returned `'intervals'`/`'tempo_finish'`/
+   * `'progressive'`, the more specific verdict wins.
+   */
+  varianceGate?: { isMixedEffort: boolean };
   
   // Execution metrics (from pace-adherence calculation)
   paceAdherencePct?: number;  // 0-100, overall pace adherence

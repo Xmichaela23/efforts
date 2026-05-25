@@ -1022,12 +1022,46 @@ Deno.serve(async (req) => {
       : (planClassifiedTypeKey || String(detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout) || '').trim() || 'steady_state');
     const classifiedHrWorkoutType: WorkoutType = mapClassifiedTypeToHrWorkoutType(classifiedTypeKey);
 
+    // D-038 Piece 1B: pre-HR variance hint. The full _varGate below depends on
+    // fact_packet_v1 (terrain_type, interval_execution) which isn't built yet,
+    // so reproduce the subset of predicates whose inputs are available now:
+    // pace CV at GAP basis, detected intervals on unplanned sessions, plan
+    // intent intervals on linked sessions. Threaded into hrAnalysisContext so
+    // analyzeHeartRate can override a steady_state verdict to 'fartlek' and
+    // engage D-037's forMixedEffort decoupling path. ie-total-steps and
+    // raw-CV-on-flat signals are deferred to the full _varGate downstream
+    // (they don't matter for HR-analyzer routing).
+    const preHRMixedEffortHint: boolean = (() => {
+      // (1) pace CV at GAP basis ≥ 8%
+      const cvPct = Number((analysis as any)?.pacing_variability?.coefficient_of_variation);
+      const gapAdj = Boolean((analysis as any)?.gap_adjusted);
+      if (Number.isFinite(cvPct) && cvPct >= 8 && gapAdj) return true;
+      // (2) detected intervals on unplanned session (non-easy/steady/long/recovery)
+      if (!isLinkedPlanSession) {
+        const detected = String(detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout) || '').toLowerCase().trim();
+        if (detected && detected !== 'easy' && detected !== 'steady_state' &&
+            detected !== 'long' && detected !== 'long_run' && detected !== 'recovery') {
+          return true;
+        }
+      }
+      // (3) plan intent intervals on linked session
+      if (isLinkedPlanSession) {
+        const k = String(classifiedTypeKey || '').toLowerCase();
+        if (k === 'intervals' || k === 'interval' || k === 'interval_run' ||
+            k === 'tempo' || k === 'tempo_run' || k === 'fartlek' || k === 'threshold' ||
+            k === 'vo2' || k === 'vo2max' || k === 'speed' || k === 'track') return true;
+      }
+      return false;
+    })();
+
     const hrAnalysisContext: HRAnalysisContext = {
       workoutType: classifiedHrWorkoutType,
       // D-035 canonical unplanned signal; consumed by the HR analyzer's
       // interval-route decoupling gate (detected intervals on unplanned runs
       // still compute decoupling, basis forced to 'raw').
       isUnplanned: !isLinkedPlanSession,
+      // D-038 Piece 1B: see preHRMixedEffortHint construction above.
+      varianceGate: { isMixedEffort: preHRMixedEffortHint },
       intervals: intervalsToAnalyze.map(interval => {
         // Compute timestamps from sample indices
         // Sample indices are roughly 1 sample per second

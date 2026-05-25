@@ -61,6 +61,53 @@ function getOverallDurationMin(row: any): number | null {
   return resolveMovingDurationMinutes(row);
 }
 
+/**
+ * D-038 §8 #1 — pace-proximity tolerance for the vs_similar pool filter.
+ * 15% locked, tune after 2 weeks of pool_intensity_filter aggregates. Single
+ * constant; do NOT per-bucket-type (the path to config explosion).
+ */
+export const POOL_PACE_TOLERANCE_PCT = 15;
+
+/**
+ * D-038 §8 #3 — boundary for pool_pace_context.intensity_match enum.
+ * 10% locked, aligned with PACING's "uneven" band (CV thresholds in D-034).
+ */
+export const POOL_INTENSITY_MATCH_PCT = 10;
+
+/**
+ * D-038 Piece 2 — pure pace-proximity predicate. Returns true when the
+ * candidate pace is within `tolerancePct` of the current pace (both expressed
+ * in sec/mi). Null inputs or non-positive current pace → false (no match).
+ */
+export function isPaceWithinTolerance(
+  candidatePaceSec: number | null | undefined,
+  currentPaceSec: number | null | undefined,
+  tolerancePct: number,
+): boolean {
+  if (candidatePaceSec == null || currentPaceSec == null) return false;
+  if (typeof currentPaceSec !== 'number' || currentPaceSec <= 0) return false;
+  if (typeof candidatePaceSec !== 'number' || !Number.isFinite(candidatePaceSec)) return false;
+  return Math.abs(candidatePaceSec - currentPaceSec) / currentPaceSec <= tolerancePct / 100;
+}
+
+/**
+ * D-038 Piece 3 — pure classifier for pool_pace_context.intensity_match.
+ * Returns 'current_much_faster' when current is faster than pool by ≥
+ * thresholdPct, 'current_much_slower' on the symmetric case, 'matched' when
+ * within ±thresholdPct.
+ */
+export function classifyPoolIntensityMatch(
+  currentPaceSec: number,
+  poolAvgPaceSec: number,
+  thresholdPct: number,
+): 'matched' | 'current_much_faster' | 'current_much_slower' {
+  if (poolAvgPaceSec <= 0) return 'matched';
+  const deltaPct = ((currentPaceSec - poolAvgPaceSec) / poolAvgPaceSec) * 100;
+  if (deltaPct <= -thresholdPct) return 'current_much_faster';
+  if (deltaPct >= thresholdPct) return 'current_much_slower';
+  return 'matched';
+}
+
 function getOverallPaceSecPerMi(row: any): number | null {
   return resolveOverallPaceSecPerMi(row);
 }
@@ -342,15 +389,47 @@ export async function getSimilarWorkoutComparisons(
       }
       rowsRaw.push({ r, pace: getOverallPaceSecPerMi(r), hr, drift });
     }
+
+    // D-038 Piece 2: pace-proximity filter (15%, locked). Excludes 11-13 min/mi
+    // recovery jogs from pooling against 9:24 fartleks (the b70658b0 class).
+    // Applied per-basis BEFORE basis selection so the basis decision keys on
+    // the filtered counts. Falls back to unfiltered pool when filtered <3 hits
+    // — mirrors the existing terrain/route fallback pattern. Never expands
+    // the pool (only narrows or fails-back).
+    const filterByPaceProximity = (rows: Metric[], currentPaceSec: number | null) => {
+      const valid = rows.filter((x) => x.pace != null && x.hr != null);
+      if (currentPaceSec == null || currentPaceSec <= 0) return { rows: valid, applied: false, before: valid.length, after: valid.length };
+      const filtered = valid.filter((x) => isPaceWithinTolerance(x.pace, currentPaceSec, POOL_PACE_TOLERANCE_PCT));
+      if (filtered.length >= 3) {
+        return { rows: filtered, applied: true, before: valid.length, after: filtered.length };
+      }
+      return { rows: valid, applied: false, before: valid.length, after: valid.length };
+    };
+    const paceWithin = (candPaceSec: number | null, currentPaceSec: number | null): boolean =>
+      isPaceWithinTolerance(candPaceSec, currentPaceSec, POOL_PACE_TOLERANCE_PCT);
+
+    const rawFilter = filterByPaceProximity(rowsRaw, currentAvgPaceSecPerMi);
+    const gapFilter = curHasGap ? filterByPaceProximity(rowsWithGap, Number(currentAvgGapSecPerMi)) : null;
+
     let paceBasis: 'gap' | 'raw' = 'raw';
     let basisAnchorPaceSec: number | null = currentAvgPaceSecPerMi;
-    let withMetrics: Metric[] = rowsRaw;
-    if (curHasGap && rowsWithGap.filter((x) => x.pace != null && x.hr != null).length >= 3) {
+    let withMetrics: Metric[] = rawFilter.rows;
+    let activeFilter = rawFilter;
+    if (curHasGap && gapFilter && gapFilter.rows.length >= 3) {
       paceBasis = 'gap';
       basisAnchorPaceSec = Number(currentAvgGapSecPerMi);
-      withMetrics = rowsWithGap;
+      withMetrics = gapFilter.rows;
+      activeFilter = gapFilter;
     }
     const filtered = withMetrics.filter((x) => x.pace != null && x.hr != null);
+    const poolIntensityFilter = {
+      applied: activeFilter.applied,
+      tolerance_pct: POOL_PACE_TOLERANCE_PCT,
+      basis: paceBasis,
+      pool_size_before: activeFilter.before,
+      pool_size_after: activeFilter.after,
+    };
+    console.warn(`[fact-packet] pool_intensity_filter: applied=${activeFilter.applied}, basis=${paceBasis}, ${activeFilter.before} → ${activeFilter.after} (tolerance=${POOL_PACE_TOLERANCE_PCT}%)`);
 
     const sample_size = filtered.length;
     console.warn(`[fact-packet] similar workouts funnel: total=${rows.length} → notSelf=${notSelf.length} → completed=${completed.length} → typeMatch=${typeMatch.length} → durationMatch(${bandLo}-${bandHi}min)=${durationMatch.length} → terrainMatch=${terrainMatch.length} → routeMatch=${routeMatch.length} → pace+hr=${sample_size} | workoutTypeKey=${workoutTypeKey}, comparableKeys=[${comparableKeys.join(',')}]`);
@@ -398,9 +477,21 @@ export async function getSimilarWorkoutComparisons(
       ? trendPool.filter((r) => r.date && getOverallGapSecPerMi(r) != null)
       : [];
     const useGapForTrend = trendGapEligible.length >= 3;
-    const trendWithPaceBase = useGapForTrend
+    const trendWithPaceBaseUnfiltered = useGapForTrend
       ? trendGapEligible
       : trendPool.filter((r) => r.date && getOverallPaceSecPerMi(r) != null);
+    // D-038 Piece 2: apply the same 15% pace-proximity filter to the trend
+    // pool. Excludes recovery-paced historicals from trending against today's
+    // harder effort. Falls back to unfiltered when filtered <3 hits.
+    const trendAnchorPace = useGapForTrend ? Number(currentAvgGapSecPerMi) : currentAvgPaceSecPerMi;
+    const trendPaceFiltered = (trendAnchorPace != null && trendAnchorPace > 0)
+      ? trendWithPaceBaseUnfiltered.filter((r) => {
+          const candPace = useGapForTrend ? getOverallGapSecPerMi(r) : getOverallPaceSecPerMi(r);
+          return paceWithin(candPace, trendAnchorPace);
+        })
+      : trendWithPaceBaseUnfiltered;
+    const trendWithPaceBase = trendPaceFiltered.length >= 3 ? trendPaceFiltered : trendWithPaceBaseUnfiltered;
+    console.warn(`[fact-packet] trend pool_intensity_filter: ${trendWithPaceBaseUnfiltered.length} → ${trendPaceFiltered.length} → ${trendWithPaceBase.length} (using ${trendPaceFiltered.length >= 3 ? 'filtered' : 'unfiltered'})`);
     console.warn(`[fact-packet] trend_points: pool=${trendPoolSource}(${trendPool.length}), withPace=${trendWithPaceBase.length}, basis=${useGapForTrend ? 'gap' : 'raw'}, wideBand=${wideBandLo}-${wideBandHi}min(${wideDurationMatch.length} hits)`);
     const trend_points = trendWithPaceBase
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -431,6 +522,8 @@ export async function getSimilarWorkoutComparisons(
         avg_hr_drift: null,
         trend_points,
         pace_basis: paceBasis,
+        pool_intensity_filter: poolIntensityFilter,
+        pool_pace_context: null,
       };
     }
 
@@ -468,6 +561,24 @@ export async function getSimilarWorkoutComparisons(
       return 'typical' as SimilarAssessment;
     })();
 
+    // D-038 Piece 3: pool_pace_context. Always populate when sample_size > 0.
+    // Numeric fields are diagnostic; intensity_match is the LLM-facing enum
+    // the POOL INTENSITY CONTEXT prompt rule keys off. 10% boundary locked
+    // per spec §8 #3 — aligns with PACING's "uneven" band.
+    let pool_pace_context: VsSimilarV1['pool_pace_context'] = null;
+    if (basisAnchorPaceSec != null && avgPace != null && avgPace > 0) {
+      const delta_sec = basisAnchorPaceSec - avgPace;
+      const delta_pct = (delta_sec / avgPace) * 100;
+      pool_pace_context = {
+        current_avg_pace_sec: Math.round(basisAnchorPaceSec),
+        pool_avg_pace_sec: Math.round(avgPace),
+        delta_sec: Math.round(delta_sec),
+        delta_pct: Math.round(delta_pct * 10) / 10,
+        basis: paceBasis,
+        intensity_match: classifyPoolIntensityMatch(basisAnchorPaceSec, avgPace, POOL_INTENSITY_MATCH_PCT),
+      };
+    }
+
     return {
       sample_size,
       pace_delta_sec: pace_delta_sec != null ? Math.round(pace_delta_sec) : null,
@@ -478,6 +589,8 @@ export async function getSimilarWorkoutComparisons(
       avg_hr_drift: avgDrift != null ? Math.round(avgDrift) : null,
       trend_points,
       pace_basis: paceBasis,
+      pool_intensity_filter: poolIntensityFilter,
+      pool_pace_context,
     };
   } catch {
     return {
@@ -490,6 +603,8 @@ export async function getSimilarWorkoutComparisons(
       avg_hr_drift: null,
       trend_points: [],
       pace_basis: 'raw' as const,
+      pool_intensity_filter: null,
+      pool_pace_context: null,
     };
   }
 }

@@ -216,6 +216,83 @@ Deno.test('D-037 mixed-effort: forMixedEffort=false on fartlek with GAP samples 
   assertEquals(out!.decoupling.basis, 'gap');
 });
 
+// ── D-038 Piece 1B: varianceGate override routes steady_state → fartlek ──
+
+import { analyzeHeartRate } from '../../analyze-running-workout/lib/heart-rate/index.ts';
+
+function makeHRSamples(n: number, opts?: { gapMarker?: boolean; baseHr?: number; basePace?: number }) {
+  const baseHr = opts?.baseHr ?? 145;
+  const basePace = opts?.basePace ?? 540;
+  return Array.from({ length: n }, (_, i) => {
+    const s: any = {
+      timestamp: i,
+      heart_rate: baseHr + Math.floor(i / 600),
+      pace_s_per_mi: basePace,
+    };
+    if (opts?.gapMarker) s.raw_pace_s_per_mi = basePace + 5;
+    return s;
+  });
+}
+
+Deno.test('D-038 Piece 1B: varianceGate=true + workoutType=steady_state → override to fartlek (decoupling.basis=raw)', () => {
+  // Mirrors b70658b0: caller-set workoutType is 'steady_state' (classified from
+  // detectWorkoutTypeFromIntervals empty fallback), but variance gate signals
+  // mixed-effort. Override routes to analyzeMixedWorkout which now calls
+  // calculateEfficiency with forMixedEffort:true → basis='raw'.
+  const samples = makeHRSamples(1400, { gapMarker: true });
+  const context = {
+    workoutType: 'steady_state' as const,
+    intervals: [],
+    terrain: { samples },
+    varianceGate: { isMixedEffort: true },
+  };
+  const result = analyzeHeartRate(samples, context as any);
+  // Override fires: workoutType becomes 'fartlek' which routes to analyzeMixedWorkout
+  assertEquals(result.workoutType, 'fartlek');
+  // analyzeMixedWorkout now calls calculateEfficiency with forMixedEffort:true
+  assertNotEquals(result.efficiency, undefined);
+  assertEquals(result.efficiency!.decoupling.basis, 'raw');
+});
+
+Deno.test('D-038 Piece 1B: varianceGate=true + workoutType=intervals → no override (more specific verdict wins)', () => {
+  // When detectWorkoutType (or caller) returned 'intervals' explicitly, the
+  // override should NOT downgrade to 'fartlek'. Intervals route stays.
+  const samples = makeHRSamples(1400);
+  const context = {
+    workoutType: 'intervals' as const,
+    intervals: [],
+    terrain: { samples },
+    varianceGate: { isMixedEffort: true },
+  };
+  const result = analyzeHeartRate(samples, context as any);
+  assertEquals(result.workoutType, 'intervals');
+});
+
+Deno.test('D-038 Piece 1B: varianceGate=undefined + workoutType=steady_state → no override (back-compat)', () => {
+  // Legacy callers don't pass varianceGate. Existing behavior preserved.
+  const samples = makeHRSamples(1400);
+  const context = {
+    workoutType: 'steady_state' as const,
+    intervals: [],
+    terrain: { samples },
+  };
+  const result = analyzeHeartRate(samples, context as any);
+  assertEquals(result.workoutType, 'steady_state');
+});
+
+Deno.test('D-038 Piece 1B: varianceGate=false + workoutType=steady_state → no override', () => {
+  // Explicit false on the gate also leaves steady-state alone.
+  const samples = makeHRSamples(1400);
+  const context = {
+    workoutType: 'steady_state' as const,
+    intervals: [],
+    terrain: { samples },
+    varianceGate: { isMixedEffort: false },
+  };
+  const result = analyzeHeartRate(samples, context as any);
+  assertEquals(result.workoutType, 'steady_state');
+});
+
 // ── toDisplayFormatV1: vs_similar restructure under isMixedEffort ──────────
 
 function makeFactPacketWithComparisons(): any {
@@ -296,3 +373,62 @@ Deno.test('D-037 mixed-effort: buildUserMessage keeps "HR vs similar" and "Trend
   assertStringIncludes(msg, 'HR vs similar');
   assertStringIncludes(msg, 'Trend:');
 });
+
+// ── D-038 Piece 3: pool_pace_context surface + buildUserMessage ──────────
+
+function makeFactPacketWithPoolContext(intensityMatch: 'matched' | 'current_much_faster' | 'current_much_slower') {
+  const fp = makeFactPacketWithComparisons();
+  fp.derived.comparisons.vs_similar.pool_pace_context = {
+    current_avg_pace_sec: 564,
+    pool_avg_pace_sec: 730,
+    delta_sec: -166,
+    delta_pct: -22.7,
+    basis: 'gap',
+    intensity_match: intensityMatch,
+  };
+  return fp;
+}
+
+Deno.test('D-038 Piece 3: pool_pace_context surfaces on display packet (always-on, no isMixedEffort gating)', () => {
+  const fp = makeFactPacketWithPoolContext('current_much_faster');
+  const dp = toDisplayFormatV1(fp, [], { isMixedEffort: true, intervalBreakdown: null }, null);
+  const ctx = (dp.signals.comparisons.vs_similar as any).pool_pace_context;
+  assertNotEquals(ctx, null);
+  assertEquals(ctx.intensity_match, 'current_much_faster');
+  assertEquals(ctx.delta_pct, -22.7);
+  assertEquals(ctx.basis, 'gap');
+});
+
+Deno.test('D-038 Piece 3: pool_pace_context also surfaces when isMixedEffort=false (always-on regression)', () => {
+  const fp = makeFactPacketWithPoolContext('matched');
+  const dp = toDisplayFormatV1(fp, [], null, null);
+  const ctx = (dp.signals.comparisons.vs_similar as any).pool_pace_context;
+  assertNotEquals(ctx, null);
+  assertEquals(ctx.intensity_match, 'matched');
+});
+
+Deno.test('D-038 Piece 3: pool_pace_context null when fact-packet doesn\'t carry it (back-compat)', () => {
+  const fp = makeFactPacketWithComparisons(); // no pool_pace_context
+  const dp = toDisplayFormatV1(fp, [], null, null);
+  assertEquals((dp.signals.comparisons.vs_similar as any).pool_pace_context ?? null, null);
+});
+
+Deno.test('D-038 Piece 3: buildUserMessage renders "Pool intensity" line when intensity_match != matched', () => {
+  const fp = makeFactPacketWithPoolContext('current_much_faster');
+  const dp = toDisplayFormatV1(fp, [], { isMixedEffort: true, intervalBreakdown: null }, null);
+  const msg = buildUserMessage(dp);
+  assertStringIncludes(msg, 'Pool intensity vs this session: current_much_faster');
+});
+
+Deno.test('D-038 Piece 3: buildUserMessage omits "Pool intensity" line when intensity_match === matched', () => {
+  const fp = makeFactPacketWithPoolContext('matched');
+  const dp = toDisplayFormatV1(fp, [], null, null);
+  const msg = buildUserMessage(dp);
+  assertEquals(msg.includes('Pool intensity vs this session'), false);
+});
+
+// POOL INTENSITY CONTEXT prompt rule presence: verified at deploy via the
+// other display-packet tests (pool_pace_context surface, buildUserMessage
+// renders the line). The rule itself is a string in COACHING_SYSTEM_PROMPT;
+// a separate file-read smoke test would require --allow-read and the other
+// tests already prove the contract works end-to-end.

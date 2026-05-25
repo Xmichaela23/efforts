@@ -887,6 +887,9 @@ export async function buildWorkoutFactPacketV1(args: {
           // D-NNN: which basis fed the pace delta. 'gap' means both current and
           // historical pool had grade-adjusted pace; 'raw' is the fallback.
           pace_basis: (vsSimilar as any).pace_basis ?? 'raw',
+          // D-038 Piece 2 + 3: diagnostic + LLM-facing context fields.
+          pool_intensity_filter: (vsSimilar as any).pool_intensity_filter ?? null,
+          pool_pace_context: (vsSimilar as any).pool_pace_context ?? null,
           trend_points: (() => {
             const pts = Array.isArray((vsSimilar as any).trend_points) ? (vsSimilar as any).trend_points : [];
             const curDate = workout?.date ?? null;
