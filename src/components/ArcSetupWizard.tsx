@@ -165,29 +165,29 @@ function hintRunQualityPlacementFromHistory(arc: WizardArcContext | null): strin
   const lead: string[] = [];
   if (arc.recentMarathonLikeRun) {
     lead.push(
-      'A recent marathon-length run shows in your history — favor folding weekday quality into the long run unless back-to-back hard days already feel easy.',
+      'A recent marathon-length run shows in your history — favor folding weekday hard running into the long run unless back-to-back hard days already feel easy.',
     );
   } else if (arc.longestRunKm28 != null && arc.longestRunKm28 >= 25) {
     lead.push(
-      `Longest run in the last ~month ~${arc.longestRunKm28} km — strong single-session stimulus; choose standalone only if Thu-style intervals still feel fresh.`,
+      `Longest run in the last ~month ~${arc.longestRunKm28} km — strong single-session stimulus; pick the separate mid-week option only if Thu-style intervals still feel fresh.`,
     );
   } else if (arc.longestRunKm28 != null && arc.longestRunKm28 >= 21) {
     lead.push(
-      `Longest recent run ~${arc.longestRunKm28} km — half-marathon-ish volume on file; blending into the long run stays the lower-risk weekday pattern.`,
+      `Longest recent run ~${arc.longestRunKm28} km — half-marathon-ish volume on file; folding into the long run stays the lower-risk weekday pattern.`,
     );
   }
 
   let tier: string;
   if (n >= 10) {
-    tier = `${n} completed runs in the last 4 weeks — strong run rhythm; standalone mid-week intervals after your quality bike day often works if you bounce back quickly on the run.`;
+    tier = `${n} completed runs in the last 4 weeks — strong run rhythm; a separate mid-week hard run after your hard bike day often works if you bounce back quickly on the run.`;
   } else if (n >= 6) {
-    tier = `${n} runs in the last 4 weeks — you're running regularly; choose standalone if hard days back-to-back have felt fine, or fold into the long run for fewer pinned hard weekdays.`;
+    tier = `${n} runs in the last 4 weeks — you're running regularly; pick the separate mid-week option if hard days back-to-back have felt fine, or fold into the long run for fewer pinned hard weekdays.`;
   } else if (n >= 3) {
-    tier = `${n} runs in the last 4 weeks — either pattern can work; blending into the long run is the lower weekday-stress option.`;
+    tier = `${n} runs in the last 4 weeks — either pattern can work; folding into the long run is the lower weekday-stress option.`;
   } else if (n >= 1) {
-    tier = `${n} run${n === 1 ? '' : 's'} in the last 4 weeks — folding quality into the long run often fits while run consistency builds.`;
+    tier = `${n} run${n === 1 ? '' : 's'} in the last 4 weeks — folding harder running into the long run often fits while run consistency builds.`;
   } else {
-    tier = `No runs logged in the last 4 weeks — putting threshold blocks on the long run keeps mid-week simpler until running is back in rhythm.`;
+    tier = `No runs logged in the last 4 weeks — putting harder blocks on the long run keeps mid-week simpler until running is back in rhythm.`;
   }
 
   const prefix = lead.length > 0 ? `${lead.join(' ')} ` : '';
@@ -199,18 +199,18 @@ function hintBikeQualityPlacementFromHistory(arc: WizardArcContext | null): stri
   if (!arc) return null;
   const n = arc.bikeSessions28;
   if (n >= 10) {
-    return `${n} completed rides in the last 4 weeks — high bike frequency; standalone mid-week bike quality may match what your legs already expect.`;
+    return `${n} completed rides in the last 4 weeks — high bike frequency; a separate mid-week hard bike session may match what your legs already expect.`;
   }
   if (n >= 6) {
-    return `${n} rides in the last 4 weeks — if stacking bike quality beside your hard run day feels like a lot, preferring long-ride emphasis frees mid-week.`;
+    return `${n} rides in the last 4 weeks — if stacking hard bike beside your hard run day feels like a lot, folding the harder work into the long ride frees up mid-week.`;
   }
   if (n >= 3) {
     return `${n} rides in the last 4 weeks — moderate bike volume; either choice is reasonable — long-ride bias helps when the week gets cramped.`;
   }
   if (n >= 1) {
-    return `${n} ride${n === 1 ? '' : 's'} in the last 4 weeks — consolidating structured bike into the long ride can spare adjacent hard days.`;
+    return `${n} ride${n === 1 ? '' : 's'} in the last 4 weeks — folding structured bike work into the long ride can spare adjacent hard days.`;
   }
-  return `No rides logged in the last 4 weeks — biasing bike quality toward the long ride keeps weekday stress lower while cycling consistency returns.`;
+  return `No rides logged in the last 4 weeks — folding harder bike work into the long ride keeps weekday stress lower while cycling consistency returns.`;
 }
 
 /** Format seconds-per-km as "m:ss/mi" (matches app-wide imperial display) */
@@ -1456,7 +1456,7 @@ function Step3Swim({
   const title = 'Swimming — experience & weekly yardage';
   const subtitle = is703
     ? 'Many beginner-friendly 70.3 builds aim near 5,000–6,000 yards/week in the pool for shoulder durability and open-water margin — split across either two longer sessions or three shorter ones.'
-    : 'Pick how much swimming fits your week. Plans scale yardage with intent — pool totals matter more than session labels alone.';
+    : 'Pick how much swimming fits your week. Plans scale yardage with your goal — pool totals matter more than session labels alone.';
 
   const race703Lines =
     'Two pool days. Typical band when schedule allows: ~2,500–3,000 yd per session (toward ~5k–6k yd/week). Fewer weekdays, longer visits — good when pool time is limited to a couple of blocks.';
@@ -1500,13 +1500,13 @@ function Step3Swim({
       <ChoiceBtn active={state.swimIntent === 'race'} onClick={() => setState({ ...state, swimIntent: 'race' })}>
         <span className="block font-semibold text-white">Race-ready — 2 sessions/week</span>
         <span className="block text-[13px] text-white/55 mt-0.5">
-          {is703 ? race703Lines : 'One quality-oriented swim and one aerobic swim — keeps the leg sharp while protecting bike and run.'}
+          {is703 ? race703Lines : 'One harder swim and one easier swim — keeps the leg sharp while protecting bike and run.'}
         </span>
       </ChoiceBtn>
       <ChoiceBtn active={state.swimIntent === 'focus'} onClick={() => setState({ ...state, swimIntent: 'focus' })}>
         <span className="block font-semibold text-white">Swim focus — 3 sessions/week</span>
         <span className="block text-[13px] text-white/55 mt-0.5">
-          {is703 ? focus703Lines : 'Technique, aerobic quality, and threshold work — swim as a development priority this block.'}
+          {is703 ? focus703Lines : 'Technique, moderate aerobic, and harder work — swim as a development priority for this build.'}
         </span>
       </ChoiceBtn>
     </StepLayout>
@@ -1712,7 +1712,7 @@ function Step4Bike({
             )}
             {routeTopoTier === 'notice' && (
               <ArcHint>
-                Rolling profile — expect more metabolic cost than a flat ride for the same time on the clock. We apply a modest bike load floor on this anchor when building volume.
+                Rolling profile — expect more metabolic cost than a flat ride for the same time on the clock. We apply a modest bike load floor on this fixed ride when building volume.
               </ArcHint>
             )}
           </div>
@@ -1824,8 +1824,8 @@ function StepTriRunQualityPlacement({
     <StepLayout
       step={step}
       totalSteps={totalSteps}
-      title="Run intervals after your quality bike day?"
-      subtitle={`Mid-week run quality often lands the next calendar day after ${ride} (e.g. Wed ride → Thu run). Some athletes handle that well; others fold threshold work into the long run instead.`}
+      title="Run intervals after your hard bike day?"
+      subtitle={`Hard mid-week run sessions often land the next day after ${ride} (e.g. Wed ride → Thu run). Some athletes handle hard back-to-back days well; others fold the hard running into Sunday's long run instead.`}
       onBack={onBack}
       onContinue={onNext}
       canContinue={canContinue}
@@ -1836,23 +1836,23 @@ function StepTriRunQualityPlacement({
           active={state.runQualityPlacement === 'standalone_midweek'}
           onClick={() => setState(prev => ({ ...prev, runQualityPlacement: 'standalone_midweek' }))}
         >
-          <span className="block font-semibold">Standalone mid-week intervals</span>
+          <span className="block font-semibold">Separate mid-week intervals</span>
           <span className="block text-[13px] text-white/55 mt-0.5">
-            Stack after quality bike when the calendar lands there — for athletes who recover quickly on the run.
+            Hard intervals get their own mid-week day, often the day after your hard bike day — for athletes who recover quickly on the run.
           </span>
         </ChoiceBtn>
         <ChoiceBtn
           active={state.runQualityPlacement === 'long_run_blend'}
           onClick={() => setState(prev => ({ ...prev, runQualityPlacement: 'long_run_blend' }))}
         >
-          <span className="block font-semibold">Fold quality into Sunday long</span>
+          <span className="block font-semibold">Fold hard running into Sunday long</span>
           <span className="block text-[13px] text-white/55 mt-0.5">
-            Skip a separate mid-week quality session; long run carries threshold / race-pace blocks — recovery-first.
+            Skip the separate mid-week hard session; Sunday's long run carries the harder pace blocks — recovery-first.
           </span>
         </ChoiceBtn>
       </div>
       <p className="text-[11px] text-white/35 px-0.5 pt-1">
-        This saves on your plan contract; you can adjust later if recovery patterns change.
+        This saves to your plan; you can adjust later if your recovery patterns change.
       </p>
     </StepLayout>
   );
@@ -1879,8 +1879,8 @@ function StepTriBikeQualityPlacement({
     <StepLayout
       step={step}
       totalSteps={totalSteps}
-      title="Bike quality when run club pins a hard day?"
-      subtitle={`Your ${rn} session is fixed. Mid-week bike quality may land on an adjacent calendar day — some athletes keep both; others prefer structured bike stress folded into the long ride when the week gets cramped.`}
+      title="Hard bike day when run club pins a hard day?"
+      subtitle={`Your ${rn} session is fixed. Hard mid-week bike work may land on an adjacent day — some athletes keep both hard days; others prefer harder work folded into Saturday's long ride when the week gets cramped.`}
       onBack={onBack}
       onContinue={onNext}
       canContinue={canContinue}
@@ -1891,23 +1891,23 @@ function StepTriBikeQualityPlacement({
           active={state.bikeQualityPlacement === 'standalone_midweek'}
           onClick={() => setState({ ...state, bikeQualityPlacement: 'standalone_midweek' })}
         >
-          <span className="block font-semibold">Keep standalone bike quality</span>
+          <span className="block font-semibold">Keep separate mid-week hard bike</span>
           <span className="block text-[13px] text-white/55 mt-0.5">
-            Allow adjacent hard bike and hard run when the planner needs it — for athletes who tolerate stacked quality.
+            Allow adjacent hard bike and hard run when the planner needs it — for athletes who tolerate hard days back-to-back.
           </span>
         </ChoiceBtn>
         <ChoiceBtn
           active={state.bikeQualityPlacement === 'long_ride_blend'}
           onClick={() => setState({ ...state, bikeQualityPlacement: 'long_ride_blend' })}
         >
-          <span className="block font-semibold">Prefer long-ride bike emphasis</span>
+          <span className="block font-semibold">Fold harder bike work into Saturday long ride</span>
           <span className="block text-[13px] text-white/55 mt-0.5">
-            When mid-week bike quality fights the run anchor, bias toward endurance + tempo on long ride day — saved on your plan contract.
+            When mid-week hard bike fights with your hard run day, push the harder bike work into Saturday's long ride instead.
           </span>
         </ChoiceBtn>
       </div>
       <p className="text-[11px] text-white/35 px-0.5 pt-1">
-        This saves on your plan contract; you can adjust later if recovery patterns change.
+        This saves to your plan; you can adjust later if your recovery patterns change.
       </p>
     </StepLayout>
   );
@@ -2517,20 +2517,20 @@ function Step9Confirm({
   }
   if (tri && state.runQualityPlacement) {
     schedule.push({
-      label: 'Run quality vs bike day',
+      label: 'Hard run vs hard bike day',
       value:
         state.runQualityPlacement === 'long_run_blend'
-          ? 'Folded into long run (no separate mid-week quality)'
-          : 'Standalone mid-week (stack after quality bike when adjacent)',
+          ? 'Hard running folded into Sunday long run (no separate mid-week hard run)'
+          : 'Separate mid-week hard run (often the day after your hard bike day)',
     });
   }
   if (tri && state.bikeQualityPlacement) {
     schedule.push({
-      label: 'Bike quality vs run anchor',
+      label: 'Hard bike vs hard run day',
       value:
         state.bikeQualityPlacement === 'long_ride_blend'
-          ? 'Prefer long-ride emphasis when mid-week is cramped (contract)'
-          : 'Standalone mid-week bike quality when possible',
+          ? 'Harder bike work folded into Saturday long ride when mid-week is cramped'
+          : 'Separate mid-week hard bike session when possible',
     });
   }
   if (tri) {
