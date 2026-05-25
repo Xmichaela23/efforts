@@ -325,7 +325,7 @@ function RouteSparkline({ route }: { route: RouteData }) {
     <div>
       <div className="flex items-center gap-2">
         <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Route</span>
-        <span className="text-xs text-gray-500">Same route · {route.times_run}×</span>
+        <span className="text-xs text-gray-500">Same route · {(route as any).comparable_runs ?? route.times_run}×</span>
       </div>
       <div className="mt-1 relative">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 280, height: 52 }}>
@@ -644,11 +644,13 @@ export default function SessionNarrative({
         // D-039 Fix 6: chart_eligible gates the sparkline at ≥6 history
         // points (server-side threshold). Below that, render text only —
         // "Same route · N runs" with a thin trend is noise, not signal.
+        // Fix 6.1: visible count uses comparable_runs (post-intent-filter)
+        // so the user never sees "6 runs" alongside "not enough history".
         (sd.terrain.route as any).chart_eligible !== false ? (
           <RouteSparkline route={sd.terrain.route} />
         ) : (
           <div className="text-xs text-gray-500">
-            Same route · {sd.terrain.route.times_run} runs — not enough history to trend.
+            Same route · {(sd.terrain.route as any).comparable_runs ?? sd.terrain.route.history.length} comparable runs — not enough history to trend.
           </div>
         )
       )}

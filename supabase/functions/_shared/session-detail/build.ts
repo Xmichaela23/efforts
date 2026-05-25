@@ -808,13 +808,20 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       const r = tc.route_runs as any;
       if (!Array.isArray(r.history) || r.history.length < 2) return null;
       // D-039 Fix 2: `name` dropped — see types.ts terrain.route doc comment.
-      // D-039 Fix 6: chart_eligible gates the sparkline at ≥6 history points.
-      // Below that, "Same route · 4 runs" is noise — client renders text only.
+      // D-039 Fix 6 + 6.1: chart_eligible AND visible count both key off
+      // history.length (post-intent-filter), not r.times_run (cluster total).
+      // The two can diverge — 6 cluster samples but only 4 same-intent in
+      // history. Pre-Fix-6.1 the text showed "Same route · 6 runs" while
+      // the gate (history.length >= 6) returned false → user saw a "6 runs"
+      // count under a "not enough history" message. Now both reflect what's
+      // actually charted.
       const ROUTE_CHART_MIN_HISTORY = 6;
+      const comparableRuns = r.history.length;
       return {
         route: {
           times_run: Number(r.times_run || 0),
-          chart_eligible: r.history.length >= ROUTE_CHART_MIN_HISTORY,
+          comparable_runs: comparableRuns,
+          chart_eligible: comparableRuns >= ROUTE_CHART_MIN_HISTORY,
           history: r.history,
         },
       };

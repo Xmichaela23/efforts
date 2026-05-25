@@ -336,14 +336,20 @@ export type SessionDetailV1 = {
    * D-039 Fix 2: `name` removed. Route names were auto-generated server-side
    * ("Route 53" = the 53rd cluster), not athlete-named. The LLM was upgrading
    * them into asserted identities. Client renders "Same route · N×" generically;
-   * the LLM input now describes the route by `times_run` count only.
+   * the LLM input now describes the route by `comparable_runs` count only.
    * D-039 Fix 6: `chart_eligible` added. Server gates chart rendering at
-   * ≥6 history points (locked); below that, history is too thin to be a
-   * meaningful trend ("Same route · 4 runs" is noise). Client renders
-   * chart when true, text fallback when false. */
+   * ≥6 comparable history points (locked); below that, history is too thin
+   * to be a meaningful trend ("Same route · 4 runs" is noise). Client renders
+   * chart when true, text fallback when false.
+   * D-039 Fix 6.1: `comparable_runs` field added (count of history points
+   * actually being compared, post-intent-filter). `times_run` (raw cluster
+   * sample_count) kept for back-compat but the gate + visible count both
+   * key off `comparable_runs` so the user never sees "6 runs" while the
+   * chart insists there's not enough history. */
   terrain?: {
     route: {
       times_run: number;
+      comparable_runs: number;
       chart_eligible: boolean;
       history: Array<{ date: string; pace_s_per_km: number | null; hr: number | null; is_current: boolean }>;
     } | null;
