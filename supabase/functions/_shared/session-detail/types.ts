@@ -190,6 +190,15 @@ export type SessionDetailV1 = {
     is_auto_lap_or_split: boolean;
     is_pool_swim: boolean;
     /**
+     * D-041 Fix C: duration-derived workout_type from fact-packet facts
+     * ("easy_run" | "long_run" | "tempo_run" | "interval_run" | "recovery_run"
+     * | etc., or null). Soft descriptive label only — NEVER a target
+     * (D-035 carryover). Client uses it as a label-only signal (e.g.
+     * 'Steady' label override for single-segment long_run / easy_run).
+     * Don't gate effort interpretation on this field downstream.
+     */
+    workout_type: string | null;
+    /**
      * Variance gate (D-NNN). True when this session showed real effort variation —
      * intervals, fartlek, mixed-effort. Server-computed; client never derives.
      * When true, TREND/vs_similar comparisons exclude this row from steady pools,

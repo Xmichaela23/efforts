@@ -63,10 +63,11 @@ type EnduranceIntervalTableProps = {
       is_easy_like?: boolean;
       is_auto_lap_or_split?: boolean;
       is_pool_swim?: boolean;
-      /** D-040 Fix C: server-side variance gate flag (D-034). When false on a
-       * single-segment session, the segment is genuinely steady and the
-       * 'Interval 1' label + pace-range subtitle should be suppressed. */
+      /** D-040 Fix C: server-side variance gate flag (D-034). */
       is_mixed_effort?: boolean;
+      /** D-041 Fix C: duration-derived workout_type from fact-packet facts.
+       * Used as a label-only signal for the 'Steady' override; NEVER a target. */
+      workout_type?: string | null;
     };
     pacing?: { coefficient_of_variation?: number | null };
     display?: { show_adherence_chips?: boolean; has_measured_execution?: boolean };
@@ -101,14 +102,17 @@ export default function EnduranceIntervalTable({
   const isEasyLike = !!sd?.classification?.is_easy_like;
   const isGoalRace = !!sd?.race?.is_goal_race;
   const race = sd?.race;
-  // D-040 Fix C: detect single-segment steady-state sessions. When true,
-  // override per-row label to "Steady" and suppress the pace-range subtitle
-  // — both are redundant with the Pace + Time + Distance columns and the
-  // server-side 'Interval 1' label is wrong for a one-segment continuous
-  // effort.
-  const isMixedEffort = sd?.classification?.is_mixed_effort === true;
-  const singleSegmentSteady = !isMixedEffort &&
-    Array.isArray(sd?.intervals) && sd.intervals.length === 1;
+  // D-040 Fix C + D-041 Fix C: detect single-segment steady-state sessions.
+  // The label/subtitle override uses workout_type (label-only signal,
+  // D-035 carryover: descriptive only, never a target) instead of
+  // is_mixed_effort. The variance gate is for downstream effort interpretation;
+  // the table-row label decision should key on whether this is a long_run /
+  // easy_run with one segment — those genuinely render as 'Steady' regardless
+  // of pace CV (which can be elevated on rolling terrain even on easy efforts).
+  const workoutType = String(sd?.classification?.workout_type ?? '').toLowerCase();
+  const singleSegmentSteady =
+    Array.isArray(sd?.intervals) && sd.intervals.length === 1 &&
+    (workoutType === 'long_run' || workoutType === 'easy_run');
   const displayMode = sd?.intervals_display?.mode ?? 'none';
   const displayReason = sd?.intervals_display?.reason ?? null;
   const allIntervals: IntervalRow[] = Array.isArray(sd?.intervals) ? sd!.intervals as IntervalRow[] : [];

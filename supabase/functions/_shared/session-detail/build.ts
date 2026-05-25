@@ -631,6 +631,14 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       is_easy_like: isEasyLike,
       is_auto_lap_or_split: isAutoLapOrSplit,
       is_pool_swim: isPoolSwim,
+      // D-041 Fix C: surface duration-derived workout_type from fact-packet
+      // facts. Soft descriptive label only — NEVER a target (D-035 carryover).
+      // Client uses it as a label-only signal (e.g. "Steady" label override
+      // for single-segment long_run / easy_run). Don't gate effort
+      // interpretation on this field downstream.
+      workout_type: (factPacket?.facts as any)?.workout_type
+        ? String((factPacket!.facts as any).workout_type)
+        : null,
       // D-NNN: variance gate — surfaced from session_state_v1.glance (analyzer-computed).
       // Client renders; never derives. Defaults to false when older rows lack
       // the field (stale-until-touched, per spec §5).
