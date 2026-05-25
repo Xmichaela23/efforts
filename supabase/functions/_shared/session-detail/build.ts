@@ -54,6 +54,24 @@ export function humanizePlannedSegmentLabel(
   const recN = numbers?.recoveryNumber;
   const hasIvN = typeof ivN === 'number' && Number.isFinite(ivN) && ivN > 0;
   const hasRecN = typeof recN === 'number' && Number.isFinite(recN) && recN > 0;
+  // D-039 Fix 7: detect labels that are just pace-range strings (no
+  // semantic word). Steady-state single-segment sessions currently render
+  // labels like "10:56-11:22/mi" or "81:00 @ 10:56-11:..." — the table
+  // columns already show pace + time + distance, so a label echoing the
+  // same pace-range is redundant. Convert to a clean semantic label.
+  // Regex tolerates trailing dots (truncated UI) and either /mi or /km.
+  // Uses [\d.]+ for the second pace so truncated forms like "11:.." match.
+  const isPaceRangeOnly = /^(?:\d+:\d+\s*@\s*)?\d+:[\d.]+\s*[-–]\s*\d+:[\d.]+(?:\s*\/(?:mi|km))?\s*\.*\s*$/.test(s);
+  if (isPaceRangeOnly) {
+    if (it === 'warmup') return 'Warmup';
+    if (it === 'cooldown') return 'Cooldown';
+    if (it === 'recovery') return hasRecN ? `Recovery ${recN}` : 'Recovery';
+    if (it === 'work' && hasIvN) return `Interval ${ivN}`;
+    // 'work' without an interval number, or no interval type → generic.
+    // 'Steady' fits any continuous-effort segment without prescribing intent;
+    // better than echoing the pace-range string back into the label cell.
+    return 'Steady';
+  }
   // Empty raw OR a bare kind word → synthesize from intervalType + number.
   // Matches interval-breakdown.ts:980-983 so PACING and segments-table agree.
   const isBareKind = low === '' || low === 'work' || low === 'recovery' || low === 'warmup' || low === 'cooldown';

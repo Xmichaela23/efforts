@@ -60,8 +60,49 @@ Deno.test('Bug A: Warmup/Cooldown synthesized regardless of input', () => {
 
 Deno.test('Bug A: meaningful labels pass through unchanged', () => {
   assertEquals(humanizePlannedSegmentLabel('0.5 mi', 'work', { intervalNumber: 1 }), '0.5 mi');
-  assertEquals(humanizePlannedSegmentLabel('5:00 @ 6:30-7:00', 'work'), '5:00 @ 6:30-7:00');
   assertEquals(humanizePlannedSegmentLabel('200 yd Stride', 'work'), '200 yd Stride');
+  // D-039 Fix 7 supersedes the pre-existing pass-through for pace-range
+  // strings — see "Fix 7" tests below. The pace-range patterns are now
+  // converted to clean semantic labels because the pace + duration columns
+  // already render that data.
+});
+
+// ─── D-039 Fix 7: strip pace-range-only labels ────────────────────────────
+
+Deno.test('D-039 Fix 7: "10:56-11:22/mi" pace-range-only label → "Steady"', () => {
+  assertEquals(humanizePlannedSegmentLabel('10:56-11:22/mi'), 'Steady');
+});
+
+Deno.test('D-039 Fix 7: "81:00 @ 10:56-11:.." duration + truncated pace-range → "Steady"', () => {
+  assertEquals(humanizePlannedSegmentLabel('81:00 @ 10:56-11:..'), 'Steady');
+});
+
+Deno.test('D-039 Fix 7: "5:00 @ 6:30-7:00" duration + pace-range with intervalType="work" → "Steady" (no number)', () => {
+  // Pace-range pattern stripped. No intervalNumber → returns generic 'Steady'.
+  // For real interval sessions, intervalNumber is populated → "Interval N".
+  assertEquals(humanizePlannedSegmentLabel('5:00 @ 6:30-7:00', 'work'), 'Steady');
+});
+
+Deno.test('D-039 Fix 7: pace-range-only + intervalType="work" + intervalNumber → "Interval N"', () => {
+  assertEquals(
+    humanizePlannedSegmentLabel('5:00 @ 6:30-7:00', 'work', { intervalNumber: 3 }),
+    'Interval 3',
+  );
+});
+
+Deno.test('D-039 Fix 7: pace-range-only + intervalType="warmup" → "Warmup"', () => {
+  assertEquals(humanizePlannedSegmentLabel('15:00 @ 11:00-11:30/mi', 'warmup'), 'Warmup');
+});
+
+Deno.test('D-039 Fix 7: km pace-range also stripped', () => {
+  assertEquals(humanizePlannedSegmentLabel('5:00-5:30/km'), 'Steady');
+});
+
+Deno.test('D-039 Fix 7: labels with semantic words pass through (not just pace-range)', () => {
+  // "Tempo 5K @ 7:30/mi" has 'Tempo' + '5K' — semantic content beyond pace.
+  // Regex requires ONLY pace-range / duration+pace-range; this doesn't match.
+  assertEquals(humanizePlannedSegmentLabel('Tempo 5K @ 7:30/mi', 'work'), 'Tempo 5K @ 7:30/mi');
+  assertEquals(humanizePlannedSegmentLabel('Long run main set', 'work'), 'Long run main set');
 });
 
 // ─── Bug B: variance gate flag reader ─────────────────────────────────────
