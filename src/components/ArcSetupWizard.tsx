@@ -2649,7 +2649,7 @@ function Step9Confirm({
         <input
           type="date"
           value={state.planStartDate}
-          min={new Date().toISOString().slice(0, 10)}
+          min={new Date(Date.now() - 8 * 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
           onChange={e => setState({ ...state, planStartDate: e.target.value })}
           className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 focus:outline-none focus:border-teal-500/50"
         />
