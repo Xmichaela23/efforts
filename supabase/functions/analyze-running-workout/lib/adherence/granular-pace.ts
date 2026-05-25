@@ -7,6 +7,29 @@ import { getPaceToleranceForSegment } from './garmin-execution.ts';
 import { calculatePaceRangeAdherence, getIntervalType, type IntervalType } from './pace-adherence.ts';
 import { paceToGAP, computeSampleGrades, hasUsableElevation, enrichSamplesWithGAP } from '../../../_shared/gap.ts';
 
+/**
+ * D-039 Fix 1 — pace sample hygiene for CV computation.
+ *
+ * Clips outliers above `maxSecPerMi` (default 1800 = 30 min/mi). A single
+ * device artifact (stoplight, water break, GPS dropout, paused-but-not-stopped)
+ * blows up std → CV → variance gate at 8% trips and a steady run mis-routes
+ * as fartlek (cascading into wrong decoupling path). Symptom on 8cbfa389:
+ * pace_cv_pct = 908.8 on a steady 11:11/mi long run.
+ *
+ * 1800 is conservative — even a 30 min/mi crawl is exceptional within a run;
+ * samples beyond that are almost certainly device artifacts, not effort.
+ */
+export const PACE_OUTLIER_MAX_SEC_PER_MI = 1800;
+
+export function filterPaceSamplesForCV(
+  samples: Array<number | null | undefined>,
+  maxSecPerMi: number = PACE_OUTLIER_MAX_SEC_PER_MI,
+): number[] {
+  return samples.filter((p): p is number =>
+    p != null && typeof p === 'number' && p > 0 && p <= maxSecPerMi
+  );
+}
+
 // -----------------------------------------------------------------------------
 // Exported types
 // -----------------------------------------------------------------------------
@@ -412,9 +435,7 @@ function calculateIntervalPaceAdherence(
   for (const interval of workIntervals) {
     if (interval.sample_idx_start !== undefined && interval.sample_idx_end !== undefined) {
       const intervalSamples = sensorData.slice(interval.sample_idx_start, interval.sample_idx_end + 1);
-      const validPaces = intervalSamples
-        .map(s => s.pace_s_per_mi)
-        .filter(p => p != null && p > 0);
+      const validPaces = filterPaceSamplesForCV(intervalSamples.map(s => s.pace_s_per_mi));
       allPaceSamples.push(...validPaces);
     }
   }
