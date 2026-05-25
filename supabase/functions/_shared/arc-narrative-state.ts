@@ -69,6 +69,24 @@ function ymdToUtcMs(ymd: string): number {
   return new Date(`${ymd}T12:00:00.000Z`).getTime();
 }
 
+/**
+ * Calendar days between two YMD dates.
+ *
+ * Both inputs are anchored at noon UTC (via `ymdToUtcMs`) so DST and
+ * timezone boundaries can't cause day-rounding errors. Math.round handles
+ * any sub-millisecond float drift from the division.
+ *
+ * **Semantics warning (D-055 / Item 12, 2026-05-25):** for arc-narrative
+ * paths, `focusYmd` is the WORKOUT DATE (not the viewing date — see
+ * `analyze-running-workout/index.ts:2000`). A session viewed today that
+ * was completed 2 days ago will correctly report
+ * `days_since_last_goal_race` against the workout's date, not "today" —
+ * the narrative is per-workout, not a moving viewing-time frame.
+ *
+ * Example: race 2026-04-19; workout 2026-05-21 (focus) shows "32 days
+ * since race". Viewing that workout on 2026-05-23 still shows 32 — not 34
+ * — because the narrative anchors to the session, not the calendar today.
+ */
 export function calendarDaysBetween(fromYmd: string, toYmd: string): number | null {
   const a = ymdToUtcMs(fromYmd);
   const b = ymdToUtcMs(toYmd);

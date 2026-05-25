@@ -382,6 +382,36 @@ same pattern as the phase-label ban (D-040 Fix B). Not scheduled.
 
 ---
 
+## Q-027 — `days_since_last_goal_race` reported off by 2 (could not reproduce; date semantics question)
+
+Filed: 2026-05-25 (D-055 / Item 12).
+
+User reported: narrative shows "32 days" when the actual count is 34
+days (April 19 race → May 23 viewing date). Three calculation sites
+audited — all return the expected value via noon-UTC-anchored math:
+
+  - `_shared/arc-narrative-state.ts:72` `calendarDaysBetween` → 34 ✓
+  - `_shared/arc-context.ts:646` `days_ago` (Math.floor) → 34 ✓
+  - `analyze-running-workout/index.ts:2018` (same shape) → 34 ✓
+
+**Likely explanation (not a bug):** arc-narrative anchors to the
+WORKOUT DATE, not the viewing date (see `analyze-running-workout:2000`
+where `focusYmd = workout.date`). A workout completed on May 21 viewed
+on May 23 will correctly report "32 days post-race" — that's 32 days
+from the WORKOUT's perspective.
+
+Per-workout semantics are intentional: the narrative describes the
+workout's relationship to events, not a moving "as of right now" frame
+that would shift each time the athlete reopens the session.
+
+**Action requested:** confirm with a concrete reproducer (workout ID +
+narrative output) whether the discrepancy is the WORKOUT-DATE-vs-
+VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
+`calendarDaysBetween` JSDoc now spells out the semantic explicitly
+(D-055 commit) so future readers don't trip on it.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
