@@ -1746,17 +1746,34 @@ export function brick(
   const runMinutes = Math.max(15, Math.round(runMilesClamped * 10));
   const miLabel = Math.round(runMilesClamped * 2) / 2;
 
+  // D-049 / Cycling Phase 2 (CYCLING-PROTOCOL.md §4.3) — race-specific brick
+  // bike emits structured Z2 base + race-pace closing block (~30 min at
+  // expected race IF, 0.78-0.82 for 70.3 / 0.62-0.68 for full IM). Previously
+  // the whole bike leg was tagged Z3 throughout, which is hotter than spec.
+  // Structured form fires only when the bike leg is long enough to support
+  // a meaningful closing block (>= 60 min total) — shorter race-specific
+  // bricks (early-season / olympic) stay on the single-zone tag.
+  const useStructuredRS = isRS && bikeMin >= 60;
+  const closingMin = useStructuredRS ? Math.min(45, Math.max(20, Math.round(bikeMin * 0.25))) : 0;
+  const baseMin = useStructuredRS ? bikeMin - closingMin : bikeMin;
+  const rsBikeCopy = useStructuredRS
+    ? `Race-simulation brick — ride ${baseMin} min at Zone 2 to build durability, then close with ${closingMin} min at expected race power (Z3, ~0.78-0.82 IF for 70.3 / 0.62-0.68 IF for full IM). Stay aero through the close. Transition quickly into the run.`
+    : `Race-simulation bike at Zone 3 (race pace). Stay aero. Transition quickly into the run.`;
+  const rsBikeSteps = useStructuredRS
+    ? [`bike_endurance_${baseMin}min_Z2`, `bike_race_pace_${closingMin}min_Z3`]
+    : [`bike_endurance_${bikeMin}min_Z3`];
+
   const bikeSession = session(
     day, 'bike',
     `Brick — Bike ${bikeHours.toFixed(1)} hr`,
     isRS
-      ? `Race-simulation bike at Zone 3 (race pace). Stay aero. Transition quickly into the run.`
+      ? rsBikeCopy
       : `Brick bike at Zone 2. Build leg feel for the transition. Maintain steady power throughout.`,
     bikeMin,
     bikeIntensity,
-    [`bike_endurance_${bikeMin}min_${isRS ? 'Z3' : 'Z2'}`],
+    isRS ? rsBikeSteps : [`bike_endurance_${bikeMin}min_Z2`],
     ['brick', 'bike', isRS ? 'race_specific' : 'build'],
-    isRS ? 'Z3' : 'Z2',
+    isRS ? (useStructuredRS ? 'Z2 with Z3 close' : 'Z3') : 'Z2',
     goalId,
     'AM',
   );

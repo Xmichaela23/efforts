@@ -110,15 +110,15 @@ For each numbered item:
 
 ## 3. Cycling 100% — stop calling Z2 weekday rides "long rides"
 
-**Status:** Phase 0 spec + Phase 1 volume ramp shipped (2026-05-21, `42b2d2c3` + `61faf828`). Phase 2+ open — intensity/structure axis (brick-bike race-pace, bikeOpeners race-week gating) + limiter dial.
+**Status:** Phase 0 spec + Phase 1 volume ramp + Phase 2 race-pace brick closing block + Phase 3 bikeOpeners race-week gating shipped. Phase 4 (limiter dial) intentionally deferred.
 
 ### Done
 - [x] Write CYCLING-PROTOCOL.md spec doc — 2026-05-21 (`42b2d2c3`), 412 lines structurally parallel to RUN-PROTOCOL.md / SWIM-PROTOCOL.md
 - [x] **Cycling arc Phase 1 — within-phase volume ramp** — 2026-05-21 (`61faf828`, D-028). `longRideHoursForWeek` lerp helper (§4.5 endpoints LOCKED: base 0.65→0.75, build 0.75→0.85, RS 0.85→1.00); sweet-spot / threshold / VO2max rep ramps per §10.4 + §5.6; validator parity (`effectiveLongRideFloorHours` within-phase-aware, mirrors D-027). 15 new pin tests; 285/0 in generate-combined-plan suite.
+- [x] **Cycling arc Phase 2 — race-specific brick-bike race-pace closing block** — closed D-049 / 2026-05-25. `brick()` at `session-factory.ts:1734` now emits structured Z2 base + Z3 race-pace closing (~30 min, target 0.78-0.82 IF for 70.3 / 0.62-0.68 IF for full IM) in `steps_preset` and description for race_specific phase bricks ≥ 60 min. Shorter bricks keep the single-zone Z3 tag. 5 pin tests in `brick-race-spec.test.ts`.
+- [x] **Cycling arc Phase 3 — `bikeOpeners` race-week-only gating** — closed D-043 item 10 / 2026-05-25. Gate at `week-builder.ts:1461` now scopes to `phase === 'taper' && raceThisWeek`, mirroring the swim-activation gate at `:914`. Non-race-week taper falls through to the existing quality-bike / group-ride logic — no behavior change for those weeks; openers special-case no longer pre-empts.
 
 ### Open
-- [ ] **Cycling arc Phase 2** — race-specific brick-bike race-pace closing block (§4.4); audit + implement.
-- [ ] **Cycling arc Phase 3** — `bikeOpeners` race-week-only gating (closes §9.1 footgun: currently fires every taper week, not just race week — line 222 below tracks this as a deliberate follow-up; Phase 3 closes it).
 - [ ] **Cycling arc Phase 4 (deferred)** — `limiter_sport='bike'` intensity dial; same shape as `limiter_sport='run'` Phase 4 deferred work.
 - [ ] Audit cycling session naming — "Long Ride" only the genuine weekly long session
 - [ ] Distinguish Easy / Endurance / Long / Quality / Brick rides
