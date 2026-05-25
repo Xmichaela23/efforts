@@ -1500,6 +1500,13 @@ function Step3Swim({
         <span className="block font-semibold text-white">Strong swimmer</span>
         <span className="block text-[13px] text-white/55 mt-0.5">Swim is not my weak leg — maintenance and sharpness are enough.</span>
       </ChoiceBtn>
+      {/* D-056 / Item 7 — explicit "use the default" path so athletes
+          without a strong self-assessment aren't forced to guess. Defaults
+          to 'steady' (matches the middle-tier engine default). */}
+      <ChoiceBtn active={state.swimExperience === 'steady'} onClick={() => setState({ ...state, swimExperience: 'steady' })}>
+        <span className="block font-semibold text-white/85">Not sure — use the recommended default</span>
+        <span className="block text-[13px] text-white/45 mt-0.5">Treats you as "Steady" — the typical age-grouper default.</span>
+      </ChoiceBtn>
 
       <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-white/40 px-1 mb-2 mt-5">Weekly structure</p>
       <ChoiceBtn active={state.swimIntent === 'race'} onClick={() => setState({ ...state, swimIntent: 'race' })}>
@@ -2263,6 +2270,17 @@ function Step8Strength({
             <span className="block font-semibold">Durability-Focused</span>
             <span className="block text-[13px] text-white/55 mt-0.5">Strength supports endurance. Injury prevention and tissue tolerance — race time is the only metric.</span>
           </ChoiceBtn>
+          {/* D-056 / Item 7 — explicit "use the default" path for
+              athletes without a strong prior strength training frame.
+              Maps to 'performance' (the engine default when strength is
+              included and weekly hours ≥ ~10). */}
+          <ChoiceBtn
+            active={state.strengthIntent === 'performance'}
+            onClick={() => setState({ ...state, strengthIntent: 'performance' })}
+          >
+            <span className="block font-semibold text-white/85">Not sure — use the recommended default</span>
+            <span className="block text-[13px] text-white/45 mt-0.5">Treats strength as a training priority (2× weekly) — the typical hybrid-athlete default.</span>
+          </ChoiceBtn>
         </div>
       )}
 
@@ -2399,6 +2417,18 @@ function Step8bStrengthOrdering({
           <span className="block font-semibold">Strength first</span>
           <span className="block text-[13px] text-white/55 mt-0.5">
             For athletes whose strength PRs matter as much as race times.
+          </span>
+        </ChoiceBtn>
+        {/* D-056 / Item 7 — recommended default for the typical
+            triathlete who's focused on race results. Maps to
+            'endurance_first' (matches the engine default for tri intent). */}
+        <ChoiceBtn
+          active={pref === 'endurance_first'}
+          onClick={() => setState({ ...state, strengthOrderingPreference: 'endurance_first' })}
+        >
+          <span className="block font-semibold text-white/85">Not sure — use the recommended default</span>
+          <span className="block text-[13px] text-white/45 mt-0.5">
+            Picks "Endurance first" — the typical tri-focused default.
           </span>
         </ChoiceBtn>
       </div>
