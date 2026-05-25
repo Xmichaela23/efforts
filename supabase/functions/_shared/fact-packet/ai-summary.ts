@@ -1141,10 +1141,11 @@ export type UnplannedGateOptions = {
  * getting faster at same HR = aerobic base building. Surfaced on display
  * packet for the AEROBIC EFFICIENCY TREND prompt rule.
  *
- * Note: the DB column on `athlete_snapshot` is still named `run_easy_hr_trend`
- * for back-compat (renaming requires a schema migration coordinated with
- * coach + plan-gen consumers — separate ticket). The TypeScript field name
- * here reflects what the value actually represents.
+ * D-060 (2026-05-25): DB column renamed `run_easy_hr_trend` →
+ * `run_easy_pace_at_hr_trend` to match the variable + type semantic.
+ * Migration: `supabase/migrations/20260525_rename_run_easy_hr_trend.sql`.
+ * Code-side consumers coordinated in compute-snapshot, coach,
+ * analyze-running-workout, longitudinal-signals, useAthleteSnapshot.
  */
 export type AerobicTrendOptions = { runEasyPaceAtHrTrendPct?: number | null };
 
