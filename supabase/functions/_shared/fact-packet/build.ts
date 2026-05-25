@@ -18,6 +18,7 @@ import { isPlanTransitionWindowByWeekIndex } from '../plan-week.ts';
 import { assessStimulus } from './stimulus.ts';
 import { identifyPerformanceLimiter } from './limiter.ts';
 import { generateFlagsV1 } from './flags.ts';
+import { classifyPaceAtHrDirection } from './pace-at-hr-direction.ts';
 import {
   resolveMovingDurationMinutes,
   resolveOverallDistanceMi,
@@ -868,6 +869,31 @@ export async function buildWorkoutFactPacketV1(args: {
   if (trainingLoad) inputs_present.push('training_load');
   if (athleteReported) inputs_present.push('athlete_reported');
 
+  // D-050 / Q-025 — pace-at-HR direction classifier. Computed once over the
+  // FULL trend window (pool + current workout). Result spreads into the
+  // vs_similar block below as two fields (`pace_at_hr_direction`,
+  // `pace_at_hr_basis`). See `pace-at-hr-direction.ts` header for the
+  // percentile algorithm.
+  const paceAtHrClassification = (() => {
+    const poolPts = Array.isArray((vsSimilar as any).trend_points)
+      ? [...(vsSimilar as any).trend_points]
+      : [];
+    const poolBasis = poolPts.length > 0
+      ? ((poolPts[0] as any)?.pace_basis === 'gap' ? 'gap' : 'raw')
+      : 'raw';
+    const curPaceRaw = overallPace != null ? Math.round(overallPace) : null;
+    const curPaceGap = _overallGap != null && _overallGap > 0 ? Math.round(_overallGap) : null;
+    const curPace = poolBasis === 'gap' ? (curPaceGap ?? curPaceRaw) : curPaceRaw;
+    if (workout?.date && curPace != null && avgHr != null && avgHr > 0) {
+      poolPts.push({
+        date: String(workout.date),
+        pace_basis: poolBasis,
+        pace_at_hr: Math.round((curPace * 100 / avgHr) * 10) / 10,
+      });
+    }
+    return classifyPaceAtHrDirection(poolPts as any);
+  })();
+
   const factPacket: FactPacketV1 = {
     version: 1,
     generated_at: new Date().toISOString(),
@@ -945,6 +971,9 @@ export async function buildWorkoutFactPacketV1(args: {
             }
             return pts;
           })(),
+          // D-050 / Q-025 — pace-at-HR direction + basis (precomputed above).
+          pace_at_hr_direction: paceAtHrClassification.direction,
+          pace_at_hr_basis: paceAtHrClassification.basis,
         },
         trend,
         achievements,
