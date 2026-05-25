@@ -3,6 +3,45 @@
  */
 import type { ArcNarrativeContextV1 } from './arc-narrative-state.ts';
 
+/**
+ * D-040 Fix A — shared backward-anchor HARD BAN used by build_read mode AND
+ * unstructured_read (when forward-eligible). The LLM has been evading earlier
+ * ban wordings ("post-X" → "out from X") so this helper enumerates the
+ * forbidden patterns explicitly AND provides the correct framing template.
+ */
+function backwardAnchorHardBan(
+  nc: ArcNarrativeContextV1,
+  opts: { mode: 'build_read' | 'unstructured_read'; planWeek?: number | null; phase?: string | null }
+): string {
+  const lr = nc.last_goal_race;
+  const ng = nc.next_primary_goal;
+  const dUntil = nc.days_until_next_goal_race;
+  if (!ng || dUntil == null) return '';
+  const raceTag = lr ? `"${lr.name}"` : 'the completed goal race';
+  const raceDist = lr?.distance ?? '[race]';
+  const correctEx = opts.mode === 'build_read' && opts.planWeek && opts.phase
+    ? `"Week ${opts.planWeek} of your ${opts.phase} block toward ${ng.name}"`
+    : `"${dUntil} days to your next race"`;
+  return `
+
+HARD BAN (${opts.mode}) — backward temporal anchors:
+- The temporal anchor in INSIGHTS MUST be forward-looking.
+- Use days_to_next_goal_race${opts.mode === 'build_read' ? ' or plan phase/week' : ''}.
+- NEVER open with "X days post-${lr?.name ?? '[race]'}" or "X days out from ${lr?.name ?? '[past race]'}" or any equivalent phrasing.
+- days_since_last_goal_race is available as context only — never as the lede frame.
+- Forbidden patterns (non-exhaustive):
+  • "X days post-${raceTag}"
+  • "X days out from your ${raceDist}"
+  • "X days since ${raceTag}"
+  • "X weeks after ${raceTag}"
+  • "in your ${raceTag} recovery / comeback window"
+  • "${raceTag} is behind you" / "${raceTag} taper" / "post-${raceTag}"
+  • Any temporal anchor (days/weeks ago) tied to ${raceTag}, even without using the name.
+- Correct: ${correctEx}
+- Incorrect: "35 days post-marathon" / "32 days out from Ojai"
+- Treat the LAST_GOAL_RACE line in the ARC FACT BLOCK as if it's not in the prompt. Lead with current fitness signals + the upcoming build context only.`;
+}
+
 export function arcNarrativeFactBlock(nc: ArcNarrativeContextV1): string {
   const lr = nc.last_goal_race;
   const ng = nc.next_primary_goal;
@@ -85,37 +124,19 @@ Judge session execution quality versus intent in the FACT PACKET only; connect t
 
 TEMPORAL ARC MODE: build_read — base/build bucket.
 Discuss adaptation stimulus (threshold/tempo/long) using fact-packet adherence and physiology; progression language only when consistent with FACTS.
-Avoid inventing prescriptions not evidenced in data.
+Avoid inventing prescriptions not evidenced in data.${backwardAnchorHardBan(nc, { mode: 'build_read', planWeek: null, phase: nc.plan_phase_normalized })}
 `;
 
     default: {
-      // D-039 Fix 3 + 3.1: forward-bias rule. When next_primary_goal is dated
-      // and within ~180 days, the narrative should look forward to that
-      // target, not back to a months-old completed race. Pre-fix the LLM was
-      // anchoring on last_goal_race in unstructured_read because it's the
-      // most narratively-rich fact in the block, even when there's an
-      // obvious upcoming goal to frame against. Fix 3.1 strengthens the ban
-      // — the LLM was sidestepping "DO NOT lead with X days post-LAST_RACE"
-      // by switching to "X days out from your marathon" wording. New rule
-      // is a HARD BAN on any phrasing that anchors on the completed race.
+      // D-039 Fix 3 + 3.1 + D-040 Fix A: forward-bias rule for unstructured_read.
+      // When next_primary_goal is dated within 14-180 days, fire the same
+      // backward-anchor HARD BAN that build_read uses. Helper enumerates
+      // the forbidden patterns + correct framing template.
       const ng = nc.next_primary_goal;
       const dUntilRace = nc.days_until_next_goal_race;
-      const lr = nc.last_goal_race;
       const forwardEligible = ng && dUntilRace != null && dUntilRace > 14 && dUntilRace <= 180;
       const forwardFraming = forwardEligible
-        ? `
-FORWARD FRAMING (HARD CONSTRAINT) — next dated goal is ${ng.name}${ng.distance ? ` (${ng.distance})` : ''} in ~${dUntilRace} days. Frame this session in the context of the build toward that goal.
-
-ABSOLUTE BAN — when forward framing is active, the narrative MUST NOT mention, reference, paraphrase, or allude to ${lr ? `the completed "${lr.name}"` : 'any completed goal race in the ARC block'} in any phrasing. This includes (non-exhaustive):
-- "X days post-${lr?.name ?? '[race]'}"
-- "X days out from your ${lr?.distance ?? '[race]'}"
-- "X days since ${lr?.name ?? '[race]'}"
-- "X weeks after ${lr?.name ?? '[race]'}"
-- "in your ${lr?.name ?? '[race]'} recovery / comeback window"
-- "[race] is behind you" / "[race] taper" / "post-[race]"
-- Any temporal anchor (days/weeks ago) tied to the completed race even without using its name.
-
-The LAST_GOAL_RACE line in the ARC FACT BLOCK is for engine bookkeeping only when forward framing is active. Treat it as if it's not in the prompt. Lead with current fitness signals + the upcoming build context only.`
+        ? backwardAnchorHardBan(nc, { mode: 'unstructured_read' })
         : '';
       return `
 
