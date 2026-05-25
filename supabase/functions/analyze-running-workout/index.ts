@@ -6,6 +6,7 @@ import { calculatePaceRangeAdherence, getIntervalType, IntervalType } from './li
 import { calculateGarminExecutionScore, getPaceToleranceForSegment } from './lib/adherence/garmin-execution.ts';
 import { calculatePrescribedRangeAdherenceGranular, type PrescribedRangeAdherence, type IntervalAnalysis, type SampleTiming } from './lib/adherence/granular-pace.ts';
 import { calculateIntervalHeartRate } from './lib/analysis/heart-rate.ts';
+import { computeVarianceGate } from './lib/variance-gate.ts';
 import { calculateIntervalElevation } from './lib/analysis/elevation.ts';
 // Old HR drift import removed - now using consolidated HR analysis module
 import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type WorkoutType, getEffectiveSlowFloor, getHeatAllowance } from './lib/heart-rate/index.ts';
@@ -2135,67 +2136,22 @@ Deno.serve(async (req) => {
     // input shape: when mixed-effort, drop vs_similar steady comparisons and
     // hand the LLM an interval-summary block instead).
     // =========================================================================
-    const _varGate = (() => {
-      const cvPct = Number(
-        (analysis as any)?.pacing_variability?.coefficient_of_variation
-      );
-      const cvValid = Number.isFinite(cvPct) && cvPct > 0;
-      const gapAdj = Boolean((analysis as any)?.gap_adjusted);
-      const cvBasis: 'gap' | 'raw' | null = cvValid ? (gapAdj ? 'gap' : 'raw') : null;
-      const terrainType = String((fact_packet_v1 as any)?.facts?.terrain_type || '').toLowerCase();
-      const isFlat = terrainType === 'flat';
-
-      const cvTripsGap = cvValid && cvBasis === 'gap' && cvPct >= 8;
-      const cvTripsRawFlat = cvValid && cvBasis === 'raw' && isFlat && cvPct >= 8;
-      // Spec §3.3 + user direction: "without grade data you can't separate
-      // terrain from effort, and a missed detection is the safer error." Raw
-      // CV on non-flat terrain is silently skipped.
-
-      const ieTotalSteps = Number(
-        (fact_packet_v1 as any)?.derived?.interval_execution?.total_steps
-      );
-      const ieTripsLinked = isLinkedPlanSession && Number.isFinite(ieTotalSteps) && ieTotalSteps >= 2;
-
-      const detectedKey = String(
-        detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout) || ''
-      ).toLowerCase().trim();
-      const detectedTripsUnplanned = !isLinkedPlanSession && detectedKey !== '' &&
-        detectedKey !== 'easy' && detectedKey !== 'steady_state' &&
-        detectedKey !== 'long' && detectedKey !== 'long_run' &&
-        detectedKey !== 'recovery';
-
-      const planIntentTripsLinked = isLinkedPlanSession && (() => {
-        const k = String(classifiedTypeKey || '').toLowerCase();
-        return k === 'intervals' || k === 'interval' || k === 'interval_run' ||
-          k === 'tempo' || k === 'tempo_run' || k === 'fartlek' || k === 'threshold' ||
-          k === 'vo2' || k === 'vo2max' || k === 'speed' || k === 'track';
-      })();
-
-      let signal:
-        | 'pace_cv' | 'interval_execution' | 'detected_intervals'
-        | 'plan_intent_intervals' | null = null;
-      if (ieTripsLinked) signal = 'interval_execution';
-      else if (planIntentTripsLinked) signal = 'plan_intent_intervals';
-      else if (detectedTripsUnplanned) signal = 'detected_intervals';
-      else if (cvTripsGap || cvTripsRawFlat) signal = 'pace_cv';
-
-      const is_mixed_effort = signal !== null;
-
-      const easyLikePlan = isLinkedPlanSession && (() => {
-        const k = String(classifiedTypeKey || '').toLowerCase();
-        return k === 'easy' || k === 'easy_run' || k === 'steady_state' ||
-          k === 'long' || k === 'long_run' || k === 'recovery';
-      })();
-      const classified_type_variance_override = is_mixed_effort && easyLikePlan;
-
-      return {
-        is_mixed_effort,
-        variance_signal: signal,
-        pace_cv_pct: cvValid ? Math.round(cvPct * 10) / 10 : null,
-        pace_cv_basis: cvBasis,
-        classified_type_variance_override,
-      };
-    })();
+    // D-044 item 7 (2026-05-25): variance-gate logic extracted as exported
+    // pure function in `lib/variance-gate.ts`. Pin tests in
+    // `lib/variance-gate.test.ts` cover the 5 spec scenarios + boundary
+    // cases. Behavior is verifiably no-op vs the prior inline IIFE — same
+    // inputs, same return shape.
+    const _varGate = computeVarianceGate({
+      analysisPacingVariabilityCv: (analysis as any)?.pacing_variability?.coefficient_of_variation,
+      analysisGapAdjusted: (analysis as any)?.gap_adjusted,
+      factPacketTerrainType: (fact_packet_v1 as any)?.facts?.terrain_type,
+      factPacketIntervalExecutionTotalSteps: (fact_packet_v1 as any)?.derived?.interval_execution?.total_steps,
+      isLinkedPlanSession,
+      intervalsToAnalyze,
+      plannedWorkout,
+      classifiedTypeKey,
+      detectWorkoutTypeFromIntervals,
+    });
 
     // =========================================================================
     // AI coaching paragraph (v1)
