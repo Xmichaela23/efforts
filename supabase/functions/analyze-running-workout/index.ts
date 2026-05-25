@@ -2084,11 +2084,20 @@ Deno.serve(async (req) => {
     // Arc narrative mode (workout date slice, not "now")
     // =========================================================================
     let arc_narrative_for_summary: ArcNarrativeContextV1 | null = null;
+    // D-042: weekly aerobic efficiency trend from athlete_snapshot.
+    // run_easy_hr_trend is pctChange(this week's pace-at-easy-HR vs chronic);
+    // negative = faster pace at same HR = aerobic base building. Forwarded
+    // into the LLM via signals.aerobic_efficiency_trend_pct + derived
+    // aerobic_direction. (Field name is a known misnomer — it's a pace-at-HR
+    // delta, not an HR-over-time delta — flagged for separate rename.)
+    let arc_run_easy_hr_trend: number | null = null;
     try {
       const wdSlice = String(workout.date || '').slice(0, 10);
       if (/^\d{4}-\d{2}-\d{2}$/.test(wdSlice) && workout.user_id) {
         const arc = await getArcContext(supabase, workout.user_id as string, `${wdSlice}T12:00:00.000Z`);
         arc_narrative_for_summary = arc.arc_narrative_context ?? null;
+        const rEasyTrend = Number((arc.latest_snapshot as any)?.run_easy_hr_trend);
+        arc_run_easy_hr_trend = Number.isFinite(rEasyTrend) ? rEasyTrend : null;
         const lr = arc_narrative_for_summary?.last_goal_race;
         console.log(
           `[analyze-running-workout] arc_narrative workout=${workout_id} date=${wdSlice} mode=${arc_narrative_for_summary?.mode ?? 'n/a'} ` +
@@ -2202,6 +2211,9 @@ Deno.serve(async (req) => {
           // D-035: pass unplanned flag so the LLM input drops prescribed-range
           // signals and the UNPLANNED MODE prompt rule fires.
           { isUnplanned: !isLinkedPlanSession },
+          // D-042: weekly aerobic efficiency trend from athlete_snapshot.
+          // Drives AEROBIC EFFICIENCY TREND prompt rule.
+          { runEasyHrTrendPct: arc_run_easy_hr_trend },
         );
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
       }

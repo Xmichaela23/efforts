@@ -437,6 +437,14 @@ MIXED-EFFORT MODE — when the user message includes an INTERVAL EXECUTION block
 - USE GAP when "grade-adjusted" is noted on the pace adherence line. The interval paces in INTERVAL EXECUTION are already GAP-corrected when that flag is set — anchor the effort read on those values, not raw pace.
 - DO NOT say "you ran faster/slower than recent similar efforts" or any whole-workout pace comparison sentence. There is no honest steady pace comparison to make.
 
+AEROBIC EFFICIENCY TREND — fires when signals.aerobic_direction is present (non-null):
+- 'improving': pace at easy HR is trending faster vs the athlete's recent baseline — aerobic base is building. Say this in plain terms when it's contextually relevant (e.g. on an easy / long run); skip on hard / interval sessions where it would feel grafted on.
+- 'stable': aerobic efficiency holding steady vs baseline. Mention only if directly relevant to the narrative; this is the default state, not news.
+- 'declining': pace at easy HR is slowing vs baseline — worth noting if it persists, but one session doesn't confirm a trend. Frame as "worth watching", not as alarm. Do NOT say the athlete is "losing fitness" from a single week's signal.
+- NEVER print the raw signals.aerobic_efficiency_trend_pct percentage — translate to plain language only. Same discipline as cardiac_decoupling.
+- This is a WEEKLY LONGITUDINAL signal aggregated from compute-snapshot, not a per-session measurement. Frame it as background context, not a verdict on today's workout. Do NOT conflate this trend with the current session's HR drift, vs_similar HR delta, or the TREND sparkline (those are session/pool-level).
+- Composes with all other prompt rules — if POST-RACE COMPARISON or POOL INTENSITY CONTEXT also apply, all apply.
+
 TREND POOL RACE BOUNDARY — when signals.comparisons.vs_similar is present AND vs_similar.trend_pool_crosses_race_boundary === true:
 - The TREND sparkline includes points from BEFORE a recent completed goal race AND from after it. Pre-race points reflect peak-taper fitness; post-race points reflect re-entry. Treating direction across that boundary as a fitness signal is misleading — they're different training phases.
 - DO NOT cite the trend's direction (improving / declining / stable) as a fitness claim. Do NOT say "you're trending faster" or "pace has slowed over the last N workouts" based on the trend block when this flag is true.
@@ -743,6 +751,7 @@ export function toDisplayFormatV1(
   varianceGate?: VarianceGateOptions | null,
   unplannedGate?: UnplannedGateOptions | null,
   arcNarrative?: ArcNarrativeContextV1 | null,
+  aerobicTrend?: AerobicTrendOptions | null,
 ) {
   const facts = packet?.facts as any;
   const derived = packet?.derived as any;
@@ -849,6 +858,22 @@ export function toDisplayFormatV1(
       // is meaningful (no GPS elevation, but session is genuinely steady so
       // the pace:HR ratio reflects real efficiency).
       is_mixed_effort: isMixedEffort,
+      // D-042: weekly aerobic efficiency trend from athlete_snapshot.
+      // run_easy_hr_trend is pctChange(this week's pace-at-easy-HR vs chronic).
+      // Drives AEROBIC EFFICIENCY TREND prompt rule. Bands ±2% match
+      // compute-snapshot:409 derivation. Field name is a misnomer (pace
+      // delta, not HR delta) — kept for source-of-truth alignment; rename
+      // is filed as a separate cleanup.
+      aerobic_efficiency_trend_pct: aerobicTrend?.runEasyHrTrendPct != null && Number.isFinite(aerobicTrend.runEasyHrTrendPct)
+        ? aerobicTrend.runEasyHrTrendPct
+        : null,
+      aerobic_direction: (() => {
+        const v = aerobicTrend?.runEasyHrTrendPct;
+        if (v == null || !Number.isFinite(v)) return null;
+        if (v < -2) return 'improving' as const;
+        if (v > 2) return 'declining' as const;
+        return 'stable' as const;
+      })(),
       // D-035: drop the entire execution-vs-plan signal block when there's no
       // linked plan. distance_deviation / pace_vs_range / "assessed against"
       // notes all imply a prescription existed. Keeping them would invite the
@@ -1108,6 +1133,15 @@ export type UnplannedGateOptions = {
   isUnplanned: boolean;
 };
 
+/**
+ * D-042 — weekly aerobic efficiency trend forwarded from arc.latest_snapshot.
+ * `runEasyHrTrendPct` is the pctChange field on athlete_snapshot
+ * (compute-snapshot:374). Negative = pace at easy HR getting faster = aerobic
+ * base building. Surfaced on display packet for the AEROBIC EFFICIENCY TREND
+ * prompt rule.
+ */
+export type AerobicTrendOptions = { runEasyHrTrendPct?: number | null };
+
 export async function generateAISummaryV1(
   factPacket: FactPacketV1,
   flags: FlagV1[],
@@ -1116,13 +1150,14 @@ export async function generateAISummaryV1(
   arcNarrative?: ArcNarrativeContextV1 | null,
   varianceGate?: VarianceGateOptions | null,
   unplannedGate?: UnplannedGateOptions | null,
+  aerobicTrend?: AerobicTrendOptions | null,
 ): Promise<string | null> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     console.warn('[ai-summary] ANTHROPIC_API_KEY not set — skipping narrative generation');
     return null;
   }
 
-  const displayPacket = toDisplayFormatV1(factPacket, flags, varianceGate ?? null, unplannedGate ?? null, arcNarrative ?? null);
+  const displayPacket = toDisplayFormatV1(factPacket, flags, varianceGate ?? null, unplannedGate ?? null, arcNarrative ?? null, aerobicTrend ?? null);
 
   const arcFacts = arcNarrative ? arcNarrativeFactBlock(arcNarrative) : '';
   const userMessage =
