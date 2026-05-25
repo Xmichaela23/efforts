@@ -754,18 +754,30 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         const rawDirection: 'improving' | 'declining' | 'stable' =
           delta > 10 ? 'improving' : delta < -10 ? 'declining' : 'stable';
 
-        // D-039 Fix 5: HR-aware direction. Raw pace delta alone is misleading
-        // when HR also shifted. "32s/mi slower over 5 workouts" in red is
-        // wrong when HR dropped too — that's a wash on pace-at-HR efficiency,
-        // not regression. Compute hrDelta when both halves have ≥2 HR points;
-        // downgrade direction to 'stable' when pace and HR move together
-        // (both faster→harder, or both slower→easier).
+        // D-039 Fix 5 + D-040 Fix D: HR-aware direction. Raw pace delta alone
+        // is misleading when HR also shifted. "32s/mi slower over 5 workouts"
+        // in red is wrong when HR dropped too — that's a wash on pace-at-HR
+        // efficiency, not regression.
+        //
+        // Fix D relaxes the gate from ≥2 HR points per half to ≥3 HR points
+        // total with ≥1 per half. With sparse HR data (one null per half,
+        // common when older device sessions lack stored avg_hr) the original
+        // gate failed and the raw pace-only fallback fired even on sessions
+        // with strong HR signal across the trend. The new gate engages on the
+        // 8cbfa389 long-run trend (7 HR points across 8, one null in first
+        // half) where the pre-fix gate happened to clear but produced
+        // direction='improving' that the user reported as "32s/mi slower" —
+        // meaning the displayed trend was the wrong direction. Investigation
+        // showed the actual pool for 8cbfa389 in the user's UI is a subset
+        // (5 points, only some with HR), and that subset failed the per-half
+        // gate. Relaxed gate fires there.
+        const allHrPts = points.filter((p) => p.avg_hr != null);
         const firstHrPts = points.slice(0, mid).filter((p) => p.avg_hr != null);
         const secondHrPts = points.slice(mid).filter((p) => p.avg_hr != null);
         let hrDelta: number | null = null;
         let direction = rawDirection;
         let efficiencyNote = '';
-        if (firstHrPts.length >= 2 && secondHrPts.length >= 2) {
+        if (allHrPts.length >= 3 && firstHrPts.length >= 1 && secondHrPts.length >= 1) {
           const firstHrAvg = firstHrPts.reduce((s, p) => s + (p.avg_hr as number), 0) / firstHrPts.length;
           const secondHrAvg = secondHrPts.reduce((s, p) => s + (p.avg_hr as number), 0) / secondHrPts.length;
           hrDelta = Math.round(firstHrAvg - secondHrAvg);
