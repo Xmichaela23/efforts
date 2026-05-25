@@ -423,31 +423,65 @@ async function writeSegmentProgressMetric(
   w: WorkoutRow,
   payload: Record<string, any>,
 ): Promise<void> {
-  // Variant A: richer schema with upsert key
+  // D-059 / Q-022 — column-name + error-surfacing fix (2026-05-25).
+  // Pre-fix: payload used `grade_adjusted_pace_sec_per_km`, `avg_pace_sec_per_km`,
+  // and `metric_date` — the real `segment_progress_metrics` columns are
+  // `grade_adjusted_pace_s_per_km`, `avg_pace_s_per_km`, and no metric_date
+  // column exists. PostgREST returned 42703 column-does-not-exist and the
+  // three-variant try/catch swallowed it silently — table hadn't been
+  // written to since ~2026-03-01. Columns are now corrected at the caller
+  // (line ~656); this helper just inserts what it's given and now LOGS
+  // errors instead of eating them.
+  // Variant A: upsert with composite key.
   try {
-    const { error } = await supabase
+    const { error: errA } = await supabase
       .from("segment_progress_metrics")
       .upsert(payload, { onConflict: "segment_id,workout_id" });
-    if (!error) return;
-  } catch {}
-
-  // Variant B: insert with canonical keys
+    if (!errA) return;
+    console.warn("[compute-facts] segment_progress_metrics upsert (Variant A) failed", {
+      message: errA.message,
+      code: (errA as any).code,
+      details: (errA as any).details,
+      workout_id: w.id,
+      segment_id: payload.segment_id,
+    });
+  } catch (e) {
+    console.warn("[compute-facts] segment_progress_metrics upsert (Variant A) threw", {
+      err: e instanceof Error ? e.message : String(e),
+    });
+  }
+  // Variant B: insert (older schema without unique key).
   try {
-    const { error } = await supabase
+    const { error: errB } = await supabase
       .from("segment_progress_metrics")
       .insert(payload);
-    if (!error) return;
-  } catch {}
-
-  // Variant C: minimal shape, no user_id requirement
+    if (!errB) return;
+    console.warn("[compute-facts] segment_progress_metrics insert (Variant B) failed", {
+      message: errB.message,
+      code: (errB as any).code,
+    });
+  } catch (e) {
+    console.warn("[compute-facts] segment_progress_metrics insert (Variant B) threw", {
+      err: e instanceof Error ? e.message : String(e),
+    });
+  }
+  // Variant C — minimal shape using the canonical column names from the
+  // live schema. No metric_date (column doesn't exist on this table; the
+  // sibling route_progress_metrics DOES have one, hence the historical
+  // confusion). Uses `_s_per_km` suffix, not `_sec_per_km`.
   const minimal = {
     workout_id: w.id,
     segment_id: payload.segment_id,
-    metric_date: payload.metric_date,
-    avg_pace_sec_per_km: payload.avg_pace_sec_per_km ?? null,
+    avg_pace_s_per_km: payload.avg_pace_s_per_km ?? null,
     confidence_score: payload.confidence_score ?? null,
   };
-  await supabase.from("segment_progress_metrics").insert(minimal);
+  const { error: errC } = await supabase.from("segment_progress_metrics").insert(minimal);
+  if (errC) {
+    console.warn("[compute-facts] segment_progress_metrics insert (Variant C minimal) failed", {
+      message: errC.message,
+      code: (errC as any).code,
+    });
+  }
 }
 
 async function upsertTerrainIntelligence(
@@ -649,11 +683,15 @@ async function upsertTerrainIntelligence(
       return Math.round(Math.min(100, hrScore + gradeScore));
     })();
 
+    // D-059 / Q-022 — column names corrected to match the live schema:
+    //   `_s_per_km` suffix (not `_sec_per_km`); `metric_date` column does
+    //   not exist on segment_progress_metrics (sibling route_progress_metrics
+    //   has it — easy to confuse). Errors now surface via console.warn in
+    //   the helper instead of being eaten by try/catch.
     await writeSegmentProgressMetric(supabase, w, {
       user_id: w.user_id,
       segment_id: segmentId,
       workout_id: w.id,
-      metric_date: metricDate,
       segment_type: seg.segment_type,
       moving_time_s: estMovingTimeS,
       distance_m: segDistM,
@@ -662,8 +700,8 @@ async function upsertTerrainIntelligence(
       avg_hr_bpm: avgHr,
       avg_power_w: avgPower,
       avg_cadence_spm: avgCadence,
-      avg_pace_sec_per_km: segPaceSecPerKm,
-      grade_adjusted_pace_sec_per_km: gradeAdjusted,
+      avg_pace_s_per_km: segPaceSecPerKm,
+      grade_adjusted_pace_s_per_km: gradeAdjusted,
       vam_m_per_h: vam,
       hr_drift_pct: toNum(runFacts?.hr_drift_pct),
       effort_score: effortScore,
