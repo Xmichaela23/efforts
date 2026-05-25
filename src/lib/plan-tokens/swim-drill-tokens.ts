@@ -484,6 +484,19 @@ export function pickSwimDrillInset(opts: {
   swimGearLabels?: string[] | null;
   /** SWIM-PROTOCOL §6.3 fitness-tier biasing — beginner→foundation drills, advanced→race-specific (Slice 3d). */
   athleteFitness?: 'beginner' | 'intermediate' | 'advanced';
+  /**
+   * D-043 item 6 / Q-015 — drill repeat-pick memory. When provided, the picker
+   * excludes any drill (by name-suffix key) already in this set BEFORE
+   * salt-rotation, so consecutive sessions don't pick the same drill.
+   * In-memory per-build posture (per Q-015 locked decision). Read-only from
+   * the picker's perspective — caller maintains the set and adds the returned
+   * `drillTokens` to it after each call to seed the next week's filter.
+   *
+   * Falls back to the unfiltered eligible pool when filtering would leave it
+   * empty — small phase pools (e.g. taper has 2 candidates) can't avoid
+   * repetition forever. Matches the terrain/route fallback pattern.
+   */
+  prevWeekDrillTokens?: Set<string> | null;
 }): { mainBudgetYd: number; drillTokens: string[] } {
   let mainBudgetYd = opts.totalYards - opts.wuYd - opts.cdYd;
   const planWeek = opts.planWeek;
@@ -496,7 +509,7 @@ export function pickSwimDrillInset(opts: {
   // Beginners lack the catch fluency to feel the pressure changes the drill teaches;
   // surfacing sculling for them is wasted volume. Filter post phaseDrillCandidates so
   // gear-availability + phase-pool logic stays uniform across tiers.
-  const eligible = ((): string[] => {
+  const baseEligible = ((): string[] => {
     const raw = phaseDrillCandidates(opts.phase, gear);
     if (opts.athleteFitness !== 'beginner') return raw;
     return raw.filter((tok) => {
@@ -504,6 +517,24 @@ export function pickSwimDrillInset(opts: {
       const suf = m ? m[1].toLowerCase() : '';
       return suf !== 'scull' && suf !== 'scullfront';
     });
+  })();
+  // D-043 item 6 / Q-015 — apply repeat-pick memory filter. Compare on the
+  // drill-name suffix (suffix is the stable identity; exact token strings
+  // differ by rep/distance/gear suffix decorations across sessions).
+  const drillKey = (tok: string): string => {
+    const m = String(tok).match(/^swim_drills?_\d+x\d+(?:yd|m)_(.+?)(?:_r\d+)?(?:_(?:fins|board|buoy|snorkel))?$/i);
+    return m ? m[1].toLowerCase() : String(tok).toLowerCase();
+  };
+  const eligible = ((): string[] => {
+    const prev = opts.prevWeekDrillTokens;
+    if (!prev || prev.size === 0) return baseEligible;
+    const prevKeys = new Set<string>();
+    prev.forEach((t) => prevKeys.add(drillKey(t)));
+    const filtered = baseEligible.filter((tok) => !prevKeys.has(drillKey(tok)));
+    // Fall back to unfiltered when the filter would empty the pool —
+    // small phase pools (taper has 2 candidates per ENGINE-STATE swim §6.2)
+    // can't avoid repetition forever.
+    return filtered.length > 0 ? filtered : baseEligible;
   })();
   const salt = opts.drillSlotSalt + SWIM_DRILL_KIND_SALT[opts.sessionKind];
 
