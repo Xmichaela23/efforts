@@ -1137,7 +1137,13 @@ export function formatCyclingEfficiencyRow(
   const ef = Number(e.efficiency_factor);
   const dec = Number(e.aerobic_decoupling_pct);
   if (!Number.isFinite(ef) || !Number.isFinite(dec)) return null;
-  return { label: 'EFFICIENCY', value: `EF ${ef} · ${dec}% HR decoupling` };
+  // D-062 / Item 4 — plain-language translation per Q-010 / SESSION-CONTEXT.md
+  // §3 cosmetic footgun. "EF" (Efficiency Factor — NP/avg HR) and "HR decoupling"
+  // (Friel pace-vs-HR drift %) are technical-coaching terms; the INSIGHTS prose
+  // is already kept jargon-clean by `summaryHasJargon` (SESSION-CONTEXT §7
+  // 3-guard-stack footgun) but the dashboard rows still leaked the abbreviations.
+  // Athletes recognize "watts per heartbeat" and "HR drift" more readily.
+  return { label: 'EFFICIENCY', value: `Watts per heartbeat ${ef} · HR drift ${dec}%` };
 }
 
 /**
@@ -1288,7 +1294,13 @@ function buildAnalysisDetailRows(
     const ifv = cf?.intensity_factor;
     if (typeof np === 'number' && np > 0 && typeof ifv === 'number' && ifv > 0) {
       const ct = cf?.classified_type ? String(cf.classified_type).replace(/_/g, ' ') : 'training stimulus';
-      rows.push({ label: 'Power', value: `Normalized power ${np}W at IF ${ifv.toFixed(2)} — ${ct} effort` });
+      // D-062 / Item 4 — translate "IF 0.85" to "85% of threshold" per Q-010
+      // plain-language cosmetic pass. Athletes read percent-of-threshold
+      // more readily than the IF (Intensity Factor) abbreviation; same
+      // numeric content, plain wording. Mirrors the SESSION-CONTEXT §7
+      // 3-guard-stack jargon ban on the INSIGHTS narrative side.
+      const pctThreshold = Math.round(ifv * 100);
+      rows.push({ label: 'Power', value: `Normalized power ${np}W (${pctThreshold}% of threshold) — ${ct} effort` });
     }
   } catch { /* */ }
 
