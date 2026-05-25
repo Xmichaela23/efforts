@@ -149,6 +149,50 @@ Prefer "what fitness signal does today show?" over "matched the workout."${forwa
 }
 
 /**
+ * D-046 / Q-026 — Backward anchor suppression for unplanned sessions.
+ *
+ * D-039 / D-040 forward-bias / hard-ban rules suppress backward race anchors
+ * on LINKED sessions in `build_read` and `unstructured_read`. Unplanned
+ * sessions with no plan link have weaker arc-mode context, so the LLM still
+ * reaches for `days_since_last_goal_race` from the ARC FACT BLOCK as the
+ * temporal anchor (the "X days post-marathon" leak Q-026 filed).
+ *
+ * This addon fires when the session is unplanned AND the narrative mode is
+ * NOT one where the comeback frame is required (recovery_read /
+ * race_debrief). It re-asserts the forbidden-pattern enumeration in the same
+ * shape as `backwardAnchorHardBan` so the LLM cannot evade via synonym
+ * substitution ("post-X" → "out from X").
+ *
+ * Empty string when not applicable (no nc, not unplanned, mode override).
+ */
+export function arcUnplannedBackwardAnchorAddon(
+  nc: ArcNarrativeContextV1 | null | undefined,
+  isUnplanned: boolean,
+): string {
+  if (!nc || !isUnplanned) return '';
+  if (nc.mode === 'recovery_read' || nc.mode === 'race_debrief') return '';
+  const lr = nc.last_goal_race;
+  if (!lr) return '';
+  const raceTag = `"${lr.name}"`;
+  const raceDist = lr.distance ?? '[race]';
+  return `
+
+HARD BAN (unplanned + Q-026) — backward temporal anchors:
+- This session has no linked plan workout (is_unplanned=true). Unplanned sessions on their own give no signal that the athlete is still anchored in a post-race window.
+- The ARC FACT BLOCK may show LAST_GOAL_RACE and days_since_last_goal_race. Do NOT use either as the temporal anchor or as the lede frame.
+- Forbidden patterns (non-exhaustive):
+  • "X days post-${raceTag}"
+  • "X days out from your ${raceDist}"
+  • "X days since ${raceTag}"
+  • "X weeks after ${raceTag}"
+  • "in your ${raceTag} recovery / comeback window"
+  • "${raceTag} is behind you" / "post-${raceTag}"
+  • Any temporal anchor (days/weeks ago) tied to ${raceTag}, even without using the name.
+- Lead with current-session signals only (HR/pace/terrain/conditions/vs_similar history). Treat the LAST_GOAL_RACE line in the ARC FACT BLOCK as engine bookkeeping — not in the prompt for narrative purposes.
+- This ban does NOT apply if NARRATIVE_MODE is recovery_read or race_debrief; those modes' addons require the comeback framing and take priority.`;
+}
+
+/**
  * POST-RACE COMPARISON prompt rule. Appended to the system prompt when the
  * arc narrative flags this session as the first run back from a goal race
  * within the 60-day window. Suppresses LLM narration that treats elevated HR

@@ -2,7 +2,7 @@ import type { FactPacketV1, FlagV1 } from './types.ts';
 import { coerceNumber, secondsToPaceString } from './utils.ts';
 import { callLLM } from '../llm.ts';
 import type { ArcNarrativeContextV1, ArcNarrativeMode } from '../arc-narrative-state.ts';
-import { arcModeSystemAddon, arcNarrativeFactBlock, arcPostRaceComparisonAddon } from '../arc-narrative-ai-appendix.ts';
+import { arcModeSystemAddon, arcNarrativeFactBlock, arcPostRaceComparisonAddon, arcUnplannedBackwardAnchorAddon } from '../arc-narrative-ai-appendix.ts';
 
 function normalizeParagraph(text: string): string {
   return String(text || '')
@@ -1170,9 +1170,10 @@ export async function generateAISummaryV1(
     `${arcFacts ? `\nTEMPORAL ARC CONTEXT (do not contradict; paraphrase for athlete):\n${arcFacts}\n` : ''}` +
     buildUserMessage(displayPacket);
   // arcPostRaceComparisonAddon emits empty string when is_first_post_race_run
-  // is false; safe to always append.
+  // is false; safe to always append. arcUnplannedBackwardAnchorAddon (D-046 /
+  // Q-026) emits empty when not unplanned or when mode override applies.
   const systemPrompt =
-    `${arcTemporalSystemPrefix(arcNarrative)}${COACHING_SYSTEM_PROMPT}${arcModeSystemAddon(arcNarrative)}${arcPostRaceComparisonAddon(arcNarrative)}`;
+    `${arcTemporalSystemPrefix(arcNarrative)}${COACHING_SYSTEM_PROMPT}${arcModeSystemAddon(arcNarrative)}${arcPostRaceComparisonAddon(arcNarrative)}${arcUnplannedBackwardAnchorAddon(arcNarrative, unplannedGate?.isUnplanned === true)}`;
   const numericAllowAnchors =
     arcNarrative ? JSON.stringify(arcNarrative) : '';
 

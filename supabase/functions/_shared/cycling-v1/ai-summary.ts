@@ -1,7 +1,7 @@
 import type { CyclingFactPacketV1, CyclingFlagV1 } from './types.ts';
 import { callLLM } from '../llm.ts';
 import type { ArcNarrativeContextV1 } from '../arc-narrative-state.ts';
-import { arcModeSystemAddon, arcNarrativeFactBlock } from '../arc-narrative-ai-appendix.ts';
+import { arcModeSystemAddon, arcNarrativeFactBlock, arcUnplannedBackwardAnchorAddon } from '../arc-narrative-ai-appendix.ts';
 
 /**
  * Numbers the LLM may legitimately cite from the temporal Arc frame (days
@@ -397,7 +397,10 @@ ${packetStr}
   // running's systemPrompt construction); the user message varies on retry.
   const systemPrompt =
     'You are a precise endurance coach. Follow the rules exactly.' +
-    (arcNarrative ? arcModeSystemAddon(arcNarrative) : '');
+    (arcNarrative ? arcModeSystemAddon(arcNarrative) : '') +
+    // D-046 / Q-026 — unplanned backward-anchor suppression. Empty when the
+    // ride is planned or when arc mode is recovery_read / race_debrief.
+    arcUnplannedBackwardAnchorAddon(arcNarrative, isUnplanned);
   const userBase =
     (arcFacts
       ? 'TEMPORAL ARC CONTEXT (SECONDARY framing — supporting context for the second sentence only, NEVER the lede or opening words; do not contradict; paraphrase — these are facts for THIS workout date, not invented load):\n' +
