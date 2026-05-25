@@ -20,7 +20,16 @@ export type SwimSessionType =
   | 'kick_focused'
   | 'pull_focused'
   | 'endurance'
-  | 'easy';
+  | 'easy'
+  // D-052 / Item 3 — SWIM-PROTOCOL §5.7-§5.10. Added 2026-05-25. Wired into
+  // the race-intent rotation via phaseSpecificMetaSubstitution: Time Trial
+  // and Mixed/Fartlek slot into build-phase weeks; Open Water Skills and
+  // Race-Pace Sustained slot into race-specific-phase weeks. All four are
+  // beginner-banned per §10.2 (substitution rules unchanged).
+  | 'time_trial'
+  | 'open_water_skills'
+  | 'mixed_fartlek'
+  | 'race_pace_sustained';
 
 export interface SwimSlotTemplate {
   session_type: SwimSessionType;
@@ -375,6 +384,66 @@ export function raceTwoSwimRotationSlotMeta(planWeek: number): Omit<SwimSlotTemp
   ];
 }
 
+// D-052 / Item 3 — SWIM-PROTOCOL §5.7-§5.10 META constants. Wired in below
+// via phaseSpecificMetaSubstitution.
+const TIME_TRIAL_META: Omit<SwimSlotTemplate, 'target_yards'> = {
+  session_type: 'time_trial',
+  drill_emphasis: false,
+  notes: 'Time Trial — CSS measurement (§5.8). 400yd max + 4min rest + 200yd max; new CSS = 200 / (T400 − T200).',
+};
+const OPEN_WATER_SKILLS_META: Omit<SwimSlotTemplate, 'target_yards'> = {
+  session_type: 'open_water_skills',
+  drill_emphasis: false,
+  notes: 'Open Water Skills (§5.9) — sighting every 6 strokes throughout; race-start hard 100yd bouts. Skip-optional if no OW access.',
+};
+const MIXED_FARTLEK_META: Omit<SwimSlotTemplate, 'target_yards'> = {
+  session_type: 'mixed_fartlek',
+  drill_emphasis: false,
+  notes: 'Mixed/Fartlek (§5.7) — 4×400 Z2-Z4 building, pace variation breaks monotony.',
+};
+const RACE_PACE_SUSTAINED_META: Omit<SwimSlotTemplate, 'target_yards'> = {
+  session_type: 'race_pace_sustained',
+  drill_emphasis: false,
+  notes: 'Race-Pace Sustained (§5.10) — 3-4×600yd at race pace, 45s rest. Race-specific only.',
+};
+
+/**
+ * D-052 / Item 3 — Phase-aware slot[1] substitution for the race-intent
+ * rotation. Injects §5.7-§5.10 session types into specific weeks where the
+ * protocol prescribes them, while leaving the existing 4-week rotation
+ * fallback in place for weeks that don't match.
+ *
+ * Wiring rules (per SWIM-PROTOCOL §5.7-§5.10 phase guidance):
+ *   build phase  weekInPhase 2 → Mixed/Fartlek (§5.7 "Build primarily")
+ *   build phase  weekInPhase 4 → Time Trial (§5.8 "mid-build test point")
+ *   race-spec   weekInPhase 1 → Race-Pace Sustained (§5.10 "Race-specific only")
+ *   race-spec   weekInPhase 2 → Open Water Skills (§5.9 "Race-specific primarily")
+ *   race-spec   weekInPhase 3 → Time Trial (§5.8 "pre-taper test point")
+ *
+ * Beginner-banned per §10.2 (threshold / race-spec aerobic / speed / time_trial
+ * / race_pace_sustained all banned). For beginners, return the original meta
+ * unchanged — their rotation is owned by raceTwoSwimRotationSlotMetaForBeginner.
+ */
+function phaseSpecificMetaSubstitution(
+  meta: Omit<SwimSlotTemplate, 'target_yards'>[],
+  phase: NormalizedPhase,
+  weekInPhase: number,
+  isBeginner: boolean,
+): Omit<SwimSlotTemplate, 'target_yards'>[] {
+  if (isBeginner) return meta;
+  if (meta.length < 2) return meta;
+  if (phase === 'build') {
+    if (weekInPhase === 2) return [meta[0]!, MIXED_FARTLEK_META];
+    if (weekInPhase === 4) return [meta[0]!, TIME_TRIAL_META];
+  }
+  if (phase === 'race_specific') {
+    if (weekInPhase === 1) return [meta[0]!, RACE_PACE_SUSTAINED_META];
+    if (weekInPhase === 2) return [meta[0]!, OPEN_WATER_SKILLS_META];
+    if (weekInPhase === 3) return [meta[0]!, TIME_TRIAL_META];
+  }
+  return meta;
+}
+
 function applyTaperScale(slots: SwimSlotTemplate[]): SwimSlotTemplate[] {
   return slots.map((s) => ({
     ...s,
@@ -682,8 +751,12 @@ export function getSwimSlotTemplates(
     yardsR = applyRaceThrottle(yardsR);
   }
   const rotationWeek = opts?.planWeekNumber ?? weekInPhase;
-  const meta = isBeginner
+  let meta = isBeginner
     ? raceTwoSwimRotationSlotMetaForBeginner(rotationWeek)
     : raceTwoSwimRotationSlotMeta(rotationWeek);
+  // D-052 / Item 3 — phase-aware substitution injects Time Trial /
+  // Open Water Skills / Mixed/Fartlek / Race-Pace Sustained per
+  // SWIM-PROTOCOL §5.7-§5.10 phase guidance. No-op for beginners.
+  meta = phaseSpecificMetaSubstitution(meta, ph, weekInPhase, isBeginner);
   return raceTemplatesFromMeta(meta, yardsR);
 }

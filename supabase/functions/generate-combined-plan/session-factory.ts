@@ -1590,9 +1590,13 @@ export function swimSessionFromTemplate(
   // kick_focused → endurance when athlete lacks the distance-specific kick gear (kickboard
   // sprint/oly, fins 70.3/full). Non-substitutable types pass through unchanged.
   const sub = resolveSwimSessionTypeForGear({
+    // D-052 / Item 3 — the 4 new types (time_trial / open_water_skills /
+    // mixed_fartlek / race_pace_sustained) aren't gear-substitutable; cast
+    // covers them by widening the union for the resolver call.
     requestedType: template.session_type as
       | 'pull_focused' | 'kick_focused' | 'endurance' | 'easy' | 'css_aerobic'
-      | 'threshold' | 'race_specific_aerobic' | 'speed' | 'technique_aerobic',
+      | 'threshold' | 'race_specific_aerobic' | 'speed' | 'technique_aerobic'
+      | 'time_trial' | 'open_water_skills' | 'mixed_fartlek' | 'race_pace_sustained',
     athleteGearLabels: swimEquipment,
     kickFocusedRequiredGear: kickFocusRequiredGear(dk),
   });
@@ -1703,6 +1707,24 @@ export function swimSessionFromTemplate(
           );
         }
         return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment, opts?.athleteFitness, opts?.prevWeekDrillTokens);
+      // D-052 / Item 3 — SWIM-PROTOCOL §5.7-§5.10 dispatch cases. All four
+      // are beginner-banned upstream (phaseSpecificMetaSubstitution is a
+      // no-op for beginners) — they should never reach this dispatcher with
+      // an athleteFitness='beginner' template. Defensive cast OK.
+      case 'time_trial':
+        return timeTrialSwim(day, goalId, swimEquipment);
+      case 'open_water_skills':
+        return openWaterSkillsSwim(day, yards, goalId, swimEquipment);
+      case 'mixed_fartlek':
+        return mixedFartlekSwim(
+          day, yards, goalId, planWeek, drillSlotSalt, phase,
+          swimEquipment, opts?.prevWeekDrillTokens,
+        );
+      case 'race_pace_sustained':
+        return racePaceSustainedSwim(
+          day, yards, goalId, planWeek, drillSlotSalt, phase,
+          swimEquipment, opts?.swimThresholdPace, opts?.prevWeekDrillTokens,
+        );
       default:
         return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment, opts?.athleteFitness, opts?.prevWeekDrillTokens);
     }
@@ -1715,6 +1737,229 @@ export function swimSessionFromTemplate(
 }
 
 /** Open water skills practice — ocean/lake chop, sighting, wetsuit comfort (tri-specific). */
+/**
+ * SWIM-PROTOCOL §5.8 — Time Trial. CSS measurement / race rehearsal.
+ *
+ * Structure: WU 500 with build → 400yd max effort → 4 min rest → 200yd max
+ * effort → CD 300. Total = 1400yd (fixed). Engine derives new CSS from
+ * (T400 − T200) / 200 (per §7.4 formula). Banned for beginners per §10.2.
+ *
+ * D-052 / Item 3 (2026-05-25).
+ */
+export function timeTrialSwim(
+  day: string,
+  goalId: string,
+  swimEquipment?: string[] | null,
+): PlannedSession {
+  const wu = 500;
+  const cd = 300;
+  const totalYards = 1400;
+  const dur = Math.round(totalYards / 36); // race-effort tempo + recovery rests
+  return session(
+    day,
+    'swim',
+    `Swim Time Trial — ${totalYards} yd`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd with progressive build (last 100 at moderate effort). 400 yd MAX effort — sustained hard, hold form. 4 min easy recovery (back-and-forth jogs or float). 200 yd MAX effort — leave nothing. Cool down ${cd} yd easy. The engine will recompute your CSS pace from these two splits.`,
+      [],
+      swimEquipment,
+    ),
+    dur,
+    'HARD',
+    [
+      `swim_warmup_${wu}yd_build`,
+      `swim_time_trial_400yd_max`,
+      `swim_recovery_4min`,
+      `swim_time_trial_200yd_max`,
+      `swim_cooldown_${cd}yd`,
+    ],
+    ['quality', 'time_trial', 'swim', 'css_test'],
+    'Z4-Z5 max effort',
+    goalId,
+  );
+}
+
+/**
+ * SWIM-PROTOCOL §5.9 — Open Water Skills. Sighting, wetsuit comfort,
+ * group-swim rehearsal. Race-specific phase primarily; skip-optional when
+ * no open-water access (engine surfaces trade-off).
+ *
+ * Structure: open water or pool with sighting every 6 strokes throughout +
+ * race-start hard 100yd bouts settling into pace. Banned for beginners.
+ *
+ * D-052 / Item 3 (2026-05-25).
+ */
+export function openWaterSkillsSwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+  swimEquipment?: string[] | null,
+): PlannedSession {
+  totalYards = Math.max(2000, Math.min(3000, snapSwimSessionTotalYdInterval100(totalYards)));
+  const wu = 300;
+  const cd = 200;
+  const main = totalYards - wu - cd;
+  // 4-6 race-start hard 100s + sustained Z2-Z3 between.
+  const startBouts = Math.max(4, Math.min(6, Math.round(main / 400)));
+  const aerobicYards = main - startBouts * 100;
+  const aerobicReps = Math.max(4, Math.round(aerobicYards / 200));
+  const dur = Math.round(totalYards / 38);
+  return session(
+    day,
+    'swim',
+    `Open Water Skills — ${totalYards} yd`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd easy. Open water if accessible — otherwise pool with sighting every 6 strokes throughout the main set. ${startBouts}×100 yd at race-start hard effort (settle into race pace by the end of each 100), 30 sec rest. ${aerobicReps}×200 yd at race-rhythm sustained effort with sighting every 6 strokes — bilateral breathing alternating sides. Cool down ${cd} yd easy. If you have access to a group, practice both lead position and drafting (feet/hip-side).`,
+      [],
+      swimEquipment,
+    ),
+    dur,
+    'MODERATE',
+    [
+      `swim_warmup_${wu}yd_easy`,
+      `swim_open_water_${startBouts}x100yd_start_hard_r30`,
+      `swim_open_water_${aerobicReps}x200yd_sustained`,
+      `swim_cooldown_${cd}yd`,
+    ],
+    ['quality', 'open_water_skills', 'swim', 'race_specific_swim'],
+    'Z2-Z3 sustained with race-start surges',
+    goalId,
+  );
+}
+
+/**
+ * SWIM-PROTOCOL §5.7 — Mixed/Fartlek. Pace variation, race-readiness,
+ * breaks monotony. Build phase primarily.
+ *
+ * Structure: WU 300 → drills (100yd, single block) → 4×400 Z2-Z4 building
+ * → CD 200. Total ~2200yd. Banned for beginners per §10.2.
+ *
+ * D-052 / Item 3 (2026-05-25).
+ */
+export function mixedFartlekSwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+  planWeek?: number,
+  drillSlotSalt: number = 0,
+  phase?: string,
+  swimEquipment?: string[] | null,
+  prevWeekDrillTokens?: Set<string> | null,
+): PlannedSession {
+  totalYards = snapSwimSessionTotalYdInterval100(totalYards);
+  const wu = 300;
+  const cd = 200;
+  // Reuse the picker for the single 100yd drill block; sessionKind='threshold'
+  // routes Path B (single drill) which matches §5.7's drill posture.
+  const { mainBudgetYd: main, drillTokens } = pickSwimDrillInset({
+    totalYards,
+    wuYd: wu,
+    cdYd: cd,
+    planWeek,
+    drillSlotSalt,
+    phase,
+    sessionKind: 'threshold',
+    swimGearLabels: swimEquipment,
+    prevWeekDrillTokens,
+  });
+  const fartlekReps = Math.max(3, Math.min(5, Math.round(main / 400)));
+  const fartlekYards = fartlekReps * 400;
+  const dur = Math.round(totalYards / 36);
+  const drillLead = drillTokens.length > 0
+    ? `${swimSessionPhilosophyLead('threshold')}${swimDrillBlockAthleteCopy(drillTokens)} `
+    : '';
+  return session(
+    day,
+    'swim',
+    `Mixed/Fartlek Swim — ${totalYards} yd`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd easy. ${drillLead}${fartlekReps}×400 yd building intensity within each 400 — first 100 easy aerobic, second 100 moderate, third 100 race-rhythm, fourth 100 hard but controlled. 30 sec rest between. Cool down ${cd} yd easy.`,
+      drillTokens,
+      swimEquipment,
+    ),
+    dur,
+    'MODERATE',
+    [
+      `swim_warmup_${wu}yd_easy`,
+      ...drillTokens,
+      `swim_fartlek_${fartlekReps}x400yd_build_r30`,
+      `swim_cooldown_${cd}yd`,
+    ],
+    drillTokens.length > 0
+      ? ['quality', 'mixed_fartlek', 'swim', 'swim_drills']
+      : ['quality', 'mixed_fartlek', 'swim'],
+    'Z2-Z4 building per 400',
+    goalId,
+  );
+}
+
+/**
+ * SWIM-PROTOCOL §5.10 — Race-Pace Sustained. Sustained race-effort
+ * intervals at race distance. Race-specific phase only.
+ *
+ * Structure: WU 300 → drills (100yd, single block) → 3-4×600yd at race
+ * pace, 45s rest → CD 300. Total ~2500yd. Banned for beginners per §10.2.
+ *
+ * D-052 / Item 3 (2026-05-25).
+ */
+export function racePaceSustainedSwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+  planWeek?: number,
+  drillSlotSalt: number = 0,
+  phase?: string,
+  swimEquipment?: string[] | null,
+  swimThresholdPace?: string | null,
+  prevWeekDrillTokens?: Set<string> | null,
+): PlannedSession {
+  totalYards = snapSwimSessionTotalYdInterval100(totalYards);
+  const wu = 300;
+  const cd = 300;
+  const { mainBudgetYd: main, drillTokens } = pickSwimDrillInset({
+    totalYards,
+    wuYd: wu,
+    cdYd: cd,
+    planWeek,
+    drillSlotSalt,
+    phase,
+    sessionKind: 'threshold',
+    swimGearLabels: swimEquipment,
+    prevWeekDrillTokens,
+  });
+  const reps = Math.max(3, Math.min(4, Math.round(main / 600)));
+  const dur = Math.round(totalYards / 38);
+  const drillLead = drillTokens.length > 0
+    ? `${swimSessionPhilosophyLead('threshold')}${swimDrillBlockAthleteCopy(drillTokens)} `
+    : '';
+  const cssFallback = !hasValidSwimThresholdPace(swimThresholdPace)
+    ? ` ${swimCssFallbackCue()}`
+    : '';
+  return session(
+    day,
+    'swim',
+    `Race-Pace Sustained Swim — ${totalYards} yd`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd easy. ${drillLead}${reps}×600 yd at race pace (sustainable hard — what you can hold for the race-distance swim). 45 sec rest between. Cool down ${cd} yd easy.${cssFallback}`,
+      drillTokens,
+      swimEquipment,
+    ),
+    dur,
+    'HARD',
+    [
+      `swim_warmup_${wu}yd_easy`,
+      ...drillTokens,
+      `swim_race_pace_${reps}x600yd_r45`,
+      `swim_cooldown_${cd}yd`,
+    ],
+    drillTokens.length > 0
+      ? ['quality', 'race_pace_sustained', 'swim', 'swim_drills', 'race_specific_swim']
+      : ['quality', 'race_pace_sustained', 'swim', 'race_specific_swim'],
+    'Z4 race pace',
+    goalId,
+  );
+}
+
 export function openWaterPracticeSwim(day: string, durationMin: number, goalId: string): PlannedSession {
   const m = Math.max(28, Math.min(55, durationMin));
   return session(
