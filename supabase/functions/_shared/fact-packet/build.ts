@@ -13,7 +13,7 @@ import {
   paceStringToSecondsPerMi,
   secondsToPaceString,
 } from './utils.ts';
-import { getComparableTypeKeys, getNotableAchievements, getPaceTrend, getSimilarWorkoutComparisons, getTrainingLoadContext, inferWorkoutTypeKey } from './queries.ts';
+import { getComparableTypeKeys, getNotableAchievements, getOverallAvgHr, getPaceTrend, getSimilarWorkoutComparisons, getTrainingLoadContext, inferWorkoutTypeKey } from './queries.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../plan-week.ts';
 import { assessStimulus } from './stimulus.ts';
 import { identifyPerformanceLimiter } from './limiter.ts';
@@ -278,10 +278,16 @@ export async function buildWorkoutFactPacketV1(args: {
   const overallDurMin = resolveMovingDurationMinutes(workout) ?? 0;
   const overallPace = resolveOverallPaceSecPerMi(workout);
 
-  const hrFromComputedAvg = coerceNumber(overall?.avg_hr);
+  // D-047 / Q-024 — share the three-stage fallback chain with the
+  // vs-similar-pool path (`getOverallAvgHr` in queries.ts:161). The earlier
+  // single-key `overall?.avg_hr` resolution dropped `currentAvgHr` to null
+  // when the row stored HR under `overall.avg_heart_rate` or row-level
+  // `avg_heart_rate`, even though the pool rows resolved fine — producing
+  // `hr_delta_bpm: null` despite sample_size >= 3. Sensor-data fallback
+  // stays at the tail as defense-in-depth for sensor-only ingests.
   const hrFromComputedMax = coerceNumber(overall?.max_hr);
   const hrSensor = deriveAvgMaxHrFromSensor(workout?.sensor_data);
-  const avgHr = hrFromComputedAvg != null ? Math.round(hrFromComputedAvg) : hrSensor.avg;
+  const avgHr = getOverallAvgHr(workout) ?? hrSensor.avg;
   const maxHr = hrFromComputedMax != null ? Math.round(hrFromComputedMax) : hrSensor.max;
 
   const elevationGainFt = (() => {

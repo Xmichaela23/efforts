@@ -158,7 +158,20 @@ export function isMixedEffortRow(row: any): boolean {
   return v === true;
 }
 
-function getOverallAvgHr(row: any): number | null {
+/**
+ * Canonical avg-HR resolution for any workout row. Three-stage fallback —
+ * `computed.overall.avg_hr` (the primary key compute-workout-summary writes)
+ * → `computed.overall.avg_heart_rate` (alternate key from legacy rows / some
+ * ingest paths) → row-level `workouts.avg_heart_rate` (older Garmin imports).
+ *
+ * **Exported** (D-047 / Q-024) so the current-workout resolution in
+ * `fact-packet/build.ts` can share the same fallback chain as the
+ * vs-similar-pool rows — see Q-024 root cause: asymmetric resolution paths
+ * dropped `currentAvgHr` to null when the current workout had HR populated
+ * under the alt key but the pool rows resolved fine via this helper,
+ * producing `hr_delta_bpm: null` despite `sample_size >= 3`.
+ */
+export function getOverallAvgHr(row: any): number | null {
   const overall = getComputedOverall(row)?.overall;
   const v = coerceNumber(overall?.avg_hr ?? overall?.avg_heart_rate ?? row?.avg_heart_rate);
   return v != null && v > 0 ? Math.round(v) : null;

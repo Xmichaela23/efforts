@@ -10,6 +10,7 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   isPaceWithinTolerance,
   classifyPoolIntensityMatch,
+  getOverallAvgHr,
   POOL_PACE_TOLERANCE_PCT,
   POOL_INTENSITY_MATCH_PCT,
 } from './queries.ts';
@@ -108,4 +109,52 @@ Deno.test('D-038 b70658b0 fixture: filter excludes 11-13 min/mi historicals from
   assertEquals(passing.length, 0);
   const poolAvg = historicals.reduce((a, b) => a + b, 0) / historicals.length;
   assertEquals(classifyPoolIntensityMatch(current, poolAvg, POOL_INTENSITY_MATCH_PCT), 'current_much_faster');
+});
+
+// ── D-047 / Q-024 — getOverallAvgHr three-stage fallback pin tests ─────────
+// Q-024 root cause: build.ts's current-workout avgHr was reading only
+// `computed.overall.avg_hr`, while the vs-similar pool used `getOverallAvgHr`
+// with three fallbacks. When a row stored HR under the alt key, the pool
+// resolved it but the current workout didn't — `hr_delta_bpm` collapsed to
+// null despite `sample_size >= 3`. build.ts now shares this helper, so these
+// tests lock the contract for both paths.
+
+Deno.test('D-047 / Q-024: getOverallAvgHr resolves overall.avg_hr (primary key)', () => {
+  const row = { computed: JSON.stringify({ overall: { avg_hr: 152 } }) };
+  assertEquals(getOverallAvgHr(row), 152);
+});
+
+Deno.test('D-047 / Q-024: getOverallAvgHr falls back to overall.avg_heart_rate (alt key)', () => {
+  const row = { computed: JSON.stringify({ overall: { avg_heart_rate: 148 } }) };
+  assertEquals(getOverallAvgHr(row), 148);
+});
+
+Deno.test('D-047 / Q-024: getOverallAvgHr falls back to row-level avg_heart_rate (legacy ingest)', () => {
+  const row = { computed: JSON.stringify({ overall: {} }), avg_heart_rate: 145 };
+  assertEquals(getOverallAvgHr(row), 145);
+});
+
+Deno.test('D-047 / Q-024: getOverallAvgHr returns null when all three sources are missing', () => {
+  const row = { computed: JSON.stringify({ overall: {} }) };
+  assertEquals(getOverallAvgHr(row), null);
+});
+
+Deno.test('D-047 / Q-024: getOverallAvgHr returns null when value is non-positive (zero/negative HR)', () => {
+  const rowZero = { computed: JSON.stringify({ overall: { avg_hr: 0 } }) };
+  assertEquals(getOverallAvgHr(rowZero), null);
+  const rowNeg = { computed: JSON.stringify({ overall: { avg_hr: -5 } }) };
+  assertEquals(getOverallAvgHr(rowNeg), null);
+});
+
+Deno.test('D-047 / Q-024: getOverallAvgHr coerces stringified numbers', () => {
+  const row = { computed: JSON.stringify({ overall: { avg_hr: '156' } }) };
+  assertEquals(getOverallAvgHr(row), 156);
+});
+
+Deno.test('D-047 / Q-024: getOverallAvgHr primary key wins over fallbacks when both present', () => {
+  const row = {
+    computed: JSON.stringify({ overall: { avg_hr: 150, avg_heart_rate: 200 } }),
+    avg_heart_rate: 300,
+  };
+  assertEquals(getOverallAvgHr(row), 150);
 });
