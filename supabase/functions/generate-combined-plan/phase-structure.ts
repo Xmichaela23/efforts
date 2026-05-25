@@ -556,9 +556,14 @@ function buildSharedPeakBlocks(
 }
 
 // ── Mesocycle recovery-week insertion ────────────────────────────────────────
-// Applies 3:1 or 2:1 loading pattern to existing build/base/rs blocks.
-export function applyLoadingPattern(blocks: PhaseBlock[], pattern: '3:1' | '2:1'): PhaseBlock[] {
-  const blockSize = pattern === '3:1' ? 4 : 3;
+// Applies 3:1 / 2:1 / 1:1 loading pattern to existing build/base/rs blocks.
+//
+// D-061 / Item 1 — '1:1' added to support `training_intent: 'first_race'`
+// (every-2nd-week recovery for conservative ramps). Helper
+// `loadingPatternForIntent` derives the pattern from training_intent when set,
+// overriding the athlete's `loading_pattern` field. See generate-combined-plan/index.ts.
+export function applyLoadingPattern(blocks: PhaseBlock[], pattern: '3:1' | '2:1' | '1:1'): PhaseBlock[] {
+  const blockSize = pattern === '3:1' ? 4 : pattern === '2:1' ? 3 : 2;
   const result: PhaseBlock[] = [];
 
   let weekInBlock = 1;
@@ -576,6 +581,39 @@ export function applyLoadingPattern(blocks: PhaseBlock[], pattern: '3:1' | '2:1'
     weekInBlock = weekInBlock >= blockSize ? 1 : weekInBlock + 1;
   }
   return result;
+}
+
+/**
+ * D-061 / Item 1 — Loading-pattern selection from `training_intent`.
+ *
+ * Wires the wizard's three-way training_intent choice into the engine's
+ * recovery cadence so the wizard promise matches engine reality (closes
+ * the D-055 wizard-vs-engine differentiation gap for the recovery axis).
+ *
+ * Rules:
+ *   performance → keep athlete's chosen loading_pattern (default '3:1'),
+ *                 every-4th-week recovery
+ *   completion  → force '2:1' — every-3rd-week recovery (matches the
+ *                 legacy tri-generator's intent==='completion' path)
+ *   first_race  → force '1:1' — every-2nd-week recovery (matches the
+ *                 legacy tri-generator's intent==='first_race' path;
+ *                 conservative ramp)
+ *   comeback    → same as first_race ('1:1' — conservative ramp)
+ *
+ * The override is intent-driven, not athlete-pin-driven, so a `first_race`
+ * athlete who pinned `loading_pattern: '3:1'` still gets the conservative
+ * '1:1' cadence appropriate to their intent. This matches D-055's
+ * wizard-copy-to-engine-reality alignment for `tri_approach`.
+ */
+export function loadingPatternForIntent(
+  trainingIntent: string | null | undefined,
+  athletePattern: '3:1' | '2:1' | '1:1' | null | undefined,
+): '3:1' | '2:1' | '1:1' {
+  const intent = String(trainingIntent ?? '').toLowerCase();
+  if (intent === 'completion') return '2:1';
+  if (intent === 'first_race' || intent === 'comeback') return '1:1';
+  // performance (and any unknown intent) → athlete's pattern or default 3:1
+  return athletePattern ?? '3:1';
 }
 
 // ── Utility pushers ───────────────────────────────────────────────────────────

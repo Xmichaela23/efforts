@@ -907,12 +907,19 @@ export function recoveryWeeksPostRace(distance: string, priority: Priority | str
 
 // ── §7.2  Mesocycle loading pattern ─────────────────────────────────────────
 // Returns the TSS multiplier for week-within-block (1-indexed).
-export function blockWeekMultiplier(weekInBlock: number, pattern: '3:1' | '2:1'): number {
+//
+// D-061 / Item 1 — added '1:1' pattern to support `training_intent: 'first_race'`
+// (every-2nd-week recovery — 1 build + 1 recovery). Recovery week ratio of 0.65
+// matches the existing 3:1 / 2:1 recovery-week multiplier (consistent deload depth).
+export function blockWeekMultiplier(weekInBlock: number, pattern: '3:1' | '2:1' | '1:1'): number {
   if (pattern === '3:1') {
     return [1.00, 1.08, 1.15, 0.65][weekInBlock - 1] ?? 1.00;
-  } else {
+  }
+  if (pattern === '2:1') {
     return [1.00, 1.10, 0.65][weekInBlock - 1] ?? 1.00;
   }
+  // '1:1': build week, recovery week, build week, recovery week, ...
+  return [1.00, 0.65][weekInBlock - 1] ?? 1.00;
 }
 
 // ── §4.2  Session intensity classification  ──────────────────────────────────

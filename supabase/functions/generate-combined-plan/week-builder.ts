@@ -1557,6 +1557,11 @@ export function buildWeek(
       } else if (triApproach === 'base_first') {
         // base_first: Base uses controlled interval progression; Build uses tempo;
         // Race-specific uses race-pace specificity.
+        // D-061 / Item 1 — `first_race` caps base-phase interval reps at 80%
+        // (max 6 instead of 8) for a conservative ramp; `completion` keeps
+        // the standard rep progression.
+        const intentLc = String(athleteState.training_intent ?? '').toLowerCase();
+        const isFirstRace = intentLc === 'first_race' || intentLc === 'comeback';
         if (phase === 'race_specific') {
           // RUN-PROTOCOL §4.3 race-pace miles ramp: clamp(3, peak, 3 + (weekInPhase − 1)).
           const peakRpMi = racePacePeakMiles(primaryGoal.distance);
@@ -1570,8 +1575,11 @@ export function buildWeek(
           // RUN-PROTOCOL §4.1 base interval rep ramp: clamp(4, 8, 4 + floor((weekInPhase − 1) / 2)).
           // ADR 0002 footgun: weekInBlock is ALWAYS 1; use runWeekInPhase from
           // weekInPhaseForTimeline (mirrors swim arc fix at c1c94cec).
-          const progressedBaseReps = Math.max(4, Math.min(8, 4 + Math.floor((runWeekInPhase - 1) / 2)));
-          runQualitySlot!.sessions.push(intervalRun(runQualityDay, progressedBaseReps, phase, servedGoal));
+          const baseRepsRaw = Math.max(4, Math.min(8, 4 + Math.floor((runWeekInPhase - 1) / 2)));
+          const baseReps = isFirstRace
+            ? Math.max(4, Math.round(baseRepsRaw * 0.8))
+            : baseRepsRaw;
+          runQualitySlot!.sessions.push(intervalRun(runQualityDay, baseReps, phase, servedGoal));
         } else {
           // Build: tempo (Z3) — builds muscular endurance safely. tempoMi inherits
           // the long-run ramp via `longRunMiles` (which is now phase-progressive).
@@ -1581,6 +1589,13 @@ export function buildWeek(
       } else {
         // race_peak: base = short intervals; build = explicit VO2 (tri) or interval ladder (run-only);
         // race_specific = race-pace run (tri) / MP (run).
+        // D-061 / Item 1 — defensive intensity-ceiling gates for `first_race` /
+        // `comeback`: even if config flips to race_peak, the conservative ramp
+        // still applies: no VO2 until build wk4+; cap base intervals at 80%.
+        // For `completion`: ceiling = no VO2 (downgrade to tempo if reached).
+        const intentLc = String(athleteState.training_intent ?? '').toLowerCase();
+        const isFirstRace = intentLc === 'first_race' || intentLc === 'comeback';
+        const isCompletion = intentLc === 'completion';
         if (phase === 'race_specific') {
           // RUN-PROTOCOL §4.3 race-pace miles ramp (same formula as base_first branch).
           const peakMpMi = racePacePeakMiles(primaryGoal.distance);
@@ -1592,11 +1607,24 @@ export function buildWeek(
           );
         } else if (hasTri && phase === 'build') {
           // RUN-PROTOCOL §4.2 VO2max rep ramp: 3 → 6 × 3min across build weeks.
-          runQualitySlot!.sessions.push(vo2Run(runQualityDay, servedGoal, runWeekInPhase));
+          // D-061: first_race gate — no VO2 until weekInPhase ≥ 4. Pre-gate
+          // weeks downgrade to tempo. completion gate — no VO2 at all
+          // (downgrade to tempo); matches WIZARD-AUDIT athlete-expectation
+          // that completion is a moderate-quality build, not a VO2 build.
+          if (isCompletion || (isFirstRace && runWeekInPhase < 4)) {
+            const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
+            runQualitySlot!.sessions.push(tempoRun(runQualityDay, tempoMi, 1.5, servedGoal));
+          } else {
+            runQualitySlot!.sessions.push(vo2Run(runQualityDay, servedGoal, runWeekInPhase));
+          }
         } else {
           // RUN-PROTOCOL §4.1 base interval rep ramp (same as base_first branch).
-          const progressedBaseReps = Math.max(4, Math.min(8, 4 + Math.floor((runWeekInPhase - 1) / 2)));
-          runQualitySlot!.sessions.push(intervalRun(runQualityDay, progressedBaseReps, phase, servedGoal));
+          // D-061 first_race cap: 80% of standard reps.
+          const baseRepsRaw = Math.max(4, Math.min(8, 4 + Math.floor((runWeekInPhase - 1) / 2)));
+          const baseReps = isFirstRace
+            ? Math.max(4, Math.round(baseRepsRaw * 0.8))
+            : baseRepsRaw;
+          runQualitySlot!.sessions.push(intervalRun(runQualityDay, baseReps, phase, servedGoal));
         }
       }
     }

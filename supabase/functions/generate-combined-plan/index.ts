@@ -10,7 +10,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import type { CombinedPlanRequest, GoalInput, AthleteState, AthleteMemory } from './types.ts';
-import { buildPhaseTimeline, applyLoadingPattern, blockForWeek } from './phase-structure.ts';
+import { buildPhaseTimeline, applyLoadingPattern, blockForWeek, loadingPatternForIntent } from './phase-structure.ts';
 import { buildWeek, buildAssessmentWeekSessions } from './week-builder.ts';
 import { harvestSwimDrillTokensFromWeek } from './drill-token-harvest.ts';
 import { validatePlan, failedChecks, findMissingRaceDaySessions } from './validator.ts';
@@ -79,8 +79,16 @@ Deno.serve(async (req: Request) => {
     if (!athlete_state?.current_ctl)      return json({ error: 'athlete_state.current_ctl required' }, 400);
     if (!athlete_state?.weekly_hours_available) return json({ error: 'weekly_hours_available required' }, 400);
 
-    // Default loading pattern
-    const loadingPattern = athlete_state.loading_pattern ?? '3:1';
+    // D-061 / Item 1 — derive loading pattern from training_intent (overrides
+    // athlete's pinned `loading_pattern` when intent is set):
+    //   performance → athlete's pattern (default '3:1')
+    //   completion  → '2:1' (every 3rd week)
+    //   first_race  → '1:1' (every 2nd week)
+    //   comeback    → '1:1'
+    const loadingPattern = loadingPatternForIntent(
+      athlete_state.training_intent,
+      athlete_state.loading_pattern,
+    );
     const startDate = start_date ? parseLocalDate(String(start_date).slice(0, 10)) : new Date();
 
     const state: AthleteState = {
