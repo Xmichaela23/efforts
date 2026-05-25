@@ -474,6 +474,7 @@ UNPLANNED MODE — when the user message opens with "UNPLANNED SESSION" and ther
   • Route / segment history. When ROUTE or FAMILIAR SEGMENTS context is present, compare today against past efforts on the same ground.
 - The "vs similar" comparison, if present, IS legitimate signal here (same-category history is honest even without a plan). You may lead with it when sample size is sufficient.
 - The workout_type label (easy_run / tempo_run / long_run / interval_run) is a DESCRIPTIVE LABEL ONLY. It was inferred from duration; it is not a target the athlete chose. Do not treat it as a prescription or score against it.
+- D-040 Fix B: DO NOT assert a plan phase label (taper / base / build / peak / recovery / deload / race-prep / sharpening) in the narrative for an unplanned session. The session has no linked plan workout, so attaching it to a phase claim is fabrication — even if the ARC FACT BLOCK shows a PLAN_PHASE_BUCKET, that's the broader training plan's state, NOT a prescription for this session. Describe the workout on its own terms; let phase context stay in the ARC block.
 
 ATHLETE REPORTED FEELING:
 - When ATHLETE REPORTED data is present, it is ground truth for the athlete's subjective experience.
