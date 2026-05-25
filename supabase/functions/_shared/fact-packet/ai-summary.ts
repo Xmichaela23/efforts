@@ -645,9 +645,10 @@ export function buildUserMessage(dp: any): string {
     sections.push(`\nPRIMARY LIMITER: ${sig.limiter.limiter}${sig.limiter.confidence != null ? ` (${sig.limiter.confidence}% confidence)` : ''}`);
   }
 
-  // Terrain segments
+  // Terrain segments. D-039 Fix 2: no route name — was auto-generated
+  // server-side, not athlete-named. Generic phrasing only.
   if (sig.terrain?.route) {
-    sections.push(`\nROUTE: "${sig.terrain.route.name}" — run ${sig.terrain.route.times_run} times`);
+    sections.push(`\nROUTE HISTORY: a route the athlete has run ${sig.terrain.route.times_run} times before. Refer to it generically ("this route", "the same route") — do NOT invent a name.`);
   }
   if (sig.terrain?.segment_comparisons?.length > 0 && sig.terrain.segment_insight_eligible) {
     sections.push('\nFAMILIAR SEGMENTS:\n' + sig.terrain.segment_comparisons.map((c: any) =>
@@ -1032,9 +1033,11 @@ export function toDisplayFormatV1(
                   hr_delta: c.hr_delta,
                 }))
               : [],
+            // D-039 Fix 2: `name` dropped from route surface. Auto-named
+            // server-side; LLM was upgrading the label into an asserted
+            // identity. Generic "a route you've run N times" framing only.
             route: derived.terrain_context.route_runs
               ? {
-                  name: derived.terrain_context.route_runs.name,
                   times_run: derived.terrain_context.route_runs.times_run,
                   history: Array.isArray((derived.terrain_context.route_runs as any).history)
                     ? (derived.terrain_context.route_runs as any).history

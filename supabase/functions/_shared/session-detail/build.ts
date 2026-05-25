@@ -758,9 +758,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       if (!tc?.route_runs) return null;
       const r = tc.route_runs as any;
       if (!Array.isArray(r.history) || r.history.length < 2) return null;
+      // D-039 Fix 2: `name` dropped — see types.ts terrain.route doc comment.
       return {
         route: {
-          name: String(r.name || 'Same route'),
           times_run: Number(r.times_run || 0),
           history: r.history,
         },

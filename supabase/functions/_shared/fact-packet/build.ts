@@ -681,7 +681,12 @@ export async function buildWorkoutFactPacketV1(args: {
         ? String((routeMatchRow as any).route_cluster_id)
         : null;
 
-      let routeRuns: { name: string; times_run: number; first_seen: string; last_seen: string; history: Array<{ date: string; pace_s_per_km: number | null; hr: number | null; is_current: boolean }> } | null = null;
+      // D-039 Fix 2: route_runs.name dropped. Was auto-generated server-side
+      // ("Route 53" = the 53rd cluster), not athlete-named. The LLM was
+      // upgrading these labels into asserted identities; the athlete never
+      // saw a name field to validate against. Generic "a route you've run N
+      // times" framing replaces it across all consumers.
+      let routeRuns: { times_run: number; first_seen: string; last_seen: string; history: Array<{ date: string; pace_s_per_km: number | null; hr: number | null; is_current: boolean }> } | null = null;
       if (matchedClusterId) {
         const [{ data: clusterRow }, { data: histRows }] = await Promise.all([
           supabase
@@ -741,7 +746,6 @@ export async function buildWorkoutFactPacketV1(args: {
           const cleanHistory = history.map(({ _workout_id, ...rest }) => rest);
 
           routeRuns = {
-            name: String((clusterRow as any).name || 'Regular route'),
             times_run: Number((clusterRow as any).sample_count),
             first_seen: String((clusterRow as any).first_seen_at || '').slice(0, 10),
             last_seen: String((clusterRow as any).last_seen_at || '').slice(0, 10),

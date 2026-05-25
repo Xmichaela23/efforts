@@ -332,10 +332,13 @@ export type SessionDetailV1 = {
   /** Plan-aware load readiness at workout date (null if no session_load / unavailable). */
   readiness?: SessionDetailReadinessV1 | null;
 
-  /** Route history for familiar routes — powers the ROUTE sparkline. */
+  /** Route history for familiar routes — powers the ROUTE sparkline.
+   * D-039 Fix 2: `name` removed. Route names were auto-generated server-side
+   * ("Route 53" = the 53rd cluster), not athlete-named. The LLM was upgrading
+   * them into asserted identities. Client renders "Same route · N×" generically;
+   * the LLM input now describes the route by `times_run` count only. */
   terrain?: {
     route: {
-      name: string;
       times_run: number;
       history: Array<{ date: string; pace_s_per_km: number | null; hr: number | null; is_current: boolean }>;
     } | null;
