@@ -546,27 +546,58 @@ export function pickSwimDrillInset(opts: {
     if (mainBudgetYd < techniqueMinMain) {
       return { mainBudgetYd, drillTokens: [] };
     }
+    // D-057 / Q-016 — drill yardage target by experience tier (LOCKED 2026-05-25).
+    // SWIM-PROTOCOL §2's higher ratios (75/30/10) are aspirational; per the Q-016
+    // audit (2026-05-25), session-count layer + band-volume layer already
+    // differentiate drill exposure by experience. Adding aggressive within-session
+    // ratio scaling on top risks double-counting. Locked at 30/20/10 — material
+    // tier differentiation while keeping the main-set aerobic floor honest.
+    //   beginner    → 30% of total session yards
+    //   intermediate → 20%
+    //   advanced    → 10%
+    // Used as a SOFT CAP on cumulative drill yardage in Path A; existing
+    // SWIM_DRILL_MAIN_FLOOR_YD remains the hard floor on the aerobic main set.
+    const drillRatioByTier: Record<'beginner' | 'intermediate' | 'advanced', number> = {
+      beginner: 0.30,
+      intermediate: 0.20,
+      advanced: 0.10,
+    };
+    const tier = opts.athleteFitness ?? 'intermediate';
+    const targetDrillYd = Math.round(opts.totalYards * (drillRatioByTier[tier] ?? 0.20));
     const n = eligible.length;
     const start = n ? (planWeek * 3 + salt) % n : 0;
     const rotated = n ? rotatePool(eligible, start) : [];
-    // §6.3 fitness-tier bias as primary sort key; smallest-yards-first as secondary.
+    // §6.3 fitness-tier bias as primary sort key. Secondary sort: for beginners
+    // (target 30%), prefer LARGER tokens so we hit target with fewer picks;
+    // for advanced (target 10%), smallest-first to stay tight to the cap.
+    const preferLarger = tier === 'beginner';
     const ranked = [...rotated].sort((a, b) => {
       const ab = tierBias(a, opts.athleteFitness);
       const bb = tierBias(b, opts.athleteFitness);
       if (ab !== bb) return ab - bb;
-      return swimDrillYardsFromToken(a) - swimDrillYardsFromToken(b);
+      const ay = swimDrillYardsFromToken(a);
+      const by = swimDrillYardsFromToken(b);
+      return preferLarger ? by - ay : ay - by;
     });
     const chosen: string[] = [];
     const usedPhases = new Set<SwimDrillStrokePhase>();
     let budget = mainBudgetYd;
+    let drillYdSoFar = 0;
     const firstRemainderFloor =
       mainBudgetYd < 520 ? SWIM_DRILL_COMPACT_FLOOR_YD : SWIM_DRILL_MAIN_FLOOR_YD;
     // First pass: SWIM-PROTOCOL §6.3 strict-distinct stroke-phase rule.
-    // Skip a candidate when its §6.1 phase is already represented in chosen.
+    // D-057: also stops when cumulative drill yards meets/exceeds the
+    // experience-tier target (soft cap — won't add a drill that would
+    // overshoot target by more than half its size).
     for (const tok of ranked) {
       if (chosen.length >= 3) break;
       const dy = swimDrillYardsFromToken(tok);
       if (dy <= 0) continue;
+      // D-057 soft cap: skip if adding this drill would overshoot the
+      // target by more than dy/2 (lets us land close to target without
+      // emitting zero drills when target is tiny vs token sizes).
+      if (drillYdSoFar >= targetDrillYd && chosen.length >= 1) break;
+      if (drillYdSoFar + dy > targetDrillYd + Math.floor(dy / 2) && chosen.length >= 1) continue;
       const phase = swimDrillStrokePhase(tok);
       if (phase && usedPhases.has(phase)) continue;
       const nextFloor =
@@ -575,23 +606,27 @@ export function pickSwimDrillInset(opts: {
         chosen.push(tok);
         if (phase) usedPhases.add(phase);
         budget -= dy;
+        drillYdSoFar += dy;
       }
     }
     // Permissive 2nd pass: when pool diversity / gear filtering starves the
     // distinct-phase pass below the §5.1 2-3-drill count, fill remaining slots
     // without the phase gate. The 2-3 count is the bigger training lever; the
-    // pairing rule is variety polish.
+    // pairing rule is variety polish. Soft cap still applies.
     if (chosen.length < 2) {
       for (const tok of ranked) {
         if (chosen.length >= 3) break;
         if (chosen.includes(tok)) continue;
         const dy = swimDrillYardsFromToken(tok);
         if (dy <= 0) continue;
+        if (drillYdSoFar >= targetDrillYd && chosen.length >= 1) break;
+        if (drillYdSoFar + dy > targetDrillYd + Math.floor(dy / 2) && chosen.length >= 1) continue;
         const nextFloor =
           chosen.length === 0 ? firstRemainderFloor : SWIM_DRILL_COMPACT_FLOOR_YD;
         if (budget - dy >= nextFloor) {
           chosen.push(tok);
           budget -= dy;
+          drillYdSoFar += dy;
         }
       }
     }
