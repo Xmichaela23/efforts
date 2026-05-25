@@ -1016,50 +1016,86 @@ inputs. 478/0 _shared + lib; 19/0 cycling.
 
 ---
 
-## D-045 — Drill rotation harvest fix (Q-015 regression closed)
+## D-043 — Autonomous batch: 10-item punch list sweep
 
-Shipped: 2026-05-25
+Shipped: 2026-05-25 / commits 87c0d15e through 141423ef
 
-Problem: D-044 item 6 (`ca1e6cd0`) shipped the Q-015 rolling 1-week
-`prevWeekDrillTokens` memory end-to-end through every swim creator and
-`pickSwimDrillInset`'s filter (`swim-drill-tokens.ts:521-538`), and that
-threading was correct. But the orchestrator harvest in
-`generate-combined-plan/index.ts:286-301` walked
-`week.days[].sessions[].steps_preset` while `buildWeek` returns the flat
-`week.sessions[].steps_preset` shape (see `computeWeekMetrics` at
-`week-builder.ts:593`). `Array.isArray(undefined)` was always false; the
-inner loop never ran; `prevWeekDrillTokens` reset to an empty Set every
-week. The filter received an empty Set on every call and was effectively
-dead in production.
+10 items, 7 functions deployed. Results:
 
-Surfaced by a real-plan audit (17-week 70.3 plan: W2 Fri Catch-Up → W3 Mon
-Catch-Up across base-phase css_aerobic → technique_aerobic). The user
-flagged the apparent repeat; the audit traced through the dispatcher (6/7
-creators consume the opt; `kickFocusedSwim` correctly skipped since it has
-no drill inset), the picker filter (intact), and bottomed out at the
-harvest's wrong-shape walk.
+Shipped functional code (5 items):
+1. CV outlier hygiene — clip pace >1800 sec/mi before CV computation. Fixes
+   misclassification of steady long runs as fartlek when GPS dropout or
+   stationary sample blows up the coefficient of variation.
+2. Route naming — dropped route_runs.name (server-auto-generated counter) from
+   fact packet. LLM receives times_run only, phrases generically.
+3. Arc plan phase + unstructured_read forward-bias — fixed arc-context.ts
+   returning 'unspecified' on active plans. Forward-bias rule added to
+   unstructured_read: active plan + next goal within 6 months → temporal anchor
+   must be forward-looking.
+4. Swim equipment line duplicate — client-side suppression when description
+   already contains Pool gear line.
+5. Tri-generator beginner swim rotation — swim_fitness === 'beginner' routes to
+   css_aerobic instead of threshold on race_peak race-spec.
+6. bikeOpeners taper gate — scoped from phase==='taper' to
+   phase==='taper' && raceThisWeek. Mirrors swim-activation gate pattern.
 
-Fix (one logical change):
-- Extracted the harvest into a pure helper at
-  `generate-combined-plan/drill-token-harvest.ts` so the contract is
-  explicit and unit-testable, instead of an inline closure inside the
-  Deno.serve handler.
-- `generate-combined-plan/index.ts` now calls
-  `harvestSwimDrillTokensFromWeek(week)` and the inline regex constant +
-  walk are gone.
-- Pin test (`drill-token-harvest.test.ts`, 6 tests): captures correct
-  tokens from the flat shape; ignores non-swim sessions and non-drill
-  tokens; accepts singular `swim_drill_*` + plural `swim_drills_*` prefixes;
-  regression sentinel — the OLD `{days: [{sessions: [...]}]}` shape produces
-  an empty Set; integration — harvested catchup token excludes catchup
-  family from week N+1's picker; baseline — empty prev Set leaves catchup
-  reachable across rotation salts (so the filter test isn't vacuous).
+Verified already resolved (3 items):
+- Recovery week strength load (createPerfRecoverySession deadlift hardcode gone)
+- Tradeoff message filtering (isInternalOptimizerTelemetry + scheduleSignalsNonEmpty already live)
+- Brick session in plan export (tags emit → persist → client merge intact)
 
-All 6 tests pass. Q-015 marked RESOLVED in OPEN-QUESTIONS.md.
+Partial / deferred (2 items):
+- Q-015 drill repeat-pick memory — picker capability shipped (ca1e6cd0) but
+  orchestrator harvest bug meant memory Set was always empty. Fixed in D-045.
+- analyze-running-workout test coverage — _varGate extraction prerequisite;
+  shipped in D-044.
 
-Deploy scope: `generate-combined-plan` (function with the fix) +
-`generate-triathlon-plan` (per user direction). The harvest helper lives
-only in `generate-combined-plan/` so there's no caller fan-out beyond it.
+---
+
+## D-044 — Autonomous batch tail: drill caller wiring + varGate extraction + tests
+
+Shipped: 2026-05-25 / commits ca1e6cd0 + dee5d9a4 + 9f6ea120
+
+Item 6 — Drill repeat-pick caller wiring (Q-015 partial close):
+prevWeekDrillTokens threaded end-to-end: generateAllWeeks rolling-Set
+orchestration → buildWeek opts → swimSessionFromTemplate opts → 7 swim creators
+(speedSwim, thresholdSwim, cssAerobicSwim, recoveryEasySwim, easySwim,
+pullFocusedSwim, enduranceSwim) → pickSwimDrillInset. Back-compat: picker
+no-ops when prevWeekDrillTokens undefined/empty. Marked partial — harvest bug
+discovered in D-045.
+
+Item 7 — _varGate extraction + 14 pin tests:
+_varGate IIFE (~75 lines) extracted to lib/variance-gate.ts as exported pure
+function computeVarianceGate. detectWorkoutTypeFromIntervals passed as function
+arg to keep helper pure. 5 user-spec scenarios + 9 predicate-priority/boundary
+pins. POLISH coverage-gap entry closed for variance-gate path. 891/0.
+
+---
+
+## D-045 — Drill token harvest bug fix (Q-015 fully closed)
+
+Shipped: 2026-05-25 / commit 5b39865e
+
+Problem: The orchestrator harvest loop in generate-combined-plan/index.ts:286-301
+was reading week.days[].sessions[] but buildWeek returns week.sessions[] (flat
+array, no .days wrapper). Array.isArray(undefined) === false → harvest loop never
+ran → prevWeekDrillTokens reset to empty Set every week → picker filter was
+effectively dead. Q-015 was marked closed in D-044 but the integration-level
+behavior hadn't changed.
+
+Fix: extracted harvest to drill-token-harvest.ts helper, replaced .days walk
+with direct week.sessions[] walk. Token format (/^swim_drills?_/i) confirmed
+correct — only the property path was wrong.
+
+6 pin tests: harvest contract, non-swim filtering, plural/singular prefix,
+OLD-shape regression sentinel (ensures the pre-fix .days path stays broken as
+a canary), N→N+1 Catch-Up exclusion integration, baseline filter proof.
+
+Verified: regenerated plan shows distinct drill families week-over-week.
+W1 Fri Fingertip Drag → W2 Fri 6-3-6 Rotation + Single-Arm → W3 Mon Fingertip
+Drag (different from W2). Cross-week repeat prevention confirmed live.
+
+Q-015 marked RESOLVED.
 
 ---
 

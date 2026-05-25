@@ -400,6 +400,22 @@ Verified-working architecture and fixes. If you think one of these is broken, th
 
 ---
 
+### Autonomous batch D-043 through D-045 (2026-05-25)
+- CV outlier clipping: pace >1800 sec/mi excluded before CV computation
+- Route naming: times_run only surfaced to LLM
+- Arc forward-bias: unstructured_read hard-bans backward temporal anchor when
+  active plan + next goal within 6 months
+- Swim equipment duplicate: suppressed client-side
+- Beginner swim rotation: swim_fitness='beginner' routes correctly
+- bikeOpeners: scoped to race week only
+- Drill repeat-pick memory: end-to-end via drill-token-harvest.ts helper;
+  harvest reads week.sessions[] directly; cross-week repeat prevention live
+- computeVarianceGate: extracted pure function, 14 pin tests, coverage gap closed
+- Verify: regenerate any triathlon plan — drill families should rotate
+  week-over-week with no consecutive cross-week repeats
+
+---
+
 ## Known broken (filed, not blocking)
 
 Behaviors that are demonstrably wrong but intentionally deferred. Don't propose fixes unless you have new information — the deferral was a scoping call, and the list below documents the cost so the next implementer can pick up cleanly.
