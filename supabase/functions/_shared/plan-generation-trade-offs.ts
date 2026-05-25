@@ -270,6 +270,18 @@ export const PLAN_GENERATION_MESSAGE_TEMPLATES: Record<string, string> = {
   // derives the internal threshold-pace value.
   no_swim_threshold_pace:
     'No swim pace data — sessions are running with conservative defaults. Add your 100yd pace to your profile and the plan will refine on the next regenerate.',
+  // D-048 (POLISH §1 Open Item 1) — fired when plan duration forces the base
+  // phase to 0 weeks (e.g. 9-week 70.3 plan with 2wk taper + 3wk race-specific +
+  // 4wk build = 0 base). Previously a silent skip; the trade-off makes the
+  // compromise visible so the athlete knows volume base is being deferred.
+  base_phase_skipped_short_plan:
+    'Your plan starts close to {{event_name}} ({{plan_weeks}} weeks total), so the base aerobic phase is skipped — you go straight into build and race-specific work. Volume base is built from your current fitness, not new aerobic adaptation. Start the plan earlier next time to get the base phase.',
+  // D-048 (POLISH §1 Open Item 2) — fired when the post-B-race window is too
+  // tight to fit even one rebuild week without eating the taper, and the
+  // non-priority-A branches silently skipped rebuild. Surfaces the compromise
+  // so the athlete knows the second race goes straight to abbreviated build.
+  rebuild_skipped_tight_window:
+    'Your two races ({{first_event}} and {{second_event}}) are close enough that the post-race rebuild block was skipped to preserve the {{second_event}} taper. Loads pick up directly from recovery — keep an eye on legs for the first week of the abbreviated build.',
 };
 
 export function renderPlanGenerationMessage(

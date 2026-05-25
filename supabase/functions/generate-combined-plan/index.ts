@@ -63,7 +63,9 @@ Deno.serve(async (req: Request) => {
     const body: CombinedPlanRequest = await req.json();
     const { user_id, goals, athlete_state, athlete_memory, start_date, generation_trade_offs, arc } = body;
     const preview = body.preview === true;
-    const persistedTradeOffs = Array.isArray(generation_trade_offs) ? generation_trade_offs : [];
+    // D-048 — copy into a local array so we can safely merge phase-structure
+    // trade-offs without mutating the caller's input array.
+    const persistedTradeOffs = Array.isArray(generation_trade_offs) ? [...generation_trade_offs] : [];
 
     console.log('[generate-combined-plan] ===== HANDLER ENTRY =====', {
       preview,
@@ -210,7 +212,11 @@ Deno.serve(async (req: Request) => {
     const scheduleState: AthleteState = reconcileAthleteStateWithWeekOptimizer(state703Cutoff);
 
     // ── Build phase timeline ────────────────────────────────────────────────
-    const { blocks: builtBlocks, totalWeeks, raceAnchors } = buildPhaseTimeline(goals, startDate, scheduleState);
+    const { blocks: builtBlocks, totalWeeks, raceAnchors, phaseStructureTradeOffs } = buildPhaseTimeline(goals, startDate, scheduleState);
+    // D-048 POLISH §1 — surface base-phase / rebuild silent-skip trade-offs.
+    if (Array.isArray(phaseStructureTradeOffs) && phaseStructureTradeOffs.length > 0) {
+      for (const t of phaseStructureTradeOffs) persistedTradeOffs.push(t);
+    }
     let blocks = builtBlocks;
     blocks = applyLoadingPattern(blocks, loadingPattern);
 

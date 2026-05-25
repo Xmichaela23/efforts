@@ -11,6 +11,7 @@ import {
   getBaseDistribution,
 } from './science.ts';
 import type { Sport } from './types.ts';
+import type { PlanGenerationTradeOff } from '../_shared/plan-generation-trade-offs.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,7 +85,19 @@ export function buildPhaseTimeline(
   goals: GoalInput[],
   startDate: Date,
   athleteState: AthleteState,
-): { blocks: PhaseBlock[]; totalWeeks: number; raceAnchors: RaceAnchor[] } {
+): {
+  blocks: PhaseBlock[];
+  totalWeeks: number;
+  raceAnchors: RaceAnchor[];
+  /**
+   * D-048 — Phase-structure-level trade-offs surfaced when the plan duration or
+   * inter-race window forces the engine to silently skip a phase the protocol
+   * would normally include (base, rebuild). Caller (index.ts) merges these into
+   * the persisted `generation_trade_offs` so the athlete sees the compromise.
+   */
+  phaseStructureTradeOffs: PlanGenerationTradeOff[];
+} {
+  const phaseStructureTradeOffs: PlanGenerationTradeOff[] = [];
 
   // §8.1: capture the GENUINE user-set priority-A tri goal BEFORE the no-A
   // fallback below mutates sortedGoals[0].priority (shared object refs). The
@@ -164,7 +177,7 @@ export function buildPhaseTimeline(
     const w2 = planWeekForCalendarEvent(startDate, g2.event_date);
     if (w1 >= 1 && w2 > w1) {
       // First race: own macrocycle ending week w1
-      buildSingleEventBlocks(g1, 1, w1, blocks, athleteState);
+      buildSingleEventBlocks(g1, 1, w1, blocks, athleteState, phaseStructureTradeOffs);
       // Post-race: easy aerobic only
       const recW = recoveryWeeksPostRace(g1.distance, g1.priority);
       const recStart = w1 + 1;
@@ -204,14 +217,14 @@ export function buildPhaseTimeline(
       }
     } else {
       // Overlapping / degenerate dates: single A timeline
-      buildSingleEventBlocks(lastAGoal, 1, totalWeeks, blocks, athleteState);
+      buildSingleEventBlocks(lastAGoal, 1, totalWeeks, blocks, athleteState, phaseStructureTradeOffs);
     }
   } else if (aGoals.length === 1 || classifyEventRelationship(
     weeksUntil(new Date(aGoals[0].event_date), new Date(aGoals[1]?.event_date ?? aGoals[0].event_date))
   ) === 'sequential') {
     // Single A-race or sequential (> 16 weeks apart): each gets its own full cycle
     buildSingleEventBlocks(
-      aGoals[0], 1, planWeekForCalendarEvent(startDate, aGoals[0].event_date), blocks, athleteState);
+      aGoals[0], 1, planWeekForCalendarEvent(startDate, aGoals[0].event_date), blocks, athleteState, phaseStructureTradeOffs);
     if (aGoals.length > 1) {
       // After first A-race: recovery + new cycle for the second
       const firstRaceWeek = planWeekForCalendarEvent(startDate, aGoals[0].event_date);
@@ -220,7 +233,7 @@ export function buildPhaseTimeline(
       const secondEnd   = planWeekForCalendarEvent(startDate, aGoals[1].event_date);
       if (secondStart <= secondEnd) {
         insertRecoveryBlock(firstRaceWeek + 1, firstRaceWeek + recoveryWeeks, aGoals[0].id, blocks, athleteState);
-        buildSingleEventBlocks(aGoals[1], secondStart, secondEnd - secondStart + 1, blocks, athleteState);
+        buildSingleEventBlocks(aGoals[1], secondStart, secondEnd - secondStart + 1, blocks, athleteState, phaseStructureTradeOffs);
       }
     }
   } else if (aGoals.length >= 2) {
@@ -234,7 +247,7 @@ export function buildPhaseTimeline(
 
     if (rel === 'overlapping') {
       // 8–16 week gap: full cycle to first, recovery, rebuild, abbreviated build, taper to second
-      buildSingleEventBlocks(aChrono[0], 1, firstEnd, blocks, athleteState);
+      buildSingleEventBlocks(aChrono[0], 1, firstEnd, blocks, athleteState, phaseStructureTradeOffs);
       const recWeeks = recoveryWeeksPostRace(aChrono[0].distance, aChrono[0].priority);
       insertRecoveryBlock(firstEnd + 1, firstEnd + recWeeks, aChrono[0].id, blocks, athleteState);
       const recEndA = firstEnd + recWeeks;
@@ -242,6 +255,14 @@ export function buildPhaseTimeline(
       const rebuildWks = rebuildWeeksAfterRace(aChrono[0].distance, recWeeks, windowWks);
       if (rebuildWks > 0) {
         insertRebuildBlock(recEndA + 1, recEndA + rebuildWks, aChrono[1], blocks, athleteState, recWeeks);
+      } else {
+        // D-048 POLISH §1 Bug 2 — surface the silent rebuild skip.
+        phaseStructureTradeOffs.push({
+          kind: 'constraint_compromise',
+          severity: 'notice',
+          message_template_id: 'rebuild_skipped_tight_window',
+          variables: { first_event: aChrono[0].event_name, second_event: aChrono[1].event_name },
+        });
       }
       const buildStart = recEndA + rebuildWks + 1;
       buildAbbreviatedBlocks(aChrono[1], buildStart, secondEnd, blocks, athleteState);
@@ -251,7 +272,7 @@ export function buildPhaseTimeline(
     } else {
       // Tight schedule: one macrocycle to the *later* race is wrong for the *earlier* race
       if (aChrono[0] && aChrono[1] && firstEnd < secondEnd) {
-        buildSingleEventBlocks(aChrono[0], 1, firstEnd, blocks, athleteState);
+        buildSingleEventBlocks(aChrono[0], 1, firstEnd, blocks, athleteState, phaseStructureTradeOffs);
         const recW = recoveryWeeksPostRace(aChrono[0].distance, aChrono[0].priority);
         const recStart = firstEnd + 1;
         const recEnd = firstEnd + recW;
@@ -260,13 +281,21 @@ export function buildPhaseTimeline(
         const rebuildWks = rebuildWeeksAfterRace(aChrono[0].distance, recW, windowWks);
         if (rebuildWks > 0) {
           insertRebuildBlock(recEnd + 1, recEnd + rebuildWks, aChrono[1], blocks, athleteState, recW);
+        } else {
+          // D-048 POLISH §1 Bug 2 — surface the silent rebuild skip (tight branch).
+          phaseStructureTradeOffs.push({
+            kind: 'constraint_compromise',
+            severity: 'notice',
+            message_template_id: 'rebuild_skipped_tight_window',
+            variables: { first_event: aChrono[0].event_name, second_event: aChrono[1].event_name },
+          });
         }
         const secondStart = recEnd + rebuildWks + 1;
         if (secondStart <= secondEnd) {
           buildAbbreviatedBlocks(aChrono[1], secondStart, secondEnd, blocks, athleteState);
         }
       } else {
-        buildSingleEventBlocks(aChrono[1] ?? aGoals[0], 1, secondEnd, blocks, athleteState);
+        buildSingleEventBlocks(aChrono[1] ?? aGoals[0], 1, secondEnd, blocks, athleteState, phaseStructureTradeOffs);
       }
     }
   }
@@ -281,7 +310,12 @@ export function buildPhaseTimeline(
     if (blk) blk.race_week = a.priority;
   }
 
-  return { blocks: blocks.sort((a, b) => a.startWeek - b.startWeek), totalWeeks, raceAnchors };
+  return {
+    blocks: blocks.sort((a, b) => a.startWeek - b.startWeek),
+    totalWeeks,
+    raceAnchors,
+    phaseStructureTradeOffs,
+  };
 }
 
 // ── Phase builder helpers ─────────────────────────────────────────────────────
@@ -292,6 +326,7 @@ function buildSingleEventBlocks(
   totalWeeks: number,
   blocks: PhaseBlock[],
   as: AthleteState,
+  tradeOffs?: PlanGenerationTradeOff[],
 ) {
   const taperWks  = taperWeeks(goal.distance, goal.priority);
   const approach  = as.tri_approach ?? 'race_peak';
@@ -307,6 +342,15 @@ function buildSingleEventBlocks(
     // Just taper + brief race-specific (too short to apply approach ratios)
     pushBlock(blocks, { phase: 'race_specific', startWeek, endWeek: Math.max(startWeek, startWeek + totalWeeks - taperWks - 1), goal, dist, as });
     pushBlock(blocks, { phase: 'taper', startWeek: startWeek + totalWeeks - taperWks, endWeek: startWeek + totalWeeks - 1, goal, dist, as });
+    // D-048 POLISH §1 Bug 1 — surface the silent base+build skip for very short plans.
+    if (tradeOffs) {
+      tradeOffs.push({
+        kind: 'constraint_compromise',
+        severity: 'notice',
+        message_template_id: 'base_phase_skipped_short_plan',
+        variables: { event_name: goal.event_name, plan_weeks: totalWeeks },
+      });
+    }
     return;
   }
 
@@ -320,6 +364,15 @@ function buildSingleEventBlocks(
 
   if (baseStart < buildStart) {
     pushBlockRange(blocks, 'base', baseStart, buildStart - 1, goal, dist, as);
+  } else if (tradeOffs) {
+    // D-048 POLISH §1 Bug 1 — base squeezed to 0 weeks (e.g. 9-week 70.3 plan
+    // with 2wk taper + 3wk RS + 4wk build = 0 base). Surface the compromise.
+    tradeOffs.push({
+      kind: 'constraint_compromise',
+      severity: 'notice',
+      message_template_id: 'base_phase_skipped_short_plan',
+      variables: { event_name: goal.event_name, plan_weeks: totalWeeks },
+    });
   }
   if (buildStart < rsStart) {
     pushBlockRange(blocks, 'build', buildStart, rsStart - 1, goal, dist, as);

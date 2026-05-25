@@ -42,7 +42,7 @@ For each numbered item:
 
 ## 1. Strength 100% across user choices
 
-**Status:** ~95% — architecture complete, two known bugs remain
+**Status:** 100% — architecture complete; two known bugs closed D-048 (2026-05-25)
 
 ### Done
 - [x] STRENGTH-PROTOCOL.md spec doc written
@@ -70,8 +70,8 @@ For each numbered item:
 - [x] Broad Jumps not appearing in power rotation — small targeted fix: removed `'push_press'` from dumbbell_based / bodyweight_bands tier rotations in `triathlon_performance.ts`. Home/DB athletes now rotate plyo + KB only, so Broad Jumps reaches selection in short race-prep windows.
 
 ### Open
-- [ ] 9-week edge case trade-off message — when plan length forces base phase to 0 weeks, surface explicit "base phase skipped due to plan length" trade-off instead of silent skip
-- [ ] Minimum rebuild week count enforcement — when post-B-race window <2 weeks, current code skips rebuild entirely; consider whether to compress taper to guarantee ≥1 rebuild week
+- [x] 9-week edge case trade-off message — closed D-048 / 2026-05-25. `base_phase_skipped_short_plan` template fires from `buildSingleEventBlocks` when the backward-from-race packing leaves `baseStart >= buildStart` OR when `totalWeeks < 4`. Merged into `persistedTradeOffs` via `buildPhaseTimeline().phaseStructureTradeOffs`. 6 pin tests in `phase-structure-tradeoffs.test.ts`.
+- [x] Minimum rebuild week count enforcement — closed D-048 / 2026-05-25 (conservative half). `rebuild_skipped_tight_window` trade-off now fires from the overlapping + tight non-priority-A branches at `phase-structure.ts:235-269` when `rebuildWeeksAfterRace` returns 0. The compress-taper-to-guarantee-rebuild question stays a product call (priority-A branch already chose taper > rebuild via the `windowWks < aTaperWks + 1` hard-fail; non-priority-A paths now visibly surface the compromise instead of skipping silently).
 - [ ] Verify all 6 intent × tier combinations end-to-end
 - [ ] Materialize-plan numerical resolution for % 1RM strings (deferred)
 - [x] **Recovery week strength load** — verified resolved 2026-05-25 (D-043 item 3 audit). Current `createPerfRecoverySession` (`performance-neural.ts:173-203`) explicitly excludes heavy spinal loading (no squats, no deadlifts — comment + exercise list confirm) and uses `% 1RM` for the light hip-thrust/step-up exercises that remain. `triathlon.ts:createRecoverySession` (`:701-752`) is bodyweight + light band only. The "2×8 @ 130 lb deadlift" hardcode this entry referenced no longer exists in either path — was a stale entry from before the protocol rewrite. No code change needed.
