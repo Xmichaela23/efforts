@@ -437,34 +437,34 @@ Deno.test('D-038 Piece 3: buildUserMessage omits "Pool intensity" line when inte
 
 Deno.test('D-042: run_easy_hr_trend=-3.5 → aerobic_direction=improving + raw pct surfaces', () => {
   const fp = makeFactPacketWithComparisons();
-  const dp = toDisplayFormatV1(fp, [], null, null, null, { runEasyHrTrendPct: -3.5 });
+  const dp = toDisplayFormatV1(fp, [], null, null, null, { runEasyPaceAtHrTrendPct: -3.5 });
   assertEquals((dp.signals as any).aerobic_efficiency_trend_pct, -3.5);
   assertEquals((dp.signals as any).aerobic_direction, 'improving');
 });
 
 Deno.test('D-042: run_easy_hr_trend=+3.5 → aerobic_direction=declining', () => {
   const fp = makeFactPacketWithComparisons();
-  const dp = toDisplayFormatV1(fp, [], null, null, null, { runEasyHrTrendPct: 3.5 });
+  const dp = toDisplayFormatV1(fp, [], null, null, null, { runEasyPaceAtHrTrendPct: 3.5 });
   assertEquals((dp.signals as any).aerobic_direction, 'declining');
 });
 
 Deno.test('D-042: run_easy_hr_trend=0.5 → aerobic_direction=stable (inside ±2% band)', () => {
   const fp = makeFactPacketWithComparisons();
-  const dp = toDisplayFormatV1(fp, [], null, null, null, { runEasyHrTrendPct: 0.5 });
+  const dp = toDisplayFormatV1(fp, [], null, null, null, { runEasyPaceAtHrTrendPct: 0.5 });
   assertEquals((dp.signals as any).aerobic_direction, 'stable');
 });
 
 Deno.test('D-042: ±2% boundary — exactly -2 stays stable; just under -2 becomes improving', () => {
   // Tier function uses strict < / > comparisons matching compute-snapshot:409.
-  const dpA = toDisplayFormatV1(makeFactPacketWithComparisons(), [], null, null, null, { runEasyHrTrendPct: -2 });
+  const dpA = toDisplayFormatV1(makeFactPacketWithComparisons(), [], null, null, null, { runEasyPaceAtHrTrendPct: -2 });
   assertEquals((dpA.signals as any).aerobic_direction, 'stable');
-  const dpB = toDisplayFormatV1(makeFactPacketWithComparisons(), [], null, null, null, { runEasyHrTrendPct: -2.0001 });
+  const dpB = toDisplayFormatV1(makeFactPacketWithComparisons(), [], null, null, null, { runEasyPaceAtHrTrendPct: -2.0001 });
   assertEquals((dpB.signals as any).aerobic_direction, 'improving');
 });
 
 Deno.test('D-042: run_easy_hr_trend=null → both fields null', () => {
   const fp = makeFactPacketWithComparisons();
-  const dp = toDisplayFormatV1(fp, [], null, null, null, { runEasyHrTrendPct: null });
+  const dp = toDisplayFormatV1(fp, [], null, null, null, { runEasyPaceAtHrTrendPct: null });
   assertEquals((dp.signals as any).aerobic_efficiency_trend_pct, null);
   assertEquals((dp.signals as any).aerobic_direction, null);
 });
@@ -477,7 +477,7 @@ Deno.test('D-042: aerobicTrend omitted entirely → both fields null (legacy cal
 });
 
 Deno.test('D-042: NaN / non-finite input → null (defensive)', () => {
-  const dpNaN = toDisplayFormatV1(makeFactPacketWithComparisons(), [], null, null, null, { runEasyHrTrendPct: Number.NaN });
+  const dpNaN = toDisplayFormatV1(makeFactPacketWithComparisons(), [], null, null, null, { runEasyPaceAtHrTrendPct: Number.NaN });
   assertEquals((dpNaN.signals as any).aerobic_direction, null);
   assertEquals((dpNaN.signals as any).aerobic_efficiency_trend_pct, null);
 });

@@ -864,11 +864,11 @@ export function toDisplayFormatV1(
       // compute-snapshot:409 derivation. Field name is a misnomer (pace
       // delta, not HR delta) — kept for source-of-truth alignment; rename
       // is filed as a separate cleanup.
-      aerobic_efficiency_trend_pct: aerobicTrend?.runEasyHrTrendPct != null && Number.isFinite(aerobicTrend.runEasyHrTrendPct)
-        ? aerobicTrend.runEasyHrTrendPct
+      aerobic_efficiency_trend_pct: aerobicTrend?.runEasyPaceAtHrTrendPct != null && Number.isFinite(aerobicTrend.runEasyPaceAtHrTrendPct)
+        ? aerobicTrend.runEasyPaceAtHrTrendPct
         : null,
       aerobic_direction: (() => {
-        const v = aerobicTrend?.runEasyHrTrendPct;
+        const v = aerobicTrend?.runEasyPaceAtHrTrendPct;
         if (v == null || !Number.isFinite(v)) return null;
         if (v < -2) return 'improving' as const;
         if (v > 2) return 'declining' as const;
@@ -1134,13 +1134,18 @@ export type UnplannedGateOptions = {
 };
 
 /**
- * D-042 — weekly aerobic efficiency trend forwarded from arc.latest_snapshot.
- * `runEasyHrTrendPct` is the pctChange field on athlete_snapshot
- * (compute-snapshot:374). Negative = pace at easy HR getting faster = aerobic
- * base building. Surfaced on display packet for the AEROBIC EFFICIENCY TREND
- * prompt rule.
+ * D-042 / D-043 — weekly aerobic efficiency trend forwarded from
+ * `arc.latest_snapshot`. `runEasyPaceAtHrTrendPct` is the pctChange value
+ * (compute-snapshot:374) — pace at easy HR vs chronic. Negative = pace
+ * getting faster at same HR = aerobic base building. Surfaced on display
+ * packet for the AEROBIC EFFICIENCY TREND prompt rule.
+ *
+ * Note: the DB column on `athlete_snapshot` is still named `run_easy_hr_trend`
+ * for back-compat (renaming requires a schema migration coordinated with
+ * coach + plan-gen consumers — separate ticket). The TypeScript field name
+ * here reflects what the value actually represents.
  */
-export type AerobicTrendOptions = { runEasyHrTrendPct?: number | null };
+export type AerobicTrendOptions = { runEasyPaceAtHrTrendPct?: number | null };
 
 export async function generateAISummaryV1(
   factPacket: FactPacketV1,

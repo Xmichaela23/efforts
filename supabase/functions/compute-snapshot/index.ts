@@ -368,10 +368,16 @@ serve(async (req: Request) => {
     const chronicRPE = avg(priorRPEs);
     const rpeTrend = pctChange(current.avgRPE, chronicRPE);
 
-    // Run easy pace trend (lower = faster = better, so negative trend = improving)
+    // Run easy pace-at-HR trend (lower = faster = better, so negative trend = improving).
+    // D-043: variable renamed runEasyHRTrend → runEasyPaceAtHrTrend to match what
+    // the value actually represents (pace-at-easy-HR delta vs chronic, NOT an
+    // HR-over-time delta). DB column athlete_snapshot.run_easy_hr_trend KEPT
+    // for back-compat (renaming requires a schema migration coordinated with
+    // coach/index.ts:2628 and longitudinal-signals.ts:81 — deferred to a
+    // separate ticket).
     const priorEasyPaces = priorAggs.map((a) => a.runEasyPaceAtHR).filter((v): v is number => v != null);
     const chronicEasyPace = avg(priorEasyPaces);
-    const runEasyHRTrend = pctChange(current.runEasyPaceAtHR, chronicEasyPace);
+    const runEasyPaceAtHrTrend = pctChange(current.runEasyPaceAtHR, chronicEasyPace);
 
     // Strength volume trend
     const priorStrVols = priorAggs.map((a) => a.strengthVolume).filter((v): v is number => v != null);
@@ -391,7 +397,7 @@ serve(async (req: Request) => {
     // -----------------------------------------------------------------------
     // 8. Interference detection (engine vs chassis)
     // -----------------------------------------------------------------------
-    // Aerobic direction: run_easy_hr_trend < 0 means faster at same HR = improving
+    // Aerobic direction: runEasyPaceAtHrTrend < 0 means faster at same HR = improving
     // Strength direction: compare current top lifts vs prior top lifts
     const priorExercises = exercises.filter((e) => e.date < targetWeek);
     const priorWeekMonday = addCalendarDays(targetWeek, -7);
@@ -405,8 +411,8 @@ serve(async (req: Request) => {
     );
 
     let aerobicDirection: 'improving' | 'stable' | 'declining' | null = null;
-    if (runEasyHRTrend != null) {
-      aerobicDirection = runEasyHRTrend < -2 ? 'improving' : runEasyHRTrend > 2 ? 'declining' : 'stable';
+    if (runEasyPaceAtHrTrend != null) {
+      aerobicDirection = runEasyPaceAtHrTrend < -2 ? 'improving' : runEasyPaceAtHrTrend > 2 ? 'declining' : 'stable';
     } else {
       // Fallback: use run efficiency trend or run workload trajectory
       const priorRunEfs = priorAggs.map((a) => a.runEfficiency).filter((v): v is number => v != null);
@@ -526,7 +532,8 @@ serve(async (req: Request) => {
       adherence_pct: adherencePct,
 
       run_easy_pace_at_hr: round(current.runEasyPaceAtHR),
-      run_easy_hr_trend: runEasyHRTrend,
+      // DB column name kept (schema migration deferred per D-043 comment at runEasyPaceAtHrTrend declaration).
+      run_easy_hr_trend: runEasyPaceAtHrTrend,
       run_long_run_duration: current.runLongRunDuration,
       run_interval_adherence: current.runIntervalAdherence,
 
