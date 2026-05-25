@@ -919,10 +919,29 @@ export async function buildWorkoutFactPacketV1(args: {
           trend_points: (() => {
             const pts = Array.isArray((vsSimilar as any).trend_points) ? (vsSimilar as any).trend_points : [];
             const curDate = workout?.date ?? null;
-            const curPace = overallPace != null ? Math.round(overallPace) : null;
+            // D-050 / Q-025 — append the current workout to trend_points with
+            // pace_basis + pace_at_hr matching the pool's basis so downstream
+            // slope computation can apply the ≥60% GAP-coverage rule against
+            // a basis-consistent view.
+            const poolBasis = pts.length > 0
+              ? ((pts[0] as any)?.pace_basis === 'gap' ? 'gap' : 'raw')
+              : 'raw';
+            const curPaceRaw = overallPace != null ? Math.round(overallPace) : null;
+            const curPaceGap = _overallGap != null && _overallGap > 0 ? Math.round(_overallGap) : null;
+            const curPace = poolBasis === 'gap' ? (curPaceGap ?? curPaceRaw) : curPaceRaw;
             const curHr = avgHr;
             if (curDate && curPace != null && curHr != null) {
-              pts.push({ date: String(curDate), pace_sec_per_mi: curPace, avg_hr: curHr, is_current: true });
+              const curPaceAtHr = curHr > 0
+                ? Math.round((curPace * 100 / curHr) * 10) / 10
+                : null;
+              pts.push({
+                date: String(curDate),
+                pace_sec_per_mi: curPace,
+                avg_hr: curHr,
+                is_current: true,
+                pace_basis: poolBasis,
+                pace_at_hr: curPaceAtHr,
+              });
             }
             return pts;
           })(),

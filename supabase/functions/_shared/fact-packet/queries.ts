@@ -551,11 +551,19 @@ export async function getSimilarWorkoutComparisons(
       .map((r) => {
         const pace = useGapForTrend ? getOverallGapSecPerMi(r)! : getOverallPaceSecPerMi(r)!;
         const hr = getOverallAvgHr(r);
+        // D-050 / Q-025 — pace_at_hr in sec/mi per 100bpm. Formula:
+        // pace_sec_per_mi * 100 / avg_hr. Uses whichever basis the pool is
+        // on (gap when useGapForTrend, raw otherwise — window-uniform per
+        // the existing trend pool design). Null when avg_hr is missing.
+        const pace_at_hr = hr != null && hr > 0
+          ? Math.round((pace * 100 / hr) * 10) / 10
+          : null;
         return {
           date: String(r.date),
           pace_sec_per_mi: Math.round(pace),
           avg_hr: hr != null ? Math.round(hr) : null,
           pace_basis: useGapForTrend ? 'gap' as const : 'raw' as const,
+          pace_at_hr,
         };
       })
       .filter((tp) =>
