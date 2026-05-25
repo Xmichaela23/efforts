@@ -1977,6 +1977,20 @@ function Step6LongDays({
           />
         </>
       )}
+      {/* D-056 / Item 8 — inline non-blocking warning when the same day
+          ends up pinned to both. DayPicker.exclude prevents same-day
+          selection during manual entry, but this serves as a defensive
+          surface if state ever lands in the same-day configuration. */}
+      {state.longRideDay && state.longRunDay && state.longRideDay === state.longRunDay && (
+        <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3.5 py-2.5">
+          <p className="text-[13px] text-red-200 font-medium">
+            Long ride and long run on the same day is a very heavy load.
+          </p>
+          <p className="text-[12px] text-red-200/75 mt-0.5">
+            Most athletes split these across Saturday and Sunday. You can continue, but the planner will flag this.
+          </p>
+        </div>
+      )}
     </StepLayout>
   );
 }
