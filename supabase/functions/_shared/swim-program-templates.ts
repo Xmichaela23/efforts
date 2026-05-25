@@ -121,6 +121,16 @@ const RACE_70_3_SLOT_META: Omit<SwimSlotTemplate, 'target_yards'>[] = [
 const RACE_70_3_BUILD_START_YDS: [number, number] = [2200, 2000];
 const RACE_70_3_BUILD_PEAK_YDS: [number, number] = [2600, 2400];
 
+// D-051 / Item 1 — Race-specific-phase yard endpoints (LOCKED 2026-05-25).
+// SWIM-PROTOCOL §5.4 prescribes RS Aerobic 1500-2500yd scaled by phase
+// (1500 base, 2000 build, 2500 race-spec). Inheriting BUILD_*_YDS[1] for the
+// race-spec phase clamped the RS Aerobic slot at 2000→2400 — under-scaled
+// vs spec target of 2500 by peak race-spec. Slot 0 (threshold/optional)
+// stays on the BUILD_*_YDS endpoints (the §4.3 optional-threshold band of
+// 2000-2500 is already covered by the existing 2200→2600 lerp).
+const RACE_70_3_RACE_SPEC_START_YDS: [number, number] = [2200, 1500];
+const RACE_70_3_RACE_SPEC_PEAK_YDS: [number, number] = [2600, 2500];
+
 // ── SWIM-PROTOCOL §10 — beginner session-type variants ──────────────────────-
 // Parallel to RACE_70_3_SLOT_META / FOCUS_70_3_SLOT_META. Routed into via
 // `getSwimSlotTemplates` when `opts.athleteFitness === 'beginner'`. Source of
@@ -655,9 +665,12 @@ export function getSwimSlotTemplates(
     yardsR = yardsForRace70_3Build(weekInPhase);
   } else if (ph === 'race_specific') {
     const t = phaseProgress(weekInPhase, RACE_SPECIFIC_RAMP_WEEKS);
+    // D-051 / Item 1 — race-spec-phase endpoints replace the BUILD_*_YDS
+    // inheritance so RS Aerobic (slot 1) ramps 1500→2500 per §5.4 instead
+    // of clamped at 2000→2400. Slot 0 (threshold/optional) unchanged.
     yardsR = [
-      roundYards(lerp(RACE_70_3_BUILD_START_YDS[0], RACE_70_3_BUILD_PEAK_YDS[0], t)),
-      roundYards(lerp(RACE_70_3_BUILD_START_YDS[1], RACE_70_3_BUILD_PEAK_YDS[1], t)),
+      roundYards(lerp(RACE_70_3_RACE_SPEC_START_YDS[0], RACE_70_3_RACE_SPEC_PEAK_YDS[0], t)),
+      roundYards(lerp(RACE_70_3_RACE_SPEC_START_YDS[1], RACE_70_3_RACE_SPEC_PEAK_YDS[1], t)),
     ];
   } else {
     yardsR = yardsForRace70_3Build(weekInPhase);
