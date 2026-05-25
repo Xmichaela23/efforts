@@ -1016,6 +1016,53 @@ inputs. 478/0 _shared + lib; 19/0 cycling.
 
 ---
 
+## D-045 — Drill rotation harvest fix (Q-015 regression closed)
+
+Shipped: 2026-05-25
+
+Problem: D-044 item 6 (`ca1e6cd0`) shipped the Q-015 rolling 1-week
+`prevWeekDrillTokens` memory end-to-end through every swim creator and
+`pickSwimDrillInset`'s filter (`swim-drill-tokens.ts:521-538`), and that
+threading was correct. But the orchestrator harvest in
+`generate-combined-plan/index.ts:286-301` walked
+`week.days[].sessions[].steps_preset` while `buildWeek` returns the flat
+`week.sessions[].steps_preset` shape (see `computeWeekMetrics` at
+`week-builder.ts:593`). `Array.isArray(undefined)` was always false; the
+inner loop never ran; `prevWeekDrillTokens` reset to an empty Set every
+week. The filter received an empty Set on every call and was effectively
+dead in production.
+
+Surfaced by a real-plan audit (17-week 70.3 plan: W2 Fri Catch-Up → W3 Mon
+Catch-Up across base-phase css_aerobic → technique_aerobic). The user
+flagged the apparent repeat; the audit traced through the dispatcher (6/7
+creators consume the opt; `kickFocusedSwim` correctly skipped since it has
+no drill inset), the picker filter (intact), and bottomed out at the
+harvest's wrong-shape walk.
+
+Fix (one logical change):
+- Extracted the harvest into a pure helper at
+  `generate-combined-plan/drill-token-harvest.ts` so the contract is
+  explicit and unit-testable, instead of an inline closure inside the
+  Deno.serve handler.
+- `generate-combined-plan/index.ts` now calls
+  `harvestSwimDrillTokensFromWeek(week)` and the inline regex constant +
+  walk are gone.
+- Pin test (`drill-token-harvest.test.ts`, 6 tests): captures correct
+  tokens from the flat shape; ignores non-swim sessions and non-drill
+  tokens; accepts singular `swim_drill_*` + plural `swim_drills_*` prefixes;
+  regression sentinel — the OLD `{days: [{sessions: [...]}]}` shape produces
+  an empty Set; integration — harvested catchup token excludes catchup
+  family from week N+1's picker; baseline — empty prev Set leaves catchup
+  reachable across rotation salts (so the filter test isn't vacuous).
+
+All 6 tests pass. Q-015 marked RESOLVED in OPEN-QUESTIONS.md.
+
+Deploy scope: `generate-combined-plan` (function with the fix) +
+`generate-triathlon-plan` (per user direction). The harvest helper lives
+only in `generate-combined-plan/` so there's no caller fan-out beyond it.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

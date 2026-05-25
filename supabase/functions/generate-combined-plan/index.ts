@@ -12,6 +12,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import type { CombinedPlanRequest, GoalInput, AthleteState, AthleteMemory } from './types.ts';
 import { buildPhaseTimeline, applyLoadingPattern, blockForWeek } from './phase-structure.ts';
 import { buildWeek, buildAssessmentWeekSessions } from './week-builder.ts';
+import { harvestSwimDrillTokensFromWeek } from './drill-token-harvest.ts';
 import { validatePlan, failedChecks, findMissingRaceDaySessions } from './validator.ts';
 import { classifyCombinedPlanError } from './classify-error.ts';
 import { scaledWeeklyTSS, resolveRunEasyPace } from './science.ts';
@@ -262,7 +263,6 @@ Deno.serve(async (req: Request) => {
       // tokens by name-suffix key before salt-rotation; falls back to
       // unfiltered when filter empties the pool.
       let prevWeekDrillTokens: Set<string> = new Set();
-      const SWIM_DRILL_TOKEN_RE = /^swim_drills?_/i;
       for (let w = 1; w <= totalWeeks; w++) {
         const block = blockForWeek(blocksArg, w);
         const week = buildWeek(w, block, prevWeightedTSS, goals, scheduleState, athlete_memory, {
@@ -283,22 +283,12 @@ Deno.serve(async (req: Request) => {
         });
         out.push(week);
         prevWeightedTSS = week.total_weighted_tss;
-        // Harvest drill tokens from this week's swim sessions for next iteration.
-        const nextSet = new Set<string>();
-        const weekDays = (week as any)?.days;
-        if (Array.isArray(weekDays)) {
-          for (const d of weekDays) {
-            const sessions = Array.isArray(d?.sessions) ? d.sessions : [];
-            for (const s of sessions) {
-              if (String(s?.type || '').toLowerCase() !== 'swim') continue;
-              const steps = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
-              for (const tok of steps) {
-                if (typeof tok === 'string' && SWIM_DRILL_TOKEN_RE.test(tok)) nextSet.add(tok);
-              }
-            }
-          }
-        }
-        prevWeekDrillTokens = nextSet;
+        // D-045 (2026-05-25) — harvest extracted to `drill-token-harvest.ts`.
+        // Prior inline walk read `week.days[].sessions[]`; `buildWeek` returns
+        // flat `week.sessions[]` (see `computeWeekMetrics` at week-builder.ts:593)
+        // so the Set stayed empty and the picker filter never fired.
+        // Closes Q-015 regression.
+        prevWeekDrillTokens = harvestSwimDrillTokensFromWeek(week);
       }
       return out;
     };
