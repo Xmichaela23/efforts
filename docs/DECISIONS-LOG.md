@@ -805,6 +805,105 @@ Numbered D-001, D-002, … in order of recording. Entries are not removed; if a 
 
 ---
 
+## D-037 — Mixed-effort / unplanned run sessions: decoupling + HR signals restored
+
+Shipped: 2026-05-23 / commits 2fac3e4d + 7226f90e
+
+Problem: Two gaps left unaddressed by D-034/035/036:
+(a) calculateEfficiency's steady-state guard prevented decoupling from running
+on any interval/mixed/fartlek path. D-036's override no-ops'd for these sessions
+— efficiency was never computed so there was nothing to override.
+(b) D-034's isMixedEffort null gate correctly killed pace comparisons but also
+killed hr_delta_bpm, drift_delta_bpm, and vs_similar.trend — valid signals
+regardless of effort type. LLM had zero historical HR context for mixed-effort
+sessions.
+
+Fixes:
+- efficiency.ts: forMixedEffort flag bypasses steady-state early-return, forces
+  basis='raw' on result. Whole-session decoupling across random hard/easy efforts
+  is less conclusive than steady-state; raw-branch prompt rule fires correctly
+  ("describe what HR did, don't claim fitness").
+- lib/heart-rate/index.ts: analyzeMixedWorkout calls calculateEfficiency with
+  forMixedEffort:true; analyzeIntervalWorkout same, gated on isUnplanned only.
+  Planned interval sessions keep the existing skip.
+- ai-summary.ts: HR fields (hr_delta_bpm, drift_delta_bpm, trend direction)
+  removed from isMixedEffort null gate. Pace fields stay gated (correct).
+- arc-narrative-state.ts: new is_first_post_race_run boolean
+  (runs_since_last_race <= 1 AND days_since_last_goal_race <= 60).
+- arc-narrative-ai-appendix.ts: POST-RACE COMPARISON prompt rule — when
+  is_first_post_race_run, do not interpret hr_delta_bpm as fatigue/regression;
+  frame pool as pre-race runs at peak fitness; hard-ban "aerobic system elevated"
+  language.
+
+Arc confirmed independent — nothing in Arc pipeline touches modified surfaces.
+aerobic_direction noted as unwired into workout INSIGHTS (Q-023).
+Taper-mode × vs_similar.trend interaction widened — existing hard-ban guards
+cover it; logged for monitoring.
+
+Planned interval sessions: decoupling stays null (intentional). HR historical
+surfaces for planned intervals — D-034 pool filter ensures correct pooling.
+
+---
+
+## D-038 — Pool composition + detection widening for run comparisons
+
+Shipped: 2026-05-24 / commit fef52335
+
+Problem: Diagnosed on session b70658b0 (unplanned fartlek, 3.5mi, 33min).
+Two-layer failure:
+(a) HR analyzer detectWorkoutType routed the session as steady_state because it
+    only recognizes planned-side signals (role='work'/'recovery' literals, planned
+    paceRange, 'fartlek' in description). Unplanned executed-variance fartleks
+    with role='lap' and no description slip through to steady_state default.
+    D-037's forMixedEffort path never engaged.
+(b) vs_similar pool matched type + duration but not intensity. Pool contained
+    11-13 min/mi recovery jogs; current session ran 9:24/mi avg (109 sec/mi
+    faster). +16 bpm HR delta was pace-explained, not fatigue. LLM had no
+    context for the pace gap and constructed post-race recalibration framing.
+
+Spec: docs/PERF-COMPARISON-POOL-SPEC.md
+
+Fixes (3 pieces):
+1. Detection widening — detectWorkoutType gains executed-pace fallback:
+   hasAlternatingPattern falls back to executed.avgPaceSPerMi when paceRange is
+   null. _varGate.is_mixed_effort threaded into HR analyzer as narrow one-way
+   override → routes to 'fartlek'. Unplanned executed-variance sessions now
+   engage D-037's forMixedEffort path correctly.
+2. Pool intensity filter — 15% pace-proximity band added to vs_similar pool
+   builder. 3-hit fallback mirrors existing terrain/route pattern. Diagnostic
+   pool_intensity_filter field on output. Decisions: 15% threshold (not 10/20),
+   3-hit fallback, 'fartlek' override target (not 'mixed').
+3. Pool pace context — new pool_pace_context.intensity_match enum
+   ('matched'/'current_much_faster'/'current_much_slower'), always-on (not gated
+   on isMixedEffort). Boundary at 10% (bumped from spec's 8%). New POOL
+   INTENSITY CONTEXT prompt rule: when current_much_faster, pace gap explains HR
+   gap — do not reach for fatigue/recalibration framing.
+
+Verified post-deploy on b70658b0:
+- heart_rate_summary.workoutType: steady_state → fartlek ✓
+- decoupling.basis: gap → raw ✓
+- pool_intensity_filter: applied:false, fell back (none of 7 pool rows within
+  ±15% — confirms pool was genuinely wrong intensity class)
+- pool_pace_context.intensity_match: current_much_faster, delta_pct: -16.1 ✓
+- Narrative: describes workout on its own terms, no post-race framing, no false
+  fitness claim from decoupling ✓
+
+Follow-up: hr_delta_bpm returned null post-recompute despite sample_size=7.
+build.ts:387 currentAvgHr may be resolving null for this row. Not blocking
+(prompt rules already suppress the misinterpretation that depended on it) but
+needs investigation.
+
+Tests: 456/0 _shared (was 446 + 10 new); 19/0 cycling. New:
+detect-workout-type.test.ts (6 pins), queries.test.ts (16 pins). Extended:
+decoupling.test.ts (+8 pins). First analyzer-side test file — opens the
+POLISH-PUNCH-LIST coverage gap.
+
+Alternatives rejected: see PERF-COMPARISON-POOL-SPEC.md §3. Key: pace_delta
+un-suppression explicitly rejected — pool_pace_context is the right surface for
+intensity context, not reopening pace-delta-as-verdict.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

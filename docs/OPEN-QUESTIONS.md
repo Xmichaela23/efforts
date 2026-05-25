@@ -259,6 +259,37 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
+## Q-023 — `aerobic_direction` unwired into workout INSIGHTS
+
+Filed: 2026-05-23
+
+`aerobic_direction` computed weekly (compute-snapshot:407-427), stored on
+`athlete_snapshot`, labelled by `longitudinal-signals.ts:135-154` as
+`improving | stable | declining`. Reaches conversational coach (`coach/index.ts:4884`)
+and plan generation (`create-goal/index.ts:1688`) — zero consumers in the
+workout INSIGHTS pipeline.
+
+`vs_similar.trend` (session pool, up to 8 workouts) reaches INSIGHTS and speaks
+to a similar concept from a different window. Complementary, not redundant.
+
+Not scheduled. Pick up after `run_easy_hr_trend` rename — rename first so the
+field name is clean at the wire point.
+
+---
+
+## Q-024 — `hr_delta_bpm` null on recomputed sessions despite populated pool
+
+Filed: 2026-05-24
+
+Post D-038 recompute of b70658b0: `hr_delta_bpm` returned null despite
+`sample_size=7` in `vs_similar`. Suspect `build.ts:387` `currentAvgHr` resolving
+null for this row even though pool `avgHr` would compute. Not blocking — POOL
+INTENSITY CONTEXT prompt rule already prevents the misinterpretation that
+depended on `hr_delta`. Investigate `build.ts:387` `currentAvgHr` resolution
+path before next HR signal ship.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

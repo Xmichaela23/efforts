@@ -10,6 +10,26 @@ Last updated: 2026-05-23 (D-036 — run aerobic decoupling computed on grade-adj
 
 Verified-working architecture and fixes. If you think one of these is broken, the bug is probably elsewhere — read the verification method before changing anything.
 
+### Mixed-effort / unplanned run decoupling + HR signals (D-037, 2026-05-23)
+- calculateEfficiency runs for unplanned interval sessions and all mixed/fartlek
+  sessions (forMixedEffort flag, basis forced to 'raw')
+- vs_similar HR fields (hr_delta_bpm, drift_delta_bpm, trend direction) reach
+  LLM for mixed-effort sessions; pace fields stay nulled
+- is_first_post_race_run flag + POST-RACE COMPARISON prompt rule suppresses
+  fatigue/regression framing on literal first run back (runs_since_last_race<=1,
+  days<=60)
+- Planned interval sessions: decoupling null (intentional)
+
+### Pool composition + detection widening (D-038, 2026-05-24)
+- detectWorkoutType executed-pace fallback: unplanned fartleks with role='lap'
+  now route correctly via _varGate threading
+- 15% pace-proximity pool filter with 3-hit fallback; pool_intensity_filter
+  diagnostic field on every session
+- pool_pace_context.intensity_match always-on; POOL INTENSITY CONTEXT prompt
+  rule prevents pace-gap from being misread as fatigue
+- Verify: recompute any unplanned fartlek session — workoutType should be
+  'fartlek', decoupling.basis 'raw', pool_pace_context present
+
 ### Run aerobic decoupling computed on grade-adjusted pace (D-036)
 - **Spec:** `docs/RUN-HR-DRIFT-SPEC.md`. Decision: D-036.
 - **Files:** `_shared/gap.ts` (new `enrichSamplesWithGAP` — idempotent via `raw_pace_s_per_mi` marker; returns `{ samples, basis: 'gap' \| 'raw' }`), `analyze-running-workout/index.ts` (GAP enrichment lifted to top after sensor extraction; `effectiveSensorData` passed to both `calculatePrescribedRangeAdherenceGranular` and `analyzeHeartRate`; post-fact-packet override of `derived.cardiac_decoupling_pct` with sample-level value plus `decoupling_basis` and `decoupling_assessment`), `analyze-running-workout/lib/adherence/granular-pace.ts` (inline enrichment replaced with shared helper call; idempotent so the outer lift doesn't double-correct), `analyze-running-workout/lib/heart-rate/efficiency.ts` (`decoupling.basis` field detected from `raw_pace_s_per_mi` marker presence), `analyze-running-workout/lib/heart-rate/types.ts` + `index.ts` (HRSummaryMetrics gains `decouplingBasis` + `decouplingAssessment`; all five summary builders updated), `_shared/fact-packet/types.ts` (`derived.decoupling_basis` + `decoupling_assessment`), `_shared/fact-packet/ai-summary.ts` (`signals.decoupling_basis` + `signals.decoupling_assessment` in display packet — only surfaced when `cardiac_decoupling` present, defense-in-depth against orphan flags; new AEROBIC DECOUPLING (RUN) prompt rule with two branches in `COACHING_SYSTEM_PROMPT`), `_shared/session-detail/types.ts` (`classification.decoupling: { pct, basis, assessment } \| null`), `_shared/session-detail/build.ts` (surfaces from `wa.heart_rate_summary`).
