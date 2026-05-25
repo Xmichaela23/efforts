@@ -840,7 +840,7 @@ export function raceWeekActivationSwim(
     'swim',
     `Race-Week Activation Swim — ${totalYards} yd`,
     appendPoolGearLine(
-      `Warm up ${wu} yd easy. ${fastReps}×50 yd build accelerations (start easy, finish strong; long rest between — pure neuromuscular sharpener, NOT threshold). ${aeroReps}×100 yd easy aerobic. Cool down ${cd} yd.`,
+      `Warm up ${wu} yd easy. ${fastReps}×50 yd build accelerations (start easy, finish strong; long rest between — pure neuromuscular sharpener, NOT a hard interval). ${aeroReps}×100 yd easy aerobic. Cool down ${cd} yd.`,
       [],
       swimEquipment,
     ),
@@ -907,7 +907,7 @@ export function thresholdSwim(
     day, 'swim',
     `Swim Threshold — ${totalYards} yd`,
     appendPoolGearLine(
-      `Warm up ${wu} yd easy. ${drillLead}${threshReps}×100 yd at threshold (Zone 4 — maximal sustainable effort) with 15 sec rest. ${aeroReps}×150 yd aerobic. Cool down ${cd} yd.${thresholdCssFallbackCue}`,
+      `Warm up ${wu} yd easy. ${drillLead}${threshReps}×100 yd at hard effort (maximal sustainable — what you can hold for the interval, not past it) with 15 sec rest. ${aeroReps}×150 yd easy aerobic. Cool down ${cd} yd.${thresholdCssFallbackCue}`,
       drillTokens,
       swimEquipment,
       undefined,
@@ -1182,7 +1182,7 @@ export function recoveryEasySwim(
         'swim',
         `Recovery Swim — ${totalYards} yd`,
         appendPoolGearLine(
-          `Warm up ${wu} yd easy. ${drillCopy} 4 × (50 yd drill + 50 yd full stroke easy) at Z1 — drill side reinforces the cue, full-stroke side carries it into normal swimming. Cool down ${cd} yd.`,
+          `Warm up ${wu} yd easy. ${drillCopy} 4 × (50 yd drill + 50 yd full stroke easy) at easy effort — drill side reinforces the cue, full-stroke side carries it into normal swimming. Cool down ${cd} yd.`,
           drillTokens,
           swimEquipment,
         ),
@@ -1203,7 +1203,7 @@ export function recoveryEasySwim(
     day,
     'swim',
     `Recovery Swim — ${totalYards} yd`,
-    `Warm up ${wu} yd easy. ${reps}×100 yd at easy aerobic Z1–Z2 (20 sec rest). Cool down ${cd} yd.`,
+    `Warm up ${wu} yd easy. ${reps}×100 yd at easy aerobic effort (20 sec rest). Cool down ${cd} yd.`,
     dur,
     'EASY',
     [`swim_warmup_${wu}yd_easy`, `swim_aerobic_${reps}x100yd_easy_r20`, `swim_cooldown_${cd}yd`],
@@ -1434,7 +1434,7 @@ export function pullFocusedSwim(
     drillTokens.length > 0
       ? `${swimDrillBlockAthleteCopy(drillTokens)} `
       : '';
-  const pullCopy = `${pullReps}×100 yd pull with buoy at moderate aerobic rhythm (Z3; sustainable steady turnover). 20 sec rest — high-elbow catch feel without kicking.`;
+  const pullCopy = `${pullReps}×100 yd pull with buoy at moderate aerobic rhythm (sustainable steady turnover). 20 sec rest — high-elbow catch feel without kicking.`;
   const integrateCopy =
     '4×100 yd full stroke easy aerobic — reconnect kick and rotation after pull isolation.';
 
@@ -1508,12 +1508,12 @@ export function enduranceSwim(
 
   let structure: string;
   if (athleteFitness === 'beginner') {
-    structure = `1×${mainRounded} yd continuous easy aerobic (Z2).`;
+    structure = `1×${mainRounded} yd continuous easy aerobic.`;
   } else if (athleteFitness === 'intermediate') {
     const half = Math.max(100, Math.round(mainRounded / 2 / 50) * 50);
     structure = `2×${half} yd easy aerobic with 30 sec rest between.`;
   } else {
-    structure = `1×${mainRounded} yd continuous easy aerobic (Z2).`;
+    structure = `1×${mainRounded} yd continuous easy aerobic.`;
   }
   const odNote =
     enduranceOverdistanceNote && athleteFitness === 'advanced'
@@ -1760,7 +1760,7 @@ export function timeTrialSwim(
     'swim',
     `Swim Time Trial — ${totalYards} yd`,
     appendPoolGearLine(
-      `Warm up ${wu} yd with progressive build (last 100 at moderate effort). 400 yd MAX effort — sustained hard, hold form. 4 min easy recovery (back-and-forth jogs or float). 200 yd MAX effort — leave nothing. Cool down ${cd} yd easy. The engine will recompute your CSS pace from these two splits.`,
+      `Warm up ${wu} yd with progressive build (last 100 at moderate effort). 400 yd MAX effort — sustained hard, hold form. 4 min easy recovery (back-and-forth jogs or float). 200 yd MAX effort — leave nothing. Cool down ${cd} yd easy. The engine will recompute your 100yd pace target from these two splits.`,
       [],
       swimEquipment,
     ),
