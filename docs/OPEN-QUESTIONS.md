@@ -298,7 +298,7 @@ path before next HR signal ship.
 
 ---
 
-## Q-025 — TREND pool spans training phases; direction label misleading post-race
+## Q-025 — TREND pool spans training phases; direction label misleading post-race — RESOLVED 2026-05-25 / D-050
 
 Filed: 2026-05-24
 
@@ -309,18 +309,60 @@ week-1-build re-entry runs. "32s/mi slower" label is mathematically honest
 but contextually misleading. Narrative correctly suppresses the claim via
 `pool_pace_context` but TREND row label still shows red.
 
+**Status:** RESOLVED 2026-05-25 / D-050. Pace-at-HR percentile classifier
+shipped end-to-end across 5 pieces (commits `e95b3c94` → `1f11555e`).
+Server emits `pace_at_hr` per trend point + `pace_at_hr_direction` +
+`pace_at_hr_basis` on session_detail_v1.trend; client renders pace-at-HR
+as the primary line with athlete-facing labels ("getting more efficient"
+/ "holding steady" / "worth watching") when the classifier returns a
+usable direction; raw-pace fallback preserved.
+
+**Classifier shape (locked):** session signal = mean of last K=3 pair-
+slopes, classified against p33 / p67 of the within-window pair-slope
+distribution. Switched from whole-window LR slope (structurally biased
+toward 'stable' — LR ≈ mean(pair_slopes) → always middle third) to
+recent-K mean (responsive to current trend; K=3 smooths single-session
+noise). Stable-bias preserved for degenerate distributions (uniform
+deltas → no NEW direction). Improving/declining fire only when recent-K
+mean is unusually extreme vs the athlete's internal volatility — the
+~33/33/33 distribution by construction prevents the spurious-red-label
+class of bug that originally filed this Q.
+
+**Original Q-025 problem statement preserved below for the why-it-existed
+record:**
+
+TREND pool for easy runs passes ±15% pace filter but pre-race taper points
+can still appear when `days_since_last_goal_race >= 60` (outside D-041's
+exclusion window). Marathon taper runs (peak fitness) pool against
+week-1-build re-entry runs. "32s/mi slower" label is mathematically honest
+but contextually misleading. Narrative correctly suppresses the claim via
+`pool_pace_context` but TREND row label still shows red.
+
 Real fix: derive TREND direction from pace-at-HR, not raw pace. Needs
 `pace_at_hr` on trend points (server) + new sparkline render (client).
-**Spec written 2026-05-25: `docs/PACE-AT-HR-TREND-SPEC.md`** — covers the
-server field shape, client render switch, label direction logic, and the
-5 implementation gates (formula calibration, slope-cutoff calibration,
-pool-filter interaction, pin tests, prompt-rule update). Not implemented
-yet; ship requires the calibration pulls + cutoff lock listed in §4 of
-the spec.
+Spec written 2026-05-25: `docs/PACE-AT-HR-TREND-SPEC.md`.
 
-Cross-ref: D-041 (the 60d exclusion window); D-047 (symmetric
-`getOverallAvgHr` resolution — prerequisite); `docs/PACE-AT-HR-TREND-SPEC.md`;
-POLISH-PUNCH-LIST §5 and Background open items.
+**What shipped (D-050):**
+- `pace_at_hr` field on each trend point (queries.ts + build.ts append)
+- Percentile classifier helper (`pace-at-hr-direction.ts`) — GAP coverage
+  ≥60% → restrict to gap-basis points; ≥6 points or insufficient_data
+- session_detail_v1.trend surface: `pace_at_hr_direction` +
+  `pace_at_hr_basis`
+- Client SessionNarrative.tsx: pace-at-HR as primary line when available;
+  red color ONLY on declining (stable + improving never red — the exact
+  class of bug Q-025 originally filed)
+- 18 pin tests in `pace-at-hr-direction.test.ts` lock the contract
+
+**Multi-user calibration note (open as follow-up, not blocking):** the
+classifier was tuned + verified on one athlete's data (D-047 batch).
+Production observation may surface tuning opportunities — most likely
+candidates are the K=3 smoothing window (K=2 more responsive / K=4
+calmer) and the GAP_COVERAGE_THRESHOLD (0.6 today). Single-athlete
+tuning would over-fit; revisit after 2-4 weeks of production data.
+
+Cross-ref: D-041 (60d exclusion window); D-047 (symmetric `getOverallAvgHr`
+resolution — prerequisite); D-050 (this closure);
+`docs/PACE-AT-HR-TREND-SPEC.md`; `supabase/functions/_shared/fact-packet/pace-at-hr-direction.{ts,test.ts}`.
 
 ---
 

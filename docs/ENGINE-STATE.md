@@ -416,6 +416,39 @@ Verified-working architecture and fixes. If you think one of these is broken, th
 
 ---
 
+### D-046 — Q-026 unplanned backward-anchor suppression (2026-05-25)
+- **Files/commits:** `97111a01`. `_shared/arc-narrative-ai-appendix.ts:arcUnplannedBackwardAnchorAddon` — new exported helper; wired into running ai-summary at `_shared/fact-packet/ai-summary.ts:~1175` and cycling ai-summary at `_shared/cycling-v1/ai-summary.ts:~400`.
+- **Behavior:** when `is_unplanned=true` AND narrative mode is NOT recovery_read / race_debrief (those modes require comeback framing per D-019), prompt now hard-bans backward race anchors with the same forbidden-pattern enumeration shape as `backwardAnchorHardBan`. Closes the "X days post-marathon" leak that escaped the linked-session forward-bias rules (D-039 / D-040).
+- **Footgun:** the recovery_read / race_debrief override is mode-keyed, not flag-keyed — those addons REQUIRE the comeback frame regardless of is_unplanned. Don't extend the ban to those modes.
+- **Decision:** D-046.
+
+### D-047 — Q-024 hr_delta_bpm null root-cause + symmetric HR resolution (2026-05-25)
+- **Files/commits:** `244c22c4`. Exported `getOverallAvgHr` from `_shared/fact-packet/queries.ts:161`; build.ts:~284 now uses the same three-stage fallback chain (overall.avg_hr → overall.avg_heart_rate → row.avg_heart_rate). 7 pin tests in `queries.test.ts`.
+- **Behavior:** when current workout has HR populated under the alt key (`overall.avg_heart_rate`) or row-level (`workouts.avg_heart_rate`) but not under `overall.avg_hr`, `currentAvgHr` now resolves correctly. Closes the asymmetric-resolution bug where pool rows resolved through `getOverallAvgHr` but the current workout dropped to null, producing `hr_delta_bpm: null` despite `sample_size >= 3`. Sensor-data fallback stays at the tail as defense-in-depth.
+- **Footgun:** any future avg-HR lookup MUST use `getOverallAvgHr` (not inline `coerceNumber(overall?.avg_hr)`) to preserve the symmetric resolution. The 7 pin tests lock the three-key fallback contract.
+- **Decision:** D-047.
+
+### D-048 — POLISH §1 base-skip + rebuild-skip trade-offs (2026-05-25)
+- **Files/commits:** `ef0f6bcb`. `_shared/plan-generation-trade-offs.ts` adds two templates (`base_phase_skipped_short_plan`, `rebuild_skipped_tight_window`). `generate-combined-plan/phase-structure.ts:buildPhaseTimeline` return shape extended with `phaseStructureTradeOffs: PlanGenerationTradeOff[]`; threaded into `buildSingleEventBlocks` + the overlapping/tight non-priority-A branches. `generate-combined-plan/index.ts` merges into persistedTradeOffs (copied first to avoid mutating caller input). 6 pin tests in `phase-structure-tradeoffs.test.ts`.
+- **Behavior:** 9-week 70.3 plan (or any plan where backward-from-race packing leaves baseStart >= buildStart) now surfaces a "base phase skipped" trade-off instead of silent skip. Two-A-priority sequential paths with tight inter-race windows surface a "rebuild skipped" trade-off instead of silent skip. Priority-A-tri-with-B branch unchanged (still hard-fails via the §8.5 windowWks < aTaperWks + 1 guard).
+- **Footgun:** `persistedTradeOffs` is now a LOCAL COPY; mutating it does NOT propagate back to the request body. Any future fan-out that needs the caller's array should re-derive or accept the copied list.
+- **Decision:** D-048. POLISH §1 flipped 95% → 100%.
+
+### D-049 — CYCLING-PROTOCOL §4.3 race-spec brick closing block (2026-05-25)
+- **Files/commits:** `228492ea`. `generate-combined-plan/session-factory.ts:brick` (~:1734) — race_specific bricks ≥ 60 min now emit a 2-block `steps_preset`: `bike_endurance_${baseMin}min_Z2` + `bike_race_pace_${closingMin}min_Z3`. Closing block ≈ 25% of total (clamped 20-45 min). 5 pin tests in `brick-race-spec.test.ts`.
+- **Behavior:** athlete description references the race-IF target band (0.78-0.82 IF for 70.3 / 0.62-0.68 IF for full IM) so they know what "race power" means. Shorter race-specific bricks (< 60 min — early-season / olympic) keep the single-zone Z3 tag (too short to slice a meaningful closing block). Base / build bricks unchanged (single-block Z2 throughout).
+- **Footgun:** the `useStructuredRS` gate is `isRS && bikeMin >= 60` — don't relax it without re-tuning. The 20-45 min closing-block clamp via `Math.min(45, Math.max(20, Math.round(bikeMin * 0.25)))` is the §4.3 spec window; closing block sizes outside that range violate the protocol.
+- **Decision:** D-049. POLISH §3 Cycling P2 + P3 both closed.
+
+### D-050 — Pace-at-HR percentile-classifier trend (Q-025 closed, 2026-05-25)
+- **Files/commits:** `e95b3c94` (Piece 1: pace_at_hr on trend points — queries.ts + build.ts), `6dc3ab5a` (Piece 2: classifier helper `pace-at-hr-direction.ts` + fact-packet/build.ts wiring), `36cec623` (Piece 3: session_detail_v1 surface), `f041619b` (Piece 4: client SessionNarrative.tsx render), `1f11555e` (Piece 5: 18 pin tests + responsiveness fix). Spec: `docs/PACE-AT-HR-TREND-SPEC.md`.
+- **Behavior:** running TREND row now uses pace-at-HR (sec/mi per 100bpm = `pace * 100 / avg_hr`) as the primary signal when ≥6 points have non-null pace_at_hr AND the server's percentile classifier returns a usable direction. Pool-uniform basis (GAP when useGapForTrend, raw otherwise). GAP-coverage filter at the classifier: when ≥60% of pace_at_hr-valid points are gap-basis, restrict to those for the slope computation. Direction labels are athlete-facing: "getting more efficient" / "holding steady" / "worth watching". Red color ONLY on declining (the Q-025 misleading-red-label class of bug is closed end-to-end).
+- **Classifier (locked):** session signal = MEAN OF THE LAST K=3 PAIR-SLOPES, classified against p33 / p67 of the full pair-slope distribution within the window. Switched from whole-window LR slope (which was structurally biased toward 'stable' — LR ≈ mean(pair_slopes) → always in middle third) to the recent-K mean (responsive to current trend; K=3 smooths single-session noise). Stable-bias preserved for degenerate distributions (p33 === p67 — uniform deltas → no NEW direction signal). Verified behavior across 14 fixture shapes; 18 pin tests green.
+- **Footgun:** the percentile classifier produces ~33/33/33 distribution on noisy data BY CONSTRUCTION — improving/declining fire when recent-K mean is unusually extreme vs internal volatility, not when there's a monotone trend. Long monotone trends correctly read as 'stable' because they're not a NEW direction relative to typical. Don't re-introduce a "monotone → improving" assumption — the classifier intentionally suppresses it. The K=3 window is locked; multi-user calibration may warrant tuning later, but single-athlete tuning would over-fit.
+- **Decision:** D-050. Q-025 RESOLVED.
+
+---
+
 ## Known broken (filed, not blocking)
 
 Behaviors that are demonstrably wrong but intentionally deferred. Don't propose fixes unless you have new information — the deferral was a scoping call, and the list below documents the cost so the next implementer can pick up cleanly.

@@ -1099,6 +1099,92 @@ Q-015 marked RESOLVED.
 
 ---
 
+## D-050 — Pace-at-HR percentile-classifier trend (Q-025 closed)
+
+Shipped: 2026-05-25 / commits e95b3c94 → 1f11555e
+
+Q-025 filed the misleading-direction-label bug on the TREND row: raw-pace
+slope was mathematically honest but contextually wrong when the trend
+pool spanned a pre-race peak-fitness taper vs post-race re-entry runs.
+The athlete saw red "32s/mi slower" labels that were neither a fitness
+regression nor a coaching signal — they were a pool composition artifact.
+
+PACE-AT-HR-TREND-SPEC.md (D-047 Item 6, 2026-05-25) prescribed pace-at-HR
+(sec/mi per 100bpm) as the normalized signal: faster pace at the same HR
+= genuine aerobic-efficiency improvement, robust to fitness-state context.
+Single-user calibration (D-047 batch) confirmed the formula scale + GAP-
+basis preference + minimum-point-count ≥ 6, and recommended the percentile
+classifier over the fixed ±15 cutoff for per-athlete adaptation.
+
+Implementation (D-050, 5 pieces):
+
+  Piece 1 (e95b3c94) — `pace_at_hr` field on each trend point in
+  `fact-packet/queries.ts` (pool) + `build.ts` (current workout append).
+  Formula: `pace_sec_per_mi * 100 / avg_hr`, basis-aligned with the pool's
+  uniform pace_basis (GAP when useGapForTrend, raw otherwise). Null when
+  avg_hr is missing.
+
+  Piece 2 (6dc3ab5a) — percentile classifier in new helper
+  `fact-packet/pace-at-hr-direction.ts`. GAP coverage ≥60% → restrict to
+  gap-basis points; ≥6 points required or insufficient_data. Wired into
+  fact-packet/build.ts; emits `pace_at_hr_direction` + `pace_at_hr_basis`
+  on vs_similar.
+
+  Piece 3 (36cec623) — session_detail_v1.trend contract surface:
+  `points[].pace_at_hr` + `pace_at_hr_direction` + `pace_at_hr_basis`.
+  Backward-compatible (all optional). session-detail/build.ts wires
+  through from vs_similar.
+
+  Piece 4 (f041619b) — client `SessionNarrative.tsx` plots pace_at_hr as
+  primary line when usable (`pace_at_hr_direction` non-null + non-
+  insufficient + ≥6 points + running unit). Athlete-facing labels:
+  improving → "getting more efficient", stable → "holding steady",
+  declining → "worth watching". Red color ONLY on declining; stable +
+  improving never red. Falls back to raw-pace + server `summary` when
+  classifier reports null / insufficient_data.
+
+  Piece 5 (1f11555e) — 18 pin tests + responsiveness fix. While writing
+  tests, discovered the original whole-window LR-slope classifier was
+  structurally biased toward 'stable': linear regression slope ≈ mean of
+  per-pair slopes, so the overall almost always landed in the middle
+  third of the per-pair percentile distribution. Improving/declining
+  effectively never fired on realistic data.
+
+Classifier responsiveness fix (Piece 5 — locked):
+
+  Session signal is now the MEAN OF THE LAST K=3 PAIR-SLOPES (smoothed
+  recent trend), classified against the same p33 / p67 boundaries derived
+  from the full pair-slope distribution within the window. This tracks
+  the athlete's CURRENT direction (responsive) while smoothing single-
+  session noise (the K=3 average suppresses one-shot outliers). Stable
+  bias preserved for degenerate distributions (p33 === p67 — all pairs
+  effectively equal → no session can be "unusually fast/slow vs typical").
+
+  Verified behavior:
+    back-heavy acceleration negative → improving
+    back-heavy acceleration positive → declining
+    front-heavy improvement then plateau → declining (recent trend
+      reversal correctly surfaced even when cumulative window is net-
+      negative)
+    steady decline (uniform deltas) → stable (degenerate distribution
+      suppresses signal — a perfectly steady trend isn't a NEW direction)
+    wide-variance noise around zero → stable
+    single outlier delta → stable (K=3 smooths)
+
+Deploy scope: `analyze-running-workout`, `workout-detail`,
+`recompute-workout`, `bulk-reanalyze-workouts`, `ingest-activity` — the
+5-function fact-packet/analyzer fan-out. No plan-generation functions
+touched.
+
+Q-025 marked RESOLVED. PACE-AT-HR-TREND-SPEC.md §4 gates 1, 3, 4, 5 all
+green; gate 2 (slope cutoffs) now obsoleted by the percentile classifier;
+gate 6 (pin tests) satisfied by `pace-at-hr-direction.test.ts` 18/0.
+Multi-user validation still warranted on production — the classifier's
+behavior was calibrated on one athlete (D-047 batch); broader observation
+may surface tuning opportunities (e.g. K=3 vs K=2 vs K=4 smoothing).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
