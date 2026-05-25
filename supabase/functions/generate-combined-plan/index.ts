@@ -253,6 +253,16 @@ Deno.serve(async (req: Request) => {
     ): GeneratedWeekFromBuilder[] => {
       const out: GeneratedWeekFromBuilder[] = [];
       let prevWeightedTSS = state.current_ctl * 7;
+      // D-044 item 6 / Q-015 — drill repeat-pick memory across weeks. Rolling
+      // 1-week window: the Set passed in for each week contains drill tokens
+      // chosen in the immediately-prior week's swim sessions. After buildWeek
+      // returns, we extract drill tokens from the week's swim PlannedSession
+      // steps_preset (any token matching swim_drills* or swim_drill_*) and
+      // replace the set for the next iteration. Picker excludes these
+      // tokens by name-suffix key before salt-rotation; falls back to
+      // unfiltered when filter empties the pool.
+      let prevWeekDrillTokens: Set<string> = new Set();
+      const SWIM_DRILL_TOKEN_RE = /^swim_drills?_/i;
       for (let w = 1; w <= totalWeeks; w++) {
         const block = blockForWeek(blocksArg, w);
         const week = buildWeek(w, block, prevWeightedTSS, goals, scheduleState, athlete_memory, {
@@ -263,6 +273,8 @@ Deno.serve(async (req: Request) => {
           // with respect to this field; Phase 1-4 consumers destructure as they
           // need fields. Undefined when caller omits `arc` from the request body.
           arc,
+          // D-044 item 6 / Q-015 — see prevWeekDrillTokens declaration above.
+          prevWeekDrillTokens,
           ...(rebuild === 'deep'
             ? { physiologicalFloorRebuild: true, physiologicalFloorRebuildDeep: true }
             : rebuild === 'normal'
@@ -271,6 +283,22 @@ Deno.serve(async (req: Request) => {
         });
         out.push(week);
         prevWeightedTSS = week.total_weighted_tss;
+        // Harvest drill tokens from this week's swim sessions for next iteration.
+        const nextSet = new Set<string>();
+        const weekDays = (week as any)?.days;
+        if (Array.isArray(weekDays)) {
+          for (const d of weekDays) {
+            const sessions = Array.isArray(d?.sessions) ? d.sessions : [];
+            for (const s of sessions) {
+              if (String(s?.type || '').toLowerCase() !== 'swim') continue;
+              const steps = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+              for (const tok of steps) {
+                if (typeof tok === 'string' && SWIM_DRILL_TOKEN_RE.test(tok)) nextSet.add(tok);
+              }
+            }
+          }
+        }
+        prevWeekDrillTokens = nextSet;
       }
       return out;
     };

@@ -637,6 +637,16 @@ export function buildWeek(
      * Falls back to baseline (athlete_state.learned_fitness) when undefined.
      */
     arc?: ArcChannelPayload;
+    /**
+     * D-044 item 6 / Q-015 — drill repeat-pick memory. The Set this week's
+     * swim creators filter against (drills already picked in the prior week).
+     * Caller (generateAllWeeks) maintains the rolling set and rotates each
+     * iteration. Empty / undefined when not provided → picker no-ops the
+     * filter (back-compat). The returned week's swim sessions' drill tokens
+     * are visible to the caller via PlannedSession.steps_preset for the
+     * caller to harvest and seed the next iteration's set.
+     */
+    prevWeekDrillTokens?: Set<string> | null;
   },
 ): GeneratedWeek {
   console.log('[buildWeek] ===== FUNCTION ENTRY ===== week', weekNum);
@@ -1401,6 +1411,10 @@ export function buildWeek(
     // (Slice 1 scope decision).
     weekInPhase: swimWeekInPhase,
     rampWeeks: rampWeeksForPhase(phase),
+    // D-044 item 6 / Q-015 — drill repeat-pick memory. Forwarded into
+    // swimSessionFromTemplate → underlying creator → pickSwimDrillInset.
+    // Empty/undefined when caller doesn't track (back-compat preserved).
+    prevWeekDrillTokens: options?.prevWeekDrillTokens ?? null,
   });
   // ── Bike quality + easy (defaults Tue / Wed; from Arc `preferred_days.quality_bike` / `easy_bike`) ──
   const bikeQualIdxBase =

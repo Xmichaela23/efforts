@@ -756,6 +756,8 @@ export function speedSwim(
   athleteFitness?: 'beginner' | 'intermediate' | 'advanced',
   /** §7.5 — when missing/invalid, session appends the RPE fallback cue (defensive — beginners are blocked from speed per §10.2). */
   swimThresholdPace?: string | null,
+  /** D-044 item 6 / Q-015 — drill repeat-pick memory. Passed through to pickSwimDrillInset. */
+  prevWeekDrillTokens?: Set<string> | null,
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
@@ -770,6 +772,7 @@ export function speedSwim(
     sessionKind: 'threshold',
     swimGearLabels: swimEquipment,
     athleteFitness,
+    prevWeekDrillTokens,
   });
   const fastBudget = Math.round(main * 0.58);
   let fastReps = Math.min(22, Math.max(10, Math.round(fastBudget / 50)));
@@ -866,6 +869,8 @@ export function thresholdSwim(
   athleteFitness?: 'beginner' | 'intermediate' | 'advanced',
   /** §7.5 — when missing/invalid, session appends the RPE fallback cue. Threshold is banned for beginners per §10.2 but the cue covers any non-beginner who reaches it without a CSS. */
   swimThresholdPace?: string | null,
+  /** D-044 item 6 / Q-015 — drill repeat-pick memory. */
+  prevWeekDrillTokens?: Set<string> | null,
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
@@ -880,6 +885,7 @@ export function thresholdSwim(
     sessionKind: 'threshold',
     swimGearLabels: swimEquipment,
     athleteFitness,
+    prevWeekDrillTokens,
   });
   const threshReps = Math.max(4, Math.round((main * 0.55) / 100));
   const aeroReps   = Math.max(3, Math.round((main * 0.45) / 150));
@@ -1029,6 +1035,8 @@ export function cssAerobicSwim(
      */
     weekInPhase?: number;
     rampWeeks?: number;
+    /** D-044 item 6 / Q-015 — drill repeat-pick memory. */
+    prevWeekDrillTokens?: Set<string> | null;
   },
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
@@ -1044,6 +1052,7 @@ export function cssAerobicSwim(
     sessionKind: 'css_aerobic',
     swimGearLabels: options?.swimEquipment,
     athleteFitness: options?.athleteFitness,
+    prevWeekDrillTokens: options?.prevWeekDrillTokens,
   });
   const raceSupport = options?.raceSupport ?? false;
   const repCap = cssHundredsRepHardCap(options?.athleteFitness, planWeek);
@@ -1140,6 +1149,8 @@ export function recoveryEasySwim(
   drillSlotSalt: number = 0,
   phase?: string,
   swimEquipment?: string[] | null,
+  /** D-044 item 6 / Q-015 — drill repeat-pick memory. */
+  prevWeekDrillTokens?: Set<string> | null,
 ): PlannedSession {
   totalYards = Math.max(650, Math.min(1200, snapSwimSessionTotalYdEasy(totalYards)));
   const wu = 200;
@@ -1158,6 +1169,7 @@ export function recoveryEasySwim(
       sessionKind: 'recovery',
       swimGearLabels: swimEquipment,
       athleteFitness: 'beginner',
+      prevWeekDrillTokens,
     });
     if (drillTokens.length > 0) {
       // Each repeat alternates 50yd drill / 50yd full stroke. The drill block in
@@ -1211,6 +1223,8 @@ export function easySwim(
   techniqueDrillEmphasis = false,
   swimEquipment?: string[] | null,
   athleteFitness?: 'beginner' | 'intermediate' | 'advanced',
+  /** D-044 item 6 / Q-015 — drill repeat-pick memory. */
+  prevWeekDrillTokens?: Set<string> | null,
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdEasy(totalYards);
   const wu = 300;
@@ -1226,6 +1240,7 @@ export function easySwim(
     techniqueDrillEmphasis,
     swimGearLabels: swimEquipment,
     athleteFitness,
+    prevWeekDrillTokens,
   });
   const reps = Math.max(4, Math.round(mainYards / 150));
   const dur = Math.round(totalYards / 35); // ~35 yd/min for easy
@@ -1358,6 +1373,8 @@ export function pullFocusedSwim(
   planWeek?: number,
   drillSlotSalt: number = 0,
   phase?: string,
+  /** D-044 item 6 / Q-015 — drill repeat-pick memory. */
+  prevWeekDrillTokens?: Set<string> | null,
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
@@ -1380,6 +1397,7 @@ export function pullFocusedSwim(
         sessionKind: 'pull_focused',
         swimGearLabels: swimEquipment,
         athleteFitness,
+        prevWeekDrillTokens,
       })
     : { mainBudgetYd: totalYards - wu - cd - integrationYd, drillTokens: [] as string[] };
 
@@ -1467,6 +1485,8 @@ export function enduranceSwim(
   swimEquipment?: string[] | null,
   swimThresholdPace?: string | null,
   enduranceOverdistanceNote?: boolean,
+  /** D-044 item 6 / Q-015 — drill repeat-pick memory. */
+  prevWeekDrillTokens?: Set<string> | null,
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 400;
@@ -1482,6 +1502,7 @@ export function enduranceSwim(
     techniqueDrillEmphasis: false,
     swimGearLabels: swimEquipment,
     athleteFitness,
+    prevWeekDrillTokens,
   });
   const mainRounded = Math.max(200, Math.round(main / 50) * 50);
 
@@ -1558,6 +1579,9 @@ export function swimSessionFromTemplate(
     /** §5.2.1 within-phase rest-interval lerp (Slice 2). Companion to `weekInPhase`;
      *  typically `rampWeeksForPhase(phase)` from science.ts. */
     rampWeeks?: number;
+    /** D-044 item 6 / Q-015 — drill repeat-pick memory. Forwarded into each
+     *  underlying swim creator → pickSwimDrillInset. */
+    prevWeekDrillTokens?: Set<string> | null;
   },
 ): PlannedSession {
   const dk: SwimDistanceKey = opts?.swimRaceDistanceKey ?? '70.3';
@@ -1607,6 +1631,7 @@ export function swimSessionFromTemplate(
         return thresholdSwim(
           day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment, opts?.athleteFitness,
           opts?.swimThresholdPace,
+          opts?.prevWeekDrillTokens,
         );
       case 'css_aerobic':
         return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, {
@@ -1615,20 +1640,23 @@ export function swimSessionFromTemplate(
           swimThresholdPace: opts?.swimThresholdPace,
           weekInPhase: opts?.weekInPhase,
           rampWeeks: opts?.rampWeeks,
+          prevWeekDrillTokens: opts?.prevWeekDrillTokens,
         });
       case 'technique_aerobic':
-        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, true, swimEquipment, opts?.athleteFitness);
+        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, true, swimEquipment, opts?.athleteFitness, opts?.prevWeekDrillTokens);
       case 'race_specific_aerobic':
         return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, {
           raceSupport: true,
           swimEquipment,
           athleteFitness: opts?.athleteFitness,
           swimThresholdPace: opts?.swimThresholdPace,
+          prevWeekDrillTokens: opts?.prevWeekDrillTokens,
         });
       case 'speed':
         return speedSwim(
           day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment, opts?.athleteFitness,
           opts?.swimThresholdPace,
+          opts?.prevWeekDrillTokens,
         );
       case 'kick_focused':
         return kickFocusedSwim(day, yards, goalId, dk, opts?.swimThresholdPace ?? undefined, swimEquipment);
@@ -1644,6 +1672,7 @@ export function swimSessionFromTemplate(
           planWeek,
           drillSlotSalt,
           phase,
+          opts?.prevWeekDrillTokens,
         );
       case 'endurance':
         return enduranceSwim(
@@ -1657,6 +1686,7 @@ export function swimSessionFromTemplate(
           swimEquipment,
           opts?.swimThresholdPace ?? undefined,
           opts?.enduranceOverdistanceNote ?? false,
+          opts?.prevWeekDrillTokens,
         );
       case 'easy':
         if (template.recovery_learner_easy_structure) {
@@ -1669,11 +1699,12 @@ export function swimSessionFromTemplate(
             drillSlotSalt,
             phase,
             swimEquipment,
+            opts?.prevWeekDrillTokens,
           );
         }
-        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment, opts?.athleteFitness);
+        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment, opts?.athleteFitness, opts?.prevWeekDrillTokens);
       default:
-        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment, opts?.athleteFitness);
+        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment, opts?.athleteFitness, opts?.prevWeekDrillTokens);
     }
   })();
   console.log('[session-factory] created swim session', {
