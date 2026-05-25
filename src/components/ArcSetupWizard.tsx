@@ -1072,6 +1072,11 @@ function Step1Races({
                   </button>
                 ))}
               </div>
+              <div className="mt-2 space-y-0.5 text-[11px] text-white/40 leading-snug">
+                <p><span className="text-white/65 font-medium">A</span> — your main goal race (shapes the whole plan).</p>
+                <p><span className="text-white/65 font-medium">B</span> — secondary race you want to perform well at.</p>
+                <p><span className="text-white/65 font-medium">C</span> — practice race; low taper, train through it.</p>
+              </div>
             </div>
           )}
         </div>
