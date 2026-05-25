@@ -258,8 +258,19 @@ export async function buildWorkoutFactPacketV1(args: {
   workoutIntent: string | null;
   classifiedTypeOverride?: string | null;
   learnedFitness: any | null; // from user_baselines.learned_fitness
+  /**
+   * D-041 Fix D: optional Arc context for phase-aware TREND pool filtering.
+   * When provided AND daysSinceLastGoalRace < 60, the trend pool excludes
+   * historicals dated before lastGoalRaceYmd (pre-race-window points reflect
+   * peak-taper fitness, not the current training phase). Fully back-compat:
+   * legacy callers that don't pass arcContext get unfiltered trend pool.
+   */
+  arcContext?: {
+    lastGoalRaceYmd?: string | null;
+    daysSinceLastGoalRace?: number | null;
+  } | null;
 }): Promise<{ factPacket: FactPacketV1; flags: FlagV1[] }> {
-  const { supabase, workout, plannedWorkout, planContext, workoutIntent, classifiedTypeOverride, learnedFitness } = args;
+  const { supabase, workout, plannedWorkout, planContext, workoutIntent, classifiedTypeOverride, learnedFitness, arcContext } = args;
 
   const computed = parseJson(workout?.computed) || {};
   const overall = computed?.overall || {};
@@ -387,6 +398,9 @@ export async function buildWorkoutFactPacketV1(args: {
       currentAvgHr: avgHr,
       currentHrDriftBpm: hrDriftCurrent,
       currentTerrainClass: terrain_type !== 'flat' ? terrain_type : null,
+      // D-041 Fix D: phase-aware trend pool filter. See arcContext doc above.
+      lastGoalRaceYmd: arcContext?.lastGoalRaceYmd ?? null,
+      daysSinceLastGoalRace: arcContext?.daysSinceLastGoalRace ?? null,
     }),
     getPaceTrend(supabase, { userId: String(workout.user_id), workoutTypeKey: comparisonTypeKey, count: 8 }),
     getNotableAchievements(supabase, { userId: String(workout.user_id), currentWorkoutId: String(workout.id), workoutTypeKey, lookbackDays: 28 }),
@@ -894,6 +908,8 @@ export async function buildWorkoutFactPacketV1(args: {
           // D-038 Piece 2 + 3: diagnostic + LLM-facing context fields.
           pool_intensity_filter: (vsSimilar as any).pool_intensity_filter ?? null,
           pool_pace_context: (vsSimilar as any).pool_pace_context ?? null,
+          // D-041 Fix D: phase-aware TREND pool boundary flag.
+          trend_pool_crosses_race_boundary: (vsSimilar as any).trend_pool_crosses_race_boundary === true,
           trend_points: (() => {
             const pts = Array.isArray((vsSimilar as any).trend_points) ? (vsSimilar as any).trend_points : [];
             const curDate = workout?.date ?? null;

@@ -437,6 +437,12 @@ MIXED-EFFORT MODE — when the user message includes an INTERVAL EXECUTION block
 - USE GAP when "grade-adjusted" is noted on the pace adherence line. The interval paces in INTERVAL EXECUTION are already GAP-corrected when that flag is set — anchor the effort read on those values, not raw pace.
 - DO NOT say "you ran faster/slower than recent similar efforts" or any whole-workout pace comparison sentence. There is no honest steady pace comparison to make.
 
+TREND POOL RACE BOUNDARY — when signals.comparisons.vs_similar is present AND vs_similar.trend_pool_crosses_race_boundary === true:
+- The TREND sparkline includes points from BEFORE a recent completed goal race AND from after it. Pre-race points reflect peak-taper fitness; post-race points reflect re-entry. Treating direction across that boundary as a fitness signal is misleading — they're different training phases.
+- DO NOT cite the trend's direction (improving / declining / stable) as a fitness claim. Do NOT say "you're trending faster" or "pace has slowed over the last N workouts" based on the trend block when this flag is true.
+- You MAY describe the trend as a limited-sample observation if relevant ("Your recent runs since the race are settling into the X:XX/mi range") — but anchor on the workouts since the race, not the pre-race comparison.
+- This rule composes with POOL INTENSITY CONTEXT and POST-RACE COMPARISON; if any apply, all apply.
+
 POOL INTENSITY CONTEXT — when signals.comparisons.vs_similar is present AND vs_similar.pool_pace_context is populated, anchor any HR-delta interpretation against pool_pace_context.intensity_match:
 - "current_much_faster": the comparison pool was significantly easier than this session. HR running higher than the pool is structurally expected and reflects intensity, not fitness change. Say so plainly (e.g. "your recent similar runs were easier paces, so the higher HR today tracks with the harder effort"). Do NOT frame the HR delta as fatigue, post-race recovery, aerobic decline, cardiovascular elevation, or any longitudinal signal. Do NOT print or quote pool_pace_context.delta_pct or delta_sec — use the words.
 - "current_much_slower": pool was significantly harder than this session. HR running lower than the pool is structurally expected — easier effort. Do NOT frame this as a fitness improvement signal in isolation.
@@ -937,6 +943,12 @@ export function toDisplayFormatV1(
               // the LLM to quote them (same defense as cardiac_decoupling's
               // "translate, never print").
               pool_pace_context: (derived.comparisons?.vs_similar as any)?.pool_pace_context ?? null,
+              // D-041 Fix D: TREND POOL RACE BOUNDARY prompt rule keys off
+              // this flag — when true, trend pool spans pre/post a recent
+              // completed goal race AND the post-race-only filter would have
+              // dropped the pool below 3 points. LLM treats trend direction
+              // as limited sample, not fitness signal.
+              trend_pool_crosses_race_boundary: (derived.comparisons?.vs_similar as any)?.trend_pool_crosses_race_boundary === true,
             },
             trend: {
               direction: derived.comparisons?.trend?.direction ?? null,

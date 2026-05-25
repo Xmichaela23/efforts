@@ -1985,6 +1985,43 @@ Deno.serve(async (req) => {
       }
 
       const intent = plannedWorkout ? (detectWorkoutIntent(plannedWorkout) as any) : null;
+
+      // D-041 Fix D: lightweight Arc lookup for phase-aware TREND pool filter.
+      // Only needs (last completed goal-race target_date, days_since). Full
+      // getArcContext fetch happens later at :2018 for ai_summary; this is a
+      // small pre-query to inform the fact-packet build. Failure non-fatal —
+      // falls through to legacy unfiltered trend pool.
+      let preFactArc: { lastGoalRaceYmd: string | null; daysSinceLastGoalRace: number | null } = {
+        lastGoalRaceYmd: null,
+        daysSinceLastGoalRace: null,
+      };
+      try {
+        const focusYmd = String(workout?.date ?? '').slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(focusYmd)) {
+          const { data: goalRows } = await supabase
+            .from('goals')
+            .select('name, target_date, status, goal_type')
+            .eq('user_id', workout.user_id);
+          const candidates = (goalRows || [])
+            .filter((r: any) => String(r.status || '').toLowerCase() !== 'cancelled')
+            .filter((r: any) => String(r.goal_type || '').toLowerCase() === 'event')
+            .map((r: any) => ({ name: String(r.name || 'Race'), td: r.target_date ? String(r.target_date).slice(0, 10) : '' }))
+            .filter((r: { name: string; td: string }) => /^\d{4}-\d{2}-\d{2}$/.test(r.td) && r.td < focusYmd)
+            .sort((a: { td: string }, b: { td: string }) => b.td.localeCompare(a.td));
+          if (candidates.length) {
+            const lr = candidates[0];
+            const focusMs = new Date(focusYmd + 'T12:00:00Z').getTime();
+            const raceMs = new Date(lr.td + 'T12:00:00Z').getTime();
+            preFactArc = {
+              lastGoalRaceYmd: lr.td,
+              daysSinceLastGoalRace: Math.round((focusMs - raceMs) / 86400000),
+            };
+          }
+        }
+      } catch (arcLookupErr) {
+        console.warn('[analyze-running-workout] preFactArc lookup failed (non-fatal):', arcLookupErr);
+      }
+
       const { factPacket, flags } = await buildWorkoutFactPacketV1({
         supabase,
         workout: workoutForFact,
@@ -2003,6 +2040,7 @@ Deno.serve(async (req) => {
         workoutIntent: (intent as any) || null,
         classifiedTypeOverride: classifiedTypeKey,
         learnedFitness: learnedFitness || null,
+        arcContext: preFactArc,
       });
       fact_packet_v1 = factPacket;
       flags_v1 = flags;

@@ -270,9 +270,21 @@ export async function getSimilarWorkoutComparisons(
     currentAvgHr: number | null;
     currentHrDriftBpm: number | null;
     currentTerrainClass?: 'flat' | 'rolling' | 'hilly' | null;
+    /**
+     * D-041 Fix D: phase-aware TREND pool. When the workout is within ~60 days
+     * post a completed goal race, exclude trend points from before that race
+     * date — pre-race-window historicals reflect peak-taper fitness and
+     * shouldn't trend against post-race re-entry. Falls back to all points
+     * with `trend_pool_crosses_race_boundary: true` set on output if the
+     * filtered pool drops below 3.
+     * Both fields optional and back-compat: filter only fires when both
+     * `lastGoalRaceYmd` is present AND `daysSinceLastGoalRace < 60`.
+     */
+    lastGoalRaceYmd?: string | null;
+    daysSinceLastGoalRace?: number | null;
   }
 ): Promise<VsSimilarV1 & { avg_pace_at_similar_hr: number | null; avg_hr_drift: number | null; pace_basis?: 'gap' | 'raw' }> {
-  const { userId, currentWorkoutId, workoutTypeKey, durationMin, currentAvgPaceSecPerMi, currentAvgGapSecPerMi, currentAvgHr, currentHrDriftBpm, currentTerrainClass } = params;
+  const { userId, currentWorkoutId, workoutTypeKey, durationMin, currentAvgPaceSecPerMi, currentAvgGapSecPerMi, currentAvgHr, currentHrDriftBpm, currentTerrainClass, lastGoalRaceYmd, daysSinceLastGoalRace } = params;
 
   try {
     const end = new Date().toISOString().slice(0, 10);
@@ -490,8 +502,35 @@ export async function getSimilarWorkoutComparisons(
           return paceWithin(candPace, trendAnchorPace);
         })
       : trendWithPaceBaseUnfiltered;
-    const trendWithPaceBase = trendPaceFiltered.length >= 3 ? trendPaceFiltered : trendWithPaceBaseUnfiltered;
-    console.warn(`[fact-packet] trend pool_intensity_filter: ${trendWithPaceBaseUnfiltered.length} → ${trendPaceFiltered.length} → ${trendWithPaceBase.length} (using ${trendPaceFiltered.length >= 3 ? 'filtered' : 'unfiltered'})`);
+    const trendPostIntensity = trendPaceFiltered.length >= 3 ? trendPaceFiltered : trendWithPaceBaseUnfiltered;
+    // D-041 Fix D: phase-aware race-boundary filter. Pre-race-window
+    // historicals reflect peak-taper fitness; trending post-race re-entry
+    // against them is misleading. When the current workout is within ~60d
+    // of a completed goal race AND that race date is known, exclude points
+    // dated before the race. Falls back to all points with a boundary flag
+    // set on the output when the filtered pool drops below 3 — matching the
+    // intensity-filter pattern. Boundary flag tells the LLM to treat the
+    // trend as a limited sample, not a fitness signal.
+    const raceFilterActive = !!lastGoalRaceYmd &&
+      typeof daysSinceLastGoalRace === 'number' &&
+      daysSinceLastGoalRace >= 0 && daysSinceLastGoalRace < 60;
+    let trendWithPaceBase = trendPostIntensity;
+    let trend_pool_crosses_race_boundary = false;
+    if (raceFilterActive) {
+      const raceYmd = String(lastGoalRaceYmd);
+      const postRace = trendPostIntensity.filter((r) => String(r.date || '') > raceYmd);
+      if (postRace.length >= 3) {
+        trendWithPaceBase = postRace;
+      } else {
+        // Filter would drop pool below 3 — keep all but flag the boundary so
+        // the prompt treats trend direction as a limited-sample observation,
+        // not a fitness signal.
+        trendWithPaceBase = trendPostIntensity;
+        trend_pool_crosses_race_boundary = trendPostIntensity.some((r) => String(r.date || '') <= raceYmd);
+      }
+      console.warn(`[fact-packet] trend race-boundary filter: ${trendPostIntensity.length} → ${postRace.length} (active, lastRace=${raceYmd}, dSince=${daysSinceLastGoalRace}, applied=${postRace.length >= 3}, crosses=${trend_pool_crosses_race_boundary})`);
+    }
+    console.warn(`[fact-packet] trend pool_intensity_filter: ${trendWithPaceBaseUnfiltered.length} → ${trendPaceFiltered.length} → ${trendPostIntensity.length} → ${trendWithPaceBase.length} (intensity_applied=${trendPaceFiltered.length >= 3}, race_boundary_applied=${raceFilterActive && trendWithPaceBase !== trendPostIntensity})`);
     console.warn(`[fact-packet] trend_points: pool=${trendPoolSource}(${trendPool.length}), withPace=${trendWithPaceBase.length}, basis=${useGapForTrend ? 'gap' : 'raw'}, wideBand=${wideBandLo}-${wideBandHi}min(${wideDurationMatch.length} hits)`);
     const trend_points = trendWithPaceBase
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -524,6 +563,7 @@ export async function getSimilarWorkoutComparisons(
         pace_basis: paceBasis,
         pool_intensity_filter: poolIntensityFilter,
         pool_pace_context: null,
+        trend_pool_crosses_race_boundary,
       };
     }
 
@@ -591,6 +631,7 @@ export async function getSimilarWorkoutComparisons(
       pace_basis: paceBasis,
       pool_intensity_filter: poolIntensityFilter,
       pool_pace_context,
+      trend_pool_crosses_race_boundary,
     };
   } catch {
     return {
@@ -605,6 +646,7 @@ export async function getSimilarWorkoutComparisons(
       pace_basis: 'raw' as const,
       pool_intensity_filter: null,
       pool_pace_context: null,
+      trend_pool_crosses_race_boundary: false,
     };
   }
 }

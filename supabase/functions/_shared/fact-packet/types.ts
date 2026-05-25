@@ -118,6 +118,15 @@ export type VsSimilarV1 = {
     basis: 'gap' | 'raw';
     intensity_match: 'matched' | 'current_much_faster' | 'current_much_slower';
   } | null;
+  /**
+   * D-041 Fix D — true when the TREND pool includes points dated before a
+   * recent (≤60d) completed goal race, AND the post-race-only filter would
+   * have dropped the pool below the 3-point minimum. Tells the LLM (via the
+   * TREND POOL RACE BOUNDARY prompt rule) to treat trend direction as a
+   * limited-sample observation, not a fitness signal — pre-race points
+   * reflect peak-taper fitness, not the current training phase.
+   */
+  trend_pool_crosses_race_boundary?: boolean;
 };
 
 export type TrendV1 = {
