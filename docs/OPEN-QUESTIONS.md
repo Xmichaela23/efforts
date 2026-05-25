@@ -259,7 +259,14 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
-## Q-023 — `aerobic_direction` unwired into workout INSIGHTS
+## Q-023 — `aerobic_direction` unwired into workout INSIGHTS — RESOLVED 2026-05-24 / D-042
+
+`aerobic_direction` + `aerobic_efficiency_trend_pct` wired into workout
+INSIGHTS signals block. AEROBIC EFFICIENCY TREND prompt rule live. Path A
+minimal wire (4 files, no schema, no client). Bands ±2% match
+compute-snapshot:409. Translate-only — never quotes the percentage.
+
+Original entry preserved below for institutional memory:
 
 Filed: 2026-05-23
 
@@ -287,6 +294,42 @@ null for this row even though pool `avgHr` would compute. Not blocking — POOL
 INTENSITY CONTEXT prompt rule already prevents the misinterpretation that
 depended on `hr_delta`. Investigate `build.ts:387` `currentAvgHr` resolution
 path before next HR signal ship.
+
+---
+
+## Q-025 — TREND pool spans training phases; direction label misleading post-race
+
+Filed: 2026-05-24
+
+TREND pool for easy runs passes ±15% pace filter but pre-race taper points
+can still appear when `days_since_last_goal_race >= 60` (outside D-041's
+exclusion window). Marathon taper runs (peak fitness) pool against
+week-1-build re-entry runs. "32s/mi slower" label is mathematically honest
+but contextually misleading. Narrative correctly suppresses the claim via
+`pool_pace_context` but TREND row label still shows red.
+
+Real fix: derive TREND direction from pace-at-HR, not raw pace. Needs
+`pace_at_hr` on trend points (server) + new sparkline render (client).
+Spec required before implementation. Not scheduled.
+
+Cross-ref: D-041 (the 60d exclusion window); POLISH-PUNCH-LIST §5 and
+Background open items.
+
+---
+
+## Q-026 — Backward anchor leaking on unplanned sessions with no plan link
+
+Filed: 2026-05-24
+
+Forward-bias hard ban (D-039 / D-040) works on linked sessions in
+`build_read` and `unstructured_read` modes. Unplanned sessions with no plan
+link have weaker Arc mode context — `days_since_last_goal_race` still
+surfaces in the ARC FACT BLOCK and the LLM uses it when no stronger forward
+signal exists.
+
+Fix: add explicit suppression of `days_since_last_goal_race` framing to
+UNPLANNED MODE prompt rule when `is_unplanned=true`. Small targeted change,
+same pattern as the phase-label ban (D-040 Fix B). Not scheduled.
 
 ---
 

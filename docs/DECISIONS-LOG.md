@@ -904,6 +904,118 @@ intensity context, not reopening pace-delta-as-verdict.
 
 ---
 
+## D-039 — Performance screen polish batch 1: CV hygiene, route naming, Arc forward-bias, decoupling surface split, HR-aware TREND, route minimum, segment label
+
+Shipped: 2026-05-24 / commits 87c0d15e + 53b0cfe7 + e1d568f7 + fefd6204 +
+dfb1b06e + edb97d75 + f18bd201
+
+Seven fixes in one session, all Performance screen display layer:
+
+1. CV outlier hygiene — clipped pace samples >1800 sec/mi before computing CV.
+   A single stationary sample (stoplight, GPS dropout) was blowing CV to 908%,
+   tripping the variance gate and misrouting steady long runs as fartlek.
+2. Route naming — dropped route_runs.name (server-auto-generated "Route 53"
+   counter) from fact packet. LLM now receives times_run only and phrases
+   generically. Same defect class as D-035 workout_type literal.
+3. Arc plan phase + forward-bias — fixed arc-context.ts returning 'unspecified'
+   on active plans. Added forward-bias rule to unstructured_read and build_read:
+   when active plan + next goal within 6 months, temporal anchor must be
+   forward-looking. Hard ban on days_since_last_goal_race as lede frame.
+4. Decoupling surface split — split raw-basis decoupling prompt rule into two
+   branches: is_mixed_effort=false (steady raw) → surface drift number with
+   plain description; is_mixed_effort=true → inconclusive, describe HR behavior
+   only. Fixes "no drift info" on steady sessions.
+5. HR-aware TREND label — TREND direction label now accounts for HR. When pace
+   declines but HR also declines proportionally, label is neutralized. Prevents
+   red "slower" framing on sessions where efficiency held.
+6. TREND route minimum — bumped from 6 to 8 intensity-matched comparable runs
+   before showing route chart. Below 8, text only.
+7. Segment label — single-segment steady sessions show "Steady" not raw pace
+   range string. Client-side, workout_type === 'long_run' || 'easy_run' +
+   intervals.length === 1.
+
+---
+
+## D-040 — Performance screen polish batch 2: backward anchor hard ban, unplanned phase-label ban, segment label via workout_type, HR-aware TREND gate fix, route minimum bump
+
+Shipped: 2026-05-24 / commits 9c4d5f36 + 3d26917c + 289c46d0 + ff25a614 +
+df642b0d
+
+Five follow-up fixes after D-039 recompute verification:
+
+1. Backward anchor hard ban — shared backwardAnchorHardBan helper added to
+   both build_read and unstructured_read modes. Explicit forbidden-pattern
+   enumeration. D-039.3 only covered unstructured_read; build_read had no ban.
+2. Unplanned phase-label ban — UNPLANNED MODE now explicitly bans phase label
+   assertions (taper/base/build/peak) when is_unplanned=true and no plan link.
+   LLM was confabulating "taper phase" without prompt support.
+3. Segment label via workout_type — Fix C condition expanded from
+   !is_mixed_effort to workout_type === 'long_run' || 'easy_run'. Variance gate
+   trips on rolling-terrain pace CV but label decision uses workout_type as the
+   signal. Decouples display from effort classification.
+4. HR-aware TREND gate relaxed — gate was requiring ≥2 HR points per half;
+   one null point per half drops a 5-point trend below threshold. Relaxed to
+   ≥3 total + ≥1/half.
+5. Route minimum — confirmed 8 is correct threshold post-D-039 verification.
+
+---
+
+## D-041 — Phase-aware TREND pool + Fix C segment label via workout_type
+
+Shipped: 2026-05-24 / commits 2f4e04a4 + a6d34002
+
+Two fixes after D-040 recompute:
+
+1. Fix C final — client segment label condition expanded to include
+   workout_type === 'long_run' || 'easy_run' when intervals.length === 1.
+   is_mixed_effort gate was preventing "Steady" from firing on rolling-terrain
+   long runs where pace CV tripped the variance gate.
+
+2. Phase-aware TREND pool — when days_since_last_goal_race < 60 AND
+   last_goal_race_date known, trend pool excludes points dated before the race.
+   Pre-race taper runs (peak fitness, fast pace) were pooling against
+   post-race re-entry runs, making TREND show "slower" when it was just a
+   different training phase. Fallback: if exclusion drops pool below 3 points,
+   include all with trend_pool_crosses_race_boundary: true flag. New prompt
+   rule: when flag set, do not assert trend direction as fitness signal.
+
+---
+
+## D-042 — Wire run_easy_hr_trend into workout INSIGHTS (Q-023 resolved)
+
+Shipped: 2026-05-24 / commit b83a7c8d
+
+Problem: run_easy_hr_trend (pace-at-easy-HR delta vs chronic average) was
+computed weekly in compute-snapshot, stored in athlete_snapshot, and consumed
+by the conversational coach and plan generation — but never reached workout
+INSIGHTS. The "are you getting fitter at the same heart rate" signal was
+dead-coded into the session narrative surface.
+
+Fix (Path A — minimal wire, ~4 files):
+- analyze-running-workout/index.ts — extracts arc.latest_snapshot.
+  run_easy_hr_trend alongside arc_narrative_context at the getArcContext call
+- generateAISummaryV1 — new 8th arg runEasyHrTrendPct
+- ai-summary.ts signals block — two new fields:
+  aerobic_efficiency_trend_pct (raw number | null)
+  aerobic_direction ('improving' | 'stable' | 'declining' | null)
+  Thresholds: <-2% → improving, >+2% → declining, else stable (matches
+  compute-snapshot:409)
+- New AEROBIC EFFICIENCY TREND prompt rule: fires when aerobic_direction
+  non-null; translates to plain language; never quotes the percentage; frames
+  as weekly longitudinal background context, not a per-session verdict
+
+Verified: "Your aerobic base is responding well" surfacing on linked easy run
+session with populated athlete_snapshot. Rule self-gates on hard/interval
+sessions (contextually irrelevant).
+
+Q-023 resolved. run_easy_hr_trend rename still open (separate cleanup —
+naming only, wire works against existing name).
+
+7 new tests covering improving/stable/declining/boundary/null/omitted/NaN
+inputs. 478/0 _shared + lib; 19/0 cycling.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

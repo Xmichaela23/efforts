@@ -10,6 +10,22 @@ Last updated: 2026-05-23 (D-036 — run aerobic decoupling computed on grade-adj
 
 Verified-working architecture and fixes. If you think one of these is broken, the bug is probably elsewhere — read the verification method before changing anything.
 
+### Performance screen polish D-039 through D-042 (2026-05-24)
+- CV outlier clipping: pace >1800 sec/mi excluded before CV computation
+- Route naming: times_run only, no auto-generated name
+- Arc forward-bias: build_read + unstructured_read hard-ban backward anchor;
+  temporal lede must reference next race when active plan exists
+- Decoupling surface: split by is_mixed_effort — steady raw gets drift number;
+  mixed raw gets inconclusive description only
+- HR-aware TREND: direction label neutralized when HR drops with pace
+- Segment label: "Steady" for long_run/easy_run single-segment via workout_type
+- Phase-aware TREND pool: pre-race points excluded when days_since_race < 60;
+  trend_pool_crosses_race_boundary flag suppresses fitness claim on fallback
+- run_easy_hr_trend wired: aerobic_direction + aerobic_efficiency_trend_pct
+  surface in signals block; AEROBIC EFFICIENCY TREND prompt rule live
+- Verify: recompute any linked easy run — should see "aerobic base responding"
+  framing when athlete_snapshot.run_easy_hr_trend is populated
+
 ### Mixed-effort / unplanned run decoupling + HR signals (D-037, 2026-05-23)
 - calculateEfficiency runs for unplanned interval sessions and all mixed/fartlek
   sessions (forMixedEffort flag, basis forced to 'raw')
