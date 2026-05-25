@@ -1766,12 +1766,24 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
           const discExport = String(w.type || w.discipline || '').toLowerCase();
           if (discExport === 'swim') {
-            const eq = swimPlannedEquipmentFromWorkout(w);
-            if (eq) {
-              const parts: string[] = [];
-              if (eq.required.length) parts.push(`Bring: ${eq.required.join(', ')}`);
-              if (eq.optional.length) parts.push(`Optional: ${eq.optional.join(', ')}`);
-              if (parts.length) lines.push(`  - Pool gear — ${parts.join(' · ')}`);
+            // D-043 item 4: server appendPoolGearLine already appends a
+            // canonical "Pool gear — Required: …. Optional: …." line onto
+            // w.description during session-factory construction. Re-emitting
+            // here duplicates it (the description carries the server line
+            // verbatim; the client line uses a different separator "·" and
+            // word "Bring" instead of "Required" → formatting drift on top
+            // of the dupe). Only fall back to client-side regeneration when
+            // the description doesn't already carry a Pool gear line — that
+            // covers older / non-canonical descriptions.
+            const descAlreadyHasGearLine = /pool\s*gear\s*[—-]/i.test(String(w.description || ''));
+            if (!descAlreadyHasGearLine) {
+              const eq = swimPlannedEquipmentFromWorkout(w);
+              if (eq) {
+                const parts: string[] = [];
+                if (eq.required.length) parts.push(`Bring: ${eq.required.join(', ')}`);
+                if (eq.optional.length) parts.push(`Optional: ${eq.optional.join(', ')}`);
+                if (parts.length) lines.push(`  - Pool gear — ${parts.join(' · ')}`);
+              }
             }
           }
 
