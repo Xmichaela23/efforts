@@ -2115,6 +2115,9 @@ function Step7BHours({
       <p className="text-xs text-white/35 px-1 pt-1">
         Be honest — undershooting locks you into a smaller plan; overshooting bakes in skipped workouts.
       </p>
+      <p className="text-xs text-white/35 px-1">
+        Include all training time including warm-ups and cool-downs. Exclude drive time and changing time.
+      </p>
     </StepLayout>
   );
 }
@@ -2353,6 +2356,9 @@ function Step8bStrengthOrdering({
       canContinue={canContinue}
     >
       <div className="space-y-3 text-[14px] leading-relaxed text-white/70">
+        <p className="text-white/55 italic">
+          This only matters when a strength and endurance session land on the same day.
+        </p>
         <p>
           Your training plan will sometimes put strength and a hard run or bike on the same day.
           Research shows the order matters — what you do first gets the better stimulus.
