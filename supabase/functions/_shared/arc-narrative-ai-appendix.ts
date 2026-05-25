@@ -88,13 +88,32 @@ Discuss adaptation stimulus (threshold/tempo/long) using fact-packet adherence a
 Avoid inventing prescriptions not evidenced in data.
 `;
 
-    default:
+    default: {
+      // D-039 Fix 3: forward-bias rule. When next_primary_goal is dated and
+      // within ~180 days, the narrative should look forward to that target,
+      // not back to a months-old completed race. Pre-fix the LLM was
+      // anchoring on last_goal_race in unstructured_read because it's the
+      // most narratively-rich fact in the block, even when there's an
+      // obvious upcoming goal to frame against (e.g., 35 days post-marathon
+      // with a 70.3 race 84 days out: forward-frame to the 70.3, not back
+      // to the marathon).
+      const ng = nc.next_primary_goal;
+      const dUntilRace = nc.days_until_next_goal_race;
+      const lr = nc.last_goal_race;
+      const dSince = nc.days_since_last_goal_race;
+      const forwardEligible = ng && dUntilRace != null && dUntilRace > 14 && dUntilRace <= 180;
+      const forwardFraming = forwardEligible
+        ? `
+FORWARD FRAMING — next dated goal is ${ng.name}${ng.distance ? ` (${ng.distance})` : ''} in ~${dUntilRace} days. Frame this session in the context of that build, not back at any completed race in the Arc block. ${lr && dSince != null ? `(${lr.name} ${dSince} days ago is past context, not the active horizon.)` : ''}
+DO NOT lead with "X days post-${lr?.name ?? 'last race'}" framing when a dated upcoming goal is present in the ARC block.`
+        : '';
       return `
 
 TEMPORAL ARC MODE: unstructured_read — temporal Arc stack is sparse on this WORKOUT DATE.
 Neutral observational synthesis; do not invent plan/program language or race proximity not present in FACTS or ARC block below.
-Prefer "what fitness signal does today show?" over "matched the workout."
+Prefer "what fitness signal does today show?" over "matched the workout."${forwardFraming}
 `;
+    }
   }
 }
 
