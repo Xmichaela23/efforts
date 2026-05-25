@@ -449,6 +449,22 @@ Verified-working architecture and fixes. If you think one of these is broken, th
 
 ---
 
+### Autonomous batch D-051 through D-060 (2026-05-25)
+- D-051: Race-Specific Aerobic ramp 1500→2500yd (SWIM-PROTOCOL §5.4); was 2000→2400
+- D-052: four new swim session types (Time Trial / Open Water Skills / Mixed-Fartlek / Race-Pace Sustained) with phase-aware rotation injection
+- D-053: §0.5 athlete-vocab pass — stripped Z-codes / "threshold" / "CSS pace" from athlete-facing swim copy
+- D-054: WIZARD-AUDIT.md written (no UI changes); 7 global findings + per-step audit
+- D-055: training_intent copy softening + Q-027 days_since semantic clarification + Q-024 / Q-026 / POLISH §1 / Cycling §4.3 closures
+- D-056: wizard polish batch (vocab pass + A/B/C tooltips + Hybrid rename + hours note + ordering note + building indicator + "Not sure" defaults + long-day same-day warning)
+- D-057: Q-016 experience-tier drill ratio (Path A only, locked 30/20/10 vs §2's 75/30/10 to avoid double-counting)
+- D-058: Q-020 ankle band added to gear chips + normalization + beginner pull_focused `optional:ankle_band` tag
+- D-059: Q-022 segment_progress_metrics writer chain fixed (column names + error-surfacing)
+- D-060: DB column rename run_easy_hr_trend → run_easy_pace_at_hr_trend (migration + 5-file consumer coordination)
+- **Footgun:** D-060 deploy required migration apply BEFORE function deploy (atomic ALTER TABLE RENAME COLUMN; brief 42703 window for in-flight old code). For future cosmetic renames on low-write tables, this pattern is acceptable; for high-write tables, use add-column → backfill → drop two-step migration instead.
+- **Decisions:** D-051 through D-060 in DECISIONS-LOG.
+
+---
+
 ## Known broken (filed, not blocking)
 
 Behaviors that are demonstrably wrong but intentionally deferred. Don't propose fixes unless you have new information — the deferral was a scoping call, and the list below documents the cost so the next implementer can pick up cleanly.

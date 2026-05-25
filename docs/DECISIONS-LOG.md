@@ -1185,6 +1185,234 @@ may surface tuning opportunities (e.g. K=3 vs K=2 vs K=4 smoothing).
 
 ---
 
+## D-051 — Race-Specific Aerobic 1500→2500 ramp (SWIM-PROTOCOL §5.4)
+
+Shipped: 2026-05-25 / commit dc7470d3
+
+Race-specific-phase lerp at `swim-program-templates.ts` inherited
+`RACE_70_3_BUILD_*_YDS` endpoints (slot 1 = 2000→2400), under-scaling vs
+spec target of 1500→2500. Added `RACE_70_3_RACE_SPEC_START_YDS` /
+`RACE_70_3_RACE_SPEC_PEAK_YDS` constants and switched the race_specific
+lerp to those. Build-phase slot 1 still uses `BUILD_*_YDS` (2000→2400) —
+race-spec aerobic isn't part of build phase per §4.2; template
+substitution exists but endpoint preserved. 24/0 swim tests green.
+
+---
+
+## D-052 — Four new swim session types (SWIM-PROTOCOL §5.7-§5.10)
+
+Shipped: 2026-05-25 / commit 6049bcc1
+
+Time Trial / Open Water Skills / Mixed-Fartlek / Race-Pace Sustained.
+Each creator follows existing session-factory conventions:
+appendPoolGearLine, structured steps_preset, tier-appropriate intensity.
+`phaseSpecificMetaSubstitution` in swim-program-templates.ts swaps
+slot[1] of the race-intent rotation per phase + weekInPhase:
+
+  build phase  weekInPhase 2 → Mixed/Fartlek
+  build phase  weekInPhase 4 → Time Trial (mid-build CSS test)
+  race-spec    weekInPhase 1 → Race-Pace Sustained
+  race-spec    weekInPhase 2 → Open Water Skills
+  race-spec    weekInPhase 3 → Time Trial (pre-taper CSS test)
+
+Beginner-banned per §10.2 — substitution no-ops for beginners. 91/0 swim
+suite green.
+
+---
+
+## D-053 — Strip internal terms from athlete-facing swim copy (§0.5)
+
+Shipped: 2026-05-25 / commit 3e47b58b
+
+§0.5 athlete vocabulary is easy/moderate/hard ONLY. Internal jargon
+(Z-codes, "threshold" word, "CSS pace") was leaking into descriptions:
+
+  thresholdSwim       — "Zone 4 — maximal sustainable" → "hard effort"
+  raceWeekActivation  — "NOT threshold" → "NOT a hard interval"
+  recoveryEasySwim    — "Z1" / "Z1–Z2" → "easy effort"
+  pullFocusedSwim     — "(Z3; ...)" → "(...)"
+  enduranceSwim       — "easy aerobic (Z2)" → "easy aerobic"
+  timeTrialSwim       — "your CSS pace" → "your 100yd pace target"
+
+`zone_targets` field (internal, never client-facing per session-detail
+audit) keeps Z-code summaries; steps_preset token grammar unchanged.
+76/0 swim tests green.
+
+---
+
+## D-054 — WIZARD-AUDIT.md (no UI changes)
+
+Shipped: 2026-05-25 / commit 8d8f1681
+
+Read-only audit of every step in `ArcSetupWizard.tsx` (2951 lines).
+Step-by-step findings plus 7 global findings (engine vocab leaks,
+missing inline conflict warnings, no "I don't know" path, training_intent
+promises vs reality, no mid-wizard jump-back, A/B/C priority labels
+load-bearing without inline definition, plan-start picker only at Step 9).
+Priority recommendations table for follow-up.
+
+---
+
+## D-055 — Items shipped: wizard training_intent softening + Q-026
+unplanned backward anchor + Q-024 hr_delta_bpm + POLISH §1 trade-offs +
+Cycling §4.3 brick close + Q-016 audit (deferral confirmed) + Q-027 filed
+
+Shipped: 2026-05-25 / commits across the autonomous batch.
+
+D-055 (umbrella decision number assigned at end-of-session) tracks the
+13-item autonomous batch from 2026-05-25 that mixed item-level decisions
+into a single end-of-session sweep. Individual entries: D-046 through
+D-050 covered the prior shipment; this entry tracks items 11 (wizard
+training_intent copy softening) + 12 (Q-027 days_since semantics audit).
+See per-item commits + WIZARD-AUDIT.md G4 / OPEN-QUESTIONS Q-027.
+
+---
+
+## D-056 — Wizard polish batch (Items 1–8 of 2026-05-25 second autonomous batch)
+
+Shipped: 2026-05-25 / commits 2d9764b0, 3bd83102, fe578215, 29262487, 2796c0b9, c8937ec0, 1da695ae
+
+Eight wizard-side improvements from the WIZARD-AUDIT.md findings:
+
+  Item 1 (2d9764b0) — engine vocabulary copy pass: replaced
+    anchor/contract/standalone/blend/intent/phase-as-label/quality-as-label
+    in athlete-facing copy across StepTriRunQualityPlacement,
+    StepTriBikeQualityPlacement, Step3Swim, Step9Confirm, hint helpers.
+    State field names + value enums unchanged.
+
+  Item 2 (3bd83102) — A/B/C priority explainer chips in Step1Races:
+    "A = main goal race / B = secondary / C = practice race".
+
+  Item 3 (fe578215) — renamed "Hybrid Strength Athlete" to "Strength as
+    a training priority (2× weekly compound lifting)" with expanded
+    description.
+
+  Items 4 + 5 (29262487) — Step7BHours hours-inclusion note;
+    Step8bStrengthOrdering "only matters when same-day" inline lede.
+
+  Item 6 (2796c0b9) — Step9Confirm building-progress indicator with
+    estimated-time copy and animated sweep bar.
+
+  Item 7 (c8937ec0) — "Not sure — use the recommended default" option
+    on Step3Swim experience (→ 'steady'), Step8Strength intent
+    (→ 'performance'), Step8bStrengthOrdering (→ 'endurance_first').
+
+  Item 8 (1da695ae) — Step6LongDays inline non-blocking warning when
+    long ride and long run pinned to the same day.
+
+No engine logic changes — copy and inline UX only.
+
+---
+
+## D-057 — Q-016 experience-tier drill ratio (Path A only)
+
+Shipped: 2026-05-25 / commit 0246c07f
+
+Per Q-016 §2 spec but LOCKED at conservative 30/20/10 instead of §2's
+aspirational 75/30/10 (calibration-driven decision to avoid double-
+counting with session-count + band-volume layers per Q-016 audit).
+
+  beginner    → 30% of total session yards
+  intermediate → 20%
+  advanced    → 10%
+
+Wired into `pickSwimDrillInset` Path A (technique_aerobic 2-3 drills)
+ONLY. Path B (single-drill css_aerobic/threshold/etc.) and beginner
+one-focus path UNCHANGED — spec-fixed drill counts there. 350yd main-set
+floor remains the hard floor; drill cap is a SOFT cap (overshoots up
+to dy/2 allowed to avoid emitting zero drills). Secondary ranking now
+tier-aware: beginners prefer larger tokens; advanced prefers smallest.
+58/0 swim tests green.
+
+---
+
+## D-058 — Q-020 ankle band beginner body-position tool
+
+Shipped: 2026-05-25 / commit b20d1aaa
+
+Per SWIM-PROTOCOL §6.4 pull buoy + ankle band pairing. Three coordinated
+changes:
+
+  1. TrainingBaselines.tsx chip list — "Ankle band" added adjacent to
+     "Pull buoy" so the pairing is visually obvious.
+  2. swimGearNormalized — "Ankle band" / any "ankle" substring
+     normalizes to canonical 'ankle band' key.
+  3. pullFocusedSwim — when athleteFitness === 'beginner' AND ankle band
+     is owned, emits `optional:ankle_band` alongside the existing
+     `req:buoy`.
+
+Beginner-gated per §6.4 (body-position teaching tool); intermediate /
+advanced athletes don't surface the option. No drill-token integration —
+fires at the session-tag level matching §6.4's pull-focused-session note.
+41/0 swim tests green.
+
+---
+
+## D-059 — Q-022 segment_progress_metrics writer chain
+
+Shipped: 2026-05-25 / commit 0adfc948
+
+Per Q-022 audit: segment_progress_metrics hadn't received writes since
+~2026-03-01 because the payload used wrong column names (`_sec_per_km`
+suffix instead of live schema's `_s_per_km`; included non-existent
+`metric_date` column from sibling route_progress_metrics table).
+PostgREST returned 42703 column-does-not-exist; the three-variant
+try/catch swallowed every error silently.
+
+Fix:
+  - Caller payload: renamed avg_pace_sec_per_km → avg_pace_s_per_km;
+    grade_adjusted_pace_sec_per_km → grade_adjusted_pace_s_per_km;
+    removed metric_date.
+  - Variant C minimal payload: same column-name correction; removed
+    metric_date.
+  - Error handling: every Variant's try/catch now logs to console.warn
+    with Postgres error code + workout_id + segment_id. Future schema
+    drifts will surface instead of silently rotting.
+
+Side-table `route_progress_metrics` unchanged — it correctly uses
+`_sec_per_km` and `metric_date` per its own schema. Comment added at
+the call site to flag the asymmetry.
+
+Backfill of pre-fix workouts is OUT of scope (Q-022 audit point c) —
+this fix gets new writes flowing; backfill is a separate decision.
+
+---
+
+## D-060 — run_easy_hr_trend DB column rename
+
+Shipped: 2026-05-25 / commit cddea208
+
+D-043 renamed the variable + types to runEasyPaceAtHrTrend but kept the
+DB column at the old name. D-060 closes the cosmetic gap.
+
+Migration `20260525_rename_run_easy_hr_trend.sql`: single ALTER TABLE
+RENAME COLUMN (instant metadata-only operation; no row rewrite).
+
+Coordinated consumer updates (same commit):
+  - compute-snapshot/index.ts:537 — WRITE site
+  - coach/index.ts:2628 — SELECT column list
+  - analyze-running-workout/index.ts:2101 — snapshot field read
+  - _shared/longitudinal-signals.ts — type field + SELECT + 2 evidence
+    strings + doc comment
+  - src/hooks/useAthleteSnapshot.ts — client TS interface
+
+Not touched: ai-summary.ts (comment only), decoupling.test.ts (D-042
+lineage test name string literals, not field access), arc-context.ts
+(no refs).
+
+IMPORTANT: migration MUST be applied BEFORE deploying the function
+bundle that reads the new column name. ALTER TABLE RENAME is instant;
+in-flight old code may briefly hit 42703 errors until functions bounce.
+Acceptable for this low-write-rate snapshot table per the user's batch
+authorization. Build + 33/0 decoupling tests green.
+
+Historical note: prior session (2026-05-25 earlier batch) had the user
+explicitly DROP the rename per "skip it — leaving the DB column name
+alone is fine". This second batch (D-055/D-060 day) explicitly
+authorized the rename. Memory updated.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

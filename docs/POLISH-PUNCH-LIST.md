@@ -80,7 +80,15 @@ For each numbered item:
 
 ## 2. Swim program 100%
 
-**Status:** ~92% — Phases 0-3 (§4.1 ramp, §6.2 pools, §6.3 hierarchy + pairing + tier biasing) shipped 2026-05-19; 2026-05-22 research-backed §5.2 / §6 / §8 revision (D-029) closed five more gaps; ankle band deferred (Q-020); CSS terminology strip parked.
+**Status:** ~96% — Phases 0-3 (§4.1 ramp, §6.2 pools, §6.3 hierarchy + pairing + tier biasing) shipped 2026-05-19; 2026-05-22 research-backed §5.2 / §6 / §8 revision (D-029) closed five more gaps; 2026-05-25 batch added D-051 (Race-Spec Aerobic 1500→2500 ramp), D-052 (4 new session types + phase rotation), D-053 (§0.5 athlete-vocab pass), D-057 (Q-016 Path A 30/20/10 partial), D-058 (Q-020 ankle band). Remaining: Q-016 multi-layer §2 full alignment (Path B / one-focus paths still unscaled).
+
+### Done (2026-05-25 batch)
+- [x] **D-051** Race-Specific Aerobic 1500→2500 ramp
+- [x] **D-052** Four new session types (Time Trial / Open Water Skills / Mixed-Fartlek / Race-Pace Sustained)
+- [x] **D-053** §0.5 athlete-vocab pass on swim copy
+- [x] **D-057** Q-016 Path A drill ratio (30/20/10 partial)
+- [x] **D-058** Q-020 ankle band wiring
+
 
 ### Done
 - [x] Drill display names lookup
@@ -102,7 +110,7 @@ For each numbered item:
 - [ ] Equipment line duplicating on some sessions
 - [x] Wire new drill tokens (Single-Arm, 6-3-6, Zipper, Sculling) into session generators *(2026-05-19, Phase 2 `ef91c2ee` — singlearm/616/scull/scullfront/zipper added to base/build pools; singlearm to peak; fingertipdrag to taper)*
 - [ ] Add missing session types: Swim Time Trial, Open Water Skills, Mixed/Fartlek, Race-Pace Sustained
-- [ ] **Q-020 ankle band enum addition** — pull buoy + ankle band as beginner body-position tool. §6.4 prose references the coaching value; engine surface blocked on wizard scope decision (separate chip vs grouped with Pull buoy). Filed in `docs/OPEN-QUESTIONS.md`.
+- [x] **Q-020 ankle band enum addition** — closed D-058 / 2026-05-25 (commit b20d1aaa). Added as a separate chip adjacent to Pull buoy in TrainingBaselines.tsx; normalized in swimGearNormalized; surfaces as `optional:ankle_band` tag on pull_focused sessions for beginner-tier athletes only. 41/0 swim tests green.
 - [ ] Standardize all swim intensity references to CSS percentages
 - [x] **CSS terminology strip + per-step drill equipment in exports** *(D-030, 2026-05-22 — spec `3833024f`, Step 2 `22642fa4`, Steps 3+4 `9d178ca9`)* — athlete-facing copy uses easy/moderate/hard tier vocabulary; internal session-type words stripped from session names + descriptions + trade-off + wizard + Garmin step labels + Form Goggles narrator + zone strings. SWIM-PROTOCOL §0.5 defines the canonical mapping table + anti-regression rule. Drill steps surface owned recommended gear via parenthetical hint (e.g. "Drill — Fingertip Drag (fins)"). 36 new pin tests across 3 new files; full sweep 899/0.
 
@@ -130,16 +138,26 @@ For each numbered item:
 
 ## 4. Wizard language + clarity
 
-**Status:** ~20% — strength step clear, other steps not audited
+**Status:** ~60% — strength step clear; D-054 (2026-05-25) full audit shipped to `docs/WIZARD-AUDIT.md`; D-056 batch (2026-05-25) closed engine-vocab leaks + A/B/C tooltips + Hybrid rename + hours note + ordering note + building indicator + Not-sure-default option + long-day same-day warning. Remaining: glossary tooltips (G1 follow-up), mid-wizard jump-back navigation (G5), plan-start surfacing earlier (G7).
 
 ### Done
 - [x] Strength step: intent labels with descriptions
 - [x] Strength step: equipment gate inline warning
 - [x] Strength step: 1RM warning when missing
+- [x] **D-054** Full wizard audit → `docs/WIZARD-AUDIT.md` (no UI changes)
+- [x] **D-056 Item 1** Engine vocabulary copy pass (anchor/contract/standalone/blend/quality-as-label)
+- [x] **D-056 Item 2** A/B/C priority explainer chips
+- [x] **D-056 Item 3** "Hybrid Strength Athlete" renamed to "Strength as a training priority (2× weekly compound lifting)"
+- [x] **D-056 Item 4** Step7BHours hours-inclusion note
+- [x] **D-056 Item 5** Step8bStrengthOrdering "only matters when same-day" lede
+- [x] **D-056 Item 6** Step9Confirm building-progress animated indicator + estimated-time copy
+- [x] **D-056 Item 7** "Not sure — use the recommended default" option on Step3Swim / Step8Strength / Step8bStrengthOrdering
+- [x] **D-056 Item 8** Step6LongDays inline non-blocking same-day warning
+- [x] **D-055 Item 11** training_intent copy softening (completion/first_race match engine reality)
 
 ### Open
-- [ ] Audit every wizard step — each question's purpose clear
-- [ ] Surface tradeoffs at decision time, not after plan generation
+- [ ] Audit every wizard step — each question's purpose clear (closed via D-054; remaining items below are the WIZARD-AUDIT follow-ups)
+- [ ] Surface tradeoffs at decision time, not after plan generation (partial — D-056 Item 8 addresses long-day; G2 remaining)
 - [ ] Link each equipment chip to what it unlocks
 - [ ] Explain what each baseline input drives
 - [ ] **`training_intent` wizard copy vs engine reality (2026-05-12 verification).** Step 2 wizard offers three options ("Race the clock", "Strong, healthy finish", "First time at this distance") promising three different prescriptions — intervals + threshold + pace targets + 3-4 wk recovery / tempo + no pace targets + 3 wk recovery / conservative + 2 wk recovery + no intensity. Engine reality: `training_intent` only gates 5 same-day pairing exceptions in `_shared/week-optimizer.ts` + 1 in `week-builder.ts` (consolidated AM run / PM lift, lb-on-QR exception). `completion` and `first_race` are functionally identical; pace targets, loading pattern, run-quality selection, and phase structure all ignore `training_intent`. Loading pattern is driven by `tri_approach` + fitness, not by intent. The wizard's primary intent question is cosmetic for 2 of 3 options today. **Two paths:** (a) wire `training_intent` through to loading pattern + intensity selection + pace-target emission (Ticket B #16 in task #120); (b) soften wizard copy to match engine reality. Picking (a) when Ticket B lands; (b) is the interim if it ships first. Same wiring-break pattern as `swim_experience`, `limiter_sport`, `goal_type` per Ticket B.
@@ -243,7 +261,7 @@ Reference corpus: `~/Downloads/ironman-70.3-santa-cruz-+-ironman-70.3-northern-c
 - [x] **Tri-generator swim sessions don't respect beginner rotation (D-025 §10.3 substitution).** Closed D-043 / 2026-05-25. `swim_fitness === 'beginner'` now routes to `css_aerobic` instead of `threshold` on race_peak race-spec in `generate-triathlon-plan`. The 6 `pickSwimDrillInset` call sites in tri-generator already got `athleteFitness` threading in D-020 Slice 3d; D-043 extends the same pattern to rotation dispatch.
 - [x] **Q-015 — drill repeat-pick memory.** RESOLVED D-043 + D-044 + D-045 / 2026-05-25. End-to-end: D-043 picker capability + D-044 caller wiring (`prevWeekDrillTokens` opt threaded through 7 swim creators) + D-045 harvest bug fix (orchestrator was reading `week.days[].sessions[]` but `buildWeek` returns flat `week.sessions[]`, so the Set was empty every week — fixed via `drill-token-harvest.ts` helper + 6 pin tests). Verified live: regenerated plan shows distinct drill families week-over-week with no consecutive cross-week repeats. Cross-ref: `docs/OPEN-QUESTIONS.md` Q-015.
 - [x] **Swim equipment line duplicate.** Closed D-043 / 2026-05-25. Client-side suppression when description already contains the Pool gear line — prevents the duplicate equipment surface when both server and client try to render it.
-- [ ] **Q-016 — §2 drill/swim ratio scaling** (drill yardage scaled by experience level per §2 ratio table — Learning 75% drill, Race-comfortable 30%, Competitive 10%). Current §6.5 fix partially closes the gap for beginners on CSS Aerobic / Pull-Focused / Recovery (Slice 1+1.5, 2026-05-21), but the full §2 yardage-percentage compliance — adjusting drill block yards as a FRACTION of total session yards rather than fixed bands — needs an investigate-first arc. Cross-ref: `docs/OPEN-QUESTIONS.md` Q-016.
+- [ ] **Q-016 — §2 drill/swim ratio scaling** (drill yardage scaled by experience level per §2 ratio table — Learning 75% drill, Race-comfortable 30%, Competitive 10%). **Partial closure D-057 / 2026-05-25 (commit 0246c07f):** Path A (technique_aerobic) tier ratio targeting LOCKED at conservative 30/20/10 vs §2's aspirational 75/30/10 (calibration-driven to avoid double-counting with session-count + band-volume layers). Path B (single-drill css_aerobic/threshold) and beginner one-focus path UNCHANGED — spec-fixed drill counts there. Full §2 alignment across all paths still requires the multi-day arc per Q-016 audit (new high-rep token variants, dispatcher accepting `(intent, experience) → target_drill_pct`, re-tuning `SWIM_DRILL_MAIN_FLOOR_YD`, explicit §2-vs-§3 responsibility carve-out, cross-layer pin tests). Cross-ref: `docs/OPEN-QUESTIONS.md` Q-016.
 - [x] **Performance tab — interval / variable-effort detection in INSIGHTS narrative + TREND filter (run + cycling).** Closed 2026-05-23 / D-034. Bug A (segment labels) + Bug B (INSIGHTS interpreting intervals as steady) + cycling-B (symmetric variance gate) bundled. Server-side `is_mixed_effort` flag computed from GAP-corrected CV (with conservative raw-only-on-flat policy) + plan/detected interval signals; LLM input swaps `vs_similar` for `interval_summary` block when mixed-effort; vs_similar pool filter excludes mixed-effort rows from easy comparisons; pace comparisons prefer GAP when both rows have it (`pace_basis` reported, never mixes). Cycling parity via VI ≥ 1.05 / power CV ≥ 12% / plan-intent intervals. Plan intent never overwritten — `classified_type_variance_override` flag carries the same information for pool filters. 9 new Deno tests, 0 regressions across 391 `_shared` + 19 cycling. No client changes (all variance math server-side; client renders off `session_detail_v1.classification.{is_mixed_effort, variance_signal, classified_type_variance_override}` + `pacing.{coefficient_of_variation_basis, variability_index, power_cv_pct}`). No backfill — display-layer `'Overall session' → 'Overall'` guard handles stale rows; pool filter treats `is_mixed_effort === undefined` as false (older rows drain naturally).
 - [x] **Coverage gap — `analyze-running-workout` variance-gate path covered** — closed D-044 item 7 / 2026-05-25. `_varGate` extracted as exported pure function `computeVarianceGate` in `analyze-running-workout/lib/variance-gate.ts`. 14 pin tests in `variance-gate.test.ts` lock the contract: 5 user-spec scenarios (linked interval / hilly easy GAP / flat fartlek unplanned / linked easy variance override / unplanned 6-interval) + 9 predicate-priority and boundary pins. Other analyzer paths (`buildRowsFromBreakdown` at `:~4040`, `'Overall session'` literal removal sites) remain untested but are pure display-layer transforms with stable surfaces; can be incremental.
 - [x] **Performance tab — unplanned workouts get null adherence, not synthesized/fake values; INSIGHTS interprets on workout's own terms.** Closed 2026-05-23 / D-035. Three analyzers fixed in one ship: run deleted the duration-derived fake-target synthesis at `analyze-running-workout/index.ts:504-538` (was inventing `tempo_run @ 10K pace` for any 30-60 min run, then scoring against the fiction); cycling's 0% default → null; swim's 100% default → null (also killed the hardcoded `duration_adherence: 100` TODO for linked swims, replaced with real ratio-based calc mirroring run formula). New `classification.is_unplanned` flag on `session_detail_v1`; LLM input drops prescribed-range signals (`execution`, `interval_execution`) when unplanned; new UNPLANNED MODE prompt rule with terrain-aware variance reading (read raw pace swings through the elevation profile via GAP, don't treat as effort variation). Plan intent sacred (D-034 carryover) — `workout_type` stays a descriptive label, NEVER a target. `vs_similar` (run) and `cross_workout` (cycling) preserved for unplanned — same-category history is honest signal, not prescription. `assessed_against = 'actual'` when no plan as defense-in-depth for client `AdherenceChips.tsx:60`. 9 new Deno tests (`unplanned-workout.test.ts`), 0 regressions across 400 `_shared` + 19 cycling. No client changes (client already null-safe per `AdherenceChips.tsx:55/60/70-72/88-89`). Spec: `docs/UNLINKED-WORKOUT-INTERPRETATION-SPEC.md`.
