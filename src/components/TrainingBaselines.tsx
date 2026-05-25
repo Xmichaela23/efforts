@@ -850,11 +850,17 @@ const disciplineOptions = [
   };
 
   // Equipment options
+  // D-058 / Q-020 — "Ankle band" added as a beginner body-position teaching
+  // tool per SWIM-PROTOCOL §6.4 (pull buoy + ankle band pairing). Placed
+  // adjacent to Pull buoy in the list so the pairing is visually obvious;
+  // server-side: when athlete is beginner AND owns ankle band, pull-focused
+  // sessions emit `optional:ankle_band` tag.
   const swimmingEquipmentOptions = [
     "Pool access",
     "Open water access",
     "Paddles",
     "Pull buoy",
+    "Ankle band",
     "Kickboard",
     "Fins",
     "Snorkel"

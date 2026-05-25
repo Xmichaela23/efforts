@@ -229,6 +229,9 @@ export function swimGearNormalized(labels: string[] | null | undefined): Set<str
     if (x.includes('snorkel')) s.add('snorkel');
     if (x === 'fins' || /\bfins?\b/.test(x)) s.add('fins');
     if (x.includes('paddle')) s.add('paddles');
+    // D-058 / Q-020 — ankle band (beginner body-position pairing with pull
+    // buoy per SWIM-PROTOCOL §6.4). Match "ankle band" or "ankle_band".
+    if (x.includes('ankle')) s.add('ankle band');
   }
   return s;
 }

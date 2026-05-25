@@ -1427,6 +1427,13 @@ export function pullFocusedSwim(
   const sessionOptional = swimSessionOptionalGear('pull_focused', athleteFitness, swimEquipment);
   const tags: string[] = ['quality', 'pull_focus_swim', 'swim', 'moderate', 'req:buoy'];
   if (athleteFitness !== 'beginner') tags.push('optional:paddles');
+  // D-058 / Q-020 — beginner body-position pairing per SWIM-PROTOCOL §6.4.
+  // Pull buoy + ankle band forces horizontal posture through core + balanced
+  // rotation (the swimmer can't kick to compensate for poor alignment). Only
+  // surface when the athlete owns the gear AND is beginner-tier.
+  if (athleteFitness === 'beginner' && swimGearNormalized(swimEquipment).has('ankle band')) {
+    tags.push('optional:ankle_band');
+  }
   if (drillTokens.length) tags.push('swim_drills');
   for (const g of sessionOptional) tags.push(`optional:${g}`);
 
