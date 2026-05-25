@@ -2222,8 +2222,8 @@ function Step8Strength({
             active={state.strengthIntent === 'performance'}
             onClick={() => setState({ ...state, strengthIntent: 'performance' })}
           >
-            <span className="block font-semibold">Hybrid Strength Athlete</span>
-            <span className="block text-[13px] text-white/55 mt-0.5">Strength is a goal alongside endurance. Maintain or build your lifts through race training.</span>
+            <span className="block font-semibold">Strength as a training priority (2× weekly compound lifting)</span>
+            <span className="block text-[13px] text-white/55 mt-0.5">Strength is a goal alongside endurance. Two weekly sessions of compound lifting (squat / deadlift / press / row) maintain or build your lifts through race training.</span>
           </ChoiceBtn>
           {state.strengthIntent === 'performance' && (
             // STRENGTH-PROTOCOL.md §0.3 race-day trade-off disclosure. Inline `<details>` keeps it
