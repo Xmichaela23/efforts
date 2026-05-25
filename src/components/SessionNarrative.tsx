@@ -641,7 +641,16 @@ export default function SessionNarrative({
       )}
       {trend && <TrendSparkline trend={trend} />}
       {sd?.terrain?.route && sd.terrain.route.history.length >= 2 && (
-        <RouteSparkline route={sd.terrain.route} />
+        // D-039 Fix 6: chart_eligible gates the sparkline at ≥6 history
+        // points (server-side threshold). Below that, render text only —
+        // "Same route · N runs" with a thin trend is noise, not signal.
+        (sd.terrain.route as any).chart_eligible !== false ? (
+          <RouteSparkline route={sd.terrain.route} />
+        ) : (
+          <div className="text-xs text-gray-500">
+            Same route · {sd.terrain.route.times_run} runs — not enough history to trend.
+          </div>
+        )
       )}
       {hasAnalysisDetails && (
         <div className="space-y-1.5">

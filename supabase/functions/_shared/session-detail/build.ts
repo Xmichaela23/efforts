@@ -790,9 +790,13 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       const r = tc.route_runs as any;
       if (!Array.isArray(r.history) || r.history.length < 2) return null;
       // D-039 Fix 2: `name` dropped — see types.ts terrain.route doc comment.
+      // D-039 Fix 6: chart_eligible gates the sparkline at ≥6 history points.
+      // Below that, "Same route · 4 runs" is noise — client renders text only.
+      const ROUTE_CHART_MIN_HISTORY = 6;
       return {
         route: {
           times_run: Number(r.times_run || 0),
+          chart_eligible: r.history.length >= ROUTE_CHART_MIN_HISTORY,
           history: r.history,
         },
       };

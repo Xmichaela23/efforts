@@ -336,10 +336,15 @@ export type SessionDetailV1 = {
    * D-039 Fix 2: `name` removed. Route names were auto-generated server-side
    * ("Route 53" = the 53rd cluster), not athlete-named. The LLM was upgrading
    * them into asserted identities. Client renders "Same route · N×" generically;
-   * the LLM input now describes the route by `times_run` count only. */
+   * the LLM input now describes the route by `times_run` count only.
+   * D-039 Fix 6: `chart_eligible` added. Server gates chart rendering at
+   * ≥6 history points (locked); below that, history is too thin to be a
+   * meaningful trend ("Same route · 4 runs" is noise). Client renders
+   * chart when true, text fallback when false. */
   terrain?: {
     route: {
       times_run: number;
+      chart_eligible: boolean;
       history: Array<{ date: string; pace_s_per_km: number | null; hr: number | null; is_current: boolean }>;
     } | null;
   } | null;
