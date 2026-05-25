@@ -4,6 +4,12 @@ type TrendPoint = {
   date: string;
   value: number;
   avg_hr: number | null;
+  /**
+   * D-050 / Q-025 — pace-at-HR (sec/mi per 100bpm). Server-emitted on each
+   * point; null when avg_hr was missing. Drives the primary sparkline line
+   * when `pace_at_hr_direction` is active (see TrendData below).
+   */
+  pace_at_hr?: number | null;
   is_current: boolean;
   label: string;
 };
@@ -16,6 +22,15 @@ type TrendData = {
   summary: string;
   lower_is_better?: boolean;
   ride_type?: string | null; // cycling: classified-type word for the text-only TREND fallback
+  /**
+   * D-050 / Q-025 — per-athlete percentile-classifier output. PRIMARY
+   * direction signal for the running TREND when non-null and not
+   * 'insufficient_data'. Falls back to `direction` (raw-pace classifier)
+   * otherwise. `pace_at_hr_basis` reports which pace basis the classifier
+   * used ('gap' = grade-adjusted; 'raw' = device pace).
+   */
+  pace_at_hr_direction?: 'improving' | 'stable' | 'declining' | 'insufficient_data' | null;
+  pace_at_hr_basis?: 'gap' | 'raw' | null;
 };
 
 type NextSession = {
@@ -156,7 +171,22 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
     );
   }
 
-  const values = pts.map((p) => p.value);
+  // D-050 / Q-025 — pace-at-HR mode. When the server's percentile classifier
+  // returned a usable direction (not null / insufficient_data) AND ≥6 points
+  // carry pace_at_hr values, plot pace_at_hr as the primary line and label
+  // direction via pace_at_hr_direction. Otherwise fall back to raw-pace
+  // values + direction (current behavior). Athlete-facing labels: "getting
+  // more efficient" / "holding steady" / "worth watching". Never red on
+  // stable / improving — only `declining` produces the red color.
+  const paceAtHrCount = pts.filter((p) => p.pace_at_hr != null && Number.isFinite(p.pace_at_hr)).length;
+  const usePaceAtHr =
+    trend.pace_at_hr_direction != null &&
+    trend.pace_at_hr_direction !== 'insufficient_data' &&
+    paceAtHrCount >= 6 &&
+    trend.unit === '/mi'; // running-only — cycling TREND already exits above
+
+  const plotValueOf = (p: TrendPoint): number => (usePaceAtHr && p.pace_at_hr != null ? p.pace_at_hr : p.value);
+  const values = pts.map(plotValueOf);
   const maxV = Math.max(...values);
   const minV = Math.min(...values);
   const range = maxV - minV || 1;
@@ -169,13 +199,18 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
 
   const coords = pts.map((p, i) => ({
     x: PAD + (i / (pts.length - 1)) * plotW,
-    y: PAD + ((p.value - minV) / range) * plotH,
+    y: PAD + ((plotValueOf(p) - minV) / range) * plotH,
     ...p,
   }));
 
   const pathD = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x},${c.y}`).join(' ');
-  const arrow = trend.direction === 'improving' ? '↗' : trend.direction === 'declining' ? '↘' : '→';
-  const color = trend.direction === 'improving' ? '#34d399' : trend.direction === 'declining' ? '#f87171' : '#9ca3af';
+  // D-050 / Q-025 — direction + color override when pace-at-HR mode active.
+  const effectiveDirection: 'improving' | 'declining' | 'stable' =
+    usePaceAtHr && trend.pace_at_hr_direction != null && trend.pace_at_hr_direction !== 'insufficient_data'
+      ? trend.pace_at_hr_direction
+      : trend.direction;
+  const arrow = effectiveDirection === 'improving' ? '↗' : effectiveDirection === 'declining' ? '↘' : '→';
+  const color = effectiveDirection === 'improving' ? '#34d399' : effectiveDirection === 'declining' ? '#f87171' : '#9ca3af';
 
   // HR line — normalize independently, lower HR = higher on chart (same direction as pace improvement)
   const hrPts = pts.filter((p) => (p as any).avg_hr != null);
@@ -214,11 +249,22 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
   // (unit '/mi', build.ts:669). "pace" was hardcoded — wrong for rides.
   const seriesLabel = trend.unit === 'W' ? 'power' : 'pace';
 
+  // D-050 / Q-025 — athlete-facing label when pace-at-HR mode active.
+  // "getting more efficient" / "holding steady" / "worth watching" map from
+  // pace_at_hr_direction; otherwise keep server-built `summary` (raw-pace).
+  const effectiveSummary = usePaceAtHr
+    ? (effectiveDirection === 'improving'
+        ? `getting more efficient (${pts.length} workouts)`
+        : effectiveDirection === 'declining'
+          ? `worth watching (${pts.length} workouts)`
+          : `holding steady (${pts.length} workouts)`)
+    : trend.summary;
+
   return (
     <div>
       <div className="flex items-center gap-2">
         <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Trend</span>
-        {trend.summary && <span className="text-xs" style={{ color }}>{arrow} {trend.summary}</span>}
+        {effectiveSummary && <span className="text-xs" style={{ color }}>{arrow} {effectiveSummary}</span>}
       </div>
       <div className="mt-1 relative">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 280, height: 52 }}>
