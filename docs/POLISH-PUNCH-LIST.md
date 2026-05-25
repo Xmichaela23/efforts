@@ -74,7 +74,7 @@ For each numbered item:
 - [ ] Minimum rebuild week count enforcement — when post-B-race window <2 weeks, current code skips rebuild entirely; consider whether to compress taper to guarantee ≥1 rebuild week
 - [ ] Verify all 6 intent × tier combinations end-to-end
 - [ ] Materialize-plan numerical resolution for % 1RM strings (deferred)
-- [ ] **Recovery week strength load — `createPerfRecoverySession` emits "2×8 @ 130 lb" deadlift every recovery week regardless of plan position.** Heavier than build-phase working load (115-120 lb). Doesn't honor "deload ~10% down" intent. Audit the recovery session generator and align load math with the new dispatcher-owned %1RM contract. Same canonical-value pattern applies — single source of truth for deload load math.
+- [x] **Recovery week strength load** — verified resolved 2026-05-25 (D-043 item 3 audit). Current `createPerfRecoverySession` (`performance-neural.ts:173-203`) explicitly excludes heavy spinal loading (no squats, no deadlifts — comment + exercise list confirm) and uses `% 1RM` for the light hip-thrust/step-up exercises that remain. `triathlon.ts:createRecoverySession` (`:701-752`) is bodyweight + light band only. The "2×8 @ 130 lb deadlift" hardcode this entry referenced no longer exists in either path — was a stale entry from before the protocol rewrite. No code change needed.
 
 ---
 
