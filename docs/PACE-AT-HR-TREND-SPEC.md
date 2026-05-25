@@ -72,16 +72,32 @@ magnitude_pace_at_hr: number | null;   // (sec/mi per 100bpm) per week
 Direction thresholds — same shape as the existing slope test (`getPaceTrend` at `queries.ts:670`), tuned for the new scale:
 
 ```ts
-if (slope < -2) 'improving';      // faster per bpm
-else if (slope > +2) 'declining'; // slower per bpm
+if (slope < -15) 'improving';      // faster per bpm
+else if (slope > +15) 'declining'; // slower per bpm
 else 'stable';
 ```
 
-The `-2 / +2` cutoff is provisional. Calibration:
-1. Pull 200 random run trends from production and run the new computation. Plot the slope distribution. Pick cutoffs that yield a roughly 60/20/20 stable/improving/declining split for steady-state athletes (no recent race).
-2. Lock the cutoffs before client ship.
+The **±15** cutoff is **provisional**, raised from an initial ±2 proposal after single-user calibration (2026-05-25 pull, n=66 qualifying points / 16 rolling windows). Findings:
+- Slope volatility on `pace_at_hr_raw` at the 5-8 point rolling window scale is wide — observed sd ≈ 17.4 sec/mi-per-100bpm per week on a single athlete with steady training.
+- ±2 yielded only ~6% stable across the simulation, nowhere near the 60% target. ±15 lands closer to one sd, which puts roughly two-thirds of windows in the stable band for steady-state training — the right shape for a "no fitness movement" signal.
+- Heavy-tailed slope distribution (driven by occasional cool-day / fast-day outliers) makes any fixed numeric cutoff fragile across athletes with different volatility profiles.
 
-**Emission rule:** the new direction fires only when **≥ 5 of the trend points have non-null `pace_at_hr`** (mirrors the existing `filtered.length < 5 → insufficient_data` guard). When fewer than 5 points qualify, `direction_pace_at_hr: 'insufficient_data'` and the client falls back to the raw-pace direction.
+**Long-term preferred approach (recommended for multi-user implementation):** switch from a fixed numeric cutoff to a **percentile-based classifier**:
+
+```
+sort slopes from all this athlete's recent trend windows
+  → bottom third (most negative)           → 'improving'
+  → top third (most positive)              → 'declining'
+  → middle third                           → 'stable'
+```
+
+Percentile cutoffs auto-adapt to athlete-specific volatility and don't require unit-aware tuning across athletes with very different training consistency or HR responsiveness. The math is the same population shape goal (~33/33/33 split) the ±15 fixed cutoff is *trying* to approximate, but does it correctly per-athlete instead of relying on cross-athlete-stable units.
+
+**Multi-user calibration still needed** before the cutoff is locked. Single-user data (one athlete, one season) under-samples cross-athlete variance. When the multi-user pull happens, use that data to either (a) confirm ±15 holds across the population, or (b) switch to the percentile classifier.
+
+**Emission rule:** the new direction fires only when **≥ 6 of the trend points have non-null `pace_at_hr`** (raised from 5 after the calibration showed the slope estimate is noisy at the floor — sd≈17 across 16 windows of 5-8 points means 5-point windows are barely above the noise threshold). When fewer than 6 points qualify, `direction_pace_at_hr: 'insufficient_data'` and the client falls back to the raw-pace direction.
+
+**GAP-basis preference rule (calibration-driven):** trend points carry a `pace_basis: 'gap' | 'raw'` flag (§1.2). The single-user pull showed the GAP-basis subset has materially better-behaved distribution shape than raw-pace points (symmetric, sd ≈ 30 vs 44 on the value distribution; no left-tail outliers from cool-day / fast-day runs). **When ≥60% of the post-filter trend points carry `pace_basis === 'gap'`, compute the slope on the GAP-basis pace** (`pace_sec_per_mi` is already GAP when basis is GAP — no extra field needed). When GAP coverage is below 60%, fall back to mixed/raw-basis slope and report the looser stable band. The `pace_basis` value on each point already lets the client know which basis fed the computation; surface it in the tooltip when the GAP-preferred path fires.
 
 ### 1.4 Back-compat
 
@@ -123,7 +139,7 @@ type TrendData = {
 const usePaceAtHr =
   trend.direction_pace_at_hr != null &&
   trend.direction_pace_at_hr !== 'insufficient_data' &&
-  trend.points.filter(p => p.value_pace_at_hr != null).length >= 5;
+  trend.points.filter(p => p.value_pace_at_hr != null).length >= 6;
 
 const plotValue = (p: TrendPoint) => usePaceAtHr ? p.value_pace_at_hr! : p.value;
 const directionForLabel = usePaceAtHr ? trend.direction_pace_at_hr! : trend.direction;
@@ -135,8 +151,8 @@ Three flow cases:
 
 | State | Sparkline plots | Direction label source | Footnote |
 |---|---|---|---|
-| ≥ 5 points with `value_pace_at_hr` AND server direction non-null | `value_pace_at_hr` | `direction_pace_at_hr` | "pace at heart rate" |
-| < 5 qualifying points OR server direction null | `value` (raw pace) | `direction` (current) | (no footnote, current behavior) |
+| ≥ 6 points with `value_pace_at_hr` AND server direction non-null | `value_pace_at_hr` | `direction_pace_at_hr` | "pace at heart rate" |
+| < 6 qualifying points OR server direction null | `value` (raw pace) | `direction` (current) | (no footnote, current behavior) |
 | All points missing HR | `value` (raw pace) | `direction` | (no footnote, current behavior) |
 
 ### 2.3 Tooltip change
@@ -179,11 +195,12 @@ The narrative prompt rule that consumes this will need a small update to acknowl
 
 Before any code lands, lock these:
 
-1. **Formula:** `pace * 100 / avg_hr` (proposed) — confirm via the 200-trend calibration pull. If the slope distribution is weird (e.g. heavy tails, asymmetric), consider `pace * (avg_hr / 100)` or a different scaling.
-2. **Slope cutoffs:** `±2 (sec/mi per 100bpm)/week` (proposed) — calibrate against production trends; pick cutoffs that yield a sensible improving/stable/declining split for steady-state athletes.
-3. **Minimum point count:** 5 (matches raw-pace minimum). Confirm no edge cases where 5 is too low to be honest.
-4. **Pool intersection with `pool_intensity_filter`:** trend pool already passes the ±15% filter post-D-038. Pace-at-HR direction should be computed on the post-filter pool. Verify: when D-041 race-boundary filter shrinks the pool, the pace-at-HR direction should ALSO be marked `insufficient_data` if `< 5` remain, not silently fall back to the wider unfiltered pool.
-5. **Pin tests required:** (a) pace-at-HR formula stability across the typical (pace, hr) range; (b) direction crossover at the cutoff; (c) insufficient-data when ≥ 5 points have null avg_hr; (d) `pool_intensity_filter` interaction (filter reduces pool below 5 → server emits `insufficient_data`); (e) client falls back to raw-pace direction when server reports null/insufficient.
+1. **Formula:** `pace * 100 / avg_hr` — **resolved 2026-05-25 single-user calibration** (n=66 qualifying points). Values land in 360–570 range for a steady-state athlete, mean 476, sd 44. Workable charting scale. Multi-user pull may surface athletes with materially different ranges; revisit if so.
+2. **Slope cutoffs:** **±15 (sec/mi per 100bpm)/week — provisional** (raised from ±2 after single-user calibration showed slope sd ≈ 17.4 on rolling 5-8 point windows; ±2 yielded only ~6% stable, ±15 lands near one sd and produces a ~60% stable band). **Multi-user calibration still required before lock.** **Long-term preferred approach:** percentile-based classifier (bottom-third improving / top-third declining / middle stable) per §1.3 — auto-adapts to athlete-specific volatility instead of relying on cross-athlete-stable units. When the multi-user pull happens, use that data to either confirm ±15 holds across the population or switch to the percentile classifier.
+3. **Minimum point count:** **6** (raised from 5 after the calibration showed slope estimates are noisy at the 5-point floor — sd ≈ 17 across 16 windows of 5-8 points means a 5-point window is barely above the noise threshold for the proposed ±15 cutoff). Mirrors raised threshold on both server (`insufficient_data` when `< 6`) and client (`usePaceAtHr` requires ≥ 6).
+4. **GAP-basis preference rule:** **resolved 2026-05-25 single-user calibration** — GAP-basis subset shows materially better distribution shape (symmetric, no left-tail outliers from cool-day / fast-day raw-pace runs). **When ≥60% of post-filter trend points carry `pace_basis === 'gap'`, compute slope on GAP-basis points only**; otherwise fall back to the mixed/raw-basis slope. Per §1.3 the `pace_basis` flag already exists on each point — no new field needed.
+5. **Pool intersection with `pool_intensity_filter`:** trend pool already passes the ±15% filter post-D-038. Pace-at-HR direction should be computed on the post-filter pool. Verify: when D-041 race-boundary filter shrinks the pool, the pace-at-HR direction should ALSO be marked `insufficient_data` if `< 6` remain, not silently fall back to the wider unfiltered pool.
+6. **Pin tests required:** (a) pace-at-HR formula stability across the typical (pace, hr) range; (b) direction crossover at the ±15 cutoff (and at the percentile boundaries if that classifier ships); (c) insufficient-data when ≥ 6 points have null avg_hr; (d) `pool_intensity_filter` interaction (filter reduces pool below 6 → server emits `insufficient_data`); (e) client falls back to raw-pace direction when server reports null/insufficient; (f) GAP-basis preference: when ≥60% of points are GAP-basis, the slope is computed on GAP-basis points only; below 60%, mixed-basis slope is used.
 
 ---
 
