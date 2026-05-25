@@ -1458,7 +1458,15 @@ export function buildWeek(
       }
     } else {
       const bq = bikeQualityDay;
-      if (phase === 'taper') {
+      // D-043 item 10: scope bikeOpeners to race week only. Pre-fix gate
+      // (`phase === 'taper'`) fired every taper week, but openers are a
+      // race-day priming session — not appropriate for the first 1-2
+      // weeks of a multi-week taper. RACE-WEEK-PROTOCOL §8.6 / §9.1 puts
+      // openers in the race-week-only window. Mirrors the swim-activation
+      // gate at :914 (same `phase === 'taper' && raceThisWeek` shape).
+      // Non-race-week taper falls through to the existing quality-bike
+      // / group-ride logic below.
+      if (phase === 'taper' && raceThisWeek) {
         bikeQualitySlot!.sessions.push(bikeOpeners(bq, servedGoal));
       } else {
         const grLabel = groupRideAnchorDisplayLabel(athleteState);
