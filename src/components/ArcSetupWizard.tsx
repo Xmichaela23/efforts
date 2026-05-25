@@ -1417,11 +1417,11 @@ function Step2Intent({
       </ChoiceBtn>
       <ChoiceBtn active={state.trainingIntent === 'completion'} onClick={() => setState({ ...state, trainingIntent: 'completion' })}>
         <span className="block font-semibold text-white">Strong, healthy finish</span>
-        <span className="block text-[13px] text-white/55 mt-0.5">Tempo-based quality work, no pace targets, recovery every 3 weeks. Built to finish feeling good.</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">Aerobic-focused build with quality work as the supporting layer. Same week structure as Race the Clock — you control the effort on quality days.</span>
       </ChoiceBtn>
       <ChoiceBtn active={state.trainingIntent === 'first_race'} onClick={() => setState({ ...state, trainingIntent: 'first_race' })}>
         <span className="block font-semibold text-white">First time at this distance</span>
-        <span className="block text-[13px] text-white/55 mt-0.5">Conservative ramp, recovery every 2 weeks, no intensity pressure. Built to get you to the line.</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">Same plan shape as Strong, healthy finish — pick this if you want a conservative mental frame. Pace pressure stays with you, not the plan.</span>
       </ChoiceBtn>
     </StepLayout>
   );
