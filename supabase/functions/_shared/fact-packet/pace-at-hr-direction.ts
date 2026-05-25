@@ -6,29 +6,34 @@
  * Approach (per-athlete, no global constants):
  *
  *   1. From the trend window's points with non-null pace_at_hr, count GAP-basis
- *      coverage. When ≥60% of points are GAP-basis, restrict the slope
- *      computation to GAP-basis points only (cleaner distribution shape per
- *      the 2026-05-25 calibration). Otherwise use all valid points.
+ *      coverage. When ≥60% of points are GAP-basis, restrict slope computation
+ *      to GAP-basis points only (cleaner distribution shape per the
+ *      2026-05-25 calibration). Otherwise use all valid points.
  *
  *   2. Need ≥6 qualifying points after the basis filter. Below that, return
- *      `insufficient_data` (raised from 5 per the calibration findings — slope
- *      estimates are noisy at the 5-point floor).
+ *      `insufficient_data` (raised from 5 per the calibration findings).
  *
- *   3. Compute the OVERALL window slope (linear regression of pace_at_hr over
- *      weeks from the earliest point).
+ *   3. Compute PER-PAIR slopes (slope between each adjacent pair of points).
+ *      These N-1 values represent the athlete's own session-to-session
+ *      volatility within the trend window.
  *
- *   4. Compute PER-PAIR slopes (slope between each adjacent pair of points).
- *      These represent the athlete's own short-window volatility within the
- *      trend window.
+ *   4. Classify each adjacent-pair slope by percentile rank in the within-
+ *      window distribution:
+ *        bottom third (most negative) → improving
+ *        top third    (most positive) → declining
+ *        middle third                 → stable
  *
- *   5. Use the 33rd/67th percentile boundaries of the per-pair distribution as
- *      cutoffs for the overall slope:
- *        overall < p33 → improving (a faster-than-typical drop in pace-at-HR)
- *        overall > p67 → declining (a slower-than-typical rise)
- *        middle → stable
+ *   5. The session's reported direction = MEAN of the most recent K pair-slopes
+ *      (K = min(3, available)) classified against the same p33 / p67 cutoffs.
+ *      "Recent K" smooths single-session noise while still being responsive to
+ *      the current session's contribution. Spec §1.3 wording "bottom-third of
+ *      slopes = improving" treats the per-pair distribution as the reference;
+ *      we evaluate the RECENT trend (not the whole-window LR) so the signal
+ *      tracks the athlete's current direction rather than the cumulative
+ *      sum-since-window-start.
  *
- *      The classifier auto-adapts to the athlete's own volatility — no
- *      cross-athlete unit assumptions, no fixed ±N cutoff.
+ *      Auto-adapts to per-athlete volatility — no cross-athlete unit
+ *      assumptions, no fixed ±N cutoff.
  *
  * Returns the chosen basis on the `basis` field so the client can show users
  * which pace was used (GAP when present, raw otherwise).
@@ -55,21 +60,7 @@ export interface ClassifyPaceAtHrResult {
 
 const MIN_POINTS = 6;
 const GAP_COVERAGE_THRESHOLD = 0.6;
-
-function linearSlope(xs: number[], ys: number[]): number | null {
-  if (xs.length < 2) return null;
-  const n = xs.length;
-  const mx = xs.reduce((a, b) => a + b, 0) / n;
-  const my = ys.reduce((a, b) => a + b, 0) / n;
-  let num = 0;
-  let den = 0;
-  for (let i = 0; i < n; i++) {
-    num += (xs[i] - mx) * (ys[i] - my);
-    den += (xs[i] - mx) * (xs[i] - mx);
-  }
-  if (den === 0) return null;
-  return num / den;
-}
+const RECENT_K = 3;
 
 function dateToWeeks(date: string, anchorMs: number): number {
   const ms = new Date(`${date}T00:00:00Z`).getTime();
@@ -114,27 +105,20 @@ export function classifyPaceAtHrDirection(
   const xs = sorted.map((p) => dateToWeeks(p.date, anchorMs));
   const ys = sorted.map((p) => p.pace_at_hr as number);
 
-  // Overall window slope (linear regression).
-  const overall = linearSlope(xs, ys);
-  if (overall == null || !Number.isFinite(overall)) {
-    return { direction: 'insufficient_data', basis };
-  }
-
-  // Per-pair slopes (N-1 values; same time / value units).
+  // Per-pair slopes (N-1 values; sec/mi-per-100bpm per week). Same-day
+  // duplicates skipped to avoid divide-by-zero and keep ordering deterministic.
   const pairs: number[] = [];
   for (let i = 0; i < sorted.length - 1; i++) {
     const dx = xs[i + 1] - xs[i];
-    if (dx <= 0) continue; // same-day duplicates skipped — keep deterministic
+    if (dx <= 0) continue;
     pairs.push((ys[i + 1] - ys[i]) / dx);
   }
-  // Need at least 3 pair-slopes to compute a meaningful percentile reference.
-  // Below that the cutoffs collapse; default to stable.
+  // Need at least 3 pair-slopes to compute meaningful percentile cutoffs.
   if (pairs.length < 3) {
     return { direction: 'stable', basis };
   }
 
-  // p33 / p67 percentile boundaries via nearest-rank (no interpolation —
-  // ties stay deterministic).
+  // p33 / p67 percentile boundaries (nearest-rank — ties stay deterministic).
   const sortedPairs = [...pairs].sort((a, b) => a - b);
   const pickPct = (p: number): number => {
     const idx = Math.max(
@@ -146,14 +130,22 @@ export function classifyPaceAtHrDirection(
   const p33 = pickPct(1 / 3);
   const p67 = pickPct(2 / 3);
 
-  // Tie handling: when p33 === p67 (e.g. distribution collapsed to a single
-  // value), the middle band has zero width and every slope would land in
-  // 'declining' or 'improving'. Force 'stable' in that degenerate case.
+  // Degenerate distribution (all pairs effectively equal) → stable. No
+  // session can be "unusually fast/slow vs typical" when typical has no
+  // variance.
   if (p33 === p67) {
     return { direction: 'stable', basis };
   }
 
-  if (overall < p33) return { direction: 'improving', basis };
-  if (overall > p67) return { direction: 'declining', basis };
+  // Session direction = mean of the most recent K pair-slopes (smooths
+  // single-session noise while staying responsive to current trend). Classified
+  // against the same p33 / p67 cutoffs derived from the full pair-slope
+  // distribution within the window.
+  const recentK = Math.min(RECENT_K, pairs.length);
+  const recentMean =
+    pairs.slice(-recentK).reduce((a, b) => a + b, 0) / recentK;
+
+  if (recentMean < p33) return { direction: 'improving', basis };
+  if (recentMean > p67) return { direction: 'declining', basis };
   return { direction: 'stable', basis };
 }
