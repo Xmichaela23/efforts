@@ -729,16 +729,47 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         );
         if (points.length < 3) return null;
         const mid = Math.ceil(points.length / 2);
-        const avgArr = (arr: typeof points) => arr.reduce((s, p) => s + p.value, 0) / arr.length;
+        const avgArr = (arr: Array<{ value: number }>) => arr.reduce((s, p) => s + p.value, 0) / arr.length;
         const firstHalfAvg = avgArr(points.slice(0, mid));
         const secondHalfAvg = avgArr(points.slice(mid));
         const delta = Math.round(firstHalfAvg - secondHalfAvg);
-        const direction = delta > 10 ? 'improving' as const : delta < -10 ? 'declining' as const : 'stable' as const;
+        const rawDirection: 'improving' | 'declining' | 'stable' =
+          delta > 10 ? 'improving' : delta < -10 ? 'declining' : 'stable';
+
+        // D-039 Fix 5: HR-aware direction. Raw pace delta alone is misleading
+        // when HR also shifted. "32s/mi slower over 5 workouts" in red is
+        // wrong when HR dropped too — that's a wash on pace-at-HR efficiency,
+        // not regression. Compute hrDelta when both halves have ≥2 HR points;
+        // downgrade direction to 'stable' when pace and HR move together
+        // (both faster→harder, or both slower→easier).
+        const firstHrPts = points.slice(0, mid).filter((p) => p.avg_hr != null);
+        const secondHrPts = points.slice(mid).filter((p) => p.avg_hr != null);
+        let hrDelta: number | null = null;
+        let direction = rawDirection;
+        let efficiencyNote = '';
+        if (firstHrPts.length >= 2 && secondHrPts.length >= 2) {
+          const firstHrAvg = firstHrPts.reduce((s, p) => s + (p.avg_hr as number), 0) / firstHrPts.length;
+          const secondHrAvg = secondHrPts.reduce((s, p) => s + (p.avg_hr as number), 0) / secondHrPts.length;
+          hrDelta = Math.round(firstHrAvg - secondHrAvg);
+          // Pace got slower (declining) BUT HR also dropped meaningfully (>3 bpm) → wash
+          if (rawDirection === 'declining' && hrDelta > 3) {
+            direction = 'stable';
+            efficiencyNote = ' — at lower HR, so effort is consistent';
+          }
+          // Pace got faster (improving) BUT HR also rose meaningfully (>3 bpm) → wash
+          else if (rawDirection === 'improving' && hrDelta < -3) {
+            direction = 'stable';
+            efficiencyNote = ' — at higher HR, so effort is consistent';
+          }
+        }
+
         const absDelta = Math.abs(delta);
         const summary = (isEasyLike && direction !== 'stable')
           ? ''
           : direction === 'stable'
-            ? `Consistent across ${points.length} workouts`
+            ? (efficiencyNote
+                ? `${absDelta}s/mi ${delta > 0 ? 'faster' : 'slower'}${efficiencyNote} (${points.length} workouts)`
+                : `Consistent across ${points.length} workouts`)
             : `${absDelta}s/mi ${direction === 'improving' ? 'faster' : 'slower'} over ${points.length} workouts`;
         return {
           metric_label: 'Pace',
