@@ -2596,9 +2596,33 @@ function Step9Confirm({
       onBack={onBack}
       onContinue={onConfirm}
       canContinue={!!state.planStartDate}
-      continueLabel={saving ? 'Building…' : 'Looks right — build my plan'}
+      continueLabel={saving ? 'Building your plan — about 30–60 seconds…' : 'Looks right — build my plan'}
       saving={saving}
     >
+      {/* D-056 / Item 6 — building progress indicator. Inline animated
+          bar surfaces during plan generation so the athlete knows the
+          wait is expected (typically 30–60 seconds). */}
+      {saving && (
+        <div className="rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 py-3 flex items-center gap-3">
+          <div className="relative h-2 flex-1 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-teal-400/70"
+              style={{ animation: 'pulse 1.5s ease-in-out infinite' }}
+            />
+            <div
+              className="absolute inset-y-0 rounded-full bg-teal-300/90"
+              style={{
+                width: '40%',
+                animation: 'arcSetupBuildingSweep 1.8s linear infinite',
+              }}
+            />
+          </div>
+          <span className="text-[12px] text-teal-100/85 font-medium whitespace-nowrap">
+            Building your plan…
+          </span>
+          <style>{`@keyframes arcSetupBuildingSweep { 0% { left: -40%; } 100% { left: 100%; } }`}</style>
+        </div>
+      )}
       {/* Season summary card */}
       <div className="rounded-2xl border border-teal-500/25 bg-gradient-to-b from-teal-950/55 via-zinc-950/50 to-zinc-950/90 px-4 py-5 space-y-1.5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-teal-400/90 mb-2">Your season</p>
