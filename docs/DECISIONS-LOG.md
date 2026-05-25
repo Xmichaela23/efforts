@@ -1413,6 +1413,70 @@ authorized the rename. Memory updated.
 
 ---
 
+## D-061 — Wire training_intent into combined-plan recovery + quality gates
+
+Shipped: 2026-05-26 / commit a5762100
+
+The WIZARD-AUDIT G4 / 2026-05-26 training_intent audit confirmed
+`completion` and `first_race` produced identical combined-plan output
+despite the wizard promising distinct prescriptions. D-061 closes the
+gap on three differentiation axes:
+
+Recovery cadence (loading pattern, overrides athlete pin):
+  performance → '3:1' (every 4th week)
+  completion  → '2:1' (every 3rd week)  NEW
+  first_race  → '1:1' (every 2nd week)  NEW
+  comeback    → '1:1'
+
+Base-phase interval reps (run quality):
+  performance / completion → standard 4→8 rep ramp
+  first_race / comeback    → 80% cap (max 6 reps)
+
+Build-phase VO2 gating (race_peak path, defensive):
+  performance               → full VO2 ramp
+  completion                → NO VO2 (downgrade to tempo)
+  first_race / comeback     → no VO2 until weekInPhase ≥ 4
+
+Implementation:
+  - `loadingPatternForIntent()` helper in phase-structure.ts
+  - applyLoadingPattern() + blockWeekMultiplier() extended with '1:1'
+  - LoadingPattern type widened to '3:1' | '2:1' | '1:1'
+  - Run-quality emission sites in week-builder.ts gain intent-aware
+    branches for base-phase rep cap + build-phase VO2 gating
+
+13 pin tests in training-intent-differentiation.test.ts lock the
+contract (3-way recovery-week counts: 3 vs 4 vs 6 across performance /
+completion / first_race in a 12-week build). 77/0 existing rebuild +
+race-week tests still green.
+
+Out of scope: swim and strength intent-wiring (separate Ticket B items
+per user direction).
+
+---
+
+## D-062 — Cycling dashboard rows plain-language (Q-010 partial)
+
+Shipped: 2026-05-26 / commit c2c32517
+
+Per SESSION-CONTEXT.md §3 cosmetic-deferred note + Q-010: cycling
+EFFICIENCY and POWER dashboard rows still carried technical
+abbreviations the INSIGHTS prose was already jargon-banned from. Two
+row translations in session-detail/build.ts:
+
+  POWER:      "175W at IF 0.85" → "175W (85% of threshold)"
+  EFFICIENCY: "EF 1.87 · 4.2% HR decoupling" → "Watts per heartbeat
+              1.87 · HR drift 4.2%"
+
+Wording change only — numeric values + gate logic unchanged. INSIGHTS
+narrative side already jargon-clean via `summaryHasJargon` guard.
+
+Not shipped: cycling LLM prompt closing-clause hedge softening — the
+SESSION-CONTEXT §7 3-guard-stack footgun warns against modifying the
+prompt without concrete reproducer; risk of degrading existing guard
+interactions. Q-010 stays partially open for the hedge-softening half.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

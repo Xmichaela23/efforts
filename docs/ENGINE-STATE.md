@@ -449,6 +449,20 @@ Verified-working architecture and fixes. If you think one of these is broken, th
 
 ---
 
+### D-061 — training_intent wired into combined-plan recovery + quality (2026-05-26)
+- **Files/commits:** `a5762100`. New `loadingPatternForIntent()` helper in `phase-structure.ts`; `applyLoadingPattern()` + `blockWeekMultiplier()` extended with '1:1' pattern; LoadingPattern type widened; run-quality emission sites in `week-builder.ts` gain intent-aware base-rep cap + build-VO2 gating; 13 pin tests in `training-intent-differentiation.test.ts`.
+- **Behavior:** closes the WIZARD-AUDIT G4 differentiation gap. `performance` → '3:1' (every 4th week recovery); `completion` → '2:1' (every 3rd); `first_race` / `comeback` → '1:1' (every 2nd). first_race/comeback also get 80% base-interval rep cap. In race_peak path (defensive): completion blocks VO2 entirely (downgrade to tempo); first_race blocks VO2 until weekInPhase ≥ 4.
+- **Footgun:** intent-driven loading pattern OVERRIDES athlete's pinned `loading_pattern` field. A first_race athlete who pinned `loading_pattern: '3:1'` still gets '1:1' because intent semantic dominates. If a future athlete-pin override mechanism is needed, it must be explicit (per-goal opt-out flag) — don't pin-respect at the loadingPatternForIntent call site without a deliberate decision.
+- **Decision:** D-061. Out of scope: swim + strength intent wiring (Ticket B follow-ups).
+
+### D-062 — Cycling dashboard rows plain-language (Q-010 partial) (2026-05-26)
+- **Files/commits:** `c2c32517`. Two row label/value translations in `_shared/session-detail/build.ts`: POWER ("IF 0.85" → "85% of threshold"); EFFICIENCY ("EF · % HR decoupling" → "Watts per heartbeat · HR drift").
+- **Behavior:** dashboard rows now align with the jargon-banned INSIGHTS prose. Numeric values + gate logic unchanged.
+- **Footgun:** the cycling LLM prompt closing-clause hedge half of Q-010 is NOT shipped — the SESSION-CONTEXT §7 3-guard-stack footgun warns the three jargon/lede/numeric-drift guards interact via a shared retry; modifying any single guard or trimming the attempt budget silently degrades the others. Without a concrete reproducer for the hedge pattern, the prompt was untouched.
+- **Decision:** D-062. Q-010 stays partially open for the closing-clause hedge softening.
+
+---
+
 ### Autonomous batch D-051 through D-060 (2026-05-25)
 - D-051: Race-Specific Aerobic ramp 1500→2500yd (SWIM-PROTOCOL §5.4); was 2000→2400
 - D-052: four new swim session types (Time Trial / Open Water Skills / Mixed-Fartlek / Race-Pace Sustained) with phase-aware rotation injection
