@@ -17,6 +17,17 @@ export type LLMOptions = {
   temperature?: number;
   /** Override model — defaults to haiku. Pass 'sonnet' or 'opus' for higher quality. */
   model?: 'haiku' | 'sonnet' | 'opus' | string;
+  /**
+   * D-082 — when provided, callLLM writes diagnostics into this object in place.
+   * Caller passes an empty {} and inspects after the call. Captures:
+   *   has_api_key, model, system_chars, user_chars, max_tokens,
+   *   http_status, http_ok, error_message, response_chars,
+   *   response_excerpt (first 200 chars), stop_reason
+   * Production sites should NOT pass this — it's strictly an instrumentation
+   * hook for active investigation. Remove the prop on cleanup once the bug
+   * is found.
+   */
+  debug?: Record<string, unknown>;
 };
 
 // Model aliases — update here to roll all functions forward at once
@@ -35,8 +46,17 @@ const DEFAULT_MODEL: keyof typeof MODELS = 'haiku';
  */
 export async function callLLM(opts: LLMOptions): Promise<string | null> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  // D-082: populate diagnostics object (in-place) before any early return so
+  // callers can introspect even when the API key is missing.
+  if (opts.debug) {
+    opts.debug.has_api_key = !!apiKey;
+    opts.debug.system_chars = String(opts.system ?? '').length;
+    opts.debug.user_chars = String(opts.user ?? '').length;
+    opts.debug.max_tokens = opts.maxTokens ?? 300;
+  }
   if (!apiKey) {
     console.warn('[llm] ANTHROPIC_API_KEY not set — skipping LLM call');
+    if (opts.debug) opts.debug.error_message = 'ANTHROPIC_API_KEY not set';
     return null;
   }
 
@@ -44,6 +64,7 @@ export async function callLLM(opts: LLMOptions): Promise<string | null> {
     opts.model === 'haiku' || opts.model === 'sonnet' || opts.model === 'opus'
       ? MODELS[opts.model]
       : (opts.model ?? MODELS[DEFAULT_MODEL]);
+  if (opts.debug) opts.debug.model = modelId;
 
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -62,17 +83,29 @@ export async function callLLM(opts: LLMOptions): Promise<string | null> {
       }),
     });
 
+    if (opts.debug) {
+      opts.debug.http_status = resp.status;
+      opts.debug.http_ok = resp.ok;
+    }
+
     if (!resp.ok) {
       const body = await resp.text().catch(() => '');
       console.warn(`[llm] Anthropic non-ok: ${resp.status} ${resp.statusText} — ${body.slice(0, 200)}`);
+      if (opts.debug) opts.debug.error_message = `${resp.status} ${resp.statusText}: ${body.slice(0, 200)}`;
       return null;
     }
 
     const data = await resp.json();
     const text = String(data?.content?.[0]?.text || '').trim();
+    if (opts.debug) {
+      opts.debug.response_chars = text.length;
+      opts.debug.response_excerpt = text.slice(0, 200);
+      opts.debug.stop_reason = data?.stop_reason ?? null;
+    }
     return text || null;
   } catch (e: any) {
     console.warn('[llm] Anthropic call failed:', e?.message || e);
+    if (opts.debug) opts.debug.error_message = `exception: ${e?.message || String(e)}`;
     return null;
   }
 }

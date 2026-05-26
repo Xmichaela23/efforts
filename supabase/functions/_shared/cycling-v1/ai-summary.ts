@@ -370,9 +370,20 @@ export async function generateCyclingAISummaryV1(
   arcNarrative?: ArcNarrativeContextV1 | null,
   varianceGate?: CyclingVarianceGateOptions | null,
   unplannedGate?: CyclingUnplannedGateOptions | null,
+  // D-082: optional diagnostics sink. Populated in-place with per-attempt LLM
+  // outcomes so the caller (analyze-cycling-workout) can persist them for
+  // out-of-band investigation when ai_summary mysteriously returns null.
+  debug?: Record<string, unknown>,
 ): Promise<string | null> {
   const display = toDisplayPacket(factPacket, flags, crossWorkout, varianceGate ?? null, unplannedGate ?? null);
   const packetStr = JSON.stringify(display, null, 2);
+  // D-083: `isUnplanned` is defined inside toDisplayPacket's scope, NOT here.
+  // The systemPrompt construction below (line ~426) references it for the
+  // D-046 backward-anchor addon — that was a ReferenceError on every cycling
+  // call since D-046 shipped (2026-05-25), silently caught by the analyzer's
+  // try/catch and producing ai_summary: null. Define it here so the addon
+  // can actually run.
+  const isUnplanned = unplannedGate?.isUnplanned === true;
   // Temporal Arc frame (post-race recovery / taper / race proximity / plan
   // phase) — consumed the same way running does: fact block in the user
   // message, mode addon on the system prompt. Numbers from it are whitelisted
@@ -427,13 +438,24 @@ ${packetStr}
         '\n\n'
       : '') + prompt;
 
+  // D-082: per-attempt LLM call diagnostics. Each attempt gets its own bucket
+  // so a non-null s1 still records what came back, and a null s1 records why.
+  const attemptDebug: Array<Record<string, unknown>> = [];
   const attempt = async (userMsg: string): Promise<string | null> => {
+    const llmDebug: Record<string, unknown> = {};
     const text = await callLLM({
       system: systemPrompt,
       user: userMsg,
       temperature: 0.2,
       maxTokens: 220,
+      debug: debug ? llmDebug : undefined,
     });
+    if (debug) {
+      attemptDebug.push({
+        ...llmDebug,
+        normalized_chars: text ? normalizeParagraph(text).length : 0,
+      });
+    }
     return text ? normalizeParagraph(text) : null;
   };
 
@@ -444,11 +466,24 @@ ${packetStr}
   // brief — no IF/VI/EF/decoupling/ACWR/TSB labels-or-numbers). All failing
   // corrections fold into the single retry.
   const s1 = await attempt(userBase);
-  if (!s1) return null;
+  if (!s1) {
+    if (debug) debug.attempts = attemptDebug;
+    if (debug) debug.outcome = 'attempt_1_null';
+    return null;
+  }
   const v1 = validateNoNewNumbers(s1, allowStr);
   const lede1 = ledeOpensWithArcFrame(s1);
   const jargon1 = summaryHasJargon(s1);
-  if (v1.ok && !lede1 && !jargon1) return s1;
+  if (debug) {
+    debug.attempt_1_validator = { ok: v1.ok, bad_numbers: v1.bad ?? null, lede_arc: lede1, jargon: jargon1 };
+  }
+  if (v1.ok && !lede1 && !jargon1) {
+    if (debug) {
+      debug.attempts = attemptDebug;
+      debug.outcome = 'attempt_1_accepted';
+    }
+    return s1;
+  }
 
   const corrections: string[] = [];
   if (!v1.ok) {
@@ -469,7 +504,17 @@ ${packetStr}
   const s2 = await attempt(
     userBase + `\n\nYour previous output ${corrections.join('; AND it ')}. Keep it to 3–4 sentences, plain language (no IF/VI/EF/decoupling jargon).`,
   );
-  if (!s2) return null;
+  if (!s2) {
+    if (debug) {
+      debug.attempts = attemptDebug;
+      debug.outcome = 'attempt_2_null';
+    }
+    return null;
+  }
+  if (debug) {
+    debug.attempts = attemptDebug;
+    debug.outcome = 'attempt_2_accepted';
+  }
   // Soft-accept: cycling's validators (numeric drift + lede guard) are
   // retry-corrected then accepted — neither is a hard reject. Returning null
   // here discards an otherwise-grounded paragraph and falls back to flag/

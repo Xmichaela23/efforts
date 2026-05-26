@@ -2431,6 +2431,10 @@ Deno.serve(async (req) => {
 
     // Cycling ai_summary — generated here so the narrative can lead with the
     // cross-workout comparison/trend (parity with analyze-running-workout).
+    // D-082: collect LLM diagnostics into aiSummaryDebug so we can persist
+    // them on workout_analysis for out-of-band investigation when the
+    // LLM call returns null mysteriously. Remove on cleanup.
+    const aiSummaryDebug: Record<string, unknown> = { collected_at: new Date().toISOString() };
     try {
       ai_summary = await generateCyclingAISummaryV1(cyclingFactPacketV1, cyclingFlagsV1, null, {
         vsSimilar: cyclingVsSimilar,
@@ -2449,10 +2453,12 @@ Deno.serve(async (req) => {
       // D-035: cycling unplanned gate. cross_workout stays populated for
       // unplanned rides (NP-vs-typical is honest history); the UNPLANNED MODE
       // prompt rule fires on is_unplanned in the display packet.
-      { isUnplanned: !plannedWorkout });
+      { isUnplanned: !plannedWorkout },
+      aiSummaryDebug);
       if (ai_summary) ai_summary_generated_at = new Date().toISOString();
-    } catch (e) {
+    } catch (e: any) {
       console.log('⚠️ Cycling ai_summary generation failed:', e);
+      aiSummaryDebug.exception = e?.message || String(e);
       ai_summary = null;
       ai_summary_generated_at = null;
     }
@@ -2574,6 +2580,11 @@ Deno.serve(async (req) => {
           flags_v1: cyclingFlagsV1,
           ai_summary,
           ai_summary_generated_at,
+          // D-082 temporary instrumentation: surfaces LLM call diagnostics on
+          // workout_analysis so callers can query via REST without dashboard
+          // log access. Remove this field (here + the collector above) once
+          // the LLM-null root cause is found.
+          ai_summary_debug: aiSummaryDebug,
           session_state_v1: sessionStateV1,
           // D-079: mirror analyze-running-workout:2817 — write `recomputed_at`
           // so workout-detail's `isSessionDetailStale` check (line 112-116)
