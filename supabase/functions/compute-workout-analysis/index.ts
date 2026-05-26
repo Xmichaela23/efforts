@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
 import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 
 const ANALYSIS_VERSION = 'v0.1.8'; // elevation + NP + swim pace (no sample timeout)
 
@@ -913,20 +914,38 @@ Deno.serve(async (req) => {
           .eq('user_id', w.user_id)
           .maybeSingle();
         console.log('[FTP] Baseline data:', baseline);
-        if (baseline?.performance_numbers) {
-          const perfNumbers = typeof baseline.performance_numbers === 'string' 
-            ? JSON.parse(baseline.performance_numbers) 
-            : baseline.performance_numbers;
-          console.log('[FTP] Parsed performance_numbers:', perfNumbers);
-          if (perfNumbers?.ftp) {
-            userFtp = Number(perfNumbers.ftp);
-            console.log('[FTP] Extracted FTP:', userFtp);
+        // D-085: route FTP through the shared resolver
+        // (src/lib/resolve-current-ftp.ts) instead of reading
+        // performance_numbers.ftp directly. The pre-fix path ignored
+        // learned_fitness.ride_ftp_estimated entirely — athletes with no
+        // manual entry but a high-confidence learned FTP had their entire
+        // ride history's IF / TSS / power-zone-bins computed against the
+        // hardcoded 200W fallback at line 1568. Resolver precedence
+        // (medium/high learned → manual → low-confidence learned → null)
+        // matches every other server consumer (send-workout-to-garmin,
+        // calculate-workload, compute-facts, materialize-plan,
+        // athlete-snapshot, infer-training-fitness).
+        const perfNumbers = baseline?.performance_numbers
+          ? (typeof baseline.performance_numbers === 'string'
+              ? JSON.parse(baseline.performance_numbers)
+              : baseline.performance_numbers)
+          : null;
+        const lf = baseline?.learned_fitness
+          ? (typeof baseline.learned_fitness === 'string'
+              ? JSON.parse(baseline.learned_fitness)
+              : baseline.learned_fitness)
+          : null;
+        if (perfNumbers || lf) {
+          const ftpResolved = resolveCurrentFtp({
+            performance_numbers: perfNumbers,
+            learned_fitness: lf,
+          });
+          if (ftpResolved.value != null) {
+            userFtp = ftpResolved.value;
+            console.log('[FTP] Resolved FTP:', userFtp, 'source:', ftpResolved.source);
           }
         }
-        if (baseline?.learned_fitness) {
-          const lf = typeof baseline.learned_fitness === 'string'
-            ? JSON.parse(baseline.learned_fitness)
-            : baseline.learned_fitness;
+        if (lf) {
           const sportMaxHr = (sport.includes('ride') || sport.includes('bike') || sport.includes('cycling'))
             ? lf?.ride_max_hr_observed
             : lf?.run_max_hr_observed;

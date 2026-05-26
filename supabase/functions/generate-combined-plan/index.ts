@@ -452,10 +452,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Validate ───────────────────────────────────────────────────────────
+    // D-087: pass endurance-adjusted hours (not declared) so the validator's
+    // TSS target matches the week-builder's actual budget. Pre-fix the
+    // validator used declared hours → target inflated for hybrid athletes →
+    // weeks that should have tripped the >15%-over-target check silently
+    // passed. Mirrors the budgetHours pattern at week-builder.ts:734-736
+    // and the plan_contract_v1.weekly_tss_target at :601 (Q-005 / D-021).
+    const validatorHours = scheduleState.session_frequency_defaults?.endurance_hours
+      ?? state.weekly_hours_available;
     const validation = validatePlan(
       generatedWeeks, blocks,
       state.current_ctl,
-      state.weekly_hours_available,
+      validatorHours,
       loadingPattern,
       hasTriGoal,
       scheduleState.transition_mode,

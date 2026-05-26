@@ -68,18 +68,17 @@ function qualityBikeAnchorFromState(
   if (state.bike_quality_day != null) {
     return { day: sunIndexToDayName(state.bike_quality_day), intensity: 'quality' };
   }
-  const hasGroupRideDuration =
-    state.bike_quality_route_estimated_hours != null ||
-    state.bike_quality_route_estimated_minutes != null ||
-    state.bike_quality_group_ride_hours != null ||
-    state.bike_quality_group_ride_minutes != null ||
-    Boolean(String(state.group_ride_route_url ?? '').trim());
-  const lbl = String(state.bike_quality_label ?? '').trim();
-  const looksGroupRide =
-    hasGroupRideDuration ||
-    /\b(group|hammer|club)\b/i.test(lbl);
-  if (!looksGroupRide) return undefined;
-  return { day: 'wednesday', intensity: 'quality' };
+  // D-086: previously fell back to a hardcoded 'wednesday' anchor when
+  // bike_quality_day was missing but group-ride signals existed (route URL,
+  // duration estimate, "group/hammer/club" label keyword). That guess could
+  // misposition the quality_bike anchor to Wednesday on an athlete whose
+  // actual group ride was on Tuesday or Saturday. Return undefined instead;
+  // the optimizer's quality_bike placement loop will pick the best matrix-
+  // clean weekday from its candidate order. If the athlete genuinely has a
+  // recurring group ride, the day belongs in `bike_quality_day` — which the
+  // wizard does write (ArcSetupWizard.tsx:601-603 maps groupRideDay →
+  // preferredDays.quality_bike → AthleteState.bike_quality_day).
+  return undefined;
 }
 
 /** Convert AthleteState `strength_preferred_days` (mixed-case strings) to lowercase DayName[]. */
