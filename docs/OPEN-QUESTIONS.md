@@ -368,19 +368,22 @@ resolution — prerequisite); D-050 (this closure);
 
 ---
 
-## Q-026 — Backward anchor leaking on unplanned sessions with no plan link
+## Q-026 — Backward anchor leaking on unplanned sessions with no plan link — RESOLVED 2026-05-25 / D-046
 
-Filed: 2026-05-24
+Filed: 2026-05-24 · Resolved: 2026-05-25 / D-046 / commit `97111a01`
 
-Forward-bias hard ban (D-039 / D-040) works on linked sessions in
-`build_read` and `unstructured_read` modes. Unplanned sessions with no plan
-link have weaker Arc mode context — `days_since_last_goal_race` still
-surfaces in the ARC FACT BLOCK and the LLM uses it when no stronger forward
-signal exists.
+Forward-bias hard ban (D-039 / D-040) worked on linked sessions in
+`build_read` and `unstructured_read` modes but unplanned sessions with no
+plan link fell through because Arc mode context is weaker without a plan.
+`days_since_last_goal_race` surfaced in the ARC FACT BLOCK and the LLM used
+it when no stronger forward signal existed.
 
-Fix: add explicit suppression of `days_since_last_goal_race` framing to
-UNPLANNED MODE prompt rule when `is_unplanned=true`. Small targeted change,
-same pattern as the phase-label ban (D-040 Fix B). Not scheduled.
+**Fix shipped (D-046):** new `arcUnplannedBackwardAnchorAddon` helper in
+`_shared/arc-narrative-ai-appendix.ts` wired into running ai-summary at
+`_shared/fact-packet/ai-summary.ts:~1175` and cycling ai-summary at
+`_shared/cycling-v1/ai-summary.ts:~400`. Adds an explicit suppression
+clause to UNPLANNED MODE that mirrors the D-040 Fix B phase-label ban
+pattern.
 
 ---
 
