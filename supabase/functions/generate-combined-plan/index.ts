@@ -309,7 +309,12 @@ Deno.serve(async (req: Request) => {
 
     let generatedWeeks = generateAllWeeks(blocks);
     let physiologicalFloorRebuiltOnce = false;
-    const floorOpts = { hasTri: hasTriGoal };
+    const floorOpts = {
+      hasTri: hasTriGoal,
+      // D-068: surface primary distance to the WoW ramp validator so full-IM
+      // plans use the wider 25% ceiling rather than the 20% 70.3 default.
+      primaryDistance: String((goals.find((g) => g.priority === 'A') ?? goals[0])?.distance ?? ''),
+    };
     // Long-day anchors are hard floors — re-enforce them after each compression pass so the
     // 0.87× tightening shrinks quality / easy / swim but never compresses long_ride / long_run
     // below their physiological minimums (`longRideFloorHours` / `longRunFloorMiles`).

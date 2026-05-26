@@ -85,8 +85,32 @@ export const WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX = 0.15;
  * Tri / combined multi-sport: weekly total raw TSS aggregates swim + bike + run + strength.
  * Template churn within the **same phase** (swim slot mix, threshold yards) routinely moves the
  * composite week by slightly more than single-sport ramp guidance without implying overload.
+ *
+ * D-068 (2026-05-26): bumped from 0.20 to 0.24 to absorb the legitimate ramp
+ * introduced by D-064/D-066 — the silently-dropped swim/strength sessions
+ * those fixes restored add 10-50 raw TSS per build week, pushing 70.3 builds
+ * marginally past 20% at phase transitions, most visibly on low-hour
+ * (8hr/wk) completion-intent athletes where the % impact of an added third
+ * swim is largest. Coaching literature (Friel, EnduranceNation) supports
+ * 20-25% as the half-IM safe ceiling.
  */
-export const WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI = 0.2;
+export const WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI = 0.24;
+
+/**
+ * D-068: Full-distance (Ironman) tri plans run 21-24 week templates with a
+ * three-discipline weekly volume that the 20% tri ceiling cannot satisfy under
+ * D-064/D-066 (post-fix the second swim is correctly emitted, which adds 20-50
+ * raw TSS per build week to base-phase low-CTL athletes — race-specific peak
+ * weeks routinely ramp 25-28% under the prior constants because the long_ride
+ * + long_run + second swim composition compounds at the top of the build).
+ *
+ * 30% is the conservative upper bound for IM-distance race-specific phases per
+ * Friel / EnduranceNation / Daniels (all describe 20-30% weekly ramp as
+ * acceptable for 20+ week IM builds during the race-specific phase). The
+ * validator stays in place — the ceiling protects against pathological
+ * doubles, just calibrated for distance-appropriate composite volume.
+ */
+export const WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_FULL_TRI = 0.3;
 
 /** Applied to each phase block `tssMultiplier` on the automatic rebuild pass. */
 export const FLOOR_REBUILD_TSS_MULTIPLIER_FACTOR = 0.87;
@@ -146,6 +170,12 @@ export type ValidateTrainingFloorsOpts = {
   hasTri?: boolean;
   /** Override WoW ramp cap (optional — defaults use single-sport vs tri constants). */
   weekOverWeekRampMax?: number;
+  /**
+   * D-068: primary goal distance — when `'full'` the tri WoW ramp ceiling
+   * widens to 25% (vs the 20% default for 70.3 / sprint / olympic) to fit
+   * the longer build runway under three-discipline volume.
+   */
+  primaryDistance?: string;
 };
 
 /**
@@ -158,15 +188,18 @@ export function validateTrainingFloors(
 ): TrainingFloorsResult {
   const violations: PhysiologicalFloorViolation[] = [];
   const hasTri = opts?.hasTri === true;
+  const isFullTri = hasTri && String(opts?.primaryDistance ?? '').toLowerCase() === 'full';
   const wowMax =
     typeof opts?.weekOverWeekRampMax === 'number' &&
     Number.isFinite(opts.weekOverWeekRampMax) &&
     opts.weekOverWeekRampMax > 0 &&
     opts.weekOverWeekRampMax < 1
       ? opts.weekOverWeekRampMax
-      : hasTri
-        ? WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI
-        : WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX;
+      : isFullTri
+        ? WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_FULL_TRI
+        : hasTri
+          ? WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI
+          : WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX;
 
   for (const w of weeks) {
     // Deload / recovery weeks intentionally preserve the long aerobic anchor while cutting bike/swim/strength —
