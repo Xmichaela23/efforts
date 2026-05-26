@@ -144,7 +144,20 @@ export function cyclingCrossWorkoutDisplay(cw: {
       sample_size: (vs.sample_size != null && Number.isFinite(Number(vs.sample_size))) ? Number(vs.sample_size) : null,
       np_delta_w: Math.round(Number(vs.np_delta_w)),
       if_delta: (vs.if_delta != null && Number.isFinite(Number(vs.if_delta))) ? Number(Number(vs.if_delta).toFixed(2)) : null,
+      // D-073 — HR fields ported from the run-side D-038 vs_similar shape.
+      // The POOL INTENSITY CONTEXT prompt rule below anchors HR-delta
+      // interpretation against `pool_power_context.intensity_match`.
+      hr_delta_bpm: (vs.hr_delta_bpm != null && Number.isFinite(Number(vs.hr_delta_bpm)))
+        ? Math.round(Number(vs.hr_delta_bpm))
+        : null,
+      drift_delta_bpm: (vs.drift_delta_bpm != null && Number.isFinite(Number(vs.drift_delta_bpm)))
+        ? Math.round(Number(vs.drift_delta_bpm))
+        : null,
       assessment: typeof vs.assessment === 'string' ? vs.assessment : null,
+      // D-073 — LLM-facing intensity-match context (analog of run's
+      // `pool_pace_context`). Always surfaced when populated so the prompt
+      // rule has the enum to key off.
+      pool_power_context: (vs as any).pool_power_context ?? null,
     };
   }
 
@@ -388,6 +401,11 @@ RULES:
 - If plan.week_number is present, anchor it in at most a short clause (e.g. "Week 3, build") — do not spend a sentence on plan position.
 - MIXED-EFFORT MODE (when packet has interval_summary and cross_workout is null): this ride was structured/variable — DO NOT compare whole-ride NP/IF to your endurance baseline. Interpret the per-interval work: which work intervals held the target wattage, whether the work tightened or faded across the set, recovery quality. Lead with the ride's intent (sweet-spot, threshold, VO2) paired with NP and a plain intensity read; cite specific work intervals from interval_summary.work_intervals. Recoveries are context, not the lede.
 - UNPLANNED MODE (when packet has is_unplanned: true): this ride had no linked plan. There was no prescribed power target. DO NOT scold the athlete for "missing a target" — there was no target. Do NOT invent a prescription from classified_type alone; classified_type is a descriptive label (the analyzer's read of what kind of ride this looked like), not a target the athlete chose. INTERPRET on the ride's own terms: lead with NP and a plain intensity read for the actual output, then explain what drove it (terrain via VAM / ascent, group dynamics suggested by VI, conditions). When cross_workout.vs_similar has sample_size ≥ 3 and a meaningful np_delta_w, that comparison IS legitimate (history, not prescription) — you may lead with it. The athlete just rode; describe what they did, don't grade what they "should" have done.
+- POOL INTENSITY CONTEXT (D-073 mirror of D-038 run rule) — when cross_workout.vs_similar is present AND vs_similar.pool_power_context is populated, anchor any HR-delta interpretation against pool_power_context.intensity_match:
+  • "current_much_harder": the comparison pool was significantly easier than this ride. HR running higher than the pool is structurally expected and reflects intensity, not fitness change. Say so plainly (e.g. "your recent similar rides were easier IF, so the higher HR today tracks with the harder effort"). Do NOT frame the HR delta as fatigue, post-race recovery, aerobic decline, cardiovascular elevation, or any longitudinal signal. Do NOT print or quote pool_power_context.delta_pct or delta_if — use the words.
+  • "current_much_easier": pool was significantly harder than this ride. HR running lower than the pool is structurally expected — easier effort. Do NOT frame this as a fitness improvement signal in isolation.
+  • "matched": pool intensity comparable to current ride. HR delta is a legitimate cross-session comparison; interpret normally (use drift signals, arc context, etc.).
+- This rule takes PRIORITY over generic vs_similar HR interpretation. It composes with UNPLANNED MODE and MIXED-EFFORT MODE — if any apply, all apply.
 
 PACKET (authoritative; do not compute outside it):
 ${packetStr}

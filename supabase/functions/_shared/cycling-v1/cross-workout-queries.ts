@@ -20,12 +20,15 @@
 
 import type {
   CyclingLimiterV1,
+  CyclingPoolIntensityFilter,
+  CyclingPoolPowerContext,
   CyclingPRDuration,
   CyclingPRDurationEntry,
   CyclingPREntry,
   CyclingPRsV1,
   CyclingVsSimilarV1,
 } from './cross-workout-types.ts';
+import { getHrDriftBpmFromAnalysis, getOverallAvgHr } from '../fact-packet/queries.ts';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -37,6 +40,19 @@ const MIN_RIDES_FOR_PRS = 5;
 const MIN_MATCHES_FOR_VS_SIMILAR = 3;
 /** ±20% duration tolerance per D-010 vs-similar matching rule. */
 const DURATION_TOLERANCE_PCT = 0.2;
+/**
+ * D-073 (mirror of D-038 run-side `POOL_PACE_TOLERANCE_PCT = 15`): IF-proximity
+ * filter tolerance. Pool keeps rides within ±15% of the current ride's IF;
+ * 3-hit fallback to unfiltered when the filter would leave <3 matches. Locked.
+ */
+const POOL_IF_TOLERANCE_PCT = 15;
+/**
+ * D-073 (mirror of D-038 run-side `POOL_INTENSITY_MATCH_PCT = 10`): boundary
+ * where `intensity_match` flips to `current_much_harder` / `current_much_easier`.
+ * The 5-point gap between filter (15%) and match (10%) lets a pool be filtered
+ * in but still flagged as a different intensity class to the LLM.
+ */
+const POOL_INTENSITY_MATCH_PCT = 10;
 
 /**
  * Age-group W/kg norms by race distance. Coaching-consensus mid-pack values; not a
@@ -69,6 +85,46 @@ function safeNum(v: unknown): number | null {
 function avg(arr: number[]): number | null {
   if (!arr.length) return null;
   return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+/**
+ * D-073 (mirror of run-side `isPaceWithinTolerance` in
+ * `_shared/fact-packet/queries.ts:82-91`): pure predicate — true when the
+ * candidate IF is within `tolerancePct` of the current IF. Null inputs or
+ * non-positive current IF → false (no match).
+ */
+export function isIfWithinTolerance(
+  candidateIf: number | null | undefined,
+  currentIf: number | null | undefined,
+  tolerancePct: number,
+): boolean {
+  if (candidateIf == null || currentIf == null) return false;
+  if (typeof currentIf !== 'number' || currentIf <= 0) return false;
+  if (typeof candidateIf !== 'number' || !Number.isFinite(candidateIf)) return false;
+  return Math.abs(candidateIf - currentIf) / currentIf <= tolerancePct / 100;
+}
+
+/**
+ * D-073 (mirror of run-side `classifyPoolIntensityMatch` in
+ * `_shared/fact-packet/queries.ts:99-109`): pure classifier for
+ * `pool_power_context.intensity_match`. Sport-domain verbs differ from run
+ * (`current_much_harder` vs run's `current_much_faster`) because cycling
+ * intensity scales with IF, not pace direction.
+ *
+ *   current IF higher than pool by ≥ thresholdPct → 'current_much_harder'
+ *   current IF lower than pool by ≥ thresholdPct  → 'current_much_easier'
+ *   within ±thresholdPct                          → 'matched'
+ */
+export function classifyCyclingPoolIntensityMatch(
+  currentIf: number,
+  poolAvgIf: number,
+  thresholdPct: number,
+): 'matched' | 'current_much_harder' | 'current_much_easier' {
+  if (poolAvgIf <= 0) return 'matched';
+  const deltaPct = ((currentIf - poolAvgIf) / poolAvgIf) * 100;
+  if (deltaPct >= thresholdPct) return 'current_much_harder';
+  if (deltaPct <= -thresholdPct) return 'current_much_easier';
+  return 'matched';
 }
 
 // ─── §1 Power-curve PRs ──────────────────────────────────────────────────
@@ -193,15 +249,22 @@ export async function fetchCyclingVsSimilar(
     currentNp: number | null;
     currentIf: number | null;
     currentExecScore: number | null;
+    /** D-073 — current ride's avg HR, used for `hr_delta_bpm` vs the matched pool. */
+    currentAvgHr?: number | null;
+    /** D-073 — current ride's HR drift bpm, used for `drift_delta_bpm` vs the matched pool. */
+    currentHrDriftBpm?: number | null;
   },
 ): Promise<CyclingVsSimilarV1 | null> {
   if (!params.currentClassifiedType || params.currentClassifiedType === 'unknown') return null;
   if (!Number.isFinite(params.currentDurationMin) || params.currentDurationMin <= 0) return null;
 
   try {
+    // D-073: also select `computed` + row-level `avg_heart_rate` so the shared
+    // `getOverallAvgHr` (D-047 three-stage fallback) can resolve HR for each
+    // candidate. The run-side `getSimilarWorkoutComparisons` does the same.
     const { data: rows } = await supabase
       .from('workouts')
-      .select('id, date, workout_analysis')
+      .select('id, date, computed, avg_heart_rate, workout_analysis')
       .eq('user_id', params.userId)
       .in('type', ['ride', 'cycling', 'bike'])
       .eq('workout_status', 'completed')
@@ -212,8 +275,18 @@ export async function fetchCyclingVsSimilar(
     const lo = params.currentDurationMin * (1 - DURATION_TOLERANCE_PCT);
     const hi = params.currentDurationMin * (1 + DURATION_TOLERANCE_PCT);
 
-    type Match = { np: number | null; if_: number | null; exec: number | null };
-    const matches: Match[] = [];
+    type Match = {
+      np: number | null;
+      if_: number | null;
+      exec: number | null;
+      avgHr: number | null;
+      drift: number | null;
+    };
+    // D-073: pre-D-073 the loop short-circuited after 3 type+duration matches,
+    // so the IF filter would have nothing to narrow on. Collect ALL matches so
+    // the filter can drop the off-IF rows; the 3-hit fallback then decides
+    // whether the filter takes effect.
+    const allMatches: Match[] = [];
     for (const r of (Array.isArray(rows) ? rows : [])) {
       const wa = (r as any)?.workout_analysis;
       if (!wa || typeof wa !== 'object') continue;
@@ -223,30 +296,52 @@ export async function fetchCyclingVsSimilar(
       if (ct !== params.currentClassifiedType.toLowerCase()) continue;
       const dur = safeNum(facts.total_duration_min);
       if (dur == null || dur < lo || dur > hi) continue;
-      matches.push({
+      allMatches.push({
         np: safeNum(facts.normalized_power),
         if_: safeNum(facts.intensity_factor),
         exec: safeNum(wa?.performance?.execution_score),
+        avgHr: getOverallAvgHr(r),
+        drift: getHrDriftBpmFromAnalysis(r),
       });
-      if (matches.length >= 3 && matches.length >= MIN_MATCHES_FOR_VS_SIMILAR) {
-        // Take exactly the last 3 matches per D-010; we have them since rows are
-        // ordered date descending and we're walking newest-first.
-        if (matches.length >= 3) break;
-      }
     }
-    // Re-trim to the most recent 3 explicitly (the break above is loose; some matches
-    // may have been added past 3 if the early-break path didn't catch them).
-    const lastThree = matches.slice(0, 3);
+
+    // D-073 IF-proximity filter (mirror of D-038 run-side `filterByPaceProximity`
+    // in `_shared/fact-packet/queries.ts:418-432`). Narrows the pool to rides
+    // within ±15% of the current ride's IF; falls back to unfiltered when the
+    // filtered pool has <3 matches. Never expands — only narrows or fails-back.
+    const filterByIfProximity = (rowsIn: Match[], currentIf: number | null) => {
+      if (currentIf == null || currentIf <= 0) {
+        return { rows: rowsIn, applied: false, before: rowsIn.length, after: rowsIn.length };
+      }
+      const filtered = rowsIn.filter((m) => isIfWithinTolerance(m.if_, currentIf, POOL_IF_TOLERANCE_PCT));
+      if (filtered.length >= MIN_MATCHES_FOR_VS_SIMILAR) {
+        return { rows: filtered, applied: true, before: rowsIn.length, after: filtered.length };
+      }
+      return { rows: rowsIn, applied: false, before: rowsIn.length, after: rowsIn.length };
+    };
+    const ifFilter = filterByIfProximity(allMatches, params.currentIf);
+
+    // Take the most recent 3 from the filtered (or fallback) pool. Rows came
+    // ordered date-desc from the query and we appended in order, so slice(0,3)
+    // is the last 3 chronologically. Same shape as D-010 last-3 contract.
+    const lastThree = ifFilter.rows.slice(0, 3);
 
     if (lastThree.length < MIN_MATCHES_FOR_VS_SIMILAR) return null;
 
     const npAvg = avg(lastThree.map((m) => m.np).filter((v): v is number => v != null));
     const ifAvg = avg(lastThree.map((m) => m.if_).filter((v): v is number => v != null));
     const execAvg = avg(lastThree.map((m) => m.exec).filter((v): v is number => v != null));
+    const hrAvg = avg(lastThree.map((m) => m.avgHr).filter((v): v is number => v != null));
+    const driftAvg = avg(lastThree.map((m) => m.drift).filter((v): v is number => v != null));
 
     const npDelta = (params.currentNp != null && npAvg != null) ? params.currentNp - npAvg : null;
     const ifDelta = (params.currentIf != null && ifAvg != null) ? params.currentIf - ifAvg : null;
     const execDelta = (params.currentExecScore != null && execAvg != null) ? params.currentExecScore - execAvg : null;
+    // D-073 — HR deltas use the shared three-stage `getOverallAvgHr` for both
+    // current and pool (D-047 symmetric resolution; same pattern as run side
+    // at `_shared/fact-packet/queries.ts:609-610`).
+    const hrDeltaRaw = (params.currentAvgHr != null && hrAvg != null) ? params.currentAvgHr - hrAvg : null;
+    const driftDeltaRaw = (params.currentHrDriftBpm != null && driftAvg != null) ? params.currentHrDriftBpm - driftAvg : null;
 
     // Summary assessment: weighted on execution + IF (NP varies with duration / route).
     let assessment: CyclingVsSimilarV1['assessment'] = 'typical';
@@ -260,6 +355,34 @@ export async function fetchCyclingVsSimilar(
       else if (signals.some((s) => s !== 0)) assessment = 'mixed';
     }
 
+    // D-073 — diagnostic field (analog of run's `pool_intensity_filter`).
+    const pool_intensity_filter: CyclingPoolIntensityFilter = {
+      applied: ifFilter.applied,
+      tolerance_pct: POOL_IF_TOLERANCE_PCT,
+      basis: 'if',
+      pool_size_before: ifFilter.before,
+      pool_size_after: ifFilter.after,
+    };
+
+    // D-073 — LLM-facing intensity-match context (analog of run's
+    // `pool_pace_context`). Populated only when both current IF and pool avg
+    // IF are present; the prompt rule keys off `intensity_match`.
+    let pool_power_context: CyclingPoolPowerContext | null = null;
+    if (params.currentIf != null && ifAvg != null && ifAvg > 0) {
+      const dIf = params.currentIf - ifAvg;
+      const dPct = (dIf / ifAvg) * 100;
+      pool_power_context = {
+        current_if: Math.round(params.currentIf * 100) / 100,
+        pool_avg_if: Math.round(ifAvg * 100) / 100,
+        delta_if: Math.round(dIf * 100) / 100,
+        delta_pct: Math.round(dPct * 10) / 10,
+        basis: 'if',
+        intensity_match: classifyCyclingPoolIntensityMatch(params.currentIf, ifAvg, POOL_INTENSITY_MATCH_PCT),
+      };
+    }
+
+    console.warn(`[cycling-cross-workout] pool_intensity_filter: applied=${ifFilter.applied}, ${ifFilter.before} → ${ifFilter.after} (tolerance=${POOL_IF_TOLERANCE_PCT}%)`);
+
     return {
       sample_size: lastThree.length,
       matched_type: params.currentClassifiedType,
@@ -267,7 +390,11 @@ export async function fetchCyclingVsSimilar(
       np_delta_w: npDelta != null ? Math.round(npDelta) : null,
       if_delta: ifDelta != null ? Math.round(ifDelta * 100) / 100 : null,
       exec_delta_pct: execDelta != null ? Math.round(execDelta) : null,
+      hr_delta_bpm: hrDeltaRaw != null ? Math.round(hrDeltaRaw) : null,
+      drift_delta_bpm: driftDeltaRaw != null ? Math.round(driftDeltaRaw) : null,
       assessment,
+      pool_intensity_filter,
+      pool_power_context,
     };
   } catch (e) {
     console.warn('[cycling-cross-workout] fetchCyclingVsSimilar failed:', e);

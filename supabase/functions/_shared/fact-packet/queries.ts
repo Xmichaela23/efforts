@@ -184,7 +184,14 @@ function getOverallMaxHr(row: any): number | null {
 }
 
 
-function getHrDriftBpmFromAnalysis(row: any): number | null {
+/**
+ * Canonical HR-drift resolution for any workout row. Reads the persisted
+ * `hr_drift_bpm` from any of the analyzer-side keys (granular analysis vs
+ * heart-rate summary, snake vs camel case). **Exported** (D-073 cycling
+ * parity port) so the cycling vs_similar pool can use the same resolver
+ * as the run side rather than reimplementing the key-enumeration.
+ */
+export function getHrDriftBpmFromAnalysis(row: any): number | null {
   const wa = row?.workout_analysis;
   const drift = coerceNumber(
     wa?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm ??

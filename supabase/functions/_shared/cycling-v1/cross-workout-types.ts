@@ -65,9 +65,51 @@ export type CyclingPRsV1 = {
 };
 
 /**
+ * D-073 cycling parity port (mirrors D-038 run-side `pool_intensity_filter`):
+ * diagnostic field surfacing whether the IF-proximity filter was applied to
+ * narrow the pool, the tolerance used (currently 15%, locked), and the pool
+ * sizes before / after. `basis: 'if'` since cycling has a single intensity
+ * basis (no GAP-equivalent for terrain-corrected power).
+ */
+export type CyclingPoolIntensityFilter = {
+  applied: boolean;
+  tolerance_pct: number;
+  basis: 'if';
+  pool_size_before: number;
+  pool_size_after: number;
+};
+
+/**
+ * D-073 cycling parity port (mirrors D-038 run-side `pool_pace_context`):
+ * LLM-facing intensity-match context for the vs_similar pool. Named
+ * `pool_power_context` because cycling's intensity domain is power
+ * (NP / IF), not pace. Same trichotomy as the run analog
+ * (`matched` / `current_much_harder` / `current_much_easier`), gated by
+ * the same 10% boundary as the run's POOL_INTENSITY_MATCH_PCT.
+ *
+ * The POOL INTENSITY CONTEXT prompt rule in
+ * `_shared/cycling-v1/ai-summary.ts` keys off `intensity_match` to suppress
+ * false fatigue / fitness-loss framing when the pool was structurally
+ * easier or harder than this ride.
+ */
+export type CyclingPoolPowerContext = {
+  current_if: number;
+  pool_avg_if: number;
+  delta_if: number;
+  delta_pct: number;
+  basis: 'if';
+  intensity_match: 'matched' | 'current_much_harder' | 'current_much_easier';
+};
+
+/**
  * Cycling vs-similar comparison — current workout against last N matching rides where
  * "matching" = same `classified_type` AND duration within ±20% per D-010. Null when
  * `sample_size < 3` (insufficient comparison pool).
+ *
+ * D-073 added (mirroring run-side D-038 / D-047):
+ *   - 15% IF-proximity pool filter with 3-hit fallback to unfiltered
+ *   - `pool_intensity_filter` diagnostic + `pool_power_context` LLM-facing
+ *   - `hr_delta_bpm` + `drift_delta_bpm` from the same matched pool
  */
 export type CyclingVsSimilarV1 = {
   /** Number of past rides used for the comparison. Always ≥3 when this object is non-null. */
@@ -84,8 +126,24 @@ export type CyclingVsSimilarV1 = {
   np_delta_w: number | null;
   if_delta: number | null;
   exec_delta_pct: number | null;
+  /**
+   * D-073 (mirror of D-038 run-side `hr_delta_bpm`): current ride's avg HR
+   * minus the matched-pool avg HR. Positive = current ran hotter than pool.
+   * Null when either side is missing — resolved via the shared three-stage
+   * `getOverallAvgHr()` (D-047) so cycling can't drift from run's contract.
+   */
+  hr_delta_bpm: number | null;
+  /**
+   * D-073 (mirror of D-038 run-side `drift_delta_bpm`): current ride's HR
+   * drift bpm minus pool avg drift bpm. Positive = more drift than typical.
+   */
+  drift_delta_bpm: number | null;
   /** Plain-language summary for the LLM coach context. */
   assessment: 'above_typical' | 'typical' | 'below_typical' | 'mixed';
+  /** D-073 — pool intensity filter diagnostic (analog of run's `pool_intensity_filter`). */
+  pool_intensity_filter: CyclingPoolIntensityFilter;
+  /** D-073 — LLM-facing intensity-match context (analog of run's `pool_pace_context`). */
+  pool_power_context: CyclingPoolPowerContext | null;
 };
 
 export type CyclingLimiterSource = 'wkg_vs_norms' | 'np_trend' | 'insufficient_data';

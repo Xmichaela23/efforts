@@ -119,14 +119,53 @@ Deno.test('null / empty input → null (no cross-workout signal)', () => {
 });
 
 Deno.test('vs_similar → shaped block; null np_delta_w drops it (Number(null)===0 trap)', () => {
+  // D-073 — vs_similar shape now includes hr_delta_bpm, drift_delta_bpm, and
+  // pool_power_context. When the input has no HR / no power context (this
+  // legacy fixture), they pass through as null so the LLM gets a stable
+  // shape regardless of source-side population.
   const out = cyclingCrossWorkoutDisplay({
     vsSimilar: { sample_size: 5, matched_type: 'threshold', np_delta_w: 12, if_delta: 0.041, assessment: 'above_typical' },
   });
   assertEquals(out, {
-    vs_similar: { matched_type: 'threshold', sample_size: 5, np_delta_w: 12, if_delta: 0.04, assessment: 'above_typical' },
+    vs_similar: {
+      matched_type: 'threshold',
+      sample_size: 5,
+      np_delta_w: 12,
+      if_delta: 0.04,
+      hr_delta_bpm: null,
+      drift_delta_bpm: null,
+      assessment: 'above_typical',
+      pool_power_context: null,
+    },
   });
   // np_delta_w null → no vs_similar (and nothing else) → whole block null
   assertEquals(cyclingCrossWorkoutDisplay({ vsSimilar: { matched_type: 'threshold', np_delta_w: null } }), null);
+});
+
+Deno.test('D-073: vs_similar surfaces HR deltas + pool_power_context when populated', () => {
+  const out = cyclingCrossWorkoutDisplay({
+    vsSimilar: {
+      sample_size: 3,
+      matched_type: 'threshold',
+      np_delta_w: 5,
+      if_delta: 0.02,
+      hr_delta_bpm: 8,
+      drift_delta_bpm: 2,
+      assessment: 'above_typical',
+      pool_power_context: {
+        current_if: 0.85,
+        pool_avg_if: 0.82,
+        delta_if: 0.03,
+        delta_pct: 3.7,
+        basis: 'if',
+        intensity_match: 'matched',
+      },
+    },
+  });
+  assertEquals(out?.vs_similar?.hr_delta_bpm, 8);
+  assertEquals(out?.vs_similar?.drift_delta_bpm, 2);
+  assertEquals(out?.vs_similar?.pool_power_context?.intensity_match, 'matched');
+  assertEquals(out?.vs_similar?.pool_power_context?.basis, 'if');
 });
 
 Deno.test('trend: np_trend fallback → metric NP, ride_type null, count/direction/delta', () => {

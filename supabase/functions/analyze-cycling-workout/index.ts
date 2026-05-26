@@ -2045,7 +2045,24 @@ Deno.serve(async (req) => {
       });
 
       // §2 vs-similar — match on classified_type + duration ±20%.
+      // D-073: thread currentAvgHr + currentHrDriftBpm so the pool computes
+      // hr_delta_bpm / drift_delta_bpm against the matched rides (mirror of
+      // run-side D-038 / D-047 HR field flow). Resolution mirrors the run
+      // side: avg HR from the workout's `computed.overall.avg_hr` via the
+      // shared three-stage helper; drift from `hrAnalysis.hr_drift_bpm`
+      // (computed earlier in this analyzer at line ~1958).
       const facts = (cyclingFactPacketV1 as any)?.facts ?? {};
+      const currentAvgHrForPool = ((): number | null => {
+        const raw = (workout as any)?.computed?.overall?.avg_hr
+          ?? (workout as any)?.computed?.overall?.avg_heart_rate
+          ?? (workout as any)?.avg_heart_rate;
+        const n = typeof raw === 'number' ? raw : Number(raw);
+        return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+      })();
+      const currentHrDriftForPool: number | null =
+        (hrAnalysis && typeof (hrAnalysis as any).hr_drift_bpm === 'number' && Number.isFinite((hrAnalysis as any).hr_drift_bpm))
+          ? Math.round((hrAnalysis as any).hr_drift_bpm)
+          : null;
       cyclingVsSimilar = await fetchCyclingVsSimilar(supabase, {
         userId: String((workout as any).user_id),
         currentWorkoutId: workout_id!,
@@ -2054,6 +2071,8 @@ Deno.serve(async (req) => {
         currentNp: Number.isFinite(facts.normalized_power) ? Number(facts.normalized_power) : null,
         currentIf: Number.isFinite(facts.intensity_factor) ? Number(facts.intensity_factor) : null,
         currentExecScore: typeof performance?.execution_score === 'number' ? performance.execution_score : null,
+        currentAvgHr: currentAvgHrForPool,
+        currentHrDriftBpm: currentHrDriftForPool,
       });
 
       // §3 Limiter — W/kg vs age-group norms (tri) or NP-trend fallback.
