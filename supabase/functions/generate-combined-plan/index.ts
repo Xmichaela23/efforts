@@ -747,14 +747,14 @@ Deno.serve(async (req: Request) => {
         description: buildDescription(goals, effectiveTotalWeeks, loadingPattern, validation, peakWeek.total_raw_tss, avgTSS),
         plan_type: 'generated',
         status: 'active',
-        // D-074: plans.start_date was being dropped from this INSERT, leaving
-        // the column NULL while per-session planned_workouts.date rendered
-        // fine. Calendar consumers that compute Week 1 from
-        // plans.start_date (e.g. progress dashboards) silently mispositioned
-        // sessions on a NaN week. Same canonical anchor used by
-        // plan_contract_v1.start_date and plan_config.user_selected_start_date
-        // — single source of truth (planStartDate) declared above.
-        start_date: planStartDate,
+        // D-074 attempted to add a top-level `start_date` column to this
+        // INSERT, but the `plans` table has no such column (original schema
+        // at `20250701120006_create_plans_table.sql`; no later ALTER adds
+        // it). PGRST204 on PATCH confirmed. The canonical anchor lives at
+        // `plan_config.user_selected_start_date` (consumed by activate-plan
+        // at `activate-plan/index.ts:379`). Holding the field name local
+        // (`planStartDate`) so it stays single-source-of-truth across
+        // plan_contract_v1.start_date and plan_config.user_selected_start_date.
         duration_weeks: effectiveTotalWeeks,
         sessions_by_week,
         config: plan_config,
