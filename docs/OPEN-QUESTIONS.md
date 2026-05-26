@@ -450,6 +450,20 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-031 — §4.21 (concurrent training spacing) is NOT enforced in tri/run generators
+
+- **Status:** intentional / deferred — DOES need wiring, but prereqs block clean implementation. Filed 2026-05-26 from Item 6 of the autonomous batch audit.
+- **Why it exists:** §4.21 is the concurrent-training spacing rule (lower_body_strength must keep ≥24h from quality_run / quality_bike in both directions; sandwich rejection; CLEAN → SOFT → SANDWICH → DROP tier ladder). It's enforced in `generate-combined-plan` via `_shared/week-optimizer.ts`'s `sequentialOk` + `concurrentSpacingTier` + prime-mover taxonomy in `_shared/schedule-session-constraints.ts`. The other three plan generators (`generate-run-plan`, `generate-triathlon-plan`, `generate-plan`) are NOT routed through that pipeline.
+- **Current state per audit (2026-05-26):**
+  - `generate-plan/index.ts` — 71-line stub that validates input only; no actual generation. **Not invoked anywhere.** Likely orphaned/dead code. No §4.21 work needed; consider deleting.
+  - `generate-triathlon-plan/index.ts` — emits a high-level plan structure (`week_intent_by_week`, `schedule_preferences: { long_ride_day, long_run_day }`) with NO per-day session placements. §4.21 doesn't apply at this layer — there's nothing to enforce against. The actual session-per-day emission happens downstream in `create-goal-and-materialize-plan` (legacy path) or the new combined-plan pipeline. **Blocker: none at this layer; §4.21 already covered downstream IF downstream uses combined-plan; not covered in the legacy materialize path.**
+  - `generate-run-plan/strength-overlay.ts` — uses `simplePlacementPolicy` (`_shared/strength-system/placement/simple.ts`) which is explicitly **"day-agnostic"** per its docstring. The policy assigns strength to abstract slots (`upper_primary`, `lower_primary`) without consulting `long_run_day` / `quality_run_day` from `athleteState`. **Blocker: simplePlacementPolicy is by design not aware of quality endurance days; making it §4.21-aware is a redesign, not a wire-up.**
+- **Why not "fixed" in this batch:** the clean fix requires either (a) extracting `sequentialOk` + prime-mover taxonomy into a portable `_shared/spacing.ts` helper that operates on a generic `(sessions, day, kind)` signature both data shapes can produce, then refactoring `simplePlacementPolicy` to call it; OR (b) routing `generate-run-plan` through `_shared/week-optimizer.ts` (a substantial refactor of the run-plan pipeline). Neither is in scope for an "audit + wire if clean" item — both need their own design pass.
+- **Recommended next move:** delete `generate-plan/index.ts` (dead). Decide whether `generate-run-plan` should be deprecated in favor of single-sport routing through `generate-combined-plan` (the natural consolidation), OR get the `simplePlacementPolicy` day-awareness refactor scheduled. Don't try to inline §4.21 in two places — that's the path to drift.
+- **Cross-ref:** `docs/SCHEDULING-RULES.md §4.21` (the rule), `docs/POLISH-PUNCH-LIST.md` line 194 (the open item, now linked back to this Q for visibility).
+
+---
+
 ## Q-030 — first_race base-phase swim threshold IS allowed (intentional asymmetry vs D-069 run rule)
 
 - **Status:** intentional
