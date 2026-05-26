@@ -414,6 +414,26 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-028 — first_race build-phase quality run still emits `tempoRun` (threshold-labeled)
+
+- **Status:** unverified / cosmetic
+- **Why it exists:** D-069 swapped the base-phase first_race quality run from `intervalRun` to a new `sweetSpotRun` (sustained Z3 moderate, RPE 6, not labeled threshold). The build-phase first_race gate at `week-builder.ts:~1614` (D-061) still emits `tempoRun` when `runWeekInPhase < 4`. tempoRun's description literally says "at lactate threshold (comfortably hard — 7-8 RPE)." Within the D-061/D-069 conservative-build philosophy (first_race athletes accumulate aerobic durability before crossing into threshold), routing the early-build downgrade through tempoRun is arguably out-of-step with the base-phase change.
+- **Why not "fixed":** D-061 is its own decision-log entry with explicit coaching rationale (build-phase tempo is the on-ramp toward race-specific threshold). Changing it without that rationale would reverse a prior call. Hold until an athlete actually flags the build-phase tempo as too intense in plan review.
+- **What "fixing" would require:** route first_race build-phase pre-week-4 through `sweetSpotRun` as well, OR draw a defensible line between "no threshold in base" and "tempo in early build is fine because it's the on-ramp." Either decision needs a coaching call, not a code change.
+- **Verification approach:** review first_race plans at week 8-10 (first three weeks of build for a 17-week 70.3) with an athlete in plan-review. If they flag the tempo as too intense, escalate to sweetSpotRun there too.
+
+---
+
+## Q-029 — Plan-matrix harness checks structural assertions only, not session label content
+
+- **Status:** intentional (for now)
+- **Why it exists:** `scripts/plan-generation-matrix.mjs` asserts on session counts, types, tags, and a handful of keyword presence checks (Z-zone leak, "threshold" word, route name leak, hybrid label leak). It does NOT compare full session descriptions to a reference corpus or verify language quality. D-069's first_race base-phase change had to be verified by direct JSON inspection because the matrix battery couldn't distinguish "Sweet-Spot Run" from "Run Intervals."
+- **Why not a bug:** the matrix's value is detecting drops, errors, and structural regressions across 486 combos in 60 seconds. Adding fuzzy label-content assertions would add maintenance burden (every copy change requires regenerating the corpus) for catching a class of bugs that plan review handles better.
+- **What "fixing" would require:** either a snapshot-test approach with a reviewed corpus (high maintenance) or a separate plan-review workflow with periodic athlete-facing sampling (lighter, but not automated).
+- **Cross-ref:** D-069 verification gap.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

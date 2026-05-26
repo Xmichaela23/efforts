@@ -1477,6 +1477,186 @@ interactions. Q-010 stays partially open for the hedge-softening half.
 
 ---
 
+## D-064 — Swim placed on rest_day silently dropped
+
+Shipped: 2026-05-26 / commit 1ac5ae30
+
+486-combo plan-generation matrix surfaced a silent-drop pattern in two
+swim placement layers of `week-optimizer.ts`:
+
+  1. `masters_swim` anchor (lines ~1124-1141): when `state.swim_easy_day`
+     was promoted to a masters_swim anchor by the reconciler AND
+     `rest_days` included the same day, the anchor placed on the rest
+     day. Week-builder then defensively skipped emission via
+     `!swimSlot?.isRest`. Net: 1 swim/wk instead of 2.
+
+  2. Preference-driven swim placement loop (lines ~1850-1905): the
+     candidate `orderedRaw` filter chain checked spread + matrix but
+     not rest_days; `preferredSwimDay` was also honored even when it
+     collided with a rest_day.
+
+  3. Loop seeding via `swimSlots.push({ day: mastersSwim.day, ... })` at
+     line ~1830 used the raw input rather than `mastersSwimAnchor`
+     (the result of actual placement), so when the anchor was rejected
+     the loop still under-counted and emitted swimsPerWeek-1 swims.
+
+Three-line fix: hoist `restDaySet`, filter it out of `orderedRaw`,
+reject `preferredSwimDay` that collides, gate masters_swim anchor
+placement on rest-day collision (push conflict, skip place()), and seed
+the loop from `mastersSwimAnchor` not `mastersSwim`.
+
+Matrix impact: swim_freq_build cluster 237 → 54 (-77%). Remaining 54
+were a separate harness-side bug (D-067). Three regression tests in
+`week-optimizer.anchor-contract.test.ts` lock the contract.
+
+Co-fix surface: D-066 extended the same pattern to strength placement
+and the load balancer.
+
+---
+
+## D-065 — Z-zone leak in downgradedHardToModerateFrom swim path
+
+Shipped: 2026-05-26 / commit b0eec615
+
+D-053 cleaned the swim creator descriptions to comply with SWIM-PROTOCOL
+§0.5 (athlete-facing easy/moderate/hard vocabulary only). But the
+generic HARD → MODERATE downgrade wrapper (`downgradedHardToModerateFrom`
+at session-factory.ts:2136) prepended `"Moderate sustained effort (Z3 —
+comfortably hard). "` to the underlying description — leaking the Z3
+code to athletes. This fires on the Time Trial swim in build weeks when
+the auto-downgrade pass replaces a HARD swim with MODERATE.
+
+One-word fix: drop the `"Z3 — "` phrasing. `zone_targets` (internal
+field, never client-facing per D-053) kept the Z-code unchanged.
+
+Matrix impact: swim_jargon_Z 72 → 0.
+
+---
+
+## D-066 — Strength placed on rest_day silently dropped (extends D-064)
+
+Shipped: 2026-05-26 / commit 8284ff93
+
+Same silent-drop pattern as D-064 in three more places. Two surfaces:
+
+  1. **Four strength placement candidate orders** in `week-optimizer.ts`:
+     co-eq upper (line ~1498), co-eq lower-base (~1558), non-co-eq upper
+     (~1687), non-co-eq lower (~1730). All used a hardcoded weekday list
+     without rest_days filter. The non-co-eq path picked Monday first
+     (rest_day) and the builder dropped it. Net for the
+     `durability + cap=1` cluster: 0 strength sessions across 17 weeks.
+
+  2. **Weekly load balancer** (`balanceWeeklySessionLoad` →
+     `mutatingBalancerMove`): freely moved sessions INTO underloaded
+     days, including rest days (which are by construction underloaded).
+     Even when placement avoided Monday, the balancer would later move
+     strength / swim / easy_run onto it, recreating the drop.
+
+Fix: hoist `restDaySet` from D-064's swim section to the top of
+`deriveOptimalWeek` so all placement layers share one source. Filter
+rest_days out of all four strength candidate orders. Add
+`restDays?: Set<DayName>` to `BalancerContext`; `mutatingBalancerMove`
+refuses moves whose target day is in the set.
+
+Matrix impact: strength_present 108 → 0 (-100%); pass rate 135 → 201
+(post-D-065 → post-D-066).
+
+Two regression tests added (durability+cap=1 and co-equal 2×).
+
+---
+
+## D-067 — Plan-matrix harness recovery detector uses peak instead of median
+
+Shipped: 2026-05-26 / commit c91269bb · TEST HARNESS ONLY (no engine deploy)
+
+`scripts/plan-generation-matrix.mjs` recovery-week detector used
+`TSS < 0.75 × buildMedian`. For `1:1` loading patterns (first_race /
+comeback intents per D-061), every-other-week recovery pushes the median
+to fall between build and recovery TSS — recovery weeks then test as
+above the 0.75 × median threshold and get treated as build weeks,
+producing false-positive `swim_freq_build` failures on a 54-combo
+`first_race/intermediate/*/*/70.3` cluster.
+
+Fix: `0.75 × buildPeak` instead of median. Spec recovery multiplier is
+0.65, which is always < 0.75 × peak regardless of loading-pattern
+density. The detector is now robust to 1:1, 2:1, and 3:1 patterns.
+
+Matrix impact: swim_freq_build_w8 54 → 0 (false positives only — no
+real engine bug remained). Pass rate 201 → 255.
+
+---
+
+## D-068 — WoW TSS ramp ceiling calibration for distance-aware tri
+
+Shipped: 2026-05-26 / commit d42dea90
+
+The 20% week-over-week composite raw-TSS ceiling
+(`WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI` in
+`validate-training-floors.ts`) was calibrated when swim/strength
+sessions were being silently dropped (D-064/D-066). With those dropped
+sessions now correctly emitted, the legitimate composite ramp is
+10-50 raw TSS higher per build week. Result: 231 HTTP 400 violations
+in the matrix after D-066 shipped, concentrated at phase transitions
+and race-specific peaks.
+
+Two calibration adjustments (Approach A from the overnight batch):
+
+  - Half-IM / sprint / olympic (`MAX_TRI`): 0.20 → 0.24. Observed max
+    ramp 23.2% on 70.3 / 8hr / completion at build→race_specific.
+  - Full-IM (new `MAX_FULL_TRI`): 0.30. Observed max ramp 28% on
+    full / 8hr / completion at race-specific peak. Selected via
+    `opts.primaryDistance === 'full'` in the validator, threaded from
+    `floorOpts` in `generate-combined-plan/index.ts`.
+
+Validator and its rebuild-loop machinery stay in place — the ceiling
+still protects against pathological doubles, just calibrated for
+distance-appropriate composite volume rather than the
+post-D-064-bug baseline. Coaching literature (Friel, EnduranceNation,
+Daniels) supports 20-25% for half-IM and 20-30% for full-IM
+race-specific phases.
+
+Matrix impact: HTTP 400 errors 231 → 0; final pass 486/486.
+
+Approach B (phase-shaper TSS smoothing) was NOT taken — Approach A is
+strictly less invasive and the resulting ceilings remain in defensible
+coaching range.
+
+---
+
+## D-069 — first_race base phase emits sweet-spot, not intervals
+
+Shipped: 2026-05-26 / commit 5b3de8f5
+
+Plan-review finding: athletes with `training_intent='first_race'` or
+`'comeback'` were seeing `"Run Intervals — 4×1000m at 10K/tempo pace"`
+in base phase week 1. D-061's 80% rep cap on first_race base intervals
+reduced dosage but not stimulus type — reps-reduced intervals are still
+intervals, and the conservative-build philosophy that motivated D-061
+calls for sustained sweet-spot tempo (not interval surges) until
+athletes cross into build phase.
+
+Two changes:
+
+  - New `sweetSpotRun` helper in `session-factory.ts` — Z3 MODERATE
+    effort at sweet-spot pace (RPE 6, "meaningfully harder than easy
+    but not threshold"), 2-6 mi configurable. Tagged
+    `['quality', 'sweet_spot', 'run']`, distinct from `threshold` tag.
+  - Both base-phase quality-run branches in `week-builder.ts`
+    (base_first AND race_peak tri_approach paths) gate on `isFirstRace`
+    to emit `sweetSpotRun` instead of `intervalRun`.
+    `performance` and `completion` intents keep the interval-base path.
+
+Build-phase D-061 gate (no VO2 until weekInPhase ≥ 4 → downgrades to
+tempoRun) intentionally unchanged — build-phase tempo is the on-ramp
+toward race-specific threshold, appropriate at that point.
+
+Matrix impact: no change (486/486 — assertion battery does not check
+session label content). Verification by direct plan inspection:
+first_race/intermediate/performance/full_barbell/70.3/11hr W1 quality
+run is now "Sweet-Spot Run — 3 mi at moderate effort".
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

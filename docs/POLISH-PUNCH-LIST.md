@@ -2,7 +2,7 @@
 
 Tracking the work to get the app from "engine works" to "every flow ships clean." No new features past this point. Only finish what's started.
 
-Last updated: May 17, 2026 (cycling-analysis arc paused — correctness pass complete; see docs/SESSION-CONTEXT.md §6)
+Last updated: May 26, 2026 (overnight plan-gen batch D-064..D-069 — 486-combo matrix at 100% pass. Six fixes shipped: D-064 swim placed on rest_day silently dropped (extends to masters_swim anchor), D-065 Z3 jargon strip from downgrade wrapper, D-066 same silent-drop pattern in strength + load balancer, D-067 harness recovery detector switched to peak (1:1 loading false positives), D-068 WoW TSS ramp ceiling distance-aware (0.24 half-IM / new 0.30 full-IM), D-069 first_race base-phase emits sweetSpotRun. Full per-fix narrative in scripts/plan-test-output/overnight-report.md. Previous: cycling-analysis arc paused 2026-05-17.)
 
 ---
 
@@ -88,6 +88,14 @@ For each numbered item:
 - [x] **D-053** §0.5 athlete-vocab pass on swim copy
 - [x] **D-057** Q-016 Path A drill ratio (30/20/10 partial)
 - [x] **D-058** Q-020 ankle band wiring
+
+### Done (2026-05-26 overnight batch — plan-generation matrix 486/486)
+- [x] **D-064** Swim placed on rest_day silently dropped (masters_swim anchor + preference loop)
+- [x] **D-065** Z3 jargon strip from downgradedHardToModerateFrom swim path (D-053 follow-through)
+- [x] **D-066** Strength placed on rest_day silently dropped + load balancer rest_days awareness
+- [x] **D-067** Plan-matrix harness recovery detector — peak instead of median (test-only)
+- [x] **D-068** WoW TSS ramp ceiling calibration — distance-aware (0.24 half-IM / 0.30 full-IM)
+- [x] **D-069** first_race base-phase quality run — sweetSpotRun replaces intervalRun
 
 
 ### Done
