@@ -595,6 +595,30 @@ async function runSessionDetailPipelineAndPersist(
       /* non-fatal logging */
     }
 
+    // D-080 debug: emit ledger-match diagnostics so we can see why
+    // session_detail_v1.classification.is_unplanned is being set to true for
+    // cycling workouts whose bidirectional plan link is healthy at the data
+    // layer. Drop after the May 23 ride investigation is resolved.
+    console.log('[D-080-debug] ledger match resolution', {
+      workout_id: id,
+      workout_date: workoutDate,
+      workout_type: row?.type ?? null,
+      ledger_day_present: !!ledgerDay,
+      ledger_day_date: ledgerDay?.date ?? null,
+      ledger_day_planned_count: ledgerDay?.planned?.length ?? 0,
+      ledger_day_actual_count: ledgerDay?.actual?.length ?? 0,
+      ledger_day_match_count: ledgerDay?.matches?.length ?? 0,
+      matches_sample: (ledgerDay?.matches ?? []).slice(0, 5).map((m: any) => ({
+        planned_id: m?.planned_id ?? null,
+        workout_id: m?.workout_id ?? null,
+        summary: m?.summary ?? null,
+      })),
+      resolved_match_planned_id: match?.planned_id ?? null,
+      resolved_match_workout_id: match?.workout_id ?? null,
+      actual_session_workout_id: actualSession?.workout_id ?? null,
+      planned_session_planned_id: plannedSession?.planned_id ?? null,
+    });
+
     sessionDetailV1 = buildSessionDetailV1({
       workoutId: id,
       workoutDate,
