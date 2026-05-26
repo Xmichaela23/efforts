@@ -546,6 +546,15 @@ Deno.serve(async (req: Request) => {
     // ── Build plan_contract_v1 ─────────────────────────────────────────────
     const primaryGoal = goals.find(g => g.priority === 'A') ?? goals[0];
     const allGoalNames = goals.map(g => g.event_name).join(' + ');
+    // D-074: canonical plan anchor date — fall back to today when the request
+    // didn't pass `start_date`. activate-plan reads
+    // `plan.config.user_selected_start_date` as the planned_workouts date
+    // anchor, so this MUST flow into plan_config AND the top-level
+    // plans.start_date column (the latter was being dropped pre-fix, leaving
+    // plans.start_date NULL while the per-session dates rendered fine).
+    const planStartDate: string = start_date
+      ? String(start_date).slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
 
     const plan_contract_v1 = {
       plan_type: 'multi_sport',
@@ -579,7 +588,7 @@ Deno.serve(async (req: Request) => {
       goals_served: goals.map(g => g.id),
       goal_names: goals.map(g => ({ id: g.id, name: g.event_name, date: g.event_date, priority: g.priority })),
       sport: 'multi_sport',
-      start_date: start_date ?? new Date().toISOString().slice(0, 10),
+      start_date: planStartDate,
       duration_weeks: effectiveTotalWeeks,
       loading_pattern: loadingPattern,
       weekly_tss_target: Math.round(
@@ -667,7 +676,7 @@ Deno.serve(async (req: Request) => {
       race_name: primaryGoal.event_name,
       units: planUnits,
       swim_unit: 'yd',
-      user_selected_start_date: start_date ?? new Date().toISOString().slice(0, 10),
+      user_selected_start_date: planStartDate,
       // Canonical athlete-input snapshot. Pinned at generation time; consumers
       // (materialize-plan, coach, adapt-plan) read from this rather than re-querying
       // user_baselines live. Initial v1 populates strength 1RMs only; FTP / swim CSS /
@@ -738,6 +747,14 @@ Deno.serve(async (req: Request) => {
         description: buildDescription(goals, effectiveTotalWeeks, loadingPattern, validation, peakWeek.total_raw_tss, avgTSS),
         plan_type: 'generated',
         status: 'active',
+        // D-074: plans.start_date was being dropped from this INSERT, leaving
+        // the column NULL while per-session planned_workouts.date rendered
+        // fine. Calendar consumers that compute Week 1 from
+        // plans.start_date (e.g. progress dashboards) silently mispositioned
+        // sessions on a NaN week. Same canonical anchor used by
+        // plan_contract_v1.start_date and plan_config.user_selected_start_date
+        // — single source of truth (planStartDate) declared above.
+        start_date: planStartDate,
         duration_weeks: effectiveTotalWeeks,
         sessions_by_week,
         config: plan_config,

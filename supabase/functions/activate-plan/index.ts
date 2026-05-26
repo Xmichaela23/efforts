@@ -537,6 +537,13 @@ Deno.serve(async (req) => {
           workload_planned: estimatedWorkload && estimatedWorkload > 0 ? estimatedWorkload : null,
           // Include authored structured workout when present so server materializer can expand it
           workout_structure: (s as any)?.workout_structure && typeof (s as any).workout_structure === 'object' ? (s as any).workout_structure : null,
+          // D-074 cleanup: planned_workouts.environment has DEFAULT 'pool' from
+          // its original swim-only migration. For non-swim sessions the default
+          // silently surfaced 'pool' on ride/run/strength rows (cosmetic
+          // confusion, no functional impact — the CHECK constraint allows NULL
+          // because CHECK passes on NULL). Explicit NULL for non-swims; swim
+          // rows below override to 'pool' / 'open_water' alongside pool_unit.
+          environment: mapped === 'swim' ? 'pool' : null,
         }
         const routeUrlRaw = typeof (s as any).route_url === 'string' ? String((s as any).route_url).trim() : '';
         const routeSnap = (s as any).group_ride_route_snapshot;
