@@ -434,6 +434,17 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-030 — first_race base-phase swim threshold IS allowed (intentional asymmetry vs D-069 run rule)
+
+- **Status:** intentional
+- **Why it exists:** D-069 swapped first_race base-phase quality run from `intervalRun` → `sweetSpotRun` (no run threshold in base for first-timers). The parallel swim slot on the same plan still emits `Swim Threshold` (e.g., Friday `[quality, threshold, swim, swim_drills]` in W1 of every first_race/advanced/*/70.3 and full combo). At first glance this looks like a coherence gap — same intent, same phase, opposite gate. It is **deliberately** not symmetric.
+- **Why not "fixed":** the run-side gate exists because run threshold work carries injury risk for first-race athletes early in the plan — impact loading, eccentric damage, 48-72h recovery cost compounding on a base aerobic foundation that isn't built yet. Swim threshold has none of those properties: no impact, no eccentric loading, 24-hour recovery. Swim fitness *is* built through threshold work in base — depriving a first-race athlete of swim threshold to satisfy a run-side rationale would slow swim development with no compensating safety benefit.
+- **Coaching call:** confirmed 2026-05-26 by the engine owner. Swim threshold in base is the *correct* prescription for first_race athletes; the run-vs-swim asymmetry is the right physiology, not a bug.
+- **What "fixing" (routing swim through an aerobic-only base variant for first_race) would require:** a coaching reversal of the above call — would need new evidence that swim threshold in base is injurious or detrimental for first-time athletes specifically. None known.
+- **Cross-ref:** D-069 (run rule), Q-028 (open question on whether build-phase first_race tempoRun should also become sweetSpotRun — different question, different phase).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
