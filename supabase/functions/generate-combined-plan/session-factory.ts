@@ -2133,7 +2133,11 @@ export function downgradedHardToModerateFrom(s: PlannedSession): PlannedSession 
       intensity_class: 'MODERATE',
       zone_targets: 'Z3 steady',
       description:
-        'Moderate sustained effort (Z3 — comfortably hard). ' + s.description,
+        // D-065: SWIM-PROTOCOL §0.5 — athlete-facing description must not leak
+        // Z-codes. zone_targets above is internal-only and stays. The downgrade
+        // wrapper runs across all sport types here; "comfortably hard" reads
+        // correctly for bike/run/swim equally.
+        'Moderate sustained effort (comfortably hard). ' + s.description,
       tags: [...(s.tags ?? []).filter(t => !['vo2max', 'intervals'].includes(t)), 'steady_state'],
     };
   }
