@@ -104,6 +104,20 @@ export default function AdherenceChips({
       return `${sign}${m}:${String(ss).padStart(2, '0')}`;
     };
 
+    // D-084: absolute duration formatter for the Duration chip's secondary
+    // line. The adherence % already conveys "how close to plan" — the
+    // secondary line is more useful as the actual completed duration than
+    // as a +/− delta from plan. H:MM:SS when ≥ 1h, MM:SS otherwise.
+    const fmtDurAbs = (s: number) => {
+      const v = Math.max(0, Math.round(s));
+      const h = Math.floor(v / 3600);
+      const m = Math.floor((v % 3600) / 60);
+      const ss = v % 60;
+      return h > 0
+        ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+        : `${m}:${String(ss).padStart(2, '0')}`;
+    };
+
     // ── Swim (open water only) ───────────────────────────────────────────────
     if (isSwim && !isPoolSwim) {
       const swimUnit = sd.planned_totals?.swim_unit || 'yd';
@@ -126,7 +140,7 @@ export default function AdherenceChips({
             <div className="flex items-end gap-3">
               {chip('Execution', executionScore, 'Overall adherence')}
               {chip('Pace', paceAdherence, paceDeltaSec != null ? fmtDeltaPer100(paceDeltaSec) : '—')}
-              {chip('Duration', durationAdherence, durationDelta != null ? fmtDeltaTime(durationDelta) : '—')}
+              {chip('Duration', durationAdherence, completedDurS != null ? fmtDurAbs(completedDurS) : '—')}
             </div>
           </div>
         </div>
@@ -142,7 +156,7 @@ export default function AdherenceChips({
             <div className="flex items-end gap-3">
               {chip('Execution', executionScore, 'Overall adherence')}
               {chip('Power', powerAdherence, 'Time in range')}
-              {chip('Duration', durationAdherence, durationDelta != null ? fmtDeltaTime(durationDelta) : '—')}
+              {chip('Duration', durationAdherence, completedDurS != null ? fmtDurAbs(completedDurS) : '—')}
             </div>
           </div>
         </div>

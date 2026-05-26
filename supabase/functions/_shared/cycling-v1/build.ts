@@ -11,7 +11,14 @@ function normalizePlanIntent(x: any): CyclingIntentV1 | null {
   if (k === 'sweetspot') return 'sweet_spot';
   if (k === 'neuromuscular_power') return 'neuromuscular';
   if (k === 'race_preparation') return 'race_prep';
-  if (k === 'bike' || k === 'ride' || k === 'cycling') return 'unknown';
+  // D-084: discipline-only types ('bike' / 'ride' / 'cycling') carry no intent
+  // signal — they only say "this is a ride". Returning `'unknown'` here used
+  // to short-circuit the `planIntent || fallbackClassifyIntent(...)` chain at
+  // line 215 (because `'unknown'` is truthy), forcing every plan-linked ride
+  // whose `planned_workouts.type` was the discipline column ('ride') to skip
+  // the IF-based fallback classifier and render as "unknown effort" in the
+  // POWER row. Return null so the fallback fires.
+  if (k === 'bike' || k === 'ride' || k === 'cycling') return null;
   // Passthrough if it matches our enum.
   const allowed: CyclingIntentV1[] = [
     'recovery',
@@ -212,8 +219,13 @@ export function buildCyclingFactPacketV1(args: {
     return (ascentM * 3.28084) / distMi;
   })();
 
+  // D-084: defense-in-depth alongside the normalizePlanIntent change at line
+  // 4-14. A non-null but `'unknown'` planIntent should still fall through to
+  // the fallback classifier — `'unknown'` is the sentinel for "no useful
+  // signal", not a valid classification. The previous `planIntent || ...`
+  // short-circuited because `'unknown'` is a truthy string.
   const classified_type: CyclingIntentV1 =
-    planIntent ||
+    (planIntent && planIntent !== 'unknown' ? planIntent : null) ||
     fallbackClassifyIntent({
       intensityFactor,
       ftpBinsMin: ftpBins,
