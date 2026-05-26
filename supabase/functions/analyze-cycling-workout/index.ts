@@ -2575,6 +2575,16 @@ Deno.serve(async (req) => {
           ai_summary,
           ai_summary_generated_at,
           session_state_v1: sessionStateV1,
+          // D-079: mirror analyze-running-workout:2817 — write `recomputed_at`
+          // so workout-detail's `isSessionDetailStale` check (line 112-116)
+          // correctly invalidates the cached `session_detail_v1` after a
+          // cycling analyzer run. Pre-fix this field was only written by the
+          // run analyzer, so cached session_detail_v1 for cycling workouts
+          // could persist past analyzer reruns until a secondary staleness
+          // signal tripped (`arc_performance.version` bump, `workouts.updated_at`
+          // advance, or the 24h timeout). Parity gap independent of any
+          // current is_unplanned investigation.
+          recomputed_at: new Date().toISOString(),
         },
         analysis_status: 'complete',
         analyzed_at: new Date().toISOString()
