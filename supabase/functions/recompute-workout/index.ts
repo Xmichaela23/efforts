@@ -100,8 +100,18 @@ Deno.serve(async (req) => {
   }
   steps.push('compute-facts');
 
+  // D-078: explicit user-triggered recompute MUST force ai_summary
+  // regeneration. Pre-fix, both run + cycling analyzers preserved the
+  // existing ai_summary when the LLM call returned null (the original
+  // intent: don't blow away good narrative on a transient sync-time
+  // LLM hiccup). That preservation is correct for ingest-activity's
+  // automatic bulk-sync path but wrong for the user-triggered
+  // "Recompute analysis" button — the user expects fresh text, and
+  // any prompt-rule change (D-046, D-076) leaves prior narrative
+  // governed by stale rules. The flag is consumed only by the
+  // analyzers; ingest-activity doesn't pass it.
   const analyzeRes = await serviceClient.functions.invoke(analyzeFn, {
-    body: { workout_id },
+    body: { workout_id, force_regenerate_ai_summary: true },
   });
   if (analyzeRes.error) {
     console.warn(`[recompute-workout] ${analyzeFn} failed:`, analyzeRes.error.message);

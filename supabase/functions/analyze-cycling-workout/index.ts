@@ -1453,11 +1453,16 @@ Deno.serve(async (req) => {
   );
 
   let workout_id: string | undefined;
-  
+  // D-078: when caller (recompute-workout) sets this flag, the preservation
+  // fallback that re-uses the prior ai_summary when the LLM returns null is
+  // SKIPPED — explicit user-triggered recompute should never leave stale text.
+  let forceRegenerateAiSummary = false;
+
   try {
     const body = await req.json();
     workout_id = body.workout_id;
-    
+    forceRegenerateAiSummary = body.force_regenerate_ai_summary === true;
+
     if (!workout_id) {
       return new Response(JSON.stringify({ error: 'workout_id is required' }), {
         status: 400,
@@ -1465,7 +1470,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`🚴 Analyzing cycling workout: ${workout_id}`);
+    console.log(`🚴 Analyzing cycling workout: ${workout_id}${forceRegenerateAiSummary ? ' (force regen ai_summary)' : ''}`);
 
     // Set analyzing status
     await supabase
@@ -2503,12 +2508,19 @@ Deno.serve(async (req) => {
     console.log(`✅ Analysis payload structure:`, Object.keys(analysisPayload));
     console.log(`  - granular_analysis.interval_breakdown: ${intervalBreakdown.length} intervals`);
 
-    if (!ai_summary && typeof (existingAnalysis as any)?.ai_summary === 'string') {
+    // D-078: skip preservation when the caller forced regeneration. Stale
+    // narrative is the wrong default for user-triggered recompute — any
+    // prompt-rule change (D-046 backward-anchor suppression, D-076
+    // route-language ban, etc.) leaves prior text governed by old rules.
+    // Better to surface no narrative than a wrong one.
+    if (!ai_summary && !forceRegenerateAiSummary && typeof (existingAnalysis as any)?.ai_summary === 'string') {
       ai_summary = (existingAnalysis as any).ai_summary;
       ai_summary_generated_at = typeof (existingAnalysis as any)?.ai_summary_generated_at === 'string'
         ? (existingAnalysis as any).ai_summary_generated_at
         : null;
       console.log('[analyze-cycling-workout] preserved previous ai_summary (LLM did not produce a new one)');
+    } else if (!ai_summary && forceRegenerateAiSummary) {
+      console.log('[analyze-cycling-workout] LLM produced no new ai_summary AND force_regenerate set — leaving null (stale preservation suppressed)');
     }
 
     // _varGateRide is hoisted above generateCyclingAISummaryV1 so it can gate

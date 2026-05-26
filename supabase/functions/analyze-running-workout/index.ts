@@ -93,11 +93,18 @@ Deno.serve(async (req) => {
   // Declare workout_id outside try block so it's accessible in catch
   let workout_id: string | undefined;
   
+  // D-078: when caller (recompute-workout) sets this flag, the preservation
+  // fallback that re-uses the prior ai_summary when the LLM returns null is
+  // SKIPPED — explicit user-triggered recompute should never leave stale text.
+  // Cycling-side parity: same flag, same semantics.
+  let forceRegenerateAiSummary = false;
+
   try {
     const body = await req.json();
     workout_id = body.workout_id;
     const force_weather_refresh = body.force_weather_refresh === true;
-    
+    forceRegenerateAiSummary = body.force_regenerate_ai_summary === true;
+
     if (!workout_id) {
       return new Response(JSON.stringify({
         error: 'workout_id is required'
@@ -2498,7 +2505,10 @@ Deno.serve(async (req) => {
     }
     
     // Preserve previous ai_summary when LLM fails on recompute.
-    if (!ai_summary) {
+    // D-078: skip preservation when the caller forced regeneration. Stale
+    // narrative is the wrong default for user-triggered recompute — any
+    // prompt-rule change leaves prior text governed by old rules.
+    if (!ai_summary && !forceRegenerateAiSummary) {
       const { data: existingRow, error: existingRowErr } = await supabase
         .from('workouts')
         .select('workout_analysis')
@@ -2516,6 +2526,8 @@ Deno.serve(async (req) => {
         console.log('[analyze-running-workout] preserved previous ai_summary');
       }
       // Don't hold the blob — we only needed ai_summary.
+    } else if (!ai_summary && forceRegenerateAiSummary) {
+      console.log('[analyze-running-workout] LLM produced no new ai_summary AND force_regenerate set — leaving null (stale preservation suppressed)');
     }
 
     const { data: existingAnalysisRow } = await supabase
