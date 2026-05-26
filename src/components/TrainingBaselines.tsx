@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAppContext } from '@/contexts/AppContext';
@@ -64,6 +64,19 @@ const { saveUserBaselines, loadUserBaselines } = useAppContext();
 const { addPlannedWorkout } = usePlannedWorkouts() as any;
 
 // FTP Test workout template - let user pick date
+// D-077: ref for the cycling FTP input so the "Edit to override" hint can
+// focus the field on tap. Previously the hint was a non-interactive <span> —
+// athletes read it as an instruction, tapped it, and got nothing.
+const ftpInputRef = useRef<HTMLInputElement | null>(null);
+const focusFtpInput = () => {
+  const el = ftpInputRef.current;
+  if (!el) return;
+  el.focus();
+  // Select-on-focus so the existing learned value is highlighted and the next
+  // keypress replaces it — matches the user mental model of "tap to override".
+  try { el.select(); } catch { /* non-fatal */ }
+};
+
 const [showFtpDatePicker, setShowFtpDatePicker] = useState(false);
 const [ftpTestDate, setFtpTestDate] = useState(() => {
   const d = new Date();
@@ -1239,8 +1252,10 @@ return (
                               return (
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-2">
-                                    <label className="text-xs text-white/60">FTP</label>
+                                    <label className="text-xs text-white/60" htmlFor="ftp-input">FTP</label>
                                     <input
+                                      id="ftp-input"
+                                      ref={ftpInputRef}
                                       type="number"
                                       value={manualFtp || learnedFtp || ''}
                                       onChange={(e) => setData(prev => ({
@@ -1264,7 +1279,14 @@ return (
                                     )}
                                     {!manualFtp && learnedFtp && (
                                       <span className="text-teal-400/70">
-                                        Auto-learned from workouts • Edit to override
+                                        Auto-learned from workouts •{' '}
+                                        <button
+                                          type="button"
+                                          onClick={focusFtpInput}
+                                          className="underline hover:text-teal-300 cursor-pointer"
+                                        >
+                                          Edit to override
+                                        </button>
                                       </span>
                                     )}
                                     {manualFtp && !learnedImproved && (
