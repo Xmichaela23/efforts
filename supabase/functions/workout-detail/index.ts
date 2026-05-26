@@ -357,7 +357,7 @@ async function runSessionDetailPipelineAndPersist(
     const [plannedRes, weekWorkoutsRes, , arcCtx] = await Promise.all([
       supabase
         .from('planned_workouts')
-        .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id')
+        .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id')
         .eq('user_id', userId)
         .gte('date', weekStartDate)
         .lte('date', weekEndDate),
@@ -450,7 +450,7 @@ async function runSessionDetailPipelineAndPersist(
         const { data: pr } = await supabase
           .from('planned_workouts')
           .select(
-            'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id',
+            'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id',
           )
           .eq('user_id', userId)
           .eq('id', effectivePlannedId)
@@ -489,7 +489,7 @@ async function runSessionDetailPipelineAndPersist(
         const { data: pr } = await supabase
           .from('planned_workouts')
           .select(
-            'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id',
+            'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id',
           )
           .eq('user_id', userId)
           .eq('id', plannedId)
@@ -594,30 +594,6 @@ async function runSessionDetailPipelineAndPersist(
     } catch {
       /* non-fatal logging */
     }
-
-    // D-080 debug: emit ledger-match diagnostics so we can see why
-    // session_detail_v1.classification.is_unplanned is being set to true for
-    // cycling workouts whose bidirectional plan link is healthy at the data
-    // layer. Drop after the May 23 ride investigation is resolved.
-    console.log('[D-080-debug] ledger match resolution', {
-      workout_id: id,
-      workout_date: workoutDate,
-      workout_type: row?.type ?? null,
-      ledger_day_present: !!ledgerDay,
-      ledger_day_date: ledgerDay?.date ?? null,
-      ledger_day_planned_count: ledgerDay?.planned?.length ?? 0,
-      ledger_day_actual_count: ledgerDay?.actual?.length ?? 0,
-      ledger_day_match_count: ledgerDay?.matches?.length ?? 0,
-      matches_sample: (ledgerDay?.matches ?? []).slice(0, 5).map((m: any) => ({
-        planned_id: m?.planned_id ?? null,
-        workout_id: m?.workout_id ?? null,
-        summary: m?.summary ?? null,
-      })),
-      resolved_match_planned_id: match?.planned_id ?? null,
-      resolved_match_workout_id: match?.workout_id ?? null,
-      actual_session_workout_id: actualSession?.workout_id ?? null,
-      planned_session_planned_id: plannedSession?.planned_id ?? null,
-    });
 
     sessionDetailV1 = buildSessionDetailV1({
       workoutId: id,
