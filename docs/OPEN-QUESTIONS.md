@@ -450,6 +450,17 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-032 — Attach-triggered analyzer recompute is not wired
+
+- **Status:** unverified / structural deferral · filed 2026-05-26 from the May 23 ride attach audit (D-075 follow-up).
+- **Why it exists:** when a workout is analyzed at sync time and the planned-workout attach happens later (separate user action), the analysis cache stays stale. The first-order cost is `session_detail_v1.classification.is_unplanned: true` on a workout that IS attached at the data-model level. The second-order cost is everything else the analyzer derives from `plannedWorkout` (intervals, performance adherence, plan-aware LLM context) staying in the unplanned shape until something else triggers a recompute. The bidirectional link write happens in the attach endpoint (sets `workouts.planned_id` + `planned_workouts.completed_workout_id`) but doesn't queue or fire a recompute of `workout_analysis` for the executed workout.
+- **Cross-ref:** same class as the `pwr20_trend_v1` stale-type issue (known footgun, different surface). D-075 fixed the cycling analyzer's silent column-error bug that was masking this; once D-075 ships, the staleness becomes the visible class of bug remaining.
+- **Why not "fixed":** D-075 closes the largest visible symptom for cycling because the silent 42703 was the actual reason `is_unplanned` was stuck — recompute now works correctly. Pure attach-after-ride timing (the original hypothesis) IS a smaller class than initially thought, but it's still real: any workout where attach happens after the ai-summary already ran has stale narrative until something re-fires the analyzer. `session_detail_v1` rebuilds on next `workout-detail` call (UI open), but the `ai_summary` text and `vs_similar_v1` / `np_trend_v1` cycling-side blocks won't refresh until a full analyzer rerun.
+- **Fix shape (deferred):** when the attach endpoint writes the bidirectional link, queue or directly invoke `recompute-workout` (or `analyze-{sport}-workout` with service role) for the affected workout. Same pattern as the `ingest-activity` fan-out at lines ~1430-1580 — register the new downstream there. Risk: cascading triggers if attach happens repeatedly or in bulk.
+- **Verification approach:** find the attach endpoint(s) — likely `attach-planned` or similar — and confirm whether they invoke any recompute today. If not, this Q stands; if they do, find why it didn't fire for the May 23 ride.
+
+---
+
 ## Q-031 — §4.21 (concurrent training spacing) is NOT enforced in tri/run generators
 
 - **Status:** intentional / deferred — DOES need wiring, but prereqs block clean implementation. Filed 2026-05-26 from Item 6 of the autonomous batch audit.
