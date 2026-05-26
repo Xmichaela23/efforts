@@ -1124,7 +1124,16 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   let mastersSwimAnchor: { day: DayName; kind: SessionKind } | undefined;
   if (mastersSwim) {
     const kind: SessionKind = mastersSwim.intensity === 'easy' ? 'easy_swim' : 'quality_swim';
-    if (canPlace(days, mastersSwim.day, kind)) {
+    const mastersOnRestDay = (inputs.preferences.rest_days ?? []).includes(mastersSwim.day);
+    if (mastersOnRestDay) {
+      // D-064: masters_swim anchor on a rest day was being force-placed here, then the
+      // week-builder would silently skip emission via `!swimSlot?.isRest` — net effect was
+      // a missing swim. Refuse the anchor placement so the swim falls through to the
+      // preference-based loop below and lands on a clean weekday.
+      conflicts.push(
+        `masters_swim anchor (${kind}) on ${mastersSwim.day} collides with rest_days — falling through to preference-based placement.`,
+      );
+    } else if (canPlace(days, mastersSwim.day, kind)) {
       place(days, mastersSwim.day, kind, { note: mastersSwim.note });
       mastersSwimAnchor = { day: mastersSwim.day, kind };
     } else {
@@ -1823,10 +1832,14 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   // Order: easy first, quality second (matches combined-schedule-prefs.ts parser).
   const swimsPerWeek = inputs.preferences.swims_per_week;
   let swimSlots: { day: DayName; kind: SessionKind }[] = [];
+  const restDaySet = new Set<DayName>(inputs.preferences.rest_days ?? []);
 
-  if (mastersSwim) {
-    const kind: SessionKind = mastersSwim.intensity === 'easy' ? 'easy_swim' : 'quality_swim';
-    swimSlots.push({ day: mastersSwim.day, kind });
+  // D-064: only seed the swim placement loop from the masters_swim anchor when it
+  // ACTUALLY placed (mastersSwimAnchor !== undefined). The earlier `mastersSwim` input
+  // can be rejected (rest-day collision, matrix collision) — in that case the placement
+  // loop must still emit `swimsPerWeek` swims, not `swimsPerWeek - 1`.
+  if (mastersSwimAnchor) {
+    swimSlots.push({ day: mastersSwimAnchor.day, kind: mastersSwimAnchor.kind });
   }
 
   // Quality-swim policy for the static template: always promote the *last* swim
@@ -1861,6 +1874,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     };
     const orderedRaw = baseOrder
       .filter((c) => !swimSlots.some((s) => s.day === c))
+      .filter((c) => !restDaySet.has(c))
       .filter(swimSpreadOk)
       .sort((a, b) => {
         const gapA = swimSpreadGap(a, occupiedSwimDays);
@@ -1872,7 +1886,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       });
     const preferredSwimDay = inputs.preferences.swim?.[swimSlots.length];
     const ordered =
-      preferredSwimDay && !swimSlots.some((s) => s.day === preferredSwimDay)
+      preferredSwimDay && !restDaySet.has(preferredSwimDay) && !swimSlots.some((s) => s.day === preferredSwimDay)
         ? [preferredSwimDay, ...orderedRaw.filter((d) => d !== preferredSwimDay)]
         : orderedRaw;
 

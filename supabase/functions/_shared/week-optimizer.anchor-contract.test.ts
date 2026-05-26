@@ -1170,3 +1170,126 @@ Deno.test({
 // Day-level easy_run placement CAN legitimately shift between modes (consolidation
 // reorganizes the quality-partner pairing and easy_run fills around it) — that's
 // expected, not a Q-012 violation.
+
+// ── D-064 swim-on-rest-day relocation ──────────────────────────────────────
+//
+// Bug repro: when the athlete's `preferences.swim` pin lands on a `rest_days`
+// member, the optimizer used to honor the swim pin and then the week-builder
+// silently skipped emission (`!easySwimSlot?.isRest` guard) → effective swim
+// count dropped from `swims_per_week` to swims_per_week - 1. The fix filters
+// `rest_days` out of swim placement candidates and refuses to honor a
+// preferredSwimDay that collides with a rest day, so the second swim lands on
+// a clean weekday instead.
+
+Deno.test({
+  name: 'D-064: swim pin on rest_day relocates instead of dropping (no swim lands on monday rest)',
+  fn() {
+    // Combo from 486-matrix harness: completion/intermediate/perf/full_barbell/70.3/11hr
+    // swim_easy_day=monday + rest_days=[monday] collision used to drop to 1 swim because
+    // the optimizer placed the easy swim on Monday and the builder defensively skipped
+    // it via the `!easySwimSlot?.isRest` guard. The fix excludes rest_days from swim
+    // placement candidates so the swim either lands on a clean day or appears as a
+    // conflict line — never silently dropped on a rest day.
+    const inputs: WeekOptimizerInputs = {
+      anchors: { long_ride: 'saturday', long_run: 'sunday' },
+      preferences: basePreferences({
+        swim: ['monday', 'thursday'],
+        rest_days: ['monday'],
+      }),
+      athlete: baseAthlete({
+        training_intent: 'completion',
+        strength_intent: 'performance',
+      }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const swimDays = ALL_DAYS.filter(
+      (d) => dayHasKind(week, d, 'easy_swim') || dayHasKind(week, d, 'quality_swim'),
+    );
+    assert(
+      !swimDays.includes('monday'),
+      `optimizer must not place a swim on a rest_day; got swims on [${swimDays.join(', ')}]`,
+    );
+    assert(
+      swimDays.length >= 1,
+      `expected ≥1 swim to still emit on a clean day; got 0`,
+    );
+  },
+});
+
+Deno.test({
+  name: 'D-064: masters_swim anchor on rest_day falls through to placement loop (no swim drop)',
+  fn() {
+    // The reconciler in generate-combined-plan/reconcile-athlete-state-week-optimizer.ts
+    // promotes `state.swim_easy_day` to a masters_swim ANCHOR (not just a preference).
+    // Pre-fix, the optimizer's anchor placement at deriveOptimalWeek() force-placed the
+    // masters_swim on the rest day (canPlace passed because the day was empty), and the
+    // builder then silently skipped emission. Post-fix, the optimizer rejects the anchor
+    // when it collides with a rest day and falls through to the preference-driven swim
+    // loop, which now also filters rest_days. Net: swim count preserved on a clean day.
+    const inputs: WeekOptimizerInputs = {
+      anchors: {
+        long_ride: 'saturday',
+        long_run: 'sunday',
+        // This is the bug surface: anchor + rest_day collision.
+        masters_swim: { day: 'monday', intensity: 'easy' },
+      },
+      preferences: basePreferences({
+        swims_per_week: 2,
+        swim: ['monday', 'thursday'],
+        rest_days: ['monday'],
+      }),
+      athlete: baseAthlete({
+        training_intent: 'completion',
+        strength_intent: 'performance',
+      }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const swimDays = ALL_DAYS.filter(
+      (d) => dayHasKind(week, d, 'easy_swim') || dayHasKind(week, d, 'quality_swim'),
+    );
+    assert(
+      !swimDays.includes('monday'),
+      `masters_swim anchor on monday rest-day must not be force-placed; got swims on [${swimDays.join(', ')}]`,
+    );
+    assertEquals(
+      swimDays.length,
+      2,
+      `expected 2 swims after rejecting masters_swim anchor (rest-day collision); got ${swimDays.length} on [${swimDays.join(', ')}]`,
+    );
+  },
+});
+
+Deno.test({
+  name: 'D-064: swim count preserved when no rest collision (filter does not over-reject)',
+  fn() {
+    // Regression sentinel for the happy path — adding the rest_days filter must NOT
+    // drop swim slots when the athlete's swim pins don't collide with rest_days.
+    // Both swims must still land (specific days may be reshuffled by unrelated
+    // matrix constraints — e.g. quality_run on the swim[1] day — but the COUNT
+    // must be preserved).
+    const inputs: WeekOptimizerInputs = {
+      anchors: { long_ride: 'saturday', long_run: 'sunday' },
+      preferences: basePreferences({
+        swim: ['tuesday', 'friday'],
+        rest_days: ['monday'],
+      }),
+      athlete: baseAthlete({
+        training_intent: 'completion',
+        strength_intent: 'performance',
+      }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const swimDays = ALL_DAYS.filter(
+      (d) => dayHasKind(week, d, 'easy_swim') || dayHasKind(week, d, 'quality_swim'),
+    );
+    assertEquals(
+      swimDays.length,
+      2,
+      `expected 2 swims (no rest collision); got ${swimDays.length} on [${swimDays.join(', ')}]`,
+    );
+    assert(
+      !swimDays.includes('monday'),
+      `no swim should land on monday (rest_day); got [${swimDays.join(', ')}]`,
+    );
+  },
+});
