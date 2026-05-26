@@ -1531,14 +1531,26 @@ Deno.serve(async (req) => {
     let intervals = [];
     
     if (workout.planned_id) {
-      const { data: planned } = await supabase
+      // D-075: previous select listed `workout_type` and `workout_name` which
+      // don't exist on `planned_workouts` (PostgREST 42703 — the columns are
+      // `type` and `name`). The destructure didn't capture `error`, the code
+      // didn't check it, and `single()` returned null silently — so
+      // `plannedWorkout` was null for EVERY cycling workout with a linked
+      // plan. Downstream: intervals=[], performance null-fields,
+      // _hasLinkedPlan=false, isUnplanned=true. The cycling LLM ran in
+      // UNPLANNED MODE for every planned ride. Mirrored run-side shape
+      // (analyze-running-workout/index.ts:455-466): select existing
+      // columns only AND capture + check `plannedError`.
+      const { data: planned, error: plannedError } = await supabase
         .from('planned_workouts')
-        .select('id, workout_type, intervals, steps_preset, computed, description, tags, training_plan_id, user_id, name, workout_name')
+        .select('id, type, intervals, steps_preset, computed, description, tags, training_plan_id, user_id, name, total_duration_seconds')
         .eq('id', workout.planned_id)
         .eq('user_id', workout.user_id)
         .single();
 
-      if (planned) {
+      if (plannedError) {
+        console.warn('⚠️ Could not load planned workout (cycling):', plannedError.message);
+      } else if (planned) {
         plannedWorkout = planned;
         
         console.log('📋 Planned workout found:', {
