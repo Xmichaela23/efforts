@@ -866,6 +866,21 @@ const disciplineOptions = [
     "Snorkel"
   ];
 
+  // D-070: athlete-facing "what this unlocks" copy for each swim equipment chip.
+  // Surfaced via the chip's title attribute (hover tooltip). Keep ≤ one line each —
+  // truncates uglily otherwise. When you add a new equipment chip, add a matching
+  // entry here OR the chip surfaces tooltip-less.
+  const swimmingEquipmentHints: Record<string, string> = {
+    "Pool access": "Required for structured swim sessions — CSS, threshold, and aerobic work all need a pool.",
+    "Open water access": "Unlocks open-water skills sets (sighting, race-start surges) in race-specific phase.",
+    "Paddles": "Unlocks paddle-augmented threshold and CSS sets (non-beginner only — protects shoulders).",
+    "Pull buoy": "Unlocks pull-focused swim sessions targeting upper-body stroke density.",
+    "Ankle band": "Pairs with pull buoy on beginner pull sets — forces rotation and discourages kick rescue.",
+    "Kickboard": "Unlocks dedicated kick sets for kick-deficit swimmers.",
+    "Fins": "Unlocks fin-assisted drill sets in technique sessions (fingertip drag, single-arm).",
+    "Snorkel": "Unlocks stroke-rhythm sets without breathing interruption — head-position and 6-3-6 work.",
+  };
+
   // Home gym equipment options (only shown when "Home gym" is selected)
   const homeGymEquipmentOptions = [
     "Barbell + plates",
@@ -1403,10 +1418,12 @@ return (
                             <div className="flex flex-wrap gap-2">
                               {swimmingEquipmentOptions.map((option) => {
                                 const isSelected = (data.equipment.swimming || []).includes(option);
+                                const hint = swimmingEquipmentHints[option];
                                 return (
                                   <button
                                     key={option}
                                     onClick={() => toggleEquipment('swimming', option)}
+                                    title={hint}
                                     className={`px-2 py-1 text-xs rounded-full transition-all duration-300 ${
                                       isSelected
                                         ? 'bg-white/[0.12] border border-white/50 text-white'
