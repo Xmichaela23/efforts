@@ -22,6 +22,8 @@ import { reconcileAthleteStateWithWeekOptimizer } from './reconcile-athlete-stat
 import { promote703SwimIntentForCutoffRisk } from './swim-tri-safety.ts';
 import {
   buildQualityRunWeekBuilderFallbackTradeOff,
+  filterAthleteFacingTradeOffs,
+  hasAthletePinsFromPrefs,
   humanizeScheduleTradeOffLine,
   plannedSessionLooksLikeStructuredQualityRun,
   sessionsByWeekHasStructuredQualityRun,
@@ -621,14 +623,25 @@ Deno.serve(async (req: Request) => {
         passed: true,
       },
       week_start_dow: 'Monday',
-      week_trade_offs: Object.fromEntries(
-        generatedWeeks
+      week_trade_offs: (() => {
+        // D-072: thread per-week trade-offs through the same filter as the
+        // generation_trade_offs aggregator. Pre-fix the per-week list bypassed
+        // `filterAthleteFacingTradeOffs` and surfaced internal optimizer
+        // telemetry ("Strength: default Monday upper moved...", "Weekly load
+        // balance: moved ..." etc.) plus anchor-reference messages on plans
+        // where the athlete pinned nothing. `hasAthletePinsFromPrefs(state)`
+        // gates the anchor-reference filter the same way the aggregator does.
+        const hasPins = hasAthletePinsFromPrefs(state as unknown as Record<string, unknown>);
+        const entries = generatedWeeks
           .filter((w) => Array.isArray(w.week_trade_offs) && w.week_trade_offs.length > 0)
-          .map((w) => [
-            String(w.weekNum),
-            (w.week_trade_offs as string[]).map((t) => humanizeScheduleTradeOffLine(t)),
-          ]),
-      ),
+          .map((w) => {
+            const humanized = (w.week_trade_offs as string[]).map((t) => humanizeScheduleTradeOffLine(t));
+            const filtered = filterAthleteFacingTradeOffs(humanized, { hasAthletePins: hasPins });
+            return [String(w.weekNum), filtered] as [string, string[]];
+          })
+          .filter(([, msgs]) => msgs.length > 0);
+        return Object.fromEntries(entries);
+      })(),
       conflict_events: Object.fromEntries(
         generatedWeeks
           .filter((w) => Array.isArray(w.conflict_events) && w.conflict_events!.length > 0)

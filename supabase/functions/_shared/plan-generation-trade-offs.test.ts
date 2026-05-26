@@ -488,3 +488,52 @@ Deno.test('Bug 1: sessions_by_week without strength sessions = no rewrite (safe 
     `expected original days preserved when realized unknown — got ${JSON.stringify(enriched.trade_offs)}`,
   );
 });
+
+// ── D-072: per-week trade-off filter pipeline ─────────────────────────────
+//
+// Pre-fix: per-week trade-offs in generate-combined-plan/index.ts bypassed
+// `filterAthleteFacingTradeOffs` and surfaced internal optimizer telemetry
+// ("Strength: default Monday upper moved..." etc) plus anchor-reference
+// messages on plans where the athlete pinned nothing. The filter pipeline
+// already exists and was wired into the aggregator; D-072 wires it into
+// the per-week path too. These pin tests lock the filter contract for the
+// patterns most likely to leak into the per-week display.
+
+Deno.test('D-072: clean per-week list with only internal telemetry filters to empty', () => {
+  // A week whose trade-offs are entirely internal telemetry should produce
+  // no athlete-facing entries — the per-week dict drops the week entirely.
+  const out = filterAthleteFacingTradeOffs([
+    'Weekly layout: moved easy_bike from Monday to Wednesday — fewer same-sport days back-to-back.',
+    'Strength: default Monday upper moved to Thursday — spacing vs lower on Friday.',
+    'Weekly load balance: moved quality_bike from Tuesday to Wednesday — spread fatigue across the week.',
+  ], { hasAthletePins: true });
+  assertEquals(out, [], `expected empty after filter; got ${JSON.stringify(out)}`);
+});
+
+Deno.test('D-072: real-constraint trade-offs survive filter', () => {
+  // Trade-offs that describe an actual constraint violation (anchor collision,
+  // swim frequency reduced because no clean day exists, etc) MUST pass through.
+  const out = filterAthleteFacingTradeOffs([
+    'Swim frequency reduced from 3× to 2× — week too dense for 3× without conflict.',
+    'Strength: upper moved from your preferred Monday to Thursday — anchors / recovery rules.',
+    'Race-specific phase compressed to 2 weeks — event date / phase budget tradeoff.',
+  ], { hasAthletePins: true });
+  assertEquals(out.length, 3, `expected all 3 real-constraint messages; got ${JSON.stringify(out)}`);
+});
+
+Deno.test('D-072: anchor-reference messages dropped when athlete has no pins', () => {
+  // When the athlete pinned nothing, telling them to "adjust pinned long or
+  // group-ride days" is a false reference. Filter drops it.
+  const out = filterAthleteFacingTradeOffs([
+    'Could not fit 2 strength days. Adjust pinned long or group-ride days to free a midweek slot.',
+  ], { hasAthletePins: false });
+  assertEquals(out, [], `expected empty when no pins; got ${JSON.stringify(out)}`);
+});
+
+Deno.test('D-072: anchor-reference messages KEPT when athlete has pins', () => {
+  // When the athlete DID pin anchors, the same message is actionable guidance.
+  const out = filterAthleteFacingTradeOffs([
+    'Could not fit 2 strength days. Adjust pinned long or group-ride days to free a midweek slot.',
+  ], { hasAthletePins: true });
+  assertEquals(out.length, 1, `expected message kept when pinned; got ${JSON.stringify(out)}`);
+});
