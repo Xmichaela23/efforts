@@ -19,7 +19,7 @@
  */
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { adjustPerformanceWorkingLoadLb } from './index.ts';
+import { adjustPerformanceWorkingLoadLb, fallbackUnresolvedPercentDisplay } from './index.ts';
 
 // ── §1 Compound passthrough — the regression class we just closed ─────────
 
@@ -118,4 +118,43 @@ Deno.test('null / undefined / non-finite inputs pass through unchanged', () => {
   assertEquals(adjustPerformanceWorkingLoadLb(undefined, 'Deadlift', 'performance', 9), undefined);
   assertEquals(adjustPerformanceWorkingLoadLb(null as any, 'Deadlift', 'performance', 9), null);
   assertEquals(adjustPerformanceWorkingLoadLb(NaN, 'Deadlift', 'performance', 9), NaN);
+});
+
+// ── §4 D-071: % 1RM fallthrough display when 1RM baseline is missing ─────
+//
+// When materialize-plan's resolution chain bails (no 1RM in
+// performance_numbers), the strength session would emit `weight_display:
+// undefined` and the client UI would fall back to the raw input string —
+// "65% 1RM (DB ≈ 70% barbell load)" leaks to athletes. The helper converts
+// that to an RIR-anchored cue using the rep count.
+
+Deno.test('D-071: raw "% 1RM" string with numeric reps → RIR-anchored cue', () => {
+  const out = fallbackUnresolvedPercentDisplay('65% 1RM', 8);
+  assertEquals(out, 'Pick a weight you can do for 8 reps with 2 in reserve');
+});
+
+Deno.test('D-071: "% 1RM" with DB modifier string still triggers fallback', () => {
+  // Real protocol emit: "65% 1RM (DB ≈ 70% barbell load)" — % 1RM detector
+  // must match regardless of trailing modifier copy.
+  const out = fallbackUnresolvedPercentDisplay('65% 1RM (DB ≈ 70% barbell load)', 10);
+  assertEquals(out, 'Pick a weight you can do for 10 reps with 2 in reserve');
+});
+
+Deno.test('D-071: string reps like "8-10" pick the first integer', () => {
+  const out = fallbackUnresolvedPercentDisplay('70% 1RM', '8-10');
+  assertEquals(out, 'Pick a weight you can do for 8 reps with 2 in reserve');
+});
+
+Deno.test('D-071: missing reps falls back to generic moderate cue', () => {
+  const out = fallbackUnresolvedPercentDisplay('70% 1RM', undefined);
+  assertEquals(out, 'Moderate weight — leave 2 reps in reserve');
+});
+
+Deno.test('D-071: non-% input returns undefined (caller falls through)', () => {
+  // Qualitative strings ("Bodyweight", "Light"), numeric strings, and band
+  // copy are owned by other branches — the helper only handles raw % 1RM.
+  assertEquals(fallbackUnresolvedPercentDisplay('Bodyweight', 8), undefined);
+  assertEquals(fallbackUnresolvedPercentDisplay('Heaviest available', 8), undefined);
+  assertEquals(fallbackUnresolvedPercentDisplay('115', 8), undefined);
+  assertEquals(fallbackUnresolvedPercentDisplay(null, 8), undefined);
 });

@@ -867,6 +867,31 @@ function qualitativeWeightDisplay(weight: any): string | undefined {
   }
 }
 
+/**
+ * D-071: when materialize-plan can't resolve a "% 1RM" prescription to a
+ * numeric weight (athlete hasn't entered a relevant 1RM baseline), don't leave
+ * the raw "65% 1RM (DB ≈ 70% barbell load)" string for the client to render —
+ * it's engine-internal grammar, not athlete-facing language. Return an
+ * RIR-anchored coaching cue based on the rep count.
+ *
+ * Returns undefined when the input doesn't look like a "% 1RM" string — the
+ * caller should fall through to whatever other display logic exists. Exported
+ * for pin tests in index.test.ts (D-071 regression sentinel).
+ */
+export function fallbackUnresolvedPercentDisplay(weight: any, reps: any): string | undefined {
+  if (weight == null) return undefined;
+  const s = String(weight);
+  if (!/%\s*1rm/i.test(s)) return undefined;
+  let repText: string | null = null;
+  if (typeof reps === 'number' && reps > 0) repText = String(reps);
+  else {
+    const m = String(reps ?? '').match(/(\d+)/);
+    if (m) repText = m[1]!;
+  }
+  if (!repText) return 'Moderate weight — leave 2 reps in reserve';
+  return `Pick a weight you can do for ${repText} reps with 2 in reserve`;
+}
+
 // Map percentage intensity to band resistance level
 function getBandResistanceFromPercentage(originalPercent: number): string {
   if (originalPercent <= 35) return "Light Band";
@@ -1699,7 +1724,14 @@ function expandTokensForRow(
             const config = getExerciseConfig(name);
             finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total');
           }
-          
+          // D-071: prevent raw "% 1RM" strings from leaking to athlete UI when
+          // the resolution chain bailed (no 1RM baseline). Override with an
+          // RIR-anchored cue instead. Numeric weights computed above are
+          // preserved — this only fires when display would otherwise be empty.
+          if (finalWeightDisplay == null) {
+            finalWeightDisplay = fallbackUnresolvedPercentDisplay((ex as any)?.weight, reps);
+          }
+
           const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
@@ -1861,7 +1893,12 @@ function expandTokensForRow(
             const config = getExerciseConfig(name);
             finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total');
           }
-          
+          // D-071: mirror first call site — RIR-anchored fallback when
+          // resolution bailed on a "% 1RM" prescription and 1RM is missing.
+          if (finalWeightDisplay == null) {
+            finalWeightDisplay = fallbackUnresolvedPercentDisplay((ex as any)?.weight, reps);
+          }
+
           const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
