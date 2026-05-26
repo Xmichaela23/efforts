@@ -389,6 +389,28 @@ export function addStridesToEasyRun(
   };
 }
 
+/**
+ * D-069: Sweet-spot equivalent for running — sustained Z3 effort that's
+ * meaningfully harder than easy aerobic but well below lactate threshold.
+ * Used as the base-phase quality replacement for `first_race` / `comeback`
+ * intent athletes where intervals + threshold are explicitly out of scope
+ * per the conservative-build philosophy: their quality stimulus is sustained
+ * marathon-pace-ish work, not interval surges.
+ */
+export function sweetSpotRun(day: string, miles: number, warmupMiles: number, goalId: string): PlannedSession {
+  const totalMiles = warmupMiles * 2 + miles;
+  const dur = Math.round(totalMiles * 9.2);
+  return session(
+    day, 'run',
+    `Sweet-Spot Run — ${miles} mi at moderate effort`,
+    `Warm up ${warmupMiles} mi easy, then ${miles} mi at sustained moderate effort (~RPE 6, conversational in short sentences — meaningfully harder than your easy runs but not threshold). Cool down ${warmupMiles} mi easy. Builds aerobic durability without the recovery cost of intervals.`,
+    dur, 'MODERATE',
+    [`warmup_run_${Math.round(warmupMiles * 10)}_easy`, `sweet_spot_${miles}mi_moderate`, `cooldown_run_${Math.round(warmupMiles * 10)}_easy`],
+    ['quality', 'sweet_spot', 'run'],
+    'Z3 sweet spot', goalId,
+  );
+}
+
 export function tempoRun(day: string, miles: number, warmupMiles: number, goalId: string): PlannedSession {
   const totalMiles = warmupMiles * 2 + miles;
   const dur = Math.round(totalMiles * 8.5);

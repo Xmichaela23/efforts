@@ -64,7 +64,7 @@ import {
 } from './validate-training-floors.ts';
 import type { DayOfWeek } from './science.ts';
 import {
-  longRun, easyRun, tempoRun, intervalRun, vo2Run, marathonPaceRun, racePaceRun,
+  longRun, easyRun, tempoRun, sweetSpotRun, intervalRun, vo2Run, marathonPaceRun, racePaceRun,
   addStridesToEasyRun,
   longRide, easyBike, bikeOpeners,
   groupRideQualityBikeSession, groupRideSession,
@@ -1572,14 +1572,27 @@ export function buildWeek(
               : marathonPaceRun(runQualityDay, rpMiles, servedGoal),
           );
         } else if (phase === 'base') {
-          // RUN-PROTOCOL §4.1 base interval rep ramp: clamp(4, 8, 4 + floor((weekInPhase − 1) / 2)).
-          // ADR 0002 footgun: weekInBlock is ALWAYS 1; use runWeekInPhase from
-          // weekInPhaseForTimeline (mirrors swim arc fix at c1c94cec).
-          const baseRepsRaw = Math.max(4, Math.min(8, 4 + Math.floor((runWeekInPhase - 1) / 2)));
-          const baseReps = isFirstRace
-            ? Math.max(4, Math.round(baseRepsRaw * 0.8))
-            : baseRepsRaw;
-          runQualitySlot!.sessions.push(intervalRun(runQualityDay, baseReps, phase, servedGoal));
+          // D-069: first_race / comeback in base phase emit sustained sweet-spot
+          // tempo instead of intervals. Per D-061 conservative-build philosophy +
+          // post-shipping plan review: these athletes should not see "Run
+          // Intervals at tempo/threshold pace" in week 1 of a 17-week plan. The
+          // 80% rep cap that previously applied is replaced by a fundamentally
+          // different stimulus — sweet-spot moderate effort (Z3, RPE 6, NOT
+          // labeled threshold). Athletes building toward their first race
+          // accumulate aerobic durability before crossing into threshold work.
+          // performance / completion intents keep the interval-base path —
+          // performance because reps are the build runway, completion because
+          // its base is the only place quality lives at all.
+          if (isFirstRace) {
+            const ssMi = Math.max(2, Math.min(6, Math.round(longRunMiles * 0.30)));
+            runQualitySlot!.sessions.push(sweetSpotRun(runQualityDay, ssMi, 1.5, servedGoal));
+          } else {
+            // RUN-PROTOCOL §4.1 base interval rep ramp: clamp(4, 8, 4 + floor((weekInPhase − 1) / 2)).
+            // ADR 0002 footgun: weekInBlock is ALWAYS 1; use runWeekInPhase from
+            // weekInPhaseForTimeline (mirrors swim arc fix at c1c94cec).
+            const baseRepsRaw = Math.max(4, Math.min(8, 4 + Math.floor((runWeekInPhase - 1) / 2)));
+            runQualitySlot!.sessions.push(intervalRun(runQualityDay, baseRepsRaw, phase, servedGoal));
+          }
         } else {
           // Build: tempo (Z3) — builds muscular endurance safely. tempoMi inherits
           // the long-run ramp via `longRunMiles` (which is now phase-progressive).
@@ -1618,13 +1631,20 @@ export function buildWeek(
             runQualitySlot!.sessions.push(vo2Run(runQualityDay, servedGoal, runWeekInPhase));
           }
         } else {
-          // RUN-PROTOCOL §4.1 base interval rep ramp (same as base_first branch).
-          // D-061 first_race cap: 80% of standard reps.
-          const baseRepsRaw = Math.max(4, Math.min(8, 4 + Math.floor((runWeekInPhase - 1) / 2)));
-          const baseReps = isFirstRace
-            ? Math.max(4, Math.round(baseRepsRaw * 0.8))
-            : baseRepsRaw;
-          runQualitySlot!.sessions.push(intervalRun(runQualityDay, baseReps, phase, servedGoal));
+          // D-069: mirror the base_first branch — first_race / comeback skip
+          // intervals in base phase and emit sustained sweet-spot tempo instead.
+          // Even though we're in the race_peak tri_approach branch, the
+          // intent-driven gate applies: athletes building toward their first
+          // race should not see intervals in the first 4-8 weeks regardless of
+          // tri_approach config.
+          if (isFirstRace) {
+            const ssMi = Math.max(2, Math.min(6, Math.round(longRunMiles * 0.30)));
+            runQualitySlot!.sessions.push(sweetSpotRun(runQualityDay, ssMi, 1.5, servedGoal));
+          } else {
+            // RUN-PROTOCOL §4.1 base interval rep ramp.
+            const baseRepsRaw = Math.max(4, Math.min(8, 4 + Math.floor((runWeekInPhase - 1) / 2)));
+            runQualitySlot!.sessions.push(intervalRun(runQualityDay, baseRepsRaw, phase, servedGoal));
+          }
         }
       }
     }
