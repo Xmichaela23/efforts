@@ -2,7 +2,7 @@
 
 Tracking the work to get the app from "engine works" to "every flow ships clean." No new features past this point. Only finish what's started.
 
-Last updated: May 26, 2026 (overnight plan-gen batch D-064..D-069 — 486-combo matrix at 100% pass. Six fixes shipped: D-064 swim placed on rest_day silently dropped (extends to masters_swim anchor), D-065 Z3 jargon strip from downgrade wrapper, D-066 same silent-drop pattern in strength + load balancer, D-067 harness recovery detector switched to peak (1:1 loading false positives), D-068 WoW TSS ramp ceiling distance-aware (0.24 half-IM / new 0.30 full-IM), D-069 first_race base-phase emits sweetSpotRun. Full per-fix narrative in scripts/plan-test-output/overnight-report.md. Previous: cycling-analysis arc paused 2026-05-17.)
+Last updated: May 26, 2026 (cycling-attach cascade D-074..D-084 — eleven-layer bug investigation triggered by "May 23 Strava ride shows unattached in UI." Root finds: two silent PostgREST 42703s on phantom column names; isUnplanned ReferenceError swallowed by try/catch silently killing every cycling LLM call since D-046. Full narrative in docs/ENGINE-STATE.md Solid entry. Earlier today: overnight plan-gen batch D-064..D-069 — 486/486 matrix pass.)
 
 ---
 
@@ -96,6 +96,19 @@ For each numbered item:
 - [x] **D-067** Plan-matrix harness recovery detector — peak instead of median (test-only)
 - [x] **D-068** WoW TSS ramp ceiling calibration — distance-aware (0.24 half-IM / 0.30 full-IM)
 - [x] **D-069** first_race base-phase quality run — sweetSpotRun replaces intervalRun
+
+### Done (2026-05-26 cycling-attach cascade — eleven layers, all-sports silent 42703s, dormant ReferenceError)
+- [x] **D-074** plans.start_date phantom column reverted; environment:'pool' DEFAULT no longer surfaces on non-swim planned rows (activate-plan row construction)
+- [x] **D-075** analyze-cycling-workout planned_workouts SELECT (silent 42703 on workout_type/workout_name → plannedWorkout: null → UNPLANNED MODE for every linked cycling ride)
+- [x] **D-076** "unplanned route" LLM hallucination — HARD BAN cycling prompt rule + "climbing route" → "climbing day" seed-word removal
+- [x] **D-077** FTP "Edit to override" tap handler fix in TrainingBaselines.tsx + docs/FTP-COLD-START-SPEC.md saved
+- [x] **D-078** recompute-workout force-regenerates ai_summary; preservation fallback only fires on ingest-activity transient errors
+- [x] **D-079** analyze-cycling-workout writes recomputed_at (run-side parity, closes workout-detail cache-bust gap)
+- [x] **D-080** debug log for ledger-match resolution (instrumentation; removed in D-081 commit after surfacing the data point)
+- [x] **D-081** workout-detail planned_workouts SELECT (silent 42703 on swim_unit/baselines_template/baselines — affected ALL sports, every linked workout rendered as unplanned)
+- [x] **D-082** LLM diagnostics instrumentation (callLLM debug sink + workout_analysis.ai_summary_debug field — kept in for future dormant-exception hunting)
+- [x] **D-083** isUnplanned ReferenceError silently killing every cycling LLM call since D-046 (2026-05-25). Exception swallowed → preservation fallback re-served stale text → no narrative actually being LLM-generated for ~1 day.
+- [x] **D-084** "unknown effort" POWER row (normalizePlanIntent('ride') returned literal 'unknown', short-circuited fallback classifier) + Duration chip absolute time (was showing +/- delta)
 
 
 ### Done
