@@ -731,6 +731,11 @@ type BalancerContext = {
   longRun: DayName;
   mastersSwim?: { day: DayName; kind: SessionKind };
   groupRunAnchor?: { day: DayName; kind: SessionKind };
+  // D-066: rest_days from user preferences. The balancer must refuse moves
+  // INTO these days, otherwise it can shift strength / swim / easy_run onto
+  // a rest day after the placement loops correctly avoided it — and the
+  // week-builder then silently skips emission of the relocated session.
+  restDays?: Set<DayName>;
 };
 
 function balancerFatigueWeight(f: SessionSlot['fatigue']): number {
@@ -856,6 +861,9 @@ function mutatingBalancerMove(
   toDay: DayName,
   ctx: BalancerContext,
 ): boolean {
+  // D-066: never balance INTO a rest day. The builder defensively skips
+  // emission on rest days, so a move here is functionally a session drop.
+  if (ctx.restDays?.has(toDay)) return false;
   const src = trial[fromDay];
   if (idx < 0 || idx >= src.length) return false;
   const [removed] = src.splice(idx, 1);
@@ -1080,6 +1088,13 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   place(days, longRide, 'long_ride');
   place(days, longRun, 'long_run');
   const noLowerBody = lowerBodyBlockedDays(longRide, longRun);
+
+  // D-064 / D-066: hoist rest_days set so swim AND strength placement loops can
+  // filter against it before placement. Without this filter, sessions land on
+  // rest days, then the week-builder defensively skips emission (`!slot?.isRest`),
+  // producing a silent drop in session count. Both swim and strength surfaced
+  // this bug; the filter belongs at every preference-driven placement loop.
+  const restDaySet = new Set<DayName>(inputs.preferences.rest_days ?? []);
 
   const qualityBikeAnchor = asAnchor(inputs.anchors?.quality_bike);
   const groupRun = inputs.anchors?.group_run;
@@ -1489,8 +1504,8 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       const preferredUpperDay = inputs.preferences.strength_preferred_days?.[0];
       const preferredLowerDay = inputs.preferences.strength_preferred_days?.[1];
       const upperOrder: DayName[] = biasOrderForPreferredDay(
-        ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'],
-        preferredUpperDay,
+        ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'].filter((d) => !restDaySet.has(d as DayName)) as DayName[],
+        preferredUpperDay && !restDaySet.has(preferredUpperDay) ? preferredUpperDay : undefined,
       );
 
       if (consolidatedQrLowerDay) {
@@ -1545,11 +1560,12 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           );
         }
       } else {
+        const lowerCandidatesBaseRaw: DayName[] = isPerf && qualityRunDay
+          ? [qualityRunDay, 'thursday', 'friday', 'tuesday', 'wednesday', 'monday']
+          : ['thursday', 'friday', 'tuesday', 'wednesday', 'monday'];
         const lowerCandidatesBase: DayName[] = biasOrderForPreferredDay(
-          isPerf && qualityRunDay
-            ? [qualityRunDay, 'thursday', 'friday', 'tuesday', 'wednesday', 'monday']
-            : ['thursday', 'friday', 'tuesday', 'wednesday', 'monday'],
-          preferredLowerDay,
+          lowerCandidatesBaseRaw.filter((d) => !restDaySet.has(d)) as DayName[],
+          preferredLowerDay && !restDaySet.has(preferredLowerDay) ? preferredLowerDay : undefined,
         );
 
         // §4.6: ≥3 days upper↔lower preferred, ≥2 days hard floor. The same loop is reused for
@@ -1677,8 +1693,8 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       const preferredUpperDayNc = inputs.preferences.strength_preferred_days?.[0];
       const preferredLowerDayNc = inputs.preferences.strength_preferred_days?.[1];
       const nonCoeqUpperOrder: DayName[] = biasOrderForPreferredDay(
-        ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'],
-        preferredUpperDayNc,
+        ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'].filter((d) => !restDaySet.has(d as DayName)) as DayName[],
+        preferredUpperDayNc && !restDaySet.has(preferredUpperDayNc) ? preferredUpperDayNc : undefined,
       );
       let upperDay: DayName | undefined;
       for (const c of nonCoeqUpperOrder) {
@@ -1716,11 +1732,12 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       }
 
       if (strengthFreq >= 2) {
+        const lowerCandidatesRaw: DayName[] = isPerf && qualityRunDay
+          ? [qualityRunDay, 'thursday', 'friday', 'tuesday']
+          : ['thursday', 'friday', 'tuesday', 'wednesday'];
         const lowerCandidates: DayName[] = biasOrderForPreferredDay(
-          isPerf && qualityRunDay
-            ? [qualityRunDay, 'thursday', 'friday', 'tuesday']
-            : ['thursday', 'friday', 'tuesday', 'wednesday'],
-          preferredLowerDayNc,
+          lowerCandidatesRaw.filter((d) => !restDaySet.has(d)) as DayName[],
+          preferredLowerDayNc && !restDaySet.has(preferredLowerDayNc) ? preferredLowerDayNc : undefined,
         );
 
         // §4.7 tier ladder for the non-coeq path: try CLEAN with full ≥3d upper↔lower spacing,
@@ -1832,7 +1849,6 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   // Order: easy first, quality second (matches combined-schedule-prefs.ts parser).
   const swimsPerWeek = inputs.preferences.swims_per_week;
   let swimSlots: { day: DayName; kind: SessionKind }[] = [];
-  const restDaySet = new Set<DayName>(inputs.preferences.rest_days ?? []);
 
   // D-064: only seed the swim placement loop from the masters_swim anchor when it
   // ACTUALLY placed (mastersSwimAnchor !== undefined). The earlier `mastersSwim` input
@@ -1930,6 +1946,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     athlete: inputs.athlete,
     longRide,
     longRun,
+    restDays: restDaySet,
     ...(mastersSwimAnchor ? { mastersSwim: mastersSwimAnchor } : {}),
     ...(groupRunAnchor ? { groupRunAnchor } : {}),
   });

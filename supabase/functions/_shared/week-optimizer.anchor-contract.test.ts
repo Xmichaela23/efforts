@@ -1260,6 +1260,74 @@ Deno.test({
 });
 
 Deno.test({
+  name: 'D-066: strength placement skips rest_day (durability+cap=1 emits 1 session, not 0)',
+  fn() {
+    // Matrix-failing combo: performance/intermediate/durability/full_barbell/70.3/11hr
+    // with rest_days=[monday]. Pre-fix: optimizer placed upper_body_strength on Monday
+    // (first in nonCoeqUpperOrder), then the week-builder silently skipped emission via
+    // `!strSlot.isRest`. Net: 0 strength sessions across 17 weeks for athletes who chose
+    // durability strength as a single-session-per-week support tier.
+    const inputs: WeekOptimizerInputs = {
+      anchors: { long_ride: 'saturday', long_run: 'sunday' },
+      preferences: basePreferences({
+        swims_per_week: 2,
+        strength_frequency: 1,
+        rest_days: ['monday'],
+      }),
+      athlete: baseAthlete({
+        training_intent: 'performance',
+        strength_intent: 'support',
+      }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const strengthDays = ALL_DAYS.filter(
+      (d) =>
+        dayHasKind(week, d, 'upper_body_strength') ||
+        dayHasKind(week, d, 'lower_body_strength'),
+    );
+    assert(
+      !strengthDays.includes('monday'),
+      `optimizer must not place strength on a rest_day; got [${strengthDays.join(', ')}]`,
+    );
+    assertEquals(
+      strengthDays.length,
+      1,
+      `expected exactly 1 strength session for support+freq=1; got ${strengthDays.length} on [${strengthDays.join(', ')}]`,
+    );
+  },
+});
+
+Deno.test({
+  name: 'D-066: co-equal 2× strength placement skips rest_day for upper AND lower',
+  fn() {
+    // Performance + freq=2 routes through the co-equal placement path. Both upper and
+    // lower must avoid rest_days, not just upper.
+    const inputs: WeekOptimizerInputs = {
+      anchors: { long_ride: 'saturday', long_run: 'sunday' },
+      preferences: basePreferences({
+        swims_per_week: 2,
+        strength_frequency: 2,
+        rest_days: ['monday'],
+      }),
+      athlete: baseAthlete({
+        training_intent: 'performance',
+        strength_intent: 'performance',
+      }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const strengthDays = ALL_DAYS.filter(
+      (d) =>
+        dayHasKind(week, d, 'upper_body_strength') ||
+        dayHasKind(week, d, 'lower_body_strength'),
+    );
+    assert(
+      !strengthDays.includes('monday'),
+      `optimizer must not place strength on a rest_day even in co-equal mode; got [${strengthDays.join(', ')}]`,
+    );
+  },
+});
+
+Deno.test({
   name: 'D-064: swim count preserved when no rest collision (filter does not over-reject)',
   fn() {
     // Regression sentinel for the happy path — adding the rest_days filter must NOT
