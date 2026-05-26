@@ -287,15 +287,28 @@ field name is clean at the wire point.
 
 ---
 
-## Q-024 — `hr_delta_bpm` null on recomputed sessions despite populated pool
+## Q-024 — `hr_delta_bpm` null on recomputed sessions despite populated pool — RESOLVED 2026-05-25 / D-047
 
-Filed: 2026-05-24
+Filed: 2026-05-24 · Resolved: 2026-05-25 / D-047 / commit `244c22c4`
 
-Post D-038 recompute of b70658b0: `hr_delta_bpm` returned null despite
-`sample_size=7` in `vs_similar`. Suspect `build.ts:387` `currentAvgHr` resolving
-null for this row even though pool `avgHr` would compute. Not blocking — POOL
-INTENSITY CONTEXT prompt rule already prevents the misinterpretation that
-depended on `hr_delta`. Investigate `build.ts:387` `currentAvgHr` resolution
+Root cause: asymmetric HR field resolution between current workout and
+historical pool. Pool-side `getSimilarWorkoutComparisons()` (queries.ts:598)
+called `getOverallAvgHr(r)` which checked three keys in order
+(`overall.avg_hr` → `overall.avg_heart_rate` → `workouts.avg_heart_rate`).
+Current-side `build.ts` checked **only** `overall.avg_hr` inline via
+`coerceNumber(overall?.avg_hr)`. When a row stored HR under the alternate
+key, current-side dropped to null; pool-side resolved fine; `hr_delta_bpm`
+short-circuited to null.
+
+**Fix shipped (D-047):** export `getOverallAvgHr` from `queries.ts:174-177`
+and use it on the current side too — `build.ts:291` is now
+`const avgHr = getOverallAvgHr(workout) ?? hrSensor.avg`. Same three-stage
+chain on both sides, sensor fallback at the tail as defense-in-depth.
+
+7 pin tests in `queries.test.ts` lock the contract. Q-024's audit
+"investigate build.ts:387" had stale line numbers — the actual fix landed
+in the broader build.ts:282-291 block. Audit confirmed during 2026-05-26
+batch (Item 5 was a stale follow-up).
 path before next HR signal ship.
 
 ---
