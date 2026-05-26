@@ -2265,16 +2265,22 @@ function expandTokensForRow(
   if (discipline === 'swim') {
     try {
       // Parse baseline swim pace from various formats (string "mm:ss" or number seconds)
+      // D-088: the `row.baselines_template` / `row.baselines` reads here pointed at
+      // columns that don't exist on planned_workouts (same class as D-081 — verified
+      // by REST probe; PostgREST 42703 on both). Removed the dead tertiary fallbacks
+      // so the lookup is the actual working path: user_baselines.performance_numbers
+      // via `baselines` (constructed at line ~2587). Behavior unchanged — the dead
+      // paths always returned undefined.
       const swimPacePer100Sec = (() => {
         // Try numeric format first (seconds per 100)
-        const numPace = baselines?.swim_pace_per_100_sec ?? (row as any)?.baselines_template?.swim_pace_per_100_sec ?? (row as any)?.baselines?.swim_pace_per_100_sec;
+        const numPace = baselines?.swim_pace_per_100_sec;
         if (typeof numPace === 'number' && numPace > 0) {
           console.log(`  🏊 Using numeric baseline pace: ${numPace}s per 100`);
           return numPace;
         }
-        
+
         // Try string format "mm:ss" (e.g., "2:10")
-        const strPace = (baselines as any)?.swimPace100 ?? (row as any)?.baselines_template?.swimPace100 ?? (row as any)?.baselines?.swimPace100;
+        const strPace = (baselines as any)?.swimPace100;
         if (typeof strPace === 'string' && /^\d{1,2}:\d{2}$/.test(strPace)) {
           const [mm, ss] = strPace.split(':').map((t:string)=>parseInt(t,10));
           const sec = mm*60 + ss;
