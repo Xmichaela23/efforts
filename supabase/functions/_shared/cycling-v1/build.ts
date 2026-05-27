@@ -37,6 +37,53 @@ function normalizePlanIntent(x: any): CyclingIntentV1 | null {
   return (allowed as string[]).includes(k) ? (k as CyclingIntentV1) : null;
 }
 
+// D-091: layered intent derivation for cycling planned workouts.
+// Order of precedence (highest signal-to-noise first):
+//   1. workout_type / type column (explicit, when populated with a real intent)
+//   2. tags (the bake/generators emit canonical intent tags like 'sweet_spot')
+//   3. steps_preset token prefix (the most reliable canonical signal — token
+//      namespaces are 'bike_ss_*' / 'bike_thr_*' / 'bike_vo2_*' / etc.)
+// Everything else (name keywords, description text) is intentionally NOT used:
+// LLM-generated names and free-text descriptions are too noisy to classify on.
+function derivePlanIntentFromTokens(tokens: string[] | null | undefined): CyclingIntentV1 | null {
+  if (!Array.isArray(tokens) || tokens.length === 0) return null;
+  for (const raw of tokens) {
+    const t = String(raw || '').toLowerCase();
+    if (/^bike_ss_/.test(t)) return 'sweet_spot';
+    if (/^bike_thr(eshold)?_/.test(t)) return 'threshold';
+    if (/^bike_vo2_/.test(t)) return 'vo2';
+    if (/^bike_tempo_/.test(t)) return 'tempo';
+    if (/^bike_recovery_/.test(t)) return 'recovery';
+    if (/^bike_anaerobic_/.test(t)) return 'anaerobic';
+    if (/^bike_neuro(muscular)?_/.test(t)) return 'neuromuscular';
+    if (/^bike_race_pace_/.test(t)) return 'race_prep';
+    if (/^bike_openers/.test(t)) return 'race_prep';
+    if (/^bike_only_brick/.test(t)) return 'brick';
+    if (/^bike_endurance_/.test(t)) return 'endurance';
+  }
+  return null;
+}
+
+function derivePlanIntentFromTags(tags: string[] | null | undefined): CyclingIntentV1 | null {
+  if (!Array.isArray(tags) || tags.length === 0) return null;
+  for (const raw of tags) {
+    const normalized = normalizePlanIntent(raw);
+    if (normalized && normalized !== 'unknown') return normalized;
+  }
+  return null;
+}
+
+export function derivePlanIntentCycling(plannedWorkout: any): CyclingIntentV1 | null {
+  if (!plannedWorkout) return null;
+  const fromType = normalizePlanIntent(plannedWorkout?.workout_type ?? plannedWorkout?.type ?? null);
+  if (fromType && fromType !== 'unknown') return fromType;
+  const fromTags = derivePlanIntentFromTags(plannedWorkout?.tags);
+  if (fromTags) return fromTags;
+  const fromTokens = derivePlanIntentFromTokens(plannedWorkout?.steps_preset);
+  if (fromTokens) return fromTokens;
+  return null;
+}
+
 export function fallbackClassifyIntent(args: {
   intensityFactor: number | null;
   ftpBinsMin: any | null;
@@ -198,7 +245,14 @@ export function buildCyclingFactPacketV1(args: {
       ? viOverride
       : (ap != null && np != null && ap > 0) ? (np / ap) : null;
 
-  const planIntent = normalizePlanIntent(plannedWorkout?.workout_type ?? plannedWorkout?.type ?? null);
+  // D-091: derive plan_intent from layered signals. Reading only `workout_type`
+  // / `type` missed every cycling planned row whose discipline column was 'ride'
+  // — the actual intent lives in `tags` (e.g. 'sweet_spot') or the steps_preset
+  // token prefix (e.g. 'bike_ss_*'). Pre-fix: plan_intent was null on every
+  // structured cycling session, the classifier fell back to IF-only and labelled
+  // a 88-94% FTP sweet-spot ride as 'threshold', so the LLM led with "sub-
+  // threshold effort" instead of the prescribed sweet-spot intent.
+  const planIntent = derivePlanIntentCycling(plannedWorkout);
   const ftpBins = (ftp != null && ftp > 0) ? computeFtpBinsMinutes({ powerSamplesW, ftpW: ftp }) : null;
 
   // Elevation density (ft/mi) for the VI gate. Source: TOTAL ride elevation
