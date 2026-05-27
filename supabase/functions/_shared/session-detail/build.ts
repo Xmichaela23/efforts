@@ -292,8 +292,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         // D-089: for cycling, fall back to power_adherence_percent so the
         // adherence badge renders watts-vs-target on rides (client already
         // colors pct via pctColor — sport-neutral).
+        // D-090: explicit null in power_adherence_percent means "ungraded"
+        // (cycling recovery rows). Short-circuit before the sr.adherence_pct
+        // fallback — that fallback would still produce a spurious badge.
         pace_adherence_pct: (() => {
           if (iv && iv.pace_adherence_percent === null) return null;
+          if (iv && iv.power_adherence_percent === null) return null;
           const fromIv = fin(iv?.pace_adherence_percent) ?? fin(iv?.power_adherence_percent);
           if (fromIv != null) return fromIv;
           return fin(sr?.adherence_pct);

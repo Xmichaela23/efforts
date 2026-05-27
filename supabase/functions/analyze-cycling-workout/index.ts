@@ -990,6 +990,10 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
       if (intervalType === 'recovery') return ++recoveryCount;
       return index + 1;
     })();
+    // D-090: recoveries are explicitly NOT performance-graded. Null out the
+    // adherence/planned-power fields so session_detail/build.ts can short-circuit
+    // the adherence badge (explicit null vs missing — the contract carries intent).
+    const isRecovery = intervalType === 'recovery';
     return {
       interval_type: intervalType,
       interval_number: intervalNumber,
@@ -997,11 +1001,11 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
       // Duration metrics
       planned_duration_s: plannedDuration,
       actual_duration_s: actualDuration,
-      duration_adherence_percent: Math.round(durationAdherence),
+      duration_adherence_percent: isRecovery ? null : Math.round(durationAdherence),
       // Power metrics
-      planned_power_range_lower: plannedPowerLower,
-      planned_power_range_upper: plannedPowerUpper,
-      planned_power_w: plannedPowerCenter,
+      planned_power_range_lower: isRecovery ? null : plannedPowerLower,
+      planned_power_range_upper: isRecovery ? null : plannedPowerUpper,
+      planned_power_w: isRecovery ? null : plannedPowerCenter,
       actual_power_w: Math.round(actualPower),
       // D-089: session_detail/build.ts:274 reads `iv.avg_power_watts` (run-aligned
       // field name) to populate IntervalRow.executed.power_watts. Cycling's
@@ -1009,16 +1013,16 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
       // session_detail builder sport-agnostic without a cycling branch.
       avg_power_watts: Math.round(actualPower),
       normalized_power_w: Math.round(normalizedPower),
-      power_adherence_percent: Math.round(powerAdherence),
+      power_adherence_percent: isRecovery ? null : Math.round(powerAdherence),
       // Combined adherence (0-1 scale for compatibility with client getEnhancedAdherence)
-      adherence_percentage: powerAdherence / 100,
+      adherence_percentage: isRecovery ? null : powerAdherence / 100,
       // Distance
       actual_distance_m: actualDistance,
       // Heart rate
       avg_heart_rate_bpm: avgHR ? Math.round(avgHR) : null,
       max_heart_rate_bpm: maxHR ? Math.round(maxHR) : null,
       // Performance score
-      performance_score: Math.round(performanceScore)
+      performance_score: isRecovery ? null : Math.round(performanceScore)
     };
   });
 }
@@ -1735,8 +1739,17 @@ Deno.serve(async (req) => {
     );
 
     // Generate interval breakdown for ALL intervals with power targets (not just work)
-    // This captures warmup/cooldown deviations too
-    const allIntervalsWithPower = intervals.filter(i => i.power_range && i.executed);
+    // This captures warmup/cooldown deviations too.
+    // D-090: also include recovery segments even though they carry no power target —
+    // they render in the display table as ungraded rows (label/duration/watts/HR,
+    // no adherence badge). Without this filter recoveries silently disappear and
+    // the user sees only 4 of 6 segments on a 2x15 SS ride.
+    const allIntervalsWithPower = intervals.filter(i => {
+      if (!i.executed) return false;
+      if (i.power_range) return true;
+      const r = String(i.role || i.kind || '').toLowerCase();
+      return /recover|rest/.test(r);
+    });
     const intervalBreakdown = generateIntervalBreakdown(workIntervals, allIntervalsWithPower, sensorData);
 
     // Analyze heart rate
@@ -1751,12 +1764,18 @@ Deno.serve(async (req) => {
       let weightedSum = 0;
       
       for (const interval of intervalBreakdown) {
+        // D-090: recoveries carry power_adherence_percent === null (explicitly
+        // ungraded). Skip them — otherwise the `|| 0` fallback would credit each
+        // recovery with 0% adherence at full duration weight and depress the
+        // session score. The pre-D-090 filter excluded recoveries entirely, so
+        // this branch is purely about preserving the prior aggregate semantics.
+        if (interval.power_adherence_percent == null) continue;
         const isWorkInterval = interval.interval_type === 'work';
         // Work intervals get 2x weight, others get 1x
         const typeMultiplier = isWorkInterval ? 2.0 : 1.0;
         const durationWeight = interval.actual_duration_s || 1;
         const weight = durationWeight * typeMultiplier;
-        
+
         totalWeight += weight;
         weightedSum += (interval.power_adherence_percent || 0) * weight;
       }
