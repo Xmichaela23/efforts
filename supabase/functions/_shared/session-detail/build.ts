@@ -237,6 +237,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     for (const iv of ibList) {
       const lower = iv.planned_pace_range_lower ?? iv.planned_pace_range?.lower;
       const upper = iv.planned_pace_range_upper ?? iv.planned_pace_range?.upper;
+      // D-089: cycling interval_breakdown carries planned_power_range_lower/upper
+      // (watts). Mirror the pace-range derivation so rides surface "150-167 W"
+      // in the planned-label subtitle without a cycling-specific code path.
+      const pwLower = iv.planned_power_range_lower ?? iv.planned_power_range?.lower;
+      const pwUpper = iv.planned_power_range_upper ?? iv.planned_power_range?.upper;
       const sr = sessionRows.find((r: any) =>
         r.planned_step_id === iv.interval_id || r.row_id === iv.interval_id,
       ) ?? null;
@@ -248,6 +253,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         Number.isFinite(upper) &&
         Number(lower) > 0 &&
         Number(upper) > 0;
+      const hasPowerRange =
+        Number.isFinite(pwLower) &&
+        Number.isFinite(pwUpper) &&
+        Number(pwLower) > 0 &&
+        Number(pwUpper) > 0;
       const ivType = normIntervalType(iv?.interval_type || iv?.kind);
       intervals.push({
         id: String(iv?.interval_id || iv?.interval_number || intervals.length),
@@ -264,7 +274,13 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         ),
         planned_duration_s: fin(iv?.planned_duration_s),
         planned_pace_range: hasRange ? { lower_sec_per_mi: Number(lower), upper_sec_per_mi: Number(upper) } : undefined,
-        planned_pace_display: typeof sr?.planned_pace_display === 'string' ? sr.planned_pace_display : (hasRange ? fmtPaceRange(Number(lower), Number(upper)) : null),
+        planned_pace_display: (() => {
+          if (typeof sr?.planned_pace_display === 'string') return sr.planned_pace_display;
+          if (hasRange) return fmtPaceRange(Number(lower), Number(upper));
+          // D-089: cycling — use the power range as the planned subtitle.
+          if (hasPowerRange) return `${Math.round(Number(pwLower))}-${Math.round(Number(pwUpper))} W`;
+          return null;
+        })(),
         executed: {
           duration_s: fin(iv?.actual_duration_s) ?? fin(sr?.executed?.duration_s),
           distance_m: fin(iv?.actual_distance_m) ?? fin(sr?.executed?.distance_m),
@@ -273,9 +289,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           actual_gap_sec_per_mi: null,
           power_watts: fin(iv?.avg_power_watts) ?? null,
         },
+        // D-089: for cycling, fall back to power_adherence_percent so the
+        // adherence badge renders watts-vs-target on rides (client already
+        // colors pct via pctColor — sport-neutral).
         pace_adherence_pct: (() => {
           if (iv && iv.pace_adherence_percent === null) return null;
-          const fromIv = fin(iv?.pace_adherence_percent);
+          const fromIv = fin(iv?.pace_adherence_percent) ?? fin(iv?.power_adherence_percent);
           if (fromIv != null) return fromIv;
           return fin(sr?.adherence_pct);
         })(),

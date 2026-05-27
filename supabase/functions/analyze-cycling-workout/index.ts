@@ -919,6 +919,11 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
     return [];
   }
   
+  // D-089: number work/recovery per-type so labels render "Interval 1/2" / "Recovery 1/2"
+  // instead of the globally-indexed "Interval 2/3" the prior `index + 1` produced. Matches
+  // the running analyzer's per-type counter pattern (session-detail/build.ts:291-301).
+  let workCount = 0;
+  let recoveryCount = 0;
   return intervalsToAnalyze.map((interval, index) => {
     // Extract planned values
     const plannedDuration = interval.planned?.duration_s || interval.duration_s || 0;
@@ -978,9 +983,16 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
     else if (role.includes('cool')) intervalType = 'cooldown';
     else if (role.includes('recovery') || role.includes('rest')) intervalType = 'recovery';
     
+    // D-089: per-type numbering (work N / recovery N) for label rendering.
+    // Warmup and cooldown don't carry a number — humanize ignores it for those.
+    const intervalNumber = (() => {
+      if (intervalType === 'work') return ++workCount;
+      if (intervalType === 'recovery') return ++recoveryCount;
+      return index + 1;
+    })();
     return {
       interval_type: intervalType,
-      interval_number: index + 1,
+      interval_number: intervalNumber,
       interval_id: interval.planned_step_id || interval.id || `interval_${index}`,
       // Duration metrics
       planned_duration_s: plannedDuration,
@@ -991,6 +1003,11 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
       planned_power_range_upper: plannedPowerUpper,
       planned_power_w: plannedPowerCenter,
       actual_power_w: Math.round(actualPower),
+      // D-089: session_detail/build.ts:274 reads `iv.avg_power_watts` (run-aligned
+      // field name) to populate IntervalRow.executed.power_watts. Cycling's
+      // actual_power_w stays for in-analyzer consumers; the alias keeps the
+      // session_detail builder sport-agnostic without a cycling branch.
+      avg_power_watts: Math.round(actualPower),
       normalized_power_w: Math.round(normalizedPower),
       power_adherence_percent: Math.round(powerAdherence),
       // Combined adherence (0-1 scale for compatibility with client getEnhancedAdherence)
@@ -1946,8 +1963,16 @@ Deno.serve(async (req) => {
     }
 
     // Build granular analysis (matches running structure for client compatibility)
+    // D-089: wrap intervalBreakdown as { available, intervals } — the run-aligned
+    // shape every consumer expects (session_detail/build.ts:234, workout-detail/
+    // index.ts:1238, _shared/cycling-v1/ai-summary.ts:259, generate-training-
+    // context/index.ts:1669). Bare array silently missed all of them.
+    const wrappedIntervalBreakdown = {
+      available: Array.isArray(intervalBreakdown) && intervalBreakdown.length > 0,
+      intervals: Array.isArray(intervalBreakdown) ? intervalBreakdown : [],
+    };
     const granularAnalysis = {
-      interval_breakdown: intervalBreakdown,
+      interval_breakdown: wrappedIntervalBreakdown,
       power_variability: enhancedAnalysis.power_variability,
       heart_rate_analysis: hrAnalysis,
       time_in_range_s: enhancedAnalysis.time_in_range_s,
@@ -1965,7 +1990,7 @@ Deno.serve(async (req) => {
         normalized_power: normalizedPower,
         average_hr: hrAnalysis.available ? hrAnalysis.average_hr : 0
       },
-      interval_breakdown: intervalBreakdown, // Also include here for backwards compatibility
+      interval_breakdown: wrappedIntervalBreakdown, // Also include here for backwards compatibility (D-089 shape)
       heart_rate_analysis: hrAnalysis,
       power_variability: enhancedAnalysis.power_variability
     };
