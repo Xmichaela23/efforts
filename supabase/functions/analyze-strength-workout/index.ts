@@ -2225,75 +2225,48 @@ COACHING INSIGHT
   
   try {
     const { callLLM } = await import('../_shared/llm.ts');
+    // D-102: tighten from the prior 6-section structured output (6 headings +
+    // ~2000 tokens, the "rich but verbose" pattern called out in the audit) to
+    // a 3-4 sentence cap mirroring cycling D-093. The structured per-exercise
+    // breakdown still exists in `detailed_analysis.exercise_breakdown` for the
+    // client to render verbatim; the narrative is supposed to *interpret*, not
+    // re-list. Mode rule structure mirrors cycling STRUCTURED PLANNED MODE /
+    // CLEAN-EXECUTION CAP from D-092 / D-093.
     const content = await callLLM({
-      system: `You are a strength training analysis expert. Generate COMPREHENSIVE, STRUCTURED analysis with detailed sections. DO NOT provide a simple summary paragraph - provide full structured analysis.
+      system: `You write strength session summaries for experienced athletes. You receive pre-calculated facts and translate them into coaching prose.
 
-CRITICAL OUTPUT REQUIREMENTS:
-- Generate ALL sections below in structured format with clear headings
-- Use section dividers (════ or ───) to separate sections
-- Be extremely detailed and specific with numbers
-- Each exercise must have its own detailed breakdown
-- Include specific recommendations for each exercise
-- Reference historical progression data when available
-- Identify data quality issues explicitly
+RULES (HARD):
+- Output EXACTLY 3-4 sentences. No headers, no section dividers, no bullet lists, no all-caps section labels. Single paragraph.
+- S1 (LEDE): RIR + load adherence vs the prescribed target. When one exercise dominates the session story (a missed lift, a PR, a clear RIR break), cite it specifically. When adherence is uniform, summarize at the session level ("Hit every working set on target across squat, bench, and row at RIR 2"). Cite specific numbers (weight, reps, RIR) when they tell the story; otherwise summarize plainly.
+- S2: ONE physiological observation — RIR drift across the set (rising = fatigue), readiness/RPE alignment, or estimated-1RM trend. Pick one; do not list.
+- S3: ONE phase + endurance-load context clause — where the athlete is in the plan (base / build / peak / taper / recovery), cumulative-fatigue read in plain words, or the relationship to nearby endurance load. ONE clause; skip entirely if no notable signal.
+- S4: ONE forward-looking sentence — next-session target adjustment OR recovery cue. ONE.
 
-REQUIRED SECTIONS (generate ALL of these):
+HARD CUTS (D-093 pattern):
+- No "this kind of work is exactly what you need..." / "this is exactly what...".
+- No "monitor how you feel" / "listen to your body" generic advice.
+- No closing exhortations.
+- No re-listing of exercises that the dashboard rows below already show.
+- If S3 has no notable load signal worth saying, SKIP IT and ship 3 sentences. Brevity > completeness.
 
-1. EXECUTION SUMMARY
-   - Specific numbers: "Completed X of Y exercises (Z%)"
-   - "Completed X of Y sets (Z%)"
-   - Total volume with comparison to planned
-   - Session duration
-   - Overall execution score breakdown
-   - Session RPE (if provided) - include as supplementary context
+PLAIN LANGUAGE:
+- Never print %1RM, ACWR, TSS, or workload as a number. Translate to words ("near-threshold load" / "high cumulative fatigue" / "well-rested for this").
+- Never print absolute target_rir / actual_rir as labelled values (e.g. "target RIR 2 vs actual 1.5"). Translate ("a touch harder than the RIR 2 target" / "right on target").
+- RIR adherence verdict: rir_verdict in the packet maps to "too easy" / "on target" / "too hard". Use those words.
 
-2. EXERCISE-BY-EXERCISE BREAKDOWN
-   - For EACH exercise: Planned vs Actual (sets, reps, weight, RIR)
-   - Load adherence percentage
-   - RIR adherence and pattern (if shows 0-0-0, flag as FAILURE with safety warnings)
-   - Compare actual RIR to target RIR from plan (if provided)
-   - Performance score
-   - PLAN ALIGNMENT ASSESSMENT: Does performance match plan expectations? Reference phase, progression history, target RIR
-   - Specific assessment with recommendations CONTEXTUALIZED BY READINESS DATA AND PLAN CONTEXT
-   - NEXT SESSION (Per Plan): What's programmed for next week and why
-   - If exercise shows "added" but has planned data, correct this - it WAS planned
+ARC CONTEXT: temporal Arc context (days since/until a race; phase; recovery state) may appear only as a TRAILING clause, never the lede.
 
-3. PROGRESSIVE OVERLOAD TRACKING
-   - Last 3 sessions comparison for each main lift
-   - Volume progression percentages
-   - Estimated 1RM trends
-   - Specific recommendations (e.g., "Increase to X lb next session")
-
-4. FATIGUE & RECOVERY ANALYSIS
-   - RIR progression pattern for each exercise (e.g., "4→3→3→3")
-   - Assessment of fatigue management
-   - Recovery capacity indicators
-
-5. DATA QUALITY FLAGS
-   - Missing RIR data
-   - Incomplete entries
-   - Logging issues (e.g., time-based exercises logged as reps)
-   - Specific recommendations to fix
-
-6. COACHING INSIGHT
-   - PLAN ADHERENCE: How well session matched plan expectations
-   - Key observations per exercise WITH readiness context AND plan context
-   - Specific recommendations based on RIR, adherence, readiness data, AND plan progression
-   - Next session targets FROM PLAN (do not contradict programmed progression)
-   - Conditional guidance: If readiness is poor, how to adjust while staying aligned with plan
-   - Data quality improvement suggestions
-   - Note Session RPE if it significantly differs from objective metrics (RIR, load)
-   - CRITICAL: If RIR pattern shows 0-0-0 (failure), provide immediate safety recommendations
-   - CRITICAL: Contextualize ALL recommendations with readiness data AND plan phase
-   - CRITICAL: Reference what's coming next week in plan
-
-CRITICAL: Avoid contradictory statements. Be extremely specific with numbers.${arcNarrative ? arcModeSystemAddon(arcNarrative) : ''}`,
+PACKET (authoritative; do not compute outside it): facts come from the user message — phase, week_in_phase, plan_intent, avg_target_rir, avg_actual_rir, rir_delta, rir_verdict, total_volume_lb, exercises_completed/planned, set_completion_pct, session_rpe.${arcNarrative ? arcModeSystemAddon(arcNarrative) : ''}`,
       user: (arcNarrative
         ? 'TEMPORAL ARC CONTEXT (do not contradict; paraphrase for the athlete — these are facts for THIS workout date, not invented load):\n' +
           arcNarrativeFactBlock(arcNarrative) +
           '\n\n'
         : '') + context,
-      maxTokens: 2000,
+      // D-102: cap token budget tightened from 2000 (which the prior verbose
+      // prompt needed for 6 sections) to 240 — comfortably fits a clean 4-sentence
+      // paragraph + a few citations, hard-caps overflow. Match cycling D-093's
+      // 220-token cap pattern.
+      maxTokens: 240,
       temperature: 0.3,
       model: 'sonnet',
     }) ?? '';
@@ -2609,6 +2582,75 @@ Deno.serve(async (req) => {
       };
     });
 
+    // D-102: thin strength_fact_packet_v1 — mirrors the run / cycling fact packet
+    // pattern. Carries the smallest set of facts the INSIGHTS narrative needs to
+    // lead with execution + phase context + RIR delta. Endurance load context
+    // reserved-but-unwired in v1 (analyzer doesn't fetch athlete_snapshot today;
+    // wiring is a follow-up that doesn't block the prompt-cap refactor).
+    const strengthFactPacketV1 = (() => {
+      const rirEntries = (analysis.exercise_adherence || [])
+        .map((ea: any) => ({
+          target: typeof ea?.adherence?.target_rir === 'number' ? ea.adherence.target_rir : null,
+          actual: typeof ea?.adherence?.avg_rir === 'number' ? ea.adherence.avg_rir : null,
+        }))
+        .filter((e: { target: number | null; actual: number | null }) => e.target != null || e.actual != null);
+      const meanOrNull = (xs: number[]): number | null =>
+        xs.length === 0 ? null : Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10;
+      const avgTargetRir = meanOrNull(rirEntries.map((e: { target: number | null }) => e.target).filter((v: number | null): v is number => typeof v === 'number'));
+      const avgActualRir = meanOrNull(rirEntries.map((e: { actual: number | null }) => e.actual).filter((v: number | null): v is number => typeof v === 'number'));
+      const rirDelta = (avgActualRir != null && avgTargetRir != null)
+        ? Math.round((avgActualRir - avgTargetRir) * 10) / 10
+        : null;
+      const rirVerdict: 'too_easy' | 'on_target' | 'too_hard' | null =
+        rirDelta == null ? null
+          : rirDelta <= -1 ? 'too_hard'
+          : rirDelta >= 1 ? 'too_easy'
+          : 'on_target';
+      const phaseFacts = (() => {
+        const pm = (analysis as any).plan_metadata as EnhancedPlanContext | null;
+        if (!pm) return { phase: null, week_in_phase: null, plan_intent: null, plan_type: null };
+        return {
+          phase: pm.parsed_phase ?? pm.phase ?? null,
+          week_in_phase: typeof pm.parsed_week === 'number' ? pm.parsed_week : (typeof pm.week === 'number' ? pm.week : null),
+          plan_intent: pm.strength_type ?? null,
+          plan_type: pm.plan_type ?? null,
+        };
+      })();
+      const overall = (analysis as any).overall_adherence ?? {};
+      const volume = (analysis as any).volume_analysis ?? {};
+      return {
+        version: 1,
+        discipline: 'strength' as const,
+        generated_at: new Date().toISOString(),
+        facts: {
+          ...phaseFacts,
+          avg_target_rir: avgTargetRir,
+          avg_actual_rir: avgActualRir,
+          rir_delta: rirDelta,
+          rir_verdict: rirVerdict,
+          total_volume_lb: typeof volume?.total_volume === 'number' ? volume.total_volume : null,
+          exercises_completed: typeof overall?.exercises_executed === 'number' ? overall.exercises_executed : 0,
+          exercises_planned: typeof overall?.exercises_planned === 'number' ? overall.exercises_planned : 0,
+          set_completion_pct: typeof overall?.set_completion_rate === 'number' ? overall.set_completion_rate : null,
+          session_rpe: typeof (analysis as any)?.session_rpe?.rpe === 'number' ? (analysis as any).session_rpe.rpe : null,
+        },
+        // D-102: reserved for the future endurance-load wiring (fetch from
+        // athlete_snapshot.weekly_workload + last-long-day signals). Null in
+        // v1 — the prompt rule is tolerant; if facts.endurance_load_context
+        // is null the narrative skips that clause.
+        endurance_load_context: null,
+      };
+    })();
+
+    // D-102: lift narrative to top-level ai_summary. Pre-fix the LLM output
+    // lived only in workout_analysis.session_state_v1.narrative.text — cycling
+    // and run analyzers expose it at workout_analysis.ai_summary for client
+    // parity (used by the cached-summary path in workout-detail + the
+    // session_detail_v1 builder). This makes strength match.
+    const liftedAiSummary: string | null = Array.isArray(analysis.insights) && analysis.insights.length > 0
+      ? String(analysis.insights[0] || '').trim() || null
+      : null;
+
     const updatePayload = {
       workout_analysis: {
         performance: performance,
@@ -2616,7 +2658,14 @@ Deno.serve(async (req) => {
         strengths: [], // Extract from progression_data if needed
         session_state_v1: sessionStateV1,
         red_flags: [], // Extract from adherence if needed
-        strength_facts: { exercises: strengthFactsExercises }
+        strength_facts: { exercises: strengthFactsExercises },
+        // D-102: top-level ai_summary + fact packet (matches run/cycling parity).
+        ai_summary: liftedAiSummary,
+        ai_summary_generated_at: liftedAiSummary ? new Date().toISOString() : null,
+        strength_fact_packet_v1: strengthFactPacketV1,
+        // D-079 parity: cycling/run write recomputed_at so workout-detail's
+        // isSessionDetailStale check fires correctly after analyzer reruns.
+        recomputed_at: new Date().toISOString(),
       },
       analysis_status: 'complete',
       analyzed_at: new Date().toISOString()
