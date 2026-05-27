@@ -3271,8 +3271,49 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </div>
                         );
                       })()}
-                      {/* Spacer to push buttons right when fewer inputs are shown */}
-                      <div className="flex-1 min-w-4" />
+                      {/* D-096: "Same as set 1" carry-forward affordance — set 2+ only.
+                          Copies reps/weight/rir (+ resistance_level for bands, +
+                          duration_seconds for time-based) from set 1. One tap to skip
+                          three keypad cycles when the athlete is grinding identical
+                          working sets — the dominant strength-session pattern. */}
+                      <div className="flex-1 min-w-4 flex items-start justify-center pt-1.5">
+                        {setIndex > 0 && exercise.sets[0] && (() => {
+                          const set0 = exercise.sets[0];
+                          const isSame =
+                            set.reps === set0.reps &&
+                            set.weight === set0.weight &&
+                            set.rir === set0.rir &&
+                            set.duration_seconds === set0.duration_seconds &&
+                            set.resistance_level === set0.resistance_level;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updates: Partial<LoggedSet> = {
+                                  weight: set0.weight,
+                                  rir: set0.rir,
+                                };
+                                if (typeof set0.reps === 'number') updates.reps = set0.reps;
+                                if (typeof set0.duration_seconds === 'number') updates.duration_seconds = set0.duration_seconds;
+                                if (set0.resistance_level) updates.resistance_level = set0.resistance_level;
+                                if (set0.barType) updates.barType = set0.barType;
+                                updateSet(exercise.id, setIndex, updates);
+                              }}
+                              className={`text-[10px] px-2 py-1 rounded-md border transition-colors ${
+                                isSame
+                                  ? 'border-white/15 text-white/35 cursor-default'
+                                  : 'border-white/25 bg-white/[0.06] text-white/70 hover:bg-white/[0.12] hover:text-white/90'
+                              }`}
+                              title={isSame ? 'Already matches set 1' : 'Copy values from set 1'}
+                              aria-label="Copy values from set 1"
+                              disabled={isSame}
+                              style={{ fontFamily: 'Inter, sans-serif' }}
+                            >
+                              ↑ Same
+                            </button>
+                          );
+                        })()}
+                      </div>
                       <div className="flex flex-col items-center gap-0.5">
                         <button
                           onClick={() => handleSetComplete(exercise.id, setIndex)}
