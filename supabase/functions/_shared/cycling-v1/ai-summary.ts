@@ -268,21 +268,55 @@ function buildCyclingIntervalSummary(
     const s = Math.round(n % 60);
     return `${m}:${String(s).padStart(2, '0')}`;
   };
+  // D-092: surface enough per-interval data for the LLM to judge target-range
+  // adherence on STRUCTURED PLANNED MODE. Pre-fix the summary exposed only
+  // duration + HR (avg_power_w was a phantom key — cycling intervals carry
+  // `actual_power_w` / `avg_power_watts` per D-089, not `avg_power_w`), and
+  // there was no planned_power_range at all. The LLM could cite "Two 15-min
+  // efforts held steady HR" but had no signal for whether wattage hit the
+  // target. The new fields are sport-neutral aliases; the cycling field names
+  // (actual_power_w, planned_power_range_lower/upper, power_adherence_percent)
+  // are read first.
+  const readPowerW = (iv: any): number | null => {
+    const v = iv?.actual_power_w ?? iv?.avg_power_watts ?? iv?.avg_power_w;
+    return v != null && Number.isFinite(Number(v)) ? Math.round(Number(v)) : null;
+  };
+  const readPowerRange = (iv: any): { lower_w: number; upper_w: number } | null => {
+    const l = iv?.planned_power_range_lower ?? iv?.planned?.power_range?.lower;
+    const u = iv?.planned_power_range_upper ?? iv?.planned?.power_range?.upper;
+    const ln = Number(l), un = Number(u);
+    if (!Number.isFinite(ln) || !Number.isFinite(un) || ln <= 0 || un <= 0) return null;
+    return { lower_w: Math.round(ln), upper_w: Math.round(un) };
+  };
   return {
     structure: 'planned',
     completed_steps: work.filter((iv: any) => Number(iv?.actual_duration_s ?? 0) > 0).length,
     total_steps: work.length,
-    work_intervals: work.slice(0, 12).map((iv: any) => ({
-      n: iv?.interval_number ?? null,
-      planned_label: typeof iv?.planned_label === 'string' && iv.planned_label.trim() ? iv.planned_label : null,
-      avg_power_w: iv?.avg_power_w != null ? Math.round(Number(iv.avg_power_w)) : null,
-      np_w: iv?.np_w != null ? Math.round(Number(iv.np_w)) : null,
-      actual_dur: fmtDur(iv?.actual_duration_s),
-      hr_avg: iv?.avg_heart_rate_bpm ?? null,
-    })),
+    work_intervals: work.slice(0, 12).map((iv: any) => {
+      const actual = readPowerW(iv);
+      const range = readPowerRange(iv);
+      // Target-hit signal: D-089 stores power_adherence_percent (100 when in range,
+      // degraded as deviation grows). 95 % is the threshold used by the cycling
+      // analyzer's flag generator and the analysis_details narrative bands.
+      const adh = iv?.power_adherence_percent;
+      const inRange = (range != null && actual != null)
+        ? (actual >= range.lower_w && actual <= range.upper_w)
+        : null;
+      return {
+        n: iv?.interval_number ?? null,
+        planned_label: typeof iv?.planned_label === 'string' && iv.planned_label.trim() ? iv.planned_label : null,
+        planned_power_range_w: range,
+        avg_power_w: actual,
+        np_w: iv?.np_w != null ? Math.round(Number(iv.np_w)) : null,
+        actual_dur: fmtDur(iv?.actual_duration_s),
+        hr_avg: iv?.avg_heart_rate_bpm ?? null,
+        power_adherence_pct: (typeof adh === 'number' && Number.isFinite(adh)) ? Math.round(adh) : null,
+        in_target_range: inRange,
+      };
+    }),
     recovery_intervals: recovery.slice(0, 12).map((iv: any) => ({
-      n: iv?.recovery_number ?? null,
-      avg_power_w: iv?.avg_power_w != null ? Math.round(Number(iv.avg_power_w)) : null,
+      n: iv?.recovery_number ?? iv?.interval_number ?? null,
+      avg_power_w: readPowerW(iv),
       actual_dur: fmtDur(iv?.actual_duration_s),
       hr_avg: iv?.avg_heart_rate_bpm ?? null,
     })),
@@ -410,7 +444,12 @@ RULES:
 - CRITICAL: introduce NO numbers or percentages that are not in the packet verbatim. Translating IF/VI/decoupling/EF into words instead of numbers SATISFIES this — only normalized power, watts, and other packet figures should appear as numerals.
 - If there is no planned intent, describe the ride physiologically; do not invent a prescription.
 - If plan.week_number is present, anchor it in at most a short clause (e.g. "Week 3, build") — do not spend a sentence on plan position.
-- MIXED-EFFORT MODE (when packet has interval_summary and cross_workout is null): this ride was structured/variable — DO NOT compare whole-ride NP/IF to your endurance baseline. Interpret the per-interval work: which work intervals held the target wattage, whether the work tightened or faded across the set, recovery quality. Lead with the ride's intent (sweet-spot, threshold, VO2) paired with NP and a plain intensity read; cite specific work intervals from interval_summary.work_intervals. Recoveries are context, not the lede.
+- STRUCTURED PLANNED MODE (D-092) — fires when interval_summary is non-null AND plan_intent ∈ {sweet_spot, threshold, vo2, tempo, anaerobic, neuromuscular, race_prep}: this OVERRIDES the LEDE rule and the HARD CONSTRAINT above. The athlete chose a structured target session; the lede MUST be interval EXECUTION, not whole-ride NP/trend/PR/vs-similar. Required lede content:
+  • Target-range adherence: did the work intervals hit interval_summary.work_intervals[i].planned_power_range_w? Use in_target_range (true/false per interval) and power_adherence_pct (100 = bullseye, <90 = drift). Say it plainly: "held the 150-167 W target across both 15-min blocks" / "drifted under target on the second rep — 142 W vs 150-167 W band".
+  • Completion: cite interval_summary.completed_steps / total_steps when not equal ("completed 3 of 4 work blocks"), or omit when full completion.
+  • HR response across the set: compare interval_summary.work_intervals[0].hr_avg → ...[last].hr_avg. Was HR steady (cardiovascular control) or did it drift up (fatigue/effort cost)?
+  Whole-ride NP is ONE clause of physiological context AFTER the execution lede — never the opening signal. Recoveries are background, not lede. Do NOT lead with the trend, the vs-similar delta, or PR signals on a planned structured session — the athlete didn't ride for those, they rode for the target.
+- MIXED-EFFORT MODE (when packet has interval_summary and cross_workout is null): this ride was structured/variable — DO NOT compare whole-ride NP/IF to your endurance baseline. Interpret the per-interval work: which work intervals held the target wattage, whether the work tightened or faded across the set, recovery quality. Lead with the ride's intent (sweet-spot, threshold, VO2) paired with NP and a plain intensity read; cite specific work intervals from interval_summary.work_intervals. Recoveries are context, not the lede. (If STRUCTURED PLANNED MODE also fires, that rule's lede requirement wins.)
 - UNPLANNED MODE (when packet has is_unplanned: true): this ride had no linked plan. There was no prescribed power target. DO NOT scold the athlete for "missing a target" — there was no target. Do NOT invent a prescription from classified_type alone; classified_type is a descriptive label (the analyzer's read of what kind of ride this looked like), not a target the athlete chose. INTERPRET on the ride's own terms: lead with NP and a plain intensity read for the actual output, then explain what drove it (terrain via VAM / ascent, group dynamics suggested by VI, conditions). When cross_workout.vs_similar has sample_size ≥ 3 and a meaningful np_delta_w, that comparison IS legitimate (history, not prescription) — you may lead with it. The athlete just rode; describe what they did, don't grade what they "should" have done.
 - HARD BAN (D-076) — route / course / GPX language: DO NOT describe this ride as having an "unplanned route" or reference route planning in any form. The packet carries NO route, course, or GPX data — introducing route-planning concepts (planned route / unplanned route / route choice / mapped route / off-route / etc.) is fabrication. Describe terrain through the data that IS in the packet: VAM, total ascent, climbing signals, and the existing "climbing day" / "rolling day" / "flat day" terrain-class vocabulary. Never frame the ride as "the athlete didn't plan the route" — Efforts has no signal for that, and conflating is_unplanned (= no linked plan workout) with route planning is wrong on both counts.
 - POOL INTENSITY CONTEXT (D-073 mirror of D-038 run rule) — when cross_workout.vs_similar is present AND vs_similar.pool_power_context is populated, anchor any HR-delta interpretation against pool_power_context.intensity_match:

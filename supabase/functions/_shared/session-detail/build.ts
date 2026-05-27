@@ -1067,6 +1067,22 @@ export function pickCyclingTrendSeries(
   }
   const nptr = w?.np_trend_v1?.points;
   if (Array.isArray(nptr) && nptr.length >= 3) {
+    // D-092: suppress the mixed-type NP fallback on planned structured sessions
+    // (plan_intent ∈ sweet_spot/threshold/vo2/tempo/...). The user opened a
+    // sweet-spot ride; an aggregate NP trend across endurance + sweet-spot +
+    // recovery rides is not a meaningful comparison for "is the threshold work
+    // trending up?". Type-filtered pwr20 didn't have ≥3 points yet — better to
+    // show no TREND than a misleading one. Unplanned/non-structured rides still
+    // get the fallback because they have no intent for which the mixed series
+    // would be misleading.
+    const planIntent = w?.fact_packet_v1?.facts?.plan_intent;
+    const structuredIntents = new Set([
+      'sweet_spot', 'threshold', 'vo2', 'tempo',
+      'anaerobic', 'neuromuscular', 'race_prep',
+    ]);
+    if (typeof planIntent === 'string' && structuredIntents.has(planIntent)) {
+      return null;
+    }
     // Fallback: NP series is NOT type-filtered (mixed ride types) — no type word.
     return { points: nptr, metricLabel: 'Normalized power', noun: 'NP', rideType: null };
   }
