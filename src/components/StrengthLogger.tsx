@@ -418,6 +418,32 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [currentRIRSet, setCurrentRIRSet] = useState<number>(-1);
   const [selectedRIR, setSelectedRIR] = useState<number | null>(null);
 
+  // D-100: short tone at rest-timer expiry. Web Audio oscillator — no asset
+  // file needed. Mobile-friendly (works on iOS WKWebView when triggered from a
+  // user-initiated event chain; auto-fired here from the setInterval tick which
+  // is descended from the athlete's Done tap, so the audio context is unlocked).
+  const playRestEndTone = () => {
+    try {
+      const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880; // A5 — clean + audible without being shrill
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const t0 = ctx.currentTime;
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.18, t0 + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
+      osc.start(t0);
+      osc.stop(t0 + 0.30);
+      // Close the context after the tone finishes to free resources on iOS.
+      setTimeout(() => { try { ctx.close(); } catch {} }, 400);
+    } catch {}
+  };
+
   const startAutoRestForNextSet = (exerciseId: string, completedSetIndex: number) => {
     try {
       const ex = exercises.find((e) => e.id === exerciseId);
@@ -1962,8 +1988,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           if (t.running && t.seconds > 0) {
             const ns = t.seconds - 1;
             copy[k] = { ...t, seconds: ns };
-            if (ns === 0 && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-              try { (navigator as any).vibrate?.(50); } catch {}
+            if (ns === 0) {
+              // D-100: pair existing haptic with a short audible tone at rest-end.
+              if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                try { (navigator as any).vibrate?.(50); } catch {}
+              }
+              // Skip the tone for duration-timer keys (those mark a set-completion
+              // event, not a rest-end — audible cue would feel out of place).
+              if (!k.includes('-set-')) {
+                playRestEndTone();
+              }
             }
             
             // For duration timers (key format: `${exerciseId}-set-${setIndex}`), update the set's actual duration
@@ -2751,6 +2785,42 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
       {/* Header */}
       <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 pt-3 pb-3 mb-3 rounded-2xl relative shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]" style={{ zIndex: 1 }}>
+        {/* D-100: active rest-timer countdown. Picks the most-recently-armed
+            rest timer that's running and still has seconds remaining. Rest
+            keys are `${exerciseId}-${setIndex}` (no '-set-' separator —
+            those are duration timers, distinct namespace per the existing
+            tick handler). Tap × to dismiss; tone + haptic fire at zero. */}
+        {(() => {
+          const restEntries = Object.entries(timers)
+            .filter(([k, t]) => !k.includes('-set-') && t?.running && (t.seconds ?? 0) > 0);
+          if (restEntries.length === 0) return null;
+          // Prefer the shortest remaining time (the most "active" rest right now).
+          restEntries.sort(([, a], [, b]) => (a.seconds ?? 0) - (b.seconds ?? 0));
+          const [activeKey, activeTimer] = restEntries[0];
+          const total = activeTimer.seconds ?? 0;
+          const mm = Math.floor(total / 60);
+          const ss = total % 60;
+          const display = `${mm}:${String(ss).padStart(2, '0')}`;
+          return (
+            <div className="px-4 mb-2 flex items-center justify-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-200">
+                <span className="text-xs uppercase tracking-wide text-amber-300/70">Rest</span>
+                <span className="text-lg font-semibold tabular-nums leading-none">{display}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTimers((prev) => ({ ...prev, [activeKey]: { ...prev[activeKey], running: false } }));
+                  }}
+                  className="ml-1 h-6 w-6 rounded-full bg-white/[0.10] hover:bg-white/[0.18] text-amber-200/80 hover:text-white flex items-center justify-center text-xs"
+                  aria-label="Dismiss rest timer"
+                  title="Skip rest"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          );
+        })()}
         <div className="flex items-center justify-between w-full px-4">
           <h1 className="text-xl font-medium text-white/90">
             {(() => {
