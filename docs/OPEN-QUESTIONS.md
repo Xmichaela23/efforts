@@ -486,6 +486,17 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-033 — cycling AI summary uses terrain vocabulary for virtual/indoor rides
+
+- **Status:** deferred / low urgency
+- **What it is:** the cycling LLM prompt at `supabase/functions/_shared/cycling-v1/ai-summary.ts:403` literally instructs the model to translate moderate `variability_index` into the phrase `"natural power variation from the terrain"`. That phrasing is correct for outdoor rides (rollers, surges, climbs) but wrong for Zwift / smart-trainer / virtual rides — no real terrain, the variation comes from the trainer's interval changes or the virtual route's resistance profile.
+- **Where it surfaces:** any cycling workout with `provider_sport === 'VirtualRide'` or whose source is Zwift (the only current virtual provider in the system) and `1.05 < VI < 1.10`-ish. Observed on workout `f9fb690b` (today's sweet spot ride on Zwift, VI 1.09) — pre-D-091 the lede was *"147 W normalized power — sub-threshold effort with natural power variation from the terrain"*. After D-091 the lede correctly leads with sweet-spot intent, but the terrain phrase could still appear later in the paragraph.
+- **What the fix would look like:** swap the prompt's VI translation table to trainer-aware language when `workout.provider_sport === 'VirtualRide'` (or some equivalent virtual flag). Candidate phrasing: *"power variation from the interval structure"* (when `is_mixed_effort`), *"steady output across the trainer block"* (when low VI), *"surging power blocks"* (when high VI). Pass `is_virtual_ride: boolean` into the cycling display packet and add a parallel rule near the existing line 403.
+- **Why deferred:** D-091 already lands the bigger win (intent-led narratives instead of terrain-led ones). Once intent leads, the terrain phrase is at most a secondary sentence and the misread is minor. The D-076 HARD BAN on route/course/GPX language remains the more serious correctness rule; this is a cosmetic vocabulary swap, not a fabrication issue.
+- **Cross-ref:** D-076 (HARD BAN on route/course/GPX language), D-091 (plan_intent derivation from tags/tokens).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
