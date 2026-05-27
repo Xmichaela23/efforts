@@ -1657,6 +1657,676 @@ run is now "Sweet-Spot Run — 3 mi at moderate effort".
 
 ---
 
+## D-070 — Swim equipment chip "what this unlocks" tooltips
+
+**Date:** 2026-05-26
+**Files:** `src/components/TrainingBaselines.tsx`.
+
+Each swim equipment chip (Pool access, Open water access, Paddles, Pull buoy,
+Ankle band, Kickboard, Fins, Snorkel) gets a one-line `title`-attribute
+tooltip explaining what selecting it unlocks downstream in plan generation.
+Copy lifted from SWIM-PROTOCOL §6.6 + §8.4 surface mappings: Fins → drill
+sets; Paddles → CSS/threshold sets non-beginner only; Ankle band → pull+band
+beginner stability work; etc.
+
+Considered: a Popover/Tooltip React component with formatted multi-line
+content. Rejected — title-attribute is zero-JS, works on desktop hover,
+mobile-acceptable because chip labels are already self-descriptive. The
+tooltip is the marginal "I want one more line of context" surface, not the
+primary affordance.
+
+`ArcSetupWizard.tsx` checked — no swim equipment chips live there; copy
+lives solely in TrainingBaselines. Strength equipment chip tooltips
+deferred (separate scope).
+
+**Verification:** zero engine changes; visual inspection of TrainingBaselines
+chip hover.
+
+---
+
+## D-071 — Materialize-plan fallback when "% 1RM" string can't resolve to a weight
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/materialize-plan/index.ts` (new
+  `fallbackUnresolvedPercentDisplay` helper + wiring at both strength call
+  sites), `supabase/functions/materialize-plan/index.test.ts` (5 pin tests).
+
+Materialize-plan's strength resolution chain bailed silently when an
+athlete's `performance_numbers` lacked the relevant 1RM baseline. The
+strength object emitted with `weight: null` and `weight_display: undefined`,
+and the client UI fell back to displaying the raw `strength_exercises[].
+weight` string — `"65% 1RM (DB ≈ 70% barbell load)"` shown verbatim to
+athletes. The string is engine-internal grammar from the protocol dispatcher
+(triathlon_performance, minimum-dose, etc.), not athlete-facing copy.
+
+Item 1's 6-tier sweep surfaced this: all three performance × {full_barbell,
+dumbbell_based, bodyweight_bands} combos showed 35 `% 1RM` hits across 20
+strength sessions. All three durability combos were clean (durability uses
+bodyweight + band by spec, no `% 1RM` resolution needed).
+
+Fix: new `fallbackUnresolvedPercentDisplay(weight, reps)` helper returns an
+RIR-anchored coaching cue (`"Pick a weight you can do for 8 reps with 2 in
+reserve"`) when the resolution chain bails on a `% 1RM` input. Wired into
+both materialize-plan call sites (lines ~1697 and ~1859); fires only when
+`finalWeightDisplay` is still null, so numeric weights computed upstream are
+preserved.
+
+Considered: refusing to materialize the session and surfacing a wizard
+prompt to capture the missing 1RM. Rejected — too disruptive for athletes
+mid-plan, and the RIR cue is a real coaching primitive (Rate of Perceived
+Exertion at Reps In Reserve) athletes can act on without leaving the screen.
+The 1RM gap remains a wizard-side improvement (separate ticket).
+
+**Verification:** 5 pin tests in `index.test.ts` lock the contract:
+`% 1RM` with numeric reps → RIR cue; `% 1RM (DB ≈ 70% ...)` modifier still
+matches; `8-10` rep range picks the first integer; undefined reps →
+generic moderate cue; non-`%` inputs (Bodyweight, qualitative, numeric)
+return undefined so other branches own them. 17/17 materialize-plan tests
+pass.
+
+---
+
+## D-072 — Per-week trade-offs thread through the athlete-facing filter
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/generate-combined-plan/index.ts` (per-week
+  pipeline at lines 624-643), `supabase/functions/_shared/
+  plan-generation-trade-offs.test.ts` (4 pin tests).
+
+`filterAthleteFacingTradeOffs` was wired into the `generation_trade_offs`
+aggregator at `plan-generation-trade-offs.ts:241` but NOT into the per-week
+`week_trade_offs` pipeline in `generate-combined-plan/index.ts`. Result:
+internal optimizer telemetry leaked into the per-week display — "Strength:
+default Monday upper moved...", "Weekly load balance: moved quality_bike
+from Tuesday to Wednesday...", "Weekly layout: moved easy_bike..." — all
+surfaced to athletes as if they were tradeoffs. Anchor-reference messages
+("adjust pinned long or group-ride days...") also surfaced unconditionally,
+including on plans where the athlete pinned nothing — a false reference
+that asked athletes to adjust pins they never set.
+
+Fix: thread `week_trade_offs` through the same filter pipeline at
+`index.ts:624-643`. The athlete-pins boolean is derived from `state` via
+`hasAthletePinsFromPrefs` so anchor-reference messages survive when
+they're actionable and drop when they aren't. Weeks that filter to empty
+are dropped from the per-week dict (vs surfacing an empty list).
+
+Considered: a second filter strictness level for the per-week pipeline (more
+aggressive than the aggregator). Rejected — the leak class is identical;
+single filter wins on simplicity. The aggregator's existing pin-detection
+logic is reused intact via the `state` pass-through.
+
+**Verification:** 4 pin tests in `plan-generation-trade-offs.test.ts`
+(D-072 section): pure-internal-telemetry list filters to empty;
+real-constraint messages survive (swim freq reduced, strength moved by
+anchor rules, race-spec phase compressed); anchor-reference dropped when no
+pins; anchor-reference KEPT when athlete pinned anchors. 34/34 _shared
+trade-offs tests pass.
+
+---
+
+## D-073 — Cycling parity port: D-038 pool intensity filter + D-038/D-047 HR deltas
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/_shared/cycling-v1/cross-workout-queries.ts`
+  (filter constants + `isIfWithinTolerance` + `classifyCyclingPoolIntensity
+  Match` + extended `fetchCyclingVsSimilar`),
+  `supabase/functions/_shared/cycling-v1/cross-workout-types.ts`
+  (`CyclingPoolIntensityFilter`, `CyclingPoolPowerContext`, extended
+  `CyclingVsSimilarV1`), `supabase/functions/_shared/cycling-v1/
+  ai-summary.ts` (display surface + POOL INTENSITY CONTEXT prompt rule
+  mirror), `supabase/functions/_shared/fact-packet/queries.ts` (export
+  `getHrDriftBpmFromAnalysis`), `supabase/functions/analyze-cycling-workout/
+  index.ts` (thread `currentAvgHr` + `currentHrDriftBpm`).
+
+Cycling parity audit (2026-05-26) found four areas where the cycling
+analyzer was running circa pre-D-034 relative to the run analyzer. This
+ships Area 3 (pool intensity filter) and the Area 4 HR-delta slice — exact
+mirrors of the run-side D-038 / D-047 implementations. Decoupling,
+longitudinal trend, post-race flag, and the mixed-effort consequences were
+deferred per user direction ("mirror the D-038 run implementation exactly.
+Use the same field names, same fallback pattern, same prompt rule
+structure. Do not invent new approaches").
+
+Implementation: `POOL_IF_TOLERANCE_PCT = 15` and `POOL_INTENSITY_MATCH_PCT
+= 10` constants match the run side. `fetchCyclingVsSimilar` extended to
+collect all type+duration matches (instead of early-breaking at 3) so the
+IF filter has candidates to narrow; applies the filter with 3-hit fallback;
+computes HR + drift averages via the shared D-047 helpers; populates two
+new diagnostic / context fields. `CyclingPoolPowerContext` parallels the
+run's `pool_pace_context` with cycling-domain naming since pace and power
+are different metrics; same `matched` / `current_much_harder` /
+`current_much_easier` trichotomy. The POOL INTENSITY CONTEXT prompt rule
+composes with UNPLANNED MODE and MIXED-EFFORT MODE per the run analogue.
+
+Considered: shared cross-sport pool helpers in `_shared/`. Rejected for now
+— the parity port favours sport-specific mirrors so changes to one
+analyzer's pool semantics don't silently move the other. A consolidation
+pass is fair follow-up after both sides stabilize.
+
+**Verification:** rationale partially reconstructed from commit message —
+no per-workout end-to-end verification was logged. Cycling parity audit
+(per ENGINE-STATE) confirmed Area 3 / Area 4 shipped; downstream cycling
+LLM consumes the new fields per the prompt rule.
+
+---
+
+## D-074 — `plans.start_date` phantom column reverted; `environment` default no longer leaks to non-swim planned rows
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/generate-combined-plan/index.ts` (hoisted
+  `planStartDate` local — INSERT into `plans.start_date` reverted),
+  `supabase/functions/activate-plan/index.ts` (baseRow:540 gains
+  `environment: mapped === 'swim' ? 'pool' : null`).
+
+Two related cleanups surfaced by the May 23 ride attach audit. Initial
+investigation attempted to set `plans.start_date` via INSERT — PostgREST
+returned `PGRST204 schema error: column does not exist`. The canonical
+anchor for a plan's start lives at `plan.config.user_selected_start_date`;
+there is no top-level `start_date` column on `plans`. INSERT attempt
+reverted. The hoisted `planStartDate` local in `generate-combined-plan/
+index.ts` was kept (single source of truth for `plan_contract_v1.start_date`
++ `plan_config.user_selected_start_date`).
+
+Separately, `activate-plan/index.ts:540` baseRow construction did not set
+`environment`, so the swim-only `DEFAULT 'pool'` column was surfacing on
+ride / run / strength planned rows. Fixed by passing `environment: mapped
+=== 'swim' ? 'pool' : null`.
+
+Considered: adding a `start_date` column via migration. Rejected — the
+config field is already the canonical anchor; an additional column would
+duplicate state and risk drift.
+
+**Verification:** rationale partially reconstructed from commit body. The
+`activate-plan` change is unit-verifiable; the `plans.start_date` revert
+is a no-op fix (returning to known-good state).
+
+---
+
+## D-075 — `analyze-cycling-workout` planned_workouts SELECT used phantom column names; silent 42703 broke every linked cycling ride
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/analyze-cycling-workout/index.ts` (lines
+  ~1534-1539 + error capture).
+
+The SELECT statement listed `workout_type` and `workout_name` — columns
+don't exist on `planned_workouts`; the correct names are `type` and
+`name`. PostgREST returned `42703` silently because the destructure did
+not capture `error` and the code did not check it; `single()` returned
+null. Net effect: `plannedWorkout: null` for **every** linked cycling
+ride; `intervals = []`, performance null-fields, `_hasLinkedPlan = false`,
+and the cycling LLM ran UNPLANNED MODE for every planned ride.
+
+Fix mirrors the run-side pattern (`analyze-running-workout/index.ts:455-
+466`): SELECT only existing columns AND capture + check `plannedError`.
+After fix, the analyzer correctly reads the linked plan; downstream
+consumers (vs_similar pool, INSIGHTS narrative, adherence chips) all
+receive real plan data.
+
+Considered: adding generated-types check at build time. Deferred — broader
+infra work; the immediate fix is the SELECT + error check pattern. Run-
+side analyzer already follows the pattern; cycling now matches.
+
+**Verification:** May 23 ride (id `7679f3a8`): recompute post-fix produced
+non-null `plannedWorkout`, intervals populated, `_hasLinkedPlan: true`,
+LLM no longer in UNPLANNED MODE for this planned ride.
+
+**Footgun:** any new SELECT against `planned_workouts` MUST capture and
+check `error`. Service-role queries with phantom columns return null data
+silently; downstream null-or-undefined handling masks the failure. Two of
+the May 26 cascade's bugs were this exact class (the other is D-081).
+
+---
+
+## D-076 — HARD BAN on route / course / GPX language in cycling LLM prompt
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/_shared/cycling-v1/ai-summary.ts` (HARD BAN
+  rule appended after UNPLANNED MODE; "climbing route" seed word removed
+  from the SO-WHAT example at line 389).
+
+Cycling LLM was synthesizing the phrase `"unplanned route"` by combining
+`is_unplanned: true` with the prompt's "climbing route" example in the
+SO-WHAT rule. The packet carries NO route, course, or GPX data — Efforts
+has no signal for whether the athlete chose a route. Conflating
+`is_unplanned` (= no linked plan workout) with route planning is wrong on
+both counts.
+
+Two-part fix:
+- **A. HARD BAN rule** appended after the UNPLANNED MODE block. Rule text
+  explicitly forbids route-planning concepts in any form (planned route /
+  unplanned route / route choice / mapped route / off-route / etc.).
+  Describes terrain through data that IS in the packet: VAM, total ascent,
+  climbing signals, and the existing "climbing day" / "rolling day" /
+  "flat day" terrain-class vocabulary.
+- **B. Seed-word removal.** `"climbing route"` → `"climbing day"` in the
+  SO-WHAT example at line 389. The model was pattern-matching on the
+  example token; removing it eliminates the synthesis path even if rule A
+  were somehow skipped.
+
+Together: A blocks the synthesis path with a hard rule; B removes the
+substrate the synthesis was drawing on. Defense in depth.
+
+Considered: a deterministic validator that rejects responses containing
+"route" / "course" / "GPX". Deferred — the prompt edits should suffice
+for the dominant case; a validator can be added if regression-in-wild
+reveals leakage.
+
+**Verification:** 23/23 cycling-v1 ai-summary tests pass post-edit; no
+production-output regression on the May 23 ride.
+
+---
+
+## D-077 — Cycling FTP "Edit to override" tap handler + FTP-COLD-START-SPEC.md saved
+
+**Date:** 2026-05-26
+**Files:** `src/components/TrainingBaselines.tsx` (`ftpInputRef` +
+  `focusFtpInput` helper + `<button>` wrap), `docs/FTP-COLD-START-SPEC.md`
+  (new).
+
+**UI half (D-077).** `TrainingBaselines.tsx` cycling section's "Auto-learned
+N W ([Edit to override])" hint was a non-interactive `<span>`. Athletes
+read it as an instruction (the word "Edit" implies tappability) and tapped
+with no result. Fix: `ftpInputRef` + `focusFtpInput()` helper focuses and
+selects the FTP input on tap; "Edit to override" wrapped in a `<button>`
+calling the helper. The static "Manual" / "Manual (auto-learned improved
+to N W)" hints remain unchanged (display-only).
+
+**Docs half (FTP-COLD-START-SPEC.md, new).** Cold-start FTP seeding design:
+W/kg-by-tier midpoints × bodyweight × 0.90 discount, stored at
+`learned_fitness.ride_ftp_estimated` with `confidence: 'low'`, source
+`'wizard_estimated'`. Quality-gated consumers (race projections, fitness
+inference) still treat low-confidence estimates appropriately per the
+existing `resolveCurrentFtp` 3-tier precedence (learned≥medium → manual →
+learned-low → null). Spec doc preserved for future wizard FTP-seeding
+work; no code change yet.
+
+Considered: a Tooltip ("tap the input above to edit"). Rejected — the
+existing input is right next to the hint; a tooltip adds friction. The
+focus + select is the canonical iOS / mobile pattern.
+
+**Verification:** UI tap focuses the FTP input on the visible
+`TrainingBaselines` cycling section.
+
+---
+
+## D-078 — `recompute-workout` force-regenerates `ai_summary`; preservation fallback gated on `!forceRegenerate`
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/recompute-workout/index.ts` (passes
+  `force_regenerate_ai_summary: true`),
+  `supabase/functions/analyze-running-workout/index.ts` (reads body flag,
+  gates preservation), `supabase/functions/analyze-cycling-workout/index.ts`
+  (same).
+
+Audit of the May 23 ride after D-076 deployed found `ai_summary` STILL
+showing pre-D-076 narrative. The analyzer ran cleanly (deterministic fields
+refreshed) but the LLM call returned null and the existing preservation
+logic kicked in (`analyze-cycling-workout:2506` preserves the prior
+`ai_summary` on LLM failure). Preservation is correct default behavior for
+ingest-activity transient errors — but wrong for user-triggered recompute,
+where the athlete explicitly asked for fresh analysis after the prompt
+itself changed.
+
+Fix: `recompute-workout` passes `force_regenerate_ai_summary: true` in the
+analyzer invoke body; both analyzers read it and gate the preservation
+fallback on `!forceRegenerateAiSummary`. ingest-activity and compute-facts
+paths unchanged so transient sync-time LLM hiccups still preserve good
+narrative; user-triggered recompute forces fresh.
+
+Considered: making recompute always force-regenerate vs respecting an
+opt-out param. The opt-in shape is cleaner — recompute is the surface
+explicitly asking for fresh; everything else is auto-recompute via ingest
+where preservation is the right default.
+
+**Verification:** May 23 ride (id `7679f3a8`): direct call to recompute
+post-fix forced regeneration; the LLM still returned null on this specific
+packet (the next layer, D-079 / D-083, owned that root cause).
+
+---
+
+## D-079 — Cycling analyzer writes `recomputed_at` (run-side parity for cache-bust)
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/analyze-cycling-workout/index.ts` (one-line
+  add to the `workout_analysis` update block at line ~2611).
+
+The run analyzer at `analyze-running-workout/index.ts:2817` writes
+`workout_analysis.recomputed_at = new Date().toISOString()` on every
+analyzer run. The cycling analyzer didn't. `workout-detail`'s
+`isSessionDetailStale` check at line 112-116 reads `recomputed_at` to
+decide whether to rebuild `session_detail_v1`; without it, cached
+session_detail_v1 for cycling could persist past analyzer reruns until a
+secondary staleness signal tripped (`arc_performance.version` bump,
+`workouts.updated_at` advance, or the 24h timeout). Run-side parity gap
+independent of any single is_unplanned investigation.
+
+Fix: one-line add to the `workout_analysis` update block — `recomputed_at:
+new Date().toISOString()`.
+
+Considered: a cross-sport shared helper that wraps every analyzer's update
+block. Deferred — three call sites is too few to warrant the abstraction;
+this is the "delete the old, replace inline" pattern.
+
+**Verification:** May 23 ride: post-fix recompute produces fresh
+`recomputed_at`; next `workout-detail` invocation correctly rebuilds
+`session_detail_v1`.
+
+---
+
+## D-080 — Debug log in workout-detail for ledger-match resolution (instrumentation, since removed)
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/workout-detail/index.ts` (drop-in
+  `console.log` before `buildSessionDetailV1` call at line ~598; removed
+  in the D-081 commit after surfacing the data point).
+
+Drop-in instrumentation to pinpoint why `is_unplanned: true` was
+surfacing on a workout with a populated `planned_id`. Logged the resolved
+ledger match alongside `plannedRows.length`, `softMatchSource`, and the
+final `match?.planned_id`. Purpose: reveal whether the ledger fails to
+produce the match OR whether `softMatch` Pass 4 emits `unplanned session`
+because no planned rows reach the builder.
+
+Result: surfaced `ledger_day_planned_count: 0` for a workout whose
+`planned_id` was confirmed in `planned_workouts` — pinpointed D-081 (the
+SELECT itself was failing silently for all sports).
+
+Block removed in the D-081 commit; the log served its narrow diagnostic
+purpose and is not a permanent surface.
+
+Considered: keeping the log permanently behind a flag. Rejected — D-082
+established the durable diagnostic surface (`workout_analysis.
+ai_summary_debug` for LLM-call diagnostics). For ledger / SELECT debugging,
+the right answer is more SELECT-error capture (which D-075 / D-081 / D-088
+codified), not a permanent console log.
+
+**Verification:** the log itself was the verification surface.
+
+---
+
+## D-081 — `workout-detail` planned_workouts SELECTs used phantom column names; silent 42703 broke linked-plan detection for ALL sports
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/workout-detail/index.ts` (3 SELECT sites at
+  lines 360, 453, 492).
+
+Three SELECT statements in `workout-detail/index.ts` listed three phantom
+columns: `swim_unit`, `baselines_template`, `baselines`. None exist on
+`planned_workouts`. Same silent-42703 class as D-075. Affected EVERY sport
+— `plannedRows: []` → ledger saw zero planned rows → `softMatch` Pass 4
+emitted `unplanned session` for every actual workout → `session-detail/
+build.ts:650` `is_unplanned: !match?.planned_id` evaluated to `!null` =
+`true` for every linked workout. Downstream consumers in `session-detail/
+build.ts:1000-1007` reading `baselines_template` / `baselines` fields with
+optional chaining had been getting `undefined` for as long as the SELECT
+shape existed — swim baseline reads silently broken across the board.
+
+Fix: removed the three phantom columns. Reads degrade gracefully (already
+were) — the displayed swim-baseline-derived hints just stop populating from
+that source. The actual swim baselines live on `user_baselines.performance
+_numbers`, which the analyzer / display path reads separately.
+
+Considered: keeping the phantom names for "future compatibility" if those
+columns might be added. Rejected — speculative; PostgREST silently fails
+on phantom columns; better to fail loud (or in this case, correctly read
+nothing) than fail silent.
+
+**Verification:** May 23 ride: post-fix, `plannedRows` populates,
+`softMatch` returns the correct planned row, `is_unplanned: false`.
+Cross-sport: run / swim / strength workouts also stop mis-rendering as
+unplanned.
+
+**Footgun (cross-sport):** this single SELECT defect was the root of "every
+linked workout looks unplanned" across all four sports. Always capture
+`error` on PostgREST destructures; never trust silent nulls.
+
+---
+
+## D-082 — LLM diagnostics instrumentation (`callLLM` debug sink + `workout_analysis.ai_summary_debug` field)
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/_shared/llm.ts` (`callLLM` accepts optional
+  `debug` mutable object), `supabase/functions/_shared/cycling-v1/
+  ai-summary.ts` (`generateCyclingAISummaryV1` threads `debug`; per-attempt
+  diagnostics + validator outcomes), `supabase/functions/analyze-cycling-
+  workout/index.ts` (writes captured diagnostics to `workout_analysis.
+  ai_summary_debug`).
+
+The LLM-call surface was a black box from the REST side — every cycling
+LLM call returned null with no visibility into whether the API call was
+even made, whether the response was empty, whether the validator rejected
+it, etc. Without dashboard log access, diagnosing dormant exceptions in
+the analyzer's try/catch required hand-instrumentation per investigation.
+
+Fix: a debug-object pattern. `callLLM` accepts an optional mutable `debug`
+object and populates it in-place with `has_api_key`, `http_status`,
+`http_ok`, `error_message`, `response_chars`, `response_excerpt`,
+`stop_reason`, etc. `generateCyclingAISummaryV1` accepts its own `debug`
+sink and adds per-attempt diagnostics (model, max_tokens, normalized_chars)
++ validator outcomes (`attempt_N_validator: { ok, jargon, lede_arc, bad_
+numbers }`). `analyze-cycling-workout` writes the captured diagnostics to
+`workout_analysis.ai_summary_debug` for REST-side visibility.
+
+Result: D-083's `ReferenceError` was found within 30 seconds of D-082
+shipping. The instrumentation revealed `outcome: 'attempt_exception'` with
+`exception: 'isUnplanned is not defined'` — exactly the dormant exception
+class the analyzer's try/catch was swallowing.
+
+Considered: removing the instrumentation after D-083 closed. Decided to
+keep it — the cost is one JSONB field per row, and the next dormant
+exception will be cheaper to diagnose. Removable in future cleanup once
+the LLM call surface stabilizes.
+
+Considered: structured logging to a separate observability table.
+Deferred — the JSONB-on-workout pattern is queryable via REST, the
+existing surface most callers already have, and doesn't introduce new
+tables.
+
+**Verification:** D-083 found within 30 seconds. Instrumentation continues
+to provide the surface for future dormant-exception hunts.
+
+**Footgun:** any reference to a variable defined inside a nested function's
+scope from the outer scope WILL throw `ReferenceError` and be swallowed
+by the analyzer's try/catch. The D-082 instrumentation is the existing
+diagnostic surface for this class — KEEP IT until the next dormant
+exception lands.
+
+---
+
+## D-083 — `isUnplanned` ReferenceError silently killing every cycling LLM call since D-046
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/_shared/cycling-v1/ai-summary.ts` (two-line
+  fix at the top of `generateCyclingAISummaryV1`).
+
+`_shared/cycling-v1/ai-summary.ts:426` referenced `isUnplanned` from
+`generateCyclingAISummaryV1`'s outer scope — but `isUnplanned` was only
+defined inside `toDisplayPacket`'s scope. Every cycling LLM call since
+D-046 shipped (2026-05-25) threw `ReferenceError: isUnplanned is not
+defined`. The analyzer's try/catch swallowed the exception, set
+`ai_summary` to null, and the preservation fallback re-served pre-D-046
+narrative on every recompute. **The cycling LLM was never actually being
+contacted for ~24 hours**, and no one noticed because the displayed
+narrative looked plausible (it was the pre-D-046 cached text).
+
+Fix: two-line add at the top of `generateCyclingAISummaryV1`:
+```typescript
+// D-083: `isUnplanned` is defined inside toDisplayPacket's scope, NOT here.
+const isUnplanned = unplannedGate?.isUnplanned === true;
+```
+
+Considered: removing the outer-scope reference entirely and threading
+`isUnplanned` through a parameter. Deferred — the inline fix preserves the
+existing call shape; D-046's backward-anchor addon needs the value at the
+outer-scope `systemPrompt` construction.
+
+**Verification:** D-082 instrumentation showed `outcome: 'attempt_excep
+tion'` pre-fix, `outcome: 'attempt_1_accepted'` post-fix. May 23 ride's
+ai_summary regenerated fresh.
+
+**Footgun (general):** Deno's lexical scoping is sharp; a variable defined
+inside a nested function (`toDisplayPacket` is a function expression
+declared inside `generateCyclingAISummaryV1`) is NOT visible in the outer
+function's later statements. Linting (`noImplicitAny: false` plus
+`@ts-nocheck` on this file family) won't catch the reference. The
+analyzer's try/catch swallows the runtime error. Three layers of silence.
+
+---
+
+## D-084 — "unknown effort" classifier leak + Duration chip absolute time
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/_shared/cycling-v1/build.ts` (normalizePlan
+  Intent + classifier short-circuit guard), `src/components/AdherenceChips.
+  tsx` (`fmtDurAbs` helper + Duration chip).
+
+Two Performance-tab cosmetic issues, both made visible by D-075 / D-081 /
+D-083 (now reaching the UI with real data):
+
+1. **`normalizePlanIntent('ride')` returned the literal `'unknown'`** for
+   discipline-only types ('bike' / 'ride' / 'cycling'). `planIntent ||
+   fallbackClassifyIntent(...)` short-circuited because `'unknown'` is a
+   truthy string → classifier never ran → POWER row read "unknown effort".
+   Fix: return null for discipline-only types at `normalizePlanIntent`
+   (so the fallback fires) + defense-in-depth `'unknown'`-aware guard at
+   line 215 (`planIntent && planIntent !== 'unknown' ? planIntent : null`).
+2. **Duration chip secondary line was a +/- delta** (`+3:00`) from plan.
+   The adherence % above already conveyed "how close to plan"; the delta
+   was confusing in absolute terms (a +3:00 on a 5-hour ride reads
+   different from +3:00 on a 30-minute ride, but both render identically).
+   Switched the secondary line to absolute completed duration via new
+   `fmtDurAbs(s)` helper (H:MM:SS when ≥1h, else M:SS).
+
+Considered: making `'unknown'` a sentinel that explicitly fails the
+short-circuit (single test). Implemented BOTH the `normalizePlanIntent`
+return-null change AND the defense-in-depth guard — the two layers protect
+against future paths that might re-introduce `'unknown'` for any reason.
+
+**Verification:** May 23 ride post-fix: POWER row renders "threshold effort"
+(now "sweet spot effort" post-D-091); Duration chip shows `2:03:00`
+absolute instead of `+3:00` delta.
+
+---
+
+## D-085 — `compute-workout-analysis` reads FTP via `resolveCurrentFtp` (was bypassing the 3-tier precedence)
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/compute-workout-analysis/index.ts` (line
+  ~921; import + use `resolveCurrentFtp`).
+
+`compute-workout-analysis/index.ts:921` was reading FTP only from
+`performance_numbers.ftp` (manual entry), ignoring `learned_fitness.
+ride_ftp_estimated`. The shared `resolveCurrentFtp` helper (`src/lib/
+resolve-current-ftp.ts`) — used by `send-workout-to-garmin`,
+`calculate-workload`, `compute-facts`, `materialize-plan`,
+`athlete-snapshot`, `infer-training-fitness` — was bypassed here. Athletes
+with no manual entry but a high-confidence learned FTP had their entire
+ride history's `intensity_factor` / `computeRideTss` / **power-zone bins**
+(line ~1568 falls back to hardcoded `200 W`) computed against 200W instead
+of their actual learned threshold.
+
+Fix: import + use `resolveCurrentFtp` like every other consumer. Precedence
+preserved: learned ≥ medium confidence → manual → learned low → null.
+
+Considered: keeping the manual-only read for backward compatibility.
+Rejected — the manual-only read was the bug; every other consumer in the
+codebase already uses `resolveCurrentFtp`, so this was the lone outlier.
+
+**Verification:** May 23 ride: `compute-workout-analysis` HTTP 200,
+`intensity_factor` populated from learned FTP (athlete has no manual
+entry). Backfill not required — the analyzer re-derives on each compute.
+
+---
+
+## D-086 — Group ride anchor false `'wednesday'` fallback removed; optimizer picks best matrix-clean day
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/generate-combined-plan/reconcile-athlete-
+  state-week-optimizer.ts` (line ~82).
+
+`reconcile-athlete-state-week-optimizer.ts:82` returned `{ day:
+'wednesday', intensity: 'quality' }` when `bike_quality_day` was null but
+group-ride signals existed (route URL, duration estimate, or
+"group/hammer/club" label keyword). Main wizard flow (`ArcSetupWizard.tsx:
+601-603` writes `state.groupRideDay → preferredDays.quality_bike →
+AthleteState.bike_quality_day`) was always correct for any day; the
+fallback fired only on edge cases where group-ride signals existed but the
+day didn't make it into `bike_quality_day` — producing a false Wednesday
+anchor regardless of actual ride day.
+
+Fix: return `undefined`; let the optimizer's `quality_bike` placement loop
+pick the best matrix-clean weekday.
+
+Considered: persisting the inferred day from the group-ride signals
+themselves (e.g., parse "Sunday group ride" from a label). Rejected —
+the parsing surface is too brittle; the wizard already captures the day
+explicitly, and the edge case is rare. Returning undefined and trusting
+the optimizer's placement is the conservative, low-blast-radius fix.
+
+**Verification:** main wizard flow regenerates a plan with any
+athlete-selected group ride day; engine respects it.
+
+---
+
+## D-087 — `scaledWeeklyTSS` validator parity: reads `endurance_hours`, not declared hours
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/generate-combined-plan/index.ts` (validator
+  hours wiring at line ~458 + new local `validatorHours`).
+
+The week-builder (`week-builder.ts:734-736`) and `plan_contract_v1.weekly_
+tss_target` (`index.ts:601`) already used `endurance_hours ?? weekly_hours_
+available` per D-021 / Q-005. The plan validator at `validator.ts:73
+checkTSSWithinBudget` received `state.weekly_hours_available` (declared) at
+`index.ts:458` — its TSS target was **inflated** relative to the actual
+week-builder budget. The validator's `if (w.total_raw_tss > target * 1.15)
+return false` check effectively had a slack ceiling for hybrid athletes;
+weeks that should have tripped silently passed.
+
+Fix: thread `validatorHours = scheduleState.session_frequency_defaults?.
+endurance_hours ?? state.weekly_hours_available` and pass to `validatePlan`.
+Mirrors the existing pattern at both other call sites.
+
+Considered: re-deriving the canonical hours inside `validatePlan` instead
+of plumbing through the call site. Rejected — the validator is intentionally
+data-in / verdict-out; threading the canonical value at the call site keeps
+the validator pure.
+
+**Verification:** NO_CACHE=1 matrix 486/486 pass post-batch. Week-builder
+TSS target now matches validator TSS target for all three consumers.
+
+---
+
+## D-088 — `materialize-plan` phantom column reads in swim pace lookup (same class as D-081)
+
+**Date:** 2026-05-26
+**Files:** `supabase/functions/materialize-plan/index.ts` (lines 2270 /
+  2277).
+
+Two lines in the swim pace lookup read `(row as any)?.baselines_template?.
+swim_pace_per_100_sec` and `(row as any)?.baselines?.swimPace100` — both
+columns don't exist on `planned_workouts` (same class as D-081). The reads
+returned `undefined` silently; the working path via `user_baselines.
+performance_numbers.swimPace100` was unaffected (the actual swim baseline
+flow runs through `user_baselines`, not `planned_workouts`).
+
+Fix: removed the dead phantom-column tertiary fallbacks. Code now honest
+about what it reads:
+```typescript
+const numPace = baselines?.swim_pace_per_100_sec;
+const strPace = (baselines as any)?.swimPace100;
+```
+
+Considered: leaving the dead reads as "defensive" code. Rejected — they
+were silently false; the working path is the primary path and the dead
+fallbacks just added phantom-column references that lint / refactor
+tools could trip over.
+
+**Verification:** NO_CACHE=1 matrix 486/486 pass post-fix. Swim pace flow
+unchanged (always was reading from `user_baselines`).
+
+---
+
 ## D-089 — Cycling analyzer interval_breakdown wraps as { available, intervals } to match the run-aligned shape every consumer expects
 
 **Date:** 2026-05-27

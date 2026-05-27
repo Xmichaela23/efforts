@@ -313,7 +313,65 @@ Fall back to RPE / HR labels in copy ("conversational", "comfortably hard", "har
 
 ---
 
-## 8. Surface / environment
+## 8. Cadence
+
+> **Status — GAP.** The targets in this section are the canonical reference, but they are **not currently prescribed by the engine**. Today's cycling sessions describe duration / power / RPE without cadence cues; the LLM narrative does not receive cadence context; the per-interval step targets in `materialize-plan` carry no cadence field. The existing scattered cadence mentions in §5.1 (Long Ride: "60-70 rpm in base, 70-85 in build/RS") and §5.9 (Recovery: "cadence 75-85") **contradict the canonical table below** and should be reconciled against it when the implementation gap is closed. See §8.4 for the implementation surfaces that need to read this section.
+
+### 8.1 Cadence by session type (canonical reference)
+
+Cadence is a *separate physiological dimension* from power: a 220 W effort at 70 rpm trains muscular strength + force-per-pedal-stroke; the same 220 W at 100 rpm trains neuromuscular coordination + cardiovascular cost. Training-stress accounting is power-based, but the adaptation differs. The protocol's cadence targets aim each session type at the *intended* physiological adaptation, not just the wattage band.
+
+| Session type | Cadence (rpm) | Why this range |
+|---|---|---|
+| Recovery | 80-90 | Higher cadence at very-easy wattage = blood flow + neural priming without muscular load. Sub-80 rpm at recovery wattage adds avoidable muscular cost. |
+| Endurance / Z2 (long ride, easy ride) | 85-95 | Aerobic-base cadence; matches steady fat-oxidation work and prepares the neuromuscular system for race cadence. |
+| Sweet Spot (88-94% FTP, Z3-Z4 boundary) | 85-95 | Same as endurance — the *aerobic* adaptation is the target; sub-aerobic cadences would shift the stimulus toward muscular strength (not the goal at sweet spot). |
+| Threshold (Z4, 100% FTP) | 88-95 | Slightly higher floor than sweet spot — at threshold the cost of low-cadence grinding scales fast (knee strain, premature glycogen depletion). |
+| VO2max (Z5, 110-120% FTP) | 95-110 | High cadence supports the neural-recruitment + cardiovascular-ceiling stimulus VO2 work is designed for. Low-cadence VO2 efforts are essentially muscular intervals (different adaptation). |
+| Neuromuscular / openers fast-pedal bursts | 110-130 | The point IS the cadence — explosive neural firing, light gear. Wattage is incidental (effort-based, per §7.3). |
+| Race cadence (70.3) | 82-88 | The race target. See §8.2 for the tri-specific trade-off rationale. |
+
+The bands are 3-tier coaching consensus (Carmichael CTS, Friel Triathlete's Training Bible, FasCat cycling-coaching framework). Endurance / sweet spot / threshold cluster in the 85-95 band because they share the same fundamental adaptation goal — *aerobic stress with neural cadence at race-relevant frequencies*; VO2 and neuromuscular lift above; race-day sits slightly below to conserve legs.
+
+### 8.2 Race cadence vs training cadence — the triathlon-specific trade-off
+
+For pure cyclists, higher cadence (~95 rpm) is the consensus race-day pick: lower per-stroke muscular cost spread across more strokes per minute reduces local fatigue. **For triathletes, race cadence is slightly lower (~82-88 rpm)** because the run-off the bike is the dominant fatigue cost. Higher cadence on the bike leaves the cardiovascular system more taxed (more strokes = more total mechanical work for the heart-lung system); lower cadence shifts some load back to the legs (which the athlete is about to dismount), preserving cardiovascular headroom for the run.
+
+The trade-off: **train at higher cadence (85-95) for cardiovascular efficiency adaptation, then race at lower cadence (82-88) to save the cardiovascular bank for the run**. Athletes who train and race at the same cadence miss the buffer effect.
+
+This is the rationale for the gap between §8.1's training cadence bands (85-95) and the race row (82-88). Both are correct for their context.
+
+### 8.3 Cadence-drill session type (proposed — does not yet exist)
+
+> **Status — does not exist in the engine.** Today there is no dedicated cadence-drill session helper. This is a NEW session type proposed alongside the cadence-prescription gap.
+
+**Purpose:** deliberate low-cadence muscular-strength training on the bike. Develops force-per-pedal-stroke and bike-specific muscular endurance separately from the gym strength work.
+
+**Structure:** WU 15 min at endurance cadence → 4-6 × 5 min at **50-70 rpm** in a hard gear, holding Z3 (sweet-spot wattage) with 3 min easy spin recovery → CD 10 min easy. Total ~60-75 min. Emphasize smooth power application across the entire pedal stroke; no mashing.
+
+**Phase use:** Base and early build, 1× every 7-10 days when prescribed. **NOT** in race-specific or taper phases (the muscular cost competes with race-pace adaptation).
+
+**Engine (proposed):** `cadenceDrillBike(day, reps, minEach, goalId)` in `session-factory.ts`, analogous to `tempoBike` / `sweetSpotBike`. Token namespace `bike_cadence_drill_*` (e.g. `bike_cadence_drill_5x5min_r3min`). Intent tag `cadence_drill`. plan_intent derivation in `derivePlanIntentCycling` (D-091) adds `cadence_drill` to the recognized canonical tags and `bike_cadence_drill_*` to the token prefix table.
+
+**Coaching cue (for descriptions):** "Pick a gear that forces 55-65 rpm at sweet-spot power. Drive through the bottom of the stroke; no mashing. If you can spin above 70, the gear is too easy."
+
+### 8.4 Implementation gap — where these targets need to land
+
+Today's cycling pipeline carries no cadence prescription past the inline mentions in §5.1 and §5.9 (which themselves contradict §8.1 above). To close the gap, cadence targets need to reach three surfaces:
+
+1. **Session descriptions** (`session-factory.ts` — all of `longRide` / `easyBike` / `tempoBike` / `sweetSpotBike` / `thresholdBike` / `vo2Bike` / `bikeOpeners` / `recoveryBike` etc.). Each session's description string should include a `Cadence: NN-NN rpm` clause. The §8.1 table is the authoritative source.
+
+2. **Interval step targets** (`materialize-plan/index.ts` — the token-expansion path that turns `bike_ss_2x15min_r5min` into per-step structured output). Each work step should carry a `cadence_rpm: { min, max }` field on the structured intervals JSONB. Garmin export then surfaces it as a per-step target on the bike computer; the Performance tab can validate it post-ride against the `computed.intervals[i].avg_cadence_spm` value the analyzer already collects.
+
+3. **LLM prompt context** (`_shared/cycling-v1/ai-summary.ts`). The display packet should expose `planned_cadence_rpm: { min, max }` per work interval AND `actual_cadence_rpm` (the analyzer already reads it). The STRUCTURED PLANNED MODE prompt rule (D-092) should add cadence-adherence to the lede option list ("held the 150-167 W target at 88-92 rpm — within the cadence band"). Cadence drift across the set is also a fatigue signal worth surfacing (drift down = muscular fatigue setting in; drift up = athlete spinning out the gear / fading effort).
+
+The analyzer already records per-interval `avg_cadence_spm` in `computed.intervals[]` and per-lap `avg_cadence_spm` in `computed.raw_laps[]`. The data side is in place; the prescription side is the gap.
+
+**Tracked as a punch-list item:** see POLISH-PUNCH-LIST §6 "Cycling Analyzer Display" → "Open" section.
+
+---
+
+## 9. Surface / environment
 
 - **Default:** outdoor road. Wattage targets assume outdoor power (drivetrain efficiency factor ~0.98).
 - **Indoor / smart trainer:** wattage is direct (no drivetrain loss). For ERG-mode trainers, hold prescribed wattage exactly. For non-ERG trainers (resistance-based / virtual rides), use perceived effort + cadence matched to the prescription.
@@ -325,9 +383,9 @@ No equipment tiers parallel to swim's pool gear inventory — cycling is gear-un
 
 ---
 
-## 9. Race week protocol
+## 10. Race week protocol
 
-### 9.1 A-race week
+### 10.1 A-race week
 
 Per `RACE-WEEK-PROTOCOL.md §8`:
 
@@ -338,7 +396,7 @@ Per `RACE-WEEK-PROTOCOL.md §8`:
 
 **Known footgun (deferred):** `bikeOpeners` over-broad `phase==='taper'` gate (`week-builder.ts:~1298`) fires every taper week, not just the race week. Same class as the swim activation Gap-6 fix landed in race-week Phase 4. Out of cycling-arc Phase 0 scope; documented in ENGINE-STATE Known Broken and POLISH-PUNCH-LIST.
 
-### 9.2 Post-race recovery week
+### 10.2 Post-race recovery week
 
 - 0 quality rides (no sweet spot / threshold / VO2).
 - Long ride 0 (`longRideFloorHours('70.3','recovery')` → 0).
@@ -347,16 +405,16 @@ Per `RACE-WEEK-PROTOCOL.md §8`:
 
 ---
 
-## 10. Implementation pointers + research references
+## 11. Implementation pointers + research references
 
-### 10.1 Files that need to read this spec
+### 11.1 Files that need to read this spec
 
 - `supabase/functions/generate-combined-plan/science.ts` — `longRideFloorHours`, `expectedBikeDurationHours` (Phase 1: add `longRideHoursForWeek` lerp helper + `LONG_RIDE_RAMP_ENDPOINTS` table mirroring the run arc).
 - `supabase/functions/generate-combined-plan/session-factory.ts` — `longRide`, `easyBike`, `sweetSpotBike`, `thresholdBike`, `vo2Bike`, `tempoBike`, `groupRideSession`, `groupRideQualityBikeSession`, `bikeOpeners`, `brick` (Phase 1: thread `weekInPhase` through `vo2Bike` and `thresholdBike` for rep ramps; thread `weekInPhase` through `longRide` indirectly via the new `longRideHoursForWeek` helper).
 - `supabase/functions/generate-combined-plan/week-builder.ts` — `weekInPhaseForTimeline` call sites (Phase 1: 1-2 new threading sites for the long-ride + interval rep ramps).
 - `supabase/functions/generate-combined-plan/validate-training-floors.ts` — `maxLongRideMinutes` brick-bike accounting (already correct — bike-leg only; comment updated 2026-05-21 per RUN-PROTOCOL §5.7 / D-023).
 
-### 10.2 What changes from current behavior (in future phases)
+### 11.2 What changes from current behavior (in future phases)
 
 | Surface | Today | Spec'd (this arc) |
 |---|---|---|
@@ -365,10 +423,10 @@ Per `RACE-WEEK-PROTOCOL.md §8`:
 | Threshold reps | Hardcoded 3 × 20 min every build week | 2 → 4 ramp (proposed; Phase 1) |
 | Sweet spot reps | Hardcoded 2 × 15 min in base; 3 × 12 in build | Per-phase progressive ramp (Phase 1) |
 | Race-spec brick bike race-pace blocks | Not surfaced explicitly | §4.3 race-pace last 30-45 min (Phase 2 spec slice) |
-| `bikeOpeners` race-week-only gating | Over-broad taper gate | Scoped to race week only (parallel to swim Gap-6; deferred — see §9.1 footgun) |
+| `bikeOpeners` race-week-only gating | Over-broad taper gate | Scoped to race week only (parallel to swim Gap-6; deferred — see §10.1 footgun) |
 | `limiter_sport='bike'` intensity dial | Only +7% TSS allocation | **Deferred — separate arc phase** (architectural-decision blocker, parallel to run Phase 4) |
 
-### 10.3 Same pattern as swim arc + run arc
+### 11.3 Same pattern as swim arc + run arc
 
 This arc consciously mirrors the swim arc (`c1c94cec` / `ef91c2ee` / `e723d246` / `95b94aba` / `f53bbf34`) and the run arc (`50921629` / `60c23de2` / D-023 commits):
 
@@ -377,12 +435,12 @@ This arc consciously mirrors the swim arc (`c1c94cec` / `ef91c2ee` / `e723d246` 
 - **Two-peak-source rule:** the ramp source (`longRideHoursForWeek`, future) and the legacy peak-of-phase source (`longRideFloorHours`) move in lockstep. Phase 1 preserves both; future peak lifts (if any) update both together.
 - **Slice 0 ratifies the spec; Slice 1 ships the engine wiring;** subsequent slices fill the per-session rep ramps + the race-pace-brick refinement.
 
-### 10.4 Phased implementation plan
+### 11.4 Phased implementation plan
 
 - **Phase 0** — this spec + close-out D-NNN at draft acceptance. **Gated; current.**
 - **Phase 1** — `weekInPhaseForTimeline` wiring through a new `longRideHoursForWeek` helper + rep ramps for `vo2Bike` / `thresholdBike` / `sweetSpotBike`. Band-as-envelope lerp for long-ride within-phase ramp. Regression test `bike-volume-ramp.test.ts` parallel to `swim-volume-ramp.test.ts` / `run-volume-ramp.test.ts`.
 - **Phase 2** — Race-spec brick bike race-pace block formalization (currently the brick run drives the race-pace stimulus; clarifying the bike-side closing block is a spec + copy slice).
-- **Phase 3** — `bikeOpeners` race-week-only gating (closes the §9.1 footgun; parallel to swim Gap-6 / activation-swim race-week scoping shipped in race-week Phase 4).
+- **Phase 3** — `bikeOpeners` race-week-only gating (closes the §10.1 footgun; parallel to swim Gap-6 / activation-swim race-week scoping shipped in race-week Phase 4).
 - **Phase 4 (DEFERRED, separate arc):** wire `limiter_sport='bike'` intensity dial. Architectural decision needed: additive vs. replacing the +7% TSS allocation (same blocker class as `limiter_sport='run'` / run-arc Phase 4 / `TICKET-B-WIRING-AUDIT.md` Field 2 §7).
 
 ---
