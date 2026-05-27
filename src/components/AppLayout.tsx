@@ -34,6 +34,7 @@ import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import PullToRefresh from './PullToRefresh';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { MobileHeader } from './MobileHeader';
+import { App as CapacitorApp } from '@capacitor/app';
 
 interface AppLayoutProps {
   onLogout?: () => void;
@@ -60,6 +61,61 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
+
+  // D-101: iOS resume → reopen strength logger when an unfinished session exists.
+  // Bug B Cause 1 (per POLISH-PUNCH-LIST): iOS WKWebView teardown after long sleep
+  // unmounts AppLayout. showStrengthLogger lives in useState (no route, no persist),
+  // so the logger comes back closed even though localStorage still has the in-flight
+  // sets. The athlete loses access to their unfinished session despite the data being
+  // intact. This listener checks the canonical strength_logger_session_${today} key
+  // on every app-foreground transition and reopens the logger if there's real data
+  // to return to.
+  useEffect(() => {
+    const todayDateString = () => {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+    const hasUncompletedStrengthSession = (): boolean => {
+      try {
+        const key = `strength_logger_session_${todayDateString()}`;
+        const raw = localStorage.getItem(key);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw);
+        const exs = Array.isArray(parsed?.exercises) ? parsed.exercises : [];
+        // "Has data" = at least one exercise with a non-empty sets array (the
+        // shape StrengthLogger writes via saveSessionProgress). Empty wrappers
+        // from a fresh-open-then-close shouldn't trigger reopen.
+        return exs.some((ex: any) => Array.isArray(ex?.sets) && ex.sets.length > 0);
+      } catch { return false; }
+    };
+    let unsubscribed = false;
+    let listenerHandle: { remove: () => Promise<void> } | null = null;
+    (async () => {
+      try {
+        listenerHandle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+          if (!isActive) return;
+          if (showStrengthLogger) return;  // already open, don't bounce it
+          if (hasUncompletedStrengthSession()) {
+            setShowStrengthLogger(true);
+          }
+        });
+      } catch {
+        // Non-Capacitor environment (web dev / unsupported platform). The
+        // localStorage persistence still works the same way; this just means
+        // the auto-reopen is iOS-only, which is the affected platform.
+      }
+    })();
+    return () => {
+      unsubscribed = true;
+      if (listenerHandle) {
+        listenerHandle.remove().catch(() => {});
+      }
+    };
+  }, [showStrengthLogger]);
+
   const [showPilatesYogaLogger, setShowPilatesYogaLogger] = useState(false);
   // MobilityLogger removed; mobility now uses StrengthLogger in mobility mode
   const initialRouteState: any = (location && location.state) || {};
