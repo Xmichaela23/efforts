@@ -1,15 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export interface StrengthSet { reps?: number; duration_seconds?: number; weight: number; rir?: number; completed?: boolean }
-export interface StrengthExercise { 
-  name: string; 
-  sets?: number; 
-  reps?: number; 
-  duration_seconds?: number; 
-  weight?: number; 
+export interface StrengthSet {
+  reps?: number;
+  duration_seconds?: number;
+  weight: number;
+  /** D-094: qualitative weight label (e.g. "Bodyweight", "Heavy barbell", "Band")
+   *  surfaced when the planned weight is a non-numeric string. Rendered in place
+   *  of the lb-suffixed number. Null/undefined for numeric weights. */
+  weight_display?: string;
+  rir?: number;
+  completed?: boolean;
+}
+export interface StrengthExercise {
+  name: string;
+  sets?: number;
+  reps?: number;
+  duration_seconds?: number;
+  weight?: number;
+  weight_display?: string;
   target_rir?: number;
-  setsArray?: StrengthSet[] 
+  setsArray?: StrengthSet[]
 }
 
 function normalizeName(raw: string): string {
@@ -175,6 +186,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     const pReps = (p?.reps || 0);
     const pDuration = (p?.duration_seconds || 0);
     const pW = (p?.weight || 0);
+    const pWDisplay = (p as any)?.weight_display as string | undefined;
     const pVol = pSets * (pDuration || pReps) * pW;
     const targetRir = p?.target_rir;
     const cSetsArrRaw = (c as any)?.setsArray as StrengthSet[] | undefined;
@@ -192,14 +204,20 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     
     const serverRir = rirSummaryMap.get(k);
     const status: 'matched'|'skipped'|'swapped' = p && c ? 'matched' : (p && !c ? 'skipped' : (!p && c ? 'swapped' : 'matched'));
-    // Build 1:1 planned vs completed sets
+    // Build 1:1 planned vs completed sets.
+    // D-094: replicate the aggregate planned values (weight / reps / target RIR / qualitative
+    // weight label) across all N sets — coaches prescribe at the exercise level, not per-set,
+    // so all planned sets render the same target. Carry target_rir as `rir` so fmt() with
+    // showRir=true renders "(RIR N)" on the Planned column.
     const plannedSets: StrengthSet[] = Array.from({ length: Math.max(0, pSets) }, () => {
       const set: StrengthSet = { weight: pW };
+      if (pWDisplay) set.weight_display = pWDisplay;
       if (pDuration > 0) {
         set.duration_seconds = pDuration;
       } else {
         set.reps = pReps;
       }
+      if (typeof targetRir === 'number') set.rir = targetRir;
       return set;
     });
     const completedSets: StrengthSet[] = cSetsArr;
@@ -281,19 +299,32 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                   return mins > 0 ? `${mins}:${String(secs).padStart(2,'0')}` : `${s}s`;
                 };
                 const fmt = (s?: StrengthSet, isBw?: boolean, showRir?: boolean) => {
-                  if (!s || (!s.reps && !s.duration_seconds && !s.weight)) return '—';
-                  // Duration-based exercises (planks, carries)
+                  if (!s) return '—';
+                  // D-094: also accept weight_display (qualitative weight like "Bodyweight")
+                  // and a target RIR as meaningful signal — the prior guard returned "—"
+                  // for every planned set on rows where reps was a string range or weight
+                  // was qualitative (both coerced to 0 upstream).
+                  const hasNumericContent = !!(s.reps || s.duration_seconds || s.weight);
+                  const hasQualitativeWeight = !!s.weight_display;
+                  const hasRirSignal = showRir && typeof s.rir === 'number';
+                  if (!hasNumericContent && !hasQualitativeWeight && !hasRirSignal) return '—';
+                  // RIR clause — prefixed "RIR" for clarity (used identically for planned
+                  // target and completed actual; column header disambiguates).
+                  const rirTxt = showRir && typeof s.rir === 'number' ? ` (RIR ${s.rir})` : '';
+                  // Weight clause: qualitative label wins over numeric when present.
+                  const weightClause = (() => {
+                    if (isBw) return '';
+                    if (s.weight_display) return ` × ${s.weight_display}`;
+                    if (typeof s.weight === 'number' && s.weight > 0) return ` @ ${Math.round(s.weight)} lb`;
+                    return '';
+                  })();
+                  // Duration-based exercises (planks, carries) — duration goes first.
                   if (s.duration_seconds && s.duration_seconds > 0) {
-                    const durationTxt = formatSeconds(s.duration_seconds);
-                    const showWt = !isBw && typeof s.weight === 'number' && s.weight > 0;
-                    const rirTxt = showRir && typeof s.rir === 'number' ? ` (${s.rir})` : '';
-                    return showWt ? `${durationTxt} @ ${Math.round(s.weight as number)} lb${rirTxt}` : `${durationTxt}${rirTxt}`;
+                    return `${formatSeconds(s.duration_seconds)}${weightClause}${rirTxt}`;
                   }
-                  // Rep-based exercises
-                  const repsTxt = String(s.reps || 0);
-                  const showWt = !isBw && typeof s.weight === 'number' && s.weight > 0;
-                  const rirTxt = showRir && typeof s.rir === 'number' ? ` (${s.rir})` : '';
-                  return showWt ? `${repsTxt} @ ${Math.round(s.weight as number)} lb${rirTxt}` : `${repsTxt}${rirTxt}`;
+                  // Rep-based exercises.
+                  const repsTxt = `${s.reps || 0} reps`;
+                  return `${repsTxt}${weightClause}${rirTxt}`;
                 };
                 const isEditing = editingSet?.exerciseName === r.name && editingSet?.setIndex === idx;
                 return (
@@ -348,7 +379,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                     ) : (
                       <div className="grid grid-cols-12 text-sm group">
                         <div className="col-span-2 text-white/60">{idx+1}</div>
-                        <div className="col-span-5 text-white/60">{fmt(p, r.isBodyweight)}</div>
+                        <div className="col-span-5 text-white/60">{fmt(p, r.isBodyweight, true)}</div>
                         <div className="col-span-4 text-white/90">{fmt(c, false, true)}</div>
                         {c && workoutId && (
                           <div className="col-span-1 flex justify-end">

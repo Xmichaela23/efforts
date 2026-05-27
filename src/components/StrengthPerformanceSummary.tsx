@@ -62,10 +62,39 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
         const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
         const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
         const durationNum = typeof ex.duration_seconds === 'number' ? ex.duration_seconds : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.duration_seconds)||0), 0) / setsArr.length) : 0);
-        const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
-        const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
+        // D-094: planned `reps` is commonly a string range like "4-6" / "8-10" — parse midpoint instead of coercing to 0.
+        const repsNum = (() => {
+          if (typeof ex.reps === 'number') return ex.reps;
+          if (typeof ex.reps === 'string') {
+            const range = ex.reps.match(/^\s*(\d+)\s*[-–]\s*(\d+)\s*$/);
+            if (range) return Math.round((parseInt(range[1], 10) + parseInt(range[2], 10)) / 2);
+            const single = parseInt(ex.reps, 10);
+            if (Number.isFinite(single) && single > 0) return single;
+          }
+          if (setsArr.length) return Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length);
+          return 0;
+        })();
+        // D-094: planned `weight` may be a qualitative string ("Bodyweight" / "Band" / "Heavy barbell"
+        // / RIR fallback cue from D-071). Preserve as `weight_display` for rendering instead of
+        // coercing to 0, which silently dropped the entire planned row to "—".
+        let weightNum = 0;
+        let weightDisplay: string | undefined;
+        if (typeof ex.weight === 'number') {
+          weightNum = ex.weight;
+        } else if (typeof ex.weight === 'string') {
+          const trimmed = ex.weight.trim();
+          // Numeric strings ("110", "85.5") parse to weightNum; anything else is qualitative.
+          if (/^[\d.]+\s*(lb|lbs|kg)?$/i.test(trimmed)) {
+            weightNum = parseFloat(trimmed) || 0;
+          } else if (trimmed) {
+            weightDisplay = trimmed;
+          }
+        } else if (setsArr.length) {
+          weightNum = Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length);
+        }
         const target_rir = typeof ex.target_rir === 'number' ? ex.target_rir : undefined;
         const result: any = { name: ex.name, sets: setsNum, weight: weightNum, target_rir };
+        if (weightDisplay) result.weight_display = weightDisplay;
         if (durationNum > 0) {
           result.duration_seconds = durationNum;
         } else {
