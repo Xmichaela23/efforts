@@ -23,6 +23,11 @@ interface LoggedSet {
   barType?: string;
   setType?: 'warmup' | 'working'; // For baseline test workouts
   setHint?: string; // Hint text for baseline test sets
+  /** D-097: true when the value was prefilled from the athlete's previous
+   *  session for this exercise (autofill on logger open). UI dims the value
+   *  so the athlete knows it's a starting suggestion, not their own log.
+   *  Cleared the moment the athlete edits any field on the set OR taps Done. */
+  from_previous?: boolean;
 }
 
 interface LoggedExercise {
@@ -1286,6 +1291,104 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     })();
   }, [scheduledWorkout, targetDate]);
 
+  // D-097: previous-session autofill. After exercises are loaded (from planned
+  // workout, saved session, or fresh init), fetch the athlete's last 10 strength
+  // sessions and prefill any "untouched" set with the most-recent prior session's
+  // per-set actuals for the same exercise. Untouched = weight === 0 AND
+  // !reps/!duration_seconds AND !rir AND !completed (i.e. not athlete-edited
+  // and not already loaded from a saved session). Prefilled sets render in a
+  // muted color via the `from_previous` flag; any athlete edit clears the flag
+  // (updateSet handles this automatically).
+  const didAutofillRef = useRef(false);
+  useEffect(() => {
+    if (didAutofillRef.current) return;
+    if (!isInitialized) return;
+    if (!exercises || exercises.length === 0) return;
+    const mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+    if (mode === 'mobility') return;
+    didAutofillRef.current = true;
+    (async () => {
+      try {
+        const userId = getStoredUserId();
+        if (!userId) return;
+        const todayDate = targetDate || getStrengthLoggerDateString();
+        const normalizeExerciseName = (raw: string): string =>
+          String(raw || '')
+            .toLowerCase()
+            .replace(/\s*\((?:left|right)\)\s*/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const currentNames = new Set<string>(
+          exercises.map((ex) => normalizeExerciseName(ex.name)).filter(Boolean),
+        );
+        if (currentNames.size === 0) return;
+        const { data: priorRows } = await supabase
+          .from('workouts')
+          .select('id,date,strength_exercises')
+          .eq('user_id', userId)
+          .in('type', ['strength', 'weight_training', 'weights', 'mobility'])
+          .lt('date', todayDate)
+          .order('date', { ascending: false })
+          .limit(10);
+        if (!Array.isArray(priorRows) || priorRows.length === 0) return;
+        const previousByName: Record<string, LoggedSet[]> = {};
+        for (const pr of priorRows) {
+          let priorEx: any[] = [];
+          try {
+            const raw = (pr as any).strength_exercises;
+            priorEx = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
+          } catch { priorEx = []; }
+          if (!Array.isArray(priorEx)) continue;
+          for (const ex of priorEx) {
+            const nn = normalizeExerciseName(ex?.name || '');
+            if (!nn || !currentNames.has(nn) || previousByName[nn]) continue;
+            const priorSets = Array.isArray(ex?.sets) ? ex.sets : [];
+            if (priorSets.length === 0) continue;
+            previousByName[nn] = priorSets.map((s: any): LoggedSet => ({
+              weight: Number(s?.weight) || 0,
+              ...(typeof s?.reps === 'number' ? { reps: s.reps } : {}),
+              ...(typeof s?.duration_seconds === 'number' ? { duration_seconds: s.duration_seconds } : {}),
+              ...(typeof s?.rir === 'number' ? { rir: s.rir } : {}),
+              ...(typeof s?.resistance_level === 'string' ? { resistance_level: s.resistance_level } : {}),
+              completed: false,
+            }));
+          }
+          if (Object.keys(previousByName).length >= currentNames.size) break;
+        }
+        if (Object.keys(previousByName).length === 0) return;
+        // Apply autofill, preserving any set that's already touched/completed/from-saved-session.
+        setExercises((prev) => prev.map((ex) => {
+          const priorSets = previousByName[normalizeExerciseName(ex.name)];
+          if (!priorSets) return ex;
+          const newSets = ex.sets.map((set, i) => {
+            const untouched =
+              !set.completed &&
+              (!set.weight || set.weight === 0) &&
+              !set.reps &&
+              !set.duration_seconds &&
+              set.rir === undefined &&
+              !set.resistance_level;
+            if (!untouched) return set;
+            const prior = priorSets[i] ?? priorSets[priorSets.length - 1];
+            if (!prior) return set;
+            return {
+              ...set,
+              weight: prior.weight ?? set.weight,
+              ...(typeof prior.reps === 'number' ? { reps: prior.reps } : {}),
+              ...(typeof prior.duration_seconds === 'number' ? { duration_seconds: prior.duration_seconds } : {}),
+              ...(typeof prior.rir === 'number' ? { rir: prior.rir } : {}),
+              ...(prior.resistance_level ? { resistance_level: prior.resistance_level } : {}),
+              from_previous: true,
+            } as LoggedSet;
+          });
+          return { ...ex, sets: newSets };
+        }));
+      } catch (e) {
+        console.warn('[strength-logger] previous-session autofill failed:', e);
+      }
+    })();
+  }, [isInitialized, exercises.length, scheduledWorkout, targetDate]);
+
   const prefillFromPlanned = (row: any) => {
     try {
       try { clearSessionProgress(); } catch {}
@@ -2172,7 +2275,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const updatedExercises = exercises.map(exercise => {
       if (exercise.id === exerciseId) {
         const newSets = [...exercise.sets];
-        const updatedSet = { ...newSets[setIndex], ...updates };
+        // D-097: any athlete-initiated update clears the from_previous flag.
+        // Autofill itself sets from_previous: true explicitly; that's the only
+        // path that should preserve it.
+        const isAutofillUpdate = 'from_previous' in updates;
+        const updatedSet = {
+          ...newSets[setIndex],
+          ...updates,
+          ...(isAutofillUpdate ? {} : { from_previous: false }),
+        };
         newSets[setIndex] = updatedSet;
         
         // Check if this is a baseline test working set that was just completed with RIR 2-3
@@ -3121,7 +3232,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             >
-                              {set.reps === 0 ? '' : (set.reps ?? '—')}
+                              {/* D-097: muted text when value came from previous-session autofill */}
+                              <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
+                                {set.reps === 0 ? '' : (set.reps ?? '—')}
+                              </span>
                             </button>
                             <span className="text-[9px] text-white/50 font-medium">Reps</span>
                           </div>
@@ -3180,7 +3294,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16 tabular-nums"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                               >
-                                {set.weight === 0 ? '' : (set.weight ?? '—')}
+                                <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
+                                  {set.weight === 0 ? '' : (set.weight ?? '—')}
+                                </span>
                               </button>
                               <span className="text-[9px] text-white/50 font-medium">lb/hand</span>
                             </div>
@@ -3206,7 +3322,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16 tabular-nums"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                               >
-                                {set.weight === 0 ? '' : (set.weight ?? '—')}
+                                <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
+                                  {set.weight === 0 ? '' : (set.weight ?? '—')}
+                                </span>
                               </button>
                               <span className="text-[9px] text-white/50 font-medium">Weight</span>
                             </div>
@@ -3231,7 +3349,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             >
-                              {set.weight === 0 ? '' : (set.weight ?? '—')}
+                              <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
+                                {set.weight === 0 ? '' : (set.weight ?? '—')}
+                              </span>
                             </button>
                             <span className="text-[9px] text-white/50 font-medium">Weight</span>
                           </div>
@@ -3263,7 +3383,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-amber-400/60 w-16 focus-visible:ring-0 focus-visible:border-white/35 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             >
-                              {set.rir == null ? (targetRir ? `→${targetRir}` : '') : set.rir}
+                              <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
+                                {set.rir == null ? (targetRir ? `→${targetRir}` : '') : set.rir}
+                              </span>
                             </button>
                             <span className={`text-[9px] font-medium ${targetRir ? 'text-amber-400/70' : 'text-white/50'}`}>
                               {targetRir ? `Target: ${targetRir}` : 'RIR'}
