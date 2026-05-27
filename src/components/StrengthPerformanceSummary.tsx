@@ -163,6 +163,11 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
   
   const rirSummary = sessionDetail?.strength_rir_summary ?? null;
   const workoutId = sessionDetail?.workout_id ?? (completed as any)?.id ?? null;
+  // D-095: per-exercise prior-session lookup populated by workout-detail.
+  // Shape: { [normalizedExerciseName]: { date, days_ago, sets: [...] } }.
+  const previousByExercise = (sessionDetail?.previous_strength_by_exercise as
+    Record<string, { date: string; days_ago: number; sets: any[] }> | null
+    | undefined) ?? null;
 
   return (
     <div className="space-y-4">
@@ -173,6 +178,7 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
         planId={planId}
         plannedWorkoutId={plannedWorkoutId}
         rirSummary={rirSummary}
+        previousByExercise={previousByExercise}
         workoutId={workoutId}
         onAdjustmentSaved={() => {
           window.dispatchEvent(new CustomEvent('plan:adjusted'));

@@ -52,6 +52,14 @@ export type RirSummaryEntry = {
   rir_verdict: 'too_easy' | 'on_target' | 'too_hard' | null;
 };
 
+/** D-095: per-exercise prior-session payload from workout-detail.
+ *  Key is the normalized exercise name (lowercase, (Left)/(Right) stripped). */
+export type PreviousStrengthByExercise = Record<string, {
+  date: string;
+  days_ago: number;
+  sets: StrengthSet[];
+}>;
+
 interface StrengthCompareTableProps {
   planned: StrengthExercise[];
   completed: StrengthExercise[];
@@ -59,11 +67,12 @@ interface StrengthCompareTableProps {
   planId?: string;
   plannedWorkoutId?: string;
   rirSummary?: RirSummaryEntry[] | null;
+  previousByExercise?: PreviousStrengthByExercise | null;
   workoutId?: string | null;
   onAdjustmentSaved?: () => void;
 }
 
-export default function StrengthCompareTable({ planned, completed, completedWorkoutRaw, planId: initialPlanId, plannedWorkoutId, rirSummary, workoutId, onAdjustmentSaved }: StrengthCompareTableProps){
+export default function StrengthCompareTable({ planned, completed, completedWorkoutRaw, planId: initialPlanId, plannedWorkoutId, rirSummary, previousByExercise, workoutId, onAdjustmentSaved }: StrengthCompareTableProps){
   // editingSet: { exerciseName, setIndex } — which completed set is being edited inline
   const [editingSet, setEditingSet] = useState<{ exerciseName: string; setIndex: number } | null>(null);
   const [editFields, setEditFields] = useState<{ reps: string; weight: string; rir: string }>({ reps: '', weight: '', rir: '' });
@@ -221,9 +230,19 @@ export default function StrengthCompareTable({ planned, completed, completedWork
       return set;
     });
     const completedSets: StrengthSet[] = cSetsArr;
-    const maxLen = Math.max(plannedSets.length, completedSets.length);
-    const pairs = Array.from({ length: maxLen }, (_, i) => ({ planned: plannedSets[i], completed: completedSets[i] }));
-    return { name: p?.name || c?.name || k, pSets, pReps, pDuration, pW, pVol, cSets, cRepsAvg, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir } as any;
+    // D-095: PREVIOUS column — last session's actual per-set data for this exercise.
+    // Lookup keyed by the same normalizeName used for plannedMap/completedMap.
+    const previousEntry = previousByExercise?.[k] ?? null;
+    const previousSets: StrengthSet[] = Array.isArray(previousEntry?.sets) ? previousEntry!.sets : [];
+    const previousDate = previousEntry?.date ?? null;
+    const previousDaysAgo = typeof previousEntry?.days_ago === 'number' ? previousEntry!.days_ago : null;
+    const maxLen = Math.max(plannedSets.length, completedSets.length, previousSets.length);
+    const pairs = Array.from({ length: maxLen }, (_, i) => ({
+      planned: plannedSets[i],
+      completed: completedSets[i],
+      previous: previousSets[i],
+    }));
+    return { name: p?.name || c?.name || k, pSets, pReps, pDuration, pW, pVol, cSets, cRepsAvg, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir, previousDate, previousDaysAgo, hasPrevious: previousSets.length > 0 } as any;
   });
 
   const totals = rows.reduce((acc, r)=>({ pVol: acc.pVol + r.pVol, cVol: acc.cVol + r.cVol, pSets: acc.pSets + r.pSets, cSets: acc.cSets + r.cSets }), { pVol:0, cVol:0, pSets:0, cSets:0 });
@@ -284,10 +303,25 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                 {advice}
               </p>
             )}
+            {/* D-095: PREVIOUS column added when prior-session data exists for this
+                exercise. 12-col grid rebalances Set/Planned/Completed when present;
+                falls back to the original 2/5/5 layout when absent. */}
             <div className="grid grid-cols-12 text-xs font-medium text-white/50 border-b border-white/20 pb-1">
               <div className="col-span-2">Set</div>
-              <div className="col-span-5">Planned</div>
-              <div className="col-span-5">Completed</div>
+              {r.hasPrevious ? (
+                <>
+                  <div className="col-span-3" title={r.previousDate ? `${r.previousDate}${r.previousDaysAgo != null ? ` · ${r.previousDaysAgo} days ago` : ''}` : undefined}>
+                    Previous{r.previousDaysAgo != null ? <span className="text-white/30 font-normal"> · {r.previousDaysAgo}d</span> : null}
+                  </div>
+                  <div className="col-span-3">Planned</div>
+                  <div className="col-span-4">Completed</div>
+                </>
+              ) : (
+                <>
+                  <div className="col-span-5">Planned</div>
+                  <div className="col-span-5">Completed</div>
+                </>
+              )}
             </div>
             <div className="space-y-1">
               {r.pairs.map((pair: any, idx: number) => {
@@ -379,8 +413,18 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                     ) : (
                       <div className="grid grid-cols-12 text-sm group">
                         <div className="col-span-2 text-white/60">{idx+1}</div>
-                        <div className="col-span-5 text-white/60">{fmt(p, r.isBodyweight, true)}</div>
-                        <div className="col-span-4 text-white/90">{fmt(c, false, true)}</div>
+                        {r.hasPrevious ? (
+                          <>
+                            <div className="col-span-3 text-white/50">{fmt(pair.previous, r.isBodyweight, true)}</div>
+                            <div className="col-span-3 text-white/60">{fmt(p, r.isBodyweight, true)}</div>
+                            <div className="col-span-3 text-white/90">{fmt(c, false, true)}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="col-span-5 text-white/60">{fmt(p, r.isBodyweight, true)}</div>
+                            <div className="col-span-4 text-white/90">{fmt(c, false, true)}</div>
+                          </>
+                        )}
                         {c && workoutId && (
                           <div className="col-span-1 flex justify-end">
                             <button

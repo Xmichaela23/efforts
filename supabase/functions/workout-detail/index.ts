@@ -633,6 +633,84 @@ async function runSessionDetailPipelineAndPersist(
       await overlaySavedRaceResultFromGoal(supabase, userId, sessionDetailV1);
     }
 
+    // D-095: previous-session lookup for the strength Performance tab PREVIOUS
+    // column. For each exercise in today's strength session, find the most
+    // recent prior session containing the same exercise and surface the per-set
+    // history. Source-of-truth: `workouts.strength_exercises` JSONB (per-set
+    // weight/reps/rir). `exercise_log` exists but only carries per-session
+    // aggregates (best_weight, best_reps, avg_rir, sets_completed); no per-set
+    // fidelity. Single batched query (last 10 strength workouts before today)
+    // beats N+1 per-exercise queries — typical 6-8 exercises per session, all
+    // resolvable from a small recent window without a dedicated index.
+    if (sessionDetailV1 && isStrengthLikePerfSession(row) && Array.isArray(compStrengthArr) && compStrengthArr.length > 0) {
+      try {
+        const normalizeExerciseName = (raw: string): string =>
+          String(raw || '')
+            .toLowerCase()
+            .replace(/\s*\((?:left|right)\)\s*/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const currentNames = new Set<string>(
+          compStrengthArr
+            .map((ex: any) => normalizeExerciseName(ex?.name || ''))
+            .filter((s: string) => s.length > 0),
+        );
+        if (currentNames.size > 0) {
+          const { data: priorRows } = await supabase
+            .from('workouts')
+            .select('id,date,strength_exercises')
+            .eq('user_id', userId)
+            .in('type', ['strength', 'weight_training', 'weights', 'mobility'])
+            .lt('date', workoutDate)
+            .neq('id', id)
+            .order('date', { ascending: false })
+            .limit(10);
+          const previousByName: Record<string, { date: string; days_ago: number; sets: any[] }> = {};
+          const todayMs = new Date(workoutDate + 'T00:00:00Z').getTime();
+          for (const pr of (priorRows ?? [])) {
+            const prDate = String((pr as any)?.date || '').slice(0, 10);
+            if (!prDate) continue;
+            let exercises: any[] = [];
+            try {
+              const raw = (pr as any).strength_exercises;
+              exercises = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
+            } catch {
+              exercises = [];
+            }
+            if (!Array.isArray(exercises)) continue;
+            for (const ex of exercises) {
+              const normName = normalizeExerciseName(ex?.name || '');
+              if (!normName || !currentNames.has(normName)) continue;
+              if (previousByName[normName]) continue;  // earlier (= more recent) row already won
+              const setsArr = Array.isArray(ex?.sets) ? ex.sets : [];
+              if (setsArr.length === 0) continue;  // skip rows with no per-set data
+              const priorMs = new Date(prDate + 'T00:00:00Z').getTime();
+              const daysAgo = Math.max(0, Math.round((todayMs - priorMs) / 86400000));
+              previousByName[normName] = {
+                date: prDate,
+                days_ago: daysAgo,
+                sets: setsArr.map((s: any) => ({
+                  weight: Number(s?.weight) || 0,
+                  ...(typeof s?.reps === 'number' ? { reps: s.reps } : {}),
+                  ...(typeof s?.duration_seconds === 'number' ? { duration_seconds: s.duration_seconds } : {}),
+                  ...(typeof s?.rir === 'number' ? { rir: s.rir } : {}),
+                })),
+              };
+            }
+            if (Object.keys(previousByName).length >= currentNames.size) break;  // all current exercises matched
+          }
+          if (Object.keys(previousByName).length > 0) {
+            (sessionDetailV1 as any).previous_strength_by_exercise = previousByName;
+          }
+        }
+      } catch (e) {
+        console.warn(
+          '[previous_strength_by_exercise] skipped:',
+          e instanceof Error ? e.message : e,
+        );
+      }
+    }
+
     if (sessionDetailV1 && planCtxForSession) {
       try {
         const rrLlm = await raceReadinessWithBudget(
