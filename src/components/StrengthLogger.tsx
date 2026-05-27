@@ -3299,6 +3299,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 </span>
                               </button>
                               <span className="text-[9px] text-white/50 font-medium">lb/hand</span>
+                              {/* D-098: inline weight stepper — ±2.5 / ±5 without opening drawer */}
+                              <div className="flex gap-0.5 mt-0.5" role="group" aria-label="Adjust weight">
+                                {[-5, -2.5, 2.5, 5].map((delta) => (
+                                  <button
+                                    key={delta}
+                                    type="button"
+                                    onClick={() => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + delta) * 2) / 2) })}
+                                    className="h-5 px-1.5 rounded-md border border-white/15 bg-white/[0.04] text-white/55 text-[10px] hover:bg-white/[0.10] hover:text-white/80 tabular-nums leading-none"
+                                    style={{ fontFamily: 'Inter, sans-serif' }}
+                                    aria-label={`${delta > 0 ? 'Add' : 'Subtract'} ${Math.abs(delta)} pounds`}
+                                  >
+                                    {delta > 0 ? `+${delta}` : delta}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                           );
                         }
@@ -3327,6 +3342,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 </span>
                               </button>
                               <span className="text-[9px] text-white/50 font-medium">Weight</span>
+                              {/* D-098: inline weight stepper — ±2.5 / ±5 without opening drawer */}
+                              <div className="flex gap-0.5 mt-0.5" role="group" aria-label="Adjust weight">
+                                {[-5, -2.5, 2.5, 5].map((delta) => (
+                                  <button
+                                    key={delta}
+                                    type="button"
+                                    onClick={() => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + delta) * 2) / 2) })}
+                                    className="h-5 px-1.5 rounded-md border border-white/15 bg-white/[0.04] text-white/55 text-[10px] hover:bg-white/[0.10] hover:text-white/80 tabular-nums leading-none"
+                                    style={{ fontFamily: 'Inter, sans-serif' }}
+                                    aria-label={`${delta > 0 ? 'Add' : 'Subtract'} ${Math.abs(delta)} pounds`}
+                                  >
+                                    {delta > 0 ? `+${delta}` : delta}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                           );
                         }
@@ -3354,6 +3384,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               </span>
                             </button>
                             <span className="text-[9px] text-white/50 font-medium">Weight</span>
+                            {/* D-098: inline weight stepper — ±2.5 / ±5 without opening drawer */}
+                            <div className="flex gap-0.5 mt-0.5" role="group" aria-label="Adjust weight">
+                              {[-5, -2.5, 2.5, 5].map((delta) => (
+                                <button
+                                  key={delta}
+                                  type="button"
+                                  onClick={() => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + delta) * 2) / 2) })}
+                                  className="h-5 px-1.5 rounded-md border border-white/15 bg-white/[0.04] text-white/55 text-[10px] hover:bg-white/[0.10] hover:text-white/80 tabular-nums leading-none"
+                                  style={{ fontFamily: 'Inter, sans-serif' }}
+                                  aria-label={`${delta > 0 ? 'Add' : 'Subtract'} ${Math.abs(delta)} pounds`}
+                                >
+                                  {delta > 0 ? `+${delta}` : delta}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         );
                       })()}
