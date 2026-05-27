@@ -1657,6 +1657,254 @@ run is now "Sweet-Spot Run — 3 mi at moderate effort".
 
 ---
 
+## D-089 — Cycling analyzer interval_breakdown wraps as { available, intervals } to match the run-aligned shape every consumer expects
+
+**Date:** 2026-05-27
+**Files:** `_shared/cycling-v1/ai-summary.ts` (`avg_power_watts` alias),
+  `_shared/session-detail/build.ts` (sport-neutral power-range subtitle +
+  power_adherence fallback), `analyze-cycling-workout/index.ts` (wrap +
+  per-type interval numbering).
+
+Cycling's `generateIntervalBreakdown` returned a bare array; every consumer
+in the codebase expected `{ available: true, intervals: [...] }`. The five
+consumers — session_detail/build.ts:234, workout-detail/index.ts:1238
+enrichment, _shared/cycling-v1/ai-summary.ts:259, generate-training-context/
+index.ts:1669, _shared/fact-packet/build.ts:305 — all silently saw nothing
+on cycling workouts. The cycling AI summary's own per-interval narrative
+(`buildCyclingIntervalSummary`) had been emitting null since it landed,
+because its type signature already required `{ intervals?: any[] }`.
+
+Three companion changes shipped with the wrap:
+- `avg_power_watts` field alias on each interval, because
+  session_detail/build.ts:274 reads `iv?.avg_power_watts` (the sport-neutral
+  field name), not cycling's local `actual_power_w`. Adding the alias keeps
+  the session_detail builder cycling-agnostic.
+- Per-type interval numbering (work N / recovery N) replaces global
+  `index + 1`. Labels render "Interval 1/2" instead of "Interval 2/3" on a
+  workout structured as warmup / work / recovery / work / recovery / cooldown.
+- session_detail/build.ts derives `planned_pace_display` from
+  `planned_power_range_lower/upper` as "150-167 W" when present (rides have
+  no pace range; the subtitle would otherwise be empty). Falls back to
+  `power_adherence_percent` for the adherence badge so the existing
+  sport-neutral `pctColor` renders the right color on rides.
+
+Considered: adding a cycling-specific code path in session_detail/build.ts
+that branched on `IntervalRow` shape. Rejected — the field-alias approach
+adds one line at the analyzer write site and keeps the display builder
+sport-neutral, which is the existing pattern (run analyzer also uses
+neutral field names). Cross-sport contracts must be shape-aligned at the
+source, not branched at the consumer.
+
+**Verification:** workout `f9fb690b` (Strava Zwift sweet spot 2×15) —
+detailed_analysis.interval_breakdown now `{ available: true, intervals: [4
+entries pre-D-090 / 6 entries post-D-090] }`, `avg_power_watts` populated
+(109/166/162/77 W), `planned_power_range_lower/upper` populated.
+
+---
+
+## D-090 — Cycling recoveries render in the interval table with explicit-null adherence (not filtered out)
+
+**Date:** 2026-05-27
+**Files:** `analyze-cycling-workout/index.ts` (filter, per-interval
+  null-emission, weighted-loop skip), `_shared/session-detail/build.ts`
+  (explicit-null short-circuit).
+
+Pre-D-090 the cycling interval-breakdown filter required `i.power_range`,
+dropping recovery segments (which don't carry a power target). A 2×15
+sweet-spot ride showed 4 rows of 6 — both rest periods were silently
+missing.
+
+Filter extended to also accept role/kind matching `/recover|rest/` so
+recoveries reach `generateIntervalBreakdown`. Inside the generator, recovery
+items emit with `power_adherence_percent: null`, `performance_score: null`,
+`planned_power_range_lower/upper: null`, `adherence_percentage: null`,
+`duration_adherence_percent: null` — explicit null carries the intent
+"explicitly ungraded," distinct from missing. The weighted session-score
+loop skips intervals where `power_adherence_percent == null` so recoveries
+don't depress the aggregate to 0%. session_detail/build.ts short-circuits
+`pace_adherence_pct` on `iv.power_adherence_percent === null` (mirroring
+the existing `iv.pace_adherence_percent === null` short-circuit) so the
+recovery row renders without a badge.
+
+Considered: a `is_graded: boolean` field per interval. Rejected — adds a
+new contract field that consumers would need to learn; explicit-null on
+existing adherence fields is the existing pattern (D-089's pace_adherence
+short-circuit already established it). Same information, fewer new
+contracts.
+
+Recoveries render: label "Recovery" (no subtitle since
+`planned_pace_display` is null when no power range), duration, avg watts,
+avg HR, no adherence badge.
+
+**Verification:** workout `f9fb690b` — 6 rows render. Recovery 1: 117 W /
+146 bpm / 5:00 / null adherence. Recovery 2: 100 W / 132 bpm / 5:00 / null
+adherence.
+
+---
+
+## D-091 — Cycling plan_intent derives from layered signals (workout_type → tags → steps_preset)
+
+**Date:** 2026-05-27
+**Files:** `_shared/cycling-v1/build.ts` (new `derivePlanIntentCycling`).
+
+Pre-D-091 the cycling fact-packet read plan_intent only from
+`plannedWorkout.workout_type ?? plannedWorkout.type`. For every cycling
+planned row those columns held the discipline value `'ride'`, which
+`normalizePlanIntent` maps to null (per D-084 — discipline-only types
+return null so the fallback classifier can fire). Net effect: **plan_intent
+was null on every structured cycling session in the system**. The fallback
+classifier ran IF/VI-only and labelled an 88-94% FTP sweet-spot ride as
+`'threshold'` (IF 0.83 falls in the threshold band of the fallback's
+IF-only logic), so the cycling LLM led every structured ride with
+"sub-threshold effort" or "threshold effort" instead of the prescribed
+intent.
+
+The intent signal exists on the planned row in two reliable places the
+builder never read:
+- `tags`: canonical intent tags like `'sweet_spot'` / `'threshold'` /
+  `'vo2'` / `'tempo'` / `'endurance_long'` / `'recovery'` / `'race_prep'` /
+  `'brick'` / `'neuromuscular'` / `'anaerobic'`. Emitted by the bake +
+  generator pipeline.
+- `steps_preset`: token prefixes like `bike_ss_*` / `bike_thr_*` /
+  `bike_vo2_*` / `bike_tempo_*` / `bike_recovery_*` / `bike_anaerobic_*` /
+  `bike_race_pace_*` / `bike_openers` / `bike_only_brick` /
+  `bike_endurance_*`. The token namespace is the most reliable canonical
+  signal — generators emit deterministically.
+
+New `derivePlanIntentCycling(plannedWorkout)` with layered precedence: (1)
+`workout_type`/`type` (current path — wins when populated with a real
+intent), (2) `tags` (looped through normalizePlanIntent), (3)
+`steps_preset` (token prefix matched via small regex table).
+
+Considered: deriving from free-text `name` / `description` ("Bike Sweet
+Spot — 2×15 min" / "Sweet spot training at 88–94% FTP"). Rejected — LLM-
+generated names and free-text descriptions are too noisy to classify on
+without false positives. Tag + token signals are deterministic and
+sufficient.
+
+The `classified_type` cascade flips automatically because the existing
+short-circuit at `cycling-v1/build.ts:228` already prefers `planIntent`
+over the fallback classifier when non-null/non-`'unknown'` (per D-084).
+
+**Verification:** workout `f9fb690b` (planned `b2e85f39`,
+tags `['quality', 'sweet_spot', 'bike']`, steps_preset includes
+`bike_ss_2x15min_r5min`): fact_packet_v1.facts.plan_intent flipped null →
+`'sweet_spot'`. classified_type flipped `'threshold'` → `'sweet_spot'`. AI
+summary lede flipped from "147 W normalized power — sub-threshold effort
+with natural power variation from the terrain" to "147 W normalized power
+at sweet-spot intensity".
+
+---
+
+## D-092 — STRUCTURED PLANNED MODE prompt rule + TREND suppression for thin type-filtered history
+
+**Date:** 2026-05-27
+**Files:** `_shared/cycling-v1/ai-summary.ts` (interval_summary data
+  surface + STRUCTURED PLANNED MODE prompt rule),
+  `_shared/session-detail/build.ts` (`pickCyclingTrendSeries`
+  suppression).
+
+Two display-layer cleanups, shipped together because both gate on the
+structured-planned condition.
+
+(a) **Prompt rule.** New STRUCTURED PLANNED MODE hard rule fires when
+`interval_summary != null` AND `plan_intent ∈ {sweet_spot, threshold, vo2,
+tempo, anaerobic, neuromuscular, race_prep}`. **Explicitly overrides** the
+general LEDE rule and the HARD CONSTRAINT at `ai-summary.ts:399`. Requires
+the lede to cover:
+  - target-range adherence (cite `interval_summary.work_intervals[i].
+    planned_power_range_w` vs actual; use `in_target_range` + `power_
+    adherence_pct`)
+  - completion count when partial (`completed_steps / total_steps`)
+  - HR response across the set (compare first → last `hr_avg`)
+NP becomes one trailing sentence of physiological context. Bans leading
+with trend / vs-similar / PR signals on structured sessions — athletes
+chose the session for the target, not the trend.
+
+(b) **interval_summary data fix.** Pre-D-092 the summary exposed only
+duration + HR per work interval. `avg_power_w` was a phantom key (cycling
+intervals carry `actual_power_w` / `avg_power_watts` per D-089, not
+`avg_power_w`) — every cycling structured-session narrative had a null
+actual-wattage signal. There was no `planned_power_range` at all. The LLM
+could cite "Two 15-min efforts held steady HR" but had no signal for
+whether wattage hit the target. Added `planned_power_range_w: { lower_w,
+upper_w }`, `power_adherence_pct`, `in_target_range: boolean` per work
+interval; fixed `avg_power_w` alias so actual wattage flows.
+
+(c) **TREND suppression.** `pickCyclingTrendSeries` returns null when
+`pwr20_trend_v1` has <3 type-filtered points AND `fact_packet_v1.facts.
+plan_intent` is in the structured set. A sweet-spot ride compared to an
+aggregate trend across endurance + recovery + sweet-spot rides isn't a
+meaningful "is the threshold work trending up?" signal; show no TREND
+rather than a misleading one. Unplanned/non-structured rides keep the
+np_trend fallback (no intent for the mixed series to mislead against).
+
+Considered: keeping the np_trend fallback on structured sessions but
+labelling it "mixed-type" in the summary. Rejected — the TREND row is a
+visual sparkline; "mixed-type" qualification would be invisible to the
+athlete who reads the line "4W lower over 12 rides" and assumes type-
+filtering. Suppression is the honest default.
+
+**Verification:** workout `f9fb690b` — `pickCyclingTrendSeries(wa)` →
+`null` (direct Deno call). AI summary lede flipped to "You held the
+150–167 W sweet-spot target across both 15-min blocks — 166 W on the
+first rep and 162 W on the second — with steady heart rate control".
+
+---
+
+## D-093 — Hard 4-sentence cap on cycling clean-execution narratives
+
+**Date:** 2026-05-27
+**Files:** `_shared/cycling-v1/ai-summary.ts` (`clean_execution` signal +
+  CLEAN-EXECUTION CAP sub-rule).
+
+Pre-D-093 the D-092 structured-session narrative ran 7 sentences with HR
+mentioned twice and fatigue mentioned twice. STRUCTURED PLANNED MODE asked
+for interval-led content but didn't cap the rest — the LLM padded with
+"this kind of work is exactly what …" closers and per-interval recovery
+commentary on a clean ride that needed nothing more to say.
+
+New `interval_summary.clean_execution: boolean` — true when every work
+interval landed ≥ 95% `power_adherence_pct`. Lets the prompt know it's a
+clean ride with no execution drama to explain.
+
+CLEAN-EXECUTION CAP sub-rule inside STRUCTURED PLANNED MODE: when
+`clean_execution` is true, output EXACTLY 4 sentences in order:
+- S1 — Lede: target-range adherence + per-rep wattage (≤3 reps) + opening HR
+- S2 — ONE physiological observation (HR-vs-power efficiency / decoupling
+  / intensity match); pick one, don't list
+- S3 — ONE fatigue/load context sentence (consecutive days, weekly load
+  in plain words); skip if no notable signal
+- S4 — ONE forward-looking sentence (race countdown OR recovery cue)
+
+Explicit cut list: no "this kind of work is exactly what …" filler, no
+"monitor how you feel" generic advice, no closing exhortation, no
+per-interval recovery commentary. "Skip S3 and write 3 sentences when
+there's no load signal worth saying — brevity > completeness."
+
+Considered: dropping `max_tokens` from 220 to 140 to make 7-sentence
+overflow physically harder. Rejected — the pre-D-093 7-sentence output was
+715 chars (~180 tokens) and didn't hit the cap, so dropping max_tokens
+wouldn't have helped on the failure case but would have truncated non-clean
+(legitimately longer) cases awkwardly. Prompt strictness is the right
+lever; max_tokens is the wrong one.
+
+Considered: deterministic sentence-count validator + retry (like the
+jargon-guard / lede-guard pattern). Deferred — sentence-count is fragile
+to parse (em-dash, embedded periods in numerics, abbreviations), and the
+prompt enforcement reduced sentence count from 7 to 4 on the only
+verification case. If observed-in-wild output regresses, add a validator
+in a follow-up.
+
+**Verification:** workout `f9fb690b` — sentence count 4 (programmatic
+split on `/(?<=[.!?])\s+/`). Pre-D-093: 7 sentences, HR mentioned twice,
+fatigue mentioned twice. Post-D-093: 4 sentences, structure intact.
+Stylistic filler still leaks ("is exactly what you need before a recovery
+day", "laying the aerobic foundation you'll need for the longer efforts
+ahead") — user accepted at diminishing returns and moved on.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

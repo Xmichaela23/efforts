@@ -2,7 +2,7 @@
 
 Tracking the work to get the app from "engine works" to "every flow ships clean." No new features past this point. Only finish what's started.
 
-Last updated: May 26, 2026 (cycling-attach cascade D-074..D-084 — eleven-layer bug investigation triggered by "May 23 Strava ride shows unattached in UI." Root finds: two silent PostgREST 42703s on phantom column names; isUnplanned ReferenceError swallowed by try/catch silently killing every cycling LLM call since D-046. Full narrative in docs/ENGINE-STATE.md Solid entry. Earlier today: overnight plan-gen batch D-064..D-069 — 486/486 matrix pass.)
+Last updated: May 27, 2026 (cycling analyzer narrative + display polish D-089..D-093 — five-decision arc that turned the cycling analyzer into a fundamentally different product than the prior morning. D-089 per-interval execution table reaches UI (analyzer-output shape parity with run); D-090 recoveries restored to display; D-091 plan_intent derives from tags/steps_preset so sweet_spot rides classify as sweet_spot not threshold; D-092 STRUCTURED PLANNED MODE prompt rule + TREND suppression when type-filtered history is thin; D-093 hard 4-sentence cap on clean-execution narratives. New §6 Cycling Analyzer Display added to the punch list; Q-033 (virtual-ride terrain vocabulary) filed deferred. Previous: May 26, 2026 — cycling-attach cascade D-074..D-084 — eleven-layer bug investigation triggered by "May 23 Strava ride shows unattached in UI." Root finds: two silent PostgREST 42703s on phantom column names; isUnplanned ReferenceError swallowed by try/catch silently killing every cycling LLM call since D-046. Full narrative in docs/ENGINE-STATE.md Solid entry. Earlier today: overnight plan-gen batch D-064..D-069 — 486/486 matrix pass.)
 
 ---
 
@@ -213,6 +213,28 @@ For each numbered item:
 
 ---
 
+## 6. Cycling Analyzer Display
+
+**Status:** core foundations shipped 2026-05-27 (D-089 through D-093); two open items + one watch-and-wait.
+
+### Done (2026-05-27 — cycling analyzer narrative + display polish, "fundamentally different product than this morning")
+- [x] **Per-interval execution table with recoveries** — D-089 / D-090 (`9cdced4e`, `37ba2255`). Cycling analyzer's `interval_breakdown` now matches the run-aligned `{ available, intervals }` shape so session_detail / workout-detail enrichment / cycling ai-summary / generate-training-context / fact-packet all see it (the bare-array version silently missed all five consumers). Recoveries included with explicit-null adherence so they render label/duration/watts/HR without a misleading badge. Per-type interval numbering ("Interval 1/2" not "Interval 2/3"). Verified 6-row table on `f9fb690b` sweet spot ride.
+- [x] **Plan intent derivation from tags/steps_preset** — D-091 (`0149f9e9`). Cycling fact-packet `plan_intent` was null on EVERY structured cycling session because it only read `workout_type/type` (always `'ride'`). New `derivePlanIntentCycling` reads layered: type → tags (canonical `'sweet_spot'`/`'threshold'`/etc.) → steps_preset (`bike_ss_*`/`bike_thr_*`/etc.). `classified_type` cascade flips automatically.
+- [x] **Structured session narrative leads with execution, not NP** — D-092 (`9f8e7f46`). New STRUCTURED PLANNED MODE prompt rule overrides the general LEDE rule when interval_summary != null and plan_intent is structured. Lede must cover target-range adherence + completion + HR response. NP becomes one trailing sentence. Bans leading with trend/vs-similar/PR. Companion data fix surfaces `planned_power_range_w` + `power_adherence_pct` + `in_target_range` per work interval.
+- [x] **4-sentence cap on clean-execution sessions** — D-093 (`806210af`). New `interval_summary.clean_execution: boolean` (true when every work interval ≥95% adherence). CLEAN-EXECUTION CAP sub-rule: exactly 4 sentences (lede / one physiological observation / one fatigue/load / one forward-looking), explicit cut list for filler. Pre-fix narratives ran 7 sentences with repeated HR + fatigue mentions. Some stylistic filler still leaks; user accepted at diminishing returns.
+
+### Done (companion — 2026-05-27)
+- [x] **TREND suppression for structured sessions with thin type-filtered history** — D-092 same commit. `pickCyclingTrendSeries` returns null when `pwr20_trend_v1` has <3 type-filtered points AND `plan_intent ∈ {sweet_spot, threshold, vo2, tempo, anaerobic, neuromuscular, race_prep}`. Sweet-spot rides shouldn't show a mixed-type NP trend that includes endurance + recovery rides. Unplanned/non-structured rides keep the np_trend fallback. Verified `null (TREND SUPPRESSED)` via direct Deno call against the recomputed workout_analysis.
+
+### Open
+- [ ] **Virtual ride terrain vocabulary — suppress TERRAIN/CLIMBING rows for VirtualRide; swap terrain phrasing in prompt** — Q-033 filed 2026-05-27 (`52c9c9d0`). Cycling prompt at `_shared/cycling-v1/ai-summary.ts:403` literally instructs the LLM to translate moderate VI into `"natural power variation from the terrain"` — correct outdoors, wrong on Zwift / VirtualRide / smart-trainer (no real terrain, the variation comes from the trainer's interval structure or virtual route resistance). The TERRAIN row at session_detail also shows GPS-derived "X ft gain · Y°F" + CLIMBING "VAM · gain" for indoor rides — both meaningless. Candidate fix: pass `is_virtual_ride: boolean` (derived from `workout.provider_sport === 'VirtualRide'`) into the display packet and the cycling display packet; gate both the TERRAIN/CLIMBING analysis rows and the prompt's VI-translation phrase on it. Low urgency — cosmetic vocabulary, not a correctness fabrication (which is what D-076 HARD BAN covers). Cross-ref: Q-033, D-076, D-091.
+- [ ] **Adaptive intent tracking — flag when athlete consistently drifts above (or below) the prescribed zone across sessions.** Today's analyzer flags per-session adherence (D-089 / D-092 surface `power_adherence_pct` + `in_target_range` per interval, and D-093 gates the 4-sentence cap on `clean_execution`). What's missing: a cross-session signal that an athlete is *systematically* riding above target (e.g. 6 of 8 recent sweet-spot rides averaged 96-102% FTP instead of 88-94%, suggesting either FTP is stale or the athlete is over-cooking the prescription). Should write to a new signal (likely `learned_fitness.ride_intent_drift_pct` or similar), surface in the Arc, and trigger one of two responses: (a) FTP re-test recommendation when drift is upward AND consistent, (b) coaching nudge when drift is upward but FTP is fresh ("you're riding sweet-spot at 99% FTP — that's threshold; ease back or update your FTP"). Mirror the existing `aerobic_direction` Arc signal (D-042 / Q-023) pattern. Multi-session aggregation, snapshot persistence, Arc surface — design pass needed before implementation.
+
+### Watch (no work needed unless violated)
+- [x] **Sweet spot trend series will populate naturally after ≥3 sweet spot rides in history.** D-091 reclassifies prescribed structured rides as `sweet_spot` going forward; the threshold pool stops growing for these athletes and the sweet_spot pool starts. `pwr20_trend_v1` is type-filtered and gated at ≥3 same-type rides (`session-detail/build.ts:1057`), so the TREND row will auto-populate with sweet-spot points once history accumulates. Today's TREND is correctly suppressed via D-092 because only 1 sweet-spot ride exists. No code action needed — verify in a few weeks by inspecting an analyzed sweet-spot ride and confirming TREND renders with `ride_type: "sweet spot"`. Re-open this entry if the auto-population doesn't happen.
+
+---
+
 ## Queued for next sessions (Theme A complete 2026-05-11)
 
 These are the architectural threads opened during the 2026-05-11 session, scoped and queued for follow-up. None are blocking today's ship.
@@ -331,4 +353,4 @@ Separate workstream from items 1–5 (running→cycling parity + intent-aware an
 
 ## Done = launchable
 
-When items 1-5 are all 100% and background items are closed, the app ships every flow clean. No new features past this point. Polish only.
+When items 1-6 are all 100% and background items are closed, the app ships every flow clean. No new features past this point. Polish only.
