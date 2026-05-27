@@ -288,10 +288,19 @@ function buildCyclingIntervalSummary(
     if (!Number.isFinite(ln) || !Number.isFinite(un) || ln <= 0 || un <= 0) return null;
     return { lower_w: Math.round(ln), upper_w: Math.round(un) };
   };
+  // D-093: clean_execution signal — true when every work interval landed
+  // within 95% adherence of its prescribed power band. Lets the prompt's
+  // 4-sentence cap know when to fire (a clean ride has no execution drama
+  // to describe, so verbose multi-interval breakdowns become padding).
+  const cleanExecution = work.length > 0 && work.every((iv: any) => {
+    const adh = Number(iv?.power_adherence_percent);
+    return Number.isFinite(adh) && adh >= 95;
+  });
   return {
     structure: 'planned',
     completed_steps: work.filter((iv: any) => Number(iv?.actual_duration_s ?? 0) > 0).length,
     total_steps: work.length,
+    clean_execution: cleanExecution,
     work_intervals: work.slice(0, 12).map((iv: any) => {
       const actual = readPowerW(iv);
       const range = readPowerRange(iv);
@@ -449,6 +458,12 @@ RULES:
   • Completion: cite interval_summary.completed_steps / total_steps when not equal ("completed 3 of 4 work blocks"), or omit when full completion.
   • HR response across the set: compare interval_summary.work_intervals[0].hr_avg → ...[last].hr_avg. Was HR steady (cardiovascular control) or did it drift up (fatigue/effort cost)?
   Whole-ride NP is ONE clause of physiological context AFTER the execution lede — never the opening signal. Recoveries are background, not lede. Do NOT lead with the trend, the vs-similar delta, or PR signals on a planned structured session — the athlete didn't ride for those, they rode for the target.
+  CLEAN-EXECUTION CAP (D-093) — when interval_summary.clean_execution is true (every work interval ≥ 95% power_adherence_pct), output EXACTLY 4 sentences, no more, in this order:
+    S1 — LEDE: target-range adherence + per-rep wattage when ≤3 reps + opening HR. ("You held the 150-167 W sweet-spot target across both 15-min blocks at 166 W and 162 W, with HR steady at 154 bpm.")
+    S2 — ONE physiological observation: HR-vs-power efficiency, decoupling read, or whether intensity matched the prescribed zone. Pick ONE; do not list.
+    S3 — ONE fatigue/load context sentence (consecutive days, weekly load in plain words). Skip entirely if no notable load signal.
+    S4 — ONE forward-looking sentence (race countdown framing OR recovery cue). ONE.
+    HARD CUTS for clean execution: no "this kind of work is exactly what …" filler; no "monitor how you feel" generic advice; no second HR mention; no second fatigue mention; no per-interval recovery commentary; no closing exhortation. If S3 has no load signal worth saying, skip it and write 3 sentences total — fewer is better than padding. Brevity > completeness on a clean ride; the dashboard rows below carry the rest.
 - MIXED-EFFORT MODE (when packet has interval_summary and cross_workout is null): this ride was structured/variable — DO NOT compare whole-ride NP/IF to your endurance baseline. Interpret the per-interval work: which work intervals held the target wattage, whether the work tightened or faded across the set, recovery quality. Lead with the ride's intent (sweet-spot, threshold, VO2) paired with NP and a plain intensity read; cite specific work intervals from interval_summary.work_intervals. Recoveries are context, not the lede. (If STRUCTURED PLANNED MODE also fires, that rule's lede requirement wins.)
 - UNPLANNED MODE (when packet has is_unplanned: true): this ride had no linked plan. There was no prescribed power target. DO NOT scold the athlete for "missing a target" — there was no target. Do NOT invent a prescription from classified_type alone; classified_type is a descriptive label (the analyzer's read of what kind of ride this looked like), not a target the athlete chose. INTERPRET on the ride's own terms: lead with NP and a plain intensity read for the actual output, then explain what drove it (terrain via VAM / ascent, group dynamics suggested by VI, conditions). When cross_workout.vs_similar has sample_size ≥ 3 and a meaningful np_delta_w, that comparison IS legitimate (history, not prescription) — you may lead with it. The athlete just rode; describe what they did, don't grade what they "should" have done.
 - HARD BAN (D-076) — route / course / GPX language: DO NOT describe this ride as having an "unplanned route" or reference route planning in any form. The packet carries NO route, course, or GPX data — introducing route-planning concepts (planned route / unplanned route / route choice / mapped route / off-route / etc.) is fabrication. Describe terrain through the data that IS in the packet: VAM, total ascent, climbing signals, and the existing "climbing day" / "rolling day" / "flat day" terrain-class vocabulary. Never frame the ride as "the athlete didn't plan the route" — Efforts has no signal for that, and conflating is_unplanned (= no linked plan workout) with route planning is wrong on both counts.
