@@ -257,7 +257,7 @@ RS wk 1-4:      17 → 18 → 19 → 20mi                (0.85×20 → 1.00×20)
 **Purpose:** T2 transition + run-off-bike durability.
 **Structure:** 70.3 race-spec = 5.5mi at Z2 with race-pace last half, off a 2.5-3hr long ride. Total ~55 min — **a meaningful run stimulus, not transition-only**. ≤8mi clamp.
 **Phase use:** Race-specific brick week.
-**Note on `validate-training-floors.ts:394-395`:** the ≤25min comment is **obsolete and will be removed in Phase 3**. The code at `science.ts:143-152` is correct (race_specific multiplier 0.42).
+**Note on `validate-training-floors.ts:394-395`:** the ≤25min comment is **obsolete and will be removed in Phase 3**. The code at `science.ts:365` (`brickRunTargetMiles`) is correct (race_specific multiplier 0.42).
 
 ### 5.8 Strides
 **Purpose:** neuromuscular speed, leg turnover, running economy.

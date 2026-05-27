@@ -1,6 +1,6 @@
 # Cycling Protocol — Aerobic Base, Quality Rotation, and Within-Phase Progression
 
-> **Status: SPEC DRAFT — 2026-05-21. Phase 0 of the cycling arc** (parallel to the swim arc Phases 0-3 at `c1c94cec` / `ef91c2ee` / `e723d246` / `95b94aba` / `f53bbf34` and the run arc Phases 0-3 at `50921629` / `60c23de2` / commits in D-023). Engine semantics below are **descriptive of the current shipped behavior** for Phase 0 unless explicitly marked LOCKED for future work. Within-phase ramps are dormant today (same `weekInBlock ≡ 1` defect class the swim and run arcs ratified) and become engine behavior in Phase 1.
+> **Status: SPEC DRAFT — 2026-05-21. Phase 0 of the cycling arc** (parallel to the swim arc Phases 0-3 at `c1c94cec` / `ef91c2ee` / `e723d246` / `95b94aba` / `f53bbf34` and the run arc Phases 0-3 at `50921629` / `60c23de2` / commits in D-023). Engine semantics below are **descriptive of the current shipped behavior**. Within-phase ramps shipped 2026-05-21 (D-028 — long-ride lerp + VO2/threshold/sweet-spot rep ramps); `bikeOpeners` race-week gating shipped 2026-05-25 (D-043). Phase 4 (`limiter_sport='bike'` intensity dial) remains deferred.
 
 ---
 
@@ -82,7 +82,7 @@ BASE_RAMP_WEEKS = 6
 
 `weekInPhase` **must** be `weekInPhaseForTimeline(phaseBlocks, weekNum, block)` — the recovery-non-resetting in-phase index. **Never** `weekInBlock` (always `1` per ADR 0002). Mirrors swim §4.1 / run §4.5 exactly.
 
-**Sweet-spot quality (base phase):** `2 × 15 min @ 88-94% FTP` (the `sweetSpotBike(day, 2, 15, goalId)` defaults in `session-factory.ts:~433`). Wired today in `groupRideQualityBikeSession` for the base branch. Within-phase progression is dormant — Phase 1 work.
+**Sweet-spot quality (base phase):** start at `2 × 15 min @ 88-94% FTP` (`sweetSpotBike(day, 2, 15, goalId)` in `session-factory.ts:609`). Wired in `groupRideQualityBikeSession` for the base branch with within-phase rep ramp `intervals = clamp(2, 4, 2 + floor((weekInPhase − 1) / 2))` — **shipped D-028 (2026-05-21)** at `session-factory.ts:747`.
 
 ### 4.2 Build phase (weeks 7-10 of typical 17-18wk plan)
 
@@ -94,7 +94,7 @@ BASE_RAMP_WEEKS = 6
 | Easy Ride | 1 | 45-60 min + Z1 form spins | Z1-Z2 |
 | Quality (threshold) | 1 | `3 × 20 min @ FTP` (Z4) | Z4 |
 
-**Threshold quality (build phase):** `thresholdBike(day, 3, 20, goalId)` — wired today in `groupRideQualityBikeSession` for the build branch. The interval count is currently **flat** (3×20m every build week); within-phase rep ramp is dormant — Phase 1 work mirrors the run-interval rep ramp formula (`reps = clamp(2, 4, 2 + floor((weekInPhase − 1) / 2))` proposed; locked when Phase 1 lands).
+**Threshold quality (build phase):** start at `thresholdBike(day, 2, 20, goalId)` — wired in `groupRideQualityBikeSession` for the build branch with within-phase rep ramp `intervals = clamp(2, 4, 2 + floor((weekInPhase − 1) / 2))` — **shipped D-028 (2026-05-21)** at `session-factory.ts:743-744`. Mirrors the run-interval rep ramp formula.
 
 ### 4.3 Race-specific phase (weeks 11-14 of typical single-race 17-18wk plan — illustrative, non-binding)
 
@@ -109,9 +109,9 @@ BASE_RAMP_WEEKS = 6
 | VO2max Quality | 1 | `6 × 5 min @ 110-120% FTP` (Z5) | Z5 |
 | Brick Bike (alternates with long ride) | 1 every other week | Long-ride duration + immediate brick run | Z2 with race-pace last 30 min |
 
-**VO2 quality (race-spec phase):** `vo2Bike(day, 6, goalId)` — hardcoded 5-min reps today, count flat at 6. Within-phase rep ramp dormant; Phase 1 work proposes `reps = clamp(3, 6, 3 + (weekInPhase − 1))` (parallel to the run VO2 ramp shipped in run-arc Phase 1).
+**VO2 quality (race-spec phase):** start at `vo2Bike(day, 3, goalId)` (5-min reps). Within-phase rep ramp `reps = clamp(3, 6, 3 + (weekInPhase − 1))` — **shipped D-028 (2026-05-21)** at `session-factory.ts:740`. Parallel to the run VO2 ramp.
 
-**Race-pace bike (race-spec brick weeks):** the brick bike's long aerobic block now incorporates race-pace efforts in the closing 30-45 min (target FTP wattage = expected race power, ~0.78-0.82 IF for 70.3 / 0.62-0.68 IF for full IM). Today the brick bike is `brick(...)` from `session-factory.ts:~1232` with the bike leg sized to long-ride floor and the run-off per §5.7.
+**Race-pace bike (race-spec brick weeks):** the brick bike's long aerobic block now incorporates race-pace efforts in the closing 30-45 min (target FTP wattage = expected race power, ~0.78-0.82 IF for 70.3 / 0.62-0.68 IF for full IM). The brick bike is `brick(...)` from `session-factory.ts:2008` with the bike leg sized to long-ride floor and the run-off per §5.7.
 
 ### 4.4 Taper (race week + 1-2 weeks pre-A)
 
@@ -130,7 +130,7 @@ BASE_RAMP_WEEKS = 6
 - Openers: `bikeOpeners(day, goalId)` — 20 min Z2 + 3 × 30-sec fast-pedal bursts. Sharpener, not training stimulus.
 - Race day = the prescribed race-distance bike leg per `RACE-WEEK-PROTOCOL.md §8.3`.
 
-### 4.5 Within-phase ramp endpoints (LOCKED 2026-05-21 — Phase 0 spec, Phase 1 implements)
+### 4.5 Within-phase ramp endpoints (LOCKED 2026-05-21 — Phase 0 spec; Phase 1 shipped D-028)
 
 **Per-distance peak target (long ride, advanced athletes):**
 
@@ -186,25 +186,25 @@ Rounding precision: **0.25hr** (matches the existing `longRideFloorHours` `Math.
 **Purpose:** aerobic capacity + durability + race-rehearsal of fueling cadence.
 **Structure:** Z2 throughout; nutrition cadence (40-45 min eat intervals); cadence 60-70 rpm in base, 70-85 in build/RS.
 **Phase use:** every phase, with phase-progressive duration per §4.5.
-**Engine:** `longRide(day, hours, goalId)` (`session-factory.ts:~394`). Today flat per phase; Phase 1 lifts to within-phase lerp.
+**Engine:** `longRide(day, hours, goalId)` (`session-factory.ts:570`). Within-phase lerp via `longRideHoursForWeek` — **shipped D-028 (2026-05-21)**.
 
 ### 5.2 Easy Ride
 **Purpose:** active recovery, aerobic-base maintenance.
 **Structure:** Z1-Z2 (conversational); 45-75 min in base, 30-45 min in build/RS, 30 min in taper.
 **Phase use:** any phase.
-**Engine:** `easyBike(day, hours, goalId)` (`session-factory.ts:~525`).
+**Engine:** `easyBike(day, hours, goalId)` (`session-factory.ts:701`).
 
 ### 5.3 Tempo Ride
 **Purpose:** lift aerobic ceiling, build muscular endurance without threshold-level cortisol cost.
 **Structure:** WU 15 min → `N × M min` at tempo (82-88% FTP, Z3) with 5 min easy between → CD 10 min.
 **Phase use:** Build (`base_first` approach primarily); base-late as a bridge from sweet spot to threshold.
-**Engine:** `tempoBike(day, intervals, minEach, goalId)` (`session-factory.ts:~512`).
+**Engine:** `tempoBike(day, intervals, minEach, goalId)` (`session-factory.ts:688`).
 
 ### 5.4 Sweet Spot
 **Purpose:** maximize Z3 time-in-zone for FTP gains with sub-threshold fatigue cost (Friel / TrainingPeaks sweet-spot literature).
 **Structure:** WU 15 min → `N × M min` at sweet spot (88-94% FTP, Z3-Z4 boundary) with 5 min easy between → CD 10 min.
 **Phase use:** Base (primary quality); Build (transitions to threshold).
-**Engine:** `sweetSpotBike(day, intervals, minEach, goalId)` (`session-factory.ts:~433`). Defaults `2 × 15 min` in base; `3 × 12 min` in build per group-ride-quality dispatcher.
+**Engine:** `sweetSpotBike(day, intervals, minEach, goalId)` (`session-factory.ts:609`). Base-phase reps ramp `2 → 4 × 15 min` per the §4.2 D-028 formula (`groupRideQualityBikeSession` at `session-factory.ts:747`); legacy `3 × 12 min` build path superseded by the threshold dispatcher.
 
 ### 5.5 Threshold
 **Purpose:** raise lactate threshold; FTP push.
@@ -223,15 +223,15 @@ Rounding precision: **0.25hr** (matches the existing `longRideFloorHours` `Math.
 **Purpose:** race-specific bike → run T1 readiness; trained off-bike legs.
 **Structure:** Long-ride-floor duration (70.3 race-spec = ~2.5-3hr) at Z2 with race-pace last 30-45 min, immediately followed by the brick run (`brickRunMilesForWeek`).
 **Phase use:** Race-specific brick week (alternates with standalone long ride per `BRICKS_PER_WEEK`).
-**Engine:** `brick(...)` (`session-factory.ts:~1232`) — emits both the bike and the run-off as paired sessions tagged `brick`.
+**Engine:** `brick(...)` (`session-factory.ts:2008`) — emits both the bike and the run-off as paired sessions tagged `brick`.
 **Note on long-ride floor accounting:** `maxLongRideMinutes` in `validate-training-floors.ts:~386` counts the brick's bike leg toward long-ride volume; the brick's run portion is bike-leg-excluded by design (function measures long-ride volume only; brick run has its own §5.7-style RUN protocol accounting).
 
 ### 5.8 Openers
 **Purpose:** neural priming for race day; flush travel stiffness.
 **Structure:** 20 min Z2 easy → 3 × 30-sec fast-pedal bursts (high cadence, light gear) → 5 min easy spin to finish. Total ~30 min.
 **Phase use:** Taper / race week (1-2 days pre-A). **NEVER** outside taper.
-**Engine:** `bikeOpeners(day, goalId)` (`session-factory.ts:~554`).
-**Known footgun (deferred, parallel to swim activation Gap-6):** the `bikeOpeners` gate at `week-builder.ts:~1298` is `phase === 'taper'` — fires every taper week, not just the race week. Same class as the swim-activation Gap-6 fix landed in race-week Phase 4. Documented in ENGINE-STATE Known Broken / RACE-WEEK-PROTOCOL §8.6 backlog; out of cycling-arc Phase 0 scope.
+**Engine:** `bikeOpeners(day, goalId)` (`session-factory.ts:752`).
+**Race-week gating — shipped D-043 (2026-05-25):** the `bikeOpeners` gate at `week-builder.ts:1461` is `phase === 'taper' && raceThisWeek` — fires only on the actual race week, not every taper week. Mirrors the swim-activation Gap-6 fix landed in race-week Phase 4.
 
 ### 5.9 Recovery Ride
 **Purpose:** active recovery, blood flow, no training stimulus.
@@ -394,7 +394,7 @@ Per `RACE-WEEK-PROTOCOL.md §8`:
 - Openers: 30 min — `bikeOpeners(day, goalId)` — 1-2 days pre-race.
 - Race day = the prescribed race-distance bike leg per `RACE-WEEK-PROTOCOL.md §8.3` (distance-aware via `science.ts:raceDaySessionSpec`).
 
-**Known footgun (deferred):** `bikeOpeners` over-broad `phase==='taper'` gate (`week-builder.ts:~1298`) fires every taper week, not just the race week. Same class as the swim activation Gap-6 fix landed in race-week Phase 4. Out of cycling-arc Phase 0 scope; documented in ENGINE-STATE Known Broken and POLISH-PUNCH-LIST.
+**Race-week gating — shipped D-043 (2026-05-25):** `bikeOpeners` gate at `week-builder.ts:1461` now scopes to `phase === 'taper' && raceThisWeek`. Mirrors the swim-activation Gap-6 fix.
 
 ### 10.2 Post-race recovery week
 
@@ -409,22 +409,22 @@ Per `RACE-WEEK-PROTOCOL.md §8`:
 
 ### 11.1 Files that need to read this spec
 
-- `supabase/functions/generate-combined-plan/science.ts` — `longRideFloorHours`, `expectedBikeDurationHours` (Phase 1: add `longRideHoursForWeek` lerp helper + `LONG_RIDE_RAMP_ENDPOINTS` table mirroring the run arc).
-- `supabase/functions/generate-combined-plan/session-factory.ts` — `longRide`, `easyBike`, `sweetSpotBike`, `thresholdBike`, `vo2Bike`, `tempoBike`, `groupRideSession`, `groupRideQualityBikeSession`, `bikeOpeners`, `brick` (Phase 1: thread `weekInPhase` through `vo2Bike` and `thresholdBike` for rep ramps; thread `weekInPhase` through `longRide` indirectly via the new `longRideHoursForWeek` helper).
-- `supabase/functions/generate-combined-plan/week-builder.ts` — `weekInPhaseForTimeline` call sites (Phase 1: 1-2 new threading sites for the long-ride + interval rep ramps).
+- `supabase/functions/generate-combined-plan/science.ts` — `longRideFloorHours`, `expectedBikeDurationHours`, `longRideHoursForWeek` lerp helper + `LONG_RIDE_RAMP_ENDPOINTS` table (mirrors the run arc — shipped D-028).
+- `supabase/functions/generate-combined-plan/session-factory.ts` — `longRide`, `easyBike`, `sweetSpotBike`, `thresholdBike`, `vo2Bike`, `tempoBike`, `groupRideSession`, `groupRideQualityBikeSession` (threads `weekInPhase` for rep ramps — shipped D-028), `bikeOpeners` (race-week-only gate — shipped D-043), `brick`.
+- `supabase/functions/generate-combined-plan/week-builder.ts` — `weekInPhaseForTimeline` call sites for long-ride + interval rep ramps + `bikeOpeners` race-week scoping (`week-builder.ts:1461`).
 - `supabase/functions/generate-combined-plan/validate-training-floors.ts` — `maxLongRideMinutes` brick-bike accounting (already correct — bike-leg only; comment updated 2026-05-21 per RUN-PROTOCOL §5.7 / D-023).
 
-### 11.2 What changes from current behavior (in future phases)
+### 11.2 Implementation status
 
-| Surface | Today | Spec'd (this arc) |
-|---|---|---|
-| Long ride within phase | Flat (peak-of-phase step) | Progressive ramp per §4.5 lerp (Phase 1) |
-| VO2 reps | Hardcoded 6 × 5 min every race-spec week | 3 → 6 ramp per §4.2 / §5.6 (Phase 1) |
-| Threshold reps | Hardcoded 3 × 20 min every build week | 2 → 4 ramp (proposed; Phase 1) |
-| Sweet spot reps | Hardcoded 2 × 15 min in base; 3 × 12 in build | Per-phase progressive ramp (Phase 1) |
-| Race-spec brick bike race-pace blocks | Not surfaced explicitly | §4.3 race-pace last 30-45 min (Phase 2 spec slice) |
-| `bikeOpeners` race-week-only gating | Over-broad taper gate | Scoped to race week only (parallel to swim Gap-6; deferred — see §10.1 footgun) |
-| `limiter_sport='bike'` intensity dial | Only +7% TSS allocation | **Deferred — separate arc phase** (architectural-decision blocker, parallel to run Phase 4) |
+| Surface | Status |
+|---|---|
+| Long ride within-phase ramp | **Shipped D-028 (2026-05-21)** — `longRideHoursForWeek` lerp per §4.5 endpoints |
+| VO2 rep ramp (race-specific) | **Shipped D-028** — `clamp(3, 6, 3 + (weekInPhase − 1))` at `session-factory.ts:740` |
+| Threshold rep ramp (build) | **Shipped D-028** — `clamp(2, 4, 2 + floor((weekInPhase − 1) / 2))` × 20 min at `session-factory.ts:743-744` |
+| Sweet spot rep ramp (base) | **Shipped D-028** — same `clamp(2, 4, …)` formula × 15 min at `session-factory.ts:747` |
+| Race-spec brick bike race-pace blocks | **Shipped D-049 (2026-05-25)** — `brick()` emits Z2 base + Z3 race-pace closing block for race-spec bricks ≥ 60 min |
+| `bikeOpeners` race-week-only gating | **Shipped D-043 (2026-05-25)** — `phase === 'taper' && raceThisWeek` gate at `week-builder.ts:1461` |
+| `limiter_sport='bike'` intensity dial | **Deferred — separate arc phase** (architectural-decision blocker, parallel to run Phase 4) |
 
 ### 11.3 Same pattern as swim arc + run arc
 
@@ -437,10 +437,10 @@ This arc consciously mirrors the swim arc (`c1c94cec` / `ef91c2ee` / `e723d246` 
 
 ### 11.4 Phased implementation plan
 
-- **Phase 0** — this spec + close-out D-NNN at draft acceptance. **Gated; current.**
-- **Phase 1** — `weekInPhaseForTimeline` wiring through a new `longRideHoursForWeek` helper + rep ramps for `vo2Bike` / `thresholdBike` / `sweetSpotBike`. Band-as-envelope lerp for long-ride within-phase ramp. Regression test `bike-volume-ramp.test.ts` parallel to `swim-volume-ramp.test.ts` / `run-volume-ramp.test.ts`.
-- **Phase 2** — Race-spec brick bike race-pace block formalization (currently the brick run drives the race-pace stimulus; clarifying the bike-side closing block is a spec + copy slice).
-- **Phase 3** — `bikeOpeners` race-week-only gating (closes the §10.1 footgun; parallel to swim Gap-6 / activation-swim race-week scoping shipped in race-week Phase 4).
+- **Phase 0** — this spec + close-out at draft acceptance. **Shipped 2026-05-21.**
+- **Phase 1** — `weekInPhaseForTimeline` wiring through a new `longRideHoursForWeek` helper + rep ramps for `vo2Bike` / `thresholdBike` / `sweetSpotBike`. Band-as-envelope lerp for long-ride within-phase ramp. Regression test `bike-volume-ramp.test.ts` parallel to `swim-volume-ramp.test.ts` / `run-volume-ramp.test.ts`. **Shipped D-028 (2026-05-21).**
+- **Phase 2** — Race-spec brick bike race-pace closing block formalization. **Shipped D-049 (2026-05-25).**
+- **Phase 3** — `bikeOpeners` race-week-only gating (parallel to swim Gap-6 / activation-swim race-week scoping shipped in race-week Phase 4). **Shipped D-043 (2026-05-25).**
 - **Phase 4 (DEFERRED, separate arc):** wire `limiter_sport='bike'` intensity dial. Architectural decision needed: additive vs. replacing the +7% TSS allocation (same blocker class as `limiter_sport='run'` / run-arc Phase 4 / `TICKET-B-WIRING-AUDIT.md` Field 2 §7).
 
 ---
@@ -457,14 +457,14 @@ This arc consciously mirrors the swim arc (`c1c94cec` / `ef91c2ee` / `e723d246` 
 
 ---
 
-## 12. Close-out decision record (Phase 0 — for the D-NNN at acceptance)
+## 12. Close-out decision record (Phases 0-3 shipped 2026-05-21 → 2026-05-25)
 
-The cycling arc Phase 0 ratifies the locked-but-dormant within-phase ramp curve for long ride + interval reps (parallel to swim arc Phase 0 / run arc Phase 0), and codifies the seven session types currently shipped (long / easy / sweet spot / threshold / VO2 / tempo / brick / openers + group-ride anchor). Locked sub-decisions:
+The cycling arc Phases 0-3 ratified and shipped the within-phase ramp curve for long ride + interval reps (D-028 / Phase 1), the race-spec brick race-pace closing block (D-049 / Phase 2), and the `bikeOpeners` race-week-only gate (D-043 / Phase 3) — parallel to swim arc Phases 0-3 / run arc Phases 0-3. Codified the seven session types shipped (long / easy / sweet spot / threshold / VO2 / tempo / brick / openers + group-ride anchor). Locked sub-decisions:
 
-1. **70.3 long-ride peak = 3.0h** (matches `expectedBikeDurationHours`; Friel typical mid-range). Full IM long-ride peak = 6.0h. No peak lift in Phase 0; Phase 1 ships the within-phase ramp at these endpoints.
+1. **70.3 long-ride peak = 3.0h** (matches `expectedBikeDurationHours`; Friel typical mid-range). Full IM long-ride peak = 6.0h. Within-phase ramp at these endpoints shipped D-028 (Phase 1).
 2. **Sweet spot = 88-94% FTP; tempo = 82-88% FTP.** Distinct sessions despite overlap zone. Engine copy aligned (`sweetSpotBike` text says "88-94% FTP (Zone 3-4)"; `tempoBike` text says "82-88% FTP — comfortably hard").
 3. **Group-ride anchor is route-aware** (`group_ride_route_snapshot` drives TSS floor + climbing copy). Wired today; spec ratifies the contract.
-4. **`bikeOpeners` over-broad taper gate** is **acknowledged-but-deferred** to Phase 3 (parallel to the run-arc / swim-arc class of fixes). Don't bundle into Phase 1.
+4. **`bikeOpeners` race-week-only gate** shipped D-043 (Phase 3) — `phase === 'taper' && raceThisWeek` at `week-builder.ts:1461`.
 5. **Phase 4 (`limiter_sport='bike'` intensity dial) deferred to its own arc** — separate architectural-decision blocker (additive vs. replace the +7% TSS allocation).
 
 Full rationale → the close-out D-NNN at Phase 0 acceptance; verified-state → ENGINE-STATE "Solid" at Phase 0 acceptance (same pattern as D-019 / D-020 / D-023 / D-025).

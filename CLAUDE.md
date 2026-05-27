@@ -2,9 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Product Identity
+
+Efforts is a hybrid endurance + strength training app for intermediate athletes (runners, cyclists, triathletes) who want to integrate strength training into their endurance training. It is **not** a triathlon-only app. Strength is always present — core to every athlete profile, not an add-on. Race goal is optional. The engine manages interference between endurance and strength automatically. See `docs/PRODUCT-POSITIONING.md` for the full product identity.
+
 ## Project
 
-**Efforts** — triathlon training app. React + TypeScript on Vite/Netlify; Supabase (Postgres + Deno edge functions); iOS via Capacitor.
+**Efforts** — hybrid endurance + strength training app (run / cycling / triathlon / duathlon + integrated strength). React + TypeScript on Vite/Netlify; Supabase (Postgres + Deno edge functions); iOS via Capacitor.
 
 ## Context-priming for new sessions
 
