@@ -2757,6 +2757,31 @@ Authorization enforced upstream: `recompute-workout` validates the user JWT at `
 
 ---
 
+## D-104 — Render SessionNarrative on strength Performance tab (display-bug tail of the strength workstream)
+
+**Date:** 2026-05-28
+**Files:** `src/components/MobileSummary.tsx` (strength/mobility branch ~ lines 103-141, add `<SessionNarrative>` above `<StrengthPerformanceSummary>`).
+
+Display bug surfaced after D-102 + D-103 made the strength narrative reliably reach the client: the strength + mobility branch of `MobileSummary` rendered only `<StrengthPerformanceSummary>` (the exercise table) — no `<SessionNarrative>`. The endurance branch (run/ride/swim) renders SessionNarrative at line 189. So strength sessions never showed an INSIGHTS narrative above the exercise table even when `ai_summary` was populated.
+
+Data was reaching the right place end-to-end:
+- `analyze-strength-workout` writes `workout_analysis.ai_summary` (D-102) + `workout_analysis.session_state_v1.narrative.text` (legacy).
+- `workout-detail/index.ts:437-439` prefers `session_state_v1.narrative.text`, falls back to `ai_summary`, passes as `narrativeText` to `buildSessionDetailV1`.
+- `session-detail/build.ts:621` exposes it as `session_detail_v1.narrative_text`.
+- `SessionNarrative.tsx:493` reads `sd.narrative_text` and renders it.
+
+But the strength branch in `MobileSummary` never invoked `SessionNarrative`. Pure tree-omission bug.
+
+Fix: add `<SessionNarrative>` above `<StrengthPerformanceSummary>` in the strength/mobility branch with the same prop shape used in the endurance branch (`sessionDetail`, `hasSessionDetail`, `noPlannedCompare`, `planLinkNote`, `recomputing`, `recomputeError`, `onRecompute`). All props already in scope.
+
+`SessionNarrative` is sport-agnostic at the read level — `sd.narrative_text` + `sd.summary` + `sd.adherence` are all sport-neutral, and the run/ride-specific blocks (trend sparkline, race readiness, etc.) gracefully no-op when their fields are absent on strength `session_detail_v1`.
+
+Minor redundancy noted: `StrengthPerformanceSummary` already has its own "Recompute analysis" button. `SessionNarrative`'s recompute fallback fires only when `hasNothing === true`. In the happy path (narrative present) only one renders; in the empty path both render with the same action. No regression, worth tightening in a follow-up if it grates.
+
+**Verification:** open any recently recomputed strength session (May 18 / March 30 — both verified via REST post-D-103). The INSIGHTS narrative now appears above the Set / Previous / Planned / Completed exercise table.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
