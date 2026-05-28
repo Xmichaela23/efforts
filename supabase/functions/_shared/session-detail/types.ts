@@ -379,7 +379,13 @@ export type SessionDetailV1 = {
       times_run: number;
       comparable_runs: number;
       chart_eligible: boolean;
-      history: Array<{ date: string; pace_s_per_km: number | null; hr: number | null; is_current: boolean }>;
+      /** D-105: `gap_pace_s_per_km` is the grade-adjusted pace from
+       *  `route_progress_metrics.effort_adjusted_pace_sec_per_km`. Client
+       *  prefers it when non-null (per-row fallback gate); raw `pace_s_per_km`
+       *  is preserved for flat routes / pre-D-105 backfill rows / rows where
+       *  GAP couldn't be computed. Additive — old clients reading only
+       *  `pace_s_per_km` keep working. */
+      history: Array<{ date: string; pace_s_per_km: number | null; gap_pace_s_per_km: number | null; hr: number | null; is_current: boolean }>;
     } | null;
   } | null;
 }

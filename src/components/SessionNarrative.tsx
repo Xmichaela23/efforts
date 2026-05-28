@@ -43,6 +43,9 @@ type NextSession = {
 type RouteHistoryPoint = {
   date: string;
   pace_s_per_km: number | null;
+  /** D-105: grade-adjusted pace from `route_progress_metrics.effort_adjusted_pace_sec_per_km`.
+   *  Preferred when non-null; falls back to `pace_s_per_km` per-row. */
+  gap_pace_s_per_km?: number | null;
   hr: number | null;
   is_current: boolean;
 };
@@ -310,10 +313,19 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
 }
 
 function RouteSparkline({ route }: { route: RouteData }) {
-  const pts = route.history.filter((p) => p.pace_s_per_km != null);
-  if (pts.length < 2) return null;
+  // D-105: prefer grade-adjusted pace per point; fall back to raw when GAP
+  // isn't available (flat-route rows, pre-D-105 backfill rows, or any row
+  // where the GAP computation didn't land). The per-row gate keeps the chart
+  // honest — a mixed series shows GAP where computed, raw where not, and
+  // the "GAP" label below tells the athlete the chart is grade-calibrated.
+  const ptsWithEffective = route.history
+    .map((p) => ({ ...p, effective_pace: p.gap_pace_s_per_km ?? p.pace_s_per_km }))
+    .filter((p) => p.effective_pace != null);
+  if (ptsWithEffective.length < 2) return null;
+  const pts = ptsWithEffective;
+  const usingGap = pts.some((p) => p.gap_pace_s_per_km != null);
 
-  const paceValues = pts.map((p) => p.pace_s_per_km as number);
+  const paceValues = pts.map((p) => p.effective_pace as number);
   const maxV = Math.max(...paceValues);
   const minV = Math.min(...paceValues);
   const range = maxV - minV || 1;
@@ -327,7 +339,7 @@ function RouteSparkline({ route }: { route: RouteData }) {
   const coords = pts.map((p, i) => ({
     x: PAD + (i / (pts.length - 1)) * plotW,
     // lower pace = faster = better = higher on chart (invert)
-    y: PAD + ((maxV - (p.pace_s_per_km as number)) / range) * plotH,
+    y: PAD + ((maxV - (p.effective_pace as number)) / range) * plotH,
     ...p,
   }));
 
@@ -372,6 +384,17 @@ function RouteSparkline({ route }: { route: RouteData }) {
       <div className="flex items-center gap-2">
         <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Route</span>
         <span className="text-xs text-gray-500">Same route · {(route as any).comparable_runs ?? route.times_run}×</span>
+        {/* D-105: tell the athlete the chart is grade-adjusted when any
+            plotted point uses GAP. Otherwise the chart is raw pace and the
+            label is silent (no badge = the default, no surprise). */}
+        {usingGap && (
+          <span
+            className="text-[10px] uppercase tracking-wider text-gray-500/80 border border-gray-600/40 rounded px-1.5 py-0.5"
+            title="Pace adjusted for elevation grade where available"
+          >
+            GAP
+          </span>
+        )}
       </div>
       <div className="mt-1 relative">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 280, height: 52 }}>
@@ -392,7 +415,8 @@ function RouteSparkline({ route }: { route: RouteData }) {
         <div className="flex justify-between text-[10px] text-gray-500 mt-0.5" style={{ maxWidth: 280 }}>
           <span>{pts[0].date.slice(5)}</span>
           <span className="font-medium text-yellow-400/80">
-            {currentPt.pace_s_per_km != null ? formatPace(currentPt.pace_s_per_km) : ''}
+            {/* D-105: show GAP value when present for today's run; otherwise raw. */}
+            {currentPt.effective_pace != null ? formatPace(currentPt.effective_pace) : ''}
             {currentPt.hr != null && <span className="text-orange-400/60 ml-1">· {currentPt.hr} bpm</span>}
             {' '}← today
           </span>

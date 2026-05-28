@@ -707,7 +707,13 @@ export async function buildWorkoutFactPacketV1(args: {
       // upgrading these labels into asserted identities; the athlete never
       // saw a name field to validate against. Generic "a route you've run N
       // times" framing replaces it across all consumers.
-      let routeRuns: { times_run: number; first_seen: string; last_seen: string; history: Array<{ date: string; pace_s_per_km: number | null; hr: number | null; is_current: boolean }> } | null = null;
+      // D-105: surface effort-adjusted pace alongside raw so the client ROUTE
+      // sparkline can plot GAP-corrected pace (grade-neutral) on hilly routes
+      // instead of raw pace, which made same-effort runs at different grades
+      // look like fitness variation. Column is on route_progress_metrics
+      // (verified populated on every recent row for the test user); previously
+      // dropped from the SELECT.
+      let routeRuns: { times_run: number; first_seen: string; last_seen: string; history: Array<{ date: string; pace_s_per_km: number | null; gap_pace_s_per_km: number | null; hr: number | null; is_current: boolean }> } | null = null;
       if (matchedClusterId) {
         const [{ data: clusterRow }, { data: histRows }] = await Promise.all([
           supabase
@@ -717,7 +723,7 @@ export async function buildWorkoutFactPacketV1(args: {
             .maybeSingle(),
           supabase
             .from('route_progress_metrics')
-            .select('metric_date, avg_pace_sec_per_km, avg_hr_bpm, workout_id')
+            .select('metric_date, avg_pace_sec_per_km, effort_adjusted_pace_sec_per_km, avg_hr_bpm, workout_id')
             .eq('user_id', userId)
             .eq('route_cluster_id', matchedClusterId)
             .order('metric_date', { ascending: true })
@@ -728,6 +734,9 @@ export async function buildWorkoutFactPacketV1(args: {
             ? histRows.map((r: any) => ({
                 date: String(r.metric_date || '').slice(0, 10),
                 pace_s_per_km: r.avg_pace_sec_per_km != null ? Number(r.avg_pace_sec_per_km) : null,
+                // D-105: grade-adjusted pace — preferred by the ROUTE sparkline
+                // when present (per-row availability gates the client fallback).
+                gap_pace_s_per_km: r.effort_adjusted_pace_sec_per_km != null ? Number(r.effort_adjusted_pace_sec_per_km) : null,
                 hr: r.avg_hr_bpm != null ? Number(r.avg_hr_bpm) : null,
                 is_current: String(r.workout_id) === workoutId,
                 _workout_id: String(r.workout_id || ''),
