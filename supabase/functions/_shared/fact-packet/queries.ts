@@ -496,13 +496,32 @@ export async function getSimilarWorkoutComparisons(
         : applyTerrainFilter(wideDurationMatch).length >= 3
           ? 'wideDurationMatch'
           : 'typeMatch';
-    const trendPool = trendPoolSource === 'routeMatch'
+    const trendPoolBase = trendPoolSource === 'routeMatch'
       ? applyRouteFilter(terrainMatch)
       : trendPoolSource === 'terrainMatch'
         ? terrainMatch
         : trendPoolSource === 'wideDurationMatch'
           ? applyTerrainFilter(wideDurationMatch)
           : typeMatch;
+    // D-106: tighten the TREND pool to STRICT same-classified_type matches
+    // only. Pre-D-106 the pool inherited typeMatch's `comparableKeys` bucket
+    // (e.g. easy_run pooled with recovery / easy / steady_state / run /
+    // long_run via getComparableTypeKeys), which is fine for the vs_similar
+    // per-session comparison (pace-proximity filtering further down narrows
+    // it) but pollutes the TREND chart that's supposed to visualize aerobic
+    // adaptation OVER TIME for a single intent. An easy run trending against
+    // mixed recovery+long+steady_state rows shows mostly intent variance,
+    // not fitness change. vs_similar pool intentionally left untouched —
+    // tighter signal there comes from the pace-proximity filter (D-038), not
+    // type strictness.
+    const trendPoolStrictType = workoutTypeKey
+      ? trendPoolBase.filter((r) => inferWorkoutTypeKey(r) === workoutTypeKey)
+      : trendPoolBase;
+    // Strict-type pool wins when ≥3; below that, the existing sample_size<3
+    // gate downstream suppresses the trend output entirely. Better to show
+    // no trend than a misleading mixed-intent one.
+    const trendPool = trendPoolStrictType;
+    console.warn(`[fact-packet] trend strict-type filter (D-106): ${trendPoolBase.length} → ${trendPoolStrictType.length} (key=${workoutTypeKey ?? 'null'})`);
     // Trend pool uses the same basis preference: GAP when current has it AND ≥3
     // historical points have it; otherwise raw across the trend pool.
     const trendGapEligible = curHasGap
@@ -554,7 +573,14 @@ export async function getSimilarWorkoutComparisons(
     console.warn(`[fact-packet] trend_points: pool=${trendPoolSource}(${trendPool.length}), withPace=${trendWithPaceBase.length}, basis=${useGapForTrend ? 'gap' : 'raw'}, wideBand=${wideBandLo}-${wideBandHi}min(${wideDurationMatch.length} hits)`);
     const trend_points = trendWithPaceBase
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-      .slice(-8)
+      // D-106: extended trend window from 8 → 12 sessions. ~6-8 weeks of
+      // regular training is enough to see real aerobic adaptation; the prior
+      // 8-point cap (which dropped to ~5 visible after the pace-proximity +
+      // race-boundary filters trimmed further) was too short for the
+      // aerobic-fitness signal the chart is meant to convey. Pairs with the
+      // strict-type filter above — a wider window of strictly-matched rows
+      // beats a tighter window of mixed-intent rows.
+      .slice(-12)
       .map((r) => {
         const pace = useGapForTrend ? getOverallGapSecPerMi(r)! : getOverallPaceSecPerMi(r)!;
         const hr = getOverallAvgHr(r);
