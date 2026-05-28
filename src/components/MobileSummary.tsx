@@ -108,6 +108,25 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
             Loading performance analysis…
           </div>
         )}
+        {/* D-104: render INSIGHTS narrative ABOVE the exercise table for strength
+            sessions. The strength branch was missing SessionNarrative entirely —
+            D-102 (lift to ai_summary) + D-103 (remove silent 401 gate) made the
+            narrative reliably reach session_detail_v1.narrative_text via the
+            workout-detail → buildSessionDetailV1 → narrative_text chain, but the
+            client never rendered it on strength; the exercise table started
+            immediately with no coaching read above it. SessionNarrative is
+            sport-agnostic (reads sd.narrative_text, sd.summary, etc.) and
+            gracefully no-ops the run/ride-specific blocks when their fields are
+            absent on strength session_detail_v1. */}
+        <SessionNarrative
+          sessionDetail={sd}
+          hasSessionDetail={hasSessionDetail}
+          noPlannedCompare={noPlannedCompare}
+          planLinkNote={!planned ? 'No plan session linked.' : null}
+          recomputing={recomputing}
+          recomputeError={recomputeError}
+          onRecompute={recomputeAnalysis}
+        />
         <StrengthPerformanceSummary
           planned={planned}
           completed={completed}
