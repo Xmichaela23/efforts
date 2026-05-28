@@ -2575,6 +2575,188 @@ ahead") — user accepted at diminishing returns and moved on.
 
 ---
 
+## D-094 — Strength Planned column parses string rep ranges + qualitative weights (display-layer fix; data shape was correct)
+
+**Date:** 2026-05-27
+**Files:** `src/components/StrengthPerformanceSummary.tsx` (parser at lines ~62-90), `src/components/StrengthCompareTable.tsx` (interfaces + fmt guard at ~283-310).
+
+The strength Performance tab Planned column rendered `"—"` for every set on every strength workout. Diagnosis: `planned_workouts.strength_exercises` carries aggregate values — `sets` is a number (count), `reps` is a string range like `"4-6"`, `weight` may be a qualitative string like `"Bodyweight"` / `"Heavy barbell"` / `"Band"`. The parser at `StrengthPerformanceSummary.tsx:62-66` tried to handle both shapes but the type-coercion fell through to 0 on the planned case (`typeof reps === 'number'` failed AND `setsArr.length === 0`). Then `StrengthCompareTable.tsx:284` had a guard `if (!s.reps && !s.duration_seconds && !s.weight) return '—'` — all three zero, `"—"` rendered.
+
+Fix at the display layer (Option A — picked over Option B normalizer in `workout-detail` because the planned data is *legitimately aggregate-shaped*; coaches prescribe "3 sets × 4-6 reps @ 110 lb @ RIR 2" at the exercise level, not per-set):
+- `StrengthPerformanceSummary.tsx`: parse string rep ranges via regex (`"4-6"` → midpoint 5); recognize qualitative weight strings (numeric-only strings parse to `weight`, anything else preserved as `weight_display`); fall back to per-set arrays only when present.
+- `StrengthCompareTable.tsx`: extend `StrengthSet` + `StrengthExercise` interfaces with `weight_display?: string`. Construct `plannedSets` carrying replicated aggregate values across all N sets (coaches prescribe at exercise level, not per-set — all planned sets render same target). Carry `target_rir` as `rir` so `fmt()` with `showRir=true` renders `"(RIR N)"`. Fix `fmt()` guard to render when any of (numeric content, qualitative weight, target RIR) is meaningful. Pass `showRir=true` to fmt on the Planned column.
+
+Considered Option B (server-side normalizer in `workout-detail` that converts aggregate planned shape to per-set arrays) and Option C (schema change to make planned use per-set shape). Both rejected as solving a problem that doesn't exist — the data shape is correct; the parser was wrong. Display layer is the right place to interpret aggregate prescriptions into per-set rendering.
+
+**Verification:** 3x5 squat at 110 lb with target RIR 2 and string reps "4-6" now renders as `"5 reps @ 110 lb (RIR 2)"` across three sets on the Planned column instead of `"—"` three times.
+
+---
+
+## D-095 — PREVIOUS column on strength Performance tab — per-set granularity via direct workouts.strength_exercises read
+
+**Date:** 2026-05-27
+**Files:** `supabase/functions/workout-detail/index.ts` (post-`buildSessionDetailV1` augmentation, +57 lines), `src/components/StrengthPerformanceSummary.tsx` (prop pass-through), `src/components/StrengthCompareTable.tsx` (`previousByExercise` prop, row construction, conditional 3-col vs 2-col layout, header rendering).
+
+New column on the strength Performance tab between Set and Planned showing the most recent prior session's per-set actual (weight × reps @ RIR) for the same exercise + set number. Tells the athlete the full arc: "you did X last time, plan says Y, you did Z."
+
+Server-side: after `buildSessionDetailV1`, if `isStrengthLikePerfSession(row)` and `compStrengthArr` is non-empty, single batched query for the user's last 10 strength-class workouts before today. Walk in date-desc order; first match per exercise wins (= most recent). Skip rows with no per-set data. Break early when all current exercises have matched. Build `{ [normalizedExerciseName]: { date, days_ago, sets: [...] } }` map and attach to `sessionDetailV1.previous_strength_by_exercise`.
+
+**Source choice:** `workouts.strength_exercises` JSONB (per-set granularity) over the `exercise_log` table. exercise_log exists but only carries per-session aggregates (`best_weight`, `best_reps`, `avg_rir`, `sets_completed`) — insufficient for the per-set-vs-set comparison the column asks for. Considered using exercise_log + replicating the aggregate across all sets (cheaper query, less per-set fidelity); rejected because the spec explicitly asks for per-set.
+
+**Cost shape:** single batched query (last 10 workouts in one round-trip), not N+1 per exercise. Typical 6-8 exercises per session, all resolvable from a small recent window without dedicated indexes.
+
+Client-side: extend `pair` construction to `{ planned, completed, previous }`. New 12-col grid when `r.hasPrevious`: Set (2) / Previous (3) / Planned (3) / Completed (3) / Edit (1). Falls back to original 2 / 5 / 5 layout when no prior session — first-time exercise gets the wider layout instead of an awkward "—" column. Header includes `"Previous · Nd"` badge with date in title tooltip.
+
+**Verification:** test user 2026-05-18 strength session: Bench Press → 2026-03-30 (4 sets, 125×5 @ RIR 4 / 130×5 @ RIR 3 / ...), Pull-ups → 2026-03-30 (2 sets, 0×6 @ RIR 2 — bodyweight), Band Face Pulls → 2026-03-27.
+
+---
+
+## D-096 — "↑ Same as set 1" carry-forward button on strength logger (set 2+)
+
+**Date:** 2026-05-27
+**Files:** `src/components/StrengthLogger.tsx` (set row render at ~3274-3320, placed in the existing `flex-1` spacer between RIR and Done).
+
+Highest-impact friction reduction on the strength logger. Most working sets in a strength session are identical to set 1 — same weight, same reps, similar RIR. Pre-D-096 each set required 3 separate keypad-drawer cycles (reps + weight + RIR) → 9-27 drawer animations per exercise.
+
+New compact `"↑ Same"` pill button on set 2+, placed in the existing flex-1 spacer between the RIR and Done columns (no layout change for set 1 or for the row otherwise). One tap copies `reps / weight / rir / duration_seconds / resistance_level / barType` from `exercise.sets[0]`. Disabled + dimmed when the current set already matches set 1's values (visual confirmation, no destructive re-apply).
+
+Drawer remains fully available for arbitrary edits — Same is additive, not a replacement.
+
+---
+
+## D-097 — Previous-session autofill on strength logger open (with muted display + tap-to-edit clearing)
+
+**Date:** 2026-05-27
+**Files:** `src/components/StrengthLogger.tsx` (new `LoggedSet.from_previous?: boolean`, autofill useEffect at ~1294-1390, `updateSet` flag-clearing logic at ~2178-2190, muted spans on reps/weight/RIR value buttons).
+
+On logger open, prefill empty sets with the athlete's most recent prior session's per-set actuals for the same exercise. The athlete arrives at a session where the work is mostly done — taps adjust only what changed since last time. Most common case: tap Done on set 1 (values already match last session), tap "Same" on set 2 + 3 (D-096), tap Done. Three taps per exercise instead of nine.
+
+Client-side mirror of D-095's server fetch: D-095 added `previous_strength_by_exercise` to `session_detail_v1` for the completed-workout Performance tab. That data isn't available pre-completion — the logger fires before workout-detail. So the autofill here is a client-side query: last 10 strength workouts via Supabase client, build the same per-exercise map, prefill empties. Reuses the same `normalizeExerciseName` helper pattern (lowercase, strip `(Left)/(Right)`) for stable matching across spelling variants.
+
+"Untouched" gate: `weight === 0 AND no reps/duration_seconds/rir/resistance AND not completed`. Sets already loaded from a saved-session restore or from the planned prescription are NOT overwritten.
+
+Display: new `LoggedSet.from_previous: boolean` flag carries the "this came from history" signal forward. Value text on reps / weight / RIR buttons renders in muted `text-white/35` when `from_previous && !completed`. Athlete reads it as a suggestion.
+
+State-clearing: `updateSet` auto-clears `from_previous: false` on any update unless the caller passes `from_previous` explicitly. Single point of truth. The autofill itself passes `from_previous: true` explicitly to preserve the flag.
+
+---
+
+## D-098 — Inline ±2.5 / ±5 weight stepper on strength logger (barbell / dumbbell / goblet only)
+
+**Date:** 2026-05-27
+**Files:** `src/components/StrengthLogger.tsx` (3 weight cells: dumbbell ~3279, goblet ~3307, barbell ~3335).
+
+Four compact chip-buttons (-5, -2.5, +2.5, +5) below the weight value on each set row for barbell / dumbbell / goblet exercises. One tap adjusts weight without opening the keypad drawer. Common cases solved: athlete drops 5 lb on a fade set, bumps +2.5 lb after hitting RIR 4 on the prior session.
+
+Skipped for bodyweight, duration-based, and band exercises (band uses a resistance-level dropdown, no weight value). Step deltas rounded to nearest 0.5 lb so 2.5 increments stay clean across repeated taps (avoids float drift like 87.4999999 from cumulative +2.5). Weight floor clamped at 0 (no negative weight on -5 from a low set).
+
+Weight button still opens the keypad drawer for arbitrary entry — stepper is additive. Updates flow through `updateSet`, which clears `from_previous` (D-097) on any athlete-initiated change.
+
+Considered: extracting the stepper to a small reusable component. Rejected — three identical inline blocks keeps the diff localized + the render loop simple; no state-closure issues.
+
+---
+
+## D-099 — Strength logger RIR drawer-keypad replaced by 5-pill inline slider (1-5)
+
+**Date:** 2026-05-27
+**Files:** `src/components/StrengthLogger.tsx` (RIR cell at ~3405-3460, full replacement of the prior drawer-trigger button).
+
+Replace the single drawer-trigger button for RIR with a 5-pill inline slider (1, 2, 3, 4, 5). One tap commits the value — no drawer animation. For a typical 6-exercise × 3-set strength session that's 18 drawer cycles eliminated.
+
+RIR is the field most likely to be entered out-of-flow (post-set, head down, breathing hard) so making it a one-tap action also removes the modal context-switch.
+
+Visual states (in priority order):
+- Selected pill: bright white border + bold text. Conveys "this is my pick."
+- Selected + from_previous (D-097 autofill): muted white border + dim text. Tells the athlete "this is suggested, hasn't been committed yet" — matches the visual language of the reps + weight muted spans.
+- Target RIR (when the prescription specifies one): amber-tinted background + amber border. Athlete sees both the prescription and their pick in the same row.
+- Other pills: subtle white-on-glass border, low-contrast text.
+
+Hidden for mobility mode / duration-based / plyometric exercises.
+
+Drawer-based RIR input via `handleSetComplete` (the "athlete taps Done without setting RIR first" fallback) is intentionally preserved as the safety net.
+
+---
+
+## D-100 — Strength logger auto rest timer made visible (header chip + Web Audio tone + dismiss)
+
+**Date:** 2026-05-27
+**Files:** `src/components/StrengthLogger.tsx` (`playRestEndTone` helper at ~421-446, tick handler tone branch at ~1985-2000, header countdown chip at ~2755-2790).
+
+Make the existing auto-rest behavior visible. Pre-D-100 the rest timer was already auto-starting via `startAutoRestForNextSet` (called from `handleSetComplete`) and the tick handler already vibrated at zero, but there was no UI affordance — the timer ran invisibly and the athlete had no way to see "how long until set 2" or to skip the rest early.
+
+Three additions:
+1. **Session-header countdown chip.** Picks the running rest timer with the smallest remaining time (most "active right now"), renders amber pill at the top of the logger header: `"REST 1:23 [×]"`. Updates live with the existing tick. Disappears when no rest is running. Rest-timer keys are `${exerciseId}-${setIndex}` — distinct from duration-timer keys (`${exerciseId}-set-${setIndex}`) which carry a "-set-" separator. The chip filter respects that namespace split.
+2. **Audible end-of-rest tone.** Web Audio API oscillator (880 Hz / A5, sine, 0.18 gain, 0.28s decay envelope). No asset file. Fires alongside the existing 50ms haptic vibrate at `ns === 0`. Isolated audio context per tone, closed after ~400ms to free resources on iOS. Triggered from a tick descended from the athlete's Done tap, so the audio context is unlocked under iOS WKWebView's gesture requirement. Duration-timer expiries are exempt — those mark a set-completion event, not a rest end.
+3. **Dismiss button.** × inside the chip flips the active timer's `running` flag to false. Tone + haptic don't fire on dismiss.
+
+No changes to the auto-start trigger — `startAutoRestForNextSet` still fires from `handleSetComplete`. Duration is calculated by the existing `calculateRestTime(exerciseName, reps)` helper (rep-band-aware: 3-5 reps → 150s, 6-8 → 120s, etc.).
+
+---
+
+## D-101 — iOS resume reopens strength logger when session unfinished (closes Bug B Cause 1)
+
+**Date:** 2026-05-27
+**Files:** `package.json` + `package-lock.json` (npm install `@capacitor/app@^8`), `ios/App/...` (cap sync output), `src/components/AppLayout.tsx` (resume listener useEffect after `showStrengthLogger` useState).
+
+Closes POLISH-PUNCH-LIST Bug B Cause 1: iOS WKWebView teardown after long sleep unmounts AppLayout and `showStrengthLogger` (useState — no route, no persist) loses the `open=true` state. localStorage still holds the in-flight sets (D-097 + commit `556c4850` persistence layer), but the athlete has no path back to the logger short of manually finding the workout and re-opening.
+
+New `@capacitor/app` resume listener:
+- Subscribes to `appStateChange`.
+- On `isActive === true` (foreground transition), checks the canonical `strength_logger_session_${today}` localStorage key for "real data" — at least one exercise with a non-empty sets array (the shape `StrengthLogger` writes via `saveSessionProgress`).
+- If present and logger isn't already open, `setShowStrengthLogger(true)` reopens it. The existing `StrengthLogger` restore-on-mount path (useEffect line 1337) then hydrates the saved exercises / addons / notes / RPE / source-planned metadata.
+
+Web / non-Capacitor environments silently no-op the listener attach (try/catch around addListener) — the auto-reopen is iOS-specific by design.
+
+Plumbing: `npm install @capacitor/app@^8` (the user-authorized install — `@capacitor/{core,cli,ios}` were already present, `app` was not). `npx cap sync ios` to register the plugin in the iOS Xcode project.
+
+**Out of scope:** Bug B Cause 2 (AuthWrapper `dc85e9d0` regression that unmounts AppLayout on every auth event) is a separate scope. D-101 covers the lifecycle gap; Cause 2 is the secondary issue that exacerbates it.
+
+---
+
+## D-102 — Strength INSIGHTS three-piece refactor (narrative lift + 4-sentence cap + strength_fact_packet_v1)
+
+**Date:** 2026-05-27
+**Files:** `supabase/functions/analyze-strength-workout/index.ts` (prompt rewrite at ~2228-2299, fact packet build at ~2611-2682, write payload at ~2683-2710).
+
+Three changes to `analyze-strength-workout`, shipped together because they share the same write surface:
+
+1. **Lift narrative to top-level `ai_summary`.** Pre-D-102 the LLM output lived only at `workout_analysis.session_state_v1.narrative.text`. Cycling and run expose it at `workout_analysis.ai_summary` for client + session-detail-builder parity. New top-level fields: `workout_analysis.ai_summary`, `workout_analysis.ai_summary_generated_at`, `workout_analysis.recomputed_at` (D-079 parity — strength was the lone analyzer missing this). The `session_state_v1.narrative.text` path stays populated (don't break existing client readers); `ai_summary` is additive.
+
+2. **Tighten LLM prompt from 6-section structured (~2000 tokens) to 4-sentence cap (240 tokens).** Mirrors cycling D-093 CLEAN-EXECUTION CAP. New rule structure: S1 LEDE (RIR + load adherence vs target — cite specific exercises when one dominates, summarize at session level when uniform), S2 ONE physiological observation (RIR drift, readiness alignment, 1RM-trend — pick one, don't list), S3 ONE phase + endurance-load clause (skip when no notable signal and ship 3 sentences), S4 ONE forward-looking sentence (next-session target adjustment or recovery cue). HARD CUTS: no "this kind of work is exactly what...", no "monitor how you feel", no closing exhortations, no exercise re-listing that the dashboard rows already render. PLAIN LANGUAGE: never print %1RM / ACWR / TSS / target_rir as labelled values — translate to words. The pre-D-102 structured 6-section output is preserved in `detailed_analysis.exercise_breakdown` for the client to render verbatim; the narrative is supposed to *interpret*, not re-list.
+
+3. **Add thin `strength_fact_packet_v1`.** New top-level field carrying the smallest set of facts the INSIGHTS narrative leads with. Pattern mirrors run's `fact_packet_v1` and cycling's `cyclingFactPacketV1`. Schema: `{ version: 1, discipline: 'strength', generated_at, facts: { phase, week_in_phase, plan_intent, plan_type, avg_target_rir, avg_actual_rir, rir_delta, rir_verdict: 'too_easy'|'on_target'|'too_hard'|null, total_volume_lb, exercises_completed, exercises_planned, set_completion_pct, session_rpe }, endurance_load_context: null }`. Values derived from existing analyzer outputs (`exercise_adherence`, `plan_metadata`, `volume_analysis`, `overall_adherence`, `session_rpe`) — no new computations. `rir_delta` sign convention: `actual - target` so negative = harder than planned, positive = easier. Verdict thresholds: `|delta| < 1` = on_target, `delta <= -1` = too_hard, `delta >= 1` = too_easy. `endurance_load_context: null` reserved for future wiring (fetches from `athlete_snapshot.weekly_workload` + last-long-day signals); v1 leaves it null so the prompt's S3 clause is tolerantly skipped.
+
+Considered: separate `_shared/strength-v1/ai-summary.ts` module mirroring `_shared/cycling-v1/ai-summary.ts` structure (per STRENGTH-ANALYSIS.md §7.1). Deferred — inlined in `analyze-strength-workout/index.ts` for delivery speed. Module-extraction is a follow-up refactor with no behavior change. Also considered: outcome-specific narrative templates (clean / under-executed / PR / deload per spec §4.2). Deferred — D-102 uses one general CLEAN-EXECUTION CAP prompt; template gates can be added once observed-in-production behavior reveals which outcomes need distinct prompting.
+
+**End-to-end verification deferred** — `analyze-strength-workout` had an in-handler user-JWT gate that rejected all internal service-role invocations (root cause closed in D-103 next).
+
+---
+
+## D-103 — Silent 401 cross-sport bug: removed in-handler user-JWT gate from analyze-strength-workout + analyze-swim-workout
+
+**Date:** 2026-05-27
+**Files:** `supabase/functions/analyze-strength-workout/index.ts` (removed lines 2358-2386 + 2417-2426), `supabase/functions/analyze-swim-workout/index.ts` (removed lines 126-150 + 193-202).
+
+The strength + swim analyzers both required `supabase.auth.getUser(token)` in-handler before reaching any analysis code. Every internal invoker (`recompute-workout`, `ingest-activity`, `bulk-reanalyze-workouts`) calls with the service-role token, which has no `user.id`, so every internal call returned 401 silently. `recompute-workout` swallowed the error at `index.ts:116-119` (`return json({ ok: true, stale: true, steps })`) — the client saw a successful recompute, but no narrative ever landed.
+
+Net effect: strength + swim narratives had been silently failing on the recompute + ingest path since the gates were added. Cycling + run analyzers don't have this check and have always worked. **Same class as D-075 / D-081 silent 42703 (PostgREST phantom columns) and D-083 swallowed ReferenceError, but at the JWT-auth layer instead of SQL or runtime.** Five-bug cluster now: silent SQL → silent runtime → silent JWT → silent JSONB shape (D-089) → silent type coercion (D-094). Each one invisible to the client; each one had failure-to-zero output for weeks/months.
+
+**Evidence**: scanned 8 recent strength sessions for the test user. Only ONE (2026-04-02, pre-gate) had a populated narrative. All seven others had `analyzed_at` set somewhere but `workout_analysis` containing only `session_detail_v1` + `session_detail_updated_at` (written by `workout-detail`, not by the analyzer). D-102's `ai_summary` lift + 4-sentence cap + `strength_fact_packet_v1` all lived downstream of the 401 reject — never executed.
+
+Fix (Option A — chose this over Option B forwarding the user JWT from invokers because removing the dead gate is one-and-done; forwarding would touch every invoker AND leave the gate as a footgun for future ones):
+- analyze-strength-workout: removed the JWT extract + `getUser` + 401 returns + `requestingUserId` block (lines 2358-2386) and the cross-check `workout.user_id !== requestingUserId` → 403 block (lines 2417-2426). Mirrors cycling + run analyzer pattern.
+- analyze-swim-workout: same removal at lines 126-150 + 193-202.
+
+Authorization enforced upstream: `recompute-workout` validates the user JWT at `index.ts:48` AND verifies `workouts.user_id === user.id` at `:69` before invoking. `ingest-activity` runs in webhook-trusted service-role context.
+
+**Verification:** recomputed two strength sessions via service-role REST call:
+- May 18 (`cfa77692`, unplanned): analyze HTTP 200 (was 401), `analyzed_at` populated, full analyzer keys, 4-sentence narrative cites bench load + pull-up RIR drop + marathon recovery + overhead-press forward call. Fact packet present but most fields null (unplanned → no `plan_metadata`, no target_rir to compare).
+- March 30 (`c09d8006`, planned): analyze HTTP 200, 3-sentence narrative (CLEAN-EXECUTION CAP correctly skipped S3), fact packet **fully populated**: phase="race prep", week_in_phase=5, plan_intent="traditional", rir_verdict="on_target", total_volume_lb=5440, set_completion_pct=137.5. The initial recompute on March 30 hit a transient Cloudflare 520 during `merge_computed`; retry cleared cleanly.
+
+**Footgun added to the analyzer family:** any future analyzer-class function MUST NOT add an in-handler user-JWT gate. Internal callers are trusted by upstream authorization. The gate pattern looks defensive but creates a silent 401-and-swallow path that's invisible until end-to-end verification catches it. D-103's surfaced bug had been dormant for an unknown duration (only one historical narrative success, April 2 — likely pre-gate).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
