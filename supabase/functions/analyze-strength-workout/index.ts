@@ -2354,36 +2354,20 @@ Deno.serve(async (req) => {
     }
     
     supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Validate user authentication (extract from Authorization header)
-    const authH = req.headers.get('Authorization') || '';
-    const token = authH.startsWith('Bearer ') ? authH.slice(7) : null;
-    
-    if (!token) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Missing authentication token' }), {
-        status: 401,
-        headers: { 
-          'Content-Type': 'application/json',
-          ...corsHeaders()
-        }
-      });
-    }
-    
-    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
-    if (userErr || !userData?.user?.id) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid authentication token' }), {
-        status: 401,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info'
-        }
-      });
-    }
-    
-    const requestingUserId = userData.user.id;
-    
+
+    // D-103: in-handler user-JWT auth gate REMOVED. Pre-D-103 this analyzer
+    // required `supabase.auth.getUser(token)` to return a user.id — but every
+    // internal invoker (recompute-workout, ingest-activity, bulk-reanalyze-
+    // workouts) calls with the service-role token, which has no user.id, so
+    // every internal call returned 401 silently. recompute-workout swallowed
+    // the error at index.ts:116-119 and returned ok:true to the client. Net
+    // effect: strength narratives have been silently failing to generate
+    // since the gate was added. Mirror cycling + run analyzers which trust
+    // the service-role caller and use workout.user_id read from the DB row.
+    // The 403 cross-check below (was line 2418) is also removed since
+    // requestingUserId no longer exists; workout.user_id is read directly
+    // for downstream queries.
+
     // Get workout data - try with workout_metadata first, fallback if column doesn't exist
     let workout: any = null;
     let workoutError: any = null;
@@ -2413,18 +2397,13 @@ Deno.serve(async (req) => {
     if (workoutError || !workout) {
       throw new Error(`Workout not found: ${workoutError?.message || 'No workout found'}`);
     }
-    
-    // Verify user has permission to access this workout
-    if (workout.user_id !== requestingUserId) {
-      return new Response(JSON.stringify({ error: 'Forbidden: You do not have access to this workout' }), {
-        status: 403,
-        headers: { 
-          'Content-Type': 'application/json',
-          ...corsHeaders()
-        }
-      });
-    }
-    
+
+    // D-103: per-user cross-check removed alongside the JWT gate above.
+    // Caller authorization is now enforced upstream by recompute-workout
+    // (validates user JWT at index.ts:48 + verifies `workouts.user_id ===
+    // user.id` at :69 before invoking) and by ingest-activity (service-role
+    // context — webhook-trusted). Matches cycling/run analyzer pattern.
+
     // Check if it's a strength workout
     if (workout.type !== 'strength' && workout.type !== 'strength_training') {
       return new Response(JSON.stringify({ 

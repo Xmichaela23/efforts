@@ -123,31 +123,15 @@ Deno.serve(async (req) => {
 
     supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Validate user authentication
-    const authH = req.headers.get('Authorization') || '';
-    const token = authH.startsWith('Bearer ') ? authH.slice(7) : null;
-
-    if (!token) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Missing authentication token' }), {
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders()
-        }
-      });
-    }
-
-    // Get user from token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders()
-        }
-      });
-    }
+    // D-103: in-handler user-JWT auth gate REMOVED (same root cause as
+    // strength — every internal invoker passes service role, which has no
+    // user.id, so the gate returned 401 silently and swim narratives
+    // failed to generate on the recompute-workout / ingest-activity path).
+    // Mirror cycling + run analyzers: trust service-role caller, read
+    // workout.user_id from the row. Cross-check at the prior line 194 is
+    // also removed; authorization is enforced upstream by recompute-workout
+    // (user JWT validated + workout user-id verified before invoke) and by
+    // ingest-activity (webhook-trusted service-role context).
 
     // Set analysis status to 'analyzing'
     await supabase
@@ -190,16 +174,9 @@ Deno.serve(async (req) => {
       throw new Error(`Workout not found: ${workoutError?.message || 'No workout found'}`);
     }
 
-    // Verify user has permission
-    if (workout.user_id !== user.id) {
-      return new Response(JSON.stringify({ error: 'Forbidden: You do not have access to this workout' }), {
-        status: 403,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders()
-        }
-      });
-    }
+    // D-103: per-user cross-check removed alongside the JWT gate above.
+    // Authorization enforced upstream (recompute-workout user-id check,
+    // ingest-activity webhook-trusted). Matches cycling/run pattern.
 
     // Check if it's a swim workout
     if (workout.type !== 'swim') {
