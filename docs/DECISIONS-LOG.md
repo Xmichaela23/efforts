@@ -2782,6 +2782,87 @@ Minor redundancy noted: `StrengthPerformanceSummary` already has its own "Recomp
 
 ---
 
+## D-105 — ROUTE sparkline plots GAP-adjusted pace with per-row raw fallback (display-layer fix; data was correct)
+
+**Date:** 2026-05-29
+**Files:** `supabase/functions/_shared/fact-packet/build.ts:720` (SELECT extension + row-shape addition), `supabase/functions/_shared/session-detail/types.ts:382` (history contract extension — additive), `src/components/SessionNarrative.tsx` (`RouteSparkline` derives effective_pace + adds "GAP" badge).
+
+The ROUTE sparkline plotted raw pace, which on hilly routes made same-effort runs at different grades read as fitness variation. The grade-adjusted-pace column (`route_progress_metrics.effort_adjusted_pace_sec_per_km`) was already populated on every recent row for the test user (verified 10/10 via REST); the fact-packet SELECT just didn't pull it.
+
+Pure SELECT-narrowing bug, same class as **D-094** (silent type coercion to 0), **D-075** + **D-081** (silent SELECT-shape gaps), **D-083** (swallowed ReferenceError) — data correct at source; the reader didn't pull/parse it correctly. Five-bug cluster now: silent SQL → silent runtime → silent JWT (D-103) → silent JSONB shape (D-089) → silent type coercion (D-094) → silent SELECT-narrowing (D-105). Each one invisible to the client; each one had failure-to-zero output until end-to-end verification caught it.
+
+Three coordinated edits:
+1. `fact-packet/build.ts:720`: extend SELECT with `effort_adjusted_pace_sec_per_km`; shape the row with `gap_pace_s_per_km` alongside existing `pace_s_per_km` (raw preserved for flat-route fallback / pre-D-105 backfill rows / rows where GAP couldn't be computed). Note: routes table column is `effort_adjusted_pace_sec_per_km`; cousin table `segment_progress_metrics` uses `grade_adjusted_pace_s_per_km` — different name, same concept (cross-table naming inconsistency).
+2. `session-detail/types.ts:382`: extend history contract with `gap_pace_s_per_km: number | null`. Additive — old clients reading only `pace_s_per_km` keep working.
+3. `SessionNarrative.tsx` `RouteSparkline`: per-row fallback gate `effective_pace = gap_pace_s_per_km ?? pace_s_per_km`. Plot effective. "Today's pace" cell shows effective. Subtle "GAP" badge in the header (border-pill, gray) when any plotted point uses GAP — silent otherwise so flat routes / first-time routes don't carry an irrelevant qualifier.
+
+Considered: a route-elevation-threshold gate ("only show GAP label when route avg grade > N%"). Rejected — per-row availability is simpler and equally honest. Athletes on flat routes still get the GAP label if GAP was computed (GAP ≈ raw in that case, so the badge is informational, not misleading).
+
+**Verification (test user May 21 run, audit reference case):** `route_runs.history` rows now carry per-row gap_pace_s_per_km. May 21 today's reading flipped from misleadingly fast 351 (raw, benefiting from downhill segments) to honest 365.5 (GAP-corrected). All 3 history rows GAP-populated → "GAP" badge renders.
+
+**Blast radius:** very small. One SELECT line, one type field added (additive), one client read site, one badge. No backfill needed (column was already populated). No analyzer logic changes — only the SELECT and row-shape function in the existing `terrain_context` derivation.
+
+---
+
+## D-106 — Run TREND pool strict-intent filter + window extended 8 → 12 (vs_similar pool untouched)
+
+**Date:** 2026-05-29
+**Files:** `supabase/functions/_shared/fact-packet/queries.ts` (trend pool strict filter at ~line 499-508 + slice cap at ~line 557).
+
+Two coupled tweaks to the run Performance tab TREND chart:
+
+1. **Strict same-classified_type filter on the trend pool.** Pre-D-106 the trend pool inherited `typeMatch`'s `comparableKeys` bucket via `getComparableTypeKeys` — e.g. `easy_run` pooled with recovery / easy / steady_state / run / long_run. That's appropriate for the vs_similar per-session comparison (pace-proximity D-038 narrows it), but pollutes the TREND chart that visualizes aerobic adaptation OVER TIME for a single intent. An easy run "trending" against mixed recovery + long + steady_state rows shows mostly intent variance, not fitness change. New strict-type filter between `trendPoolBase` construction and `trend_points` serialization: `trendPoolBase.filter((r) => inferWorkoutTypeKey(r) === workoutTypeKey)`. Below the existing `sample_size < 3` gate, the chart suppresses entirely — better to show no trend than a mixed-intent one.
+
+2. **Trend window extended 8 → 12 sessions** (`.slice(-8)` → `.slice(-12)`). 8 sessions dropped to ~5 visible after the pace-proximity (D-038) + race-boundary (D-041 Fix D) filters trimmed further — too short to convey aerobic adaptation. 12 covers ~6-8 weeks of regular training.
+
+**vs_similar pool intentionally LEFT UNTOUCHED** — the per-session comparison already narrows via pace-proximity (D-038) and the broader bucket is useful there for sample size on cross-session HR-vs-pace reads.
+
+**Scope: run-only** — `fact-packet/queries.ts` is invoked from `analyze-running-workout`. Cycling has its own `cycling-v1/cross-workout-queries.ts` module (D-073) — separate concern.
+
+**Architecture call documented for future:** TREND answers "am I getting fitter at this intent?" → strict intent. vs_similar answers "how did THIS session compare to similar recent sessions?" → broad bucket + pace-proximity. ROUTE answers "how is this terrain getting easier?" → no intent (D-107, see below). Three different questions warrant three different filter posture; do not unify.
+
+**Verification (test user May 27 easy run):** recent 5 runs by classified_type — 2 `easy` + 3 `steady_state`. Strict filter correctly excludes the steady_state rows from the trend pool. Post-D-106 trend_points count: 3 (Mar 26 + May 11 + May 20, all `easy`). vs_similar.sample_size: 4 (broader bucket retained for that surface).
+
+**Caveat:** strict-type filter makes the pool more selective; for athletes who haven't logged many runs of a given intent, the trend may not render at all. That's the trade-off — better truth than misleading pace-mixing. If observed "no trend" rate becomes high in production, consider relaxing to "same broad bucket BUT filtered to single peak intent" rather than strict-exact.
+
+---
+
+## D-107 — Drop ROUTE intent filter + lower TREND HR threshold + restore times_run label (post-D-106 web cleanups)
+
+**Date:** 2026-05-29
+**Files:** `supabase/functions/_shared/fact-packet/build.ts` (deleted intent-filter block at original lines 746-773), `src/components/SessionNarrative.tsx:220` (`hasHr` threshold change), `src/components/SessionNarrative.tsx:374` (route-header label source change).
+
+Three changes shipped together because they share the same release surface (post-D-106 Performance-tab cleanup batch).
+
+1. **ROUTE intent filter REMOVED.** Pre-D-107 the route history was narrowed to same-classified_type historicals (per D-039 Fix 6.1). For today's test-user easy run that cut 8 metric rows → 5 same-intent; the `chart_eligible` gate (≥8 per D-040 Fix E) evaluated false; web rendered the text fallback ("Same route · 5 comparable runs — not enough history to trend"). iOS rendered the chart because (almost certainly) the iOS Capacitor bundle predates the chart_eligible gate addition and renders unconditionally.
+
+   The intent filter made sense pre-D-105: intent-mixing on raw pace was noise. Post-D-105 GAP correction neutralizes effort-level variance per-point, so an easy run and a threshold run on the same hill route both contribute GAP-adjusted pace that reads as "what does this terrain cost me at this effort." Mixing intents NOW adds signal (full evolution of athlete-on-this-route) where pre-D-105 it would have added noise.
+
+   Deleted the intent-filter block entirely. ROUTE history returns all matched-cluster metric rows.
+
+2. **TREND HR dashed-line threshold lowered `>= 3` → `>= 2`.** Direct consequence of D-106's strict pool: thin pools (e.g. 3 trend points, only 2 with HR populated) hid the HR line entirely. New threshold renders a 2-point line as a single segment — sparse but honest. Backfills naturally as more same-intent runs land.
+
+3. **Route-header label uses `times_run` first** instead of `comparable_runs ?? times_run`. Post-D-107 `comparable_runs` resolves to `history.length` (≤10 due to the route_progress_metrics SELECT cap), so reading it in the label says "8×" when the cluster sample_count is 43. The label should answer "how many times have I run this route" — that's `times_run` (43 for today's test-user run). iOS has been using `times_run` all along; this restores parity.
+
+Considered: bumping the route_progress_metrics SELECT `.limit(10)` in `fact-packet/build.ts:724` to render denser sparklines. Deferred — 8-10 points is reasonable visual density today; can revisit if denser sparklines become valuable.
+
+Considered: leaving the intent filter and lowering `chart_eligible` threshold from ≥8 to ≥5 instead. Rejected — the intent filter was solving the pre-D-105 noise problem; post-D-105 it became overcorrection. Removing it is the architecturally honest fix; lowering the threshold would just paper over the symptom.
+
+**Verification (test user May 27 easy run, workout `fd820df6`):**
+- Pre-D-107: `route_runs.history.length: 5`, `chart_eligible: false`, web renders text fallback.
+- Post-D-107: `route_runs.history.length: 8` (all matched cluster rows, no intent filter), `chart_eligible: true` (8 ≥ 8), label "Same route · 43×" matches iOS, chart renders with 8 GAP + 8 HR data points.
+
+**Sparkline architecture (carried forward; cite this when revisiting):**
+| Chart | Question it answers | Intent filter posture |
+|---|---|---|
+| TREND | "Am I getting fitter at this intent?" | **Strict same-classified_type** (D-106) |
+| ROUTE | "How is this terrain getting easier?" | **None** — GAP correction (D-105) neutralizes per-point |
+| vs_similar | "How did THIS session compare to similar recent sessions?" | **Broad `comparableKeys` bucket + pace-proximity** (D-038, unchanged) |
+
+Three different questions warrant three different filter posture. Do not unify.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
