@@ -743,34 +743,31 @@ export async function buildWorkoutFactPacketV1(args: {
               }))
             : [];
 
-          // Filter route history to same-intent workouts so the sparkline
-          // doesn't mix easy runs with threshold/interval sessions.
-          const comparableKeys = getComparableTypeKeys(comparisonTypeKey);
-          if (comparableKeys.length > 0 && history.length > 0) {
-            const otherIds = history
-              .filter(h => !h.is_current && h._workout_id)
-              .map(h => h._workout_id);
-            if (otherIds.length > 0) {
-              try {
-                const { data: typeRows } = await supabase
-                  .from('workouts')
-                  .select('id, type, workout_analysis')
-                  .in('id', otherIds);
-                if (Array.isArray(typeRows)) {
-                  const sameIntent = new Set<string>();
-                  for (const r of typeRows) {
-                    const inferred = inferWorkoutTypeKey(r);
-                    if (inferred != null && comparableKeys.includes(inferred)) {
-                      sameIntent.add(String(r.id));
-                    }
-                  }
-                  history = history.filter(h => h.is_current || sameIntent.has(h._workout_id));
-                }
-              } catch (e) {
-                console.warn('[fact-packet] route history type filter failed (non-fatal):', e);
-              }
-            }
-          }
+          // D-107: ROUTE-history intent filter REMOVED. Pre-D-107 this block
+          // narrowed the route history to "same-intent" historicals (per the
+          // D-039 Fix 6.1 spec, the comparable count + chart_eligible gate
+          // both keyed off post-filter history.length). The intent of that
+          // filter was to keep easy + threshold runs out of the same trend.
+          //
+          // After shipping the ROUTE sparkline GAP correction (D-105), the
+          // per-point GAP value already neutralizes effort-level variance —
+          // an easy run and a threshold run on the same hill route both
+          // contribute a GAP-adjusted pace that reads as "what does this
+          // terrain cost me at this effort." Mixing intents on the ROUTE
+          // chart now adds signal (the athlete sees the full evolution of
+          // their relationship to this route), where pre-D-105 it would
+          // have added noise.
+          //
+          // TREND chart still uses strict-intent filtering (D-106) because
+          // TREND answers "am I getting fitter at this intent" — a question
+          // where intent strictness matters. ROUTE answers "how is this
+          // terrain getting easier over time" — a question GAP solves at
+          // the per-point level.
+          //
+          // Net effect: route_runs.history now includes ALL matched-cluster
+          // runs (43 for today's test-user easy run vs the prior 5 same-
+          // intent), chart_eligible at session-detail/build.ts:881 evaluates
+          // true again (43 ≥ 8), and the web ROUTE sparkline renders.
 
           // Strip internal _workout_id before exposing
           const cleanHistory = history.map(({ _workout_id, ...rest }) => rest);

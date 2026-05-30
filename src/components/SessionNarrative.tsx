@@ -216,8 +216,13 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
   const color = effectiveDirection === 'improving' ? '#34d399' : effectiveDirection === 'declining' ? '#f87171' : '#9ca3af';
 
   // HR line — normalize independently, lower HR = higher on chart (same direction as pace improvement)
+  // D-107: threshold lowered from >=3 to >=2. D-106's strict-intent TREND
+  // pool narrows the data; on thin pools (e.g. an athlete's first few easy
+  // runs after a build block) only 2 of 3 trend points carry HR. >=3 hid
+  // the HR dashed line entirely in that case. >=2 renders a single segment
+  // — sparse but honest. Backfills naturally as more same-intent runs land.
   const hrPts = pts.filter((p) => (p as any).avg_hr != null);
-  const hasHr = hrPts.length >= 3;
+  const hasHr = hrPts.length >= 2;
   const hrCoords = hasHr ? (() => {
     const hrVals = pts.map((p) => (p as any).avg_hr as number | null);
     const validHr = hrVals.filter((v): v is number => v != null);
@@ -383,7 +388,16 @@ function RouteSparkline({ route }: { route: RouteData }) {
     <div>
       <div className="flex items-center gap-2">
         <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Route</span>
-        <span className="text-xs text-gray-500">Same route · {(route as any).comparable_runs ?? route.times_run}×</span>
+        {/* D-107: display cluster total (times_run) in the chart-header label
+            instead of comparable_runs. Post-D-107 the ROUTE intent filter is
+            removed and comparable_runs is just history.length (≤10 due to the
+            route_progress_metrics SELECT cap), so a label saying "8×" reads
+            as the chart's data-point count rather than the athlete's actual
+            cumulative experience with the route. times_run is the cluster
+            sample_count — the honest "how many times have I run this route"
+            answer (43 for today's test-user easy run). iOS has been using
+            times_run all along; this restores parity. */}
+        <span className="text-xs text-gray-500">Same route · {route.times_run ?? (route as any).comparable_runs}×</span>
         {/* D-105: tell the athlete the chart is grade-adjusted when any
             plotted point uses GAP. Otherwise the chart is raw pace and the
             label is silent (no badge = the default, no surprise). */}
