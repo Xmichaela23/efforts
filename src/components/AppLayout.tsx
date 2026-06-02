@@ -40,6 +40,31 @@ interface AppLayoutProps {
   onLogout?: () => void;
 }
 
+// D-109: module-level helpers — pure, no React deps. Used by both the
+// useState lazy initializer (which can't reference component-scoped functions)
+// and the warm-resume listener. Keeps the AND-gate logic in one place.
+function todayDateString(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function hasUncompletedStrengthSession(): boolean {
+  try {
+    const key = `strength_logger_session_${todayDateString()}`;
+    const raw = localStorage.getItem(key);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    const exs = Array.isArray(parsed?.exercises) ? parsed.exercises : [];
+    // "Has data" = at least one exercise with a non-empty sets array (the
+    // shape StrengthLogger writes via saveSessionProgress). Empty wrappers
+    // from a fresh-open-then-close shouldn't trigger reopen.
+    return exs.some((ex: any) => Array.isArray(ex?.sets) && ex.sets.length > 0);
+  } catch { return false; }
+}
+
 const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,82 +85,74 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   // plannedWorkouts removed; unified get-week feeds views
 
   const [showBuilder, setShowBuilder] = useState(false);
-  const [showStrengthLogger, setShowStrengthLogger] = useState(false);
 
-  // D-101 + D-108: reopen strength logger when an unfinished session exists in
-  // localStorage. Bug B Cause 1 (per POLISH-PUNCH-LIST): iOS WKWebView teardown
-  // after long sleep unmounts AppLayout. showStrengthLogger lives in useState
-  // (no route, no persist), so the logger comes back closed even though
-  // localStorage still has the in-flight sets.
+  // D-109: separate "session data exists in localStorage" from "user wants
+  // logger open." D-108 conflated the two — any unfinished session in
+  // localStorage forced the logger open on every cold-start / resume, even
+  // when the user had deliberately navigated to the dashboard before leaving.
   //
-  // D-101 only handled WARM resumes (background → foreground while the app
-  // process was still alive). It registered a Capacitor `appStateChange`
-  // listener that fires on `isActive: true` transitions. That covers app-switch
-  // scenarios but MISSES the cold-start case — when iOS kills the WKWebView
-  // (long sleep, memory pressure) and the user relaunches from the icon, the
-  // app starts already-active, the listener registers AFTER the transition,
-  // and the `false → true` event never fires. The athlete returns to a closed
-  // logger even though their sets are intact in localStorage. This was the
-  // exact failure mode Bug B Cause 1 described.
+  // The fix is an AND gate: auto-reopen requires BOTH a persisted intent flag
+  // (`strength_logger_open`) AND today's session-data key being non-empty.
+  // The flag mirrors the user's last expressed intent — written when the
+  // logger opens, cleared when it closes (via a useEffect bound to
+  // showStrengthLogger; covers all 17 setShowStrengthLogger call sites in
+  // this file without touching any of them).
   //
-  // D-108 closes the gap with a mount-time check: read localStorage once on
-  // AppLayout mount AND keep the warm-resume listener. Cold start → mount
-  // check fires → logger reopens. Warm resume → listener fires → logger
-  // reopens. Both paths converge on `setShowStrengthLogger(true)` (a no-op
-  // when already true, so the two paths can't bounce each other).
+  // Stale-flag safety: a leftover flag from yesterday combined with today's
+  // empty session key does NOT trigger a reopen. The hasUncompletedStrengthSession
+  // check uses today's date-keyed storage; yesterday's orphaned session lives
+  // under a different key and is invisible to today's check. So even if the
+  // flag never gets cleared (e.g., app crash mid-session), the day-rollover
+  // naturally prevents next-day reopens.
   //
-  // Also drops the `[showStrengthLogger]` dep — the listener no longer needs
-  // to be torn down + re-registered every time the logger opens or closes
-  // (the prior `if (showStrengthLogger) return` guard was just an
-  // optimization; setState to the same value is already a no-op).
+  // Cold-start path: useState lazy initializer runs SYNCHRONOUSLY during the
+  // first render — before any useEffect fires — so the flag-write useEffect
+  // can't race with it and clear the flag before init reads it.
+  //
+  // Warm-resume path: Capacitor appStateChange listener still wired for
+  // background → foreground transitions while the process stays alive.
+  // (Required for AuthWrapper churn / Bug B Cause 2 — AppLayout remount
+  // mid-foreground could otherwise lose showStrengthLogger.)
+  const [showStrengthLogger, setShowStrengthLogger] = useState<boolean>(() => {
+    try {
+      if (localStorage.getItem('strength_logger_open') !== '1') return false;
+      return hasUncompletedStrengthSession();  // AND gate — both required
+    } catch { return false; }
+  });
+
+  // D-109: flag-write. Mirrors showStrengthLogger to the `strength_logger_open`
+  // localStorage key. Every navigation that closes the logger (7 call sites)
+  // and every action that opens it (10 call sites) flows through showStrengthLogger
+  // → this useEffect → flag write. Single source of truth, zero touches to
+  // the 17 individual call sites.
   useEffect(() => {
-    const todayDateString = () => {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const d = String(now.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    };
-    const hasUncompletedStrengthSession = (): boolean => {
-      try {
-        const key = `strength_logger_session_${todayDateString()}`;
-        const raw = localStorage.getItem(key);
-        if (!raw) return false;
-        const parsed = JSON.parse(raw);
-        const exs = Array.isArray(parsed?.exercises) ? parsed.exercises : [];
-        // "Has data" = at least one exercise with a non-empty sets array (the
-        // shape StrengthLogger writes via saveSessionProgress). Empty wrappers
-        // from a fresh-open-then-close shouldn't trigger reopen.
-        return exs.some((ex: any) => Array.isArray(ex?.sets) && ex.sets.length > 0);
-      } catch { return false; }
-    };
+    try {
+      if (showStrengthLogger) {
+        localStorage.setItem('strength_logger_open', '1');
+      } else {
+        localStorage.removeItem('strength_logger_open');
+      }
+    } catch {}
+  }, [showStrengthLogger]);
 
-    // D-108: cold-start path. Mount-time check runs once when AppLayout first
-    // renders. Catches the case where iOS killed the WKWebView and the user
-    // relaunched from the icon (no appStateChange event fires for this).
-    if (hasUncompletedStrengthSession()) {
-      setShowStrengthLogger(true);
-    }
-
-    // D-101: warm-resume path. Listener fires on every background → foreground
-    // transition while the app process is alive. Setting showStrengthLogger to
-    // true when it's already true is a React no-op; no need to gate on the
-    // current state (which was the only reason for the `[showStrengthLogger]`
-    // dep before — now dropped, listener registers once at mount).
+  // D-109: warm-resume listener. AND gate matches the useState initializer
+  // exactly. Mostly redundant given the initializer handles cold start, but
+  // catches the AppLayout-remount-mid-foreground case (Bug B Cause 2 —
+  // AuthWrapper churn).
+  useEffect(() => {
     let listenerHandle: { remove: () => Promise<void> } | null = null;
     (async () => {
       try {
         listenerHandle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
           if (!isActive) return;
-          if (hasUncompletedStrengthSession()) {
-            setShowStrengthLogger(true);
-          }
+          if (localStorage.getItem('strength_logger_open') !== '1') return;
+          if (!hasUncompletedStrengthSession()) return;
+          setShowStrengthLogger(true);
         });
       } catch {
-        // Non-Capacitor environment (web dev / unsupported platform). The
-        // mount-time check above still ran (it doesn't depend on Capacitor),
-        // so cold-start restore works on web too via localStorage. The
-        // warm-resume listener is iOS-only by design.
+        // Non-Capacitor environment (web dev). Cold-start restore via useState
+        // initializer above doesn't depend on Capacitor, so web works the same
+        // way for the cold-start case. Warm-resume is iOS-only by design.
       }
     })();
     return () => {
