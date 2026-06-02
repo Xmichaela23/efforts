@@ -62,14 +62,32 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
 
-  // D-101: iOS resume → reopen strength logger when an unfinished session exists.
-  // Bug B Cause 1 (per POLISH-PUNCH-LIST): iOS WKWebView teardown after long sleep
-  // unmounts AppLayout. showStrengthLogger lives in useState (no route, no persist),
-  // so the logger comes back closed even though localStorage still has the in-flight
-  // sets. The athlete loses access to their unfinished session despite the data being
-  // intact. This listener checks the canonical strength_logger_session_${today} key
-  // on every app-foreground transition and reopens the logger if there's real data
-  // to return to.
+  // D-101 + D-108: reopen strength logger when an unfinished session exists in
+  // localStorage. Bug B Cause 1 (per POLISH-PUNCH-LIST): iOS WKWebView teardown
+  // after long sleep unmounts AppLayout. showStrengthLogger lives in useState
+  // (no route, no persist), so the logger comes back closed even though
+  // localStorage still has the in-flight sets.
+  //
+  // D-101 only handled WARM resumes (background → foreground while the app
+  // process was still alive). It registered a Capacitor `appStateChange`
+  // listener that fires on `isActive: true` transitions. That covers app-switch
+  // scenarios but MISSES the cold-start case — when iOS kills the WKWebView
+  // (long sleep, memory pressure) and the user relaunches from the icon, the
+  // app starts already-active, the listener registers AFTER the transition,
+  // and the `false → true` event never fires. The athlete returns to a closed
+  // logger even though their sets are intact in localStorage. This was the
+  // exact failure mode Bug B Cause 1 described.
+  //
+  // D-108 closes the gap with a mount-time check: read localStorage once on
+  // AppLayout mount AND keep the warm-resume listener. Cold start → mount
+  // check fires → logger reopens. Warm resume → listener fires → logger
+  // reopens. Both paths converge on `setShowStrengthLogger(true)` (a no-op
+  // when already true, so the two paths can't bounce each other).
+  //
+  // Also drops the `[showStrengthLogger]` dep — the listener no longer needs
+  // to be torn down + re-registered every time the logger opens or closes
+  // (the prior `if (showStrengthLogger) return` guard was just an
+  // optimization; setState to the same value is already a no-op).
   useEffect(() => {
     const todayDateString = () => {
       const now = new Date();
@@ -91,30 +109,41 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         return exs.some((ex: any) => Array.isArray(ex?.sets) && ex.sets.length > 0);
       } catch { return false; }
     };
-    let unsubscribed = false;
+
+    // D-108: cold-start path. Mount-time check runs once when AppLayout first
+    // renders. Catches the case where iOS killed the WKWebView and the user
+    // relaunched from the icon (no appStateChange event fires for this).
+    if (hasUncompletedStrengthSession()) {
+      setShowStrengthLogger(true);
+    }
+
+    // D-101: warm-resume path. Listener fires on every background → foreground
+    // transition while the app process is alive. Setting showStrengthLogger to
+    // true when it's already true is a React no-op; no need to gate on the
+    // current state (which was the only reason for the `[showStrengthLogger]`
+    // dep before — now dropped, listener registers once at mount).
     let listenerHandle: { remove: () => Promise<void> } | null = null;
     (async () => {
       try {
         listenerHandle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
           if (!isActive) return;
-          if (showStrengthLogger) return;  // already open, don't bounce it
           if (hasUncompletedStrengthSession()) {
             setShowStrengthLogger(true);
           }
         });
       } catch {
         // Non-Capacitor environment (web dev / unsupported platform). The
-        // localStorage persistence still works the same way; this just means
-        // the auto-reopen is iOS-only, which is the affected platform.
+        // mount-time check above still ran (it doesn't depend on Capacitor),
+        // so cold-start restore works on web too via localStorage. The
+        // warm-resume listener is iOS-only by design.
       }
     })();
     return () => {
-      unsubscribed = true;
       if (listenerHandle) {
         listenerHandle.remove().catch(() => {});
       }
     };
-  }, [showStrengthLogger]);
+  }, []);
 
   const [showPilatesYogaLogger, setShowPilatesYogaLogger] = useState(false);
   // MobilityLogger removed; mobility now uses StrengthLogger in mobility mode
