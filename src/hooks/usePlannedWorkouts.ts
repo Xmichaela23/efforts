@@ -235,6 +235,18 @@ export const usePlannedWorkouts = (options?: UsePlannedWorkoutsOptions) => {
         throw new Error('User must be authenticated to delete planned workouts');
       }
 
+      // D-110 A1: capture the planned row's date + type BEFORE delete so we
+      // can clear the matching strength logger localStorage session key. The
+      // logger saves under `strength_logger_session_${date}`; if we don't
+      // remove this key when the planned row is deleted, the next Log
+      // Strength tap will call restoreSessionProgress() and hydrate the
+      // deleted workout's state — the "resurrection" symptom. A1 closes
+      // the eager-cleanup path; A2 in StrengthLogger.tsx is the defensive
+      // backstop for any other path that could orphan a session key.
+      const targetRow = plannedWorkouts.find(w => w.id === id);
+      const targetDate = targetRow?.date ?? null;
+      const targetType = String(targetRow?.type ?? '').toLowerCase();
+
       const { error } = await supabase
         .from('planned_workouts')
         .delete()
@@ -246,6 +258,16 @@ export const usePlannedWorkouts = (options?: UsePlannedWorkoutsOptions) => {
       }
 
       setPlannedWorkouts(prev => prev.filter(workout => workout.id !== id));
+
+      // D-110 A1: only clear when we confirmed a strength row was deleted.
+      // Non-strength rows don't write to the strength logger key, so the
+      // removeItem would be a no-op — but skipping it keeps the intent
+      // explicit and avoids confusing future readers.
+      if (targetDate && targetType === 'strength') {
+        try {
+          localStorage.removeItem(`strength_logger_session_${targetDate}`);
+        } catch {}
+      }
     } catch (err) {
       console.error('Error deleting planned workout:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete planned workout');

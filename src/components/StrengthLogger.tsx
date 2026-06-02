@@ -1461,22 +1461,70 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (didInitRef.current) return;
     didInitRef.current = true;
 
-    // Try to restore session progress first
-    const modeAtOpen = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
-    const savedSession = restoreSessionProgress();
-    if (savedSession && modeAtOpen !== 'mobility') {
-      setExercises(savedSession.exercises);
-      setAttachedAddons(savedSession.addons);
-      setNotesText(savedSession.notes);
-      setNotesRpe(savedSession.rpe);
-      setSourcePlannedName(savedSession.sourcePlannedName);
-      setSourcePlannedId(savedSession.sourcePlannedId);
-      setSourcePlannedDate(savedSession.sourcePlannedDate);
-      setLockManualPrefill(true);
-      setIsInitialized(true);
-      return;
-    }
-    
+    // D-110 A2: async-verify the saved session's sourcePlannedId still exists
+    // in planned_workouts BEFORE hydrating. If the planned row was deleted
+    // (or any other path orphaned the localStorage key — force-quit mid-
+    // reschedule, day-rollover edge cases, etc.), the verify returns true
+    // and we clear+fall through to fresh init instead of resurrecting the
+    // deleted workout. A1 (usePlannedWorkouts deletePlannedWorkout) handles
+    // the eager-cleanup case; A2 is the defensive backstop at the choke point.
+    //
+    // FAIL SAFE: orphan is confirmed ONLY when the DB query returns
+    // (error === null) AND (data === null) — a definitive "row not found."
+    // Network errors, RLS failures, timeouts, or any thrown exception keep
+    // the session intact (a flaky connection mid-workout must NOT wipe the
+    // athlete's in-progress sets through this code path).
+    (async () => {
+      const modeAtOpen = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+      const savedSession = restoreSessionProgress();
+
+      if (savedSession && modeAtOpen !== 'mobility') {
+        const verifiedOrphan = await (async (): Promise<boolean> => {
+          const pid = savedSession.sourcePlannedId;
+          if (!pid) return false;  // No planned ref — can't be an orphan of a deleted plan.
+          try {
+            const userId = getStoredUserId();
+            if (!userId) return false;  // No user — fail safe, keep session.
+            const { data, error } = await supabase
+              .from('planned_workouts')
+              .select('id')
+              .eq('id', pid)
+              .eq('user_id', userId)
+              .maybeSingle();
+            // Definitive "row gone" → orphan. Anything else (error set, or
+            // data returned) → not an orphan, keep the session.
+            return (error == null) && (data == null);
+          } catch {
+            return false;  // Any throw → fail safe.
+          }
+        })();
+
+        if (verifiedOrphan) {
+          // Planned row deleted. Clear the orphan and fall through to fresh init.
+          try { clearSessionProgress(); } catch {}
+        } else {
+          setExercises(savedSession.exercises);
+          setAttachedAddons(savedSession.addons);
+          setNotesText(savedSession.notes);
+          setNotesRpe(savedSession.rpe);
+          setSourcePlannedName(savedSession.sourcePlannedName);
+          setSourcePlannedId(savedSession.sourcePlannedId);
+          setSourcePlannedDate(savedSession.sourcePlannedDate);
+          setLockManualPrefill(true);
+          setIsInitialized(true);
+          return;
+        }
+      }
+
+      // Fall-through path (no saved session, mobility mode, or verified
+      // orphan that was just cleared) — defer to the inline init below by
+      // re-firing the rest of this effect synchronously.
+      runFreshInit();
+    })();
+
+    // Existing init body extracted into a local function so the orphan-cleared
+    // path can re-enter it without duplicating ~200 lines.
+    function runFreshInit() {
     // Clear any existing lock when no saved session
     setLockManualPrefill(false);
     setIsInitialized(true);
@@ -1947,6 +1995,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (or2 && or2.length>1) setPendingOrOptions(prev => prev || or2);
       } catch {}
     })();
+    }  // close runFreshInit (D-110 A2)
   }, [scheduledWorkout, targetDate]);
 
   // Handle manual prefill lock - separate effect to avoid infinite loops
