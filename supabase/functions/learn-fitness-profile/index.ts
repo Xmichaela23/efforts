@@ -305,6 +305,23 @@ Deno.serve(async (req) => {
       mergedLearned.swim_pace_per_100m = existing.swim_pace_per_100m;
     }
 
+    // Tier-cliff guard: block FTP overwrite ONLY when new confidence drops below prior.
+    // A decline measured at equal-or-higher confidence still goes through. No-op on INSERT
+    // (existing parses to {} → priorFtp undefined → condition short-circuits).
+    const confRank = (c: unknown): number =>
+      c === 'high' ? 2 : c === 'medium' ? 1 : c === 'low' ? 0 : -1;
+    const priorFtp = existing?.ride_ftp_estimated as LearnedMetric | undefined;
+    const newFtp = learnedProfile.ride_ftp_estimated;
+    if (
+      priorFtp && newFtp &&
+      typeof priorFtp.value === 'number' && typeof newFtp.value === 'number' &&
+      newFtp.value < priorFtp.value &&
+      confRank(newFtp.confidence) < confRank(priorFtp.confidence)
+    ) {
+      mergedLearned.ride_ftp_estimated = priorFtp;
+      console.log(`  FTP ratchet floor: kept prior ${priorFtp.value}W (${priorFtp.confidence}) over new ${newFtp.value}W (${newFtp.confidence})`);
+    }
+
     const existingIdentity = parseJsonb((existingBaselines as any)?.athlete_identity);
     const userConfirmed = existingIdentity?.confirmed_by_user === true;
 
@@ -925,7 +942,8 @@ export function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
         
         ftp_estimated = {
           value: estimatedFTP,
-          confidence: normalizedPowers.length >= 3 ? 'high' : (normalizedPowers.length >= 2 ? 'medium' : 'low'),
+          // Tier 2 cap: NP-from-hard-rides is a fallback, not a 20-min measurement. Never claim resolver-trusted 'high'.
+          confidence: normalizedPowers.length >= 2 ? 'medium' : 'low',
           source: `95% of best NP from ${normalizedPowers.length} hard rides`,
           sample_count: normalizedPowers.length
         };
