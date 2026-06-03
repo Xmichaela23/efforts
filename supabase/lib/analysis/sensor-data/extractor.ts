@@ -243,7 +243,12 @@ export function normalizeSamples(samplesIn: any[]): Array<{ t:number; d:number; 
     const cad_rpm = (typeof s.bikeCadenceInRPM === 'number' && s.bikeCadenceInRPM)
       || (typeof s.bikeCadence === 'number' && s.bikeCadence)
       || (!hasBikeCadField && genericCad != null && genericCad < 65 && genericCad >= 12 ? genericCad : undefined);
-    const power_w = (typeof s.power === 'number' && s.power) || (typeof s.watts === 'number' && s.watts) || undefined;
+    // Preserve 0W coasting samples — short-circuit `s.power && ...` coerced 0 to undefined
+    // (falsy), then to null, then NP/VI rolling windows stripped them, inflating NP ~20%
+    // on rides with significant coasting (e.g. sweet-spot interval sessions). D-112.
+    const power_w = typeof s.power === 'number' ? s.power
+      : typeof s.watts === 'number' ? s.watts
+      : undefined;
     const v_mps = (typeof s.speedMetersPerSecond === 'number' && s.speedMetersPerSecond) || (typeof s.v === 'number' && s.v) || undefined;
     out.push({ t: Number.isFinite(t)?t:i, d: Number.isFinite(d)?d:NaN, elev, hr, cad_spm, cad_rpm, power_w, v_mps });
     }

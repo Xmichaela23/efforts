@@ -6,7 +6,7 @@ import { parseRunningTokens } from '../_shared/token-parser.ts';
 import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 
-const ANALYSIS_VERSION = 'v0.1.8'; // elevation + NP + swim pace (no sample timeout)
+const ANALYSIS_VERSION = 'v0.1.9'; // NP zero-preserve + 30s Coggan startup trim (D-112)
 
 
 function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
@@ -1253,8 +1253,10 @@ Deno.serve(async (req) => {
           }
         }
         
-        if (rollingAvgs.length > 0) {
-          const avgOfFourthPowers = rollingAvgs.reduce((a, b) => a + b, 0) / rollingAvgs.length;
+        // Coggan: drop the first 30s (incomplete rolling windows) before the 4th-root mean.
+        const trimmed = rollingAvgs.slice(windowSize - 1);
+        if (trimmed.length > 0) {
+          const avgOfFourthPowers = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
           normalizedPower = Math.pow(avgOfFourthPowers, 0.25);
           
           // Variability Index: NP / Avg Power
