@@ -1332,14 +1332,20 @@ function buildAnalysisDetailRows(
     const np = cf?.normalized_power_w;
     const ifv = cf?.intensity_factor;
     if (typeof np === 'number' && np > 0 && typeof ifv === 'number' && ifv > 0) {
-      const ct = cf?.classified_type ? String(cf.classified_type).replace(/_/g, ' ') : 'training stimulus';
       // D-062 / Item 4 — translate "IF 0.85" to "85% of threshold" per Q-010
       // plain-language cosmetic pass. Athletes read percent-of-threshold
       // more readily than the IF (Intensity Factor) abbreviation; same
       // numeric content, plain wording. Mirrors the SESSION-CONTEXT §7
       // 3-guard-stack jargon ban on the INSIGHTS narrative side.
       const pctThreshold = Math.round(ifv * 100);
-      rows.push({ label: 'Power', value: `Normalized power ${np}W (${pctThreshold}% of threshold) — ${ct} effort` });
+      // D-113: describe execution from execution data — derived.executed_intensity
+      // (easy/moderate/hard), NOT classified_type which is the planned intent. Stops
+      // the row asserting "sweet spot effort" on a 79%-of-threshold ride. classified_type
+      // stays untouched for grouping/trends; just not rendered as the execution descriptor here.
+      const ei = (factPacket as any)?.derived?.executed_intensity;
+      const effortDescriptor = (typeof ei === 'string' && ei !== 'unknown') ? `${ei} effort` : null;
+      const suffix = effortDescriptor ? ` — ${effortDescriptor}` : '';
+      rows.push({ label: 'Power', value: `Normalized power ${np}W (${pctThreshold}% of threshold)${suffix}` });
     }
   } catch { /* */ }
 
