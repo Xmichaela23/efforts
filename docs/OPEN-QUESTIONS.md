@@ -497,6 +497,97 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-034 — Strength logger viewport overflow on iOS 393pt (audit complete; fix recipe documented; deferred)
+
+- **Status:** unverified-deferred (audit complete; fix recipe documented; deferred to a fresh session — not shipped end-of-day under time pressure)
+- **What it is:** the set row in `src/components/StrengthLogger.tsx:3256` overflows the card width on iOS 393pt devices. The card bleeds off both edges of the viewport. Surfaced 2026-06-03 alongside the D-108..D-110 resume-hardening work. Audit done; not fixed.
+- **Why it overflows (verified):** the set row is a single non-wrapping horizontal `flex items-start gap-2` track. Width budget on iOS 393pt: `393 − 24 (px-3) − 16 (card p-2) − 11 × 8 (gaps) ≈ 265pt`. The current row consumes >330pt because:
+  - D-098 `±2.5 / ±5` weight stepper nests INSIDE the weight column, dominating its intrinsic width (~134px vs the natural `w-16` = 64px).
+  - D-099 RIR pills are `w-7` each (5 × 28px + 4 × 2px gap = 148px).
+  - D-096 "Same as set 1" button is in a `flex-1 min-w-4` spacer.
+  - Plus Set# (`w-6` = 24px), Reps column (~64px), Done (~50px), Delete (~36px).
+- **Fix shape (documented; do this in a fresh session):**
+  1. Convert outer container at `StrengthLogger.tsx:3256` from `<div className="flex items-start gap-2">` to a 2-row CSS grid via `<div className="grid grid-cols-12 gap-2 items-start">` — or a `<div className="space-y-1.5">` wrapper containing two stacked `grid grid-cols-12 gap-2` rows for cleaner column alignment.
+  2. Row 1 (primary inputs): Reps `col-span-3` | Weight value `col-span-3` | RIR pills `col-span-4` (shrink `w-7 → w-5`) | Done `col-span-2`.
+  3. Row 2 (secondary widgets): Set# `col-span-2` | Stepper `col-span-4` | Same `col-span-4` | Delete `col-span-2`.
+  4. Extract D-098 stepper from inside the weight column (currently nested) so the weight column shrinks to its natural `w-16`.
+  5. Extract D-096 "Same" button from the flex-1 spacer so it can occupy row 2 independently.
+  6. Move Set# and Delete to row 2 (less prominent placement).
+- **Why deferred:** ~80-100 lines of nested JSX rewrite touching the conditional branches (duration-based exercise, baseline-test set hints, band-resistance dropdown, plate-math expansion below the row). Medium regression risk if shipped at the end of a long session. Pragmatic shrink-only (`w-7 → w-5` on RIR + `px-1.5 → px-1` on stepper chips) was considered and rejected — even at maximum shrinkage the row still overflows by ~30-40px because the stepper must come out of the weight column. The grid restructure is the only path that fully solves it. End-of-day shipping it would invite a regression at exactly the wrong time.
+- **Verification target after fix:** open logger on iOS 393pt device with a barbell exercise (so stepper renders). All set-row columns visible within card boundaries; card flush with viewport edges. Spot-check: duration-based exercise (treadmill / time-under-tension), baseline-test set, band-resistance with band-color dropdown — each conditional branch renders correctly post-restructure.
+- **Cross-ref:** D-096, D-098, D-099 (the widgets that pushed the row over budget). The audit is repeatable from this entry; do not re-litigate the diagnosis.
+
+---
+
+## Q-035 — "Deleting a logged strength workout also deletes the planned prescription" (awaiting user repro)
+
+- **Status:** unverified (awaiting user repro artifacts)
+- **What it is:** user reports: deleting a logged/actual strength workout from the UI also removes the planned prescription. Expected behavior: the planned row stays intact at `status='planned'`; only the logged execution is removed.
+- **What the code says (verified 2026-06-03):** `useWorkouts.deleteWorkout` at `src/hooks/useWorkouts.ts:1685-1697` does NOT delete from `planned_workouts`. It DELETEs the `workouts` row and then UPDATEs the linked `planned_workouts.status` back to `'planned'` (a revert, not a cascade delete). So if the planned row is disappearing, one of these is true:
+  1. **Silent revert failure** — the UPDATE to `status='planned'` raises an error that's swallowed; the DB row remains at `status='completed'` and downstream filters hide it.
+  2. **UI staleness across hook instances** (Leak B — `usePlannedWorkouts` per-instance React state — separate filed issue). The planned row may still exist in the DB but the local React state of the calling component is stale, so the row appears "gone" from the user's perspective. A page refresh would reveal it's actually intact. **Most likely candidate per the available signals.**
+  3. **DB cascade trigger** — an unexpected ON DELETE CASCADE between `workouts` and `planned_workouts`. Schema audit didn't reveal one, but worth confirming if (1) and (2) are ruled out.
+- **What to ask the user for:**
+  - Exact repro steps + timestamp + the affected workout's planned_workouts.id and workouts.id.
+  - Network capture (DevTools Network tab) of the DELETE-workout flow showing the request + response sequence.
+  - After the "delete," check in Supabase Studio whether the planned_workouts row is `(a) deleted entirely`, `(b) status='completed' (silent revert failure)`, or `(c) status='planned' but invisible in UI (staleness)`. That tells us which candidate it is.
+- **Why deferred:** D-110 A1 (which touches `usePlannedWorkouts.deletePlannedWorkout`) was initially suspected — confirmed it CANNOT fire from the `deleteWorkout` path because the two flows don't intersect. The audit ruled it out within 30 seconds. The remaining three candidates need repro artifacts to disambiguate; without them, fixing blind risks shipping the wrong fix.
+- **Cross-ref:** Leak B (Pick planned stale across hook instances; filed separately under POLISH-PUNCH-LIST background items). D-110 A1+A2 (related but distinct — D-110 is the OPPOSITE direction: planned-delete leaving an actual-side localStorage orphan).
+
+---
+
+## Q-036 — Option B adherence field (`derived.intent_execution_match`) — deterministic, TSS-based — DEFERRED (full spec captured)
+
+- **Status:** deferred / spec complete / open decision pending
+- **What it is:** the principled architecture for "the analyzer should not assert execution matched intent when it didn't." D-113 stopped the user-visible contradiction in the POWER row; Q-036 captures the deeper field-and-LLM-constraint design that closes the LLM lede too.
+- **Why deferred:** the build is ~150 lines (new file `_shared/cycling-v1/adherence.ts` with constants + classifier + tests; types extension; build.ts wiring; renderer row; LLM HARD CONSTRAINT prompt addition; backfill over rides with planned_id). Spec is settled but one coefficient question is open (secondary IF gate, see below).
+- **The design (settled):**
+  - **Planned TSS source = `planned_workouts.computed.steps[]` summed Coggan** (`(sec/3600) × IF² × 100` per step, midpoint of `powerRange` as NP proxy, `powerTarget` as fallback). NOT `planned_workouts.workload_planned` — that column is `calculate-workload`'s TRIMP+duration-intensity output, NOT Coggan, NOT numerically comparable to `computed.analysis.power.tss`. Worked: 3×15 sweet spot plan → ~77 TSS Coggan vs stored `workload_planned = 115`. Apples and oranges if the column is used directly.
+  - **Actual TSS = `computed.analysis.power.tss`** (Coggan, D-112-corrected). Same formula on both sides.
+  - **Field:** `derived.intent_execution_match: 'on_target' | 'under' | 'well_under' | 'over' | 'well_over' | 'unstructured' | null`. Companion: `derived.planned_tss_coggan: number | null` so the renderer can show both numbers without recomputing.
+  - **Bucket math:** `delta = (actualTss - plannedTssCoggan) / plannedTssCoggan`. `|delta| ≤ 0.20 → on_target`; `0.20 < |delta| < 0.50 → under/over`; `|delta| ≥ 0.50 → well_under/well_over`. No planned TSS → `unstructured`.
+  - **Constants in a single named module:** `_shared/cycling-v1/adherence.ts` exporting `ADHERENCE_TSS_ON_TARGET_PCT = 0.20`, `ADHERENCE_TSS_SEVERE_PCT = 0.50`, `ADHERENCE_RECOVERY_DEFAULT_IF = 0.30` (for steps without powerTarget — most "recovery" steps in computed.steps), and (if secondary gate is enabled) `ADHERENCE_IF_TOLERANCE = 0.03` + `INTENT_IF_FLOOR` map.
+  - **Two consumers:** (a) new renderer row in `session-detail/build.ts` added after POWER row, neutral comparison wording ("Planned ~77 TSS sweet spot; delivered 62 at moderate intensity — came in lighter than planned."); (b) HARD CONSTRAINT in `ai-summary.ts` at top of constraint stack — when match is `under`/`well_under`, lede MUST acknowledge the gap and MUST NOT assert execution matched intent ("right in the sweet-spot zone" / "held the X target" / "as prescribed" banned).
+  - **Backfill:** re-trigger `analyze-cycling-workout` for cycling rides with planned_id; same shape as D-112's backfill, different target function. Adds `intent_execution_match` + `planned_tss_coggan` only — touches nothing from D-111/112/113.
+- **Open decision (the one open question):** **secondary IF gate on or off?**
+  - Without it, target ride 6bf694a6 classifies `on_target` by 0.5 percentage points (delta = -19.5%, just inside ±20% band). TSS dose was within tolerance even though IF (0.79) is below sweet-spot floor (0.83).
+  - With it (TSS primary + IF secondary): when primary is `on_target` AND `plan_intent ∈ {sweet_spot, threshold, vo2, anaerobic}` AND actual IF more than 0.03 below the intent's expected floor, demote to `under`. Catches 6bf694a6 (0.79 vs floor 0.83, gap 0.04 > tolerance 0.03 → `under`).
+  - Recommendation in the spec: ship the secondary gate. Matches the user's original "TSS primary, IF secondary" framing. Trade: ~tiny extra complexity in adherence.ts for catching the exact case that motivated this work.
+  - User has not yet given go/no-go on the gate. Decision needed before build.
+- **What "doing it" looks like:** ~150 lines + a deploy + backfill of planned cycling rides + LLM prompt regen. Spec in chat transcript is sufficient to start without re-litigation.
+- **Cross-ref:** D-091 (classified_type follows plan_intent), D-092 (STRUCTURED PLANNED MODE prompt rule gated on interval_summary), D-113 (POWER row Option A — tonight's narrow fix), D-112 (actual TSS now Coggan-correct, prerequisite for this comparison).
+
+---
+
+## Q-037 — FTP gap to Garmin remains ~28W after D-112; hypothesis Strava power-stream smoothing
+
+- **Status:** unverified hypothesis (surfaced 2026-06-05)
+- **What it is:** Garmin auto-FTP reports 204W (climbed 192→204 over recent weeks); Efforts reports 176W post-D-112. The 28W gap is *not* a bug in D-112's math — post-fix the Coggan computation is honest, and the live trace shows `power_curve['20min']` max across the user's 90d window is 185W (→ 176W FTP via × 0.95). Garmin's 204W implies a best-20min around 215W on the data Garmin sees. The gap is a *data difference*, not a *computation difference*.
+- **Hypothesis:** Strava ingest path may smooth or downsample power streams compared to the native Garmin .fit file. Strava's API serves a derived stream, not the raw device samples. If the smoothing reduces peak 20-min readings, Efforts' computed `power_curve['20min']` underestimates what Garmin Connect's native algorithm sees.
+- **Alternative hypothesis:** Garmin's auto-FTP doesn't use 95%-of-best-20min — it may use CP modeling, ramp-test detection, or a non-Coggan estimator. The number isn't reverse-engineerable from outside, and Garmin's algorithm could legitimately disagree with Coggan on the same underlying data.
+- **How to verify (when picked up):**
+  1. Export the same ride (e.g. ride 6f7da2d9 — Efforts' top-20min ride at 185W) as native Garmin .fit from Garmin Connect.
+  2. Compute best-20min directly from the .fit power stream using the same `rollingMaxAverage` math.
+  3. Compare to Efforts' stored `computed.power_curve['20min']` for that ride. If they match → Garmin's FTP algorithm differs from Coggan and the gap is irreducible from the Efforts side. If Garmin's stream gives ≥200W for the same 20-min window → confirms Strava ingest path is the lossy surface.
+- **What "fixing" would look like (after verification):** if Strava smoothing confirmed, candidate fix is to ingest the native Garmin .fit when available (Garmin Connect API path exists for some integrations) and bypass Strava for power-curve computation. If Garmin's algorithm just differs, document as Q-INTENTIONAL and surface a fourth resolver tier ("ingest Garmin's reported FTP as truth above learned") — your original instinct from the trace prompt.
+- **Why deferred:** D-111's ratchet floor + D-112's math fix are the load-bearing pieces; the remaining 28W gap doesn't cliff the FTP, it just sits below Garmin's reading. Not blocking anything user-facing today; worth investigating when the swim/strength items don't take priority.
+- **Cross-ref:** D-112 (NP / Coggan fix that closes the per-ride inflation), D-111 (FTP learner guards that protect the 176W value from cliff-dropping).
+
+---
+
+## Q-038 — Swim ingest renders through wrong analyzer + 701:00 duration unit bug
+
+- **Status:** deferred / explicitly tabled by user (2026-06-05) for a separate session
+- **What it is:** FORM goggles → Strava → Efforts swim activities are mangled on multiple axes:
+  - **Duration adherence 2263% / +670:01.** Efforts thinks a planned 31-min swim took 701:00 (11 hours 41 minutes). Strava's reported moving_time for the same activity is 18:12. The 701:00 vs 18:12 numeric signature points at a seconds-vs-minutes-vs-aggregate-of-lengths parsing bug somewhere in swim ingest or session_detail render.
+  - **Wrong analyzer selected.** Pool swim rendered with "5:03/mi pace", "61 spm cadence", "Splits (mi)" at "50:30/mi", speed chart in mph. A pool swim has no business with miles-per-hour. Activity-type mapping in the Strava webhook isn't selecting `analyze-swim-workout`; the activity is being routed through the run/ride generic path.
+  - **Distance ingested at 875 yd** (Strava) vs **800m on FORM**. Plan was 1200 yd; -325 yd gap is real (user cut the set short), so the distance number is the only honest field on the screen.
+- **Why deferred:** completely orthogonal to the FTP / NP / labeling work D-111/112/113 closed. User explicitly tabled to a separate session ("table swim for now") so the cycling-analyzer arc could close cleanly.
+- **What "the prompt" would look like when picked up:** trace (a) activity-type mapping from the Strava webhook payload — why does FORM-via-Strava swim end up not routing to `analyze-swim-workout`? (b) the duration-parsing path that turns 18:12 into 701:00 — likely a seconds-as-minutes coercion or a per-length aggregation that double-counts. Report-only before any fix.
+- **Cross-ref:** none yet — first filing of this surface.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

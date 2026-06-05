@@ -2863,6 +2863,195 @@ Three different questions warrant three different filter posture. Do not unify.
 
 ---
 
+## D-108 — Close cold-start gap in iOS strength logger resume (mount-time check; not just warm resume)
+
+**Date:** 2026-06-03 (commit `58cc16c1`)
+**Files:** `src/components/AppLayout.tsx` — added mount-time `hasUncompletedStrengthSession()` check; dropped `[showStrengthLogger]` dependency from the `@capacitor/app` listener-bind useEffect.
+
+D-101 wired `@capacitor/app`'s `appStateChange` listener so iOS warm-resume reopens the logger when an unfinished session exists. That covered the *warm* path: app suspended in background → user re-foregrounds → `isActive === true` fires. It did NOT cover *cold* start: iOS killed the WKWebView entirely (after long sleep / memory pressure / explicit user-kill from app switcher) → React mounts fresh → `showStrengthLogger` initializes `false` → `appStateChange` never fires (no transition; the app boots into "already active"). User lost the path back to the logger despite localStorage still holding the sets.
+
+Fix has two parts:
+1. **Mount-time inspection.** On AppLayout mount, synchronously read `strength_logger_session_${todayDateString()}` from localStorage and call `setShowStrengthLogger(true)` if the exercises array has any entries. This is the cold-start equivalent of the warm-resume handler.
+2. **Drop the `[showStrengthLogger]` dependency** from the listener-bind useEffect. With it, the useEffect re-fired (and re-bound a new listener) every time `showStrengthLogger` toggled — multiple listeners stacked over a session.
+
+Considered: persist `showStrengthLogger` as a separate localStorage flag rather than inferring from session-data presence. Rejected at this step — keep the contract simple (one storage key, one source of truth). [D-109 immediately superseded this call when the data-only check turned out to conflate user intent with data presence — see D-109.]
+
+**Verification:** rebuilt iOS bundle (`npm run build` + `npx cap sync ios` + Xcode reinstall). Cold-killed app mid-set; relaunched; logger reopened with sets intact. Bug B Cause 1 closure tightened — D-101 + D-108 together now cover both warm and cold paths.
+
+---
+
+## D-109 — Separate intent flag from session-data presence (AND gate on resume)
+
+**Date:** 2026-06-03 (commit `0d466474`)
+**Files:** `src/components/AppLayout.tsx` — module-level `todayDateString()` + `hasUncompletedStrengthSession()` helpers; useState lazy initializer reads BOTH `strength_logger_open` flag AND today's session data; new write-side useEffect maintains the flag; `appStateChange` handler also reads both.
+
+Regression observed immediately post-D-108: if any uncompleted session existed in localStorage, the logger force-reopened on every warm resume AND every cold start — even when the user had deliberately navigated away to the dashboard before backgrounding. D-108's `hasUncompletedStrengthSession()` check conflated *"data exists"* with *"user wants the logger open."* The two are independent.
+
+Fix: separate intent from data. New `localStorage['strength_logger_open']` flag stores user intent (`'1'` when open, removed when closed). Reopen requires **both** the flag set AND today's session having data — an AND gate.
+
+```typescript
+function todayDateString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function hasUncompletedStrengthSession(): boolean {
+  try {
+    const raw = localStorage.getItem(`strength_logger_session_${todayDateString()}`);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.exercises) && parsed.exercises.length > 0;
+  } catch { return false; }
+}
+
+const [showStrengthLogger, setShowStrengthLogger] = useState<boolean>(() => {
+  try {
+    if (localStorage.getItem('strength_logger_open') !== '1') return false;
+    return hasUncompletedStrengthSession();
+  } catch { return false; }
+});
+
+useEffect(() => {
+  try {
+    if (showStrengthLogger) localStorage.setItem('strength_logger_open', '1');
+    else localStorage.removeItem('strength_logger_open');
+  } catch {}
+}, [showStrengthLogger]);
+```
+
+useState lazy initializer runs synchronously **before** the flag-write useEffect ever fires, so there's no race where a fresh page-load momentarily sees the prior session's stale flag → no spurious auto-reopen.
+
+The AND gate also defends against the day-rollover case: a stale `strength_logger_open=1` from yesterday's session is harmless because today's session key is empty → `hasUncompletedStrengthSession()` returns false → no reopen.
+
+**Verification:** test cycle: open logger, add a set, close logger explicitly, navigate to dashboard, kill app. Cold-relaunch → dashboard, no auto-reopen. Reopen logger, add another set, background app (don't close). Foreground → logger reopens. Both states honored.
+
+Considered alternatives: (a) persist `currentRoute` per AppLayout state and reopen only when last route was strength-logger. Rejected — couples logger reopen logic to routing, brittle. (b) Drop auto-reopen entirely and require user tap to resume. Rejected — that's the whole point of D-101.
+
+---
+
+## D-110 — Kill resurrection of deleted strength workouts (A1 delete-side cleanup + A2 restore-side fail-safe verify)
+
+**Date:** 2026-06-03 (commit `93339e71`)
+**Files:** `src/hooks/usePlannedWorkouts.ts` (A1 — capture target row date+type before delete, remove `strength_logger_session_${date}` after successful DELETE), `src/components/StrengthLogger.tsx` (A2 — verify `sourcePlannedId` still exists in DB before hydrating; fail-safe on lookup errors).
+
+**Bug:** athlete deletes today's planned strength workout from the calendar. The DELETE succeeds (row gone from `planned_workouts`). Athlete taps "Log Strength" later — the deleted workout *resurrects* in the logger, hydrated from localStorage as if it were still planned.
+
+**Root cause:** the StrengthLogger session JSON in localStorage is keyed by date (`strength_logger_session_2026-06-03`) and persists `sourcePlannedId` pointing at the planned row. Deleting the planned row from the DB does NOT touch the localStorage cache; the next "Log Strength" tap restores from the orphan cache. Same class as D-110's sibling silent-cluster (D-075 / D-081 / D-083 / D-089 / D-094 / D-103 / D-105) — data state in two places, mutation to one doesn't propagate.
+
+**Fix shape: AND gate at both sides** (audit's A1 + A2 — A1 alone is insufficient because the cache can be orphaned by paths other than the calendar delete: server-side cleanup, multi-device, manual DB tinkering).
+
+**A1 — delete-side cleanup** (`usePlannedWorkouts.ts deletePlannedWorkout`):
+- Capture `targetRow = plannedWorkouts.find(w => w.id === id)` and pull `targetDate` + `targetType` BEFORE the supabase DELETE call. The in-memory state still has them at this point.
+- After successful DELETE, if `targetType === 'strength'` and `targetDate` is set, `localStorage.removeItem(\`strength_logger_session_${targetDate}\`)`.
+- Captures *every* delete that flows through the hook. Doesn't fire on cascade deletes or server-direct mutations.
+
+**A2 — restore-side fail-safe verify** (`StrengthLogger.tsx` mount-time init useEffect):
+- Wrap the restore path in an async IIFE.
+- After parsing the localStorage session, IF the persisted `sourcePlannedId` is non-null, do a `select('id').eq('id', sourcePlannedId).maybeSingle()` to verify the row still exists in `planned_workouts`.
+- **CRITICAL fail-safe**: only clear the session when the lookup returns a *definitive "no row"*:
+  ```typescript
+  async function plannedRowMissing(id: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('planned_workouts').select('id').eq('id', id).maybeSingle();
+      return (error == null) && (data == null);
+    } catch { return false; }
+  }
+  ```
+  Errors (offline, network timeout, RLS hiccup, Supabase 5xx) → return `false` → preserve session. **Never** wipe an in-progress session because the network blinked.
+- If missing: clear `strength_logger_session_${date}` + `strength_logger_open` and fall through to `runFreshInit()` (extracted local function — the existing fresh-init path).
+- If present: hydrate as before.
+
+Considered: clear on DELETE only (A1 alone, simpler). Rejected — A1 only catches orphans created through this hook. A2 catches resurrection *regardless of how the orphan was created*, because A2 guards at the restore side. Both ship together — A1 narrows the orphan window, A2 closes the resurrection vector.
+
+Considered: clear on ANY error (no fail-safe). Rejected — would wipe in-progress logger session whenever a mid-workout phone-flake hit the verify query. The strict `(error == null) && (data == null)` check is the right safety posture.
+
+**Out of scope (filed separate):** Leak B (`usePlannedWorkouts` per-instance React state — deletes don't invalidate sibling instances' caches, so the deleted row keeps appearing under "Pick planned" elsewhere in the UI until manual refresh). Awaiting cross-component invalidation work via `planned:invalidate` window CustomEvent.
+
+**Verification:** delete a planned strength workout from the calendar; tap "Log Strength" → fresh logger, no resurrection. Repro flow no longer reproduces. The fail-safe was hand-tested by disabling network mid-mount: session preserved as expected.
+
+---
+
+## D-111 — FTP cliff guard: confidence floor (Tier 2 cap) + writer-side ratchet floor
+
+**Date:** 2026-06-05 (commit `e46aed65`)
+**Files:** `supabase/functions/learn-fitness-profile/index.ts` (Tier 2 confidence cap at 928; ratchet floor at 300-321).
+
+**Bug:** the cycling FTP learner cascades Tier 1 (best 20-min power × 0.95) → Tier 2 (best hard-effort NP × 0.95) → Tier 3 (avg power × 1.05 × 0.95) → Tier 4 (best NP overall × 0.95). Tier 1 requires ≥2 eligible rides with a populated `power_curve['20min']`. When the 90d window slid hard rides out without replacement and the eligible count dropped to <2, Tier 2 fired with 'high' confidence (≥3 hard rides → high per pre-fix line 928). The resolver in `src/lib/resolve-current-ftp.ts` trusts 'high' learned over 'manual'. Result: 176W could cliff to 144W (32W = -18%) overnight with no real fitness change.
+
+**Two changes, work as a pair:**
+
+1. **Tier 2 confidence cap at 'medium'** (line 928). Was `≥3 → 'high', =2 → 'medium', =1 → 'low'`. Now `≥2 → 'medium', =1 → 'low'`. Tier 2 is a fallback estimate, not a 20-min measurement — never claim resolver-trusted 'high'. Tier 3 already capped at medium (line 958), Tier 4 always low (line 977), Tier 1 untouched.
+
+2. **Ratchet floor in the writer** (lines 300-321). The prior FTP is already in scope as `existing.ride_ftp_estimated` (line 299, parsed from existingBaselines). Added guard: if BOTH new value < prior value AND new confidence tier-ranks lower than prior (high>medium>low), keep prior; else overwrite. No-op on INSERT path (existing parses to `{}` → priorFtp undefined → short-circuits).
+
+**Why the two changes are coupled:** the Tier 2 cap alone doesn't dodge the cliff (resolver still trusts medium). It's what makes the ratchet's confidence-drop check meaningful — any Tier-1→Tier-2 collapse is now ALWAYS a confidence drop (high→medium), which the ratchet recognizes and blocks.
+
+**Considered and rejected:**
+- **Pure ratchet (don't overwrite if new < old):** traps inflated FTP after real detrain. A 3-month layoff with real 176→150 decline would stay at 176, leading to percentage-based intervals at 117% of actual capacity. The brutal version of this is the trap the run-pace side already had problems with.
+- **Hysteresis (N consecutive runs confirm lower):** correct architecture but adds new schema (pending-drop counter field + tolerance band coefficient). Deferred.
+- **Window widen (180d for FTP only):** delays the cliff by 90 days but doesn't fix the structural problem. Also leaks into other learner outputs (threshold HR, easy HR) unless we shape a second fetch.
+
+**Tradeoff accepted:** a brand-new user with no prior FTP takes the first tier-collapse value at face. Confidence-floor still applies (Tier 2 → 'medium', Tier 3 → 'low'), but there's no prior to ratchet against. Hysteresis would close this; deferred.
+
+**Verification:** post-deploy re-trigger of learn-fitness-profile for user 45d122e7: ride_ftp_estimated stable at `{ value: 176, confidence: high, source: "95% of 20-min best power (12 efforts)" }`. last_updated advances 04:30 → 12:57 UTC without disturbing value. Trap-door closes against any future Tier-1→Tier-2 collapse for this user as long as a 'high' anchor exists.
+
+---
+
+## D-112 — Preserve 0W coasting samples in the shared sensor extractor + 30s Coggan startup trim
+
+**Date:** 2026-06-05 (commit `05b69313`)
+**Files:** `supabase/lib/analysis/sensor-data/extractor.ts` (zero-preserve coercion at line 246), `supabase/functions/compute-workout-analysis/index.ts` (30s Coggan startup trim at line 1262; ANALYSIS_VERSION bumped 0.1.8 → 0.1.9 as deploy cache-bust diagnostic).
+
+**Bug:** the shared `normalizeSamples` in the extractor coerced raw power through `(typeof s.power === 'number' && s.power) || (typeof s.watts === 'number' && s.watts) || undefined`. The `&& s.power` short-circuit treats 0 as falsy, so coasting samples (which Strava reports as `power: 0`, not null) became `undefined` → then `null` in the `power_watts` array (line 1189 of compute-workout-analysis), then stripped by the NP rolling-window filter at `p !== null && !isNaN(p)`.
+
+Net effect: NP and VI computed over a *pedaling-only* power series. Outdoor sweet-spot ride 6bf694a6 (3,483 samples, 1,169 of them 0W = 34% coasting): Efforts read NP 169W vs Garmin's Coggan-correct 141W. That 28W cascaded into IF (0.96 vs 0.79), VI (1.13 vs 1.41), TSS (89 vs 62). Per-ride inflation ~20% on rides with significant coasting; 25% over-count of cycling load across the user's 90d block.
+
+**Two changes:**
+
+1. **Zero-preserve coercion** (`supabase/lib/analysis/sensor-data/extractor.ts:246`). Explicit ternary: `typeof s.power === 'number' ? s.power : typeof s.watts === 'number' ? s.watts : undefined`. 0 now survives as 0; `undefined` only for samples that genuinely lack a power field.
+
+2. **30s Coggan startup trim** (`compute-workout-analysis/index.ts:1262`). Drop the first 29 rolling-average entries (incomplete windows of 1, 2, …, 29 samples) before the 4th-root mean. ~1-2W effect per ride; the textbook Coggan algorithm specifies it.
+
+**Power curve unaffected by design:** `rollingMaxAverage` at `compute-workout-analysis/index.ts:51-82` filters with `v !== null && Number.isFinite(v) && v > 0` (line 56) — `v > 0` still strips zeros explicitly by design (best-of-N-min-pedaling semantic, intentionally zero-stripped). Input array now contains 0s instead of nulls; output identical. D-111's FTP learner reads `workouts.normalized_power` (top-level Strava column, never touched by this function) and `computed.power_curve['20min']` — both safe. Tier 2 fallbacks of D-111 are also safe because they too read Strava's NP, not the inflated value.
+
+**Detour worth filing (footgun added to silent-cluster catalog):** the first edit landed inside a `/* ... */` block at `compute-workout-analysis/index.ts:1050-1095` — a dead-code duplicate of `normalizeSamples` left over from an extract-to-shared-lib refactor. The deploy succeeded, version-bumped (0.1.8 → 0.1.9 visible in the response payload), but the values didn't change. The 30s trim moved NP by 1W, which initially looked like deploy propagation lag. The ANALYSIS_VERSION bump (used here purely as a deploy-cache-bust marker) is what made the deploy-but-no-change observable — once v0.1.9 appeared in responses without value change, the dead-block hypothesis surfaced quickly. Dead block was reverted; real fix landed in the live extractor. The dead `/* */` block remains in compute-workout-analysis because removing it is a refactor not part of D-112; a future session may clean it.
+
+**Backfill:** 20 cycling rides for user 45d122e7 re-triggered via deployed `compute-workout-analysis`. All 20 match the pre-deploy dry-run within 0-1W. Target 6bf694a6: 168→140W (within 1W of Garmin 141W). Zwift indoor rides (f9fb690b, 7f15c92f): moved 2W only — canary confirming the fix targets coast-bearing outdoor rides and isn't an across-the-board reduction. Total 90d cycling TSS: 2493 → 1865 (-628 phantom TSS).
+
+**Considered:** rewriting line 1069 in `compute-workout-analysis/index.ts` instead of the extractor. Rejected — that's the dead `/* */` block; live path is the extractor. The discovery loop is the durable artifact.
+
+**Diagnostic pattern worth keeping:** when a deploy succeeds and a clearly-deterministic change doesn't materialize in DB state, bump a visible version constant in the request response payload (here `ANALYSIS_VERSION`). If the new version appears without value change, the deploy reached production but the code path you edited isn't the one running.
+
+---
+
+## D-113 — POWER row reads executed_intensity, not classified_type
+
+**Date:** 2026-06-05 (commit `3f9d6df3`)
+**Files:** `supabase/functions/_shared/session-detail/build.ts:1342` (descriptor source swap).
+
+**Bug:** D-091 (2026-05-27) made `classified_type` follow planned intent — correct for grouping (pwr20_trend_v1 same-type filter), cross-workout trends (np-trend), and the LLM's STRUCTURED PLANNED MODE prompt gate. But the cycling POWER row at session-detail/build.ts:1342 glued classified_type into one sentence with executed metrics: `"Normalized power ${np}W (${pctThreshold}% of threshold) — ${ct} effort"`. Result on outdoor sweet-spot ride 6bf694a6: `"Normalized power 140W (79% of threshold) — sweet spot effort"` — a contradiction (79% of threshold is endurance/tempo, not sweet spot 88-94%). The label was asserting planned intent as if it were executed reality.
+
+**Fix:** swap descriptor source from `classified_type` (planned intent) to `derived.executed_intensity` (easy/moderate/hard, deterministically computed from IF + ftp_bins by `_shared/cycling-v1/utils.ts:65`). The four-bucket classifier was already in the packet pre-fix; nothing read it for this label. classified_type left untouched for grouping/trends. The fact packet, the LLM INSIGHTS narrative path, the resolver, the FTP learner — none touched.
+
+**Why this is the minimal honest fix (Option A in the report):**
+- Doesn't invent new thresholds or coefficients (executed_intensity is already in the packet).
+- Doesn't change any grouping/trend behavior (classified_type still the authority for pwr20_trend_v1, np_trend, STRUCTURED PLANNED MODE gate).
+- Doesn't require a fact-packet schema change.
+- Stops the user-visible contradiction tonight without committing to the deeper architecture decision.
+
+**Considered (Option B in the report — fully specced, deferred to Q-036):** new `derived.intent_execution_match` field, computed deterministically from planned TSS (summed Coggan from `planned_workouts.computed.steps`) vs actual TSS (`computed.analysis.power.tss`), with ±20% / ±50% bands. Both renderer AND LLM read it. The principled answer, but adds schema + LLM HARD CONSTRAINT + backfill + needs a coefficient decision (secondary IF gate). Out of scope for tonight; full spec captured in Q-036.
+
+**Considered (Option D in the report):** override classified_type to executed category when execution diverges far enough. Rejected explicitly — it would silently change `pwr20_trend_v1`'s same-type filter and break grouping. classified_type is the planned-intent authority by design.
+
+**Tradeoff accepted (caveats):**
+- Persisted `workout_analysis.session_detail_v1` JSONB still holds old strings until the next user-JWT view triggers rebuild — service-role cannot refresh it server-side via the existing `workout-detail` endpoint (the session_detail scope requires a user token at line 1132-1134). Will refresh organically when user opens each ride.
+- The LLM lede in `ai-summary.ts` can still slip into "right in the sweet-spot zone" on under-executed rides whose `interval_summary` is null (gate at ai-summary.ts:402 / D-092 STRUCTURED PLANNED MODE). Indoor structured rides have laps → interval_summary populated → adherence-aware lede fires. Outdoor "attempted intervals" without clean laps → interval_summary null → LLM defaults to whole-ride narrative + reads `classified_type` as fact. That's Option B's territory — Q-036.
+
+**Verification:** deterministic against live fact packets (see `scripts/power-row-verify.mjs`). 6bf694a6 (IF 0.79, executed=moderate): "Normalized power 140W (79% of threshold) — **moderate effort**". f9fb690b (IF 0.83, executed=hard): "...— **hard effort**". May 26 Zwift case lost the "sweet spot" wording too — that's a small honest gap (the colour goes; the truthfulness arrives). Trade accepted.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
