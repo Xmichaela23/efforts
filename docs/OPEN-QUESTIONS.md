@@ -497,9 +497,10 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
-## Q-034 — Strength logger viewport overflow on iOS 393pt (audit complete; fix recipe documented; deferred)
+## Q-034 — Strength logger viewport overflow on iOS 393pt — RESOLVED 2026-06-08 (D-114)
 
-- **Status:** unverified-deferred (audit complete; fix recipe documented; deferred to a fresh session — not shipped end-of-day under time pressure)
+- **Status:** RESOLVED 2026-06-08 via D-114 — but **not** through the grid restructure recipe captured below. Shipped a collapse/expand redesign instead: only the active set renders full controls (stacked vertically with Done/✕ in a right-aligned footer); all other sets collapse to a one-line summary with `min-w-0 + truncate` + `shrink-0` action buttons, which kills the overflow class structurally rather than re-budgeting columns. Verified at 380px via `scripts/verify-strength-row-380.mjs` (every control ≤344px vs 354px border, both states; old layout overflowed +207px). Bug A (set-0 rest-row mismatch) fixed in the same pass — see D-115. The grid recipe below is left intact as the historical audit; do **not** implement it. Commit `ce83b9b0`.
+- **Status (original):** unverified-deferred (audit complete; fix recipe documented; deferred to a fresh session — not shipped end-of-day under time pressure)
 - **What it is:** the set row in `src/components/StrengthLogger.tsx:3256` overflows the card width on iOS 393pt devices. The card bleeds off both edges of the viewport. Surfaced 2026-06-03 alongside the D-108..D-110 resume-hardening work. Audit done; not fixed.
 - **Why it overflows (verified):** the set row is a single non-wrapping horizontal `flex items-start gap-2` track. Width budget on iOS 393pt: `393 − 24 (px-3) − 16 (card p-2) − 11 × 8 (gaps) ≈ 265pt`. The current row consumes >330pt because:
   - D-098 `±2.5 / ±5` weight stepper nests INSIDE the weight column, dominating its intrinsic width (~134px vs the natural `w-16` = 64px).

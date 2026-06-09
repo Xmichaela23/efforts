@@ -3052,6 +3052,36 @@ Net effect: NP and VI computed over a *pedaling-only* power series. Outdoor swee
 
 ---
 
+## D-114 — Strength set rows are collapse/expand, not a flat width-budgeted grid (Q-034 close, 2026-06-08)
+
+**Context:** the set row at `StrengthLogger.tsx:3256` overflowed the exercise card on ~380px viewports — Done/✕ rendered in the black gutter (Q-034). The single horizontal `flex items-start gap-2` packed set#/reps/weight+stepper/RIR/Same/Done/✕ (~470px of fixed-width children + gaps) into a ~316px content box with no width or overflow handling.
+
+**Decision:** collapse/expand, not the 2-row `grid grid-cols-12` restructure that Q-034's recipe proposed. Only the active set (first incomplete, per exercise) renders full controls; every other set collapses to a one-line summary.
+- **Per-exercise active set, UI-only state.** New `activeSetByExercise: Record<exerciseId, number>` — explicit override (a re-opened completed set) else `findIndex(!completed)`, else -1 (all collapsed). Scoped per exercise so expanding Bench doesn't collapse Row's working set. **Deliberately NOT written to the `strength_logger_session_*` localStorage key** — it's view state, not session data, so D-108/D-109 resume logic is untouched. Per-set data still persists on Done exactly as before.
+- **Collapsed row** = summary line (`{weight} lb × {reps} · RIR {x}`, with duration/band/bodyweight variants) + Done/✕ inside the card. The overflow class is killed structurally: `min-w-0 + truncate` on the summary span + `shrink-0` on Done/✕ means the summary absorbs any squeeze and the action buttons can never be pushed past the border. This is the actual fix for the whole overflow family, not a one-row patch.
+- **Expanded row** = controls stacked vertically (reps/weight inputs row, steppers, RIR pills, equipment, rest/Start), Done/✕ in a right-aligned footer. Nothing is packed horizontally, so no single line can exceed card width regardless of how many widgets D-096/D-098/D-099 added.
+- **Auto-advance:** Done on the active set drops the explicit override → active falls through to the next incomplete set, which auto-expands.
+
+**Rejected — the grid restructure (Q-034 recipe).** A flat 2-row 12-col grid keeps every control on screen for every set and re-budgets columns. It works, but it's a width-budget tightrope: the next widget (cadence, tempo, plate-color) re-breaks it, and it forces the RIR pills to shrink (`w-7 → w-5`), degrading the tap target. Collapse/expand removes the budget constraint entirely instead of re-balancing it, and a resting set doesn't need its full control surface visible.
+
+**Files:** `src/components/StrengthLogger.tsx` (active-set state ~:420; per-set compute + collapsed/expanded branch inside `exercise.sets.map`). **Verification:** `scripts/verify-strength-row-380.mjs` renders the exact markup against the compiled Tailwind CSS at 380px — every control ≤344px vs the 354px card border in both states; the old horizontal layout overflowed +207px (negative control proving the harness is real). Commit `ce83b9b0`.
+
+## D-115 — Rest is the gap *after* set N-1; set 0 renders no rest row (Q-034 / Bug A, 2026-06-08)
+
+**Context:** Bench Press set 1 showed a 1:30 rest timer, set 2 showed 2:30 — same lift, same 4-rep target, on a deload session. Rest should be uniform across sets of one lift.
+
+**Root cause (render, not data):** the logger never stores rest — it's always computed from reps via `calculateRestTime` (`:115`). The rest-timer block derived each row's value from the **previous** set's reps (`exercise.sets[setIndex - 1]`), the "rest after set N-1" model that `startAutoRestForNextSet` also writes to (key `${exerciseId}-${completedSetIndex + 1}`). Set 0 has no previous set, so it hit a hardcoded `: 90` (1:30) fallback; set 1 computed `calculateRestTime(Bench, 4)` = 150 (2:30) — a compound at 3-5 reps. Both numbers were "correct" under the model; the inconsistency was set 0's missing-previous fallback.
+
+**Decision:** set 0 renders **no rest row at all** (`showRestTimer` now requires `setIndex > 0`), and the hardcoded 90s default is removed rather than swapped for a less-wrong default. Rationale (physiology over tidy uniformity): rest is the recovery gap *between* sets — you don't rest before your first working set. Forcing a uniform 2:30 onto set 1 would imply a pre-set rest that doesn't exist, and with D-114 auto-advance it would start a phantom timer before the athlete has lifted anything. No row is the honest representation. Sets 1+ keep the existing previous-set computation unchanged.
+
+**Verified safe against auto-rest:** suppressing set 0's *rendered* row does not touch `startAutoRestForNextSet` — it writes the `+1` key, so completing set 0 still starts **set 1's** timer (it never writes a `-0` key). Confirmed at `:459`.
+
+**Footgun (recurring bug class) — index-0 hardcoded fallback defaults.** When a per-item value is derived from the *previous* item, item 0 has no predecessor and tends to get a silent hardcoded default (here `: 90`) that diverges from every real value and reads as a bug. Same family as the failure-to-zero / truthy-coercion footgun behind D-112 (0W coasting samples coerced to null): both are "the boundary element silently gets a wrong default." When a per-set/per-sample default is only hit by the first (or zeroth) element, ask whether that element should carry the value at all — don't pick a less-wrong default to paper it over.
+
+**Files:** `src/components/StrengthLogger.tsx:~3210` (`showRestTimer` gate). Commit `ce83b9b0`.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
