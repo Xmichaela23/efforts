@@ -3245,7 +3245,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     const wTxt = (set.weight !== undefined && set.weight !== 0) ? `${set.weight} lb` : '—';
                     collapsedSummary = `${wTxt} × ${repsTxt}`;
                   }
-                  if (set.rir !== undefined && set.rir !== null) collapsedSummary += ` · RIR ${set.rir}`;
+                  // Always surface RIR in the summary wherever the inline pills would render
+                  // (i.e. not mobility / duration / plyometric), using — when not yet logged.
+                  const isMobilitySummary = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase() === 'mobility';
+                  if (!isDurationBased && !isPlyometric(exercise.name) && !isMobilitySummary) {
+                    collapsedSummary += ` · RIR ${set.rir ?? '—'}`;
+                  }
 
                   return (
                     <div key={setIndex} className={`bg-white/[0.03] backdrop-blur-lg border-2 border-white/15 rounded-xl p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] ${isActiveSet && showRestTimer ? "mb-4" : "mb-1"}`}>
@@ -3684,33 +3689,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           );
                         })()}
                       </div>
-                      {/* Action footer — Done/✕ right-aligned inside the card border. */}
-                      <div className="flex items-center justify-end gap-2 pt-1">
-                        <button
-                          onClick={() => {
-                            handleSetComplete(exercise.id, setIndex);
-                            // Auto-advance: drop the explicit override so the active set
-                            // falls back to the next incomplete set (which auto-expands).
-                            setActiveSetByExercise(prev => {
-                              const next = { ...prev };
-                              delete next[exercise.id];
-                              return next;
-                            });
-                          }}
-                          className={`text-xs px-3 py-1 rounded-full h-9 transition-all duration-300 ${set.completed ? `${themeColors.doneBg} border-2 ${themeColors.doneBorder} ${themeColors.doneText}` : 'bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'}`}
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                        >
-                          {set.completed ? '✓ Done' : 'Done'}
-                        </button>
-                        <button
-                          onClick={() => deleteSet(exercise.id, setIndex)}
-                          className="rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/60 hover:text-red-400 hover:bg-white/[0.12] hover:border-red-400/60 transition-all duration-300 h-9 w-9 flex items-center justify-center flex-shrink-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                          aria-label="Delete set"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                      </div>
                     {(() => {
                       // Duration-based exercises don't need equipment selection (bodyweight)
                       if (isDurationBased) {
@@ -3911,6 +3889,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         )}
                       </div>
                     )}
+                      {/* Action footer — Done/✕ right-aligned, last in the expanded stack. */}
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button
+                          onClick={() => {
+                            handleSetComplete(exercise.id, setIndex);
+                            // Auto-advance: drop the explicit override so the active set
+                            // falls back to the next incomplete set (which auto-expands).
+                            setActiveSetByExercise(prev => {
+                              const next = { ...prev };
+                              delete next[exercise.id];
+                              return next;
+                            });
+                          }}
+                          className={`text-xs px-3 py-1 rounded-full h-9 transition-all duration-300 ${set.completed ? `${themeColors.doneBg} border-2 ${themeColors.doneBorder} ${themeColors.doneText}` : 'bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'}`}
+                          style={{ fontFamily: 'Inter, sans-serif' }}
+                        >
+                          {set.completed ? '✓ Done' : 'Done'}
+                        </button>
+                        <button
+                          onClick={() => deleteSet(exercise.id, setIndex)}
+                          className="rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/60 hover:text-red-400 hover:bg-white/[0.12] hover:border-red-400/60 transition-all duration-300 h-9 w-9 flex items-center justify-center flex-shrink-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                          aria-label="Delete set"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      </div>
                       </>
                       )}
                   </div>
