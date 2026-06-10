@@ -3609,6 +3609,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const isPrefilled = set.from_previous && !set.completed;
                         return (
                           <div className="flex flex-col items-center gap-0.5">
+                            <span className="text-[9px] font-medium text-white/50">RIR</span>
                             <div className="flex gap-0.5" role="group" aria-label="RIR (reps in reserve)">
                               {[1, 2, 3, 4, 5].map((r) => {
                                 const isSelected = set.rir === r;
@@ -3640,9 +3641,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 );
                               })}
                             </div>
-                            <span className={`text-[9px] font-medium ${targetRir ? 'text-amber-400/70' : 'text-white/50'}`}>
-                              {targetRir ? `Target: ${targetRir}` : 'RIR'}
-                            </span>
+                            {targetRir ? (
+                              <span className="text-[9px] font-medium text-amber-400/70">target {targetRir}</span>
+                            ) : null}
                           </div>
                         );
                       })()}
