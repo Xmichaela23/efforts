@@ -3073,6 +3073,8 @@ Net effect: NP and VI computed over a *pedaling-only* power series. Outdoor swee
 
 ## D-115 — Rest is the gap *after* set N-1; set 0 renders no rest row (Q-034 / Bug A, 2026-06-08)
 
+> **REVERSED by [D-120](#d-120) (2026-06-11).** The "rest after set N-1 → timer on the upcoming set's card" model was backwards from how a lifter experiences it (you finish a set, then rest). D-120 flips the ownership: each set owns the rest that *follows* it (timer on the just-finished set's card, last set none). The honesty principle below — never show a rest that hasn't happened — is preserved and met a better way (gate on `set.completed`), and the index-0 footgun note still stands. The original reasoning is kept here for the record.
+
 **Context:** Bench Press set 1 showed a 1:30 rest timer, set 2 showed 2:30 — same lift, same 4-rep target, on a deload session. Rest should be uniform across sets of one lift.
 
 **Root cause (render, not data):** the logger never stores rest — it's always computed from reps via `calculateRestTime` (`:115`). The rest-timer block derived each row's value from the **previous** set's reps (`exercise.sets[setIndex - 1]`), the "rest after set N-1" model that `startAutoRestForNextSet` also writes to (key `${exerciseId}-${completedSetIndex + 1}`). Set 0 has no previous set, so it hit a hardcoded `: 90` (1:30) fallback; set 1 computed `calculateRestTime(Bench, 4)` = 150 (2:30) — a compound at 3-5 reps. Both numbers were "correct" under the model; the inconsistency was set 0's missing-previous fallback.
@@ -3156,6 +3158,20 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 - Circles `w-9 → w-8`; stepper stays the 2×2 from D-117; `paddingLeft` column-anchoring removed (the label + consistent leader width is the alignment now).
 
 **Files:** `src/components/StrengthLogger.tsx` (LoggedExercise `target_reps` field; prescription parse ~:1227; the three labeled control rows ~:3529/:3578/:3630). **Verification:** app build clean; 380px harness all sets/both exercises `overflowPx -10` (no border crossing); each row carries a `Reps`/`Wt`/`RIR` leader. **Q-039 sequence complete** (steps 1–4); the only remaining strength-logger item is the Q-040 UI-trend follow-up (RIR-5 trend points visible-but-dimmed), explicitly sequenced after this.
+
+---
+
+## D-120 — Rest belongs to the just-finished set, not the upcoming one (reverses D-115, 2026-06-11)
+
+**Context:** The rest timer lived on the **upcoming** set's card: finish set 1 → the timer appeared on set 2. Backwards from how a lifter experiences it — you finish a set, *then* you rest, and the rest you just triggered showed up attached to a set you hadn't done yet. D-115's "rest is the gap after set N-1" model was internally consistent but read as a bug at the bench.
+
+**Decision — each set owns the rest that FOLLOWS it.** The rule flips from *"timer on set N+1's card, shown for sets > 0"* to *"timer on set N's card when set N is completed AND set N is not the last set."*
+- **Position:** `startRestAfterSet` (renamed from `startAutoRestForNextSet`) writes the running timer to key `${exerciseId}-${N}` (was `${N+1}`) when set N's Done is tapped. The `!nextSet` guard is unchanged — "has a next set" *is* "not the last set", so the last set still auto-starts nothing (nothing meaningful follows it).
+- **Gate:** `showRestTimer = !isDurationBased && !isLastSet && set.completed && !restDismissed.has(key)`. Gating on `set.completed` (not `setIndex > 0`) means undone sets show **no idle rest row** — which preserves D-115's honesty principle (never imply a rest that hasn't happened) the right way: a fresh exercise shows zero rest rows until you start completing sets. That absence is expected, not a regression from the old idle "Rest 2:30 / Start" that used to sit on set 2.
+- **Duration source:** the rendered fallback now derives from **`set.reps`** (the set just finished) instead of `exercise.sets[setIndex-1].reps` (the previous set). Each set's rest reflects its own effort. `restSeconds` inside the auto-start was already computed from the completed set's reps — unchanged.
+- **Controls:** the manual **Start** button is gone (auto-starts on Done). Replaced with **Pause/Resume** (toggles `running` on the existing timer) and **Skip** (cuts it short → `seconds:0, running:false` + adds the key to a new `restDismissed` set that hides the row). A re-completed set re-arms: `startRestAfterSet` clears the dismissed key on a fresh start. The tap-to-edit time button (long-press reset) is retained.
+
+**Files:** `src/components/StrengthLogger.tsx` — `startRestAfterSet` (~:448) + 4 callers; `restDismissed` state (~:381); `showRestTimer` gate (~:3218); footer Rest/Pause/Skip block + `set.reps` duration source (~:3838). **Verification:** app build clean; 380px harness — rest row renders on completed non-last sets with Rest+Pause+Skip (`overflowPx -10`, footer below open picker), last sets render no rest row, steppers still aligned 44→308. Device-verify steps reported to user.
 
 ---
 

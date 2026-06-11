@@ -378,6 +378,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Mood removed per request; keep RPE only
   // Per-set rest timers: key = `${exerciseId}-${setIndex}`
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
+  // Rest rows the user has Skipped — hides that set's rest row until the set is re-completed.
+  const [restDismissed, setRestDismissed] = useState<Set<string>>(new Set());
   const [editingTimerKey, setEditingTimerKey] = useState<string | null>(null);
   const [editingTimerValue, setEditingTimerValue] = useState<string>("");
   // Numeric keypad (bottom sheet) for fast, error-resistant input
@@ -445,7 +447,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } catch {}
   };
 
-  const startAutoRestForNextSet = (exerciseId: string, completedSetIndex: number) => {
+  // Each set owns the rest that follows it (D-115, reversed). When set N is
+  // completed, auto-start its rest timer ON set N's own card (key `${id}-${N}`).
+  // The `!nextSet` guard means the LAST set starts no rest (nothing follows it).
+  const startRestAfterSet = (exerciseId: string, completedSetIndex: number) => {
     try {
       const ex = exercises.find((e) => e.id === exerciseId);
       if (!ex) return;
@@ -457,8 +462,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
       const reps = typeof completedSet.reps === 'number' ? completedSet.reps : 0;
       const restSeconds = calculateRestTime(ex.name, reps);
-      const key = `${exerciseId}-${completedSetIndex + 1}`;
+      const key = `${exerciseId}-${completedSetIndex}`;
 
+      // Re-arm: a re-completed set should show its rest again even if Skip hid it.
+      setRestDismissed((prev) => {
+        if (!prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
       setTimers((prev) => {
         const cur = prev[key];
         if (cur?.running) return prev;
@@ -528,7 +540,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const rirVal = isValidNumber ? Math.max(0, Math.min(5, Math.round(n))) : undefined;
       updateSet(ctx.exerciseId, ctx.setIndex, { rir: rirVal, ...(ctx.alsoComplete ? { completed: true } : null) });
       if (ctx.alsoComplete) {
-        startAutoRestForNextSet(ctx.exerciseId, ctx.setIndex);
+        startRestAfterSet(ctx.exerciseId, ctx.setIndex);
       }
     }
 
@@ -2489,14 +2501,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // If mobility mode, just mark as complete without RIR prompt
     if (isMobilityMode) {
       updateSet(exerciseId, setIndex, { completed: true });
-      startAutoRestForNextSet(exerciseId, setIndex);
+      startRestAfterSet(exerciseId, setIndex);
       return;
     }
     
     // If RIR was already entered inline, just mark complete (don't prompt again)
     if (set.rir !== undefined && set.rir !== null) {
       updateSet(exerciseId, setIndex, { completed: true });
-      startAutoRestForNextSet(exerciseId, setIndex);
+      startRestAfterSet(exerciseId, setIndex);
       return;
     }
     
@@ -2512,7 +2524,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       secondaryLabel: 'Skip RIR',
       onSecondary: () => {
         updateSet(exerciseId, setIndex, { completed: true });
-        startAutoRestForNextSet(exerciseId, setIndex);
+        startRestAfterSet(exerciseId, setIndex);
       },
       alsoComplete: true,
     });
@@ -3211,11 +3223,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   const isDurationRunning = durationTimer?.running || false;
                   const currentDurationSeconds = durationTimer?.seconds ?? (set.duration_seconds || 60);
                   
-                  // Rest is the gap *after* the previous set (the "rest after set N-1"
-                  // model startAutoRestForNextSet writes to). Set 0 has no previous set,
-                  // so it gets no rest row — showing one would imply a pre-first-set rest
-                  // that doesn't exist (Bug A). Sets 1+ keep the existing computation.
-                  const showRestTimer = !isDurationBased && setIndex > 0;
+                  // Each set owns the rest that FOLLOWS it (D-115, reversed): the timer
+                  // belongs to the just-finished set, not the upcoming one. So the rest row
+                  // appears on set N's card only once set N is completed AND set N is not
+                  // the last set (nothing meaningful follows the last set). Gating on
+                  // completed means undone sets show NO idle rest row — avoiding the
+                  // "implies a rest that hasn't happened" problem the original D-115 avoided.
+                  const isLastSet = setIndex >= exercise.sets.length - 1;
+                  const showRestTimer = !isDurationBased && !isLastSet && !!set.completed && !restDismissed.has(restTimerKey);
                   
                   const isBaselineTest = isBaselineTestWorkout(scheduledWorkout || {});
                   const isWarmup = set.setType === 'warmup';
@@ -3824,9 +3839,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           <button
                             onClick={() => {
                               const key = restTimerKey;
-                              const prevSet = exercise.sets[setIndex - 1];
-                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, prevSet.reps)
+                              // Rest duration reflects THIS set's effort (the set just finished).
+                              const calculatedRest = set.reps && set.reps > 0 && set.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, set.reps)
                                 : 90;
                               const cur = restTimer?.seconds ?? calculatedRest;
                               const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
@@ -3835,9 +3850,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             }}
                             onContextMenu={(e) => {
                               e.preventDefault();
-                              const prevSet = exercise.sets[setIndex - 1];
-                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, prevSet.reps)
+                              const calculatedRest = set.reps && set.reps > 0 && set.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, set.reps)
                                 : 90;
                               setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: calculatedRest, running: false } }));
                             }}
@@ -3846,25 +3860,44 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             aria-label="Rest timer"
                           >
                             {formatSeconds(restTimer?.seconds ?? (() => {
-                              const prevSet = exercise.sets[setIndex - 1];
-                              return prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, prevSet.reps)
+                              return set.reps && set.reps > 0 && set.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, set.reps)
                                 : 90;
                             })())}
                           </button>
                           <button
                             onClick={() => {
-                              const prevSet = exercise.sets[setIndex - 1];
-                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, prevSet.reps)
+                              const calculatedRest = set.reps && set.reps > 0 && set.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, set.reps)
                                 : 90;
-                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: (prev[restTimerKey]?.seconds ?? calculatedRest) || calculatedRest, running: true } }));
+                              // Toggle pause/resume on the auto-started rest timer.
+                              setTimers(prev => {
+                                const cur = prev[restTimerKey];
+                                const seconds = (cur?.seconds ?? calculatedRest) || calculatedRest;
+                                return { ...prev, [restTimerKey]: { seconds, running: !(cur?.running) } };
+                              });
                             }}
                             className="h-7 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                             style={{ fontFamily: 'Inter, sans-serif' }}
-                            aria-label="Start rest timer"
+                            aria-label={restTimer?.running ? 'Pause rest timer' : 'Resume rest timer'}
                           >
-                            Start
+                            {restTimer?.running ? 'Pause' : 'Resume'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              // Skip: cut the rest short and hide this set's rest row.
+                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: 0, running: false } }));
+                              setRestDismissed(prev => {
+                                const next = new Set(prev);
+                                next.add(restTimerKey);
+                                return next;
+                              });
+                            }}
+                            className="h-7 px-2 text-xs rounded-md border-2 border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/[0.1] hover:border-white/30 transition-all duration-300"
+                            style={{ fontFamily: 'Inter, sans-serif' }}
+                            aria-label="Skip rest timer"
+                          >
+                            Skip
                           </button>
                           {editingTimerKey === restTimerKey && (
                             <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">

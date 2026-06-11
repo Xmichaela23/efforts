@@ -673,6 +673,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-044 — Rest timer ownership reversed; fresh exercise shows NO rest rows (filed + shipped 2026-06-11, D-120)
+
+- **Status:** shipped 2026-06-11 (D-120, reverses D-115). Filed to stop a future session from "fixing" the now-intentional absence of rest rows on undone sets.
+- **What changed:** the rest timer used to live on the **upcoming** set's card (finish set 1 → timer on set 2). Now each set owns the rest that *follows* it — finish set N → its rest auto-starts ON set N's card; the **last** set shows none. Duration derives from the just-finished set's reps; Start replaced by Pause/Resume + Skip.
+- **Intentional behavior, NOT a regression:** because `showRestTimer` now gates on `set.completed`, **a fresh exercise shows zero rest rows until you start completing sets.** This is correct — it's the honest version of D-115's "never imply a rest that hasn't happened" principle. Do **not** re-add an idle "Rest 2:30 / Start" row to undone sets; that idle row was the old (reversed) behavior. An incomplete non-last set having no rest row is expected.
+- **Verification:** 380px harness — rest renders on completed non-last sets (Rest+Pause+Skip, `overflowPx -10`), last sets render none, steppers stay aligned 44→308.
+- **Cross-ref:** D-115 (reversed), D-120 (the reversal), Q-043 (the prior "rest timer on set 1 re-confirmed" note — now superseded by this reversal).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
