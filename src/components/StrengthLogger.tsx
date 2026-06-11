@@ -3527,11 +3527,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         if (loggerMode === 'mobility' || isDurationBased || isPlyometric(exercise.name)) return null;
                         const targetRir = exercise.target_rir;
                         const isPrefilled = set.from_previous && !set.completed;
-                        // RIR pills on their own row, centered under the RIR header column (col 4)
-                        // via a grid matching the top row's columns (24 / 64 / 64 / 64, gap 8).
+                        // RIR pills on their own row, anchored so the group's RIGHT edge sits under
+                        // the RIR cell's right edge: 240px from content-left (set#24 + gap8 + reps64
+                        // + gap8 + weight64 + gap8 + RIR64). Pills are 212px wide, so paddingLeft
+                        // 28px (240 − 212) lands the right edge at 240 — device-independent (the
+                        // header cells are fixed-width, so 240 doesn't move with viewport).
                         return (
-                          <div className="grid items-start mt-2" style={{ gridTemplateColumns: '24px 64px 64px 64px', columnGap: '8px' }}>
-                            <div className="flex flex-col items-center gap-0.5" style={{ gridColumn: 4, minWidth: 0 }}>
+                          <div className="flex mt-2" style={{ paddingLeft: '28px' }}>
+                            <div className="flex flex-col items-start gap-0.5">
                             <div className="flex items-center gap-2" role="group" aria-label="RIR (reps in reserve)">
                               {[1, 2, 3, 4, 5].map((r) => {
                                 const isSelected = set.rir === r;
@@ -3567,11 +3570,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </div>
                         );
                       })()}
-                      {/* Steppers row — ±5/±2.5 (+ "↑ Same") centered under the Weight header
-                          column (col 3) on their own line, via a grid matching the top row. */}
+                      {/* Steppers row — ±5/±2.5 (+ "↑ Same") LEFT-aligned: the group's left edge
+                          sits under the Weight cell's left edge (paddingLeft 104 = set#24 + gap8 +
+                          reps64 + gap8). Edge-anchored, not centered. Same wraps beneath if wide. */}
                       {(showStepper || (setIndex > 0 && exercise.sets[0])) && (
-                      <div className="grid items-center" style={{ gridTemplateColumns: '24px 64px 64px 64px', columnGap: '8px' }}>
-                        <div className="flex items-center justify-center gap-2" style={{ gridColumn: 3, minWidth: 0 }}>
+                      <div className="flex flex-wrap items-center gap-2" style={{ paddingLeft: '104px' }}>
                         {showStepper && (
                           <div className="flex gap-1" role="group" aria-label="Adjust weight">
                             {[-5, -2.5, 2.5, 5].map((delta) => (
@@ -3624,7 +3627,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             </button>
                           );
                         })()}
-                        </div>
                       </div>
                       )}
                     {(() => {
