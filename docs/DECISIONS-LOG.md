@@ -3238,6 +3238,8 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 **Files:** `src/components/StrengthLogger.tsx` (header, ~:2887 — title wrapped with the conditional pill). **Verification:** app build clean; tag is header-only (does not touch the set-card layout / 380px harness scope).
 
+**Addendum (2026-06-11) — header spacing fix.** The Deload pill (end of the left title cluster) was butting against the date field with no gap — the outer header row was `justify-between` with no `gap`, and the `h1` didn't truncate, so a long title pushed the pill into the right cluster. Fix: outer row `gap-3` (guaranteed 12px between the title-cluster and the date), `h1` → `truncate min-w-0`, right cluster (date + Pick planned) → `shrink-0`. Verified at 380px: pill↔date 12px, date↔Pick-planned 8px, no wrap, no overflow (right cluster ends exactly at the `px-4` edge). **Trade-off (accepted):** at 380px the date (~137px) + Pick-planned (~110px) + pill leave almost no room for the title, so a long name (e.g. "Log: Hypertrophy Deload (Upper)") truncates to ~1 char. Inherent — the four elements exceed the 348px content width, and the title is the only flexible one; the pill (the load-bearing context) stays fully visible. If the title needs to survive, the levers are a compact date display or a two-row header (neither taken here — out of scope for a spacing bug).
+
 ---
 
 ## D-125 — Compact "keypad-primary" set logger: one quick-adjust strip replaces the circle rows (Q-048 step 1, 2026-06-11)

@@ -2888,9 +2888,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             </div>
           );
         })()}
-        <div className="flex items-center justify-between w-full px-4">
+        <div className="flex items-center justify-between gap-3 w-full px-4">
           <div className="flex items-center gap-2 min-w-0">
-            <h1 className="text-xl font-medium text-white/90">
+            <h1 className="text-xl font-medium text-white/90 truncate min-w-0">
               {(() => {
                 const mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                 if (mode === 'mobility') return 'Log Mobility';
@@ -2910,7 +2910,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Input
               type="date"
               value={performedDate || ''}
