@@ -3226,6 +3226,18 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-124 — "Deload" tag in the logger header (communication, not logic, 2026-06-11)
+
+**Context:** On a deload week, bench prescribed 100 × 4 @ RIR 4 (target 4-6) while the new D-122 "last:" anchor showed 105 × 6 @ RIR 2 — i.e. the suggestion was *lighter and easier than last time*. Investigation (Q-047) confirmed this is **correct-by-design**: when logging a planned session, set values prefill from the **plan prescription** (`row.computed.steps` → `parseFromComputed`), and the plan generator prescribes lighter loads on a deload week. The "last:" anchor (D-122, last-actual) is intentionally heavier. No logic gap — but the screen never *said* it was a deload, so the lighter number read as confusing (it confused the app's own author).
+
+**Decision — surface the deload context; no logic change.** A subtle amber **"Deload"** pill in the logger header next to the title, so "why is this lighter than last time?" answers itself. Detection mirrors the app's established convention — a case-insensitive name-string parse (`/deload/i` on `scheduledWorkout.name`, which already reads "…Deload…" and is already shown in the header), the same method `WorkoutCalendar`, `UnifiedWorkoutView`, `AllPlansInterface`, and `PlanSelect` use. **No new state/queries/plumbing** — surfaces what the plan already encodes in the name.
+
+**Known limitation (accepted):** there is **no structured `week_type`/`is_deload` flag** plumbed to the logger; detection is name-based, so a deload session whose name omits "Deload" won't show the tag — the same limitation every other client surface has. Plumbing a structured phase flag (the server `WeekPhase` type exists in `athlete-snapshot/body-response.ts` but isn't wired to the client logger) would be a larger task, deliberately not taken here.
+
+**Files:** `src/components/StrengthLogger.tsx` (header, ~:2887 — title wrapped with the conditional pill). **Verification:** app build clean; tag is header-only (does not touch the set-card layout / 380px harness scope).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

@@ -2884,13 +2884,27 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           );
         })()}
         <div className="flex items-center justify-between w-full px-4">
-          <h1 className="text-xl font-medium text-white/90">
-            {(() => {
-              const mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
-              if (mode === 'mobility') return 'Log Mobility';
-              return scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength';
-            })()}
-          </h1>
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-xl font-medium text-white/90">
+              {(() => {
+                const mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+                if (mode === 'mobility') return 'Log Mobility';
+                return scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength';
+              })()}
+            </h1>
+            {/* D-124: surface deload context so a lighter-than-last-time prescription
+                explains itself. Detection mirrors the app's convention (name-string
+                parse — same as WorkoutCalendar/UnifiedWorkoutView/AllPlansInterface);
+                no structured week_type flag is plumbed to the logger. */}
+            {/deload/i.test(String(scheduledWorkout?.name || '')) && (
+              <span
+                className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300/90"
+                title="This is a deload week — lighter loads are intentional recovery, not a regression."
+              >
+                Deload
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <Input
               type="date"

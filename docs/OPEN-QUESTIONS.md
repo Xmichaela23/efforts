@@ -710,6 +710,22 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-047 — Why is the deload-week suggestion lighter than "last:"? (investigated 2026-06-11; correct-by-design + D-124 tag)
+
+- **Status:** resolved 2026-06-11. The lighter suggestion is **correct-by-design** (deload week). No logic change. Communication gap fixed by D-124 (a "Deload" header tag).
+- **The observation:** bench prescribed 100 × 4 @ RIR 4 (target 4-6) but the "last:" anchor showed 105 × 6 @ RIR 2 — lighter and easier than last actual.
+- **Where the numbers come from (the investigation answer):**
+  - **Prefill weight / suggested reps** (the dimmed starting values, when logging a *planned* session): the **plan prescription** — `prefillFromPlanned` → `parseFromComputed(row.computed)` reads the planned workout's `computed.steps`. NOT last-actual.
+  - **`target_reps` / `target_rir` captions** ("target 4-6" / "suggested 4"): the **plan prescription** (parsed from the planned exercise, ~:1203/:1216).
+  - **D-097 last-actual autofill:** fills only sets the plan prefill left *untouched* (fallback), from the last actual session.
+  - **"last:" anchor (D-122):** the **last actual session** (`workouts.strength_exercises`).
+  - So plan-prescribed 100 < last-actual 105 = the deload prescription, not a stale/non-progressing number. **User confirmed the current block is a deload week.**
+- **Not a progression bug.** Whether the deload's exact load math is "right" was out of scope (the user confirmed it's a deload and asked for no logic change); this entry only records the prescription-source architecture and the correct-by-design verdict.
+- **Residual gap → fixed:** the logger never displayed the deload context, so a correct lighter prescription read as confusing. D-124 surfaces a "Deload" tag.
+- **Cross-ref:** D-124 (the tag), D-122 ("last:" anchor), D-097 (last-actual prefill), the `computed.steps` plan-prescription path.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
