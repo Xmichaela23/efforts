@@ -769,8 +769,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
   
   // Restore session progress from localStorage
-  const restoreSessionProgress = (): { exercises: LoggedExercise[]; addons: AttachedAddon[]; notes: string; rpe: number | ''; sourcePlannedName: string; sourcePlannedId: string | null; sourcePlannedDate: string | null } | null => {
+  const restoreSessionProgress = (openedId?: string | null): { exercises: LoggedExercise[]; addons: AttachedAddon[]; notes: string; rpe: number | ''; sourcePlannedName: string; sourcePlannedId: string | null; sourcePlannedDate: string | null } | null => {
     try {
+      // Layer 2 (D-132) uses `openedId` to read the identity-aware key (+ legacy fallback).
       const saved = localStorage.getItem(sessionKey);
       if (saved) {
         const sessionData = JSON.parse(saved);
@@ -1497,9 +1498,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // athlete's in-progress sets through this code path).
     (async () => {
       const modeAtOpen = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
-      const savedSession = restoreSessionProgress();
+      // D-132 Layer 1 — IDENTITY GUARD: a saved draft may only rehydrate into the SAME
+      // workout it was logged against. `openedId` mirrors the sourcePlannedId logic in
+      // runFreshInit (planned id, or null for ad-hoc / completed). A draft from a DIFFERENT
+      // workout (e.g. Upper's draft when opening Lower) must NEVER restore — mismatch →
+      // skip restore, load the opened workout fresh. null === null allows genuine ad-hoc
+      // same-day resume. This is the core fix for the cross-workout bleed.
+      const openedId = (scheduledWorkout?.id && String((scheduledWorkout as any)?.workout_status || 'planned').toLowerCase() !== 'completed')
+        ? String(scheduledWorkout.id)
+        : null;
+      const savedSession = restoreSessionProgress(openedId);
+      const identityMatches = !!savedSession && ((savedSession.sourcePlannedId ?? null) === openedId);
 
-      if (savedSession && modeAtOpen !== 'mobility') {
+      if (savedSession && identityMatches && modeAtOpen !== 'mobility') {
         const verifiedOrphan = await (async (): Promise<boolean> => {
           const pid = savedSession.sourcePlannedId;
           if (!pid) return false;  // No planned ref — can't be an orphan of a deleted plan.
