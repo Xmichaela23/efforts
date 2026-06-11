@@ -2888,7 +2888,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             </div>
           );
         })()}
-        <div className="flex items-center justify-between gap-3 w-full px-4">
+        <div className="flex flex-col gap-2 w-full px-4">
+          {/* Row 1: workout identity — title + Deload pill (the pill describes the
+              workout, so it belongs with the name, not competing with the date/Pick
+              planned controls for horizontal space). Title gets the full row width. */}
           <div className="flex items-center gap-2 min-w-0">
             <h1 className="text-xl font-medium text-white/90 truncate min-w-0">
               {(() => {
@@ -2910,7 +2913,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Row 2: controls — date + Pick planned get their own row, full room, no
+              longer squeezing the title. */}
+          <div className="flex items-center gap-2">
             <Input
               type="date"
               value={performedDate || ''}
