@@ -37,6 +37,7 @@ interface LoggedExercise {
   expanded?: boolean;
   notes?: string;
   target_rir?: number; // Target RIR from prescription (1-5)
+  target_reps?: string; // Target reps from prescription, e.g. "4-6" or "8" (display only)
 }
 
 interface StrengthLoggerProps {
@@ -1223,8 +1224,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (!byName[name]) {
           // Extract notes separately - ensure they don't end up in the name
           const rawNotes = String(notes || '').trim();
-          // Extract target RIR from the strength prescription
+          // Extract target RIR + target reps from the strength prescription (display only)
           const targetRir = typeof s?.target_rir === 'number' ? s.target_rir : undefined;
+          const targetReps = typeof repsRaw === 'string' && /\d/.test(repsRaw)
+            ? repsRaw.trim()
+            : (typeof repsRaw === 'number' && repsRaw > 0 ? String(repsRaw) : undefined);
           byName[name] = {
             id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
             name,
@@ -1235,6 +1239,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             notes: rawNotes || undefined,
             rir: null,
             target_rir: targetRir, // Target RIR from prescription
+            target_reps: targetReps, // Target reps from prescription (e.g. "4-6")
           } as LoggedExercise;
         }
         const targetSets = Math.max(1, sets);
@@ -3521,39 +3526,48 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           );
                         })()}
                         </div>
-                      {/* Rep-circle picker (Q-039 step 3) — window of 5 centered on the current
-                          reps value (target±2, since reps prefills to target), clamp low at 1;
-                          re-centers when reps changes (pick or keypad). Left edge under the Reps
-                          cell (paddingLeft 32 = set#24 + gap8). Hidden for duration / no-reps. */}
+                      {/* Rep-circle picker (Q-039 steps 3–4) — labeled full-width row. A 3-char
+                          row-leader ("Reps") makes the stacked control rows legible; strict column
+                          alignment can't differentiate a 5-wide picker in a 308px card (D-119).
+                          Window of 5 centered on current reps (target±2, clamp 1), re-centers on
+                          pick/keypad. Prescribed reps shown as the "target N" caption (Q-039 spec).
+                          Hidden for duration / no-reps. Circles are ~32px shortcuts; the keypad
+                          cell above is the 44px primary input. */}
                       {(() => {
                         if (isDurationBased || set.reps === undefined) return null;
                         const center = (typeof set.reps === 'number' && set.reps >= 1) ? set.reps : 8;
                         const lo = Math.max(1, center - 2);
                         const isPrefilled = set.from_previous && !set.completed;
                         return (
-                          <div className="flex mt-2" style={{ paddingLeft: '32px' }}>
-                            <div className="flex items-center gap-1" role="group" aria-label="Reps">
-                              {[lo, lo + 1, lo + 2, lo + 3, lo + 4].map((v) => {
-                                const isSel = set.reps === v;
-                                const stateCls = isSel
-                                  ? (isPrefilled
-                                      ? 'bg-white/[0.08] border-white/20 text-white/40'
-                                      : 'bg-white/[0.20] border-white/45 text-white font-semibold')
-                                  : 'bg-white/[0.04] border-white/15 text-white/55 hover:bg-white/[0.10] hover:text-white/80';
-                                return (
-                                  <button
-                                    key={v}
-                                    type="button"
-                                    onClick={() => updateSet(exercise.id, setIndex, { reps: v })}
-                                    className={`h-9 w-9 rounded-md border-2 text-sm tabular-nums transition-colors leading-none ${stateCls}`}
-                                    style={{ fontFamily: 'Inter, sans-serif' }}
-                                    aria-pressed={isSel}
-                                    aria-label={`${v} reps`}
-                                  >
-                                    {v}
-                                  </button>
-                                );
-                              })}
+                          <div className="flex items-start gap-2 mt-2">
+                            <span className="w-9 shrink-0 pt-2 text-[10px] font-medium text-white/50">Reps</span>
+                            <div className="flex flex-col items-start gap-0.5">
+                              <div className="flex items-center gap-1" role="group" aria-label="Reps">
+                                {[lo, lo + 1, lo + 2, lo + 3, lo + 4].map((v) => {
+                                  const isSel = set.reps === v;
+                                  const stateCls = isSel
+                                    ? (isPrefilled
+                                        ? 'bg-white/[0.08] border-white/20 text-white/40'
+                                        : 'bg-white/[0.20] border-white/45 text-white font-semibold')
+                                    : 'bg-white/[0.04] border-white/15 text-white/55 hover:bg-white/[0.10] hover:text-white/80';
+                                  return (
+                                    <button
+                                      key={v}
+                                      type="button"
+                                      onClick={() => updateSet(exercise.id, setIndex, { reps: v })}
+                                      className={`h-8 w-8 rounded-md border-2 text-sm tabular-nums transition-colors leading-none ${stateCls}`}
+                                      style={{ fontFamily: 'Inter, sans-serif' }}
+                                      aria-pressed={isSel}
+                                      aria-label={`${v} reps`}
+                                    >
+                                      {v}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {exercise.target_reps ? (
+                                <span className="text-[9px] font-medium text-white/45 leading-none">target {exercise.target_reps}</span>
+                              ) : null}
                             </div>
                           </div>
                         );
@@ -3566,20 +3580,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         if (loggerMode === 'mobility' || isDurationBased || isPlyometric(exercise.name)) return null;
                         const targetRir = exercise.target_rir;
                         const isPrefilled = set.from_previous && !set.completed;
-                        // RIR pills on their own row (Q-039 scale: 0,1,2,3,4,5+), anchored so the
-                        // group's RIGHT edge sits under the RIR cell's right edge: 240px from
-                        // content-left (set#24 + gap8 + reps64 + gap8 + weight64 + gap8 + RIR64).
-                        // 6 pills × w-9 (36) + 5 × gap-1 (4) = 236px, so paddingLeft 4px (240 − 236)
-                        // keeps the right edge at 240 — device-independent (header cells fixed-width).
+                        // RIR pills (Q-039 scale 0,1,2,3,4,5+) as a labeled full-width row ("RIR"
+                        // leader). The prescribed RIR shows as the "suggested N" caption (Q-039
+                        // spec — RIR is a suggestion, not a hard target; renamed from "target N" so
+                        // it's not confused with the rep target). ~32px shortcut pills.
                         return (
-                          <div className="flex mt-2" style={{ paddingLeft: '4px' }}>
+                          <div className="flex items-start gap-2 mt-2">
+                            <span className="w-9 shrink-0 pt-2 text-[10px] font-medium text-white/50">RIR</span>
                             <div className="flex flex-col items-start gap-0.5">
                             <div className="flex items-center gap-1" role="group" aria-label="RIR (reps in reserve)">
                               {[0, 1, 2, 3, 4, 5].map((r) => {
                                 const isSelected = set.rir === r;
                                 const isTarget = targetRir === r;
                                 const isCap = r === 5; // 5 renders as "5+" (RIR >= 5, far from failure)
-                                const baseCls = 'h-9 w-9 rounded-md border-2 text-sm tabular-nums transition-colors leading-none';
+                                const baseCls = 'h-8 w-8 rounded-md border-2 text-sm tabular-nums transition-colors leading-none';
                                 // D-097: prefilled-from-previous selection renders muted, same as reps/weight.
                                 const stateCls = isSelected
                                   ? (isPrefilled
@@ -3596,7 +3610,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     className={`${baseCls} ${stateCls}`}
                                     style={{ fontFamily: 'Inter, sans-serif' }}
                                     aria-pressed={isSelected}
-                                    aria-label={`RIR ${isCap ? '5 or more' : r}${isTarget ? ' (target)' : ''}`}
+                                    aria-label={`RIR ${isCap ? '5 or more' : r}${isTarget ? ' (suggested)' : ''}`}
                                   >
                                     {isCap ? '5+' : r}
                                   </button>
@@ -3604,17 +3618,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               })}
                             </div>
                             {targetRir ? (
-                              <span className="text-[9px] font-medium text-amber-400/70 leading-none">target {targetRir >= 5 ? '5+' : targetRir}</span>
+                              <span className="text-[9px] font-medium text-amber-400/70 leading-none">suggested {targetRir >= 5 ? '5+' : targetRir}</span>
                             ) : null}
                             </div>
                           </div>
                         );
                       })()}
-                      {/* Steppers row — ±5/±2.5 (+ "↑ Same") LEFT-aligned: the group's left edge
-                          sits under the Weight cell's left edge (paddingLeft 104 = set#24 + gap8 +
-                          reps64 + gap8). Edge-anchored, not centered. Same wraps beneath if wide. */}
+                      {/* Weight steppers row (Q-039 step 4) — labeled "Wt" full-width row to match
+                          the Reps/RIR rows (legible stack, not a floating centered block). 2×2
+                          stepper (−5/+5 / −2.5/+2.5) + "↑ Same". The Weight keypad cell above is the
+                          44px primary input; steppers are shortcuts. */}
                       {(showStepper || (setIndex > 0 && exercise.sets[0])) && (
-                      <div className="flex flex-wrap items-center gap-2" style={{ paddingLeft: '104px' }}>
+                      <div className="flex items-start gap-2 mt-2">
+                        <span className="w-9 shrink-0 pt-2 text-[10px] font-medium text-white/50">{showStepper ? 'Wt' : ''}</span>
+                        <div className="flex flex-wrap items-center gap-2">
                         {showStepper && (
                           // Q-039 step 3: 2×2 stepper — −5/+5 top row, −2.5/+2.5 bottom row
                           <div className="grid grid-cols-2 gap-1" role="group" aria-label="Adjust weight">
@@ -3668,6 +3685,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             </button>
                           );
                         })()}
+                        </div>
                       </div>
                       )}
                     {(() => {

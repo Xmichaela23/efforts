@@ -3147,6 +3147,18 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-119 — Q-039 step 4: labeled full-width control rows (alignment-alone doesn't survive a 5-wide picker, 2026-06-11)
+
+**Context:** Q-039 step 4 — the layout pass. The screenshot showed the rep-circle row and RIR-pill row as two **visually identical, overlapping** rows (both ~36px number circles), so the user couldn't tell which was which. The earlier "alignment is the labeling / no row labels" intent (Q-039) was the goal, but it **doesn't survive contact with the geometry**: a 5-circle rep picker (and a 6-pill RIR row) is ~200–240px wide, far wider than its 64px header column, so two such rows in a 308px card **cannot be positioned to not overlap** at any tappable size. Proven with the harness across the whole iteration.
+
+**Decision (made jointly with the user):** keep the controls at a comfortable ~32px (`w-8`) as **full-width rows** (the Q-039 primary layout), and differentiate each row with a **minimal 3-char leading text label** — `Reps` / `Wt` / `RIR` — a fixed-width (`w-9`) inline row-leader, NOT a column header. The label is the cheap, honest fix that makes stacked rows legible. The 44px-min tap target lives on the **keypad cells** (the source-of-truth primary input); the circle/pill rows are smaller shortcuts. This is "closer to option B" from the fork, deliberately chosen over shrinking circles to ~20px (which would chase a column alignment that can't fully hold anyway, at the cost of tappability).
+- **Captions corrected to the Q-039 spec:** the Reps row shows **`target N`** (the prescribed reps — newly plumbed as `exercise.target_reps`, e.g. "4-6", from the prescription `reps` string), and the RIR row shows **`suggested N`** (renamed from "target"; RIR is a suggestion, not a hard target). This fixes the earlier mislabel where the lone "target 4" caption (actually `target_rir`) sat under the RIR row and read like a rep target.
+- Circles `w-9 → w-8`; stepper stays the 2×2 from D-117; `paddingLeft` column-anchoring removed (the label + consistent leader width is the alignment now).
+
+**Files:** `src/components/StrengthLogger.tsx` (LoggedExercise `target_reps` field; prescription parse ~:1227; the three labeled control rows ~:3529/:3578/:3630). **Verification:** app build clean; 380px harness all sets/both exercises `overflowPx -10` (no border crossing); each row carries a `Reps`/`Wt`/`RIR` leader. **Q-039 sequence complete** (steps 1–4); the only remaining strength-logger item is the Q-040 UI-trend follow-up (RIR-5 trend points visible-but-dimmed), explicitly sequenced after this.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
