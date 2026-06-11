@@ -686,6 +686,20 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-045 — "Last session" per-set anchor in the logger (filed + shipped 2026-06-11, D-122)
+
+- **Status:** shipped 2026-06-11 (D-122). Investigation-first, then built same session.
+- **What/why:** the biggest intuitiveness gap vs Strong/Hevy — every lifter wants "what did I do last time for this set?" as the anchor to match/beat. The D-097 prefill already fetched the per-set prior data and threw it away after prefilling; this surfaces it as a persistent muted line (`last: 100 × 5 @ RIR 3`) under each set's top cells.
+- **Intentional behaviors, do NOT "fix":**
+  - **Overflow set index shows no anchor (blank), not a clamped value.** If today has 4 sets and last time had 3, set 4 shows no "last:" line. This is deliberate — a truth-anchor must not lie; it diverges on purpose from the prefill's `?? priorSets[last]` clamp (prefill convenience is fine to clamp; the anchor is not).
+  - **A history-less exercise shows no line at all**, not "last: —" on every set. Absence is intended; the placeholder repetition was rejected as clutter.
+  - **Prefill (D-097) and the anchor (D-122) both exist** — not a duplicate. Prefill clears on edit (`from_previous`); the anchor is stable and never clears.
+- **Data:** reuses the single D-097 fetch (`workouts.strength_exercises` JSONB) — no new query/table/server work. `exercise_log` is aggregate-per-session and was the wrong source (can't give per-set-index).
+- **Verification:** 380px harness — anchor line adds height, width still `overflowPx -10`, open-picker footer math holds, steppers aligned 44→308.
+- **Cross-ref:** D-122 (the decision), D-097 (the prefill/fetch it reuses), D-095 (the post-workout PREVIOUS column in StrengthCompareTable — same data, different surface).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

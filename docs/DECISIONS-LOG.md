@@ -3195,6 +3195,24 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-122 — Persistent "last:" per-set anchor in the logger (Q-045, 2026-06-11)
+
+**Context:** "What did I do last time?" is the question every lifter asks at the rack — the single most-used feature in Strong/Hevy. The logger already *had the data*: the D-097 prefill fetch (`StrengthLogger.tsx:1302`) pulls the last 10 strength sessions' per-set actuals from `workouts.strength_exercises` (JSONB) and matches them by normalized exercise name + set index. It used that data only to **prefill** fields (which clear on edit), then discarded it. The investigation confirmed no new query/table/server work was needed — `exercise_log` is aggregate-per-session (best_weight/best_reps/sets_completed), so the per-set JSONB source was already the right one.
+
+**Decision — surface the prior session as a persistent anchor line, reusing the existing fetch:**
+- **Data:** hoisted the prior-session map to component state (`previousSessionByName`, keyed by normalized name) so the **one existing fetch feeds both** the prefill and the anchor. No new query.
+- **Match key:** same exercise (normalized: lowercase, strip `(Left)/(Right)`, collapse whitespace — `normalizeExerciseName`, hoisted to module scope so prefill + anchor key identically) + **same set index**.
+- **Overflow sets → BLANK, not clamped (deliberate divergence from prefill).** The prefill clamps `priorSets[i] ?? priorSets[last]` for entry convenience; the anchor does **not** — `priorSets[setIndex]` only. Showing "last: 100×5" on a set index that had no real prior set is a false anchor, and the entire value of the feature is a number you can trust. A false anchor is worse than none.
+- **History-less exercise → no line at all,** not "last: —" repeated on every set (that empty repetition is its own clutter). `formatLastSet` returns `null` for absent/empty prior data and the caller renders nothing.
+- **Format:** `last: {weight} × {reps} @ RIR {rir}`. Handles duration sets (`last: 0:45`), bands (`resistance_level` in place of weight, e.g. `last: Heavy × 12`), and missing RIR (drops `@ RIR` cleanly). RIR ≥5 renders `5+` (consistent with D-116).
+- **Coexists with prefill (both kept):** different jobs — prefill speeds entry and clears the moment you edit (`from_previous`); the anchor is the stable compare line that never clears regardless of what you type.
+
+**Placement:** one muted full-width line (`text-[10px] text-white/40`) directly under the 3 top input cells, indented past a `w-9` spacer so it aligns under the first cell (the set-number leader column). Deliberately **not** attached to a Reps/Wt/RIR control row (it spans all three fields) and does **not** touch the row geometry balanced in Q-043/D-119.
+
+**Files:** `src/components/StrengthLogger.tsx` — `normalizeExerciseName` hoisted to module scope (~:116); `previousSessionByName` state (~:383); `setPreviousSessionByName` in the D-097 effect (~:1370); `formatLastSet` helper (~:933); anchor render line at the top-cell seam (~:3534). **Verification:** app build clean; 380px harness — anchor line adds height, width still `overflowPx -10`, footer stays below the open RIR picker and inside the card, steppers aligned 44→308. Device-verify reported to user.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

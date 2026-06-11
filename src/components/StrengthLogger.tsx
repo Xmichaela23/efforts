@@ -112,6 +112,16 @@ const isPlyometric = (exerciseName: string): boolean => {
   return /jump|bound|hop|box jump|bench jump|broad jump|depth jump|squat jump|tuck jump|split jump|plyo|explosive/.test(name);
 };
 
+// Normalize an exercise name for cross-session matching: lowercase, strip
+// (Left)/(Right) suffixes, collapse whitespace. Shared by the D-097 prefill and
+// the D-122 "last:" anchor so both key prior sessions the same way.
+const normalizeExerciseName = (raw: string): string =>
+  String(raw || '')
+    .toLowerCase()
+    .replace(/\s*\((?:left|right)\)\s*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 // Calculate rest time based on exercise type and reps
 const calculateRestTime = (exerciseName: string, reps: number | undefined): number => {
   if (!reps || reps === 0) return 90; // Default 90 seconds
@@ -380,6 +390,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
   // Rest rows the user has Skipped — hides that set's rest row until the set is re-completed.
   const [restDismissed, setRestDismissed] = useState<Set<string>>(new Set());
+  // D-122: prior-session per-set actuals, keyed by normalized exercise name.
+  // Populated by the D-097 autofill fetch; feeds the persistent "last:" anchor line.
+  const [previousSessionByName, setPreviousSessionByName] = useState<Record<string, LoggedSet[]>>({});
   const [editingTimerKey, setEditingTimerKey] = useState<string | null>(null);
   const [editingTimerValue, setEditingTimerValue] = useState<string>("");
   // Numeric keypad (bottom sheet) for fast, error-resistant input
@@ -918,6 +931,29 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return m > 0 ? `${m}:${String(r).padStart(2,'0')}` : `${r}s`;
   };
 
+  // D-122: format a prior set as the "last:" anchor. Returns null when the prior
+  // set has no real data — the caller renders nothing (no false anchor on an
+  // overflow set index, no "last: —" placeholder on a history-less exercise).
+  // Handles: weight × reps @ RIR; duration sets (last: 0:45); bands
+  // (resistance_level in place of weight); missing RIR (drop "@ RIR" cleanly).
+  const formatLastSet = (p?: LoggedSet): string | null => {
+    if (!p) return null;
+    if (typeof p.duration_seconds === 'number' && p.duration_seconds > 0) {
+      return `last: ${formatSeconds(p.duration_seconds)}`;
+    }
+    const hasReps = typeof p.reps === 'number' && p.reps > 0;
+    const load = p.resistance_level
+      ? p.resistance_level
+      : (typeof p.weight === 'number' && p.weight > 0 ? String(p.weight) : null);
+    if (!load && !hasReps) return null; // no real prior data → no line
+    let s = 'last: ';
+    if (load && hasReps) s += `${load} × ${p.reps}`;
+    else if (load) s += `${load}`;
+    else s += `${p.reps} reps`;
+    if (typeof p.rir === 'number') s += ` @ RIR ${p.rir >= 5 ? '5+' : p.rir}`;
+    return s;
+  };
+
   const parseTimerInput = (raw: string): number | null => {
     if (!raw) return null;
     const txt = String(raw).trim().toLowerCase();
@@ -1320,12 +1356,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const userId = getStoredUserId();
         if (!userId) return;
         const todayDate = targetDate || getStrengthLoggerDateString();
-        const normalizeExerciseName = (raw: string): string =>
-          String(raw || '')
-            .toLowerCase()
-            .replace(/\s*\((?:left|right)\)\s*/gi, '')
-            .replace(/\s+/g, ' ')
-            .trim();
         const currentNames = new Set<string>(
           exercises.map((ex) => normalizeExerciseName(ex.name)).filter(Boolean),
         );
@@ -1364,6 +1394,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           if (Object.keys(previousByName).length >= currentNames.size) break;
         }
         if (Object.keys(previousByName).length === 0) return;
+        // D-122: keep the prior-session per-set map in state so the persistent
+        // "last:" anchor line can read it (the same single fetch feeds both the
+        // prefill below and the anchor). Unlike prefill, the anchor never clears.
+        setPreviousSessionByName(previousByName);
         // Apply autofill, preserving any set that's already touched/completed/from-saved-session.
         setExercises((prev) => prev.map((ex) => {
           const priorSets = previousByName[normalizeExerciseName(ex.name)];
@@ -3524,6 +3558,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         })()}
                         </div>
                         </div>
+                      {/* D-122: persistent "last:" anchor — the prior session's actuals for THIS
+                          set index (weight × reps @ RIR). Blank on an overflow set index (no real
+                          prior set) and absent entirely for a history-less exercise — never a false
+                          or placeholder anchor. Indented to the set-number leader; stays put
+                          regardless of edits (unlike the from_previous prefill, which clears). */}
+                      {(() => {
+                        const priorSets = previousSessionByName[normalizeExerciseName(exercise.name)];
+                        const txt = priorSets ? formatLastSet(priorSets[setIndex]) : null;
+                        if (!txt) return null;
+                        return (
+                          <div className="flex items-start gap-2 mt-1">
+                            <span className="w-9 shrink-0" aria-hidden="true" />
+                            <span className="text-[10px] font-medium text-white/40 leading-none tabular-nums">{txt}</span>
+                          </div>
+                        );
+                      })()}
                       {/* Rep-circle picker (Q-039 steps 3–4) — labeled full-width row. A 3-char
                           row-leader ("Reps") makes the stacked control rows legible; strict column
                           alignment can't differentiate a 5-wide picker in a 308px card (D-119).
