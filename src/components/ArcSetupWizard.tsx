@@ -32,13 +32,9 @@ import {
   type LimiterSport,
   type SwimFreqIntent,
   type StrengthFreqIntent,
+  type DaysPerWeek,
 } from '@/lib/session-frequency-defaults';
 import { parseTimeToSeconds, type RaceDistance } from '@/lib/effort-score';
-import {
-  computeSessionFrequencyDefaults,
-  type DaysPerWeek,
-  type StrengthFreqIntent,
-} from '@/lib/session-frequency-defaults';
 
 // ─── Arc context (client-side slice) ─────────────────────────────────────────
 
