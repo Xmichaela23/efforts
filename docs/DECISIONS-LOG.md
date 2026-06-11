@@ -3301,6 +3301,22 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-129 — Quick-adjust strip sizes to the device, not the 380px floor (2026-06-11)
+
+**Context:** The strip buttons (D-125/D-128) were tuned `h-8 px-1` to *survive* the 380px harness worst-case — so they shipped cramped there AND stayed cramped on real iPhones (390–430px), wasting the extra room. The ±1 pairs especially felt too small as mid-workout thumb targets. The harness can only tell "fits / doesn't"; it can't feel "cramped" — so the device surfaced this, not the test.
+
+**Decision — let the buttons grow with available width; 380px is the floor, not the target.**
+- **`flex-1` (basis-0) buttons** inside **count-weighted groups** (`reps flex-[2]` / `wt flex-[4]` / `rir flex-[2]`) → every button is ~equal width and **expands to fill the real row** on wider phones, while always summing to ≤ the row so it **never overflows at 380px**. Hidden groups (mobility/duration/band/bodyweight) are omitted and the weights redistribute.
+- **`h-10` (40px) tap height** (was `h-8`/32px) — the comfort win that's free of the width budget.
+- **Dropped the `w-9` leader** the strip didn't need (it only aligned under the set-#); a control bar earns that ~44px, widening every button.
+- **`text-xs`** (was `text-[11px]`) — fits "−2.5" at the 380px floor (~32px buttons) and reads comfortably as they grow.
+
+**Measured (real markup, both widths):** 380px floor → 32×40px buttons, `overflowPx -10` (no crossing), "−2.5" not clipped. 414px (typical iPhone) → ~37×40px, comfortably tappable. The harness (`verify-strength-row-380.mjs`) now asserts nudge ≥28px wide / ≥40px tall at the floor, in addition to no-overflow.
+
+**Files:** `src/components/StrengthLogger.tsx` (strip ~:3636, `nudgeCls`/`nudgeClsRir` ~:3626). **Follow-up note:** if the ±1 pairs still want to be *bigger than* the weight buttons specifically, weighting them more (e.g. 3:4:3) trades weight-button width and risks clipping "−2.5" at 380px — not taken; equal-width was the safe call.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

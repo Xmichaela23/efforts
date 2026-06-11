@@ -3618,38 +3618,44 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const showWeight = !isDurationBased && !isBodyweightMove(exercise.name) && exType !== 'band';
                         const showRir = loggerMode !== 'mobility' && !isDurationBased && !isPlyometric(exercise.name);
                         if (!showReps && !showWeight && !showRir) return null;
-                        const nudgeCls = 'h-8 px-1 rounded-md border border-white/15 bg-white/[0.04] text-white/70 text-[11px] hover:bg-white/[0.10] hover:text-white/90 active:bg-white/[0.16] tabular-nums leading-none transition-colors';
-                        // D-128: RIR nudges carry the app's "RIR = amber" tint so the rir ±1 pair
-                        // reads instantly distinct from the (identical-looking) reps ±1 pair — same
-                        // disambiguation as D-123, zero added width (keeps the 380px margin).
-                        const nudgeClsRir = 'h-8 px-1 rounded-md border border-amber-400/30 bg-amber-500/[0.06] text-amber-300/75 text-[11px] hover:bg-amber-500/15 hover:text-amber-200 active:bg-amber-500/25 tabular-nums leading-none transition-colors';
+                        // D-129: buttons are `flex-1` (basis-0) so they GROW to fill the real row
+                        // width — comfortable thumb targets on 390–430px phones — while still
+                        // summing to ≤ the row, so they never overflow at the 380px floor (380px is
+                        // the floor, not the target). `h-10` (40px) is the tap-height. min-w-0 lets
+                        // them shrink if a narrow device demands it.
+                        const nudgeCls = 'flex-1 min-w-0 h-10 rounded-md border border-white/15 bg-white/[0.04] text-white/70 text-xs hover:bg-white/[0.10] hover:text-white/90 active:bg-white/[0.16] tabular-nums leading-none transition-colors';
+                        // RIR nudges carry the app's "RIR = amber" tint so the rir ±1 pair reads
+                        // instantly distinct from the (identical-looking) reps ±1 pair (D-128/D-123).
+                        const nudgeClsRir = 'flex-1 min-w-0 h-10 rounded-md border border-amber-400/30 bg-amber-500/[0.06] text-amber-300/75 text-xs hover:bg-amber-500/15 hover:text-amber-200 active:bg-amber-500/25 tabular-nums leading-none transition-colors';
                         const adjReps = (d: number) => updateSet(exercise.id, setIndex, { reps: Math.max(1, (typeof set.reps === 'number' ? set.reps : 0) + d) });
                         const adjWeight = (d: number) => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + d) * 2) / 2) });
                         const adjRir = (d: number) => updateSet(exercise.id, setIndex, { rir: Math.max(0, Math.min(5, (set.rir ?? exercise.target_rir ?? 0) + d)) });
+                        // Groups are weighted by button count (reps 2 / wt 4 / rir 2) so every button
+                        // ends up ~the same width as the row grows. Hidden groups are omitted and the
+                        // weights redistribute (reps stays left, rir stays right).
                         return (
+                          // Full card width (no w-9 leader): a control bar earns the extra ~44px the
+                          // set-# indent would cost, so the flex-1 buttons land wider on real phones.
                           <div className="flex items-center gap-2 mt-2">
-                            <span className="w-9 shrink-0" aria-hidden="true" />
-                            <div className="flex-1 min-w-0 flex items-center justify-between">
-                              {showReps ? (
-                                <div className="flex items-center gap-1.5" role="group" aria-label="Adjust reps">
-                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(-1)} aria-label="Reps minus 1">−1</button>
-                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(1)} aria-label="Reps plus 1">+1</button>
-                                </div>
-                              ) : <span />}
-                              {showWeight ? (
-                                <div className="flex items-center gap-1" role="group" aria-label="Adjust weight">
-                                  {[-5, -2.5, 2.5, 5].map((d) => (
-                                    <button key={d} type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjWeight(d)} aria-label={`${d > 0 ? 'Add' : 'Subtract'} ${Math.abs(d)} pounds`}>{d > 0 ? `+${d}` : d}</button>
-                                  ))}
-                                </div>
-                              ) : <span />}
-                              {showRir ? (
-                                <div className="flex items-center gap-1.5" role="group" aria-label="Adjust RIR">
-                                  <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(-1)} aria-label="RIR minus 1">−1</button>
-                                  <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(1)} aria-label="RIR plus 1">+1</button>
-                                </div>
-                              ) : <span />}
-                            </div>
+                            {showReps && (
+                              <div className="flex-[2] flex items-center gap-1.5" role="group" aria-label="Adjust reps">
+                                <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(-1)} aria-label="Reps minus 1">−1</button>
+                                <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(1)} aria-label="Reps plus 1">+1</button>
+                              </div>
+                            )}
+                            {showWeight && (
+                              <div className="flex-[4] flex items-center gap-1.5" role="group" aria-label="Adjust weight">
+                                {[-5, -2.5, 2.5, 5].map((d) => (
+                                  <button key={d} type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjWeight(d)} aria-label={`${d > 0 ? 'Add' : 'Subtract'} ${Math.abs(d)} pounds`}>{d > 0 ? `+${d}` : d}</button>
+                                ))}
+                              </div>
+                            )}
+                            {showRir && (
+                              <div className="flex-[2] flex items-center gap-1.5" role="group" aria-label="Adjust RIR">
+                                <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(-1)} aria-label="RIR minus 1">−1</button>
+                                <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(1)} aria-label="RIR plus 1">+1</button>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
