@@ -3344,6 +3344,28 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-132 — Cross-workout draft bleed: identity guard + identity-aware key + gate-on-Done (data-integrity, 2026-06-11)
+
+**Context (live repro, survived a HARD QUIT):** poked +/- on Bench in Monday's **Upper** (never tapped Done) → hard-quit → reopened, selected today (Jun 11), opened **Lower** → Lower's card showed **Upper's** Bench at 105/100, Source "Upper", and would have saved against Upper's `planned_id`. A genuine logged-data corruption vector, not cosmetic.
+
+**Root cause (corrected from the first static read):** the draft key was **date-only** (`strength_logger_session_${performedDate}`), and `performedDate = targetDate = selectedDate` — **the day you're *viewing*, which defaults to today and is deliberately NOT changed when you open a planned workout** (`AppLayout:245-246`; planned `.date` is for linkage/prefill only). So the workout's *planned* date never entered the key. Both the Upper poke and the Lower open happened while viewing Jun 11 → both keyed `strength_logger_session_2026-06-11` → one shared draft slot for *any two workouts opened the same day*. The restore path (`:1500`) then rehydrated that blob with **no check that it belonged to the workout being opened** — only the D-110 orphan check (does the saved plan still exist). And it persisted eagerly: a bare +/- nudge wrote the blob (`updateSet → saveSessionProgress`), so the never-completed Upper poke became a restorable phantom. Survived hard-quit because it's `localStorage`, restored on cold mount.
+
+**Fix — three layers (each committed + independently safe):**
+- **Layer 1 — Identity guard on restore.** On mount, compute `openedId` (planned id, or `null` for ad-hoc/completed) and rehydrate **only if `saved.sourcePlannedId === openedId`** (`null === null` allows genuine ad-hoc same-day resume). Mismatch → skip restore, `runFreshInit()`. This alone kills the bleed even with a colliding key (Upper's blob can't load into Lower).
+- **Layer 2 — Identity-aware key.** `strength_logger_session_${date}_${plannedId || 'adhoc'}`. WRITE/CLEAR use the live `sourcePlannedId`; RESTORE reads the opened workout's id key, **falling back to the legacy date-only key** for pre-fix drafts — which still pass through the Layer-1 guard, so a legacy blob from another workout fails identity and loads fresh. Two workouts opened the same day now get separate slots (no collision in the first place).
+- **Layer 3 — Gate on Done.** `saveSessionProgress` writes a restorable draft **only once ≥1 set is completed**. Bare +/- nudges and prefill edits with zero completed sets write **no** blob — "saved session" now means "I logged real work." **Edge decision (chosen): completing a set then un-completing/deleting back to zero CLEARS the draft** (the gate removes the key when the completed count hits 0). Plus a **one-time legacy cleanup** on mount: removes pre-fix date-only keys whose blob is phantom (no completed set) or >24h — proactively clears the stuck blob. **Safe:** it can only delete zero-completed-set or stale drafts; a genuine recent completed-set draft is left for the fallback+guard; identity-aware keys (trailing `_id`) never match the date-only regex.
+
+**MUST-PRESERVE — confirmed:**
+- **D-110 orphan fail-safe:** unchanged; the `(error==null)&&(data==null)` DB verify still runs, now only on the identity-matched path (reopen the same, since-deleted workout → orphan → clear → fresh).
+- **24h window:** unchanged (`hoursDiff < 24`; expires the slot the blob came from).
+- **Genuine same-workout resume:** identity match → key match → restore, exactly as before.
+
+**Data safety for the already-stuck blob (no path mislogs it):** the only code that sets `sourcePlannedId` from a saved blob (`:1532`) is now behind the Layer-1 guard. Opening Lower with the stuck Upper blob present → guard fails → fresh → `sourcePlannedId = LOWER`. Opening Upper → guard matches → restores correctly (it *is* Upper's). Worst case is always "load fresh," never "log to the wrong `planned_id`."
+
+**Files:** `src/components/StrengthLogger.tsx` — key helpers (`computeSessionKey`/`legacySessionKey`, ~:748), `saveSessionProgress` gate (~:759), `restoreSessionProgress` openedId+fallback (~:794), `clearSessionProgress` (+legacy, ~:822), legacy-cleanup effect (~:830), identity guard at mount-init (~:1499). **Verification:** `scripts/_session-trace.mjs` — 11/11 (bug repro → Lower fresh / never UPPER; gate-on-Done; un-complete clears; same-workout + ad-hoc resume; 24h expiry; cross-workout isolation) + device repro.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
