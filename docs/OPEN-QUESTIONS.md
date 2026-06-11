@@ -589,6 +589,35 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-039 — Set logger refactor: column alignment + manual entry + RIR 0–5+ scale (SPEC, deferred to Cursor/next session)
+
+- **Status:** specced, NOT implemented. Filed as the authoritative spec for the next implementer (handed off to Cursor). Supersedes the iterative layout work in D-114 (the column-cell → disclosed-picker → always-visible-pills → full-width → column-centered → edge-anchored sequence). The current shipped layout (commit `a5007c48`) is the edge-anchored interim: steppers left-anchored under the Weight cell, RIR pills' right edge anchored under the RIR cell's right edge (240px from content-left); RIR cell is keypad-editable (`ee5bd75d`).
+- **Why this spec exists:** the repeated 380px-fit failures all stem from one root cause — the control groups (4-wide stepper ~189px, 5-pill RIR ~212px) are ~3× wider than their 64px header cells, so they can't sit *centered* under a single column. This spec resolves it by (a) making the controls narrower (2×2 stepper, windowed rep circles) so they actually fit a column, and (b) using a real 3-col grid where each column owns its pill + picker stacked vertically, with a documented small-device fallback.
+
+### LAYOUT (refactor)
+- **3-column grid, each column = pill + its picker, vertically aligned:**
+  - **Col 1 — Reps:** Reps pill → rep circles, a window of 5 centered on the target (target±2, clamp low end at 1). The "target N" caption lives in this column, styled on/under the target circle — **not** floating left.
+  - **Col 2 — Weight:** Weight pill → **2×2 stepper grid** (−5/+5 row, −2.5/+2.5 row). Barbell/plates selector as a micro-caption in this column.
+  - **Col 3 — RIR:** RIR pill → RIR picker (see scale below). A pre-filled suggestion renders as a "suggested N" caption + **dimmed** pill value; the pill becomes **solid** once the user confirms or changes it.
+- **Remove the unlabeled centered control rows** — the column alignment *is* the labeling (no more "which pill does this row belong to?").
+- **Min tap target 44px.** If the 3-col grid is too tight on small devices (e.g. iPhone ~380px — note: a windowed 5-rep-circle column at 44px ≈ 220px, so three 44px-target columns will NOT fit 380px), **fall back to full-width rows, each left-anchored under its pill** (one picker per row). The fallback is the expected 380px rendering; the true 3-col grid is for wider viewports.
+
+### MANUAL ENTRY
+- Tapping any pill (Reps / Weight / RIR) opens the numeric keypad for inline edit. **Pickers update to reflect the typed value** — the rep window re-centers on the typed reps, the RIR selection moves to the typed value. (Today all three cells already open the keypad via `openKeypadForSet`; the new work is making the *pickers* reactive to the committed value.)
+- **Validation:** reps = integer ≥ 1; weight ≥ 0 with **no snapping** — accept arbitrary values (dumbbells, kg, micro-loading); RIR clamps to 0–5.
+
+### RIR SCALE
+- **Options: 0, 1, 2, 3, 4, 5+** (today's picker is 1–5; this widens the low end to 0 and caps the top as "5+").
+- **Storage:** store 5+ as integer `5` with a flag `rir_capped: true` (or just `5` — the engine treats ≥5 as "far from failure", no granularity needed above 5).
+- **Engine semantics (scope beyond the logger UI — touches the strength analyzer / e1RM path, not just `StrengthLogger.tsx`):** RIR 0–4 = usable for e1RM + effective-rep calcs; RIR 5 = autoregulation signal only ("increase load next set"), not fed into e1RM granularity.
+
+### Implementation notes for the picker-up
+- The 240px RIR-cell-right and 104px Weight-cell-left anchors are device-independent only because the header cells are fixed-width (`w-6` + `w-16`×3, `gap-2`). If the grid refactor changes cell widths, re-derive those anchors.
+- The 380px overflow harness `scripts/verify-strength-row-380.mjs` (local, untracked) is the fit oracle — extend it for the new picker widths before shipping.
+- The RIR-cell tap-to-edit fix (D-115-era, commit `ee5bd75d`) and the edge-anchored control rows (`a5007c48`) are already on `main`; this refactor replaces the control-row layout but keeps the keypad-editable cells.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
