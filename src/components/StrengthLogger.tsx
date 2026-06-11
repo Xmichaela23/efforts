@@ -518,7 +518,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const isValidNumber = raw.length > 0 && Number.isFinite(n);
 
     if (ctx.field === 'reps') {
-      updateSet(ctx.exerciseId, ctx.setIndex, { reps: isValidNumber ? Math.max(0, Math.round(n)) : 0 });
+      // Q-039: a logged rep count is an integer ≥1; invalid/empty entry clears to 0.
+      updateSet(ctx.exerciseId, ctx.setIndex, { reps: isValidNumber ? Math.max(1, Math.round(n)) : 0 });
     } else if (ctx.field === 'weight') {
       updateSet(ctx.exerciseId, ctx.setIndex, { weight: isValidNumber ? Math.max(0, n) : 0 });
     } else if (ctx.field === 'rir') {
@@ -3520,6 +3521,43 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           );
                         })()}
                         </div>
+                      {/* Rep-circle picker (Q-039 step 3) — window of 5 centered on the current
+                          reps value (target±2, since reps prefills to target), clamp low at 1;
+                          re-centers when reps changes (pick or keypad). Left edge under the Reps
+                          cell (paddingLeft 32 = set#24 + gap8). Hidden for duration / no-reps. */}
+                      {(() => {
+                        if (isDurationBased || set.reps === undefined) return null;
+                        const center = (typeof set.reps === 'number' && set.reps >= 1) ? set.reps : 8;
+                        const lo = Math.max(1, center - 2);
+                        const isPrefilled = set.from_previous && !set.completed;
+                        return (
+                          <div className="flex mt-2" style={{ paddingLeft: '32px' }}>
+                            <div className="flex items-center gap-1" role="group" aria-label="Reps">
+                              {[lo, lo + 1, lo + 2, lo + 3, lo + 4].map((v) => {
+                                const isSel = set.reps === v;
+                                const stateCls = isSel
+                                  ? (isPrefilled
+                                      ? 'bg-white/[0.08] border-white/20 text-white/40'
+                                      : 'bg-white/[0.20] border-white/45 text-white font-semibold')
+                                  : 'bg-white/[0.04] border-white/15 text-white/55 hover:bg-white/[0.10] hover:text-white/80';
+                                return (
+                                  <button
+                                    key={v}
+                                    type="button"
+                                    onClick={() => updateSet(exercise.id, setIndex, { reps: v })}
+                                    className={`h-9 w-9 rounded-md border-2 text-sm tabular-nums transition-colors leading-none ${stateCls}`}
+                                    style={{ fontFamily: 'Inter, sans-serif' }}
+                                    aria-pressed={isSel}
+                                    aria-label={`${v} reps`}
+                                  >
+                                    {v}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
                       {/* RIR pills — ALWAYS visible, directly beneath the top row. 1-5, target
                           pill amber, tap to select → fills the RIR cell above. No disclosure.
                           Hidden for mobility / duration-based / plyometric. */}
@@ -3578,8 +3616,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       {(showStepper || (setIndex > 0 && exercise.sets[0])) && (
                       <div className="flex flex-wrap items-center gap-2" style={{ paddingLeft: '104px' }}>
                         {showStepper && (
-                          <div className="flex gap-1" role="group" aria-label="Adjust weight">
-                            {[-5, -2.5, 2.5, 5].map((delta) => (
+                          // Q-039 step 3: 2×2 stepper — −5/+5 top row, −2.5/+2.5 bottom row
+                          <div className="grid grid-cols-2 gap-1" role="group" aria-label="Adjust weight">
+                            {[-5, 5, -2.5, 2.5].map((delta) => (
                               <button
                                 key={delta}
                                 type="button"

@@ -3104,6 +3104,22 @@ Net effect: NP and VI computed over a *pedaling-only* power series. Outdoor swee
 
 ---
 
+## D-117 — Q-039 step 3: narrow controls (rep-circle picker, 2×2 stepper, reactive entry, 2026-06-11)
+
+**Context:** Q-039 step 3 — the "narrow controls" that make the columns viable. Pure logger UI, no e1RM dependency (so it proceeded in parallel while the Q-040 e1RM-path decision is pending).
+
+**Decisions:**
+- **Rep-circle picker** (new): a window of 5 circles `[lo … lo+4]` where `lo = max(1, center − 2)` and `center = set.reps` (current value). Tapping a circle sets reps. **Re-centers on any reps change** (pick or keypad) because the window is derived from `set.reps`. Centered on `set.reps` rather than a separate target field: reps prefills to the prescribed target (D-097), so the initial window is target-centered, and this is the simplest thing that also satisfies "re-center on manual edit". Hidden for duration-based / no-reps ("until") patterns. Left edge under the Reps cell (`paddingLeft 32` = set#24 + gap8); `w-9` circles, `gap-1`. The reps *cell* (keypad) stays the source of truth; the circles are a shortcut (same cell-vs-picker split as RIR).
+- **2×2 weight stepper** (was 1×4): `grid grid-cols-2`, order `[-5, 5, -2.5, 2.5]` → −5/+5 top row, −2.5/+2.5 bottom row. Narrower footprint than the 1×4 so it sits under the Weight column without crowding.
+- **Reactive manual entry:** pickers read `set.*`, so keypad-typed values reflect immediately — the rep window re-centers, RIR pill selection moves. (Already true for RIR; the rep picker makes it true for reps too.)
+- **Validation:** reps keypad clamps a valid number to `Math.max(1, round(n))` (logged reps are integers ≥1); invalid/empty entry clears to 0. Weight stays `≥0` arbitrary (no snapping — dumbbells/kg). RIR clamps 0–5 (D-116).
+
+**Layout note (interim — step 4 finalizes):** rep-circles / RIR pills / stepper are currently three separate full-width rows, each edge-anchored under its column (rep-circles left @32 under Reps, 2×2 stepper left @104 under Weight, RIR pills right-edge @240 under RIR). The 44px-min tap targets and the true 3-col grid (with the full-width-row fallback as the 380px default) are **Q-039 step 4**, still pending.
+
+**Files:** `src/components/StrengthLogger.tsx` (rep-circle picker block ~:3523, 2×2 stepper ~:3618, reps keypad clamp ~:521). **Verification:** app build clean; 380px harness — all sets/both exercises `overflowPx -10` (no border crossing), `stepperLeftVsWeight 0`, `pillRight 240`. Commit: Q-039 step-3 commit.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
