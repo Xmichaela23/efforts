@@ -983,28 +983,40 @@ async function updateLearnedStrengthFromExerciseLog(
 
     const { data: rows } = await supabase
       .from("exercise_log")
-      .select("canonical_name, estimated_1rm, date")
+      .select("canonical_name, estimated_1rm, date, avg_rir")
       .eq("user_id", userId)
       .gte("date", fromDate)
       .in("canonical_name", STRENGTH_ANCHORS);
 
     if (!rows?.length) return;
 
-    const agg: Record<string, { max1rm: number; count: number; last_logged: string }> = {};
+    // D-118 (Q-039 / Q-040): RIR preference-with-fallback. Within the window, aggregate a
+    // lift's e1RM from sessions with avg_rir ≤4 (or no RIR data) when any exist — RIR ≥5
+    // sessions are "far from failure" and would inflate the estimate (the deadlift 175→155
+    // case). If a lift has ONLY RIR ≥5 sessions, fall back to using them (don't go dark) and
+    // flag the estimate low-confidence. NOT blanket exclusion. Granularity = session avg_rir.
+    const byLift: Record<string, { preferred: any[]; fallback: any[] }> = {};
     for (const r of rows) {
       const c = r.canonical_name as StrengthAnchor;
       if (!(STRENGTH_ANCHORS as readonly string[]).includes(c)) continue;
       const val = Number(r.estimated_1rm);
       if (!Number.isFinite(val) || val <= 0) continue;
-      const cur = agg[c];
-      if (!cur) {
-        agg[c] = { max1rm: val, count: 1, last_logged: r.date };
-      } else {
-        agg[c].max1rm = Math.max(agg[c].max1rm, val);
-        agg[c].count += 1;
-        // Track most recent date
-        if (r.date > agg[c].last_logged) agg[c].last_logged = r.date;
+      const rir = r.avg_rir == null ? null : Number(r.avg_rir);
+      const bucket = rir != null && rir >= 5 ? "fallback" : "preferred"; // null or ≤4 → preferred
+      (byLift[c] ??= { preferred: [], fallback: [] })[bucket].push(r);
+    }
+
+    const agg: Record<string, { max1rm: number; count: number; last_logged: string; usedFallback: boolean }> = {};
+    for (const [c, b] of Object.entries(byLift)) {
+      const use = b.preferred.length > 0 ? b.preferred : b.fallback;
+      if (use.length === 0) continue;
+      let max1rm = 0;
+      let last = "";
+      for (const r of use) {
+        max1rm = Math.max(max1rm, Number(r.estimated_1rm));
+        if (r.date > last) last = r.date;
       }
+      agg[c] = { max1rm, count: use.length, last_logged: last, usedFallback: b.preferred.length === 0 };
     }
 
     const strength_1rms: Record<string, LearnedMetric & { last_logged: string }> = {};
@@ -1013,7 +1025,8 @@ async function updateLearnedStrengthFromExerciseLog(
       if (!a) continue;
       strength_1rms[lift] = {
         value: Math.round(a.max1rm),
-        confidence: confidenceFromSamples(a.count),
+        // Only-RIR≥5 fallback estimates are flagged low-confidence (D-118).
+        confidence: a.usedFallback ? "low" : confidenceFromSamples(a.count),
         source: "exercise_log",
         sample_count: a.count,
         last_logged: a.last_logged,

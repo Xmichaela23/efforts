@@ -3120,6 +3120,33 @@ Net effect: NP and VI computed over a *pedaling-only* power series. Outdoor swee
 
 ---
 
+## D-118 — RIR preference-with-fallback in the live e1RM path + strength_1rms backfill (Q-040 decision #1, 2026-06-11)
+
+**Context:** Q-040 found the live, plan-driving e1RM path is `compute-facts` (Brzycki on reps+RIR) → `exercise_log` + `learned_fitness.strength_1rms` (consumed by coach / materialize-plan for load prescription), and it had no RIR cap — a far-from-failure (RIR ≥5) session could set an inflated `strength_1rm`. Decision #1 approved the rule below (the data showed 0 exercises would go dark; see Q-039 session report).
+
+**Rule (in `compute-facts/updateLearnedStrengthFromExerciseLog`):** within the 12-week window, aggregate a lift's `strength_1rm` (max e1RM) from sessions with `avg_rir ≤ 4` **or no RIR data** when any such sessions exist. If a lift has **only** RIR ≥5 sessions, fall back to using them (Brzycki on reps+RIR — don't go dark) and flag the estimate **`confidence: "low"`**. **Preference-with-fallback, not blanket exclusion.** Granularity is the session's `avg_rir` (one `exercise_log` row per session), not per-set — that's the resolution `compute-facts` already computes at.
+- Per-session `exercise_log.estimated_1rm` values are **unchanged** (still Brzycki on reps+RIR per session); the rule only changes which sessions feed the window aggregate.
+- `confidence` is `"low" | "medium" | "high"` (`confidenceFromSamples`); fallback estimates are forced `"low"`, and excluding RIR ≥5 sessions also reduces `sample_count`, which legitimately lowers confidence for thinned lifts.
+
+**Scope flag (NOT changed — see Q-040 follow-up):** the UI progression trend (`useExerciseLog` → StrengthSummaryView/BlockSummaryTab) still reads raw per-session `exercise_log.estimated_1rm`, so a RIR-5 session still appears as a data point in the trend and could show as the "current" point. The rule was applied to the **aggregate** (`strength_1rms`, which drives plans) per Decision #1's framing; extending the same `avg_rir ≤4` preference to the UI trend's current/peak derivation is a separate, lower-stakes follow-up (left for after on-device review of step 4).
+
+**Backfill (re-ran the deployed `compute-facts` once for the user; `updateLearnedStrengthFromExerciseLog` re-aggregates the full window, so one trigger suffices — exercise_log rows unchanged):**
+| lift | before | after | note |
+|---|---|---|---|
+| trap_bar_deadlift | 160 (medium) | **150 (low)** | −10; RIR≥5 session was the window-max, excluded |
+| barbell_row | 130 (high) | **120 (low)** | −10; same — RIR≥5 was the max |
+| bench_press | 165 (high) | 165 (medium) | value unchanged (max from a RIR≤4 session); count/confidence down |
+| squat | 105 (medium) | 105 (low) | value unchanged; sample_count 3→2 after excluding a RIR≥5 session |
+| overhead_press | 105 (medium) | 105 (low) | value unchanged; thinned to 1 sample |
+
+Two lifts corrected downward (−10 each); none went dark. **Plan loads now derive from the corrected `strength_1rms`** — `materialize-plan:2612` reads `learned_fitness.strength_1rms` (then manual `performance_numbers` override, then hardcoded default), so the next plan generation uses 120/150 instead of 130/160.
+
+Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session* e1RM (175→155); `strength_1rms` uses the *window-max* for `trap_bar_deadlift` (160→150). Different aggregation, same direction — RIR≥5 inflation removed. Also: **more than deadlift changed** (barbell_row too), because barbell_row's window-max was also a RIR≥5 session.
+
+**Files:** `supabase/functions/compute-facts/index.ts` (`updateLearnedStrengthFromExerciseLog` ~:984). **Deployed** to `yyriamwvtvzlkumqrvpm`. **Verification:** backfill before/after above; rule is preference-with-fallback (0 lifts dark). The dead `compute-adaptation-metrics` path (D-116) is unaffected and still inert (Q-041).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
