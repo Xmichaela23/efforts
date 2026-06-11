@@ -3322,7 +3322,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         {/* Duration-based exercises show timer input, rep-based show reps input */}
                         {isDurationBased ? (
                           // DURATION-BASED EXERCISE - Simple timer display matching reps input style
-                          <div className="flex-1 flex flex-col items-center gap-0.5 relative">
+                          // D-131: weighted flex-[2] to match the reps column slot.
+                          <div className="flex-[2] flex flex-col items-center gap-0.5 relative">
                             <button
                               onClick={() => {
                                 const cur = set.duration_seconds || 60;
@@ -3398,7 +3399,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // REP-BASED EXERCISE (e.g., Squat, Bench Press)
                         // Hide reps input if no reps are prescribed (for "until" patterns)
                         set.reps === undefined ? null : (
-                          <div className="flex-1 flex flex-col items-center gap-0.5">
+                          // D-131: weighted flex-[2] (reps) so the cell shares the strip's reps column.
+                          <div className="flex-[2] flex flex-col items-center gap-0.5">
                             <button
                               type="button"
                               onClick={() =>
@@ -3449,7 +3451,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               value={set.resistance_level || 'Light'}
                               onValueChange={(value) => updateSet(exercise.id, setIndex, { resistance_level: value, weight: 0 })}
                             >
-                              <SelectTrigger className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-1 focus:ring-0 focus:border-white/30 focus:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+                              <SelectTrigger className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-[4] focus:ring-0 focus:border-white/30 focus:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
                                 <SelectValue placeholder="Resistance" />
                               </SelectTrigger>
                               <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
@@ -3465,7 +3467,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // Dumbbell exercises: Show weight input with /hand label
                         if (exerciseType === 'dumbbell') {
                           return (
-                            <div className="flex-1 flex flex-col items-center gap-0.5">
+                            // D-131: weighted flex-[4] (weight) — shares the strip's 4-button column.
+                            <div className="flex-[4] flex flex-col items-center gap-0.5">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -3494,7 +3497,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // Goblet exercises (lateral lunges, goblet squat): Single weight, no /hand
                         if (exerciseType === 'goblet') {
                           return (
-                            <div className="flex-1 flex flex-col items-center gap-0.5">
+                            // D-131: weighted flex-[4] (weight).
+                            <div className="flex-[4] flex flex-col items-center gap-0.5">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -3522,7 +3526,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         
                         // Barbell exercises: Standard weight input
                         return (
-                          <div className="flex-1 flex flex-col items-center gap-0.5">
+                          // D-131: weighted flex-[4] (weight).
+                          <div className="flex-[4] flex flex-col items-center gap-0.5">
                             <button
                               type="button"
                               onClick={() =>
@@ -3556,7 +3561,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           const targetRir = exercise.target_rir;
                           const hasValue = set.rir !== undefined && set.rir !== null;
                           return (
-                            <div className="flex-1 flex flex-col items-center gap-0.5">
+                            // D-131: weighted flex-[2] (rir) — shares the strip's RIR column.
+                            <div className="flex-[2] flex flex-col items-center gap-0.5">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -3634,31 +3640,34 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // ends up ~the same width as the row grows. Hidden groups are omitted and the
                         // weights redistribute (reps stays left, rir stays right).
                         return (
-                          // Full card width (no w-9 leader): a control bar earns the extra ~44px the
-                          // set-# indent would cost, so the flex-1 buttons land wider on real phones.
-                          // D-130: gap-4 BETWEEN groups (echoes the top cells' gap-4) + gap-1 WITHIN
-                          // each group → reps | wt | rir read as three distinct clusters, by spacing
-                          // alone (no per-button borders).
-                          <div className="flex items-center gap-4 mt-2">
-                            {showReps && (
-                              <div className="flex-[2] flex items-center gap-1" role="group" aria-label="Adjust reps">
-                                <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(-1)} aria-label="Reps minus 1">−1</button>
-                                <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(1)} aria-label="Reps plus 1">+1</button>
-                              </div>
-                            )}
-                            {showWeight && (
-                              <div className="flex-[4] flex items-center gap-1" role="group" aria-label="Adjust weight">
-                                {[-5, -2.5, 2.5, 5].map((d) => (
-                                  <button key={d} type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjWeight(d)} aria-label={`${d > 0 ? 'Add' : 'Subtract'} ${Math.abs(d)} pounds`}>{d > 0 ? `+${d}` : d}</button>
-                                ))}
-                              </div>
-                            )}
-                            {showRir && (
-                              <div className="flex-[2] flex items-center gap-1" role="group" aria-label="Adjust RIR">
-                                <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(-1)} aria-label="RIR minus 1">−1</button>
-                                <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(1)} aria-label="RIR plus 1">+1</button>
-                              </div>
-                            )}
+                          // D-131: mirror the top-cells container exactly — `[w-9 set-# leader][gap-2]
+                          // [flex-1 weighted 2:4:2 with gap-4]` — so each nudge group sits in the SAME
+                          // column band as its keypad cell above → each cell centers over its group.
+                          // Keeps D-130's gap-1 within / gap-4 between. (Reclaims the leader D-129 had
+                          // dropped; alignment is worth the ~6px of button width here.)
+                          <div className="flex items-start gap-2 mt-2">
+                            <span className="w-9 shrink-0" aria-hidden="true" />
+                            <div className="flex-1 min-w-0 flex items-center gap-4">
+                              {showReps && (
+                                <div className="flex-[2] flex items-center gap-1" role="group" aria-label="Adjust reps">
+                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(-1)} aria-label="Reps minus 1">−1</button>
+                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(1)} aria-label="Reps plus 1">+1</button>
+                                </div>
+                              )}
+                              {showWeight && (
+                                <div className="flex-[4] flex items-center gap-1" role="group" aria-label="Adjust weight">
+                                  {[-5, -2.5, 2.5, 5].map((d) => (
+                                    <button key={d} type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjWeight(d)} aria-label={`${d > 0 ? 'Add' : 'Subtract'} ${Math.abs(d)} pounds`}>{d > 0 ? `+${d}` : d}</button>
+                                  ))}
+                                </div>
+                              )}
+                              {showRir && (
+                                <div className="flex-[2] flex items-center gap-1" role="group" aria-label="Adjust RIR">
+                                  <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(-1)} aria-label="RIR minus 1">−1</button>
+                                  <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(1)} aria-label="RIR plus 1">+1</button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         );
                       })()}

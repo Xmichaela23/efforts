@@ -3329,6 +3329,21 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-131 — Each top cell column-aligned over its nudge group (weighted 2:4:2 columns, 2026-06-11)
+
+**Context:** The top Reps/Weight/RIR keypad cells (3 equal columns, offset by the `w-9` set-# leader) didn't line up over the strip groups below (weighted 2:4:2, full-width after D-129) — so a column's box didn't visibly "own" the cluster beneath it.
+
+**Decision — give the cells and the strip identical column structure** so center *i* of cell *i* = center *i* of group *i* by construction:
+- **Top cells weighted `flex-[2]` (reps) / `flex-[4]` (weight, all variants — barbell/dumbbell/goblet/band/duration) / `flex-[2]` (rir)** — matching the strip groups' `2:4:2`. The **Weight box is now wider** than Reps/RIR (it has 4 controls below it) — reads as intentional (column width ∝ control count), not lopsided.
+- **Re-added the `w-9` leader + `gap-2` to the strip** (which D-129 had dropped) so both rows share `[w-9][gap-2][flex-1: 2:4:2 with gap-4]` — same offset, same weights. Hidden columns (bodyweight/mobility) omit from *both* and redistribute identically, so alignment holds.
+- Kept D-130 (gap-1 within / gap-4 between), the amber RIR pair (D-128), and `h-10` (40px).
+
+**Trade-off (accepted):** re-adding the leader costs ~6px of button width vs D-129 (nudge ≈26px at the 380px floor, ≈30px on a 414px iPhone — still ≥40px tall, "−2.5" not clipped). Alignment was judged worth it; this is the deliberate counter-weight to D-129's "drop the leader for width." The harness floor assertion relaxed 28→24px to match.
+
+**Verification (both widths):** rendered 380px + 414px and measured `cell_center − group_center = 0` for reps, weight, AND rir at both — exact column alignment. `overflowPx -10`, no clipping. **Files:** `src/components/StrengthLogger.tsx` (cells ~:3325/3401/3452/3468/3497/3525/3559 weighted; strip leader+wrapper ~:3636).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
