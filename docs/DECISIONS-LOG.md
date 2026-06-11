@@ -3087,6 +3087,23 @@ Net effect: NP and VI computed over a *pedaling-only* power series. Outdoor swee
 
 ---
 
+## D-116 — RIR scale 0–5+; RIR ≥5 excluded from e1RM (Q-039 steps 1+2, 2026-06-11)
+
+**Context:** Q-039 set-logger refactor. The pre-check before step 1 found that RIR already feeds e1RM in `compute-adaptation-metrics/estimate1Rm` as `epley × (1 + rir/10)` — so a RIR-5 set inflates the estimate by ×1.5. The spec says RIR 5 is an autoregulation signal only, *excluded* from e1RM. Making "5+" a first-class picker option (step 1) without fixing the engine (step 2) would have spread that inflation, so per the working contract the two steps shipped together.
+
+**Decisions:**
+- **RIR picker scale 1–5 → `0, 1, 2, 3, 4, 5+`.** Added 0 (= at failure) and capped the top as "5+". The cell, the target caption, and the picker all render `5+` for values ≥5.
+- **"5+" stored as integer `5`, with NO separate `rir_capped` flag.** The spec allowed "or just 5"; since the engine now branches on `rir >= 5`, a flag would be redundant. One less field to thread through storage/analyzer.
+- **Engine (`estimate1Rm`): RIR ≥5 returns `null` (excluded from e1RM).** RIR 0–4 → `epley × (1 + rir/10)` (unchanged); `null` RIR → raw Epley (unchanged, no RIR data). The caller stores `estimated_1rm: null` for excluded sets; downstream `useExerciseLog` already skips `estimated_1rm ?? 0 <= 0`, so null is safe end-to-end. **`avg_rir` is still recorded** for RIR-5 sets — the autoregulation signal is preserved; only the e1RM data point is dropped.
+- **Manual keypad entry clamps RIR to 0–5** (was 0–10).
+- **Effective-reps:** not implemented anywhere yet (grep clean across `src` + `supabase/functions`). The spec's "RIR 0–4 usable for effective-reps" is N/A until that calc exists; only the e1RM path needed the exclusion now.
+
+**Layout note (interim, not the final Q-039 layout):** adding the 0 pill made it 6 pills. Kept `w-9` (36px) by tightening the pill row `gap-2 → gap-1` and `paddingLeft 28 → 4`, so the group's right edge stays anchored under the RIR cell (240px) — harness `pillRight 240 == rirCellRight 240`, no border crossing. The 44px tap targets + windowed rep-circle picker + 2×2 stepper + grid are Q-039 steps 3–4, still pending.
+
+**Files:** `src/components/StrengthLogger.tsx` (pills 0–5+ at ~:3540, cell/caption `5+`, keypad clamp ~:525), `supabase/functions/compute-adaptation-metrics/index.ts` (`estimate1Rm` exclusion at :94 + caller at :430). **Verification:** app build + 380px harness; engine change is a single call site, downstream null-safe. **Commit:** see Q-039 step-1+2 commit.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

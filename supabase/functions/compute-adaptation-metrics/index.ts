@@ -91,7 +91,11 @@ function pickBestSet(sets: any[]): { weight: number; reps: number; rir: number |
   return best;
 }
 
-function estimate1Rm(weight: number, reps: number, avgRir: number | null): number {
+function estimate1Rm(weight: number, reps: number, avgRir: number | null): number | null {
+  // Q-039 step 2: RIR >= 5 means "far from failure" — an autoregulation signal,
+  // not a valid e1RM data point. Exclude it from e1RM entirely (null) rather than
+  // inflate the Epley estimate by 1.5x. RIR 0-4 (and null = no RIR data) stay usable.
+  if (avgRir != null && avgRir >= 5) return null;
   const epley = weight * (1 + reps / 30);
   const rirFactor = avgRir != null ? (1 + avgRir / 10) : 1;
   return epley * rirFactor;
@@ -432,7 +436,9 @@ Deno.serve(async (req) => {
           exercise: lift,
           weight: Number(best.weight.toFixed(2)),
           avg_rir: best.rir,
-          estimated_1rm: Math.round(est1rm),
+          // null when the best set was RIR >= 5 (excluded from e1RM, Q-039 step 2);
+          // downstream (useExerciseLog) already skips estimated_1rm <= 0 / null.
+          estimated_1rm: est1rm != null ? Math.round(est1rm) : null,
         });
       }
 

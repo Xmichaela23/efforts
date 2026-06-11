@@ -522,7 +522,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } else if (ctx.field === 'weight') {
       updateSet(ctx.exerciseId, ctx.setIndex, { weight: isValidNumber ? Math.max(0, n) : 0 });
     } else if (ctx.field === 'rir') {
-      const rirVal = isValidNumber ? Math.max(0, Math.min(10, Math.round(n))) : undefined;
+      // Q-039: RIR scale is 0–5+; clamp manual entry to 0–5 (5 = "5+", far from failure).
+      const rirVal = isValidNumber ? Math.max(0, Math.min(5, Math.round(n))) : undefined;
       updateSet(ctx.exerciseId, ctx.setIndex, { rir: rirVal, ...(ctx.alsoComplete ? { completed: true } : null) });
       if (ctx.alsoComplete) {
         startAutoRestForNextSet(ctx.exerciseId, ctx.setIndex);
@@ -3511,8 +3512,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 aria-label="RIR"
                               >
                                 {hasValue
-                                  ? <span className={set.from_previous && !set.completed ? 'text-white/35' : 'text-white'}>{set.rir}</span>
-                                  : <span className="text-white/30">{targetRir ?? '—'}</span>}
+                                  ? <span className={set.from_previous && !set.completed ? 'text-white/35' : 'text-white'}>{set.rir >= 5 ? '5+' : set.rir}</span>
+                                  : <span className="text-white/30">{targetRir != null ? (targetRir >= 5 ? '5+' : targetRir) : '—'}</span>}
                               </button>
                               <span className="text-[9px] text-white/50 font-medium">RIR</span>
                             </div>
@@ -3527,18 +3528,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         if (loggerMode === 'mobility' || isDurationBased || isPlyometric(exercise.name)) return null;
                         const targetRir = exercise.target_rir;
                         const isPrefilled = set.from_previous && !set.completed;
-                        // RIR pills on their own row, anchored so the group's RIGHT edge sits under
-                        // the RIR cell's right edge: 240px from content-left (set#24 + gap8 + reps64
-                        // + gap8 + weight64 + gap8 + RIR64). Pills are 212px wide, so paddingLeft
-                        // 28px (240 − 212) lands the right edge at 240 — device-independent (the
-                        // header cells are fixed-width, so 240 doesn't move with viewport).
+                        // RIR pills on their own row (Q-039 scale: 0,1,2,3,4,5+), anchored so the
+                        // group's RIGHT edge sits under the RIR cell's right edge: 240px from
+                        // content-left (set#24 + gap8 + reps64 + gap8 + weight64 + gap8 + RIR64).
+                        // 6 pills × w-9 (36) + 5 × gap-1 (4) = 236px, so paddingLeft 4px (240 − 236)
+                        // keeps the right edge at 240 — device-independent (header cells fixed-width).
                         return (
-                          <div className="flex mt-2" style={{ paddingLeft: '28px' }}>
+                          <div className="flex mt-2" style={{ paddingLeft: '4px' }}>
                             <div className="flex flex-col items-start gap-0.5">
-                            <div className="flex items-center gap-2" role="group" aria-label="RIR (reps in reserve)">
-                              {[1, 2, 3, 4, 5].map((r) => {
+                            <div className="flex items-center gap-1" role="group" aria-label="RIR (reps in reserve)">
+                              {[0, 1, 2, 3, 4, 5].map((r) => {
                                 const isSelected = set.rir === r;
                                 const isTarget = targetRir === r;
+                                const isCap = r === 5; // 5 renders as "5+" (RIR >= 5, far from failure)
                                 const baseCls = 'h-9 w-9 rounded-md border-2 text-sm tabular-nums transition-colors leading-none';
                                 // D-097: prefilled-from-previous selection renders muted, same as reps/weight.
                                 const stateCls = isSelected
@@ -3556,15 +3558,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     className={`${baseCls} ${stateCls}`}
                                     style={{ fontFamily: 'Inter, sans-serif' }}
                                     aria-pressed={isSelected}
-                                    aria-label={`RIR ${r}${isTarget ? ' (target)' : ''}`}
+                                    aria-label={`RIR ${isCap ? '5 or more' : r}${isTarget ? ' (target)' : ''}`}
                                   >
-                                    {r}
+                                    {isCap ? '5+' : r}
                                   </button>
                                 );
                               })}
                             </div>
                             {targetRir ? (
-                              <span className="text-[9px] font-medium text-amber-400/70 leading-none">target {targetRir}</span>
+                              <span className="text-[9px] font-medium text-amber-400/70 leading-none">target {targetRir >= 5 ? '5+' : targetRir}</span>
                             ) : null}
                             </div>
                           </div>
