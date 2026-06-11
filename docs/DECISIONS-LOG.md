@@ -3213,6 +3213,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-123 — Reps vs RIR circle rows made visually distinct (2026-06-11)
+
+**Context:** The Reps circle row and the RIR circle row were near-identical twins — both `h-9 w-9 rounded-md` number buttons with the same **white** selected state. A new user relied entirely on the left `Reps`/`RIR` label to tell them apart; it's the one spot in the logger prone to a mis-tap. Only the RIR *target* pill and "suggested" caption carried any amber today.
+
+**Decision — differentiate by shape AND selected-color, no added text, no geometry change:**
+- **RIR row → `rounded-full` (true circles)** + **amber selected state** (`bg-amber-500/25 border-amber-400/60 text-amber-100`). This completes the "RIR = amber" identity that was already half-present (target pill + caption).
+- **Reps row → unchanged** (`rounded-md` rounded-squares + white selected `bg-white/[0.20] border-white/45`).
+- Two always-on cues (shape) plus a selection cue (color), reinforced by the existing caption colors (neutral "target" vs amber "suggested"). Rejected adding a unit-hint/extra text (the brief said "instantly tell which is which, not more text"). Same `h-9 w-9` footprint → zero change to the Q-043/D-119 row geometry; the prefilled-from-previous muted state (D-097) is preserved on both rows.
+
+**Files:** `src/components/StrengthLogger.tsx` (RIR `baseCls` + selected `stateCls`, ~:3644). **Verification:** app build clean; 380px harness `overflowPx -10` (shape change is footprint-neutral), footer math holds; rendered Reps-vs-RIR mockup confirmed the instant distinction.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

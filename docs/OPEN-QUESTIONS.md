@@ -700,6 +700,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-046 — Reps vs RIR circle rows look like twins (filed + shipped 2026-06-11, D-123)
+
+- **Status:** shipped 2026-06-11 (D-123).
+- **What/why:** the Reps and RIR rows were both `rounded-md` number circles with an identical white selected state — only the left label distinguished them, the one spot prone to mis-tap for a new user.
+- **Fix:** RIR row → full circles (`rounded-full`) + amber selected state; Reps row unchanged (rounded-squares + white). Shape + color difference, no extra text, no geometry change (same `h-9 w-9`). Leans into the "RIR = amber" cue already partly present (target pill/caption).
+- **Verification:** 380px harness `overflowPx -10` (footprint-neutral); rendered mockup confirms instant distinction.
+- **Cross-ref:** D-123; Q-043/D-119 (the row geometry left untouched).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

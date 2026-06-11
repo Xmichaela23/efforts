@@ -3641,12 +3641,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 const isSelected = set.rir === r;
                                 const isTarget = targetRir === r;
                                 const isCap = r === 5; // 5 renders as "5+" (RIR >= 5, far from failure)
-                                const baseCls = 'h-9 w-9 rounded-md border-2 text-sm tabular-nums transition-colors leading-none';
+                                // D-123: RIR pills are round + amber-selected to read instantly
+                                // distinct from the Reps row (square + white-selected) — they were
+                                // near-identical twins before, the one spot prone to mis-tap.
+                                const baseCls = 'h-9 w-9 rounded-full border-2 text-sm tabular-nums transition-colors leading-none';
                                 // D-097: prefilled-from-previous selection renders muted, same as reps/weight.
                                 const stateCls = isSelected
                                   ? (isPrefilled
                                       ? 'bg-white/[0.08] border-white/20 text-white/40'
-                                      : 'bg-white/[0.20] border-white/45 text-white font-semibold')
+                                      : 'bg-amber-500/25 border-amber-400/60 text-amber-100 font-semibold')
                                   : isTarget
                                     ? 'bg-amber-500/15 border-amber-400/40 text-amber-300/80 hover:bg-amber-500/25'
                                     : 'bg-white/[0.04] border-white/15 text-white/55 hover:bg-white/[0.10] hover:text-white/80';
