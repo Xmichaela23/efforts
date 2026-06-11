@@ -3366,6 +3366,21 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-133 — Suppress iOS autofill/save bubble on logger text inputs (2026-06-11)
+
+**Context:** On device, a white iOS autofill/save bubble overlapped set 2 in the logger (first mistaken for a timer/UI bug). WebKit was treating logger text inputs as contact/credential/phone fields and offering to "save" them.
+
+**Key diagnosis (non-obvious):** the **Reps/Weight/RIR cells are NOT inputs** — they're `<button>`s opening the custom `NumericKeypadSheet` (all buttons; its value display is a `<div>` text node, `:107`), so *number entry has no autofill surface at all*. The actual triggers were the real text inputs: the **exercise-name `<Input>`** (`:3245`, holds the lift name e.g. "Conventional Deadlift" → iOS contact/name autofill, always rendered = primary suspect), the **"Add exercise" search `<Input>`** (`:4054`), and the **rest/duration timer editors** which were `<input type="tel">` (`:3437`, `:3923`) → iOS *phone-number* autofill.
+
+**Fix:** 
+- Exercise-name + search inputs → `type="search"`, `autoComplete="off"`, `autoCorrect="off"`, `autoCapitalize="off"`, `spellCheck={false}`, `name="exercise-search"` (search semantics + non-credential name suppress the contact bar).
+- Timer editors → `type="tel"` **changed to** `type="text"` + `inputMode="numeric"` (kills the phone-autofill heuristic, keeps a number keyboard; `parseTimerInput` still accepts seconds; pasted `mm:ss` still parses) + the same suppression attrs.
+- Notes (`Textarea` `:4038`, session `textarea` `:4129`) → `autoComplete="off"` only (kept autocorrect/spellcheck — free prose benefits from them; the bubble is an autofill, not autocorrect, concern). RPE `<input type="number">` (`:4137`) → `inputMode="numeric"` + `autoComplete="off"`.
+
+**Files:** `src/components/StrengthLogger.tsx`. **Verification:** build; device check (type in a search/name + open a timer editor → no save/autofill bubble). The keypad (weight/RIR) was never a trigger — no input to autofill.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

@@ -3245,6 +3245,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     <Input
                       placeholder="Add exercise..."
                       value={exercise.name}
+                      // D-133: exercise name is a search-to-pick field, NOT a contact/credential.
+                      // Suppress iOS autofill/save bubble (was offering to "save" the lift name).
+                      type="search"
+                      enterKeyHint="done"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      name="exercise-search"
                       onChange={(e) => {
                         updateExerciseName(exercise.id, e.target.value);
                         setActiveDropdown(e.target.value.length > 0 ? exercise.id : null);
@@ -3435,7 +3444,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             {editingTimerKey === durationTimerKey && (
                               <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
                                 <input
-                                  type="tel"
+                                  type="text"
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  autoCorrect="off"
+                                  autoCapitalize="off"
+                                  spellCheck={false}
                                   value={editingTimerValue}
                                   onChange={(e)=>setEditingTimerValue(e.target.value)}
                                   placeholder=":60 or 1:00"
@@ -3921,7 +3935,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           {editingTimerKey === restTimerKey && (
                             <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
                               <input
-                                type="tel"
+                                type="text"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                spellCheck={false}
                                 value={editingTimerValue}
                                 onChange={(e)=>setEditingTimerValue(e.target.value)}
                                 placeholder="mm:ss or 90"
@@ -4018,6 +4037,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       <div className="mt-3 pt-3 border-t border-white/10">
                         <Textarea
                           id={`notes-${exercise.id}`}
+                          autoComplete="off"
                           value={exercise.notes || ''}
                           onChange={(e) => {
                             const updatedExercises = exercises.map(ex => 
@@ -4054,6 +4074,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <Input
               placeholder="Add exercise..."
               value={currentExercise}
+              // D-133: search-to-pick field — suppress iOS autofill/save bubble.
+              type="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              name="exercise-search"
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
               className="h-8 text-sm !border-0 bg-transparent text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:!border-0 pr-9 flex-1"
@@ -4098,7 +4126,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <div className="space-y-3">
               <div>
                 <label className="text-sm text-white/70">Notes</label>
-                <textarea value={notesText} onChange={(e)=>{
+                <textarea autoComplete="off" value={notesText} onChange={(e)=>{
                   setNotesText(e.target.value);
                   if (isInitialized && exercises.length > 0) {
                     saveSessionProgress(exercises, attachedAddons, e.target.value, notesRpe);
@@ -4107,7 +4135,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               </div>
               <div>
                 <label className="text-sm text-white/70">RPE (1–10)</label>
-                <input type="number" min={1} max={10} value={notesRpe} onChange={(e)=>{
+                <input type="number" min={1} max={10} inputMode="numeric" autoComplete="off" value={notesRpe} onChange={(e)=>{
                   const newRpe = e.target.value?Math.max(1, Math.min(10, parseInt(e.target.value)||0)): '';
                   setNotesRpe(newRpe);
                   if (isInitialized && exercises.length > 0) {
