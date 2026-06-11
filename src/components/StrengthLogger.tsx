@@ -3527,10 +3527,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         if (loggerMode === 'mobility' || isDurationBased || isPlyometric(exercise.name)) return null;
                         const targetRir = exercise.target_rir;
                         const isPrefilled = set.from_previous && !set.completed;
-                        // Full-width RIR pill row, left-aligned (own row, Hevy/RPE style).
-                        // The RIR cell directly above + the amber target pill carry the label.
+                        // RIR pills on their own row, centered under the RIR header column (col 4)
+                        // via a grid matching the top row's columns (24 / 64 / 64 / 64, gap 8).
                         return (
-                          <div className="flex flex-col items-start gap-0.5 mt-2">
+                          <div className="grid items-start mt-2" style={{ gridTemplateColumns: '24px 64px 64px 64px', columnGap: '8px' }}>
+                            <div className="flex flex-col items-center gap-0.5" style={{ gridColumn: 4, minWidth: 0 }}>
                             <div className="flex items-center gap-2" role="group" aria-label="RIR (reps in reserve)">
                               {[1, 2, 3, 4, 5].map((r) => {
                                 const isSelected = set.rir === r;
@@ -3562,18 +3563,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             {targetRir ? (
                               <span className="text-[9px] font-medium text-amber-400/70 leading-none">target {targetRir}</span>
                             ) : null}
+                            </div>
                           </div>
                         );
                       })()}
-                      {/* Steppers row — ±5/±2.5 left-aligned under the Weight column (set#/reps
-                          spacers, not centered), with "↑ Same" (D-096 carry-forward) on the same
-                          line to their right. One compact row; kills the orphaned Same row. */}
+                      {/* Steppers row — ±5/±2.5 (+ "↑ Same") centered under the Weight header
+                          column (col 3) on their own line, via a grid matching the top row. */}
                       {(showStepper || (setIndex > 0 && exercise.sets[0])) && (
-                      <div className="flex items-start gap-2">
-                        {/* spacers: set# + reps columns → steppers align under the Weight cell */}
-                        <div className="w-6 shrink-0"></div>
-                        <div className="w-16 shrink-0"></div>
-                        <div className="flex flex-wrap items-center gap-2">
+                      <div className="grid items-center" style={{ gridTemplateColumns: '24px 64px 64px 64px', columnGap: '8px' }}>
+                        <div className="flex items-center justify-center gap-2" style={{ gridColumn: 3, minWidth: 0 }}>
                         {showStepper && (
                           <div className="flex gap-1" role="group" aria-label="Adjust weight">
                             {[-5, -2.5, 2.5, 5].map((delta) => (
