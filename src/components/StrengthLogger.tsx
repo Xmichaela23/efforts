@@ -2892,8 +2892,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           {/* Row 1: workout identity — title + Deload pill (the pill describes the
               workout, so it belongs with the name, not competing with the date/Pick
               planned controls for horizontal space). Title gets the full row width. */}
-          <div className="flex items-center gap-2 min-w-0">
-            <h1 className="text-xl font-medium text-white/90 truncate min-w-0">
+          <div className="flex items-start gap-2">
+            <h1 className="text-xl font-medium text-white/90 min-w-0 leading-tight">
               {(() => {
                 const mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                 if (mode === 'mobility') return 'Log Mobility';
@@ -2906,7 +2906,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 no structured week_type flag is plumbed to the logger. */}
             {/deload/i.test(String(scheduledWorkout?.name || '')) && (
               <span
-                className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300/90"
+                className="shrink-0 mt-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300/90"
                 title="This is a deload week — lighter loads are intentional recovery, not a regression."
               >
                 Deload
