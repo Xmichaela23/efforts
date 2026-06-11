@@ -1335,14 +1335,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     })();
   }, [scheduledWorkout, targetDate]);
 
-  // D-097: previous-session autofill. After exercises are loaded (from planned
-  // workout, saved session, or fresh init), fetch the athlete's last 10 strength
-  // sessions and prefill any "untouched" set with the most-recent prior session's
-  // per-set actuals for the same exercise. Untouched = weight === 0 AND
-  // !reps/!duration_seconds AND !rir AND !completed (i.e. not athlete-edited
-  // and not already loaded from a saved session). Prefilled sets render in a
-  // muted color via the `from_previous` flag; any athlete edit clears the flag
-  // (updateSet handles this automatically).
+  // D-097 (prefill) → D-126 (anchor-only): this effect fetches the athlete's last
+  // 10 strength sessions and builds the per-set prior-session map. It NO LONGER
+  // prefills the set fields from last-actual (D-126 superseded that — fields now
+  // reflect the plan prescription, history lives only in the "last:" anchor). The
+  // fetch remains because the D-122 "last:" anchor reads `previousSessionByName`,
+  // which this effect populates.
   const didAutofillRef = useRef(false);
   useEffect(() => {
     if (didAutofillRef.current) return;
@@ -1394,39 +1392,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           if (Object.keys(previousByName).length >= currentNames.size) break;
         }
         if (Object.keys(previousByName).length === 0) return;
-        // D-122: keep the prior-session per-set map in state so the persistent
-        // "last:" anchor line can read it (the same single fetch feeds both the
-        // prefill below and the anchor). Unlike prefill, the anchor never clears.
+        // D-126 (supersedes the D-097 field prefill): this fetch now ONLY feeds the
+        // persistent "last:" anchor (D-122) — it no longer writes last-actual values
+        // into the set fields. The fields reflect the PLAN PRESCRIPTION (planned
+        // sessions prefill weight/reps from `computed.steps` via parseFromComputed;
+        // RIR shows the target as a ghost); unplanned sessions start empty. Rationale:
+        // plan in the box, history in the anchor — cleaner on deload weeks, where the
+        // prescription is intentionally lighter than last-actual and overlaying
+        // last-actual onto the box contradicted the "last:" line. The `from_previous`
+        // dimming path is now dormant (nothing sets it) but left in place.
         setPreviousSessionByName(previousByName);
-        // Apply autofill, preserving any set that's already touched/completed/from-saved-session.
-        setExercises((prev) => prev.map((ex) => {
-          const priorSets = previousByName[normalizeExerciseName(ex.name)];
-          if (!priorSets) return ex;
-          const newSets = ex.sets.map((set, i) => {
-            const untouched =
-              !set.completed &&
-              (!set.weight || set.weight === 0) &&
-              !set.reps &&
-              !set.duration_seconds &&
-              set.rir === undefined &&
-              !set.resistance_level;
-            if (!untouched) return set;
-            const prior = priorSets[i] ?? priorSets[priorSets.length - 1];
-            if (!prior) return set;
-            return {
-              ...set,
-              weight: prior.weight ?? set.weight,
-              ...(typeof prior.reps === 'number' ? { reps: prior.reps } : {}),
-              ...(typeof prior.duration_seconds === 'number' ? { duration_seconds: prior.duration_seconds } : {}),
-              ...(typeof prior.rir === 'number' ? { rir: prior.rir } : {}),
-              ...(prior.resistance_level ? { resistance_level: prior.resistance_level } : {}),
-              from_previous: true,
-            } as LoggedSet;
-          });
-          return { ...ex, sets: newSets };
-        }));
       } catch (e) {
-        console.warn('[strength-logger] previous-session autofill failed:', e);
+        console.warn('[strength-logger] previous-session fetch (for "last:" anchor) failed:', e);
       }
     })();
   }, [isInitialized, exercises.length, scheduledWorkout, targetDate]);

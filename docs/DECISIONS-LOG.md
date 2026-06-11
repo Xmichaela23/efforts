@@ -2626,6 +2626,8 @@ Drawer remains fully available for arbitrary edits — Same is additive, not a r
 
 ## D-097 — Previous-session autofill on strength logger open (with muted display + tap-to-edit clearing)
 
+> **SUPERSEDED (field prefill) by [D-126](#d-126) (2026-06-11).** The fields no longer prefill from last-actual; they reflect the plan prescription, and last-actual now lives only in the D-122 "last:" anchor. The fetch built here survives — it's what populates the anchor's per-set map — but the `setExercises` autofill + `from_previous` dimming path is dormant. Original entry kept for the record.
+
 **Date:** 2026-05-27
 **Files:** `src/components/StrengthLogger.tsx` (new `LoggedSet.from_previous?: boolean`, autofill useEffect at ~1294-1390, `updateSet` flag-clearing logic at ~2178-2190, muted spans on reps/weight/RIR value buttons).
 
@@ -3252,6 +3254,24 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 **Sizing:** buttons `h-8 px-1` (height-maximized for a thin strip; width slim to fit 8 buttons). `px-2`→`px-1.5`→`px-1` tuned against the harness: `px-2` overflowed +19px, `px-1.5` fit but groups crammed (2px apart), `px-1` gives an **18px inter-group gap** at 380px (`overflowPx -10`, full p-2 clearance) — real margin, not the mockup's edge-to-edge `overflowPx 0`.
 
 **Files:** `src/components/StrengthLogger.tsx` — captions under Reps cell (~:3414) + RIR cell (~:3569); the quick-adjust strip replacing the three rows (~:3591). `showStepper` (~:3260) is now unused but left in place. **Verification:** app build clean; 380px harness — `overflowPx -10`, inter-group gap 18px; rendered compact card confirmed. **NOTE:** this is the layout half of Q-048; the prefill-source change is D-126 (separate commit).
+
+---
+
+## D-126 — Logger fields prefill from the PLAN PRESCRIPTION, not last-actual (supersedes D-097's prefill; Q-048 step 2, 2026-06-11)
+
+**Context:** With the compact layout (D-125), the pre-filled cells *are* the primary input, so what they prefill with matters more. Two sources existed: the **plan prescription** (planned sessions → `parseFromComputed(computed.steps)` sets `weight`/`reps`; `target_rir` shows as a ghost) and **last-actual** (the D-097 effect overlaid the most-recent prior session's per-set values onto untouched sets, dimmed via `from_previous`). On a deload week this produced a contradiction the user hit: the box showed last-actual-ish numbers while the new "last:" anchor (D-122) *also* showed last-actual — and the plan was intentionally lighter. Two history surfaces, one of them masquerading as the prescription.
+
+**Decision — plan in the box, history in the anchor.** Removed the last-actual **field prefill** (the `setExercises(... from_previous ...)` block in the D-097 effect). Now:
+- **Planned sessions:** fields = plan prescription (`weight`/`reps` from `parseFromComputed`; `rir` stays `null` so the prescribed RIR shows as a ghost AND the honest RIR-on-Done prompt still fires). Unchanged mechanically — the prescription was always there; we just stopped overlaying last-actual on top.
+- **Unplanned/fresh sessions:** fields start **empty** (no last-actual prefill). The athlete types via keypad or nudges; the `last:` anchor shows what they did last time. *(Deliberate trade — flagged. This is the one real behavior change: unplanned sessions used to prefill last-actual.)*
+- **Last-actual** now appears in exactly one place: the D-122 `last:` line.
+- **Kept the fetch:** the same effect still fetches prior sessions and populates `previousSessionByName` — the anchor depends on it. Only the field-writing block was removed.
+
+**Why not prefill RIR from target as a real value:** leaving `rir = null` preserves the post-set RIR prompt (`handleSetComplete` asks when `rir` is unset) — RIR is the one value the athlete should report honestly, not inherit from the prescription. The target still shows as a ghost in the cell.
+
+**Dormant code (left in place):** the `from_previous` flag, its muted-text rendering across the cells, and `updateSet`'s from_previous-clearing branch are now inert (nothing sets `from_previous`). Left rather than ripped out — low-risk, and a foothold if a future "prefill from last-actual" toggle is wanted.
+
+**Files:** `src/components/StrengthLogger.tsx` — D-097 effect: removed the autofill `setExercises` block, kept `setPreviousSessionByName` (~:1396); header comment updated (~:1338). **Verification:** app build clean. Data-source change only — no layout impact (380px harness unaffected; D-125 already verified the layout). **NOTE:** prefill half of Q-048; shipped as a separate commit from D-125 per the working contract.
 
 ---
 
