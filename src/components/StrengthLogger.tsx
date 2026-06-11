@@ -3253,6 +3253,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   if (!isDurationBased && !isPlyometric(exercise.name) && !isMobilitySummary) {
                     collapsedSummary += ` · RIR ${set.rir ?? '—'}`;
                   }
+                  // Weight steppers apply to loaded barbell/dumbbell/goblet lifts only
+                  // (not band/bodyweight/duration). Rendered as their own row below the top
+                  // row, no longer nested inside the Weight column.
+                  const showStepper = !isDurationBased && !isBodyweightMove(exercise.name)
+                    && ['barbell', 'dumbbell', 'goblet'].includes(exTypeSummary);
 
                   return (
                     <div key={setIndex} className={`bg-white/[0.03] backdrop-blur-lg border-2 border-white/15 rounded-xl p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] ${isActiveSet && showRestTimer ? "mb-4" : "mb-1"}`}>
@@ -3494,23 +3499,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   {set.weight === 0 ? '' : (set.weight ?? '—')}
                                 </span>
                               </button>
-                              <span className="text-[9px] text-white/50 font-medium">lb/hand</span>
-                              {/* D-098: inline weight stepper — ±2.5 / ±5 without opening drawer */}
-                              <div className="flex gap-0.5 mt-0.5" role="group" aria-label="Adjust weight">
-                                {[-5, -2.5, 2.5, 5].map((delta) => (
-                                  <button
-                                    key={delta}
-                                    type="button"
-                                    onClick={() => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + delta) * 2) / 2) })}
-                                    className="h-5 px-1.5 rounded-md border border-white/15 bg-white/[0.04] text-white/55 text-[10px] hover:bg-white/[0.10] hover:text-white/80 tabular-nums leading-none"
-                                    style={{ fontFamily: 'Inter, sans-serif' }}
-                                    aria-label={`${delta > 0 ? 'Add' : 'Subtract'} ${Math.abs(delta)} pounds`}
-                                  >
-                                    {delta > 0 ? `+${delta}` : delta}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+                              <span className="text-[9px] text-white/50 font-medium">lb/hand</span>                            </div>
                           );
                         }
                         
@@ -3537,23 +3526,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   {set.weight === 0 ? '' : (set.weight ?? '—')}
                                 </span>
                               </button>
-                              <span className="text-[9px] text-white/50 font-medium">Weight</span>
-                              {/* D-098: inline weight stepper — ±2.5 / ±5 without opening drawer */}
-                              <div className="flex gap-0.5 mt-0.5" role="group" aria-label="Adjust weight">
-                                {[-5, -2.5, 2.5, 5].map((delta) => (
-                                  <button
-                                    key={delta}
-                                    type="button"
-                                    onClick={() => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + delta) * 2) / 2) })}
-                                    className="h-5 px-1.5 rounded-md border border-white/15 bg-white/[0.04] text-white/55 text-[10px] hover:bg-white/[0.10] hover:text-white/80 tabular-nums leading-none"
-                                    style={{ fontFamily: 'Inter, sans-serif' }}
-                                    aria-label={`${delta > 0 ? 'Add' : 'Subtract'} ${Math.abs(delta)} pounds`}
-                                  >
-                                    {delta > 0 ? `+${delta}` : delta}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+                              <span className="text-[9px] text-white/50 font-medium">Weight</span>                            </div>
                           );
                         }
                         
@@ -3579,23 +3552,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 {set.weight === 0 ? '' : (set.weight ?? '—')}
                               </span>
                             </button>
-                            <span className="text-[9px] text-white/50 font-medium">Weight</span>
-                            {/* D-098: inline weight stepper — ±2.5 / ±5 without opening drawer */}
-                            <div className="flex gap-0.5 mt-0.5" role="group" aria-label="Adjust weight">
-                              {[-5, -2.5, 2.5, 5].map((delta) => (
-                                <button
-                                  key={delta}
-                                  type="button"
-                                  onClick={() => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + delta) * 2) / 2) })}
-                                  className="h-5 px-1.5 rounded-md border border-white/15 bg-white/[0.04] text-white/55 text-[10px] hover:bg-white/[0.10] hover:text-white/80 tabular-nums leading-none"
-                                  style={{ fontFamily: 'Inter, sans-serif' }}
-                                  aria-label={`${delta > 0 ? 'Add' : 'Subtract'} ${Math.abs(delta)} pounds`}
-                                >
-                                  {delta > 0 ? `+${delta}` : delta}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
+                            <span className="text-[9px] text-white/50 font-medium">Weight</span>                          </div>
                         );
                       })()}
                         {/* RIR cell — sits in the Reps/Weight row, same rounded-input styling.
@@ -3675,12 +3632,27 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </div>
                         );
                       })()}
-                      {/* D-096: "Same as set 1" carry-forward affordance — set 2+ only.
-                          Copies reps/weight/rir (+ resistance_level for bands, +
-                          duration_seconds for time-based) from set 1. One tap to skip
-                          three keypad cycles when the athlete is grinding identical
-                          working sets — the dominant strength-session pattern. */}
-                      <div className="flex items-center justify-start pt-0.5">
+                      {/* Steppers row — ±5/±2.5 left-aligned under the Weight column (set#/reps
+                          spacers, not centered), with "↑ Same" (D-096 carry-forward) on the same
+                          line to their right. One compact row; kills the orphaned Same row. */}
+                      {(showStepper || (setIndex > 0 && exercise.sets[0])) && (
+                      <div className="flex items-center justify-center gap-2">
+                        {showStepper && (
+                          <div className="flex gap-1" role="group" aria-label="Adjust weight">
+                            {[-5, -2.5, 2.5, 5].map((delta) => (
+                              <button
+                                key={delta}
+                                type="button"
+                                onClick={() => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + delta) * 2) / 2) })}
+                                className="h-8 px-2.5 rounded-md border border-white/15 bg-white/[0.04] text-white/70 text-sm hover:bg-white/[0.10] hover:text-white/90 tabular-nums leading-none"
+                                style={{ fontFamily: 'Inter, sans-serif' }}
+                                aria-label={`${delta > 0 ? 'Add' : 'Subtract'} ${Math.abs(delta)} pounds`}
+                              >
+                                {delta > 0 ? `+${delta}` : delta}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                         {setIndex > 0 && exercise.sets[0] && (() => {
                           const set0 = exercise.sets[0];
                           const isSame =
@@ -3718,6 +3690,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           );
                         })()}
                       </div>
+                      )}
                     {(() => {
                       // Duration-based exercises don't need equipment selection (bodyweight)
                       if (isDurationBased) {
@@ -3731,7 +3704,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       // Band exercises - show resistance selector
                       if (exerciseType === 'band') {
                         return (
-                          <div className="flex items-center justify-between mt-0.5 mb-2">
+                          <div className="flex items-center justify-between">
                             <span className="text-xs text-amber-400/80">Band</span>
                             <Select
                               value={set.resistance_level || 'Light'}
@@ -3756,7 +3729,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       // Only show Plates/Barbell UI for barbell exercises
                       if (exerciseType === 'barbell') {
                         return (
-                          <div className="flex items-center justify-between mt-0.5 mb-2">
+                          <div className="flex items-center justify-between">
                             <button
                               onClick={() => togglePlateCalc(exercise.id, setIndex)}
                               className="text-xs text-white/70 flex items-center gap-1 hover:text-white/90 transition-colors"
@@ -3805,7 +3778,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       // Only show PlateMath for barbell exercises
                       if (exerciseType === 'barbell' && expandedPlates[`${exercise.id}-${setIndex}`]) {
                         return (
-                          <div className="mb-2">
+                          <div>
                             <PlateMath
                               weight={set.weight}
                               barType={set.barType || 'standard'}
@@ -3826,100 +3799,99 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </div>
                     )}
                     
-                    {/* Rest timer - only show when rest is actually needed, positioned after all set content */}
-                    {showRestTimer && (
-                      <div className="flex items-center gap-2 mt-2 mb-1 ml-8 relative">
-                        <span className="text-xs text-white/60">Rest</span>
-                        <button
-                          onClick={() => {
-                            const key = restTimerKey;
-                            // Calculate rest time based on previous set's reps
-                            const prevSet = exercise.sets[setIndex - 1];
-                            const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                              ? calculateRestTime(exercise.name, prevSet.reps)
-                              : 90;
-                            const cur = restTimer?.seconds ?? calculatedRest;
-                            const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
-                            setEditingTimerKey(key);
-                            setEditingTimerValue(prefill);
-                          }}
-                          onContextMenu={(e) => { 
-                            e.preventDefault(); 
-                            const prevSet = exercise.sets[setIndex - 1];
-                            const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                              ? calculateRestTime(exercise.name, prevSet.reps)
-                              : 90;
-                            setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: calculatedRest, running: false } })); 
-                          }}
-                          className="h-7 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                          aria-label="Rest timer"
-                        >
-                          {formatSeconds(restTimer?.seconds ?? (() => {
-                            const prevSet = exercise.sets[setIndex - 1];
-                            return prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                              ? calculateRestTime(exercise.name, prevSet.reps)
-                              : 90;
-                          })())}
-                        </button>
-                        <button
-                          onClick={() => {
-                            const prevSet = exercise.sets[setIndex - 1];
-                            const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
-                              ? calculateRestTime(exercise.name, prevSet.reps)
-                              : 90;
-                            setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: (prev[restTimerKey]?.seconds ?? calculatedRest) || calculatedRest, running: true } }));
-                          }}
-                          className="h-7 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                          aria-label="Start rest timer"
-                        >
-                          Start
-                        </button>
-
-                        {editingTimerKey === restTimerKey && (
-                          <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
-                            <input
-                              type="tel"
-                              value={editingTimerValue}
-                              onChange={(e)=>setEditingTimerValue(e.target.value)}
-                              placeholder="mm:ss or 90"
-                              className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
-                            />
-                            <div className="flex justify-end gap-2 mt-2">
-                              <button
-                                onClick={() => {
-                                  const input = editingTimerValue.trim();
-                                  let newSeconds = 0;
-                                  if (input.includes(':')) {
-                                    const [mins, secs] = input.split(':');
-                                    newSeconds = (parseInt(mins, 10) || 0) * 60 + (parseInt(secs, 10) || 0);
-                                  } else {
-                                    const num = parseInt(input, 10) || 0;
-                                    newSeconds = num <= 20 ? num * 60 : num;
-                                  }
-                                  if (newSeconds > 0) {
-                                    setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: newSeconds, running: false } }));
-                                  }
-                                  setEditingTimerKey(null);
-                                }}
-                                className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={() => setEditingTimerKey(null)}
-                                className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                              >
-                                Close
-                              </button>
+                    {/* Footer row — Rest/Start (left) shares ONE line with Done/✕ (right).
+                        Kills the floating Rest row and the dead space above the footer. */}
+                    <div className="flex items-center gap-2 relative">
+                      {showRestTimer && (
+                        <>
+                          <span className="text-xs text-white/60">Rest</span>
+                          <button
+                            onClick={() => {
+                              const key = restTimerKey;
+                              const prevSet = exercise.sets[setIndex - 1];
+                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, prevSet.reps)
+                                : 90;
+                              const cur = restTimer?.seconds ?? calculatedRest;
+                              const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
+                              setEditingTimerKey(key);
+                              setEditingTimerValue(prefill);
+                            }}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              const prevSet = exercise.sets[setIndex - 1];
+                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, prevSet.reps)
+                                : 90;
+                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: calculatedRest, running: false } }));
+                            }}
+                            className="h-7 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                            style={{ fontFamily: 'Inter, sans-serif' }}
+                            aria-label="Rest timer"
+                          >
+                            {formatSeconds(restTimer?.seconds ?? (() => {
+                              const prevSet = exercise.sets[setIndex - 1];
+                              return prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, prevSet.reps)
+                                : 90;
+                            })())}
+                          </button>
+                          <button
+                            onClick={() => {
+                              const prevSet = exercise.sets[setIndex - 1];
+                              const calculatedRest = prevSet?.reps && prevSet.reps > 0 && prevSet.duration_seconds === undefined
+                                ? calculateRestTime(exercise.name, prevSet.reps)
+                                : 90;
+                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: (prev[restTimerKey]?.seconds ?? calculatedRest) || calculatedRest, running: true } }));
+                            }}
+                            className="h-7 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                            style={{ fontFamily: 'Inter, sans-serif' }}
+                            aria-label="Start rest timer"
+                          >
+                            Start
+                          </button>
+                          {editingTimerKey === restTimerKey && (
+                            <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
+                              <input
+                                type="tel"
+                                value={editingTimerValue}
+                                onChange={(e)=>setEditingTimerValue(e.target.value)}
+                                placeholder="mm:ss or 90"
+                                className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
+                              />
+                              <div className="flex justify-end gap-2 mt-2">
+                                <button
+                                  onClick={() => {
+                                    const input = editingTimerValue.trim();
+                                    let newSeconds = 0;
+                                    if (input.includes(':')) {
+                                      const [mins, secs] = input.split(':');
+                                      newSeconds = (parseInt(mins, 10) || 0) * 60 + (parseInt(secs, 10) || 0);
+                                    } else {
+                                      const num = parseInt(input, 10) || 0;
+                                      newSeconds = num <= 20 ? num * 60 : num;
+                                    }
+                                    if (newSeconds > 0) {
+                                      setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: newSeconds, running: false } }));
+                                    }
+                                    setEditingTimerKey(null);
+                                  }}
+                                  className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => setEditingTimerKey(null)}
+                                  className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                >
+                                  Close
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                      {/* Action footer — Done/✕ right-aligned, last in the expanded stack. */}
-                      <div className="flex items-center justify-end gap-2 pt-1">
+                          )}
+                        </>
+                      )}
+                      <div className="ml-auto flex items-center gap-2">
                         <button
                           onClick={() => {
                             handleSetComplete(exercise.id, setIndex);
@@ -3944,6 +3916,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           <X className="h-4 w-4" />
                         </button>
                       </div>
+                    </div>
                       </div>
                       </>
                       )}
