@@ -636,6 +636,18 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-041 — `workout_adaptation` / `compute-adaptation-metrics`: retire or wire up? (filed 2026-06-11)
+
+- **Status:** open, decision owed, **do not act yet** (per Decision #2 of the Q-039/Q-040 session — leave the deployed D-116 change as-is, just flag the table dead).
+- **Finding:** `compute-adaptation-metrics` computes a full per-week adaptation packet (strength e1RM, `confidence`, `data_quality`, etc.) and writes `workout_adaptation`, but **`from('workout_adaptation')` has 0 readers** anywhere in `src` or `supabase/functions`. It's dead output. (See ENGINE-STATE "`workout_adaptation` is a DEAD table".)
+- **Two options to decide between:**
+  1. **Retire** `compute-adaptation-metrics` + the `workout_adaptation` write (and remove its invocation from the ingest fan-out / wherever it's called) — less dead code, one fewer place for strength e1RM logic to drift from the live `compute-facts` path.
+  2. **Wire it up** — if the adaptation packet (confidence/data_quality/autoregulation signals) is genuinely wanted by the coach or Arc, connect a reader and make it the/an authority. But then its e1RM formula (Epley×rirFactor) must be reconciled with `compute-facts` (Brzycki on reps+RIR) — see Q-040 — so they don't diverge.
+- **Why filed not fixed:** retiring touches the ingest orchestrator (`ingest-activity` fan-out) and possibly other invokers; wiring up is a product call. Neither is in Q-039 scope.
+- **Cross-ref:** Q-040 (the two divergent e1RM paths), D-116 (the inert step-2 change), ENGINE-STATE dead-table note.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
