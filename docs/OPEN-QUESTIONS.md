@@ -673,13 +673,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
-## Q-044 — Rest timer ownership reversed; fresh exercise shows NO rest rows (filed + shipped 2026-06-11, D-120)
+## Q-044 — Rest timer model: auto-start experiment → reverted to opt-in (filed 2026-06-11, D-120 then D-121)
 
-- **Status:** shipped 2026-06-11 (D-120, reverses D-115). Filed to stop a future session from "fixing" the now-intentional absence of rest rows on undone sets.
-- **What changed:** the rest timer used to live on the **upcoming** set's card (finish set 1 → timer on set 2). Now each set owns the rest that *follows* it — finish set N → its rest auto-starts ON set N's card; the **last** set shows none. Duration derives from the just-finished set's reps; Start replaced by Pause/Resume + Skip.
-- **Intentional behavior, NOT a regression:** because `showRestTimer` now gates on `set.completed`, **a fresh exercise shows zero rest rows until you start completing sets.** This is correct — it's the honest version of D-115's "never imply a rest that hasn't happened" principle. Do **not** re-add an idle "Rest 2:30 / Start" row to undone sets; that idle row was the old (reversed) behavior. An incomplete non-last set having no rest row is expected.
-- **Verification:** 380px harness — rest renders on completed non-last sets (Rest+Pause+Skip, `overflowPx -10`), last sets render none, steppers stay aligned 44→308.
-- **Cross-ref:** D-115 (reversed), D-120 (the reversal), Q-043 (the prior "rest timer on set 1 re-confirmed" note — now superseded by this reversal).
+- **Status:** settled 2026-06-11. The auto-start version (D-120) was reverted the same day to an **opt-in** model (D-121). Current behavior is D-121.
+- **Current behavior (D-121):** the rest row appears on **every set except the last**, shows its duration **idle** (does NOT auto-count), and the user taps **Start** to launch it (Pause/Resume to control, Skip to dismiss + hide the row). No `set.completed` gate, no auto-trigger.
+- **Intentional, NOT a regression — do not "fix" either of these:**
+  - The timer **sits idle and does not count on its own.** That's deliberate (D-121) — the rest timer is a courtesy the user owns. Don't re-add auto-start on Done (that was D-120, reverted).
+  - The **last set has no rest row** (nothing follows it). Expected.
+- **History:** D-120 (briefly) made the timer auto-start on Done and live on the just-finished set, gated on `set.completed`. Reverted because auto-firing a courtesy timer is the wrong default.
+- **Verification:** 380px harness — Rest+Start+Skip on every non-last set (`overflowPx -10`), last sets render none, steppers aligned 44→308.
+- **Cross-ref:** D-115 → D-120 (auto-start, reverted) → D-121 (opt-in, current); Q-043 (prior rest-timer notes).
 
 ---
 

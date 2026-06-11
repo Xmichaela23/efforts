@@ -3073,7 +3073,7 @@ Net effect: NP and VI computed over a *pedaling-only* power series. Outdoor swee
 
 ## D-115 — Rest is the gap *after* set N-1; set 0 renders no rest row (Q-034 / Bug A, 2026-06-08)
 
-> **REVERSED by [D-120](#d-120) (2026-06-11).** The "rest after set N-1 → timer on the upcoming set's card" model was backwards from how a lifter experiences it (you finish a set, then rest). D-120 flips the ownership: each set owns the rest that *follows* it (timer on the just-finished set's card, last set none). The honesty principle below — never show a rest that hasn't happened — is preserved and met a better way (gate on `set.completed`), and the index-0 footgun note still stands. The original reasoning is kept here for the record.
+> **SUPERSEDED — see [D-121](#d-121) for current behavior (2026-06-11).** Chain: D-115 (set-0 renders no rest) → [D-120](#d-120) (moved the timer to the just-finished set + auto-started it — the auto-start experiment, reverted) → **D-121** (opt-in courtesy: rest row on every set except the last, idle by default, user taps Start). The index-0 footgun note below still stands. Original reasoning kept for the record.
 
 **Context:** Bench Press set 1 showed a 1:30 rest timer, set 2 showed 2:30 — same lift, same 4-rep target, on a deload session. Rest should be uniform across sets of one lift.
 
@@ -3163,6 +3163,8 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ## D-120 — Rest belongs to the just-finished set, not the upcoming one (reverses D-115, 2026-06-11)
 
+> **AUTO-START EXPERIMENT — REVERTED by [D-121](#d-121) (2026-06-11).** D-120 moved the timer to the just-finished set's card AND made it **auto-start on Done** (gated on `set.completed`). The auto-trigger was unwanted: the rest timer is a courtesy, not something that should fire itself. D-121 reverts to an **opt-in** model — the rest row appears on every set except the last, shows the duration **idle** (no auto-count), and the user taps **Start** to launch it. The Pause/Resume/Skip controls and `restDismissed` state introduced here are **kept**; the auto-start function (`startRestAfterSet`) and the `set.completed` gate are gone. Kept here for the record.
+
 **Context:** The rest timer lived on the **upcoming** set's card: finish set 1 → the timer appeared on set 2. Backwards from how a lifter experiences it — you finish a set, *then* you rest, and the rest you just triggered showed up attached to a set you hadn't done yet. D-115's "rest is the gap after set N-1" model was internally consistent but read as a bug at the bench.
 
 **Decision — each set owns the rest that FOLLOWS it.** The rule flips from *"timer on set N+1's card, shown for sets > 0"* to *"timer on set N's card when set N is completed AND set N is not the last set."*
@@ -3172,6 +3174,24 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 - **Controls:** the manual **Start** button is gone (auto-starts on Done). Replaced with **Pause/Resume** (toggles `running` on the existing timer) and **Skip** (cuts it short → `seconds:0, running:false` + adds the key to a new `restDismissed` set that hides the row). A re-completed set re-arms: `startRestAfterSet` clears the dismissed key on a fresh start. The tap-to-edit time button (long-press reset) is retained.
 
 **Files:** `src/components/StrengthLogger.tsx` — `startRestAfterSet` (~:448) + 4 callers; `restDismissed` state (~:381); `showRestTimer` gate (~:3218); footer Rest/Pause/Skip block + `set.reps` duration source (~:3838). **Verification:** app build clean; 380px harness — rest row renders on completed non-last sets with Rest+Pause+Skip (`overflowPx -10`, footer below open picker), last sets render no rest row, steppers still aligned 44→308. Device-verify steps reported to user.
+
+---
+
+## D-121 — Rest timer is opt-in: idle by default, user owns when it counts (reverts D-120's auto-start, 2026-06-11)
+
+**Context:** D-120 made the rest timer auto-start the moment you tapped Done on a set. In use that's the wrong default — the rest timer is a *courtesy*, not something that should launch itself and start beeping. The right model is the simplest one: the timer exists, the user decides when (and whether) it counts.
+
+**Decision — opt-in courtesy, minimal:**
+- **Presence:** the rest row appears on **every set except the last** (no rest after the final set). `showRestTimer = !isDurationBased && !isLastSet && !restDismissed.has(key)`. **No `set.completed` gate, no auto-trigger.** A set that hasn't been done still shows its idle rest row.
+- **Idle by default:** the timer displays its duration (e.g. `2:30`) but does **not** count. The auto-start function (`startRestAfterSet`) and its four call sites are **deleted** — completing a set no longer touches the timer.
+- **User-launched:** a single toggle button — **Start** when never-started, **Pause** while running, **Resume** when paused mid-count (label derived from `restTimer.running` + whether `seconds < restCalcSeconds`). **Skip** cuts it short and hides the row (`restDismissed`). The tap-to-edit time button (long-press reset) is retained.
+- **Kept from D-120:** the Pause/Resume/Skip controls, the `restDismissed` set, and the `set.reps` duration source (no duration-logic changes were in scope for this revert).
+
+**Why no re-arm:** without auto-start there's nothing to re-arm — Skip simply dismisses the row for that set for the session, which is the intended "hide it" behavior.
+
+**Doc-attribution note:** the user's request said 'mark D-115 as "auto-start experiment, reverted".' The auto-start was actually introduced by **D-120** (D-115 was the earlier set-0-no-rest decision), so the "auto-start experiment, reverted" banner is placed on D-120 for accuracy. The chain is now D-115 → D-120 (auto-start, reverted) → D-121 (opt-in, current).
+
+**Files:** `src/components/StrengthLogger.tsx` — removed `startRestAfterSet` + 4 callers; `showRestTimer` drops the completed gate (~:3218); `restToggleLabel` (Start/Pause/Resume) computed near the gate; footer toggle uses it (~:3827). **Verification:** app build clean; 380px harness — Rest+Start+Skip on every non-last set (`overflowPx -10`, footer below open picker), last sets render no rest row, steppers aligned 44→308.
 
 ---
 
