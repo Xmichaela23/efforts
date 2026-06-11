@@ -3272,7 +3272,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           line) so nothing exceeds the card width on a 380px viewport. */}
                       <div className="flex flex-col gap-2">
                         <div className="flex items-start gap-2">
-                        <div className="w-6 text-xs text-white/60 text-right pt-2">{setIndex + 1}</div>
+                        {/* Set# in a proper w-9 leader slot — aligns as the left column above the
+                            Reps/Wt/RIR row labels below, rather than floating far-left (Q-043). */}
+                        <div className="w-9 shrink-0 text-xs text-white/60 pt-2">{setIndex + 1}</div>
                         
                         {/* Duration-based exercises show timer input, rep-based show reps input */}
                         {isDurationBased ? (
@@ -3353,7 +3355,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // REP-BASED EXERCISE (e.g., Squat, Bench Press)
                         // Hide reps input if no reps are prescribed (for "until" patterns)
                         set.reps === undefined ? null : (
-                          <div className="flex flex-col items-center gap-0.5">
+                          <div className="flex-1 flex flex-col items-center gap-0.5">
                             <button
                               type="button"
                               onClick={() =>
@@ -3366,7 +3368,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   allowDecimal: false,
                                 })
                               }
-                              className="relative h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
+                              className="relative h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-full focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             >
                               {/* D-097: muted text when value came from previous-session autofill */}
@@ -3417,7 +3419,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // Dumbbell exercises: Show weight input with /hand label
                         if (exerciseType === 'dumbbell') {
                           return (
-                            <div className="flex flex-col items-center gap-0.5">
+                            <div className="flex-1 flex flex-col items-center gap-0.5">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -3430,7 +3432,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     allowDecimal: true,
                                   })
                                 }
-                                className="relative h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16 tabular-nums"
+                                className="relative h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-full tabular-nums"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                               >
                                 <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
@@ -3446,7 +3448,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // Goblet exercises (lateral lunges, goblet squat): Single weight, no /hand
                         if (exerciseType === 'goblet') {
                           return (
-                            <div className="flex flex-col items-center gap-0.5">
+                            <div className="flex-1 flex flex-col items-center gap-0.5">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -3459,7 +3461,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     allowDecimal: true,
                                   })
                                 }
-                                className="relative h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16 tabular-nums"
+                                className="relative h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-full tabular-nums"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                               >
                                 <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
@@ -3474,7 +3476,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         
                         // Barbell exercises: Standard weight input
                         return (
-                          <div className="flex flex-col items-center gap-0.5">
+                          <div className="flex-1 flex flex-col items-center gap-0.5">
                             <button
                               type="button"
                               onClick={() =>
@@ -3487,7 +3489,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   allowDecimal: true,
                                 })
                               }
-                              className="relative h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
+                              className="relative h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-full focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             >
                               <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
@@ -3508,7 +3510,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           const targetRir = exercise.target_rir;
                           const hasValue = set.rir !== undefined && set.rir !== null;
                           return (
-                            <div className="flex flex-col items-center gap-0.5">
+                            <div className="flex-1 flex flex-col items-center gap-0.5">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -3521,7 +3523,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     allowDecimal: false,
                                   })
                                 }
-                                className="relative h-9 w-16 flex items-center justify-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl tabular-nums shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12]"
+                                className="relative h-9 w-full flex items-center justify-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl tabular-nums shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12]"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                                 aria-label="RIR"
                               >
