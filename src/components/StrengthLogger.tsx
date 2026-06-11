@@ -3412,6 +3412,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
                             </button>
                             <span className="text-[9px] text-white/50 font-medium">Reps</span>
+                            {exercise.target_reps ? (
+                              <span className="text-[9px] font-medium text-white/45 leading-none">target {exercise.target_reps}</span>
+                            ) : null}
                           </div>
                         )
                       )}
@@ -3567,6 +3570,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
                               </button>
                               <span className="text-[9px] text-white/50 font-medium">RIR</span>
+                              {targetRir ? (
+                                <span className="text-[9px] font-medium text-amber-400/70 leading-none">suggested {targetRir >= 5 ? '5+' : targetRir}</span>
+                              ) : null}
                             </div>
                           );
                         })()}
@@ -3588,174 +3594,51 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </div>
                         );
                       })()}
-                      {/* Rep-circle picker (Q-039 steps 3–4) — labeled full-width row. A 3-char
-                          row-leader ("Reps") makes the stacked control rows legible; strict column
-                          alignment can't differentiate a 5-wide picker in a 308px card (D-119).
-                          Window of 5 centered on current reps (target±2, clamp 1), re-centers on
-                          pick/keypad. Prescribed reps shown as the "target N" caption (Q-039 spec).
-                          Hidden for duration / no-reps. Circles are ~32px shortcuts; the keypad
-                          cell above is the 44px primary input. */}
-                      {(() => {
-                        if (isDurationBased || set.reps === undefined) return null;
-                        const center = (typeof set.reps === 'number' && set.reps >= 1) ? set.reps : 8;
-                        const lo = Math.max(1, center - 2);
-                        const isPrefilled = set.from_previous && !set.completed;
-                        return (
-                          <div className="flex items-start gap-2 mt-2">
-                            <span className="w-9 shrink-0 pt-2 text-[10px] font-medium text-white/50">Reps</span>
-                            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                              <div className="flex items-center justify-between" role="group" aria-label="Reps">
-                                {[lo, lo + 1, lo + 2, lo + 3, lo + 4].map((v) => {
-                                  const isSel = set.reps === v;
-                                  const stateCls = isSel
-                                    ? (isPrefilled
-                                        ? 'bg-white/[0.08] border-white/20 text-white/40'
-                                        : 'bg-white/[0.20] border-white/45 text-white font-semibold')
-                                    : 'bg-white/[0.04] border-white/15 text-white/55 hover:bg-white/[0.10] hover:text-white/80';
-                                  return (
-                                    <button
-                                      key={v}
-                                      type="button"
-                                      onClick={() => updateSet(exercise.id, setIndex, { reps: v })}
-                                      className={`h-9 w-9 rounded-md border-2 text-sm tabular-nums transition-colors leading-none ${stateCls}`}
-                                      style={{ fontFamily: 'Inter, sans-serif' }}
-                                      aria-pressed={isSel}
-                                      aria-label={`${v} reps`}
-                                    >
-                                      {v}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                              {exercise.target_reps ? (
-                                <span className="text-[9px] font-medium text-white/45 leading-none">target {exercise.target_reps}</span>
-                              ) : null}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                      {/* RIR pills — ALWAYS visible, directly beneath the top row. 1-5, target
-                          pill amber, tap to select → fills the RIR cell above. No disclosure.
-                          Hidden for mobility / duration-based / plyometric. */}
+                      {/* D-125: ONE thin quick-adjust strip replaces the two circle rows + the 2×2
+                          weight stepper. The pre-filled keypad cells above are the primary input
+                          (tap = keypad, Q-042 pencil signals it); this strip just nudges off the
+                          prescription when reality differed. NO inline labels — reps-left /
+                          wt-center / rir-right mirrors the cell order above. reps ±1 (clamp ≥1,
+                          D-117), wt −5/−2.5/+2.5/+5, rir ±1 (clamp 0–5, D-116). Each group renders
+                          only when its field applies; the whole strip is hidden if none do. */}
                       {(() => {
                         const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
-                        if (loggerMode === 'mobility' || isDurationBased || isPlyometric(exercise.name)) return null;
-                        const targetRir = exercise.target_rir;
-                        const isPrefilled = set.from_previous && !set.completed;
-                        // RIR pills (Q-039 scale 0,1,2,3,4,5+) as a labeled full-width row ("RIR"
-                        // leader). The prescribed RIR shows as the "suggested N" caption (Q-039
-                        // spec — RIR is a suggestion, not a hard target; renamed from "target N" so
-                        // it's not confused with the rep target). ~32px shortcut pills.
+                        const exType = getExerciseType(exercise.name);
+                        const showReps = !isDurationBased && set.reps !== undefined;
+                        const showWeight = !isDurationBased && !isBodyweightMove(exercise.name) && exType !== 'band';
+                        const showRir = loggerMode !== 'mobility' && !isDurationBased && !isPlyometric(exercise.name);
+                        if (!showReps && !showWeight && !showRir) return null;
+                        const nudgeCls = 'h-8 px-1 rounded-md border border-white/15 bg-white/[0.04] text-white/70 text-[11px] hover:bg-white/[0.10] hover:text-white/90 active:bg-white/[0.16] tabular-nums leading-none transition-colors';
+                        const adjReps = (d: number) => updateSet(exercise.id, setIndex, { reps: Math.max(1, (typeof set.reps === 'number' ? set.reps : 0) + d) });
+                        const adjWeight = (d: number) => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + d) * 2) / 2) });
+                        const adjRir = (d: number) => updateSet(exercise.id, setIndex, { rir: Math.max(0, Math.min(5, (set.rir ?? exercise.target_rir ?? 0) + d)) });
                         return (
-                          <div className="flex items-start gap-2 mt-2">
-                            <span className="w-9 shrink-0 pt-2 text-[10px] font-medium text-white/50">RIR</span>
-                            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                            <div className="flex items-center justify-between" role="group" aria-label="RIR (reps in reserve)">
-                              {[0, 1, 2, 3, 4, 5].map((r) => {
-                                const isSelected = set.rir === r;
-                                const isTarget = targetRir === r;
-                                const isCap = r === 5; // 5 renders as "5+" (RIR >= 5, far from failure)
-                                // D-123: RIR pills are round + amber-selected to read instantly
-                                // distinct from the Reps row (square + white-selected) — they were
-                                // near-identical twins before, the one spot prone to mis-tap.
-                                const baseCls = 'h-9 w-9 rounded-full border-2 text-sm tabular-nums transition-colors leading-none';
-                                // D-097: prefilled-from-previous selection renders muted, same as reps/weight.
-                                const stateCls = isSelected
-                                  ? (isPrefilled
-                                      ? 'bg-white/[0.08] border-white/20 text-white/40'
-                                      : 'bg-amber-500/25 border-amber-400/60 text-amber-100 font-semibold')
-                                  : isTarget
-                                    ? 'bg-amber-500/15 border-amber-400/40 text-amber-300/80 hover:bg-amber-500/25'
-                                    : 'bg-white/[0.04] border-white/15 text-white/55 hover:bg-white/[0.10] hover:text-white/80';
-                                return (
-                                  <button
-                                    key={r}
-                                    type="button"
-                                    onClick={() => updateSet(exercise.id, setIndex, { rir: r })}
-                                    className={`${baseCls} ${stateCls}`}
-                                    style={{ fontFamily: 'Inter, sans-serif' }}
-                                    aria-pressed={isSelected}
-                                    aria-label={`RIR ${isCap ? '5 or more' : r}${isTarget ? ' (suggested)' : ''}`}
-                                  >
-                                    {isCap ? '5+' : r}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            {targetRir ? (
-                              <span className="text-[9px] font-medium text-amber-400/70 leading-none">suggested {targetRir >= 5 ? '5+' : targetRir}</span>
-                            ) : null}
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="w-9 shrink-0" aria-hidden="true" />
+                            <div className="flex-1 min-w-0 flex items-center justify-between">
+                              {showReps ? (
+                                <div className="flex items-center gap-1.5" role="group" aria-label="Adjust reps">
+                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(-1)} aria-label="Reps minus 1">−1</button>
+                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(1)} aria-label="Reps plus 1">+1</button>
+                                </div>
+                              ) : <span />}
+                              {showWeight ? (
+                                <div className="flex items-center gap-1" role="group" aria-label="Adjust weight">
+                                  {[-5, -2.5, 2.5, 5].map((d) => (
+                                    <button key={d} type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjWeight(d)} aria-label={`${d > 0 ? 'Add' : 'Subtract'} ${Math.abs(d)} pounds`}>{d > 0 ? `+${d}` : d}</button>
+                                  ))}
+                                </div>
+                              ) : <span />}
+                              {showRir ? (
+                                <div className="flex items-center gap-1.5" role="group" aria-label="Adjust RIR">
+                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(-1)} aria-label="RIR minus 1">−1</button>
+                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(1)} aria-label="RIR plus 1">+1</button>
+                                </div>
+                              ) : <span />}
                             </div>
                           </div>
                         );
                       })()}
-                      {/* Weight steppers row (Q-039 step 4) — labeled "Wt" full-width row to match
-                          the Reps/RIR rows (legible stack, not a floating centered block). 2×2
-                          stepper (−5/+5 / −2.5/+2.5) + "↑ Same". The Weight keypad cell above is the
-                          44px primary input; steppers are shortcuts. */}
-                      {(showStepper || (setIndex > 0 && exercise.sets[0])) && (
-                      <div className="flex items-start gap-2 mt-2">
-                        <span className="w-9 shrink-0 pt-2 text-[10px] font-medium text-white/50">{showStepper ? 'Wt' : ''}</span>
-                        <div className="flex-1 min-w-0 flex flex-col gap-1">
-                        {showStepper && (
-                          // Q-043: full-width row −5/−2.5/+2.5/+5; fixed positions across all sets,
-                          // independent of "↑ Same" (which sits on its own trailing line below).
-                          <div className="flex items-center justify-between" role="group" aria-label="Adjust weight">
-                            {[-5, -2.5, 2.5, 5].map((delta) => (
-                              <button
-                                key={delta}
-                                type="button"
-                                onClick={() => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + delta) * 2) / 2) })}
-                                className="h-8 px-2.5 rounded-md border border-white/15 bg-white/[0.04] text-white/70 text-sm hover:bg-white/[0.10] hover:text-white/90 tabular-nums leading-none"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                                aria-label={`${delta > 0 ? 'Add' : 'Subtract'} ${Math.abs(delta)} pounds`}
-                              >
-                                {delta > 0 ? `+${delta}` : delta}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {setIndex > 0 && exercise.sets[0] && (() => {
-                          const set0 = exercise.sets[0];
-                          const isSame =
-                            set.reps === set0.reps &&
-                            set.weight === set0.weight &&
-                            set.rir === set0.rir &&
-                            set.duration_seconds === set0.duration_seconds &&
-                            set.resistance_level === set0.resistance_level;
-                          return (
-                            <div className="flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updates: Partial<LoggedSet> = {
-                                  weight: set0.weight,
-                                  rir: set0.rir,
-                                };
-                                if (typeof set0.reps === 'number') updates.reps = set0.reps;
-                                if (typeof set0.duration_seconds === 'number') updates.duration_seconds = set0.duration_seconds;
-                                if (set0.resistance_level) updates.resistance_level = set0.resistance_level;
-                                if (set0.barType) updates.barType = set0.barType;
-                                updateSet(exercise.id, setIndex, updates);
-                              }}
-                              className={`text-[10px] px-2 py-1 rounded-md border transition-colors ${
-                                isSame
-                                  ? 'border-white/15 text-white/35 cursor-default'
-                                  : 'border-white/25 bg-white/[0.06] text-white/70 hover:bg-white/[0.12] hover:text-white/90'
-                              }`}
-                              title={isSame ? 'Already matches set 1' : 'Copy values from set 1'}
-                              aria-label="Copy values from set 1"
-                              disabled={isSame}
-                              style={{ fontFamily: 'Inter, sans-serif' }}
-                            >
-                              ↑ Same
-                            </button>
-                            </div>
-                          );
-                        })()}
-                        </div>
-                      </div>
-                      )}
                     {(() => {
                       // Duration-based exercises don't need equipment selection (bodyweight)
                       if (isDurationBased) {

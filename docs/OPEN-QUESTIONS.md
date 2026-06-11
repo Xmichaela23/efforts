@@ -726,6 +726,19 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-048 — Compact "keypad-primary" set logger (filed + shipping 2026-06-11, D-125 layout + D-126 prefill)
+
+- **Status:** shipping 2026-06-11 in two commits — **D-125** (layout) then **D-126** (prefill source). Investigated via an A/B render mockup first (336px circles vs 180px compact = 46% shorter); user chose compact.
+- **What/why:** the expanded card had three full control rows (reps circles + RIR pills + weight stepper). Replaced with pre-filled keypad cells (tap = keypad, the primary input) + ONE thin quick-adjust strip (`reps ±1 / wt −5/−2.5/+2.5/+5 / rir ±1`). Common case = confirm a pre-filled value, zero number-taps; reclaims ~156px of height.
+- **Intentional, do NOT "fix":**
+  - **No inline labels on the strip** — cell order above (Reps|Weight|RIR) signals the groups; this was a deliberate call (more text was explicitly rejected).
+  - **"↑ Same" (copy set 1) was removed** — not in the approved mockup; prescription-prefill (D-126) fills every set from the plan, so per-set carry-forward is largely moot. Flagged to the user; re-add on request.
+  - **Fields pre-fill from the PLAN prescription, not last-actual** (D-126) — supersedes the D-097 source. Last-actual now lives only in the `last:` anchor.
+- **Verification:** 380px harness `overflowPx -10`, inter-group gap 18px (real margin, not the mockup's edge-to-edge 0).
+- **Cross-ref:** D-125 (layout), D-126 (prefill), D-097 (superseded prefill source), D-122 (`last:` anchor kept), D-123 (the rep/RIR differentiation now moot — circles gone).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

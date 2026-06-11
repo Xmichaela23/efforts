@@ -3238,6 +3238,23 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-125 — Compact "keypad-primary" set logger: one quick-adjust strip replaces the circle rows (Q-048 step 1, 2026-06-11)
+
+**Context:** The expanded set card had grown three full control rows — the Reps circle picker (D-117/D-119), the RIR pill row (D-123), and the 2×2/full-width weight stepper (D-117/D-043) — each ~36px tall plus a caption. A rendered A/B mockup (kept-vs-compact) showed the circles version at **336px** vs a keypad-primary variant at **180px** (46% shorter). The user chose compact.
+
+**Decision — pre-filled keypad cells as the primary input + ONE thin quick-adjust strip:**
+- **Top cells stay the primary input** — the Reps/Weight/RIR cells already open the numeric keypad on tap (`openKeypadForSet`), with the Q-042 pencil affordance signalling it. The common case ("hit your number") is now *confirm a pre-filled value, zero number-taps*.
+- **Removed:** the Reps circle row, the RIR pill row, and the weight stepper row (incl. the "↑ Same" copy-set-1 button — it wasn't in the approved mockup; prescription-prefill (D-126) makes per-set carry-forward largely moot).
+- **Added: one strip** — `reps −1/+1` (left) · `wt −5/−2.5/+2.5/+5` (center) · `rir −1/+1` (right), for nudging off the prescription when reality differed. **No inline labels** — the cell order above (Reps | Weight | RIR) signals which group is which; `justify-between` distributes the spare width as inter-group breathing room. reps clamps ≥1 (D-117), wt rounds to 0.5 (matches the old stepper), rir clamps 0–5 (D-116); rir nudge bases off `set.rir ?? target_rir ?? 0`.
+- **Captions relocated:** `target N` now sits under the Reps cell, `suggested N` (amber) under the RIR cell — they used to live under the circle rows.
+- Each strip group renders only when its field applies (reps/weight/RIR each gated like the cell above); the whole strip is hidden when none apply (e.g. mobility/duration).
+
+**Sizing:** buttons `h-8 px-1` (height-maximized for a thin strip; width slim to fit 8 buttons). `px-2`→`px-1.5`→`px-1` tuned against the harness: `px-2` overflowed +19px, `px-1.5` fit but groups crammed (2px apart), `px-1` gives an **18px inter-group gap** at 380px (`overflowPx -10`, full p-2 clearance) — real margin, not the mockup's edge-to-edge `overflowPx 0`.
+
+**Files:** `src/components/StrengthLogger.tsx` — captions under Reps cell (~:3414) + RIR cell (~:3569); the quick-adjust strip replacing the three rows (~:3591). `showStepper` (~:3260) is now unused but left in place. **Verification:** app build clean; 380px harness — `overflowPx -10`, inter-group gap 18px; rendered compact card confirmed. **NOTE:** this is the layout half of Q-048; the prefill-source change is D-126 (separate commit).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
