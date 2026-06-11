@@ -418,12 +418,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [currentRIRSet, setCurrentRIRSet] = useState<number>(-1);
   const [selectedRIR, setSelectedRIR] = useState<number | null>(null);
 
-  // Collapse/expand: which set is currently being logged, per exercise.
-  // Default (no explicit entry) = first incomplete set; an explicit entry lets a
-  // completed set be re-opened for editing. UI-only state — deliberately NOT written
-  // to the strength_logger_session_* localStorage key, so D-108/D-109 resume is untouched.
-  const [activeSetByExercise, setActiveSetByExercise] = useState<Record<string, number>>({});
-
   // D-100: short tone at rest-timer expiry. Web Audio oscillator — no asset
   // file needed. Mobile-friendly (works on iOS WKWebView when triggered from a
   // user-initiated event chain; auto-fired here from the setInterval tick which
@@ -3223,78 +3217,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   const showAddWarmupButton = isBaselineTest && setIndex === workingSetIndex && workingSetIndex > 0;
                   const result = baselineTestResults[exercise.id];
 
-                  // Collapse/expand: active set = explicit override (re-opened set) else the
-                  // first incomplete set; -1 (all complete) collapses every row. Scoped per
-                  // exercise so expanding Bench never collapses Row's working set.
-                  const firstIncompleteIdx = exercise.sets.findIndex(s => !s.completed);
-                  const explicitActiveIdx = activeSetByExercise[exercise.id];
-                  const activeSetIndex = explicitActiveIdx !== undefined ? explicitActiveIdx : firstIncompleteIdx;
-                  const isActiveSet = activeSetIndex === setIndex;
-
-                  // Collapsed-row summary line, e.g. "100 lb × 4 · RIR 2" (with equipment variants).
-                  const exTypeSummary = getExerciseType(exercise.name);
-                  const repsTxt = (set.reps !== undefined && set.reps !== 0) ? String(set.reps) : '—';
-                  let collapsedSummary: string;
-                  if (isDurationBased) {
-                    collapsedSummary = formatSeconds(set.duration_seconds || 0);
-                  } else if (isBodyweightMove(exercise.name) || exTypeSummary === 'bodyweight') {
-                    collapsedSummary = `${repsTxt} reps`;
-                  } else if (exTypeSummary === 'band') {
-                    collapsedSummary = `${set.resistance_level || 'Light'} × ${repsTxt}`;
-                  } else {
-                    const wTxt = (set.weight !== undefined && set.weight !== 0) ? `${set.weight} lb` : '—';
-                    collapsedSummary = `${wTxt} × ${repsTxt}`;
-                  }
-                  // Always surface RIR in the summary wherever the inline pills would render
-                  // (i.e. not mobility / duration / plyometric), using — when not yet logged.
-                  const isMobilitySummary = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase() === 'mobility';
-                  if (!isDurationBased && !isPlyometric(exercise.name) && !isMobilitySummary) {
-                    collapsedSummary += ` · RIR ${set.rir ?? '—'}`;
-                  }
                   // Weight steppers apply to loaded barbell/dumbbell/goblet lifts only
-                  // (not band/bodyweight/duration). Rendered as their own row below the top
-                  // row, no longer nested inside the Weight column.
+                  // (not band/bodyweight/duration).
+                  const exType = getExerciseType(exercise.name);
                   const showStepper = !isDurationBased && !isBodyweightMove(exercise.name)
-                    && ['barbell', 'dumbbell', 'goblet'].includes(exTypeSummary);
+                    && ['barbell', 'dumbbell', 'goblet'].includes(exType);
 
+                  // No collapse/expand — every set renders fully expanded, always.
                   return (
-                    <div key={setIndex} className={`bg-white/[0.03] backdrop-blur-lg border-2 border-white/15 rounded-xl p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] ${isActiveSet && showRestTimer ? "mb-4" : "mb-1"}`}>
-                      {!isActiveSet ? (
-                        // COLLAPSED set — compact summary line, Done/✕ inside the card.
-                        // min-w-0 + truncate on the summary is what keeps the action
-                        // buttons from ever being pushed past the card's right border.
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setActiveSetByExercise(prev => ({ ...prev, [exercise.id]: setIndex }))}
-                            className="flex-1 min-w-0 flex items-center gap-2 text-left py-1.5"
-                            aria-label={`Edit set ${setIndex + 1}`}
-                          >
-                            <span className="w-6 shrink-0 text-right text-xs text-white/60">{setIndex + 1}</span>
-                            <span className={`min-w-0 truncate text-sm ${set.completed ? 'text-white/90' : 'text-white/40'}`}>
-                              {collapsedSummary}
-                            </span>
-                            {set.completed
-                              ? <span className={`shrink-0 text-xs ${themeColors.text}`}>✓</span>
-                              : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-white/40" />}
-                          </button>
-                          <button
-                            onClick={() => handleSetComplete(exercise.id, setIndex)}
-                            className={`shrink-0 text-xs px-3 py-1 rounded-full h-8 transition-all duration-300 ${set.completed ? `${themeColors.doneBg} border-2 ${themeColors.doneBorder} ${themeColors.doneText}` : 'bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12]'}`}
-                            style={{ fontFamily: 'Inter, sans-serif' }}
-                          >
-                            {set.completed ? '✓' : 'Done'}
-                          </button>
-                          <button
-                            onClick={() => deleteSet(exercise.id, setIndex)}
-                            className="shrink-0 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/60 hover:text-red-400 hover:bg-white/[0.12] hover:border-red-400/60 transition-all duration-300 h-8 w-8 flex items-center justify-center"
-                            aria-label="Delete set"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ) : (
-                      <>
+                    <div key={setIndex} className={`bg-white/[0.03] backdrop-blur-lg border-2 border-white/15 rounded-xl p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] ${showRestTimer ? "mb-4" : "mb-1"}`}>
                       {/* Baseline test set type label and hint */}
                       {isBaselineTest && (
                         <div className="mb-1 ml-8">
@@ -3585,13 +3516,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         if (loggerMode === 'mobility' || isDurationBased || isPlyometric(exercise.name)) return null;
                         const targetRir = exercise.target_rir;
                         const isPrefilled = set.from_previous && !set.completed;
+                        // Full-width RIR pill row, left-aligned (own row, Hevy/RPE style).
+                        // The RIR cell directly above + the amber target pill carry the label.
                         return (
-                          <div className="flex flex-col items-center gap-0.5">
-                            <div className="flex items-center justify-center gap-0.5" role="group" aria-label="RIR (reps in reserve)">
+                          <div className="flex flex-col items-start gap-0.5 mt-2">
+                            <div className="flex items-center gap-2" role="group" aria-label="RIR (reps in reserve)">
                               {[1, 2, 3, 4, 5].map((r) => {
                                 const isSelected = set.rir === r;
                                 const isTarget = targetRir === r;
-                                const baseCls = 'h-9 w-7 rounded-md border-2 text-xs tabular-nums transition-colors leading-none';
+                                const baseCls = 'h-9 w-9 rounded-md border-2 text-sm tabular-nums transition-colors leading-none';
                                 // D-097: prefilled-from-previous selection renders muted, same as reps/weight.
                                 const stateCls = isSelected
                                   ? (isPrefilled
@@ -3625,7 +3558,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           spacers, not centered), with "↑ Same" (D-096 carry-forward) on the same
                           line to their right. One compact row; kills the orphaned Same row. */}
                       {(showStepper || (setIndex > 0 && exercise.sets[0])) && (
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-start gap-2">
+                        {/* spacers: set# + reps columns → steppers align under the Weight cell */}
+                        <div className="w-6 shrink-0"></div>
+                        <div className="w-16 shrink-0"></div>
+                        <div className="flex flex-wrap items-center gap-2">
                         {showStepper && (
                           <div className="flex gap-1" role="group" aria-label="Adjust weight">
                             {[-5, -2.5, 2.5, 5].map((delta) => (
@@ -3678,6 +3615,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             </button>
                           );
                         })()}
+                        </div>
                       </div>
                       )}
                     {(() => {
@@ -3882,16 +3820,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       )}
                       <div className="ml-auto flex items-center gap-2">
                         <button
-                          onClick={() => {
-                            handleSetComplete(exercise.id, setIndex);
-                            // Auto-advance: drop the explicit override so the active set
-                            // falls back to the next incomplete set (which auto-expands).
-                            setActiveSetByExercise(prev => {
-                              const next = { ...prev };
-                              delete next[exercise.id];
-                              return next;
-                            });
-                          }}
+                          onClick={() => handleSetComplete(exercise.id, setIndex)}
                           className={`text-xs px-3 py-1 rounded-full h-9 transition-all duration-300 ${set.completed ? `${themeColors.doneBg} border-2 ${themeColors.doneBorder} ${themeColors.doneText}` : 'bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'}`}
                           style={{ fontFamily: 'Inter, sans-serif' }}
                         >
@@ -3907,8 +3836,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </div>
                     </div>
                       </div>
-                      </>
-                      )}
                   </div>
                   );
                 })}
