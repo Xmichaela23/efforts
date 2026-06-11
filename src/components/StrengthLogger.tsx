@@ -3494,15 +3494,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           const hasValue = set.rir !== undefined && set.rir !== null;
                           return (
                             <div className="flex flex-col items-center gap-0.5">
-                              <div
-                                className="h-9 w-16 flex items-center justify-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl tabular-nums shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openKeypadForSet({
+                                    exerciseId: exercise.id,
+                                    setIndex,
+                                    field: 'rir',
+                                    title: 'RIR (reps in reserve)',
+                                    initialValue: (set.rir === undefined || set.rir === null) ? '' : String(set.rir),
+                                    allowDecimal: false,
+                                  })
+                                }
+                                className="h-9 w-16 flex items-center justify-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl tabular-nums shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12]"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                                aria-label="RIR value"
+                                aria-label="RIR"
                               >
                                 {hasValue
                                   ? <span className={set.from_previous && !set.completed ? 'text-white/35' : 'text-white'}>{set.rir}</span>
                                   : <span className="text-white/30">{targetRir ?? '—'}</span>}
-                              </div>
+                              </button>
                               <span className="text-[9px] text-white/50 font-medium">RIR</span>
                             </div>
                           );
