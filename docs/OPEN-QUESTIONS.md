@@ -649,6 +649,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-042 — Keypad-cell tap affordance: pencil glyph (filed + shipped 2026-06-11)
+
+- **Status:** shipped 2026-06-11 (same session it was filed).
+- **What/why:** the three keypad cells (Reps / Weight / RIR) are the 44px primary input (the circles/pills/steppers are shortcuts), but nothing signaled they're tappable-to-type → discoverability gap.
+- **Decision — affordance over instruction:** a subtle `Pencil` glyph (lucide-react — the codebase's icon set; `ti-pencil`/Tabler isn't a dep, don't add one) in the top-right corner of each of the three cells. **No text note** — a persistent "tap to enter manually" sentence is permanent clutter to teach a one-time thing. Considered a first-run hint and rejected: a glyph carries the meaning continuously and is consistent with Q-039's design-not-text approach.
+- **Implementation:** `h-2.5 w-2.5` (10px) `text-white/25` `pointer-events-none absolute top-0.5 right-0.5` inside each cell button (button made `relative`). Covers Reps, RIR, and all three Weight type-branches (dumbbell/goblet/barbell); the band-resistance cell is a Select (already reads tappable) so no glyph there. Subtle by design; if it ever crowds at 380px, shrink or nudge into the corner rather than drop.
+- **Cross-ref:** Q-039 (the logger refactor this completes the discoverability of).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

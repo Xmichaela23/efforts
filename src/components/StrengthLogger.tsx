@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, CheckCircle } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, CheckCircle, Pencil } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
@@ -3366,13 +3366,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   allowDecimal: false,
                                 })
                               }
-                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
+                              className="relative h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             >
                               {/* D-097: muted text when value came from previous-session autofill */}
                               <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
                                 {set.reps === 0 ? '' : (set.reps ?? '—')}
                               </span>
+                              {/* Q-042: subtle tap-to-type affordance */}
+                              <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
                             </button>
                             <span className="text-[9px] text-white/50 font-medium">Reps</span>
                           </div>
@@ -3428,12 +3430,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     allowDecimal: true,
                                   })
                                 }
-                                className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16 tabular-nums"
+                                className="relative h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16 tabular-nums"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                               >
                                 <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
                                   {set.weight === 0 ? '' : (set.weight ?? '—')}
                                 </span>
+                                {/* Q-042: subtle tap-to-type affordance */}
+                                <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
                               </button>
                               <span className="text-[9px] text-white/50 font-medium">lb/hand</span>                            </div>
                           );
@@ -3455,12 +3459,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     allowDecimal: true,
                                   })
                                 }
-                                className="h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16 tabular-nums"
+                                className="relative h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-16 tabular-nums"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                               >
                                 <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
                                   {set.weight === 0 ? '' : (set.weight ?? '—')}
                                 </span>
+                                {/* Q-042: subtle tap-to-type affordance */}
+                                <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
                               </button>
                               <span className="text-[9px] text-white/50 font-medium">Weight</span>                            </div>
                           );
@@ -3481,12 +3487,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   allowDecimal: true,
                                 })
                               }
-                              className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
+                              className="relative h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-16 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             >
                               <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
                                 {set.weight === 0 ? '' : (set.weight ?? '—')}
                               </span>
+                              {/* Q-042: subtle tap-to-type affordance */}
+                              <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
                             </button>
                             <span className="text-[9px] text-white/50 font-medium">Weight</span>                          </div>
                         );
@@ -3513,13 +3521,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     allowDecimal: false,
                                   })
                                 }
-                                className="h-9 w-16 flex items-center justify-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl tabular-nums shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12]"
+                                className="relative h-9 w-16 flex items-center justify-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl tabular-nums shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12]"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                                 aria-label="RIR"
                               >
                                 {hasValue
                                   ? <span className={set.from_previous && !set.completed ? 'text-white/35' : 'text-white'}>{set.rir >= 5 ? '5+' : set.rir}</span>
                                   : <span className="text-white/30">{targetRir != null ? (targetRir >= 5 ? '5+' : targetRir) : '—'}</span>}
+                                {/* Q-042: subtle tap-to-type affordance */}
+                                <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
                               </button>
                               <span className="text-[9px] text-white/50 font-medium">RIR</span>
                             </div>
