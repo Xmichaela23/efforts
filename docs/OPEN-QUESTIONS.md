@@ -733,9 +733,10 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 - **Intentional, do NOT "fix":**
   - **No inline labels on the strip** — cell order above (Reps|Weight|RIR) signals the groups; this was a deliberate call (more text was explicitly rejected).
   - **"↑ Same" (copy set 1) was removed** — not in the approved mockup; prescription-prefill (D-126) fills every set from the plan, so per-set carry-forward is largely moot. Flagged to the user; re-add on request.
-  - **Fields pre-fill from the PLAN prescription, not last-actual** (D-126) — supersedes the D-097 source. Last-actual now lives only in the `last:` anchor.
-- **Verification:** 380px harness `overflowPx -10`, inter-group gap 18px (real margin, not the mockup's edge-to-edge 0).
-- **Cross-ref:** D-125 (layout), D-126 (prefill), D-097 (superseded prefill source), D-122 (`last:` anchor kept), D-123 (the rep/RIR differentiation now moot — circles gone).
+  - **Fields pre-fill from the PLAN prescription when a plan exists** (D-126); **unplanned sessions fall back to last-actual** (D-127, never empty when we have history). Planned ≠ overlaid with last-actual (deload stays correct).
+  - **RIR ±1 strip buttons are amber** (D-128) to tell them apart from the identical-looking reps ±1 pair; reps/weight neutral. (Supersedes the earlier "no inline labels, leave them identical" note — color, not labels, since color costs no width.)
+- **Verification:** 380px harness `overflowPx -10`, inter-group gap 18px (real margin, not the mockup's edge-to-edge 0); color tint is geometry-neutral.
+- **Cross-ref:** D-125 (layout), D-126 (prefill from plan), D-127 (unplanned last-actual fallback), D-128 (RIR amber), D-097 (superseded prefill source), D-122 (`last:` anchor kept), D-123 (RIR=amber precedent).
 
 ---
 

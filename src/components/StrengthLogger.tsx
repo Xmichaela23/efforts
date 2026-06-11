@@ -1335,12 +1335,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     })();
   }, [scheduledWorkout, targetDate]);
 
-  // D-097 (prefill) → D-126 (anchor-only): this effect fetches the athlete's last
-  // 10 strength sessions and builds the per-set prior-session map. It NO LONGER
-  // prefills the set fields from last-actual (D-126 superseded that — fields now
-  // reflect the plan prescription, history lives only in the "last:" anchor). The
-  // fetch remains because the D-122 "last:" anchor reads `previousSessionByName`,
-  // which this effect populates.
+  // D-097 → D-126 → D-127: this effect fetches the athlete's last 10 strength
+  // sessions and builds the per-set prior-session map. It (a) populates
+  // `previousSessionByName` for the D-122 "last:" anchor (always), and (b) prefills
+  // last-actual ONLY into untouched (= unplanned/fresh) sets — planned sets carry
+  // the prescription and are skipped (D-126 "plan in the box"; D-127 unplanned
+  // fallback so the box is never empty when we have history).
   const didAutofillRef = useRef(false);
   useEffect(() => {
     if (didAutofillRef.current) return;
@@ -1392,18 +1392,46 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           if (Object.keys(previousByName).length >= currentNames.size) break;
         }
         if (Object.keys(previousByName).length === 0) return;
-        // D-126 (supersedes the D-097 field prefill): this fetch now ONLY feeds the
-        // persistent "last:" anchor (D-122) — it no longer writes last-actual values
-        // into the set fields. The fields reflect the PLAN PRESCRIPTION (planned
-        // sessions prefill weight/reps from `computed.steps` via parseFromComputed;
-        // RIR shows the target as a ghost); unplanned sessions start empty. Rationale:
-        // plan in the box, history in the anchor — cleaner on deload weeks, where the
-        // prescription is intentionally lighter than last-actual and overlaying
-        // last-actual onto the box contradicted the "last:" line. The `from_previous`
-        // dimming path is now dormant (nothing sets it) but left in place.
+        // This fetch feeds the D-122 "last:" anchor (always) AND the unplanned-only
+        // last-actual fallback below.
         setPreviousSessionByName(previousByName);
+        // D-127 (refines D-126): "plan in the box whenever a plan exists; otherwise
+        // last-actual — never empty when we have a number to show." Fill ONLY
+        // "untouched" sets: weight 0 AND no reps/duration AND rir === undefined AND
+        // not completed. Planned sets carry plan values (incl. `rir: null` from
+        // parseFromComputed, which is NOT undefined) so they're never untouched →
+        // they keep the prescription (D-126). Unplanned/fresh sets are untouched →
+        // they get last-actual (dimmed via `from_previous`) instead of empty. The
+        // deload contradiction stays fixed: a deload session is planned, so its box
+        // shows the (lighter) prescription, never last-actual.
+        setExercises((prev) => prev.map((ex) => {
+          const priorSets = previousByName[normalizeExerciseName(ex.name)];
+          if (!priorSets) return ex;
+          const newSets = ex.sets.map((set, i) => {
+            const untouched =
+              !set.completed &&
+              (!set.weight || set.weight === 0) &&
+              !set.reps &&
+              !set.duration_seconds &&
+              set.rir === undefined &&
+              !set.resistance_level;
+            if (!untouched) return set;
+            const prior = priorSets[i] ?? priorSets[priorSets.length - 1];
+            if (!prior) return set;
+            return {
+              ...set,
+              weight: prior.weight ?? set.weight,
+              ...(typeof prior.reps === 'number' ? { reps: prior.reps } : {}),
+              ...(typeof prior.duration_seconds === 'number' ? { duration_seconds: prior.duration_seconds } : {}),
+              ...(typeof prior.rir === 'number' ? { rir: prior.rir } : {}),
+              ...(prior.resistance_level ? { resistance_level: prior.resistance_level } : {}),
+              from_previous: true,
+            } as LoggedSet;
+          });
+          return { ...ex, sets: newSets };
+        }));
       } catch (e) {
-        console.warn('[strength-logger] previous-session fetch (for "last:" anchor) failed:', e);
+        console.warn('[strength-logger] previous-session fetch/fallback failed:', e);
       }
     })();
   }, [isInitialized, exercises.length, scheduledWorkout, targetDate]);
@@ -3586,6 +3614,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const showRir = loggerMode !== 'mobility' && !isDurationBased && !isPlyometric(exercise.name);
                         if (!showReps && !showWeight && !showRir) return null;
                         const nudgeCls = 'h-8 px-1 rounded-md border border-white/15 bg-white/[0.04] text-white/70 text-[11px] hover:bg-white/[0.10] hover:text-white/90 active:bg-white/[0.16] tabular-nums leading-none transition-colors';
+                        // D-128: RIR nudges carry the app's "RIR = amber" tint so the rir ±1 pair
+                        // reads instantly distinct from the (identical-looking) reps ±1 pair — same
+                        // disambiguation as D-123, zero added width (keeps the 380px margin).
+                        const nudgeClsRir = 'h-8 px-1 rounded-md border border-amber-400/30 bg-amber-500/[0.06] text-amber-300/75 text-[11px] hover:bg-amber-500/15 hover:text-amber-200 active:bg-amber-500/25 tabular-nums leading-none transition-colors';
                         const adjReps = (d: number) => updateSet(exercise.id, setIndex, { reps: Math.max(1, (typeof set.reps === 'number' ? set.reps : 0) + d) });
                         const adjWeight = (d: number) => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + d) * 2) / 2) });
                         const adjRir = (d: number) => updateSet(exercise.id, setIndex, { rir: Math.max(0, Math.min(5, (set.rir ?? exercise.target_rir ?? 0) + d)) });
@@ -3608,8 +3640,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               ) : <span />}
                               {showRir ? (
                                 <div className="flex items-center gap-1.5" role="group" aria-label="Adjust RIR">
-                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(-1)} aria-label="RIR minus 1">−1</button>
-                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(1)} aria-label="RIR plus 1">+1</button>
+                                  <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(-1)} aria-label="RIR minus 1">−1</button>
+                                  <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(1)} aria-label="RIR plus 1">+1</button>
                                 </div>
                               ) : <span />}
                             </div>

@@ -3275,6 +3275,28 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-127 — Unplanned-only last-actual fallback (refines D-126; never empty when we have history, 2026-06-11)
+
+**Context:** D-126 removed the last-actual field prefill entirely, which left **unplanned** sessions (no plan) with empty boxes. The user's call: empty is worse than history when we have history. Rule = *"plan in the box whenever a plan exists; otherwise last-actual."*
+
+**Decision — restore the last-actual prefill, but only for untouched (= unplanned/fresh) sets.** Re-added the `setExercises(... from_previous ...)` block that D-126 removed, unchanged. It naturally partitions: planned sets carry plan values (incl. `rir: null` from `parseFromComputed`, which is *not* `undefined`), so they fail the `untouched` test (`weight 0 && !reps && !duration && rir === undefined && !completed && !resistance`) and keep the prescription (D-126 intact). Unplanned/fresh sets are untouched → they get last-actual, dimmed via `from_previous`.
+- **Deload contradiction stays fixed:** a deload session is *planned*, so its sets are never untouched → the box shows the (lighter) prescription, never last-actual. D-126's win is preserved; D-127 only changes the no-plan case.
+- The `from_previous` dimming path (called dormant in D-126) is **live again** for unplanned sessions.
+
+**Files:** `src/components/StrengthLogger.tsx` — re-added the autofill block after `setPreviousSessionByName` (~:1396); header comment updated (~:1338). **Verification:** app build clean. Logic-only (no layout change).
+
+---
+
+## D-128 — RIR ±1 nudges tinted amber to distinguish from the reps ±1 twins (2026-06-11)
+
+**Context:** The compact strip's two `±1` pairs (reps, left; RIR, right) were visual twins — the same "identical number controls, only position/label disambiguates" problem D-123 fixed for the old circles. The weight group (4 distinct-value buttons) was never ambiguous.
+
+**Decision — tint the RIR `±1` buttons amber** (`border-amber-400/30 bg-amber-500/[0.06] text-amber-300/75`), leave the reps `±1` neutral. Same disambiguation strategy as D-123 (RIR = amber), and it ties to the amber `suggested N` caption + the RIR cell above. Chosen over adding inline `R`/`RIR` markers because **color costs zero width** — the markers would have eaten the 18px inter-group margin (D-125) and risked re-crowding at 380px. Subtle, instant, language-independent.
+
+**Files:** `src/components/StrengthLogger.tsx` — `nudgeClsRir` variant + applied to the RIR group (~:3600). **Verification:** app build clean; 380px harness unchanged (`overflowPx -10`, inter-group gap 18px — color-only); rendered card confirms the amber pair reads instantly distinct.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
