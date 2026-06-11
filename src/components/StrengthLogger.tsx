@@ -365,6 +365,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [currentExercise, setCurrentExercise] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [expandedPlates, setExpandedPlates] = useState<{[key: string]: boolean}>({});
+  // RIR picker disclosure (Plates-style) keyed by `${exerciseId}-${setIndex}`.
+  const [expandedRir, setExpandedRir] = useState<{[key: string]: boolean}>({});
   const [expandedExercises, setExpandedExercises] = useState<{[key: string]: boolean}>({});
   const [workoutStartTime] = useState<Date>(new Date());
   const [isInitialized, setIsInitialized] = useState(false);
@@ -3596,54 +3598,80 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </div>
                         );
                       })()}
+                        {/* RIR cell — sits in the Reps/Weight row, same rounded-input styling.
+                            Shows the logged set.rir; when unset, shows the prescribed target as
+                            dimmed ghost text. Tapping toggles the 1-5 picker disclosed below. */}
+                        {(() => {
+                          const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+                          if (loggerMode === 'mobility' || isDurationBased || isPlyometric(exercise.name)) return null;
+                          const targetRir = exercise.target_rir;
+                          const rirKey = `${exercise.id}-${setIndex}`;
+                          const isOpen = !!expandedRir[rirKey];
+                          const hasValue = set.rir !== undefined && set.rir !== null;
+                          return (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedRir(prev => ({ ...prev, [rirKey]: !prev[rirKey] }))}
+                                className={`h-9 w-16 text-center text-sm border-2 backdrop-blur-md rounded-xl tabular-nums transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] ${isOpen ? 'border-white/40 bg-white/[0.12] text-white' : 'border-white/25 bg-white/[0.08] text-white'}`}
+                                style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
+                                aria-expanded={isOpen}
+                                aria-label="RIR"
+                              >
+                                {hasValue
+                                  ? <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>{set.rir}</span>
+                                  : <span className="text-white/30">{targetRir ?? '—'}</span>}
+                              </button>
+                              <span className="text-[9px] text-white/50 font-medium">RIR</span>
+                              {targetRir ? (
+                                <span className="text-[9px] font-medium text-amber-400/70 leading-none">target {targetRir}</span>
+                              ) : null}
+                            </div>
+                          );
+                        })()}
                         </div>
-                      {/* RIR input — D-099: replaced drawer-keypad with 5-pill inline slider.
-                          One tap commits 1-5. Target RIR (when prescribed) is amber-tinted
-                          so the athlete sees both the prescription and their pick at a
-                          glance. Hidden for mobility / duration-based / plyometric. */}
+                      {/* RIR picker — 1-5 pill row disclosed below the reps/weight row when the
+                          RIR cell is tapped (same disclosure pattern as Plates). Pills unchanged:
+                          same binding, target pill amber. Selecting a pill writes set.rir, updates
+                          the cell, and collapses the picker. Hidden for mobility/duration/plyometric. */}
                       {(() => {
                         const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
-                        const isMobilityMode = loggerMode === 'mobility';
-                        if (isMobilityMode || isDurationBased || isPlyometric(exercise.name)) return null;
+                        if (loggerMode === 'mobility' || isDurationBased || isPlyometric(exercise.name)) return null;
+                        const rirKey = `${exercise.id}-${setIndex}`;
+                        if (!expandedRir[rirKey]) return null;
                         const targetRir = exercise.target_rir;
                         const isPrefilled = set.from_previous && !set.completed;
                         return (
-                          <div className="flex flex-col items-center gap-0.5">
-                            <span className="text-[9px] font-medium text-white/50">RIR</span>
-                            <div className="flex gap-0.5" role="group" aria-label="RIR (reps in reserve)">
-                              {[1, 2, 3, 4, 5].map((r) => {
-                                const isSelected = set.rir === r;
-                                const isTarget = targetRir === r;
-                                const baseCls = 'h-9 w-7 rounded-md border-2 text-xs tabular-nums transition-colors leading-none';
-                                // D-097: when the selected value came from previous-session
-                                // autofill, render the selected pill in the muted (text-white/35
-                                // equivalent) variant so the athlete sees the same "suggested,
-                                // not yet committed" signal as on reps/weight buttons.
-                                const stateCls = isSelected
-                                  ? (isPrefilled
-                                      ? 'bg-white/[0.08] border-white/20 text-white/40'
-                                      : 'bg-white/[0.20] border-white/45 text-white font-semibold')
-                                  : isTarget
-                                    ? 'bg-amber-500/15 border-amber-400/40 text-amber-300/80 hover:bg-amber-500/25'
-                                    : 'bg-white/[0.04] border-white/15 text-white/55 hover:bg-white/[0.10] hover:text-white/80';
-                                return (
-                                  <button
-                                    key={r}
-                                    type="button"
-                                    onClick={() => updateSet(exercise.id, setIndex, { rir: r })}
-                                    className={`${baseCls} ${stateCls}`}
-                                    style={{ fontFamily: 'Inter, sans-serif' }}
-                                    aria-pressed={isSelected}
-                                    aria-label={`RIR ${r}${isTarget ? ' (target)' : ''}`}
-                                  >
-                                    {r}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            {targetRir ? (
-                              <span className="text-[9px] font-medium text-amber-400/70">target {targetRir}</span>
-                            ) : null}
+                          <div className="flex items-center justify-center gap-0.5 pt-0.5" role="group" aria-label="RIR (reps in reserve)">
+                            {[1, 2, 3, 4, 5].map((r) => {
+                              const isSelected = set.rir === r;
+                              const isTarget = targetRir === r;
+                              const baseCls = 'h-9 w-7 rounded-md border-2 text-xs tabular-nums transition-colors leading-none';
+                              // D-097: prefilled-from-previous selection renders muted, same as reps/weight.
+                              const stateCls = isSelected
+                                ? (isPrefilled
+                                    ? 'bg-white/[0.08] border-white/20 text-white/40'
+                                    : 'bg-white/[0.20] border-white/45 text-white font-semibold')
+                                : isTarget
+                                  ? 'bg-amber-500/15 border-amber-400/40 text-amber-300/80 hover:bg-amber-500/25'
+                                  : 'bg-white/[0.04] border-white/15 text-white/55 hover:bg-white/[0.10] hover:text-white/80';
+                              return (
+                                <button
+                                  key={r}
+                                  type="button"
+                                  onClick={() => {
+                                    updateSet(exercise.id, setIndex, { rir: r });
+                                    setExpandedRir(prev => ({ ...prev, [rirKey]: false }));
+                                  }}
+                                  className={`${baseCls} ${stateCls}`}
+                                  style={{ fontFamily: 'Inter, sans-serif' }}
+                                  aria-pressed={isSelected}
+                                  aria-label={`RIR ${r}${isTarget ? ' (target)' : ''}`}
+                                >
+                                  {r}
+                                </button>
+                              );
+                            })}
                           </div>
                         );
                       })()}
