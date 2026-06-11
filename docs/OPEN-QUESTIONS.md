@@ -659,6 +659,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-043 — Control-row horizontal balance: spread full-width (filed + shipped 2026-06-11)
+
+- **Status:** shipped 2026-06-11 (control rows). One related observation flagged below (top row), not acted on.
+- **What/why:** the three control rows (Reps/RIR circle pickers, Wt stepper) were left-packed after their row label, leaving dead space on the right → looked lopsided vs the top input cells.
+- **Fix:** each control row's inner group is now `flex-1` and spreads across the full content width — `justify-between` on the Reps/RIR circle rows (circles distribute edge-to-edge) and on the Wt row (2×2 stepper at the left edge, "↑ Same" at the right). Row labels (Reps/Wt/RIR) kept. `src/components/StrengthLogger.tsx`. Verified 380px harness — no overflow (circles are fixed-width; `justify-between` only distributes the slack).
+- **Flagged, NOT done (top row):** the request was scoped to the control rows, but the top sub-row (set# + Reps/Weight/RIR cells) is **also left-packed** — the RIR cell's right edge is at 240px of the ~308px content box (68px dead on the right), i.e. it only *looks* full-width. So the control rows now reach ~308 while the top cells stop at ~240 — bottom slightly wider than top. For true top↔bottom balance, the fix is to make the three top cell wrappers `flex-1` (distribute them across the width too). Left as a follow-up since it touches the established top row; surface it if the bottom reads wider than the top on device.
+- **Cross-ref:** Q-039 (the layout), Q-042 (the cells' tap affordance).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
