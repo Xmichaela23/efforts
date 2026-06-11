@@ -3275,7 +3275,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         {/* Set# in a proper w-9 leader slot — aligns as the left column above the
                             Reps/Wt/RIR row labels below, rather than floating far-left (Q-043). */}
                         <div className="w-9 shrink-0 text-xs text-white/60 pt-2">{setIndex + 1}</div>
-                        
+                        {/* Q-043: 3 cells in a flex-1 group with gap-4 so the boxes breathe at the
+                            same rate as the circle rows below; set#→group stays gap-2 so box1 still
+                            aligns with circle1. */}
+                        <div className="flex-1 flex items-start gap-4">
                         {/* Duration-based exercises show timer input, rep-based show reps input */}
                         {isDurationBased ? (
                           // DURATION-BASED EXERCISE - Simple timer display matching reps input style
@@ -3537,6 +3540,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             </div>
                           );
                         })()}
+                        </div>
                         </div>
                       {/* Rep-circle picker (Q-039 steps 3–4) — labeled full-width row. A 3-char
                           row-leader ("Reps") makes the stacked control rows legible; strict column
