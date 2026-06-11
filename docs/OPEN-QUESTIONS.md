@@ -619,6 +619,23 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-040 — Two divergent e1RM paths; the consumed one (compute-facts/Brzycki) was never RIR-capped + formula choice (filed 2026-06-11)
+
+- **Status:** open / needs a decision. Surfaced by the Q-039 step-2 render-path verification (which is exactly what that check was for). **The Q-039 step-2 exclusion landed on a dead path** — see below.
+- **Two e1RM computations exist, with different formulas and different reach:**
+  1. `compute-adaptation-metrics/estimate1Rm` — **Epley × (1 + rir/10)**. Writes `workout_adaptation`. **`from('workout_adaptation')` has 0 readers in the codebase** — dead output. This is the one D-116 changed to exclude RIR ≥5. Net effect on UI/plans: **none**.
+  2. `compute-facts/brzycki1RM` — **Brzycki on `effectiveReps = reps + RIR`**. Writes `exercise_log.estimated_1rm` (→ `useExerciseLog` → StrengthSummaryView + BlockSummaryTab) **and** aggregates into `learned_fitness.strength_1rms` (→ coach / materialize-plan / recompute-athlete-memory → **plan load prescription**). This is the live, user-visible, plan-driving path. It is **NOT** RIR-capped — a RIR-5 set yields Brzycki(reps+5), a real number, not an exclusion.
+- **Consequence:** Q-039 step 2 ("RIR 5 excluded from e1RM, renders as dash") is **not** achieved for anything a user or the engine actually sees. To honor it, the exclusion must move to `compute-facts/brzycki1RM`'s caller (`compute-facts/index.ts:~1313`, where `est1rm = brzycki1RM(bestWeight, bestReps, avgRir ?? 0)`), gated on `avgRir >= 5`. **Stakes:** that feeds `learned_fitness.strength_1rms`, which prescribes plan loads — excluding RIR-5 sets there changes load math, so it needs deliberate sign-off, not a silent flip.
+- **Formula choice (the original ask — log, don't change):** the standard reps-to-failure approach is to run the 1RM formula on `reps + RIR`. `compute-facts` already does this (Brzycki on reps+RIR — good). The dead `compute-adaptation-metrics` does NOT (Epley × a linear rir factor — non-standard). **Sample, 100 lb × 4 reps @ RIR 2:**
+  - Epley × (1 + rir/10) *(compute-adaptation-metrics, dead)*: `100 × (1+4/30) × 1.2 = 136 lb`
+  - Brzycki on reps+RIR *(compute-facts, live)*: effReps 6 → `100 × 36/(37−6) = 116 → 115 lb` (rounds to 5)
+  - Epley on reps+RIR *(the "standard" alternative)*: `100 × (1 + 6/30) = 120 lb`
+  Three different numbers for the same set. The live path (115) is already the most defensible; the dead path (136) over-estimates. Decision owed: keep Brzycki-on-reps+RIR as canonical and delete/retire the dead Epley path, or unify deliberately.
+- **Open decisions:** (a) apply the RIR ≥5 exclusion in `compute-facts` (the live path) — yes/no, given plan-load stakes; (b) keep, retire, or wire up the dead `compute-adaptation-metrics` e1RM (D-116's change is harmless but pointless as-is); (c) backfill target becomes `exercise_log` + `learned_fitness.strength_1rms` (re-run `compute-facts`) **only after (a)** — backfilling `workout_adaptation` is moot.
+- **Cross-ref:** D-116 (the dead-path step-2 change), Q-039 (the refactor this surfaced under).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
