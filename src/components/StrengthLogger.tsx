@@ -3647,10 +3647,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       {(showStepper || (setIndex > 0 && exercise.sets[0])) && (
                       <div className="flex items-start gap-2 mt-2">
                         <span className="w-9 shrink-0 pt-2 text-[10px] font-medium text-white/50">{showStepper ? 'Wt' : ''}</span>
-                        <div className="flex-1 flex items-center gap-2">
+                        <div className="flex-1 min-w-0 flex flex-col gap-1">
                         {showStepper && (
-                          // Q-043: one horizontal row −5/−2.5/+2.5/+5, spread full-width (small in middle, big on ends)
-                          <div className="flex-1 flex items-center justify-between" role="group" aria-label="Adjust weight">
+                          // Q-043: full-width row −5/−2.5/+2.5/+5; fixed positions across all sets,
+                          // independent of "↑ Same" (which sits on its own trailing line below).
+                          <div className="flex items-center justify-between" role="group" aria-label="Adjust weight">
                             {[-5, -2.5, 2.5, 5].map((delta) => (
                               <button
                                 key={delta}
@@ -3674,6 +3675,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             set.duration_seconds === set0.duration_seconds &&
                             set.resistance_level === set0.resistance_level;
                           return (
+                            <div className="flex justify-end">
                             <button
                               type="button"
                               onClick={() => {
@@ -3699,6 +3701,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             >
                               ↑ Same
                             </button>
+                            </div>
                           );
                         })()}
                         </div>
