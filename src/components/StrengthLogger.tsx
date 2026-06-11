@@ -744,7 +744,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return `${year}-${month}-${day}`;
   };
   
-  const sessionKey = `strength_logger_session_${performedDate || targetDate || getStrengthLoggerDateString()}`;
+  // D-132 Layer 2 — IDENTITY-AWARE KEY. The draft slot is scoped by BOTH the performed
+  // date AND the workout identity (planned id, or 'adhoc'), so two workouts opened on the
+  // same viewing day (e.g. Upper + Lower) no longer share one slot. WRITE/CLEAR use the
+  // live `sourcePlannedId`; the RESTORE read uses the OPENED workout's id (known at mount).
+  const sessionDateStr = () => performedDate || targetDate || getStrengthLoggerDateString();
+  const computeSessionKey = (id: string | null | undefined) =>
+    `strength_logger_session_${sessionDateStr()}_${id || 'adhoc'}`;
+  // Pre-D-132 drafts were keyed by date alone; read as a fallback (still identity-guarded).
+  const legacySessionKey = () => `strength_logger_session_${sessionDateStr()}`;
+  const sessionKey = computeSessionKey(sourcePlannedId);
   
   // Save session progress to localStorage
   const saveSessionProgress = (exercisesData: LoggedExercise[], addonsData: AttachedAddon[], notes: string, rpe: number | '') => {
@@ -771,8 +780,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Restore session progress from localStorage
   const restoreSessionProgress = (openedId?: string | null): { exercises: LoggedExercise[]; addons: AttachedAddon[]; notes: string; rpe: number | ''; sourcePlannedName: string; sourcePlannedId: string | null; sourcePlannedDate: string | null } | null => {
     try {
-      // Layer 2 (D-132) uses `openedId` to read the identity-aware key (+ legacy fallback).
-      const saved = localStorage.getItem(sessionKey);
+      // Identity-aware key first; fall back to the legacy date-only key (pre-D-132 drafts).
+      // The Layer-1 guard at the call site validates identity for BOTH sources, so a legacy
+      // blob from a different workout still fails the guard and loads fresh.
+      const primaryKey = computeSessionKey(openedId ?? null);
+      let usedKey = primaryKey;
+      let saved = localStorage.getItem(primaryKey);
+      if (!saved) { usedKey = legacySessionKey(); saved = localStorage.getItem(usedKey); }
       if (saved) {
         const sessionData = JSON.parse(saved);
         const now = new Date();
@@ -782,7 +796,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (hoursDiff < 24) {
           return sessionData;
         } else {
-          localStorage.removeItem(sessionKey);
+          localStorage.removeItem(usedKey);  // expire the slot the blob actually came from
         }
       }
     } catch {
@@ -794,6 +808,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const clearSessionProgress = () => {
     try {
       localStorage.removeItem(sessionKey);
+      localStorage.removeItem(legacySessionKey());  // also drop any pre-D-132 date-only draft for this date
     } catch {
     }
   };
