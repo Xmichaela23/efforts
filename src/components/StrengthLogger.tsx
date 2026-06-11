@@ -758,6 +758,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Save session progress to localStorage
   const saveSessionProgress = (exercisesData: LoggedExercise[], addonsData: AttachedAddon[], notes: string, rpe: number | '') => {
     try {
+      // D-132 Layer 3 — GATE ON DONE: a restorable draft is written ONLY once ≥1 set is
+      // completed (Done tapped). Bare +/- nudges and prefill edits with zero completed sets
+      // write NO blob — this kills the phantom drafts that hijacked other workouts. EDGE:
+      // if a completed set is later un-completed/deleted back to zero, the draft is CLEARED
+      // (a "saved session" must mean real logged work). Composes with Layers 1+2: the write
+      // uses the identity-aware `sessionKey` (correct sourcePlannedId) and resumes only for
+      // the same workout.
+      const hasCompletedSet = Array.isArray(exercisesData) && exercisesData.some(
+        (ex) => Array.isArray(ex?.sets) && ex.sets.some((s) => s?.completed)
+      );
+      if (!hasCompletedSet) {
+        try { localStorage.removeItem(sessionKey); } catch {}
+        return;
+      }
       const sessionData = {
         exercises: exercisesData,
         addons: addonsData,
@@ -812,7 +826,37 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } catch {
     }
   };
-  
+
+  // D-132 Layer 3 — one-time LEGACY CLEANUP. Pre-D-132 drafts were keyed by date alone
+  // (`strength_logger_session_YYYY-MM-DD`, no identity). On mount, remove any such legacy
+  // key whose blob is PHANTOM (no completed set — e.g. the stuck +/- poke) or expired
+  // (>24h). SAFE: it can only delete drafts with zero completed sets or stale ones — a
+  // genuine, recent, completed-set draft is LEFT intact (the restore fallback + identity
+  // guard still resume it for its rightful workout). Identity-aware keys (with a trailing
+  // `_id`) never match the regex, so current drafts are untouched. Runs once.
+  const didLegacyCleanupRef = useRef(false);
+  useEffect(() => {
+    if (didLegacyCleanupRef.current) return;
+    didLegacyCleanupRef.current = true;
+    try {
+      const legacyRe = /^strength_logger_session_\d{4}-\d{2}-\d{2}$/;  // date-only, no `_id`
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (!k || !legacyRe.test(k)) continue;
+        try {
+          const blob = JSON.parse(localStorage.getItem(k) || 'null');
+          const hasCompleted = Array.isArray(blob?.exercises) && blob.exercises.some(
+            (ex: any) => Array.isArray(ex?.sets) && ex.sets.some((s: any) => s?.completed)
+          );
+          const ageH = blob?.timestamp ? Math.abs(Date.now() - new Date(blob.timestamp).getTime()) / 36e5 : Infinity;
+          if (!hasCompleted || ageH >= 24) localStorage.removeItem(k);
+        } catch {
+          localStorage.removeItem(k);  // unparseable legacy blob → safe to drop
+        }
+      }
+    } catch {}
+  }, []);
+
   const addonCatalog: Record<string, { name: string; duration_min: number; variants: string[] }> = {
     'addon_strength_wu_5': { name: 'Warm‑Up (5m)', duration_min: 5, variants: ['v1','v2'] },
     'addon_core_5': { name: 'Core (5m)', duration_min: 5, variants: ['v1','v2'] },
