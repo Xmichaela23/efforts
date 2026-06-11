@@ -3093,6 +3093,8 @@ Net effect: NP and VI computed over a *pedaling-only* power series. Outdoor swee
 
 ## D-116 — RIR scale 0–5+; RIR ≥5 excluded from e1RM (Q-039 steps 1+2, 2026-06-11)
 
+> **INERT — landed on a DEAD path.** The RIR-picker-scale half (0–5+, keypad clamp) is live and correct. But the engine half (`compute-adaptation-metrics/estimate1Rm` excluding RIR ≥5) writes `workout_adaptation`, which has **0 readers** — so it has **no effect** on plans or UI. The discovery came right after (Q-040): the LIVE e1RM path is `compute-facts/brzycki1RM`, fixed separately by **[D-118](#d-118)** (RIR preference-with-fallback). Treat the e1RM/RIR rule as D-118; D-116's engine change is a no-op kept only because it's harmless. Retire-vs-wire the dead path = Q-041. The scale/clamp/`avg_rir`-preservation decisions below remain accurate.
+
 **Context:** Q-039 set-logger refactor. The pre-check before step 1 found that RIR already feeds e1RM in `compute-adaptation-metrics/estimate1Rm` as `epley × (1 + rir/10)` — so a RIR-5 set inflates the estimate by ×1.5. The spec says RIR 5 is an autoregulation signal only, *excluded* from e1RM. Making "5+" a first-class picker option (step 1) without fixing the engine (step 2) would have spread that inflation, so per the working contract the two steps shipped together.
 
 **Decisions:**
