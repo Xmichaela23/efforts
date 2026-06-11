@@ -26,6 +26,7 @@ The set card is now: **pre-filled Reps/Weight/RIR keypad cells** (tap = `openKey
 - **Rest timer (D-121):** opt-in courtesy — row on every set except the last, **idle by default**, user taps Start; Pause/Resume/Skip. (Reverses the D-120 auto-start experiment; D-115's set-0 model is the ancestor.)
 - **Deload pill (D-124)** in a two-row header (title+pill row / date+Pick-planned row); title **wraps** rather than truncating.
 - **Strip sizing (D-129):** the nudge buttons are `flex-1` (basis-0) inside count-weighted groups (`reps 2 / wt 4 / rir 2`) at `h-10` (40px) — they **grow with the real row width** (≈32×40px at the 380px floor → ≈37×40px on a 414px iPhone) and never overflow 380. Do NOT re-pin them to a fixed minimum size tuned to the harness — 380px is the floor, not the target.
+- **Strip grouping (D-130):** the three clusters are separated by **spacing contrast, not borders** — `gap-1` (4px) within a group, `gap-4` (16px) between groups (echoing the top cells' `gap-4`). Keep that 4×-ish ratio if you touch the gaps; uniform gaps make the strip read as undifferentiated buttons.
 - **Verification:** `scripts/verify-strength-row-380.mjs` (untracked harness) renders the real markup at 380px — asserts `overflowPx -10` (full p-2 clearance) AND nudge buttons ≥28px wide / ≥40px tall. Re-run after any set-card change; for sizing changes also eyeball ~414px (the harness can't feel "cramped," only "fits/doesn't" — D-129 was a device-only catch).
 
 **⚠ Two load-bearing invariants (don't break):**

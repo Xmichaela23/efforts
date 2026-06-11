@@ -3636,22 +3636,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         return (
                           // Full card width (no w-9 leader): a control bar earns the extra ~44px the
                           // set-# indent would cost, so the flex-1 buttons land wider on real phones.
-                          <div className="flex items-center gap-2 mt-2">
+                          // D-130: gap-4 BETWEEN groups (echoes the top cells' gap-4) + gap-1 WITHIN
+                          // each group → reps | wt | rir read as three distinct clusters, by spacing
+                          // alone (no per-button borders).
+                          <div className="flex items-center gap-4 mt-2">
                             {showReps && (
-                              <div className="flex-[2] flex items-center gap-1.5" role="group" aria-label="Adjust reps">
+                              <div className="flex-[2] flex items-center gap-1" role="group" aria-label="Adjust reps">
                                 <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(-1)} aria-label="Reps minus 1">−1</button>
                                 <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(1)} aria-label="Reps plus 1">+1</button>
                               </div>
                             )}
                             {showWeight && (
-                              <div className="flex-[4] flex items-center gap-1.5" role="group" aria-label="Adjust weight">
+                              <div className="flex-[4] flex items-center gap-1" role="group" aria-label="Adjust weight">
                                 {[-5, -2.5, 2.5, 5].map((d) => (
                                   <button key={d} type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjWeight(d)} aria-label={`${d > 0 ? 'Add' : 'Subtract'} ${Math.abs(d)} pounds`}>{d > 0 ? `+${d}` : d}</button>
                                 ))}
                               </div>
                             )}
                             {showRir && (
-                              <div className="flex-[2] flex items-center gap-1.5" role="group" aria-label="Adjust RIR">
+                              <div className="flex-[2] flex items-center gap-1" role="group" aria-label="Adjust RIR">
                                 <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(-1)} aria-label="RIR minus 1">−1</button>
                                 <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(1)} aria-label="RIR plus 1">+1</button>
                               </div>

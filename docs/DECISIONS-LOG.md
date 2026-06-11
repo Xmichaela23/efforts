@@ -3317,6 +3317,18 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-130 — Strip grouping by spacing contrast, not borders (2026-06-11)
+
+**Context:** After D-129 made the buttons equal-width with a uniform gap (within-group `gap-1.5` ≈ between-group `gap-2`), the strip read as 6–8 undifferentiated buttons — the reps / weight / RIR clusters blurred together.
+
+**Decision — restore the three groups with spacing contrast (no per-button borders — too noisy, and no height cost):** tighten **within-group to `gap-1` (4px)** so each cluster's buttons sit close, and widen **between-group to `gap-4` (16px)** — the same gap the three top Reps/Weight/RIR cells use, so the strip clusters echo the cells above them. A 4× gap ratio (4px vs 16px) makes reps | wt | rir read as three obvious groups at a glance. Kept from D-129: the amber RIR pair (D-128), `h-10` (40px), and `flex-1` responsive width-fill.
+
+**Measured (both widths, no overflow):** 380px → 32×40px buttons, within-gap 4px / between-gap 16px, `overflowPx -10`. 414px → 36×40px, same gap ratio. The redistribution costs ~0 button width (gaps net out).
+
+**Files:** `src/components/StrengthLogger.tsx` (strip container `gap-4`, group divs `gap-1`, ~:3640). **Verification:** app build + 380px harness (no overflow, nudge 32×40); rendered both 380/414.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
