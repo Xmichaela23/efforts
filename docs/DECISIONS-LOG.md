@@ -3438,6 +3438,18 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-138 — Unconfirmed RIR reads as "suggested" (amber), not a greyed placeholder (2026-06-11)
+
+**Context:** the pre-confirm RIR value rendered `text-white/30` — so the prescribed suggestion looked broken/inactive. It's dim on purpose (D-126/D-134: RIR is not pre-committed; you confirm it on Done), but too-faint read as a placeholder.
+
+**Decision:** style the unconfirmed suggested RIR as **amber + `font-medium`** (`text-amber-300/80`) — the app's RIR=amber language (matching the "suggested N" caption and the RIR pills), so it reads as an intentional *suggested* value. **Deliberately NOT** full-white-like-Reps/Weight: white is the "your logged value" weight; making an unconfirmed suggestion white would make it look committed and undercut the confirm-on-Done signal. So the three states stay distinct: **amber = suggested (not yet logged)**, **white = confirmed/logged RIR**, **Reps/Weight white = prefilled/logged**. The `—` (no prescription) stays dim grey.
+
+**Why not the requested "bold like Reps/Weight":** Reps/Weight aren't 700-bold — they're full-opacity white; matching them literally = white, which flattens the suggested-vs-committed distinction this app relies on (D-126/D-134). Amber keeps the "prescribed but not yet assessed" meaning while giving it the active weight the greyed version lacked. (One-word swap to plain white if that's preferred.)
+
+**Files:** `src/components/StrengthLogger.tsx` (~:3702, RIR ghost span). **Verification:** build; visual — amber suggested value vs white confirmed value vs dim `—`.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
