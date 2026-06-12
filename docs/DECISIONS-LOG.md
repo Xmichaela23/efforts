@@ -3539,6 +3539,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-145 — Surface readiness in the coach prompt + STATE screen (Q-049 Phase 1, visible-everywhere)
+
+- **Date:** 2026-06-12
+- **Context:** D-144 populated `ArcContext.readiness` but nothing rendered it. This step makes it actually **visible** — the Phase-1 goal — in the two surfaces where a new Arc field is shown: the LLM coach prompt and the client STATE tab. Built on the human's "build it now, my judgment" call; presentation choices below are mine (review-and-adjust), not reserved decisions.
+- **Coach prompt (`supabase/functions/coach/index.ts`):** coach already loads the full `ArcContext` (`arc` at `:1150`), so `arc.readiness` is read directly — no extra fetch. A `narrativeFacts` line is pushed next to the longitudinal-signals block: latest check-in (date → "today" when it's the focus day) + raw energy/soreness/sleep, plus oldest→newest sequences per signal when ≥3 check-ins exist (so the model can SEE a trend like "soreness climbing" without me labeling it). The line is explicitly tagged *"athlete-reported, raw — do not invent or rescale"* and *"do NOT change prescribed loads or RIR from this"* — reinforcing Phase-1 visible-only at the prompt level.
+- **STATE screen (`src/components/context/StateTab.tsx`):** a new `READINESS` row between BODY and AERO, rendered ONLY when `latest` exists (Q3 no-data → absent rows show nothing, never a neutral placeholder). Shows raw energy/soreness/sleep + a staleness label ("today"/"yesterday"/"Nd ago" from `latest.date`) + a neutral trend arrow per signal (newest vs oldest in window) when ≥3 check-ins. **Deliberately no good/bad tone coloring** — Phase 1 encodes no judgement (unlike the cycling-form `readiness_state` row, which is a different concept; the check-in state is named `checkinReadiness` to avoid the existing `readiness` local collision that the build caught).
+- **Client plumbing:** `ClientArcContext` + `ArcContextPayload` gain `readiness?: ArcReadiness | null` (mirrors of the server types); `get-arc-context` already returns the whole `{ arc }`, so no endpoint change.
+- **Scope held:** strictly visible-only. Nothing here consumes readiness for prescription; adapt-plan / suggested_rir / auto-attach-planned untouched. The derived "readiness score" (Q2 optional) is still not built — raw three are surfaced as mandated.
+- **Verification:** client `npm run build` clean (after the `checkinReadiness` rename fixed a symbol collision). `coach/index.ts` deno-check error count unchanged (9 at HEAD, 9 after — all pre-existing; my block adds none). Coach deploys without type-gating per repo convention.
+- **Files:** `supabase/functions/coach/index.ts`, `src/lib/arc-types.ts`, `src/lib/fetch-arc-context.ts`, `src/components/context/StateTab.tsx`. **Deploy:** `coach` + `get-arc-context` (the two surfaces); other arc-context consumers don't render readiness, so they only need redeploy for lib-sync (no behavior change).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

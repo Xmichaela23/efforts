@@ -4280,6 +4280,32 @@ Deno.serve(async (req) => {
         if (longLegacyBlock.trim()) narrativeFacts.push(longLegacyBlock);
         else if (triSwimIntent != null) narrativeFacts.push(swimPostureFactLine(triSwimIntent));
 
+        // READINESS CHECK-INS (Q-049 Phase 1, D-144). Surface RAW athlete-reported
+        // energy/soreness/sleep from ArcContext.readiness. VISIBLE-ONLY: this is
+        // context for narration, NOT a prescription input — the line itself tells
+        // the model not to move loads from it (Phase 1 has no autoregulation).
+        // Anti-fabrication (Q3): only emitted when a recent check-in exists; raw
+        // values, never rescaled or invented.
+        {
+          const rdy = arc.readiness;
+          if (rdy && rdy.latest) {
+            const L = rdy.latest;
+            const whenStr = L.date === asOfDate ? 'today' : L.date;
+            let rdyLine =
+              `READINESS CHECK-IN (athlete-reported, raw — do not invent or rescale): latest ${whenStr} — energy ${L.energy}, soreness ${L.soreness}, sleep ${L.sleep}.`;
+            // oldest→newest sequences for trend visibility (e.g. "soreness climbing
+            // all week") when there are ≥3 check-ins in the window. `recent` is
+            // newest-first, so reverse for chronological order.
+            if (rdy.recent.length >= 3) {
+              const chron = [...rdy.recent].reverse();
+              const seq = (k: 'energy' | 'soreness' | 'sleep') => chron.map((c) => c[k]).join('→');
+              rdyLine += ` Last ${chron.length} check-ins (oldest→newest) — energy ${seq('energy')}, soreness ${seq('soreness')}, sleep ${seq('sleep')}.`;
+            }
+            rdyLine += ` Use only as context; do NOT change prescribed loads or RIR from this.`;
+            narrativeFacts.push(rdyLine);
+          }
+        }
+
         const todayDay = (() => {
           try { return new Date(asOfDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) }); }
           catch { return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(asOfDate + 'T12:00:00Z').getUTCDay()]; }

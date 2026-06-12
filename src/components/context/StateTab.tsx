@@ -17,6 +17,7 @@ import { pickRaceFinishProjectionV1FromCoachData, pickRaceReadinessFromCoachData
 import { planWizardRaceDistanceDisplay } from '@/lib/plan-wizard-distance-label';
 import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
+import type { ArcReadiness } from '@/lib/arc-types';
 import { shouldShowNudge } from '@/lib/nudge-policy';
 
 const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
@@ -621,11 +622,15 @@ export default function StateTab({
     daysAfterRace: number;
   } | null>(null);
   const [longitudinalSignals, setLongitudinalSignals] = useState<unknown>(null);
+  // Daily check-in readiness (Q-049). Named distinctly from the local
+  // `readiness`/`readiness_state` (cycling form) used further down in render.
+  const [checkinReadiness, setCheckinReadiness] = useState<ArcReadiness | null>(null);
   const [nudgeDismissNonce, setNudgeDismissNonce] = useState(0);
 
   useEffect(() => {
     fetchArcContext().then((arc) => {
       setLongitudinalSignals(arc?.longitudinal_signals ?? null);
+      setCheckinReadiness((arc?.readiness as ArcReadiness | null) ?? null);
     });
   }, []);
 
@@ -1296,6 +1301,39 @@ export default function StateTab({
             </div>
           </div>
         </div>
+
+        {/* READINESS — athlete-reported energy/soreness/sleep (Q-049 Phase 1, D-144).
+            Raw + distinct sliders; shown ONLY when a recent check-in exists (no-data
+            on absent, per Q3). Neutral tone — Phase 1 is visible-only, no good/bad
+            judgement encoded. Trend arrow per signal (newest vs oldest in window)
+            when ≥3 check-ins. */}
+        {checkinReadiness?.latest && (() => {
+          const L = checkinReadiness.latest!;
+          const today = new Date().toISOString().slice(0, 10);
+          const dayDiff = Math.round(
+            (Date.parse(today + 'T00:00:00Z') - Date.parse(L.date + 'T00:00:00Z')) / 86400000,
+          );
+          const whenLabel = dayDiff <= 0 ? 'today' : dayDiff === 1 ? 'yesterday' : `${dayDiff}d ago`;
+          const arrow = (k: 'energy' | 'soreness' | 'sleep') => {
+            if (checkinReadiness.recent.length < 3) return '';
+            const newest = checkinReadiness.recent[0][k];
+            const oldest = checkinReadiness.recent[checkinReadiness.recent.length - 1][k];
+            return newest > oldest ? ' ↑' : newest < oldest ? ' ↓' : ' →';
+          };
+          return (
+            <div className="px-3 py-3">
+              <Row label="READINESS">
+                <Chip label="energy" value={`${L.energy}${arrow('energy')}`} />
+                <Dot />
+                <Chip label="soreness" value={`${L.soreness}${arrow('soreness')}`} />
+                <Dot />
+                <Chip label="sleep" value={`${L.sleep}${arrow('sleep')}`} />
+                <Dot />
+                <Chip value={whenLabel} valueClass="text-white/45" />
+              </Row>
+            </div>
+          );
+        })()}
 
         {/* AERO */}
         {runTypes.some(rt => rt.avg_execution_score != null) && (

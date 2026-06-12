@@ -51,11 +51,27 @@ export type CompletedEvent = {
   finish_time_seconds: number | null;
 };
 
+/** Mirrors `ArcReadinessCheckin` from `supabase/functions/_shared/arc-context.ts` (Q-049 Phase 1) */
+export type ArcReadinessCheckin = {
+  date: string;
+  energy: number;
+  soreness: number;
+  sleep: number;
+};
+
+/** Mirrors `ArcReadiness` from `supabase/functions/_shared/arc-context.ts` — raw + distinct sliders; `latest` null = no recent check-in (no-data, never a neutral default). */
+export type ArcReadiness = {
+  latest: ArcReadinessCheckin | null;
+  recent: ArcReadinessCheckin[];
+  window_days: number;
+};
+
 export type ClientArcContext = {
   five_k_nudge: ArcFiveKLearnedDivergence | null;
   gear?: ArcGearSummary;
   recent_completed_events?: CompletedEvent[];
   longitudinal_signals?: LongitudinalSignalsPayload | null;
+  readiness?: ArcReadiness | null;
 };
 
 export function fiveKNudgeDismissKey(n: { manual_5k_total_sec: number; implied_5k_total_sec: number }): string {
