@@ -746,6 +746,28 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-049 — Athlete State Continuity: check-in → Arc → every screen (SPEC filed 2026-06-12, Priority 1, not built)
+
+- **Status:** open spec, **not built**, parked ("pick up when the atmosphere's right"). Full spec: **`docs/SPEC-ATHLETE-STATE-CONTINUITY.md`**.
+- **Audit verdict (CORRECTED 2026-06-12 — first pass understated it):** write-wired (`workout_metadata.readiness`) → `workout_facts.readiness` → **`compute-snapshot` aggregates to `athlete_snapshot.avg_readiness` (a WEEKLY time-series, keyed user_id+week_start)** → consumed narrowly by `recompute-athlete-memory` (`taperSensitivity` energy-rebound + injury flags) and by the strength narrative. **A weekly time-series DOES exist** (the original "no time-series / fully orphaned" was wrong). The real gap: **`arc-context.ts` does NOT read `avg_readiness`** (the Arc dead-end), and nothing moves prescribed RIR/load. Read-only options doc (flow map + per-question tradeoffs, no decisions): **`docs/SPEC-ATHLETE-STATE-CONTINUITY-OPTIONS.md`**.
+- **Done = ** (Phase 1) check-in → Arc as a structured readiness signal; Arc the single source every surface reads; a queryable readiness time-series (trends, not snapshots). (Phase 2, separate) autoregulation — let it *influence* RIR/load with a real model + guardrails.
+- **⚠ Naming trap:** NOT the server-computed `ReadinessSnapshotV1` (`session-detail/readiness-*`) — that's the muscular-load model, a different signal.
+- **Cross-ref:** D-126 (target_rir from plan), arc-context.ts, the open "adaptive plan adjustment" item.
+
+---
+
+## Q-050 — Pick Planned with Teeth: reconcile intent vs. what was done (SPEC filed 2026-06-12, Priority 2, not built)
+
+- **Status:** open spec, **not built**, parked. Full spec: **`docs/SPEC-PICK-PLANNED-RECONCILIATION.md`**.
+- **Audit verdict:** the core mechanic is **correctly wired** (pick loads exercises + claims the right slot via explicit `planned_id`, no duplicates). Three edges, all from one root cause — *the plan is date-fixed and nothing reconciles intent vs. done*:
+  1. **Coverage gap / silent swap** — pick Thursday, do Tuesday → Thursday consumed, Tuesday's own slot left open & easy to skip, no warning.
+  2. **Slot-date ≠ performed-date** — Thursday marked done but linked to a Tuesday-dated workout (attribution/display, engine reads correctly by date).
+  3. **Start Fresh re-attaches by date** (the sneaky one) — UI unlinks (`planned_id=null`) but `auto-attach-planned`'s date-matching branch can silently re-claim that day's slot, contradicting the "blank, unlinked" label.
+- **Fix order (by likelihood of biting):** (1) Start-Fresh date re-attach — it's a correctness/trust bug, make the unlink authoritative or warn; (2) out-of-order confirm ("Tuesday stays open" + gap-handling); (3) slot-vs-performed attribution (cosmetic, later). **Ambitious end:** plan understands sequence over fixed dates (bigger rework, noted as direction).
+- **Cross-ref:** auto-attach-planned (`:120` explicit vs `:120–289` date-match), Start Fresh (`StrengthLogger.tsx:~3066`), get-week (sole calendar path).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
