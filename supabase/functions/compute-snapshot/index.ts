@@ -521,6 +521,47 @@ serve(async (req: Request) => {
     const round = (v: number | null, decimals = 1): number | null =>
       v != null ? Math.round(v * Math.pow(10, decimals)) / Math.pow(10, decimals) : null;
 
+    // -----------------------------------------------------------------------
+    // 8b. Readiness rollup (D-141). avg_readiness is now a DERIVED weekly view
+    //     over the readiness_checkins source-of-truth table (D-140), computed
+    //     over the target week [targetWeek, rangeEnd]. Falls back to the
+    //     facts-based average (current.avgReadiness) when the table is missing
+    //     (pre-migration), errors, or has no rows for the week — so this deploys
+    //     safely BEFORE the migration/backfill land, and behavior is identical
+    //     until then. The output SHAPE is unchanged ({energy,soreness,sleep}),
+    //     so the two consumers in recompute-athlete-memory (taperSensitivity via
+    //     avg_readiness.energy, and injury flags via per-workout facts — which
+    //     never read this field) keep working unchanged.
+    let avgReadinessForWeek = current.avgReadiness;
+    try {
+      const { data: rcRows, error: rcErr } = await supabase
+        .from("readiness_checkins")
+        .select("energy, soreness, sleep")
+        .eq("user_id", userId)
+        .gte("date", targetWeek)
+        .lte("date", rangeEnd);
+      if (!rcErr && rcRows && rcRows.length > 0) {
+        const rcEnergy: number[] = [];
+        const rcSoreness: number[] = [];
+        const rcSleep: number[] = [];
+        for (const r of rcRows as Array<Record<string, unknown>>) {
+          if (typeof r.energy === "number") rcEnergy.push(r.energy);
+          if (typeof r.soreness === "number") rcSoreness.push(r.soreness);
+          if (typeof r.sleep === "number") rcSleep.push(r.sleep);
+        }
+        if (rcEnergy.length > 0 || rcSoreness.length > 0 || rcSleep.length > 0) {
+          avgReadinessForWeek = {
+            energy: avg(rcEnergy),
+            soreness: avg(rcSoreness),
+            sleep: avg(rcSleep),
+          };
+        }
+      }
+    } catch (_e) {
+      // Table absent (pre-migration) or transient error — keep the facts-based
+      // fallback so the snapshot never fails on the readiness rollup.
+    }
+
     const snapshot = {
       user_id: userId,
       week_start: targetWeek,
@@ -548,7 +589,7 @@ serve(async (req: Request) => {
       ride_interval_adherence: current.rideIntervalAdherence,
 
       avg_session_rpe: round(current.avgRPE),
-      avg_readiness: current.avgReadiness,
+      avg_readiness: avgReadinessForWeek,
       rpe_trend: rpeTrend,
 
       plan_id: planId,

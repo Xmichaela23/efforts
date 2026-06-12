@@ -3484,6 +3484,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-141 — avg_readiness rollup reads readiness_checkins, with a facts-based fallback
+
+- **Date:** 2026-06-12
+- **Context:** SPEC-ATHLETE-STATE-CONTINUITY (Q-049) Phase 1 step 2 of 4. With the source-of-truth table created (D-140), `compute-snapshot` must derive `athlete_snapshot.avg_readiness` from it — the user's directive: "avg_readiness becomes a rollup over the new table — do NOT rip it out."
+- **Decision:** Added a guarded override in the compute-snapshot handler (section 8b), computed over the target week `[targetWeek, rangeEnd]`: select `readiness_checkins` for the user/week, average energy/soreness/sleep, and write that to `avg_readiness`. The pure `aggregateWeek` aggregator (and its facts-based `current.avgReadiness`) is **left untouched**; the override only swaps the final value at the payload.
+- **Fallback (load-bearing):** the override is `try`-wrapped and only replaces the value when the query succeeds AND returns ≥1 row with ≥1 numeric slider. On a missing table (pre-migration), a query error, or an empty week, it keeps `current.avgReadiness`. This is the cycling-columns guarded-update pattern (D-… migration note) — the function **deploys safely before the migration/backfill land**, and any week with no daily check-in keeps its prior facts-based value rather than going null.
+- **Why this shape:** keeping `aggregateWeek` pure means its 18-test suite stays green by construction (verified: 18/18 pass; the only `deno check` error is the pre-existing line-311 `FactRow[]` cast, present at HEAD before this change). The output shape `{energy,soreness,sleep}` is unchanged, so the two `avg_readiness` consumers in `recompute-athlete-memory` keep working unchanged: **taperSensitivity** reads `avg_readiness.energy` (same key/shape), and **injury flags** read per-workout `workout_facts.readiness` — never this field.
+- **Alternatives considered:** (a) rewrite `aggregateWeek` to take readiness rows — rejected: pollutes a pure, well-tested aggregator and couples it to a DB fetch. (b) Null `avg_readiness` when the table is empty — rejected: would regress historical weeks to null before backfill and break the taperSensitivity series; fallback-to-facts preserves continuity.
+- **Tradeoff accepted:** during the window between deploy and backfill, `avg_readiness` is still facts-derived (identical to today). After backfill it's table-derived; the two are equivalent for workout-day check-ins and the table additionally captures any future non-workout daily check-ins.
+- **Files:** `supabase/functions/compute-snapshot/index.ts` (section 8b + payload field). Deployed `yyriamwvtvzlkumqrvpm`.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
