@@ -3510,6 +3510,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-143 — Backfill workout_metadata.readiness → readiness_checkins, latest-per-day
+
+- **Date:** 2026-06-12
+- **Context:** SPEC-ATHLETE-STATE-CONTINUITY (Q-049) Phase 1 step 4 of 4. The new table starts empty; historical check-ins live in `workouts.workout_metadata.readiness`. Without a backfill the rollup (D-141) only sees check-ins logged after the table came online.
+- **Decision:** A one-shot SQL migration `INSERT … SELECT` from `workouts` into `readiness_checkins`, `source = 'backfill'`, `ON CONFLICT (user_id, date) DO NOTHING`.
+- **Dedup sub-decision (the one real judgment call — flagged, not a reserved Q1–Q3 call):** the table is `UNIQUE(user_id, date)` but an athlete can log multiple workouts in one day, each with a check-in. The backfill keeps the **latest** workout's check-in per day (`DISTINCT ON (user_id, date) … ORDER BY created_at DESC`). Rationale: readiness is a daily ritual, not per-session; the most recent save best reflects the day's final state. (If the human prefers earliest, or an average, this is the line to change — noted in the handoff.)
+- **Ordering (load-bearing):** apply **last** — after the table migration, the compute-snapshot deploy, and the client push. `ON CONFLICT DO NOTHING` makes live `'workout_logger'` rows win over backfilled ones (live data is authoritative; the backfill only fills gaps) and makes re-runs idempotent.
+- **Guard:** only rows whose three sliders are all present and numeric are migrated (regex on each `->>`); a readiness blob carrying only `threshold_hr` (no sliders) is skipped. Assumes `workouts.created_at` exists (standard) for the tie-break.
+- **Tradeoff accepted:** days with multiple distinct check-ins collapse to one (by design — daily key). Backfilled rows are tagged `source='backfill'` so they're distinguishable from live check-ins for any future audit.
+- **Files:** `supabase/migrations/20260612130000_backfill_readiness_checkins.sql` (apply via Supabase SQL editor).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
