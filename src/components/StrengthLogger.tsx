@@ -2967,13 +2967,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 <button
                   type="button"
                   onClick={() => {
-                    setTimers((prev) => ({ ...prev, [activeKey]: { ...prev[activeKey], running: false } }));
+                    // D-139: Skip ENDS the rest (not just pause) — clear the timer and mark its
+                    // set's key dismissed (same dismiss path as the in-row Skip). Pill disappears.
+                    setRestDismissed((prev) => new Set(prev).add(activeKey));
+                    setTimers((prev) => { const next = { ...prev }; delete next[activeKey]; return next; });
                   }}
-                  className="ml-1 h-6 w-6 rounded-full bg-white/[0.10] hover:bg-white/[0.18] text-amber-200/80 hover:text-white flex items-center justify-center text-xs"
-                  aria-label="Dismiss rest timer"
-                  title="Skip rest"
+                  className="ml-1 px-2 h-6 rounded-full bg-white/[0.10] hover:bg-white/[0.18] text-amber-200/90 hover:text-white flex items-center justify-center text-xs font-medium"
+                  aria-label="Skip rest"
                 >
-                  ×
+                  Skip
                 </button>
               </div>
             </div>
