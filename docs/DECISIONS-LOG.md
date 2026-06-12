@@ -3430,7 +3430,11 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 **Decision:** gate Skip on `restToggleLabel !== 'Start'` — it appears only once the timer is **running** (Pause) or **paused** (Resume), where it does its real job (dismiss/clear an active timer = "done resting early"). Idle shows just `Rest · 2:30 · Start`.
 
-**Files:** `src/components/StrengthLogger.tsx` (~:4014, Skip wrapped in `restToggleLabel !== 'Start'`). **Verification:** rendered all 3 states × 380/414px — idle has 4 controls (no Skip), running/paused have 5; no overlap, no overflow, no wrap (fewer idle buttons only helps the D-136 layout).
+**Contrast with Hevy/Strong (inverted model):** they surface Skip *always* because their timers auto-fire — Skip is the escape hatch from a timer that started without the user. Ours only starts on an explicit tap, so the escape hatch only needs to exist once the user has opted in. Same control, inverted trigger, because the underlying interaction model is inverted.
+
+**Files:** `src/components/StrengthLogger.tsx` (~:4014, Skip wrapped in `restToggleLabel !== 'Start'`). **Verification:** rendered all 3 states × 380/414px — idle has 4 controls (no Skip), running/paused have 5; no overlap, no overflow, no wrap. **Side effect:** partially relieves D-136 (rest-row crowding) by dropping idle from 5 controls to 4 — noted so the D-136 layout isn't re-solved from scratch.
+
+**Post-Skip transition — verified by code trace (the one edge not in the state table):** after running → Skip → dismiss, the *next* set's rest row returns to a clean idle. Confirmed structurally: every set reads its own per-set key `${exercise.id}-${setIndex}` for BOTH `timers` and `restDismissed` (`:3345/:3357`), so Skipping set N (adds `${id}-${N}` to `restDismissed`, writes `timers[${id}-${N}]`) cannot affect set N+1 — its `timers[${id}-${N+1}]` is `undefined` → `restToggleLabel` falls through to `'Start'` (`:3363`) → idle, no Skip. No shared cross-set state. **Caveats:** (a) the skipped set stays dismissed for the session (`restDismissed` is add-only; no re-arm since D-121 removed auto-start) and resets on a fresh logger mount (component state) — no cross-session leak; (b) the dismissed flag is keyed by `setIndex`, not set identity, so deleting/reordering sets after a Skip could re-attribute it (index-keying footgun, same family as the D-122 anchor) — out of the normal sequential path but recorded.
 
 ---
 
