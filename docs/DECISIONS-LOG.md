@@ -3411,6 +3411,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-136 — Rest-timer footer overlaps in running/paused state; fix with shrink-0 group + label drop (2026-06-11)
+
+**Context (device):** the footer's rest controls share one flex row with the Done/✕ cluster (D-121). In the IDLE state ("Rest · 2:30 · Start · Skip" + Done/✕) it fits, but in RUNNING/PAUSED the toggle label widens ("Pause"/"**Resume**" vs "Start", ~+18px) and the row exceeds ~308px at 380. The buttons had default `flex-shrink:1`, so they shrank below their text and the labels **bled into each other** ("Resume" over "Skip").
+
+**Decision — no overlap in any state, by structure not by luck:**
+- **`shrink-0` on every footer button** (time / toggle / Skip / Done / ✕) + `whitespace-nowrap` — a button can never shrink below its label, so text can't spill.
+- **Grouped the rest controls into a `shrink-0` unit** and the Done/✕ into a `shrink-0` unit; the row is **`flex-wrap`** — if the two units genuinely can't fit, Done/✕ wraps to a second line (right-aligned via `ml-auto`) instead of overlapping. Safety net.
+- **Drop the "Rest" text label once the timer is active** (`restToggleLabel !== 'Start'`) — the countdown is self-evident, and this reclaims ~36px, keeping even the "Resume" state on ONE line (no wrap needed in practice).
+
+**Files:** `src/components/StrengthLogger.tsx` — footer row `flex-wrap` + rest-control group + Done/✕ group `shrink-0` (~:3949), conditional "Rest" label, `shrink-0 whitespace-nowrap` on time/toggle/Skip. **Verification:** rendered all 3 states (idle/running/paused) × 380px + 414px — no adjacent-button overlap, no control past the card edge, no wrap triggered. Device-test reported.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

@@ -3945,10 +3945,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
                     {/* Footer row — Rest/Start (left) shares ONE line with Done/✕ (right).
                         Kills the floating Rest row and the dead space above the footer. */}
-                    <div className="flex items-center gap-2 relative">
+                    {/* D-136: footer wraps + the rest-control cluster is a shrink-0 group so the
+                        wider running/paused labels (Pause/Resume) + countdown never shrink the
+                        buttons into each other. "Rest" label drops once the timer is active (the
+                        countdown is self-evident) to reclaim width; Done/✕ wraps below only if it
+                        still can't fit. */}
+                    <div className="flex flex-wrap items-center gap-2 relative">
                       {showRestTimer && (
-                        <>
-                          <span className="text-xs text-white/60">Rest</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {restToggleLabel === 'Start' && <span className="text-xs text-white/60 shrink-0">Rest</span>}
                           <button
                             onClick={() => {
                               const key = restTimerKey;
@@ -3968,7 +3973,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 : 90;
                               setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: calculatedRest, running: false } }));
                             }}
-                            className="h-7 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                            className="h-7 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] shrink-0 whitespace-nowrap"
                             style={{ fontFamily: 'Inter, sans-serif' }}
                             aria-label="Rest timer"
                           >
@@ -3990,7 +3995,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 return { ...prev, [restTimerKey]: { seconds, running: !(cur?.running) } };
                               });
                             }}
-                            className="h-7 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                            className="h-7 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] shrink-0 whitespace-nowrap"
                             style={{ fontFamily: 'Inter, sans-serif' }}
                             aria-label={`${restToggleLabel} rest timer`}
                           >
@@ -4006,7 +4011,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 return next;
                               });
                             }}
-                            className="h-7 px-2 text-xs rounded-md border-2 border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/[0.1] hover:border-white/30 transition-all duration-300"
+                            className="h-7 px-2 text-xs rounded-md border-2 border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/[0.1] hover:border-white/30 transition-all duration-300 shrink-0 whitespace-nowrap"
                             style={{ fontFamily: 'Inter, sans-serif' }}
                             aria-label="Skip rest timer"
                           >
@@ -4062,9 +4067,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               </div>
                             </div>
                           )}
-                        </>
+                        </div>
                       )}
-                      <div className="ml-auto flex items-center gap-2">
+                      <div className="ml-auto flex items-center gap-2 shrink-0">
                         <button
                           onClick={() => handleSetComplete(exercise.id, setIndex)}
                           className={`text-xs px-3 py-1 rounded-full h-9 transition-all duration-300 ${set.completed ? `${themeColors.doneBg} border-2 ${themeColors.doneBorder} ${themeColors.doneText}` : 'bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'}`}
