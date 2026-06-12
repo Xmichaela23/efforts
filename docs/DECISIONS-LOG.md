@@ -3523,6 +3523,22 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-144 — Arc reads readiness raw + distinct from readiness_checkins; absent = no-data (Q-049 Phase 1 step 5)
+
+- **Date:** 2026-06-12
+- **Context:** SPEC-ATHLETE-STATE-CONTINUITY (Q-049) Phase 1 culmination. With the table (D-140), rollup (D-141), dual-write (D-142), and backfill (D-143) in place, the last wire is `arc-context.ts` reading readiness — which it never did (confirmed: zero readiness refs pre-change). The human answered the two gating questions: **Q2 — raw, distinct** (energy/soreness/sleep kept separate, never collapsed into a single score; a derived score may sit on top later as optional convenience, but the raw three are the source of truth and stay individually readable); **Q3 — unfilled = no-data/absent**, not a neutral default (matches the engine's anti-fabrication norm). Sleep stays (only sleep signal in the app).
+- **Decision:** `getArcContext` now fetches `readiness_checkins` for the trailing window and exposes `ArcContext.readiness: { latest, recent, window_days } | null`:
+  - **Raw + distinct (Q2):** `ArcReadinessCheckin = { date, energy, soreness, sleep }` — the three sliders verbatim, never a composite. No derived score is written here (deferred as the explicitly-optional convenience; the mandated raw three are delivered).
+  - **No-data on absent (Q3):** `recent` omits days with no check-in (never fabricates a neutral); `latest = recent[0] ?? null` (null when there's no recent check-in). The field is `null` only on a query failure (e.g. table not yet migrated) — fail-soft, so it never starves the rest of Arc.
+  - **`latest` carries its `date`** so a consumer can judge staleness rather than assume "today."
+- **Window = 14 days (`READINESS_WINDOW_DAYS`):** enough to surface current state + a within-week trend ("soreness climbing all week") without dragging stale weeks into `latest`. A chosen knob, documented; not a reserved decision.
+- **Phase-1 guardrail (load-bearing):** this is **visible-only**. `readiness` is populated into the Arc context object but **nothing consumes it for prescription** — adapt-plan / suggested-RIR / load are untouched. Surfacing it in the coach prompt and the STATE screen is the deliberate **next increment**, not part of this step (it needs copy/UI decisions, so it wasn't guessed here).
+- **Why read the table directly, not `avg_readiness`:** the directive — raw, distinct, daily, no-data-on-absent — is exactly what the weekly aggregate can't give (it's averaged + weekly). The daily table is the source of truth (D-140); Arc reads it directly.
+- **Safety:** additive interface field; the only `ArcContext` literal in the tree is a test stub via `as ArcContext` (cast tolerates the new field — 13/13 pass). `deno check` on `arc-context.ts` + `get-arc-context` clean.
+- **Files:** `supabase/functions/_shared/arc-context.ts` (const + `ArcReadiness`/`ArcReadinessCheckin` types + interface field + parallel fetch + computation + return + fresh-setup reset). **Deploy:** arc-context is a shared lib — its consumers (`get-arc-context`, `coach`, `workout-detail`, the analyzers, `generate-training-context`, `arc-setup-chat`, …) must be redeployed to serve the field; pending the human's go-ahead on the deploy set (no user-visible effect until a consumer surfaces it, so not auto-deployed).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

@@ -217,6 +217,39 @@ export interface ArcContext {
    * Full sorted list; consumers choose severity / caps. Null if computation failed.
    */
   longitudinal_signals: LongitudinalSignals | null;
+
+  /**
+   * Daily readiness check-ins (energy/soreness/sleep) read from the
+   * `readiness_checkins` source-of-truth table (Q-049 Phase 1). RAW + DISTINCT
+   * per Q2 — the three signals are never collapsed into a single score here
+   * (a derived score may sit on top elsewhere as optional convenience; the raw
+   * three stay individually readable). `latest` is the most recent check-in
+   * within the trailing window, dated so consumers can judge staleness; it is
+   * null when there is no recent check-in — Q3: absent reads as no-data, never a
+   * neutral default. `recent` is the raw daily series with absent days omitted
+   * (not fabricated), enabling trend visibility. PHASE 1 = visible only: this is
+   * NOT wired to any prescription (no suggested-RIR / load effect). `null` only
+   * on a query failure.
+   */
+  readiness: ArcReadiness | null;
+}
+
+/** One raw daily readiness check-in (Q-049 Phase 1). Sliders kept distinct; never a single score. */
+export interface ArcReadinessCheckin {
+  date: string;
+  energy: number;
+  soreness: number;
+  sleep: number;
+}
+
+/** Arc's readiness view over the trailing window (Q-049 Phase 1; raw + distinct, no-data on absent). */
+export interface ArcReadiness {
+  /** Most recent check-in within the window (raw + dated), or null when none — Q3 no-data. */
+  latest: ArcReadinessCheckin | null;
+  /** Raw daily check-ins over the trailing window, newest-first; absent days omitted. */
+  recent: ArcReadinessCheckin[];
+  /** Trailing window length in days (READINESS_WINDOW_DAYS). */
+  window_days: number;
 }
 
 /**
@@ -241,6 +274,7 @@ export function arcContextForFreshSetup(arc: ArcContext): ArcContext {
     five_k_nudge: null,
     arc_narrative_context: null,
     longitudinal_signals: null,
+    readiness: null,
   };
 }
 
@@ -593,6 +627,10 @@ function resolveTemporalPlanRow(planRows: Record<string, unknown>[], focusYmd: s
 }
 
 const EIGHT_WEEKS_DAYS = 56;
+// Readiness check-in trailing window for Arc (Q-049 Phase 1). 14 days = enough to
+// surface the current state plus a within-week trend ("soreness climbing all week")
+// without dragging in stale weeks. Absent days are omitted, never fabricated (Q3).
+const READINESS_WINDOW_DAYS = 14;
 
 async function buildRecentCompletedEvents(
   supabase: { from: (t: string) => any },
@@ -729,6 +767,7 @@ export async function getArcContext(
     gearRes,
     recentCompletedGoalsRes,
     swimWorkoutsRes,
+    readinessRes,
     longitudinalSignals,
   ] =
     await Promise.all([
@@ -799,6 +838,17 @@ export async function getArcContext(
       .in('type', ['swim', 'swimming'])
       .gte('date', start90Ymd)
       .lte('date', focusYmd),
+    // Readiness check-ins over the trailing window (Q-049 Phase 1). Source of
+    // truth = readiness_checkins (D-140); raw rows, ordered newest-first so the
+    // first row is `latest`. Fail-soft: a missing table (pre-migration) errors
+    // here and readiness resolves to null, never starving the rest of Arc.
+    supabase
+      .from('readiness_checkins')
+      .select('date, energy, soreness, sleep')
+      .eq('user_id', userId)
+      .gte('date', addDaysYmd(focusYmd, -(READINESS_WINDOW_DAYS - 1)))
+      .lte('date', focusYmd)
+      .order('date', { ascending: false }),
     longitudinalSignalsPromise,
   ]);
 
@@ -958,6 +1008,36 @@ export async function getArcContext(
     }
   }
 
+  // Readiness signals (Q-049 Phase 1) — read RAW + DISTINCT from the
+  // readiness_checkins source-of-truth table. Q2: never collapsed into a single
+  // score here. Q3: absent days are omitted from `recent` and `latest` is null
+  // when there is no recent check-in (no fabricated neutral). PHASE 1: visible
+  // only — nothing downstream consumes this for prescription. null only on a
+  // query failure (e.g. table not yet migrated).
+  let readiness: ArcReadiness | null = null;
+  if (readinessRes?.error) {
+    console.warn('[getArcContext] readiness_checkins', readinessRes.error.message);
+  } else {
+    const rows = Array.isArray(readinessRes?.data) ? readinessRes.data : [];
+    const recent: ArcReadinessCheckin[] = [];
+    for (const r of rows as Array<Record<string, unknown>>) {
+      const date = typeof r.date === 'string' ? r.date.slice(0, 10) : null;
+      const energy = Number(r.energy);
+      const soreness = Number(r.soreness);
+      const sleep = Number(r.sleep);
+      // Skip malformed rows rather than fabricate; the table enforces NOT NULL
+      // integers, so this is belt-and-suspenders.
+      if (!date || !Number.isFinite(energy) || !Number.isFinite(soreness) || !Number.isFinite(sleep)) continue;
+      recent.push({ date, energy, soreness, sleep });
+    }
+    // Query orders date DESC → recent[0] is the most recent check-in in window.
+    readiness = {
+      latest: recent.length > 0 ? recent[0] : null,
+      recent,
+      window_days: READINESS_WINDOW_DAYS,
+    };
+  }
+
   let athlete_memory: AthleteMemorySummary | null = null;
   if (memoryRes?.error) {
     console.warn('[getArcContext] athlete_memory', memoryRes.error.message);
@@ -1075,5 +1155,6 @@ export async function getArcContext(
     built_at,
     arc_narrative_context,
     longitudinal_signals: longitudinalSignals,
+    readiness,
   };
 }
