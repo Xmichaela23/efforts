@@ -4001,6 +4001,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           >
                             {restToggleLabel}
                           </button>
+                          {/* D-137: Skip only appears once the timer is actually running/paused —
+                              our timer is opt-in (tap Start), so there's nothing to "skip" in the
+                              idle state. Skip = dismiss an ACTIVE timer (done resting early). */}
+                          {restToggleLabel !== 'Start' && (
                           <button
                             onClick={() => {
                               // Skip: cut the rest short and hide this set's rest row.
@@ -4017,6 +4021,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           >
                             Skip
                           </button>
+                          )}
                           {editingTimerKey === restTimerKey && (
                             <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
                               <input

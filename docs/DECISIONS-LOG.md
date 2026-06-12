@@ -3424,6 +3424,16 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-137 — Skip button only in running/paused, not idle (our timer is opt-in, 2026-06-11)
+
+**Context:** Hevy/Strong *auto-start* rest timers, so they need Skip to dismiss a timer the user never asked for. Ours is **opt-in** (D-121 — tap Start), so in the IDLE state there's nothing running to skip; Skip was pointless clutter.
+
+**Decision:** gate Skip on `restToggleLabel !== 'Start'` — it appears only once the timer is **running** (Pause) or **paused** (Resume), where it does its real job (dismiss/clear an active timer = "done resting early"). Idle shows just `Rest · 2:30 · Start`.
+
+**Files:** `src/components/StrengthLogger.tsx` (~:4014, Skip wrapped in `restToggleLabel !== 'Start'`). **Verification:** rendered all 3 states × 380/414px — idle has 4 controls (no Skip), running/paused have 5; no overlap, no overflow, no wrap (fewer idle buttons only helps the D-136 layout).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
