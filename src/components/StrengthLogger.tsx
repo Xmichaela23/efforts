@@ -3002,6 +3002,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <div className="flex items-center gap-2">
             <Input
               type="date"
+              // D-133 follow-up: the one input the autofill pass missed. type="date" shows the
+              // native picker (functional, not the autofill bubble), but suppress any autofill on it.
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              name="performed-date"
               value={performedDate || ''}
               onChange={(e) => setPerformedDate(e.target.value)}
               className="h-8 px-2 py-1 text-xs text-white/90 bg-white/[0.08] border-2 border-white/20 rounded-full hover:bg-white/[0.12] hover:border-white/30 focus:bg-white/[0.12] focus:border-white/35 transition-all duration-300"
