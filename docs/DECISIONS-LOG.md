@@ -3183,6 +3183,8 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ## D-121 — Rest timer is opt-in: idle by default, user owns when it counts (reverts D-120's auto-start, 2026-06-11)
 
+> **SUPERSEDED by [D-139](#d-139) (2026-06-11).** The opt-in model was reverted back to **auto-start** — but cleanly, surfaced only in a pinned top pill (not the in-card controls D-120 used). Saga: D-120 (auto-start, in-card) → D-121 (opt-in) → D-139 (auto-start, top-pill-only + haptics). The in-row Start/Pause/Resume/Skip controls described below are gone.
+
 **Context:** D-120 made the rest timer auto-start the moment you tapped Done on a set. In use that's the wrong default — the rest timer is a *courtesy*, not something that should launch itself and start beeping. The right model is the simplest one: the timer exists, the user decides when (and whether) it counts.
 
 **Decision — opt-in courtesy, minimal:**
@@ -3447,6 +3449,22 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 **Why not the requested "bold like Reps/Weight":** Reps/Weight aren't 700-bold — they're full-opacity white; matching them literally = white, which flattens the suggested-vs-committed distinction this app relies on (D-126/D-134). Amber keeps the "prescribed but not yet assessed" meaning while giving it the active weight the greyed version lacked. (One-word swap to plain white if that's preferred.)
 
 **Files:** `src/components/StrengthLogger.tsx` (~:3702, RIR ghost span). **Verification:** build; visual — amber suggested value vs white confirmed value vs dim `—`.
+
+---
+
+## D-139 — Auto-start rest on Done, top-pill-only timer, haptics (supersedes D-121's opt-in, 2026-06-11)
+
+**Context:** the rest-timer saga came full circle — D-120 auto-started it (on the just-finished set's card) → D-121 reverted to **opt-in** (tap Start) because auto-firing-in-the-card felt wrong → here it returns to **auto-start**, but cleanly: surfaced only in a **pinned top pill**, not per-set in-row controls. This is the Hevy/Strong model the user had been circling, now with the clutter removed.
+
+**Decision:**
+- **Auto-start rest on Done** (`autoStartRestForSet`): completing a **non-last, non-duration** set starts its rest timer (`running`, keyed `${exerciseId}-${setIndex}`), re-arming a previously-Skipped set. Wired at all four completion points (mobility, RIR-already-set, confirm-RIR, skip-RIR). Reverses D-121.
+- **Top pill is the SOLE timer** (the D-100 active-rest pill): shows `REST m:ss · Skip` while a rest runs; **Skip ends the rest** (clears the timer + marks the key dismissed — D-139 part 1, was a pause-only `✕`).
+- **Removed the entire in-row rest block** — no Start, no in-row countdown/Pause/Resume/Skip, no editor popover. The set footer is now just **Done + delete-✕** (delete-✕ kept: it's `deleteSet`, a load-bearing function, not a timer control). The set-card margin (was `showRestTimer`-gated) is now fixed; the `showRestTimer`/`restToggleLabel`/etc. consts are left dead-but-harmless.
+- **Haptics** (`@capacitor/haptics@8`, guarded/no-op on web): **light impact** on auto-start (confirms Done registered + rest running), **success notification** at rest `0:00` (added to the existing tone/vibrate zero-handler → "start the next set"). An optional silence toggle is a noted follow-up, not built.
+
+**Rest saga (for future-me):** D-120 (auto-start, in-card) → D-121 (opt-in, in-row Start) → **D-139 (auto-start, top-pill-only + haptics)**. If reverting again, this is the chain.
+
+**Files:** `src/components/StrengthLogger.tsx` — `autoStartRestForSet` + `hapticLight`/`hapticSuccess` (~:2540), wired at completion points (~:2594/2600/2615/2621), top-pill Skip (~:2967), zero-handler success haptic (~:2153), in-row block removed (footer now Done+✕). `package.json` (+@capacitor/haptics). **Verification:** build clean; `cap sync` registered the native plugin. Device-test reported (Xcode rebuild needed for native haptics).
 
 ---
 
