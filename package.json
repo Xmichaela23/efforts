@@ -24,6 +24,7 @@
     "@capacitor/app": "^8.1.0",
     "@capacitor/cli": "^8.3.2",
     "@capacitor/core": "^8.3.0",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.3.2",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/ibm-plex-sans": "^5.2.8",

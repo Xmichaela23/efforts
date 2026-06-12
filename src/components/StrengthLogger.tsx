@@ -12,6 +12,7 @@ import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
 import CoreTimer from '@/components/CoreTimer';
 import { NumericKeypadSheet } from '@/components/ui/numeric-keypad-sheet';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 
 interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
@@ -2149,6 +2150,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               // event, not a rest-end — audible cue would feel out of place).
               if (!k.includes('-set-')) {
                 playRestEndTone();
+                hapticSuccess();  // D-139: success haptic at rest-end → "start the next set"
               }
             }
             
@@ -2566,6 +2568,34 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   // RIR prompt handlers
+  // D-139: haptic cues (Capacitor Haptics; no-op/guarded on web). Light tap when a rest
+  // auto-starts (confirms Done registered), success notification when rest hits 0:00.
+  const hapticLight = () => { try { void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {}); } catch {} };
+  const hapticSuccess = () => { try { void Haptics.notification({ type: NotificationType.Success }).catch(() => {}); } catch {} };
+
+  // D-139: auto-start rest on Done (reverses D-121's opt-in). Completing a non-last,
+  // non-duration set starts its rest timer (running) — surfaced ONLY in the top pill
+  // (the in-row rest block was removed). Re-arms a previously-skipped set. Light haptic.
+  const autoStartRestForSet = (exerciseId: string, setIndex: number) => {
+    try {
+      const ex = exercises.find((e) => e.id === exerciseId);
+      const set = ex?.sets[setIndex];
+      if (!ex || !set) return;
+      if (set.duration_seconds !== undefined) return;          // no rest after a duration hold
+      if (setIndex >= ex.sets.length - 1) return;              // no rest after the last set
+      const restKey = `${exerciseId}-${setIndex}`;
+      const calculatedRest = (typeof set.reps === 'number' && set.reps > 0)
+        ? calculateRestTime(ex.name, set.reps)
+        : 90;
+      setRestDismissed((prev) => { if (!prev.has(restKey)) return prev; const n = new Set(prev); n.delete(restKey); return n; });
+      setTimers((prev) => {
+        if (prev[restKey]?.running) return prev;                // already running — don't restart
+        return { ...prev, [restKey]: { seconds: calculatedRest, running: true } };
+      });
+      hapticLight();
+    } catch {}
+  };
+
   const handleSetComplete = (exerciseId: string, setIndex: number) => {
     const exercise = exercises.find(ex => ex.id === exerciseId);
     const set = exercise?.sets[setIndex];
@@ -2592,12 +2622,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // If mobility mode, just mark as complete without RIR prompt
     if (isMobilityMode) {
       updateSet(exerciseId, setIndex, { completed: true });
+      autoStartRestForSet(exerciseId, setIndex);
       return;
     }
 
     // If RIR was already entered inline, just mark complete (don't prompt again)
     if (set.rir !== undefined && set.rir !== null) {
       updateSet(exerciseId, setIndex, { completed: true });
+      autoStartRestForSet(exerciseId, setIndex);
       return;
     }
     
@@ -2614,10 +2646,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const confirmRirAndComplete = (exerciseId: string, setIndex: number, rir: number) => {
     updateSet(exerciseId, setIndex, { rir, completed: true });
     setRirConfirm(null);
+    autoStartRestForSet(exerciseId, setIndex);
   };
   const skipRirAndComplete = (exerciseId: string, setIndex: number) => {
     updateSet(exerciseId, setIndex, { completed: true });
     setRirConfirm(null);
+    autoStartRestForSet(exerciseId, setIndex);
   };
 
   const handleRIRSubmit = (rir: number | null) => {
@@ -3381,7 +3415,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
                   // No collapse/expand — every set renders fully expanded, always.
                   return (
-                    <div key={setIndex} className={`bg-white/[0.03] backdrop-blur-lg border-2 border-white/15 rounded-xl p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] ${showRestTimer ? "mb-4" : "mb-1"}`}>
+                    <div key={setIndex} className="bg-white/[0.03] backdrop-blur-lg border-2 border-white/15 rounded-xl p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] mb-2">
                       {/* Baseline test set type label and hint */}
                       {isBaselineTest && (
                         <div className="mb-1 ml-8">
@@ -3947,136 +3981,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
                     {/* Footer row — Rest/Start (left) shares ONE line with Done/✕ (right).
                         Kills the floating Rest row and the dead space above the footer. */}
-                    {/* D-136: footer wraps + the rest-control cluster is a shrink-0 group so the
-                        wider running/paused labels (Pause/Resume) + countdown never shrink the
-                        buttons into each other. "Rest" label drops once the timer is active (the
-                        countdown is self-evident) to reclaim width; Done/✕ wraps below only if it
-                        still can't fit. */}
-                    <div className="flex flex-wrap items-center gap-2 relative">
-                      {showRestTimer && (
-                        <div className="flex items-center gap-2 shrink-0">
-                          {restToggleLabel === 'Start' && <span className="text-xs text-white/60 shrink-0">Rest</span>}
-                          <button
-                            onClick={() => {
-                              const key = restTimerKey;
-                              // Rest duration reflects THIS set's effort (the set just finished).
-                              const calculatedRest = set.reps && set.reps > 0 && set.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, set.reps)
-                                : 90;
-                              const cur = restTimer?.seconds ?? calculatedRest;
-                              const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
-                              setEditingTimerKey(key);
-                              setEditingTimerValue(prefill);
-                            }}
-                            onContextMenu={(e) => {
-                              e.preventDefault();
-                              const calculatedRest = set.reps && set.reps > 0 && set.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, set.reps)
-                                : 90;
-                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: calculatedRest, running: false } }));
-                            }}
-                            className="h-7 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] shrink-0 whitespace-nowrap"
-                            style={{ fontFamily: 'Inter, sans-serif' }}
-                            aria-label="Rest timer"
-                          >
-                            {formatSeconds(restTimer?.seconds ?? (() => {
-                              return set.reps && set.reps > 0 && set.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, set.reps)
-                                : 90;
-                            })())}
-                          </button>
-                          <button
-                            onClick={() => {
-                              const calculatedRest = set.reps && set.reps > 0 && set.duration_seconds === undefined
-                                ? calculateRestTime(exercise.name, set.reps)
-                                : 90;
-                              // Opt-in: Start launches the idle timer; toggles pause/resume thereafter.
-                              setTimers(prev => {
-                                const cur = prev[restTimerKey];
-                                const seconds = (cur?.seconds ?? calculatedRest) || calculatedRest;
-                                return { ...prev, [restTimerKey]: { seconds, running: !(cur?.running) } };
-                              });
-                            }}
-                            className="h-7 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] shrink-0 whitespace-nowrap"
-                            style={{ fontFamily: 'Inter, sans-serif' }}
-                            aria-label={`${restToggleLabel} rest timer`}
-                          >
-                            {restToggleLabel}
-                          </button>
-                          {/* D-137: Skip only appears once the timer is actually running/paused —
-                              our timer is opt-in (tap Start), so there's nothing to "skip" in the
-                              idle state. Skip = dismiss an ACTIVE timer (done resting early). */}
-                          {restToggleLabel !== 'Start' && (
-                          <button
-                            onClick={() => {
-                              // Skip: cut the rest short and hide this set's rest row.
-                              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: 0, running: false } }));
-                              setRestDismissed(prev => {
-                                const next = new Set(prev);
-                                next.add(restTimerKey);
-                                return next;
-                              });
-                            }}
-                            className="h-7 px-2 text-xs rounded-md border-2 border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/[0.1] hover:border-white/30 transition-all duration-300 shrink-0 whitespace-nowrap"
-                            style={{ fontFamily: 'Inter, sans-serif' }}
-                            aria-label="Skip rest timer"
-                          >
-                            Skip
-                          </button>
-                          )}
-                          {editingTimerKey === restTimerKey && (
-                            <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                name="rest-seconds"
-                                autoComplete="off"
-                                autoCorrect="off"
-                                autoCapitalize="off"
-                                spellCheck={false}
-                                data-1p-ignore="true"
-                                data-lpignore="true"
-                                data-form-type="other"
-                                readOnly={timerEditReadOnly}
-                                onFocus={() => setTimerEditReadOnly(false)}
-                                value={editingTimerValue}
-                                onChange={(e)=>setEditingTimerValue(e.target.value)}
-                                placeholder="mm:ss or 90"
-                                className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
-                              />
-                              <div className="flex justify-end gap-2 mt-2">
-                                <button
-                                  onClick={() => {
-                                    const input = editingTimerValue.trim();
-                                    let newSeconds = 0;
-                                    if (input.includes(':')) {
-                                      const [mins, secs] = input.split(':');
-                                      newSeconds = (parseInt(mins, 10) || 0) * 60 + (parseInt(secs, 10) || 0);
-                                    } else {
-                                      const num = parseInt(input, 10) || 0;
-                                      newSeconds = num <= 20 ? num * 60 : num;
-                                    }
-                                    if (newSeconds > 0) {
-                                      setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: newSeconds, running: false } }));
-                                    }
-                                    setEditingTimerKey(null);
-                                  }}
-                                  className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  onClick={() => setEditingTimerKey(null)}
-                                  className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                                >
-                                  Close
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <div className="ml-auto flex items-center gap-2 shrink-0">
+                    {/* D-139: footer is now just Done + delete-✕ (right-aligned). The in-row rest
+                        block was removed — rest auto-starts on Done and lives only in the top pill. */}
+                    <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={() => handleSetComplete(exercise.id, setIndex)}
                           className={`text-xs px-3 py-1 rounded-full h-9 transition-all duration-300 ${set.completed ? `${themeColors.doneBg} border-2 ${themeColors.doneBorder} ${themeColors.doneText}` : 'bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'}`}
