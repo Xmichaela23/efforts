@@ -2803,6 +2803,32 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         saved = await addWorkout(completedWorkout as any);
       }
 
+      // Readiness check-in dual-write (D-142, Q-049 Phase 1 step 3). The check-in
+      // is now a first-class DAILY signal in readiness_checkins (source of truth,
+      // D-140), keyed (user_id, date) and decoupled from the workout. We KEEP the
+      // workout_metadata.readiness JSONB write above — injury-flag extraction and
+      // compute-facts still read it (guardrail: those consumers stay unchanged) —
+      // and ALSO upsert the daily row here. Fail-soft on purpose: a missing table
+      // (pre-migration) or any error must NEVER block the workout save.
+      if (readinessData) {
+        try {
+          const rcUserId = getStoredUserId();
+          if (rcUserId) {
+            await supabase.from('readiness_checkins').upsert({
+              user_id: rcUserId,
+              date: workoutDate,
+              energy: readinessData.energy,
+              soreness: readinessData.soreness,
+              sleep: readinessData.sleep,
+              source: 'workout_logger',
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id,date' });
+          }
+        } catch (rcErr) {
+          console.warn('[readiness] check-in dual-write failed (non-fatal):', rcErr);
+        }
+      }
+
       // Calculate workload for completed workout
       try {
         const workoutId = saved?.id || completedWorkout.id;

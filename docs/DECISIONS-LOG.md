@@ -3497,6 +3497,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-142 — Check-in dual-writes the daily table AND keeps the workout_metadata JSONB
+
+- **Date:** 2026-06-12
+- **Context:** SPEC-ATHLETE-STATE-CONTINUITY (Q-049) Phase 1 step 3 of 4. With the table (D-140) + rollup (D-141) in place, the live check-in must start populating `readiness_checkins`. The migration plan left "in addition to / instead of" the JSONB path open.
+- **Decision:** **Dual-write, not replace.** `finalizeSave` in `StrengthLogger.tsx` keeps embedding the check-in in `workout_metadata.readiness` (the existing path) **and** additionally upserts a `readiness_checkins` row keyed `(user_id, date)` with `source: 'workout_logger'`, immediately after the workout save succeeds. Direct client upsert (RLS `auth.uid() = user_id`), `onConflict: 'user_id,date'`.
+- **Why dual-write was forced (not a free choice):** the guardrail requires injury-flag extraction to keep working **unchanged**, and `recompute-athlete-memory` extracts injury flags from the per-workout `workout_metadata.readiness` blob (and `compute-facts` echoes the same blob into `workout_facts`). Dropping the JSONB write would break those consumers. So the JSONB stays; the table is added alongside.
+- **Fail-soft (load-bearing):** the upsert is `try/caught` and only runs when `readinessData` exists and a stored user id is present. A missing table (pre-migration), RLS hiccup, or offline state logs a non-fatal warning and the workout save proceeds untouched. This is why the client can ship **before** the migration is applied — the dual-write simply no-ops until the table exists.
+- **Sub-decision flagged (not a reserved Q1–Q3 call):** `source = 'workout_logger'` for live check-ins (vs `'backfill'` for migrated rows, D-143). Free-text column, so the future non-workout daily entry point can add its own value with no migration.
+- **Tradeoff accepted:** two readiness stores momentarily diverge if one write succeeds and the other fails — acceptable because the table is the go-forward source of truth and the JSONB is only still read by the injury/facts path; reconciliation isn't needed for Phase 1 (no prescription effect).
+- **Files:** `src/components/StrengthLogger.tsx` (`finalizeSave`, after the workout save). Client build clean.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
