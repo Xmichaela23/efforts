@@ -3699,7 +3699,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               >
                                 {hasValue
                                   ? <span className={set.from_previous && !set.completed ? 'text-white/35' : 'text-white'}>{set.rir >= 5 ? '5+' : set.rir}</span>
-                                  : <span className="text-white/30">{targetRir != null ? (targetRir >= 5 ? '5+' : targetRir) : '—'}</span>}
+                                  : <span className={targetRir != null ? "text-amber-300/80 font-medium" : "text-white/30"}>{targetRir != null ? (targetRir >= 5 ? '5+' : targetRir) : '—'}</span>}
                                 {/* Q-042: subtle tap-to-type affordance */}
                                 <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
                               </button>
