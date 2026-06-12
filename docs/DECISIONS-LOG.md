@@ -3398,6 +3398,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-135 — Safari "Save" autofill bubble on the rest-timer input: readOnly-on-focus + PW-manager ignores (2026-06-11)
+
+**Context:** Device-pinpointed (screenshot: the "2:30" rest-timer field amber-ringed/focused with the iOS "Save" bubble directly below). D-133 changed it off `type="tel"` (phone autofill) and added `autocomplete="off"`, but the bubble persisted — the classic "**Safari ignores `autocomplete="off"`**" case, and the "Save" wording suggests the iOS credential-save prompt **or** a password manager (1Password/LastPass save bubbles look identical).
+
+**Decision — stop the whack-a-mole with the two reliable, attribute-only suppressions (held the nuclear "make it a non-input" option in reserve):**
+- **`readOnly`-until-focus** (the reliable iOS/Safari fix): the timer editor `<input>` renders `readOnly`, so it is read-only *at the moment focus lands* → iOS/Safari won't offer AutoFill/Save for it. `onFocus` drops `readOnly` so typing still works; a `useEffect([editingTimerKey])` resets it to `true` each time an editor (re)opens. The editor is tap-to-focus (not autofocused), so UX is unchanged. State `timerEditReadOnly` is shared (only one editor open at a time).
+- **Password-manager ignores:** `data-1p-ignore`, `data-lpignore="true"`, `data-form-type="other"` — suppress 1Password / LastPass / Dashlane save bubbles.
+- **Neutral name:** `name="rest-seconds"` / `name="duration-seconds"` (nothing Safari pattern-matches as a credential/contact). No `<form>` wrapper exists, so it's not a form-submit save.
+
+**Files:** `src/components/StrengthLogger.tsx` — `timerEditReadOnly` state + reset effect (~:398); both timer editor inputs (rest ~:4002, duration ~:3465). **Verification:** build; device test (tap the "2:30" field, type → no Save bubble). **Reserve (if attributes still fail):** convert the timer editor to a non-input — a tappable `<div>` opening a keypad sheet like the Reps/Weight/RIR cells (which never autofill because they're buttons, not inputs) — eliminating the autofill surface entirely. Not done unless this round fails on device.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

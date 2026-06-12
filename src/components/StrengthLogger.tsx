@@ -395,6 +395,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [previousSessionByName, setPreviousSessionByName] = useState<Record<string, LoggedSet[]>>({});
   const [editingTimerKey, setEditingTimerKey] = useState<string | null>(null);
   const [editingTimerValue, setEditingTimerValue] = useState<string>("");
+  // D-135: readOnly-until-focus on the timer editor inputs. iOS Safari (and 1Password/
+  // LastPass) won't fire the AutoFill "Save" bubble for a field that is readOnly at the
+  // moment focus lands — `autocomplete="off"` alone is ignored by Safari. We render the
+  // input readOnly, drop readOnly on focus so typing still works, and reset to true each
+  // time a timer editor (re)opens. Combined with data-1p-ignore / data-lpignore below.
+  const [timerEditReadOnly, setTimerEditReadOnly] = useState(true);
+  useEffect(() => { if (editingTimerKey) setTimerEditReadOnly(true); }, [editingTimerKey]);
   // Numeric keypad (bottom sheet) for fast, error-resistant input
   type KeypadField = 'reps' | 'weight' | 'rir';
   const keypadCtxRef = useRef<{ exerciseId: string; setIndex: number; field: KeypadField; alsoComplete?: boolean } | null>(null);
@@ -3467,10 +3474,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 <input
                                   type="text"
                                   inputMode="numeric"
+                                  name="duration-seconds"
                                   autoComplete="off"
                                   autoCorrect="off"
                                   autoCapitalize="off"
                                   spellCheck={false}
+                                  data-1p-ignore="true"
+                                  data-lpignore="true"
+                                  data-form-type="other"
+                                  readOnly={timerEditReadOnly}
+                                  onFocus={() => setTimerEditReadOnly(false)}
                                   value={editingTimerValue}
                                   onChange={(e)=>setEditingTimerValue(e.target.value)}
                                   placeholder=":60 or 1:00"
@@ -4004,10 +4017,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               <input
                                 type="text"
                                 inputMode="numeric"
+                                name="rest-seconds"
                                 autoComplete="off"
                                 autoCorrect="off"
                                 autoCapitalize="off"
                                 spellCheck={false}
+                                data-1p-ignore="true"
+                                data-lpignore="true"
+                                data-form-type="other"
+                                readOnly={timerEditReadOnly}
+                                onFocus={() => setTimerEditReadOnly(false)}
                                 value={editingTimerValue}
                                 onChange={(e)=>setEditingTimerValue(e.target.value)}
                                 placeholder="mm:ss or 90"
