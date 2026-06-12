@@ -406,6 +406,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [keypadSecondaryLabel, setKeypadSecondaryLabel] = useState<string | undefined>(undefined);
   const [keypadHint, setKeypadHint] = useState<string | undefined>(undefined);
   const keypadSecondaryHandlerRef = useRef<(() => void) | undefined>(undefined);
+  // D-134: inline RIR confirm-on-Done. When Done is tapped on a set with no RIR yet, we
+  // surface a quick confirm-or-adjust RIR selector on that set's card (suggested value
+  // pre-highlighted, one tap to accept) instead of opening the numeric keypad. RIR stays
+  // NOT pre-committed (D-126) — the tap is the post-set assessment.
+  const [rirConfirm, setRirConfirm] = useState<{ exerciseId: string; setIndex: number } | null>(null);
   // Menus
   const [showPlannedMenu, setShowPlannedMenu] = useState(false);
   const [showAddonsMenu, setShowAddonsMenu] = useState(false);
@@ -2565,7 +2570,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       updateSet(exerciseId, setIndex, { completed: false });
       return;
     }
-    
+
+    // D-134: a second Done tap while THIS set's inline RIR confirm is open cancels it
+    // (back out of an accidental Done without committing).
+    if (rirConfirm && rirConfirm.exerciseId === exerciseId && rirConfirm.setIndex === setIndex) {
+      setRirConfirm(null);
+      return;
+    }
+
     // Check if we're in mobility mode - skip RIR prompt for mobility
     const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
     const isMobilityMode = loggerMode === 'mobility';
@@ -2582,21 +2594,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
     
-    // If set is not completed and no RIR entered, prompt via numeric keypad (no separate screen)
-    openKeypadForSet({
-      exerciseId,
-      setIndex,
-      field: 'rir',
-      title: 'RIR (reps in reserve)',
-      initialValue: '',
-      allowDecimal: false,
-      confirmLabel: 'Done',
-      secondaryLabel: 'Skip RIR',
-      onSecondary: () => {
-        updateSet(exerciseId, setIndex, { completed: true });
-      },
-      alsoComplete: true,
-    });
+    // D-134 (refines D-126): RIR is not pre-committed, but Done no longer drops into the
+    // numeric keypad. Surface a quick INLINE confirm-or-adjust RIR selector on this set's
+    // card (suggested value pre-highlighted; one tap confirms, a different tap adjusts, both
+    // complete the set; "skip" completes without RIR). The confirmed tap is the post-set
+    // assessment — the suggested value is never auto-committed without it.
+    setRirConfirm({ exerciseId, setIndex });
+  };
+
+  // D-134: resolve the inline RIR confirm — a pill tap confirms/adjusts + completes; skip
+  // completes without RIR. Both clear the prompt.
+  const confirmRirAndComplete = (exerciseId: string, setIndex: number, rir: number) => {
+    updateSet(exerciseId, setIndex, { rir, completed: true });
+    setRirConfirm(null);
+  };
+  const skipRirAndComplete = (exerciseId: string, setIndex: number) => {
+    updateSet(exerciseId, setIndex, { completed: true });
+    setRirConfirm(null);
   };
 
   const handleRIRSubmit = (rir: number | null) => {
@@ -3863,6 +3877,52 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </div>
                     )}
                     
+                    {/* D-134: inline RIR confirm-on-Done. Appears on THIS set's card when Done was
+                        tapped with no RIR yet. Suggested value (target_rir) is pre-highlighted with a
+                        ring — one tap confirms, a different tap adjusts; both complete the set. "skip"
+                        completes without RIR. Feels like confirming, not a blocking modal. */}
+                    {rirConfirm && rirConfirm.exerciseId === exercise.id && rirConfirm.setIndex === setIndex && (() => {
+                      const targetRir = exercise.target_rir;
+                      return (
+                        <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/[0.08] px-2 py-1.5" role="group" aria-label="Confirm reps in reserve">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-300/90">Confirm RIR</span>
+                            <button
+                              type="button"
+                              onClick={() => skipRirAndComplete(exercise.id, setIndex)}
+                              className="text-[10px] text-white/45 hover:text-white/75 px-1"
+                              style={{ fontFamily: 'Inter, sans-serif' }}
+                              aria-label="Skip RIR — complete the set without recording RIR"
+                            >
+                              skip
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            {[0, 1, 2, 3, 4, 5].map((r) => {
+                              const isCap = r === 5;  // 5 = "5+"
+                              const isSuggested = targetRir != null && (targetRir === r || (targetRir >= 5 && isCap));
+                              return (
+                                <button
+                                  key={r}
+                                  type="button"
+                                  onClick={() => confirmRirAndComplete(exercise.id, setIndex, r)}
+                                  className={`h-9 w-9 rounded-full border-2 text-sm tabular-nums leading-none transition-colors ${
+                                    isSuggested
+                                      ? 'bg-amber-500/30 border-amber-300 text-amber-100 font-semibold ring-2 ring-amber-300/50'
+                                      : 'bg-white/[0.04] border-white/15 text-white/70 hover:bg-amber-500/15 hover:border-amber-400/40'
+                                  }`}
+                                  style={{ fontFamily: 'Inter, sans-serif' }}
+                                  aria-label={`RIR ${isCap ? '5 or more' : r}${isSuggested ? ' (suggested — tap to confirm)' : ''}`}
+                                >
+                                  {isCap ? '5+' : r}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Footer row — Rest/Start (left) shares ONE line with Done/✕ (right).
                         Kills the floating Rest row and the dead space above the footer. */}
                     <div className="flex items-center gap-2 relative">

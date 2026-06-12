@@ -3263,6 +3263,9 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ## D-126 — Logger fields prefill from the PLAN PRESCRIPTION, not last-actual (supersedes D-097's prefill; Q-048 step 2, 2026-06-11)
 
+> **RIR-not-prefilled friction resolved by [D-134](#d-134) (2026-06-11):** RIR stays *not pre-committed* (the rationale below holds — it's assessed AFTER the set), but Done now surfaces a one-tap inline confirm-or-adjust instead of requiring manual keypad entry. The confirmed tap *is* the assessment; the suggested value is still never auto-committed.
+
+
 **Context:** With the compact layout (D-125), the pre-filled cells *are* the primary input, so what they prefill with matters more. Two sources existed: the **plan prescription** (planned sessions → `parseFromComputed(computed.steps)` sets `weight`/`reps`; `target_rir` shows as a ghost) and **last-actual** (the D-097 effect overlaid the most-recent prior session's per-set values onto untouched sets, dimmed via `from_previous`). On a deload week this produced a contradiction the user hit: the box showed last-actual-ish numbers while the new "last:" anchor (D-122) *also* showed last-actual — and the plan was intentionally lighter. Two history surfaces, one of them masquerading as the prescription.
 
 **Decision — plan in the box, history in the anchor.** Removed the last-actual **field prefill** (the `setExercises(... from_previous ...)` block in the D-097 effect). Now:
@@ -3378,6 +3381,20 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 - Notes (`Textarea` `:4038`, session `textarea` `:4129`) → `autoComplete="off"` only (kept autocorrect/spellcheck — free prose benefits from them; the bubble is an autofill, not autocorrect, concern). RPE `<input type="number">` (`:4137`) → `inputMode="numeric"` + `autoComplete="off"`.
 
 **Files:** `src/components/StrengthLogger.tsx`. **Verification:** build; device check (type in a search/name + open a timer editor → no save/autofill bubble). The keypad (weight/RIR) was never a trigger — no input to autofill.
+
+---
+
+## D-134 — RIR confirm-on-Done: one-tap confirm-or-adjust (resolves D-126's manual-entry friction, 2026-06-11)
+
+**Context:** Reps + Weight prefill from the plan, but RIR is intentionally **not** pre-committed (D-126: RIR is assessed *after* the set, and the e1RM pipeline must not ingest an unassessed/auto-defaulted RIR). The friction: that meant manually entering RIR via the numeric keypad on every Done, even when the suggested value was right.
+
+**Decision (option 1 — confirm-or-adjust, matches RP/Boostcamp autoregulation apps):** tapping **Done** on a set with no RIR yet surfaces a **quick inline RIR confirm** on that set's card instead of the keypad:
+- A small amber **"Confirm RIR"** row with the `0,1,2,3,4,5+` pills; the **suggested value (`target_rir`) is pre-highlighted with a ring** ("tap to confirm"). One tap confirms; a different tap adjusts — **both complete the set** (`confirmRirAndComplete` → `updateSet({ rir, completed: true })`). A subtle **"skip"** completes without RIR (`skipRirAndComplete`).
+- **Not a blocking modal** — inline on the card, at the moment of Done. A **second Done tap cancels** the open confirm (back out of an accidental Done).
+- **If RIR was already set** (via the keypad cell or the strip ±1 before Done) → no prompt, just logs (unchanged).
+- **Data integrity preserved:** the suggested value is **never auto-committed** — it requires the tap, which IS the post-set assessment. This is the whole reason RIR isn't prefilled (D-126); confirm-on-Done keeps that property while removing the keypad friction. Replaced the old `openKeypadForSet({field:'rir', secondaryLabel:'Skip RIR'})` path.
+
+**Files:** `src/components/StrengthLogger.tsx` — `rirConfirm` state (~:409), `handleSetComplete` (sets `rirConfirm` instead of opening the keypad; second-Done-cancels), `confirmRirAndComplete`/`skipRirAndComplete` (~:2600), inline confirm row before the footer (~:3880). **Verification:** build; 380px render — pills `w-9` (36px) with 15px gaps (22px @414px), no overflow (label + skip moved to a top line so the 6 pills get the full width). Device-test reported.
 
 ---
 
