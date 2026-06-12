@@ -3468,6 +3468,22 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-140 — Readiness check-ins get their own daily-keyed table (source of truth); avg_readiness becomes a derived rollup
+
+- **Date:** 2026-06-12
+- **Context:** SPEC-ATHLETE-STATE-CONTINUITY (Q-049) Phase 1. The Quick check-in (energy/soreness/sleep) was trapped per-workout in `workout_metadata.readiness` JSONB; the only time-series was the WEEKLY `athlete_snapshot.avg_readiness` (averaged over `workout_facts`). No per-day resolution, and the check-in was bound to a workout save.
+- **Decision (Q1=C, chosen by the human):** Create a dedicated `readiness_checkins` table — `(user_id, date, energy, soreness, sleep, source)`, `UNIQUE(user_id, date)` — as the **source of truth**, decoupled from workout saves. `athlete_snapshot.avg_readiness` is **retained** and becomes a **derived weekly rollup** over this table (D-141), NOT removed. Step 1 of 4 (table → rollup → dual-write → backfill); the Arc wire (Phase 1 culmination) is deliberately NOT in this arc — it's blocked on the still-open Q2 (Arc payload shape) and Q3 (unfilled-check-in handling).
+- **Alternatives considered (the Q1 options doc):**
+  - **A — finish the wire on the existing weekly `avg_readiness`.** Cheapest (no schema), but weekly-only granularity forecloses day-by-day trends ("soreness climbing all week") permanently. Rejected as the ceiling.
+  - **B — per-workout `workout_facts.readiness` queried by date.** No new table, but per-workout ≠ per-day: rest days / unlogged sessions are gaps, and the check-in stays welded to a workout save. Rejected.
+  - **C (chosen) — new daily table.** True daily series; decouples the check-in from a workout (enables a future morning check-in with no session). Cost: schema + migration + new write path + backfill.
+- **Why this one:** Q1 gates Q2/Q3 — only a per-day series unlocks daily trends, and the human picked the resolution explicitly. The weekly aggregate stays as a cheap derived view so the two existing consumers (taperSensitivity, injury flags) are untouched.
+- **Schema choices:** raw sliders only (the table is lossless; any derived "readiness score" — Q2, still open — is computed at read time in arc-context, never stored). `source` is **free text, no CHECK** (it will gain a value when the non-workout daily entry point lands; a CHECK would force a migration). RLS grants authenticated users read+insert+update on their OWN rows because the check-in is written directly from the client (D-142), plus full service-role access for the rollup/backfill.
+- **Tradeoff accepted:** a second readiness store now coexists with the per-workout JSONB (kept on purpose — see D-142). The table is daily-keyed, so the backfill must dedupe multiple same-day workouts (D-143). Migration applied via the Supabase SQL editor, not `supabase db push` (repo convention, docs/MAINTENANCE-DEBT.md).
+- **Files:** `supabase/migrations/20260612120000_create_readiness_checkins.sql`.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
