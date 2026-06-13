@@ -3569,6 +3569,21 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-147 — Unplanned-load escalation gated on ACWR ≥ 1.0 + "off plan" wording (sibling of D-146)
+
+- **Date:** 2026-06-12
+- **Bug (case b, found by tracing real data after D-146 didn't flip the screen):** the STATE "Load is high — back off and recover" / "pull back" persisted on a week where the athlete had a **healthy** 28-day base (chronic 1544 ≫ 500 floor, so D-146 correctly stayed silent) but trained **light and off-plan** — skipped all planned runs and did one unplanned ride. The live trace (`scripts/d146-load-trace.mjs`, read-only) showed the cached `load_status.interpretation` named the trigger verbatim: *"Running load 100% below plan … unplanned load is 89% of planned week"* — i.e. `reconcileLoadStatus:763` (`unplannedPct > 50 → raise('high')`). **ACWR was 0.49** (acute 191 ≈ half a normal week): the athlete was *under* baseline, not overloaded. The unplanned-load path read a *ratio* ("89% of a small planned week") as overload.
+- **Fix 1 — gate unplanned-load escalation on absolute load (`reconcileLoadStatus:758-771`):** `loadActuallyElevated = unweightedAcwr != null && unweightedAcwr >= 1.0` (ACWR ≥ 1.0 ≡ acute ≥ chronic-average). The unplanned-load-magnitude raises (both `'high'` and `'elevated'`, planned-week and no-plan branches) now fire **only** when `loadActuallyElevated`. Below baseline, an unplanned session is a *swap*, not overload → `load_status` reflects the real (low) value.
+- **Fix 2 — "off plan" wording (`intent_summary`, before the race-aware overrides):** when `load_status` is low (`under`/`on_target`), running is ≥50% under plan (`run_only_week_load_pct ≤ -50`), and the intent isn't one that's *meant* to be light (`recovery`/`taper`/`deload`/`peak`) → return *"Off plan this week — planned sessions skipped. Get back on schedule before adding extra."* **Placed before the race overrides on purpose:** "final build, every session counts" is worse than useless when the sessions were skipped, so adherence takes precedence over race-phase encouragement on a genuine skip.
+- **Case (c) preserved (verified in code):** genuine overload still fires "high → back off" — `loadActuallyElevated` true (ACWR ≥ 1.0) keeps the unplanned escalation, and the body-decline (`:709`) and overreached/fatigued-readiness (`:731`) paths are **independent** of this gate, so real overreaching at *any* ACWR is untouched. The off-plan wording only fires for low/normal `load_status` (high/elevated handled above).
+- **Threshold:** `ACWR ≥ 1.0`. Signed off. The athlete's 0.49 has large margin; off-plan shortfall bar is `≤ -50%` (did ≤ half the planned running).
+- **Trace confirmation (real account, this week):** `loadActuallyElevated = false` (ACWR 0.49) → unplanned escalation gated off → `load_status` flips `high → under` (bar "build more") → off-plan wording fires ("…Get back on schedule…"). Was "Load is high — back off and recover."
+- **Cache:** bumped `COACH_PAYLOAD_VERSION 35 → 36` — D-146/D-147 change `load_status`/`intent_summary` *values*, and a coach **deploy does not invalidate `coach_cache`**; without the bump the fresh cached "high load" row would serve stale (≤24h / until next ingest). This is why D-146 alone "didn't visibly take." (`COACH_CLIENT_MIN_PAYLOAD_VERSION` left as-is — no client-required field added.)
+- **Composition with D-146:** disjoint cases — D-146 = spike on *thin* base (ACWR nulled); D-147 = healthy base, *light off-plan* week. On a thin base `acwr` is null → `loadActuallyElevated` false → D-147 also won't fire unplanned-high, consistent.
+- **Scope:** server-only (`coach/index.ts`). Untouched: `LoadBar.tsx`, adapt-plan/suggested_rir, auto-attach-planned, D-139. `deno check` error count unchanged (9 pre-existing, 0 added). **Deploy:** `coach` (held for sign-off).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

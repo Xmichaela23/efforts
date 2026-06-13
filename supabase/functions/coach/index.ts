@@ -89,7 +89,8 @@ const corsHeaders: Record<string, string> = {
 /** v32: 70.3 swim yardage gate → Olympic bridge pivot lines in snapshot longitudinal block + legacy FACTS. */
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
 /** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
-const COACH_PAYLOAD_VERSION = 35;
+/** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
+const COACH_PAYLOAD_VERSION = 36;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -755,8 +756,18 @@ function reconcileLoadStatus(
     }
   }
 
-  // Unplanned load magnitude
-  if (unplannedLoad.count > 0 && unplannedLoad.plannedWeekLoad > 0) {
+  // Unplanned load magnitude — gated on absolute load actually being at/above
+  // baseline (D-147). unplanned-as-%-of-planned-week explodes on a LIGHT, off-plan
+  // week (skip your planned runs + do one unplanned ride → "89% of planned week")
+  // and used to escalate to 'high' → "back off and recover" while ACWR was 0.49
+  // (you're UNDER baseline — half a normal week). That's a SWAP, not overload.
+  // Require unweightedAcwr ≥ 1.0 (acute ≥ chronic average) before unplanned volume
+  // can raise load_status at all; below baseline the status reflects actual (low)
+  // load → "build more / off plan". Genuine overload still fires here when ACWR
+  // ≥ 1.0, and the body-decline (:709) and overreached-readiness (:731) paths are
+  // independent of this gate, so real overreaching at any ACWR is preserved.
+  const loadActuallyElevated = unweightedAcwr != null && unweightedAcwr >= 1.0;
+  if (loadActuallyElevated && unplannedLoad.count > 0 && unplannedLoad.plannedWeekLoad > 0) {
     const unplannedPct = Math.round((unplannedLoad.totalLoad / unplannedLoad.plannedWeekLoad) * 100);
     if (runBodyOk && excessIsCrossTraining) {
       if (unplannedPct > 100) raise('elevated', `unplanned cross-training is ${unplannedPct}% of planned week`);
@@ -765,7 +776,7 @@ function reconcileLoadStatus(
       else if (unplannedPct > 25) raise('elevated', `unplanned load is ${unplannedPct}% of planned week`);
     }
   }
-  if (unplannedLoad.count > 0 && unplannedLoad.plannedWeekLoad <= 0 && raw.actual_vs_planned_pct != null) {
+  if (loadActuallyElevated && unplannedLoad.count > 0 && unplannedLoad.plannedWeekLoad <= 0 && raw.actual_vs_planned_pct != null) {
     if (raw.actual_vs_planned_pct > 50) raise('high', `actual load ${raw.actual_vs_planned_pct}% above plan`);
     else if (raw.actual_vs_planned_pct > 25) raise('elevated', `actual load ${raw.actual_vs_planned_pct}% above plan`);
   }
@@ -4720,6 +4731,25 @@ ${narrativeFacts.join('\n')}`;
               return 'Peak week — running is on plan. Watch cross-training volume.';
             }
             return 'Peak week — load is creeping up. Keep it controlled, protect your legs.';
+          }
+
+          // ── Off-plan adherence (D-147) — takes precedence over race-phase
+          // encouragement on a genuine skip ──────────────────────────────────
+          // Substantially under planned running on a normal training week with no
+          // overload signal = a SKIPPED-the-plan week, not a light plan. The
+          // actionable message is adherence (get back on schedule), NOT added
+          // volume — and "final build, every session counts" is worse than useless
+          // when the sessions were skipped, so this fires BEFORE the race-aware
+          // overrides. Gated on a real planned-running shortfall (runLoadPct ≤ -50,
+          // i.e. did ≤ half the planned running) and excluded on intents MEANT to
+          // be light (recovery/taper/deload/peak). Only for low/normal
+          // load_status; 'high'/'elevated' (real overload) are handled above.
+          if (
+            (ls === 'under' || ls === 'on_target') &&
+            runLoadPct != null && runLoadPct <= -50 &&
+            !['recovery', 'taper', 'deload', 'peak'].includes(intent)
+          ) {
+            return 'Off plan this week — planned sessions skipped. Get back on schedule before adding extra.';
           }
 
           // ── Race-aware overrides (≤21 days out) ─────────────────────────
