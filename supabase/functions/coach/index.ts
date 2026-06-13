@@ -665,6 +665,7 @@ function reconcileLoadStatus(
   unplannedLoad: { count: number; totalLoad: number; plannedWeekLoad: number },
   runLoadPct: number | null,
   discProfiles?: Array<{ discipline: string; maturity: string; acwr: number | null }>,
+  spikeOnEmptyBase: boolean = false,
 ): { status: 'under' | 'on_target' | 'elevated' | 'high'; interpretation: string } {
   const reasons: string[] = [];
 
@@ -804,6 +805,29 @@ function reconcileLoadStatus(
     (unweightedAcwr == null || unweightedAcwr < 1.25)
   ) {
     status = LOAD_RANK[raw.status] < LOAD_RANK['on_target'] ? raw.status : 'on_target';
+  }
+
+  // ── Spike-on-empty-base downgrade (D-146) ──────────────────────────────
+  // The escalation paths above (cross-training ACWR :750, unplanned load :763,
+  // actual-vs-plan :768) can drive 'high'/'elevated' off a SINGLE big session on
+  // a thin base — but an undertrained athlete needs volume, not recovery. When
+  // the week is a spike on an empty base and there is NO genuine overreaching
+  // signal (body trends not declining, readiness not fatigued/overreached) and
+  // it isn't a planned easy week, downgrade to 'under' so the verdict reads
+  // "build more / get consistent" instead of "back off". Gated to NEVER suppress
+  // a real ramp (multiple sessions + real chronic base clears the chronic floor,
+  // so spikeOnEmptyBase is false) or a body-signal 'high' (nDeclining ≥ 2 /
+  // overreached readiness keep it). Extends the detrained-softening family above.
+  if (
+    spikeOnEmptyBase &&
+    (status === 'high' || status === 'elevated') &&
+    !isEasyWeek &&
+    nDeclining < 2 &&
+    readiness !== 'overreached' &&
+    readiness !== 'fatigued'
+  ) {
+    status = 'under';
+    reasons.push('one big session on a thin base — build consistency, not recovery');
   }
 
   // ── Build interpretation ───────────────────────────────────────────────
@@ -2488,7 +2512,35 @@ Deno.serve(async (req) => {
       .sort((a: any, b: any) => (b.workload_actual || 0) - (a.workload_actual || 0))
       .slice(0, 3);
 
-    const acwr = chronic28Load > 0 ? (acute7Load / 7) / (chronic28Load / 28) : null;
+    // ── Spike-on-empty-base guard (D-146) ──────────────────────────────────
+    // A big single session on a thin/empty chronic base makes the discipline-
+    // agnostic ACWR explode (one ride in a dead month → ACWR ≈ 4.0) and reads as
+    // "high load → back off" when the athlete is actually UNDERtrained —
+    // undertraining MAXIMISES the signal instead of dampening it. ACWR is
+    // statistically unreliable on a thin chronic base, so we null it there. That
+    // single value feeds the gauge dot (:4771), the okTitle/okKicker (:2529),
+    // the buildVerdict ACWR branch (:882), and the cross-training-ACWR
+    // escalation in reconcileLoadStatus (:3239) — so one null neutralises all
+    // four ACWR-driven "high load" surfaces at once.
+    //
+    // Thresholds (workload = hours × intensity² × 100): a normal ~6-session week
+    // is ≈300–420 pts/wk → ≈1300–1700 over 28d and clears CHRONIC_LOAD_FLOOR
+    // comfortably (≈2.7×); a light-but-consistent 4-session week ≈800 also
+    // clears; one big ride on an otherwise dead month ≈200–300 does not.
+    const CHRONIC_LOAD_FLOOR = 500;          // 28-day workload sum below which ACWR / "high load" is unreliable
+    const SINGLE_SESSION_DOMINANCE = 0.60;   // one session > 60% of the acute week = a spike, not sustained load
+    const acuteSessionCount = acute7Rows.length;
+    const topAcuteSessionLoad = acute7Rows.reduce((m: number, r: any) => Math.max(m, safeNum(r?.workload_actual) || 0), 0);
+    const thinChronicBase = chronic28Load < CHRONIC_LOAD_FLOOR;
+    const oneSessionDominatesAcute = acute7Load > 0 && (topAcuteSessionLoad / acute7Load) > SINGLE_SESSION_DOMINANCE;
+    // Master gate = thin chronic base → ACWR unreliable (catches any lumpy thin
+    // week, including a multi-small-session ramp-back). The load_status DOWNGRADE
+    // additionally requires the week to actually BE a spike (≤1 session or one
+    // session dominating), so a thin-base week that is genuinely ramping back
+    // isn't told "build more" without cause.
+    const isSpikeOnEmptyBase = thinChronicBase && (acuteSessionCount < 2 || oneSessionDominatesAcute);
+    const rawAcwr = chronic28Load > 0 ? (acute7Load / 7) / (chronic28Load / 28) : null;
+    const acwr = thinChronicBase ? null : rawAcwr;
 
     const metrics: CoachWeekContextResponseV1['metrics'] = {
       wtd_planned_load: plannedWtdLoad || 0,
@@ -3245,6 +3297,7 @@ Deno.serve(async (req) => {
           },
           snapshotBody.load_status.run_only_week_load_pct ?? null,
           disciplineProfiles.map(p => ({ discipline: p.discipline, maturity: p.maturity, acwr: p.acwr })),
+          isSpikeOnEmptyBase,
         );
         snapshotBody.load_status.status = reconciled.status;
         snapshotBody.load_status.interpretation = reconciled.interpretation;
