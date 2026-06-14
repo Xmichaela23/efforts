@@ -12,6 +12,25 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
+import { suggestBaselineUpdate, type BaselineSuggestion } from '@shared/state-trend';
+
+// Step 1 Part 2 — hybrid suggest-with-confirm. A subtle line under a baseline when the computed
+// learned aggregate diverges (gated: ≥3 samples, ≥medium confidence, fresh, ≥5%). Never
+// auto-applies — the athlete taps Update.
+function SuggestionLine({ sug, display, onConfirm }: { sug: BaselineSuggestion; display: string; onConfirm: () => void }) {
+  return (
+    <div className="mt-1 flex items-center gap-2 text-[11px] text-amber-300/80">
+      <span>Logged suggests <span className="tabular-nums">{display}</span> ({sug.divergencePct > 0 ? '+' : ''}{sug.divergencePct}%)</span>
+      <button
+        type="button"
+        onClick={onConfirm}
+        className="px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-200 hover:bg-amber-400/25 transition-colors"
+      >
+        Update
+      </button>
+    </div>
+  );
+}
 
 function fmtGoalClock(totalSec: number): string {
   const h = Math.floor(totalSec / 3600);
@@ -62,6 +81,8 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [pn, setPn] = useState<Record<string, unknown>>({});
+  const [learned, setLearned] = useState<Record<string, any>>({});
+  const [actedKeys, setActedKeys] = useState<Set<string>>(new Set()); // suggestions confirmed/dismissed this session
   const [resolvedFtp, setResolvedFtp] = useState<number | null>(null);
   const [longestRideSec, setLongestRideSec] = useState<number | null>(null);
   const [longestRideDate, setLongestRideDate] = useState<string | null>(null);
@@ -112,6 +133,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
       if (bl?.updated_at) setLastUpdated(String(bl.updated_at));
       const perf = (bl?.performance_numbers as Record<string, unknown>) || {};
       setPn(perf);
+      setLearned((bl?.learned_fitness as Record<string, any>) || {});
       // FTP via shared precedence helper. Permissive (accepts learned medium+/manual/
       // learned-low) — display surface benefits from any non-null FTP. Documented
       // behavior change: prior code preferred manual over learned regardless of
@@ -358,6 +380,45 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
     }
   }
 
+  // ── Step 1 Part 2: baseline suggest-with-confirm ──────────────────────────────
+  const sugAsOf = new Date().toISOString().slice(0, 10);
+  const parseMmSs = (s: unknown): number | null => {
+    const m = /^(\d+):(\d{2})$/.exec(String(s ?? '').trim());
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  const fmtMmSs = (sec: number): string => {
+    const mm = Math.floor(sec / 60); const ss = Math.round(sec % 60);
+    return `${mm}:${String(ss).padStart(2, '0')}`;
+  };
+  const toAgg = (m: any) => (m && Number(m.value) > 0)
+    ? { value: Number(m.value), confidence: m.confidence, sample_count: Number(m.sample_count), last_logged: m.last_logged ?? null }
+    : null;
+  // strength: lbs vs lbs (learned key = canonical name)
+  const strengthSug = (pnKey: string, learnedKey: string, label: string): BaselineSuggestion | null =>
+    suggestBaselineUpdate({ key: pnKey, label, baseline: Number(pn[pnKey]), learned: toAgg(learned?.strength_1rms?.[learnedKey]), asOf: sugAsOf });
+  // swim: learned s/100m → s/100yd to compare with the typed 100yd pace
+  const swimSug = (): BaselineSuggestion | null => {
+    const baseYd = parseMmSs(pn.swimPace100);
+    const lr = learned?.swim_pace_per_100m;
+    if (baseYd == null || !lr || !(Number(lr.value) > 0)) return null;
+    return suggestBaselineUpdate({
+      key: 'swimPace100', label: 'Swim 100yd', baseline: baseYd,
+      learned: { value: Math.round(Number(lr.value) * 0.9144), confidence: lr.confidence, sample_count: Number(lr.sample_count) },
+      asOf: sugAsOf,
+    });
+  };
+  const confirmSuggestion = async (key: string, writeValue: number | string) => {
+    const uid = getStoredUserId(); if (!uid) return;
+    const nextPn = { ...pn, [key]: writeValue };
+    const { error } = await supabase
+      .from('user_baselines')
+      .update({ performance_numbers: nextPn, updated_at: new Date().toISOString() })
+      .eq('user_id', uid);
+    if (error) { window.alert(error.message || 'Could not update baseline'); return; }
+    setPn(nextPn);
+    setActedKeys((prev) => new Set(prev).add(key));
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-4 pb-6">
       <h2 className="text-2xl font-bold text-white pb-2">My Record</h2>
@@ -535,23 +596,34 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
                   100yd pace:{' '}
                   <span className="tabular-nums text-white/90">{(pn.swimPace100 as string) || '—'}</span>
                 </p>
+                {(() => {
+                  const sug = !actedKeys.has('swimPace100') ? swimSug() : null;
+                  return sug ? <SuggestionLine sug={sug} display={fmtMmSs(sug.computed)} onConfirm={() => confirmSuggestion('swimPace100', fmtMmSs(sug.computed))} /> : null;
+                })()}
               </div>
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-white/70">Strength</p>
                 <ul className="text-sm text-white/80 space-y-1.5">
-                  {[
-                    ['Deadlift', pn.deadlift],
-                    ['Squat', pn.squat],
-                    ['Bench', pn.bench],
-                    ['OHP', pn.overheadPress1RM],
-                  ].map(([label, v]) => (
-                    <li key={String(label)} className="flex justify-between">
-                      <span className="text-white/50">{label}</span>
-                      <span className="tabular-nums">
-                        {typeof v === 'number' && v > 0 ? `${v} lbs` : '—'}
-                      </span>
-                    </li>
-                  ))}
+                  {([
+                    ['Deadlift', 'deadlift', 'deadlift'],
+                    ['Squat', 'squat', 'squat'],
+                    ['Bench', 'bench', 'bench_press'],
+                    ['OHP', 'overheadPress1RM', 'overhead_press'],
+                  ] as const).map(([label, pnKey, learnedKey]) => {
+                    const v = pn[pnKey];
+                    const sug = !actedKeys.has(pnKey) ? strengthSug(pnKey, learnedKey, label) : null;
+                    return (
+                      <li key={pnKey}>
+                        <div className="flex justify-between">
+                          <span className="text-white/50">{label}</span>
+                          <span className="tabular-nums">
+                            {typeof v === 'number' && v > 0 ? `${v} lbs` : '—'}
+                          </span>
+                        </div>
+                        {sug && <SuggestionLine sug={sug} display={`${sug.computed} lbs`} onConfirm={() => confirmSuggestion(pnKey, sug.computed)} />}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             </div>
