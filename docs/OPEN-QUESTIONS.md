@@ -799,6 +799,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-054 — Run-side GAP/pace corruption at source (the run cousin of Q-038)
+
+- **Status:** filed 2026-06-14 (route-backbone audit) · symptom guarded, source not fixed
+- **What it is:** the route-backbone audit found **4 of 118** run rows in `route_progress_metrics` with corrupt pace — `effort_adjusted_pace_sec_per_km` AND the underlying `avg_pace_sec_per_km` are garbage: 2026-05-11 (GAP 2280 / avg 2449), 2026-04-15 (2335 / 2508), 2026-04-05 (**23610** / 24808), 2026-03-26 (GAP 0 / avg 463). ~3.4% of runs. So the 2280 from the STATE-trend audit was NOT one-off — it's a small systemic pattern of bad SOURCE pace being written for certain runs (a run-side cousin of Q-038's unit/parse class).
+- **Guarded, not fixed:** the STATE run adapter + the per-session engine apply a plausibility guard (150–750 s/km) that filters all 4 — so trends/efficiency are protected. But **bad pace is still written upstream** (compute-facts / run ingest), so any consumer that doesn't guard sees garbage, and the source data is wrong.
+- **Fix scope (separate):** trace the run pace path (compute-facts run pace + route_progress_metrics write) for those 4 workout_ids — likely a unit/parse edge (very short run, GPS dropout, or a duration/distance unit mismatch like the swim Q-051 bug). Fix the source so plausible pace is written; the guard becomes a backstop, not the load-bearing filter.
+- **Cross-ref:** Q-038 (swim ingest), Q-051 (swim pace pipeline), `route_progress_metrics`, the route-backbone audit.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
