@@ -58,11 +58,20 @@ export function synthesizeHeadline(cards: DisciplineCard[]): Headline {
     else if (c.headlineVerdict === 'sliding') movers.push(`${c.discipline} sliding`);
   }
   const detail = movers.join(', ');
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  // Line: a single mover reads as just the mover ("Run sliding") — echoing it after a status
+  // word ("Sliding — run sliding") is redundant. Two+ movers keep the "status — m1, m2" form;
+  // zero movers (all holding) read as just the status.
+  let line: string;
+  if (movers.length === 1) line = cap(movers[0]);
+  else if (movers.length > 1) line = `${status} — ${detail}`;
+  else line = status;
 
   return {
     status,
     detail,
-    line: detail ? `${status} — ${detail}` : status,
+    line,
     basis: { improving, sliding, holding, performanceCards: perfCards.length },
   };
 }

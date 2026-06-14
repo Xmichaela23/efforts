@@ -35,8 +35,14 @@ export interface AdherenceState {
   context: SessionContextTag[];
 }
 
+// Adherence label = the count + a brief meaning, so "1/2" reads as a state, not just a ratio.
+// Boundary: ≥60% done = "on track" (covers 2/3), some-but-under = "behind" (1/2), none = "falling behind".
 function adherenceLabel(completed: number, planned: number): string {
-  if (planned > 0) return `${completed}/${planned} planned`;
+  if (planned > 0) {
+    const ratio = completed / planned;
+    const meaning = ratio >= 0.6 ? 'on track' : ratio > 0 ? 'behind' : 'falling behind';
+    return `${completed}/${planned} — ${meaning}`;
+  }
   if (completed > 0) return `${completed} unplanned`;
   return 'none this week';
 }
