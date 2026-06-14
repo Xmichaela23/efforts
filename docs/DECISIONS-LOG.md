@@ -3607,6 +3607,20 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-149 — Athlete-State Spine: architecture of record (end-of-session 2026-06-14)
+
+- **Date:** 2026-06-14
+- **Context:** Today shipped Part A of the per-ride narrative fix (D-148 — killed the `np_trend_v1` all-type-pool fallback, deployed + verified) and ran a chain of read-only audits (STATE v2 trend data, bike-options, bike-fitness, the per-ride LLM contradiction). Those audits surfaced a structural gap bigger than any one screen: **the app has no spine.** Fitness is re-derived screen-by-screen, so screens can tell four different stories about the same athlete at the same moment — which is exactly how the np_trend contamination survived (one screen fixed, another kept reading the poisoned pool).
+- **Decision — two specs are now architecture of record (committed, not drafts):**
+  - **`docs/SPEC-athlete-state-spine.md`** — one deterministic athlete-state layer every screen + the narrative read from instead of re-deriving. Properties (generalized from the STATE v2 primitive): deterministic / terrain-binned-not-pooled / staleness-gated / claim-grounded / honest-blank. **Spine = what's true; Arc = how it's said** — Arc becomes the narration layer bound to the spine (claim-grounding is the enforcement), not a parallel reasoner. The spine must absorb the *whole training loop* (baselines → plan → execution → computed state → records → adjustment), not just read-only views — because Training Baselines and My Record are a 3rd/4th source of truth already contradicting the computed values.
+  - **`docs/BUILD-SEQUENCE-spine-foundation.md`** — the build order: P0 shared-primitive relocation (client→server, one impl) → P1 truth-reconciliation audit (read-only) → P2a bike-fitness signals (terrain-binned power + HR-at-power) → P2b per-ride HR@power read → P2c narrative→spine (Part B/C/D) → P2d load/readiness fold-in → **P3 close-loop-to-adjustment (GATED, separate sign-off — autoregulation)**.
+- **Load-bearing principle:** *audit before trust, trust before adjustment.* The spine is display/synthesis only; it does NOT drive prescription (adapt-plan / suggested_rir) until Phase 3 explicit sign-off. Phase 1 (reconcile FTP 176/204, strength baseline-vs-e1RM, swim recorded-vs-computed) **gates Phase 3** — closing the loop off contradictory data would autoregulate against a lie.
+- **USER-AGNOSTIC MANDATE (carried into all spine/bike/HR work):** the spine's *logic* is universal; *thresholds* are either sane constants or scale to each athlete's own baseline — **no magic numbers tuned to one athlete.** Flagged for review: HR reference band (must be per-rider, no hardcoded watt range), `CHRONIC_LOAD_FLOOR=500` (sanity-checked against one baseline — confirm/scale), freshness windows + trend thresholds (reasoned partly from one athlete's cadence — confirm they hold across low- and high-volume athletes).
+- **Status of the day's work:** Part A live (D-148). Bike-fitness design approved (bins, HR@power clean metric, per-rider band, ±3%, show-both, thin-bin provisional). Per-ride HR@power read scoped. **Phase 1 truth-reconciliation audit = the next read-only task.** Parts B/C/D + bike-fitness build gated behind P0 relocation + threshold sign-off.
+- **Scope:** docs/architecture only — no code shipped in this entry. Prior open questions (shared-lib core + server compute; readiness sits alongside-not-driving fitness) resolved in the spec and baked into the build sequence.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
