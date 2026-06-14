@@ -20,6 +20,14 @@ export { computeRunState, routeMetricsToSeries, isComparableRunEffort, COMPARABL
 export { computeSwimState, swimPaceToSeries, type SwimState } from './swim.ts';
 export { synthesizeHeadline, type Headline } from './headline.ts';
 export {
+  suggestBaselineUpdate,
+  SUGGEST_MIN_SAMPLES,
+  SUGGEST_MIN_DIVERGENCE_PCT,
+  SUGGEST_FRESHNESS_DAYS,
+  type LearnedAggregate,
+  type BaselineSuggestion,
+} from './reconcile.ts';
+export {
   computeAdherenceState,
   type AdherenceInput,
   type AdherenceState,
