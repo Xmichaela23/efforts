@@ -58,6 +58,45 @@ This is beyond Garmin: Garmin sees the ride but doesn't know it was *meant* to b
 and then sandbagged socially. The intent + context tag is what makes the behavioral read
 possible.
 
+## Sub-feature — cross-discipline pattern analysis (Layer 3; GATED, not built)
+
+A named Layer-3 pattern that joins the STATE v2 performance trend (sliding) with adherence
+(falling behind) and the context why-tags into one read:
+
+> *"You've been sliding + skipping run for ~4 weeks."*
+
+It correlates, per discipline, the STATE v2 verdict (`sliding`, from the shared trend model)
+**and** sustained weekly adherence shortfall (`falling behind`) **and** the Layer-1 context
+tags — and can read across disciplines ("strength climbing while run slides and gets skipped").
+
+**HARD GATE — stays SILENT until the Layer-1 why-tags exist.** This is the load-bearing
+constraint, not a nice-to-have:
+- Sliding + skipped, *without the why*, is ambiguous. A deliberate **deload**, an **injury
+  layoff**, or a **planned de-prioritization** all look identical to real decline on the
+  perf+adherence signals alone. Surfacing the pattern without context would misread a
+  legitimate, intentional deviation as failure — the exact "guilt meter" this whole spec
+  exists to avoid.
+- Therefore the pattern fires **only** when context tags are present AND indicate the skips
+  were *not* deliberate (no `injury` / `deload` / `planned_light` / `taper` tag on the
+  skipped sessions; ideally a positive "unintended skip" signal). No tags → no pattern,
+  silently. It is gated on context, not on the perf/adherence math being available.
+- It must also respect the same authority split as the headline: **off-plan / load verdicts
+  stay with the server (D-147 `intent_summary`)** — this pattern adds the *behavioral* read,
+  it does not re-derive load status.
+
+**Noise guard:** sustained over **N weeks** (propose 3–4, sign-off like the trend thresholds),
+never off a single bad week — same anti-single-point discipline as the trend primitive and the
+staleness/load-bug lessons. A deliberate light week inside an otherwise-consistent block must
+not trip it.
+
+**Tone:** informational, not punitive — it names a pattern the athlete may not have noticed,
+the way the core insight reframes adherence from punishment into information.
+
+**Open (resolve when building, after Layer 1 lands):** the N-week threshold + non-deliberate
+tag set (sign-off); where it surfaces (STATE, a "patterns" view, or the coach); and whether it
+also flags the *inverse* (a discipline quietly improving despite low adherence — "you're
+holding fitness on less run than planned"). **Builds nothing now — purely the gated spec.**
+
 ## Dependency / sequencing
 
 Forced order — cannot shortcut to the insight:
