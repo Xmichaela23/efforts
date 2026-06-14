@@ -199,6 +199,27 @@ Deno.serve(async (req) => {
 
     console.log(`🏃 Runs (normalized): ${runs.length}, 🚴 Rides (normalized): ${rides.length}`);
 
+    // Q-051: swim pace comes from workout_facts (compute-facts already computed it correctly
+    // per-session) — NOT recomputed from raw workouts.distance/moving_time, whose units (km/min
+    // vs the expected m/s) made analyzeSwims filter out EVERY swim and publish null. Single-source
+    // of truth (same principle as the spine): don't re-derive what's already computed right.
+    const swimIds = allWorkouts
+      .filter((w) => normType(workoutTypeFromRow(w)) === 'swim')
+      .map((w) => String(w.id))
+      .filter((id) => id && id !== 'undefined');
+    const swimPaceById = new Map<string, number>();
+    if (swimIds.length) {
+      const { data: swimFacts, error: sfErr } = await supabase
+        .from('workout_facts')
+        .select('workout_id, swim_facts')
+        .in('workout_id', swimIds);
+      if (sfErr) console.warn('⚠️ swim workout_facts fetch failed (non-fatal):', sfErr.message);
+      for (const r of (swimFacts || [])) {
+        const p = Number((r as any)?.swim_facts?.pace_per_100m);
+        if (Number.isFinite(p) && p > 0) swimPaceById.set(String((r as any).workout_id), p);
+      }
+    }
+
     // Last activity per normalized type (for dormant swim, etc.) — 18m lookback; uses `workouts.type`
     const { data: recencyRows, error: recencyErr } = await supabase
       .from('workouts')
@@ -234,7 +255,7 @@ Deno.serve(async (req) => {
     // ==========================================================================
 
     const rideProfile = analyzeRides(rides);
-    const swimProfile = analyzeSwims(allWorkouts);
+    const swimProfile = analyzeSwims(allWorkouts, swimPaceById);
 
     // ==========================================================================
     // BUILD LEARNED PROFILE
@@ -1039,18 +1060,18 @@ interface SwimAnalysisResult {
 /**
  * Median sec/100m from completed swims with useful distance+time (≥3 sessions to publish).
  */
-function analyzeSwims(all: WorkoutRecord[]): SwimAnalysisResult {
+function analyzeSwims(all: WorkoutRecord[], paceById: Map<string, number>): SwimAnalysisResult {
   const swims = all.filter((w) => normType(workoutTypeFromRow(w)) === 'swim');
   const paces: number[] = [];
   for (const w of swims) {
-    const dist = Number(w.distance) || 0;
-    const mov = Number(w.moving_time) || Number(w.duration) || 0;
-    if (dist < 100 || dist > 200_000 || mov < 30) continue;
-    const secPer100m = mov / (dist / 100);
-    if (!Number.isFinite(secPer100m) || secPer100m < 40 || secPer100m > 600) continue;
-    paces.push(secPer100m);
+    // Q-051: use the per-session pace compute-facts already computed (workout_facts.swim_facts.
+    // pace_per_100m), keyed by workout id. The prior raw recompute from workouts.distance (km) /
+    // moving_time (min) — formula expecting m/s — filtered out every swim and published null.
+    const p = paceById.get(String(w.id));
+    if (!Number.isFinite(p) || (p as number) < 40 || (p as number) > 600) continue;
+    paces.push(p as number);
   }
-  console.log(`  🏊 Swim sessions (usable pace): ${paces.length} of ${swims.length} swim rows`);
+  console.log(`  🏊 Swim sessions (usable pace from workout_facts): ${paces.length} of ${swims.length} swim rows`);
   if (paces.length < 3) {
     return { swim_pace_per_100m: null };
   }
