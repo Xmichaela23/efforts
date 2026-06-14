@@ -768,6 +768,37 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-051 — Swim learned-aggregate pipeline gap: `learn-fitness-profile` not populating `swim_pace_per_100m`
+
+- **Status:** filed 2026-06-14 (truth-reconciliation audit) · not fixed · tied to Q-038
+- **What it is:** `learned_fitness.swim_pace_per_100m` is **empty** for the test user despite 5+ swims with a computed `pace_per_100m` in `workout_facts` (188–209 s/100m). The per-workout swim pace is computed fine; it just never rolls up into the `learned_fitness` aggregate the plan reads (`planning-context.swimSecPer100YdFromArcSwimInputs` needs ≥3 learned samples). So the plan falls back to the typed baseline (2:30/100yd) while the athlete actually swims ~2:52–3:11/100yd → swim prescriptions too fast.
+- **Why it matters:** blocks swim truth-reconciliation (the spine can't compare computed-vs-baseline like-for-like when the computed aggregate is never built) and mis-seeds the swim plan.
+- **Likely cause:** `learn-fitness-profile` either doesn't aggregate swim pace at all, or the Q-038 swim-ingest issues (wrong analyzer routing, duration unit bug) corrupt the inputs so the aggregate never qualifies. Trace `learn-fitness-profile` swim path before fixing.
+- **Cross-ref:** Q-038 (swim ingest), `docs/AUDIT-truth-reconciliation-2026-06-14.md`.
+
+---
+
+## Q-052 — User-agnostic: make spine thresholds scale per-athlete, not constants tuned to one athlete
+
+- **Status:** filed 2026-06-14 · decision/build owed · gates the bike-fitness + spine builds
+- **What it is:** several thresholds were sanity-checked against ONE athlete's data and must scale per-athlete (the spine's logic is universal; magic numbers that only fit one athlete are not):
+  - **`CHRONIC_LOAD_FLOOR = 500`** (D-146) → scale to the athlete's **own chronic base** (a low-volume athlete's normal base can be <500 → false "thin base / spike-on-empty").
+  - **HR reference band `[130,150]W`** (bike-fitness HR-at-power) → **per-rider** (% of FTP or the athlete's Z2 power); **no hardcoded watts**.
+  - **Freshness windows (strength 14 / bike 21 / run 14 / swim 10d) + min-session gates (4/3/4/3)** → scale to each athlete's **per-discipline session frequency** (low-volume athletes would read perpetual stale/needs_data).
+- **Explicitly NOT to change (correctly scale-free):** trend **% thresholds** (±2.5/±2/±1.5) and **plausibility bands** (swim 40–240 s/100m, run GAP 150–750 s/km) — universal.
+- **Cross-ref:** D-146, D-148, `SPEC-bike-fitness-read`, `docs/AUDIT-truth-reconciliation-2026-06-14.md`.
+
+---
+
+## Q-053 — Decision: ingest Garmin native FTP? (plan pinned ~28W under)
+
+- **Status:** filed 2026-06-14 · **decision owed (Michael)** · xref Q-037
+- **What it is:** Efforts is internally consistent at **FTP 176W** (typed = learned-high = resolved = active-plan-pinned = displayed). Garmin's native auto-FTP is **~204W**; it has never been ingested (the ~28W gap is Q-037 — Strava power-stream smoothing vs native .fit). So the **active IRONMAN 70.3 plan is pinned ~28W under Garmin's number**, prescribing bike intensity off the lower Efforts estimate.
+- **The decision:** ingest Garmin native FTP (trust the external number), keep Efforts' computed 176 (trust own data), or surface both and let the athlete pick? Not a spine reconciliation (no internal contradiction) — a data-source trust decision.
+- **Cross-ref:** Q-037, `docs/AUDIT-truth-reconciliation-2026-06-14.md`.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
