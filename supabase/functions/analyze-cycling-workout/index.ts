@@ -4,7 +4,7 @@ import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
 // Step 2 (spine): first server consumer of the relocated deterministic core. The narrative
 // DESCRIBES the spine's bike verdict (terrain-matched + staleness-gated), never infers direction.
-import { computeBikeState, pwr20ToSeries } from '../_shared/state-trend/index.ts';
+import { computeBikeState, pwr20ToSeries, resolveZoneBand } from '../_shared/state-trend/index.ts';
 import { rideComputedNp } from '../_shared/cycling-v1/np-trend.ts';
 import { detectClimbSegments, parseStravaSegmentEfforts } from '../_shared/cycling-v1/segments.ts';
 import { computeCtlAtl } from '../_shared/cycling-v1/ride-physiology.ts';
@@ -2505,6 +2505,36 @@ Deno.serve(async (req) => {
       spineBikeTrend = null;
     }
 
+    // Step 3 (spine bike fitness): per-ride efficiency input — mean HR in the rider's reference
+    // power band (resolveZoneBand seam) + this ride's 20-min power. Stored lightweight so the
+    // STATE bike row trends HR-at-power + binned power without re-fetching the raw series.
+    let bikeFitnessV1: any = null;
+    try {
+      const band = resolveZoneBand({ ftp: ftpW }, 'bike');
+      const w20 = Number((workout as any)?.computed?.power_curve?.['20min']);
+      const ser = (workout as any)?.computed?.analysis?.series || {};
+      const pw = ser.power_watts, hb = ser.hr_bpm;
+      let hrAtBand: number | null = null, inBandS = 0;
+      if (band.source !== 'none' && Array.isArray(pw) && Array.isArray(hb) && pw.length === hb.length) {
+        const hrs: number[] = [];
+        for (let i = 0; i < pw.length; i++) {
+          const p = Number(pw[i]), h = Number(hb[i]);
+          if (p >= band.lo && p <= band.hi && Number.isFinite(h) && h > 0) hrs.push(h);
+        }
+        inBandS = hrs.length; // ≈ seconds (1 Hz)
+        if (hrs.length >= 120) hrAtBand = Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length);
+      }
+      bikeFitnessV1 = {
+        w20: Number.isFinite(w20) && w20 > 0 ? Math.round(w20) : null,
+        hr_at_band: hrAtBand,
+        band_lo: band.lo, band_hi: band.hi, band_source: band.source,
+        in_band_s: inBandS,
+      };
+    } catch (e: any) {
+      console.log('⚠️ bike_fitness_v1 failed (non-fatal):', e?.message || e);
+      bikeFitnessV1 = null;
+    }
+
     try {
       ai_summary = await generateCyclingAISummaryV1(cyclingFactPacketV1, cyclingFlagsV1, null, {
         vsSimilar: cyclingVsSimilar,
@@ -2553,6 +2583,7 @@ Deno.serve(async (req) => {
       // in _shared/cross-sport-key-scrub.ts; see docs/MAINTENANCE-DEBT.md
       // "Cross-sport analysis-key bleed".
       ...runOnlyKeyScrub(),
+      bike_fitness_v1: bikeFitnessV1,  // Step 3: per-ride HR-at-band + w20 for the STATE bike row
       granular_analysis: granularAnalysis,  // Same path as running for client compatibility
       performance: performance,
       detailed_analysis: detailedAnalysis,

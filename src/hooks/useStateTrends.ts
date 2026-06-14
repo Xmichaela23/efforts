@@ -14,6 +14,8 @@ import {
   computeBikeState,
   pwr20ToSeries,
   pickBestPwr20,
+  computeBikeFitness,
+  type BikeFitness,
   computeRunState,
   routeMetricsToSeries,
   computeSwimState,
@@ -44,6 +46,7 @@ const disciplineOf = (t: unknown): string | null => {
 
 interface ExtraPerf {
   bike: PerfSummary | null;
+  bikeFitness: BikeFitness | null; // Step 3: power + HR-at-power efficiency dual read
   run: PerfSummary | null;
   swim: PerfSummary | null;
   plannedBy: Record<string, number>;
@@ -54,6 +57,7 @@ interface ExtraPerf {
 export interface StateTrends {
   cards: DisciplineCard[];
   headline: Headline | null;
+  bikeFitness: BikeFitness | null; // the bike row's "Power · Efficiency" dual read
   loading: boolean;
 }
 
@@ -131,11 +135,23 @@ export function useStateTrends(): StateTrends {
       const spw: Record<string, number> = {};
       for (const k of ORDER) spw[k] = (cnt[k] || 0) / WEEKS_90D;
 
-      // bike — pick the densest CURRENT pwr20 series across recent rides, not just the latest
-      let bike: PerfSummary | null = null;
-      const pwr20Candidates = (bikeR.data || []).map((r: any) => r?.workout_analysis?.pwr20_trend_v1).filter(Boolean);
-      const bestPwr20 = pickBestPwr20(pwr20Candidates, asOf);
-      if (bestPwr20) bike = perfFromTrend(computeBikeState(pwr20ToSeries(bestPwr20), asOf, spw.bike, bestPwr20.classified_type ?? null).trend);
+      // bike — Step 3 fitness engine: terrain-binned power + HR-at-power efficiency, from the
+      // per-ride bike_fitness_v1 the analyzer stored (no raw-series fetch). Power leads; when
+      // power is needs_data but efficiency isn't, efficiency leads the row.
+      const binRides = (bikeR.data || []).map((r: any) => ({
+        date: r.date,
+        classified_type: r.workout_analysis?.classified_type ?? null,
+        w20: r.workout_analysis?.bike_fitness_v1?.w20 ?? null,
+      }));
+      const hrPts = (bikeR.data || [])
+        .filter((r: any) => Number(r.workout_analysis?.bike_fitness_v1?.hr_at_band) > 0)
+        .map((r: any) => ({ date: r.date, value: Number(r.workout_analysis.bike_fitness_v1.hr_at_band) }));
+      const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike);
+      // zone-band source (honesty label): coggan_ftp = estimated, personal = from test (the seam)
+      bikeFitness.efficiency.basis = (bikeR.data || []).map((r: any) => r.workout_analysis?.bike_fitness_v1?.band_source).find((s: any) => s) ?? null;
+      const bikeLeadVerdict = bikeFitness.power.verdict !== 'needs_data' ? bikeFitness.power.verdict : bikeFitness.efficiency.verdict;
+      const bikeLeadPct = bikeFitness.power.verdict !== 'needs_data' ? bikeFitness.power.pctChange : bikeFitness.efficiency.pctChange;
+      const bike: PerfSummary | null = bikeLeadVerdict !== 'needs_data' ? { verdict: bikeLeadVerdict, pctChange: bikeLeadPct } : null;
 
       // run — join classified_type from workouts (the RPM source field workout_intent is null)
       const runRows = (runR.data || []) as any[];
@@ -166,7 +182,7 @@ export function useStateTrends(): StateTrends {
         const k = disciplineOf(w.type); if (k) doneBy[k] = (doneBy[k] || 0) + 1;
       }
 
-      setExtra({ bike, run, swim, plannedBy, doneBy, spw });
+      setExtra({ bike, bikeFitness, run, swim, plannedBy, doneBy, spw });
     })();
     return () => { cancelled = true; };
   }, []);
@@ -203,7 +219,7 @@ export function useStateTrends(): StateTrends {
     }),
   );
 
-  return { cards, headline: loading ? null : synthesizeHeadline(cards), loading };
+  return { cards, headline: loading ? null : synthesizeHeadline(cards), bikeFitness: extra?.bikeFitness ?? null, loading };
 }
 
 // SCALABILITY NOTE: these fetches live client-side today (mirrors useExerciseLog). Because
