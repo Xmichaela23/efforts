@@ -203,6 +203,21 @@ Q-038 also routes the swim through the **wrong analyzer** (generic run/ride path
 
 ---
 
+# STEP 4 — staleness gate SHIPPED 2026-06-14 (+ data audit findings)
+
+**Audit (read-only, `scripts/state-trend-audit.mjs`) found:** no discipline showed a fresh verdict. Strength/bike/run = needs_data; **swim showed "improving −2.5%" but on sessions 13–39 days old** (last swim 13d ago). Root cause: `classifyTrend` only checked window *membership*, never recency of the *newest* point — **no staleness gate**. A discipline kept its last-known verdict until points aged out of the window.
+
+**Fix shipped:** `classifyTrend` now decays an otherwise-real verdict to `needs_data` (flagged `stale: true`, with `newestAgeDays`) when the newest qualifying point is older than a per-discipline **`freshnessDays`**. Decay → needs_data → adherence fallback (a stale "improving" is worse than an honest needs_data — Michael). New TrendResult fields `newestAgeDays` + `stale`; no new verdict enum, no UI change (swim row now falls to adherence).
+**Freshness thresholds (my proposed values — tunable, one constant each):** strength 14d · bike 21d · run 14d · swim 10d. Verified: swim 13d>10d → decays to needs_data on live data. Type-clean, build clean.
+**Follow-up option (not built):** show "last trended Nd ago" in the row instead of silently falling to adherence — `newestAgeDays`/`stale` already carry the data.
+
+**Pipeline findings (diagnoses pending — report-before-fix):**
+- **RUN:** 11 runs in window, all 11 reach `route_progress_metrics` (gap 0), but **`workout_intent = null` on all 11** → 0 pass the easy gate → needs_data. (Diagnosing: null at source vs lost before RPM.)
+- **BIKE:** 15 rides in window but `pwr20_trend_v1` has only 3 points ever, 1 in-window, anchored to a 15-day-old ride. (Diagnosing: legit type-filter sparsity vs population gap.)
+- **STRENGTH:** left as-is (pre-existing: canonical split + per-lift min-4), separate track.
+
+---
+
 ## What I did NOT do (per task guardrails)
 - No code built or changed; thresholds are a proposal awaiting your sign-off.
 - Did not touch run/swim trend rows, did not fix Q-038, did not query the DB, did not push.

@@ -11,6 +11,7 @@ export const STRENGTH_THRESHOLDS: TrendThresholds = {
   improvePct: 2.5,
   slidePct: -2.0,
   minSessions: 4,
+  freshnessDays: 14, // a lift not trained in 2 weeks → its trend isn't current
 };
 
 // Bike — 8-week window on the 20-min-power substrate (shown as "power at threshold").
@@ -21,6 +22,7 @@ export const BIKE_THRESHOLDS: TrendThresholds = {
   improvePct: 2.0,
   slidePct: -2.0,
   minSessions: 3,
+  freshnessDays: 21, // power substrate is sparser; allow a little longer before going stale
 };
 
 // Run — GAP pace at comparable effort (sec/km), 6wk to match strength's cadence. Pace moves
@@ -33,6 +35,7 @@ export const RUN_THRESHOLDS: TrendThresholds = {
   slidePct: -2.0,
   minSessions: 4, // ≥4 comparable-effort (easy) runs before a GAP trend is asserted
   lowerIsBetter: true,
+  freshnessDays: 14, // no comparable-effort run in 2 weeks → trend isn't current
 };
 
 // Swim — pace per 100 (sec/100m), 8wk (swims are sparse, like bike). ⚠️ STAYS PROVISIONAL
@@ -46,6 +49,7 @@ export const SWIM_THRESHOLDS: TrendThresholds = {
   slidePct: -1.5,
   minSessions: 3,
   lowerIsBetter: true,
+  freshnessDays: 10, // a swim block gone quiet 10+ days isn't a current trend (the audit case)
 };
 
 // Adherence (the fallback axis) = weekly plan-compliance: "am I on plan THIS week". 7-day

@@ -16,6 +16,11 @@ function avg(nums: number[]): number {
   return nums.reduce((s, n) => s + n, 0) / nums.length;
 }
 
+/** Whole-day age of an ISO date relative to asOf (pure). */
+function ageDays(dateISO: string, asOf: string): number {
+  return Math.round((Date.parse(asOf + 'T12:00:00Z') - Date.parse(dateISO + 'T12:00:00Z')) / MS_PER_DAY);
+}
+
 export interface ClassifyOpts {
   /** Points matching this predicate are dropped before trending (e.g. deload weeks). */
   exclude?: (p: TrendPoint) => boolean;
@@ -38,7 +43,7 @@ export function classifyTrend(
   asOf: string,
   opts: ClassifyOpts = {},
 ): TrendResult {
-  const { windowDays, improvePct, slidePct, minSessions, lowerIsBetter } = thresholds;
+  const { windowDays, improvePct, slidePct, minSessions, lowerIsBetter, freshnessDays } = thresholds;
   const endpointN = opts.endpointWindow ?? 2;
   const windowStart = isoMinusDays(asOf, windowDays);
 
@@ -48,14 +53,17 @@ export function classifyTrend(
     .filter((p) => !opts.exclude?.(p))
     .sort((a, b) => a.date.localeCompare(b.date));
 
+  const newestAgeDays = inWindow.length ? ageDays(inWindow[inWindow.length - 1].date, asOf) : null;
+
   const base = {
     window: { days: windowDays, start: windowStart, end: asOf },
     sampleCount: inWindow.length,
     points: inWindow,
+    newestAgeDays,
   };
 
   if (inWindow.length < minSessions) {
-    return { ...base, verdict: 'needs_data', pctChange: null, earlyAvg: null, recentAvg: null };
+    return { ...base, verdict: 'needs_data', pctChange: null, earlyAvg: null, recentAvg: null, stale: false };
   }
 
   const k = Math.min(endpointN, inWindow.length);
@@ -74,5 +82,18 @@ export function classifyTrend(
   else if (effective <= slidePct) verdict = 'sliding';
   else verdict = 'holding';
 
-  return { ...base, verdict, pctChange, earlyAvg, recentAvg };
+  // STALENESS GATE: a real verdict whose newest qualifying point is older than freshnessDays
+  // is not a CURRENT trend — decay to needs_data (honest) rather than assert a stale direction.
+  // A stale "improving" is worse than an honest needs_data. The result still carries
+  // newestAgeDays + stale=true so a consumer can say "last data Nd ago" if desired.
+  if (
+    verdict !== 'needs_data' &&
+    freshnessDays != null &&
+    newestAgeDays != null &&
+    newestAgeDays > freshnessDays
+  ) {
+    return { ...base, verdict: 'needs_data', pctChange: null, earlyAvg: null, recentAvg: null, stale: true };
+  }
+
+  return { ...base, verdict, pctChange, earlyAvg, recentAvg, stale: false };
 }

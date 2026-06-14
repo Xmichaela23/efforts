@@ -22,6 +22,10 @@ export interface TrendThresholds {
   /** When the metric is "lower is better" (pace: sec/km, sec/100m), a DECREASE is improving.
    *  The primitive flips the sign for verdict assignment; `pctChange` in the result stays raw. */
   lowerIsBetter?: boolean;
+  /** STALENESS GATE: if the NEWEST qualifying point is older than this many days, the trend is
+   *  no longer current → decays to needs_data (honest), even with enough in-window points. Window
+   *  membership alone is not recency. Omit to disable the gate for a discipline. */
+  freshnessDays?: number;
 }
 
 /** Result of running a series through the shared primitive. */
@@ -33,4 +37,8 @@ export interface TrendResult {
   earlyAvg: number | null; // noise-guard endpoint averages (null when needs_data)
   recentAvg: number | null;
   points: TrendPoint[]; // the qualifying points actually used (in-window, post-exclude)
+  /** Age in days of the newest in-window qualifying point (null when there are none). */
+  newestAgeDays: number | null;
+  /** True when an otherwise-real verdict was decayed to needs_data by the staleness gate. */
+  stale: boolean;
 }
