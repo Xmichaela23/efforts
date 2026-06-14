@@ -19,6 +19,7 @@ import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/rac
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import type { ArcReadiness } from '@/lib/arc-types';
 import { shouldShowNudge } from '@/lib/nudge-policy';
+import StatePerformanceSection from '@/components/context/StatePerformanceSection';
 
 const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
 
@@ -1353,6 +1354,9 @@ export default function StateTab({
             </Row>
           </div>
         )}
+
+        {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
+        <StatePerformanceSection />
 
         {/* SIGNAL — longitudinal nudge, only when there's an actionable signal */}
         {showNudge && (
