@@ -3584,6 +3584,29 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-148 — STATE v2 per-discipline performance-trend model (shipped) + post-audit fixes
+
+- **Date:** 2026-06-14
+- **Context:** STATE screen v2 (spec `docs/SPEC-state-screen-v2-performance.md`). The screen's centerpiece becomes **per-discipline performance trend** (Improving / Holding / Sliding / Needs data), with **adherence as an honest fallback** where performance signal is thin — never blank, graduates over time. Built in steps with sign-off gates; then a read-only data audit drove three fixes.
+- **Model (`src/lib/state-trend/`, pure TS, runs client or server):**
+  - **One shared primitive** `classifyTrend(points, thresholds, asOf, opts)` — window membership + **noise guard** (min-session gate, 2-point endpoint averaging, dead-band) → verdict. Every discipline is a thin adapter feeding its dated metric series (architecture contract #1).
+  - **Adapters:** strength (per-lift e1RM from `exercise_log`, roll-up follows primary lifts — contract #2), bike (`pwr20_trend_v1`, source-agnostic — contract #4), run (GAP pace `route_progress_metrics`), swim (pace/100 `workout_facts`). Run/swim are **`lowerIsBetter`** (pace: a decrease is improving).
+  - **Hybrid resolver** `resolveDisciplineCard` — performance leads where it has a verdict, else weekly adherence. **Co-equal-ready:** `AdherenceState.context` (empty until SPEC-session-context Layer 1 tags exist) + `DISPLAY_MODE` one-spot flip fallback→co-equal (contract: adherence/performance are the same axis at two maturity levels, gated by data).
+  - **Two-part headline** `synthesizeHeadline` (e.g. "Building — strength up, run sliding"). **Off-plan is NOT synthesized** — it stays authoritative on the server `intent_summary` (D-147). Untrusted disciplines are **gated out** (`HEADLINE_GATED_DISCIPLINES = {swim}`); empty state is **neutral** (`"No trend yet"`, never a fabricated direction).
+  - **Deload** handled by one isolated predicate (`isDeloadWeek`, name-based per D-124) — swap to the `WeekPhase` flag is one-spot (contract #3).
+- **Thresholds (signed off):** strength 6wk asymmetric (+2.5 / −2.0 / min 4); bike pwr20 8wk (±2.0 / min 3, shown as "power at threshold"); run 6wk (±2.0 / min 4); **swim 8wk (±1.5 / min 3) stays PROVISIONAL + headline-gated until Q-038 is fixed.** Adherence window 7d (weekly plan-compliance, aligns with D-147).
+- **Wiring:** `useStateTrends` hook (client read-only fetches) → `StatePerformanceSection` → `StateTab` (between AERO and SIGNAL). Shipped user-visible.
+- **Post-audit fixes (a read-only audit found no fresh verdict; swim showed "improving" on 13–39-day-old data):**
+  1. **Staleness gate** — `classifyTrend` decays a verdict to `needs_data` (flag `stale`, `newestAgeDays`) when the newest qualifying point is older than per-discipline `freshnessDays` (strength 14 / bike 21 / run 14 / swim 10). *A stale "improving" is worse than an honest needs_data.* Window membership ≠ recency.
+  2. **Run intent** — the gate read `route_progress_metrics.workout_intent`, which is **null at source** (`compute-facts:930` reads the unpopulated `computed.analysis.heart_rate.workout_type`). Real intent lives in `workout_analysis.classified_type` (5/11 runs = `easy`). Gate now joins + filters on `classified_type`, **plus a GAP-pace plausibility band (150–750 s/km)** after the audit found a corrupt 2280 s/km run that alone flipped the trend to a bogus −66.7%. Run now reads a real verdict on existing data.
+  3. **Bike adapter** — `pickBestPwr20` selects the **densest in-window** pwr20 series, not merely the latest ride's (which was a lone 1-point endurance series). Type-filter sparsity itself is correct and left as-is.
+- **Deliberately NOT fixed (filed for separate tracks):** RPM `workout_intent` null at source (a pipeline/compute-facts fix); the corrupt GAP-pace value's upstream root cause; **strength canonical-name split + per-lift min-4** (pre-existing); swim Q-038; the density-vs-freshness pick refinement (bike could prefer densest *among fresh* series). vo2 carries no pwr20 **by design** (short intervals → no sustained 20-min power).
+- **Note (correction logged 2026-06-14):** D-144/D-145 (readiness + STATE readiness row) were found **already on `origin/main`** (ancestors of the deployed D-146/D-147) — the "hold" was moot; readiness shipped earlier, live-but-dormant (renders only with a recent check-in).
+- **Commits:** `2907cfdf` (model + wiring, steps 1–3), `61152b81` (staleness gate), `d777afbf` (run fix), `be2edd7d` (bike fix), this docs entry. Verified throughout: `tsc -p tsconfig.app.json` clean, `npm run build` clean, live read-only audit/trace (`scripts/state-trend-{audit,diagnose,trace}.mjs`, untracked).
+- **Scope:** client display/synthesis only. **Does NOT feed prescription** — adapt-plan / suggested_rir / auto-attach-planned / D-139 untouched. Trend verdicts must not drive autoregulation without separate sign-off.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

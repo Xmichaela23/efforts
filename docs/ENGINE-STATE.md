@@ -18,6 +18,20 @@ Previous: 2026-06-11 (Q-048 follow-up fixes. D-127: unplanned-only last-actual f
 
 Verified-working architecture and fixes. If you think one of these is broken, the bug is probably elsewhere — read the verification method before changing anything.
 
+### STATE v2 per-discipline trend model — shared primitive + adapters + hybrid fallback (D-148, 2026-06-14)
+
+The STATE screen's PERFORMANCE section. **Pure model in `src/lib/state-trend/`** (runs client or server), wired via `useStateTrends` → `StatePerformanceSection` → `StateTab` (between AERO and SIGNAL). Spec: `docs/SPEC-state-screen-v2-performance.md`.
+
+- **One shared primitive** `classifyTrend` (window + 3-layer noise guard + **staleness gate**) classifies every discipline → Improving / Holding / Sliding / Needs data. Each discipline is a thin adapter feeding a dated metric series — **adding run/swim later = a new adapter, not new scaffolding.**
+- **Sources:** strength = `exercise_log.estimated_1rm` per lift (roll-up follows primary lifts); bike = `pwr20_trend_v1` via `pickBestPwr20` (densest in-window series, NOT latest); run = `route_progress_metrics` GAP pace gated on **`workout_analysis.classified_type='easy'`** (NOT the null `workout_intent`) + a 150–750 s/km plausibility band; swim = `workout_facts.pace_per_100m` + a 40–240 plausibility band. Run/swim are `lowerIsBetter`.
+- **Hybrid fallback:** performance where it has a verdict, else **weekly adherence** (7d). Co-equal-ready (`AdherenceState.context` empty until SPEC-session-context Layer 1; `DISPLAY_MODE` one-spot flip).
+- **Staleness gate (load-bearing):** a verdict whose newest qualifying point is older than `freshnessDays` (strength 14 / bike 21 / run 14 / swim 10) **decays to `needs_data`** (flag `stale`). Window membership ≠ recency — without this, a discipline shows its last-known trend after training stops. This is why swim correctly reads needs_data (last swim 13d > 10d), not a stale "improving".
+- **Headline** `synthesizeHeadline` ("Building — strength up, run sliding") gates untrusted disciplines (`{swim}` until Q-038) and is **neutral when empty** ("No trend yet"). **Off-plan is NOT synthesized here** — it stays on the server `intent_summary` (D-147).
+- **⚠ Thresholds are sign-off-gated** (like the 500 floor): strength +2.5/−2.0/min4/14d; bike ±2.0/min3/21d; run ±2.0/min4/14d; swim ±1.5/min3/10d **provisional+gated until Q-038**. Don't retune without sign-off.
+- **Scope:** display/synthesis only — **does NOT feed prescription** (adapt-plan/suggested_rir/auto-attach-planned/D-139 untouched).
+- **Known-thin (filed, not bugs in this layer):** RPM `workout_intent` null at source (`compute-facts:930`); strength canonical-name split + per-lift min-4; swim Q-038; vo2 carries no pwr20 by design (no sustained 20-min power).
+- **Verification:** `tsc -p tsconfig.app.json` + `npm run build` clean; read-only `scripts/state-trend-{audit,diagnose,trace}.mjs` (untracked) run the shipped model against production data. Commits `2907cfdf`→`be2edd7d`.
+
 ### Strength logger draft persistence — identity-scoped, gated on Done (D-132, 2026-06-11)
 
 The logger's in-progress draft lives in `localStorage`, restored on cold mount (survives hard quit). After D-132 it is safe against cross-workout bleed:
