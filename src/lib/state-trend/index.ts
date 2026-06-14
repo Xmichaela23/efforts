@@ -16,7 +16,7 @@ export {
   type StrengthState,
 } from './strength';
 export { computeBikeState, pwr20ToSeries, type BikeState } from './bike';
-export { computeRunState, routeMetricsToSeries, type RunState } from './run';
+export { computeRunState, routeMetricsToSeries, isComparableRunEffort, COMPARABLE_RUN_EFFORT, type RunState } from './run';
 export { computeSwimState, swimPaceToSeries, type SwimState } from './swim';
 export { synthesizeHeadline, type Headline } from './headline';
 export {

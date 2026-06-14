@@ -77,10 +77,11 @@ export function useStateTrends(): StateTrends {
         .order('date', { ascending: false })
         .limit(30);
 
-      // run — GAP pace at comparable (easy) effort over the 6wk window
+      // run — GAP pace at comparable (easy) effort over the 6wk window. The intent gate reads
+      // workout_analysis.classified_type (joined below), NOT RPM.workout_intent (null at source).
       const runP = supabase
         .from('route_progress_metrics')
-        .select('metric_date,effort_adjusted_pace_sec_per_km,workout_intent')
+        .select('metric_date,effort_adjusted_pace_sec_per_km,workout_id')
         .eq('user_id', userId)
         .gte('metric_date', isoMinus(42))
         .order('metric_date', { ascending: true });
@@ -117,9 +118,20 @@ export function useStateTrends(): StateTrends {
       const ride = (bikeR.data || []).find((r: any) => r?.workout_analysis?.pwr20_trend_v1?.points?.length);
       if (ride) bike = perfFromTrend(computeBikeState(pwr20ToSeries((ride as any).workout_analysis.pwr20_trend_v1), asOf).trend);
 
-      // run
-      const easy = (runR.data || []).filter((r: any) => String(r.workout_intent || '').toLowerCase().includes('easy'));
-      const run = perfFromTrend(computeRunState(routeMetricsToSeries(easy), asOf).trend);
+      // run — join classified_type from workouts (the RPM source field workout_intent is null)
+      const runRows = (runR.data || []) as any[];
+      const runWids = [...new Set(runRows.map((r) => r.workout_id).filter(Boolean))];
+      const runCtById = new Map<string, string | null>();
+      if (runWids.length) {
+        const { data: rw } = await supabase.from('workouts').select('id,workout_analysis').in('id', runWids);
+        for (const w of (rw || []) as any[]) runCtById.set(w.id, w.workout_analysis?.classified_type ?? null);
+      }
+      const runJoined = runRows.map((r) => ({
+        metric_date: r.metric_date,
+        effort_adjusted_pace_sec_per_km: r.effort_adjusted_pace_sec_per_km,
+        classified_type: runCtById.get(r.workout_id) ?? null,
+      }));
+      const run = perfFromTrend(computeRunState(routeMetricsToSeries(runJoined), asOf).trend);
 
       // swim
       const swimRows = (swimR.data || []).map((r: any) => ({ date: r.date, pace_per_100m: Number(r.swim_facts?.pace_per_100m) }));
