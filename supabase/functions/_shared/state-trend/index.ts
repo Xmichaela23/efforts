@@ -45,6 +45,21 @@ export {
   type SessionContextTag,
 } from './adherence.ts';
 export {
+  assembleStateTrends,
+  liftSeriesFromExerciseLog,
+  toStateTrendsV1,
+  disciplineOf,
+  todayISO,
+  isoMinus,
+  ORDER,
+  STATE_TREND_WINDOWS,
+  type StateTrendInputs,
+  type StateTrendResult,
+  type StateTrendsV1,
+  type DisciplineTrendCache,
+  type ExerciseLogLite,
+} from './assemble.ts';
+export {
   resolveDisciplineCard,
   performanceLeads,
   perfFromTrend,
