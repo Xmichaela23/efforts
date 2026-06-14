@@ -16,6 +16,17 @@ export {
   type StrengthState,
 } from './strength.ts';
 export { computeBikeState, pwr20ToSeries, pickBestPwr20, type BikeState, type Pwr20Series } from './bike.ts';
+export { resolveZoneBand, type AthleteZoneInputs, type ZoneBand } from './zones.ts';
+export {
+  computeBikeFitness,
+  computeTerrainBinnedPower,
+  computeEfficiencyTrend,
+  isProvisionalTrend,
+  POWER_BINS,
+  type BikeEffortRide,
+  type BikeSignal,
+  type BikeFitness,
+} from './bike-fitness.ts';
 export { computeRunState, routeMetricsToSeries, isComparableRunEffort, COMPARABLE_RUN_EFFORT, type RunState } from './run.ts';
 export { computeSwimState, swimPaceToSeries, type SwimState } from './swim.ts';
 export { synthesizeHeadline, type Headline } from './headline.ts';
