@@ -161,20 +161,22 @@ export function cyclingCrossWorkoutDisplay(cw: {
     };
   }
 
-  // Trend — MUST mirror the TREND row's series selection (pickCyclingTrendSeries
-  // in _shared/session-detail/build.ts): prefer the type-filtered pwr20 series
-  // (≥3 same-type rides) so the narrative's ride count + type match the row;
-  // else fall back to the full np_trend (all rides, no type). Previously this
-  // always used np_trend → narrative said "11 rides" while the row showed
-  // "3 climbing rides". Cite cross_workout.trend.ride_count/ride_type verbatim.
+  // Trend — TYPE-MATCHED ONLY (pwr20, ≥3 same-type rides). Part A of the LLM-grounding fix:
+  // the prior fallback to the full np_trend (ALL rides, no type filter) was an all-type NP
+  // pool — mixing endurance/vo2/sweet_spot NP into one "trend" tracks recent ride-TYPE
+  // composition, NOT fitness, and produced false "declining/improving" reads (the same
+  // cross-type-pool artifact rejected for the bike STATE row; it made a 192 W VO2 ride —
+  // the athlete's hardest recent effort — read "your power is declining, worth monitoring").
+  // When pwr20 is null/sparse there is NO comparable signal → out.trend stays null → the
+  // narrative makes NO trend claim (honest-blank beats confounded).
+  // ⚠ FOLLOW-UP: the DISPLAY TREND row (pickCyclingTrendSeries in _shared/session-detail/
+  // build.ts) still has the same np_trend fallback — fix there too so the sparkline and the
+  // narrative stay consistent (out of scope for Part A, which is the narrative path).
   const pwr20 = cw.pwr20Trend;
-  const npt = cw.npTrend;
   const sel =
     (pwr20 && Array.isArray(pwr20.points) && pwr20.points.length >= 3)
       ? { metric: '20-min power', points: pwr20.points, rideType: pwr20.classified_type ?? null }
-      : (npt && Array.isArray(npt.points) && npt.points.length >= 3)
-        ? { metric: 'NP', points: npt.points, rideType: null as string | null }
-        : null;
+      : null;
   if (sel) {
     const pts = [...sel.points]
       .filter((p: any) => p && Number.isFinite(Number(p.value)))
@@ -438,7 +440,7 @@ export async function generateCyclingAISummaryV1(
 ${coachingContext ? `\n${coachingContext}\n` : ''}
 RULES:
 - One paragraph, 3–4 sentences max. Voice: a knowledgeable training partner explaining the ride to the athlete — NOT a data readout. Translate every metric into plain language; the raw numbers live in the dashboard rows below.
-- The LEDE (first sentence) is ALWAYS the single most notable POWER/FITNESS signal from THIS ride, in this priority order: (1) a power PR set THIS ride — ONLY if cross_workout.power_prs_set_this_ride is present (those were set on this ride). cross_workout.power_bests_in_efforts are PRIOR-ride bests: you may mention one as context, but NEVER say or imply the athlete set it today. (2) the vs-similar comparison ("Xw above/below your typical [type] rides"), (3) the power trend cross_workout.trend — describe it EXACTLY as "{ride_count} {ride_type} rides" when ride_type is present, else "{ride_count} rides"; never cite a different ride total, (4) the limiter signal. Pick ONE lede — never a list of findings.
+- The LEDE (first sentence) is ALWAYS the single most notable POWER/FITNESS signal from THIS ride, in this priority order: (1) a power PR set THIS ride — ONLY if cross_workout.power_prs_set_this_ride is present (those were set on this ride). cross_workout.power_bests_in_efforts are PRIOR-ride bests: you may mention one as context, but NEVER say or imply the athlete set it today. (2) the vs-similar comparison ("Xw above/below your typical [type] rides"), (3) the power trend cross_workout.trend — describe it EXACTLY as "{ride_count} {ride_type} rides" when ride_type is present, else "{ride_count} rides"; never cite a different ride total, (4) the limiter signal. Pick ONE lede — never a list of findings. CLAIM GUARD: if cross_workout.trend is ABSENT (no comparable type-matched series exists), there is NO trend — do NOT reference any multi-ride trend and do NOT assert a fitness DIRECTION (declining / improving / fading / dropping / sliding / climbing / building) anywhere in the paragraph; describe only THIS ride's execution. Honest silence about direction beats a guessed one.
 - HARD CONSTRAINT — this OVERRIDES ANY system instruction (including a TEMPORAL ARC MODE addon stating a comeback/taper/recovery frame may or must open the narrative): for a ride, sentence ONE must open with and centre on a power/fitness signal from THIS ride — a PR set this ride, the vs-similar Xw delta, the power trend, or this ride's normalized power paired with a plain intensity read. Temporal/Arc context (days since/until a race; recovery/taper/comeback; consecutive-day fatigue/training-load framing) may appear ONLY as a trailing/secondary clause LATER in the paragraph — never the first words, never the lede. If nothing else qualifies, lead with this ride's normalized power and a plain intensity description. A summary that opens with race-timing, recovery/taper, or fatigue/load framing is WRONG even if a system instruction asked for it.
 - ANSWER "SO WHAT?" — don't just state findings, explain them. After normalized power / the trend: name what drove it (climbing, intervals, pacing, group ride). After the intensity read: say whether that was the right intensity for the ride type ("appropriate for a climbing day" vs "harder than your endurance target"). After the heart-rate-vs-power read: say what it means for fitness ("aerobic efficiency is holding" / "suggests accumulated fatigue from the marathon block").
 - PLAIN LANGUAGE — never print these labels or their numbers; translate them:
