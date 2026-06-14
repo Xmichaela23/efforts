@@ -6,8 +6,8 @@
 // shown) is a ONE-SPOT change — see DISPLAY_MODE below — landing when Layer 1 context tags
 // give adherence enough substance to stand co-equal.
 
-import type { TrendVerdict, TrendResult } from './types';
-import type { AdherenceState } from './adherence';
+import type { TrendVerdict, TrendResult } from './types.ts';
+import type { AdherenceState } from './adherence.ts';
 
 export type AxisMode = 'performance' | 'adherence';
 

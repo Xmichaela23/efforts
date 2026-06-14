@@ -6,10 +6,10 @@
 // ⚠️ Thresholds are PROVISIONAL and Q-038-gated — see thresholds.ts. When Q-038 is fixed,
 // the guard band can relax; the trend/threshold code does not change.
 
-import type { TrendPoint, TrendResult } from './types';
-import { classifyTrend } from './classify';
-import { SWIM_THRESHOLDS } from './thresholds';
-import { isDeloadWeek } from './deload';
+import type { TrendPoint, TrendResult } from './types.ts';
+import { classifyTrend } from './classify.ts';
+import { resolveThresholds } from './thresholds.ts';
+import { isDeloadWeek } from './deload.ts';
 
 export interface SwimState {
   trend: TrendResult;
@@ -42,10 +42,11 @@ export function swimPaceToSeries(
 export function computeSwimState(
   series: TrendPoint[],
   asOf: string,
+  sessionsPerWeek: number,
   droppedImplausible = 0,
 ): SwimState {
   return {
-    trend: classifyTrend(series, SWIM_THRESHOLDS, asOf, { exclude: isDeloadWeek }),
+    trend: classifyTrend(series, resolveThresholds('swim', sessionsPerWeek), asOf, { exclude: isDeloadWeek }),
     metricLabel: 'pace per 100',
     droppedImplausible,
   };

@@ -10,7 +10,7 @@
 // labeler — change exclude → "Holding (deload)". That is a one-spot change by design;
 // nothing else in the trend layer knows deloads exist.
 
-import type { TrendPoint } from './types';
+import type { TrendPoint } from './types.ts';
 
 export function isDeloadWeek(p: TrendPoint): boolean {
   const name = typeof p.meta?.name === 'string' ? (p.meta.name as string) : '';

@@ -8,6 +8,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Shared deterministic core (state-trend spine) — ONE impl for client + Deno edge fns.
+      "@shared": path.resolve(__dirname, "./supabase/functions/_shared"),
       // Redirect @supabase/node-fetch to the native browser fetch so Vite
       // never bundles its XHR polyfill.  On iOS/WKWebView that polyfill
       // throws "XMLHttpRequest.onreadystatechange getter can only be called

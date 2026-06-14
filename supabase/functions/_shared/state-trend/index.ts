@@ -3,28 +3,28 @@
 // Step 2: adherence adapter (fallback axis, co-equal-ready) + the hybrid discipline resolver.
 // Step 3: run & swim adapters (provisional thresholds) + two-part headline synthesis.
 
-export * from './types';
-export * from './thresholds';
-export { classifyTrend } from './classify';
-export type { ClassifyOpts } from './classify';
-export { isDeloadWeek } from './deload';
+export * from './types.ts';
+export * from './thresholds.ts';
+export { classifyTrend } from './classify.ts';
+export type { ClassifyOpts } from './classify.ts';
+export { isDeloadWeek } from './deload.ts';
 export {
   computeStrengthState,
   PRIMARY_LIFTS,
   type LiftSeries,
   type LiftVerdict,
   type StrengthState,
-} from './strength';
-export { computeBikeState, pwr20ToSeries, pickBestPwr20, type BikeState, type Pwr20Series } from './bike';
-export { computeRunState, routeMetricsToSeries, isComparableRunEffort, COMPARABLE_RUN_EFFORT, type RunState } from './run';
-export { computeSwimState, swimPaceToSeries, type SwimState } from './swim';
-export { synthesizeHeadline, type Headline } from './headline';
+} from './strength.ts';
+export { computeBikeState, pwr20ToSeries, pickBestPwr20, type BikeState, type Pwr20Series } from './bike.ts';
+export { computeRunState, routeMetricsToSeries, isComparableRunEffort, COMPARABLE_RUN_EFFORT, type RunState } from './run.ts';
+export { computeSwimState, swimPaceToSeries, type SwimState } from './swim.ts';
+export { synthesizeHeadline, type Headline } from './headline.ts';
 export {
   computeAdherenceState,
   type AdherenceInput,
   type AdherenceState,
   type SessionContextTag,
-} from './adherence';
+} from './adherence.ts';
 export {
   resolveDisciplineCard,
   performanceLeads,
@@ -33,4 +33,4 @@ export {
   type DisciplineCard,
   type AxisMode,
   type PerfSummary,
-} from './discipline';
+} from './discipline.ts';

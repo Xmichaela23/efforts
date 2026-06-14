@@ -6,7 +6,7 @@
 // the server (D-147 `intent_summary`) and already shown in the STATE header — re-deriving it
 // here would risk divergence. A consumer that wants an off-plan lead should read that signal.
 
-import type { DisciplineCard } from './discipline';
+import type { DisciplineCard } from './discipline.ts';
 
 export interface Headline {
   status: string; // left part: Building / Holding / Sliding / Mixed / Getting started

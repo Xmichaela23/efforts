@@ -4,10 +4,10 @@
 //
 // ⚠️ Thresholds are PROVISIONAL (not signed off) — see thresholds.ts.
 
-import type { TrendPoint, TrendResult } from './types';
-import { classifyTrend } from './classify';
-import { RUN_THRESHOLDS } from './thresholds';
-import { isDeloadWeek } from './deload';
+import type { TrendPoint, TrendResult } from './types.ts';
+import { classifyTrend } from './classify.ts';
+import { resolveThresholds } from './thresholds.ts';
+import { isDeloadWeek } from './deload.ts';
 
 export interface RunState {
   trend: TrendResult;
@@ -50,9 +50,9 @@ export function routeMetricsToSeries(
     .filter((p) => p.date && Number.isFinite(p.value) && p.value >= MIN_RUN_PACE_S && p.value <= MAX_RUN_PACE_S);
 }
 
-export function computeRunState(series: TrendPoint[], asOf: string): RunState {
+export function computeRunState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): RunState {
   return {
-    trend: classifyTrend(series, RUN_THRESHOLDS, asOf, { exclude: isDeloadWeek }),
+    trend: classifyTrend(series, resolveThresholds('run', sessionsPerWeek), asOf, { exclude: isDeloadWeek }),
     metricLabel: 'GAP pace at comparable effort',
   };
 }

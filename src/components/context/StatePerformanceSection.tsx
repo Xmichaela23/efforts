@@ -6,7 +6,7 @@
 // tagged as such; swim is additionally Q-038-clouded.
 
 import React from 'react';
-import type { DisciplineCard, TrendVerdict } from '@/lib/state-trend';
+import type { DisciplineCard, TrendVerdict } from '@shared/state-trend';
 import { useStateTrends } from '@/hooks/useStateTrends';
 
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {

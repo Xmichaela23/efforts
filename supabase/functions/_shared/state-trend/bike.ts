@@ -4,10 +4,10 @@
 // ftp_history table is built later, add a sibling source adapter and feed computeBikeState
 // the same shape — nothing below changes.
 
-import type { TrendPoint, TrendResult } from './types';
-import { classifyTrend } from './classify';
-import { BIKE_THRESHOLDS } from './thresholds';
-import { isDeloadWeek } from './deload';
+import type { TrendPoint, TrendResult } from './types.ts';
+import { classifyTrend } from './classify.ts';
+import { resolveThresholds, windowDaysFor } from './thresholds.ts';
+import { isDeloadWeek } from './deload.ts';
 
 export interface BikeState {
   trend: TrendResult;
@@ -49,7 +49,7 @@ export function pickBestPwr20(
   candidates: Array<Pwr20Series | null | undefined>,
   asOf: string,
 ): Pwr20Series | null {
-  const start = windowStart(asOf, BIKE_THRESHOLDS.windowDays);
+  const start = windowStart(asOf, windowDaysFor('bike'));
   let best: Pwr20Series | null = null;
   let bestKey: [number, number, string] | null = null;
   for (const c of candidates) {
@@ -71,10 +71,11 @@ export function pickBestPwr20(
 export function computeBikeState(
   series: TrendPoint[],
   asOf: string,
+  sessionsPerWeek: number,
   rideType: string | null = null,
 ): BikeState {
   return {
-    trend: classifyTrend(series, BIKE_THRESHOLDS, asOf, { exclude: isDeloadWeek }),
+    trend: classifyTrend(series, resolveThresholds('bike', sessionsPerWeek), asOf, { exclude: isDeloadWeek }),
     metricLabel: 'power at threshold',
     rideType,
   };

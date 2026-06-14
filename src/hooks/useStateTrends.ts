@@ -1,5 +1,6 @@
 // useStateTrends — assembles the STATE v2 per-discipline hybrid cards + two-part headline
-// from the pure `@/lib/state-trend` model. Client-side read-only fetches (mirrors
+// from the pure `@shared/state-trend` model (relocated to supabase/functions/_shared so
+// client + Deno edge fns run ONE impl). Client-side read-only fetches (mirrors
 // useExerciseLog's pattern). The model is pure TS, so this same assembly could move
 // server-side (arc-context/coach payload) later with no change to the model — see the note
 // at the bottom. Until run/swim performance thresholds are signed off, those rows are
@@ -26,7 +27,7 @@ import {
   type Headline,
   type LiftSeries,
   type PerfSummary,
-} from '@/lib/state-trend';
+} from '@shared/state-trend';
 
 const DAY = 86_400_000;
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -47,6 +48,7 @@ interface ExtraPerf {
   swim: PerfSummary | null;
   plannedBy: Record<string, number>;
   doneBy: Record<string, number>;
+  spw: Record<string, number>; // per-discipline sessions/week (Q-052 cadence input)
 }
 
 export interface StateTrends {
@@ -111,14 +113,29 @@ export function useStateTrends(): StateTrends {
         .gte('date', adhStart)
         .lte('date', asOf);
 
-      const [bikeR, runR, swimR, plannedR, doneR] = await Promise.all([bikeP, runP, swimP, plannedP, doneP]);
+      // cadence — per-discipline sessions/week over 90d (Q-052: scales freshness + min-session gates)
+      const cadenceP = supabase
+        .from('workouts')
+        .select('type,date,workout_status')
+        .eq('user_id', userId)
+        .eq('workout_status', 'completed')
+        .gte('date', isoMinus(90));
+
+      const [bikeR, runR, swimR, plannedR, doneR, cadenceR] = await Promise.all([bikeP, runP, swimP, plannedP, doneP, cadenceP]);
       if (cancelled) return;
+
+      // per-discipline cadence (sessions/week over 90d) — the athlete's OWN frequency
+      const WEEKS_90D = 90 / 7;
+      const cnt: Record<string, number> = {};
+      for (const w of (cadenceR.data || []) as any[]) { const k = disciplineOf(w.type); if (k) cnt[k] = (cnt[k] || 0) + 1; }
+      const spw: Record<string, number> = {};
+      for (const k of ORDER) spw[k] = (cnt[k] || 0) / WEEKS_90D;
 
       // bike — pick the densest CURRENT pwr20 series across recent rides, not just the latest
       let bike: PerfSummary | null = null;
       const pwr20Candidates = (bikeR.data || []).map((r: any) => r?.workout_analysis?.pwr20_trend_v1).filter(Boolean);
       const bestPwr20 = pickBestPwr20(pwr20Candidates, asOf);
-      if (bestPwr20) bike = perfFromTrend(computeBikeState(pwr20ToSeries(bestPwr20), asOf, bestPwr20.classified_type ?? null).trend);
+      if (bestPwr20) bike = perfFromTrend(computeBikeState(pwr20ToSeries(bestPwr20), asOf, spw.bike, bestPwr20.classified_type ?? null).trend);
 
       // run — join classified_type from workouts (the RPM source field workout_intent is null)
       const runRows = (runR.data || []) as any[];
@@ -133,12 +150,12 @@ export function useStateTrends(): StateTrends {
         effort_adjusted_pace_sec_per_km: r.effort_adjusted_pace_sec_per_km,
         classified_type: runCtById.get(r.workout_id) ?? null,
       }));
-      const run = perfFromTrend(computeRunState(routeMetricsToSeries(runJoined), asOf).trend);
+      const run = perfFromTrend(computeRunState(routeMetricsToSeries(runJoined), asOf, spw.run).trend);
 
       // swim
       const swimRows = (swimR.data || []).map((r: any) => ({ date: r.date, pace_per_100m: Number(r.swim_facts?.pace_per_100m) }));
       const { series: swimSeries, dropped } = swimPaceToSeries(swimRows);
-      const swim = perfFromTrend(computeSwimState(swimSeries, asOf, dropped).trend);
+      const swim = perfFromTrend(computeSwimState(swimSeries, asOf, spw.swim, dropped).trend);
 
       // adherence counts
       const plannedBy: Record<string, number> = {};
@@ -149,7 +166,7 @@ export function useStateTrends(): StateTrends {
         const k = disciplineOf(w.type); if (k) doneBy[k] = (doneBy[k] || 0) + 1;
       }
 
-      setExtra({ bike, run, swim, plannedBy, doneBy });
+      setExtra({ bike, run, swim, plannedBy, doneBy, spw });
     })();
     return () => { cancelled = true; };
   }, []);
@@ -164,7 +181,7 @@ export function useStateTrends(): StateTrends {
     // (resolves when the WeekPhase flag is plumbed — see deload.ts). Acceptable interim.
     points: lt.entries.map((e) => ({ date: e.date, value: e.estimated_1rm })),
   }));
-  const strength = computeStrengthState(liftSeries, asOf);
+  const strength = computeStrengthState(liftSeries, asOf, extra?.spw?.strength ?? 0);
 
   const perfByDisc: Record<string, PerfSummary | null> = {
     strength: { verdict: strength.overall, pctChange: strength.overallPctChange },

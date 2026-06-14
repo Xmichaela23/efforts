@@ -5,10 +5,10 @@
 // the per-lift verdicts are returned as a LIST (not pre-collapsed), so a richer roll-up
 // later is a change to `rollUp` alone — the trend layer below never moves.
 
-import type { TrendPoint, TrendResult, TrendVerdict } from './types';
-import { classifyTrend } from './classify';
-import { STRENGTH_THRESHOLDS } from './thresholds';
-import { isDeloadWeek } from './deload';
+import type { TrendPoint, TrendResult, TrendVerdict } from './types.ts';
+import { classifyTrend } from './classify.ts';
+import { resolveThresholds } from './thresholds.ts';
+import { isDeloadWeek } from './deload.ts';
 
 /** Per-lift dated e1RM series. value = estimated_1rm; meta.name carries the workout name (deload detect). */
 export interface LiftSeries {
@@ -43,12 +43,13 @@ export const PRIMARY_LIFTS = new Set([
   'overhead_press',
 ]);
 
-export function computeStrengthState(series: LiftSeries[], asOf: string): StrengthState {
+export function computeStrengthState(series: LiftSeries[], asOf: string, sessionsPerWeek: number): StrengthState {
+  const thresholds = resolveThresholds('strength', sessionsPerWeek); // per-lift cadence (Q-052)
   const lifts: LiftVerdict[] = series.map((s) => ({
     canonical: s.canonical,
     displayName: s.displayName,
     isPrimary: PRIMARY_LIFTS.has(s.canonical),
-    trend: classifyTrend(s.points, STRENGTH_THRESHOLDS, asOf, { exclude: isDeloadWeek }),
+    trend: classifyTrend(s.points, thresholds, asOf, { exclude: isDeloadWeek }),
   }));
 
   const { overall, overallPctChange } = rollUp(lifts);

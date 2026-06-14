@@ -2,7 +2,7 @@
 // Pure: no Date.now / Math.random. The caller passes `asOf` (today) so the window is
 // deterministic and testable. This file knows nothing about strength/bike specifics.
 
-import type { TrendPoint, TrendResult, TrendThresholds, TrendVerdict } from './types';
+import type { TrendPoint, TrendResult, TrendThresholds, TrendVerdict } from './types.ts';
 
 const MS_PER_DAY = 86_400_000;
 
