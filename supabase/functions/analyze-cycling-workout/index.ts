@@ -2,6 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
+// Step 2 (spine): first server consumer of the relocated deterministic core. The narrative
+// DESCRIBES the spine's bike verdict (terrain-matched + staleness-gated), never infers direction.
+import { computeBikeState, pwr20ToSeries } from '../_shared/state-trend/index.ts';
 import { rideComputedNp } from '../_shared/cycling-v1/np-trend.ts';
 import { detectClimbSegments, parseStravaSegmentEfforts } from '../_shared/cycling-v1/segments.ts';
 import { computeCtlAtl } from '../_shared/cycling-v1/ride-physiology.ts';
@@ -2479,6 +2482,29 @@ Deno.serve(async (req) => {
     // them on workout_analysis for out-of-band investigation when the
     // LLM call returns null mysteriously. Remove on cleanup.
     const aiSummaryDebug: Record<string, unknown> = { collected_at: new Date().toISOString() };
+
+    // Step 2 (spine): compute the DETERMINISTIC bike verdict the narrative describes. The
+    // direction comes from the spine (computeBikeState → terrain-matched pwr20, staleness-gated
+    // to the athlete's OWN cadence), NOT an ad-hoc first/second-half delta. needs_data (sparse
+    // OR stale) → the narrative makes no trend claim. asOf = NOW (the trend's currency is "as of
+    // when you're reading it"): a series gone 27+ days quiet is not a current trend. The full
+    // bike fitness signal (terrain-binned power + HR@power) arrives with Step 3; until then most
+    // rides resolve needs_data — Step 2's win is "the narrative stops lying", not "richer trends".
+    let spineBikeTrend: any = null;
+    try {
+      const spineAsOf = new Date().toISOString().slice(0, 10);
+      const ninetyAgo = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+      const { data: bikeCadRows } = await supabase
+        .from('workouts').select('id')
+        .eq('user_id', workout.user_id).in('type', ['ride', 'bike'])
+        .eq('workout_status', 'completed').gte('date', ninetyAgo);
+      const bikeSpw = ((bikeCadRows?.length) || 0) / (90 / 7);
+      spineBikeTrend = computeBikeState(pwr20ToSeries(pwr20TrendV1), spineAsOf, bikeSpw).trend;
+    } catch (e: any) {
+      console.log('⚠️ spine bike verdict failed (non-fatal):', e?.message || e);
+      spineBikeTrend = null;
+    }
+
     try {
       ai_summary = await generateCyclingAISummaryV1(cyclingFactPacketV1, cyclingFlagsV1, null, {
         vsSimilar: cyclingVsSimilar,
@@ -2488,6 +2514,7 @@ Deno.serve(async (req) => {
         // TREND row's series selection (pwr20 if same-type ≥3, else np_trend)
         // so the cited ride count/type match what the row shows.
         pwr20Trend: pwr20TrendV1,
+        spineBikeTrend, // Step 2: deterministic, staleness-gated verdict the narrative describes
         limiter: cyclingLimiter,
         fitness: fitnessV1, // design #9 — CTL/ATL/TSB into the INSIGHTS narrative
       }, arc_narrative_for_summary, {

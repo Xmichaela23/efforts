@@ -53,8 +53,8 @@ export function pickBestPwr20(
   let best: Pwr20Series | null = null;
   let bestKey: [number, number, string] | null = null;
   for (const c of candidates) {
-    const pts = c?.points;
-    if (!Array.isArray(pts) || pts.length === 0) continue;
+    if (!c || !Array.isArray(c.points) || c.points.length === 0) continue; // narrows c → Pwr20Series
+    const pts = c.points;
     const inWin = pts.filter((p) => String(p.date) > start).length;
     const newest = pts.map((p) => String(p.date)).sort().pop() || '';
     const key: [number, number, string] = [inWin, pts.length, newest];
