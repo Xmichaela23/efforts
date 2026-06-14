@@ -21,6 +21,15 @@ import {
   mondayOfToday,
   parseLocalDate,
 } from "../_shared/parse-local-date.ts";
+import {
+  assembleStateTrends,
+  toStateTrendsV1,
+  disciplineOf,
+  todayISO,
+  isoMinus,
+  STATE_TREND_WINDOWS,
+  type StateTrendsV1,
+} from "../_shared/state-trend/index.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -562,9 +571,88 @@ serve(async (req: Request) => {
       // fallback so the snapshot never fails on the readiness rollup.
     }
 
+    // -----------------------------------------------------------------------
+    // Spine (Step 4a) — cache the per-discipline state-trend verdict so coach +
+    // session-detail read ONE source instead of each re-deriving fitness. Runs the
+    // SAME assembler (assembleStateTrends) the client STATE screen runs, with the
+    // SAME fetch windows (STATE_TREND_WINDOWS) — identical model + identical rows →
+    // identical output (the cached==live single-source proof). Only for the CURRENT
+    // week (the verdict is "as of now"; historical snapshots leave it null, unread).
+    // Non-fatal: a failure here must never break the snapshot write.
+    // -----------------------------------------------------------------------
+    let stateTrendsV1: StateTrendsV1 | null = null;
+    if (targetWeek === mondayOfToday()) {
+      try {
+        const asOf = todayISO();
+        const adhStart = isoMinus(STATE_TREND_WINDOWS.adherenceDays - 1);
+
+        const [exR, bikeR, runR, swimR, plannedR, doneR, cadenceR] = await Promise.all([
+          supabase.from("exercise_log").select("date,canonical_name,exercise_name,estimated_1rm")
+            .eq("user_id", userId).gte("date", isoMinus(STATE_TREND_WINDOWS.liftWeeks * 7)).order("date"),
+          supabase.from("workouts").select("date,workout_analysis")
+            .eq("user_id", userId).in("type", ["ride", "bike"]).not("workout_analysis", "is", null)
+            .order("date", { ascending: false }).limit(STATE_TREND_WINDOWS.bikeLimit),
+          supabase.from("route_progress_metrics").select("metric_date,effort_adjusted_pace_sec_per_km,workout_id")
+            .eq("user_id", userId).gte("metric_date", isoMinus(STATE_TREND_WINDOWS.runDays)).order("metric_date"),
+          supabase.from("workout_facts").select("date,swim_facts")
+            .eq("user_id", userId).eq("discipline", "swim").gte("date", isoMinus(STATE_TREND_WINDOWS.swimDays)).order("date"),
+          supabase.from("planned_workouts").select("type,date").eq("user_id", userId).gte("date", adhStart).lte("date", asOf),
+          supabase.from("workouts").select("type,date,workout_status").eq("user_id", userId).gte("date", adhStart).lte("date", asOf),
+          supabase.from("workouts").select("type,date,workout_status").eq("user_id", userId)
+            .eq("workout_status", "completed").gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)),
+        ]);
+
+        const cadenceCounts: Record<string, number> = {};
+        for (const w of (cadenceR.data ?? []) as any[]) { const k = disciplineOf(w.type); if (k) cadenceCounts[k] = (cadenceCounts[k] || 0) + 1; }
+
+        const bikeRows = (bikeR.data ?? []).map((r: any) => ({
+          date: r.date,
+          classified_type: r.workout_analysis?.classified_type ?? null,
+          w20: r.workout_analysis?.bike_fitness_v1?.w20 ?? null,
+          hr_at_band: r.workout_analysis?.bike_fitness_v1?.hr_at_band ?? null,
+          band_source: r.workout_analysis?.bike_fitness_v1?.band_source ?? null,
+        }));
+
+        const runRows = (runR.data ?? []) as any[];
+        const runWids = [...new Set(runRows.map((r) => r.workout_id).filter(Boolean))];
+        const runCtById = new Map<string, string | null>();
+        if (runWids.length) {
+          const { data: rw } = await supabase.from("workouts").select("id,workout_analysis").in("id", runWids);
+          for (const w of (rw ?? []) as any[]) runCtById.set(w.id, w.workout_analysis?.classified_type ?? null);
+        }
+        const runJoined = runRows.map((r) => ({
+          metric_date: r.metric_date,
+          effort_adjusted_pace_sec_per_km: r.effort_adjusted_pace_sec_per_km,
+          classified_type: runCtById.get(r.workout_id) ?? null,
+        }));
+
+        const swimRows = (swimR.data ?? []).map((r: any) => ({ date: r.date, pace_per_100m: Number(r.swim_facts?.pace_per_100m) }));
+
+        const plannedBy: Record<string, number> = {};
+        const doneBy: Record<string, number> = {};
+        for (const p of (plannedR.data ?? []) as any[]) { const k = disciplineOf(p.type); if (k) plannedBy[k] = (plannedBy[k] || 0) + 1; }
+        for (const w of (doneR.data ?? []) as any[]) {
+          if (String(w.workout_status || "").toLowerCase() !== "completed") continue;
+          const k = disciplineOf(w.type); if (k) doneBy[k] = (doneBy[k] || 0) + 1;
+        }
+
+        const exerciseRows = (exR.data ?? []).map((e: any) => ({
+          date: e.date, canonical_name: e.canonical_name, exercise_name: e.exercise_name, estimated_1rm: e.estimated_1rm,
+        }));
+
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, plannedBy, doneBy, cadenceCounts });
+        stateTrendsV1 = toStateTrendsV1(result, asOf);
+      } catch (e: any) {
+        console.log("⚠️ state_trends_v1 (spine) failed (non-fatal):", e?.message || e);
+        stateTrendsV1 = null;
+      }
+    }
+
     const snapshot = {
       user_id: userId,
       week_start: targetWeek,
+
+      state_trends_v1: stateTrendsV1,
 
       workload_total: Math.round(current.workloadTotal),
       workload_by_discipline: current.workloadByDisc,
