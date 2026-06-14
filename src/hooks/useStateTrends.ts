@@ -12,6 +12,7 @@ import {
   computeStrengthState,
   computeBikeState,
   pwr20ToSeries,
+  pickBestPwr20,
   computeRunState,
   routeMetricsToSeries,
   computeSwimState,
@@ -113,10 +114,11 @@ export function useStateTrends(): StateTrends {
       const [bikeR, runR, swimR, plannedR, doneR] = await Promise.all([bikeP, runP, swimP, plannedP, doneP]);
       if (cancelled) return;
 
-      // bike
+      // bike — pick the densest CURRENT pwr20 series across recent rides, not just the latest
       let bike: PerfSummary | null = null;
-      const ride = (bikeR.data || []).find((r: any) => r?.workout_analysis?.pwr20_trend_v1?.points?.length);
-      if (ride) bike = perfFromTrend(computeBikeState(pwr20ToSeries((ride as any).workout_analysis.pwr20_trend_v1), asOf).trend);
+      const pwr20Candidates = (bikeR.data || []).map((r: any) => r?.workout_analysis?.pwr20_trend_v1).filter(Boolean);
+      const bestPwr20 = pickBestPwr20(pwr20Candidates, asOf);
+      if (bestPwr20) bike = perfFromTrend(computeBikeState(pwr20ToSeries(bestPwr20), asOf, bestPwr20.classified_type ?? null).trend);
 
       // run — join classified_type from workouts (the RPM source field workout_intent is null)
       const runRows = (runR.data || []) as any[];

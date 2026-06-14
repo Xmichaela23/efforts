@@ -15,7 +15,7 @@ export {
   type LiftVerdict,
   type StrengthState,
 } from './strength';
-export { computeBikeState, pwr20ToSeries, type BikeState } from './bike';
+export { computeBikeState, pwr20ToSeries, pickBestPwr20, type BikeState, type Pwr20Series } from './bike';
 export { computeRunState, routeMetricsToSeries, isComparableRunEffort, COMPARABLE_RUN_EFFORT, type RunState } from './run';
 export { computeSwimState, swimPaceToSeries, type SwimState } from './swim';
 export { synthesizeHeadline, type Headline } from './headline';
