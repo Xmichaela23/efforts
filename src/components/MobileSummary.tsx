@@ -193,6 +193,38 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         hideTopAdherence={hideTopAdherence || !!sd?.race?.is_goal_race}
       />
 
+      {/* Bike session-detail ← spine. The per-ride HR-at-power datapoint (bike_fitness_v1.hr_at_band)
+          is the EXACT value the STATE efficiency trend is built from — surfacing it here connects the
+          single ride to the same spine signal the dashboard reads (no re-derivation, one source). Only
+          renders when the analyzer found ≥120s in the reference band; band source carries the honesty
+          label (est(FTP) vs personal). Run/swim/strength already show their per-session substance
+          (GAP pace, pace/100, e1RM); this brings bike to parity. */}
+      {(() => {
+        const isRide = type.includes('ride') || type.includes('bike') || type.includes('cycl');
+        if (!isRide) return null;
+        let wa: any = (completed as any)?.workout_analysis;
+        if (typeof wa === 'string') { try { wa = JSON.parse(wa); } catch { wa = null; } }
+        const bf = wa?.bike_fitness_v1;
+        if (!bf || !(Number(bf.hr_at_band) > 0)) return null;
+        const src = bf.band_source === 'personal' ? 'personal'
+          : bf.band_source === 'coggan_ftp' ? 'est (FTP)' : null;
+        const band = (Number(bf.band_lo) > 0 && Number(bf.band_hi) > 0)
+          ? `${Math.round(bf.band_lo)}–${Math.round(bf.band_hi)} W` : null;
+        return (
+          <div className="w-full pt-1 pb-3">
+            <div className="mb-1 text-center text-xs text-gray-400 uppercase tracking-widest">
+              Aerobic efficiency
+            </div>
+            <div className="flex flex-col items-center">
+              <div className="text-sm font-semibold text-gray-100">{bf.hr_at_band} bpm</div>
+              <div className="text-[11px] text-gray-400 mt-0.5">
+                at Z2 power{band ? ` · ${band}` : ''}{src ? ` · ${src}` : ''}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
 
       {/* Execution score card is rendered in UnifiedWorkoutView strip to avoid duplication */}
       {/* Goal race: no segments table — summary times + debrief only */}
