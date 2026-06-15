@@ -27,12 +27,14 @@ public class HealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         
-        // Types we want to read
+        // Types we want to read (+ swim: distance + stroke count for the rich swim fields Strava strips)
         let readTypes: Set<HKObjectType> = [
             HKObjectType.workoutType(),
             HKObjectType.quantityType(forIdentifier: .heartRate)!,
             HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
             HKObjectType.quantityType(forIdentifier: .distanceCycling)!,
+            HKObjectType.quantityType(forIdentifier: .distanceSwimming)!,
+            HKObjectType.quantityType(forIdentifier: .swimmingStrokeCount)!,
             HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!
         ]
         
@@ -106,37 +108,90 @@ public class HealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
     
     @objc func readWorkouts(_ call: CAPPluginCall) {
         let limit = call.getInt("limit") ?? 50
-        
+
         let workoutType = HKObjectType.workoutType()
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
-        
+
         let query = HKSampleQuery(
             sampleType: workoutType,
             predicate: nil,
             limit: limit,
             sortDescriptors: [sortDescriptor]
-        ) { _, samples, error in
+        ) { [weak self] _, samples, error in
+            guard let self = self else { call.resolve(["workouts": []]); return }
             if let error = error {
                 call.reject("Failed to read workouts: \(error.localizedDescription)")
                 return
             }
-            
-            let workouts = (samples as? [HKWorkout])?.map { workout -> [String: Any] in
-                return [
+
+            let workouts = (samples as? [HKWorkout]) ?? []
+            var out: [[String: Any]] = []
+            let lock = NSLock()
+            let group = DispatchGroup()
+
+            for workout in workouts {
+                var dict: [String: Any] = [
                     "id": workout.uuid.uuidString,
                     "activityType": workout.workoutActivityType.rawValue,
                     "startDate": workout.startDate.timeIntervalSince1970 * 1000,
                     "endDate": workout.endDate.timeIntervalSince1970 * 1000,
-                    "duration": workout.duration,
+                    "duration": workout.duration, // seconds-precise (the value Strava rounds to minutes)
                     "totalDistance": workout.totalDistance?.doubleValue(for: .meter()) ?? 0,
                     "totalCalories": workout.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0,
                     "sourceName": workout.sourceRevision.source.name
                 ]
-            } ?? []
-            
-            call.resolve(["workouts": workouts])
+
+                // SWIM enrichment — the rich fields Strava strips. Pool length is in workout
+                // metadata (sync); stroke count + avg HR need statistics queries (async).
+                if workout.workoutActivityType == .swimming {
+                    if let lap = workout.metadata?[HKMetadataKeyLapLength] as? HKQuantity {
+                        dict["pool_length"] = lap.doubleValue(for: .meter()) // real device pool length
+                    }
+                    group.enter()
+                    self.swimStats(for: workout) { strokes, avgHr in
+                        if let s = strokes { dict["strokes"] = s }
+                        if let h = avgHr { dict["avgHr"] = h }
+                        lock.lock(); out.append(dict); lock.unlock()
+                        group.leave()
+                    }
+                } else {
+                    lock.lock(); out.append(dict); lock.unlock()
+                }
+            }
+
+            group.notify(queue: .main) {
+                call.resolve(["workouts": out])
+            }
         }
-        
+
         healthStore.execute(query)
+    }
+
+    // Per-swim statistics: cumulative stroke count + average HR over the workout window.
+    private func swimStats(for workout: HKWorkout, completion: @escaping (Double?, Double?) -> Void) {
+        let predicate = HKQuery.predicateForObjects(from: workout)
+        var strokes: Double? = nil
+        var avgHr: Double? = nil
+        let g = DispatchGroup()
+
+        if let strokeType = HKObjectType.quantityType(forIdentifier: .swimmingStrokeCount) {
+            g.enter()
+            let q = HKStatisticsQuery(quantityType: strokeType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, stats, _ in
+                strokes = stats?.sumQuantity()?.doubleValue(for: .count())
+                g.leave()
+            }
+            healthStore.execute(q)
+        }
+        if let hrType = HKObjectType.quantityType(forIdentifier: .heartRate) {
+            g.enter()
+            let bpm = HKUnit.count().unitDivided(by: .minute())
+            let q = HKStatisticsQuery(quantityType: hrType, quantitySamplePredicate: predicate, options: .discreteAverage) { _, stats, _ in
+                avgHr = stats?.averageQuantity()?.doubleValue(for: bpm)
+                g.leave()
+            }
+            healthStore.execute(q)
+        }
+
+        g.notify(queue: .main) { completion(strokes, avgHr) }
     }
 }

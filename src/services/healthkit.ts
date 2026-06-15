@@ -41,10 +41,15 @@ export interface HealthKitWorkout {
   activityType: number;
   startDate: number;
   endDate: number;
-  duration: number;
+  duration: number; // seconds-precise (Strava rounds to minutes)
   totalDistance?: number;
   totalCalories?: number;
   sourceName?: string;
+  // Swim enrichment (the rich fields Strava strips) — populated for swimming workouts only.
+  pool_length?: number; // meters (HKMetadataKeyLapLength)
+  strokes?: number;
+  avgHr?: number;
+  number_of_active_lengths?: number;
 }
 
 // HKWorkoutActivityType values (subset)
@@ -138,6 +143,36 @@ export async function readWorkoutsFromHealthKit(options?: ReadWorkoutsOptions): 
   } catch (error) {
     return [];
   }
+}
+
+/**
+ * Layer 3 Tier A — sync SWIM workouts from HealthKit into Efforts.
+ *
+ * Reads HealthKit swims (with the rich fields the native plugin now extracts: pool_length, strokes,
+ * avg HR, seconds-duration) and POSTs each to `ingest-activity` with provider='healthkit'. The
+ * server-side cross-source dedup/merge gate reconciles each against any existing Strava/Garmin copy
+ * (FORM writes both) → one workout, never a duplicate. iOS-only; no-op elsewhere.
+ *
+ * Pass the supabase client + userId from the caller (keeps this service free of app-context imports).
+ */
+export async function syncSwimsFromHealthKit(
+  ingest: (body: { userId: string; provider: 'healthkit'; activity: any }) => Promise<unknown>,
+  userId: string,
+  options?: ReadWorkoutsOptions,
+): Promise<{ synced: number }> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return { synced: 0 };
+  const workouts = await readWorkoutsFromHealthKit(options);
+  const swims = workouts.filter((w) => w.activityType === HKWorkoutActivityType.Swimming);
+  let synced = 0;
+  for (const w of swims) {
+    try {
+      await ingest({ userId, provider: 'healthkit', activity: w });
+      synced += 1;
+    } catch (e) {
+      console.warn('[healthkit] swim sync failed for', w.id, e);
+    }
+  }
+  return { synced };
 }
 
 /**

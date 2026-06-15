@@ -7,6 +7,7 @@ import SessionNarrative from './SessionNarrative';
 import EnduranceIntervalTable from './EnduranceIntervalTable';
 import AdherenceChips from './AdherenceChips';
 import { formatDuration } from '@/utils/workoutFormatting';
+import AppleHealthSwimEnrichment from './AppleHealthSwimEnrichment';
 
 // Step 4b — this session's DISCIPLINE spine verdict, read from session_detail_v1.discipline_trend
 // (which workout-detail reads from athlete_snapshot.state_trends_v1 — the SAME cache the STATE
@@ -219,6 +220,10 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       />
 
       <DisciplineTrendLine sd={sd} />
+
+      {/* Layer 3: swim enrichment surface — native iOS shows the Connect-Apple-Health toggle;
+          PWA/browser/Android shows the "richer swim data in the iOS app" note. Swims only. */}
+      {type === 'swim' && <AppleHealthSwimEnrichment />}
 
       {/* Bike session-detail ← spine. The per-ride HR-at-power datapoint (bike_fitness_v1.hr_at_band)
           is the EXACT value the STATE efficiency trend is built from — surfacing it here connects the
