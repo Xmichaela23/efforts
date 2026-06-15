@@ -28,6 +28,7 @@ import {
 } from '../_shared/acwr-state.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
+import { rollupFitnessDirection, type FitnessDirection } from '../_shared/state-trend/index.ts';
 import {
   computeWeeklyResponse,
   type WeeklyResponseState,
@@ -90,7 +91,7 @@ const corsHeaders: Record<string, string> = {
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
 /** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
 /** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
-const COACH_PAYLOAD_VERSION = 36;
+const COACH_PAYLOAD_VERSION = 37; // 37: fitness_direction is now the spine roll-up (state_trends_v1), not response-model re-derivation
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2688,27 +2689,20 @@ Deno.serve(async (req) => {
     try {
       const { data: snapRows } = await supabase
         .from('athlete_snapshot')
-        .select('interference, run_easy_pace_at_hr_trend, strength_volume_trend, strength_top_lifts, acwr, rpe_trend, intensity_distribution')
+        .select('interference, run_easy_pace_at_hr_trend, strength_volume_trend, strength_top_lifts, acwr, rpe_trend, intensity_distribution, state_trends_v1')
         .eq('user_id', userId)
         .order('week_start', { ascending: false })
         .limit(1);
       latestSnapshot = snapRows?.[0] ?? null;
     } catch {}
 
-    const fitnessDirection = (() => {
-      const rm = weeklyResponseModel;
-      const aeroImproving = rm.endurance.cardiac_efficiency.sufficient && rm.endurance.cardiac_efficiency.trend === 'improving';
-      const aeroDecl = rm.endurance.cardiac_efficiency.sufficient && rm.endurance.cardiac_efficiency.trend === 'declining';
-      const driftDecl = rm.endurance.hr_drift.sufficient && rm.endurance.hr_drift.trend === 'declining';
-      const strengthGaining = rm.strength.overall.trend === 'gaining';
-      const strengthDecl = rm.strength.overall.trend === 'declining';
-
-      if (aeroImproving && (strengthGaining || rm.strength.overall.trend === 'maintaining')) return 'improving';
-      if ((aeroDecl || driftDecl) && strengthDecl) return 'declining';
-      if ((aeroDecl || driftDecl) || strengthDecl) return 'mixed';
-      if (aeroImproving || strengthGaining) return 'improving';
-      return 'stable';
-    })() as 'improving' | 'stable' | 'declining' | 'mixed';
+    // Fitness direction is now the SPINE roll-up (athlete_snapshot.state_trends_v1), NOT a separate
+    // response-model re-derivation. Coach DESCRIBES the spine verdict; it no longer infers fitness
+    // its own way — the same single-source principle as the Step-2 narrative→spine work, one level
+    // up. Two coexisting fitness verdicts (response-model vs spine) is exactly how the old
+    // contradictions survived; there is now one truth. Absent cache (cold start) → 'stable', which
+    // matches the prior derivation's catch-all default, so the degraded contract is unchanged.
+    const fitnessDirection: FitnessDirection = rollupFitnessDirection(latestSnapshot?.state_trends_v1);
 
     const readinessState = (() => {
       const rm = weeklyResponseModel;
@@ -4279,6 +4273,26 @@ Deno.serve(async (req) => {
         // Deterministic verdict
         narrativeFacts.push(`Overall status: ${training_state.title}.`);
         narrativeFacts.push(`Fitness direction: ${fitnessDirection}. Readiness: ${readinessState}.`);
+
+        // Per-discipline spine breakdown so the narrative can EXPLAIN the direction (coherent, not
+        // just a label) and never asserts a direction for a discipline with no data. Sourced from
+        // the same state_trends_v1 the fitness_direction roll-up reads — one truth, described.
+        {
+          const st = latestSnapshot?.state_trends_v1;
+          if (st) {
+            const moved: string[] = [];
+            const noData: string[] = [];
+            for (const d of ['strength', 'bike', 'run', 'swim'] as const) {
+              const v = st[d]?.verdict;
+              if (v && v !== 'needs_data') moved.push(`${d} ${v}`);
+              else noData.push(d);
+            }
+            const parts: string[] = [];
+            if (moved.length) parts.push(`moving: ${moved.join(', ')}`);
+            if (noData.length) parts.push(`not enough data: ${noData.join(', ')}`);
+            if (parts.length) narrativeFacts.push(`Per-discipline spine (the basis for fitness direction — describe it, do not infer beyond it): ${parts.join('; ')}.`);
+          }
+        }
 
         // Interference signal (aerobic vs structural balance from stored snapshot)
         if (interference && interference.status === 'interference_detected') {

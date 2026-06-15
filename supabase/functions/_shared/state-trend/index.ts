@@ -48,6 +48,8 @@ export {
   assembleStateTrends,
   liftSeriesFromExerciseLog,
   toStateTrendsV1,
+  rollupFitnessDirection,
+  type FitnessDirection,
   disciplineOf,
   todayISO,
   isoMinus,

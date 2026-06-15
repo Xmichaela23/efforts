@@ -157,6 +157,26 @@ export interface StateTrendsV1 {
   };
 }
 
+export type FitnessDirection = 'improving' | 'stable' | 'declining' | 'mixed';
+
+/** Roll the per-discipline spine verdicts up to the coach's single fitness_direction. The coach
+ *  DESCRIBES this; it no longer re-derives fitness its own way (the Step-2 narrative→spine lesson,
+ *  one level up). Only disciplines with a real verdict count (needs_data is ignored, not asserted
+ *  as a direction). Mixed = genuinely both ways; stable = no detected change OR no signal at all
+ *  (matches the prior derivation's catch-all default, so the cold-start contract is unchanged). */
+export function rollupFitnessDirection(v1: StateTrendsV1 | null | undefined): FitnessDirection {
+  if (!v1) return 'stable';
+  const verdicts = [v1.strength?.verdict, v1.bike?.verdict, v1.run?.verdict, v1.swim?.verdict]
+    .filter((x) => x && x !== 'needs_data');
+  if (verdicts.length === 0) return 'stable';
+  const hasImp = verdicts.includes('improving');
+  const hasSld = verdicts.includes('sliding');
+  if (hasImp && hasSld) return 'mixed';
+  if (hasImp) return 'improving';
+  if (hasSld) return 'declining';
+  return 'stable'; // only holding
+}
+
 /** Shape the assembled result into the cached contract. Per-discipline = the model's performance
  *  verdict (needs_data when no real trend), independent of the card's display axis. */
 export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV1 {
