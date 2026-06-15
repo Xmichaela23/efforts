@@ -57,6 +57,14 @@ pctChange = (recentAvg − earlyAvg) / earlyAvg × 100   (raw, rounded to 0.1%)
   28d / external / all-time baseline. So `pctChange` is a **within-window, endpoint-smoothed
   first-pair-vs-last-pair delta** (2 sessions averaged at each end so no single PR or bad day
   anchors an endpoint — the noise guard).
+- **Endpoint overlap at the floor (n=3) — documented, benign.** With exactly 3 in-window
+  sessions, `early = avg(p0, p1)` and `recent = avg(p1, p2)` **share the middle session p1** (the
+  endpoint window is `k = min(2, n)`, so the two pairs overlap when `n < 4`). The shared point
+  damps the measured delta, so at the floor `pctChange` is **conservative** — it can read a touch
+  smaller than a naive first-vs-last would. This is intentional/benign, not a bug: being
+  conservative exactly where data is thinnest is consistent with the **honest-blank discipline**,
+  and these n∈{3,4} cases are already surfaced as `provisional` (see the per-discipline confidence
+  flag). Flagged here so it isn't rediscovered later as a mystery.
 - `pctChange` is always the **RAW** movement of the underlying metric (it shows the real
   direction the number moved). The **verdict** applies `lowerIsBetter` — it does NOT change the
   displayed sign.
