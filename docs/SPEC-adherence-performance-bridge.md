@@ -52,6 +52,21 @@ Session writes the adherence fact (planned vs. actual — already captured). The
 
 This is the honest precursor to plan adjustment: before the app *adjusts* for dropped runs, it first *notices*, *surfaces*, and *asks why* — with the human at the gate. The adjust-offer is where this bridges into Step 5 (gated autoregulation). Build the surface+ask first; the adjust-action stays behind Step 5's explicit sign-off.
 
+## The real feature this enables — AUTOREGULATION FLAGGING (the arc)
+
+The adherence↔performance bridge is one facet of a bigger feature: **flag when the plan doesn't fit the athlete.** Three detection patterns, each from a *combination* of signals (no single signal is enough):
+
+1. **Plan over-built** — missing sessions + **declining body-response** + RPE climbing → *"consider scaling down."*
+2. **Plan under-built** — hitting everything easily + **strong body-response** + flat fitness → *"you have headroom."*
+3. **Sessions ridden too hard** — easy/Z2 efforts above zone, HR too high for the effort → *"your easy days aren't easy."* (This is the per-session **zone-adherence** Read in `SPEC-per-session-performance-engine.md`.)
+
+### Why tonight's load-fix is the FOUNDATION
+These detections depend on a **trustworthy body-response signal**. Before tonight, body-response was fragmented + mislabeled: it hijacked the LOAD label (said "HIGH LOAD" off 2 thin sessions) and fired on insufficient data. Tonight's load-fix (D-NNN) makes body-response a **clean, properly-labeled, min-session-gated** signal — separated from volume-load, living on the readiness axis, not firing on thin data. **That clean signal is exactly the input these flags need.** Arc for the next session: **load-fix → clean body-response → autoregulation flagging.**
+
+### Critical boundary — DETECT + FLAG now; ADJUST is gated
+- **Buildable (next real feature):** the **detection + flagging** layer — surface the pattern, say *"consider adjusting."* Read-only synthesis over the spine + the clean body-response + zone-adherence. Same honest-flag-with-human-at-the-gate discipline as the bridge.
+- **🔒 GATED (Step 5):** the **adjustment action** — actually changing the prescription. Needs explicit sign-off + vetted science. Flag, don't auto-adjust. (The injury-path guardrail — adjust-down-never-up — is part of Step 5, not the flagging layer.)
+
 ## Sign-offs when built
 
 - Adherence-low threshold (what % missed, over what window, counts as "sustained low")?
