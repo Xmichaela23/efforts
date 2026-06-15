@@ -1353,7 +1353,7 @@ const Connections: React.FC = () => {
             </Button>
             <Button
               onClick={() => {
-                // Navigate back to main app - context will be accessible from there
+                // Back to the main app — State is accessible there (label renamed Context→State).
                 navigate('/');
               }}
               className="flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45"
@@ -1366,35 +1366,22 @@ const Connections: React.FC = () => {
                 boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
               }}
             >
-              Context
+              State
             </Button>
-            <PlansMenu
-              currentPlans={currentPlans}
-              completedPlans={[]}
-              onSelectPlan={() => {}}
-              isOpen={plansMenuOpen}
-              onOpenChange={setPlansMenuOpen}
-              trigger={
-                <Button
-                  onClick={() => setPlansMenuOpen(true)}
-                  className={`flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl ${
-                    plansMenuOpen
-                      ? 'border-white/50 text-white bg-white/[0.12]' 
-                      : 'border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45'
-                  }`}
-                  style={{
-                    fontFamily: 'Inter, sans-serif',
-                    padding: '10px 14px',
-                    borderRadius: '1rem',
-                    fontSize: '14px',
-                    minHeight: '42px',
-                    boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
-                  }}
-                >
-                  Plans
-                </Button>
-              }
-            />
+            <Button
+              onClick={() => navigate('/')}
+              className="flex-1 flex items-center justify-center bg-white/[0.08] backdrop-blur-lg border-2 text-gray-300 font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl border-white/35 hover:bg-white/[0.10] hover:text-white hover:border-white/45"
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                padding: '10px 14px',
+                borderRadius: '1rem',
+                fontSize: '14px',
+                minHeight: '42px',
+                boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 4px 12px rgba(0, 0, 0, 0.3)',
+              }}
+            >
+              Goals
+            </Button>
             <LogFAB onSelectType={() => {}} />
           </div>
         </div>
