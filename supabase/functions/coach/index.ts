@@ -91,7 +91,7 @@ const corsHeaders: Record<string, string> = {
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
 /** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
 /** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
-const COACH_PAYLOAD_VERSION = 38; // 38: per-discipline spine FACT w/ provisional framing + retired response-model "on the right track" echo
+const COACH_PAYLOAD_VERSION = 39; // 39: spine FACT requires explicit per-discipline naming (w/ confidence framing)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -4299,8 +4299,8 @@ Deno.serve(async (req) => {
               const parts: string[] = [];
               if (moved.length) parts.push(`trending: ${moved.join('; ')}`);
               if (noData.length) parts.push(`not enough data yet: ${noData.join(', ')}`);
-              narrativeFacts.push(`Per-discipline spine (the BASIS for fitness direction — name each discipline's state, do not infer beyond it): ${parts.join(' | ')}.`);
-              narrativeFacts.push(`SPINE FRAMING: name each discipline's trend, but treat any [provisional] trend — and any discipline whose recent sessions were largely missed — as a SIGNAL TO CONFIRM, not a confident verdict. Cite the missed/limited sessions as a co-explanation rather than stating fitness is declining as fact. Disciplines with no data are too early to call: say so, do not imply a decline from missed sessions.`);
+              narrativeFacts.push(`Per-discipline spine (the BASIS for fitness direction — do not infer beyond it): ${parts.join(' | ')}.`);
+              narrativeFacts.push(`SPINE FRAMING (required): your narrative MUST include one sentence that explicitly states EACH discipline's current trend from the spine above — name the improving ones, the sliding ones, AND the ones with no data yet. Do not omit a discipline that has a verdict, even when adherence is the bigger story. BUT frame honestly: a [provisional] trend, and any discipline whose recent sessions were largely missed, is a SIGNAL TO CONFIRM — cite the missed/limited sessions as a co-explanation, never state fitness is declining as fact. No-data disciplines are too early to call: say so, do not imply decline from missed sessions.`);
             }
           }
         }
