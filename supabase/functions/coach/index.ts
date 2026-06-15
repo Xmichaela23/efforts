@@ -91,7 +91,7 @@ const corsHeaders: Record<string, string> = {
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
 /** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
 /** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
-const COACH_PAYLOAD_VERSION = 43; // 43: narrativePrompt hard lexical rule — NO raw "X of Y" completion tallies anywhere; qualitative register required (#4 tone, robustness)
+const COACH_PAYLOAD_VERSION = 44; // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -4470,6 +4470,10 @@ Connect the dots when you have athlete context: if they said they had the flu, t
 
 CRITICAL: If the athlete has an active training plan, NEVER suggest adding extra sessions or workouts. If sessions were missed, sentence 4 may tell them to prioritize the planned sessions ahead — without turning sentences 1–3 into a missed-workout list. Frame adjustments only as intensity changes within existing planned sessions.
 
+NAMING SESSION PRIORITIES (sentence 4 only — describe the plan, do not decide for it):
+- LEXICAL (hard): NEVER write "add a session", "add one more", "add another", or "if you can only add one more". The word "add" reads as extra volume even when you mean a planned session — it is forbidden. Use "prioritize", "anchor on", or "make X your non-negotiable" — and these ALWAYS refer to sessions ALREADY in the plan, never new work.
+- DESCRIBE, DON'T DECIDE: When you name which sessions matter most, name ONLY the sessions the FACTS already mark as key (the KEY sessions / STILL UPCOMING key sessions / per-discipline key-session lines). Do NOT invent your own priority ranking across all sessions or elevate a session the plan didn't flag. You are describing the plan's existing key-session marking, not choosing what matters. If the FACTS don't mark any session as key, keep sentence 4 general ("prioritize your planned key sessions this week") and name none.
+
 Do NOT use jargon like ACWR, RIR, RPE, TRIMP, or sample sizes. Speak like a real coach talking to their athlete.
 
 UNITS: The athlete uses ${isImperial ? 'imperial (lb, miles)' : 'metric (kg, km)'}. Always use ${wUnit} for weights and ${isImperial ? 'miles' : 'km'} for distances. The facts below already use the correct units.
@@ -4497,7 +4501,7 @@ ${narrativeFacts.join('\n')}`;
               model: 'claude-sonnet-4-5-20250929',
               system: systemPrompt,
               messages: [{ role: 'user', content: narrativePrompt }],
-              max_tokens: 300,
+              max_tokens: 500, // was 300 — the 4–5 sentence contract truncated mid-sentence ("…if you can only add one more, make—")
               temperature: 0,
             }),
           });
