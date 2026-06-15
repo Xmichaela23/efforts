@@ -47,6 +47,32 @@ The fitness verdict is computed **once** and read everywhere — closes the scre
   - **Loop framing:** the **execution → spine → display** arc is wired (STATE / session-detail / coach); the **spine → baselines/record/plan** feedback arc is **OPEN**. "Spine done" = the core engine + read surfaces, NOT the full loop.
 - **Scope:** display/synthesis only — **does NOT feed prescription.**
 - **Verification:** deno check + tsc clean; `compute-snapshot` / `coach` (v39) / `workout-detail` deployed; cached==live (16/16) + coach before/after (`stable`→`mixed`) verified live. Commits `efbeee3b`→`c33ef732`.
+- **Component duties (who reads what, from the ONE cache — stated, not aspirational):**
+  - **STATE screen** (`useStateTrends` → `StatePerformanceSection`): duty = **the macro per-discipline verdict** — "am I getting fitter, per discipline." Reads `state_trends_v1` (live-computed client-side via the shared assembler; identical to the cached server copy). Shows the four discipline trends + headline + bike Power·Efficiency dual. **Aggregate, glanceable.**
+  - **Session-detail / Performance** (`workout-detail` → `build.ts` → `MobileSummary`): duty = **this session's place in the discipline trend** — the per-session screen surfaces `session_detail_v1.discipline_trend` (the session's discipline verdict, read from the SAME cache, not re-derived) + the bike per-ride HR-at-power datapoint. **One session against its discipline's trend.**
+  - **Coach** (`coach`): duty = **describe the verdict, don't re-derive** — `fitness_direction` = spine roll-up; narrative names each discipline with confidence framing.
+  - **SPECCED-NOT-BUILT (the honest gaps):** the **per-session +/- engine** (`SPEC-per-session-performance-engine.md`, Reads 1–3) — the duty of saying "this session was better/worse than your comparable sessions, terrain/confound-controlled" — is **not built** (Read-3 blocked on weather/route data, Q-055). The **STATE headline** synthesis (`SPEC-state-headline.md`) and the **adherence↔performance bridge** (`SPEC-adherence-performance-bridge.md`) are **specced-not-built**. So today's division is: STATE = macro verdict, session-detail = per-session *context* (the discipline trend), NOT yet per-session *judgment* (that's the unbuilt engine).
+
+### Tier-1 honesty sweep — data-integrity write-side + narrative anti-speculation (D-152, 2026-06-14)
+
+First sweep off the whole-board Tier map. Correctness/honesty bugs that mislead the athlete, sequenced **data-integrity before voice**. No prescription touched.
+
+- **Q-054 run pace (`compute-facts`):** the live `avgHr=0 → GAP=0` collapse fixed (zero-not-null class, D-112/D-115 family) — HR-less run now writes `GAP=null`, never `0`. Write-side plausibility clamp (150–750 s/km) so garbage provider pace never persists. 4 stale-residue rows recomputed clean (0/118 OOB). Filing's "GPS-dropout" premise was wrong — it was stale residue + one live zero-blind bug.
+- **T2 `overall.avg_power/avg_hr=0`:** verified NOT firing (0/40 rides); hardened `buildRideFacts` with the same first-positive treatment → `compute-facts` is now **zero-safe across both disciplines** (run + ride).
+- **T1 cycling narrative anti-speculation (`_shared/cycling-v1/ai-summary.ts`):** extended `validateClaimsGrounded` (holding/responding/consolidating, fitness-subject-anchored) — extends an EXISTING retry guard, no new one (honors §7). Anti-speculation prompt rule + targeted limiter-projection line (**prompt-only — retry loop untouched**). Result: **11/12 reliably clean**; 1 ride retains an intermittent soft projective tail (Q-058, documented edge).
+- **Verification:** `compute-facts` + `analyze-cycling-workout` deployed; 4 runs + 12 rides recomputed against real data; `deno test` 20/0 of the grounding/lede/jargon guards (3 pre-existing trend-test failures unrelated). Commit `9c0f73d8` (Q-054/T2) + the T1 commit.
+- **Tickets filed:** Q-057 (NULL-`workout_id` write-path hygiene), Q-058 (T1 soft-tail edge).
+
+### Whole-board Tier map (do-now / do-next / gated — captured 2026-06-14 for the next session)
+
+The priority order weighed: **mislead-the-athlete > polish · Monday's live build-week data · unblock-leverage · gated-prescription-flagged-separately · effort:payoff.** Full punch-list section: §8 + the per-section items.
+
+- **Tier 1 — honesty bugs, Monday-visible — ✅ DONE (D-152):** Q-054, T2, T1.
+- **Tier 2 — cheap, read-only, high-unblock — NEXT:** §5 baseline→zones flow audit (surfaces the deadlift-under/bench-over class); Q-053 FTP-ingest *decision* (the implementation is gated).
+- **Tier 3 — complete the spine:** Load/BODY fold-in (D-146/147 ACWR + off-plan → spine); Q-052 load-threshold remainder.
+- **Tier 4 — spine follow-on surfaces (build once observed live):** STATE headline; per-session engine Reads 1–2; §6 adaptive-intent / §7 interference surfacing.
+- **🔒 Tier 5 — GATED (prescription, explicit sign-off, NOT auto-sequenced):** Step 4 (plan builder reads spine); Step 5 (autoregulation) + adherence↔perf adjust-action; Q-053 FTP-ingest implementation; `scaledWeeklyTSS` over-prescription; §6 cadence prescription.
+- **⬜ Tier 6 — deep / blocked:** iOS auth-lifecycle + Bug A/B (blocked on repro — Monday device use may produce it); Q-034 iOS logger overflow; Consolidated-mode; §5 apply §4.21 to other generators.
 
 ### Strength logger draft persistence — identity-scoped, gated on Done (D-132, 2026-06-11)
 

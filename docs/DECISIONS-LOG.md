@@ -3648,6 +3648,26 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-152 — Tier-1 honesty sweep: run pace corruption (Q-054) + zero-not-null hardening (T2) + narrative anti-speculation (T1)
+
+- **Date:** 2026-06-14
+- **Context:** first sweep off the whole-board priority order (ENGINE-STATE Tier map) — correctness/honesty bugs that mislead the athlete, sequenced data-integrity-before-voice (same reconcile-senses-before-voice discipline as the spine). All three land on `compute-facts` + the cycling narrator; none touch prescription.
+- **Q-054 — run GAP/pace source corruption (`compute-facts`):**
+  - **The filing's premise was wrong.** It guessed a "GPS-dropout unit bug." The trace showed the 4 corrupt `route_progress_metrics` rows were **stale residue** — written when the provider pace was garbage (source `computed.overall.avg_pace_s_per_mi` since corrected to clean), never overwritten (cluster-key churn + a NULL-`workout_id` write path left orphans). Only **one** mechanism was a live code bug.
+  - **Fix 1 (the live bug):** a zero HR (no strap / treadmill) collapsed GAP to 0 — `effort_adjusted = pace × (hr/refHr)` with `hr=0`, and the guard checked `avgHr != null` (which **0 passes**). The **zero-not-null class, same family as D-112 (failure-to-zero coercion) / D-115 (index-0 hardcoded fallback)**. Now `buildRunFacts` picks the first POSITIVE hr source, and the route_progress writer treats `avgHr ≤ 0` as missing → `effort_adjusted = null` (raw pace stands), **never 0**.
+  - **Fix 2 (write-side clamp):** plausibility clamp (150–750 s/km, mirrors the spine read-guard) on `avg_pace` + `effort_adjusted` at the **write** site → a garbage provider pace (path A) or any OOB value never persists; the read guards become a backstop, not load-bearing.
+  - **Fix 3 (recompute, not delete):** recomputed the 4 affected workouts → all **self-healed** (2449→404, 2508→418, 24808→415; the HR-less 2026-03-26 GAP `0→null`). Recompute proved Fixes 1+2 on the real corrupt rows (the regression check); delete would have hidden them. Full scan: **0/118** OOB remaining.
+- **T2 — `computed.overall.avg_power/avg_hr=0` (verified not firing; hardened):** verified **0/40** rides carried `overall.avg_power_w=0` or `avg_hr=0` (the `avg_hr` display half was already closed by Q-007's TREND HR-line fallback) — T2 does not currently mislead. But the latent zero-blind pattern (`??` passes a literal 0) is the same class, so **`buildRideFacts` avg_power/avg_hr got the same first-positive treatment** → `compute-facts` now treats 0-as-missing **across both disciplines** (symmetric with the run fix). `get-week:785/788` (`== null` fill, zero-blind) left untouched — `overall` is written clean upstream, zero payoff, higher risk to change calendar reads.
+- **T1 — cycling narrative anti-speculation (`_shared/cycling-v1/ai-summary.ts`, prompt-only):**
+  - **Root cause, two gaps:** (a) `validateClaimsGrounded`'s `dirRe` word list was incomplete — caught `declin*/improv*/slid*` but **missed "holding/responding/consolidating"** (fitness claims by another word); (b) **no anti-speculation rule for the trailing clause** — phase-guessing ("suggests you're in a base-building phase rather than a taper"), projection ("will pay dividends / move the needle"), and alarm leaked. **The prompt itself seeded it** (the "SO WHAT?" rule literally instructed *"aerobic efficiency is holding" / "suggests accumulated fatigue"*). Concentrated in cycling; run already constrains via prompt rules.
+  - **Part A (hard guard, low-risk):** extended `validateClaimsGrounded` with a fitness-subject-anchored pattern for holding/responding/consolidating (anchored so "held the 150-167 W target" = execution is NOT flagged). This **extends an existing retry-loop guard — does not add one** (honors the SESSION-CONTEXT §7 3-guard-stack footgun).
+  - **Part B (prompt-only):** fixed the seeding example + added an anti-speculation rule (phase / projection / alarm / fitness-direction) mirroring run's, plus a **targeted limiter-projection line** (state the limiter as fact, never project its fix). **Prompt-only — never touched the retry loop**, per §7 + the explicit "prompt rules generalize, regex is whack-a-mole" reasoning.
+  - **Result (recorded honestly):** force-regenerated all 12 leaker rides — **11/12 fully clean, reliably** (9 immediate + 2 on re-roll); **1 ride (2026-05-19)** had its severe projection killed and the limiter grounded as fact, but retains an **intermittent soft projective tail** on ~1-in-2 rolls (rephrases — "return concentrates"). Filed as Q-058: prompt-only cannot deterministically suppress an open-ended class; closing it fully needs the retry-loop hard guard deliberately declined here. Part A fired on 0 (the prompt prevented the phrasing upstream) — it stays as a zero-cost backstop.
+- **Commits:** `9c0f73d8` (Q-054 + T2, `compute-facts`, deployed + 4 recomputed); T1 (`_shared/cycling-v1/ai-summary.ts`, `analyze-cycling-workout` deployed); this docs entry.
+- **Scope:** display/data-integrity only — no prescription touched. Tier-1 honesty sweep complete; Tier-2 (read-only baseline→zones flow audit) is next per the Tier map.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

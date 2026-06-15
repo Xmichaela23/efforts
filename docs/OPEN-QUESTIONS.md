@@ -826,6 +826,24 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-057 — 8 `route_progress_metrics` rows with NULL `workout_id` (write-path hygiene)
+
+- **Status:** filed 2026-06-14 (surfaced during the Q-054 trace) · unverified
+- **What it is:** the full OOB scan found **8 rows in `route_progress_metrics` with `workout_id = NULL`** for the dev athlete. `compute-facts` writes `workout_id: w.id` (the run path Q-054 fixed), so a DIFFERENT write path is producing them — or they're legacy. They also defeat the `onConflict(route_cluster_id, workout_id)` dedup (NULL ≠ NULL in Postgres unique constraints), which is how the 2026-04-05 corrupt orphan survived alongside 3 clean NULL-wid duplicate rows.
+- **Why it matters (small):** orphan/duplicate rows that no upsert overwrites → stale residue accumulates; not currently misleading any spine consumer (the read-guard + Q-054 clamp backstop it), but it's a data-hygiene leak.
+- **Fix scope (separate):** find the write path that omits `workout_id` (grep the `route_progress_metrics` writers — `compute-facts` is one; check for others / legacy backfills); either populate it or stop the path. Then a one-time cleanup of the existing 8 NULL-wid rows.
+- **Cross-ref:** Q-054 (the trace that found it), D-152.
+
+## Q-058 — T1 soft limiter-projection tail (prompt-only can't fully suppress open-ended projection)
+
+- **Status:** filed 2026-06-14 (T1 close, D-152) · known soft edge, documented-not-fixed
+- **What it is:** after the T1 anti-speculation fix (D-152), **11/12** cycling narratives are reliably clean, but **1 ride (2026-05-19)** retains an intermittent **soft projective tail** on ~1-in-2 force-regens — the severe projection ("will unlock the most return" / "move the needle") is killed and the limiter is grounded as a fact, but the LLM occasionally appends a rephrased soft projection ("the work ahead will be where the return concentrates"). It rephrases each roll, so a narrow regex backstop is whack-a-mole.
+- **Why left as-is:** the fix was deliberately **prompt-only** (no retry-loop hard guard — SESSION-CONTEXT §7 3-guard-stack footgun + the "prompt rules generalize, regex chases phrasings" reasoning). Open-ended projection cannot be deterministically suppressed by prompt alone; the residual is the irreducible edge of that constraint.
+- **Revisit ONLY if:** a hard grounding guard is ever added to the cycling narrative retry (a structural backstop that checks trailing-clause grounding, not a phrase regex). Until then, accept the soft tail — it's grounded-adjacent coaching, not a severe ungrounded claim.
+- **Cross-ref:** D-152 (T1), `validateClaimsGrounded`, the cycling anti-speculation prompt rule, SESSION-CONTEXT §7.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

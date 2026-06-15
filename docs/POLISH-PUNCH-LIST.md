@@ -342,6 +342,18 @@ The cached single source of athlete truth. Several items below were re-deriving 
 - **Closed by the spine:** np_trend all-type-pool lie (D-148/D-150); the *internal* FTP 176/204 contradiction (Efforts is internally consistent at 176 — the gap is external Garmin only, now Q-053); swim learned-aggregate pipeline (Q-051).
 - **NOT subsumed (adjacent):** §6 cadence prescription (prescription side — separate); §5 "apply §4.21 to other generators" (scheduling — unrelated).
 
+### Tier-1 honesty sweep — DONE (2026-06-14, D-152)
+
+First sweep off the whole-board **Tier map** (now in `ENGINE-STATE.md` → "Whole-board Tier map" — the durable do-now/do-next/gated order for the next session). Correctness/honesty bugs that mislead the athlete, data-integrity before voice.
+
+- [x] **Q-054** — run GAP/pace source corruption. Live `avgHr=0 → GAP=0` collapse fixed (HR-less run → `GAP=null`, never 0); write-side plausibility clamp; 4 stale rows recomputed clean (0/118 OOB). `compute-facts` deployed (`9c0f73d8`).
+- [x] **T2** — `overall.avg_power/avg_hr=0` verified not firing (0/40); `buildRideFacts` hardened zero-safe (symmetric with the run fix — both disciplines now treat 0-as-missing).
+- [x] **T1** — cycling narrative anti-speculation: `validateClaimsGrounded` word list extended (Part A) + anti-speculation prompt rule + targeted limiter-projection line (Part B, prompt-only, no retry-loop touch). 11/12 reliably clean; 1 soft-tail edge → **Q-058**.
+- Filed: **Q-057** (8 NULL-`workout_id` rows, write-path hygiene), **Q-058** (T1 soft limiter-projection tail).
+- **§8 Athlete-State Spine** confirmed filed (root-cause layer, D-150/D-151).
+
+**Next per the Tier map:** Tier 2 — §5 baseline→zones flow audit (read-only) + the Q-053 FTP-ingest decision.
+
 ---
 
 ## Queued for next sessions (Theme A complete 2026-05-11)
