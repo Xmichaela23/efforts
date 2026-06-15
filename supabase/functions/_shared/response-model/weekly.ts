@@ -366,17 +366,21 @@ function computeAssessment(
       `Limited signals this week. One metric is slightly off but not enough data to draw conclusions.`);
   }
 
+  // NB: these explain strings describe RESPONSE MARKERS (cardiac efficiency, HR drift, execution,
+  // RPE) — how the body is handling load — NOT overall fitness direction (that is the spine's
+  // state_trends_v1 roll-up). Phrasing is scoped accordingly: no global "on the right track" /
+  // "training is producing results" claims that would echo the retired fitness re-derivation.
   if (improving >= 2) {
     return make('responding', improvingSignals[0] || null, available >= 3 ? 'high' : 'medium',
-      `Positive trends in ${improvingSignals.join(' and ')}. Training is producing results.`);
+      `Positive response markers in ${improvingSignals.join(' and ')}. Your body is handling the load well.`);
   }
 
   if (improving === 1 && concerning === 0) {
     return make('responding', improvingSignals[0] || null, 'medium',
-      `${improvingSignals[0]} improving, other signals stable. On the right track.`);
+      `${improvingSignals[0]} improving; other response markers steady.`);
   }
 
-  return make('responding', null, 'medium', 'Signals are stable. Your body is handling the current load.');
+  return make('responding', null, 'medium', 'Response markers are stable. Your body is handling the current load.');
 }
 
 // ---------------------------------------------------------------------------

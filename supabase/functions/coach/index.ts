@@ -91,7 +91,7 @@ const corsHeaders: Record<string, string> = {
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
 /** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
 /** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
-const COACH_PAYLOAD_VERSION = 37; // 37: fitness_direction is now the spine roll-up (state_trends_v1), not response-model re-derivation
+const COACH_PAYLOAD_VERSION = 38; // 38: per-discipline spine FACT w/ provisional framing + retired response-model "on the right track" echo
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -4275,22 +4275,33 @@ Deno.serve(async (req) => {
         narrativeFacts.push(`Fitness direction: ${fitnessDirection}. Readiness: ${readinessState}.`);
 
         // Per-discipline spine breakdown so the narrative can EXPLAIN the direction (coherent, not
-        // just a label) and never asserts a direction for a discipline with no data. Sourced from
-        // the same state_trends_v1 the fitness_direction roll-up reads — one truth, described.
+        // just a label), names each discipline's state, and NEVER overstates: a provisional trend
+        // (sparse/clustered data) is framed as a signal-to-confirm, and a discipline with no data is
+        // called too-early, not implied as decline. Faithful-to-the-spine AND honest-about-
+        // confidence — both. Sourced from the same state_trends_v1 the roll-up reads.
         {
           const st = latestSnapshot?.state_trends_v1;
           if (st) {
             const moved: string[] = [];
             const noData: string[] = [];
             for (const d of ['strength', 'bike', 'run', 'swim'] as const) {
-              const v = st[d]?.verdict;
-              if (v && v !== 'needs_data') moved.push(`${d} ${v}`);
-              else noData.push(d);
+              const sd = st[d];
+              const v = sd?.verdict;
+              if (v && v !== 'needs_data') {
+                const pct = sd?.pctChange;
+                const pctStr = pct != null ? ` ${pct > 0 ? '+' : ''}${pct}%` : '';
+                moved.push(`${d} ${v}${pctStr}${sd?.provisional ? ' [provisional — sparse/limited data]' : ''}`);
+              } else {
+                noData.push(d);
+              }
             }
-            const parts: string[] = [];
-            if (moved.length) parts.push(`moving: ${moved.join(', ')}`);
-            if (noData.length) parts.push(`not enough data: ${noData.join(', ')}`);
-            if (parts.length) narrativeFacts.push(`Per-discipline spine (the basis for fitness direction — describe it, do not infer beyond it): ${parts.join('; ')}.`);
+            if (moved.length || noData.length) {
+              const parts: string[] = [];
+              if (moved.length) parts.push(`trending: ${moved.join('; ')}`);
+              if (noData.length) parts.push(`not enough data yet: ${noData.join(', ')}`);
+              narrativeFacts.push(`Per-discipline spine (the BASIS for fitness direction — name each discipline's state, do not infer beyond it): ${parts.join(' | ')}.`);
+              narrativeFacts.push(`SPINE FRAMING: name each discipline's trend, but treat any [provisional] trend — and any discipline whose recent sessions were largely missed — as a SIGNAL TO CONFIRM, not a confident verdict. Cite the missed/limited sessions as a co-explanation rather than stating fitness is declining as fact. Disciplines with no data are too early to call: say so, do not imply a decline from missed sessions.`);
+            }
           }
         }
 

@@ -10,7 +10,7 @@
 // Import from source modules (NOT ./index.ts) — index.ts re-exports this file, so importing the
 // barrel here would create a load-order cycle.
 import { computeStrengthState, type LiftSeries } from './strength.ts';
-import { computeBikeFitness, type BikeFitness } from './bike-fitness.ts';
+import { computeBikeFitness, isProvisionalTrend, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries } from './run.ts';
 import { computeSwimState, swimPaceToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
@@ -85,6 +85,7 @@ export interface StateTrendResult {
   headline: Headline | null;
   bikeFitness: BikeFitness;
   perfByDisc: Record<string, PerfSummary | null>;
+  provisionalByDisc: Record<string, boolean>;
   spw: Record<string, number>;
 }
 
@@ -109,11 +110,13 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const bike: PerfSummary | null = bikeLeadVerdict !== 'needs_data' ? { verdict: bikeLeadVerdict, pctChange: bikeLeadPct } : null;
 
   // run
-  const run = perfFromTrend(computeRunState(routeMetricsToSeries(inp.runJoined), asOf, spw.run).trend);
+  const runState = computeRunState(routeMetricsToSeries(inp.runJoined), asOf, spw.run);
+  const run = perfFromTrend(runState.trend);
 
   // swim
   const { series: swimSeries, dropped } = swimPaceToSeries(inp.swimRows);
-  const swim = perfFromTrend(computeSwimState(swimSeries, asOf, spw.swim, dropped).trend);
+  const swimState = computeSwimState(swimSeries, asOf, spw.swim, dropped);
+  const swim = perfFromTrend(swimState.trend);
 
   // strength
   const liftSeries = liftSeriesFromExerciseLog(inp.exerciseRows);
@@ -124,6 +127,18 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     bike,
     run,
     swim,
+  };
+
+  // Per-discipline confidence (provisional = near-floor n or clustered/short span — the same gate
+  // the bike signals use). Carried into the cache so the coach FACT can frame a provisional trend
+  // as a signal-to-confirm, not a confident verdict. Strength: provisional if the primary lifts
+  // driving the verdict are few (<2) or themselves provisional.
+  const strengthPrimaries = strength.lifts.filter((l) => l.isPrimary && l.trend.verdict !== 'needs_data');
+  const provisionalByDisc: Record<string, boolean> = {
+    strength: strengthPrimaries.length > 0 && (strengthPrimaries.length < 2 || strengthPrimaries.some((l) => isProvisionalTrend(l.trend))),
+    bike: bikeFitness.power.verdict !== 'needs_data' ? bikeFitness.power.provisional : bikeFitness.efficiency.provisional,
+    run: isProvisionalTrend(runState.trend),
+    swim: isProvisionalTrend(swimState.trend),
   };
 
   const cards: DisciplineCard[] = ORDER.map((k) =>
@@ -139,11 +154,11 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     }),
   );
 
-  return { cards, headline: synthesizeHeadline(cards), bikeFitness, perfByDisc, spw };
+  return { cards, headline: synthesizeHeadline(cards), bikeFitness, perfByDisc, provisionalByDisc, spw };
 }
 
 // ---- cache shape: athlete_snapshot.state_trends_v1 ----
-export interface DisciplineTrendCache { verdict: string; pctChange: number | null }
+export interface DisciplineTrendCache { verdict: string; pctChange: number | null; provisional: boolean }
 export interface StateTrendsV1 {
   as_of: string;
   version: 1;
@@ -182,7 +197,7 @@ export function rollupFitnessDirection(v1: StateTrendsV1 | null | undefined): Fi
 export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV1 {
   const disc = (k: string): DisciplineTrendCache => {
     const p = r.perfByDisc[k];
-    return { verdict: p?.verdict ?? 'needs_data', pctChange: p?.pctChange ?? null };
+    return { verdict: p?.verdict ?? 'needs_data', pctChange: p?.pctChange ?? null, provisional: !!r.provisionalByDisc[k] };
   };
   return {
     as_of: asOf,
