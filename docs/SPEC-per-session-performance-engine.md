@@ -29,6 +29,11 @@ A single-session verdict: was this ride/run better/worse than your recent *compa
 - Like Garmin's per-session read, but terrain-normalized so a hilly route doesn't read as "worse" just because it was harder.
 - The per-session analog of the spine's trend verdict — one session vs. baseline, not weeks vs. weeks.
 
+**REQUIREMENT — the comparison MUST control for confounds before asserting a fitness signal.** The current session-detail HR-drift read ("+11 vs typical +6") is *unconditioned*: it doesn't normalize for weather, grade, or route, so it asserts a fitness signal the data can't support. That +11 run was 78°F — heat drives cardiac drift independent of fitness; grade and route do the same. An unconditioned drift comparison is the same class of error as the np_trend lie and the cross-terrain power artifact: a number presented as a fitness verdict when the inputs aren't like-for-like. So Read 3:
+- **Controls for weather + grade + route** in the comparison set — only compare sessions whose conditions are close enough that a drift/effort delta plausibly reflects fitness, not environment.
+- **Uses same-route history as the comparison set for common routes** — for a route the athlete repeats, the cleanest control is prior runs of *that route*; the confounds (grade, route) are held constant by construction, leaving weather as the main residual to bound.
+- **Falls back to "not enough similar sessions" rather than a confounded comparison.** Honest-blank over a false signal — same principle as the staleness gate and the gated headline. Never widen the match just to produce a verdict.
+
 ## The structural mandate (protects against rebuild)
 
 **Build the engine sport-agnostic from day one.** It takes `(session, sport)` and the sport supplies its inputs:
@@ -48,6 +53,7 @@ The grade/HR/zone analysis logic is shared; only the effort-metric (power vs pac
 - Grade buckets — how is "a climb" defined (grade % thresholds, duration)?
 - Zone-hold definition — what % time-in-zone counts as "held" vs "blew the zone"?
 - Per-session +/- — what's "comparable" (same sport + similar terrain profile?), and the better/worse thresholds (noise-guarded, like the trend % thresholds).
+- **Confound match tightness (Read 3) — how close must weather + grade + route be to count as comparable?** Concretely: the temperature band (e.g. ±X °F), the grade-profile similarity (elevation gain/km or per-bucket time within Y%), and the route-match rule (same-route exact match for common routes vs. a terrain-profile proxy for one-offs). Plus the minimum N of similar sessions below which Read 3 returns "not enough similar sessions" rather than a confounded verdict. Sign off these bands before building — too loose reasserts the confounded-drift error; too tight makes Read 3 perpetually blank.
 - Sport-agnostic: keep grade/zone logic shared, effort-metric pluggable — verify run and bike both route through one engine.
 
 ## Open questions
@@ -56,3 +62,4 @@ The grade/HR/zone analysis logic is shared; only the effort-metric (power vs pac
 - How does this surface — per-session screen, narrative substance, or both? (Likely both: engine computes, narrative describes, session-detail screen shows the detail.)
 - Zone adherence needs prescribed zone — is that on the planned_workout, and does it survive to the logged session for comparison?
 - Relationship to the spine: is per-session +/- a spine output (one more verdict) or a separate per-session layer the spine's trend aggregates from? (Likely the latter feeds the former — per-session reads are the points the trend is built from.)
+- **Read-3 confound data — is per-session weather (temperature/humidity) stored, and is route identity available?** The normalization requirement is only buildable if the inputs exist: confirm temperature (and ideally humidity) is captured per session, and that a route key / same-route grouping exists for common routes. If weather isn't stored, Read 3's weather control degrades to "can't compare across conditions" — which must still fall back to honest-blank, never an unconditioned drift verdict. (Same retention check as HR-at-power's sample retention.)
