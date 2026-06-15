@@ -434,8 +434,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const completedTotals: SessionDetailV1['completed_totals'] = {
     duration_s: completedDurS,
     distance_m: completedDistM,
-    avg_pace_s_per_mi: fin(compOverall?.avg_pace_s_per_mi) ?? fin(fpFacts?.avg_pace_sec_per_mi),
-    avg_gap_s_per_mi: fin(compOverall?.avg_gap_s_per_mi) ?? fin(fpFacts?.avg_gap_sec_per_mi),
+    // Land pace (min/mi) + GAP are meaningless for a swim — null them so the swim screen never
+    // renders "5:03/mi". Swim pace lives in swim_pace_per_100_s. (Layer 1: numbers honest; the
+    // full swim-native template — speed chart, cadence, grade rows — is the separate Layer 2.)
+    avg_pace_s_per_mi: type === 'swim' ? null : (fin(compOverall?.avg_pace_s_per_mi) ?? fin(fpFacts?.avg_pace_sec_per_mi)),
+    avg_gap_s_per_mi: type === 'swim' ? null : (fin(compOverall?.avg_gap_s_per_mi) ?? fin(fpFacts?.avg_gap_sec_per_mi)),
     avg_hr: fin(compOverall?.avg_hr) ?? fin(fpFacts?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
     swim_pace_per_100_s: completedSwimPer100,
   };

@@ -892,6 +892,25 @@ Deno.serve(async (req) => {
     // RPC is required - no fallbacks to prevent data loss
     async function writeComputed(computedPayload: any): Promise<void> {
       const stamp = new Date().toISOString();
+      // SWIM duration clamp (Q-038) — SINGLE choke point for ALL branches. Every overallSec branch
+      // writes through here, so clamp once: the Strava scalar moving_time is AUTHORITATIVE for
+      // swims; the pool-swim sample timespan inflated duration ~39× (701:00 / 2263% adherence), and
+      // Priority-1 reuse of duration_s_moving made it STICKY (recompute couldn't self-heal). Force
+      // the scalar so no branch can persist a corrupt swim duration; downstream (build.ts) then
+      // reads the correct value. avg_pace_s_per_mi is land-meaningless for swims (nulled in build.ts)
+      // but we recompute it from the corrected duration for internal consistency.
+      try {
+        const sportCW = String((w as any)?.type || '').toLowerCase();
+        const mv = Number((w as any)?.moving_time);
+        if (sportCW === 'swim' && computedPayload?.overall && Number.isFinite(mv) && mv > 0) {
+          const secs = Math.round(mv < 1000 ? mv * 60 : mv);
+          computedPayload.overall.duration_s_moving = secs;
+          const distM = Number(computedPayload.overall.distance_m);
+          if (Number.isFinite(distM) && distM > 0) {
+            computedPayload.overall.avg_pace_s_per_mi = paceSecPerMiFromMetersSeconds(distM, secs);
+          }
+        }
+      } catch { /* non-fatal */ }
       const normalized = normalizeComputedPaces(computedPayload);
       
       // Use database RPC for atomic JSONB merge - REQUIRED, no fallbacks

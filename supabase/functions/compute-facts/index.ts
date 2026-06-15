@@ -1268,11 +1268,13 @@ function buildSwimFacts(w: WorkoutRow): Record<string, any> {
     distance_m: Math.round(dist),
   };
 
+  // Scalar-derived pace (moving_time + distance, both Strava-authoritative) is the trusted source.
+  // The sample-derived analysis.swim pace overrode it with a ~39%-inflated value (same root as the
+  // duration bug — Q-038: sample-derived swim values are unreliable). Use the analysis pace ONLY as
+  // a fallback when the scalar can't be computed, never as an override.
   if (dur > 0 && dist > 0) {
     facts.pace_per_100m = Math.round((dur * 60 * 100) / dist);
-  }
-
-  if (analysis.swim?.avg_pace_per_100m) {
+  } else if (analysis.swim?.avg_pace_per_100m) {
     facts.pace_per_100m = Math.round(analysis.swim.avg_pace_per_100m);
   }
 
