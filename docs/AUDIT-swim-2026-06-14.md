@@ -70,22 +70,22 @@ The rich fields (per-length, stroke, pool length, SWOLF) are **not a display gap
 - **HealthKit = on-device local read:** no cloud API — the iPhone's local store, read via our native plugin, **iOS-only, only while the app is active**; the OS already aggregates FORM + Apple Watch and dedups at the OS level. Ingest is **client-side.**
 - ⇒ The dedup must reconcile a **server-ingested Strava swim** against a **client-ingested HealthKit swim** — different routes, different timing.
 
-### ⚠ PREREQUISITE before ANY HealthKit ingest — dedup by SOURCE PRECEDENCE (not fuzzy matching)
-FORM writes the same swim to BOTH HealthKit and Strava → dup risk. **Solve by choosing the source UP FRONT — never create the duplicate** (no fuzzy time/distance reconciliation after the fact):
-- **Strava only connected →** Strava (status quo).
-- **HealthKit only →** HealthKit.
-- **Both connected →** **HealthKit is the swim source-of-truth for FORM swims, skip Strava** (HealthKit has real `pool_length` + seconds-precise duration + stroke count).
-- **Key on the FORM source tag** — Strava activities carry "FORM goggles" in `device_name`; HealthKit carries source=FORM. Applies to **FORM-originated swims only.**
+### ⚠ PREREQUISITE before ANY HealthKit ingest — multi-source dedup (Runna/TrainerRoad pattern)
+Researched how Runna / TrainerRoad / etc. handle multi-source sync. The industry pattern is **time-window dedup + source precedence + best-field-from-each MERGE** — NOT a "pick one source" radio, and NOT choosing up front. Ingest both, recognize same-swim, reconcile to one. (Supersedes the earlier "pick-one-up-front" sketch.)
 
-**Generalizes (origin device → carriers → pick the richest, ingest once):**
-- FORM swim = HealthKit + Strava (dup risk → precedence).
-- Garmin swim = Strava only — **Garmin does NOT write to HealthKit by default**, so one carrier, no dup.
-- Rule: identify the origin device + which carriers have the swim, pick the richest carrier, ingest once. **Degrades gracefully** (one carrier → use it; two → precedence).
-- **Known hard edge (flag, do NOT build):** FORM + a Garmin watch together for open-water could put the same swim on multiple paths where "one origin" breaks — there, a source-tag + time-window fallback match may be needed.
+**Design goal — friction-free:** existing Strava/Garmin users change nothing; Apple users who opt in get richer swim data; duplicates never reach the user.
 
-**Audit prerequisite — ANSWERED:** our Strava ingest **does capture `device_name`** (→ `device_info` JSON + `workout_metadata`, `ingest-activity:526/535/1175`). So the FORM-vs-Garmin-vs-AppleWatch origin tag precedence keys on **is already available** — no new capture needed; precedence reads `device_info.device_name`.
+1. **Keep the current Garmin/Strava source preference as the PRIMARY import** — unchanged, no new decision for existing users.
+2. **Add "Connect Apple Health" as an optional TOGGLE (not a 4th radio)** — off by default, framed "pull richer swim data when available."
+3. **When both active, dedup AUTOMATICALLY:** the industry-standard **60-second start-time window + sport + rough distance match** — handles the Strava integer-minutes vs HealthKit seconds-precision mismatch. Same swim from two sources → one workout.
+4. **Best-field-from-each MERGE (Runna model):** HealthKit's real `pool_length` + seconds-duration + stroke count win where richer; Strava fills what HealthKit lacks. **One reconciled swim, not two.**
+5. **Auto-detect overlap on connect (DC Rainmaker HealthKit-enumeration move):** on connecting Apple Health, enumerate existing HealthKit workouts, detect whether Strava already feeds the same swims, dedup silently.
 
-**Gate:** do NOT build HealthKit ingest until this source-precedence selection (+ the FORM-source-tag detection) is designed. Scoped as part of Tier A.
+**Scales to Apple Watch:** Apple Watch writes to HealthKit natively (no FORM needed) — same 60s window applies. **Triple-overlap** (FORM goggles + Apple Watch + Strava all recording the same swim) is handled by the same window → one merged workout.
+
+**Source tag (supports the merge precedence):** Strava ingest **already captures `device_name`** (→ `device_info` JSON + `workout_metadata`, `ingest-activity:526/535/1175`) — so "is this a FORM swim?" / origin-device is available with no new capture. Used to bias the merge (FORM/HealthKit fields win for FORM swims).
+
+**Today's gap (why this is the gate):** dedup is **per-source only** (upsert `onConflict` = `user_id,strava_activity_id` / `user_id,garmin_activity_id`, `ingest-activity:1205/1208`); HealthKit doesn't ingest workouts yet. **No cross-source matching exists** — so adding HealthKit ingest without this design ships double workouts. Do NOT build Tier A until the 60s-window match + best-field merge + auto-overlap-on-connect is implemented.
 
 ### Layer 3 summary
-Two reliable tiers, per-length OCR skipped: **(A) HealthKit-extend** (automatic: pool length, seconds-duration, stroke count, HR — **gated on dedup-by-precedence**) + **(B) Swim Breakdown single-screenshot import** (opt-in: SWOLF, efficiency, bests, stroke type). Both reliable; the fragile per-length table is dropped.
+Two reliable tiers, per-length OCR skipped: **(A) HealthKit-extend** (automatic: pool length, seconds-duration, stroke count, HR — **gated on the multi-source dedup/merge: 60s window + best-field-from-each + auto-overlap-on-connect**) + **(B) Swim Breakdown single-screenshot import** (opt-in: SWOLF, efficiency, bests, stroke type). Both reliable; the fragile per-length table is dropped.
