@@ -1499,8 +1499,8 @@ function buildAnalysisDetailRows(
         ? (durMinHr >= 150 ? 20 : durMinHr >= 90 ? 15 : durMinHr >= 60 ? 12 : 8)
         : null;
 
-    if (shouldSuppressSessionHrDrift(factPacket, intervals)) {
-      // no row
+    if (sport === 'swim' || shouldSuppressSessionHrDrift(factPacket, intervals)) {
+      // Layer 2: swims get NO land HR-drift row (terrain/grade/pace-drift framing is land-only).
     } else if (driftExplanation === 'pace_driven' && rawAbsDrift != null && Math.abs(rawAbsDrift) >= 5) {
       rows.push({
         label: 'Heart rate',
@@ -1543,6 +1543,7 @@ function buildAnalysisDetailRows(
   } catch { /* */ }
 
   try {
+    if (sport === 'swim') throw new Error('swim-skip-conditions'); // Layer 2: no land terrain/grade/elevation row for swims
     const facts = factPacket?.facts;
     const wx = facts?.weather;
     const terrainType = typeof facts?.terrain_type === 'string' && facts.terrain_type !== 'flat'

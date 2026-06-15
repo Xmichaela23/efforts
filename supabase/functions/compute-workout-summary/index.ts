@@ -4,6 +4,7 @@
 //           (pace, GAP, HR, cadence, power) and persist to workouts.computed.
 //           Also normalizes pace units and tags records with normalization_version='v1'.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
 
 // ---------- small helpers ----------
 const ydToM = (yd:number)=> yd * 0.9144;
@@ -654,7 +655,7 @@ Deno.serve(async (req) => {
     // Load workout + planned link
     const { data: w, error: workoutError } = await supabase
       .from('workouts')
-      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_power,avg_temperature,weather_data')
+      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,user_corrected_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_power,avg_temperature,weather_data')
       .eq('id', workout_id)
       .maybeSingle();
     try { 
@@ -739,7 +740,7 @@ Deno.serve(async (req) => {
         if (sport0 === 'swim') {
           if (!(meters > 0)) { try { const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data; const lens = Array.isArray(swim?.lengths) ? swim.lengths : []; if (lens.length) meters = Math.round(lens.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0)); } catch {} }
           if (!(secs > 0)) { try { const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data; const lens = Array.isArray(swim?.lengths) ? swim.lengths : []; if (lens.length) secs = Math.round(lens.reduce((s:number,l:any)=> s + (Number(l?.duration_s)||0), 0)); } catch {} }
-          if (!(meters > 0)) { const n = Number((wAny as any)?.number_of_active_lengths); const L = Number((wAny as any)?.pool_length); if (Number.isFinite(n)&&n>0&&Number.isFinite(L)&&L>0) meters = Math.round(n * L); }
+          if (!(meters > 0)) { const n = Number((wAny as any)?.number_of_active_lengths); if (Number.isFinite(n)&&n>0) { const L = resolvePoolLength({ user_corrected_pool_length_m: (wAny as any)?.user_corrected_pool_length_m, pool_length: (wAny as any)?.pool_length, plan_pool_length_m: (wAny as any)?.plan_pool_length_m }).length_m; meters = Math.round(n * L); } }
         }
       } catch {}
       return { meters, secs };
@@ -809,7 +810,7 @@ Deno.serve(async (req) => {
         if (sport0 === 'swim') {
           if (!(meters > 0)) { try { const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data; const lens = Array.isArray(swim?.lengths) ? swim.lengths : []; if (lens.length) meters = Math.round(lens.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0)); } catch {} }
           if (!(secs > 0)) { try { const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data; const lens = Array.isArray(swim?.lengths) ? swim.lengths : []; if (lens.length) secs = Math.round(lens.reduce((s:number,l:any)=> s + (Number(l?.duration_s)||0), 0)); } catch {} }
-          if (!(meters > 0)) { const n = Number((wAny as any)?.number_of_active_lengths); const L = Number((wAny as any)?.pool_length); if (Number.isFinite(n)&&n>0&&Number.isFinite(L)&&L>0) meters = Math.round(n * L); }
+          if (!(meters > 0)) { const n = Number((wAny as any)?.number_of_active_lengths); if (Number.isFinite(n)&&n>0) { const L = resolvePoolLength({ user_corrected_pool_length_m: (wAny as any)?.user_corrected_pool_length_m, pool_length: (wAny as any)?.pool_length, plan_pool_length_m: (wAny as any)?.plan_pool_length_m }).length_m; meters = Math.round(n * L); } }
         }
       } catch {}
       return { meters, secs };
@@ -961,7 +962,7 @@ Deno.serve(async (req) => {
           }
           if (!(overallMeters > 0)) {
             const nLen = Number((w as any)?.number_of_active_lengths);
-            const poolM = Number((w as any)?.pool_length);
+            const poolM = resolvePoolLength({ user_corrected_pool_length_m: (w as any)?.user_corrected_pool_length_m, pool_length: (w as any)?.pool_length, plan_pool_length_m: (w as any)?.plan_pool_length_m }).length_m;
             if (Number.isFinite(nLen) && nLen > 0 && Number.isFinite(poolM) && poolM > 0) overallMeters = Math.round(nLen * poolM);
           }
         } else {
@@ -1361,7 +1362,7 @@ Deno.serve(async (req) => {
           // 2) number_of_active_lengths × pool_length
           if (!(overallMeters > 0)) {
             const nLen = Number((w as any)?.number_of_active_lengths);
-            const poolM = Number((w as any)?.pool_length);
+            const poolM = resolvePoolLength({ user_corrected_pool_length_m: (w as any)?.user_corrected_pool_length_m, pool_length: (w as any)?.pool_length, plan_pool_length_m: (w as any)?.plan_pool_length_m }).length_m;
             if (Number.isFinite(nLen) && nLen > 0 && Number.isFinite(poolM) && poolM > 0) {
               overallMeters = Math.round(nLen * poolM);
             }
@@ -1514,7 +1515,7 @@ Deno.serve(async (req) => {
             } catch {}
             if (!(overallMeters > 0)) {
               const nLen = Number((w as any)?.number_of_active_lengths);
-              const poolM = Number((w as any)?.pool_length);
+              const poolM = resolvePoolLength({ user_corrected_pool_length_m: (w as any)?.user_corrected_pool_length_m, pool_length: (w as any)?.pool_length, plan_pool_length_m: (w as any)?.plan_pool_length_m }).length_m;
               if (Number.isFinite(nLen) && nLen > 0 && Number.isFinite(poolM) && poolM > 0) {
                 overallMeters = Math.round(nLen * poolM);
               }
@@ -2089,7 +2090,7 @@ Deno.serve(async (req) => {
           } catch {}
           if (!(overallMeters > 0)) {
             const nLen = Number((w as any)?.number_of_active_lengths);
-            const poolM = Number((w as any)?.pool_length);
+            const poolM = resolvePoolLength({ user_corrected_pool_length_m: (w as any)?.user_corrected_pool_length_m, pool_length: (w as any)?.pool_length, plan_pool_length_m: (w as any)?.plan_pool_length_m }).length_m;
             if (Number.isFinite(nLen) && nLen > 0 && Number.isFinite(poolM) && poolM > 0) {
               overallMeters = Math.round(nLen * poolM);
             }

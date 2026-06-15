@@ -151,7 +151,10 @@ export default function EnduranceIntervalTable({
   if (!hasSessionDetail || !sd) return null;
 
   // ── Pool swim: overall comparison ────────────────────────────────────────
-  if (isPoolSwim) {
+  // Layer 2: ALL swims (pool AND open-water) route through the swim block — never the land interval
+  // table. Open-water uses its GPS distance directly; pool uses the resolved pool length. Neither
+  // shows land splits.
+  if (sd?.type === 'swim') {
     return <PoolSwimOverall sd={sd} useImperial={useImperial} />;
   }
 
@@ -428,6 +431,21 @@ function CompletedTotalsSegmentTable({
 
 // ── Pool swim overall comparison ───────────────────────────────────────────
 
+// Minimal HR-over-time sparkline for the swim block (no axes — a glanceable shape). Used only when
+// session_detail_v1 carries a populated HR series; avg-HR-only otherwise.
+function SwimHrSparkline({ series }: { series: number[] }) {
+  const pts = series.filter((n) => Number.isFinite(n) && n > 0);
+  if (pts.length < 2) return null;
+  const min = Math.min(...pts), max = Math.max(...pts), span = max - min || 1;
+  const W = 240, H = 36;
+  const d = pts.map((v, i) => `${(i / (pts.length - 1)) * W},${H - ((v - min) / span) * H}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-9" preserveAspectRatio="none" aria-label="Heart rate over the swim">
+      <polyline points={d} fill="none" stroke="#f87171" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
 function PoolSwimOverall({ sd, useImperial }: { sd: NonNullable<EnduranceIntervalTableProps['sessionDetail']>; useImperial: boolean }) {
   const ct = sd.completed_totals;
   const pt = sd.planned_totals;
@@ -479,6 +497,19 @@ function PoolSwimOverall({ sd, useImperial }: { sd: NonNullable<EnduranceInterva
     );
   };
 
+  // Layer 2 — swim-native metrics. Pace/100 (in the same unit as distance) + avg HR are the two
+  // reads that matter for a swim. swim_pace_per_100_s is already per-100-of-swimUnit (build.ts).
+  const per100Unit = (useImperial || swimUnit === 'yd') ? 'yd' : 'm';
+  const pace100 = (ct as any).swim_pace_per_100_s as number | null | undefined;
+  const avgHr = (ct as any).avg_hr as number | null | undefined;
+  const fmtPace100 = (s: number) => {
+    const v = Math.round(s); return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')} /100${per100Unit}`;
+  };
+  // HR-stream mini-chart: render ONLY when a populated HR series reaches the contract; else
+  // avg-HR-only (NULL-safe). The stream isn't in session_detail_v1 yet → avg-HR-only today; the
+  // chart lights up with zero change here once the series is plumbed in.
+  const hrSeries = (sd as any)?.hr_series as number[] | null | undefined;
+
   return (
     <div>
       <div className="flex items-center justify-center gap-6 text-center">
@@ -487,6 +518,27 @@ function PoolSwimOverall({ sd, useImperial }: { sd: NonNullable<EnduranceInterva
           {chip('Duration', timePct, timeDelta != null ? fmtTimeDelta(timeDelta) : '—')}
         </div>
       </div>
+      {(pace100 != null && pace100 > 0) || (avgHr != null && avgHr > 0) ? (
+        <div className="mt-3 flex items-center justify-center gap-8 text-center">
+          {pace100 != null && pace100 > 0 && (
+            <div className="flex flex-col items-center">
+              <div className="text-sm font-semibold text-gray-100">{fmtPace100(pace100)}</div>
+              <div className="text-[11px] text-gray-700">Pace</div>
+            </div>
+          )}
+          {avgHr != null && avgHr > 0 && (
+            <div className="flex flex-col items-center">
+              <div className="text-sm font-semibold text-gray-100">{Math.round(avgHr)} bpm</div>
+              <div className="text-[11px] text-gray-700">Avg HR</div>
+            </div>
+          )}
+        </div>
+      ) : null}
+      {Array.isArray(hrSeries) && hrSeries.length > 1 && (
+        <div className="mt-3">
+          <SwimHrSparkline series={hrSeries} />
+        </div>
+      )}
       <div className="mt-4 px-4 py-3 bg-gray-50 rounded-lg">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
