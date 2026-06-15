@@ -1186,6 +1186,12 @@ function mapHealthKitToWorkout(activity: any, userId: string) {
   const durS = Number(activity?.duration);
   const distM = Number(activity?.totalDistance);
   const iso = Number.isFinite(startMs) ? new Date(startMs).toISOString() : new Date().toISOString();
+  // D-161: HealthKit carries real pool_length + total distance but no length COUNT (FORM writes summary-
+  // level, no per-length lap array; Strava gives neither). Derive it — round(distance ÷ pool length) —
+  // preferring an explicit count if the plugin ever supplies one. Both in metres.
+  const poolLm = Number(activity?.pool_length) > 0 ? Number(activity.pool_length) : null;
+  const explicitLengths = Number(activity?.number_of_active_lengths) > 0 ? Number(activity.number_of_active_lengths) : null;
+  const lengths = explicitLengths ?? (distM > 0 && poolLm ? Math.round(distM / poolLm) : null);
   return {
     user_id: userId,
     name: activity?.workoutName || 'Pool Swim', // workouts.name is NOT NULL (Strava mapper sets it too)
@@ -1199,8 +1205,8 @@ function mapHealthKitToWorkout(activity: any, userId: string) {
     duration: durS > 0 ? Math.round(durS / 60) : 0, // MINUTES — NOT NULL (Strava mapper sets it too)
     moving_time: durS > 0 ? Math.round(durS / 60) : null, // MINUTES (convention) — see note above
     elapsed_time: durS > 0 ? Math.round(durS / 60) : null,
-    pool_length: Number(activity?.pool_length) > 0 ? Number(activity.pool_length) : null,
-    number_of_active_lengths: Number(activity?.number_of_active_lengths) > 0 ? Number(activity.number_of_active_lengths) : null,
+    pool_length: poolLm,
+    number_of_active_lengths: lengths,
     strokes: Number(activity?.strokes) > 0 ? Number(activity.strokes) : null,
     avg_heart_rate: Number(activity?.avgHr) > 0 ? Number(activity.avgHr) : null,
     device_info: JSON.stringify({ device_name: activity?.sourceName || 'Apple Health' }),

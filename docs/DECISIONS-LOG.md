@@ -3748,6 +3748,17 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-161 — Derive HealthKit swim length-count from distance ÷ pool length
+
+- **Date:** 2026-06-15
+- **Context:** the D-160 swim rich-detail block shows Pool / Lengths / Strokes. HealthKit gives `pool_length` (`HKMetadataKeyLapLength`) + `strokes` + total distance, but **no length COUNT** — FORM writes summary-level to HealthKit (no per-length lap array), and Strava strips everything. So the "Lengths" cell was always blank even on enriched swims.
+- **Fix (one derive, `mapHealthKitToWorkout`):** `number_of_active_lengths = round(distance_m / pool_length_m)` when both are non-null, **preferring an explicit count** if the plugin ever supplies one (`explicitLengths ?? derived`). Both values are already in metres. No new HealthKit read, no native change.
+- **Propagates through the merge for free:** `mergeSameSwimIfExists` fills `number_of_active_lengths` onto a kept Strava row from the HealthKit side when absent — now that the HealthKit row carries the derived count, a merged FORM→Strava+HealthKit swim gets it too.
+- **Honest bound:** this is a COUNT, not per-length splits / SWOLF / stroke-type — those need the FORM "Swim Breakdown" screengrab path (audit Tier B), still not built. The derive assumes uniform pool lengths (true for lap swimming); an odd final partial length rounds to nearest.
+- **Scope:** ingest/display only — no prescription. `ingest-activity` deployed (`yyriamwvtvzlkumqrvpm`). Verify on the next HealthKit swim: Lengths populates ≈ distance/pool.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
