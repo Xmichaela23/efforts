@@ -1177,6 +1177,74 @@ async function mapGarminToWorkout(activity, userId) {
     created_at: new Date().toISOString()
   };
 }
+// Layer 3 Tier A — map a HealthKit swim workout (from the native plugin) to a workouts row.
+// Rich swim fields HealthKit alone carries: real pool_length (HKMetadataKeyLapLength), stroke count.
+// NOTE: duration stays in the integer-minute moving_time convention (compute-facts.durationMinutes
+// reads it as minutes); HealthKit's seconds precision is the known Q-038 residual, not merged here.
+function mapHealthKitToWorkout(activity: any, userId: string) {
+  const startMs = Number(activity?.startDate);
+  const durS = Number(activity?.duration);
+  const distM = Number(activity?.totalDistance);
+  const iso = Number.isFinite(startMs) ? new Date(startMs).toISOString() : new Date().toISOString();
+  return {
+    user_id: userId,
+    source: 'healthkit',
+    healthkit_id: String(activity?.id || ''),
+    type: 'swim',
+    workout_status: 'completed',
+    date: iso.slice(0, 10),
+    timestamp: iso,
+    distance: distM > 0 ? distM / 1000 : null, // km
+    moving_time: durS > 0 ? Math.round(durS / 60) : null, // MINUTES (convention) — see note above
+    elapsed_time: durS > 0 ? Math.round(durS / 60) : null,
+    pool_length: Number(activity?.pool_length) > 0 ? Number(activity.pool_length) : null,
+    number_of_active_lengths: Number(activity?.number_of_active_lengths) > 0 ? Number(activity.number_of_active_lengths) : null,
+    strokes: Number(activity?.strokes) > 0 ? Number(activity.strokes) : null,
+    avg_heart_rate: Number(activity?.avgHr) > 0 ? Number(activity.avgHr) : null,
+    device_info: JSON.stringify({ device_name: activity?.sourceName || 'Apple Health' }),
+  };
+}
+
+// Cross-source same-swim dedup/merge (the Layer-3 gate). FORM writes the same swim to Strava AND
+// HealthKit → recognize it (60s start-window + ±10% distance, DIFFERENT source) and merge into ONE
+// workout: HealthKit supplies the rich fields it alone has (pool_length, lengths, strokes); the
+// primary import keeps everything else. Returns the kept workout when merged, else null (caller
+// falls through to the normal per-source upsert). Recomputes so distance/pace reflect the merge.
+async function mergeSameSwimIfExists(supabase: any, userId: string, row: any) {
+  const tsMs = Date.parse(row?.timestamp || `${row?.date}T00:00:00Z`);
+  if (!Number.isFinite(tsMs)) return null;
+  const distM = Number(row?.distance) * 1000;
+  const { data: cands } = await supabase.from('workouts')
+    .select('id,source,distance,pool_length,number_of_active_lengths,strokes')
+    .eq('user_id', userId).eq('type', 'swim')
+    .gte('timestamp', new Date(tsMs - 60_000).toISOString())
+    .lte('timestamp', new Date(tsMs + 60_000).toISOString());
+  const match = (cands || []).find((c: any) => {
+    if (String(c.source || '') === String(row.source || '')) return false; // same source → per-source upsert
+    const cd = Number(c.distance) * 1000;
+    if (!(distM > 0) || !(cd > 0)) return true; // no distance to compare → time-window alone
+    return Math.abs(cd - distM) / Math.max(cd, distM) <= 0.10; // ±10%
+  });
+  if (!match) return null;
+  // The HealthKit side supplies the rich fields; merge onto the existing matched workout. Only fill
+  // a field when HealthKit has it and the kept row lacks it (or HealthKit is genuinely richer).
+  const hk = row.source === 'healthkit' ? row : (match.source === 'healthkit' ? match : null);
+  const u: Record<string, any> = {};
+  if (hk) {
+    if (Number(hk.pool_length) > 0 && !(Number(match.pool_length) > 0)) u.pool_length = Number(hk.pool_length);
+    if (Number(hk.number_of_active_lengths) > 0 && !(Number(match.number_of_active_lengths) > 0)) u.number_of_active_lengths = Number(hk.number_of_active_lengths);
+    if (Number(hk.strokes) > 0 && !(Number(match.strokes) > 0)) u.strokes = Number(hk.strokes);
+  }
+  if (Object.keys(u).length) {
+    await supabase.from('workouts').update(u).eq('id', match.id);
+    try {
+      await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: match.id } });
+      await supabase.functions.invoke('compute-facts', { body: { workout_id: match.id } });
+    } catch (_e) { /* recompute non-fatal */ }
+  }
+  return { id: match.id, keptSource: match.source, mergedFields: Object.keys(u) };
+}
+
 Deno.serve(async (req)=>{
   if (req.method === 'OPTIONS') return new Response('ok', {
     headers: cors
@@ -1206,6 +1274,9 @@ Deno.serve(async (req)=>{
     } else if (provider === 'garmin') {
       row = await mapGarminToWorkout(activity, userId);
       onConflict = 'user_id,garmin_activity_id';
+    } else if (provider === 'healthkit') {
+      row = mapHealthKitToWorkout(activity, userId);
+      onConflict = 'user_id,healthkit_id';
     } else {
       return new Response(JSON.stringify({
         error: 'Unsupported provider'
@@ -1217,6 +1288,23 @@ Deno.serve(async (req)=>{
         }
       });
     }
+
+    // SWIM cross-source dedup/merge GATE (Layer 3) — before the per-source upsert. Same swim from
+    // Strava + HealthKit (FORM writes both) → merge to ONE workout, never insert the duplicate.
+    if (String(row.type || '').toLowerCase() === 'swim') {
+      try {
+        const merged = await mergeSameSwimIfExists(supabase, userId, row);
+        if (merged) {
+          console.log(`🏊 swim merge: kept ${merged.id} (${merged.keptSource}), enriched from ${row.source} with [${merged.mergedFields.join(',')}] — no duplicate created`);
+          return new Response(JSON.stringify({ success: true, merged: true, workout_id: merged.id, kept_source: merged.keptSource, enriched_from: row.source, merged_fields: merged.mergedFields }), {
+            headers: { ...cors, 'Content-Type': 'application/json' },
+          });
+        }
+      } catch (e: any) {
+        console.error('[ingest] swim dedup/merge failed (non-fatal → falling through to upsert):', e?.message || e);
+      }
+    }
+
     // Idempotent upsert by provider-specific unique index
     console.log(`📅 About to upsert workout with date: ${row.date}, strava_activity_id: ${row.strava_activity_id}`);
     const { error } = await supabase.from('workouts').upsert(row, {
