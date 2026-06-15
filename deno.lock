@@ -74,8 +74,10 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@capacitor/app@^8.1.0",
         "npm:@capacitor/cli@^8.3.2",
         "npm:@capacitor/core@^8.3.0",
+        "npm:@capacitor/haptics@^8.0.2",
         "npm:@capacitor/ios@^8.3.2",
         "npm:@eslint/js@^9.9.0",
         "npm:@fontsource/ibm-plex-mono@^5.2.7",

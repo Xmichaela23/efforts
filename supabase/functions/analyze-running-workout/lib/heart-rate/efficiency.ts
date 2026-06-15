@@ -17,27 +17,17 @@ const WARMUP_SKIP_SECONDS = 600;
 
 /**
  * Calculate efficiency metrics for steady-state workouts.
- *
- * `options.forMixedEffort=true` bypasses the steady-state guard so the run
- * analyzer's mixed/interval routes (fartlek; intervals on unplanned sessions)
- * can still surface a decoupling number. Whole-session pace:HR drift across
- * randomly-distributed hard/easy efforts is genuinely less conclusive than
- * steady-state, so basis is forced to `'raw'` regardless of GAP enrichment —
- * the AEROBIC DECOUPLING (RUN) raw-branch prompt rule then fires and treats
- * the value as inconclusive ("describe what HR did, don't claim fitness").
  */
 export function calculateEfficiency(
   sensorData: SensorSample[],
   validHRSamples: SensorSample[],
   context: HRAnalysisContext,
-  workoutType: WorkoutType,
-  options?: { forMixedEffort?: boolean }
+  workoutType: WorkoutType
 ): EfficiencyMetrics | undefined {
   console.log('📈 [EFFICIENCY] Calculating pace:HR efficiency...');
-
-  // Steady-state guard — bypassed only when the caller explicitly opted into
-  // the mixed-effort interpretation (basis will be forced to 'raw' below).
-  if (!options?.forMixedEffort && (workoutType === 'intervals' || workoutType === 'hill_repeats')) {
+  
+  // Only calculate for steady-state-ish workouts
+  if (workoutType === 'intervals' || workoutType === 'hill_repeats') {
     console.log('📈 [EFFICIENCY] Skipping for interval workout');
     return undefined;
   }
@@ -107,23 +97,12 @@ export function calculateEfficiency(
   // Overall average efficiency
   const avgRatio = calculateEfficiencyRatio(samplesAfterWarmup);
   
-  // D-036: detect whether the input series was GAP-enriched at the analyzer
-  // entry. enrichSamplesWithGAP stamps `raw_pace_s_per_mi` on every sample
-  // when it applies grade adjustment; absence of that marker = raw input.
-  // Mixed-effort callers force 'raw' so the prompt's raw-branch rule fires —
-  // whole-session decoupling across heterogeneous efforts is genuinely
-  // inconclusive even when the sample series itself was grade-adjusted.
-  const detectedBasis: 'gap' | 'raw' = (sensorData[0] && typeof (sensorData[0] as any).raw_pace_s_per_mi !== 'undefined')
-    ? 'gap' : 'raw';
-  const basis: 'gap' | 'raw' = options?.forMixedEffort ? 'raw' : detectedBasis;
-
   return {
     decoupling: {
       percent: Math.round(decouplingPercent * 10) / 10,
       earlyRatio: Math.round(earlyRatio * 1000) / 1000,
       lateRatio: Math.round(lateRatio * 1000) / 1000,
-      assessment,
-      basis,
+      assessment
     },
     avgEfficiencyRatio: avgRatio !== null ? Math.round(avgRatio * 1000) / 1000 : 0
   };

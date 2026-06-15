@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, ChevronDown } from 'lucide-react';
 import type {
   CoachWeekContextV1,
   RaceReadinessV1,
@@ -20,6 +20,7 @@ import { fetchArcContext } from '@/lib/fetch-arc-context';
 import type { ArcReadiness } from '@/lib/arc-types';
 import { shouldShowNudge } from '@/lib/nudge-policy';
 import StatePerformanceSection from '@/components/context/StatePerformanceSection';
+import { buildLoadHeadline, acwrVolumeLabel } from '@/lib/load-headline';
 
 const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
 
@@ -606,6 +607,7 @@ export default function StateTab({
   const { data, loading, error, refresh, revalidating } = coachData;
   const coachBusy = loading || Boolean(revalidating);
   const { liftTrends } = useExerciseLog(8);
+  const [narrativeOpen, setNarrativeOpen] = useState(false);
   const [adjustingLift, setAdjustingLift] = useState<string | null>(null);
   const [resolvedGoalId, setResolvedGoalId] = useState<string | null>(null);
   const [stateCourseRow, setStateCourseRow] = useState<{ id: string; name: string } | null>(null);
@@ -1108,6 +1110,15 @@ export default function StateTab({
     readiness === 'fatigued' ? 'text-amber-400/90' :
     'text-white/60';
 
+  // #4 — deterministic glance headline (load + readiness + fitness, observation never a prescription).
+  // The full LLM narrative goes behind an "open for more" expand (collapsed by default).
+  const loadHeadline = buildLoadHeadline({
+    loadLabel: acwrVolumeLabel(load.acwr),
+    readinessState: readiness,
+    fitnessDirection: (trends as any).fitness_direction,
+    isTaperOrPeak: week.intent === 'taper' || week.intent === 'peak',
+  });
+
 
   // ── Cross-training signal (server-computed) ──────────────────────────────
   const crossTrainingSignal = load.cross_training_signal ?? null;
@@ -1155,8 +1166,24 @@ export default function StateTab({
               {intentSummary && (
                 <span className="text-[14px] font-medium text-white/85 leading-snug">{intentSummary}</span>
               )}
+              {loadHeadline && (
+                <span className="text-[13px] font-medium text-white/80 leading-snug">{loadHeadline}</span>
+              )}
               {weekNarrative && (
-                <span className="text-[12px] text-white/50 leading-snug">{weekNarrative}</span>
+                <div className="flex flex-col">
+                  <button
+                    type="button"
+                    onClick={() => setNarrativeOpen((o) => !o)}
+                    className="self-start flex items-center gap-1 text-[11px] text-white/45 hover:text-white/70 transition-colors mt-0.5 touch-manipulation"
+                    aria-expanded={narrativeOpen}
+                  >
+                    {narrativeOpen ? 'Show less' : 'open for more'}
+                    <ChevronDown className={`w-3 h-3 transition-transform ${narrativeOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {narrativeOpen && (
+                    <span className="text-[12px] text-white/55 leading-snug mt-1">{weekNarrative}</span>
+                  )}
+                </div>
               )}
             </>
           )}

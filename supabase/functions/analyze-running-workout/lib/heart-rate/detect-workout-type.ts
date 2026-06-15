@@ -127,28 +127,22 @@ function isFartlek(description: string, token: string): boolean {
 
 /**
  * Check for alternating work/recovery pattern by pace differences.
- *
- * Uses planned `paceRange` when present (linked planned interval session);
- * falls back to `executed.avgPaceSPerMi` for unplanned sessions where the
- * runner detected intervals via executed-pace variance (e.g., fartleks logged
- * as plain `role: 'lap'` with no planned target). Without the fallback,
- * unplanned interval-class sessions default to `'steady_state'` and miss the
- * mixed-effort decoupling path entirely.
  */
 function hasAlternatingPattern(intervals: IntervalData[]): boolean {
   if (intervals.length < 4) return false;
-
-  const pickPace = (iv: IntervalData): number => {
-    if (iv.paceRange) return (iv.paceRange.lower + iv.paceRange.upper) / 2;
-    const ex = iv.executed?.avgPaceSPerMi;
-    return typeof ex === 'number' && ex > 0 ? ex : 0;
-  };
-
+  
   let alternations = 0;
   for (let i = 1; i < intervals.length; i++) {
-    const prevPace = pickPace(intervals[i - 1]);
-    const currPace = pickPace(intervals[i]);
-
+    const prev = intervals[i - 1];
+    const curr = intervals[i];
+    
+    const prevPace = prev.paceRange 
+      ? (prev.paceRange.lower + prev.paceRange.upper) / 2 
+      : 0;
+    const currPace = curr.paceRange 
+      ? (curr.paceRange.lower + curr.paceRange.upper) / 2 
+      : 0;
+    
     if (prevPace > 0 && currPace > 0) {
       // Significant pace difference (>15%) suggests alternation
       const diff = Math.abs(currPace - prevPace) / Math.min(currPace, prevPace);
@@ -157,7 +151,7 @@ function hasAlternatingPattern(intervals: IntervalData[]): boolean {
       }
     }
   }
-
+  
   // Need at least 2 alternations to consider it interval pattern
   return alternations >= 2;
 }

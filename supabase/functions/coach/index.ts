@@ -91,7 +91,7 @@ const corsHeaders: Record<string, string> = {
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
 /** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
 /** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
-const COACH_PAYLOAD_VERSION = 40; // 40: load-fix — readiness_label no longer reads load_status (category fix); completed-count fact (no undercount)
+const COACH_PAYLOAD_VERSION = 41; // 41: narrative opens with state+credit, not a deficit/miss-count (#4 tone fix; off-plan credited, never "behind")
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();

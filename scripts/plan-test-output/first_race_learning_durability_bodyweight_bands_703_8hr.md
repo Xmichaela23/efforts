@@ -1,0 +1,425 @@
+# Test Plan — first_race / learning / durability / bodyweight_bands / 70.3 / 8hr
+
+**Loading pattern:** 1:1
+**Total weeks:** 17
+**Peak weekly TSS:** 589
+**Avg weekly TSS:** 361
+
+## Sessions by week
+
+### Week 1 — base (TSS 459)
+- **Tuesday**
+  - Bike Sweet Spot — 2×15 min (bike · 65min · MODERATE)
+    Sweet spot training at 88–94% FTP (Zone 3–4). Warm up 15 min, 2×15 min at sweet spot with 5 min recovery. Cool down 10 min.
+  - Moderate Aerobic Swim — 800 yd (swim · 19min · MODERATE)
+    Warm up 300 yd. 5×100 yd at moderate effort — sustainable and conversational (15 sec rest). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume aerobic blocks. Cool down 200 yd.
+- **Wednesday**
+  - Technique Aerobic Swim — 650 yd (swim · 19min · EASY)
+    Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+  - Tri Durability — Anatomical Adaptation B (Hinge/Vertical Press/Pull) (strength · 40min · MODERATE)
+    Base Week 1 (AA phase) — Full-body tissue work. Light loads, high reps (20-25), slow tempos. Loads should feel easy; the goal is connective-tissue resilience, not muscle fatigue. RIR 3-4 throughout. Equipment — Required: Bands.
+- **Thursday**
+  - Sweet-Spot Run — 3 mi at moderate effort (run · 55min · MODERATE)
+    Warm up 1.5 mi easy, then 3 mi at sustained moderate effort (~RPE 6, conversational in short sentences — meaningfully harder than your easy runs but not threshold). Cool down 1.5 mi easy. Builds aerobic durability without the recovery cost of intervals.
+- **Friday**
+  - Swim Threshold — 800 yd (swim · 20min · HARD)
+    Warm up 300 yd easy. 4×100 yd at hard effort (maximal sustainable — what you can hold for the interval, not past it) with 15 sec rest. 3×150 yd easy aerobic. Cool down 200 yd.
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Long Ride — 2.0 hr (bike · 120min · EASY)
+    Aerobic endurance ride at Z2. Maintain 60–70 rpm cadence. Nutrition practice: eat every 40–45 minutes. No surges.
+- **Sunday**
+  - Long Run — 8.5 mi (run · 81min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 2 — base (TSS 209)
+- **Tuesday**
+  - Easy Ride — 0.8 hr (bike · 45min · EASY)
+    Recovery spin at Z1–Z2. No pushing. Legs should feel loose and refreshed by the end.
+- **Wednesday**
+  - Technique Aerobic Swim — 1200 yd (swim · 34min · EASY)
+    Warm up 300 yd easy. Efficiency-first: sharpen one or two mechanics before aerobic volume so every yard transfers to the race. Prescribed drills: 2×50 Catch-Up (front-quadrant timing); 2×50 Fingertip Drag (high-elbow recovery). 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+- **Thursday**
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Friday**
+  - Recovery Swim — 800 yd (swim · 24min · EASY)
+    Warm up 200 yd easy. 4×100 yd at easy aerobic effort (20 sec rest). Cool down 200 yd.
+  - Easy Run — 2 mi (run · 20min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Long Ride — 0.8 hr (bike · 45min · EASY)
+    Aerobic endurance ride at Z2. Maintain 60–70 rpm cadence. Nutrition practice: eat every 40–45 minutes. No surges.
+- **Sunday**
+  - Long Run — 4 mi (run · 38min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 3 — base (TSS 488)
+- **Tuesday**
+  - Bike Sweet Spot — 3×15 min (bike · 85min · MODERATE)
+    Sweet spot training at 88–94% FTP (Zone 3–4). Warm up 15 min, 3×15 min at sweet spot with 5 min recovery. Cool down 10 min.
+  - Moderate Aerobic Swim — 800 yd (swim · 19min · MODERATE)
+    Warm up 300 yd. 5×100 yd at moderate effort — sustainable and conversational (14 sec rest). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume aerobic blocks. Cool down 200 yd.
+- **Wednesday**
+  - Technique Aerobic Swim — 650 yd (swim · 19min · EASY)
+    Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+  - Tri Durability — Anatomical Adaptation B (Hinge/Vertical Press/Pull) (strength · 40min · MODERATE)
+    Base Week 3 (AA phase) — Full-body tissue work. Light loads, high reps (20-25), slow tempos. Loads should feel easy; the goal is connective-tissue resilience, not muscle fatigue. RIR 3-4 throughout. Equipment — Required: Bands.
+- **Thursday**
+  - Sweet-Spot Run — 3 mi at moderate effort (run · 55min · MODERATE)
+    Warm up 1.5 mi easy, then 3 mi at sustained moderate effort (~RPE 6, conversational in short sentences — meaningfully harder than your easy runs but not threshold). Cool down 1.5 mi easy. Builds aerobic durability without the recovery cost of intervals.
+- **Friday**
+  - Swim Threshold — 800 yd (swim · 20min · HARD)
+    Warm up 300 yd easy. 4×100 yd at hard effort (maximal sustainable — what you can hold for the interval, not past it) with 15 sec rest. 3×150 yd easy aerobic. Cool down 200 yd.
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Long Ride — 2.0 hr (bike · 120min · EASY)
+    Aerobic endurance ride at Z2. Maintain 60–70 rpm cadence. Nutrition practice: eat every 40–45 minutes. No surges.
+- **Sunday**
+  - Long Run — 9 mi (run · 86min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 4 — base (TSS 209)
+- **Tuesday**
+  - Easy Ride — 0.8 hr (bike · 45min · EASY)
+    Recovery spin at Z1–Z2. No pushing. Legs should feel loose and refreshed by the end.
+- **Wednesday**
+  - Technique Aerobic Swim — 1200 yd (swim · 34min · EASY)
+    Warm up 300 yd easy. Efficiency-first: sharpen one or two mechanics before aerobic volume so every yard transfers to the race. Prescribed drills: 2×50 Catch-Up (front-quadrant timing); 2×50 Fingertip Drag (high-elbow recovery). 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+- **Thursday**
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Friday**
+  - Recovery Swim — 800 yd (swim · 24min · EASY)
+    Warm up 200 yd easy. 4×100 yd at easy aerobic effort (20 sec rest). Cool down 200 yd.
+  - Easy Run — 2 mi (run · 20min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Long Ride — 0.8 hr (bike · 45min · EASY)
+    Aerobic endurance ride at Z2. Maintain 60–70 rpm cadence. Nutrition practice: eat every 40–45 minutes. No surges.
+- **Sunday**
+  - Long Run — 4 mi (run · 38min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 5 — base (TSS 536)
+- **Tuesday**
+  - Bike Sweet Spot — 4×15 min (bike · 105min · MODERATE)
+    Sweet spot training at 88–94% FTP (Zone 3–4). Warm up 15 min, 4×15 min at sweet spot with 5 min recovery. Cool down 10 min.
+  - Moderate Aerobic Swim — 800 yd (swim · 19min · MODERATE)
+    Warm up 300 yd. 5×100 yd at moderate effort — sustainable and conversational (13 sec rest). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume aerobic blocks. Cool down 200 yd.
+- **Wednesday**
+  - Technique Aerobic Swim — 650 yd (swim · 19min · EASY)
+    Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+  - Tri Durability — Anatomical Adaptation B (Hinge/Vertical Press/Pull) (strength · 40min · MODERATE)
+    Base Week 5 (AA phase) — Full-body tissue work. Light loads, high reps (20-25), slow tempos. Loads should feel easy; the goal is connective-tissue resilience, not muscle fatigue. RIR 3-4 throughout. Equipment — Required: Bands.
+- **Thursday**
+  - Sweet-Spot Run — 3 mi at moderate effort (run · 55min · MODERATE)
+    Warm up 1.5 mi easy, then 3 mi at sustained moderate effort (~RPE 6, conversational in short sentences — meaningfully harder than your easy runs but not threshold). Cool down 1.5 mi easy. Builds aerobic durability without the recovery cost of intervals.
+- **Friday**
+  - Swim Threshold — 800 yd (swim · 20min · HARD)
+    Warm up 300 yd easy. 4×100 yd at hard effort (maximal sustainable — what you can hold for the interval, not past it) with 15 sec rest. 3×150 yd easy aerobic. Cool down 200 yd.
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Long Ride — 2.3 hr (bike · 135min · EASY)
+    Aerobic endurance ride at Z2. Maintain 60–70 rpm cadence. Nutrition practice: eat every 40–45 minutes. No surges.
+- **Sunday**
+  - Long Run — 10 mi (run · 95min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 6 — base (TSS 209)
+- **Tuesday**
+  - Easy Ride — 0.8 hr (bike · 45min · EASY)
+    Recovery spin at Z1–Z2. No pushing. Legs should feel loose and refreshed by the end.
+- **Wednesday**
+  - Technique Aerobic Swim — 1200 yd (swim · 34min · EASY)
+    Warm up 300 yd easy. Efficiency-first: sharpen one or two mechanics before aerobic volume so every yard transfers to the race. Prescribed drills: 2×50 Catch-Up (front-quadrant timing); 2×50 Fingertip Drag (high-elbow recovery). 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+- **Thursday**
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Friday**
+  - Recovery Swim — 800 yd (swim · 24min · EASY)
+    Warm up 200 yd easy. 4×100 yd at easy aerobic effort (20 sec rest). Cool down 200 yd.
+  - Easy Run — 2 mi (run · 20min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Long Ride — 0.8 hr (bike · 45min · EASY)
+    Aerobic endurance ride at Z2. Maintain 60–70 rpm cadence. Nutrition practice: eat every 40–45 minutes. No surges.
+- **Sunday**
+  - Long Run — 4 mi (run · 38min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 7 — base (TSS 539)
+- **Tuesday**
+  - Bike Sweet Spot — 4×15 min (bike · 105min · MODERATE)
+    Sweet spot training at 88–94% FTP (Zone 3–4). Warm up 15 min, 4×15 min at sweet spot with 5 min recovery. Cool down 10 min.
+  - Moderate Aerobic Swim — 800 yd (swim · 19min · MODERATE)
+    Warm up 300 yd. 5×100 yd at moderate effort — sustainable and conversational (12 sec rest). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume aerobic blocks. Cool down 200 yd.
+- **Wednesday**
+  - Technique Aerobic Swim — 650 yd (swim · 19min · EASY)
+    Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+  - Tri Durability — Maximum Strength B (strength · 45min · MODERATE)
+    Late Base Week 7 (MS phase) — Heavy compounds at 6-8 reps, RIR 2. Same movement patterns you've been training in AA, now at race-meaningful loads. Squat / hinge / push / pull — 3 sets each, full-body. Equipment — Required: Dumbbells, Pull-up Bar, Bands.
+- **Thursday**
+  - Sweet-Spot Run — 3 mi at moderate effort (run · 55min · MODERATE)
+    Warm up 1.5 mi easy, then 3 mi at sustained moderate effort (~RPE 6, conversational in short sentences — meaningfully harder than your easy runs but not threshold). Cool down 1.5 mi easy. Builds aerobic durability without the recovery cost of intervals.
+- **Friday**
+  - Swim Threshold — 800 yd (swim · 20min · HARD)
+    Warm up 300 yd easy. 4×100 yd at hard effort (maximal sustainable — what you can hold for the interval, not past it) with 15 sec rest. 3×150 yd easy aerobic. Cool down 200 yd.
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Long Ride — 2.3 hr (bike · 135min · EASY)
+    Aerobic endurance ride at Z2. Maintain 60–70 rpm cadence. Nutrition practice: eat every 40–45 minutes. No surges.
+- **Sunday**
+  - Long Run — 10 mi (run · 95min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 8 — build (TSS 217)
+- **Tuesday**
+  - Easy Ride — 0.8 hr (bike · 45min · EASY)
+    Recovery spin at Z1–Z2. No pushing. Legs should feel loose and refreshed by the end.
+- **Wednesday**
+  - Technique Aerobic Swim — 900 yd (swim · 26min · EASY)
+    Warm up 300 yd easy. Efficiency-first: sharpen one or two mechanics before aerobic volume so every yard transfers to the race. Prescribed drills: 2×50 Fingertip Drag (high-elbow recovery). 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+- **Thursday**
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Friday**
+  - Recovery Swim — 850 yd (swim · 25min · EASY)
+    Warm up 200 yd easy. 5×100 yd at easy aerobic effort (20 sec rest). Cool down 200 yd.
+  - Easy Run — 2 mi (run · 20min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Long Ride — 1.0 hr (bike · 60min · EASY)
+    Aerobic endurance ride at Z2. Maintain 60–70 rpm cadence. Nutrition practice: eat every 40–45 minutes. No surges.
+- **Sunday**
+  - Long Run — 4 mi (run · 38min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 9 — build (TSS 569)
+- **Tuesday**
+  - Bike Threshold — 2×20 min (bike · 75min · HARD)
+    Warm up 15 min with fast-pedal spins. 2×20 min at FTP (Zone 4 — hard but sustainable). 5 min easy between. Cool down 10 min.
+  - Moderate Aerobic Swim — 900 yd (swim · 21min · MODERATE)
+    Warm up 300 yd. Race rhythm session: groove stroke quality early, then hold sustainable pacing. Prescribed drills: 2×50 Catch-Up (front-quadrant timing). 5×100 yd at moderate effort — sustainable and conversational (11 sec rest). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume aerobic blocks. Cool down 200 yd.
+- **Wednesday**
+  - Endurance Swim — 1000 yd (swim · 29min · EASY)
+    Warm up 400 yd easy. Efficiency-first: sharpen one or two mechanics before aerobic volume so every yard transfers to the race. Prescribed drills: 2×50 Catch-Up (front-quadrant timing). Main set — 2×150 yd easy aerobic with 30 sec rest between. Cool down 200 yd.
+  - Tri Durability — Strength Maintenance B (strength · 35min · EASY)
+    Build Week 9 (SM phase) — Maintain strength built in MS with 2 sets at 8-10 reps and moderate load (~70% 1RM). Movement quality, not maximal effort.  Equipment — Required: Dumbbells, Pull-up Bar, Bands.
+- **Thursday**
+  - Tempo Run — 3 mi at threshold (run · 51min · MODERATE)
+    Warm up 1.5 mi easy, then 3 mi at lactate threshold (comfortably hard — 7–8 RPE, can say a few words). Cool down 1.5 mi easy.
+- **Friday**
+  - Swim Threshold — 900 yd (swim · 23min · HARD)
+    Warm up 300 yd easy. Hard swim day: prime stroke integrity before high-output repeats. Prescribed drills: 2×50 Catch-Up (front-quadrant timing). 4×100 yd at hard effort (maximal sustainable — what you can hold for the interval, not past it) with 15 sec rest. 3×150 yd easy aerobic. Cool down 200 yd.
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Brick — Bike 2.0 hr (bike · 120min · EASY)
+    Brick bike at Zone 2. Build leg feel for the transition. Maintain steady power throughout.
+  - Brick — Run 3.5 mi off the bike (run · 35min · EASY)
+    Immediately after the bike. The first 5 min will feel strange — focus on turnover, not pace. Easy Z2 throughout.
+- **Sunday**
+  - Long Run — 10 mi (run · 95min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 10 — build (TSS 220)
+- **Tuesday**
+  - Easy Ride — 0.8 hr (bike · 45min · EASY)
+    Recovery spin at Z1–Z2. No pushing. Legs should feel loose and refreshed by the end.
+- **Wednesday**
+  - Technique Aerobic Swim — 1100 yd (swim · 31min · EASY)
+    Warm up 300 yd easy. Efficiency-first: sharpen one or two mechanics before aerobic volume so every yard transfers to the race. Prescribed drills: 2×50 Fingertip Drag (high-elbow recovery); 4×50 Fist Swim (early vertical forearm). 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+- **Thursday**
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Friday**
+  - Recovery Swim — 850 yd (swim · 25min · EASY)
+    Warm up 200 yd easy. 5×100 yd at easy aerobic effort (20 sec rest). Cool down 200 yd.
+  - Easy Run — 2 mi (run · 20min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Long Ride — 1.0 hr (bike · 60min · EASY)
+    Aerobic endurance ride at Z2. Maintain 60–70 rpm cadence. Nutrition practice: eat every 40–45 minutes. No surges.
+- **Sunday**
+  - Long Run — 4 mi (run · 38min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 11 — build (TSS 642)
+- **Tuesday**
+  - Bike Threshold — 3×20 min (bike · 100min · HARD)
+    Warm up 15 min with fast-pedal spins. 3×20 min at FTP (Zone 4 — hard but sustainable). 5 min easy between. Cool down 10 min.
+  - Moderate Aerobic Swim — 900 yd (swim · 21min · MODERATE)
+    Warm up 300 yd. Race rhythm session: groove stroke quality early, then hold sustainable pacing. Prescribed drills: 2×50 Catch-Up (front-quadrant timing). 5×100 yd at moderate effort — sustainable and conversational (10 sec rest). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume aerobic blocks. Cool down 200 yd.
+- **Wednesday**
+  - Endurance Swim — 1000 yd (swim · 29min · EASY)
+    Warm up 400 yd easy. Efficiency-first: sharpen one or two mechanics before aerobic volume so every yard transfers to the race. Prescribed drills: 2×50 Catch-Up (front-quadrant timing). Main set — 2×150 yd easy aerobic with 30 sec rest between. Cool down 200 yd.
+  - Tri Durability — Strength Maintenance B (strength · 35min · EASY)
+    Build Week 11 (SM phase) — Maintain strength built in MS with 2 sets at 8-10 reps and moderate load (~70% 1RM). Movement quality, not maximal effort.  Equipment — Required: Dumbbells, Pull-up Bar, Bands.
+- **Thursday**
+  - Tempo Run — 3 mi at threshold (run · 51min · MODERATE)
+    Warm up 1.5 mi easy, then 3 mi at lactate threshold (comfortably hard — 7–8 RPE, can say a few words). Cool down 1.5 mi easy.
+- **Friday**
+  - Swim Threshold — 900 yd (swim · 23min · HARD)
+    Warm up 300 yd easy. Hard swim day: prime stroke integrity before high-output repeats. Prescribed drills: 2×50 Catch-Up (front-quadrant timing). 4×100 yd at hard effort (maximal sustainable — what you can hold for the interval, not past it) with 15 sec rest. 3×150 yd easy aerobic. Cool down 200 yd.
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Brick — Bike 2.3 hr (bike · 135min · EASY)
+    Brick bike at Zone 2. Build leg feel for the transition. Maintain steady power throughout.
+  - Brick — Run 4 mi off the bike (run · 40min · EASY)
+    Immediately after the bike. The first 5 min will feel strange — focus on turnover, not pace. Easy Z2 throughout.
+- **Sunday**
+  - Long Run — 11 mi (run · 105min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 12 — build (TSS 221)
+- **Tuesday**
+  - Easy Ride — 0.8 hr (bike · 45min · EASY)
+    Recovery spin at Z1–Z2. No pushing. Legs should feel loose and refreshed by the end.
+- **Wednesday**
+  - Technique Aerobic Swim — 1150 yd (swim · 33min · EASY)
+    Warm up 300 yd easy. Efficiency-first: sharpen one or two mechanics before aerobic volume so every yard transfers to the race. Prescribed drills: 2×50 Fingertip Drag (high-elbow recovery); 4×50 Fist Swim (early vertical forearm). 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+- **Thursday**
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Friday**
+  - Recovery Swim — 850 yd (swim · 25min · EASY)
+    Warm up 200 yd easy. 5×100 yd at easy aerobic effort (20 sec rest). Cool down 200 yd.
+  - Easy Run — 2 mi (run · 20min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Long Ride — 1.0 hr (bike · 60min · EASY)
+    Aerobic endurance ride at Z2. Maintain 60–70 rpm cadence. Nutrition practice: eat every 40–45 minutes. No surges.
+- **Sunday**
+  - Long Run — 4 mi (run · 38min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 13 — race_specific (TSS 542)
+- **Tuesday**
+  - Bike VO2max — 3×5 min (bike · 49min · HARD)
+    Warm up 15 min. 3×5 min at 110–120% FTP (Zone 5) with 3 min easy recovery. Cool down 10 min. Short, maximal efforts — go hard.
+  - Moderate Aerobic Swim — 800 yd (swim · 19min · MODERATE)
+    Warm up 300 yd. 5×100 yd at moderate effort — sustainable and conversational (10 sec rest). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume aerobic blocks. Cool down 200 yd.
+- **Wednesday**
+  - Endurance Swim — 900 yd (swim · 26min · EASY)
+    Warm up 400 yd easy. Main set — 2×150 yd easy aerobic with 30 sec rest between. Cool down 200 yd.
+  - Tri Durability — Strength Maintenance B (Reduced) (strength · 30min · EASY)
+    Race-Specific Week 13 (SM phase) — Maintain strength built in MS with 2 sets at 8-10 reps and moderate load (~70% 1RM). Movement quality, not maximal effort. Race-specific volume reduced — minimize fatigue ahead of the race. Equipment — Required: Dumbbells, Pull-up Bar, Bands.
+- **Thursday**
+  - Half-Marathon Pace Run — 3 mi (run · 54min · MODERATE)
+    1.5 mi warm-up, 3 mi at 70.3 / half-marathon run pace (Z3–Z4), 1.5 mi cool-down. Trains your body to hold race effort on accumulating fatigue.
+- **Friday**
+  - Swim Threshold — 900 yd (swim · 23min · HARD)
+    Warm up 300 yd easy. Hard swim day: prime stroke integrity before high-output repeats. Prescribed drills: 2×50 Single-Arm Freestyle (rotation + balanced pull). 4×100 yd at hard effort (maximal sustainable — what you can hold for the interval, not past it) with 15 sec rest. 3×150 yd easy aerobic. Cool down 200 yd.
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Brick — Bike 2.3 hr (bike · 135min · EASY)
+    Brick bike at Zone 2. Build leg feel for the transition. Maintain steady power throughout.
+  - Brick — Run 3.5 mi off the bike (run · 35min · EASY)
+    Immediately after the bike. The first 5 min will feel strange — focus on turnover, not pace. Easy Z2 throughout.
+- **Sunday**
+  - Half-Marathon Pace Run — 5 mi (run · 72min · MODERATE)
+    1.5 mi warm-up, 5 mi at 70.3 / half-marathon run pace (Z3–Z4), 1.5 mi cool-down. Trains your body to hold race effort on accumulating fatigue.
+
+### Week 14 — race_specific (TSS 234)
+- **Tuesday**
+  - Easy Ride — 0.8 hr (bike · 45min · EASY)
+    Recovery spin at Z1–Z2. No pushing. Legs should feel loose and refreshed by the end.
+- **Wednesday**
+  - Technique Aerobic Swim — 1200 yd (swim · 34min · EASY)
+    Warm up 300 yd easy. Efficiency-first: sharpen one or two mechanics before aerobic volume so every yard transfers to the race. Prescribed drills: 2×50 Fingertip Drag (high-elbow recovery); 2×50 Sighting Drill (head-up race-day navigation). 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+- **Thursday**
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Friday**
+  - Recovery Swim — 900 yd (swim · 26min · EASY)
+    Warm up 200 yd easy. 5×100 yd at easy aerobic effort (20 sec rest). Cool down 200 yd.
+  - Easy Run — 2 mi (run · 20min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Long Ride — 1.3 hr (bike · 75min · EASY)
+    Aerobic endurance ride at Z2. Maintain 60–70 rpm cadence. Nutrition practice: eat every 40–45 minutes. No surges.
+- **Sunday**
+  - Long Run — 4 mi (run · 38min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 15 — race_specific (TSS 607)
+- **Tuesday**
+  - Bike VO2max — 5×5 min (bike · 65min · HARD)
+    Warm up 15 min. 5×5 min at 110–120% FTP (Zone 5) with 3 min easy recovery. Cool down 10 min. Short, maximal efforts — go hard.
+  - Moderate Aerobic Swim — 1000 yd (swim · 24min · MODERATE)
+    Warm up 300 yd. Race rhythm session: groove stroke quality early, then hold sustainable pacing. Prescribed drills: 2×50 Single-Arm Freestyle (rotation + balanced pull). 5×100 yd at moderate effort — sustainable and conversational (10 sec rest). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume aerobic blocks. Cool down 200 yd.
+- **Wednesday**
+  - Endurance Swim — 1100 yd (swim · 32min · EASY)
+    Warm up 400 yd easy. Efficiency-first: sharpen one or two mechanics before aerobic volume so every yard transfers to the race. Prescribed drills: 2×50 Single-Arm Freestyle (rotation + balanced pull). Main set — 2×200 yd easy aerobic with 30 sec rest between. Cool down 200 yd.
+  - Tri Durability — Strength Maintenance B (Reduced) (strength · 30min · EASY)
+    Race-Specific Week 15 (SM phase) — Maintain strength built in MS with 2 sets at 8-10 reps and moderate load (~70% 1RM). Movement quality, not maximal effort. Race-specific volume reduced — minimize fatigue ahead of the race. Equipment — Required: Dumbbells, Pull-up Bar, Bands.
+- **Thursday**
+  - Tempo Run — 3 mi at threshold (run · 51min · MODERATE)
+    Warm up 1.5 mi easy, then 3 mi at lactate threshold (comfortably hard — 7–8 RPE, can say a few words). Cool down 1.5 mi easy.
+- **Friday**
+  - Swim Threshold — 1100 yd (swim · 28min · HARD)
+    Warm up 300 yd easy. Hard swim day: prime stroke integrity before high-output repeats. Prescribed drills: 2×50 Catch-Up (front-quadrant timing). 4×100 yd at hard effort (maximal sustainable — what you can hold for the interval, not past it) with 15 sec rest. 3×150 yd easy aerobic. Cool down 200 yd.
+  - Easy Run — 3 mi (run · 30min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Saturday**
+  - Brick — Bike 2.3 hr (bike · 135min · EASY)
+    Brick bike at Zone 2. Build leg feel for the transition. Maintain steady power throughout.
+  - Brick — Run 3.5 mi off the bike (run · 35min · EASY)
+    Immediately after the bike. The first 5 min will feel strange — focus on turnover, not pace. Easy Z2 throughout.
+- **Sunday**
+  - Long Run — 13 mi (run · 124min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 16 — taper (TSS 308)
+- **Tuesday**
+  - Bike Sweet Spot — 2×15 min (bike · 65min · MODERATE)
+    Sweet spot training at 88–94% FTP (Zone 3–4). Warm up 15 min, 2×15 min at sweet spot with 5 min recovery. Cool down 10 min.
+  - Moderate Aerobic Swim — 800 yd (swim · 19min · MODERATE)
+    Warm up 300 yd. 5×100 yd at moderate effort — sustainable and conversational (15 sec rest). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume aerobic blocks. Cool down 200 yd.
+- **Wednesday**
+  - Technique Aerobic Swim — 650 yd (swim · 19min · EASY)
+    Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+  - Tri Durability — Taper Light Session (strength · 30min · EASY)
+    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Dumbbells, Bands.
+- **Thursday**
+  - Easy Run — 4 mi (run · 40min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Friday**
+  - Swim Threshold — 800 yd (swim · 20min · HARD)
+    Warm up 300 yd easy. 4×100 yd at hard effort (maximal sustainable — what you can hold for the interval, not past it) with 15 sec rest. 3×150 yd easy aerobic. Cool down 200 yd.
+- **Saturday**
+  - Brick — Bike 0.8 hr (bike · 45min · EASY)
+    Brick bike at Zone 2. Build leg feel for the transition. Maintain steady power throughout.
+  - Brick — Run 3 mi off the bike (run · 30min · EASY)
+    Immediately after the bike. The first 5 min will feel strange — focus on turnover, not pace. Easy Z2 throughout.
+- **Sunday**
+  - Long Run — 5 mi (run · 48min · EASY)
+    Aerobic long run at conversational pace. Full Z2 effort — if you can't speak in sentences, slow down.
+
+### Week 17 — taper (TSS 463)
+- **Tuesday**
+  - Bike Openers — 30 min (bike · 30min · EASY)
+    Short pre-race sharpener. 20 min easy Z2, then 3×30-second fast-pedal bursts. Legs should feel snappy afterwards.
+  - Moderate Aerobic Swim — 800 yd (swim · 19min · MODERATE)
+    Warm up 300 yd. 5×100 yd at moderate effort — sustainable and conversational (15 sec rest). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume aerobic blocks. Cool down 200 yd.
+- **Wednesday**
+  - Technique Aerobic Swim — 650 yd (swim · 19min · EASY)
+    Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
+  - Tri Durability — Taper Light Session (strength · 30min · EASY)
+    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Dumbbells, Bands.
+- **Thursday**
+  - Easy Run — 4 mi (run · 40min · EASY)
+    Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
+- **Friday**
+  - Race-Week Activation Swim — 800 yd (swim · 23min · EASY)
+    Warm up 300 yd easy. 4×50 yd build accelerations (start easy, finish strong; long rest between — pure neuromuscular sharpener, NOT a hard interval). 2×100 yd easy aerobic. Cool down 200 yd.
+- **Sunday**
+  - Test 70.3 race (race · 330min · MODERATE)
+    Race day. Swim 1.2mi → Bike 56mi → Run 13.1mi. No add-on training; execute pacing and fueling.

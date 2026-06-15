@@ -316,6 +316,7 @@ Provide THREE things:
 1. HEADLINE (5-8 words): The single most important INSIGHT. Not a recap. What should the athlete know that they don't already?
 
 2. NARRATIVE (2-3 sentences max): DO NOT RECAP WHAT THE ATHLETE DID. They already know — they were there. Instead:
+   - OPENING — lead with state + credit, never a deficit. Open with where the athlete IS (readiness, load, fitness direction) and the work they actually did — INCLUDING off-plan sessions, which ARE real training, credited as work done and never framed as "behind." NEVER open with a miss-count, a gap, or "only X of Y" — a shortfall is context that comes AFTER the credit, if at all, never the first sentence.
    - Compare actual vs planned: did they follow the prescription? "Plan called for 3x5 at 80% — you hit it." or "Run was 3 miles of a planned 4.5 — shorter than prescribed."
    - Interpret the body's response: was HR normal? Did effort feel harder than expected for the prescribed intensity? Is that expected for this phase?
    - Connect to the plan context: "This is week 3 of build — the weights are supposed to feel heavier." or "You're in base phase, so the easy runs matter more than speed right now."

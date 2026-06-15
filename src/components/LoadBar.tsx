@@ -1,5 +1,6 @@
 import React from 'react';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
+import { acwrVolumeLabel } from '@/lib/load-headline';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,13 +29,9 @@ interface LoadBarProps {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function acwrLabel(v: number | null): string {
-  if (v == null) return '—';
-  if (v < 0.8) return 'build more';
-  if (v <= 1.3) return 'balanced';
-  if (v <= 1.5) return 'back off';
-  return 'rest now';
-}
+// The VOLUME verdict band mapping is the shared acwrVolumeLabel (single source — imported above so
+// the gauge label and the STATE glance headline can never disagree on the bands).
+const acwrLabel = acwrVolumeLabel;
 
 // Color for the VOLUME verdict (the load label now reads this — matches the gauge). Distinct from
 // loadStatusColor (the retired body-response label, which conflated readiness into LOAD).
