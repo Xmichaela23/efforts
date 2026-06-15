@@ -182,11 +182,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   // Post-workout feedback popup state
   const [feedbackWorkout, setFeedbackWorkout] = useState<{
     id: string;
-    type: 'run' | 'ride';
+    type: 'run' | 'ride' | 'swim';
     name: string;
     existingGearId?: string | null;
     existingRpe?: number | null;
   } | null>(null);
+  // D-162: post-workout feedback now covers swims (feel/RPE + pool length + equipment), not just run/ride.
+  const isFeedbackType = (t: unknown) => ['run', 'ride', 'swim'].includes(String(t || '').toLowerCase());
   const feedbackShownIdsRef = useRef<Set<string>>(new Set()); // Track which workouts we've shown popup for (UI state only)
   const feedbackDismissedRef = useRef<Set<string>>(new Set()); // Client-side cache of dismissed IDs (server is source of truth)
   const checkingFeedbackRef = useRef(false); // Prevent concurrent checks
@@ -482,7 +484,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
     // Only check completed run/ride workouts (don't check RPE locally - check DB)
     if (workoutStatus === 'completed' &&
-        (workoutType === 'run' || workoutType === 'ride') &&
+        isFeedbackType(workoutType) &&
         !feedbackWorkout) {
       const workoutId = String(selectedWorkout.id);
       
@@ -544,7 +546,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             // feedbackShownIdsRef is only for general checkForFeedbackNeeded to prevent duplicate popups
             setFeedbackWorkout({
               id: workoutId,
-              type: workout.type as 'run' | 'ride',
+              type: workout.type as 'run' | 'ride' | 'swim',
               name: workout.name || `${workout.type} workout`,
               existingGearId: workout.gear_id || null,
               existingRpe: workout.rpe || null,
@@ -587,16 +589,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             
             // Only show popup for completed runs/rides without RPE
             // Note: Server is source of truth for dismissals, but realtime is fast-path optimization
-            if ((workoutType === 'run' || workoutType === 'ride') && 
+            if (isFeedbackType(workoutType) &&
                 workoutStatus === 'completed' &&
-                workoutId && 
+                workoutId &&
                 !feedbackShownIdsRef.current.has(workoutId) &&
                 !newWorkout.rpe && // Only check RPE, not gear_id
                 !newWorkout.feedback_dismissed_at) { // Server tracks dismissals
               feedbackShownIdsRef.current.add(workoutId);
               setFeedbackWorkout({
                 id: workoutId,
-                type: workoutType as 'run' | 'ride',
+                type: workoutType as 'run' | 'ride' | 'swim',
                 name: newWorkout.name || `${workoutType} workout`,
                 existingGearId: newWorkout.gear_id || null,
                 existingRpe: newWorkout.rpe || null,
@@ -625,15 +627,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             const rpeBecameNull = !updatedWorkout.rpe && oldWorkout.rpe !== null;
             
             if ((justCompleted || rpeBecameNull) &&
-                (workoutType === 'run' || workoutType === 'ride') &&
-                workoutId && 
+                isFeedbackType(workoutType) &&
+                workoutId &&
                 !feedbackShownIdsRef.current.has(workoutId) &&
                 !updatedWorkout.rpe &&
                 !updatedWorkout.feedback_dismissed_at) { // Server tracks dismissals
               feedbackShownIdsRef.current.add(workoutId);
               setFeedbackWorkout({
                 id: workoutId,
-                type: workoutType as 'run' | 'ride',
+                type: workoutType as 'run' | 'ride' | 'swim',
                 name: updatedWorkout.name || `${workoutType} workout`,
                 existingGearId: updatedWorkout.gear_id || null,
                 existingRpe: updatedWorkout.rpe || null,
@@ -989,10 +991,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           console.warn('[AppLayout] calculate-workload after import failed:', e);
         }
         
-        if ((workout.type === 'run' || workout.type === 'ride') && savedWorkout.id) {
+        if (isFeedbackType(workout.type) && savedWorkout.id) {
           setFeedbackWorkout({
             id: savedWorkout.id,
-            type: workout.type as 'run' | 'ride',
+            type: workout.type as 'run' | 'ride' | 'swim',
             name: workout.name || savedWorkout.name || `${workout.type} workout`,
           });
         }

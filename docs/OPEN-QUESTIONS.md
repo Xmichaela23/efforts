@@ -857,6 +857,24 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-060 — HealthKit native swim enrichment deferred (capability/build friction not worth it for pool_length alone)
+
+- **Status:** filed 2026-06-15 (paused in favour of D-162) · deferred-with-reason
+- **What it is:** D-157 built the HealthKit path to get real `pool_length` (+ strokes/seconds) automatically. In practice the friction is high: a HealthKit **+Capability** must be added in Xcode, a **full native build** is required (a JS `cap sync` isn't enough), FORM→Apple Health must be enabled, and the **60s start-window merge** must match the Strava row. Surfaced live: a delete+reimport produced a **Strava-only** row (`source=strava`, `pool_length=null`, no `healthkit_id`) — the Apple side never ingested, so the merge had nothing to merge.
+- **Why deferred:** for **pool_length alone**, the athlete-ask (D-162: one-tap "What pool?") gives the same `pool_length` + derived length count with **zero** native/build/merge friction. The native path's marginal value over the ask is small.
+- **Revisit when:** the richer fields that *only* HealthKit/FORM provide become the goal — **SWOLF, per-length splits, stroke type** (FORM "Swim Breakdown", audit Tier B). At that point the native enrichment + dedup/merge is worth finishing. Until then, D-162 covers pool length.
+- **Cross-ref:** D-157 (the built-but-paused path), D-162 (the replacement), D-161 (length derive), AUDIT-swim Tier A/B.
+
+## Q-061 — Finned/drill-step pace exclusion from the swim trend (data now captured, filtering not built)
+
+- **Status:** filed 2026-06-15 · capture done (D-162), filtering deferred
+- **What it is:** fins (and pull/drill sets) distort pace, so a swim's session-level pace — and the swim trend built on it — is clouded when finned sets are mixed in. D-162 now **captures** which steps actually used equipment (`workout_metadata.swim_steps_equipment_confirmed: [{step_index, equipment, used}]`, or the unplanned `swim_equipment_unplanned` tag), and the Performance tab shows a `· some sets with fins` note. **The pace exclusion itself is not built** — only the data + the note.
+- **Why deferred / what it needs:** excluding finned steps from the pace that feeds `state-trend/swim` requires per-step pace (per-length / per-interval data), which we don't reliably have for Strava swims (per-length is NULL — same gap as Q-038 / AUDIT Tier B). With only session-level pace, the cleanest near-term move is to **down-weight or flag** finned sessions in the trend, not surgically remove a step's contribution. The per-step *confirmed* data (D-162) is the prerequisite that now exists; the per-step *pace* is still missing.
+- **Revisit when:** per-length swim data lands (HealthKit Tier A / FORM Breakdown), OR decide to flag-and-down-weight finned sessions at the trend level using the session-level confirmation alone.
+- **Cross-ref:** D-162 (capture + note), Q-038 (swim pace reliability), `supabase/functions/_shared/state-trend/swim.ts`, AUDIT-swim.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

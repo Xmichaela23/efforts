@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Activity, Bike, Plus } from 'lucide-react';
+import { X, Activity, Bike, Plus, Waves } from 'lucide-react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { Button } from './ui/button';
@@ -24,9 +24,19 @@ interface GearItem {
   is_default: boolean;
 }
 
+// Pool options (D-162). pool_length stored in METRES to match the HealthKit path (Q-060 deferred).
+const POOL_OPTIONS: Array<{ value: string; label: string; meters: number }> = [
+  { value: '25yd', label: '25 yd', meters: 22.86 },
+  { value: '25m', label: '25 m', meters: 25 },
+  { value: '50m', label: '50 m', meters: 50 },
+];
+
+// Unplanned-swim equipment multi-select fallback (session-level tag).
+const UNPLANNED_EQUIP = ['Fins', 'Pull buoy', 'Snorkel', 'Paddles'];
+
 interface PostWorkoutFeedbackProps {
   workoutId: string;
-  workoutType: 'run' | 'ride';
+  workoutType: 'run' | 'ride' | 'swim';
   workoutName?: string;
   // Existing values for editing
   existingGearId?: string | null;
@@ -87,9 +97,20 @@ export default function PostWorkoutFeedback({
   const [selectedRpe, setSelectedRpe] = useState<number | null>(existingRpe || null);
   const [selectedFeeling, setSelectedFeeling] = useState<string | null>(existingFeeling || null);
 
+  // Swim-only state (D-162)
+  const isSwim = workoutType === 'swim';
+  const [selectedPool, setSelectedPool] = useState<string | null>(null);
+  // Prescribed-equipment steps read from the LINKED PLANNED swim (computed.steps[].equipment).
+  const [plannedEquipSteps, setPlannedEquipSteps] = useState<Array<{ step_index: number; equipment: string; label: string }>>([]);
+  const [hasPlannedLink, setHasPlannedLink] = useState(false);
+  // step_index → used (true=Yes, false=No; absent=Skip) for the per-step confirmation.
+  const [equipConfirms, setEquipConfirms] = useState<Record<number, boolean>>({});
+  // Unplanned-swim session multi-select.
+  const [unplannedEquip, setUnplannedEquip] = useState<Set<string>>(new Set());
+
   const gearType = workoutType === 'run' ? 'shoe' : 'bike';
-  const sportColor = workoutType === 'run' ? SPORT_COLORS.run : SPORT_COLORS.cycling;
-  const SportIcon = workoutType === 'run' ? Activity : Bike;
+  const sportColor = isSwim ? SPORT_COLORS.swim : workoutType === 'run' ? SPORT_COLORS.run : SPORT_COLORS.cycling;
+  const SportIcon = isSwim ? Waves : workoutType === 'run' ? Activity : Bike;
 
   // Extract RGB from sport color for gradient
   const getRgbFromColor = (color: string): string => {
@@ -136,7 +157,7 @@ export default function PostWorkoutFeedback({
 
       const { data, error } = await supabase
         .from('workouts')
-        .select('distance, gps_track, computed, date')
+        .select('distance, gps_track, computed, date, planned_id, workout_metadata, pool_length')
         .eq('id', workoutId)
         .eq('user_id', userId)
         .single();
@@ -148,6 +169,41 @@ export default function PostWorkoutFeedback({
 
       console.log('📅 [PostWorkoutFeedback] Loaded workout data:', { date: data?.date, distance: data?.distance });
       setWorkoutData(data);
+
+      // Swim (D-162): prefill the pool from any prior pool_length, and read the LINKED PLANNED swim's
+      // prescribed per-step equipment so we can ask "did you actually use the prescribed fins?".
+      if (isSwim) {
+        if (Number(data?.pool_length) > 0) {
+          const m = Number(data.pool_length);
+          const match = POOL_OPTIONS.find((p) => Math.abs(p.meters - m) < 0.6);
+          if (match) setSelectedPool(match.value);
+        }
+        const plannedId = data?.planned_id;
+        if (plannedId) {
+          const { data: planned } = await supabase
+            .from('planned_workouts')
+            .select('computed')
+            .eq('id', plannedId)
+            .eq('user_id', userId)
+            .single();
+          const steps: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : [];
+          const equipSteps = steps
+            .map((st: any, i: number) => {
+              const eq = typeof st?.equipment === 'string' ? st.equipment.trim().toLowerCase() : '';
+              if (!eq || eq === 'none') return null;
+              return {
+                step_index: Number.isFinite(st?.planned_index) ? Number(st.planned_index) : i,
+                equipment: eq,
+                label: String(st?.label || st?.kind || `Step ${i + 1}`),
+              };
+            })
+            .filter(Boolean) as Array<{ step_index: number; equipment: string; label: string }>;
+          setHasPlannedLink(true);
+          setPlannedEquipSteps(equipSteps);
+        } else {
+          setHasPlannedLink(false);
+        }
+      }
     } catch (e) {
       console.error('Error loading workout data:', e);
     }
@@ -156,6 +212,8 @@ export default function PostWorkoutFeedback({
   const loadGear = async () => {
     try {
       setLoading(true);
+      // Swims have no shoe/bike gear — skip the gear query (it would fetch bikes for a swim).
+      if (isSwim) { setGear([]); return; }
       const userId = getStoredUserId();
       if (!userId) return;
 
@@ -213,8 +271,8 @@ export default function PostWorkoutFeedback({
       }
 
       const updateData: any = {};
-      
-      if (selectedGearId) {
+
+      if (selectedGearId && !isSwim) {
         updateData.gear_id = selectedGearId;
       }
       if (selectedRpe !== null) {
@@ -222,6 +280,32 @@ export default function PostWorkoutFeedback({
       }
       if (selectedFeeling) {
         updateData.feeling = selectedFeeling;
+      }
+
+      // Swim (D-162): pool → pool_length (m) + derived length count; equipment → workout_metadata.
+      if (isSwim) {
+        const pool = POOL_OPTIONS.find((p) => p.value === selectedPool);
+        if (pool) {
+          updateData.pool_length = pool.meters;
+          const distM = Number(workoutData?.distance) > 0 ? Number(workoutData.distance) * 1000 : 0;
+          updateData.number_of_active_lengths = distM > 0 ? Math.round(distM / pool.meters) : null;
+        }
+        // Merge equipment into workout_metadata without clobbering existing keys (readiness, session_rpe…).
+        const existingMeta = typeof workoutData?.workout_metadata === 'string'
+          ? (() => { try { return JSON.parse(workoutData.workout_metadata); } catch { return {}; } })()
+          : (workoutData?.workout_metadata || {});
+        const meta: any = { ...existingMeta };
+        if (hasPlannedLink && plannedEquipSteps.length > 0) {
+          const confirmed = plannedEquipSteps
+            .filter((s) => s.step_index in equipConfirms)
+            .map((s) => ({ step_index: s.step_index, equipment: s.equipment, used: equipConfirms[s.step_index] }));
+          if (confirmed.length > 0) meta.swim_steps_equipment_confirmed = confirmed;
+        } else if (!hasPlannedLink && unplannedEquip.size > 0) {
+          meta.swim_equipment_unplanned = Array.from(unplannedEquip);
+        }
+        if (meta.swim_steps_equipment_confirmed || meta.swim_equipment_unplanned) {
+          updateData.workout_metadata = meta;
+        }
       }
 
       // Only update if something was selected
@@ -465,6 +549,118 @@ export default function PostWorkoutFeedback({
           ))}
         </div>
       </div>
+
+      {/* Swim: pool length (D-162) — sets distance-per-length so we can derive the length count */}
+      {isSwim && (
+        <div>
+          <label className="text-sm font-light text-white/70 mb-2 block">
+            What pool? <span className="text-xs text-white/40 font-light">(sets distance per length)</span>
+          </label>
+          <div className="flex gap-2">
+            {POOL_OPTIONS.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setSelectedPool(p.value === selectedPool ? null : p.value)}
+                className={`flex-1 py-2.5 text-sm font-light rounded-lg border-2 backdrop-blur-md transition-all duration-300 ${
+                  selectedPool === p.value
+                    ? 'bg-white/[0.15] border-white/40 text-white'
+                    : 'bg-white/[0.08] border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white/90 hover:border-white/30'
+                }`}
+                style={{
+                  backgroundColor: selectedPool === p.value ? `rgba(${rgb}, 0.2)` : undefined,
+                  borderColor: selectedPool === p.value ? `rgba(${rgb}, 0.5)` : undefined,
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setSelectedPool(null)}
+              className="flex-1 py-2.5 text-sm font-light rounded-lg border-2 backdrop-blur-md transition-all duration-300 bg-white/[0.04] border-white/10 text-white/50 hover:text-white/70"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Swim: per-step equipment confirmation (D-162) — only steps the plan prescribed equipment for.
+          Keeps session pace honest (a finned/drill set can be flagged downstream without clouding it). */}
+      {isSwim && hasPlannedLink && plannedEquipSteps.length > 0 && (
+        <div>
+          <label className="text-sm font-light text-white/70 mb-2 block">
+            Equipment — did you use what was planned?
+          </label>
+          <div className="space-y-2">
+            {plannedEquipSteps.map((s) => {
+              const val = s.step_index in equipConfirms ? equipConfirms[s.step_index] : null;
+              return (
+                <div key={s.step_index} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <div className="text-[13px] text-white/80 mb-1.5 capitalize">{s.label} — {s.equipment}?</div>
+                  <div className="flex gap-2">
+                    {[{ k: 'yes', v: true, t: 'Yes' }, { k: 'no', v: false, t: 'No' }, { k: 'skip', v: null, t: 'Skip' }].map((opt) => {
+                      const active = val === opt.v;
+                      return (
+                        <button
+                          key={opt.k}
+                          onClick={() => setEquipConfirms((prev) => {
+                            const next = { ...prev };
+                            if (opt.v === null) delete next[s.step_index];
+                            else next[s.step_index] = opt.v;
+                            return next;
+                          })}
+                          className={`flex-1 py-1.5 text-xs font-light rounded-md border-2 transition-all duration-300 ${
+                            active ? 'bg-white/[0.15] border-white/40 text-white' : 'bg-white/[0.06] border-white/15 text-white/60 hover:text-white/85'
+                          }`}
+                          style={{
+                            backgroundColor: active && opt.v !== null ? `rgba(${rgb}, 0.2)` : undefined,
+                            borderColor: active && opt.v !== null ? `rgba(${rgb}, 0.5)` : undefined,
+                          }}
+                        >
+                          {opt.t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Swim: unplanned-swim equipment fallback (D-162) — simple session-level multi-select */}
+      {isSwim && !hasPlannedLink && (
+        <div>
+          <label className="text-sm font-light text-white/70 mb-2 block">
+            Equipment used? <span className="text-xs text-white/40 font-light">(optional)</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {UNPLANNED_EQUIP.map((e) => {
+              const active = unplannedEquip.has(e);
+              return (
+                <button
+                  key={e}
+                  onClick={() => setUnplannedEquip((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(e)) next.delete(e); else next.add(e);
+                    return next;
+                  })}
+                  className={`py-2 px-3 text-xs font-light rounded-lg border-2 backdrop-blur-md transition-all duration-300 ${
+                    active ? 'bg-white/[0.15] border-white/40 text-white' : 'bg-white/[0.08] border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white/90'
+                  }`}
+                  style={{
+                    backgroundColor: active ? `rgba(${rgb}, 0.2)` : undefined,
+                    borderColor: active ? `rgba(${rgb}, 0.5)` : undefined,
+                  }}
+                >
+                  {e}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Gear Selection - Dropdown (moved to bottom) */}
       {gear.length > 0 && (

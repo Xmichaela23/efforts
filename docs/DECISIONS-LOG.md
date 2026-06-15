@@ -3759,6 +3759,22 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-162 — Swim post-workout feedback: pool length + planned-equipment confirmation (replaces the HealthKit-for-pool-length path)
+
+- **Date:** 2026-06-15
+- **Context:** the HealthKit native path (D-157) is the *automatic* way to get pool length, but the friction is high (HealthKit capability in Xcode + full native build + FORM→Apple Health toggle + the 60s merge window — surfaced live when a reimport produced a Strava-only row with no enrichment). Paused that path (**Q-060**) and instead **ask the athlete** in the existing post-workout feedback popup — a one-tap pool selection gives the same pool_length + length count with zero native work.
+- **Flow (swims only; run/ride unchanged — they keep feel + RPE):**
+  - Swims get the same **feel + RPE** screens as run/ride (not replaced), **no gear** section, plus two swim screens.
+  - **"What pool?"** — 25 yd / 25 m / 50 m / Skip. On save: write `pool_length` (metres) to the workout row + derive `number_of_active_lengths = round(distance_m / pool_length_m)` client-side. Surfaces immediately in the Performance-tab rich-detail (Pool / Lengths wired in D-160).
+  - **Equipment confirmation** — *planned-aware, not free entry.* Reads the LINKED PLANNED swim (`planned_workouts.computed.steps[].equipment`) and shows a Yes/No/Skip only for steps that **prescribed** equipment ("Catch-Up drill — pull buoy?"). If the plan prescribed none → screen skipped entirely. **Unplanned** swims (no `planned_id`) fall back to a simple session multi-select (Fins / Pull buoy / Snorkel / Paddles). Stored in `workout_metadata.swim_steps_equipment_confirmed: [{step_index, equipment, used}]` (planned) or `swim_equipment_unplanned: string[]` (unplanned), merged without clobbering existing metadata keys.
+- **Pool unit:** `pool_length` stored in **metres** (25 yd → 22.86 m) to match the HealthKit path so both sources are unit-consistent; display unit handling stays Q-059.
+- **Downstream (capture-only, no filtering yet):** if any confirmed step used **fins** (or the unplanned tag includes fins), the Performance tab shows a session-level note **"· some sets with fins"**. The per-step pace exclusion from the trend is deliberately **not built** — only captured — see **Q-061** (which now has the per-step confirmed data it needs).
+- **Trigger plumbing:** swims were excluded at the source — opened the gate in **all five** paths: `check-feedback-needed` (`.in('type', […,'swim'])`), the `feedbackWorkout` union, and the four AppLayout trigger predicates (`checkSpecificWorkout`, two realtime handlers, post-import) via a shared `isFeedbackType` helper. RPE-null + dismissal gating unchanged.
+- **UX call:** implemented as **sections in the existing single panel** (matching the current RPE/feeling/gear layout), not a multi-screen wizard — lower risk, consistent with the component.
+- **Scope:** capture/display only — no prescription, no pace filtering. `check-feedback-needed` deployed; client `npm run build` clean. Verify on the June-15 swim (open it → popup shows feel/RPE + pool + equipment) and on the next planned swim with prescribed drill equipment.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

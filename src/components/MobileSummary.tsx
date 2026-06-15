@@ -302,6 +302,22 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           </div>
         );
       })()}
+
+      {/* Session-level fins note (D-162) — from the post-swim equipment confirmation (planned per-step)
+          or the unplanned multi-select. Capture/display only; the per-step pace exclusion from the trend
+          is Q-061 (now has the confirmed data it needs). Flags fins specifically — they distort pace. */}
+      {type === 'swim' && (() => {
+        const c: any = completed || {};
+        let meta = c.workout_metadata;
+        if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = {}; } }
+        meta = meta || {};
+        const confirmed = Array.isArray(meta.swim_steps_equipment_confirmed) ? meta.swim_steps_equipment_confirmed : [];
+        const unplanned = Array.isArray(meta.swim_equipment_unplanned) ? meta.swim_equipment_unplanned : [];
+        const finsPlanned = confirmed.some((e: any) => e?.used === true && String(e?.equipment || '').toLowerCase().includes('fin'));
+        const finsUnplanned = unplanned.some((e: any) => String(e || '').toLowerCase().includes('fin'));
+        if (!finsPlanned && !finsUnplanned) return null;
+        return <div className="mt-2 text-center text-[11px] text-white/40">· some sets with fins</div>;
+      })()}
       {!sd?.classification?.is_pool_swim && (
         <SessionNarrative
           sessionDetail={sd}

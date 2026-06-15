@@ -37,15 +37,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Query for most recent completed run/ride without RPE
+    // Query for most recent completed run/ride/swim without RPE
     // Server-side logic: determines which workout needs feedback
     // Single source of truth: server checks database for dismissals
+    // D-162: swims now get the popup too (feel/RPE + pool length + equipment confirmation).
     const { data: workouts, error } = await supabase
       .from('workouts')
       .select('id, type, name, gear_id, rpe, date, feedback_dismissed_at')
       .eq('user_id', user.id)
       .eq('workout_status', 'completed')
-      .in('type', ['run', 'ride'])
+      .in('type', ['run', 'ride', 'swim'])
       .is('rpe', null)
       .is('feedback_dismissed_at', null) // Server checks dismissals from database
       .gte('date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]) // Last 7 days
