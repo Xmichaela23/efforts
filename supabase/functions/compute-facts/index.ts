@@ -892,12 +892,22 @@ async function upsertRouteIntelligence(
     }, { onConflict: "workout_id" });
 
   const metricDate = String(w.date || "").slice(0, 10);
-  const paceSecPerKm = toNum(runFacts?.pace_avg_s_per_km);
-  const avgHr = toNum(runFacts?.hr_avg);
+  // Q-054 Fix 2 — plausibility clamp at the WRITE site (mirrors the spine read-guard, 150–750
+  // s/km). A garbage provider pace (path A: overall.avg_pace_s_per_mi × 0.621) or any OOB value
+  // never persists → the read-side guards become a backstop, not load-bearing. Out-of-band → null.
+  const plausiblePace = (v: number | null): number | null =>
+    v != null && v >= 150 && v <= 750 ? v : null;
+  const paceSecPerKm = plausiblePace(toNum(runFacts?.pace_avg_s_per_km));
+  // Q-054 Fix 1 — avgHr ≤ 0 is missing, not a real 0 (the GAP=0 collapse). HR absent →
+  // effort_adjusted is null (raw pace stands), NEVER 0.
+  const avgHrRaw = toNum(runFacts?.hr_avg);
+  const avgHr = avgHrRaw != null && avgHrRaw > 0 ? avgHrRaw : null;
   const refHr = toNum((w.workout_metadata as any)?.readiness?.threshold_hr) ?? 145;
-  const effortAdjusted = (paceSecPerKm != null && avgHr != null && refHr > 0)
-    ? Math.round((paceSecPerKm * (avgHr / refHr)) * 10) / 10
-    : null;
+  const effortAdjusted = plausiblePace(
+    paceSecPerKm != null && avgHr != null && refHr > 0
+      ? Math.round((paceSecPerKm * (avgHr / refHr)) * 10) / 10
+      : null,
+  );
   const consistency = (() => {
     const drift = toNum(runFacts?.hr_drift_pct);
     if (drift == null) return null;
@@ -1083,7 +1093,11 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null): Record<strin
   const facts: Record<string, any> = {
     distance_m: Math.round(dist),
     pace_avg_s_per_km: paceAvg,
-    hr_avg: w.avg_heart_rate ?? overall.avg_hr ?? null,
+    // Q-054 Fix 1 — avgHr ≤ 0 is MISSING, not a real 0. A zero HR (no strap / treadmill)
+    // must not propagate: downstream `effort_adjusted = pace × (hr/refHr)` collapses GAP to 0
+    // when hr=0 (the zero-not-null class, cf. D-112/D-115). Pick the first POSITIVE source;
+    // `??` alone wouldn't catch a literal 0. null → GAP falls back to raw pace, never 0.
+    hr_avg: [w.avg_heart_rate, overall.avg_hr].map((x) => toNum(x)).find((h) => h != null && h > 0) ?? null,
     elevation_gain_m: w.elevation_gain ?? null,
   };
 
@@ -1171,9 +1185,12 @@ function buildRideFacts(w: WorkoutRow, baselines: Baselines | null): Record<stri
   const facts: Record<string, any> = {
     distance_m: Math.round(dist),
     duration_minutes: Math.round(dur),
-    avg_power: w.avg_power ?? overall.avg_power_w ?? null,
+    // T2 — avg_power/avg_hr ≤ 0 is MISSING, not a real 0 (the zero-not-null class, cf. Q-054 run
+    // fix + D-112/D-115). `??` would pass a literal 0 from a power-less/HR-less ride straight
+    // through. Pick the first POSITIVE source; null falls back cleanly downstream.
+    avg_power: [w.avg_power, overall.avg_power_w].map((x) => toNum(x)).find((v) => v != null && v > 0) ?? null,
     normalized_power: w.normalized_power ?? analysis.power?.normalized_power ?? null,
-    avg_hr: w.avg_heart_rate ?? overall.avg_hr ?? null,
+    avg_hr: [w.avg_heart_rate, overall.avg_hr].map((x) => toNum(x)).find((v) => v != null && v > 0) ?? null,
   };
 
   if (ftp && facts.normalized_power) {
