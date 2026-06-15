@@ -36,6 +36,16 @@ function acwrLabel(v: number | null): string {
   return 'rest now';
 }
 
+// Color for the VOLUME verdict (the load label now reads this — matches the gauge). Distinct from
+// loadStatusColor (the retired body-response label, which conflated readiness into LOAD).
+function loadVolumeColor(label: string): string {
+  if (label === 'balanced') return 'text-emerald-400/85';
+  if (label === 'build more') return 'text-sky-400/85';
+  if (label === 'back off') return 'text-amber-400/85';
+  if (label === 'rest now') return 'text-red-400/85';
+  return 'text-white/45';
+}
+
 function acwrToGaugePct(v: number): number {
   const min = 0.6;
   const max = 1.7;
@@ -111,11 +121,15 @@ export default function LoadBar({ load, loadStatus, readinessState, weekIntent, 
         <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">LOAD</span>
         <div className="flex items-center gap-2">
           <AcwrGauge value={load.acwr} readinessState={readinessState} />
-          {loadStatus?.status && !(isTaperOrPeak && loadStatus.status === 'under') && (
-            <><Dot /><span className={`text-[14px] font-semibold tracking-tight ${loadStatusColor(loadStatus.status)}`}>
-              {loadStatusLabel(loadStatus.status)}
-            </span></>
-          )}
+          {/* The LOAD label reads the VOLUME verdict (the same ACWR band the gauge shows) — one load
+              verdict, so gauge + label can never disagree. Body-response/overreaching is NOT load: it
+              lives on the readiness axis (the gauge color + the readiness row), never the LOAD label.
+              (load fragmentation fix — was reading loadStatus.status, the body-response verdict.) */}
+          {(() => {
+            const vl = acwrLabel(load.acwr);
+            if (vl === '—' || (isTaperOrPeak && vl === 'build more')) return null;
+            return <><Dot /><span className={`text-[14px] font-semibold tracking-tight ${loadVolumeColor(vl)}`}>{vl}</span></>;
+          })()}
         </div>
       </div>
       {!hideDailyBars && dailyLoad.length > 0 && (

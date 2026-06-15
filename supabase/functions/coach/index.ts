@@ -91,7 +91,7 @@ const corsHeaders: Record<string, string> = {
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
 /** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
 /** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
-const COACH_PAYLOAD_VERSION = 39; // 39: spine FACT requires explicit per-discipline naming (w/ confidence framing)
+const COACH_PAYLOAD_VERSION = 40; // 40: load-fix — readiness_label no longer reads load_status (category fix); completed-count fact (no undercount)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -3661,6 +3661,17 @@ Deno.serve(async (req) => {
             return String(a?.timestamp || '').localeCompare(String(b?.timestamp || ''));
           });
 
+        // Deterministic completed-session count + list — anchors the narrative so it can't
+        // undercount or omit a completed session (the LLM listed 3 of 4, dropping an off-plan ride).
+        // Off-plan completed sessions are real training and must be credited, not erased.
+        if (completedNarrativeWorkouts.length > 0) {
+          const compList = completedNarrativeWorkouts.map((w: any) => {
+            const d = String(w?.__local_date || w?.date || '').slice(0, 10);
+            return `${d} ${normalizeType(w?.type)}${w?.planned_id ? '' : ' (off-plan)'}`;
+          }).join(', ');
+          narrativeFacts.push(`COMPLETED THIS WEEK — ${completedNarrativeWorkouts.length} sessions (count ALL of these, including off-plan, which IS real training — do not undercount, omit, or frame off-plan work as "behind"): ${compList}.`);
+        }
+
         // Athlete-provided context (highest priority — never guess over this)
         if (athleteContextStr) {
           narrativeFacts.unshift(`ATHLETE SAYS (use this, do not guess): ${athleteContextStr}`);
@@ -4990,11 +5001,13 @@ ${narrativeFacts.join('\n')}`;
         fitness_direction: fitnessDirection,
         readiness_state: readinessState,
         readiness_label: (() => {
-          const ls = athleteSnapshot?.body_response?.load_status?.status;
+          // The readiness label reflects READINESS ONLY (how the body is responding). Load is a
+          // SEPARATE axis — the LoadBar reads the volume verdict (ACWR band). The old `ls==='high'
+          // → 'HIGH LOAD'` / `ls==='elevated' → 'WATCH LOAD'` branches put the LOAD verdict onto the
+          // READINESS chip — the category error that showed "HIGH LOAD" in green while readiness was
+          // 'fresh'. Removed: load never wears the readiness label, readiness never wears load.
           if (readinessState === 'overreached') return 'OVERREACHED';
           if (readinessState === 'fatigued') return 'FATIGUED';
-          if (ls === 'high') return 'HIGH LOAD';
-          if (ls === 'elevated' && readinessState === 'fresh') return 'WATCH LOAD';
           if (readinessState === 'fresh') return 'LOW FATIGUE';
           if (readinessState === 'adapting') return 'ABSORBING';
           if (readinessState === 'normal' && isAcwrDetrainedSignal(metrics.acwr)) {

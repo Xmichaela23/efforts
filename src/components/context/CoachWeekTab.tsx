@@ -1009,11 +1009,14 @@ export default function CoachWeekTab() {
 // ─── Snapshot Load Bar ─────────────────────────────────────────────────────
 
 function SnapshotLoadBar({ status, interpretation, acwr }: { status: string; interpretation: string; acwr: number | null }) {
-  const positions: Record<string, number> = {
-    under: 15, on_target: 50, elevated: 72, high: 90,
-  };
-  const pct = positions[status] ?? 50;
-  const dotColor = status === 'high' ? 'bg-red-400' : status === 'elevated' ? 'bg-amber-400' : status === 'under' ? 'bg-sky-400' : 'bg-emerald-400';
+  // LOAD reads the VOLUME verdict (the ACWR band) — NOT the body-response `status`/`interpretation`
+  // (which conflated readiness into LOAD and could say "high" off thin/skipped weeks). One load
+  // verdict; body-response lives on the readiness axis. `status`/`interpretation` retained in the
+  // signature but no longer drive the bar.
+  const band = acwr == null ? null : acwr < 0.8 ? 'build more' : acwr <= 1.3 ? 'balanced' : acwr <= 1.5 ? 'back off' : 'rest now';
+  const positions: Record<string, number> = { 'build more': 15, 'balanced': 50, 'back off': 72, 'rest now': 90 };
+  const pct = band ? positions[band] : 50;
+  const dotColor = band === 'rest now' ? 'bg-red-400' : band === 'back off' ? 'bg-amber-400' : band === 'build more' ? 'bg-sky-400' : 'bg-emerald-400';
 
   return (
     <div>
@@ -1034,8 +1037,8 @@ function SnapshotLoadBar({ status, interpretation, acwr }: { status: string; int
         <span className="text-[9px] text-white/25">Optimal</span>
         <span className="text-[9px] text-white/25">Over</span>
       </div>
-      {interpretation && (
-        <div className="text-[10px] text-white/45 mt-1">{interpretation}</div>
+      {band && (
+        <div className="text-[10px] text-white/45 mt-1">Training volume {band}{acwr != null ? ` (ACWR ${acwr.toFixed(2)})` : ''}</div>
       )}
     </div>
   );
