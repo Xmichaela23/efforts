@@ -3668,6 +3668,63 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-153 — Load de-fragmentation: "HIGH LOAD" headline was a category leak, not LLM hallucination
+
+- **Date:** 2026-06-14
+- **Context:** STATE/coach showed "HIGH LOAD" (green) while readiness was `fresh`. Looked like an invented verdict; was **deterministic**, three conflations.
+- **Root (the real one):** `readiness_label` (coach:4992) returned `'HIGH LOAD'` when `load_status.status==='high'` **before** checking `readinessState` — putting the LOAD verdict on the READINESS chip. Plus `LoadBar` + `SnapshotLoadBar` (CoachWeekTab) read `loadStatus.status` (the body-response verdict) instead of the volume verdict.
+- **Fix — one verdict per axis:** LoadBar + SnapshotLoadBar read the **volume verdict** via `acwrVolumeLabel` (single source for the ACWR→band map; LoadBar imports it, so gauge label + headline can't drift). `readiness_label` reflects **readiness only** (`fresh`→`LOW FATIGUE`); load branches removed. Deterministic COMPLETED-THIS-WEEK fact (count all incl. off-plan; no undercount).
+- **#3 was NOT the bug:** the body-response min-session gate (`based_on_sessions≥2`, coach:676-682) already holds and readiness was correctly `fresh` — did **not** add a redundant gate to a working computation. The fix was the category separation.
+- **Class:** same fragmentation family as the spine — load finally gets **one-verdict discipline** (volume on the load axis, body-response on the readiness axis, single-sourced across 3 surfaces). This is the Tier-3 load fold-in's *label* half (D-146/147 ACWR-compute fold-into-`state_trends_v1` still remains).
+- **Cache-bust:** the load-fix code shipped in `fa4e1813` at **v39**; the **v40** bump (its comment describes this fix + the completed-count) landed in the immediately-following #4 commit `a8bf025b` — **v40 is the shared handoff into D-154** (cache-busts this change AND begins #4). Coach deployed, client pushed.
+
+---
+
+## D-154 — STATE #4: deterministic glance + expandable narrative, credit-first voice
+
+- **Date:** 2026-06-15
+- **Context:** STATE rendered the full `week_narrative` inline, opening with a deficit ("only two of seven"). #4 = glance-first presentation, after the verdicts were made true (D-153).
+- **Glance:** `buildLoadHeadline` (`src/lib/load-headline.ts`) — three slots: STATE (load verdict · readiness) · FITNESS shape (`fitness_direction`) — OBSERVATION. Observation is **state-implied, never a prescription** ("you have headroom" / "you're carrying fatigue" / muted off otherwise). `acwrVolumeLabel` single-sources the bands (shared with LoadBar). **Bounded composition now; the authored phrase bank (`SPEC-state-headline`) is the follow-on.**
+- **Structure:** full narrative collapsed behind "open for more" (`StateTab`), **collapsed by default** — glance-first, detail opt-in.
+- **Narrative tone (active path = `narrativePrompt` coach:~4425, which OVERRIDES `generateCoaching`/`COACHING_SYSTEM_PROMPT` — a real trap: the first prompt edited was not the one rendering):** credit-before-deficit + **hard lexical rule** — no raw "X of Y" tally anywhere; qualitative register required. Leads with state + work-done (off-plan credited, never "behind"). `max_tokens` 300→500 (was truncating mid-sentence).
+- `COACH_PAYLOAD_VERSION` **40→44** (iterated live: 41 credit-first, 42 active-path-found, 43 hard-lexical, 44 sentence-4-describe + token). Continuous chain 39→44, no gaps. Commits `a8bf025b`, `a2fda91e`, `821f5552`, `0db80156`.
+
+---
+
+## D-155 — The prescription boundary: describe the plan freely, never change it (durable rule)
+
+- **Date:** 2026-06-15
+- **The rule (durable, governs the whole LLM-coach voice):** **Naming planned-session priorities = plan-describing → ALLOWED** (opt-in, behind the expand; same category as session-detail narration — pointing at what the plan already encodes as key sessions). **Changing the prescription** (loads, RIR, adding/cutting sessions, plan JSON) **= GATED** (Step 5 autoregulation, explicit sign-off).
+- **Why the line is here:** describing the plan's existing key sessions is not *deciding for* the athlete; it's reading back what's prescribed. The gate is about *changing what's prescribed*, not *talking about it*.
+- **Enforced in `narrativePrompt`:** (a) **lexical "add" ban** — "add a session"/"add one more"/"add another" forbidden (reads as extra volume even when it means a planned session); use "prioritize"/"anchor on", always referring to planned sessions. (b) **Pin to FACTS-marked key sessions** — name only sessions the FACTS mark key; don't invent a priority ranking (describe-not-decide).
+- **Relation:** the read-side companion to the spine's "display-only, prescription gated" — same human-at-the-gate discipline, applied to the coach's voice. Commit `0db80156`.
+
+---
+
+## D-156 — Swim de-conflation: adherence ≠ trend verdict (same family as D-153, render-only)
+
+- **Date:** 2026-06-15
+- **Context:** STATE PERFORMANCE showed `swim   0/2 — falling behind` where bike/run show a trend verdict. **Spine model was already correct** (swim `headlineVerdict=null`, `primaryAxis='adherence'` — no trend); the bug was **render-only** — `StatePerformanceSection` dropped the adherence `ratioLabel` into the verdict slot. Adherence wearing a trend's clothing. Exactly the D-153 shape (model knew; render mislabeled).
+- **Fix (B — demote + relabel, judgment word killed at the source):**
+  - `adherence.ts`: `adherenceLabel` is now a **neutral count** ("0/2 planned"), never a judgment word. "on track"/"behind"/"falling behind" mimic trend verdicts ("falling behind"≈"sliding") and could leak into any slot — removed **at the source** (class fix, same discipline as the zero-not-null fixes D-112/D-115/Q-054).
+  - `StatePerformanceSection`: no-trend disciplines render the honest **"needs data"** in the verdict slot + adherence demoted to a muted neutral count → `swim   needs data · 0/2 planned`.
+- **(B) over (A) (drop adherence entirely):** (A) hides the true 0/2 fact; (B) shows the full truth in the right slots — **honest-blank over hiding**, same as the spine's blank-over-confounded discipline. Adherence stays the co-equal axis it was built for, de-conflated.
+- Client-assembled (`useStateTrends`→shared module), so the rebuilt bundle carries it; compute-snapshot/coach redeployed to keep `_shared` in lockstep. Verified via deno: renders "needs data · 0/2 planned"; 1/2→"1/2 planned", 2/2→"2/2 planned". Commit `81c88047`.
+
+---
+
+## D-157 — HealthKit swim integration: dedup-first gate + native plugin + on-device merge
+
+- **Date:** 2026-06-14
+- **Context:** swim-audit Layer 3 — extend swim data via Apple Health, sequenced **dedup-first** (add a second source only after same-swim collisions are handled, not after).
+- **Dedup gate (required first):** `mergeSameSwimIfExists` (`ingest-activity`) — 60s start-window + sport + ±10% distance + different source; **best-field-from-each merge** (HealthKit-rich `pool_length`/lengths/strokes merge onto existing Strava only where absent), **not** pick-one-source (Runna pattern, supersedes the pick-one-up-front design). Recomputes via compute-workout-summary + compute-facts. **Non-partial** unique index (a `WHERE`-partial index can't serve `ON CONFLICT` — 42P10, caught in sanity check); NOT NULL `name`/`duration` added to `mapHealthKitToWorkout` (23502, caught).
+- **Native:** `HealthKitPlugin.swift` `readWorkouts` enriches swims (pool length from `HKMetadataKeyLapLength`, async stroke count + avg HR via `HKStatisticsQuery`). `App.entitlements` healthkit key pre-added (user adds +Capability in Xcode → syncs the provisioning profile).
+- **Platform-split UX:** `AppleHealthSwimEnrichment` — native iOS → "Connect Apple Health" toggle (off by default); web → "richer data in the iOS app" note; download link = config (`app-links.ts`).
+- **On-device verified:** Apple Health shows Connected; same-swim Strava+HealthKit → **one merged workout**, no duplicate. The "not available on this device" red herring was a **stale web bundle** (cap sync not run after the build), NOT the entitlement (`isHealthDataAvailable` is true on iPhone regardless).
+- **Scope:** ingest/display + native read only — no prescription. Commits `be6894dd`, `f8e92bae`, `f814f40d`, `f9b43c4f`, `3b3891d2`, `4797f031` (design `5b4a927f`/`e814c72c`/`b9d4697c`).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

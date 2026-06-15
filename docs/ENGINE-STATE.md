@@ -63,16 +63,31 @@ First sweep off the whole-board Tier map. Correctness/honesty bugs that mislead 
 - **Verification:** `compute-facts` + `analyze-cycling-workout` deployed; 4 runs + 12 rides recomputed against real data; `deno test` 20/0 of the grounding/lede/jargon guards (3 pre-existing trend-test failures unrelated). Commit `9c0f73d8` (Q-054/T2) + the T1 commit.
 - **Tickets filed:** Q-057 (NULL-`workout_id` write-path hygiene), Q-058 (T1 soft-tail edge).
 
+### STATE one-verdict-per-axis sweep — load de-frag · #4 glance · swim de-conflation (D-153–D-156, 2026-06-14/15)
+
+Correctness sweep applying the spine's "one truth, in the right slot" discipline to the STATE surfaces. All display-only; no prescription touched.
+
+- **Load (D-153):** the volume verdict is single-sourced via `acwrVolumeLabel` across **3 surfaces** (LoadBar home/week, STATE LoadBar, CoachWeek `SnapshotLoadBar`); `readiness_label` reads readiness only. The "HIGH LOAD while fresh" leak (readiness chip reading `load_status`) is closed. **Verify:** headline matches the gauge band on all three; the readiness chip never shows a load word.
+- **#4 glance (D-154):** deterministic `buildLoadHeadline` (state · fitness · observation, observation never a prescription) + full narrative collapsed behind "open for more"; narrative leads credit-first, no raw "X of Y" (coach v44). `acwrVolumeLabel` is the shared band source.
+- **Prescription boundary (D-155):** the narrative may **name** planned key sessions (describe), never **add/change** them (gated). Lexical "add" ban + pin-to-FACTS-key-sessions in `narrativePrompt`. The durable describe-vs-change line for the coach voice.
+- **Swim (D-156):** adherence de-conflated from the trend slot — no-trend disciplines show `needs data · 0/2 planned`; judgment words removed at the `adherence.ts` source (so they can't re-leak into any slot). Same family as load: the spine model was right, the render mislabeled.
+- Client live-assembled (`useStateTrends`); coach/compute-snapshot deployed. Commits `fa4e1813`→`81c88047`.
+
+### Apple Health (HealthKit) swim integration — connected on-device, dedup-gated (D-157, 2026-06-14)
+
+A second swim source behind a dedup gate. Same-swim Strava+HealthKit → **one merged workout** (best-field-from-each; 60s start + sport + ±10% distance). Native `HealthKitPlugin.swift` enriches pool length / strokes / HR. Platform-split "Connect Apple Health" toggle (off by default; web shows an iOS-app pointer). Verified connected + merging on device. Scope: ingest/display + native read only — no prescription.
+
 ### Whole-board Tier map (do-now / do-next / gated — captured 2026-06-14 for the next session)
 
 The priority order weighed: **mislead-the-athlete > polish · Monday's live build-week data · unblock-leverage · gated-prescription-flagged-separately · effort:payoff.** Full punch-list section: §8 + the per-section items.
 
 - **Tier 1 — honesty bugs, Monday-visible — ✅ DONE (D-152):** Q-054, T2, T1.
 - **Tier 2 — cheap, read-only, high-unblock — NEXT:** §5 baseline→zones flow audit (surfaces the deadlift-under/bench-over class); Q-053 FTP-ingest *decision* (the implementation is gated).
-- **Tier 3 — complete the spine:** Load/BODY fold-in (D-146/147 ACWR + off-plan → spine); Q-052 load-threshold remainder.
+- **Tier 3 — complete the spine:** Load/BODY fold-in — **label half DONE (D-153: one volume verdict via `acwrVolumeLabel`, single-sourced across 3 surfaces, readiness ≠ load); the D-146/147 ACWR-compute fold-into-`state_trends_v1` (verdicts as spine outputs) REMAINS.** Q-052 load-threshold remainder.
 - **Tier 4 — spine follow-on surfaces (build once observed live):** STATE headline; per-session engine Reads 1–2; §6 adaptive-intent / §7 interference surfacing.
 - **🔒 Tier 5 — GATED (prescription, explicit sign-off, NOT auto-sequenced):** Step 4 (plan builder reads spine); Step 5 (autoregulation) + adherence↔perf adjust-action; Q-053 FTP-ingest implementation; `scaledWeeklyTSS` over-prescription; §6 cadence prescription.
 - **⬜ Tier 6 — deep / blocked:** iOS auth-lifecycle + Bug A/B (blocked on repro — Monday device use may produce it); Q-034 iOS logger overflow; Consolidated-mode; §5 apply §4.21 to other generators.
+- **→ The throughline behind Tier-3→Tier-5 — AUTOREGULATION FLAGGING:** tonight's load-fix (D-153) makes body-response a clean, properly-labeled signal on its own axis → that clean signal is the input for flagging when the plan doesn't fit the athlete. **Detect/flag is buildable; the adjust-action stays gated (Step 5).** Full arc (the foundation→feature throughline, the three detection patterns, the detect-vs-adjust boundary): `SPEC-adherence-performance-bridge.md`. Don't re-derive it here — that SPEC is the source.
 
 ### Strength logger draft persistence — identity-scoped, gated on Done (D-132, 2026-06-11)
 

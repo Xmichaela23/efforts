@@ -325,13 +325,14 @@ The cached single source of athlete truth. Several items below were re-deriving 
 - [x] **Bike-fitness engine** — terrain-binned power + HR-at-power efficiency, `resolveZoneBand` seam (D-150 Step 3).
 - [x] **Per-athlete threshold scaling** `resolveThresholds` (Q-052 windows/min-sessions); **narrative→spine** claim-grounding (D-150 Steps 0/2).
 - [x] **Swim learned-aggregate pipeline** (Q-051) + **baseline suggest-with-confirm** (D-150 Step 1).
+- [x] **STATE one-verdict-per-axis sweep** (D-153–D-156, 2026-06-14/15) — load de-frag (volume verdict single-sourced across 3 surfaces, readiness ≠ load), #4 glance + collapsed credit-first narrative, prescription boundary (describe-not-change), swim adherence de-conflated from the trend slot. ENGINE-STATE "STATE one-verdict-per-axis sweep" Solid entry.
 
 ### Open — specced, not built (sign-off-gated where prescription is touched)
 - [ ] **Adherence↔Performance bridge** (`SPEC-adherence-performance-bridge.md`) — surface+ask buildable now; the *adjust-action* is Step 5.
-- [ ] **STATE headline** (`SPEC-state-headline.md`) — deterministic phrase bank.
+- [~] **STATE headline** (`SPEC-state-headline.md`) — **bounded composition DONE (D-154):** deterministic `buildLoadHeadline` glance (state · fitness · observation, observation never a prescription). The authored phrase bank (warm multi-sentence variants) remains.
 - [ ] **Per-session performance engine** (`SPEC-per-session-performance-engine.md`) — Reads 1–2 buildable; Read-3 blocked on weather/route data (Q-055).
 - [ ] **Personal zones / `resolveZoneBand` feature** (`SPEC-personal-zones-outlier-detection.md`) — seam exists; the personal-zone source + outlier detection is the build.
-- [ ] **Load/BODY fold-in** — D-146/D-147 ACWR + off-plan verdict become spine outputs (last read-limb; not its own spec yet).
+- [~] **Load/BODY fold-in** — **label half DONE (D-153):** one volume verdict (`acwrVolumeLabel`) single-sourced across 3 surfaces, readiness ≠ load. The D-146/D-147 ACWR-compute fold-into-`state_trends_v1` (verdicts as spine outputs; the last read-limb) REMAINS. (Lockstep with ENGINE-STATE Tier-3.)
 - [ ] 🔒 **Step 4 — plan builder reads spine** (GATED — changes prescription).
 - [ ] 🔒 **Step 5 — plan adjustment / autoregulation** (GATED).
 
