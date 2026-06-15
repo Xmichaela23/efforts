@@ -91,7 +91,7 @@ const corsHeaders: Record<string, string> = {
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
 /** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
 /** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
-const COACH_PAYLOAD_VERSION = 41; // 41: narrative opens with state+credit, not a deficit/miss-count (#4 tone fix; off-plan credited, never "behind")
+const COACH_PAYLOAD_VERSION = 42; // 42: narrativePrompt (4425, the active path) credit-before-deficit — no raw per-discipline X-of-Y opener; lead with state+work-done (#4 tone fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -4431,6 +4431,8 @@ NARRATIVE CONTRACT (Training Status) — sentences 1–3 anchor phase and goal t
 - Sentence 4 — NEXT ACTION: One concrete, actionable suggestion (see CRITICAL below).
 
 SESSION INVENTORY: Forbidden in sentences 1–3. In sentence 4, at most one named session example if it sharpens the action; never a list of days.
+
+OPENING — CREDIT BEFORE DEFICIT (hard rule): Sentences 1–2 lead with where the athlete IS (phase, readiness, fitness direction) and the real training they HAVE done — including off-plan work, which IS real training and is credited as work done, never framed as "behind." Do NOT open with a shortfall, a completion deficit, or raw per-discipline "X of Y" counts ("only one of seven swims, four of eleven rides…"). If consistency is genuinely behind, that is an INTERPRETATION point for sentence 3 — framed as what the block needs next — never the first thing the athlete reads and never a per-discipline tally. The athlete already knows what they missed; the opening earns trust by naming the state and the work done, not by leading with the gap.
 
 PLAN VS ACTUAL: Session-level gaps (duration, distance, load execution) belong in sentence 3 or 4 only when they illuminate the phase/goal story or the next action — not as an opening recap. The athlete already sees the schedule; prioritize meaning over restatement.
 
