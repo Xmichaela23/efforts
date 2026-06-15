@@ -1188,6 +1188,7 @@ function mapHealthKitToWorkout(activity: any, userId: string) {
   const iso = Number.isFinite(startMs) ? new Date(startMs).toISOString() : new Date().toISOString();
   return {
     user_id: userId,
+    name: activity?.workoutName || 'Pool Swim', // workouts.name is NOT NULL (Strava mapper sets it too)
     source: 'healthkit',
     healthkit_id: String(activity?.id || ''),
     type: 'swim',
@@ -1195,6 +1196,7 @@ function mapHealthKitToWorkout(activity: any, userId: string) {
     date: iso.slice(0, 10),
     timestamp: iso,
     distance: distM > 0 ? distM / 1000 : null, // km
+    duration: durS > 0 ? Math.round(durS / 60) : 0, // MINUTES — NOT NULL (Strava mapper sets it too)
     moving_time: durS > 0 ? Math.round(durS / 60) : null, // MINUTES (convention) — see note above
     elapsed_time: durS > 0 ? Math.round(durS / 60) : null,
     pool_length: Number(activity?.pool_length) > 0 ? Number(activity.pool_length) : null,
