@@ -315,6 +315,35 @@ Context: the Athlete-State Spine read-surfaces shipped today (STATE / session-de
 
 ---
 
+## 8. Athlete-State Spine (root-cause layer — D-150/D-151, 2026-06-14)
+
+The cached single source of athlete truth. Several items below were re-deriving fitness independently; the spine replaces that with ONE deterministic cache every surface reads. Full detail: ENGINE-STATE "Athlete-State Spine" Solid entry; `SPEC-athlete-state-spine.md`.
+
+### Done (the Solid foundation)
+- [x] **Cached single-source** `athlete_snapshot.state_trends_v1` — one `assembleStateTrends`, read by STATE / session-detail / coach. cached==live proven 16/16 (D-151).
+- [x] **Coach `fitness_direction` ← spine roll-up** — replaced the response-model re-derivation (stable→mixed on real data); per-discipline naming + confidence framing (D-151).
+- [x] **Bike-fitness engine** — terrain-binned power + HR-at-power efficiency, `resolveZoneBand` seam (D-150 Step 3).
+- [x] **Per-athlete threshold scaling** `resolveThresholds` (Q-052 windows/min-sessions); **narrative→spine** claim-grounding (D-150 Steps 0/2).
+- [x] **Swim learned-aggregate pipeline** (Q-051) + **baseline suggest-with-confirm** (D-150 Step 1).
+
+### Open — specced, not built (sign-off-gated where prescription is touched)
+- [ ] **Adherence↔Performance bridge** (`SPEC-adherence-performance-bridge.md`) — surface+ask buildable now; the *adjust-action* is Step 5.
+- [ ] **STATE headline** (`SPEC-state-headline.md`) — deterministic phrase bank.
+- [ ] **Per-session performance engine** (`SPEC-per-session-performance-engine.md`) — Reads 1–2 buildable; Read-3 blocked on weather/route data (Q-055).
+- [ ] **Personal zones / `resolveZoneBand` feature** (`SPEC-personal-zones-outlier-detection.md`) — seam exists; the personal-zone source + outlier detection is the build.
+- [ ] **Load/BODY fold-in** — D-146/D-147 ACWR + off-plan verdict become spine outputs (last read-limb; not its own spec yet).
+- [ ] 🔒 **Step 4 — plan builder reads spine** (GATED — changes prescription).
+- [ ] 🔒 **Step 5 — plan adjustment / autoregulation** (GATED).
+
+### Subsumes / unblocks existing items
+- **§6 "adaptive intent tracking"** → **substrate now exists.** The cross-session drift signal it wants (systematic ride-above-zone) is the per-session engine's Read-2 (zone adherence) aggregated over `state_trends_v1`. Re-scope as a spine/per-session follow-on, not a standalone.
+- **§7 "strength→endurance interference"** → **partially unblocked.** `athlete_snapshot.interference` + `state_trends_v1` is the substrate; coach already reads the snapshot. Remaining = the flag/surface wiring, not the computation.
+- **§5 "verify X → zones" cluster** → **baseline-integrity half backed** by FTP single-sourcing + Q-051 swim pipeline + suggest-with-confirm. The prescription-flow-audit half (does the baseline actually reach the zone math) is still open.
+- **Closed by the spine:** np_trend all-type-pool lie (D-148/D-150); the *internal* FTP 176/204 contradiction (Efforts is internally consistent at 176 — the gap is external Garmin only, now Q-053); swim learned-aggregate pipeline (Q-051).
+- **NOT subsumed (adjacent):** §6 cadence prescription (prescription side — separate); §5 "apply §4.21 to other generators" (scheduling — unrelated).
+
+---
+
 ## Queued for next sessions (Theme A complete 2026-05-11)
 
 These are the architectural threads opened during the 2026-05-11 session, scoped and queued for follow-up. None are blocking today's ship.
