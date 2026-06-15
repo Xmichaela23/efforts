@@ -40,6 +40,50 @@ Output: **one verdict per discipline** (improving / holding / sliding / needs_da
 plus the athlete's current state (readiness, load, adherence, race context) — computed
 once, read everywhere.
 
+## What `pctChange` measures + sign conventions (all four surfaces display it)
+
+Every discipline runs the SAME primitive (`classifyTrend`, `_shared/state-trend/classify.ts`).
+The displayed `pctChange` is computed identically everywhere:
+
+```
+pctChange = (recentAvg − earlyAvg) / earlyAvg × 100   (raw, rounded to 0.1%)
+  recentAvg = mean of the 2 MOST-RECENT in-window sessions
+  earlyAvg  = mean of the 2 EARLIEST in-window sessions
+```
+
+- **Recent window** = the trailing `windowDays` (the training-BLOCK length below, not cadence):
+  points with `date ∈ (asOf − windowDays, asOf]`, value > 0, sorted ascending.
+- **Comparison baseline** = the **2 earliest sessions inside that same window** — NOT a chronic
+  28d / external / all-time baseline. So `pctChange` is a **within-window, endpoint-smoothed
+  first-pair-vs-last-pair delta** (2 sessions averaged at each end so no single PR or bad day
+  anchors an endpoint — the noise guard).
+- `pctChange` is always the **RAW** movement of the underlying metric (it shows the real
+  direction the number moved). The **verdict** applies `lowerIsBetter` — it does NOT change the
+  displayed sign.
+
+Per-discipline substrate, window, and thresholds:
+
+| Discipline | Metric (substrate) | Window | improve/slide % | lower=better | `+%` means | Verdict at `+%` |
+|---|---|---|---|---|---|---|
+| strength | e1RM, primary lifts (rolled up) | 42d (6wk) | +2.5 / −2.0 | no | stronger | improving |
+| bike power | terrain-binned 20-min power (freshest bin) | 56d (8wk) | +2.0 / −2.0 | no | more watts | improving |
+| bike efficiency | mean HR at the reference power band | 56d (8wk) | +3.0 / −3.0 | **yes** | higher HR (worse) | sliding (−% = improving) |
+| run | GAP pace at easy effort, sec/km | 42d (6wk) | +2.0 / −2.0 | **yes** | slower pace | sliding (−% = improving) |
+| swim | pace per 100, sec | 56d (8wk) | +1.5 / −1.5 | **yes** | slower pace | sliding (−% = improving) |
+
+**Sign conventions (confirmed correct, 2026-06-14):**
+- bike power **+% → improving** (higher=better, no flip)
+- run pace **+% → sliding** (raw pace rose = slower; `lowerIsBetter` flips the *verdict*, not the sign — `classify.ts:77`)
+- bike efficiency **−% → improving** (raw HR fell at the same power)
+- swim pace same as run; strength e1RM same as bike power.
+
+On screen this reads `bike +4.9% improving`, `run +8.1% sliding`, `efficiency −8.4% improving`:
+the sign is the metric's real movement, the verdict word says whether that movement is good.
+
+`windowDays` and the `%` thresholds are **universal** (a % is scale-free). `freshnessDays` and
+`minSessions` are **cadence-scaled per athlete** (Q-052, `thresholds.ts`). A verdict can still be
+forced to `needs_data` by the min-session gate or the staleness gate regardless of `pctChange`.
+
 ## What reads from the spine
 
 - **STATE** — per-discipline performance + adherence (already does, via the primitive).
