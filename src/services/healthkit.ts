@@ -82,14 +82,22 @@ const HealthKit = registerPlugin<HealthKitPlugin>('HealthKit');
  * Check if HealthKit is available (iOS only)
  */
 export async function isHealthKitAvailable(): Promise<boolean> {
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') {
+  // Instrumented (Q-059) — pinpoints WHY "not available" fires on real hardware: the platform
+  // guard vs the native call. Logs land in the Xcode console / Safari Web Inspector.
+  const native = Capacitor.isNativePlatform();
+  const platform = Capacitor.getPlatform();
+  if (!native || platform !== 'ios') {
+    console.log(`[HealthKit] isAvailable=false via PLATFORM GUARD — isNativePlatform=${native} getPlatform=${platform}`);
     return false;
   }
-  
   try {
     const result = await HealthKit.isAvailable();
-    return result.available;
+    console.log(`[HealthKit] native isAvailable resolved → available=${result?.available}`);
+    return !!result?.available;
   } catch (error: any) {
+    // On iPhone HKHealthStore.isHealthDataAvailable() is always true — so a THROW here means the
+    // native plugin call didn't route (registration / stale bridge), NOT that the device lacks Health.
+    console.log(`[HealthKit] native isAvailable THREW (plugin not routing?) → ${error?.message || error}`);
     return false;
   }
 }
