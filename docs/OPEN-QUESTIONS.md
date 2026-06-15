@@ -809,6 +809,23 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-055 — Read-3 per-session comparison must control for weather/grade/route (confound) — unbuilt, data-availability unconfirmed
+
+- **Status:** filed 2026-06-14 · unbuilt / unverified
+- **What it is:** the per-session engine's Read 3 (comparable-session +/-) is not built. When it is, the comparison MUST control for weather + grade + route — the session-detail HR-drift read ("+11 vs typical +6") is unconditioned (the +11 was a 78°F run; heat drives drift independent of fitness), and an unconditioned drift comparison asserts a fitness signal the data can't support (same class as the np_trend lie). Read 3 must use same-route history as the comparison set for common routes and fall back to "not enough similar sessions" over a confounded comparison.
+- **Motivating live instance:** the spine's run "sliding +8.1%" rests on sparse, possibly-confounded easy-run GAP data (>50% sessions missed) — currently surfaced honestly as a *provisional / signal-to-confirm*, but Read-3 is what would resolve whether it's a real decline or a confound artifact.
+- **Blocking unknown:** is per-session weather (temp/humidity) + route identity even stored? If not, Read-3's weather control degrades to honest-blank (never an unconditioned verdict). Sign-off items (match-tightness bands + min-N) are in `SPEC-per-session-performance-engine.md`.
+- **Cross-ref:** Q-054, `SPEC-per-session-performance-engine.md`, D-150 (Step 3 bike-fitness foundation), D-151 (provisional flag).
+
+## Q-056 — Coach per-discipline naming is a prompt REQUIREMENT, not a structural guarantee
+
+- **Status:** filed 2026-06-14 · cosmetic / verify-over-time
+- **What it is:** the coach narrative names each discipline's spine state via a required-naming FACT instruction (D-151), added after soft guidance got editorialized away under the dominant >50%-missed-adherence signal (narrative named bike-up, dropped run). This is an LLM constraint, not deterministic.
+- **Verify over time:** does it hold as data/adherence shifts — when all four have real verdicts, or when one discipline dominates? If the LLM drops a discipline again, escalate the FACT from a prompt instruction to a **deterministic prefix line** in the narrative (computed, not asked).
+- **Cross-ref:** D-151, `coach/index.ts` spine FACT block, `COACH_PAYLOAD_VERSION`.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

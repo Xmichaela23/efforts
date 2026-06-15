@@ -92,6 +92,11 @@ For each numbered item:
 - [ ] **Rest/haptic on-device test** — user doing Monday (deliberate).
 - [ ] Any change to prescribed load / RIR, or that reverses a decision — held for user sign-off.
 
+### Open (parked 2026-06-14 — spine on-ramp specs filed, not built; sign-off-gated)
+Context: the Athlete-State Spine read-surfaces shipped today (STATE / session-detail / coach all read `state_trends_v1` — D-150/D-151, ENGINE-STATE Solid). These two specs are the next surfaces, filed but NOT built.
+- [ ] **Adherence↔Performance bridge** (`SPEC-adherence-performance-bridge.md`) — STATE surfaces the sliding-performance + sustained-low-adherence link, asks *why* (intentional/injury/busy), then offers to adjust — conditioned on the answer (**injury → adjust DOWN, never catch-up**). Pattern-gated (inherits the spine's restraint; quiet on lemon sessions/deloads), reads the spine cache. On-ramp to Step 5 (gated autoregulation). Sign-offs: adherence-low threshold, deload/taper detection, injury guardrail, surface UX.
+- [ ] **STATE headline** (`SPEC-state-headline.md`) — deterministic hand-authored phrase bank (NOT LLM), progressive-disclosure 2-3 sentence synthesis of the spine verdicts + expand-to-detail. Warm-not-clinical via authored phrasings + shape-synthesis + honesty-as-understanding. Door left open for a constrained validator-gated paraphrase hybrid later. Sign-offs: the phrase bank (the voice — the real work), pattern taxonomy, variant count, expand content.
+
 ---
 
 ## 2. Swim program 100%

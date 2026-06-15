@@ -3621,6 +3621,33 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-150 — Athlete-State Spine: shipped implementation Steps 0–3 (relocation, scaling, narrative→spine, bike-fitness engine)
+
+- **Date:** 2026-06-14
+- **Context:** D-149 set the spine as architecture of record; this is the build-out from architecture to shipped vertical slices, each behind a sign-off gate.
+- **Step 0 — relocation + per-athlete scaling:** moved the trend core `src/lib/state-trend/` → `supabase/functions/_shared/state-trend/` (one impl, `.ts`-extension imports for Deno + `@shared/*` client alias) so client screens and edge fns run ONE model, no drift. Added `resolveThresholds(discipline, sessionsPerWeek)` (Q-052): `windowDays` + `%` thresholds stay universal; `freshnessDays` + `minSessions` **scale to the athlete's own 90d cadence**. `REF_SPW` anchored to **measured** cohort cadence (bike 1.6 / run 2.6 / swim 0.7; strength 1.2 typical per-lift) — eyeballing REF_SPW caused a swim regression (13d read fresh → false "improving") caught in verify; measured values preserve all 4 verdicts.
+- **Step 1 — reconcile the senses:** Q-051 swim pipeline fix (`learn-fitness-profile` reads `workout_facts.swim_facts.pace_per_100m`, not a raw km/min recompute that filtered every swim to null — verified publishes 199 s/100m n=9). Baseline **suggest-with-confirm** (`reconcile.ts` + My Record surface): computed-vs-typed divergence surfaces a suggestion, never auto-applies — gated ≥3 samples / ≥medium confidence / ≤42d / ≥5% divergence; sourced from learned aggregate, not raw e1RM. Verified only swim surfaced ("3:02/100yd +21.3%").
+- **Step 2 — narrative→spine:** cycling per-ride LLM **describes** the deterministic verdict, never infers direction from raw numbers. `validateClaimsGrounded` (direction words must trace to `cross_workout.trend`) wired into the retry loop; `np_trend` all-type-pool fallback killed (Part A).
+- **Step 3 — sport-agnostic per-session engine (bike instance):** `bike-fitness.ts` = terrain-binned 20-min power (freshest non-needs_data bin; climbing vs flat_sustained never mixed) + HR-at-power efficiency (lower=better, ±3%). **`resolveZoneBand(athlete, sport)` seam** — HR reference band from a function (Coggan Z2 default inside; personal zones drop in with zero downstream change), NOT an inline watt range (user-agnostic mandate). Per-ride `bike_fitness_v1` (w20 + hr_at_band + band_source) stored by `analyze-cycling-workout`; STATE bike row reads "Power · Efficiency" dual. Verified live: bike Power ↑+4.9% [prov] · Efficiency ↑−8.4% est(FTP).
+- **Scope:** display/synthesis only — does NOT feed prescription (Step 4 plan-builder writeback GATED, separate sign-off).
+- **Commits:** `ba60a8b1` (Step 0), `9a4c8ccd`+`77030dba`+`2f8d74ee` (Step 1), `2be4288e`+`3edd49c4` (Step 2), `53fba143`+`091187d1` (Step 3). deno check + tsc clean; live read-only verification each step.
+
+---
+
+## D-151 — Spine CACHE + single-source assembler + coach/session-detail readers (Steps 4a/4b)
+
+- **Date:** 2026-06-14
+- **Context:** Steps 0–3 each computed fitness where it was displayed. 4a/4b make it ONE cached value every surface reads — closing the fragmentation structurally (the bug class that let the np_trend lie + FTP contradiction survive).
+- **4a — single source, proven structural:** extracted the STATE assembly into ONE pure `assembleStateTrends(rawRows)` (`_shared/state-trend/assemble.ts`) that **both** the client hook (`useStateTrends`) and the server (`compute-snapshot`) call. Identical model + identical fetch windows (`STATE_TREND_WINDOWS`) → identical output; equality is **structural, not coincidental** (one code path). Cached the result to **`athlete_snapshot.state_trends_v1`** (new JSONB column) — chosen over `coach_cache` because compute-snapshot already runs per-ingest with the windowed data and is already read by coach + arc + session-detail. **Verified cached==live 16/16** on real data before any reader was wired (the single-source proof gate).
+- **4b — readers, REPLACE not add:** coach `fitness_direction` is now `rollupFitnessDirection(state_trends_v1)` — the **old 7d-vs-28d response-model derivation was removed, not kept alongside.** *Decision: two coexisting fitness verdicts is exactly how contradictions survived; one truth.* On real data the difference was stark — old method returned **"stable"** (a false-neutral burying a real run decline); roll-up returns **"mixed"** (bike improving + run sliding) and refuses to assert strength/swim. session-detail gained `discipline_trend` (read from the same cache in `workout-detail`, passed through `build.ts`, rendered in `MobileSummary` on all four disciplines; needs_data → honest "building").
+- **Confidence framing (faithful AND honest — both):** added a per-discipline `provisional` flag to the cache (same near-floor-n / clustered-span gate the bike signals use). The coach narrative FACT **requires** naming each discipline's spine state, BUT frames any `[provisional]` trend — and any discipline whose recent sessions were largely missed — as a *signal to confirm*, citing missed sessions as co-explanation, never a confident decline; no-data disciplines are too-early. *Why required-naming: soft guidance got editorialized away under the dominant >50%-missed-adherence signal (narrative named bike-up, dropped run).* Result: "bike provisionally up 4.9%, run sliding 8.1%, swim & strength not enough sessions yet."
+- **Retired the echo:** the response-model assessment's global "On the right track" / "training is producing results" `explain` strings (`weekly.ts`) scoped to RESPONSE MARKERS — that leftover was a mini-echo of the retired fitness derivation sitting next to "mixed."
+- **`COACH_PAYLOAD_VERSION` 36→39** (D-147 cache-bust lesson). **pctChange semantics + sign conventions + n=3 endpoint-overlap** documented in `SPEC-athlete-state-spine.md` (all four surfaces now display it).
+- **Shipped:** migration `20260614000000_add_state_trends_v1` applied; `compute-snapshot` + `coach` + `workout-detail` deployed; client pushed.
+- **Commits:** `4bc089b3` (bike session-detail), `efbeee3b`+`ab6f68a8` (4a), `96c53b20`+`f6b9d679`+`4fe62ddb`+`a7327178` (4b), `185f338c`+`c33ef732` (pctChange spec).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

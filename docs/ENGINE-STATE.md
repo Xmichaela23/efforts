@@ -32,6 +32,22 @@ The STATE screen's PERFORMANCE section. **Pure model in `src/lib/state-trend/`**
 - **Known-thin (filed, not bugs in this layer):** RPM `workout_intent` null at source (`compute-facts:930`); strength canonical-name split + per-lift min-4; swim Q-038; vo2 carries no pwr20 by design (no sustained 20-min power).
 - **Verification:** `tsc -p tsconfig.app.json` + `npm run build` clean; read-only `scripts/state-trend-{audit,diagnose,trace}.mjs` (untracked) run the shipped model against production data. Commits `2907cfdf`→`be2edd7d`.
 
+### Athlete-State Spine — cached single source read by STATE, session-detail, coach (D-150/D-151, 2026-06-14)
+
+The fitness verdict is computed **once** and read everywhere — closes the screen-by-screen re-derivation that let contradictions survive.
+
+- **One assembler:** `assembleStateTrends` (`_shared/state-trend/assemble.ts`) — pure, called identically by the client hook `useStateTrends` AND by `compute-snapshot`. Same model + same fetch windows (`STATE_TREND_WINDOWS`) → **cached == live is structural, not coincidental** (one code path). Verified 16/16 fields on real data.
+- **Cache home:** `athlete_snapshot.state_trends_v1` (JSONB), written per-ingest for the current week only (verdict is as-of-now; historical rows null, unread). Carries per-discipline `{verdict, pctChange, provisional}` + the bike power/efficiency dual.
+- **Readers wired:** STATE rows; session-detail `discipline_trend` (via `workout-detail` → `build.ts` → `MobileSummary`, all four disciplines); coach `fitness_direction` = `rollupFitnessDirection(state_trends_v1)` — **replaced** the old response-model derivation (not alongside). Coach narrative names each discipline with confidence framing (provisional + adherence co-explanation).
+- **Bike-fitness engine** (`bike-fitness.ts`): terrain-binned 20-min power + HR-at-power efficiency, HR band from `resolveZoneBand` seam (Coggan default, personal zones drop-in). Per-ride datapoint also on the cycling session-detail.
+- **pctChange:** within-window endpoint-smoothed first-pair-vs-last-pair delta (NOT a chronic baseline); raw sign = metric movement, verdict applies `lowerIsBetter`. Conservative at n=3 (endpoint overlap). Spec: `SPEC-athlete-state-spine.md`.
+- **⚠ Surfaces NOT yet reading the spine — "spine done" ≠ "every surface reads it":**
+  - **Partial:** Training Baselines + Athletic Record — surface spine-*derived* suggestions (suggest-with-confirm, D-150 Step 1), but do **not** fully read the spine.
+  - **Not wired:** Goals (untouched); plan builder (**Step 4, GATED** — changes prescription, separate sign-off).
+  - **Loop framing:** the **execution → spine → display** arc is wired (STATE / session-detail / coach); the **spine → baselines/record/plan** feedback arc is **OPEN**. "Spine done" = the core engine + read surfaces, NOT the full loop.
+- **Scope:** display/synthesis only — **does NOT feed prescription.**
+- **Verification:** deno check + tsc clean; `compute-snapshot` / `coach` (v39) / `workout-detail` deployed; cached==live (16/16) + coach before/after (`stable`→`mixed`) verified live. Commits `efbeee3b`→`c33ef732`.
+
 ### Strength logger draft persistence — identity-scoped, gated on Done (D-132, 2026-06-11)
 
 The logger's in-progress draft lives in `localStorage`, restored on cold mount (survives hard quit). After D-132 it is safe against cross-workout bleed:
