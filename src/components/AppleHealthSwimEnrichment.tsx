@@ -12,7 +12,16 @@ import { IOS_APP_DOWNLOAD_URL, IOS_APP_IS_PUBLIC } from '@/config/app-links';
 const SYNC_FLAG = 'healthkit_swim_sync_enabled';
 const isNativeIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 
-export default function AppleHealthSwimEnrichment() {
+export default function AppleHealthSwimEnrichment(
+  { source, hasRichData }: { source?: string | null; hasRichData?: boolean } = {},
+) {
+  // D-160: don't nudge "pull richer swim data" for a swim that ALREADY came through HealthKit — either
+  // ingested directly (source = 'healthkit') or merged from a FORM→Strava + HealthKit pair, in which
+  // case the kept row stays source = 'strava' but carries the HealthKit-supplied pool_length (the merge
+  // only fills rich fields — ingest-activity mergeSameSwimIfExists). hasRichData covers that case. Gate
+  // both branches (native toggle AND the get-the-app note) — there's nothing richer to offer.
+  if (source === 'healthkit' || hasRichData) return null;
+
   // ── PWA / browser / Android: get-the-app note (where the richer data would be) ──
   if (!isNativeIOS()) {
     return (

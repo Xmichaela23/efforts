@@ -847,6 +847,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-059 — Swim display unit (/100yd vs /100m): derive from real pool length once HealthKit lands
+
+- **Status:** filed 2026-06-15 (during D-159/D-160 swim render work) · intentional-for-now
+- **What it is:** swim pace + distance currently display in **yd** when `planned_totals.swim_unit === 'yd'` (default) OR `useImperial` is set, else **m** (`PoolSwimOverall`, `CompletedTab` swim grid). For the dev athlete (yd pool) this reads correctly (`2:00/100yd`), but the unit is inferred from the plan/locale, **not from the actual pool**. Strava swims store `pool_length = NULL`, so there's no truth to derive from yet.
+- **Why left for now:** the correct source is the **real pool length**, which only arrives with **HealthKit Tier A** (D-157 native plugin reads `HKMetadataKeyLapLength`; the merge fills `pool_length`). Once that's reliably populated, auto-detect the unit from the pool (25.0m → m; ~22.86m / the 20–26m band → 25yd → yd) and stop relying on `swim_unit`/`useImperial`. Building a unit toggle before the pool-length signal exists would be guessing.
+- **Revisit when:** HealthKit pool_length is populated on real swims (D-157 verified connected; confirm the value lands), then make swim unit pool-derived with the locale default as fallback.
+- **Cross-ref:** D-159, D-160, D-157 (HealthKit `pool_length`), the audit's `pool_length = NULL` finding, `resolve-pool-length.ts`.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

@@ -129,6 +129,12 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
     return raw || 'run';
   }, [workoutType, workoutData?.type, (norm as any)?.sport]);
 
+  // Type-based swim flag (D-159). Strava swims store swim_data = NULL, so keying swim detection
+  // off `workoutData.swim_data` (the prior signal) left them falling through to the land render
+  // paths — the mph speed chart, mile splits, map, and Grade/VAM/Cadence metric row all fired.
+  // resolvedWorkoutType is reliable (workoutType prop → type → norm.sport) regardless of swim_data.
+  const isSwimType = resolvedWorkoutType === 'swim';
+
   const accentRgb = getDisciplineColorRgb(resolvedWorkoutType);
   const accentCore = getDisciplinePhosphorCore(resolvedWorkoutType);
   const plateGlow = getDisciplineGlowStyle(resolvedWorkoutType, 'week')?.boxShadow as string | undefined;
@@ -1346,7 +1352,7 @@ const formatMovingTime = () => {
           </div>
          </div>
 
-     {workoutData.swim_data ? (
+     {(isSwimType || workoutData.swim_data) ? (
        <div className="grid grid-cols-3 gap-0.5">
          {/* Distance */}
          <div className="px-0.5 pb-1">
@@ -1962,7 +1968,7 @@ const formatMovingTime = () => {
      <div className="w-full">
        {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
        {(() => {
-         const isSwim = workoutData.swim_data;
+         const isSwim = isSwimType || !!workoutData.swim_data;
          const hasLengths = Number((workoutData as any)?.number_of_active_lengths) > 0
            || (Array.isArray((workoutData as any)?.swim_data?.lengths) && (workoutData as any).swim_data.lengths.length > 0);
          const providerStr = String((workoutData as any)?.provider_sport || (workoutData as any)?.activity_type || (workoutData as any)?.name || '').toLowerCase();
@@ -2152,7 +2158,7 @@ const formatMovingTime = () => {
         );
       })()}
 
-      {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
+      {!isSwimType && (hydrated||workoutData)?.computed?.analysis?.events?.splits && (
         <div className="mt-6 mx-[-16px] px-3 py-3">
           {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
             <div className="mb-2">

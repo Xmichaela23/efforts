@@ -24,11 +24,20 @@ function DisciplineTrendLine({ sd }: { sd: any }) {
   };
   const v = VERD[dt.verdict] || VERD.needs_data;
   const pct = dt.pct_change;
+  // D-160 sign fix: pct_change is the RAW metric delta (classify.ts keeps it raw so the UI knows the
+  // real direction of movement). For lower-is-better disciplines (swim/run pace) a faster session is
+  // a NEGATIVE delta, so the engine flips only the VERDICT — leaving "↑ improving  −34.6%" on screen,
+  // which reads as a contradiction. The verdict already encodes good/bad; show the magnitude signed by
+  // the verdict (improving → +, sliding → −) so the number and the arrow always agree.
+  const pctDisplay = pct == null ? null
+    : dt.verdict === 'improving' ? `+${Math.abs(pct)}%`
+    : dt.verdict === 'sliding' ? `−${Math.abs(pct)}%`
+    : `${pct > 0 ? '+' : ''}${pct}%`;
   return (
     <div className="flex items-baseline gap-1.5 py-1 text-[12px]">
       <span className="text-white/45">{dt.discipline} trend</span>
       <span className={`inline-flex items-baseline gap-0.5 ${v.c}`}>{v.a && <span>{v.a}</span>}<span>{v.w}</span></span>
-      {dt.verdict !== 'needs_data' && pct != null && <span className="text-white/35">{pct > 0 ? '+' : ''}{pct}%</span>}
+      {dt.verdict !== 'needs_data' && pctDisplay && <span className="text-white/35">{pctDisplay}</span>}
     </div>
   );
 }
@@ -221,10 +230,6 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
 
       <DisciplineTrendLine sd={sd} />
 
-      {/* Layer 3: swim enrichment surface — native iOS shows the Connect-Apple-Health toggle;
-          PWA/browser/Android shows the "richer swim data in the iOS app" note. Swims only. */}
-      {type === 'swim' && <AppleHealthSwimEnrichment />}
-
       {/* Bike session-detail ← spine. The per-ride HR-at-power datapoint (bike_fitness_v1.hr_at_band)
           is the EXACT value the STATE efficiency trend is built from — surfacing it here connects the
           single ride to the same spine signal the dashboard reads (no re-derivation, one source). Only
@@ -268,6 +273,35 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           noPlannedCompare={noPlannedCompare}
         />
       )}
+      {/* Swim rich-detail (D-160) — pool length / lengths / strokes when the source carried them
+          (HealthKit/FORM, or a merged swim). Strava swims store these NULL → the block no-ops and the
+          relocated Apple-Health nudge fills the space instead. Reads the workout row directly (these
+          fields aren't in session_detail_v1's completed_totals); fills the dead area the suppressed
+          pool-swim narrative left below the planned/executed card. */}
+      {type === 'swim' && (() => {
+        const c: any = completed || {};
+        const poolLm = Number(c.pool_length) || 0;
+        const lengths = Number(c.number_of_active_lengths) || 0;
+        const strokes = Number(c.strokes) || 0;
+        const items: Array<[string, string]> = [];
+        if (poolLm > 0) {
+          const isYd = poolLm >= 20 && poolLm <= 26; // 25yd ≈ 22.86m stored as metres
+          items.push(['Pool', isYd ? `${Math.round(poolLm / 0.9144)} yd` : `${Math.round(poolLm)} m`]);
+        }
+        if (lengths > 0) items.push(['Lengths', String(lengths)]);
+        if (strokes > 0) items.push(['Strokes', String(strokes)]);
+        if (!items.length) return null;
+        return (
+          <div className="mt-4 flex items-center justify-center gap-8 text-center">
+            {items.map(([l, val]) => (
+              <div key={l} className="flex flex-col items-center">
+                <div className="text-sm font-semibold text-gray-100">{val}</div>
+                <div className="text-[11px] text-gray-700">{l}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
       {!sd?.classification?.is_pool_swim && (
         <SessionNarrative
           sessionDetail={sd}
@@ -277,6 +311,17 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           recomputing={recomputing}
           recomputeError={recomputeError}
           onRecompute={recomputeAnalysis}
+        />
+      )}
+
+      {/* Layer 3 swim enrichment — RELOCATED to the bottom (D-160): it was a near-top hero element
+          above the swim metrics; demoted to a quiet opt-in row at the end of the swim view (also
+          fills the dead space left by the suppressed pool-swim narrative). Hidden when the swim
+          already came through HealthKit / already carries rich data (gated inside the component). */}
+      {type === 'swim' && (
+        <AppleHealthSwimEnrichment
+          source={(completed as any)?.source ?? null}
+          hasRichData={Number((completed as any)?.pool_length) > 0}
         />
       )}
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (

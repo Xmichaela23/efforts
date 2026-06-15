@@ -3725,6 +3725,29 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-159 — Details-tab swim render: detect swims by TYPE, not by `swim_data` presence
+
+- **Date:** 2026-06-15
+- **Context:** swim-audit Layer 2 shipped the **Performance-tab** swim-native view (a44f9b2d: `build.ts` guards + `PoolSwimOverall`). The **Details tab** (`CompletedTab`) was never swim-guarded for the Strava case. On device, June 1 + June 15 pool swims still rendered the **mph speed chart, mile splits, route map, and the Grade/VAM/Cadence metric-tab row**.
+- **Root cause (confirmed on device, not just code):** `CompletedTab` keyed every swim decision off **`workoutData.swim_data`**, which is **NULL for Strava swims** (Strava strips per-length/stroke data — see the audit's live-record finding). So the swim readout grid (`:1349`), the pool-swim viewer short-circuit (`:1965` `isSwim = workoutData.swim_data`), and the splits block all fell through to the land paths. Same class as Q-054/D-112/D-115 (an absent value silently selecting the wrong branch).
+- **Fix (type-based, one signal):** derived `isSwimType = resolvedWorkoutType === 'swim'` (`resolvedWorkoutType` = `workoutType` prop → `type` → `norm.sport`, reliable regardless of `swim_data`) and applied it at the three decision points: readout grid gate (`isSwimType || swim_data`), viewer `isSwim` (`isSwimType || !!swim_data` → the existing pool-vs-open `isPoolSwim` logic still distinguishes), and the standalone splits block (`!isSwimType`). The swim readout grid reads `norm.avg_swim_pace_per_100m` from `computed.analysis.swim` (stored for Strava swims) + scalar distance/duration/HR; pool/lengths/strokes show N/A (honest — not captured).
+- **Not touched:** HR Zones (`:2110`, data-gated, swim-safe), the open-water GPS map (legit route), the dead `getAdvancedMetrics` (`isRun = swim_data` copy-paste bug, never rendered).
+- **Verification:** `tsc` clean on the file (pre-existing 814–841 errors unrelated) + `npm run build` clean. Verify on-device against the June 15 swim: Details tab shows swim readouts, no mph chart / mile splits / map.
+
+---
+
+## D-160 — Performance-tab swim polish: total readout, trend-sign agreement, nudge gating, rich-detail fill
+
+- **Date:** 2026-06-15
+- **Context:** four on-device swim Performance-tab papercuts reported alongside D-159, all display-only.
+- **(a) Prominent total (`EnduranceIntervalTable/PoolSwimOverall`):** executed distance was legible only as a % adherence chip / inside the planned-vs-executed card — no standalone "how far did I swim." Added a distance + duration **headline** (`text-2xl`) above the adherence chips.
+- **(b) Trend-sign agreement (`MobileSummary/DisciplineTrendLine` + `StatePerformanceSection` ×2):** `swim trend ↑ improving −34.6%` read as a contradiction. **The engine is correct** — `classify.ts` keeps `pctChange` RAW (so the UI knows real direction) and flips only the *verdict* for `lowerIsBetter`; a faster swim is a negative pace delta. Fix is **display-only**: a shared `verdictSignedPct(verdict, pct)` signs the magnitude by the verdict (improving → `+`, sliding → `−`, holding → raw) so the number always agrees with the arrow. Applied at all three render sites (session tab + STATE bike-dual + STATE discipline row). **Did NOT touch the classifier** (D-148/D-150 contract; the raw-sign comment at `classify.ts:76` is intentional).
+- **(c) Nudge gating + relocation (`AppleHealthSwimEnrichment`, `MobileSummary`):** the "Richer swim data / Connect Apple Health" card was a near-top hero AND showed even for swims already ingested via HealthKit. Now **gated** — hidden when `source === 'healthkit'` OR `pool_length > 0` (the merge keeps `source='strava'` but fills rich fields, so the source check alone misses merged swims) — and **relocated** to the bottom of the swim view as a quiet opt-in row.
+- **(d) Empty-area fill (`MobileSummary`):** the dead space below the planned/executed card = the pool-swim-suppressed `SessionNarrative` (`!is_pool_swim`, from the March a7e14381 refactor) leaving nothing after `PoolSwimOverall`. Now filled two ways: the relocated nudge (Strava swims) **or** a new **swim rich-detail block** (Pool / Lengths / Strokes, read from the `completed` workout row — these aren't in `completed_totals`) for HealthKit/merged swims that carry them. The pool-swim narrative suppression was left intact (re-enabling is a separate call — swim narrative quality is Q-038-clouded, unverified).
+- **Scope:** display/synthesis only — no prescription, no analyzer, no contract change (rich-detail reads the existing workout row). **Verification:** `npm run build` clean; verify on-device against June 15 swim (headline total, `↑ improving +34.6%`, nudge absent for the HealthKit swim, rich-detail or nudge filling the lower area).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

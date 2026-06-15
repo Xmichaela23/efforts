@@ -512,6 +512,21 @@ function PoolSwimOverall({ sd, useImperial }: { sd: NonNullable<EnduranceInterva
 
   return (
     <div>
+      {/* Total-distance headline (D-160): the executed total was previously only legible as a %
+          adherence chip / in the planned-vs-executed card — never a standalone "how far did I swim"
+          readout. Lead with absolute distance + duration; the adherence % chips follow as context. */}
+      {(executedDistM > 0 || executedDurS > 0) && (
+        <div className="flex items-center justify-center gap-10 text-center mb-3">
+          <div className="flex flex-col items-center">
+            <div className="text-2xl font-semibold text-gray-100">{executedDistM > 0 ? fmtDistLocal(executedDistM) : '—'}</div>
+            <div className="text-[11px] text-gray-700">Distance</div>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className="text-2xl font-semibold text-gray-100">{executedDurS > 0 ? fmtTimeLocal(executedDurS) : '—'}</div>
+            <div className="text-[11px] text-gray-700">Duration</div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-center gap-6 text-center">
         <div className="flex items-end gap-3">
           {chip('Distance', distPct, distDelta != null ? fmtDistDelta(distDelta) : '—')}

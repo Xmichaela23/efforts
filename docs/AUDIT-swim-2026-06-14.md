@@ -38,11 +38,13 @@ So "we have more than we show" is **half true**: HR + distance + a swim-analysis
 - **Verified** on 3 real swims: `duration_s_moving` 42060→1080/1800/1440; `pace_per_100m` 188→135/131/129.
 - Residual (cosmetic): `moving_time` stored as integer minutes → duration reads ~18:00 not 18:12 (precision lost at ingest).
 
-## Layer 2 — Swim-native template (NEXT)
+## Layer 2 — Swim-native template (DONE — Performance tab a44f9b2d; Details tab + polish D-159/D-160, 2026-06-15)
 
-- `build.ts`: a swim build branch; **guard out** the land rows firing for swims — HR-drift (~1484), conditions/terrain/grade (~1542) — and stop emitting speed/cadence land data.
-- Client `MobileSummary.tsx`: a swim render branch (or `SwimSessionView`) replacing `EnduranceIntervalTable` + the mph speed chart with a swim layout — pace/100 (yd/m), distance, HR, per-length when available.
-- Sign-offs: exactly what the swim screen shows; yd-vs-m unit handling.
+- `build.ts`: swim build branch shipped (a44f9b2d) — land HR-drift (`:1502`) + conditions/terrain/grade (`:1546`) guarded for swims; land pace nulled (Layer 1).
+- **Performance tab** (`MobileSummary`→`PoolSwimOverall`): swim-native (a44f9b2d) + D-160 polish — distance/duration headline, trend-sign display fix (`verdictSignedPct`), Apple-Health nudge gated (`source==='healthkit' || pool_length>0`) + moved to bottom, rich-detail block (pool/lengths/strokes).
+- **Details tab** (`CompletedTab`): D-159 — swim detection made **type-based** (`resolvedWorkoutType==='swim'`, not `swim_data` which is NULL for Strava); mph speed chart + mile splits + map + Grade/VAM/Cadence row now hidden for swims; swim readout grid renders from scalar data. HR Zones untouched.
+- **Resolved sign-offs:** display in /100yd (locale/plan-inferred); yd-vs-m auto-detection from real pool length deferred to **Q-059** (needs HealthKit `pool_length`). Pool-swim narrative left suppressed (Q-038-clouded).
+- **Verify owed:** on-device against the June 15 swim after deploy.
 
 ## Layer 3 — richer FORM swim data (scoped 2026-06-14; ingest-path problem, not display)
 

@@ -77,6 +77,14 @@ Correctness sweep applying the spine's "one truth, in the right slot" discipline
 
 A second swim source behind a dedup gate. Same-swim Strava+HealthKit → **one merged workout** (best-field-from-each; 60s start + sport + ±10% distance). Native `HealthKitPlugin.swift` enriches pool length / strokes / HR. Platform-split "Connect Apple Health" toggle (off by default; web shows an iOS-app pointer). Verified connected + merging on device. Scope: ingest/display + native read only — no prescription.
 
+### Swim-native render — Layer 2 DONE on BOTH surfaces (D-159/D-160, 2026-06-15)
+
+Swims no longer fall through the land/endurance render on either tab. **Two surfaces, fixed separately** (don't conflate them):
+- **Performance tab** (`MobileSummary` → `EnduranceIntervalTable`→`PoolSwimOverall`): swim-native since a44f9b2d (pace/100, distance, avg HR, HR sparkline; land rows guarded in `build.ts` at `:1502`/`:1546`, land pace nulled). D-160 added the **distance/duration headline**, the **trend-sign display fix** (`verdictSignedPct` — the engine's raw `pctChange` is correct, `lowerIsBetter` flips only the verdict; display now signs by verdict so "↑ improving +34.6%"), the **Apple-Health nudge gate** (`source==='healthkit' || pool_length>0`) + **relocation to the bottom**, and a **rich-detail block** (pool/lengths/strokes from the workout row) that fills the space the pool-swim-suppressed narrative leaves.
+- **Details tab** (`CompletedTab`): D-159 made swim detection **type-based** (`isSwimType = resolvedWorkoutType==='swim'`) instead of `workoutData.swim_data` (NULL for Strava → was leaking the mph speed chart / mile splits / map / Grade-VAM-Cadence row). Applied at the readout-grid gate, the pool-swim viewer short-circuit, and the splits block. HR Zones untouched (data-gated, swim-safe).
+
+**⚠ Load-bearing:** `swim_data` is **NULL for Strava swims** — never key swim detection off it; use the workout TYPE (`resolvedWorkoutType` / `sd.type`). This is the D-159 root cause and a recurring footgun (same class as Q-054/D-112 absent-value-selects-wrong-branch). **Trend-sign:** the fix is **display-only** (`verdictSignedPct`); do NOT "correct" the sign in `classify.ts` — `pctChange` is deliberately raw (comment at `classify.ts:76`). Pool-swim narrative stays suppressed (re-enable is unverified, Q-038-clouded). Swim display **unit** is locale/plan-inferred pending real pool length → **Q-059**. Verification: `npm run build` clean; on-device verify owed against the June 15 swim.
+
 ### Whole-board Tier map (do-now / do-next / gated — captured 2026-06-14 for the next session)
 
 The priority order weighed: **mislead-the-athlete > polish · Monday's live build-week data · unblock-leverage · gated-prescription-flagged-separately · effort:payoff.** Full punch-list section: §8 + the per-section items.

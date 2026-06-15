@@ -16,6 +16,17 @@ const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
   needs_data: { word: 'needs data', cls: 'text-white/40', arr: '' },
 };
 
+// D-160: pctChange is the RAW metric delta (classify.ts keeps it raw so the UI knows real direction).
+// For lower-is-better disciplines (swim/run pace) an improvement is a NEGATIVE delta — printing it
+// verbatim gives "↑ improving −34%". The verdict already encodes good/bad; sign the magnitude by the
+// verdict so the number and the arrow always agree. improving → +, sliding → −, holding → raw.
+function verdictSignedPct(verdict: string, pct: number | null | undefined): string | null {
+  if (pct == null) return null;
+  if (verdict === 'improving') return `+${Math.abs(pct)}%`;
+  if (verdict === 'sliding') return `−${Math.abs(pct)}%`;
+  return `${pct > 0 ? '+' : ''}${pct}%`;
+}
+
 // One labelled signal ("Power: improving +2%") for the bike dual read.
 function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
   const v = VERDICT[sig.verdict];
@@ -25,7 +36,7 @@ function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
       <span className={`inline-flex items-baseline gap-0.5 ${v.cls}`}>
         {v.arr && <span>{v.arr}</span>}<span>{v.word}</span>
       </span>
-      {sig.pctChange != null && sig.verdict !== 'needs_data' && <span className="text-white/40">{sig.pctChange > 0 ? '+' : ''}{sig.pctChange}%</span>}
+      {sig.pctChange != null && sig.verdict !== 'needs_data' && <span className="text-white/40">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
       {sig.provisional && <span className="text-white/30 text-[10px]">prov</span>}
     </span>
   );
@@ -75,7 +86,7 @@ function DisciplineRow({ card }: { card: DisciplineCard }) {
           {v.arr && <span>{v.arr}</span>}
           <span>{v.word}</span>
         </span>
-        {pct != null && <span className="text-white/40">{pct > 0 ? '+' : ''}{pct}%</span>}
+        {pct != null && <span className="text-white/40">{verdictSignedPct(card.headlineVerdict, pct)}</span>}
         {PROVISIONAL_PERF.has(card.discipline) && <span className="text-white/30 text-[11px]">provisional</span>}
       </Row>
     );
