@@ -8,6 +8,30 @@ import EnduranceIntervalTable from './EnduranceIntervalTable';
 import AdherenceChips from './AdherenceChips';
 import { formatDuration } from '@/utils/workoutFormatting';
 
+// Step 4b — this session's DISCIPLINE spine verdict, read from session_detail_v1.discipline_trend
+// (which workout-detail reads from athlete_snapshot.state_trends_v1 — the SAME cache the STATE
+// screen and coach read). The per-session screen shows the discipline's trend context without
+// re-deriving it. needs_data renders as an honest "building" state, never a false direction.
+function DisciplineTrendLine({ sd }: { sd: any }) {
+  const dt = sd?.discipline_trend;
+  if (!dt) return null;
+  const VERD: Record<string, { w: string; c: string; a: string }> = {
+    improving: { w: 'improving', c: 'text-emerald-400', a: '↑' },
+    holding: { w: 'holding', c: 'text-amber-300', a: '→' },
+    sliding: { w: 'sliding', c: 'text-red-400', a: '↓' },
+    needs_data: { w: 'building — need more sessions', c: 'text-white/40', a: '' },
+  };
+  const v = VERD[dt.verdict] || VERD.needs_data;
+  const pct = dt.pct_change;
+  return (
+    <div className="flex items-baseline gap-1.5 py-1 text-[12px]">
+      <span className="text-white/45">{dt.discipline} trend</span>
+      <span className={`inline-flex items-baseline gap-0.5 ${v.c}`}>{v.a && <span>{v.a}</span>}<span>{v.w}</span></span>
+      {dt.verdict !== 'needs_data' && pct != null && <span className="text-white/35">{pct > 0 ? '+' : ''}{pct}%</span>}
+    </div>
+  );
+}
+
 type MobileSummaryProps = {
   planned: any | null;
   completed: any | null;
@@ -108,6 +132,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
             Loading performance analysis…
           </div>
         )}
+        <DisciplineTrendLine sd={sd} />
         {/* D-104: render INSIGHTS narrative ABOVE the exercise table for strength
             sessions. The strength branch was missing SessionNarrative entirely —
             D-102 (lift to ai_summary) + D-103 (remove silent 401 gate) made the
@@ -192,6 +217,8 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         noPlannedCompare={noPlannedCompare}
         hideTopAdherence={hideTopAdherence || !!sd?.race?.is_goal_race}
       />
+
+      <DisciplineTrendLine sd={sd} />
 
       {/* Bike session-detail ← spine. The per-ride HR-at-power datapoint (bike_fitness_v1.hr_at_band)
           is the EXACT value the STATE efficiency trend is built from — surfacing it here connects the

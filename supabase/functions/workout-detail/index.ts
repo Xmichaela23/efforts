@@ -7,6 +7,7 @@ import { weekStartOf } from '../_shared/plan-week.ts';
 import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapshot/daily-ledger.ts';
 import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
 import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
+import { disciplineOf } from '../_shared/state-trend/index.ts';
 import {
   fetchActivePlanId,
   fetchPlanContextForWorkout,
@@ -354,7 +355,7 @@ async function runSessionDetailPipelineAndPersist(
             );
           });
 
-    const [plannedRes, weekWorkoutsRes, , arcCtx] = await Promise.all([
+    const [plannedRes, weekWorkoutsRes, , arcCtx, snapRes] = await Promise.all([
       supabase
         .from('planned_workouts')
         .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id')
@@ -375,7 +376,28 @@ async function runSessionDetailPipelineAndPersist(
         );
         return null;
       }),
+      // Step 4b — latest spine cache for THIS session's discipline trend (read-only pass-through;
+      // builder does not re-derive). Non-fatal: null cache → no discipline_trend on the card.
+      supabase
+        .from('athlete_snapshot')
+        .select('state_trends_v1')
+        .eq('user_id', userId)
+        .order('week_start', { ascending: false })
+        .limit(1)
+        .then((r: any) => r)
+        .catch(() => null),
     ]);
+
+    // Map the cached spine verdict for this session's discipline (one source — same state_trends_v1
+    // the STATE screen and coach read).
+    let disciplineTrend: any = null;
+    try {
+      const st = snapRes?.data?.[0]?.state_trends_v1;
+      const disc = disciplineOf(row?.type);
+      if (st && disc && st[disc]) {
+        disciplineTrend = { discipline: disc, verdict: st[disc].verdict, pct_change: st[disc].pctChange ?? null };
+      }
+    } catch {}
 
     const plannedRows = Array.isArray(plannedRes?.data) ? plannedRes.data : [];
     const weekWorkoutsRaw = Array.isArray(weekWorkoutsRes?.data) ? weekWorkoutsRes.data : [];
@@ -627,6 +649,7 @@ async function runSessionDetailPipelineAndPersist(
         const t = Number(wd?.temperature_start_f ?? wd?.temperature);
         return Number.isFinite(t) ? Math.round(t) : null;
       })(),
+      disciplineTrend,
     });
 
     if (sessionDetailV1?.race?.is_goal_race) {

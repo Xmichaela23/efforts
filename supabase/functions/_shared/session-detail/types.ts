@@ -305,6 +305,19 @@ export type SessionDetailV1 = {
     pace_at_hr_basis?: 'gap' | 'raw' | null;
   } | null;
 
+  /**
+   * Step 4b — this session's DISCIPLINE spine verdict, read from the cached
+   * athlete_snapshot.state_trends_v1 (NOT re-derived in the builder). The same single source the
+   * STATE screen and coach read; surfaced here so the per-session screen shows the discipline's
+   * trend context without computing it a different way. `needs_data` when the discipline has no
+   * real trend yet; null when no snapshot/cache is available.
+   */
+  discipline_trend?: {
+    discipline: string;
+    verdict: 'improving' | 'holding' | 'sliding' | 'needs_data';
+    pct_change: number | null;
+  } | null;
+
   // ── Next session (forward-looking context) ────────────────────────────────
   next_session: {
     name: string;

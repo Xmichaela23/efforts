@@ -133,6 +133,10 @@ export type SessionDetailInput = {
    *  ?? temperature), resolved in workout-detail. The contract had no weather
    *  field — added for the cycling Performance stat line + TERRAIN row. */
   weatherTempF?: number | null;
+  /** Step 4b — this session's discipline spine verdict, pre-read from
+   *  athlete_snapshot.state_trends_v1 in workout-detail. The builder only passes it through
+   *  (no re-derivation); null when no cache is available. */
+  disciplineTrend?: SessionDetailV1['discipline_trend'];
 };
 
 export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1 {
@@ -853,6 +857,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         };
       } catch { return null; }
     })(),
+
+    discipline_trend: input.disciplineTrend ?? null,
 
     next_session: nextSession ?? null,
 
