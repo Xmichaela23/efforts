@@ -35,14 +35,13 @@ export interface AdherenceState {
   context: SessionContextTag[];
 }
 
-// Adherence label = the count + a brief meaning, so "1/2" reads as a state, not just a ratio.
-// Boundary: ≥60% done = "on track" (covers 2/3), some-but-under = "behind" (1/2), none = "falling behind".
+// Adherence label = a NEUTRAL count, never a judgment word. "on track"/"behind"/"falling behind"
+// mimic trend verdicts ("falling behind" ≈ "sliding"), so they could read as a fitness trend in any
+// slot they land in — the category error this label must never re-create. State the fact (count of
+// planned sessions done), not a verdict on it. Direction/quality is the PERFORMANCE axis's job; this
+// is the ADHERENCE axis and it only counts. (De-conflation fix — judgment word removed at the source.)
 function adherenceLabel(completed: number, planned: number): string {
-  if (planned > 0) {
-    const ratio = completed / planned;
-    const meaning = ratio >= 0.6 ? 'on track' : ratio > 0 ? 'behind' : 'falling behind';
-    return `${completed}/${planned} — ${meaning}`;
-  }
+  if (planned > 0) return `${completed}/${planned} planned`;
   if (completed > 0) return `${completed} unplanned`;
   return 'none this week';
 }

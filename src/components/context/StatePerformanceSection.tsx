@@ -80,10 +80,15 @@ function DisciplineRow({ card }: { card: DisciplineCard }) {
       </Row>
     );
   }
-  // adherence fallback
+  // No performance trend yet → the spine set headlineVerdict null (primaryAxis 'adherence'). Show the
+  // honest "needs data" in the VERDICT slot (the model's first-class no-trend state, same as bike/run
+  // would show), and demote adherence to a neutral, clearly-secondary count. Adherence must never sit
+  // in the verdict slot wearing a trend's clothing — that was the category error (adherence ≠ trend).
+  const nd = VERDICT.needs_data;
   return (
     <Row label={card.discipline}>
-      <span className="text-white/55">{card.adherence?.ratioLabel ?? '—'}</span>
+      <span className={nd.cls}>{nd.word}</span>
+      {card.adherence && <span className="text-white/35">· {card.adherence.ratioLabel}</span>}
     </Row>
   );
 }
