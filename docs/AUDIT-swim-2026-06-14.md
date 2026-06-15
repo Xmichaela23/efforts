@@ -44,8 +44,33 @@ So "we have more than we show" is **half true**: HR + distance + a swim-analysis
 - Client `MobileSummary.tsx`: a swim render branch (or `SwimSessionView`) replacing `EnduranceIntervalTable` + the mph speed chart with a swim layout — pace/100 (yd/m), distance, HR, per-length when available.
 - Sign-offs: exactly what the swim screen shows; yd-vs-m unit handling.
 
-## Layer 3 — FORM metrics ingest + surface (BIGGEST; ingest-first)
+## Layer 3 — richer FORM swim data (scoped 2026-06-14; ingest-path problem, not display)
 
-- **Ingest investigation FIRST:** trace why the Strava swim payload's `swim_data` (lengths, stroke_type, pool_length, per-interval) isn't populating (live record shows NULL despite extraction code). It may require the Garmin/FORM-direct path rather than Strava.
-- Then store + surface: per-length pace bars, stroke type, SWOLF, pool length.
-- Sign-offs: confirm the source actually sends per-length data for FORM activities before building display.
+The rich fields (per-length, stroke, pool length, SWOLF) are **not a display gap — they never reach Efforts.** Strava strips them. So Layer 3 = "get a richer source," scoped to **two clean tiers; the per-length OCR table is explicitly SKIPPED.**
+
+### FORM ingest reality (researched)
+- **FORM captures rich at source** (stroke 99.7%, pool-length count 99.8%, per-length, SWOLF — validated).
+- **Strava is the lossy path** — strips pool_length, per-length, stroke (confirmed: our NULL `pool_length`).
+- **FORM→Garmin is DEAD** — one-directional (Garmin→FORM only); FORM won't sync swims TO Garmin.
+- **No FORM public API** — devs can't get technical responses; FORM only consumes Garmin/Apple APIs.
+- FORM syncs direct to Strava, **Apple Health**, TrainingPeaks, TriDot, Final Surge.
+- ⇒ **Apple Health is the best *automatic* path** — an upgrade over Strava, but summary-level (see test below).
+
+### Tier A — HealthKit-extend (automatic) — verdict: EXTEND, not rebuild
+- **Rails already exist + work** (not abandoned): `src/services/healthkit.ts` (177 lines), native `ios/App/App/HealthKitPlugin.swift` (142 lines, registered), auto-auth in `AppContext`, `Connections.tsx` UI. But **summary-only** — `readWorkouts` returns `{ activityType, duration, totalDistance, totalCalories, sourceName }`; queries **no** lap/stroke/pool data.
+- **On-device test — what FORM→HealthKit actually writes:** ✅ lap length (25yd — the value Strava NULLs), stroke count, **true duration-with-seconds**, pool location, HR. ❌ NOT per-length splits / stroke-type / SWOLF.
+- **So Tier A = widen the Swift plugin** to query lap length + stroke count + HR, and **feed the resolver a real `pool_length`** (device tier, replacing the 25yd default). Bounded native iOS work on existing rails. **Worth it — reliable, automatic.** Also fixes the integer-minute duration precision (HealthKit has seconds).
+
+### Tier B — "Swim Breakdown" screengrab (opt-in)
+- **Target = the FORM app's "Swim Breakdown" aggregate screen, NOT the per-length table.** One clean fixed-layout screen with the decision-useful aggregates: SWOLF (avg/best), distance-per-stroke, stroke count/length, stroke rate, pace/100, best 50/100, avg/max HR, total lengths. Ideal single-screenshot vision-extraction conditions.
+- **The per-length scrolling table (was "B2") is OUT** — messy multi-screenshot OCR; and the Breakdown screen *obsoletes* it (it's the aggregate of what per-length would compute). Skip the fragile path.
+
+### ⚠ PREREQUISITE before ANY HealthKit ingest — same-swim dedup + source precedence
+- **Today's dedup is PER-SOURCE ONLY:** upsert `onConflict` = `user_id,strava_activity_id` or `user_id,garmin_activity_id` (`ingest-activity:1205/1208`). **No cross-source matching.** HealthKit doesn't ingest workouts yet (read-only plugin).
+- **The risk:** a user with BOTH Strava + HealthKit connected → FORM syncs the same swim to both → different conflict keys → **two duplicate workouts.**
+- **What the match needs (tolerance, not exact ID — there's no shared external id across Strava/HealthKit):** `user_id` + discipline=swim + **start-time within a window** (Strava integer-minute vs HealthKit seconds → ±~60–90s) + **distance within tolerance** (won't be exactly equal).
+- **Beyond drop-the-dup — SOURCE PRECEDENCE:** HealthKit has the richer fields (real `pool_length`, seconds-precise duration, stroke count) vs Strava's stripped version. Goal = "recognize same-swim, **keep the best fields from each**" — HealthKit's pool_length/duration/strokes win over Strava's.
+- **Gate:** do NOT build HealthKit ingest until same-swim dedup + source-precedence merge is designed. Scoped as part of Tier A.
+
+### Layer 3 summary
+Two reliable tiers, per-length OCR skipped: **(A) HealthKit-extend** (automatic: pool length, seconds-duration, stroke count, HR — gated on the dedup prerequisite) + **(B) Swim Breakdown single-screenshot import** (opt-in: SWOLF, efficiency, bests). Both reliable; the fragile per-length table is dropped.
