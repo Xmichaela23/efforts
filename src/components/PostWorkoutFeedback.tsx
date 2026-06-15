@@ -100,12 +100,13 @@ export default function PostWorkoutFeedback({
   // Swim-only state (D-162)
   const isSwim = workoutType === 'swim';
   const [selectedPool, setSelectedPool] = useState<string | null>(null);
-  // Prescribed-equipment steps read from the LINKED PLANNED swim (computed.steps[].equipment).
-  const [plannedEquipSteps, setPlannedEquipSteps] = useState<Array<{ step_index: number; equipment: string; label: string }>>([]);
-  const [hasPlannedLink, setHasPlannedLink] = useState(false);
-  // step_index → used (true=Yes, false=No; absent=Skip) for the per-step confirmation.
-  const [equipConfirms, setEquipConfirms] = useState<Record<number, boolean>>({});
-  // Unplanned-swim session multi-select.
+  // Prescribed equipment read from the LINKED PLANNED swim — BOTH per-step required (step.equipment)
+  // AND session-level suggested/optional (computed.swim_equipment_suggested / _optional_suggested,
+  // where drills like catch-up surface snorkel/fins). step_index is null for session-level items.
+  const [prescribedEquip, setPrescribedEquip] = useState<Array<{ id: string; equipment: string; prompt: string; step_index: number | null }>>([]);
+  // id → used (true=Yes, false=No; absent=Skip) for the per-item confirmation.
+  const [equipConfirms, setEquipConfirms] = useState<Record<string, boolean>>({});
+  // Fallback multi-select when the plan prescribed nothing (or unplanned swim).
   const [unplannedEquip, setUnplannedEquip] = useState<Set<string>>(new Set());
 
   const gearType = workoutType === 'run' ? 'shoe' : 'bike';
@@ -179,6 +180,7 @@ export default function PostWorkoutFeedback({
           if (match) setSelectedPool(match.value);
         }
         const plannedId = data?.planned_id;
+        const prescribed: Array<{ id: string; equipment: string; prompt: string; step_index: number | null }> = [];
         if (plannedId) {
           const { data: planned } = await supabase
             .from('planned_workouts')
@@ -187,22 +189,33 @@ export default function PostWorkoutFeedback({
             .eq('user_id', userId)
             .single();
           const steps: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : [];
-          const equipSteps = steps
-            .map((st: any, i: number) => {
-              const eq = typeof st?.equipment === 'string' ? st.equipment.trim().toLowerCase() : '';
-              if (!eq || eq === 'none') return null;
-              return {
-                step_index: Number.isFinite(st?.planned_index) ? Number(st.planned_index) : i,
-                equipment: eq,
-                label: String(st?.label || st?.kind || `Step ${i + 1}`),
-              };
-            })
-            .filter(Boolean) as Array<{ step_index: number; equipment: string; label: string }>;
-          setHasPlannedLink(true);
-          setPlannedEquipSteps(equipSteps);
-        } else {
-          setHasPlannedLink(false);
+          const seen = new Set<string>();
+          // (1) Per-step REQUIRED equipment (pull→buoy, kick→board): tied to a specific step.
+          steps.forEach((st: any, i: number) => {
+            const eq = typeof st?.equipment === 'string' ? st.equipment.trim().toLowerCase() : '';
+            if (!eq || eq === 'none' || seen.has(eq)) return;
+            seen.add(eq);
+            prescribed.push({
+              id: `s${i}`,
+              equipment: eq,
+              prompt: `${String(st?.label || st?.kind || `Step ${i + 1}`)} — ${eq}?`,
+              step_index: Number.isFinite(st?.planned_index) ? Number(st.planned_index) : i,
+            });
+          });
+          // (2) Session-level SUGGESTED/OPTIONAL equipment (e.g. catch-up drill → snorkel/fins): not
+          // tied to one step, lives in computed.swim_equipment_suggested / _optional_suggested.
+          const sessionEquip = [
+            ...(Array.isArray(planned?.computed?.swim_equipment_suggested) ? planned.computed.swim_equipment_suggested : []),
+            ...(Array.isArray(planned?.computed?.swim_equipment_optional_suggested) ? planned.computed.swim_equipment_optional_suggested : []),
+          ];
+          for (const raw of sessionEquip) {
+            const eq = String(raw || '').trim().toLowerCase();
+            if (!eq || eq === 'none' || seen.has(eq)) continue;
+            seen.add(eq);
+            prescribed.push({ id: `g-${eq}`, equipment: eq, prompt: `Did you use ${eq}?`, step_index: null });
+          }
         }
+        setPrescribedEquip(prescribed);
       }
     } catch (e) {
       console.error('Error loading workout data:', e);
@@ -295,12 +308,12 @@ export default function PostWorkoutFeedback({
           ? (() => { try { return JSON.parse(workoutData.workout_metadata); } catch { return {}; } })()
           : (workoutData?.workout_metadata || {});
         const meta: any = { ...existingMeta };
-        if (hasPlannedLink && plannedEquipSteps.length > 0) {
-          const confirmed = plannedEquipSteps
-            .filter((s) => s.step_index in equipConfirms)
-            .map((s) => ({ step_index: s.step_index, equipment: s.equipment, used: equipConfirms[s.step_index] }));
+        if (prescribedEquip.length > 0) {
+          const confirmed = prescribedEquip
+            .filter((p) => p.id in equipConfirms)
+            .map((p) => ({ step_index: p.step_index, equipment: p.equipment, used: equipConfirms[p.id] }));
           if (confirmed.length > 0) meta.swim_steps_equipment_confirmed = confirmed;
-        } else if (!hasPlannedLink && unplannedEquip.size > 0) {
+        } else if (unplannedEquip.size > 0) {
           meta.swim_equipment_unplanned = Array.from(unplannedEquip);
         }
         if (meta.swim_steps_equipment_confirmed || meta.swim_equipment_unplanned) {
@@ -584,19 +597,20 @@ export default function PostWorkoutFeedback({
         </div>
       )}
 
-      {/* Swim: per-step equipment confirmation (D-162) — only steps the plan prescribed equipment for.
-          Keeps session pace honest (a finned/drill set can be flagged downstream without clouding it). */}
-      {isSwim && hasPlannedLink && plannedEquipSteps.length > 0 && (
+      {/* Swim: equipment confirmation (D-162) — prescribed items from the plan (per-step required +
+          session-level suggested/optional like snorkel/fins). Lets a finned/drill set be flagged
+          downstream (Q-061) without clouding session pace. Falls back to multi-select when none. */}
+      {isSwim && prescribedEquip.length > 0 && (
         <div>
           <label className="text-sm font-light text-white/70 mb-2 block">
-            Equipment — did you use what was planned?
+            Equipment — did you use what the plan called for?
           </label>
           <div className="space-y-2">
-            {plannedEquipSteps.map((s) => {
-              const val = s.step_index in equipConfirms ? equipConfirms[s.step_index] : null;
+            {prescribedEquip.map((p) => {
+              const val = p.id in equipConfirms ? equipConfirms[p.id] : null;
               return (
-                <div key={s.step_index} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <div className="text-[13px] text-white/80 mb-1.5 capitalize">{s.label} — {s.equipment}?</div>
+                <div key={p.id} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <div className="text-[13px] text-white/80 mb-1.5 capitalize">{p.prompt}</div>
                   <div className="flex gap-2">
                     {[{ k: 'yes', v: true, t: 'Yes' }, { k: 'no', v: false, t: 'No' }, { k: 'skip', v: null, t: 'Skip' }].map((opt) => {
                       const active = val === opt.v;
@@ -605,8 +619,8 @@ export default function PostWorkoutFeedback({
                           key={opt.k}
                           onClick={() => setEquipConfirms((prev) => {
                             const next = { ...prev };
-                            if (opt.v === null) delete next[s.step_index];
-                            else next[s.step_index] = opt.v;
+                            if (opt.v === null) delete next[p.id];
+                            else next[p.id] = opt.v as boolean;
                             return next;
                           })}
                           className={`flex-1 py-1.5 text-xs font-light rounded-md border-2 transition-all duration-300 ${
@@ -629,8 +643,9 @@ export default function PostWorkoutFeedback({
         </div>
       )}
 
-      {/* Swim: unplanned-swim equipment fallback (D-162) — simple session-level multi-select */}
-      {isSwim && !hasPlannedLink && (
+      {/* Swim: equipment fallback (D-162) — simple multi-select when the plan prescribed nothing
+          (or the swim is unplanned). Ensures equipment can always be logged. */}
+      {isSwim && prescribedEquip.length === 0 && (
         <div>
           <label className="text-sm font-light text-white/70 mb-2 block">
             Equipment used? <span className="text-xs text-white/40 font-light">(optional)</span>
