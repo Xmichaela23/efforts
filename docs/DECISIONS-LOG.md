@@ -3824,6 +3824,11 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 - **Details equipment flag:** `· fins used` tag on the Avg Pace label (`CompletedTab`) when `swim_steps_equipment_confirmed` has fins=yes — honest signal the blended pace includes finned sets (Q-061 context).
 - **"No route data (pool swim)" gap:** the placeholder floating in the tall map section left a large void before HR Zones → replaced with a thin muted divider.
 - **Scope:** display only — no prescription, no analyzer/contract change (swimExtras reads the existing workout row). `npm run build` clean. Punch-list §9. Verify on device alongside D-159..D-165 in one rebuild: home/Details/Performance pace all read 2:00 (never 1:60); swim Performance is a dark sibling of the Details card with Pool/Lengths in-grid and dot-pills; Details shows `· fins used`; the pool-swim gap is tightened.
+- **Refinements (post-device-feedback, same day):**
+  - **Top adherence header dropped for swims** — it duplicated the in-card green-dot Distance/Duration pills (113% Duration showed twice). `MobileSummary` now passes `hideTopAdherence` for `type === 'swim'`; the inline pills are the single source.
+  - **Discipline trend moved INSIDE the card** — "swim trend ↑ improving +34.6%" was orphaned between the header and the card; `PoolSwimOverall` now renders it as the card's top line (reads `sd.discipline_trend`, same verdict-signed-% rule as D-160), and the standalone `DisciplineTrendLine` is suppressed for swims.
+  - **Pace label** — "2:00 /100yd" is now one value line with "Pace" as the label beneath (was wrapping `/100yd` under "Pace"); `whitespace-nowrap` on metric values.
+  - **Dead space below the card → Q-064** — the run/ride INSIGHTS narrative is still suppressed for pool swims (Q-038-clouded); filed rather than re-enabled blind.
 
 ---
 

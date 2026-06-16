@@ -221,14 +221,18 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           </div>
         );
       })()}
+      {/* D-166 refinement: swims drop the top adherence header — it duplicated the green-dot
+          Distance/Duration pills now inside the swim card (113% Duration was showing twice). */}
       <AdherenceChips
         sessionDetail={sd}
         hasSessionDetail={hasSessionDetail}
         noPlannedCompare={noPlannedCompare}
-        hideTopAdherence={hideTopAdherence || !!sd?.race?.is_goal_race}
+        hideTopAdherence={hideTopAdherence || !!sd?.race?.is_goal_race || type === 'swim'}
       />
 
-      <DisciplineTrendLine sd={sd} />
+      {/* Swims render the discipline trend INSIDE the card (PoolSwimOverall) so it isn't orphaned
+          between the header and the card. */}
+      {type !== 'swim' && <DisciplineTrendLine sd={sd} />}
 
       {/* Bike session-detail ← spine. The per-ride HR-at-power datapoint (bike_fitness_v1.hr_at_band)
           is the EXACT value the STATE efficiency trend is built from — surfacing it here connects the

@@ -886,6 +886,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-064 — Swim Performance tab dead space: surface a swim INSIGHTS narrative (still suppressed, Q-038-clouded)
+
+- **Status:** filed 2026-06-15 (D-166 refinement) · deferred pending narrative-quality verification
+- **What it is:** after the D-166 swim card, the Performance tab has a large empty area below the recompute link (between it and the nav bar). The run/ride Performance tabs fill that space with the **INSIGHTS narrative** (`SessionNarrative`), but it's **suppressed for pool swims** (`MobileSummary` `!sd?.classification?.is_pool_swim`, from the March a7e14381 refactor). So swims get a void where every other sport gets coaching prose.
+- **Why still suppressed:** the swim narrative's quality is **unverified** — swim numbers were garbage pre-Layer-1, and Q-038 (swim ingest/analyzer reliability) is still open, so re-enabling risks surfacing land-flavored or wrong-number prose. Re-enabling blind is the regression risk flagged repeatedly during D-159..D-166.
+- **Revisit when:** the swim analyzer's `narrative_text` is verified clean on real swims (recompute one + read the output). If clean → drop the `!is_pool_swim` suppression so swims get INSIGHTS in that space. If not → the void stays until the narrative is trustworthy (or fill it with something else deterministic).
+- **Cross-ref:** D-166 (the card above the void), D-156/D-160 (the suppression history), Q-038 (swim reliability), `SessionNarrative`, `analyze-swim-workout`.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

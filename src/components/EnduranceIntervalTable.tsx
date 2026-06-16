@@ -489,10 +489,38 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   // D-166: Pace/HR/Pool/Lengths share ONE metrics grid alongside the distance/duration headline —
   // same visual weight, not an afterthought row bolted below the card.
   const metrics: Array<[string, string]> = [];
-  if (pace100 != null && pace100 > 0) metrics.push([formatSwimPace(pace100), `Pace /100${per100Unit}`]);
+  // D-166 refinement: keep "2:00 /100yd" on one value line with "Pace" as the muted label beneath
+  // (the unit was wrapping awkwardly under "Pace").
+  if (pace100 != null && pace100 > 0) metrics.push([`${formatSwimPace(pace100)} /100${per100Unit}`, 'Pace']);
   if (avgHr != null && avgHr > 0) metrics.push([`${Math.round(avgHr)}`, 'Avg HR']);
   if (poolLm != null) { const isYd = poolLm >= 20 && poolLm <= 26; metrics.push([isYd ? `${Math.round(poolLm / 0.9144)} yd` : `${Math.round(poolLm)} m`, 'Pool']); }
   if (lengths != null) metrics.push([String(lengths), 'Lengths']);
+
+  // D-166 refinement: render the discipline trend INSIDE the card (was orphaned between header + card).
+  const dt = (sd as any)?.discipline_trend;
+  const trendNode = (() => {
+    if (!dt?.verdict) return null;
+    const VERD: Record<string, { w: string; c: string; a: string }> = {
+      improving: { w: 'improving', c: 'text-emerald-400', a: '↑' },
+      holding: { w: 'holding', c: 'text-amber-300', a: '→' },
+      sliding: { w: 'sliding', c: 'text-red-400', a: '↓' },
+      needs_data: { w: 'building — need more sessions', c: 'text-white/40', a: '' },
+    };
+    const v = VERD[dt.verdict] || VERD.needs_data;
+    const pct = dt.pct_change;
+    // Sign by verdict so the number agrees with the arrow (D-160 verdictSignedPct rule).
+    const pctDisplay = pct == null ? null
+      : dt.verdict === 'improving' ? `+${Math.abs(pct)}%`
+      : dt.verdict === 'sliding' ? `−${Math.abs(pct)}%`
+      : `${pct > 0 ? '+' : ''}${pct}%`;
+    return (
+      <div className="flex items-baseline justify-center gap-1.5 text-[12px] mb-3">
+        <span style={labelStyle}>{dt.discipline} trend</span>
+        <span className={`inline-flex items-baseline gap-0.5 ${v.c}`}>{v.a && <span>{v.a}</span>}<span>{v.w}</span></span>
+        {dt.verdict !== 'needs_data' && pctDisplay && <span className="text-white/35">{pctDisplay}</span>}
+      </div>
+    );
+  })();
 
   // Adherence as a pill+dot (matches STATE/home): green at/above plan, amber below.
   const pill = (label: string, pct: number | null) => {
@@ -509,6 +537,7 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      {trendNode}
       {(executedDistM > 0 || executedDurS > 0) && (
         <div className="flex items-center justify-center gap-10 text-center mb-4">
           <div className="flex flex-col items-center">
@@ -526,7 +555,7 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
         <div className={`grid gap-3 text-center ${metrics.length >= 4 ? 'grid-cols-4' : metrics.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
           {metrics.map(([v, l]) => (
             <div key={l} className="flex flex-col items-center">
-              <div className="text-sm font-light text-gray-100" style={tnum}>{v}</div>
+              <div className="text-sm font-light text-gray-100 whitespace-nowrap" style={tnum}>{v}</div>
               <div className="text-[11px] mt-0.5" style={labelStyle}>{l}</div>
             </div>
           ))}
