@@ -318,6 +318,21 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         if (!finsPlanned && !finsUnplanned) return null;
         return <div className="mt-2 text-center text-[11px] text-white/40">· some sets with fins</div>;
       })()}
+
+      {/* Recompute affordance for pool swims — the control normally lives in SessionNarrative, which is
+          suppressed for pool swims (below), so swims had no in-app recompute. This restores it. */}
+      {type === 'swim' && sd?.classification?.is_pool_swim && (
+        <div className="mt-3 flex flex-col items-center gap-1">
+          <button
+            onClick={recomputeAnalysis}
+            disabled={recomputing}
+            className="text-[12px] text-white/55 hover:text-white/80 underline underline-offset-2 disabled:opacity-50 disabled:no-underline"
+          >
+            {recomputing ? 'Recomputing…' : 'Recompute analysis'}
+          </button>
+          {recomputeError && <span className="text-[11px] text-red-400">{recomputeError}</span>}
+        </div>
+      )}
       {!sd?.classification?.is_pool_swim && (
         <SessionNarrative
           sessionDetail={sd}

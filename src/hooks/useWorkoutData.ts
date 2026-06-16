@@ -96,10 +96,17 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     const avg_power_pedaling_w = Number.isFinite(powerMetrics?.avg_power_pedaling_w) ? Number(powerMetrics.avg_power_pedaling_w) : null;
     const pct_time_pedaling = Number.isFinite(powerMetrics?.pct_time_pedaling) ? Number(powerMetrics.pct_time_pedaling) : null;
     
-    // Read swim pace (server-calculated)
+    // Swim pace: PREFER the authoritative scalar (moving duration ÷ distance), matching the Performance
+    // tab (build.ts). computed.analysis.swim is sample-derived and can be stale/wrong — e.g. 3:03/100yd
+    // when the scalar truth is 2:00 — because the Layer-1 swim-pace correction reached facts/
+    // session_detail but NOT this computed.analysis block. Fall back to the stored value only when the
+    // scalar inputs are absent. (Only read for swims, so a meaningless value on run/ride is never shown.)
     const swimMetrics = workoutData?.computed?.analysis?.swim;
-    const avg_swim_pace_per_100m = Number.isFinite(swimMetrics?.avg_pace_per_100m) ? Number(swimMetrics.avg_pace_per_100m) : null;
-    const avg_swim_pace_per_100yd = Number.isFinite(swimMetrics?.avg_pace_per_100yd) ? Number(swimMetrics.avg_pace_per_100yd) : null;
+    const _swimScalarOk = !!(distance_m && duration_s && distance_m > 0 && duration_s > 0);
+    const _swimScalarPer100m = _swimScalarOk ? Math.round((duration_s as number) / ((distance_m as number) / 100)) : null;
+    const _swimScalarPer100yd = _swimScalarOk ? Math.round((duration_s as number) / (((distance_m as number) / 0.9144) / 100)) : null;
+    const avg_swim_pace_per_100m = _swimScalarPer100m ?? (Number.isFinite(swimMetrics?.avg_pace_per_100m) ? Number(swimMetrics.avg_pace_per_100m) : null);
+    const avg_swim_pace_per_100yd = _swimScalarPer100yd ?? (Number.isFinite(swimMetrics?.avg_pace_per_100yd) ? Number(swimMetrics.avg_pace_per_100yd) : null);
     
     const sport = typeof workoutData?.type === 'string' ? String(workoutData.type).toLowerCase() : null;
     const series = workoutData?.computed?.analysis?.series || null;

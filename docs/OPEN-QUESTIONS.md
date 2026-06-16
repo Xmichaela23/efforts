@@ -875,6 +875,17 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-062 — "Send planned workout to Apple Watch": Watch Connectivity exists; native scheduling needs WorkoutKit (iOS 17+)
+
+- **Status:** filed 2026-06-15 (assessment done) · path clear, deferred
+- **What exists today:** the app already has **Watch Connectivity** rails — `ios/App/App/WatchConnectivityPlugin.swift` (`isPaired`/`isReachable`/`sendWorkout(json)`) + `src/services/watchConnectivity.ts`, already called from `TodaysEffort`. That can push a structured-step JSON to a **companion watch app**, but does NOT drive Apple's **native Workout app** (no system-level guidance).
+- **The real mechanism = WorkoutKit (iOS 17+), NOT HealthKit:** `WorkoutPlan` + `WorkoutScheduler` schedule a planned workout that syncs to the Watch's native Workout app. The project has **zero** WorkoutKit usage; entitlements declare only HealthKit. Run/ride have full fidelity (pace/power/HR zones); **swim is experimental/partial** in WorkoutKit (iOS 17.2+) — Garmin export stays the mature swim path.
+- **Concrete path (when built):** new native plugin method `scheduleWorkoutToAppleWatch` gated `if #available(iOS 17,*)`; build a `WorkoutPlan` from `planned_workouts.computed.steps` (the SAME step model `send-workout-to-garmin` already consumes — sport-agnostic: pace/power/HR/duration/distance); schedule via `WorkoutScheduler`; add `com.apple.developer.fitness.{running,cycling}` entitlements (+provisioning); runtime-gate with graceful fallback to the existing Watch Connectivity path on iOS 15–16. Deployment target is currently iOS 15 — keep it; WorkoutKit degrades gracefully.
+- **Why deferred not shipped:** it's a bounded-but-real native lift (~native plugin + WorkoutPlan builder + entitlement approval), not a one-session change, and swim (the current focus) is the weakest WorkoutKit sport. Tier-1 (Watch Connectivity push) is the cheap interim if a watch surface is wanted sooner.
+- **Cross-ref:** `WatchConnectivityPlugin.swift`, `watchConnectivity.ts`, `send-workout-to-garmin/index.ts` (the reusable `computed.steps` export model), D-157 (the HealthKit-plugin precedent for bounded native work).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

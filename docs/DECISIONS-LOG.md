@@ -3790,6 +3790,18 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-164 — Swim follow-ups: Details-tab pace (Layer-1 completeness), pool_length wiring, recompute button
+
+- **Date:** 2026-06-15
+- **Context:** three loose ends after D-162/D-163, all confirmed on real data (read-only query). Client-only.
+- **Details-tab pace (Layer-1 completeness):** the Details tab read `computed.analysis.swim.avg_pace_per_100yd = 183s = 3:03/100yd` (stale, sample-derived) while the Performance tab showed `2:00/100yd` (scalar). The Layer-1 swim-pace correction (D-156/e77cb3ad) reached `workout_facts` + `session_detail` but **not** `computed.analysis.swim`. Fix: `useWorkoutData` now derives swim pace from the **authoritative scalar** (moving duration ÷ distance), matching the Performance tab; the stored analysis value is fallback-only. Client-side — no recompute needed, fixes existing swims immediately.
+- **pool_length wiring:** the popup wrote `pool_length` (50), but `analyze-swim-workout` reads `pool_length_m` **directly** (was defaulting to 22.86 = 25 yd), and `resolvePoolLength`'s tier-1 is `user_corrected_pool_length_m`. The popup now writes **all** the columns readers actually use: `user_corrected_pool_length_m` (resolver tier-1 "athlete fixed it post-swim") + `pool_length_m` (analyzer direct read) + `pool_length` (display) + `pool_unit`. (Only affects the analyzer's internal SWOLF/pool calc — pace-per-100 doesn't need pool length — but closes the column split.)
+- **Swim recompute button:** pool swims had no in-app recompute (the control lives in `SessionNarrative`, suppressed for pool swims). Added a "Recompute analysis" affordance to the swim Performance view in `MobileSummary` (uses the existing `recomputeAnalysis` + user JWT).
+- **Garmin FIT rests/equipment — VERIFIED (no change):** audited `send-workout-to-garmin` — rest steps **are** in the payload (`intensity: 'REST'`, `durationType: 'FIXED_REST'` for pool swims, 20s preserved) and equipment is on work steps (`mapSwimEquipment` → `SWIM_PULL_BUOY`/`SWIM_FINS`/…); rest steps correctly carry no equipment, trailing rest correctly skipped. The UI display matches the FIT payload. No bug.
+- **Scope:** display only — no prescription. `npm run build` clean. Verify: Details + Performance pace agree (2:00/100yd); next pool selection writes `pool_length_m`; swim Performance tab shows a Recompute control.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

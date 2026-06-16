@@ -313,7 +313,15 @@ export default function PostWorkoutFeedback({
       if (isSwim) {
         const pool = POOL_OPTIONS.find((p) => p.value === selectedPool);
         if (pool) {
+          // Write EVERY pool column readers actually use (they don't all go through resolvePoolLength):
+          //  - user_corrected_pool_length_m → the resolver's tier-1 "athlete fixed it post-swim" column
+          //  - pool_length_m → analyze-swim-workout reads this DIRECTLY (was defaulting to 22.86)
+          //  - pool_length → the display surfaces (MobileSummary rich-detail, CompletedTab) read this
+          //  - pool_unit → display unit
+          updateData.user_corrected_pool_length_m = pool.meters;
+          updateData.pool_length_m = pool.meters;
           updateData.pool_length = pool.meters;
+          updateData.pool_unit = pool.value.endsWith('yd') ? 'yd' : 'm';
           const distM = Number(workoutData?.distance) > 0 ? Number(workoutData.distance) * 1000 : 0;
           updateData.number_of_active_lengths = distM > 0 ? Math.round(distM / pool.meters) : null;
         }
