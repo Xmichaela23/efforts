@@ -413,8 +413,9 @@ Deno.serve(async (req) => {
 CRITICAL RULES:
 - SECOND PERSON — address the swimmer directly as "you" ("You covered…", "Your heart rate…"), matching the coaching voice the run and ride analyses use. NEVER "the swimmer" or third person.
 - PLAIN PROSE ONLY — no Markdown. No "#" headers, no "**bold**", no numbered section titles, no labels. Each observation is one or two complete sentences. Separate observations with a blank line.
-- BUILD AROUND THE DATA THIS SWIM HAS — distance, pace, heart rate, the work:rest split, and how it felt (RPE/feel). Swim has no power or GPS, so lean into these. Use heart rate to characterize the effort (aerobic control / how hard). The felt/RPE rating is the swimmer's OWN read of the session — the best subjective signal here — so weave it in when given (e.g. "…at RPE 3, feeling good").
-- WORK:REST is a real signal — if a moving-vs-elapsed split is given (e.g. 24 min of work across a 35 min session, ~11 min rest), you may note the pattern factually. But OBSERVE ONLY — do NOT diagnose WHY (do not claim the sets were hard, the rest was deliberate, or it was a technique session). State what the data shows, never the cause.
+- INTERPRET, DON'T LIST — reason from the RELATIONSHIP between the signals (RPE, heart rate, pace, work:rest), not a recital of each number. Swim has no power or GPS, so these are what you have; read how they fit together and what that says about the session.
+- RPE + HR COHERENCE: a low RPE with a controlled heart rate is a genuinely easy session — say so. But a low RPE with an ELEVATED heart rate, OR a high RPE at a modest pace, means the swim was a HARDER day than the raw numbers alone suggest — say that plainly. The read may slide DOWNWARD when the signals point to a grind; do NOT force a positive spin or default to "comfortable aerobic" when the data disagrees.
+- WORK:REST as effort context: a high rest fraction (lots of elapsed over moving) means more of the session was spent recovering — read it against the session's intent when known (more recovery on a technique/easy swim is unremarkable; the same on a moderate aerobic set suggests effort was being managed). Characterize the pattern's MEANING; still do NOT assert the specific cause (don't claim the sets were hard or the rest was deliberate — interpret the relationship, never diagnose the why).
 - UNIT CONSISTENCY: every distance and pace is in ${poolUnit === 'yd' ? 'YARDS' : 'METRES'}. Use that unit only. Do NOT convert to or mention the other unit anywhere — no "X ${poolUnit === 'yd' ? 'metres' : 'yards'}", no "≈ Y per 100 ${poolUnit === 'yd' ? 'm' : 'yd'}" translations. (The pool's physical length is given in its own build unit below — state it as-is; do NOT convert distances or paces to match it.)
 - NO INVENTED MATH: state only the metrics listed below. Do NOT compute or estimate derived values that are not given — no number of lengths, no stroke counts, no calories, no per-minute rates. Mixing the pool unit with the distance unit to "estimate lengths" is wrong and forbidden.
 - Write like "a chart in words" - factual observations only
@@ -485,7 +486,7 @@ ${intervalAnalysis.slice(0, 10).map((i: any) =>
 
         prompt += `
 
-Write 3-4 plain-prose observations addressed to the swimmer as "you" (one or two sentences each). No headers, no bold, no numbered titles — just sentences. Weave in the heart rate, the work:rest split, and how it felt (RPE) where they're given:`;
+Write 3-4 plain-prose observations addressed to the swimmer as "you" (one or two sentences each). No headers, no bold, no numbered titles — just sentences. Read how the RPE, heart rate, pace, and work:rest fit TOGETHER — if they say it was a grind or a harder day than the pace alone implies, say so honestly; do not force positivity:`;
 
         const { callLLM } = await import('../_shared/llm.ts');
         const swContent = await callLLM({

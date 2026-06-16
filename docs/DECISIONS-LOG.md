@@ -3915,6 +3915,16 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-177 — Swim narrative INTERPRETS (RPE×HR coherence + work:rest context), honest downward read
+
+- **Date:** 2026-06-16
+- **Context:** post-D-168 the narrative had all the signals (RPE/feel, HR, work:rest — already in the analyzer's workout-row input, confirmed; no fact-packet threading needed) but **recited** them. Make it reason from the RELATIONSHIP.
+- **Prompt change (analyze-swim-workout — no new data):** replaced the "build around the data / observe-only" rules with INTERPRET rules: (1) reason from how RPE, HR, pace, work:rest fit together, don't list; (2) **RPE×HR coherence** — low RPE + controlled HR = genuinely easy; low RPE + ELEVATED HR, or high RPE at modest pace = a harder day than the numbers alone suggest, say so; the read **may slide DOWNWARD** when the signals point to a grind — do NOT force positivity or default to "comfortable aerobic"; (3) **work:rest as effort context** — high rest fraction = more recovery, read against session intent (unremarkable on technique/easy, "effort being managed" on a moderate aerobic set). **Honesty preserved:** interpret the relationship/coherence, never diagnose the CAUSE.
+- **Verified (real recompute):** "…a 2:00 per 100 yard pace with average HR 119, which aligns well with your reported RPE of 3 — this was a genuinely easy aerobic session… roughly one-third of the session was recovery, which kept the overall intensity low…" — interprets, second person, unit-consistent, no cause-diagnosis. (This swim's signals are coherent-easy so the read is "easy"; the downward path fires only on incoherent data.)
+- **Scope:** narrative only. **DEPLOYS** `analyze-swim-workout` (workout-detail already serves it). Same single-source/voice/unit rules as D-167/D-168.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
