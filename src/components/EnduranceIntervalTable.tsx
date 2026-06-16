@@ -3,6 +3,7 @@ import {
   type SessionInterpretationV1,
   fmtTime,
 } from '@/utils/performance-format';
+import { formatSwimPace } from '@/utils/workoutFormatting';
 
 type IntervalRow = {
   id: string;
@@ -84,6 +85,9 @@ type EnduranceIntervalTableProps = {
   noPlannedCompare: boolean;
   /** Goal race: which benchmark targets and adherence use (client toggle). */
   goalRaceReferenceMode?: GoalRaceReferenceMode | null;
+  /** D-166: swim extras from the completed workout row (pool/lengths/fins aren't in session_detail) —
+   * folded into the unified swim card so they share the metrics grid with distance/duration/pace/HR. */
+  swimExtras?: { poolLengthM?: number | null; lengths?: number | null; finsUsed?: boolean } | null;
 };
 
 export default function EnduranceIntervalTable({
@@ -92,6 +96,7 @@ export default function EnduranceIntervalTable({
   useImperial,
   noPlannedCompare,
   goalRaceReferenceMode = null,
+  swimExtras = null,
 }: EnduranceIntervalTableProps) {
   const [showAllIntervals, setShowAllIntervals] = useState(false);
 
@@ -155,7 +160,7 @@ export default function EnduranceIntervalTable({
   // table. Open-water uses its GPS distance directly; pool uses the resolved pool length. Neither
   // shows land splits.
   if (sd?.type === 'swim') {
-    return <PoolSwimOverall sd={sd} useImperial={useImperial} />;
+    return <PoolSwimOverall sd={sd} useImperial={useImperial} swimExtras={swimExtras} />;
   }
 
   const ct = sd.completed_totals;
@@ -446,12 +451,13 @@ function SwimHrSparkline({ series }: { series: number[] }) {
   );
 }
 
-function PoolSwimOverall({ sd, useImperial }: { sd: NonNullable<EnduranceIntervalTableProps['sessionDetail']>; useImperial: boolean }) {
+function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<EnduranceIntervalTableProps['sessionDetail']>; useImperial: boolean; swimExtras?: { poolLengthM?: number | null; lengths?: number | null; finsUsed?: boolean } | null }) {
   const ct = sd.completed_totals;
   const pt = sd.planned_totals;
   if (!ct) return null;
 
   const swimUnit = pt?.swim_unit || 'yd';
+  const useYd = useImperial || swimUnit === 'yd';
   const executedDurS = ct.duration_s ?? 0;
   const executedDistM = ct.distance_m ?? 0;
   const plannedDurS = pt?.duration_s ?? 0;
@@ -459,112 +465,98 @@ function PoolSwimOverall({ sd, useImperial }: { sd: NonNullable<EnduranceInterva
 
   const distPct = plannedDistM > 0 && executedDistM > 0 ? Math.round((executedDistM / plannedDistM) * 100) : null;
   const timePct = plannedDurS > 0 && executedDurS > 0 ? Math.round((executedDurS / plannedDurS) * 100) : null;
-  const distDelta = plannedDistM > 0 && executedDistM > 0 ? executedDistM - plannedDistM : null;
-  const timeDelta = plannedDurS > 0 && executedDurS > 0 ? executedDurS - plannedDurS : null;
+  if (distPct == null && timePct == null && !(executedDistM > 0)) return null;
 
-  const anyVal = distPct != null || timePct != null;
-  if (!anyVal) return null;
-
-  const fmtDistDelta = (m: number) => {
-    const sign = m >= 0 ? '+' : '−';
-    const abs = Math.abs(m);
-    if (useImperial || swimUnit === 'yd') return `${sign}${Math.round(abs / 0.9144)} yd`;
-    return `${sign}${Math.round(abs)} m`;
-  };
-  const fmtTimeDelta = (s: number) => {
-    const sign = s >= 0 ? '+' : '−';
-    const v = Math.abs(Math.round(s));
-    const m = Math.floor(v / 60);
-    const ss = v % 60;
-    return `${sign}${m}:${String(ss).padStart(2, '0')}`;
-  };
-  const fmtDistLocal = (m: number) =>
-    (useImperial || swimUnit === 'yd') ? `${Math.round(m / 0.9144)} yd` : `${Math.round(m)} m`;
+  const fmtDistLocal = (m: number) => useYd ? `${Math.round(m / 0.9144)} yd` : `${Math.round(m)} m`;
   const fmtTimeLocal = (s: number) => {
-    const min = Math.floor(s / 60);
-    const sec = Math.round(s % 60);
+    const min = Math.floor(s / 60); const sec = Math.round(s % 60);
     return `${min}:${String(sec).padStart(2, '0')}`;
   };
 
-  const chip = (label: string, pct: number | null, text: string) => {
+  const per100Unit = useYd ? 'yd' : 'm';
+  const pace100 = (ct as any).swim_pace_per_100_s as number | null | undefined;
+  const avgHr = (ct as any).avg_hr as number | null | undefined;
+  const hrSeries = (sd as any)?.hr_series as number[] | null | undefined;
+
+  const poolLm = Number(swimExtras?.poolLengthM) > 0 ? Number(swimExtras?.poolLengthM) : null;
+  const lengths = Number(swimExtras?.lengths) > 0 ? Number(swimExtras?.lengths) : null;
+  const finsUsed = !!swimExtras?.finsUsed;
+
+  // Muted blue-tinted label — matches the Details READOUTS card so both tabs read as one design system.
+  const labelStyle: React.CSSProperties = { color: 'rgba(120, 170, 255, 0.55)' };
+  const tnum: React.CSSProperties = { fontFeatureSettings: '"tnum"' };
+
+  // D-166: Pace/HR/Pool/Lengths share ONE metrics grid alongside the distance/duration headline —
+  // same visual weight, not an afterthought row bolted below the card.
+  const metrics: Array<[string, string]> = [];
+  if (pace100 != null && pace100 > 0) metrics.push([formatSwimPace(pace100), `Pace /100${per100Unit}`]);
+  if (avgHr != null && avgHr > 0) metrics.push([`${Math.round(avgHr)}`, 'Avg HR']);
+  if (poolLm != null) { const isYd = poolLm >= 20 && poolLm <= 26; metrics.push([isYd ? `${Math.round(poolLm / 0.9144)} yd` : `${Math.round(poolLm)} m`, 'Pool']); }
+  if (lengths != null) metrics.push([String(lengths), 'Lengths']);
+
+  // Adherence as a pill+dot (matches STATE/home): green at/above plan, amber below.
+  const pill = (label: string, pct: number | null) => {
     if (pct == null) return null;
+    const dot = pct >= 100 ? 'bg-emerald-400' : 'bg-amber-300';
     return (
-      <div className="flex flex-col items-center px-2">
-        <div className="text-sm font-semibold text-gray-100">{pct}%</div>
-        <div className="text-[11px] text-gray-700">{label}</div>
-        <div className="text-[11px] text-gray-600">{text}</div>
+      <div className="flex items-center gap-1.5">
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+        <span className="text-[12px] text-gray-100" style={tnum}>{pct}%</span>
+        <span className="text-[11px]" style={labelStyle}>{label}</span>
       </div>
     );
   };
 
-  // Layer 2 — swim-native metrics. Pace/100 (in the same unit as distance) + avg HR are the two
-  // reads that matter for a swim. swim_pace_per_100_s is already per-100-of-swimUnit (build.ts).
-  const per100Unit = (useImperial || swimUnit === 'yd') ? 'yd' : 'm';
-  const pace100 = (ct as any).swim_pace_per_100_s as number | null | undefined;
-  const avgHr = (ct as any).avg_hr as number | null | undefined;
-  const fmtPace100 = (s: number) => {
-    const v = Math.round(s); return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')} /100${per100Unit}`;
-  };
-  // HR-stream mini-chart: render ONLY when a populated HR series reaches the contract; else
-  // avg-HR-only (NULL-safe). The stream isn't in session_detail_v1 yet → avg-HR-only today; the
-  // chart lights up with zero change here once the series is plumbed in.
-  const hrSeries = (sd as any)?.hr_series as number[] | null | undefined;
-
   return (
-    <div>
-      {/* Total-distance headline (D-160): the executed total was previously only legible as a %
-          adherence chip / in the planned-vs-executed card — never a standalone "how far did I swim"
-          readout. Lead with absolute distance + duration; the adherence % chips follow as context. */}
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
       {(executedDistM > 0 || executedDurS > 0) && (
-        <div className="flex items-center justify-center gap-10 text-center mb-3">
+        <div className="flex items-center justify-center gap-10 text-center mb-4">
           <div className="flex flex-col items-center">
-            <div className="text-2xl font-semibold text-gray-100">{executedDistM > 0 ? fmtDistLocal(executedDistM) : '—'}</div>
-            <div className="text-[11px] text-gray-700">Distance</div>
+            <div className="text-2xl font-light text-gray-100" style={tnum}>{executedDistM > 0 ? fmtDistLocal(executedDistM) : '—'}</div>
+            <div className="text-[11px] mt-0.5" style={labelStyle}>Distance</div>
           </div>
           <div className="flex flex-col items-center">
-            <div className="text-2xl font-semibold text-gray-100">{executedDurS > 0 ? fmtTimeLocal(executedDurS) : '—'}</div>
-            <div className="text-[11px] text-gray-700">Duration</div>
+            <div className="text-2xl font-light text-gray-100" style={tnum}>{executedDurS > 0 ? fmtTimeLocal(executedDurS) : '—'}</div>
+            <div className="text-[11px] mt-0.5" style={labelStyle}>Duration</div>
           </div>
         </div>
       )}
-      <div className="flex items-center justify-center gap-6 text-center">
-        <div className="flex items-end gap-3">
-          {chip('Distance', distPct, distDelta != null ? fmtDistDelta(distDelta) : '—')}
-          {chip('Duration', timePct, timeDelta != null ? fmtTimeDelta(timeDelta) : '—')}
-        </div>
-      </div>
-      {(pace100 != null && pace100 > 0) || (avgHr != null && avgHr > 0) ? (
-        <div className="mt-3 flex items-center justify-center gap-8 text-center">
-          {pace100 != null && pace100 > 0 && (
-            <div className="flex flex-col items-center">
-              <div className="text-sm font-semibold text-gray-100">{fmtPace100(pace100)}</div>
-              <div className="text-[11px] text-gray-700">Pace</div>
+
+      {metrics.length > 0 && (
+        <div className={`grid gap-3 text-center ${metrics.length >= 4 ? 'grid-cols-4' : metrics.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          {metrics.map(([v, l]) => (
+            <div key={l} className="flex flex-col items-center">
+              <div className="text-sm font-light text-gray-100" style={tnum}>{v}</div>
+              <div className="text-[11px] mt-0.5" style={labelStyle}>{l}</div>
             </div>
-          )}
-          {avgHr != null && avgHr > 0 && (
-            <div className="flex flex-col items-center">
-              <div className="text-sm font-semibold text-gray-100">{Math.round(avgHr)} bpm</div>
-              <div className="text-[11px] text-gray-700">Avg HR</div>
-            </div>
-          )}
+          ))}
         </div>
-      ) : null}
+      )}
+
+      {finsUsed && <div className="mt-2 text-center text-[11px] text-white/40">· some sets with fins</div>}
+
+      {(distPct != null || timePct != null) && (
+        <div className="mt-4 flex items-center justify-center gap-5">
+          {pill('Distance', distPct)}
+          {pill('Duration', timePct)}
+        </div>
+      )}
+
       {Array.isArray(hrSeries) && hrSeries.length > 1 && (
-        <div className="mt-3">
-          <SwimHrSparkline series={hrSeries} />
-        </div>
+        <div className="mt-3"><SwimHrSparkline series={hrSeries} /></div>
       )}
-      <div className="mt-4 px-4 py-3 bg-gray-50 rounded-lg">
+
+      <div className="mt-4 pt-3 border-t border-white/[0.08]">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <div className="text-xs text-gray-500 mb-1">Planned</div>
-            <div className="font-medium">{plannedDistM > 0 ? fmtDistLocal(plannedDistM) : '—'}</div>
-            <div className="text-gray-600">{plannedDurS > 0 ? fmtTimeLocal(plannedDurS) : '—'}</div>
+            <div className="text-[11px] mb-1" style={labelStyle}>Planned</div>
+            <div className="font-light text-gray-200" style={tnum}>{plannedDistM > 0 ? fmtDistLocal(plannedDistM) : '—'}</div>
+            <div className="text-gray-400" style={tnum}>{plannedDurS > 0 ? fmtTimeLocal(plannedDurS) : '—'}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">Executed</div>
-            <div className="font-medium">{executedDistM > 0 ? fmtDistLocal(executedDistM) : '—'}</div>
-            <div className="text-gray-600">{executedDurS > 0 ? fmtTimeLocal(executedDurS) : '—'}</div>
+            <div className="text-[11px] mb-1" style={labelStyle}>Executed</div>
+            <div className="font-light text-gray-200" style={tnum}>{executedDistM > 0 ? fmtDistLocal(executedDistM) : '—'}</div>
+            <div className="text-gray-400" style={tnum}>{executedDurS > 0 ? fmtTimeLocal(executedDurS) : '—'}</div>
           </div>
         </div>
       </div>

@@ -473,6 +473,20 @@ Separate workstream from items 1–5 (running→cycling parity + intent-aware an
 
 ---
 
+## §9 Swim Visual Polish (2026-06-15, D-166 — DONE)
+
+Pattern-matched the swim surfaces to the existing design system (Details READOUTS card / STATE pill-dots); no new design language. Builds on the swim functional work (D-159..D-165).
+
+- [x] **Pace formatter 1:60 bug** — `formatSwimPace` (the shared util) did `floor(s/60)+round(s%60)` → "1:60" for 119.5s. Now rounds total seconds first. Routed every surface through it: home card (`TodaysEffort` ×3 inline copies), Details grid (`CompletedTab`), Performance card (`EnduranceIntervalTable`). One source of truth.
+- [x] **Swim Performance card → dark, unified** (`PoolSwimOverall`) — replaced the jarring white `bg-gray-50` planned/executed card with the dark `border-white/10 bg-white/[0.03]` treatment; muted blue-tinted labels (`rgba(120,170,255,.55)`) + light values, matching the Details READOUTS card so the two tabs read as one system.
+- [x] **Pool / Lengths integrated into the metrics grid** — were an afterthought row in `MobileSummary`; now share the card's grid with Pace/HR (passed via `EnduranceIntervalTable.swimExtras` since they live on the workout row, not session_detail). `· some sets with fins` is a subtle in-card tag.
+- [x] **Adherence as pill+dot** — Distance/Duration adherence render with a colored dot (green ≥ plan / amber below) instead of flat % chips.
+- [x] **Details equipment flag** — `· fins used` tag on the Details Avg Pace label when `swim_steps_equipment_confirmed` has fins=yes (honest signal the blended pace includes finned sets).
+- [x] **"No route data (pool swim)" gap** — replaced the placeholder floating in the tall map section with a thin muted divider; tightens the space before HR Zones.
+- Sibling work (same session): D-165 planned-swim bottom sheet (Copy-for-FORM + pool selector + Watch placeholder).
+
+---
+
 ## Done = launchable
 
 When items 1-7 are all 100% and background items are closed, the app ships every flow clean. No new features past this point. Polish only.

@@ -135,6 +135,17 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
   // resolvedWorkoutType is reliable (workoutType prop → type → norm.sport) regardless of swim_data.
   const isSwimType = resolvedWorkoutType === 'swim';
 
+  // D-166: did this swim use fins? (post-workout equipment confirmation, D-162). Surfaced as a tag on
+  // the Avg Pace label so the athlete knows the blended pace includes finned sets.
+  const swimFinsUsed = useMemo(() => {
+    let meta = (workoutData as any)?.workout_metadata;
+    if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = {}; } }
+    const confirmed = Array.isArray(meta?.swim_steps_equipment_confirmed) ? meta.swim_steps_equipment_confirmed : [];
+    const unplanned = Array.isArray(meta?.swim_equipment_unplanned) ? meta.swim_equipment_unplanned : [];
+    return confirmed.some((e: any) => e?.used === true && String(e?.equipment || '').toLowerCase().includes('fin'))
+      || unplanned.some((e: any) => String(e || '').toLowerCase().includes('fin'));
+  }, [workoutData]);
+
   const accentRgb = getDisciplineColorRgb(resolvedWorkoutType);
   const accentCore = getDisciplinePhosphorCore(resolvedWorkoutType);
   const plateGlow = getDisciplineGlowStyle(resolvedWorkoutType, 'week')?.boxShadow as string | undefined;
@@ -1379,13 +1390,14 @@ const formatMovingTime = () => {
            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {(() => {
                 const pace = useImperial ? norm.avg_swim_pace_per_100yd : norm.avg_swim_pace_per_100m;
-                if (!pace) return 'N/A';
-                const mins = Math.floor(pace / 60);
-                const secs = Math.round(pace % 60);
-                return `${mins}:${String(secs).padStart(2, '0')}`;
+                return pace ? formatSwimPace(pace) : 'N/A';
               })()}
            </div>
-           <div className="text-xs font-light" style={metricLabelStyle}>Avg Pace {useImperial ? '/100yd' : '/100m'}</div>
+           <div className="text-xs font-light" style={metricLabelStyle}>
+             Avg Pace {useImperial ? '/100yd' : '/100m'}
+             {/* D-166: honest signal that the blended pace includes finned sets (fins speed you up). */}
+             {swimFinsUsed && <span className="ml-1 opacity-90">· fins used</span>}
+           </div>
          </div>
 
          {/* Duration (Elapsed) */}
@@ -1977,11 +1989,9 @@ const formatMovingTime = () => {
          const hasGps = Array.isArray((workoutData as any)?.gps_track) && (workoutData as any).gps_track.length > 10;
          const isPoolSwim = isSwim && (hasLengths || poolHint || (!openWaterHint && !hasGps));
         if (isPoolSwim) {
-           return (
-             <div className="mx-[-16px] px-3 py-2">
-               <div className="text-sm text-muted-foreground">No route data (pool swim)</div>
-             </div>
-           );
+           // D-166: pool swims have no GPS route. A "No route data" placeholder floating in the tall
+           // map section left a large empty gap before HR Zones — replace it with a thin muted divider.
+           return <div className="mx-[-16px] my-1 border-t border-white/[0.06]" />;
          }
         // GOLDEN RULE: Wait for server to provide series data
         // For historical workouts: render with whatever data exists (graceful degradation)

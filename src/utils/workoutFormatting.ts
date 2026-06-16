@@ -39,9 +39,11 @@ export const formatElevation = (meters: number | null, imperial?: boolean): stri
   return imp ? `${v} ft` : `${v} m`;
 };
 
+// D-166: round TOTAL seconds first, THEN split — otherwise 119.5s → floor(1.99)=1 min + round(59.5)=60s
+// prints "1:60" instead of "2:00". The single source of truth for swim pace m:ss; every surface (home
+// card, Performance tab, Details tab) routes through this — do not re-roll floor(/60)+round(%60) inline.
 export const formatSwimPace = (seconds: number | null): string => {
   if (!Number.isFinite(seconds as any) || (seconds as number) <= 0) return '—';
-  const mins = Math.floor((seconds as number) / 60);
-  const secs = Math.round((seconds as number) % 60);
-  return `${mins}:${String(secs).padStart(2,'0')}`;
+  const v = Math.round(seconds as number);
+  return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
 };

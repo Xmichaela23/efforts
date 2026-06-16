@@ -3815,6 +3815,18 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-166 — Swim Performance/Details visual polish + the 1:60 pace-formatter bug
+
+- **Date:** 2026-06-15
+- **Context:** the swim surfaces were functionally correct (D-159..D-165) but visually off — a white card on a dark app, flat clinical chips, Pool/Lengths bolted below the card, and a real formatter bug. Pattern-matched to the existing design system; **no new design language.** (Numbering note: the bottom sheet took D-165, so this batch is D-166.)
+- **Pace formatter 1:60 bug (functional):** `formatSwimPace` (the shared util) did `floor(s/60)+round(s%60)` → for 119.5s, `floor(1.99)=1` + `round(59.5)=60` = **"1:60"**. Fixed to **round total seconds first** (`v=round(s); floor(v/60):v%60`). Routed every surface through the one util — `TodaysEffort` had **three** inline copies of the bug (home card), `CompletedTab` (Details grid) one more; all now call `formatSwimPace`. `EnduranceIntervalTable`'s was already round-first but now uses the shared util too.
+- **Unified dark swim card (`PoolSwimOverall`):** white `bg-gray-50` planned/executed card → dark `rounded-xl border-white/10 bg-white/[0.03]`; muted blue-tinted labels (`rgba(120,170,255,.55)`) + light values, matching the Details READOUTS card. Pool/Lengths **folded into the metrics grid** (Pace/HR/Pool/Lengths share one row) via a new `EnduranceIntervalTable.swimExtras` prop (they live on the workout row, not `session_detail`, so `MobileSummary` passes them); the separate `MobileSummary` rich-detail + fins-note blocks were **removed** (consolidated into the card). Adherence renders as **pill+dot** (green ≥ plan / amber below) instead of flat % chips.
+- **Details equipment flag:** `· fins used` tag on the Avg Pace label (`CompletedTab`) when `swim_steps_equipment_confirmed` has fins=yes — honest signal the blended pace includes finned sets (Q-061 context).
+- **"No route data (pool swim)" gap:** the placeholder floating in the tall map section left a large void before HR Zones → replaced with a thin muted divider.
+- **Scope:** display only — no prescription, no analyzer/contract change (swimExtras reads the existing workout row). `npm run build` clean. Punch-list §9. Verify on device alongside D-159..D-165 in one rebuild: home/Details/Performance pace all read 2:00 (never 1:60); swim Performance is a dark sibling of the Details card with Pool/Lengths in-grid and dot-pills; Details shows `· fins used`; the pool-swim gap is tightened.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

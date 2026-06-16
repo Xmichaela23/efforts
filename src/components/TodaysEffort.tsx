@@ -8,6 +8,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell, Activity, X, Copy } from 'lucide-react';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
+import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
@@ -436,9 +437,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           const denom = preferYards ? (distM / 0.9144) / 100 : distM / 100;
           if (denom > 0) {
             const per100 = durS / denom;
-            const mm = Math.floor(per100 / 60);
-            const ss = Math.round(per100 % 60);
-            parts.push(`${mm}:${String(ss).padStart(2, '0')} ${preferYards ? '/100yd' : '/100m'}`);
+            parts.push(`${formatSwimPace(per100)} ${preferYards ? '/100yd' : '/100m'}`);
           }
         }
       }
@@ -999,9 +998,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           if (Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
                   const preferYards = !!useImperial;
             const per100 = preferYards ? (durS / ((distM / 0.9144) / 100)) : (durS / (distM / 100));
-                  const mm = Math.floor(per100 / 60);
-                  const ss = Math.round(per100 % 60);
-                  paceSpeed = `${mm}:${String(ss).padStart(2,'0')} ${preferYards ? '/100yd' : '/100m'}`;
+                  paceSpeed = `${formatSwimPace(per100)} ${preferYards ? '/100yd' : '/100m'}`;
                 }
         } else if (isRun && Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
           // Pace min/mi from overall
@@ -1061,7 +1058,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             ? (()=>{ const s=Math.round(durS as number); const m=Math.floor(s/60); const ss=s%60; return `${m}:${String(ss).padStart(2,'0')}`; })()
             : 'N/A';
           const per100 = (Number.isFinite(durS) && (durS as number) > 0 && ((preferYards && yards && yards>0) || (!preferYards && meters && meters>0)))
-            ? (()=>{ const denom = preferYards ? (yards as number)/100 : (meters as number)/100; const per = (durS as number) / denom; const m_=Math.floor(per/60); const ss=Math.round(per%60); return `${m_}:${String(ss).padStart(2,'0')}/${preferYards ? '100yd' : '100m'}`; })()
+            ? (()=>{ const denom = preferYards ? (yards as number)/100 : (meters as number)/100; const per = (durS as number) / denom; return `${formatSwimPace(per)}/${preferYards ? '100yd' : '100m'}`; })()
             : 'N/A';
           return [distText, durText, per100];
         }

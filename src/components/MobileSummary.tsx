@@ -271,53 +271,21 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           hasSessionDetail={hasSessionDetail}
           useImperial={useImperial}
           noPlannedCompare={noPlannedCompare}
+          swimExtras={type === 'swim' ? (() => {
+            const c: any = completed || {};
+            let meta = c.workout_metadata;
+            if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = {}; } }
+            meta = meta || {};
+            const confirmed = Array.isArray(meta.swim_steps_equipment_confirmed) ? meta.swim_steps_equipment_confirmed : [];
+            const unplanned = Array.isArray(meta.swim_equipment_unplanned) ? meta.swim_equipment_unplanned : [];
+            const finsUsed = confirmed.some((e: any) => e?.used === true && String(e?.equipment || '').toLowerCase().includes('fin'))
+              || unplanned.some((e: any) => String(e || '').toLowerCase().includes('fin'));
+            return { poolLengthM: Number(c.pool_length) || null, lengths: Number(c.number_of_active_lengths) || null, finsUsed };
+          })() : null}
         />
       )}
-      {/* Swim rich-detail (D-160) — pool length / lengths / strokes when the source carried them
-          (HealthKit/FORM, or a merged swim). Strava swims store these NULL → the block no-ops and the
-          relocated Apple-Health nudge fills the space instead. Reads the workout row directly (these
-          fields aren't in session_detail_v1's completed_totals); fills the dead area the suppressed
-          pool-swim narrative left below the planned/executed card. */}
-      {type === 'swim' && (() => {
-        const c: any = completed || {};
-        const poolLm = Number(c.pool_length) || 0;
-        const lengths = Number(c.number_of_active_lengths) || 0;
-        const strokes = Number(c.strokes) || 0;
-        const items: Array<[string, string]> = [];
-        if (poolLm > 0) {
-          const isYd = poolLm >= 20 && poolLm <= 26; // 25yd ≈ 22.86m stored as metres
-          items.push(['Pool', isYd ? `${Math.round(poolLm / 0.9144)} yd` : `${Math.round(poolLm)} m`]);
-        }
-        if (lengths > 0) items.push(['Lengths', String(lengths)]);
-        if (strokes > 0) items.push(['Strokes', String(strokes)]);
-        if (!items.length) return null;
-        return (
-          <div className="mt-4 flex items-center justify-center gap-8 text-center">
-            {items.map(([l, val]) => (
-              <div key={l} className="flex flex-col items-center">
-                <div className="text-sm font-semibold text-gray-100">{val}</div>
-                <div className="text-[11px] text-gray-700">{l}</div>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
-
-      {/* Session-level fins note (D-162) — from the post-swim equipment confirmation (planned per-step)
-          or the unplanned multi-select. Capture/display only; the per-step pace exclusion from the trend
-          is Q-061 (now has the confirmed data it needs). Flags fins specifically — they distort pace. */}
-      {type === 'swim' && (() => {
-        const c: any = completed || {};
-        let meta = c.workout_metadata;
-        if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = {}; } }
-        meta = meta || {};
-        const confirmed = Array.isArray(meta.swim_steps_equipment_confirmed) ? meta.swim_steps_equipment_confirmed : [];
-        const unplanned = Array.isArray(meta.swim_equipment_unplanned) ? meta.swim_equipment_unplanned : [];
-        const finsPlanned = confirmed.some((e: any) => e?.used === true && String(e?.equipment || '').toLowerCase().includes('fin'));
-        const finsUnplanned = unplanned.some((e: any) => String(e || '').toLowerCase().includes('fin'));
-        if (!finsPlanned && !finsUnplanned) return null;
-        return <div className="mt-2 text-center text-[11px] text-white/40">· some sets with fins</div>;
-      })()}
+      {/* Pool / Lengths / fins moved INTO the unified swim card (D-166, PoolSwimOverall) so they share
+          the metrics grid instead of floating below it. */}
 
       {/* Recompute affordance for pool swims — the control normally lives in SessionNarrative, which is
           suppressed for pool swims (below), so swims had no in-app recompute. This restores it. */}
