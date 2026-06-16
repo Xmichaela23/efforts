@@ -29,6 +29,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '../lib/supabase';
 import { Capacitor } from '@capacitor/core';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
+import SwimSourceMatrix from './SwimSourceMatrix';
 
 interface ConnectionStatus {
   provider: string;
@@ -900,6 +901,16 @@ const Connections: React.FC = () => {
           <p className="text-white/50 text-sm mb-6">
             Connect your fitness services to automatically sync data and enable real-time updates.
           </p>
+
+          {/* D-172: honest swim source capability matrix — what each source actually gives you. */}
+          <div className="mb-6">
+            <SwimSourceMatrix
+              garminConnected={garminConnected}
+              stravaConnected={!!connections.find((c) => c.provider === 'strava')?.connected}
+              appleHealthConnected={healthKitAuthorized}
+              appleHealthAvailable={healthKitAvailable}
+            />
+          </div>
 
       <div className="grid gap-6">
         {connections.map((connection) => (

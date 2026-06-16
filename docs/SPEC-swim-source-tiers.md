@@ -73,6 +73,26 @@ The dedup/merge (`mergeSameSwimIfExists`) + HealthKit plugin **already exist** (
 3. **D-171** — popup optional-strokes field + manual swim entry.
 4. **Phase 2 (Q-060)** — HealthKit ingest + merge, AFTER Phase 1 ships and users opt in. Do NOT build speculatively ahead of the nudge.
 
+## Strategic context — Strava can't be the universal swim source (D-172)
+
+- **Strava API is gated at 10 users** and slow/resistant to opening data access → structurally CANNOT be the universal swim pipe. It's basic-tier and capped.
+- **Garmin (live, full)** and **Apple Watch (integration in place, NEEDS TESTING)** are the real universal rich pipes (native per-length recording). **Today the only LIVE rich swim source is Garmin.**
+- **FORM reaches us only via Strava (thin) or Apple Health (modest).** ⚠ **FORM via Apple Health is NOT "rich"** — it adds only **pool length + total stroke count + seconds-duration** (→ session-average SWOLF at best). FORM keeps **per-length splits/SWOLF in its own app**; it does NOT export them to HealthKit. So:
+  - The genuinely rich AUTOMATIC path is **Apple Watch** (native per-length), not FORM-via-anything.
+  - **Q-060's payoff is smaller than "rich" implied** — a modest pool+session-strokes bump for FORM users, plus the no-doubles merge. Still worth it (it's the only automatic strokes path for FORM), but don't oversell it.
+  - FORM's real value is the **in-pool HUD experience + stroke-type accuracy**, not HealthKit export depth.
+
+## Connections source matrix + honest framing (D-172) — SHIPPED (Phase 1, display-only)
+
+`SwimSourceMatrix` in Connections: a warm one-liner ("swim data's messy… add one by hand") + five honest rows (Garmin Full / Apple Watch Full · needs-testing / FORM via Apple Health:+pool,strokes-coming-soon · via Strava:basic / Strava Basic / Manual). Turns the fragmented data story into a trust moment. **No source overstated.** Decisions locked:
+- **Pending labels = honest hybrid, truthful per-source:** Apple Watch reads "Needs testing" (integration exists, rides the D-157 HealthKit sync); FORM-via-Apple-Health is stated as **coming soon** (ingest unbuilt) — NOT a connect button that delivers nothing.
+- **FORM = one entry**, corrected value (pool + stroke count, not "rich"), points to Apple Health as the somewhat-better pipe.
+- Dual-source reassurance line: "use both FORM and Apple Watch? we'll merge into one swim — no duplicates" (Phase 2 / Q-060 intent, stated not built).
+
+## Manual swim escape hatch (D-172 item 4) — courtesy tier
+
+Dead-simple **completed**-swim entry from the planned screen (NOT a full logger, NOT `WorkoutBuilder` which makes *planned* workouts). Minimal: distance (yd/m) + duration; pool optional (→ lengths). Inserts `type='swim', source='manual', workout_status='completed'`; badge `Manual`. Reuses the D-162 popup for the optional RPE/feel/equipment enrichment after the row exists. One screen.
+
 ## Open gaps / unknowns
 - **Strokes**: no automatic source today (see the gap above). SWOLF is sparse until D-171/Phase-2.
 - **Garmin strokes**: not in the stored per-length array; extracting from the FIT is unconfirmed + out of scope.

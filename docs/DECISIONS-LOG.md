@@ -3862,6 +3862,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-172 — Connections swim source matrix + honest framing (+ manual escape hatch)
+
+- **Date:** 2026-06-16
+- **Context:** swim data richness is entirely source-dependent and the source landscape is messy (Strava gated at 10 users → can't scale; Garmin the only LIVE rich source; Apple Watch in-place-but-untested; FORM only thin-via-Strava or modest-via-Apple-Health). Rather than hide it, make it legible — turn the weak data story into a trust moment.
+- **Source matrix (`SwimSourceMatrix`, in Connections — Phase 1, display-only, SHIPPED):** a warm one-liner + five honest rows showing what each source actually gives. Reads connected state (garmin/strava/HealthKit) from Connections. **No source overstated.**
+- **⚠ FORM honesty correction (load-bearing):** "FORM via Apple Health" is a **MODEST** bump — pool length + total stroke count + seconds-duration (→ session-average SWOLF at best) — **NOT "rich."** FORM keeps per-length splits/SWOLF in its own app; it does NOT export them to HealthKit. The genuinely rich AUTOMATIC path is **Apple Watch** (native per-length). ⇒ Q-060's payoff is smaller than "rich" implied; don't oversell it. FORM's real value = in-pool HUD + stroke-type accuracy.
+- **Decisions:** (1) pending labels = **honest hybrid, truthful per-source** — Apple Watch "Needs testing" (integration exists, rides the D-157 HealthKit sync), FORM-via-Apple-Health "coming soon" (ingest unbuilt; never a connect-button-that-does-nothing). (2) FORM = **one entry**, corrected value, points to Apple Health as the somewhat-better pipe.
+- **Tier-derivation function (D-169, verified):** `src/lib/swim-source-tier.ts` `deriveSwimTier()` — pure single-source (badge + tier + `isFormViaStrava` nudge flag), verified against all 24 real swims (10 Strava·basic / 12 Garmin·full / 2 Garmin·basic — honest gating: Garmin swims lacking a lengths count correctly read basic) + synthetic manual/healthkit/merged cases. Not yet wired to the card badge (next).
+- **Still open under D-172:** the **manual swim escape hatch** (item 4) — a dead-simple COMPLETED-swim entry from the planned screen (distance + time, pool optional; `source='manual'`, reuses the D-162 popup for enrichment). Distinct from `WorkoutBuilder` (which makes *planned* workouts). Deferred to a focused pass — a completed-workout insert deserves care, not a tail-of-session rush. And the **card badge wiring** + the **FORM→Apple nudge** (Phase 1) on the swim card.
+- **Scope:** display-only — no prescription, no ingest. `npm run build` clean. SPEC: `SPEC-swim-source-tiers.md` (strategic context + matrix + FORM correction + manual hatch). Phase 2 (Q-060 HealthKit ingest + 60s merge) remains the follow-on, now justified by SWOLF + no-doubles.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
