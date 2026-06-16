@@ -98,10 +98,12 @@ Richest-data-wins is **three layers**, not one feature. They must not contradict
 
 **Verified, no contradiction:** matrix informs, preference chooses, merge protects — complementary halves of one story.
 
-### ⚠ Honesty constraint + the residual gap
-- The Garmin↔Strava layer (preference + merge) is **LIVE** → can promise "one swim, pick your source."
-- The **HealthKit/FORM richest-merge is gated on Q-060** (HealthKit ingest unbuilt) → frame as **"coming," never "done."** The matrix dedup line says exactly: *"…we aim to keep it to one — pick your source above. (FORM + Apple Health merge coming soon.)"*
-- **Residual gap:** `mergeSameSwimIfExists` keys on a 60-sec start-window, but Strava rounds start times to integer minutes while Garmin has seconds — the same swim's starts can differ >60s → merge misses → double. The "both" default leans entirely on this merge. Widening the window / matching on date+distance+duration is the Q-060-area fix.
+### Guarantee framing + the Q-060 dependency
+- **Product decision (D-172 cont.):** the matrix presents the **intended end-state** confidently — "You'll only ever see the richest version of each swim — never a duplicate" — with **no hedge words** in the UI. Apple Watch + FORM-via-Apple-Health share ONE badge keyed to the Apple Health connection state (Connected / Connect), exactly like Garmin/Strava.
+- **⚠ What this assumes (load-bearing — keep the backend matched to the promise):**
+  - Garmin↔Strava dedup (preference + merge) is **LIVE** → the guarantee holds today for those.
+  - **HealthKit ingest + the FORM/Watch richest-merge is Q-060 (UNBUILT).** Until it ships, connecting Apple Health enables the *connection* but FORM/Watch swims don't actually flow or merge — so the "never a duplicate" guarantee and the FORM-via-Apple-Health "Connect" are **forward-looking for the HealthKit path.** Q-060 is what makes the UI promise true end-to-end; it must ship to match the stated guarantee.
+- **Residual gap (folds into Q-060):** `mergeSameSwimIfExists` keys on a 60-sec start-window, but Strava rounds starts to integer minutes while Garmin has seconds — the same swim's starts can differ >60s → merge misses → double. Widening the window / matching on date+distance+duration is the Q-060-area fix.
 
 ## Manual swim escape hatch (D-172 item 4) — courtesy tier
 

@@ -16,13 +16,11 @@ interface SwimSourceMatrixProps {
 type Status = { label: string; tone: 'connected' | 'action' | 'pending' | 'muted' };
 
 const Chip: React.FC<{ s: Status }> = ({ s }) => {
+  // 'muted' is a plain text pointer (e.g. Manual → planned screen), not a pill.
+  if (s.tone === 'muted') return <span className="shrink-0 text-[11px] text-white/40">{s.label}</span>;
   const cls = s.tone === 'connected'
     ? 'text-emerald-300 border-emerald-400/30 bg-emerald-400/10'
-    : s.tone === 'action'
-      ? 'text-sky-300 border-sky-400/30 bg-sky-400/10'
-      : s.tone === 'pending'
-        ? 'text-amber-300/80 border-amber-300/20 bg-amber-300/[0.06]'
-        : 'text-white/40 border-white/10 bg-white/[0.03]';
+    : 'text-sky-300 border-sky-400/30 bg-sky-400/10';
   return <span className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{s.label}</span>;
 };
 
@@ -39,12 +37,8 @@ const SwimSourceMatrix: React.FC<SwimSourceMatrixProps> = ({
 }) => {
   const garmin: Status = garminConnected ? { label: 'Connected', tone: 'connected' } : { label: 'Connect', tone: 'action' };
   const strava: Status = stravaConnected ? { label: 'Connected', tone: 'connected' } : { label: 'Connect', tone: 'action' };
-  // Apple Watch rides the HealthKit sync (D-157) — integration exists, NEEDS TESTING (honest hybrid).
-  const watch: Status = appleHealthConnected
-    ? { label: 'Connected · testing', tone: 'pending' }
-    : appleHealthAvailable
-      ? { label: 'Needs testing', tone: 'action' }
-      : { label: 'iOS app only', tone: 'muted' };
+  // Apple Watch + FORM-via-Apple-Health share ONE pipe — Apple Health. Both badges read its connection state.
+  const appleHealth: Status = appleHealthConnected ? { label: 'Connected', tone: 'connected' } : { label: 'Connect', tone: 'action' };
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
@@ -57,17 +51,14 @@ const SwimSourceMatrix: React.FC<SwimSourceMatrixProps> = ({
 
       <div>
         <Row name="Garmin" gives="Full · splits, stroke count, SWOLF, rest" status={garmin} />
-        <Row name="Apple Watch" gives="Full · splits, stroke count, SWOLF" status={watch} />
-        <Row name="FORM goggles" gives="via Apple Health: +pool, strokes (soon) · via Strava: basic" />
         <Row name="Strava" gives="Basic · distance, time, heart rate" status={strava} />
-        <Row name="Manual" gives="Whatever you enter — distance + time" status={{ label: 'Add by hand', tone: 'muted' }} />
+        <Row name="Apple Watch" gives="Full · splits, stroke count, SWOLF" status={appleHealth} />
+        <Row name="FORM goggles" gives="via Apple Health: +pool, strokes · via Strava: basic" status={appleHealth} />
+        <Row name="Manual" gives="distance + time, pool optional" status={{ label: 'Log on planned session screen', tone: 'muted' }} />
       </div>
 
-      {/* Dedup reassurance — scoped HONESTLY to what's live (Garmin/Strava via the preference above);
-          the HealthKit/FORM richest-merge is Q-060 (unbuilt) so it's "coming", not a kept promise. */}
-      <p className="text-[11px] text-white/35 leading-snug mt-3">
-        However your swims arrive, we aim to keep it to one — pick your source above.
-        <span className="text-white/25"> (FORM + Apple Health merge coming soon.)</span>
+      <p className="text-[12px] text-white/45 leading-snug mt-3">
+        You'll only ever see the richest version of each swim — never a duplicate.
       </p>
     </div>
   );
