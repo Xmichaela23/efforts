@@ -3,8 +3,17 @@
  * Auth: user JWT + workouts.user_id match. Downstream invokes use service role.
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
 
-type RecomputeStep = 'compute-workout-analysis' | 'compute-facts' | 'analyze';
+type RecomputeStep = 'compute-workout-analysis' | 'compute-facts' | 'analyze' | 'snapshot';
+
+// Monday (UTC) of the week containing dateStr — for compute-snapshot's per-week cache key.
+function mondayOf(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const day = d.getUTCDay(); // 0=Sun..6=Sat
+  d.setUTCDate(d.getUTCDate() + (day === 0 ? -6 : 1 - day));
+  return d.toISOString().slice(0, 10);
+}
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -64,7 +73,7 @@ Deno.serve(async (req) => {
   const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: workout, error: rowErr } = await serviceClient
     .from('workouts')
-    .select('id, type, user_id')
+    .select('id, type, user_id, date')
     .eq('id', workout_id)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -118,6 +127,21 @@ Deno.serve(async (req) => {
     return json({ ok: true, stale: true, steps });
   }
   steps.push('analyze');
+
+  // D-178: refresh the cached snapshot + invalidate the training caches so the recomputed workout
+  // reaches every CACHED reader (LOAD bar, coach, the athlete-state spine) — not just its own
+  // Performance/Details tabs (which read live). Before this, recompute left the snapshot stale, so a
+  // manual swim (and any recompute) was invisible to LOAD/coach until the next real ingest. Non-fatal.
+  try {
+    const d = String((workout as any).date || '').slice(0, 10);
+    await serviceClient.functions.invoke('compute-snapshot', {
+      body: { user_id: workout.user_id, ...(d ? { week_start: mondayOf(d) } : {}) },
+    });
+    await invalidateUserTrainingCache(serviceClient, workout.user_id, 'recompute-workout');
+    steps.push('snapshot');
+  } catch (e) {
+    console.warn('[recompute-workout] snapshot/cache refresh failed (non-fatal):', (e as Error)?.message ?? e);
+  }
 
   console.log('[recompute-workout] steps completed:', steps);
   return json({ ok: true, stale: false, steps });

@@ -3925,6 +3925,21 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-178 — Manual swim whole-app awareness: verified source-agnostic + fixed the stale-snapshot gap
+
+- **Date:** 2026-06-16
+- **Verification (read-only trace — "does a `source='manual'` swim reach every state consumer?"):**
+  - **No source filter excludes manual** anywhere in the completed-workout consumers (get-week, compute-facts, compute-snapshot, athlete-snapshot, state-trend, workload). The snapshot's `ActualSession` type explicitly lists `source: 'strava' | 'garmin' | 'manual'` — manual is first-class.
+  - **Week view / calendar:** `get-week` reads workouts live, no source filter → ✓.
+  - **Load / volume:** `workload.ts` computes swim load from **duration** with intensity from RPE (`mapRPEToIntensity`) or the swim default `0.75` when no HR → a manual swim (no HR) gets a **non-zero** load and counts → ✓.
+  - **State screen:** `useStateTrends` assembles **live** client-side (`assembleStateTrends` over raw facts), not the cached snapshot → reflects the manual swim once compute-facts ran → ✓.
+  - **`recompute-workout`** (which D-174's manual entry invokes) runs compute-workout-analysis → compute-facts → analyze-swim → writes workout_analysis + workout_facts (pace_per_100m) + session_load → ✓.
+- **The gap found + FIXED:** a **direct insert + recompute did NOT refresh the cached `athlete_snapshot`** or invalidate the training caches the way the ingest fan-out does — so the **LOAD bar, coach, and the athlete-state spine** (all read the cached snapshot) stayed stale until the next real ingest. Fix: `recompute-workout` now, at its tail, invokes **`compute-snapshot`** (the workout's week) + **`invalidateUserTrainingCache`** (non-fatal). Benefits the manual swim AND **every** recompute (recompute changes facts that feed the snapshot; it should leave the app consistent).
+- **Result:** "the entire app knows you did it" — calendar, load/volume, State (live), coach (cached, now refreshed), all source-agnostic consumers.
+- **Scope:** server only (recompute-workout). **DEPLOYS** `recompute-workout`. Deno-valid (deploy clean). Verify on device: LogFAB → Log Swim → the swim shows in the week, the LOAD bar moves, the State swim card reflects it.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
