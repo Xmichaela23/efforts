@@ -18,6 +18,7 @@ import LogEffortDropdown from './LogEffortDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
 import ContextTabs from './ContextTabs';
 import LogFAB from './LogFAB';
+import ManualSwimEntry from './ManualSwimEntry';
 import PlansMenu from './PlansMenu';
 import GoalsScreen from './GoalsScreen';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
@@ -85,6 +86,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   // plannedWorkouts removed; unified get-week feeds views
 
   const [showBuilder, setShowBuilder] = useState(false);
+  const [showManualSwim, setShowManualSwim] = useState(false); // D-174 dead-simple manual swim entry
 
   // D-109: separate "session data exists in localStorage" from "user wants
   // logger open." D-108 conflated the two — any unfinished session in
@@ -1346,6 +1348,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     } else if (type === 'upload-course') {
       setGoalsCourseUploadNonce((n) => n + 1);
       setShowGoals(true);
+    } else if (type === 'log-swim') {
+      // D-174: swim gets the dead-simple completed-swim form, not the full planned builder.
+      setShowManualSwim(true);
     } else {
       setShowBuilder(true);
     }
@@ -1804,6 +1809,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       )}
       
       {/* Post-Workout Feedback Popup */}
+      {showManualSwim && (
+        <ManualSwimEntry
+          date={selectedDate}
+          onClose={() => setShowManualSwim(false)}
+        />
+      )}
+
       {feedbackWorkout && (
           <PostWorkoutFeedback
             workoutId={feedbackWorkout.id}

@@ -1301,7 +1301,7 @@ const Connections: React.FC = () => {
       {/* D-172: swim source capability matrix sits WITH the source toggles (informs what the preference
           above chooses) — not as the screen's opening. */}
       <SwimSourceMatrix
-        garminConnected={garminConnected}
+        garminConnected={garminConnected || !!connections.find((c) => c.provider === 'garmin')?.connected}
         stravaConnected={!!connections.find((c) => c.provider === 'strava')?.connected}
         appleHealthConnected={healthKitAuthorized}
         appleHealthAvailable={healthKitAvailable}

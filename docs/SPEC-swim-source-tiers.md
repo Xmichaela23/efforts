@@ -109,6 +109,16 @@ Richest-data-wins is **three layers**, not one feature. They must not contradict
 
 Dead-simple **completed**-swim entry from the planned screen (NOT a full logger, NOT `WorkoutBuilder` which makes *planned* workouts). Minimal: distance (yd/m) + duration; pool optional (→ lengths). Inserts `type='swim', source='manual', workout_status='completed'`; badge `Manual`. Reuses the D-162 popup for the optional RPE/feel/equipment enrichment after the row exists. One screen.
 
+## Send swim TO Apple Watch — BUILDABLE via WorkoutKit (watchOS 11, D-175)
+
+Supersedes the Q-062 "deferred — weak swim support" note: that was WWDC23-era. **Custom POOL SWIM workouts ARE supported in WorkoutKit as of watchOS 11 / WWDC24.** Build: compose a custom pool-swim `WorkoutPlan` from `planned_workouts.computed.steps` (warmup + repeatable work/recovery interval blocks + cooldown — maps cleanly to our step model) with activity = swimming + the pool length; schedule via `WorkoutScheduler`; enable the disabled "Send to Apple Watch" button (D-165 bottom sheet). Native Swift, watchOS 11+ target.
+- **Rest-type limitation:** WorkoutKit rests support distance/time/open only → send our fixed-time rests (e.g. 0:21) as-is. It CANNOT replicate Garmin's "manual-advance / leave-on-the-clock" rest. Accept the time-based send.
+- **Open Water NOT supported** by custom workouts (pool only) → gate the send to pool swims.
+
+## Manual swim escape hatch — SHIPPED (D-174)
+
+`ManualSwimEntry` (from `LogFAB` "Log Swim"): distance + time, pool optional, inserts a COMPLETED `source='manual'` swim + recompute so the tabs populate; the D-162 popup enriches. Badge `Manual`. (Was: design only.)
+
 ## Open gaps / unknowns
 - **Strokes**: no automatic source today (see the gap above). SWOLF is sparse until D-171/Phase-2.
 - **Garmin strokes**: not in the stored per-length array; extracting from the FIT is unconfirmed + out of scope.

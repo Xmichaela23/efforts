@@ -3882,6 +3882,22 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-174 — Manual swim entry (the courtesy escape hatch) — SHIPPED
+
+- **Date:** 2026-06-16
+- **Context:** the swim matrix's "Log on planned session screen" badge advertised a manual entry that didn't exist yet — build it. The priority of the D-172 follow-ups.
+- **What:** `ManualSwimEntry` — a dead-simple one-screen modal (distance + yd/m toggle, time mm:ss, optional pool selector, date). Inserts a **COMPLETED** swim (`type='swim', source='manual', workout_status='completed'`, distance km, `moving_time`/`elapsed_time`/`duration` in minutes — the swim storage convention; pool → `pool_length_m`+`pool_unit`+`user_corrected_pool_length_m`+derived `number_of_active_lengths`). Routed from `LogFAB`'s existing "Log Swim" option (was falling through to `WorkoutBuilder`, the full *planned* builder) via `handleSelectEffortType` `log-swim` → `ManualSwimEntry`.
+- **Processing:** a direct insert doesn't fire the ingest fan-out, so after insert it invokes `recompute-workout` (user JWT, fire-and-forget) → compute-facts/summary + analyze-swim-workout populate so the Performance/Details tabs render. The D-162 post-workout popup then handles optional RPE/feel/equipment (the swim is completed + rpe-null → it fires). Badge reads `Manual` (`deriveSwimTier`).
+- **Scope:** courtesy-tier, one screen — NOT a full logger. Client + a recompute invoke; `npm run build` clean. Verify on device: LogFAB → Log Swim → enter 1200 yd / 24:00 / 50 m → appears in the week, Performance tab populates, badge "Manual".
+
+## D-173 — Garmin per-discipline swim override (badge bug fixed; full override NEXT)
+
+- **Date:** 2026-06-16
+- **Fixed now:** the swim matrix's Garmin badge read "Connect" despite Garmin being connected — it keyed off the separate `garminConnected` state while Strava used the reliable `connections` array. Now reads `garminConnected || connections.find(garmin)?.connected`.
+- **NEXT (the actual override — designed, not yet built):** a "Use Garmin for swim data" toggle in the matrix (off by default) so a Strava-global user pulls **swims** from Garmin (full: splits/strokes/SWOLF/rest) while runs/rides stay on Strava. Storage: a per-discipline override in `user_baselines.preferences` (e.g. `swim_source_override: 'garmin'`). **Webhook routing (2 server edits):** `garmin-webhook-activities` must NOT skip a SWIM when global pref=`strava` AND the override is on; `strava-webhook` must SKIP swims when the override is on (so they don't double the Garmin copy). Gives "richest data wins" real teeth. Deferred to a focused pass (server change, needs a Garmin+Strava swim to verify the routing).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
