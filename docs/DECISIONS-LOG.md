@@ -3940,6 +3940,17 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-179 — Swim narrative: work:rest promoted to FIRST-CLASS in the lead (was relegated to a trailing bullet)
+
+- **Date:** 2026-06-16
+- **Symptom:** the displayed INSIGHTS read "1203 yd at 2:00/100yd, HR 119, RPE 3 → genuinely easy" — the D-177 RPE×HR coherence landed, but the moving-vs-elapsed (work:rest) tell was absent from what the user saw, even though D-176/D-177 asked for it.
+- **Root cause (NOT what was hypothesized — verified by reading the live narrative, not just the prompt):** work:rest was **already in the prompt input** (`workoutContext.{moving_min,elapsed_min,rest_min}`, fed at the "Work vs rest" line) AND the model was **already producing it** — but as **bullet 3**, the last/weakest of 3-4 separate observations. The displayed lead `session_state_v1.narrative.text` = `analysis.insights[0]` (build maps insights[0] → the headline), and nothing forced work:rest into that first observation, so the model spent the lead on pace+HR+RPE and appended a generic "substantial recovery fraction" read at the end. So the gap was **placement/prominence, not input threading** — the user's "maybe it was never threaded into the prompt input" hypothesis was checked and ruled out.
+- **Fix (prompt-only, `analyze-swim-workout`):** two edits making work:rest first-class — (1) the WORK:REST rule now states it is a first-class signal that MUST be read on equal footing with RPE/HR/pace and **woven into the FIRST/opening observation**, not only a trailing bullet; (2) the closing instruction now requires the **first observation** to integrate every signal — RPE + HR + pace + work:rest — into one honest verdict ("do not save work:rest for last"). Kept the existing read-against-intent guidance (technique/drill → high rest unremarkable; sustained aerobic → effort managed) and the honesty discipline (observe the ratio, never diagnose the cause).
+- **Verified (regenerated on the June 15 swim, real data):** the lead now reads "…HR 119 bpm and a reported RPE of just 3 out of 10, which aligns well with a controlled aerobic session. The work-to-rest ratio shows you spent 24 minutes actively swimming across a 35-minute window, meaning roughly one-third of your elapsed time was recovery, a pattern consistent with a structured set format rather than continuous swimming." → all three signals in the displayed headline; observes the pattern without diagnosing cause; unit-consistent; second-person.
+- **Scope:** server only (prompt). **DEPLOYS** `analyze-swim-workout`. Note for future: because the displayed lead = `insights[0]`, any "this signal must show up" requirement has to land in the FIRST observation, not just "somewhere in the prompt" — a non-lead bullet may not render as prominently as the user reads "the narrative."
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
