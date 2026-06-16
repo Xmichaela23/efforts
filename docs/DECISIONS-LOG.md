@@ -3848,6 +3848,20 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-168 — Swim narrative: second-person voice + build around the data swim actually has (HR, RPE/feel, work:rest)
+
+- **Date:** 2026-06-16
+- **Context:** post-D-167 the swim narrative was clean but **third-person** ("The swimmer covered…") — mismatched the run/ride COACHING voice ("You held…") — and **thin**, because it leaned on the little data swim has (distance/pace) and ignored two strong signals it DOES have.
+- **(1) Voice → second person:** prompt + system message now require "you" ("You covered…", "Your heart rate…"), matching the other analyzers. No more "the swimmer".
+- **(2) Lean into available data** (swim has no power/GPS/per-length, so use what it has):
+  - **Heart rate** (already stored) — prompt directs it to characterize the effort (aerobic control / how hard), the way the ride narrative uses power/HR.
+  - **RPE + feel** (D-162 post-swim popup, `workouts.rpe` / `workouts.feeling`) — added to the analyzer SELECT + prompt as the swimmer's OWN read, swim's best subjective signal (the equivalent of the ride's power data). Woven in: "…at RPE 3, feeling good."
+  - **Work:rest split** — moving (24 min) vs elapsed (35 min) = ~11 min rest, threaded into the prompt as a real signal. **Honesty discipline:** observe the pattern ("24 min of work across a 35-min session"), never diagnose WHY (don't claim the sets were hard / rest was deliberate / it was a technique session) — same restraint as the adherence bridge.
+- **Verified (real recompute, June 15 swim):** "**You covered 1203 yards** … at **2:00 per 100 yards** … average of **119 bpm** … **roughly 11 minutes of rest** across the 35-minute total … **You rated the effort as RPE 3** … and **felt good**…" — second person, all signals, observes rest without diagnosing.
+- **Scope:** narrative only — no prescription. **DEPLOYS** `analyze-swim-workout` (workout-detail already serves the narrative). The data was already captured (D-162); D-168 just threads it into the prompt.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

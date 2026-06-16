@@ -159,6 +159,8 @@ Deno.serve(async (req) => {
         max_heart_rate,
         avg_speed,
         max_speed,
+        rpe,
+        feeling,
         swim_data,
         intervals,
         computed,
@@ -373,6 +375,16 @@ Deno.serve(async (req) => {
     let narrativeInsights: string[] = [];
     if (Deno.env.get('ANTHROPIC_API_KEY')) {
       try {
+        // D-168: swim has no power/GPS/per-length data, so build the read around what it DOES have —
+        // HR, the work:rest split (moving vs elapsed), and the felt/RPE signal (swim's best subjective
+        // input, the equivalent of the ride's power data). Observe the rest pattern; never diagnose why.
+        const _elapsedSeconds = workout.elapsed_time ? (workout.elapsed_time < 1000 ? workout.elapsed_time * 60 : workout.elapsed_time) : null;
+        const movingMin = _movingSeconds ? Math.round(_movingSeconds / 60) : null;
+        const elapsedMin = _elapsedSeconds ? Math.round(_elapsedSeconds / 60) : null;
+        const restMin = (movingMin != null && elapsedMin != null && elapsedMin > movingMin) ? (elapsedMin - movingMin) : null;
+        const rpeVal = Number.isFinite(Number(workout.rpe)) && Number(workout.rpe) > 0 ? Number(workout.rpe) : null;
+        const feelLabel = (typeof workout.feeling === 'string' && workout.feeling.trim()) ? workout.feeling.trim() : null;
+
         const workoutContext = {
           type: workout.type,
           duration: workout.duration || 0,
@@ -389,12 +401,20 @@ Deno.serve(async (req) => {
           stroke_type: swimData.strokeType || 'Freestyle',
           intervals_completed: intervals.length,
           overall_adherence: overallAdherence != null ? Math.round(overallAdherence) : null,
+          moving_min: movingMin,
+          elapsed_min: elapsedMin,
+          rest_min: restMin,
+          rpe: rpeVal,
+          feeling: feelLabel,
         };
 
         let prompt = `You are analyzing a swimming workout. Generate 3-4 concise, data-driven observations based on the metrics below.
 
 CRITICAL RULES:
+- SECOND PERSON — address the swimmer directly as "you" ("You covered…", "Your heart rate…"), matching the coaching voice the run and ride analyses use. NEVER "the swimmer" or third person.
 - PLAIN PROSE ONLY — no Markdown. No "#" headers, no "**bold**", no numbered section titles, no labels. Each observation is one or two complete sentences. Separate observations with a blank line.
+- BUILD AROUND THE DATA THIS SWIM HAS — distance, pace, heart rate, the work:rest split, and how it felt (RPE/feel). Swim has no power or GPS, so lean into these. Use heart rate to characterize the effort (aerobic control / how hard). The felt/RPE rating is the swimmer's OWN read of the session — the best subjective signal here — so weave it in when given (e.g. "…at RPE 3, feeling good").
+- WORK:REST is a real signal — if a moving-vs-elapsed split is given (e.g. 24 min of work across a 35 min session, ~11 min rest), you may note the pattern factually. But OBSERVE ONLY — do NOT diagnose WHY (do not claim the sets were hard, the rest was deliberate, or it was a technique session). State what the data shows, never the cause.
 - UNIT CONSISTENCY: every distance and pace is in ${poolUnit === 'yd' ? 'YARDS' : 'METRES'}. Use that unit only. Do NOT convert to or mention the other unit anywhere — no "X ${poolUnit === 'yd' ? 'metres' : 'yards'}", no "≈ Y per 100 ${poolUnit === 'yd' ? 'm' : 'yd'}" translations. (The pool's physical length is given in its own build unit below — state it as-is; do NOT convert distances or paces to match it.)
 - NO INVENTED MATH: state only the metrics listed below. Do NOT compute or estimate derived values that are not given — no number of lengths, no stroke counts, no calories, no per-minute rates. Mixing the pool unit with the distance unit to "estimate lengths" is wrong and forbidden.
 - Write like "a chart in words" - factual observations only
@@ -418,6 +438,9 @@ Workout Profile:
 - Environment: ${workoutContext.environment}
 - Stroke Type: ${workoutContext.stroke_type}
 ${workoutContext.avg_heart_rate ? `- Avg HR: ${workoutContext.avg_heart_rate} bpm (Max: ${workoutContext.max_heart_rate} bpm)` : ''}
+${workoutContext.rest_min != null ? `- Work vs rest: ${workoutContext.moving_min} min of moving (work) across a ${workoutContext.elapsed_min} min session (~${workoutContext.rest_min} min rest)` : ''}
+${workoutContext.rpe != null ? `- Perceived effort (RPE): ${workoutContext.rpe}/10` : ''}
+${workoutContext.feeling ? `- Felt: ${workoutContext.feeling}` : ''}
 ${intervals.length > 0 ? `- Intervals Completed: ${workoutContext.intervals_completed}` : ''}
 ${plannedWorkout && workoutContext.overall_adherence != null ? `- Overall Adherence: ${workoutContext.overall_adherence}%` : ''}
 `;
@@ -462,11 +485,11 @@ ${intervalAnalysis.slice(0, 10).map((i: any) =>
 
         prompt += `
 
-Write 3-4 plain-prose observations (one or two sentences each). No headers, no bold, no numbered titles — just sentences:`;
+Write 3-4 plain-prose observations addressed to the swimmer as "you" (one or two sentences each). No headers, no bold, no numbered titles — just sentences. Weave in the heart rate, the work:rest split, and how it felt (RPE) where they're given:`;
 
         const { callLLM } = await import('../_shared/llm.ts');
         const swContent = await callLLM({
-          system: 'You are a swimming coach analyzing workout data. Respond in plain prose sentences only — never Markdown, headers, bold, or numbered section titles.',
+          system: 'You are a swimming coach giving an athlete feedback on their swim. Write in the second person (address them as "you"), in plain prose sentences only — never Markdown, headers, bold, or numbered section titles.',
           user: prompt,
           maxTokens: 500,
           temperature: 0.3,
