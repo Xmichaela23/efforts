@@ -484,6 +484,9 @@ Pattern-matched the swim surfaces to the existing design system (Details READOUT
 - [x] **Details equipment flag** — `· fins used` tag on the Details Avg Pace label when `swim_steps_equipment_confirmed` has fins=yes (honest signal the blended pace includes finned sets).
 - [x] **"No route data (pool swim)" gap** — replaced the placeholder floating in the tall map section with a thin muted divider; tightens the space before HR Zones.
 - Sibling work (same session): D-165 planned-swim bottom sheet (Copy-for-FORM + pool selector + Watch placeholder).
+- [x] **Swim narrative re-enabled (D-167)** — analyzer fixed (pace single-sourced via `swimPacePer100Seconds`, plain-prose prompt, unit-consistent with the UI, no invented derived stats) → pool-swim INSIGHTS restored, filling the dead space below the card. Closes Q-064.
+
+**§9 — and the full swim arc (D-159 → D-167) — CLOSED 2026-06-15.** From "swims render land junk + wrong numbers" to a swim-native experience across home / Details / Performance, single-sourced so the analyzer can't re-diverge. Consolidated in ENGINE-STATE ("Swim sweep consolidation"). Next-up swim feature: Q-061 (finned-pace exclusion — data dependency satisfied).
 
 ---
 
