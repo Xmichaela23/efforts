@@ -3890,11 +3890,28 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 - **Processing:** a direct insert doesn't fire the ingest fan-out, so after insert it invokes `recompute-workout` (user JWT, fire-and-forget) → compute-facts/summary + analyze-swim-workout populate so the Performance/Details tabs render. The D-162 post-workout popup then handles optional RPE/feel/equipment (the swim is completed + rpe-null → it fires). Badge reads `Manual` (`deriveSwimTier`).
 - **Scope:** courtesy-tier, one screen — NOT a full logger. Client + a recompute invoke; `npm run build` clean. Verify on device: LogFAB → Log Swim → enter 1200 yd / 24:00 / 50 m → appears in the week, Performance tab populates, badge "Manual".
 
-## D-173 — Garmin per-discipline swim override (badge bug fixed; full override NEXT)
+## D-173 — Garmin per-discipline swim override — SHIPPED
 
 - **Date:** 2026-06-16
-- **Fixed now:** the swim matrix's Garmin badge read "Connect" despite Garmin being connected — it keyed off the separate `garminConnected` state while Strava used the reliable `connections` array. Now reads `garminConnected || connections.find(garmin)?.connected`.
-- **NEXT (the actual override — designed, not yet built):** a "Use Garmin for swim data" toggle in the matrix (off by default) so a Strava-global user pulls **swims** from Garmin (full: splits/strokes/SWOLF/rest) while runs/rides stay on Strava. Storage: a per-discipline override in `user_baselines.preferences` (e.g. `swim_source_override: 'garmin'`). **Webhook routing (2 server edits):** `garmin-webhook-activities` must NOT skip a SWIM when global pref=`strava` AND the override is on; `strava-webhook` must SKIP swims when the override is on (so they don't double the Garmin copy). Gives "richest data wins" real teeth. Deferred to a focused pass (server change, needs a Garmin+Strava swim to verify the routing).
+- **Badge bug fixed:** the matrix's Garmin badge read "Connect" despite Garmin being connected — it keyed off the separate `garminConnected` state while Strava used the reliable `connections` array. Now `garminConnected || connections.find(garmin)?.connected`.
+- **The override:** a "Use Garmin for swim data" toggle in the matrix (off by default, shown when Garmin connected) → a Strava-global user pulls **swims** from Garmin (full: splits/strokes/SWOLF/rest) while runs/rides stay on the global source. Stored in `users.preferences.swim_source_override` ('garmin' | null) — the SAME table the webhooks read. The Garmin badge reads "Swim source" when on.
+- **Webhook routing (deployed, fallback-safe):**
+  - `strava-webhook` (both handlers): the existing fallback-aware garmin-pref skip now also fires for swims when the override is on — `if (sourcePreference === 'garmin' || (swimOverride === 'garmin' && isSwim))`. Reusing that tested path means a Strava swim is dropped **only when Garmin actually has it** (existence-checked) — never lost; worst case a transient double, not a loss.
+  - `garmin-webhook-activities` (both handlers): the strava-only skip now EXEMPTS swims when the override is on — `if (pref === 'strava' && !(swimOverride === 'garmin' && isSwim))` — so the Garmin swim ingests for override users.
+- **⚠ Verification owed:** I can't simulate a dual-source (Garmin+Strava) swim here. The edits are scoped to swims + the opt-in override and reuse the existing existence-check fallback, so blast radius is limited (worst case a double, never a lost swim, never affects runs/rides/non-override users). Verify with a real swim recorded on both Garmin + FORM→Strava: with the toggle ON → one swim, source Garmin, full data; toggle OFF → behaves as before.
+- **Scope:** client toggle + 2 webhooks (deployed `yyriamwvtvzlkumqrvpm`). Build clean.
+
+---
+
+## D-176 — Work:rest as the universal swim signal (session readout + rest-fraction trend) — NEXT SESSION
+
+- **Date filed:** 2026-06-16 (design recorded; build is next-session, after today's close)
+- **The insight:** do NOT reconstruct per-interval rest (needs per-length data, unreliable across sources). Use the **SESSION-LEVEL work:rest ratio** — total elapsed (pool duration) − moving time — as the universal rest tell. **It's the ONE rest signal that survives every source:** Strava, Garmin, and Apple Watch ALL carry both moving + elapsed. So it works for every swim regardless of pipe — including thin Strava swims and Apple Watch swims that haven't come through Q-060. Computable TODAY, no Q-060 dependency.
+- **Two layers:**
+  1. **Session readout (card):** surface work:rest on the swim card/Details — e.g. "Work 24:00 · Rest 11:00" or a rest-fraction readout (24:00 moving / 35:00 elapsed = ~31% recovering). The D-168 narrative already uses it; this backs it with a real surfaced metric. **Single-source it** (shared fn, same discipline as `swimPacePer100Seconds` — don't recompute in multiple places).
+  2. **Rest-fraction TREND (the part that lands for the hybrid athlete):** track the rest fraction over time, same-source, comparison-to-self. The progress signal for a non-elite swimmer grinding yardage isn't pace or SWOLF — it's **"I'm resting less to cover the same distance"**: moving time creeping toward total duration across a block at similar yardage = real, felt improvement ("your moving time is taking up more of your pool session" / shrinking rest fraction).
+- **Honest constraints:** trend ONLY within comparable sessions (similar distance/intent — don't compare a sprint set to a long aerobic swim); needs **same-source consistency** (moving/elapsed definitions differ slightly across Strava/Garmin/Watch — note it); **observe the trend, don't diagnose the cause** (high rest on a technique/drill session is normal; high rest on a threshold session may mean taxing sets — same restraint as the adherence bridge). Keep it a quiet, legible read — NOT a whole analytics surface.
+- **Why it's the right swim progress signal:** it's for the hybrid athlete (not the swim-first specialist chasing stroke mechanics).
 
 ---
 

@@ -208,7 +208,11 @@ async function processActivities(activities) {
         .single();
       
       const sourcePreference = userData?.preferences?.source_preference || 'both';
-      if (sourcePreference === 'strava') {
+      // D-173: per-discipline swim override — a Strava-global user can still route SWIMS to Garmin
+      // (richer data: splits/strokes/SWOLF/rest). Exempt swims from the strava-only skip when on.
+      const swimSourceOverride = (userData?.preferences as any)?.swim_source_override || null;
+      const _isSwimActivity = String((activity as any)?.activityType || '').toLowerCase().includes('swim');
+      if (sourcePreference === 'strava' && !(swimSourceOverride === 'garmin' && _isSwimActivity)) {
         console.log(`⏭️ Skipping Garmin activity ${activity.summaryId} - user prefers Strava only`);
         continue;
       }
@@ -339,7 +343,11 @@ async function processActivityDetails(activityDetails) {
         .single();
       
       const sourcePreference = userData?.preferences?.source_preference || 'both';
-      if (sourcePreference === 'strava') {
+      // D-173: per-discipline swim override — a Strava-global user can still route SWIMS to Garmin
+      // (richer data: splits/strokes/SWOLF/rest). Exempt swims from the strava-only skip when on.
+      const swimSourceOverride = (userData?.preferences as any)?.swim_source_override || null;
+      const _isSwimActivity = String((activity as any)?.activityType || '').toLowerCase().includes('swim');
+      if (sourcePreference === 'strava' && !(swimSourceOverride === 'garmin' && _isSwimActivity)) {
         console.log(`⏭️ Skipping Garmin activity ${activity.summaryId} - user prefers Strava only`);
         continue;
       }

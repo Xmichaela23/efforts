@@ -68,6 +68,7 @@ const Connections: React.FC = () => {
   const [showDateControls, setShowDateControls] = useState(false);
   const navigate = useNavigate();
   const [sourcePreference, setSourcePreference] = useState<'garmin' | 'strava' | 'both'>('both');
+  const [swimOverride, setSwimOverride] = useState(false); // D-173: route swims to Garmin (per-discipline)
   const [savingPreference, setSavingPreference] = useState(false);
   
   // Apple Health state (only relevant on iOS native app)
@@ -168,8 +169,29 @@ const Connections: React.FC = () => {
       if (userData?.preferences?.source_preference) {
         setSourcePreference(userData.preferences.source_preference);
       }
+      setSwimOverride((userData?.preferences as any)?.swim_source_override === 'garmin');
     } catch (error) {
       console.error('Error loading source preference:', error);
+    }
+  };
+
+  // D-173: toggle routing swims to Garmin (richer data) while runs/rides keep the global preference.
+  const toggleSwimOverride = async () => {
+    const next = !swimOverride;
+    setSwimOverride(next); // optimistic
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser?.id) throw new Error('Not authenticated');
+      const { data: userData } = await supabase.from('users').select('preferences').eq('id', authUser.id).single();
+      const currentPrefs = userData?.preferences || {};
+      const { error } = await supabase.from('users')
+        .update({ preferences: { ...currentPrefs, swim_source_override: next ? 'garmin' : null } })
+        .eq('id', authUser.id);
+      if (error) throw error;
+      toast({ title: next ? 'Swims now from Garmin' : 'Swim override off', description: next ? 'Runs and rides stay on your global source.' : undefined });
+    } catch (error) {
+      setSwimOverride(!next); // revert
+      toast({ title: 'Error', description: 'Could not save swim source.', variant: 'destructive' });
     }
   };
 
@@ -1305,6 +1327,8 @@ const Connections: React.FC = () => {
         stravaConnected={!!connections.find((c) => c.provider === 'strava')?.connected}
         appleHealthConnected={healthKitAuthorized}
         appleHealthAvailable={healthKitAvailable}
+        swimOverride={swimOverride}
+        onToggleSwimOverride={toggleSwimOverride}
       />
 
       <div className="text-center text-sm text-white/70">

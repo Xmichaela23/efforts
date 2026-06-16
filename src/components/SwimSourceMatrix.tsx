@@ -11,6 +11,8 @@ interface SwimSourceMatrixProps {
   stravaConnected?: boolean;
   appleHealthConnected?: boolean;
   appleHealthAvailable?: boolean; // iOS native app
+  swimOverride?: boolean; // D-173: route swims to Garmin even on a Strava-global preference
+  onToggleSwimOverride?: () => void;
 }
 
 type Status = { label: string; tone: 'connected' | 'action' | 'pending' | 'muted' };
@@ -33,9 +35,12 @@ const Row: React.FC<{ name: string; gives: string; status?: Status }> = ({ name,
 );
 
 const SwimSourceMatrix: React.FC<SwimSourceMatrixProps> = ({
-  garminConnected, stravaConnected, appleHealthConnected, appleHealthAvailable,
+  garminConnected, stravaConnected, appleHealthConnected, appleHealthAvailable, swimOverride, onToggleSwimOverride,
 }) => {
-  const garmin: Status = garminConnected ? { label: 'Connected', tone: 'connected' } : { label: 'Connect', tone: 'action' };
+  // D-173: when the swim override is on, Garmin IS the swim source — the badge says so.
+  const garmin: Status = garminConnected
+    ? (swimOverride ? { label: 'Swim source', tone: 'connected' } : { label: 'Connected', tone: 'connected' })
+    : { label: 'Connect', tone: 'action' };
   const strava: Status = stravaConnected ? { label: 'Connected', tone: 'connected' } : { label: 'Connect', tone: 'action' };
   // Apple Watch + FORM-via-Apple-Health share ONE pipe — Apple Health. Both badges read its connection state.
   const appleHealth: Status = appleHealthConnected ? { label: 'Connected', tone: 'connected' } : { label: 'Connect', tone: 'action' };
@@ -56,6 +61,24 @@ const SwimSourceMatrix: React.FC<SwimSourceMatrixProps> = ({
         <Row name="FORM goggles" gives="via Apple Health: +pool, strokes · via Strava: basic" status={appleHealth} />
         <Row name="Manual" gives="distance + time, pool optional" status={{ label: 'Log on planned session screen', tone: 'muted' }} />
       </div>
+
+      {/* D-173: opt-in — route swims to Garmin (richer) while runs/rides stay on the global preference. */}
+      {garminConnected && (
+        <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-white/[0.06]">
+          <div className="min-w-0">
+            <div className="text-[12px] text-white/80">Use Garmin for swim data</div>
+            <div className="text-[11px] text-white/40">Garmin offers richer swim data.</div>
+          </div>
+          <button
+            onClick={onToggleSwimOverride}
+            role="switch"
+            aria-checked={!!swimOverride}
+            className={`shrink-0 w-11 h-6 rounded-full relative transition-colors ${swimOverride ? 'bg-emerald-500/60' : 'bg-white/15'}`}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${swimOverride ? 'right-0.5' : 'left-0.5'}`} />
+          </button>
+        </div>
+      )}
 
       <p className="text-[12px] text-white/45 leading-snug mt-3">
         You'll only ever see the richest version of each swim — never a duplicate.

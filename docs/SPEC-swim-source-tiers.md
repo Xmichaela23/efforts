@@ -119,6 +119,10 @@ Supersedes the Q-062 "deferred — weak swim support" note: that was WWDC23-era.
 
 `ManualSwimEntry` (from `LogFAB` "Log Swim"): distance + time, pool optional, inserts a COMPLETED `source='manual'` swim + recompute so the tabs populate; the D-162 popup enriches. Badge `Manual`. (Was: design only.)
 
+## Work:rest — the UNIVERSAL rest tell (D-176, next-session)
+
+Distinct from **per-interval rest** (needs per-length data → unreliable cross-source; don't reconstruct it). The **session-level work:rest ratio (elapsed − moving)** is the ONE rest signal every source carries (Strava, Garmin, Apple Watch all have moving + elapsed) → works for every swim, including thin Strava and pre-Q-060 Watch swims. Computable today. Two layers: (1) session readout on the card; (2) rest-fraction **trend** (same-source, comparable sessions, comparison-to-self) — the hybrid athlete's real progress signal ("resting less to cover the same distance"). Single-source the calc (shared fn, the `swimPacePer100Seconds` discipline). Observe, don't diagnose. See D-176.
+
 ## Open gaps / unknowns
 - **Strokes**: no automatic source today (see the gap above). SWOLF is sparse until D-171/Phase-2.
 - **Garmin strokes**: not in the stored per-length array; extracting from the FIT is unconfirmed + out of scope.

@@ -174,7 +174,12 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
 
     // When Garmin is the preferred source, only fall back to Strava if Garmin has no record
     // for this specific workout (e.g. activity was only tracked on Strava, not on Garmin device).
-    if (sourcePreference === 'garmin') {
+    // D-173: the per-discipline swim override makes SWIMS behave like pref=garmin (route to Garmin's
+    // richer data) even for a Strava-global user — reusing this same fallback-aware skip so a swim is
+    // only dropped when Garmin actually has it (never lost).
+    const swimSourceOverride = (userData?.preferences as any)?.swim_source_override || null;
+    const _isSwimActivity = String(activityData.sport_type || activityData.type || '').toLowerCase().includes('swim');
+    if (sourcePreference === 'garmin' || (swimSourceOverride === 'garmin' && _isSwimActivity)) {
       const activityDate = (activityData.start_date_local || activityData.start_date || '').split('T')[0];
       const s = (activityData.sport_type?.toLowerCase() || activityData.type?.toLowerCase() || '');
       const mappedType = s.includes('run') ? 'run'
@@ -264,7 +269,12 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
 
     // When Garmin is the preferred source, only fall back to Strava if Garmin has no record
     // for this specific workout (e.g. activity was only tracked on Strava, not on Garmin device).
-    if (sourcePreference === 'garmin') {
+    // D-173: the per-discipline swim override makes SWIMS behave like pref=garmin (route to Garmin's
+    // richer data) even for a Strava-global user — reusing this same fallback-aware skip so a swim is
+    // only dropped when Garmin actually has it (never lost).
+    const swimSourceOverride = (userData?.preferences as any)?.swim_source_override || null;
+    const _isSwimActivity = String(activityData.sport_type || activityData.type || '').toLowerCase().includes('swim');
+    if (sourcePreference === 'garmin' || (swimSourceOverride === 'garmin' && _isSwimActivity)) {
       const activityDate = (activityData.start_date_local || activityData.start_date || '').split('T')[0];
       const s = (activityData.sport_type?.toLowerCase() || activityData.type?.toLowerCase() || '');
       const mappedType = s.includes('run') ? 'run'
