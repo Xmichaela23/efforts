@@ -3802,6 +3802,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-165 — Planned-swim bottom sheet (home/calendar): Copy-for-FORM + pool selector + Apple Watch placeholder
+
+- **Date:** 2026-06-15
+- **Context:** tapping a planned workout from the home "Today's Effort" card / calendar opens a Radix Drawer (`TodaysEffort.tsx`) with Send-to-Garmin / Mark-Complete / Close. For swims it was a **downgraded** surface vs the Planned tab — no Copy-for-FORM-Goggles, no pool selector.
+- **Added (swim-only, between the Garmin row and the Mark-Complete row):**
+  - **Pool length selector** (25 yd / 25 m / 50 m) → writes `pool_unit` + `pool_length_m` + `plan_pool_length_m` to the **planned** row. `PostWorkoutFeedback` now prefills its pool from the linked planned swim's `pool_length_m` when the completed swim has none — so picking the pool here pre-selects it in the post-workout popup.
+  - **"Copy for FORM Goggles"** — reuses the Planned tab's exact path (`buildFormGogglesSwimScript` + clipboard + toast), no duplicate logic.
+  - **"Send to Apple Watch"** — disabled placeholder, `title="Coming soon (Q-062)"`.
+- **Unchanged:** Send-to-Garmin, Mark-Complete, Close. Non-swim sheets untouched.
+- **Scope:** UI + planned-row pool write — no prescription, no analyzer change. `npm run build` clean. Verify on device: tap a planned swim → sheet shows pool selector + Copy-for-FORM; selection prefills the post-workout popup.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

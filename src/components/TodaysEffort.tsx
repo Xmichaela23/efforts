@@ -6,7 +6,8 @@ import { useStrengthOrderingPreference } from '@/lib/use-strength-ordering-prefe
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
-import { Calendar, Clock, Dumbbell, Activity, X } from 'lucide-react';
+import { Calendar, Clock, Dumbbell, Activity, X, Copy } from 'lucide-react';
+import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
@@ -266,6 +267,51 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // Expanded details toggle per workout (id → boolean)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [sendingToGarmin, setSendingToGarmin] = useState<string | null>(null);
+  // Bottom-sheet swim controls (D-165): pool selector + Copy-for-FORM, matching the Planned tab.
+  const [savingPool, setSavingPool] = useState(false);
+  const [localPlannedPool, setLocalPlannedPool] = useState<{ lengthM: number } | null>(null);
+
+  // Pool choices (metres; matches the post-workout feedback popup so the prefill lines up).
+  const POOL_CHOICES = [
+    { value: '25yd', label: '25 yd', unit: 'yd' as const, meters: 22.86 },
+    { value: '25m', label: '25 m', unit: 'm' as const, meters: 25 },
+    { value: '50m', label: '50 m', unit: 'm' as const, meters: 50 },
+  ];
+
+  // Set the pool on the PLANNED swim → flows to the post-workout feedback prefill (PostWorkoutFeedback
+  // reads the linked planned pool). Writes both columns the resolver/analyzer read.
+  const setPlannedPool = async (choice: { unit: 'yd' | 'm'; meters: number }) => {
+    if (!selectedPlannedWorkout?.id) return;
+    try {
+      setSavingPool(true);
+      await supabase
+        .from('planned_workouts')
+        .update({ pool_unit: choice.unit, pool_length_m: choice.meters, plan_pool_length_m: choice.meters } as any)
+        .eq('id', selectedPlannedWorkout.id);
+      setLocalPlannedPool({ lengthM: choice.meters });
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* */ }
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* */ }
+    } catch (e) {
+      toast({ title: 'Error', description: 'Failed to save pool length', variant: 'destructive' });
+    } finally {
+      setSavingPool(false);
+    }
+  };
+
+  // Copy-for-FORM-Goggles — same script + UX as the Planned tab (StructuredPlannedView).
+  const handleCopyFormGoggles = async () => {
+    const script = buildFormGogglesSwimScript(selectedPlannedWorkout);
+    if (!script) {
+      toast({ title: 'Nothing to copy', description: 'This swim needs materialized steps. Try after the plan is activated.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(script);
+      toast({ title: 'Copied for FORM Goggles', description: 'FORM → Custom Workouts → Create From Text, then paste.' });
+    } catch {
+      toast({ title: 'Copy failed', description: 'Allow clipboard access for this site and try again.', variant: 'destructive' });
+    }
+  };
   const [sendingToWatch, setSendingToWatch] = useState<string | null>(null);
   const [watchAvailable, setWatchAvailable] = useState(false);
   
@@ -1994,7 +2040,57 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   );
                 })()}
               </div>
-              
+
+              {/* Swim-only (D-165): pool selector + Copy-for-FORM-Goggles + Apple Watch placeholder.
+                  Mirrors the Planned tab so the home/calendar bottom sheet isn't a downgraded surface. */}
+              {selectedPlannedWorkout && String(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase() === 'swim' && (() => {
+                const rgb = getDisciplineColorRgb('swim');
+                const border = `rgba(${rgb}, 0.55)`;
+                const curMeters = localPlannedPool?.lengthM ?? Number(selectedPlannedWorkout.pool_length_m ?? selectedPlannedWorkout.pool_length);
+                const activeVal = Number.isFinite(curMeters)
+                  ? (POOL_CHOICES.find((c) => Math.abs(c.meters - curMeters) < 0.6)?.value ?? null)
+                  : null;
+                return (
+                  <>
+                    <div className="w-full">
+                      <div className="text-xs text-white/50 mb-1.5">Pool length</div>
+                      <div className="flex gap-2 w-full">
+                        {POOL_CHOICES.map((c) => (
+                          <button
+                            key={c.value}
+                            disabled={savingPool}
+                            onClick={() => setPlannedPool(c)}
+                            className="flex-1 px-3 py-2 rounded-xl text-sm font-light text-white border transition-all disabled:opacity-50"
+                            style={{ borderColor: border, borderWidth: '0.5px', borderStyle: 'solid', backgroundColor: activeVal === c.value ? `rgba(${rgb}, 0.18)` : 'transparent' }}
+                          >
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 w-full">
+                      <button
+                        onClick={handleCopyFormGoggles}
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium tracking-wide text-white border transition-all"
+                        style={{ borderColor: border, borderWidth: '0.5px', borderStyle: 'solid', backgroundColor: 'transparent' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.15)`; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      >
+                        <Copy className="h-4 w-4 opacity-80" aria-hidden />
+                        Copy for FORM Goggles
+                      </button>
+                      <button
+                        disabled
+                        title="Coming soon (Q-062)"
+                        className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide text-white/40 border border-white/10 cursor-not-allowed opacity-50"
+                      >
+                        Send to Apple Watch
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+
               {/* Bottom row: Mark as Complete and Close - evenly spaced with yellow outlines */}
               <div className="flex gap-2 w-full">
                 {selectedPlannedWorkout && (() => {

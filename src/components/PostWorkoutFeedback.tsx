@@ -188,20 +188,28 @@ export default function PostWorkoutFeedback({
       // Swim (D-162): prefill the pool from any prior pool_length, and read the LINKED PLANNED swim's
       // prescribed per-step equipment so we can ask "did you actually use the prescribed fins?".
       if (isSwim) {
+        let poolSet = false;
         if (Number(data?.pool_length) > 0) {
           const m = Number(data.pool_length);
           const match = POOL_OPTIONS.find((p) => Math.abs(p.meters - m) < 0.6);
-          if (match) setSelectedPool(match.value);
+          if (match) { setSelectedPool(match.value); poolSet = true; }
         }
         const plannedId = data?.planned_id;
         const prescribed: Array<{ id: string; equipment: string; prompt: string; step_index: number | null }> = [];
         if (plannedId) {
           const { data: planned } = await supabase
             .from('planned_workouts')
-            .select('computed')
+            .select('computed, pool_length_m, pool_unit')
             .eq('id', plannedId)
             .eq('user_id', userId)
             .single();
+          // Prefill the pool from the PLANNED swim (set on the home/calendar bottom sheet, D-165) when the
+          // completed swim carries none — so the popup opens with the right pool already selected.
+          if (!poolSet && Number(planned?.pool_length_m) > 0) {
+            const pm = Number(planned.pool_length_m);
+            const pmatch = POOL_OPTIONS.find((p) => Math.abs(p.meters - pm) < 0.6);
+            if (pmatch) setSelectedPool(pmatch.value);
+          }
           const steps: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : [];
           const seen = new Set<string>();
           // (1) Per-step REQUIRED equipment (pull→buoy, kick→board): tied to a specific step.
