@@ -376,8 +376,10 @@ Deno.serve(async (req) => {
         const workoutContext = {
           type: workout.type,
           duration: workout.duration || 0,
-          distance: totalDistanceMeters,
-          distance_unit: 'meters',
+          // D-167 cont.: feed distance in the DISPLAY unit (yards here) so the narrative matches the UI
+          // (1203 yd / 2:00 per 100yd / 22 lengths) instead of leaking "1100 metres" + a metres pace.
+          distance: poolUnit === 'yd' ? Math.round(totalDistanceMeters / 0.9144) : Math.round(totalDistanceMeters),
+          distance_unit: poolUnit === 'yd' ? 'yards' : 'meters',
           avg_pace_per_100: avgPacePer100 > 0 ? formatPace(avgPacePer100) : 'N/A',
           pool_length: poolLength,
           pool_unit: poolUnit,
@@ -393,6 +395,8 @@ Deno.serve(async (req) => {
 
 CRITICAL RULES:
 - PLAIN PROSE ONLY — no Markdown. No "#" headers, no "**bold**", no numbered section titles, no labels. Each observation is one or two complete sentences. Separate observations with a blank line.
+- UNIT CONSISTENCY: every distance and pace is in ${poolUnit === 'yd' ? 'YARDS' : 'METRES'}. Use that unit only. Do NOT convert to or mention the other unit anywhere — no "X ${poolUnit === 'yd' ? 'metres' : 'yards'}", no "≈ Y per 100 ${poolUnit === 'yd' ? 'm' : 'yd'}" translations. (The pool's physical length is given in its own build unit below — state it as-is; do NOT convert distances or paces to match it.)
+- NO INVENTED MATH: state only the metrics listed below. Do NOT compute or estimate derived values that are not given — no number of lengths, no stroke counts, no calories, no per-minute rates. Mixing the pool unit with the distance unit to "estimate lengths" is wrong and forbidden.
 - Write like "a chart in words" - factual observations only
 - NO motivational language ("great job", "keep it up")
 - NO subjective judgments ("slow", "bad", "should have")
