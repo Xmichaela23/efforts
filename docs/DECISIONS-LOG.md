@@ -3872,6 +3872,13 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 - **Tier-derivation function (D-169, verified):** `src/lib/swim-source-tier.ts` `deriveSwimTier()` — pure single-source (badge + tier + `isFormViaStrava` nudge flag), verified against all 24 real swims (10 Strava·basic / 12 Garmin·full / 2 Garmin·basic — honest gating: Garmin swims lacking a lengths count correctly read basic) + synthetic manual/healthkit/merged cases. Not yet wired to the card badge (next).
 - **Still open under D-172:** the **manual swim escape hatch** (item 4) — a dead-simple COMPLETED-swim entry from the planned screen (distance + time, pool optional; `source='manual'`, reuses the D-162 popup for enrichment). Distinct from `WorkoutBuilder` (which makes *planned* workouts). Deferred to a focused pass — a completed-workout insert deserves care, not a tail-of-session rush. And the **card badge wiring** + the **FORM→Apple nudge** (Phase 1) on the swim card.
 - **Scope:** display-only — no prescription, no ingest. `npm run build` clean. SPEC: `SPEC-swim-source-tiers.md` (strategic context + matrix + FORM correction + manual hatch). Phase 2 (Q-060 HealthKit ingest + 60s merge) remains the follow-on, now justified by SWOLF + no-doubles.
+- **D-172 continued (Connections polish + dedup reconciliation):**
+  - **Matrix moved** below the account cards + source preference (was leading the whole screen); now sits *with* the toggles.
+  - **FORM row tightened** — one clean line ("via Apple Health: +pool, strokes (soon) · via Strava: basic"), no status chip (was wrapping into a tall narrow column).
+  - **Dedup verified in code (the real fix):** source preference IS enforced at ingest (`strava-webhook` skips on pref=garmin; `garmin-webhook` skips on pref=strava) AND all swim ingests route through `ingest-activity` where `mergeSameSwimIfExists` reconciles same-swim cross-source. **Matrix and Source Preference don't contradict** — informs / chooses / protects. **Residual gap flagged:** the 60s merge window can miss when Strava's integer-minute start differs >60s from Garmin's → double (Q-060-area fix).
+  - **"Richest data" = three layers** (matrix informs · preference chooses · merge protects) — documented in the SPEC.
+  - **Dedup wording scoped honestly** — replaced the full no-duplicates promise with "…we aim to keep it to one — pick your source above. (FORM + Apple Health merge coming soon.)" — the HealthKit merge is Q-060-gated, framed as coming not done.
+  - **Still open:** manual swim entry (item 4) + card badge wiring + FORM→Apple nudge.
 
 ---
 

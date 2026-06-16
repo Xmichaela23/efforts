@@ -89,6 +89,20 @@ The dedup/merge (`mergeSameSwimIfExists`) + HealthKit plugin **already exist** (
 - **FORM = one entry**, corrected value (pool + stroke count, not "rich"), points to Apple Health as the somewhat-better pipe.
 - Dual-source reassurance line: "use both FORM and Apple Watch? we'll merge into one swim — no duplicates" (Phase 2 / Q-060 intent, stated not built).
 
+## "Choose the richest data" — the three-layer model (D-172 cont.)
+
+Richest-data-wins is **three layers**, not one feature. They must not contradict — and they don't:
+1. **INFORMS — the swim matrix** (`SwimSourceMatrix`): shows what each source gives (the richness column). Sits *with* the source toggles (below them), not as the screen's opening.
+2. **CHOOSES — Activity Source Preference** (`user_baselines.preferences.source_preference` = garmin/strava/both): the user steers swims to their richest available source. **Enforced at ingest**: `strava-webhook` skips when pref=`garmin` (`:177`/`:267`); `garmin-webhook-activities` skips when pref=`strava` (`:211`). So a Garmin-source swim is NOT double-ingested from Strava.
+3. **PROTECTS — auto-merge backstop**: when overlaps slip through anyway, richest fields win → one swim. **All swim ingests route through `ingest-activity`** (Strava webhook calls it directly `:571`; Garmin swims via `swim-activity-details`→ingest), where `mergeSameSwimIfExists` (D-157, `:1304`) reconciles same-swim cross-source (60s window + ±10% distance + different source).
+
+**Verified, no contradiction:** matrix informs, preference chooses, merge protects — complementary halves of one story.
+
+### ⚠ Honesty constraint + the residual gap
+- The Garmin↔Strava layer (preference + merge) is **LIVE** → can promise "one swim, pick your source."
+- The **HealthKit/FORM richest-merge is gated on Q-060** (HealthKit ingest unbuilt) → frame as **"coming," never "done."** The matrix dedup line says exactly: *"…we aim to keep it to one — pick your source above. (FORM + Apple Health merge coming soon.)"*
+- **Residual gap:** `mergeSameSwimIfExists` keys on a 60-sec start-window, but Strava rounds start times to integer minutes while Garmin has seconds — the same swim's starts can differ >60s → merge misses → double. The "both" default leans entirely on this merge. Widening the window / matching on date+distance+duration is the Q-060-area fix.
+
 ## Manual swim escape hatch (D-172 item 4) — courtesy tier
 
 Dead-simple **completed**-swim entry from the planned screen (NOT a full logger, NOT `WorkoutBuilder` which makes *planned* workouts). Minimal: distance (yd/m) + duration; pool optional (→ lengths). Inserts `type='swim', source='manual', workout_status='completed'`; badge `Manual`. Reuses the D-162 popup for the optional RPE/feel/equipment enrichment after the row exists. One screen.

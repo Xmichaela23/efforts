@@ -26,11 +26,11 @@ const Chip: React.FC<{ s: Status }> = ({ s }) => {
   return <span className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{s.label}</span>;
 };
 
-const Row: React.FC<{ name: string; gives: string; status: Status }> = ({ name, gives, status }) => (
+const Row: React.FC<{ name: string; gives: string; status?: Status }> = ({ name, gives, status }) => (
   <div className="flex items-center gap-3 py-2.5 border-b border-white/[0.06] last:border-0">
     <div className="w-[104px] shrink-0 text-[13px] text-white/85">{name}</div>
     <div className="flex-1 min-w-0 text-[12px] text-white/45 leading-snug">{gives}</div>
-    <Chip s={status} />
+    {status && <Chip s={status} />}
   </div>
 );
 
@@ -56,16 +56,18 @@ const SwimSourceMatrix: React.FC<SwimSourceMatrixProps> = ({
       </p>
 
       <div>
-        <Row name="Garmin" gives="Full · per-length splits, stroke count, SWOLF, rest intervals" status={garmin} />
-        <Row name="Apple Watch" gives="Full · per-length splits, stroke count, SWOLF" status={watch} />
-        <Row name="FORM goggles" gives="via Apple Health: + pool & stroke count (coming soon) · via Strava: basic" status={{ label: 'via Strava / Apple Health', tone: 'muted' }} />
-        <Row name="Strava" gives="Basic · distance, time, heart rate (no pool / strokes / SWOLF)" status={strava} />
-        <Row name="Manual" gives="Whatever you enter — distance + time, pool optional" status={{ label: 'Add by hand', tone: 'muted' }} />
+        <Row name="Garmin" gives="Full · splits, stroke count, SWOLF, rest" status={garmin} />
+        <Row name="Apple Watch" gives="Full · splits, stroke count, SWOLF" status={watch} />
+        <Row name="FORM goggles" gives="via Apple Health: +pool, strokes (soon) · via Strava: basic" />
+        <Row name="Strava" gives="Basic · distance, time, heart rate" status={strava} />
+        <Row name="Manual" gives="Whatever you enter — distance + time" status={{ label: 'Add by hand', tone: 'muted' }} />
       </div>
 
-      {/* Dual-source reassurance (Phase 2 / Q-060 merge — stated as intent, not yet built). */}
+      {/* Dedup reassurance — scoped HONESTLY to what's live (Garmin/Strava via the preference above);
+          the HealthKit/FORM richest-merge is Q-060 (unbuilt) so it's "coming", not a kept promise. */}
       <p className="text-[11px] text-white/35 leading-snug mt-3">
-        Use both FORM and Apple Watch? We'll merge the same swim into one workout — no duplicates.
+        However your swims arrive, we aim to keep it to one — pick your source above.
+        <span className="text-white/25"> (FORM + Apple Health merge coming soon.)</span>
       </p>
     </div>
   );

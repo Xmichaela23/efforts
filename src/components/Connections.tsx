@@ -902,16 +902,6 @@ const Connections: React.FC = () => {
             Connect your fitness services to automatically sync data and enable real-time updates.
           </p>
 
-          {/* D-172: honest swim source capability matrix — what each source actually gives you. */}
-          <div className="mb-6">
-            <SwimSourceMatrix
-              garminConnected={garminConnected}
-              stravaConnected={!!connections.find((c) => c.provider === 'strava')?.connected}
-              appleHealthConnected={healthKitAuthorized}
-              appleHealthAvailable={healthKitAvailable}
-            />
-          </div>
-
       <div className="grid gap-6">
         {connections.map((connection) => (
           <Card key={connection.provider} className="relative">
@@ -1307,6 +1297,15 @@ const Connections: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* D-172: swim source capability matrix sits WITH the source toggles (informs what the preference
+          above chooses) — not as the screen's opening. */}
+      <SwimSourceMatrix
+        garminConnected={garminConnected}
+        stravaConnected={!!connections.find((c) => c.provider === 'strava')?.connected}
+        appleHealthConnected={healthKitAuthorized}
+        appleHealthAvailable={healthKitAvailable}
+      />
 
       <div className="text-center text-sm text-white/70">
         <p>
