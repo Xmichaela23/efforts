@@ -496,6 +496,10 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   if (poolLm != null) { const isYd = poolLm >= 20 && poolLm <= 26; metrics.push([isYd ? `${Math.round(poolLm / 0.9144)} yd` : `${Math.round(poolLm)} m`, 'Pool']); }
   if (lengths != null) metrics.push([String(lengths), 'Lengths']);
 
+  // D-166 refinement: week/phase context ("Week 5 · Build") rides at the top of the card — it lived in
+  // the top adherence header that swims now drop, and that context matters for every discipline.
+  const weekLabel = (sd as any)?.plan_context?.week_label as string | null | undefined;
+
   // D-166 refinement: render the discipline trend INSIDE the card (was orphaned between header + card).
   const dt = (sd as any)?.discipline_trend;
   const trendNode = (() => {
@@ -537,6 +541,9 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      {weekLabel && (
+        <div className="text-center text-[11px] uppercase tracking-wide mb-2" style={labelStyle}>{weekLabel}</div>
+      )}
       {trendNode}
       {(executedDistM > 0 || executedDurS > 0) && (
         <div className="flex items-center justify-center gap-10 text-center mb-4">

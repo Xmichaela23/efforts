@@ -3829,6 +3829,7 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
   - **Discipline trend moved INSIDE the card** — "swim trend ↑ improving +34.6%" was orphaned between the header and the card; `PoolSwimOverall` now renders it as the card's top line (reads `sd.discipline_trend`, same verdict-signed-% rule as D-160), and the standalone `DisciplineTrendLine` is suppressed for swims.
   - **Pace label** — "2:00 /100yd" is now one value line with "Pace" as the label beneath (was wrapping `/100yd` under "Pace"); `whitespace-nowrap` on metric values.
   - **Dead space below the card → Q-064** — the run/ride INSIGHTS narrative is still suppressed for pool swims (Q-038-clouded); filed rather than re-enabled blind.
+  - **Week/phase label kept** — dropping the top adherence header also dropped the week label ("Week 5 · Build") it carried. Restored as the card's top line (`sd.plan_context.week_label`) — week/phase context matters for every discipline, not just the ones that kept the header.
 
 ---
 
