@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
+import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
+import { swimPacePer100Seconds } from '../_shared/swim/swim-pace.ts';
 
 // =============================================================================
 // ANALYZE-SWIM-WORKOUT - SWIMMING ANALYSIS EDGE FUNCTION
@@ -162,7 +164,10 @@ Deno.serve(async (req) => {
         computed,
         planned_id,
         user_id,
+        pool_length,
         pool_length_m,
+        plan_pool_length_m,
+        user_corrected_pool_length_m,
         pool_unit,
         environment,
         workout_metadata
@@ -199,7 +204,7 @@ Deno.serve(async (req) => {
     if (workout.planned_id) {
       const { data: planned, error: plannedError } = await supabase
         .from('planned_workouts')
-        .select('id, intervals, steps_preset, computed, total_duration_seconds, description, tags, training_plan_id, pool_length_m, pool_unit, user_id')
+        .select('id, intervals, steps_preset, computed, total_duration_seconds, description, tags, training_plan_id, pool_length_m, pool_unit, swim_unit, user_id')
         .eq('id', workout.planned_id)
         .eq('user_id', workout.user_id) // Authorization: verify planned workout belongs to user
         .single();
@@ -282,17 +287,31 @@ Deno.serve(async (req) => {
     // Calculate basic metrics
     const totalDistance = workout.distance || 0; // in km, convert to meters
     const totalDistanceMeters = totalDistance * 1000;
-    const poolLength = workout.pool_length_m || swimData.poolLength || 25; // default 25m
-    const poolUnit = workout.pool_unit || swimData.poolUnit || 'm';
+    // D-167: pool length via the ONE resolver (user_corrected → device → planned → default) — the
+    // analyzer was defaulting to 25 (m/yd) and ignoring the athlete's post-swim correction (D-164).
+    const poolLength = resolvePoolLength({
+      user_corrected_pool_length_m: (workout as any).user_corrected_pool_length_m,
+      pool_length: (workout as any).pool_length ?? (workout as any).pool_length_m,
+      plan_pool_length_m: (workout as any).plan_pool_length_m,
+    }).length_m;
+    // Display/pace unit = the plan's swim unit (matches the Performance tab, build.ts plannedTotals.swim_unit),
+    // defaulting to yd; pool PHYSICAL length is separate (above) and may be metres in a yard-plan pool.
+    const poolUnit: 'yd' | 'm' = ((plannedWorkout as any)?.swim_unit || workout.pool_unit || 'yd') === 'm' ? 'm' : 'yd';
+
     const isPool = workout.environment !== 'open_water';
-    
-    // Calculate average pace per 100m/yd
-    let avgPacePer100 = 0;
-    if (totalDistanceMeters > 0 && workout.moving_time) {
-      const totalSeconds = workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time;
-      const paceSeconds = (totalSeconds / totalDistanceMeters) * 100;
-      avgPacePer100 = paceSeconds;
-    }
+
+    // D-167: pace via the SHARED helper (single source with build.ts) so the narrative pace == the
+    // Performance-tab pace. Was computing per-100m and mislabeling as /100yd ("2:11" vs the true "2:00").
+    const _movingSeconds = workout.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null;
+    const avgPacePer100 = swimPacePer100Seconds(_movingSeconds, totalDistanceMeters, poolUnit) ?? 0;
+
+    // Physical pool length display (separate from the pace unit): 25/50 yd pools read in yd, 25/50 m in m.
+    const poolDisplay = (() => {
+      const Lm = Number(poolLength);
+      if (!(Lm > 0)) return null;
+      const isYdPool = (Lm >= 22 && Lm <= 24) || (Lm >= 44 && Lm <= 47); // 25yd ≈ 22.86m, 50yd ≈ 45.72m
+      return isYdPool ? `${Math.round(Lm / 0.9144)} yd` : `${Math.round(Lm)} m`;
+    })();
 
     // Analyze intervals if available
     const intervalAnalysis = intervals.map((interval: any, idx: number) => {
@@ -373,6 +392,7 @@ Deno.serve(async (req) => {
         let prompt = `You are analyzing a swimming workout. Generate 3-4 concise, data-driven observations based on the metrics below.
 
 CRITICAL RULES:
+- PLAIN PROSE ONLY — no Markdown. No "#" headers, no "**bold**", no numbered section titles, no labels. Each observation is one or two complete sentences. Separate observations with a blank line.
 - Write like "a chart in words" - factual observations only
 - NO motivational language ("great job", "keep it up")
 - NO subjective judgments ("slow", "bad", "should have")
@@ -390,7 +410,7 @@ Workout Profile:
 - Duration: ${workoutContext.duration} minutes
 - Distance: ${workoutContext.distance.toFixed(0)} ${workoutContext.distance_unit}
 - Avg Pace: ${workoutContext.avg_pace_per_100} per 100${poolUnit}
-- Pool Length: ${workoutContext.pool_length}${workoutContext.pool_unit}
+- Pool Length: ${poolDisplay ?? 'unknown'}
 - Environment: ${workoutContext.environment}
 - Stroke Type: ${workoutContext.stroke_type}
 ${workoutContext.avg_heart_rate ? `- Avg HR: ${workoutContext.avg_heart_rate} bpm (Max: ${workoutContext.max_heart_rate} bpm)` : ''}
@@ -438,27 +458,38 @@ ${intervalAnalysis.slice(0, 10).map((i: any) =>
 
         prompt += `
 
-Generate 3-4 observations about this swim workout:`;
+Write 3-4 plain-prose observations (one or two sentences each). No headers, no bold, no numbered titles — just sentences:`;
 
         const { callLLM } = await import('../_shared/llm.ts');
         const swContent = await callLLM({
-          system: 'You are a swimming coach analyzing workout data. Provide concise, factual observations.',
+          system: 'You are a swimming coach analyzing workout data. Respond in plain prose sentences only — never Markdown, headers, bold, or numbered section titles.',
           user: prompt,
           maxTokens: 500,
           temperature: 0.3,
         });
 
         if (swContent) {
-          const content = swContent;
-          // Split into individual insights (assuming they're separated by newlines or periods)
-          narrativeInsights = content.split('\n')
-            .map((line: string) => line.trim())
-            .filter((line: string) => line.length > 0 && !line.match(/^\d+\.$/))
+          // Prose-first prompt is the primary defense; this is a backstop that strips any stray Markdown
+          // (leading #, **bold**) and drops header-only / label-only lines so the narrative never leads
+          // with "# Swim Workout Analysis" or a bare "1. Pace consistency" bold header (D-167).
+          const stripMd = (s: string) => s
+            .replace(/^\s*#{1,6}\s*/, '')        // leading "# "
+            .replace(/^\s*[-*•]\s+/, '')          // bullet marker
+            .replace(/^\s*\d+[.)]\s*/, '')        // "1." / "1)"
+            .replace(/\*\*/g, '')                  // bold markers
+            .replace(/^\*\*?|\*\*?$/g, '')
+            .trim();
+          const isHeaderOnly = (s: string) =>
+            s.length < 18 ||                        // too short to be a real observation
+            !/[a-z]/.test(s) ||                     // no lowercase → likely a TITLE
+            (!/[.!?]$/.test(s) && s.split(/\s+/).length <= 6); // short, no terminal punctuation
+          narrativeInsights = swContent.split('\n')
+            .map(stripMd)
+            .filter((line: string) => line.length > 0 && !isHeaderOnly(line))
             .slice(0, 4);
-          
+
           if (narrativeInsights.length === 0) {
-            // Fallback: treat entire response as one insight
-            narrativeInsights = [content.substring(0, 200)];
+            narrativeInsights = [stripMd(swContent).substring(0, 200)];
           }
         }
       } catch (error) {

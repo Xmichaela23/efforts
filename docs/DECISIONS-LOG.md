@@ -3833,6 +3833,20 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-167 — Swim narrative fixed (pace single-sourced + plain-prose prompt) → re-enabled for pool swims
+
+- **Date:** 2026-06-15
+- **Context:** Q-064 assessment found the swim INSIGHTS narrative unshippable: it led with the markdown title **"# Swim Workout Analysis"** and stated the **wrong pace** ("2:11/100yd" — per-100m mislabeled as /100yd) with a **wrong pool** (25 yd default, not the athlete's 50 m). Fixed all three, then re-enabled.
+- **(1) Pace + pool single-sourced (the foundational fix):**
+  - New shared helper `_shared/swim/swim-pace.ts` `swimPacePer100Seconds(movingS, distanceM, unit)` — **the one** swim-pace calc, now called by BOTH `build.ts` (Performance tab) and `analyze-swim-workout` (narrative). The analyzer was computing per-100m independently and mislabeling; single-sourcing kills the divergence at the source (same recurring class as D-156/D-164).
+  - Pool length via `resolvePoolLength` (user_corrected → device → planned → default), reading the D-164 columns added to the analyzer SELECT — was hard-defaulting to 25. Pace **unit** = the plan's `swim_unit` (matches `build.ts` `plannedTotals.swim_unit`, default yd); physical pool length shown separately (50 m).
+- **(2) Plain-prose prompt (over post-hoc stripping):** the prompt + system message now forbid Markdown (no `#`, no `**`, no numbered titles) and ask for 3–4 plain sentences — a prose-first prompt is more robust than a parser chasing syntax. A backstop parser still strips stray markdown and drops header-only / label-only lines.
+- **(3) Re-enabled `SessionNarrative` for pool swims** (`MobileSummary` — dropped the `!is_pool_swim` suppression) only **after** verifying clean on a real recompute. Swims now get INSIGHTS like run/ride (filling the dead space below the card, Q-064), and SessionNarrative hosts recompute, so the separate D-164 pool-swim recompute button was removed.
+- **Verified (real recompute, June 15 swim):** narrative.text = "The swimmer completed 1100 meters in 24 minutes, **averaging 2:00 per 100 yards**…"; bullets all plain prose (no markdown); "**50-meter pool**"; `workout_summary.average_pace_per_100: "2:00"`, `pool_length: 50`.
+- **Scope:** display/narrative only — no prescription. **DEPLOYS:** `analyze-swim-workout` + `workout-detail` (build.ts consumer) — server change. Client + docs pushed. Closes Q-064.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

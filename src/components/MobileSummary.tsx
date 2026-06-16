@@ -288,34 +288,21 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           })() : null}
         />
       )}
-      {/* Pool / Lengths / fins moved INTO the unified swim card (D-166, PoolSwimOverall) so they share
-          the metrics grid instead of floating below it. */}
+      {/* Pool / Lengths / fins moved INTO the unified swim card (D-166, PoolSwimOverall). */}
 
-      {/* Recompute affordance for pool swims — the control normally lives in SessionNarrative, which is
-          suppressed for pool swims (below), so swims had no in-app recompute. This restores it. */}
-      {type === 'swim' && sd?.classification?.is_pool_swim && (
-        <div className="mt-3 flex flex-col items-center gap-1">
-          <button
-            onClick={recomputeAnalysis}
-            disabled={recomputing}
-            className="text-[12px] text-white/55 hover:text-white/80 underline underline-offset-2 disabled:opacity-50 disabled:no-underline"
-          >
-            {recomputing ? 'Recomputing…' : 'Recompute analysis'}
-          </button>
-          {recomputeError && <span className="text-[11px] text-red-400">{recomputeError}</span>}
-        </div>
-      )}
-      {!sd?.classification?.is_pool_swim && (
-        <SessionNarrative
-          sessionDetail={sd}
-          hasSessionDetail={hasSessionDetail}
-          noPlannedCompare={noPlannedCompare}
-          planLinkNote={!planned ? 'No plan session linked.' : null}
-          recomputing={recomputing}
-          recomputeError={recomputeError}
-          onRecompute={recomputeAnalysis}
-        />
-      )}
+      {/* D-167: pool-swim narrative RE-ENABLED. The swim analyzer now emits clean plain prose with the
+          authoritative pace (verified on real data — no markdown title, 2:00/100yd, 50 m pool), so swims
+          get INSIGHTS like run/ride and fill the dead space below the card. SessionNarrative also hosts
+          the recompute control, so the separate D-164 pool-swim recompute button is removed (Q-064). */}
+      <SessionNarrative
+        sessionDetail={sd}
+        hasSessionDetail={hasSessionDetail}
+        noPlannedCompare={noPlannedCompare}
+        planLinkNote={!planned ? 'No plan session linked.' : null}
+        recomputing={recomputing}
+        recomputeError={recomputeError}
+        onRecompute={recomputeAnalysis}
+      />
 
       {/* Layer 3 swim enrichment — RELOCATED to the bottom (D-160): it was a near-top hero element
           above the swim metrics; demoted to a quiet opt-in row at the end of the swim view (also

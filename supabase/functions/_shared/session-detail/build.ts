@@ -8,6 +8,7 @@ import { mergeArcPerformanceNarrative } from './arc-performance-bridge.ts';
 import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../athlete-snapshot/types.ts';
 import type { ReadinessSnapshotV1 } from '../readiness-types.ts';
 import { packageSessionDetailReadiness } from './readiness-load-context.ts';
+import { swimPacePer100Seconds } from '../swim/swim-pace.ts';
 
 /** Match fact-packet ai-summary: session HR drift is not meaningful for structured interval sessions. */
 function shouldSuppressSessionHrDrift(factPacket: any, intervals?: IntervalRow[]): boolean {
@@ -421,14 +422,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const completedDurS = fin(compOverall?.duration_s_moving);
   const completedDistM = fin(compOverall?.distance_m);
   const swimUnit = plannedTotals.swim_unit || 'yd';
-  const completedSwimPer100 = (() => {
-    if (type !== 'swim') return null;
-    if (completedDurS != null && completedDurS > 0 && completedDistM != null && completedDistM > 0) {
-      const per100count = swimUnit === 'yd' ? (completedDistM / 0.9144) / 100 : completedDistM / 100;
-      if (per100count > 0) return Math.round(completedDurS / per100count);
-    }
-    return null;
-  })();
+  // D-167: single-sourced via the shared helper so the analyzer's narrative pace can't diverge from
+  // this (the Performance-tab) value. Moving duration ÷ distance, per 100 of the display unit.
+  const completedSwimPer100 = type === 'swim'
+    ? swimPacePer100Seconds(completedDurS, completedDistM, swimUnit === 'yd' ? 'yd' : 'm')
+    : null;
   const fpFacts = factPacket?.facts || {};
   const fpDerived = factPacket?.derived || {};
   // D-163: a swim's planned duration is TOTAL session time (incl. rest), so the swim block must show the
