@@ -328,25 +328,26 @@ Deno.serve(async (req) => {
     // hardcoded `100` was a TODO for linked swims AND a fake-perfect-score for
     // unlinked. Both modes are now honest: linked → ratio-based score;
     // unlinked → null.
+    // D-163: planned swim duration is TOTAL session time (warmup + sets + REST + cooldown), so compare
+    // it to the athlete's ELAPSED pool time — NOT moving time, which excludes rest. The old moving-vs-
+    // total comparison understated adherence badly (24 min moving / 31 min planned = 77%, when the
+    // athlete was in the pool the full ~35 min). Reported as a RAW completion ratio (matches the
+    // distance chip: >100% = did more than planned), uncapped for display; the execution-score blend
+    // clamps it to 100 below so a long session can't inflate the quality score.
+    // Elapsed pool time in seconds (handles the integer-minute storage convention). Drives the duration
+    // adherence AND is surfaced on `performance` so the swim block shows TOTAL time, not moving time.
+    const _swimElapsedSec: number | null = (() => {
+      const raw = Number(workout.elapsed_time ?? workout.moving_time ?? 0);
+      return raw > 0 ? (raw < 1000 ? raw * 60 : raw) : null;
+    })();
     const _swimDurationAdherence: number | null = (() => {
       if (!plannedWorkout) return null;
       const plannedSec = Number(
         plannedWorkout?.total_duration_seconds ??
         plannedWorkout?.computed?.total_duration_seconds ?? 0
       );
-      const actualMv = Number(workout.moving_time ?? 0);
-      const actualSec = actualMv > 0 ? (actualMv < 1000 ? actualMv * 60 : actualMv) : 0;
-      if (!(plannedSec > 0 && actualSec > 0)) return null;
-      const ratio = actualSec / plannedSec;
-      let pct: number;
-      if (ratio >= 0.9 && ratio <= 1.1) {
-        pct = 100 - Math.abs(ratio - 1) * 100;
-      } else if (ratio < 0.9) {
-        pct = ratio * 100;
-      } else {
-        pct = (plannedSec / actualSec) * 100;
-      }
-      return Math.round(Math.max(0, Math.min(100, pct)));
+      if (!(plannedSec > 0 && _swimElapsedSec != null && _swimElapsedSec > 0)) return null;
+      return Math.round((_swimElapsedSec / plannedSec) * 100);
     })();
 
     // Generate AI insights if OpenAI key is available
@@ -481,7 +482,10 @@ Generate 3-4 observations about this swim workout:`;
     const _swimExecAdherence: number | null = (() => {
       if (overallAdherence == null && _swimDurationAdherence == null) return null;
       const pace = overallAdherence ?? null;
-      const dur = _swimDurationAdherence ?? null;
+      // Clamp to 100 for the QUALITY blend (D-163): duration_adherence is now a raw completion ratio
+      // that can exceed 100 (a longer-than-planned swim), but "did more time" must not push the
+      // execution quality score above a clean session's.
+      const dur = _swimDurationAdherence != null ? Math.min(100, _swimDurationAdherence) : null;
       if (pace != null && dur != null) {
         return Math.round((pace * 0.5) + (dur * 0.5));
       }
@@ -497,6 +501,8 @@ Generate 3-4 observations about this swim workout:`;
         pace_adherence: overallAdherence != null ? Math.round(overallAdherence) : null,
         duration_adherence: _swimDurationAdherence,
         execution_adherence: _swimExecAdherence,
+        // D-163: total pool time (seconds) so session-detail shows elapsed, not moving (pace stays on moving).
+        session_elapsed_s: _swimElapsedSec,
       },
       detailed_analysis: {
         workout_summary: {

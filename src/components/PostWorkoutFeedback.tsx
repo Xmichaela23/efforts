@@ -34,6 +34,20 @@ const POOL_OPTIONS: Array<{ value: string; label: string; meters: number }> = [
 // Unplanned-swim equipment multi-select fallback (session-level tag).
 const UNPLANNED_EQUIP = ['Fins', 'Pull buoy', 'Snorkel', 'Paddles'];
 
+// Friendly display names — the materializer normalizes equipment to terse tokens ('buoy', 'board')
+// that read poorly in a prompt ("Did you use buoy?"). Map to athlete-facing names. equipment string
+// stored to workout_metadata is unchanged (the token); only the prompt label is friendly.
+const EQUIP_DISPLAY: Record<string, string> = {
+  buoy: 'pull buoy',
+  'pull buoy': 'pull buoy',
+  board: 'kickboard',
+  kickboard: 'kickboard',
+  fins: 'fins',
+  snorkel: 'snorkel',
+  paddles: 'paddles',
+};
+const equipDisplay = (eq: string): string => EQUIP_DISPLAY[eq] ?? eq;
+
 interface PostWorkoutFeedbackProps {
   workoutId: string;
   workoutType: 'run' | 'ride' | 'swim';
@@ -198,7 +212,7 @@ export default function PostWorkoutFeedback({
             prescribed.push({
               id: `s${i}`,
               equipment: eq,
-              prompt: `${String(st?.label || st?.kind || `Step ${i + 1}`)} — ${eq}?`,
+              prompt: `${String(st?.label || st?.kind || `Step ${i + 1}`)} — ${equipDisplay(eq)}?`,
               step_index: Number.isFinite(st?.planned_index) ? Number(st.planned_index) : i,
             });
           });
@@ -212,7 +226,7 @@ export default function PostWorkoutFeedback({
             const eq = String(raw || '').trim().toLowerCase();
             if (!eq || eq === 'none' || seen.has(eq)) continue;
             seen.add(eq);
-            prescribed.push({ id: `g-${eq}`, equipment: eq, prompt: `Did you use ${eq}?`, step_index: null });
+            prescribed.push({ id: `g-${eq}`, equipment: eq, prompt: `Did you use ${equipDisplay(eq)}?`, step_index: null });
           }
         }
         setPrescribedEquip(prescribed);

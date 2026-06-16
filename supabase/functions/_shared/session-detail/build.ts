@@ -431,8 +431,13 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   })();
   const fpFacts = factPacket?.facts || {};
   const fpDerived = factPacket?.derived || {};
+  // D-163: a swim's planned duration is TOTAL session time (incl. rest), so the swim block must show the
+  // athlete's ELAPSED pool time (from the analyzer's session_elapsed_s) — NOT moving time, which excludes
+  // rest and made "duration" read short. Pace stays on moving time (completedSwimPer100 uses completedDurS
+  // above, computed before this). Non-swims and missing elapsed fall back to moving.
+  const completedElapsedS = fin((perf as any)?.session_elapsed_s);
   const completedTotals: SessionDetailV1['completed_totals'] = {
-    duration_s: completedDurS,
+    duration_s: (type === 'swim' && completedElapsedS != null && completedElapsedS > 0) ? completedElapsedS : completedDurS,
     distance_m: completedDistM,
     // Land pace (min/mi) + GAP are meaningless for a swim — null them so the swim screen never
     // renders "5:03/mi". Swim pace lives in swim_pace_per_100_s. (Layer 1: numbers honest; the

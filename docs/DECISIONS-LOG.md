@@ -3772,6 +3772,21 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 - **Trigger plumbing:** swims were excluded at the source — opened the gate in **all five** paths: `check-feedback-needed` (`.in('type', […,'swim'])`), the `feedbackWorkout` union, and the four AppLayout trigger predicates (`checkSpecificWorkout`, two realtime handlers, post-import) via a shared `isFeedbackType` helper. RPE-null + dismissal gating unchanged.
 - **UX call:** implemented as **sections in the existing single panel** (matching the current RPE/feeling/gear layout), not a multi-screen wizard — lower risk, consistent with the component.
 - **Scope:** capture/display only — no prescription, no pace filtering. `check-feedback-needed` deployed; client `npm run build` clean. Verify on the June-15 swim (open it → popup shows feel/RPE + pool + equipment) and on the next planned swim with prescribed drill equipment.
+- **Verified on device (2026-06-15):** full flow persisted on the real swim — `pool_length: 50`, `number_of_active_lengths: 22` (=round(1100/50)), `rpe: 3`, `feeling: "good"`, and `workout_metadata.swim_steps_equipment_confirmed: [{snorkel,used:true},{fins,used:true}]`. The equipment two-source read (per-step + session-level) was the fix that made it show.
+- **Friendly equipment names (follow-up):** the materializer normalizes equipment to terse tokens (`buoy`, `board`); the popup now maps those to athlete-facing names for the prompt only (`buoy → "pull buoy"`, `board → "kickboard"`) via `EQUIP_DISPLAY` — the stored `equipment` token is unchanged. Note pull/kick-focused sessions surface **all** plan gear (required + optional), e.g. pull → buoy + paddles + snorkel, not buoy-only — same path that correctly shows snorkel+fins on a catch-up swim.
+
+---
+
+## D-163 — Swim duration adherence: compare ELAPSED pool time to the planned total, not moving time
+
+- **Date:** 2026-06-15
+- **Context:** the swim Performance tab read **"77% Duration"** when the athlete swam *longer* than planned (planned 30:59, elapsed ~35 min). Audited: `analyze-swim-workout` computed `duration_adherence` from **`moving_time`** (24 min, excludes rest between sets) against the planned **`total_duration_seconds`** (1859s, which *includes* rest) → 1440/1859 = 77%. Apples-to-oranges — a swim's planned duration is whole-session time, so the comparable executed value is **elapsed**, not moving.
+- **Fix:**
+  - **`analyze-swim-workout`:** `duration_adherence` now uses **elapsed** (`workout.elapsed_time`, integer-minute-aware) and reports a **raw completion ratio** (`elapsed/planned`, uncapped → ~113% here, ">100% = did more", matching the distance chip's raw method). The execution-score blend **clamps it to 100** so a long session can't inflate the quality score. Also surfaces `performance.session_elapsed_s`.
+  - **`build.ts` (session-detail):** the swim block's `completed_totals.duration_s` now shows **elapsed** (from `perf.session_elapsed_s`) so the planned/executed card + the D-160 headline read total pool time, not moving. **Pace stays on moving** — `swim_pace_per_100_s` is computed from `completedDurS` (moving) *before* this, untouched. Non-swims and missing-elapsed fall back to moving.
+- **Why raw, not the prior symmetric closeness score:** the old formula penalized over- AND under-shoot (capped 100); for a swim "I did more time" should read as >100% like distance (+yd), not as a deduction. The quality blend keeps the bounded behavior via the clamp.
+- **Residual:** Strava stores elapsed as **integer minutes** (35, not 36:42), so it reads ~113% not the athlete's exact 118% — the same integer-minute precision loss flagged in the swim audit (Layer 1), not a new bug.
+- **Scope:** display/adherence only — no prescription. Deploy `analyze-swim-workout` + `workout-detail`; recompute the swim to populate `session_elapsed_s`. Verify: Duration chip ~113%, swim block shows ~35:00 executed.
 
 ---
 
