@@ -3,6 +3,9 @@ import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { arcModeSystemAddon, arcNarrativeFactBlock } from '../_shared/arc-narrative-ai-appendix.ts';
+// Shared narrative-reasoning core (D-189 — strength leg). Scaffold + validator suite via the strength
+// adapter; strength gets a 2-attempt validator loop (it had none). See docs/WORK-ORDER-narrative-core.md.
+import { buildReasoningScaffold, validateNarrative, strengthAdapter } from '../_shared/narrative-core/index.ts';
 
 /**
  * =============================================================================
@@ -797,6 +800,49 @@ async function getStrengthProgression(
   }
 }
 
+// D-189: canonical per-exercise e1RM trend from exercise_log (the single-source — brzycki1RM → exercise_log,
+// written by compute-facts). Current session's e1RM per lift + the most recent PRIOR session's e1RM →
+// a per-exercise trend. Returns [] gracefully on any error (honest blank — the narrative then states no
+// e1RM, never invents one). Never recomputes e1RM here; reads the canonical stored value.
+async function getE1rmTrend(
+  supabase: any,
+  userId: string,
+  workoutId: string,
+  workoutDate: string,
+): Promise<Array<{ exercise: string; canonical: string; current_e1rm: number; prior_e1rm: number | null; trend: 'up' | 'down' | 'flat' | null }>> {
+  try {
+    const { data: cur } = await supabase
+      .from('exercise_log')
+      .select('canonical_name, exercise_name, estimated_1rm')
+      .eq('workout_id', workoutId);
+    const rows = (cur ?? []).filter((r: any) => Number(r?.estimated_1rm) > 0);
+    const out: Array<{ exercise: string; canonical: string; current_e1rm: number; prior_e1rm: number | null; trend: 'up' | 'down' | 'flat' | null }> = [];
+    for (const r of rows) {
+      const { data: prev } = await supabase
+        .from('exercise_log')
+        .select('estimated_1rm, date')
+        .eq('user_id', userId)
+        .eq('canonical_name', r.canonical_name)
+        .lt('date', workoutDate)
+        .gt('estimated_1rm', 0)
+        .order('date', { ascending: false })
+        .limit(1);
+      const prior = prev?.[0]?.estimated_1rm != null ? Number(prev[0].estimated_1rm) : null;
+      const current = Number(r.estimated_1rm);
+      let trend: 'up' | 'down' | 'flat' | null = null;
+      if (prior != null && prior > 0) {
+        const d = current - prior;
+        trend = Math.abs(d) < 2.5 ? 'flat' : d > 0 ? 'up' : 'down'; // 2.5 lb dead-band (smallest plate)
+      }
+      out.push({ exercise: r.exercise_name || r.canonical_name, canonical: r.canonical_name, current_e1rm: current, prior_e1rm: prior, trend });
+    }
+    return out;
+  } catch (e) {
+    console.warn('[analyze-strength] getE1rmTrend failed (non-fatal → honest blank):', (e as Error)?.message ?? e);
+    return [];
+  }
+}
+
 /**
  * Generate comprehensive exercise-by-exercise breakdown
  */
@@ -1472,7 +1518,15 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   });
   
   console.log(`📊 PROGRESSION: Analyzed ${Object.keys(progressionData).length} exercises`);
-  
+
+  // D-189: canonical per-exercise e1RM trend from exercise_log.estimated_1rm (brzycki1RM → exercise_log,
+  // the app's clean single-source — written by compute-facts before this analyzer runs). This is the
+  // PREREQUISITE for the narrative-core strength migration: the prompt's "estimated-1RM trend" line had
+  // NO data behind it (rule-6 fabrication vector) because the packet read raw strength_exercises, never
+  // the canonical e1RM. Now it reads the real value; the e1RM-trend addendum becomes expressible.
+  const e1rmTrend = await getE1rmTrend(supabase, workout.user_id, workout.id, workout.date);
+  console.log(`📊 e1RM: ${e1rmTrend.length} exercises with canonical estimated_1rm (${e1rmTrend.filter((e: any) => e.prior_e1rm != null).length} with a prior to trend)`);
+
   // Generate comprehensive exercise-by-exercise breakdown
   let exerciseBreakdown: any[] = [];
   try {
@@ -1589,8 +1643,9 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     volumeAnalysis,
     dataQuality,
     arc_narrative_for_summary,
+    e1rmTrend, // D-189: canonical e1RM per exercise (+ prior/trend) for the narrative core
   );
-  
+
   return {
     status: 'success',
     exercise_adherence: exerciseAdherence,
@@ -1626,6 +1681,7 @@ async function generateEnhancedStrengthInsights(
   volumeAnalysis: any,
   dataQuality: any,
   arcNarrative: ArcNarrativeContextV1 | null = null,
+  e1rmTrend: Array<{ exercise: string; canonical: string; current_e1rm: number; prior_e1rm: number | null; trend: 'up' | 'down' | 'flat' | null }> = [], // D-189: canonical e1RM per exercise
 ): Promise<string[]> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     return ['AI analysis not available - ANTHROPIC_API_KEY not configured'];
@@ -2232,13 +2288,20 @@ COACHING INSIGHT
     // client to render verbatim; the narrative is supposed to *interpret*, not
     // re-list. Mode rule structure mirrors cycling STRUCTURED PLANNED MODE /
     // CLEAN-EXECUTION CAP from D-092 / D-093.
-    const content = await callLLM({
-      system: `You write strength session summaries for experienced athletes. You receive pre-calculated facts and translate them into coaching prose.
+    // D-189: canonical e1RM block — real values from exercise_log, NEVER invented. When a lift has no
+    // prior session, say so explicitly so the model can't claim a trend (rule 5 / rule 6 guard).
+    const e1rmBlock = e1rmTrend.length
+      ? '\n\nESTIMATED 1RM (canonical, from exercise_log — authoritative; use ONLY these numbers, never invent an e1RM):\n' +
+        e1rmTrend.map((e) => `- ${e.exercise}: ${e.current_e1rm} lb${e.prior_e1rm != null ? ` (prev ${e.prior_e1rm} lb → ${e.trend})` : ' — NO prior session, so NO trend exists; do not claim one'}`).join('\n')
+      : '\n\nESTIMATED 1RM: not available this session — do NOT mention or invent an estimated 1RM.';
+    const ncCtx = strengthAdapter.buildContext({ e1rm_by_exercise: e1rmTrend });
+    // D-189: scaffold APPENDED to the existing strength prompt (assembly not unified — guardrail #1).
+    const systemPrompt = `You write strength session summaries for experienced athletes. You receive pre-calculated facts and translate them into coaching prose.
 
 RULES (HARD):
 - Output EXACTLY 3-4 sentences. No headers, no section dividers, no bullet lists, no all-caps section labels. Single paragraph.
 - S1 (LEDE): RIR + load adherence vs the prescribed target. When one exercise dominates the session story (a missed lift, a PR, a clear RIR break), cite it specifically. When adherence is uniform, summarize at the session level ("Hit every working set on target across squat, bench, and row at RIR 2"). Cite specific numbers (weight, reps, RIR) when they tell the story; otherwise summarize plainly.
-- S2: ONE physiological observation — RIR drift across the set (rising = fatigue), readiness/RPE alignment, or estimated-1RM trend. Pick one; do not list.
+- S2: ONE physiological observation — RIR drift across the set (rising = fatigue), readiness/RPE alignment, or estimated-1RM trend (ONLY when a prior session exists in the e1RM block; never invent one). Pick one; do not list.
 - S3: ONE phase + endurance-load context clause — where the athlete is in the plan (base / build / peak / taper / recovery), cumulative-fatigue read in plain words, or the relationship to nearby endurance load. ONE clause; skip entirely if no notable signal.
 - S4: ONE forward-looking sentence — next-session target adjustment OR recovery cue. ONE.
 
@@ -2256,20 +2319,26 @@ PLAIN LANGUAGE:
 
 ARC CONTEXT: temporal Arc context (days since/until a race; phase; recovery state) may appear only as a TRAILING clause, never the lede.
 
-PACKET (authoritative; do not compute outside it): facts come from the user message — phase, week_in_phase, plan_intent, avg_target_rir, avg_actual_rir, rir_delta, rir_verdict, total_volume_lb, exercises_completed/planned, set_completion_pct, session_rpe.${arcNarrative ? arcModeSystemAddon(arcNarrative) : ''}`,
-      user: (arcNarrative
-        ? 'TEMPORAL ARC CONTEXT (do not contradict; paraphrase for the athlete — these are facts for THIS workout date, not invented load):\n' +
-          arcNarrativeFactBlock(arcNarrative) +
-          '\n\n'
-        : '') + context,
-      // D-102: cap token budget tightened from 2000 (which the prior verbose
-      // prompt needed for 6 sections) to 240 — comfortably fits a clean 4-sentence
-      // paragraph + a few citations, hard-caps overflow. Match cycling D-093's
-      // 220-token cap pattern.
-      maxTokens: 240,
-      temperature: 0.3,
-      model: 'sonnet',
-    }) ?? '';
+PACKET (authoritative; do not compute outside it): facts come from the user message — phase, week_in_phase, plan_intent, avg_target_rir, avg_actual_rir, rir_delta, rir_verdict, total_volume_lb, exercises_completed/planned, set_completion_pct, session_rpe, and the ESTIMATED 1RM block.${arcNarrative ? arcModeSystemAddon(arcNarrative) : ''}${buildReasoningScaffold(strengthAdapter, { e1rm_by_exercise: e1rmTrend })}`;
+    const baseUser = (arcNarrative
+      ? 'TEMPORAL ARC CONTEXT (do not contradict; paraphrase for the athlete — these are facts for THIS workout date, not invented load):\n' +
+        arcNarrativeFactBlock(arcNarrative) +
+        '\n\n'
+      : '') + context + e1rmBlock;
+    const callOnce = async (userMsg: string): Promise<string> =>
+      (await callLLM({ system: systemPrompt, user: userMsg, maxTokens: 240, temperature: 0.3, model: 'sonnet' })) ?? '';
+
+    // D-189: 2-attempt validator loop (strength previously had NONE). Shared core catches rules 1/2/4/5 —
+    // here the load-bearing ones are rule 6/5 (no fabricated/un-trended e1RM) + rule 4 (no cause-diagnosis
+    // of a missed lift) + rule 3 (no endurance HR framing). Retry-then-soft-accept (never regress to empty).
+    let content = await callOnce(baseUser);
+    const nc1 = validateNarrative(content, ncCtx);
+    if (!nc1.ok && content) {
+      console.warn('[analyze-strength] narrative rejected:', JSON.stringify(nc1.failures.map((f) => f.code)));
+      const corrective = baseUser + '\n\nYour previous draft violated the reasoning rules:\n' + nc1.failures.map((f) => '- ' + f.why).join('\n') + '\nRewrite as 3-4 sentences fixing these.';
+      const s2 = await callOnce(corrective);
+      if (s2) content = s2;
+    }
     
     // Return the full structured analysis as a single string
     // Don't split it - the UI should display it as formatted text

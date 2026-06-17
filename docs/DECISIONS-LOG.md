@@ -4082,6 +4082,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-189 — STRENGTH migration onto the shared narrative core (+ canonical e1RM packet wiring)
+
+- **Date:** 2026-06-16
+- **What:** migrated STRENGTH onto `_shared/narrative-core/` (3rd of 4). Two parts: a **data prerequisite** (wire canonical e1RM) then the migration.
+- **Prerequisite — canonical e1RM wiring (fixes the rule-6 fabrication vector):** the strength narrative prompt listed "estimated-1RM trend" as an S2 option, but the packet carried NO e1RM — it read raw `workout.strength_exercises`, never `exercise_log.estimated_1rm`. So any e1RM the LLM mentioned was **fabricated**. New `getE1rmTrend(supabase, userId, workoutId, date)` reads the canonical `exercise_log.estimated_1rm` (`brzycki1RM → exercise_log`, the clean single-source written by compute-facts) — current session's e1RM per lift + the most recent PRIOR session → a per-exercise trend (up/flat/down, 2.5 lb dead-band). **No schema** (column pre-existing, confirmed). Fed into the narrative's user message as an explicit block ("use ONLY these; when no prior session, NO trend exists — do not claim one") so e1RM is real or absent, never invented.
+- **Migration:** built `adapters/strength.ts` (`leadSignals=['RIR','load','e1RM-trend']`; `anchors.strength='e1rm-history'` and deliberately **no hr anchor** so endurance-framing imports trip `anchorlessEffort`; `establishedCauses:[]` so cause-of-missed-lift is never diagnosed; `hasFitnessTrend = a lift has a prior e1RM`). Appended the scaffold to strength's existing prompt and **added a 2-attempt validator loop — strength previously had NONE** (single call, no backstop). Extended the shared `FITNESS_STATE` regex with strength phrasings ("strength is building", "getting stronger").
+- **Verified on 3 real strength sessions (before→after):** reads **real canonical e1RM** (matches `exercise_log`: bench 150, deadlift 120, …), **no fabricated e1RM**, **no endurance framing** (✅ none — HR/pace/zones absent), validators pass; the May-18 AFTER even dropped the BEFORE's looser "clear upward trend" framing. **Rule-5 lever confirmed:** a "getting stronger / strength is building" claim is **caught** with no e1RM trend (ungrounded_fitness_state + ungrounded_direction) and **allowed** when a per-exercise e1RM trend grounds it; an endurance HR-framing import is **caught** (anchorless_hr). Swim acceptance gate still green; run/ride unaffected.
+- **Process note (transparency):** a stash-compare `mv` during type-checking corrupted the `narrative-core/` dir layout (files nested under a stray `nc-bak2/`); recovered, but the recovery first restored the stale committed versions of `validate.ts`/`index.ts` — the two D-189 edits to them (strength FITNESS_STATE phrasings + strengthAdapter export) were re-applied and the diff verified clean. The first strength deploy failed on the corruption; the post-recovery deploy succeeded.
+- **Guardrails honored:** Option-1 (scaffold appended, assembly not unified); BOTH scaffold + validators; single-source the logic. **DEPLOYS `analyze-strength-workout`.** (Optional follow-up, not done: also surface `e1rm_by_exercise` in the stored `strength_fact_packet_v1` JSON for display parity — the narrative already consumes the canonical value, which is what fixes the fabrication.)
+- **NEXT:** SWIM (leg 4, last of the session legs) — reference; complete the Q-061 kick/drill pessimistic-direction flag through the core. Then COACH (leg 5, week-scoped).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

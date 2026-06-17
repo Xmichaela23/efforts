@@ -9,4 +9,5 @@ export { buildReasoningScaffold } from './scaffold.ts';
 export { validateNarrative } from './validate.ts';
 export { runAdapter } from './adapters/run.ts';
 export { rideAdapter } from './adapters/ride.ts';
+export { strengthAdapter } from './adapters/strength.ts';
 export { swimAdapter } from './adapters/swim.ts';

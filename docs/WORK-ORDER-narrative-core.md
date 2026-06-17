@@ -1,6 +1,6 @@
 # WORK ORDER — Shared Narrative-Reasoning Core (cross-discipline consolidation)
 
-**Status:** IN PROGRESS (2026-06-16). Core built; **RUN migrated (D-187, done)** + **RIDE migrated (D-188, done, no-regression verified)**. **NEXT: STRENGTH (leg 3, e1RM wiring first) → SWIM (leg 4) → COACH (leg 5, week-scoped).** Migrate one at a time, verify on real data, deploy, D-entry per leg.
+**Status:** IN PROGRESS (2026-06-16). Core built; **RUN (D-187)** + **RIDE (D-188, no-regression)** + **STRENGTH (D-189, e1RM wired + fabrication vector closed)** migrated. **NEXT: SWIM (leg 4, + Q-061 kick/drill flag) → COACH (leg 5, week-scoped).** Migrate one at a time, verify on real data, deploy, D-entry per leg.
 
 **Purpose:** This is the executable plan for consolidating all four discipline narratives (run / ride / swim / strength) onto ONE shared reasoning core. It is **self-contained** — a fresh session must be able to execute Phase 3 from this doc alone (same discipline as the feature-audit work order). Do not rely on conversation memory.
 

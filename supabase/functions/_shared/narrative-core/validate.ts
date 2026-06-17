@@ -23,7 +23,7 @@ const ACK_ATYPICAL = /\b(drift|decoupl\w+|elevated|higher than (typical|usual|no
 const READINESS_VERDICT = /\b(signal(s|ing)?\s+(you'?re|you are)\s+ready|you'?re\s+ready\b|ready\s+(to\s+race|for\s+(race|your|the)\b)|peaking|dialed\s+in|primed)\b/i;
 // FITNESS-STATE verdicts (Rule 5) — "X is holding/building" needs a FITNESS-grade trend (ctx.hasFitnessTrend:
 // ride's spine verdict qualifies, run's pace-similarity does NOT). Fires when no fitness trend backs it.
-const FITNESS_STATE = /\b(aerobic\s+base\s+is\s+(holding|building)|fitness\s+is\s+(holding|building|improving|responding|consolidating|sharpening)|efficiency\s+is\s+holding)\b/i;
+const FITNESS_STATE = /\b(aerobic\s+base\s+is\s+(holding|building)|fitness\s+is\s+(holding|building|improving|responding|consolidating|sharpening)|efficiency\s+is\s+holding|strength\s+is\s+(building|holding|improving|progressing|climbing)|getting\s+stronger)\b/i;
 // DIRECTION verdicts (Rule 5) — pace/power direction needs a (similarity-grade) trend field (ctx.hasTrendField).
 const DIRECTION_VERDICT = /\b(improving|declining|getting\s+(faster|fitter|stronger)|losing\s+fitness|building\s+fitness|trending\s+(up|down)|worth\s+monitoring)\b/i;
 // explicit causal connectives (Rule 4).
