@@ -35,6 +35,7 @@ import {
   type ExerciseRegistryRow,
 } from "../_shared/exercise-registry-lookup.ts";
 import { rewriteSessionLoad, type ExerciseLogRowForLoad } from "../_shared/session-load.ts";
+import { resolveRunScalars } from "../_shared/run/run-scalars.ts";
 import { resolveCurrentFtp } from "../../../src/lib/resolve-current-ftp.ts";
 
 // ---------------------------------------------------------------------------
@@ -1084,20 +1085,17 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null): Record<strin
   const overall = w.computed?.overall ?? {};
   const analysis = w.computed?.analysis ?? {};
 
-  const paceAvg = overall.avg_pace_s_per_mi
-    ? Math.round(overall.avg_pace_s_per_mi * 0.621371)
-    : dur > 0 && dist > 0
-      ? Math.round((dur * 60) / (dist / 1000))
-      : null;
+  // D-185: pace + HR via the ONE run resolver (resolveRunScalars) so facts == card == narrative. The
+  // resolver delegates to the same guarded/reconciled primitives the narrative fact-packet uses
+  // (resolveOverallPaceSecPerMi + getOverallAvgHr — the latter is the Q-054/D-112 zero-not-null guard:
+  // a 0 HR is MISSING, never propagated so it can't collapse downstream GAP/effort-adjusted to 0).
+  const runScalars = resolveRunScalars(w);
+  const paceAvg = runScalars.paceSecPerKm;
 
   const facts: Record<string, any> = {
     distance_m: Math.round(dist),
     pace_avg_s_per_km: paceAvg,
-    // Q-054 Fix 1 — avgHr ≤ 0 is MISSING, not a real 0. A zero HR (no strap / treadmill)
-    // must not propagate: downstream `effort_adjusted = pace × (hr/refHr)` collapses GAP to 0
-    // when hr=0 (the zero-not-null class, cf. D-112/D-115). Pick the first POSITIVE source;
-    // `??` alone wouldn't catch a literal 0. null → GAP falls back to raw pace, never 0.
-    hr_avg: [w.avg_heart_rate, overall.avg_hr].map((x) => toNum(x)).find((h) => h != null && h > 0) ?? null,
+    hr_avg: runScalars.avgHr,
     elevation_gain_m: w.elevation_gain ?? null,
   };
 

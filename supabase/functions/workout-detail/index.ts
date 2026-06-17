@@ -8,6 +8,7 @@ import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapsh
 import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
 import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
 import { resolveSwimScalars } from '../_shared/swim/swim-scalars.ts';
+import { resolveRunScalars } from '../_shared/run/run-scalars.ts';
 import { swimPacePer100Seconds } from '../_shared/swim/swim-pace.ts';
 import { disciplineOf } from '../_shared/state-trend/index.ts';
 import {
@@ -644,6 +645,19 @@ async function runSessionDetailPipelineAndPersist(
             elapsed_time: (detail as any).elapsed_time ?? (detail as any).metrics?.elapsed_time,
             distance: (detail as any).distance,
             avg_heart_rate: (detail as any).avg_heart_rate ?? (detail as any).metrics?.avg_heart_rate,
+          })
+        : null,
+      // D-185: for RUNS, resolve pace + HR through the ONE run resolver (computed.overall-primary with
+      // the narrative-trusted guard/reconciliation) so the card reads the SAME guarded value the
+      // narrative's fact packet does. Pass computed + raw cols + workout_analysis (for GAP read-through).
+      completedRunScalars: ((row?.type ?? (detail as any)?.type) === 'run')
+        ? resolveRunScalars({
+            computed: (detail as any).computed,
+            moving_time: (detail as any).moving_time ?? (detail as any).metrics?.moving_time,
+            duration: (detail as any).duration ?? (detail as any).metrics?.duration,
+            distance: (detail as any).distance,
+            avg_heart_rate: (detail as any).avg_heart_rate ?? (detail as any).metrics?.avg_heart_rate,
+            workout_analysis: wa,
           })
         : null,
       completedRefinedType: (detail as any).refined_type ?? row?.refined_type ?? null,

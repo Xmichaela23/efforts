@@ -10,6 +10,7 @@ import type { ReadinessSnapshotV1 } from '../readiness-types.ts';
 import { packageSessionDetailReadiness } from './readiness-load-context.ts';
 import { swimPacePer100Seconds } from '../swim/swim-pace.ts';
 import type { SwimScalars } from '../swim/swim-scalars.ts';
+import { resolveRunGap, type RunScalars } from '../run/run-scalars.ts';
 
 /** Match fact-packet ai-summary: session HR drift is not meaningful for structured interval sessions. */
 function shouldSuppressSessionHrDrift(factPacket: any, intervals?: IntervalRow[]): boolean {
@@ -125,6 +126,10 @@ export type SessionDetailInput = {
    *  computed.overall is sample-derived and has been wrong). Resolved in workout-detail via
    *  resolveSwimScalars; null for non-swims (which keep computed.overall, GPS-authoritative). */
   completedSwimScalars?: SwimScalars | null;
+  /** D-185: RUN pace + HR scalars from the ONE run resolver (resolveRunScalars — computed.overall
+   *  primary with the narrative-trusted guard/reconciliation, raw columns fallback). Resolved in
+   *  workout-detail; null for non-runs. So the card reads the SAME guarded pace/HR the narrative does. */
+  completedRunScalars?: RunScalars | null;
   /** Completed workout's refined_type (e.g. 'pool_swim', 'open_water_swim'). */
   completedRefinedType?: string | null;
   /** Next planned session from the week (forward-looking context). */
@@ -163,6 +168,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     loadStatus,
     completedComputed,
     completedSwimScalars,
+    completedRunScalars,
     weatherTempF,
     completedRefinedType,
     nextSession,
@@ -442,6 +448,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     : null;
   const fpFacts = factPacket?.facts || {};
   const fpDerived = factPacket?.derived || {};
+  // D-185: RUN GAP via the ONE read-through accessor (sample-derived; the analyzer owns it). Honest
+  // null today (overall-GAP not yet persisted — "make honest now, persist later"); never fabricated.
+  const completedRunGap = type === 'run' ? resolveRunGap({ workout_analysis: wa, computed: comp }) : null;
   // D-163: a swim's planned duration is TOTAL session time (incl. rest), so the swim block must show the
   // athlete's ELAPSED pool time (from the analyzer's session_elapsed_s) — NOT moving time, which excludes
   // rest and made "duration" read short. Pace stays on moving time (completedSwimPer100 uses completedDurS
@@ -455,10 +464,14 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     // Land pace (min/mi) + GAP are meaningless for a swim — null them so the swim screen never
     // renders "5:03/mi". Swim pace lives in swim_pace_per_100_s. (Layer 1: numbers honest; the
     // full swim-native template — speed chart, cadence, grade rows — is the separate Layer 2.)
-    avg_pace_s_per_mi: type === 'swim' ? null : (fin(compOverall?.avg_pace_s_per_mi) ?? fin(fpFacts?.avg_pace_sec_per_mi)),
-    avg_gap_s_per_mi: type === 'swim' ? null : (fin(compOverall?.avg_gap_s_per_mi) ?? fin(fpFacts?.avg_gap_sec_per_mi)),
-    // D-182: swim avg-HR from the raw-column scalar first (matches the narrative); non-swims unchanged.
-    avg_hr: (type === 'swim' ? completedSwimScalars?.avgHr : null) ?? fin(compOverall?.avg_hr) ?? fin(fpFacts?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
+    // D-185: RUN reads the ONE run resolver (completedRunScalars / resolveRunGap) so card == narrative
+    // == facts; the compOverall/fpFacts terms are belt-and-suspenders fallback (fire only if the
+    // resolver returns null) and keep walk/hike on the prior path. Swim nulls land pace (D-182).
+    avg_pace_s_per_mi: type === 'swim' ? null : ((type === 'run' ? fin(completedRunScalars?.paceSecPerMi) : null) ?? fin(compOverall?.avg_pace_s_per_mi) ?? fin(fpFacts?.avg_pace_sec_per_mi)),
+    avg_gap_s_per_mi: type === 'swim' ? null : ((type === 'run' ? fin(completedRunGap) : null) ?? fin(compOverall?.avg_gap_s_per_mi) ?? fin(fpFacts?.avg_gap_sec_per_mi)),
+    // D-182 swim avg-HR from the raw-column scalar; D-185 run avg-HR from the run resolver (matches the
+    // narrative); other non-swims unchanged.
+    avg_hr: (type === 'swim' ? completedSwimScalars?.avgHr : (type === 'run' ? completedRunScalars?.avgHr : null)) ?? fin(compOverall?.avg_hr) ?? fin(fpFacts?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
     swim_pace_per_100_s: completedSwimPer100,
   };
 
