@@ -33,7 +33,10 @@ export interface NarrativeContext {
   notableLeadSignals: NotableLeadSignal[];  // Rule 1 — must be reasoned about, not dropped
   atypicalSignals: SignalFlag[];            // Rule 2 — lead must reconcile these
   anchors: AnchorSet;                       // Rule 3 — effort claims need a present anchor
-  hasTrendField: boolean;                   // Rule 5 — direction/fitness claims need a multi-session trend
+  hasTrendField: boolean;                   // Rule 5 — pace/power DIRECTION claims (improving/declining) need a trend
+  hasFitnessTrend: boolean;                 // Rule 5 — FITNESS-STATE claims ("fitness is holding/building") need a FITNESS-grade
+                                            //          verdict, not just a similarity trend. Ride's spine cross_workout.trend
+                                            //          qualifies; run's pace-similarity trend does NOT. The adapter decides.
   establishedCauses: string[];              // Rule 4 — lowercase causes the packet deterministically proved
 }
 

@@ -1,5 +1,8 @@
 import type { CyclingFactPacketV1, CyclingFlagV1 } from './types.ts';
 import { callLLM } from '../llm.ts';
+// Shared narrative-reasoning core (D-188 — ride leg). Scaffold appended to the existing prompt + the
+// shared validator suite folded into the loop; ride is the no-regression case. See WORK-ORDER-narrative-core.md.
+import { buildReasoningScaffold, validateNarrative, rideAdapter } from '../narrative-core/index.ts';
 import type { ArcNarrativeContextV1 } from '../arc-narrative-state.ts';
 import { arcModeSystemAddon, arcNarrativeFactBlock, arcUnplannedBackwardAnchorAddon } from '../arc-narrative-ai-appendix.ts';
 
@@ -504,12 +507,17 @@ ${packetStr}
 
   // System is constant across attempts (base + Arc mode addon, matching
   // running's systemPrompt construction); the user message varies on retry.
+  // D-188: shared reasoning-core context + scaffold (appended, like run — assembly NOT unified). Calibrated
+  // for no-regression: ride's compliant output passes the shared validators (empty notable/atypical;
+  // hasFitnessTrend tracks the spine cross_workout.trend so grounded "fitness is building" is allowed).
+  const ncCtx = rideAdapter.buildContext(display);
   const systemPrompt =
     'You are a precise endurance coach. Follow the rules exactly.' +
     (arcNarrative ? arcModeSystemAddon(arcNarrative) : '') +
     // D-046 / Q-026 — unplanned backward-anchor suppression. Empty when the
     // ride is planned or when arc mode is recovery_read / race_debrief.
-    arcUnplannedBackwardAnchorAddon(arcNarrative, isUnplanned);
+    arcUnplannedBackwardAnchorAddon(arcNarrative, isUnplanned) +
+    buildReasoningScaffold(rideAdapter, display);
   const userBase =
     (arcFacts
       ? 'TEMPORAL ARC CONTEXT (SECONDARY framing — supporting context for the second sentence only, NEVER the lede or opening words; do not contradict; paraphrase — these are facts for THIS workout date, not invented load):\n' +
@@ -554,10 +562,11 @@ ${packetStr}
   const lede1 = ledeOpensWithArcFrame(s1);
   const jargon1 = summaryHasJargon(s1);
   const claims1 = validateClaimsGrounded(s1, packetStr); // Step 2: direction claims must trace to the spine verdict
+  const nc1 = validateNarrative(s1, ncCtx); // D-188 shared core (rules 1/2/4/5). Ride keeps jargon/lede-frame (discipline-specific, outside the universal suite).
   if (debug) {
-    debug.attempt_1_validator = { ok: v1.ok, bad_numbers: v1.bad ?? null, lede_arc: lede1, jargon: jargon1, ungrounded_claims: claims1.bad ?? null };
+    debug.attempt_1_validator = { ok: v1.ok, bad_numbers: v1.bad ?? null, lede_arc: lede1, jargon: jargon1, ungrounded_claims: claims1.bad ?? null, core: nc1.failures.map((f) => f.code) };
   }
-  if (v1.ok && !lede1 && !jargon1 && claims1.ok) {
+  if (v1.ok && !lede1 && !jargon1 && claims1.ok && nc1.ok) {
     if (debug) {
       debug.attempts = attemptDebug;
       debug.outcome = 'attempt_1_accepted';
@@ -586,6 +595,7 @@ ${packetStr}
       `asserted a fitness DIRECTION ("${claims1.bad.join(', ')}") with no computed trend to support it — cross_workout.trend is ABSENT (the engine's deterministic verdict is needs_data: the series is too sparse or too old to be a current trend). DELETE every trajectory claim; describe ONLY this ride's execution and intensity, with no implication that fitness is rising or falling`,
     );
   }
+  for (const f of nc1.failures) corrections.push(f.why); // D-188 shared-core corrections fold into the same retry
   const s2 = await attempt(
     userBase + `\n\nYour previous output ${corrections.join('; AND it ')}. Keep it to 3–4 sentences, plain language (no IF/VI/EF/decoupling jargon).`,
   );

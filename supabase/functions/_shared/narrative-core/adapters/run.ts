@@ -60,9 +60,12 @@ export const runAdapter: DisciplineAdapter = {
     // ── Rule 3: run anchors HR to threshold-derived zones (built in the fact packet) — present by default.
     const anchors = { hr: 'zones' as const };
 
-    // ── Rule 5: a multi-session trend field present (and not needs_data)?
+    // ── Rule 5: run's comparisons.trend is a PACE-SIMILARITY direction (grounds "you're X faster than your
+    // last N similar efforts"), NOT a fitness-grade verdict — so it grounds DIRECTION claims but NOT
+    // fitness-STATE claims ("aerobic base is holding"). hasFitnessTrend stays false for run.
     const trend = der?.comparisons?.trend ?? null;
     const hasTrendField = !!(trend && (trend.direction || num(trend.data_points)));
+    const hasFitnessTrend = false;
 
     // ── Rule 4: causes the drift decomposition has deterministically established.
     const establishedCauses: string[] = [];
@@ -70,6 +73,6 @@ export const runAdapter: DisciplineAdapter = {
     if (dexp === 'terrain_driven') establishedCauses.push('terrain', 'grade', 'hill', 'hills');
     if (dexp === 'pace_driven') establishedCauses.push('pace');
 
-    return { notableLeadSignals, atypicalSignals, anchors, hasTrendField, establishedCauses };
+    return { notableLeadSignals, atypicalSignals, anchors, hasTrendField, hasFitnessTrend, establishedCauses };
   },
 };

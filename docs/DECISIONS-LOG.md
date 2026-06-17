@@ -4068,6 +4068,20 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-188 — RIDE migration onto the shared narrative core (the no-regression case)
+
+- **Date:** 2026-06-16
+- **What:** migrated RIDE onto `_shared/narrative-core/` (2nd of 4, after run D-187). Ride was the **no-regression** case — it already has the strongest bespoke validators, so the goal was to **absorb an already-compliant discipline without degrading it**, the reasoning analog of D-185's "418 unchanged." Built `adapters/ride.ts`; appended the scaffold to ride's existing prompt (assembly NOT unified) + folded `validateNarrative` into ride's loop. Ride keeps its DISCIPLINE-SPECIFIC bespoke validators (jargon ban, lede-frame) — those are addendum concerns, correctly OUTSIDE the universal suite; the shared suite covers the universal rules.
+- **Result (verified on 4 real rides, before→after):** **PARITY clean** — the shared validators do NOT false-positive on any of the 4 compliant BEFORE narratives, and all 4 AFTER narratives pass. **Value preserved** — same NP-watts lede, same intensity read, same facts, power-truth + HR-secondary + structured-mode (D-092/D-093) intact (one even improved to "held the 140 W sweet-spot target"). The text was **reworded** (40–64% word-overlap, not byte-identical) — expected for an LLM narrative + an appended scaffold; substance unchanged, not degradation.
+- **Two refinements the ride leg surfaced (the "investigate before shipping" paid off — wiring ride IMPROVED the shared suite):**
+  1. **Rule 5 split (readiness / fitness-state / direction).** Ride legitimately says "fitness is building" when grounded by its **spine `cross_workout.trend`** (a real fitness verdict — terrain-matched 20-min power, staleness-gated); run's "aerobic base is holding" is a single-session verdict with no fitness-grade trend. A single Rule-5 check would either regress ride (block the grounded claim) or regress run (allow the ungrounded one). Fixed by adding **`hasFitnessTrend`** to the adapter context: READINESS ("you're ready") always fires; FITNESS-STATE ("fitness is holding/building") fires unless `hasFitnessTrend`; DIRECTION (improving/declining) fires unless `hasTrendField`. The **adapter** decides per discipline (ride true, run/swim false) — no discipline branch in the validator. Re-verified: run's "aerobic base is holding" still caught, ride's grounded "fitness is building" now allowed.
+  2. **`noCauseDiagnosis` hedge-guard.** It false-fired on ride's honest "rolling climbs **likely** drove the surges" — the allowed plausible-contributor framing (Rule 4 permits hedged attribution). Added a hedge-guard (likely/probably/may/might/seems/suggests/partly within 28 chars before the causal connective → don't fire). This also **reduces forced retries** (the false-fire was forcing a retry, contributing to the rewording drift) — so the fix improves correctness AND no-regression.
+- **Guardrails honored:** Option-1 (no prompt-assembly unification — scaffold appended like run); BOTH scaffold + validators; single-source the logic (the Rule-5 + hedge fixes live in the ONE shared validator, inherited by all four). Swim acceptance gate still green; run triad still caught after the validate.ts changes (unit-verified).
+- **DEPLOYS `analyze-cycling-workout` + `analyze-running-workout`** (the latter re-deployed because `validate.ts` changed — run behavior unchanged, re-verified).
+- **NEXT:** STRENGTH — wire canonical `exercise_log.estimated_1rm` into `strength_fact_packet_v1` FIRST (pure wiring, schema-confirmed-existing), then migrate; `establishedCauses: []` kills its "lower energy may have impacted" causal framing. Then SWIM last (reference; complete the Q-061 kick/drill pessimistic-direction flag through the core).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

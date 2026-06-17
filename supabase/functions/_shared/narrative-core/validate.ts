@@ -19,9 +19,12 @@ const firstSentence = (s: string): string => {
 const EASY_ANYWHERE = /\b(steady|controlled|comfortable|relaxed|in control|well within|cruis\w+|easy)\b/i;
 // tokens that COUNT as acknowledging an atypical signal (so the lead isn't a contradiction).
 const ACK_ATYPICAL = /\b(drift|decoupl\w+|elevated|higher than (typical|usual|normal)|climbed|crept up|rose (over|through)|ran high)\b/i;
-// single-session readiness/fitness verdicts (Rule 5) — never grounded by one session.
-const READINESS_VERDICT = /\b(signal(s|ing)?\s+(you'?re|you are)\s+ready|you'?re\s+ready\b|ready\s+(to\s+race|for\s+(race|your|the)\b)|aerobic\s+base\s+is\s+(holding|building)|fitness\s+is\s+(holding|building|improving|sharpening)|peaking|dialed\s+in|primed)\b/i;
-// direction/trend verdicts (Rule 5) — need a multi-session trend field.
+// READINESS verdicts (Rule 5) — race-readiness is NEVER grounded by one session OR a trend; always fire.
+const READINESS_VERDICT = /\b(signal(s|ing)?\s+(you'?re|you are)\s+ready|you'?re\s+ready\b|ready\s+(to\s+race|for\s+(race|your|the)\b)|peaking|dialed\s+in|primed)\b/i;
+// FITNESS-STATE verdicts (Rule 5) — "X is holding/building" needs a FITNESS-grade trend (ctx.hasFitnessTrend:
+// ride's spine verdict qualifies, run's pace-similarity does NOT). Fires when no fitness trend backs it.
+const FITNESS_STATE = /\b(aerobic\s+base\s+is\s+(holding|building)|fitness\s+is\s+(holding|building|improving|responding|consolidating|sharpening)|efficiency\s+is\s+holding)\b/i;
+// DIRECTION verdicts (Rule 5) — pace/power direction needs a (similarity-grade) trend field (ctx.hasTrendField).
 const DIRECTION_VERDICT = /\b(improving|declining|getting\s+(faster|fitter|stronger)|losing\s+fitness|building\s+fitness|trending\s+(up|down)|worth\s+monitoring)\b/i;
 // explicit causal connectives (Rule 4).
 const CAUSAL = /\b(caused by|because of|due to|drove the|led to the|resulted in|attributable to)\b/i;
@@ -46,12 +49,17 @@ export function validateNarrative(summary: string, ctx: NarrativeContext): Valid
     failures.push({ rule: 2, code: 'unreconciled_atypical', why: `The lead calls the session steady/easy while these are atypical this session: ${ctx.atypicalSignals.map((s) => `${s.signal} ${s.state}${s.detail ? ` (${s.detail})` : ''}`).join(', ')}. Reconcile the lead with them, or don't call it steady.` });
   }
 
-  // ── Rule 5a — readiness verdict: a single-session "you're ready" / "fitness is holding" is never
-  //    grounded by one session, trend field or not.
+  // ── Rule 5a — readiness verdict: race-readiness ("you're ready", "primed", "peaking") is never grounded
+  //    by one session or a trend. Always fire.
   if (READINESS_VERDICT.test(text)) {
-    failures.push({ rule: 5, code: 'single_session_readiness', why: `Drop the single-session readiness/fitness verdict (e.g. "signaling you're ready", "aerobic base is holding") — one session can't establish it. Describe THIS session only.` });
+    failures.push({ rule: 5, code: 'single_session_readiness', why: `Drop the readiness verdict (e.g. "signaling you're ready", "primed") — one session/trend can't establish race-readiness. Describe THIS session only.` });
   }
-  // ── Rule 5b — direction verdict without a multi-session trend field.
+  // ── Rule 5b — fitness-state verdict ("fitness is holding/building") WITHOUT a fitness-grade trend.
+  //    (Ride's spine cross_workout.trend grounds it; run's pace-similarity does not — the adapter decides.)
+  if (!ctx.hasFitnessTrend && FITNESS_STATE.test(text)) {
+    failures.push({ rule: 5, code: 'ungrounded_fitness_state', why: `No fitness-grade trend backs a fitness-state claim ("aerobic base is holding", "fitness is building") from this one session. Drop it; describe only this session.` });
+  }
+  // ── Rule 5c — direction verdict (improving/declining) without a (similarity-grade) trend field.
   if (!ctx.hasTrendField && DIRECTION_VERDICT.test(text)) {
     failures.push({ rule: 5, code: 'ungrounded_direction', why: `No multi-session trend is provided, so drop the direction claim (improving/declining/trending). Describe only this session.` });
   }
@@ -64,12 +72,20 @@ export function validateNarrative(summary: string, ctx: NarrativeContext): Valid
     }
   }
 
-  // ── Rule 4 — cause diagnosis: a causal connective tying the result to a non-established factor.
-  if (CAUSAL.test(text)) {
-    const factorRe = new RegExp(`\\b(${NON_DET_FACTORS.join('|')})\\b`, 'i');
-    const m = text.match(factorRe);
-    if (m && !ctx.establishedCauses.includes(m[1].toLowerCase())) {
-      failures.push({ rule: 4, code: 'cause_diagnosed', why: `"${m[1]}" is stated as a proven cause, but it is not deterministically established this session. Name it as a plausible contributor, not the cause.` });
+  // ── Rule 4 — cause diagnosis: a causal connective tying the result to a non-established factor — UNLESS
+  //    the claim is HEDGED ("rolling climbs LIKELY drove the surges" is the allowed plausible-contributor
+  //    framing, not a proven cause). Only fire on an UNhedged causal connective.
+  const causalMatch = text.match(CAUSAL);
+  if (causalMatch) {
+    const idx = causalMatch.index ?? 0;
+    const preceding = text.slice(Math.max(0, idx - 28), idx);
+    const hedged = /\b(likely|probably|possibly|perhaps|may|might|seem\w*|appear\w*|suggest\w*|partly|partial\w*|some of)\b/i.test(preceding);
+    if (!hedged) {
+      const factorRe = new RegExp(`\\b(${NON_DET_FACTORS.join('|')})\\b`, 'i');
+      const m = text.match(factorRe);
+      if (m && !ctx.establishedCauses.includes(m[1].toLowerCase())) {
+        failures.push({ rule: 4, code: 'cause_diagnosed', why: `"${m[1]}" is stated as a proven cause, but it is not deterministically established this session. Name it as a plausible contributor (e.g. "likely", "partly"), not the sole cause.` });
+      }
     }
   }
 

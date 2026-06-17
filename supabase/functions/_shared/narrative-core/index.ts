@@ -8,4 +8,5 @@ export type { Discipline, DisciplineAdapter, NarrativeContext, AnchorSet, Signal
 export { buildReasoningScaffold } from './scaffold.ts';
 export { validateNarrative } from './validate.ts';
 export { runAdapter } from './adapters/run.ts';
+export { rideAdapter } from './adapters/ride.ts';
 export { swimAdapter } from './adapters/swim.ts';

@@ -39,6 +39,7 @@ export const swimAdapter: DisciplineAdapter = {
       atypicalSignals,
       anchors: { hr: hasZones ? 'zones' : null }, // neutral floor when no zones (D-183)
       hasTrendField: false,                        // a single swim is not a trend
+      hasFitnessTrend: false,                      // and not a fitness-grade verdict either
       establishedCauses: [],                       // swim never diagnoses the cause of rest
     };
   },
