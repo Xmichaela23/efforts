@@ -36,6 +36,7 @@ import {
 } from "../_shared/exercise-registry-lookup.ts";
 import { rewriteSessionLoad, type ExerciseLogRowForLoad } from "../_shared/session-load.ts";
 import { resolveRunScalars } from "../_shared/run/run-scalars.ts";
+import { detectSwimEquipment } from "../_shared/swim/swim-equipment.ts";
 import { resolveCurrentFtp } from "../../../src/lib/resolve-current-ftp.ts";
 
 // ---------------------------------------------------------------------------
@@ -1275,6 +1276,15 @@ function buildSwimFacts(w: WorkoutRow): Record<string, any> {
   } else if (analysis.swim?.avg_pace_per_100m) {
     facts.pace_per_100m = Math.round(analysis.swim.avg_pace_per_100m);
   }
+
+  // Q-061 / D-193: flag equipment/drill contamination of the pace SUBSTRATE. fins/buoy/paddles read
+  // faster, kick/drill read slower — either way pace_per_100m is not a clean unaided-fitness number.
+  // We KEEP pace_per_100m as-is (the Details display + narrative honestly flag it per D-190/D-192);
+  // the swim TREND excludes these rows downstream (compute-snapshot swimRows). Snorkel is neutral.
+  // Session-level only — no per-length data for surgical extraction.
+  const equip = detectSwimEquipment(w.workout_metadata);
+  facts.pace_equipment_contaminated = equip.contaminated;
+  facts.pace_equipment_direction = equip.direction; // 'optimistic' | 'pessimistic' | 'mixed' | null
 
   return facts;
 }

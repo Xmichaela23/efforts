@@ -4134,6 +4134,21 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-193 — Q-061 trend-substrate half: equipment/drill swims excluded from the swim pace trend (both directions) — built
+
+- **Date:** 2026-06-17
+- **Context:** D-190/D-192 made the swim NARRATIVE honestly flag equipment-distorted pace (both directions, on-device verified). The TREND-substrate half of Q-061 remained: `compute-facts.buildSwimFacts` wrote `pace_per_100m` equipment-blind, so fins/buoy/paddles (faster) and kick/drill (slower) sessions polluted the State-screen swim trend as if they were unaided fitness.
+- **What was built (3 files, no migration, no client compute):**
+  - New shared helper `_shared/swim/swim-equipment.ts` → `detectSwimEquipment(workout_metadata)` returns `{contaminated, direction, names}` from the D-162 capture (`swim_steps_equipment_confirmed[].used` + `swim_equipment_unplanned`). Regexes: optimistic `/fin|buoy|pull|paddle/`, pessimistic `/kick|board|drill|catch.?up|single.?arm|scull/`; snorkel neutral.
+  - `compute-facts.buildSwimFacts` (index.ts:1260) now writes `swim_facts.pace_equipment_contaminated` + `pace_equipment_direction`. `pace_per_100m` itself is UNCHANGED (Details/narrative still show the real swim, honestly flagged per D-190/D-192) — only the trend excludes.
+  - `compute-snapshot` (index.ts:~629) filters `pace_equipment_contaminated === true` rows out of `swimRows` before `assembleStateTrends`, logging the drop count.
+- **Decision — EXCLUDE, not down-weight:** `classifyTrend` has no weighting hook; "unaided only" is the honest substrate. `swim_facts` is JSONB so no schema change. The narrative path was deliberately NOT rewired (its inline `equipmentDir`, analyze-swim:454-472, is now a duplicate of the shared helper — see follow-up).
+- **Verified on real data (2026-06-17, user 45d122e7):** 10 in-window swims; the Jun-15 snorkel+fins swim flipped to `contaminated:true / optimistic` and dropped; the 9 unaided swims (all `false`) feed the trend. **Consequence (intended, surfaced):** that fin swim was the athlete's only swim in the last 16 days, so excluding it leaves the newest unaided point (Jun-1, 16d old) beyond the cadence-scaled swim freshness window → `classifyTrend` staleness gate (`classify.ts:90-95`) → swim trend decays to `needs_data`. This is the honest read ("no current unaided signal"), not a regression; reversible to down-weight if preferred. On-device confirm pending.
+- **Deployed:** `compute-facts`, `compute-snapshot` (2026-06-17).
+- **Follow-up (flagged, deferred):** the equipment-direction classification now lives in TWO places — the shared helper (trend) and analyze-swim's inline `equipmentDir` (narrative) — because this work order scoped out touching the on-device-verified narrative path. They MUST stay in sync; consolidating (analyze-swim imports the shared helper, deletes its inline block) is a future pass that re-verifies narrative output.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

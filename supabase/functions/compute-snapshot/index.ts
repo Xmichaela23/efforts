@@ -626,7 +626,20 @@ serve(async (req: Request) => {
           classified_type: runCtById.get(r.workout_id) ?? null,
         }));
 
-        const swimRows = (swimR.data ?? []).map((r: any) => ({ date: r.date, pace_per_100m: Number(r.swim_facts?.pace_per_100m) }));
+        // Q-061 / D-193: the swim pace trend must reflect UNAIDED swimming only. Exclude sessions
+        // flagged equipment/drill-contaminated by compute-facts (fins/buoy/paddles → faster; kick/drill
+        // → slower; either way not a clean fitness number). Snorkel is neutral and not flagged.
+        // Exclusion (not down-weight): classifyTrend has no weighting hook, and "unaided only" is the
+        // honest substrate. Trade-off (intended): an equipment-heavy athlete may now fall below the
+        // min-session gate → needs_data, which is the honest read rather than a contaminated trend.
+        const swimRowsAll = (swimR.data ?? []) as any[];
+        const swimRows = swimRowsAll
+          .filter((r) => r.swim_facts?.pace_equipment_contaminated !== true)
+          .map((r) => ({ date: r.date, pace_per_100m: Number(r.swim_facts?.pace_per_100m) }));
+        const swimContaminatedDropped = swimRowsAll.length - swimRows.length;
+        if (swimContaminatedDropped > 0) {
+          console.log(`[compute-snapshot] Q-061: excluded ${swimContaminatedDropped}/${swimRowsAll.length} equipment-contaminated swim(s) from trend substrate`);
+        }
 
         const plannedBy: Record<string, number> = {};
         const doneBy: Record<string, number> = {};

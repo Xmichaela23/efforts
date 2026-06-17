@@ -95,6 +95,9 @@ Observed and located, not consolidated. Ranked by how load-bearing / drift-prone
 
 These are *flags*, not verdicts. Each is something that looks surprising, contradicts a doc, or whose trigger couldn't be confirmed. **None were acted on.** Verify before treating any as a bug.
 
+**Resolved since the 2026-06-16 snapshot:**
+- **Q-061** (swim pace trend blended equipment/drill sets as if unaided) — **Resolved by D-193, 2026-06-17.** `compute-facts` flags contaminated swims (both directions, via shared `detectSwimEquipment`); `compute-snapshot` excludes them from the trend substrate. Verified on real data; deployed.
+
 1. **Swim HR zones anchor to `run_threshold_hr`** (`analyze-swim index.ts:432`) — the spec explicitly warns swim HR ≠ run HR. (area 02) **High.**
 2. **`FTP-COLD-START-SPEC` is spec-only, unimplemented** — `grep wizard_estimated` = zero code hits; ENGINE-STATE D-077 confirms "saved for future work." The onboarding gap (#null baselines for new athletes) is real and masked only by runtime fallbacks. (area 07) **High.**
 3. **FTP precedence is inconsistent across screens** — `TrainingBaselines` is manual-first while `resolve-current-ftp` is confidence-gated, so the same athlete can show different FTP on different screens. (area 06/07) **High.**
