@@ -23,6 +23,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { isWatchConnectivityAvailable, sendWorkoutToWatch, convertToWatchWorkout } from '@/services/watchConnectivity';
+import { isWorkoutKitAvailable, scheduleSwimOnWatch, buildSwimPayloadFromWorkout } from '@/services/workoutkit';
 import SkipSessionReasonPanel from '@/components/planned/SkipSessionReasonPanel';
 import { skipReasonLabel } from '@/lib/skip-session-reasons';
 import { useNavigate } from 'react-router-dom';
@@ -315,10 +316,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   };
   const [sendingToWatch, setSendingToWatch] = useState<string | null>(null);
   const [watchAvailable, setWatchAvailable] = useState(false);
-  
+  // WorkoutKit (pool-swim "Send to Apple Watch", D-196 item 2) — iOS-native only.
+  const [workoutKitAvailable, setWorkoutKitAvailable] = useState(false);
+
   // Check if Apple Watch is available (on iOS native app)
   useEffect(() => {
     isWatchConnectivityAvailable().then(setWatchAvailable);
+    isWorkoutKitAvailable().then(setWorkoutKitAvailable);
   }, []);
   
   // Send workout to Garmin
@@ -587,32 +591,37 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
   };
   
-  // Send workout to Apple Watch
+  // Send to Apple Watch — POOL SWIM ONLY via WorkoutKit (D-196 item 2).
+  // On-device: builds the payload from computed.steps + pool length/unit and
+  // schedules a CustomWorkout via the native WorkoutKit plugin. No edge fn, no userId.
   const handleSendToWatch = async (e: React.MouseEvent, workout: any) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
+    const type = String(workout?.type || workout?.workout_type || '').toLowerCase();
+    if (type !== 'swim') {
+      toast({ title: 'Pool swims only', description: 'Send to Apple Watch currently supports pool swims.', variant: 'destructive' });
+      return;
+    }
+
     try {
       setSendingToWatch(workout.id);
-      
-      const workoutType = ['ride', 'bike', 'cycling'].includes((workout.type || workout.workout_type || '').toLowerCase()) ? 'ride' : 'run';
-      const watchWorkout = convertToWatchWorkout(
-        workout.id,
-        workout.rendered_description || workout.description || workout.name || 'Workout',
-        workoutType,
-        workout.computed || { steps: [], total_duration_seconds: 0 }
-      );
-      
-      const sent = await sendWorkoutToWatch(watchWorkout);
-      
-      if (sent) {
-        toast({ title: 'Sent!', description: 'Workout sent to Apple Watch' });
+
+      const payload = buildSwimPayloadFromWorkout(workout);
+      if (!payload) {
+        toast({ title: 'Nothing to send', description: 'This swim needs materialized steps and a pool length.', variant: 'destructive' });
+        return;
+      }
+
+      const scheduled = await scheduleSwimOnWatch(payload);
+      if (scheduled) {
+        toast({ title: 'Sent to Apple Watch', description: 'Pool swim scheduled. Open the Workout app on your watch.' });
         setSelectedPlannedWorkout(null);
       } else {
-        toast({ title: 'Error', description: 'Failed to send to Apple Watch', variant: 'destructive' });
+        toast({ title: 'Error', description: 'Failed to schedule on Apple Watch', variant: 'destructive' });
       }
-    } catch (err) {
-      toast({ title: 'Error', description: 'Failed to send to Apple Watch', variant: 'destructive' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || 'Failed to send to Apple Watch', variant: 'destructive' });
     } finally {
       setSendingToWatch(null);
     }
@@ -2076,13 +2085,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         <Copy className="h-4 w-4 opacity-80" aria-hidden />
                         Copy for FORM Goggles
                       </button>
-                      <button
-                        disabled
-                        title="Coming soon (Q-062)"
-                        className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide text-white/40 border border-white/10 cursor-not-allowed opacity-50"
-                      >
-                        Send to Apple Watch
-                      </button>
+                      {workoutKitAvailable && (
+                        <button
+                          disabled={sendingToWatch === selectedPlannedWorkout?.id}
+                          onClick={(ev) => handleSendToWatch(ev, selectedPlannedWorkout)}
+                          className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide text-white border transition-all disabled:opacity-50"
+                          style={{ borderColor: border, borderWidth: '0.5px', borderStyle: 'solid', backgroundColor: 'transparent' }}
+                          onMouseEnter={(ev) => { ev.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.15)`; }}
+                          onMouseLeave={(ev) => { ev.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                          {sendingToWatch === selectedPlannedWorkout?.id ? 'Sending...' : 'Send to Apple Watch'}
+                        </button>
+                      )}
                     </div>
                   </>
                 );

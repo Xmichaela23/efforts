@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
+import { isWorkoutKitAvailable, scheduleSwimOnWatch, buildSwimPayloadFromWorkout } from '@/services/workoutkit';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 import { swimDrillDisplayName } from '@/lib/plan-tokens/swim-drill-tokens';
 
@@ -102,6 +103,10 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     return (typeof (workout as any)?.pool_length_m === 'number') ? (workout as any).pool_length_m : null;
   })();
   const lines: string[] = [];
+  // D-196 item 3: per-line equipment for the swim breakout, rendered as a distinct chip (not inline
+  // text). Keyed by index into `lines` so `lines` stays string[] (handleDownloadWorkout still serializes
+  // plain strings). Drill-aware filtering is already applied upstream where `equip` is computed.
+  const lineEquip: Record<number, string> = {};
   let totalSecsFromSteps = 0;
   // Strength: rely on server-computed steps only (single source of truth)
   let preferStrengthLines = false;
@@ -261,7 +266,11 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           const timeTxt = (typeof secs==='number' && secs>0) ? `1 × ${fmtDur(secs)}` : undefined;
           const seg = [distTxt || timeTxt, baseLabel || undefined].filter(Boolean).join(' — ')
           if (seg && seg.trim()) {
-            lines.push([seg, equip].filter(Boolean).join(''))
+            // D-196 item 3: push the step text only; carry equipment separately for a chip (was
+            // appended inline as " with fins"). `equip` is the already-filtered ` with X` string.
+            lines.push(seg)
+            const bare = equip ? equip.replace(/^\s*with\s+/i, '').trim() : ''
+            if (bare) lineEquip[lines.length - 1] = bare
           }
           return;
         }
@@ -569,6 +578,35 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     }
   };
 
+  // Send to Apple Watch — POOL SWIM ONLY via WorkoutKit (D-196 item 2).
+  // On-device; no edge fn, no userId. Gated below on iOS + WorkoutKit availability.
+  const [workoutKitAvailable, setWorkoutKitAvailable] = useState(false);
+  const [sendingToWatch, setSendingToWatch] = useState(false);
+  useEffect(() => {
+    isWorkoutKitAvailable().then(setWorkoutKitAvailable);
+  }, []);
+
+  const handleSendToWatch = async () => {
+    try {
+      setSendingToWatch(true);
+      const payload = buildSwimPayloadFromWorkout(workout);
+      if (!payload) {
+        toast({ title: 'Nothing to send', description: 'This swim needs materialized steps and a pool length.', variant: 'destructive' });
+        return;
+      }
+      const scheduled = await scheduleSwimOnWatch(payload);
+      if (scheduled) {
+        toast({ title: 'Sent to Apple Watch', description: 'Pool swim scheduled. Open the Workout app on your watch.' });
+      } else {
+        toast({ title: 'Error', description: 'Failed to schedule on Apple Watch', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || 'Failed to send to Apple Watch', variant: 'destructive' });
+    } finally {
+      setSendingToWatch(false);
+    }
+  };
+
   const handleGarminExport = async () => {
     try {
       // Call the Garmin export function
@@ -708,14 +746,26 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           </div>
           {hasComputedV3 ? (
             <div className="mt-3">
-              <button
-                type="button"
-                onClick={handleCopyFormGoggles}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
-              >
-                <Copy className="h-3.5 w-3.5 opacity-80" aria-hidden />
-                Copy for FORM Goggles
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyFormGoggles}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
+                >
+                  <Copy className="h-3.5 w-3.5 opacity-80" aria-hidden />
+                  Copy for FORM Goggles
+                </button>
+                {workoutKitAvailable && (
+                  <button
+                    type="button"
+                    disabled={sendingToWatch}
+                    onClick={handleSendToWatch}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer disabled:opacity-50"
+                  >
+                    {sendingToWatch ? 'Sending…' : 'Send to Apple Watch'}
+                  </button>
+                )}
+              </div>
               <p className="mt-1.5 text-[11px] text-gray-400 font-light leading-snug max-w-md">
                 Plain-text layout for FORM&apos;s Script importer (Warm-up / Main / Cool-down). Paste in Custom Workouts → Create From Text.
               </p>
@@ -752,7 +802,12 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
             const isPlannedRow = String((workout as any)?.workout_status || '').toLowerCase() === 'planned';
             return (
               <li key={i} className="text-sm text-gray-200 font-light tracking-normal flex items-start justify-between">
-                <span>{ln}</span>
+                <span className="flex items-baseline gap-2 flex-wrap">
+                  <span>{ln}</span>
+                  {lineEquip[i] && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide bg-sky-500/15 text-sky-300/80 border border-sky-400/20 whitespace-nowrap">{lineEquip[i]}</span>
+                  )}
+                </span>
                 {i===0 && isPlannedRow && (
                   <div className="ml-3 flex items-center gap-2">
                     <button

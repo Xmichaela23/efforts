@@ -51,6 +51,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         bridge.registerPluginInstance(HealthKitPlugin())
         bridge.registerPluginInstance(WatchConnectivityPlugin())
         bridge.registerPluginInstance(BluetoothHRPlugin())
+        // WorkoutKitPlugin is gated behind @available (WorkoutKit scheduling).
+        // COMPILE-RISK (availability): keep this guard's version in sync with the
+        // @available annotation on WorkoutKitPlugin. On older OS the plugin simply
+        // isn't registered; the JS side falls back to its platform/availability check.
+        if #available(iOS 17.0, *) {
+            bridge.registerPluginInstance(WorkoutKitPlugin())
+        }
         pluginsRegistered = true
         print("[AppDelegate] Plugins registered!")
     }

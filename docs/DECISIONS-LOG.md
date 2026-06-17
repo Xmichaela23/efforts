@@ -4182,6 +4182,29 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-196 — Swim workout delivery: FORM rest lines + Send to Apple Watch (WorkoutKit) + breakout equipment chip
+
+- **Date:** 2026-06-17
+- Three-item swim-delivery work order. Items 1 and 3 are TypeScript (verified, web build clean); item 2 is native Swift (first pass, **compile-pending in Xcode** — cannot be built in a headless session, per the D-175 framing).
+
+**Item 1 — FORM Goggles rest lines (SHIPPED to main, 2026-06-17):**
+- `src/utils/formGogglesSwimScript.ts` `compactRepeatedLines`: a repeated set with a per-rep rest now emits the work+rest pair once per rep (rest after every interval) instead of one trailing rest line. Rest seconds read from `computed.steps` (`restBetween` via `recoverySec`) — not hardcoded. Singles / no-rest repeats / warmup / cooldown unchanged. No `materialize-plan` change.
+- Verified: 2026-06-19 Moderate Aerobic Swim — the 12×100 main now shows `21 sec rest` after each 100 yd. Shipped early (commit `15004624`) to unblock Friday.
+
+**Item 2 — Send to Apple Watch via WorkoutKit (built, NOT yet merged — Xcode-pending):**
+- New `ios/App/App/WorkoutKitPlugin.swift` (+ `.m` bridge) — Capacitor plugin (`CAPPlugin`/`CAPBridgedPlugin`, matches `WatchConnectivityPlugin`/`HealthKitPlugin` registration). `scheduleSwim` maps warmup/work/rest/cooldown `computed.steps` → a pool-swim `CustomWorkout` with `IntervalBlock`s (time-based rests; WorkoutKit can't do manual-advance), schedules via `WorkoutScheduler.shared`. Pool-swim only; `@available` iOS-17 guard (FLAGGED — version may need bumping vs the watchOS-11 target).
+- Registered in `AppDelegate.swift` (guarded). New `src/services/workoutkit.ts` JS wrapper (mirrors `watchConnectivity.ts`). Handler wired in `TodaysEffort.tsx` + `StructuredPlannedView.tsx` (replaces the dead `handleSendToWatch` stub); button enabled (removed hard-disabled + "Coming soon (Q-062)"), gated on iOS + pool-swim, shown beside Send to Garmin.
+- **On-device path — does NOT trust client `userId`** (the `send-workout-to-garmin` §1 item-11 flag is deliberately not inherited): no edge function, the client passes `computed.steps` straight to the on-device plugin.
+- Blueprint reused (not rewritten): the `computed.steps`→warmup/work/rest/cooldown decomposition from `send-workout-to-garmin/index.ts:~619-760`.
+- **COMPILE-RISK:** the WorkoutKit API surface (`CustomWorkout`/`IntervalBlock`/`IntervalStep`/`WorkoutGoal`/`WorkoutScheduler.schedule` signatures, `@available` versions, activity/location enums, pool-length attachment, capability/entitlement) is a first-pass guess — every spot is flagged inline with `COMPILE-RISK:` in `WorkoutKitPlugin.swift`. The Capacitor registration, JS wiring, and button gating match working project patterns. Must be compiled + on-device-verified in Xcode before merge.
+
+**Item 3 — Breakout equipment chip (built, web build clean):**
+- `src/components/StructuredPlannedView.tsx`: per-set swim equipment now renders as a distinct chip/badge instead of inline " with fins" text. Kept `lines: string[]` intact (so `handleDownloadWorkout` still serializes plain strings); equipment carried in a parallel `lineEquip` index→name map and rendered as a chip in the `<li>`. Drill-aware filtering preserved (it already gates `equip`). Presentation only — data path untouched.
+
+- **Status:** item 1 merged + live; items 2 & 3 on branch `feat/d196-swim-delivery`, held from `main` until item 2 compiles in Xcode and the Watch send is confirmed on-device. Item 3 is web-verified and merges with the branch.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
