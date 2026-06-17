@@ -1,6 +1,6 @@
 # WORK ORDER — Shared Narrative-Reasoning Core (cross-discipline consolidation)
 
-**Status:** DESIGN APPROVED (Phase 1 map + Phase 2 design done, 2026-06-16). **NOT BUILT.** Hold at the Phase 2→3 boundary; build starts on explicit go.
+**Status:** IN PROGRESS (2026-06-16). Core built; **RUN migrated (D-187, done)** + **RIDE migrated (D-188, done, no-regression verified)**. **NEXT: STRENGTH (leg 3, e1RM wiring first) → SWIM (leg 4) → COACH (leg 5, week-scoped).** Migrate one at a time, verify on real data, deploy, D-entry per leg.
 
 **Purpose:** This is the executable plan for consolidating all four discipline narratives (run / ride / swim / strength) onto ONE shared reasoning core. It is **self-contained** — a fresh session must be able to execute Phase 3 from this doc alone (same discipline as the feature-audit work order). Do not rely on conversation memory.
 
@@ -139,6 +139,14 @@ swim: {
 - **COMPLETE Q-061's pessimistic-direction half:** the shipped D-183 narrative flags only the **fins/optimistic** direction ("reads faster"). Add the **kick/drill pessimistic-direction** flag ("this session included kick/drill sets, so the blended pace reads slower than your swimming pace") into the swim adapter's equipment-direction logic — landed THROUGH the shared core, not as an isolated swim patch. (See `SPEC-honest-swim-inference.md` Tier 2 + the widened Q-061.)
 - **SUCCESS CRITERION:** swim output unchanged for the fins case; kick/drill sessions now get the pessimistic-direction flag; all via the shared core. Log D-entry. Update Q-061 (pessimistic half DONE; trend-substrate exclusion still open).
 - Deploys: `analyze-swim-workout`.
+
+### 5. COACH (week/state-scoped) — bring under the 7 universal rules, AFTER the four session-scoped legs
+- **DISTINCT SHAPE — not a per-workout narrative.** The coach (`supabase/functions/coach/`, displayed on the State screen as `wsv.coach?.narrative`, behind "open for more") is a **fifth LLM narrative path** that reasons over the athlete's **week / state**, not a single workout. Its NUMBERS are already single-sourced (`fitness_direction = rollupFitnessDirection(state_trends_v1)` — the spine, `coach:2705`); its **PROSE is its own LLM path with its own prompt** (`COACH_PAYLOAD_VERSION`), NOT through the shared core. (State's own numbers + deterministic `synthesizeHeadline` are already covered by the spine — nothing to migrate there; it's only the coach PROSE.)
+- **Needs a coach adapter built from the SPINE + WEEK context, not a fact packet:** `leadSignals` / `atypicalSignals` / `establishedCauses` derive from `state_trends_v1` + the week (per-discipline verdicts, load/ACWR, adherence, planned key sessions) — there is no single-workout fact packet here. The adapter is the only coach-aware code; the same shared scaffold + validators apply.
+- **⚠ RULES 4 AND 5 ARE THE HIGHEST-RISK for the coach** — a week-level coach is exactly where over-claiming creeps in: single-session / short-window **fitness verdicts** (rule 5) and **diagnosing cause** of a week's pattern (rule 4). The `hasFitnessTrend` flag (D-188) matters most here — a coach fitness-direction claim must trace to the spine verdict, never a short/sparse window; and the coach must observe week patterns ("you've autoregulated 3 of 5 hard sessions") without diagnosing them ("you're overtrained").
+- **Folds in its accumulated rules:** the coach has grown its own rule-set that OVERLAPS the universal set without sharing it — **D-154** (deterministic load headline; observation-never-prescription), **D-155** (describe-vs-change the plan; lexical "add" ban). The migration folds these into the shared core (they become the coach addendum + the shared rules), ending the per-path-in-a-vacuum pattern at the coach too.
+- **SUCCESS CRITERION:** coach prose passes the shared validators; fitness-direction claims trace to the spine (`hasFitnessTrend`); no week-level cause-diagnosis; D-154/D-155 behavior preserved (no regression — same no-regression discipline as ride). Log a D-entry. Deploys: `coach`.
+- **Sequenced LAST** — after run (D-187, done) / ride (D-188, done) / strength / swim. Do NOT start until the four session legs land.
 
 ---
 
