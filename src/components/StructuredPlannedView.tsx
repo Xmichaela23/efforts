@@ -41,6 +41,16 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   // D-196: grouped swim actions (Copy FORM · Send to Apple Watch · Send to Garmin) up top.
   const isPlanned = String((workout as any)?.workout_status || '').toLowerCase() === 'planned';
   const isIosNative = Capacitor.getPlatform() === 'ios';
+  // D-197: session-level snorkel brief — shown for any swim that suggests snorkel (snorkel is now
+  // drill-only per-step; this explains the "occasional on mains" usage).
+  const snorkelSuggested = (() => {
+    const fromComputed = [
+      ...(Array.isArray(computedAny?.swim_equipment_optional_suggested) ? computedAny.swim_equipment_optional_suggested : []),
+      ...(Array.isArray(computedAny?.swim_equipment_suggested) ? computedAny.swim_equipment_suggested : []),
+    ];
+    const fromTags = Array.isArray((workout as any)?.tags) ? (workout as any).tags : [];
+    return [...fromComputed, ...fromTags].some((e: any) => /snorkel/i.test(String(e)));
+  })();
 
   const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
   const mobilityList: Array<{ name: string; duration?: string; description?: string }> = (() => {
@@ -783,6 +793,11 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
               <p className="mt-1.5 text-[11px] text-gray-400 font-light leading-snug max-w-md">
                 Plain-text layout for FORM&apos;s Script importer (Warm-up / Main / Cool-down). Paste in Custom Workouts → Create From Text.
               </p>
+              {snorkelSuggested && (
+                <p className="mt-1.5 text-[11px] text-gray-400 font-light leading-snug max-w-md">
+                  Snorkel: free on drills, occasional on main sets to reset form. Don&apos;t race-train on it.
+                </p>
+              )}
             </div>
           ) : null}
           {!savingPool && autoDefaulted && (

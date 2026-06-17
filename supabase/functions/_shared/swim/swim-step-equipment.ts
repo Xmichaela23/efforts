@@ -58,14 +58,10 @@ export function resolveSwimStepEquipment(
     if (has('dps', 'distance per stroke')) return { ...EMPTY };
   }
 
-  // ── Main-set rules by intent (for non-drill work). ──
-  if (kind === 'work' || kind === 'main' || kind === 'steady' || kind === 'interval' || kind === '') {
-    if (/(^|\b)(easy|aerobic|recovery)/.test(intent)) return { required: [], optional: ['snorkel'] };
-    if (/(^|\b)(moderate|tempo)/.test(intent)) return { required: [], optional: ['snorkel'] };
-    if (/(^|\b)(css|threshold|quality)/.test(intent)) return { ...EMPTY };
-    if (/(^|\b)(sprint|speed)/.test(intent)) return { ...EMPTY };
-  }
-
+  // ── Main sets get NO per-step equipment (D-197 final, Michael 2026-06-17): snorkel was removed
+  // from easy/moderate/threshold/sprint mains — snorkel stays drill-only. The session-level snorkel
+  // brief covers "occasional on main sets to reset form." `intent`/`kind` kept for future rules. ──
+  void intent;
   return { ...EMPTY };
 }
 
