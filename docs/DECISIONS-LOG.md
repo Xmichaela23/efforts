@@ -4052,6 +4052,22 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-187 — Shared narrative-reasoning core + RUN migration (continuity leg #3: reasoning)
+
+- **Date:** 2026-06-16
+- **What:** built `_shared/narrative-core/` — the shared 7-rule SCAFFOLD + the shared VALIDATOR SUITE, single-sourced and parameterized by per-discipline ADAPTERS (no `if discipline ==` monolith). Migrated RUN onto it (first of four). This is the same invariant as D-185/D-186 applied to *reasoning* instead of *numbers*. Standard: `SPEC-universal-narrative-inference.md`; plan: `WORK-ORDER-narrative-core.md`.
+- **The core:**
+  - **Scaffold** (`scaffold.ts buildReasoningScaffold(adapter, packet)`): the SAME 7-rule block for every discipline, with three adapter-driven inserts — Rule 1 lead-signals (+ this-session notables), Rule 2 atypical-signals-to-reconcile, Rule 4 established-cause allowlist — + the discipline addendum. INJECTED into each analyzer's existing prompt (run: appended to the sectional `COACHING_SYSTEM_PROMPT`); **prompt assembly NOT unified** (work-order guardrail #1).
+  - **Validators** (`validate.ts validateNarrative(summary, ctx)`): `noNewNumbers`(existing, kept) + the NEW shared backstops — `noContradiction` (Rule 2: steady/easy claim while an atypical signal is unreconciled), `groundedDirection`/single-session-readiness (Rule 5), `anchorlessEffort` (Rule 3), `noCauseDiagnosis` (Rule 4). Lexical-deterministic, driven entirely by the adapter-built `NarrativeContext` (no discipline knowledge in the core). Folded into the run path's existing 2-attempt loop, retry-then-soft-accept (never regresses to no-narrative; the scaffold is the primary fix).
+  - **Adapter** (`adapters/run.ts`): translates the run `FactPacketV1` → `{notableLeadSignals, atypicalSignals, anchors, hasTrendField, establishedCauses}`. The ONLY run-aware code. leadSignals = `pace + grade/terrain + heat + HR drift`.
+- **RUN target (the captured triad, before→after verified on real data):** (1) **heat-silo** — `weather.temperature_f` was in the packet but the narrative dropped it on hot runs (the swim "captured-but-unconsumed-data" pattern again); (2) **"steady" over elevated+UNDECOMPOSED drift** (Apr 19: 35 bpm raw / 12% decoupling / null pace-normalized); (3) **single-session readiness verdict** ("signaling you're ready", "aerobic base is holding"). After: 82°F now reasoned with terrain+drift; the 35 bpm drift acknowledged ("rather than a fitness concern") not called steady; readiness verdicts gone. **Validators PASS on the regenerated output.**
+- **Calibration / acceptance gate:** the core's validators were proven against the **swim reference FIRST** — swim's compliant narrative must PASS (no false positives) before run goes through; it does. And the atypical-drift detection is decomposed-aware: a high RAW drift the analyzer already attributes to pace/terrain (low pace-normalized — May 31) is NOT flagged (no false contradiction); only undecomposed/elevated drift is (Apr 19). **Bug found + fixed during calibration (ironic, same class I've been chasing):** the adapter's `num()` helper treated `null` as `0` (`Number(null)===0`), so `pace_normalized_drift_bpm: null` read as `0` and took the "explained" branch — the zero-not-null class (D-112/Q-054). Fixed to null-guard first.
+- **Verified:** swim acceptance gate green; run before/after on 3 real hilly/hot runs (heat enters, drift acknowledged, readiness gone, validators pass); `deno check` clean on the core (the 4 ai-summary.ts errors are pre-existing, none reference the new symbols). **DEPLOYS `analyze-running-workout`.**
+- **Scope / guardrails honored:** Option-1 (no prompt-assembly unification); BOTH scaffold AND validators; single-source the LOGIC (one scaffold + one validator suite, thin adapters). Did NOT touch ride/swim/strength paths or the D-185/D-186 number resolvers.
+- **NEXT (per work order):** RIDE (no-regression case — swap its bespoke validators for the shared suite, prove byte-similar), then STRENGTH (wire canonical `exercise_log.estimated_1rm` into its packet FIRST — pure wiring, no schema — then migrate), then SWIM last (reference; complete the Q-061 kick/drill pessimistic-direction flag through the core).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

@@ -1,6 +1,9 @@
 import type { FactPacketV1, FlagV1 } from './types.ts';
 import { coerceNumber, secondsToPaceString } from './utils.ts';
 import { callLLM } from '../llm.ts';
+// Shared narrative-reasoning core (continuity leg #3 — D-187). The 7-rule scaffold + the shared
+// validator suite, single-sourced; run plugs in via the run adapter. See docs/WORK-ORDER-narrative-core.md.
+import { buildReasoningScaffold, validateNarrative, runAdapter } from '../narrative-core/index.ts';
 import type { ArcNarrativeContextV1, ArcNarrativeMode } from '../arc-narrative-state.ts';
 import { arcModeSystemAddon, arcNarrativeFactBlock, arcPostRaceComparisonAddon, arcUnplannedBackwardAnchorAddon } from '../arc-narrative-ai-appendix.ts';
 
@@ -1173,8 +1176,12 @@ export async function generateAISummaryV1(
   // arcPostRaceComparisonAddon emits empty string when is_first_post_race_run
   // is false; safe to always append. arcUnplannedBackwardAnchorAddon (D-046 /
   // Q-026) emits empty when not unplanned or when mode override applies.
+  // D-187: inject the shared reasoning-core scaffold (Rule 1 lead-signal=pace+grade+heat+drift fixes the
+  // heat-silo; Rule 2 reconcile atypical drift; Rule 4 cause allowlist; + the run addendum). Assembly is
+  // NOT unified — the scaffold is APPENDED to the existing sectional run prompt (work-order guardrail #1).
+  const ncCtx = runAdapter.buildContext(factPacket);
   const systemPrompt =
-    `${arcTemporalSystemPrefix(arcNarrative)}${COACHING_SYSTEM_PROMPT}${arcModeSystemAddon(arcNarrative)}${arcPostRaceComparisonAddon(arcNarrative)}${arcUnplannedBackwardAnchorAddon(arcNarrative, unplannedGate?.isUnplanned === true)}`;
+    `${arcTemporalSystemPrefix(arcNarrative)}${COACHING_SYSTEM_PROMPT}${arcModeSystemAddon(arcNarrative)}${arcPostRaceComparisonAddon(arcNarrative)}${arcUnplannedBackwardAnchorAddon(arcNarrative, unplannedGate?.isUnplanned === true)}${buildReasoningScaffold(runAdapter, factPacket)}`;
   const numericAllowAnchors =
     arcNarrative ? JSON.stringify(arcNarrative) : '';
 
@@ -1190,12 +1197,14 @@ export async function generateAISummaryV1(
     const pd1 = validateNoPaceDeltaFormat(s1);
     const ac1 = validateNoAthleteContradiction(s1, displayPacket);
     const rp1 = validateNoRpeClaimsWithoutAthleteReport(s1, displayPacket);
-    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && hr1.ok && pd1.ok && ac1.ok && rp1.ok) return s1;
-    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, hr: hr1.why, pd: pd1.why, ac: ac1.why, rp: rp1.why }));
+    const nc1 = validateNarrative(s1, ncCtx); // D-187 shared core: rules 1/2/4/5 (heat-silo, contradiction, cause, single-session)
+    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && hr1.ok && pd1.ok && ac1.ok && rp1.ok && nc1.ok) return s1;
+    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, hr: hr1.why, pd: pd1.why, ac: ac1.why, rp: rp1.why, core: nc1.failures.map(f => f.code) }));
 
     const corrections = [
       v1.bad.length ? 'Bad numeric tokens: ' + v1.bad.join(', ') : null,
       z1.why, len1.why, td1.why, g1.why, hr1.why, pd1.why, ac1.why, rp1.why,
+      ...nc1.failures.map(f => f.why),
     ].filter(Boolean);
     const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
     const s2 = await callLLMParagraph(systemPrompt, corrective, 0);
@@ -1209,8 +1218,9 @@ export async function generateAISummaryV1(
     const pd2 = validateNoPaceDeltaFormat(s2);
     const ac2 = validateNoAthleteContradiction(s2, displayPacket);
     const rp2 = validateNoRpeClaimsWithoutAthleteReport(s2, displayPacket);
-    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && hr2.ok && pd2.ok && ac2.ok && rp2.ok) return s2;
-    console.warn('[ai-summary] attempt 2 also rejected:', JSON.stringify({ num: v2.ok, zone: z2.why, len: len2.why, td: td2.why, filler: g2.why, hr: hr2.why, pd: pd2.why, ac: ac2.why, rp: rp2.why }));
+    const nc2 = validateNarrative(s2, ncCtx);
+    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && hr2.ok && pd2.ok && ac2.ok && rp2.ok && nc2.ok) return s2;
+    console.warn('[ai-summary] attempt 2 also rejected:', JSON.stringify({ num: v2.ok, zone: z2.why, len: len2.why, td: td2.why, filler: g2.why, hr: hr2.why, pd: pd2.why, ac: ac2.why, rp: rp2.why, core: nc2.failures.map(f => f.code) }));
     if (!hr2.ok || !ac2.ok || !rp2.ok) return null;
     return s2;
   } catch (e) {
