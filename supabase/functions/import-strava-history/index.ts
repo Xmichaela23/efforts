@@ -664,6 +664,16 @@ Deno.serve(async (req) => {
 
     const existing = new Set<number>((existingRes.data || []).map((w: any) => w.strava_activity_id));
 
+    // Q-066: port the LIVE webhook's source-preference gate (strava-webhook/index.ts:175-204) so historical
+    // import respects the SAME Garmin/Strava preference the live path does. Without it, a dual-connect user
+    // importing their back-catalog double-inserts runs/rides (no preference skip here AND no cross-source
+    // merge for non-swims — swims were already covered by ingest-activity's merge gate + D-184). Fetch once.
+    const { data: userPrefRow } = await supabase
+      .from('users').select('preferences').eq('id', userId).single();
+    const sourcePreference = (userPrefRow?.preferences as any)?.source_preference || 'both';
+    const swimSourceOverride = (userPrefRow?.preferences as any)?.swim_source_override || null;
+    let skippedByPreference = 0;
+
     let imported = 0;
     let skipped = 0;
     let page = 1;
@@ -749,6 +759,34 @@ Deno.serve(async (req) => {
         } catch (_) {}
 
         if (existing.has(a.id)) { skipped++; continue; }
+
+        // Q-066: same fallback-aware skip the live webhook applies (strava-webhook:175-204). When Garmin is
+        // preferred — globally, OR per the D-173 swim override for swims — drop the Strava copy ONLY if
+        // Garmin already has a record for this date+type (never lose a Strava-only activity). Runs BEFORE
+        // ingest-activity, exactly like the live path; anything that PASSES still goes through the swim
+        // merge gate (D-157/D-184) inside ingest-activity — layered, not conflicting. Same mapping/date
+        // derivation as the workout row (`start_date_local || start_date`) so the lookup matches stored rows.
+        {
+          const sp = String(a.sport_type || a.type || '').toLowerCase();
+          const isSwim = sp.includes('swim');
+          if (sourcePreference === 'garmin' || (swimSourceOverride === 'garmin' && isSwim)) {
+            const activityDate = String(a.start_date_local || a.start_date || '').split('T')[0];
+            const mappedType = sp.includes('run') ? 'run'
+              : (sp.includes('ride') || sp.includes('bike')) ? 'ride'
+              : sp.includes('swim') ? 'swim'
+              : (sp.includes('walk') || sp.includes('hike')) ? 'walk'
+              : (sp.includes('weight') || sp.includes('strength')) ? 'strength'
+              : 'run';
+            const { data: garminWorkout } = await supabase
+              .from('workouts').select('id')
+              .eq('user_id', userId).eq('date', activityDate).eq('type', mappedType)
+              .not('garmin_activity_id', 'is', null).maybeSingle();
+            if (garminWorkout) {
+              console.log(`⏭️ Q-066: skipping Strava activity ${a.id} — Garmin record exists for ${activityDate} ${mappedType}`);
+              skipped++; skippedByPreference++; continue;
+            }
+          }
+        }
 
         // Fetch detailed activity data to get HR, calories, etc.
         let detailedActivity = a;
@@ -856,7 +894,7 @@ Deno.serve(async (req) => {
       await runPostImportAthletePipeline(userId, 'import-strava-history');
     }
 
-    return new Response(JSON.stringify({ success: true, imported, skipped, tokens: updatedTokens }), {
+    return new Response(JSON.stringify({ success: true, imported, skipped, skipped_by_preference: skippedByPreference, tokens: updatedTokens }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
   } catch (err) {
