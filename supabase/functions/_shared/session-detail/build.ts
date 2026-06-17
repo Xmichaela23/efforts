@@ -9,6 +9,7 @@ import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../
 import type { ReadinessSnapshotV1 } from '../readiness-types.ts';
 import { packageSessionDetailReadiness } from './readiness-load-context.ts';
 import { swimPacePer100Seconds } from '../swim/swim-pace.ts';
+import type { SwimScalars } from '../swim/swim-scalars.ts';
 
 /** Match fact-packet ai-summary: session HR drift is not meaningful for structured interval sessions. */
 function shouldSuppressSessionHrDrift(factPacket: any, intervals?: IntervalRow[]): boolean {
@@ -120,6 +121,10 @@ export type SessionDetailInput = {
   loadStatus?: { status: 'on_target' | 'high' | 'elevated' | 'under'; interpretation?: string } | null;
   /** Completed workout's `computed` field (from compute-workout-analysis). */
   completedComputed?: Record<string, unknown> | null;
+  /** D-182: SWIM pace + HR scalars from the RAW workouts columns (the authoritative layer for swims —
+   *  computed.overall is sample-derived and has been wrong). Resolved in workout-detail via
+   *  resolveSwimScalars; null for non-swims (which keep computed.overall, GPS-authoritative). */
+  completedSwimScalars?: SwimScalars | null;
   /** Completed workout's refined_type (e.g. 'pool_swim', 'open_water_swim'). */
   completedRefinedType?: string | null;
   /** Next planned session from the week (forward-looking context). */
@@ -157,6 +162,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     narrativeText,
     loadStatus,
     completedComputed,
+    completedSwimScalars,
     weatherTempF,
     completedRefinedType,
     nextSession,
@@ -422,10 +428,17 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const completedDurS = fin(compOverall?.duration_s_moving);
   const completedDistM = fin(compOverall?.distance_m);
   const swimUnit = plannedTotals.swim_unit || 'yd';
+  // D-182: for SWIMS, moving-seconds + distance + avg-HR come from the RAW-column scalar
+  // (completedSwimScalars), NOT computed.overall — which is sample-derived and has produced impossible
+  // swim values (moving > elapsed). This is the SAME source the narrative reads, so card and narrative
+  // can never diverge on pace/HR again (the D-156 lesson, now enforced cross-surface). Non-swims keep
+  // computed.overall untouched (GPS-authoritative). Falls back to compOverall if no scalar was passed.
+  const swimDurS = type === 'swim' ? (completedSwimScalars?.movingSeconds ?? completedDurS) : completedDurS;
+  const swimDistM = type === 'swim' ? (completedSwimScalars?.distanceMeters ?? completedDistM) : completedDistM;
   // D-167: single-sourced via the shared helper so the analyzer's narrative pace can't diverge from
   // this (the Performance-tab) value. Moving duration ÷ distance, per 100 of the display unit.
   const completedSwimPer100 = type === 'swim'
-    ? swimPacePer100Seconds(completedDurS, completedDistM, swimUnit === 'yd' ? 'yd' : 'm')
+    ? swimPacePer100Seconds(swimDurS, swimDistM, swimUnit === 'yd' ? 'yd' : 'm')
     : null;
   const fpFacts = factPacket?.facts || {};
   const fpDerived = factPacket?.derived || {};
@@ -433,16 +446,19 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   // athlete's ELAPSED pool time (from the analyzer's session_elapsed_s) — NOT moving time, which excludes
   // rest and made "duration" read short. Pace stays on moving time (completedSwimPer100 uses completedDurS
   // above, computed before this). Non-swims and missing elapsed fall back to moving.
-  const completedElapsedS = fin((perf as any)?.session_elapsed_s);
+  // D-182: prefer the raw-column elapsed scalar for swims (authoritative; perf.session_elapsed_s and
+  // computed.overall have both been unreliable). Falls back to the prior perf-derived value.
+  const completedElapsedS = (type === 'swim' ? completedSwimScalars?.elapsedSeconds : null) ?? fin((perf as any)?.session_elapsed_s);
   const completedTotals: SessionDetailV1['completed_totals'] = {
-    duration_s: (type === 'swim' && completedElapsedS != null && completedElapsedS > 0) ? completedElapsedS : completedDurS,
-    distance_m: completedDistM,
+    duration_s: (type === 'swim' && completedElapsedS != null && completedElapsedS > 0) ? completedElapsedS : swimDurS,
+    distance_m: swimDistM,
     // Land pace (min/mi) + GAP are meaningless for a swim — null them so the swim screen never
     // renders "5:03/mi". Swim pace lives in swim_pace_per_100_s. (Layer 1: numbers honest; the
     // full swim-native template — speed chart, cadence, grade rows — is the separate Layer 2.)
     avg_pace_s_per_mi: type === 'swim' ? null : (fin(compOverall?.avg_pace_s_per_mi) ?? fin(fpFacts?.avg_pace_sec_per_mi)),
     avg_gap_s_per_mi: type === 'swim' ? null : (fin(compOverall?.avg_gap_s_per_mi) ?? fin(fpFacts?.avg_gap_sec_per_mi)),
-    avg_hr: fin(compOverall?.avg_hr) ?? fin(fpFacts?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
+    // D-182: swim avg-HR from the raw-column scalar first (matches the narrative); non-swims unchanged.
+    avg_hr: (type === 'swim' ? completedSwimScalars?.avgHr : null) ?? fin(compOverall?.avg_hr) ?? fin(fpFacts?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
     swim_pace_per_100_s: completedSwimPer100,
   };
 

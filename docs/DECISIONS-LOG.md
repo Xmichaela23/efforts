@@ -3951,6 +3951,21 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-182 — Swim pace + HR single-sourced to the RAW-column scalar across card AND narrative (computed.overall is not authoritative for swims)
+
+- **Date:** 2026-06-16
+- **Symptom:** same swim, two numbers — the Performance **card** showed Pace **3:03/100yd** + Avg HR **125**, while the **narrative** said **2:00** + **119**. The D-156/D-164/D-167 single-source divergence class, resurfaced cross-surface.
+- **Root cause (confirmed by a read-only prod dump of the row, not asserted):** D-167 single-sourced pace *within* each surface (both call `swimPacePer100Seconds`) but the two surfaces fed it **different upstream layers**. Narrative read the raw `workouts` columns (`moving_time` 24 min → 1440s, `distance` 1.1 km → 1100 m, `avg_heart_rate` 119). Card (`session-detail/build.ts`) read `computed.overall` (`duration_s_moving` **2202s**, `avg_hr` **125**). `computed.overall.duration_s_moving = 2202s` is **larger than elapsed (2100s)** — physically impossible; moving cannot exceed elapsed. The sample-derived `computed.overall` layer is unreliable for swims — the exact Q-038 / D-156 lesson ("701:00 duration / 2263% adherence"). The raw provider-summary scalar (2:00 / 119) is authoritative.
+- **Decision:** the **raw `workouts` columns are the authoritative swim scalar**; `computed.overall` (and `computed.analysis.swim`) are NOT for swims. Enforced via ONE shared resolver `_shared/swim/swim-scalars.ts` `resolveSwimScalars({moving_time, elapsed_time, distance, avg_heart_rate})` → `{movingSeconds, elapsedSeconds, distanceMeters, avgHr}` (handles the integer-minute storage convention; distance is km). **Both** surfaces now read swim pace + HR from this one path, so they can never re-diverge:
+  - **Narrative** (`analyze-swim-workout`) — refactored to `resolveSwimScalars(workout)` (value-preserving; it already read the raw columns).
+  - **Card** (`session-detail/build.ts`) — new optional input `completedSwimScalars`, populated in `workout-detail` from the raw row; swim pace/HR/distance/elapsed read it **swim-gated** (non-swims keep `computed.overall`, which is GPS-authoritative — do NOT touch run/ride).
+  - **Details tab** (`workout-detail` `display_metrics`) — swim `durS`/`distM`/`avg_swim_pace_per_100m·yd` also swim-gated to the scalar (was preferring `computed.overall.duration_s_moving` + `computed.analysis.swim`, the same divergent layer).
+- **Verified:** offline unit test against the REAL helpers (`scripts/_swim-scalars-test.mjs`) — raw row → moving 1440s, dist 1100 m, HR 119, pace **120s = 2:00/100yd** (all assertions PASS), and the `computed.overall` path reproduces the bug exactly (3:03 / 125). Narrative re-run post-deploy still reads 2:00 / 119 with the D-179 work:rest lead intact (refactor safe). Card re-renders on next open (workout-detail rebuilds `session_detail_v1` from the new `build.ts`).
+- **Scope:** server only. **DEPLOYS** `workout-detail`, `analyze-swim-workout`, `analyze-cycling-workout` (the third bundles `build.ts`; its non-swim path is byte-for-byte unchanged — redeployed to keep the shared bundle current). The new `build.ts` input is optional → other importers (the shared barrel) stay backward-compatible.
+- **Separate, NOT in this fix (Q-061):** even this now-correct blended pace is **fin-assisted** — finned drill sets pull it artificially fast. D-182 only makes the number right and consistent; the equipment exclusion/flagging is Q-061 (confirmed 0% built — `equipment_confirmed` has zero readers; see OPEN-QUESTIONS). Deliberately kept separate per the user's scoping split.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

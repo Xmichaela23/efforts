@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
 import { swimPacePer100Seconds } from '../_shared/swim/swim-pace.ts';
+import { resolveSwimScalars } from '../_shared/swim/swim-scalars.ts';
 
 // =============================================================================
 // ANALYZE-SWIM-WORKOUT - SWIMMING ANALYSIS EDGE FUNCTION
@@ -287,8 +288,11 @@ Deno.serve(async (req) => {
     const computed = workout.computed || {};
     
     // Calculate basic metrics
-    const totalDistance = workout.distance || 0; // in km, convert to meters
-    const totalDistanceMeters = totalDistance * 1000;
+    // D-182: swim scalars (moving/elapsed seconds, distance, avg HR) from the RAW workouts columns via
+    // the ONE shared resolver — the SAME source the Performance card (build.ts) now reads, so card and
+    // narrative can never diverge on pace/HR again. computed.overall is NOT authoritative for swims.
+    const swimScalars = resolveSwimScalars(workout);
+    const totalDistanceMeters = swimScalars.distanceMeters ?? 0;
     // D-167: pool length via the ONE resolver (user_corrected → device → planned → default) — the
     // analyzer was defaulting to 25 (m/yd) and ignoring the athlete's post-swim correction (D-164).
     const poolLength = resolvePoolLength({
@@ -302,9 +306,10 @@ Deno.serve(async (req) => {
 
     const isPool = workout.environment !== 'open_water';
 
-    // D-167: pace via the SHARED helper (single source with build.ts) so the narrative pace == the
-    // Performance-tab pace. Was computing per-100m and mislabeling as /100yd ("2:11" vs the true "2:00").
-    const _movingSeconds = workout.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null;
+    // D-167/D-182: pace via the SHARED helper, fed by the SHARED raw-column scalar, so the narrative
+    // pace == the Performance-tab pace. Was computing per-100m and mislabeling as /100yd ("2:11" vs the
+    // true "2:00"); D-182 further pins moving-seconds to the raw column (not computed.overall).
+    const _movingSeconds = swimScalars.movingSeconds;
     const avgPacePer100 = swimPacePer100Seconds(_movingSeconds, totalDistanceMeters, poolUnit) ?? 0;
 
     // Physical pool length display (separate from the pace unit): 25/50 yd pools read in yd, 25/50 m in m.
@@ -378,7 +383,7 @@ Deno.serve(async (req) => {
         // D-168: swim has no power/GPS/per-length data, so build the read around what it DOES have —
         // HR, the work:rest split (moving vs elapsed), and the felt/RPE signal (swim's best subjective
         // input, the equivalent of the ride's power data). Observe the rest pattern; never diagnose why.
-        const _elapsedSeconds = workout.elapsed_time ? (workout.elapsed_time < 1000 ? workout.elapsed_time * 60 : workout.elapsed_time) : null;
+        const _elapsedSeconds = swimScalars.elapsedSeconds;
         const movingMin = _movingSeconds ? Math.round(_movingSeconds / 60) : null;
         const elapsedMin = _elapsedSeconds ? Math.round(_elapsedSeconds / 60) : null;
         const restMin = (movingMin != null && elapsedMin != null && elapsedMin > movingMin) ? (elapsedMin - movingMin) : null;
@@ -396,7 +401,7 @@ Deno.serve(async (req) => {
           pool_length: poolLength,
           pool_unit: poolUnit,
           environment: isPool ? 'pool' : 'open water',
-          avg_heart_rate: workout.avg_heart_rate || null,
+          avg_heart_rate: swimScalars.avgHr,
           max_heart_rate: workout.max_heart_rate || null,
           stroke_type: swimData.strokeType || 'Freestyle',
           intervals_completed: intervals.length,

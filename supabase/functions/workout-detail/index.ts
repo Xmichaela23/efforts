@@ -7,6 +7,8 @@ import { weekStartOf } from '../_shared/plan-week.ts';
 import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapshot/daily-ledger.ts';
 import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
 import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
+import { resolveSwimScalars } from '../_shared/swim/swim-scalars.ts';
+import { swimPacePer100Seconds } from '../_shared/swim/swim-pace.ts';
 import { disciplineOf } from '../_shared/state-trend/index.ts';
 import {
   fetchActivePlanId,
@@ -633,6 +635,17 @@ async function runSessionDetailPipelineAndPersist(
       narrativeText,
       loadStatus: bodyResponse?.load_status ? { status: bodyResponse.load_status.status, interpretation: bodyResponse.load_status.interpretation } : null,
       completedComputed: (detail as any).computed ?? null,
+      // D-182: for swims, pass the RAW-column scalar (moving/elapsed/distance/HR) so the card reads the
+      // SAME authoritative numbers the narrative does — never computed.overall (sample-derived, has been
+      // wrong: moving > elapsed). Null for non-swims (they keep computed.overall in build.ts).
+      completedSwimScalars: ((row?.type ?? (detail as any)?.type) === 'swim')
+        ? resolveSwimScalars({
+            moving_time: (detail as any).moving_time ?? (detail as any).metrics?.moving_time,
+            elapsed_time: (detail as any).elapsed_time ?? (detail as any).metrics?.elapsed_time,
+            distance: (detail as any).distance,
+            avg_heart_rate: (detail as any).avg_heart_rate ?? (detail as any).metrics?.avg_heart_rate,
+          })
+        : null,
       completedRefinedType: (detail as any).refined_type ?? row?.refined_type ?? null,
       nextSession,
       readinessSnapshot: readinessUnavailable ? null : readinessSnapshot,
@@ -1404,11 +1417,22 @@ Deno.serve(async (req) => {
 
     // display_metrics: WorkoutDataNormalized for useWorkoutData (smart server, dumb client)
     const d = detail as any;
+    // D-182: for SWIMS, distance/moving/elapsed come from the RAW-column scalar — NOT computed.overall,
+    // which is sample-derived and has produced impossible swim values (moving > elapsed). Same source as
+    // the Performance card + narrative, so the Details tab can't diverge either. Non-swims untouched.
+    const _isSwim = (d?.type === 'swim');
+    const _swimSc = _isSwim
+      ? resolveSwimScalars({ moving_time: d?.moving_time ?? d?.metrics?.moving_time, elapsed_time: d?.elapsed_time ?? d?.metrics?.elapsed_time, distance: d?.distance, avg_heart_rate: d?.avg_heart_rate ?? d?.metrics?.avg_heart_rate })
+      : null;
     const getDistM = () => { const distKm = Number.isFinite(d?.distance) ? Number(d.distance) * 1000 : null; const distM = d?.computed?.overall?.distance_m ?? null; return Number.isFinite(distM) && distM > 0 ? Number(distM) : (Number.isFinite(distKm) ? Number(distKm) : null); };
-    const distM = getDistM();
+    const distM = (_isSwim && _swimSc?.distanceMeters != null) ? _swimSc.distanceMeters : getDistM();
     const distKm = Number.isFinite(distM) && distM > 0 ? distM / 1000 : null;
-    const durS = Number.isFinite(d?.computed?.overall?.duration_s_moving) ? Number(d.computed.overall.duration_s_moving) : (Number.isFinite(d?.moving_time ?? d?.metrics?.moving_time) ? Number(d.moving_time ?? d.metrics.moving_time) * 60 : null);
-    const elapsedS = Number.isFinite(d?.computed?.overall?.duration_s_elapsed) ? Number(d.computed.overall.duration_s_elapsed) : (Number.isFinite(d?.elapsed_time ?? d?.metrics?.elapsed_time) ? Number(d.elapsed_time ?? d.metrics.elapsed_time) * 60 : null) ?? durS;
+    const durS = (_isSwim && _swimSc?.movingSeconds != null)
+      ? _swimSc.movingSeconds
+      : (Number.isFinite(d?.computed?.overall?.duration_s_moving) ? Number(d.computed.overall.duration_s_moving) : (Number.isFinite(d?.moving_time ?? d?.metrics?.moving_time) ? Number(d.moving_time ?? d.metrics.moving_time) * 60 : null));
+    const elapsedS = (_isSwim && _swimSc?.elapsedSeconds != null)
+      ? _swimSc.elapsedSeconds
+      : (Number.isFinite(d?.computed?.overall?.duration_s_elapsed) ? Number(d.computed.overall.duration_s_elapsed) : (Number.isFinite(d?.elapsed_time ?? d?.metrics?.elapsed_time) ? Number(d.elapsed_time ?? d.metrics.elapsed_time) * 60 : null) ?? durS);
     const elevation_gain_m = Number.isFinite(d?.elevation_gain ?? d?.metrics?.elevation_gain) ? Number(d.elevation_gain ?? d.metrics.elevation_gain) : null;
     const avg_power = Number.isFinite(d?.avg_power ?? d?.metrics?.avg_power) ? Number(d.avg_power ?? d.metrics.avg_power) : null;
     const avg_hr = Number.isFinite(d?.avg_heart_rate ?? d?.metrics?.avg_heart_rate) ? Number(d.avg_heart_rate ?? d.metrics.avg_heart_rate) : null;
@@ -1438,9 +1462,16 @@ Deno.serve(async (req) => {
     const variability_index = Number.isFinite(powerMetrics?.variability_index) ? Number(powerMetrics.variability_index) : null;
     const avg_power_pedaling_w = Number.isFinite(powerMetrics?.avg_power_pedaling_w) ? Number(powerMetrics.avg_power_pedaling_w) : null;
     const pct_time_pedaling = Number.isFinite(powerMetrics?.pct_time_pedaling) ? Number(powerMetrics.pct_time_pedaling) : null;
+    // D-182: swim pace derived from the SAME raw-column scalar (moving ÷ distance) via the shared helper,
+    // not computed.analysis.swim (sample-derived, diverged). Falls back to the computed block if a swim
+    // somehow lacks the raw scalar. Non-swims never reach the scalar branch.
     const swimMetrics = d?.computed?.analysis?.swim;
-    const avg_swim_pace_per_100m = Number.isFinite(swimMetrics?.avg_pace_per_100m) ? Number(swimMetrics.avg_pace_per_100m) : null;
-    const avg_swim_pace_per_100yd = Number.isFinite(swimMetrics?.avg_pace_per_100yd) ? Number(swimMetrics.avg_pace_per_100yd) : null;
+    const _scPer100m = (_isSwim && _swimSc?.movingSeconds != null && _swimSc?.distanceMeters != null)
+      ? swimPacePer100Seconds(_swimSc.movingSeconds, _swimSc.distanceMeters, 'm') : null;
+    const _scPer100yd = (_isSwim && _swimSc?.movingSeconds != null && _swimSc?.distanceMeters != null)
+      ? swimPacePer100Seconds(_swimSc.movingSeconds, _swimSc.distanceMeters, 'yd') : null;
+    const avg_swim_pace_per_100m = _scPer100m ?? (Number.isFinite(swimMetrics?.avg_pace_per_100m) ? Number(swimMetrics.avg_pace_per_100m) : null);
+    const avg_swim_pace_per_100yd = _scPer100yd ?? (Number.isFinite(swimMetrics?.avg_pace_per_100yd) ? Number(swimMetrics.avg_pace_per_100yd) : null);
     const work_kj = Number.isFinite(d?.total_work) ? Number(d.total_work) : null;
     const rawSeries = d?.computed?.analysis?.series || null;
     const series = rawSeries ? bucketSeries(rawSeries, MAX_SERIES_POINTS) : null;

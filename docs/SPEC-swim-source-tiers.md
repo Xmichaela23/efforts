@@ -46,6 +46,8 @@ Each metric renders **only if its inputs exist**; otherwise omit (no synthesis, 
 
 `session SWOLF = (avg sec/length) + (avg strokes/length)`, normalized to 25 (industry standard). **Single-source it** in a new shared fn (e.g. `_shared/swim/swim-swolf.ts`) — same pattern as `swimPacePer100Seconds`. **FOOTGUN:** computing SWOLF (or pace, or pool length) in more than one place reinstates the D-156/D-164/D-167 divergence class. Comparison-to-self only, never cross-athlete.
 
+> **D-182 — pace + HR are single-sourced cross-surface, from the RAW-column scalar.** It's not enough to single-source the *formula* (`swimPacePer100Seconds`); the **inputs** must come from one place too. For swims, that place is the raw `workouts` columns via `_shared/swim/swim-scalars.ts` `resolveSwimScalars()` — **NOT `computed.overall` / `computed.analysis.swim`**, which are sample-derived and have produced impossible values (observed `duration_s_moving` 2202s > elapsed 2100s). The Performance card (`session-detail/build.ts`), the Details-tab `display_metrics` (`workout-detail`), and the narrative (`analyze-swim-workout`) all read swim pace + HR through this one resolver. Any new swim surface MUST do the same (raw scalar, swim-gated; non-swims keep `computed.overall`, which is GPS-authoritative). This is the D-156 lesson promoted from "one number, one formula" to "one number, one *source*, every surface."
+
 **Folds in Q-061:** finned/equipped sessions are flagged OUT of the SWOLF trend pool (a fin-assisted SWOLF isn't comparable to unaided) — same equipment exclusion as the pace trend; the data dependency (`workout_metadata.swim_steps_equipment_confirmed`) is already captured (D-162).
 
 ## Multi-source reconciliation + FORM→Apple nudge
