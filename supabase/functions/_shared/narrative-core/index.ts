@@ -11,3 +11,4 @@ export { runAdapter } from './adapters/run.ts';
 export { rideAdapter } from './adapters/ride.ts';
 export { strengthAdapter } from './adapters/strength.ts';
 export { swimAdapter } from './adapters/swim.ts';
+export { coachAdapter } from './adapters/coach.ts';

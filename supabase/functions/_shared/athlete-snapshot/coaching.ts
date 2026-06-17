@@ -8,6 +8,9 @@
 
 import type { AthleteSnapshot, LedgerDay, PlannedSession, Coaching } from './types.ts';
 import { callLLM } from '../llm.ts';
+// Shared narrative-reasoning core (D-191 — coach leg, the 5th & final narrative path). Week-scoped adapter
+// feeds the shared scaffold + validators from the spine + week context. See docs/WORK-ORDER-narrative-core.md.
+import { buildReasoningScaffold, validateNarrative, coachAdapter } from '../narrative-core/index.ts';
 
 const SKIP_TAG_FOR_PROMPT: Record<string, string> = {
   fatigued: 'fatigued / training load',
@@ -384,17 +387,47 @@ export async function generateCoaching(
     longitudinalBlock?: string | null;
     suppressRunLoadSpike?: boolean;
     priorComparableRaceBlock?: string | null;
+    // D-191: week-scoped grounding for the shared narrative core. fitness_direction is the spine verdict
+    // (rollupFitnessDirection) — the Rule-5 grounding for any fitness-direction claim.
+    weekContext?: {
+      fitness_direction?: string | null;
+      load_status?: { status?: string } | string | null;
+      readiness_state?: string | null;
+      weekly_trends?: Record<string, unknown> | null;
+    } | null;
   },
 ): Promise<Coaching> {
   const prompt = snapshotToPrompt(snapshot, opts);
 
-  const raw = await callLLM({
-    system: COACHING_SYSTEM_PROMPT,
-    user: `Here is the athlete snapshot for this week. Write the headline, narrative, and next session guidance.\n\n${prompt}`,
-    model: 'claude-sonnet-4-20250514',
-    maxTokens: 400,
-    temperature: 0.4,
-  });
+  // D-191: append the shared reasoning-core scaffold (coach addendum: lead-with-state+credit / D-154,
+  // describe-don't-prescribe / D-155, fitness-direction pinned to the spine verdict, no state-diagnosis) +
+  // run the shared validators with a retry. Coach was a single call with NO validator loop.
+  const ncCtx = coachAdapter.buildContext(opts?.weekContext ?? {});
+  const systemPrompt = COACHING_SYSTEM_PROMPT + buildReasoningScaffold(coachAdapter, opts?.weekContext ?? {});
+  const baseUser = `Here is the athlete snapshot for this week. Write the headline, narrative, and next session guidance.\n\n${prompt}`;
+  const callOnce = (userMsg: string) => callLLM({ system: systemPrompt, user: userMsg, model: 'claude-sonnet-4-20250514', maxTokens: 400, temperature: 0.4 });
+
+  // Coach-specific HARD post-check (D-155): prescription-shaped 'add'-ban — "add a session / another / one
+  // more / extra / in [work]". Prescription-banning is coach-only (the four session analyzers legitimately
+  // give next-session guidance), so it wraps the shared validator here rather than living in the shared suite.
+  // Prescription-SHAPED, not a raw substring — "added load" / "add-on" do not trip it.
+  const addBan = /\badd\s+(a\b|an\b|one\b|another\b|more\b|extra\b|in\b)/i;
+  const checkCoach = (raw: string): string[] => {
+    const prose = raw || '';
+    const fails = validateNarrative(prose, ncCtx).failures.map((f) => f.why);
+    if (addBan.test(prose)) fails.push('You used "add a session/another/more" — that prescribes new volume. Describe the plan\'s existing key sessions ("prioritize", "anchor on"), never ADD work.');
+    return fails;
+  };
+
+  let raw = await callOnce(baseUser);
+  if (raw) {
+    const fails = checkCoach(raw);
+    if (fails.length) {
+      console.warn('[coaching] narrative rejected:', JSON.stringify(fails.slice(0, 4)));
+      const s2 = await callOnce(baseUser + '\n\nYour previous draft violated the reasoning rules:\n' + fails.map((f) => '- ' + f).join('\n') + '\nRewrite the headline, narrative, and next-session guidance fixing these.');
+      if (s2) raw = s2; // retry-then-soft-accept (never regress to the deterministic fallback over a rule miss)
+    }
+  }
 
   if (!raw) {
     return fallbackCoaching(snapshot);

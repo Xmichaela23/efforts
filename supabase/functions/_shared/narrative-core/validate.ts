@@ -29,6 +29,11 @@ const DIRECTION_VERDICT = /\b(improving|declining|getting\s+(faster|fitter|stron
 // explicit causal connectives (Rule 4).
 const CAUSAL = /\b(caused by|because of|due to|drove the|led to the|resulted in|attributable to)\b/i;
 const NON_DET_FACTORS = ['heat', 'temperature', 'terrain', 'grade', 'hill', 'hills', 'fatigue', 'tired', 'dehydration', 'dehydrated', 'humidity'];
+// physiological-STATE diagnoses (Rule 4) — unprovable verdicts the narrative must not assert; observe the
+// pattern instead ("load climbed while readiness dipped"). Highest-risk for the week-level coach voice.
+const STATE_DIAGNOSIS = /\b(overreach\w*|overtrain\w*|under.?recover\w*|burn(t|ed)?\s?out|detrain\w*)\b/i;
+// hedge words that turn a cause/state claim into an allowed PLAUSIBLE attribution (shared by both Rule-4 checks).
+const HEDGE = /\b(likely|probably|possibly|perhaps|may|might|seem\w*|appear\w*|suggest\w*|partly|partial\w*|some of|tend\w*|can\b|risk of)\b/i;
 
 export function validateNarrative(summary: string, ctx: NarrativeContext): ValidationResult {
   const failures: ValidationFailure[] = [];
@@ -78,14 +83,23 @@ export function validateNarrative(summary: string, ctx: NarrativeContext): Valid
   const causalMatch = text.match(CAUSAL);
   if (causalMatch) {
     const idx = causalMatch.index ?? 0;
-    const preceding = text.slice(Math.max(0, idx - 28), idx);
-    const hedged = /\b(likely|probably|possibly|perhaps|may|might|seem\w*|appear\w*|suggest\w*|partly|partial\w*|some of)\b/i.test(preceding);
+    const hedged = HEDGE.test(text.slice(Math.max(0, idx - 28), idx));
     if (!hedged) {
       const factorRe = new RegExp(`\\b(${NON_DET_FACTORS.join('|')})\\b`, 'i');
       const m = text.match(factorRe);
       if (m && !ctx.establishedCauses.includes(m[1].toLowerCase())) {
         failures.push({ rule: 4, code: 'cause_diagnosed', why: `"${m[1]}" is stated as a proven cause, but it is not deterministically established this session. Name it as a plausible contributor (e.g. "likely", "partly"), not the sole cause.` });
       }
+    }
+  }
+  // ── Rule 4b — physiological-state diagnosis (overreaching / overtrained / under-recovered / burnt out /
+  //    detraining): an unprovable verdict unless hedged. Observe the pattern instead. (Week-level coach risk.)
+  const stateMatch = text.match(STATE_DIAGNOSIS);
+  if (stateMatch) {
+    const idx = stateMatch.index ?? 0;
+    const hedged = HEDGE.test(text.slice(Math.max(0, idx - 28), idx));
+    if (!hedged) {
+      failures.push({ rule: 4, code: 'state_diagnosed', why: `"${stateMatch[0]}" is a physiological-state diagnosis the data can't prove. Observe the pattern instead (e.g. "load climbed while readiness dipped"), or hedge it ("may be", "signals suggest").` });
     }
   }
 

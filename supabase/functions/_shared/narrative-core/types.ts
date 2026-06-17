@@ -4,7 +4,7 @@
 // discipline's fact packet into the generic NarrativeContext the core reasons over.
 // Standard: docs/SPEC-universal-narrative-inference.md. Work order: docs/WORK-ORDER-narrative-core.md.
 
-export type Discipline = 'run' | 'ride' | 'swim' | 'strength';
+export type Discipline = 'run' | 'ride' | 'swim' | 'strength' | 'coach';
 
 /** Which effort claims have an anchor THIS session (Rule 3). null = no anchor → stay neutral. */
 export interface AnchorSet {

@@ -91,7 +91,7 @@ const corsHeaders: Record<string, string> = {
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
 /** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
 /** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
-const COACH_PAYLOAD_VERSION = 44; // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+const COACH_PAYLOAD_VERSION = 45; // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -3538,6 +3538,14 @@ Deno.serve(async (req) => {
             longitudinalBlock: coachingLongitudinalBlock,
             suppressRunLoadSpike: earlyRunAdherenceArtifact && !hasRealLoadConcerns,
             priorComparableRaceBlock: coachPromptPriorRaceBlock(goalRows, asOfDate) ?? undefined,
+            // D-191: week-scoped grounding for the shared narrative core. fitness_direction is the spine
+            // verdict (rollupFitnessDirection) — the Rule-5 grounding; numbers untouched, prose-only.
+            weekContext: {
+              fitness_direction: fitnessDirection ?? null,
+              load_status: (partialSnapshot as any)?.body_response?.load_status ?? null,
+              readiness_state: readinessState ?? null,
+              weekly_trends: (partialSnapshot as any)?.body_response?.weekly_trends ?? null,
+            },
           });
         } catch (llmErr: any) {
           console.warn('[coach] snapshot coaching generation failed:', llmErr?.message || llmErr);

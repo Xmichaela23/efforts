@@ -1,6 +1,6 @@
 # WORK ORDER — Shared Narrative-Reasoning Core (cross-discipline consolidation)
 
-**Status:** IN PROGRESS (2026-06-16). Core built; the **FOUR SESSION-SCOPED LEGS ARE DONE** — RUN (D-187), RIDE (D-188, no-regression), STRENGTH (D-189, e1RM wired + fabrication vector closed), SWIM (D-190, reference preserved + Q-061 kick/drill narrative flag completed). **ONLY COACH (leg 5, week/state-scoped) REMAINS** — filed below, not started. (Also still open, separate: Q-061 trend-substrate exclusion → held swim-cleanup work order.)
+**Status:** ✅ COMPLETE (2026-06-16). All FIVE narrative paths migrated onto the shared scaffold + validator suite: RUN (D-187), RIDE (D-188, no-regression), STRENGTH (D-189, e1RM wired + fabrication vector closed), SWIM (D-190, reference preserved + Q-061 kick/drill narrative flag), COACH (D-191, week-scoped, fitness-claims pinned to spine verdict + state-diagnosis caught + D-154/D-155 folded in). The reasoning leg of the continuity invariant is done across every narrative surface. **Remaining, all filed (not part of this work order):** coach legacy-fallback prose (degraded path, follow-up); Q-061 trend-substrate exclusion (held swim-cleanup WO); the two held feature WOs (deviation-reason, swim-cleanup).
 
 **Purpose:** This is the executable plan for consolidating all four discipline narratives (run / ride / swim / strength) onto ONE shared reasoning core. It is **self-contained** — a fresh session must be able to execute Phase 3 from this doc alone (same discipline as the feature-audit work order). Do not rely on conversation memory.
 
