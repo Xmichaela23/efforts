@@ -176,12 +176,21 @@ function compactRepeatedLines(sectionSteps: any[], displayYards: boolean): strin
       reps++
       j += 2
     }
-    out.push(`${reps} x ${cur.dist} ${cur.desc}`.trim())
     if (reps > 1 && restBetween != null && restBetween > 0) {
-      out.push(`${restBetween} sec rest`)
-    } else if (reps === 1 && j < tokens.length && tokens[j].k === 'rest') {
-      out.push(`${tokens[j].sec} sec rest`)
-      j++
+      // FORM Script shows rest only when it follows each interval — a single trailing rest line for
+      // the whole set renders incorrectly in the goggles. Emit the work + rest pair once per rep so
+      // rest appears after every interval. Rest seconds come from computed.steps (restBetween, via
+      // recoverySec) — never hardcoded.
+      for (let r = 0; r < reps; r++) {
+        out.push(`${cur.dist} ${cur.desc}`.trim())
+        out.push(`${restBetween} sec rest`)
+      }
+    } else {
+      out.push(`${reps} x ${cur.dist} ${cur.desc}`.trim())
+      if (reps === 1 && j < tokens.length && tokens[j].k === 'rest') {
+        out.push(`${tokens[j].sec} sec rest`)
+        j++
+      }
     }
     i = j
   }
