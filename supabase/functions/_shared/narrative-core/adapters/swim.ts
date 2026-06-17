@@ -15,8 +15,8 @@ const num = (v: unknown): number | null => {
 const SWIM_ADDENDUM = `
 Signals: pace/100 (equipment/drill-inclusive), work:rest (moving vs elapsed), avg/max HR, RPE/feel, pool/lengths, equipment-per-step, planned intent.
 Honest reads: work:rest vs the session-intent norm; RPE×HR coherence (zone-anchored); equipment-flag DIRECTION-only.
-Equipment is directional (NOT fins-only): fins/buoy/paddles speed pace UP (reads optimistic); kickboard/kick/drill slow it DOWN (reads pessimistic); snorkel ~neutral. Mixed-equipment sessions are pulled both ways and are not a clean fitness number either way.
-Traps: diagnosing the cause of rest; absolute HR; peak-driven reads; quantifying equipment effect; pace trend without equipment/drill-flagging (Q-061).
+Equipment, DIRECTION-only: name ONLY the actual equipment given in the "Equipment used" line — NEVER recite a category list or name gear that wasn't used. The fast/slow grouping (fast-assist gear → reads faster; kick/drill → reads slower; mixed → pulled both ways, not a clean number) is INTERNAL direction-logic for YOU to pick the right one-clause flag, NOT a list to state as fact.
+Traps: NAMING equipment not in the data (fabrication); diagnosing the cause of rest (never assert the rest was technique/mixed/fatigue — state the fraction + whether typical for a KNOWN intent only); absolute HR; peak-driven reads; quantifying equipment effect; pace trend without equipment/drill-flagging (Q-061).
 Swim caveat: swim HR runs ~10-15 bpm below run HR for the same effort — a run threshold is NOT a valid swim anchor; with no swim anchor on file, stay neutral.
 `;
 
@@ -44,10 +44,10 @@ export const swimAdapter: DisciplineAdapter = {
         signal: 'equipment pace-distortion',
         mentions: ['fin', 'buoy', 'paddle', 'kick', 'board', 'drill', 'faster than', 'slower than', 'equipment', 'gear', 'assisted', 'flatter'],
         detail: (packet.equip_optimistic && packet.equip_pessimistic)
-          ? 'mixed fast-assist gear AND slow work — the blended pace is not a clean fitness number'
+          ? 'mixed fast + slow gear — the blended pace is not a clean fitness number (name only the actual gear listed)'
           : packet.equip_optimistic
-          ? 'fins/buoy/paddles used — the pace reads FASTER than unaided swimming'
-          : 'kick/drill sets used — the pace reads SLOWER than your actual swimming pace',
+          ? 'the pace reads FASTER than unaided swimming (name only the actual gear listed)'
+          : 'the pace reads SLOWER than your actual swimming pace (name only the actual gear listed)',
       });
     }
 

@@ -4122,6 +4122,18 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-192 — Two post-migration SWIM regressions caught on-device (fabricated equipment + rest-cause diagnosis) — fixed
+
+- **Date:** 2026-06-16
+- **Context (honesty):** D-190 declared swim "green," but two live bugs surfaced on-device AFTER it — the "swim green" claim predated them. Both are now fixed; the milestone is corrected to record them (see ENGINE-STATE).
+- **Bug 1 — Rule 6 fabrication (priority):** the swim narrative said "fins, buoy, and paddles were in use" when only **fins + snorkel** were used. Root cause was in D-190's own code: the equipment prompt line literally read "fins/buoy/paddles on some sets" — it recited the **directional CATEGORY list** instead of the actual `swim_steps_equipment_confirmed` values, and the swim-adapter addendum + notableLeadSignal detail also named the category gear into the scaffold. The LLM recited the categories as fact. **Fix:** the analyzer now collects the ACTUAL equipment names (`equipmentDir.names`) and the prompt/addendum name ONLY those; the fast/slow grouping is explicitly INTERNAL direction-logic, never recited. **New swim post-check** (wraps `validateNarrative`, swim-specific like the coach add-ban): any equipment word in the prose must be a subset of the confirmed actuals → else retry.
+- **Bug 2 — Rule 4 diagnose-cause:** "the substantial rest fraction… is consistent with a technique or mixed-intent structure rather than a sign of fatigue management" — diagnosed WHY the rest happened (swim SPEC hard-boundary #1, the killed "structured set format" hallucination). **Fix:** swim post-check `REST_CAUSE` catches the diagnose-the-why phrasings (technique/drill/mixed-intent structure, "fatigue management", "rather than fatigue", "structured set format") + strengthened prompt; the narrative may state the rest fraction + whether typical for a KNOWN planned intent, never assert what the rest WAS.
+- **Verified (June 15 recompute):** narrative now names only "snorkel and fins" (no buoy/paddles), rest read as "typical for a sustained aerobic swim" with no cause/structure diagnosis. Swim acceptance gate green; `deno check` clean.
+- **All-four cross-check (did the directional generalization introduce these elsewhere, or did any path lose a guard?):** **Class 1 (category-list-as-fact):** swim-specific — equipment is the only adapter input that's an enumerable set of physical items; run/ride/strength/coach addenda list signal TYPES (pace/HR/RIR/load/fitness-direction), nothing fabricable as "in use." **Class 2 (lost guard):** none — every migration APPENDED scaffold + validators; no bespoke guard was removed (run terrain/feeling/number validators, ride jargon/lede/grounded, coach add-ban all intact; strength had none). Swim's fins-only→bidirectional replacement was the sole guard-change and was exactly Bug 1's source, now fixed. **DEPLOYS `analyze-swim-workout`.**
+- **Lesson:** a generalization (fins-only → directional categories) re-introduced a fabrication vector by putting an example LIST in prose-facing text. Category/example lists belong in INTERNAL logic, never in the model-facing prose; and "name only the actual data" needs a subset VALIDATOR, not just a prompt instruction.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
