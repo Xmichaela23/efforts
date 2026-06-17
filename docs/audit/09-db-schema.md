@@ -105,6 +105,7 @@ One row per user. All performance data lives here:
 - `completed_workout_id` uuid — link back to `workouts` when completed.
 - `workload_planned`, `workload_actual` — both present.
 - `skip_reason`, `skip_note` — skip tracking confirmed.
+- **Intent columns (`session_type`, `hardness`) exist but are NULL on all 49 swim rows** (verified 2026-06-17); `intensity` is an empty `{}`. Swim session intention lives only in `tags` (`technique_swim`, `easy`/`aerobic`, `css_aerobic`/`quality`, `recovery_swim`, …) and free-text `description`. D-195 derives intent from tags as a result. Plan generator not populating structured intent for swims — see `99-SUMMARY §3`.
 
 ### `session_load`
 8 columns. `load_domain`, `load_target`, `magnitude`, `decay_hours` — the load ledger structure confirmed.

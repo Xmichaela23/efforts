@@ -4166,6 +4166,22 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-195 — Swim rest-fraction NORM model: in/below/above-band read in the narrative (D-180) — built
+
+- **Date:** 2026-06-17
+- **Context:** D-176/D-194 surfaced rest fraction as a metric + trend. D-180 gives it meaning — an expected rest band per session type so the swim narrative can read a swim as in/below/above its norm. The honest successor to the killed "structured set format" hallucination.
+- **Finding that changed the design (verified in DB, user 45d122e7):** the work order's stated intent source — `planned_workouts.session_type` / `hardness` — is **NULL on all 49 planned swims**; `intensity` is an empty `{}`. The intention signal that actually exists is in **tags** (`technique_swim`, `swim_drills`, `swim_maintenance`, `easy`, `aerobic`, `css_aerobic`, `quality`, `recovery_swim`). So intent is derived from tags. (Flagged as a discrepancy — the plan generator doesn't populate `session_type` for swims; see `99-SUMMARY §3`.)
+- **What was built:**
+  - New pure helper `_shared/swim/rest-norm.ts`: `swimIntentFromTags(tags)` + `restBandRead(restFraction, tags)`. Bands (provisional): technique 30–45%, speed 30–50%, threshold 20–35%, endurance/aerobic 10–20%, long-continuous 0–10%.
+  - `analyze-swim-workout`: computes the band read from the SAME `resolveSwimScalars` scalar as pace/HR (never recomputed inline) + `plannedWorkout.tags`, and injects a one-line norm note into the narrative prompt next to the existing work:rest read. NOT a card metric — interpretive context for the narrative only.
+- **Decisions (Michael):** intent from TAGS (the only populated source); **conflict rule = technique wins** (and more generally, the MORE PERMISSIVE/wider band when tags conflict) — a technique-tagged swim includes drill work, so the higher rest expectation applies; using the aerobic band on a technique session would risk a false "above band" read, the exact failure D-180 must avoid. No mapped tags → **silent** (no read), same as unplanned.
+- **Honesty contract:** in_band → unremarkable (don't single out); below_band → quietly positive ("less rest than typical for this kind of session"); above_band → gentle observation only, **NEVER** a cause (one rest number can't separate prescribed rest / equipment / wall time / fatigue). Backstopped by the D-192 `REST_CAUSE` post-check.
+- **Verified on real planned swims (2026-06-17):** 2026-06-15 (rest 31%, tags `technique_swim`+`swim_drills`+`easy`+`aerobic`) → technique wins → **in_band** [30–45%]; 2026-06-01 (rest 25%, technique tags) → **below_band**; untagged swims → **SILENT**. Re-ran the analyzer on the below_band swim — narrative read it as "rest is **modest** … carried **work density** … without extended recovery breaks," quietly positive with **no cause diagnosis**. **On-device confirm pending.**
+- **Deployed:** `analyze-swim-workout` (2026-06-17).
+- **Next:** D-181 (growth reward) depends on this — do NOT start until D-180 is confirmed on-device.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

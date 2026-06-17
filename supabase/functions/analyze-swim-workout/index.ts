@@ -3,6 +3,7 @@ import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
 import { swimPacePer100Seconds } from '../_shared/swim/swim-pace.ts';
 import { resolveSwimScalars } from '../_shared/swim/swim-scalars.ts';
+import { restBandRead } from '../_shared/swim/rest-norm.ts';
 // Shared narrative-reasoning core (D-190 — swim leg, the reference). Swim's inline honesty rules were
 // the source of the 7 universal rules; this brings its prompt onto the shared scaffold + validators like
 // the other three. See docs/WORK-ORDER-narrative-core.md.
@@ -409,6 +410,25 @@ Deno.serve(async (req) => {
         const movingMin = _movingSeconds ? Math.round(_movingSeconds / 60) : null;
         const elapsedMin = _elapsedSeconds ? Math.round(_elapsedSeconds / 60) : null;
         const restMin = (movingMin != null && elapsedMin != null && elapsedMin > movingMin) ? (elapsedMin - movingMin) : null;
+        // D-195 (D-180): rest-fraction NORM read — gives the work:rest read meaning vs the session's
+        // expected band. Single-sourced from swimScalars (same scalar as pace/HR). Intent derived from
+        // the planned tags (session_type/hardness are null for swims). SILENT when intent doesn't map
+        // or there's no rest fraction. Observe the band position — NEVER diagnose the cause (backstopped
+        // by the D-192 REST_CAUSE post-check).
+        const _restFraction = (_movingSeconds != null && _elapsedSeconds != null && _elapsedSeconds > _movingSeconds && _movingSeconds > 0)
+          ? (_elapsedSeconds - _movingSeconds) / _elapsedSeconds
+          : null;
+        const _restBand = restBandRead(_restFraction, plannedWorkout?.tags);
+        const restBandNote = (() => {
+          if (!_restBand) return null;
+          const pct = Math.round(_restBand.restFraction * 100);
+          const lo = Math.round(_restBand.band[0] * 100), hi = Math.round(_restBand.band[1] * 100);
+          const LABEL: Record<string, string> = { technique: 'technique/drill', speed: 'speed/sprint', threshold: 'threshold', endurance: 'endurance/aerobic', long_continuous: 'long continuous' };
+          const label = LABEL[_restBand.intent] ?? _restBand.intent;
+          if (_restBand.position === 'in_band') return `Rest fraction (~${pct}%) is WITHIN the typical ${lo}–${hi}% band for a ${label} swim — unremarkable; do not single it out.`;
+          if (_restBand.position === 'below_band') return `Rest fraction (~${pct}%) is BELOW the typical ${lo}–${hi}% band for a ${label} swim — you MAY note this quietly and positively (less rest than typical for this kind of session). Do NOT diagnose why.`;
+          return `Rest fraction (~${pct}%) is ABOVE the typical ${lo}–${hi}% band for a ${label} swim — you MAY note it gently, as an OBSERVATION ONLY. NEVER state or imply a cause (not fatigue, effort, prescribed rest, equipment, or wall time — one rest number cannot separate these).`;
+        })();
         const rpeVal = Number.isFinite(Number(workout.rpe)) && Number(workout.rpe) > 0 ? Number(workout.rpe) : null;
         const feelLabel = (typeof workout.feeling === 'string' && workout.feeling.trim()) ? workout.feeling.trim() : null;
 
@@ -499,6 +519,7 @@ Deno.serve(async (req) => {
           moving_min: movingMin,
           elapsed_min: elapsedMin,
           rest_min: restMin,
+          rest_band_note: restBandNote, // D-195: rest-fraction norm read (null = silent)
           rpe: rpeVal,
           feeling: feelLabel,
         };
@@ -539,6 +560,7 @@ ${(workoutContext.equip_names && workoutContext.equip_names.length > 0)
   ? `- Equipment used (name ONLY these, exactly — no other gear): ${workoutContext.equip_names.join(', ')}. Pace-direction: ${(workoutContext.equip_optimistic && workoutContext.equip_pessimistic) ? 'this mixes fast-assist AND slow gear, so the average pace above is pulled BOTH ways and is NOT a clean fitness-comparable number' : workoutContext.equip_optimistic ? 'reads FASTER than your unaided swimming' : workoutContext.equip_pessimistic ? 'reads SLOWER than your actual swimming pace' : 'roughly neutral'} (flag the direction; do NOT quantify).`
   : ''}
 ${workoutContext.rest_min != null ? `- Work vs rest: ${workoutContext.moving_min} min of moving (work) across a ${workoutContext.elapsed_min} min session (~${workoutContext.rest_min} min rest)` : ''}
+${workoutContext.rest_band_note ? `- Rest norm (D-195): ${workoutContext.rest_band_note}` : ''}
 ${workoutContext.rpe != null ? `- Perceived effort (RPE): ${workoutContext.rpe}/10` : ''}
 ${workoutContext.feeling ? `- Felt: ${workoutContext.feeling}` : ''}
 ${intervals.length > 0 ? `- Intervals Completed: ${workoutContext.intervals_completed}` : ''}
