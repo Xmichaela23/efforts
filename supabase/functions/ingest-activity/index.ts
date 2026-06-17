@@ -1222,26 +1222,71 @@ async function mergeSameSwimIfExists(supabase: any, userId: string, row: any) {
   const tsMs = Date.parse(row?.timestamp || `${row?.date}T00:00:00Z`);
   if (!Number.isFinite(tsMs)) return null;
   const distM = Number(row?.distance) * 1000;
-  const { data: cands } = await supabase.from('workouts')
-    .select('id,source,distance,pool_length,number_of_active_lengths,strokes')
+  const incomingSource = String(row.source || '');
+  const SEL = 'id,source,distance,pool_length,number_of_active_lengths,strokes,avg_heart_rate,max_heart_rate';
+  const distOk = (cd: number) => (!(distM > 0) || !(cd > 0)) ? true : Math.abs(cd - distM) / Math.max(cd, distM) <= 0.10; // ±10%
+
+  // Candidate set 1 (cross-device same swim within ±60s — Strava/Garmin/HealthKit all carry a real start).
+  const { data: tsCands } = await supabase.from('workouts')
+    .select(SEL)
     .eq('user_id', userId).eq('type', 'swim')
     .gte('timestamp', new Date(tsMs - 60_000).toISOString())
     .lte('timestamp', new Date(tsMs + 60_000).toISOString());
-  const match = (cands || []).find((c: any) => {
-    if (String(c.source || '') === String(row.source || '')) return false; // same source → per-source upsert
-    const cd = Number(c.distance) * 1000;
-    if (!(distM > 0) || !(cd > 0)) return true; // no distance to compare → time-window alone
-    return Math.abs(cd - distM) / Math.max(cd, distM) <= 0.10; // ±10%
-  });
+
+  // Candidate set 2 (D-184): a MANUALLY-logged swim on the same calendar date. Manual entries store a
+  // NOON-UTC placeholder timestamp (ManualSwimEntry writes `${date}T12:00:00Z` — the athlete enters a date,
+  // not a time), so the ±60s window above can NEVER catch them. Without this, an auto-import of a swim the
+  // athlete also logged by hand double-inserts (one `manual`, one device). This protects every user who
+  // imports their back-catalog after logging swims by hand, not just one migration. Match manual on
+  // same-day + distance instead of timestamp. Skip when the incoming row is itself manual.
+  let manualCands: any[] = [];
+  if (incomingSource !== 'manual' && row?.date) {
+    const { data } = await supabase.from('workouts')
+      .select(SEL)
+      .eq('user_id', userId).eq('type', 'swim').eq('source', 'manual').eq('date', row.date);
+    manualCands = data || [];
+  }
+
+  // Prefer the ±60s cross-device match (unchanged behavior); else fall back to a same-day manual match.
+  let match = (tsCands || []).find((c: any) =>
+    String(c.source || '') !== incomingSource && distOk(Number(c.distance) * 1000));
+  let isManualMatch = false;
+  if (!match) {
+    match = manualCands.find((c: any) => distOk(Number(c.distance) * 1000));
+    if (match) isManualMatch = true;
+  }
   if (!match) return null;
-  // The HealthKit side supplies the rich fields; merge onto the existing matched workout. Only fill
-  // a field when HealthKit has it and the kept row lacks it (or HealthKit is genuinely richer).
-  const hk = row.source === 'healthkit' ? row : (match.source === 'healthkit' ? match : null);
+
   const u: Record<string, any> = {};
-  if (hk) {
-    if (Number(hk.pool_length) > 0 && !(Number(match.pool_length) > 0)) u.pool_length = Number(hk.pool_length);
-    if (Number(hk.number_of_active_lengths) > 0 && !(Number(match.number_of_active_lengths) > 0)) u.number_of_active_lengths = Number(hk.number_of_active_lengths);
-    if (Number(hk.strokes) > 0 && !(Number(match.strokes) > 0)) u.strokes = Number(hk.strokes);
+  if (isManualMatch) {
+    // D-184: the athlete logged this swim by hand (carrying their user-captured pool / RPE / feeling and
+    // the workout_metadata equipment), then it arrived from a device. KEEP the manual row (preserves all
+    // of those — they live in columns / workout_metadata we don't touch) but upgrade it to the device
+    // provenance + device-truth fields, and STAMP the provider id so a RE-import dedups via the unique
+    // index (idempotent). Never insert a second row. Device values win for distance/moving/elapsed/HR/
+    // timestamp (the manual entry's were estimates with elapsed==moving, i.e. no real work:rest).
+    u.source = incomingSource;
+    if (incomingSource === 'strava' && row.strava_activity_id) { u.strava_activity_id = row.strava_activity_id; u.is_strava_imported = true; }
+    if (incomingSource === 'garmin' && row.garmin_activity_id) u.garmin_activity_id = row.garmin_activity_id;
+    if (incomingSource === 'healthkit' && row.healthkit_id) u.healthkit_id = row.healthkit_id;
+    if (row.timestamp) u.timestamp = row.timestamp;                          // real start replaces the noon placeholder
+    if (Number(row.distance) > 0) u.distance = row.distance;                 // device distance (already within ±10%)
+    if (Number(row.moving_time) > 0) u.moving_time = row.moving_time;
+    if (Number(row.elapsed_time) > 0) u.elapsed_time = row.elapsed_time;     // real elapsed → honest work:rest
+    if (Number(row.avg_heart_rate) > 0 && !(Number(match.avg_heart_rate) > 0)) u.avg_heart_rate = row.avg_heart_rate;
+    if (Number(row.max_heart_rate) > 0 && !(Number(match.max_heart_rate) > 0)) u.max_heart_rate = row.max_heart_rate;
+    if (Number(row.strokes) > 0 && !(Number(match.strokes) > 0)) u.strokes = Number(row.strokes);
+    if (Number(row.pool_length) > 0 && !(Number(match.pool_length) > 0)) u.pool_length = Number(row.pool_length);
+    if (Number(row.number_of_active_lengths) > 0 && !(Number(match.number_of_active_lengths) > 0)) u.number_of_active_lengths = Number(row.number_of_active_lengths);
+  } else {
+    // The HealthKit side supplies the rich fields; merge onto the existing matched workout. Only fill
+    // a field when HealthKit has it and the kept row lacks it (or HealthKit is genuinely richer).
+    const hk = row.source === 'healthkit' ? row : (match.source === 'healthkit' ? match : null);
+    if (hk) {
+      if (Number(hk.pool_length) > 0 && !(Number(match.pool_length) > 0)) u.pool_length = Number(hk.pool_length);
+      if (Number(hk.number_of_active_lengths) > 0 && !(Number(match.number_of_active_lengths) > 0)) u.number_of_active_lengths = Number(hk.number_of_active_lengths);
+      if (Number(hk.strokes) > 0 && !(Number(match.strokes) > 0)) u.strokes = Number(hk.strokes);
+    }
   }
   if (Object.keys(u).length) {
     await supabase.from('workouts').update(u).eq('id', match.id);
@@ -1250,7 +1295,7 @@ async function mergeSameSwimIfExists(supabase: any, userId: string, row: any) {
       await supabase.functions.invoke('compute-facts', { body: { workout_id: match.id } });
     } catch (_e) { /* recompute non-fatal */ }
   }
-  return { id: match.id, keptSource: match.source, mergedFields: Object.keys(u) };
+  return { id: match.id, keptSource: u.source || match.source, mergedFields: Object.keys(u) };
 }
 
 Deno.serve(async (req)=>{
