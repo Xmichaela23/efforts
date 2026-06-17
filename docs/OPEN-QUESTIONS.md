@@ -921,6 +921,17 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-066 — Historical Strava import IGNORES source preference → duplicate runs/rides vs Garmin (real new-user signup bug; PRIORITY)
+
+- **Status:** filed 2026-06-16 · **confirmed read-only, NOT fixed** · **PRIORITY — affects new-user signup import, not one account.**
+- **What it is:** the LIVE Strava webhook respects the athlete's `source_preference` / `swim_source_override` and **skips** a Strava activity when Garmin is preferred and already has a record for that date+type (`strava-webhook/index.ts:180-204`). The **historical/bulk importer does NOT** — `import-strava-history/index.ts` has **zero** `source_preference` checks; its only pre-filter is an in-memory set of already-present `strava_activity_id` (`:659-665`, `:751`). So a bulk import ingests **every** Strava activity regardless of preference.
+- **Why it's a real new-user bug:** a common signup flow is "connect my accounts + import my back-catalog." A new user who connects **both Strava and Garmin** and imports Strava history gets **duplicate runs/rides** — the Strava copy is inserted alongside the Garmin copy because (a) the historical path skips the preference gate, AND (b) **non-swim activities have NO cross-source merge at all** (`mergeSameSwimIfExists` is gated `type==='swim'` at `ingest-activity:1302`; runs/rides only dedup on the *same-provider* `onConflict`, which can't catch Strava-vs-Garmin). Swims are mostly protected (the swim merge gate + D-184 manual fix); **runs/rides are not.**
+- **Scope of the gap:** duplication is the failure mode (two rows, different provider ids, same workout) — it inflates volume/load/trends. It is NOT a stale-data or contamination issue; it's missing dedup on one path.
+- **Candidate fixes (NOT applied — decide before building):** (1) **apply the same source-preference gate the webhook uses** inside `import-strava-history` before calling `ingest-activity` (symmetry — cleanest); (2) **a general cross-source merge for runs/rides** (start ±Ns + distance/duration tolerance), the non-swim analog of `mergeSameSwimIfExists` — broader, riskier; (3) both. Option 1 is the targeted new-user fix.
+- **Cross-ref:** D-184 (the swim half — same-day manual merge; swims also rely on the swim merge gate, so swims are largely covered while runs/rides are the exposure), `strava-webhook/index.ts:180-204` (the gate the historical path lacks), `import-strava-history/index.ts`, `ingest-activity/index.ts:1302` (swim-only merge gate).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

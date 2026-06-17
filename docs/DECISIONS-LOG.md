@@ -3982,6 +3982,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-184 — Dedup auto-imported swims against same-day MANUAL entries (manual noon-UTC timestamp defeated the ±60s merge)
+
+- **Date:** 2026-06-16
+- **Symptom / risk:** `mergeSameSwimIfExists` (`ingest-activity`) deduped same-swim-from-two-sources within a **±60s timestamp window** + ±10% distance. But a **manually-logged** swim (`ManualSwimEntry`) stores a **noon-UTC placeholder timestamp** (`${date}T12:00:00Z` — the athlete enters a date, not a time), so the ±60s window could **never** catch it. Net: an auto-import (Strava/Garmin/HealthKit) of a swim the athlete had also logged by hand **double-inserted** — one `manual` row, one device row. Surfaced while tracing whether a historical Strava import is safe (it funnels through the same `ingest-activity` merge gate); confirmed this hits **every new user who logs swims by hand and later imports their back-catalog**, not one migration.
+- **Decision:** add a **second candidate path** — when the incoming swim has **no ±60s cross-device match**, fall back to matching a **same-`date` + ±10%-distance `source:'manual'`** row. On a manual match: **keep the manual row** (so its user-captured `rpe` / `feeling` / `user_corrected_pool_length_m` / `number_of_active_lengths` and the `workout_metadata` equipment — D-162 — all survive untouched), **upgrade its provenance** to the device source, adopt the **device-truth fields** (real `timestamp`, `distance`, `moving_time`, `elapsed_time` → honest work:rest where manual had `elapsed==moving`, `avg/max HR`), and **stamp the provider activity id** (`strava_activity_id` etc.) so a RE-import dedups via the partial unique index (idempotent). Never inserts a second row. The pre-existing ±60s HealthKit-enriches-kept-row path is unchanged.
+- **Why keep-and-upgrade (vs. drop-incoming or insert-then-delete):** the manual row is the one carrying the athlete's subjective + pool capture (the whole point of the D-162 popup); the device row carries the objective truth. Keeping the manual row's id preserves those fields and any FK references with a single UPDATE, matching the existing merge philosophy (keep `match`, enrich, discard incoming, return early). Device values win for the objective fields because the manual entry's were estimates (single total time, no real rest).
+- **Verified (guarded live test + cleanup, `scripts/_d184-verify.mjs`):** seed a `manual` swim (noon ts, rpe 4, pool 25, elapsed==moving) → ingest a synthetic Strava swim same-day, +2% distance, real moving≠elapsed → **1 row** (no dup), `source` manual→strava, `strava_activity_id` stamped, `timestamp` 07:00 (real), `elapsed_time` 30 ≠ `moving_time` 25 (real work:rest), `rpe`/`feeling`/`pool`/`lengths` **preserved**, HR adopted. **Repeat ingest → still 1 row** (idempotent). Test rows deleted after. `deno check` clean.
+- **Scope / DEPLOYS `ingest-activity`.** Both the live webhook and historical import funnel through it, so both paths get the fix.
+- **Known limitation (not fixed here):** the REVERSE order — a device swim already exists, THEN the athlete logs the same swim manually — is NOT caught, because `ManualSwimEntry` does a **direct `.insert()`** that bypasses `ingest-activity`/the merge gate. In practice manual entry is for swims with no device source, so this is the rare direction; a client-side pre-insert same-day check is a possible follow-up if it shows up.
+- **Cross-ref:** D-157/D-172 (the swim merge + "never a duplicate" guarantee D-184 hardens), D-162 (the user-captured fields it preserves), Q-066 (the SEPARATE non-swim duplication gap — historical import ignores source preference; runs/rides have no cross-source merge at all).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
