@@ -3995,6 +3995,32 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-180 — Swim rest-fraction norm model (DESIGNED, NOT BUILT)
+
+- **Date filed:** 2026-06-16 (design recorded; build is a future session). Recorded after D-184 by recording order; the D-176/D-180/D-181 trio is the swim rest-fraction arc (number assigned earlier on the board).
+- **Status:** **NOT BUILT — designed.** Landing spot for the next session; this captures the actual design, not just a name.
+- **What it is:** give the **session-level rest fraction** (`rest = non-moving / elapsed`, single-sourced via `resolveSwimScalars` — the SAME scalar as D-176/D-182, never recomputed inline) an **expected band** so a swim can be read as in/below/above its norm. The band is keyed **PRIMARILY on session INTENTION** (the plan carries it — technique vs aerobic vs threshold vs sprint vs long-continuous), with a **light proficiency modifier** and a **very-light age modifier**. This is the model D-176's rest-fraction readout/trend is interpreted against.
+- **Research-grounded bands (provisional — TUNE LATER, sign-off-gated like the trend thresholds):** technique/drill **~30–45%**, endurance/aerobic **~10–20%**, threshold **~20–35%**, speed/sprint **~30–50%**, long-continuous **~0–10%**.
+- **Read logic (the honesty boundary is the whole point):** in-band → **unremarkable** (say nothing special); below band → **quietly positive** (less rest than expected for the intent); above band → **noted gently, NEVER diagnosed.** We CANNOT separate prescribed rest / equipment changes / wall-and-clock time / fatigue from one session-level number, so an above-band read describes the observation and stops — same honesty boundary as the inference doc. No cause attribution.
+- **What it replaces / kills:** this is the honest successor to the **killed "structured set format" hallucination** (the analyzer inventing per-interval set structure it never had). It also continues the D-183 line — **no absolute-HR reads, no peak-driven reads** (HR is anchored to the athlete's zones from the average; the rest-fraction norm is the *effort-context* signal, not HR).
+- **Depends on / relates to:** D-176 (the rest-fraction metric + trend this norms), D-183 (the HR/zone + fins honesty already shipped), `resolveSwimScalars` (the single source), the plan's session intention (band key). **Boundaries:** `SPEC-honest-swim-inference.md` (the "what swim data supports vs can't" doc — authoritative for the never-diagnose line; **forthcoming/being authored**, do not treat as present until it lands).
+
+---
+
+## D-181 — Swim growth-reward convergence detector (DESIGNED, NOT BUILT)
+
+- **Date filed:** 2026-06-16 (design recorded; build is a future session, AFTER Q-061). Recorded after D-184 by recording order.
+- **Status:** **NOT BUILT — designed.** Landing spot for the next session.
+- **Core principle — RECOGNITION ONLY, NEVER PENALTY:** a high-rest day always gets the neutral D-180 norm read, **never a scold.** The detector only ever ADDS a warm note; it never subtracts or criticizes.
+- **What fires it (convergence, not a single metric):** a warm growth sentiment fires **ONLY** when recent **comparable** swims show convergence on ALL of: **rest fraction shrinking** (more moving, same/more yardage) **AND pace held or improved AND RPE held or lower** (RPE term **required when RPE is present**; when RPE is absent, lean on **rest-down + pace-held**). This is the **adult-onset progress signal** — "more swimming, less wall-hanging, and it felt easier" — and it's valuable PRECISELY BECAUSE there are no per-length splits to show mechanics; the convergence IS the visible progress.
+- **Credibility gates (rare = trusted):** conservative threshold (N comparable sessions, sustained direction, a noise gate in the spirit of `classifyTrend`); **comparable sessions only** (same intent/distance bucket — don't cross a sprint set with a long aerobic swim); activates **only with enough history.** It should fire seldom and mean it.
+- **Tone:** warm, specific, earned — NOT confetti, not a streak badge. One credible sentence.
+- **Honesty:** credits the **observed convergence** only; **never claims mechanism** (no VO2, no physiology, no "your aerobic base improved"). Describes what the numbers did, not why.
+- **⚠ DEPENDS ON Q-061 (hard dependency):** the pace term must read a **fin-flagged / fin-corrected** substrate. If Q-061 (fin exclusion from the trend substrate) is not done first, the reward can fire on **fin-inflated pace** — rewarding "growth" that is just more fin days. **Do not build D-181 before Q-061.**
+- **Relates to:** D-180 (the rest-fraction norm it sits on), D-176 (rest-fraction trend), Q-061 (the fin-flagged substrate it requires), D-183 (the honesty line). **Boundaries:** `SPEC-honest-swim-inference.md` (forthcoming; authoritative for the never-claim-mechanism line — do not treat as present until it lands).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
