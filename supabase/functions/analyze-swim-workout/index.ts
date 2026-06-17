@@ -200,10 +200,28 @@ Deno.serve(async (req) => {
       });
     }
 
+    // D-183: fetch the athlete's HR zones / learned threshold so the narrative can anchor HR to the
+    // athlete's OWN physiology — read e.g. 119 bpm as the easy Zone-2 effort it is, not "elevated".
+    // Mirrors the run analyzer (configured_hr_zones → Friel-%LTHR-from-learned-threshold fallback).
+    // When neither is on file the narrative is told to stay neutral on HR (never assert "elevated").
+    let configuredHrZones: any = null;
+    let learnedFitness: any = null;
+    try {
+      const { data: ub } = await supabase
+        .from('user_baselines')
+        .select('configured_hr_zones, learned_fitness')
+        .eq('user_id', workout.user_id)
+        .single();
+      configuredHrZones = (ub as any)?.configured_hr_zones || null;
+      learnedFitness = (ub as any)?.learned_fitness || null;
+    } catch (_e) {
+      // no baselines → narrative stays neutral on HR (D-183)
+    }
+
     // Get planned workout if available
     let plannedWorkout: any = null;
     let planContext: any = null;
-    
+
     if (workout.planned_id) {
       const { data: planned, error: plannedError } = await supabase
         .from('planned_workouts')
@@ -390,6 +408,54 @@ Deno.serve(async (req) => {
         const rpeVal = Number.isFinite(Number(workout.rpe)) && Number(workout.rpe) > 0 ? Number(workout.rpe) : null;
         const feelLabel = (typeof workout.feeling === 'string' && workout.feeling.trim()) ? workout.feeling.trim() : null;
 
+        // D-183 bug 1: anchor HR to the athlete's zones and read effort from the AVERAGE, not the peak.
+        // Build the zone bands the same way the run analyzer does (configured_hr_zones → Friel %LTHR
+        // from learned threshold), then classify the AVG HR. hrZoneCtx is null when no threshold is on
+        // file → the prompt is told to stay neutral (never call HR "elevated" without zones to judge by).
+        const hrBands = (() => {
+          try {
+            const czArr = (configuredHrZones as any)?.zones as Array<{ min?: number; max?: number | null }> | undefined;
+            if (Array.isArray(czArr) && czArr.length >= 4) {
+              const get = (i: number) => czArr[i];
+              const z1Max = Number(get(0)?.max ?? get(1)?.min ?? 0) - 1;
+              const z2Max = Number(get(1)?.max ?? 0);
+              const z3Max = Number(get(2)?.max ?? 0);
+              const z4Max = Number(get(3)?.max ?? 0);
+              if (z1Max > 0 && z2Max > z1Max && z3Max > z2Max && z4Max > z3Max) {
+                return { z1Max, z2Max, z3Max, z4Max, thr: z4Max };
+              }
+            }
+            const thr = Number((learnedFitness as any)?.run_threshold_hr?.value ?? (learnedFitness as any)?.runThresholdHr?.value);
+            if (!Number.isFinite(thr) || thr <= 0) return null;
+            return { z1Max: Math.round(thr * 0.75), z2Max: Math.round(thr * 0.85), z3Max: Math.round(thr * 0.92), z4Max: Math.round(thr * 0.98), thr };
+          } catch { return null; }
+        })();
+        const hrZoneCtx = (() => {
+          const h = Number(swimScalars.avgHr);
+          if (!hrBands || !(h > 0)) return null;
+          let zone: number, label: string;
+          if (h <= hrBands.z1Max) { zone = 1; label = 'recovery'; }
+          else if (h <= hrBands.z2Max) { zone = 2; label = 'easy aerobic'; }
+          else if (h <= hrBands.z3Max) { zone = 3; label = 'moderate aerobic'; }
+          else if (h <= hrBands.z4Max) { zone = 4; label = 'threshold'; }
+          else { zone = 5; label = 'above threshold'; }
+          return { zone, label, threshold: hrBands.thr, easy: zone <= 2 };
+        })();
+
+        // D-183 bug 2 / Q-061 (partial): the narrative was blind to equipment. Detect fins the SAME way
+        // the Performance card does (MobileSummary, off workout_metadata.swim_steps_equipment_confirmed /
+        // swim_equipment_unplanned, D-162) and flag fin-assisted pace — DIRECTION ONLY (reads faster than
+        // unaided), never quantified. Full per-step pace exclusion remains Q-061 (needs per-length pace).
+        const finsUsed = (() => {
+          let meta: any = (workout as any).workout_metadata;
+          if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = {}; } }
+          meta = meta || {};
+          const confirmed = Array.isArray(meta.swim_steps_equipment_confirmed) ? meta.swim_steps_equipment_confirmed : [];
+          const unplanned = Array.isArray(meta.swim_equipment_unplanned) ? meta.swim_equipment_unplanned : [];
+          return confirmed.some((e: any) => e?.used === true && String(e?.equipment || '').toLowerCase().includes('fin'))
+            || unplanned.some((e: any) => String(e || '').toLowerCase().includes('fin'));
+        })();
+
         const workoutContext = {
           type: workout.type,
           duration: workout.duration || 0,
@@ -403,6 +469,12 @@ Deno.serve(async (req) => {
           environment: isPool ? 'pool' : 'open water',
           avg_heart_rate: swimScalars.avgHr,
           max_heart_rate: workout.max_heart_rate || null,
+          // D-183: zone-anchored read of the AVERAGE HR (null when no threshold on file → stay neutral)
+          avg_hr_zone: hrZoneCtx ? `Zone ${hrZoneCtx.zone}` : null,
+          avg_hr_label: hrZoneCtx ? hrZoneCtx.label : null,
+          hr_threshold: hrZoneCtx ? hrZoneCtx.threshold : null,
+          hr_is_easy: hrZoneCtx ? hrZoneCtx.easy : null,
+          fins_used: finsUsed,
           stroke_type: swimData.strokeType || 'Freestyle',
           intervals_completed: intervals.length,
           overall_adherence: overallAdherence != null ? Math.round(overallAdherence) : null,
@@ -419,7 +491,8 @@ CRITICAL RULES:
 - SECOND PERSON — address the swimmer directly as "you" ("You covered…", "Your heart rate…"), matching the coaching voice the run and ride analyses use. NEVER "the swimmer" or third person.
 - PLAIN PROSE ONLY — no Markdown. No "#" headers, no "**bold**", no numbered section titles, no labels. Each observation is one or two complete sentences. Separate observations with a blank line.
 - INTERPRET, DON'T LIST — reason from the RELATIONSHIP between the signals (RPE, heart rate, pace, work:rest), not a recital of each number. Swim has no power or GPS, so these are what you have; read how they fit together and what that says about the session.
-- RPE + HR COHERENCE: a low RPE with a controlled heart rate is a genuinely easy session — say so. But a low RPE with an ELEVATED heart rate, OR a high RPE at a modest pace, means the swim was a HARDER day than the raw numbers alone suggest — say that plainly. The read may slide DOWNWARD when the signals point to a grind; do NOT force a positive spin or default to "comfortable aerobic" when the data disagrees.
+- RPE + HR COHERENCE: read effort from the AVERAGE heart rate and the heart-rate ZONE given below, NEVER from the peak/max — a brief peak is a momentary high, not the session's effort, so do not build the read on it. When the average sits in an easy zone (recovery / easy aerobic), a low RPE alongside it is COHERENT — a genuinely easy aerobic swim — say exactly that; do NOT manufacture "working harder than perceived", "more taxing than the numbers imply", or any RPE-vs-HR tension out of the peak or the absolute bpm. Only read the swim as HARDER than the numbers suggest when the AVERAGE HR is genuinely elevated (moderate-aerobic zone or above) against a low RPE, OR a high RPE sits at a modest pace; the read may slide DOWNWARD when the signals genuinely point to a grind, but never force tension the average does not support. If NO heart-rate zone is given below (no athlete threshold on file), do NOT characterize HR as elevated or easy — report the average plainly and reason from RPE, pace and work:rest instead.
+- EQUIPMENT — when the data below says fins were used on some sets, the recorded pace is FIN-ASSISTED and reads FASTER than your unaided swimming; flag that direction honestly in one plain clause (the blended pace flatters your true swim speed) but NEVER quantify it — no per-set splits, no "X seconds faster", no estimate of an unaided pace.
 - WORK:REST is a FIRST-CLASS signal, NOT an afterthought — whenever the work-vs-rest line is given below, the proportion of the session spent actively swimming versus resting MUST be read as part of the interpretation, on equal footing with RPE/HR/pace. Weave it into the FIRST/opening observation (the lead that reasons about the session's overall character), not only a trailing bullet — the lead should reason from RPE + HR + pace + work:rest TOGETHER. A high rest fraction (lots of elapsed over moving) means more of the session was spent recovering — read it against the session's intent when known (more recovery on a technique/drill swim is unremarkable; the same on a sustained aerobic set suggests effort was being managed). Characterize the pattern's MEANING; still do NOT assert the specific cause (don't claim the sets were hard or the rest was deliberate — interpret the relationship, never diagnose the why).
 - UNIT CONSISTENCY: every distance and pace is in ${poolUnit === 'yd' ? 'YARDS' : 'METRES'}. Use that unit only. Do NOT convert to or mention the other unit anywhere — no "X ${poolUnit === 'yd' ? 'metres' : 'yards'}", no "≈ Y per 100 ${poolUnit === 'yd' ? 'm' : 'yd'}" translations. (The pool's physical length is given in its own build unit below — state it as-is; do NOT convert distances or paces to match it.)
 - NO INVENTED MATH: state only the metrics listed below. Do NOT compute or estimate derived values that are not given — no number of lengths, no stroke counts, no calories, no per-minute rates. Mixing the pool unit with the distance unit to "estimate lengths" is wrong and forbidden.
@@ -443,7 +516,8 @@ Workout Profile:
 - Pool Length: ${poolDisplay ?? 'unknown'}
 - Environment: ${workoutContext.environment}
 - Stroke Type: ${workoutContext.stroke_type}
-${workoutContext.avg_heart_rate ? `- Avg HR: ${workoutContext.avg_heart_rate} bpm (Max: ${workoutContext.max_heart_rate} bpm)` : ''}
+${workoutContext.avg_heart_rate ? `- Avg HR: ${workoutContext.avg_heart_rate} bpm${workoutContext.avg_hr_zone ? ` — ${workoutContext.avg_hr_zone} (${workoutContext.avg_hr_label})${workoutContext.hr_threshold ? `, against your threshold HR ~${workoutContext.hr_threshold} bpm` : ''}` : ''}${workoutContext.max_heart_rate ? ` · brief peak ${workoutContext.max_heart_rate} bpm (a momentary high, NOT the session's effort)` : ''}` : ''}
+${workoutContext.fins_used ? `- Equipment: fins on some sets — the average pace above is fin-assisted and reads faster than unaided swimming (flag the direction; do NOT quantify)` : ''}
 ${workoutContext.rest_min != null ? `- Work vs rest: ${workoutContext.moving_min} min of moving (work) across a ${workoutContext.elapsed_min} min session (~${workoutContext.rest_min} min rest)` : ''}
 ${workoutContext.rpe != null ? `- Perceived effort (RPE): ${workoutContext.rpe}/10` : ''}
 ${workoutContext.feeling ? `- Felt: ${workoutContext.feeling}` : ''}

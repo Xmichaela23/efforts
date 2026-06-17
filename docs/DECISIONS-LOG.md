@@ -3966,6 +3966,22 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-183 — Swim narrative INTERPRETATION fix: HR read against the athlete's zones (avg, not peak) + fins flagged (direction-only)
+
+- **Date:** 2026-06-16
+- **Symptom (June 15 swim, `1c72ec75`):** the narrative manufactured RPE/HR tension that isn't there — "119 bpm with peaks near 152, working considerably harder than perceived… more taxing than the numbers imply" — and **never accounted for the fins** the card already flags ("· some sets with fins"). 119 avg HR is genuinely easy for this athlete (deep Zone 2); RPE 3 + 119 is **coherent-easy, not a conflict**.
+- **Two root causes (bug 1):** (a) the prompt's RPE+HR rule primed "low RPE + ELEVATED HR = harder day", and the data line fed **avg + peak** with no athlete reference, so the LLM over-weighted the **peak (152)**; (b) HR was read in the **absolute** — no zones — so any double-digit-over-resting bpm could read as "elevated". **Bug 2:** `analyze-swim-workout` had **zero readers** of the captured equipment (`workout_metadata.swim_steps_equipment_confirmed` / `swim_equipment_unplanned`, D-162) — the analyzer was blind to it.
+- **Decision:**
+  - **Anchor HR to the athlete's own zones, read from the AVERAGE not the peak.** Fetch `user_baselines.{configured_hr_zones, learned_fitness}` and build zone bands the **same way the run analyzer does** (`configured_hr_zones.zones[]` → Friel %LTHR from `learned_fitness.run_threshold_hr` fallback). Classify the **avg** HR into Zone 1–5 (`recovery / easy aerobic / moderate aerobic / threshold / above threshold`) + an `easy = zone≤2` flag, and feed that + the threshold into the fact packet. Prompt rule rewritten: read effort from avg+zone, treat the peak as a **momentary high that does NOT define the session**, and **only** read "harder than the numbers suggest" when the **average** is genuinely elevated (Z3+). **Honesty floor:** when no zone/threshold is on file (`hrZoneCtx === null`), the prompt is told to **stay neutral** — never assert HR is elevated or easy without zones to judge by.
+  - **Flag fin-assisted pace, direction-only.** Detect fins the **same way the Performance card does** (`MobileSummary`: `swim_steps_equipment_confirmed.used===true && /fin/` ∥ `swim_equipment_unplanned` contains fin) → `fins_used` into the packet. New EQUIPMENT prompt rule: when fins were used, note the pace "reads faster than your unaided swimming" in one plain clause; **NEVER quantify** (no per-set splits, no seconds-faster, no unaided-pace estimate).
+- **Alternatives rejected:** (1) a swim-specific threshold HR — none exists; HR is cardiac, the run-derived threshold/zones are the athlete's best on-file anchor (swims read systematically lower, accepted; the forthcoming "Honest Swim Inference Boundaries" doc will set swim-specific guardrails). (2) Quantifying the fin pace correction — needs per-LENGTH pace (Q-038/Tier-B), and would assert precision we don't have. (3) Building the full Q-061 trend-level exclusion now — out of scope; this is narrative-only.
+- **Verified (real recompute, `scripts/_d183-verify.mjs`, untracked):** athlete has **no `configured_hr_zones`** → fell back to `learned_fitness.run_threshold_hr=150` (low-confidence) → 119 classifies **Zone 2**. New narrative leads "**genuinely easy aerobic swim**, average heart rate sitting comfortably in **Zone 2** at 119 bpm against an RPE of 3/10… all three signals aligned"; explicitly de-weights the peak ("**brief … 152 bpm was a momentary spike and does not change the read**"); and flags fins ("average pace … is **flattered by fin-assisted sets**, so your true unaided swim speed reads faster"). Both bugs closed; no quantification leaked. `deno check` clean.
+- **Scope:** narrative/interpretation only — **does NOT** touch the displayed pace number (still the D-182 blended scalar), the trend substrate (`compute-facts` `pace_per_100m`), or any prescription. **DEPLOYS** `analyze-swim-workout`.
+- **Relation to Q-061:** this is the **narrative half** of the fins problem (honest flag in prose). The **trend-level exclusion / down-weighting** of finned pace (so the fitness signal isn't corrupted) is still **Q-061, unbuilt** — D-183 makes the displayed read honest, not the trend.
+- **Held for the doc:** the user is authoring an "Honest Swim Inference Boundaries" doc (what swim data supports vs. can't); **no broader swim-narrative changes** until it lands — D-183 is scoped to exactly these two bugs.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
