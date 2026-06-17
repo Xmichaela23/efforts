@@ -4095,6 +4095,18 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-190 — SWIM migration onto the shared core (the reference) + Q-061 kick/drill pessimistic flag
+
+- **Date:** 2026-06-16
+- **What:** migrated SWIM onto `_shared/narrative-core/` (4th and last of the session-scoped legs). Swim's inline honesty rules (D-167→D-183) were the SOURCE the 7 universal rules were extracted from — this brings its prompt onto the shared scaffold + validators like the other three, so it stops being a separate inline path. AND completes the **Q-061 narrative half, both directions** (the trend-substrate half stays in the held swim-cleanup work order).
+- **Migration:** appended `buildReasoningScaffold(swimAdapter, …)` to swim's existing prompt (assembly NOT unified — guardrail #1; consistent with run/ride/strength), and added a **2-attempt validator loop — swim had none** (single call + Markdown-strip only). Swim is the reference, so the goal was preservation: verified on real swims the output is **unchanged in substance** — the June-15 narrative still leads with work:rest+HR+RPE reasoned TOGETHER (D-179), zone-anchored avg HR (D-183), coherent-easy, fins flagged. **Swim acceptance gate stays green AS the live path** (the core reproduces swim's compliant output — the proof the rules were right, now load-bearing).
+- **Q-061 kick/drill pessimistic flag (the new behavior):** replaced the fins-only detection with **bidirectional equipment-direction** — fins/buoy/paddles → pace reads FASTER (optimistic, D-183); kick/kickboard/drill → pace reads SLOWER (pessimistic, NEW); snorkel ~neutral; both → pulled both ways, not a clean number. The shipped narrative previously flagged only the fins/optimistic direction.
+- **The reliability mechanism (elegant, shared — not a swim patch):** equipment-when-present is set as a **notableLeadSignal** in the swim adapter, so the SHARED Rule-1 (`leadSignalCoverage`) validator REQUIRES the narrative to flag the direction — the exact mechanism that stops run dropping heat. First synthetic kick/drill draft OMITTED the slower flag (LLM discretion); with equipment as a notable signal, the validator caught the omission and the retry surfaced it. Verified (guarded synthetic kick/drill swim, created + deleted): narrative now flags SLOWER, never says faster. Real fins swim still flags faster; detection unit-checked (fins→FASTER, kick/drill→SLOWER, mixed→BOTH-WAYS, none→no flag).
+- **Guardrails honored:** Option-1 (scaffold appended); BOTH scaffold + validators; single-source the logic (the equipment-direction enforcement rides the SHARED Rule-1 validator via the adapter, no swim-specific validator code). **DEPLOYS `analyze-swim-workout`.**
+- **MILESTONE — the four session-scoped narrative legs are DONE:** run (D-187), ride (D-188), strength (D-189), swim (D-190). All four reason through ONE shared scaffold + validator suite, fed by per-discipline adapters. The per-path-in-a-vacuum era is over for session narratives. **Remaining:** COACH (leg 5, week/state-scoped — filed in the work order, not started) + the Q-061 **trend-substrate** exclusion (held swim-cleanup work order).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

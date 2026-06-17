@@ -3,6 +3,10 @@ import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
 import { swimPacePer100Seconds } from '../_shared/swim/swim-pace.ts';
 import { resolveSwimScalars } from '../_shared/swim/swim-scalars.ts';
+// Shared narrative-reasoning core (D-190 — swim leg, the reference). Swim's inline honesty rules were
+// the source of the 7 universal rules; this brings its prompt onto the shared scaffold + validators like
+// the other three. See docs/WORK-ORDER-narrative-core.md.
+import { buildReasoningScaffold, validateNarrative, swimAdapter } from '../_shared/narrative-core/index.ts';
 
 // =============================================================================
 // ANALYZE-SWIM-WORKOUT - SWIMMING ANALYSIS EDGE FUNCTION
@@ -442,18 +446,26 @@ Deno.serve(async (req) => {
           return { zone, label, threshold: hrBands.thr, easy: zone <= 2 };
         })();
 
-        // D-183 bug 2 / Q-061 (partial): the narrative was blind to equipment. Detect fins the SAME way
-        // the Performance card does (MobileSummary, off workout_metadata.swim_steps_equipment_confirmed /
-        // swim_equipment_unplanned, D-162) and flag fin-assisted pace — DIRECTION ONLY (reads faster than
-        // unaided), never quantified. Full per-step pace exclusion remains Q-061 (needs per-length pace).
-        const finsUsed = (() => {
+        // D-183 + D-190 (Q-061 narrative half, BOTH directions): detect equipment from the D-162 capture
+        // (swim_steps_equipment_confirmed / swim_equipment_unplanned) and classify its DIRECTIONAL effect on
+        // pace — never quantified. fins/buoy/paddles speed pace UP (optimistic); kickboard/kick/drill slow it
+        // DOWN (pessimistic); snorkel ~neutral. D-183 flagged only the fins/optimistic half; D-190 adds the
+        // kick/drill pessimistic half. (Trend-substrate exclusion stays in the held swim-cleanup work order.)
+        const equipmentDir = (() => {
           let meta: any = (workout as any).workout_metadata;
           if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = {}; } }
           meta = meta || {};
           const confirmed = Array.isArray(meta.swim_steps_equipment_confirmed) ? meta.swim_steps_equipment_confirmed : [];
           const unplanned = Array.isArray(meta.swim_equipment_unplanned) ? meta.swim_equipment_unplanned : [];
-          return confirmed.some((e: any) => e?.used === true && String(e?.equipment || '').toLowerCase().includes('fin'))
-            || unplanned.some((e: any) => String(e || '').toLowerCase().includes('fin'));
+          const used: string[] = [
+            ...confirmed.filter((e: any) => e?.used === true).map((e: any) => String(e?.equipment || '').toLowerCase()),
+            ...unplanned.map((e: any) => String(e || '').toLowerCase()),
+          ];
+          const has = (re: RegExp) => used.some((u) => re.test(u));
+          return {
+            optimistic: has(/fin|buoy|pull|paddle/),                 // reads FASTER than unaided
+            pessimistic: has(/kick|board|drill|catch.?up|single.?arm|scull/), // reads SLOWER than swimming
+          };
         })();
 
         const workoutContext = {
@@ -474,7 +486,8 @@ Deno.serve(async (req) => {
           avg_hr_label: hrZoneCtx ? hrZoneCtx.label : null,
           hr_threshold: hrZoneCtx ? hrZoneCtx.threshold : null,
           hr_is_easy: hrZoneCtx ? hrZoneCtx.easy : null,
-          fins_used: finsUsed,
+          equip_optimistic: equipmentDir.optimistic, // fins/buoy/paddles → pace reads faster
+          equip_pessimistic: equipmentDir.pessimistic, // kick/drill → pace reads slower
           stroke_type: swimData.strokeType || 'Freestyle',
           intervals_completed: intervals.length,
           overall_adherence: overallAdherence != null ? Math.round(overallAdherence) : null,
@@ -492,7 +505,7 @@ CRITICAL RULES:
 - PLAIN PROSE ONLY — no Markdown. No "#" headers, no "**bold**", no numbered section titles, no labels. Each observation is one or two complete sentences. Separate observations with a blank line.
 - INTERPRET, DON'T LIST — reason from the RELATIONSHIP between the signals (RPE, heart rate, pace, work:rest), not a recital of each number. Swim has no power or GPS, so these are what you have; read how they fit together and what that says about the session.
 - RPE + HR COHERENCE: read effort from the AVERAGE heart rate and the heart-rate ZONE given below, NEVER from the peak/max — a brief peak is a momentary high, not the session's effort, so do not build the read on it. When the average sits in an easy zone (recovery / easy aerobic), a low RPE alongside it is COHERENT — a genuinely easy aerobic swim — say exactly that; do NOT manufacture "working harder than perceived", "more taxing than the numbers imply", or any RPE-vs-HR tension out of the peak or the absolute bpm. Only read the swim as HARDER than the numbers suggest when the AVERAGE HR is genuinely elevated (moderate-aerobic zone or above) against a low RPE, OR a high RPE sits at a modest pace; the read may slide DOWNWARD when the signals genuinely point to a grind, but never force tension the average does not support. If NO heart-rate zone is given below (no athlete threshold on file), do NOT characterize HR as elevated or easy — report the average plainly and reason from RPE, pace and work:rest instead.
-- EQUIPMENT — when the data below says fins were used on some sets, the recorded pace is FIN-ASSISTED and reads FASTER than your unaided swimming; flag that direction honestly in one plain clause (the blended pace flatters your true swim speed) but NEVER quantify it — no per-set splits, no "X seconds faster", no estimate of an unaided pace.
+- EQUIPMENT — equipment distorts pace DIRECTIONALLY; flag the direction the data below gives, in one plain clause, but NEVER quantify (no per-set splits, no "X seconds faster/slower", no estimate of an unaided pace). fins / pull buoy / paddles → the blended pace reads FASTER than your unaided swimming (flatters it). kick / kickboard / drill sets → the blended pace reads SLOWER than your actual swimming pace (a kick set is not a swim-pace-comparable number). If BOTH were used, the blended pace is pulled both ways and is not a clean fitness-comparable number in either direction — say so. If no equipment line is given, do not mention equipment.
 - WORK:REST is a FIRST-CLASS signal, NOT an afterthought — whenever the work-vs-rest line is given below, the proportion of the session spent actively swimming versus resting MUST be read as part of the interpretation, on equal footing with RPE/HR/pace. Weave it into the FIRST/opening observation (the lead that reasons about the session's overall character), not only a trailing bullet — the lead should reason from RPE + HR + pace + work:rest TOGETHER. A high rest fraction (lots of elapsed over moving) means more of the session was spent recovering — read it against the session's intent when known (more recovery on a technique/drill swim is unremarkable; the same on a sustained aerobic set suggests effort was being managed). Characterize the pattern's MEANING; still do NOT assert the specific cause (don't claim the sets were hard or the rest was deliberate — interpret the relationship, never diagnose the why).
 - UNIT CONSISTENCY: every distance and pace is in ${poolUnit === 'yd' ? 'YARDS' : 'METRES'}. Use that unit only. Do NOT convert to or mention the other unit anywhere — no "X ${poolUnit === 'yd' ? 'metres' : 'yards'}", no "≈ Y per 100 ${poolUnit === 'yd' ? 'm' : 'yd'}" translations. (The pool's physical length is given in its own build unit below — state it as-is; do NOT convert distances or paces to match it.)
 - NO INVENTED MATH: state only the metrics listed below. Do NOT compute or estimate derived values that are not given — no number of lengths, no stroke counts, no calories, no per-minute rates. Mixing the pool unit with the distance unit to "estimate lengths" is wrong and forbidden.
@@ -517,7 +530,13 @@ Workout Profile:
 - Environment: ${workoutContext.environment}
 - Stroke Type: ${workoutContext.stroke_type}
 ${workoutContext.avg_heart_rate ? `- Avg HR: ${workoutContext.avg_heart_rate} bpm${workoutContext.avg_hr_zone ? ` — ${workoutContext.avg_hr_zone} (${workoutContext.avg_hr_label})${workoutContext.hr_threshold ? `, against your threshold HR ~${workoutContext.hr_threshold} bpm` : ''}` : ''}${workoutContext.max_heart_rate ? ` · brief peak ${workoutContext.max_heart_rate} bpm (a momentary high, NOT the session's effort)` : ''}` : ''}
-${workoutContext.fins_used ? `- Equipment: fins on some sets — the average pace above is fin-assisted and reads faster than unaided swimming (flag the direction; do NOT quantify)` : ''}
+${(workoutContext.equip_optimistic && workoutContext.equip_pessimistic)
+  ? `- Equipment: this session mixed fast-assist gear (fins/buoy/paddles) AND slow work (kick/drill) — the blended pace above is pulled BOTH ways and is NOT a clean fitness-comparable number; say so, do NOT quantify`
+  : workoutContext.equip_optimistic
+  ? `- Equipment: fins/buoy/paddles on some sets — the average pace above reads FASTER than your unaided swimming (flag the direction; do NOT quantify)`
+  : workoutContext.equip_pessimistic
+  ? `- Equipment: kick/drill sets in this session — the average pace above reads SLOWER than your actual swimming pace (flag the direction; do NOT quantify)`
+  : ''}
 ${workoutContext.rest_min != null ? `- Work vs rest: ${workoutContext.moving_min} min of moving (work) across a ${workoutContext.elapsed_min} min session (~${workoutContext.rest_min} min rest)` : ''}
 ${workoutContext.rpe != null ? `- Perceived effort (RPE): ${workoutContext.rpe}/10` : ''}
 ${workoutContext.feeling ? `- Felt: ${workoutContext.feeling}` : ''}
@@ -568,12 +587,23 @@ ${intervalAnalysis.slice(0, 10).map((i: any) =>
 Write 3-4 plain-prose observations addressed to the swimmer as "you" (one or two sentences each). No headers, no bold, no numbered titles — just sentences. The FIRST observation is the lead read of the session's overall character and MUST integrate every signal you have — RPE, heart rate, pace, AND the work:rest split (when given) — into one honest verdict; do not save work:rest for last. Read how RPE, heart rate, pace, and work:rest fit TOGETHER — if they say it was a grind or a harder day than the pace alone implies, say so honestly; do not force positivity:`;
 
         const { callLLM } = await import('../_shared/llm.ts');
-        const swContent = await callLLM({
-          system: 'You are a swimming coach giving an athlete feedback on their swim. Write in the second person (address them as "you"), in plain prose sentences only — never Markdown, headers, bold, or numbered section titles.',
-          user: prompt,
-          maxTokens: 500,
-          temperature: 0.3,
-        });
+        // D-190: append the shared reasoning-core scaffold (swim addendum carries the bidirectional
+        // equipment-direction rule) + run the shared validators with a retry. Swim is the reference — the
+        // validators must PASS its compliant output (acceptance gate, now AS the live path); the loop is a
+        // backstop, the scaffold/inline-rules are the primary driver. Assembly NOT unified (guardrail #1).
+        const ncCtx = swimAdapter.buildContext(workoutContext);
+        const swimSystem = 'You are a swimming coach giving an athlete feedback on their swim. Write in the second person (address them as "you"), in plain prose sentences only — never Markdown, headers, bold, or numbered section titles.'
+          + buildReasoningScaffold(swimAdapter, workoutContext);
+        const callSwim = (userMsg: string) => callLLM({ system: swimSystem, user: userMsg, maxTokens: 500, temperature: 0.3 });
+        let swContent = await callSwim(prompt);
+        if (swContent) {
+          const nc = validateNarrative(swContent, ncCtx);
+          if (!nc.ok) {
+            console.warn('[analyze-swim] narrative rejected:', JSON.stringify(nc.failures.map((f) => f.code)));
+            const s2 = await callSwim(prompt + '\n\nYour previous draft violated the reasoning rules:\n' + nc.failures.map((f) => '- ' + f.why).join('\n') + '\nRewrite the observations fixing these.');
+            if (s2) swContent = s2; // retry-then-soft-accept (never regress to no narrative)
+          }
+        }
 
         if (swContent) {
           // Prose-first prompt is the primary defense; this is a backstop that strips any stray Markdown

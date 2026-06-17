@@ -4,7 +4,7 @@
 // through the core). Swim's full migration is last (work order), at which point this adapter also gains
 // the Q-061 kick/drill pessimistic-direction equipment flag. Full detail: docs/SPEC-honest-swim-inference.md.
 
-import type { DisciplineAdapter, NarrativeContext, SignalFlag } from '../types.ts';
+import type { DisciplineAdapter, NarrativeContext, SignalFlag, NotableLeadSignal } from '../types.ts';
 
 const num = (v: unknown): number | null => {
   if (v == null || v === '') return null; // zero-not-null: Number(null)===0 (D-112 class)
@@ -34,8 +34,25 @@ export const swimAdapter: DisciplineAdapter = {
     if (hasZones && rpe != null && rpe <= 3 && easyZone === false) {
       atypicalSignals.push({ signal: 'HR', state: 'high-for-zone', detail: `RPE ${rpe} but HR above the easy zone` });
     }
+    // D-190: when equipment distorts the pace, make it a NOTABLE lead signal so the shared Rule-1
+    // (leadSignalCoverage) validator REQUIRES the narrative to flag the direction — the same mechanism
+    // that stops run dropping heat. This makes the kick/drill pessimistic flag RELIABLE (an omission now
+    // triggers a retry), and keeps the fins/optimistic flag enforced too.
+    const notableLeadSignals: NotableLeadSignal[] = [];
+    if (packet?.equip_optimistic || packet?.equip_pessimistic) {
+      notableLeadSignals.push({
+        signal: 'equipment pace-distortion',
+        mentions: ['fin', 'buoy', 'paddle', 'kick', 'board', 'drill', 'faster than', 'slower than', 'equipment', 'gear', 'assisted', 'flatter'],
+        detail: (packet.equip_optimistic && packet.equip_pessimistic)
+          ? 'mixed fast-assist gear AND slow work — the blended pace is not a clean fitness number'
+          : packet.equip_optimistic
+          ? 'fins/buoy/paddles used — the pace reads FASTER than unaided swimming'
+          : 'kick/drill sets used — the pace reads SLOWER than your actual swimming pace',
+      });
+    }
+
     return {
-      notableLeadSignals: [], // swim's lead already reasons across work:rest+RPE+HR (D-179); nothing forced-notable here yet
+      notableLeadSignals, // equipment direction enforced when present (D-190); else swim's lead is free (D-179)
       atypicalSignals,
       anchors: { hr: hasZones ? 'zones' : null }, // neutral floor when no zones (D-183)
       hasTrendField: false,                        // a single swim is not a trend
