@@ -3,6 +3,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts'
+import { getStepEquipmentDetail } from '../_shared/swim/swim-step-equipment.ts'
 
 type PlannedWorkout = {
   id: string
@@ -842,7 +843,8 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               const src = seg ?? {}
               const labelTxt = String(src?.effortLabel || interval?.effortLabel || '')
               const cueTxt = String((src as any)?.cue || '')
-              const equipTxt = String((src as any)?.equipment || '')
+              const _eqDetail = getStepEquipmentDetail(src) // D-197: prefer equipment_detail, derive if absent
+              const equipTxt = _eqDetail.required[0] || _eqDetail.optional[0] || String((src as any)?.equipment || '')
               const strokeTxt = String((src as any)?.stroke || labelTxt)
               const drill = detectDrillType(labelTxt, cueTxt)
               const equip = mapSwimEquipment(equipTxt)
@@ -933,7 +935,8 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         const src = interval ?? {}
         const labelTxt = String(src?.effortLabel || '')
         const cueTxt = String((src as any)?.cue || '')
-        const equipTxt = String((src as any)?.equipment || '')
+        const _eqDetail = getStepEquipmentDetail(src) // D-197: prefer equipment_detail, derive if absent
+        const equipTxt = _eqDetail.required[0] || _eqDetail.optional[0] || String((src as any)?.equipment || '')
         const strokeTxt = String((src as any)?.stroke || labelTxt)
         const drill = detectDrillType(labelTxt, cueTxt)
         const equip = mapSwimEquipment(equipTxt)

@@ -15,6 +15,7 @@ import {
   hasCompound1RMSignals,
   resolveStrengthEquipmentTypeForPlan,
 } from '../_shared/strength-equipment-tier.ts';
+import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from './exercise-config.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
 import {
@@ -2002,7 +2003,7 @@ function expandTokensForRow(
         const name = swimDrillDisplayName(m[1]); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(m[1]);
         const distM = unit==='yd'? ydToM(dist) : dist;
         const drillLabel = drillLabelWithGear(s, name);
-        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label: drillLabel, equipment: equip||undefined, intensity: swimIntensity }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label: drillLabel, equipment: equip||undefined, intensity: swimIntensity, equipment_detail: resolveSwimStepEquipment(drillLabel, 'drill', swimIntensity) }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
         continue;
       }
       // Drill (count first): swim_drills_6x50yd_fingertipdrag (optional _r15, optional equipment)
@@ -2014,7 +2015,7 @@ function expandTokensForRow(
         const distM = unit==='yd'? ydToM(dist) : dist;
         const drillLabel = drillLabelWithGear(s, name);
         for(let i=0;i<reps;i++) {
-          steps.push({ id: uid(), kind:'drill', distance_m: distM, label: drillLabel, equipment: equip||undefined, intensity: swimIntensity });
+          steps.push({ id: uid(), kind:'drill', distance_m: distM, label: drillLabel, equipment: equip||undefined, intensity: swimIntensity, equipment_detail: resolveSwimStepEquipment(drillLabel, 'drill', swimIntensity) });
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
@@ -2085,7 +2086,7 @@ function expandTokensForRow(
         const distM=unit==='yd'? ydToM(dist):dist;
         console.log(`  ✅ Matched ${kind}: reps=${reps}, dist=${dist}${unit}, intensity="${swimIntensity}", rest=${rest}s, equip=${eq}`);
         for(let i=0;i<reps;i++){
-          steps.push({ id: uid(), kind:'work', distance_m: distM, label: swimIntensity, equipment:eq||undefined, intensity: swimIntensity });
+          steps.push({ id: uid(), kind:'work', distance_m: distM, label: swimIntensity, equipment:eq||undefined, intensity: swimIntensity, equipment_detail: resolveSwimStepEquipment(null, 'work', swimIntensity) });
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
@@ -2467,6 +2468,7 @@ function toV3Step(st: any, row?: any): any {
   }
   if (typeof st?.label === 'string') out.label = st.label;
   if (st?.equipment) out.equipment = st.equipment;
+  if (st?.equipment_detail) out.equipment_detail = st.equipment_detail; // D-197
   if (st?.strength) out.strength = st.strength;
   if (typeof st?.planned_index === 'number') out.planned_index = st.planned_index;
   if (st?.kind) out.kind = st.kind;

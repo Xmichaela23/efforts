@@ -4205,6 +4205,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-197 — Per-set swim equipment assignment (`equipment_detail`) with read-time fallback
+
+- **Date:** 2026-06-17
+- **Context:** D-196 surfaced that equipment was session-level only (`swim_equipment_optional_suggested`); no step said *which sets* to use fins on, so FORM/breakout/Garmin (all per-step readers) had nothing to show. This assigns equipment per step from the drill name + session/step intent.
+- **New shared module** `_shared/swim/swim-step-equipment.ts`: `resolveSwimStepEquipment(drillName, stepKind, sessionIntent) → { required: string[], optional: string[] }` (the work order's rule table — drills by keyword match, mains by intent; kick EXCEPTIONS like six-kick-switch/side-kick checked before the generic kick→kickboard rule). Plus `getStepEquipmentDetail(step)` (read-time accessor) and `formatStepEquipment`/`stepEquipmentLabel` (display: required bare, optional suffixed "(optional)").
+- **Format:** new per-step `equipment_detail: { required, optional }` (object) ALONGSIDE the legacy `equipment` string (kept for back-compat). The work order's premise that the readers "pick it up automatically" was **false** — they expected a string — so all 3 readers were updated (flagged with Michael, agreed Option A).
+- **No-rematerialize design (Michael's call):** readers **prefer** `equipment_detail`, and when it's absent (old plan data) **derive it at read-time** from the drill name + intensity (+ folding the legacy string in as optional). So existing plans get enriched display with no rematerialize; `materialize-plan` writes `equipment_detail` for new plans; both paths converge on the same output.
+- **Files:** `materialize-plan` writes `equipment_detail` on drill + work steps (and copies it through the step out-builder); `formGogglesSwimScript.ts`, `StructuredPlannedView.tsx` (breakout chip), and `send-workout-to-garmin` (picks `required[0] || optional[0]` for the single Garmin `equipmentType`) all read via the shared helper. Session-level `swim_equipment_optional_suggested` unchanged.
+- **Verified on Friday's swim (read-time fallback path, no rematerialize):** Catch-Up drill → "fins (optional), snorkel (optional)"; moderate main → "snorkel (optional)"; warmup/cooldown/recovery → none. Client build clean; `deno`-bundled deploy of `materialize-plan` + `send-workout-to-garmin` succeeded.
+- **Deployed:** `materialize-plan`, `send-workout-to-garmin` (2026-06-17). FORM/breakout ship with the client. **On-device confirm pending.**
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

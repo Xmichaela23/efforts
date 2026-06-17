@@ -239,14 +239,12 @@ public class WorkoutKitPlugin: CAPPlugin, CAPBridgedPlugin {
         // computed.steps stores distance_m. The pool LENGTH below is set on the
         // workout/lap config — see COMPILE-RISK (pool length) further down.
         func distanceGoal(_ meters: Double) -> WorkoutGoal {
-            // COMPILE-RISK: WorkoutGoal.distance(_:) signature. Likely takes a
-            // Measurement<UnitLength>. Could instead be `.distance(meters, unit: .meters)`.
-            return .distance(Measurement(value: meters, unit: UnitLength.meters))
+            // WorkoutGoal.distance takes (value: Double, unit: UnitLength) positionally.
+            return .distance(meters, UnitLength.meters)
         }
         func timeGoal(_ seconds: Double) -> WorkoutGoal {
-            // COMPILE-RISK: WorkoutGoal.time(_:) signature. Likely takes a
-            // Measurement<UnitDuration> or (value, unit). Adjust to SDK.
-            return .time(Measurement(value: seconds, unit: UnitDuration.seconds))
+            // WorkoutGoal.time takes (value: Double, unit: UnitDuration) positionally.
+            return .time(seconds, UnitDuration.seconds)
         }
 
         // A work step → IntervalStep(.work); a rest → IntervalStep(.recovery).

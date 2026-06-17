@@ -7,6 +7,8 @@ import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 import { isWorkoutKitAvailable, scheduleSwimOnWatch, buildSwimPayloadFromWorkout } from '@/services/workoutkit';
+import { Capacitor } from '@capacitor/core';
+import { stepEquipmentLabel } from '@shared/swim/swim-step-equipment';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 import { swimDrillDisplayName } from '@/lib/plan-tokens/swim-drill-tokens';
 
@@ -36,6 +38,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   })();
   const hasStructured = !!(structureAny && typeof structureAny === 'object');
   const hasComputedV3 = Array.isArray(computedAny?.steps) && computedAny.steps.length > 0;
+  // D-196: grouped swim actions (Copy FORM · Send to Apple Watch · Send to Garmin) up top.
+  const isPlanned = String((workout as any)?.workout_status || '').toLowerCase() === 'planned';
+  const isIosNative = Capacitor.getPlatform() === 'ios';
 
   const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
   const mobilityList: Array<{ name: string; duration?: string; description?: string }> = (() => {
@@ -266,11 +271,11 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           const timeTxt = (typeof secs==='number' && secs>0) ? `1 × ${fmtDur(secs)}` : undefined;
           const seg = [distTxt || timeTxt, baseLabel || undefined].filter(Boolean).join(' — ')
           if (seg && seg.trim()) {
-            // D-196 item 3: push the step text only; carry equipment separately for a chip (was
-            // appended inline as " with fins"). `equip` is the already-filtered ` with X` string.
+            // D-196/D-197: push the step text only; show equipment as a chip from equipment_detail
+            // (or derived at read-time from drill name + intensity). e.g. "fins (optional)", "kickboard".
             lines.push(seg)
-            const bare = equip ? equip.replace(/^\s*with\s+/i, '').trim() : ''
-            if (bare) lineEquip[lines.length - 1] = bare
+            const equipLabel = stepEquipmentLabel(st)
+            if (equipLabel) lineEquip[lines.length - 1] = equipLabel
           }
           return;
         }
@@ -746,6 +751,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           </div>
           {hasComputedV3 ? (
             <div className="mt-3">
+              {isPlanned && (
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={handleGarminExport}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
+                  >Send to Garmin</button>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -755,7 +769,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
                   <Copy className="h-3.5 w-3.5 opacity-80" aria-hidden />
                   Copy for FORM Goggles
                 </button>
-                {workoutKitAvailable && (
+                {isIosNative && (
                   <button
                     type="button"
                     disabled={sendingToWatch}
@@ -808,7 +822,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
                     <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide bg-sky-500/15 text-sky-300/80 border border-sky-400/20 whitespace-nowrap">{lineEquip[i]}</span>
                   )}
                 </span>
-                {i===0 && isPlannedRow && (
+                {/* Non-swims keep Garmin on the first row; swims show all three actions grouped up top (D-196). */}
+                {i===0 && isPlannedRow && parentDisc !== 'swim' && (
                   <div className="ml-3 flex items-center gap-2">
                     <button
                       type="button"

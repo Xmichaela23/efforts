@@ -19,6 +19,7 @@
 		5C9517952F141BED00D58C8E /* HealthKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8AA5E2F1036CF00A9216D /* HealthKitPlugin.swift */; };
 		5C9517962F141BED00D58C8E /* BluetoothHRPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8C267E2F10AA97004715FC /* BluetoothHRPlugin.swift */; };
 		5C9517972F141BED00D58C8E /* WatchConnectivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8AA5F2F1036CF00A9216D /* WatchConnectivityPlugin.swift */; };
+		5C9517972F141BED00C00003 /* WorkoutKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8AA5F2F1036CF00C00001 /* WorkoutKitPlugin.swift */; };
 		5C9517982F141BED00D58C8E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		5C95179A2F141BED00D58C8E /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 5C9517922F141BED00D58C8E /* CapApp-SPM */; };
 		5C95179C2F141BED00D58C8E /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
@@ -29,6 +30,7 @@
 		5C9517A12F141BED00D58C8E /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		5CF8AA602F1036CF00A9216D /* HealthKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8AA5E2F1036CF00A9216D /* HealthKitPlugin.swift */; };
 		5CF8AA612F1036CF00A9216D /* WatchConnectivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8AA5F2F1036CF00A9216D /* WatchConnectivityPlugin.swift */; };
+		5CF8AA612F1036CF00C00002 /* WorkoutKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8AA5F2F1036CF00C00001 /* WorkoutKitPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +48,7 @@
 		5C9517A62F141BED00D58C8E /* App copy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "App copy-Info.plist"; path = "/Users/michaelambp/efforts/ios/App/App copy-Info.plist"; sourceTree = "<absolute>"; };
 		5CF8AA5E2F1036CF00A9216D /* HealthKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitPlugin.swift; sourceTree = "<group>"; };
 		5CF8AA5F2F1036CF00A9216D /* WatchConnectivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivityPlugin.swift; sourceTree = "<group>"; };
+		5CF8AA5F2F1036CF00C00001 /* WorkoutKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutKitPlugin.swift; sourceTree = "<group>"; };
 		5CF8AA622F10376300A9216D /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
@@ -96,6 +99,7 @@
 				5CF8AA622F10376300A9216D /* App.entitlements */,
 				5CF8AA5E2F1036CF00A9216D /* HealthKitPlugin.swift */,
 				5CF8AA5F2F1036CF00A9216D /* WatchConnectivityPlugin.swift */,
+				5CF8AA5F2F1036CF00C00001 /* WorkoutKitPlugin.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -226,6 +230,7 @@
 				5CF8AA602F1036CF00A9216D /* HealthKitPlugin.swift in Sources */,
 				5C8C267F2F10AA97004715FC /* BluetoothHRPlugin.swift in Sources */,
 				5CF8AA612F1036CF00A9216D /* WatchConnectivityPlugin.swift in Sources */,
+				5CF8AA612F1036CF00C00002 /* WorkoutKitPlugin.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -237,6 +242,7 @@
 				5C9517952F141BED00D58C8E /* HealthKitPlugin.swift in Sources */,
 				5C9517962F141BED00D58C8E /* BluetoothHRPlugin.swift in Sources */,
 				5C9517972F141BED00D58C8E /* WatchConnectivityPlugin.swift in Sources */,
+				5C9517972F141BED00C00003 /* WorkoutKitPlugin.swift in Sources */,
 				5C9517982F141BED00D58C8E /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

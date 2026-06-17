@@ -9,6 +9,8 @@
  * appear in the athlete-facing script.
  */
 
+import { stepEquipmentLabel } from '@shared/swim/swim-step-equipment'
+
 function num(v: unknown): number | undefined {
   if (typeof v === 'number' && isFinite(v) && v > 0) return v
   const m = String(v ?? '').match(/(-?\d+\.?\d*)/)
@@ -105,7 +107,7 @@ function describeSwimStep(st: any): string {
   else if (label) parts.push(label)
   else parts.push('steady')
 
-  const eq = formatEquipment(st?.equipment)
+  const eq = stepEquipmentLabel(st) // D-197: equipment_detail (or derived) → "fins (optional)" / "kickboard"
   if (eq) parts.push(eq)
 
   return parts.join(' ').replace(/\s+/g, ' ').trim()
