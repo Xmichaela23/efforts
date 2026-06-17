@@ -944,6 +944,18 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-068 — Server-compute the Details-tab metrics that have NO server source (swim SWOLF/sets/splits, workout-level VAM, work_kj unit) — so the Details tab can read instead of recompute
+
+- **Status:** filed 2026-06-16 (continuity audit fix #2 / D-186 follow-up) · **NOT building now — scoped out as a real feature build.**
+- **What it is:** D-186 consolidated `CompletedTab` (Details tab) toward "client formats, never recomputes," but several values it shows have **NO server-side equivalent**, so they stay client-side **by necessity** (documented as honest exceptions in `AUDIT-continuity-2026-06-16.md`, not fake-consolidated). To finish the invariant, the SERVER must compute these first; then the Details tab reads them:
+  - **Swim display heuristics** — SWOLF, warmup/main/cooldown **set detection**, strokes-per-length, stroke-rate, **100m splits**, pool-length inference. Today these are clustered/derived client-side from the laps array. The server (`analyze-swim-workout` / `compute-facts` / `session_detail_v1`) computes none of them. Move them server-side (e.g. into `swim_facts` + the display contract) so the Details tab and any future surface read ONE computed value.
+  - **Workout-level VAM** — `compute-facts` only computes a **per-segment** `vam_m_per_h` (`:680/:706`); there is no workout-level VAM scalar in `display_metrics` / `session_detail_v1`. The Details tab shows an inline client VAM (no server source). Compute a workout-level VAM server-side and surface it.
+  - **`work_kj` UNIT BUG (real, currently dormant):** `workout-detail:1489` sets `display_metrics.work_kj = total_work` **without ÷1000**, but FIT `total_work` is in **JOULES** (which is why the client `calculateTotalWork` divides by 1000). So `display_metrics.work_kj` is **1000× too big** for any workout with `total_work` populated. It's dormant only because no surface currently displays `norm.work_kj` and the dev cohort has null `total_work`. **Fix:** `display_metrics.work_kj = total_work / 1000` (+ add the `avg_power × moving_s / 1000` fallback the client has) — THEN the Details tab can migrate total-work onto it. Until fixed, the client `calculateTotalWork` (correct unit + fallback) stays; D-186 deliberately did NOT migrate onto the buggy server field.
+- **Why deferred:** Option 3 from the fix-#2 scope decision — a genuine server-feature build (new computations + verification across sources), beyond the "stay tight, just consolidate the Details tab" scope. The honest-exception documentation makes the current state truthful; this Q is the path to closing it.
+- **Cross-ref:** D-186 (the consolidation that surfaced these), `AUDIT-continuity-2026-06-16.md` (the exception list), `CompletedTab.tsx` (the client computations), `workout-detail/index.ts:1489` (the work_kj unit bug), `compute-facts/index.ts:680` (per-segment VAM).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

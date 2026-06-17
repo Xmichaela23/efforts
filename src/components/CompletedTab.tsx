@@ -1169,124 +1169,13 @@ const formatMaxSpeed = (speedValue: any): string => {
 
  
 
-  // Enhanced VAM calculation for running with insights
- const calculateRunningVAM = () => {
-  if (!workoutData.swim_data) return null;
-  
-  const elevationGain = (workoutData as any)?.elevation_gain ?? (workoutData as any)?.metrics?.elevation_gain;
-  const duration = Number(norm.duration_s);
-   
-  if (!elevationGain || !duration) return null;
-   
-   const elevationM = Number(elevationGain);
-  const durationHours = duration / 3600;
-   const vam = Math.round(elevationM / durationHours);
-   
-   // Professional VAM insights with actionable feedback
-   let insight = '';
-   let trainingZone = '';
-   let racePacing = '';
-   
-   if (vam >= 1000) {
-     insight = 'Elite climbing performance';
-     trainingZone = 'VO2 Max / Anaerobic';
-     racePacing = 'Suitable for short, steep races';
-   } else if (vam >= 800) {
-     insight = 'Advanced climbing strength';
-     trainingZone = 'Threshold / Tempo';
-     racePacing = 'Good for hilly 10K-21K';
-   } else if (vam >= 600) {
-     insight = 'Strong climbing ability';
-     trainingZone = 'Aerobic / Endurance';
-     racePacing = 'Ideal for marathon training';
-   } else if (vam >= 400) {
-     insight = 'Good climbing endurance';
-     trainingZone = 'Aerobic Base';
-     racePacing = 'Ultra-distance ready';
-   } else {
-     insight = 'Endurance-focused climbing';
-     trainingZone = 'Recovery / Base';
-     racePacing = 'Build climbing strength';
-   }
-   
-   return { vam, insight, trainingZone, racePacing };
- };
-
- // Calculate Grade Adjusted Pace (GAP) using proper Strava formula
- const calculateGradeAdjustedPace = () => {
-   if (import.meta.env?.DEV) console.log('🔍 GAP calculation');
-   if (!workoutData.swim_data && !workoutData.walk_data) {
-     if (import.meta.env?.DEV) console.log('❌ GAP calculation skipped - not a run/walk:', workoutData.swim_data);
-     return null;
-   }
-   
-  const distance = norm.distance_m;
-  const duration = Number(norm.duration_s);
-  const elevationGain = (workoutData as any)?.elevation_gain ?? (workoutData as any)?.metrics?.elevation_gain;
-   
-   if (import.meta.env?.DEV) console.log('🔍 GAP calculation - data:', { distance, duration, elevationGain });
-   
-  if (!distance || !duration || !elevationGain) {
-     if (import.meta.env?.DEV) console.log('❌ GAP calculation skipped - missing data');
-     return null;
-   }
-   
-   // Convert to standard units - handle both km and miles
-   let distanceMiles = Number(distance);
-  let durationMinutes = Number(duration) / 60; // norm is seconds -> minutes
-   let elevationFeet = Number(elevationGain);
-   
-   // If distance is in km, convert to miles
-   if (distanceMiles > 10) { // Likely in km if > 10
-     distanceMiles = distanceMiles * 0.621371; // km to miles
-     if (import.meta.env?.DEV) console.log('🔍 Converted distance from km to miles:', distanceMiles);
-   }
-   
-  // duration is already seconds converted to minutes
-   
-   // If elevation is in meters, convert to feet
-   if (elevationFeet > 1000) { // Likely in meters if > 1000
-     elevationFeet = elevationFeet * 3.28084; // meters to feet
-     if (import.meta.env?.DEV) console.log('🔍 Converted elevation from meters to feet:', elevationFeet);
-   }
-   
-   if (import.meta.env?.DEV) console.log('🔍 GAP calculation - converted units:', { distanceMiles, durationMinutes, elevationFeet });
-   
-   // Calculate actual pace (min/mi)
-   const actualPaceMinutes = durationMinutes / distanceMiles;
-   if (import.meta.env?.DEV) console.log('🔍 Actual pace (min/mi):', actualPaceMinutes);
-   
-   // Proper Strava GAP formula
-   // Elevation gain per mile affects pace
-   const elevationPerMile = elevationFeet / distanceMiles;
-   if (import.meta.env?.DEV) console.log('🔍 Elevation per mile:', elevationPerMile);
-   
-   // Strava's GAP adjustment: more sophisticated than simple linear
-   // Accounts for both uphill and downhill effects
-   let gapAdjustment = 0;
-   
-   if (elevationPerMile > 0) {
-     // Uphill: slows you down more than simple linear
-     // Strava uses a curve that increases impact for steeper grades
-     gapAdjustment = (elevationPerMile / 100) * 1.2; // 20% more impact than linear
-     if (import.meta.env?.DEV) console.log('🔍 Uphill adjustment:', gapAdjustment);
-   } else if (elevationPerMile < 0) {
-     // Downhill: speeds you up, but not as much as uphill slows you down
-     gapAdjustment = (Math.abs(elevationPerMile) / 100) * 0.8; // 80% of uphill benefit
-     if (import.meta.env?.DEV) console.log('🔍 Downhill adjustment:', gapAdjustment);
-   }
-   
-   // Calculate GAP
-   // Uphill: add penalty (slower pace), Downhill: subtract benefit (faster pace)
-   const gapPaceMinutes = actualPaceMinutes + gapAdjustment;
-   if (import.meta.env?.DEV) console.log('🔍 GAP pace (min/mi):', gapPaceMinutes);
-   
-   // Format GAP pace (don't go below 0)
-   const gapPace = formatPace(Math.max(0, gapPaceMinutes));
-   if (import.meta.env?.DEV) console.log('🔍 Final GAP pace:', gapPace);
-   
-   return gapPace;
- };
+  // D-186 (continuity audit fix #2): removed two DEAD client-recompute functions — `calculateRunningVAM`
+  // and `calculateGradeAdjustedPace` (a client GAP with its own 1.2/0.8 Strava-approx coefficients).
+  // Both were defined but NEVER called (verified zero call sites), so deleting them is display-neutral.
+  // GAP's authoritative source is the server (session_detail_v1.completed_totals.avg_gap_s_per_mi /
+  // the D-185 run resolver); the client must never re-derive it. The VAM still SHOWN below (inline) is
+  // a documented HONEST EXCEPTION — there is no workout-level server VAM yet (compute-facts has only a
+  // per-segment vam_m_per_h), so it stays client-side by necessity. See AUDIT-continuity-2026-06-16.md.
 
 const formatMovingTime = () => {
   // Prefer our unified swim-aware resolver

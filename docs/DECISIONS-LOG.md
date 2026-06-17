@@ -4035,6 +4035,23 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-186 — Details-tab (CompletedTab) consolidation: delete dead client recomputes; total-work stays client-side (server field is unit-buggy) — continuity audit fix #2
+
+- **Date:** 2026-06-16
+- **Goal (continuity audit fix #2):** enforce "smart server, dumb client — the client formats, never recomputes" on `src/components/CompletedTab.tsx` (the Details tab), the audit's flagged "biggest client-recompute" surface (GAP/VAM/SWOLF/swim-sets/total-work).
+- **Map-first finding (the violation was smaller than the audit implied):** CompletedTab already consumes the server contract **`display_metrics`** (built by `workout-detail:1492`, *preferred* by `useWorkoutData:39`) for pace/HR/power/NP/IF/VI/swim-pace/distance/elevation/calories — those are **already server-sourced** (clean). The actual recomputes broke down as: GAP + VAM functions = **DEAD CODE** (defined, zero call sites); swim cluster (SWOLF / set-detection / strokes / pool-length / 100m-splits) + workout-level VAM = **NO server source**; total-work = a server field exists but is **unit-buggy**.
+- **Decision (Option 1 "tight", Michael 2026-06-16):**
+  - **Deleted the two dead functions** `calculateRunningVAM` + `calculateGradeAdjustedPace` (the latter a client GAP with its own 1.2/0.8 Strava-approx coefficients). Verified **zero call sites** → display-neutral; `tsc` error count unchanged (7→7, all pre-existing). GAP's authoritative source is the server (`session_detail_v1.completed_totals.avg_gap_s_per_mi` / the D-185 run resolver); the client must never re-derive it.
+  - **Did NOT plumb `session_detail_v1` into CompletedTab** (rejected Option 2): `display_metrics` is already server-sourced and consistent, so re-routing the scalar reads would be busywork with no display change.
+  - **Did NOT migrate total-work** — and this is the load-bearing honesty call. The "server source" `display_metrics.work_kj` is **unit-buggy**: `workout-detail:1489` sets it to `total_work` **without ÷1000**, but FIT `total_work` is **JOULES** (which is exactly why the client `calculateTotalWork` divides by 1000). So the server field is **1000× too big**; the **client calc is the correct one**. Migrating onto it would *introduce* a 1000× error and regress the dev user (null `total_work`) to N/A. Per the honest-blank discipline, the client calc **stays** (value-preserving); the server fix is filed (Q-068), not faked.
+  - **Documented honest exceptions** (no usable server source — client-side by necessity): the swim cluster, workout-level VAM, and total-work. Marked in `AUDIT-continuity-2026-06-16.md`.
+  - **Filed Q-068** to server-compute the swim display metrics + workout-level VAM + fix the `work_kj` unit (Option 3 — a real feature build, out of "stay tight" scope) so the Details tab can eventually read instead of recompute.
+- **Verified:** dead code gone, zero remaining references, `tsc` error delta 0 (display-neutral); total-work display preserved (client calc retained, including the `avg_power × duration` fallback the dev user relies on since `total_work` is null). Client-only change — no edge deploy; Netlify auto-deploys on push.
+- **Scope:** Details-tab only. Did NOT touch the D-185 run resolver, ride/swim/strength single-sources, or the trend spine (confirmed unchanged). Isolated items (Q-041 dead Epley, ride TSS, StrengthCompareTable, Q-061) remain out of scope.
+- **Continuity pass COMPLETE:** D-185 (run resolver) + D-186 (Details consolidation) close the two structural fractures from the continuity audit. Remaining work is filed (Q-068 server-compute; run overall-GAP persistence; the isolated items) — see `AUDIT-continuity-2026-06-16.md`.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

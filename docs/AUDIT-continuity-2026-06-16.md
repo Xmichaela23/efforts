@@ -1,6 +1,11 @@
 # AUDIT — Continuity / Single-Source (2026-06-16)
 
-**Type:** READ-ONLY mapping pass. Nothing was changed. This catalogs where every meaningful value is computed, whether it is single-sourced, and whether all surfaces read the same value or re-derive it.
+> **RESOLUTION STATUS (2026-06-16) — both flagged fractures CLOSED:**
+> - **Fix #1 — Run resolver (D-185, DONE):** `_shared/run/run-scalars.ts resolveRunScalars` now single-sources run pace/HR (delegating to the narrative-trusted guarded primitives + the zero-not-null HR guard); card + compute-facts read it; narrative already used the wrapped fn. computed.overall-primary (D-182 standing rule). Value-preserved, ride/swim/strength unchanged. The "RUN has no resolver" gap below is **resolved**.
+> - **Fix #2 — Details tab consolidation (D-186, DONE):** the `CompletedTab` "parallel client math layer" below is reduced to honest exceptions. **Dead code removed** (the GAP + VAM client functions were never called). **Scalars confirmed already server-sourced** via `display_metrics`. **Honest exceptions documented** (see HALF 2): the swim cluster (SWOLF/sets/strokes/pool/splits) + workout-level VAM + total-work have **NO usable server source — client-side by necessity**, filed as **Q-068** (server-compute them). Total-work specifically was NOT migrated because the server `display_metrics.work_kj` is **unit-buggy** (1000× — Joules mislabeled kJ); the client calc is correct and stays.
+> - **Remaining (filed, not in this pass):** Q-068 (server-compute the Details exceptions + work_kj unit), run overall-GAP persistence (D-185 fast-follow), and the isolated items (Q-041 dead Epley, ride TSS, StrengthCompareTable re-sum, Q-061 fin-blind). The clean single-sources (ride power, strength e1RM, load/ACWR, trend spine) were confirmed untouched.
+
+**Type:** READ-ONLY mapping pass (original). Nothing was changed *during the audit*; the RESOLUTION above records the subsequent D-185/D-186 fixes. This catalogs where every meaningful value is computed, whether it is single-sourced, and whether all surfaces read the same value or re-derive it.
 
 **Principle being audited:** *meaningful values computed once, server-side; the client formats but never recomputes; every surface reads one source.*
 
@@ -77,6 +82,8 @@
 **Rule:** FORMAT a server value = fine. RECOMPUTE the value from raw inputs = drift risk. The server ships a pre-formatted contract `session_detail_v1` (`build.ts`); the **Performance tab** (`MobileSummary`) renders it. The **Details tab** (`CompletedTab.tsx`) is a separate, older surface that does its own math off `workoutData.computed` — that's where the recompute cluster lives.
 
 ### RECOMPUTE cluster — Details tab (`CompletedTab.tsx`) — LATENT divergence vs the Performance card
+
+> **D-186 disposition (2026-06-16):** GAP + VAM here were **DEAD CODE** (zero call sites) → **deleted**. Everything else in this cluster has **NO usable server source — it stays CLIENT-SIDE BY NECESSITY**, now a documented honest exception, NOT a violation: **SWOLF / swim-set detection / strokes / pool-length / 100m-splits** (server computes none of these), **workout-level VAM** (server has only per-segment `vam_m_per_h`), and **total-work** (server `display_metrics.work_kj` is unit-buggy 1000× — the client calc is the correct one). Server-compute path filed as **Q-068**. The scalars NOT in this cluster (pace/HR/power/etc.) were confirmed already server-sourced via `display_metrics`.
 
 | Site | Value | Note | Flag |
 |---|---|---|---|
