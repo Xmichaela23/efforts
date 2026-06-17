@@ -4149,6 +4149,23 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-194 — Work:rest as a swim signal: session card readout + rest-fraction trend (D-176) — built
+
+- **Date:** 2026-06-17
+- **Context:** D-176 design — for a hybrid/triathlete swimmer the progress signal isn't pace or SWOLF, it's "I'm resting less to cover the same distance." Work:rest (moving ÷ elapsed) was already in the swim narrative (D-179) but never surfaced as a metric or trended. This builds both layers. It's the one rest signal that survives every source (Strava/Garmin/Watch all carry moving + elapsed).
+- **Layer 1 — card readout:** `session_detail_v1.completed_totals.swim_work_rest` — a preformatted `"Work 24:00 · Rest 11:00"` string built in `session-detail/build.ts` from `completedSwimScalars` (the SAME `resolveSwimScalars` source as pace/duration — never recomputed inline). Rendered on the swim card in `EnduranceIntervalTable` (the `completed_totals` consumer). Deployed via `workout-detail`.
+- **Layer 2 — rest-fraction trend:**
+  - `compute-facts.buildSwimFacts` persists `swim_facts.rest_fraction = (elapsed − moving)/elapsed` via `resolveSwimScalars` — which also brings the swim substrate ONTO the single source (the inline-pace inconsistency flagged in Q-061). Added `elapsed_time` to the `compute-facts` `WorkoutRow` + SELECT.
+  - `state-trend/swim.ts` `swimRestToSeries` / `computeSwimRestState`: **comparable-session filter = swims within ±25% of the in-window MEDIAN distance** (don't compare a sprint set to a long aerobic swim); Q-061 contamination excluded upstream; same `classifyTrend` gates (min-session, staleness, dead-band); `lowerIsBetter` (shrinking rest = improving).
+  - Cached as `state_trends_v1.swim.rest` (nested, mirroring bike power/efficiency); rendered as a quiet `· rest ↓ −X%` tag on the State swim row (`StatePerformanceSection`). `useStateTrends` exposes `swimRest`.
+- **Decisions:** EXCLUDE (not down-weight) out-of-band/contaminated swims; ±25% distance band (intent isn't reliably stored for swims, so distance is the lever); `swim_facts` is JSONB → no schema change; card format is the human-readable time split, not a percentage (Michael's call).
+- **Independent bug fix (Q-061 client parity):** the Q-061 contamination filter had landed only in `compute-snapshot`, NOT the client `useStateTrends` mirror — so the live STATE card could include contaminated swims while the cached snapshot excluded them (a single-source-guarantee drift). `useStateTrends` now applies the same filter. Real fix in its own right; see Q-061.
+- **Verified on real data (2026-06-17, user 45d122e7):** `rest_fraction` persisted for all 10 in-window swims (0.25–0.44); Jun-15 fin swim excluded (Q-061); comparable-distance filter kept 4 of 9 (median 891m, band 668–1114); `state_trends_v1.swim.rest` populated. Verdict `needs_data` — honest (newest comparable point Jun-1, 16d old → staleness gate), same cause as pace. Layer-1 card confirmed at the data level: Jun-15 swim (moving 24m / elapsed 35m) → `"Work 24:00 · Rest 11:00"`. **On-device confirm pending** (client ships on merge).
+- **Deployed:** `workout-detail`, `compute-facts`, `compute-snapshot` (2026-06-17). Client via Netlify on merge.
+- **Source-consistency caveat (noted, not blocked):** moving/elapsed definitions differ slightly across Strava/Garmin/Watch; the trend is comparison-to-self and tolerant of this.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

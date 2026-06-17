@@ -118,6 +118,14 @@ One row per user. All performance data lives here:
 ### `block_adaptation_cache`
 `expires_at` timestamp with `(now() + '24:00:00')` default — 24h TTL baked into schema. `aerobic_efficiency_trend`, `strength_progression_trend` jsonb.
 
+### `workout_facts.swim_facts` (JSONB keys — written by `compute-facts.buildSwimFacts`)
+Not a table column — `swim_facts` is one JSONB column on `workout_facts` (alongside `run_facts`/`ride_facts`/`strength_facts`), so new keys need no migration. Current keys:
+- `distance_m`, `pace_per_100m` — original substrate (pace trend reads `pace_per_100m`).
+- `pace_equipment_contaminated` (bool), `pace_equipment_direction` (`'optimistic'|'pessimistic'|'mixed'|null`) — **D-193** (Q-061). Equipment/drill contamination flag; excluded from both the pace and rest trends.
+- `rest_fraction` (number 0–1, or null) — **D-194**. `(elapsed − moving)/elapsed` via `resolveSwimScalars`; substrate for the rest-fraction trend (`state_trends_v1.swim.rest`). Null when elapsed isn't a clean superset of moving.
+
+(Also D-194: `state_trends_v1.swim` now nests a `rest: {verdict, pctChange, provisional}` block — a JSONB key on `athlete_snapshot.state_trends_v1`, no column change.)
+
 ---
 
 ## 3. ONBOARDING NULL GAP — CONFIRMED OR REFUTED?

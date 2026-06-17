@@ -97,6 +97,8 @@ These are *flags*, not verdicts. Each is something that looks surprising, contra
 
 **Resolved since the 2026-06-16 snapshot:**
 - **Q-061** (swim pace trend blended equipment/drill sets as if unaided) — **Resolved by D-193, 2026-06-17.** `compute-facts` flags contaminated swims (both directions, via shared `detectSwimEquipment`); `compute-snapshot` excludes them from the trend substrate. Verified on real data; deployed.
+- **Q-061 client-parity drift** (the D-193 contamination filter landed only in `compute-snapshot`, not the client `useStateTrends` mirror → live STATE card vs cached `state_trends_v1` could disagree on swim) — **Resolved by D-194, 2026-06-17.** `useStateTrends` now applies the same filter; the two `assembleStateTrends` callers match again.
+- **D-176 → D-194, 2026-06-17:** work:rest shipped as a swim card readout + a rest-fraction trend (`state_trends_v1.swim.rest`). Not an audit discrepancy — a planned feature; noted here for traceability. On-device confirm pending.
 
 1. **Swim HR zones anchor to `run_threshold_hr`** (`analyze-swim index.ts:432`) — the spec explicitly warns swim HR ≠ run HR. (area 02) **High.**
 2. **`FTP-COLD-START-SPEC` is spec-only, unimplemented** — `grep wizard_estimated` = zero code hits; ENGINE-STATE D-077 confirms "saved for future work." The onboarding gap (#null baselines for new athletes) is real and masked only by runtime fallbacks. (area 07) **High.**
