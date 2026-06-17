@@ -51,3 +51,60 @@ export function computeSwimState(
     droppedImplausible,
   };
 }
+
+// ── D-194: rest-fraction trend (work:rest) ──────────────────────────────────────────────────
+// The hybrid athlete's swim progress signal: "I'm resting less to cover the same distance" =
+// moving time taking up more of the pool session over a block at similar yardage. lower = better.
+//
+// COMPARABLE-SESSION filter (don't compare a sprint set to a long aerobic swim): only swims within
+// ±25% of the in-window MEDIAN distance feed the trend. Q-061 equipment/drill contamination is
+// already excluded upstream (compute-snapshot / useStateTrends), so drill/kick high-rest sessions
+// never reach here. Observe the trend; never diagnose why the rest was high.
+
+export interface SwimRestState {
+  trend: TrendResult;
+  metricLabel: string; // "rest fraction"
+  /** Rows dropped for being outside the comparable distance band (surfaced for honesty). */
+  droppedOutOfBand: number;
+}
+
+const REST_MIN = 0.02; // < 2% rest ≈ a continuous open-water swim or a bad scalar — not a pool set
+const REST_MAX = 0.80; // > 80% rest isn't a swim workout's work:rest — drop defensively
+
+/** SOURCE ADAPTER: swim rest-fraction rows → {date,value}[], keeping only comparable-distance swims. */
+export function swimRestToSeries(
+  rows: Array<{ date?: string; rest_fraction?: number | null; distance_m?: number | null }> | null | undefined,
+): { series: TrendPoint[]; dropped: number } {
+  if (!Array.isArray(rows)) return { series: [], dropped: 0 };
+  const valid = rows.filter((r) => {
+    const rf = Number(r.rest_fraction);
+    return r.date && Number(r.distance_m) > 0 && Number.isFinite(rf) && rf >= REST_MIN && rf <= REST_MAX;
+  });
+  if (!valid.length) return { series: [], dropped: 0 };
+  const dists = valid.map((r) => Number(r.distance_m)).sort((a, b) => a - b);
+  const median = dists[Math.floor(dists.length / 2)];
+  const lo = median * 0.75, hi = median * 1.25;
+  let dropped = 0;
+  const series: TrendPoint[] = [];
+  for (const r of valid) {
+    const d = Number(r.distance_m);
+    if (d < lo || d > hi) { dropped++; continue; } // outside the comparable distance band
+    series.push({ date: r.date!, value: Number(r.rest_fraction) });
+  }
+  return { series, dropped };
+}
+
+export function computeSwimRestState(
+  series: TrendPoint[],
+  asOf: string,
+  sessionsPerWeek: number,
+  droppedOutOfBand = 0,
+): SwimRestState {
+  return {
+    // Same gates as pace (min-session, staleness, dead-band). lowerIsBetter (rest shrinking = better)
+    // is already true in the swim threshold config, so the swim thresholds apply unchanged.
+    trend: classifyTrend(series, resolveThresholds('swim', sessionsPerWeek), asOf, { exclude: isDeloadWeek }),
+    metricLabel: 'rest fraction',
+    droppedOutOfBand,
+  };
+}

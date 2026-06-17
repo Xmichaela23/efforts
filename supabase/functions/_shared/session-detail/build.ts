@@ -458,6 +458,16 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   // D-182: prefer the raw-column elapsed scalar for swims (authoritative; perf.session_elapsed_s and
   // computed.overall have both been unreliable). Falls back to the prior perf-derived value.
   const completedElapsedS = (type === 'swim' ? completedSwimScalars?.elapsedSeconds : null) ?? fin((perf as any)?.session_elapsed_s);
+  // D-194: work:rest readout for the swim card — single-sourced from the same swim scalars as pace/
+  // duration (resolveSwimScalars), never recomputed elsewhere. "Work 24:00 · Rest 11:00". Null for
+  // non-swims or when elapsed isn't a clean superset of moving (some sources carry only one).
+  const swimMovingS = type === 'swim' ? (completedSwimScalars?.movingSeconds ?? null) : null;
+  const swimWorkRest = (() => {
+    if (swimMovingS == null || completedElapsedS == null) return null;
+    if (!(completedElapsedS > swimMovingS) || !(swimMovingS > 0)) return null;
+    const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+    return `Work ${fmt(swimMovingS)} · Rest ${fmt(completedElapsedS - swimMovingS)}`;
+  })();
   const completedTotals: SessionDetailV1['completed_totals'] = {
     duration_s: (type === 'swim' && completedElapsedS != null && completedElapsedS > 0) ? completedElapsedS : swimDurS,
     distance_m: swimDistM,
@@ -473,6 +483,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     // narrative); other non-swims unchanged.
     avg_hr: (type === 'swim' ? completedSwimScalars?.avgHr : (type === 'run' ? completedRunScalars?.avgHr : null)) ?? fin(compOverall?.avg_hr) ?? fin(fpFacts?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
     swim_pace_per_100_s: completedSwimPer100,
+    swim_work_rest: swimWorkRest, // D-194
   };
 
   // Single planned/executed row must match completed_totals (same source as Details / chips).

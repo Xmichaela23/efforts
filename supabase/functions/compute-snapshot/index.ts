@@ -635,7 +635,12 @@ serve(async (req: Request) => {
         const swimRowsAll = (swimR.data ?? []) as any[];
         const swimRows = swimRowsAll
           .filter((r) => r.swim_facts?.pace_equipment_contaminated !== true)
-          .map((r) => ({ date: r.date, pace_per_100m: Number(r.swim_facts?.pace_per_100m) }));
+          .map((r) => ({
+            date: r.date,
+            pace_per_100m: Number(r.swim_facts?.pace_per_100m),
+            rest_fraction: r.swim_facts?.rest_fraction ?? null, // D-194 rest-fraction trend
+            distance_m: Number(r.swim_facts?.distance_m),       // D-194 comparable-session key
+          }));
         const swimContaminatedDropped = swimRowsAll.length - swimRows.length;
         if (swimContaminatedDropped > 0) {
           console.log(`[compute-snapshot] Q-061: excluded ${swimContaminatedDropped}/${swimRowsAll.length} equipment-contaminated swim(s) from trend substrate`);

@@ -12,7 +12,7 @@
 import { computeStrengthState, type LiftSeries } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries } from './run.ts';
-import { computeSwimState, swimPaceToSeries } from './swim.ts';
+import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
 import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSummary } from './discipline.ts';
 import { synthesizeHeadline, type Headline } from './headline.ts';
@@ -74,7 +74,7 @@ export interface StateTrendInputs {
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
   bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; band_source: string | null }>;
   runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; classified_type: string | null }>;
-  swimRows: Array<{ date: string; pace_per_100m: number }>;
+  swimRows: Array<{ date: string; pace_per_100m: number; rest_fraction?: number | null; distance_m?: number | null }>;
   plannedBy: Record<string, number>; // this-week planned counts per discipline
   doneBy: Record<string, number>; // this-week completed counts per discipline
   cadenceCounts: Record<string, number>; // 90d completed counts per discipline
@@ -87,6 +87,9 @@ export interface StateTrendResult {
   perfByDisc: Record<string, PerfSummary | null>;
   provisionalByDisc: Record<string, boolean>;
   spw: Record<string, number>;
+  /** D-194: swim rest-fraction trend (secondary swim signal, nested under swim in the cache). */
+  swimRest: PerfSummary | null;
+  swimRestProvisional: boolean;
 }
 
 /** The assembly. Mirrors useStateTrends' body — one code path for client + server. */
@@ -117,6 +120,11 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const { series: swimSeries, dropped } = swimPaceToSeries(inp.swimRows);
   const swimState = computeSwimState(swimSeries, asOf, spw.swim, dropped);
   const swim = perfFromTrend(swimState.trend);
+
+  // swim rest fraction (D-194) — comparable-distance filtered; Q-061 contamination excluded upstream
+  const { series: swimRestSeries, dropped: restOob } = swimRestToSeries(inp.swimRows);
+  const swimRestState = computeSwimRestState(swimRestSeries, asOf, spw.swim, restOob);
+  const swimRest = perfFromTrend(swimRestState.trend);
 
   // strength
   const liftSeries = liftSeriesFromExerciseLog(inp.exerciseRows);
@@ -154,7 +162,10 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     }),
   );
 
-  return { cards, headline: synthesizeHeadline(cards), bikeFitness, perfByDisc, provisionalByDisc, spw };
+  return {
+    cards, headline: synthesizeHeadline(cards), bikeFitness, perfByDisc, provisionalByDisc, spw,
+    swimRest, swimRestProvisional: isProvisionalTrend(swimRestState.trend),
+  };
 }
 
 // ---- cache shape: athlete_snapshot.state_trends_v1 ----
@@ -164,7 +175,8 @@ export interface StateTrendsV1 {
   version: 1;
   strength: DisciplineTrendCache;
   run: DisciplineTrendCache;
-  swim: DisciplineTrendCache;
+  /** D-194: `rest` = the rest-fraction (work:rest) trend, nested like bike's power/efficiency. */
+  swim: DisciplineTrendCache & { rest: DisciplineTrendCache };
   bike: DisciplineTrendCache & {
     power: { verdict: string; pctChange: number | null; provisional: boolean; basis: string | null };
     efficiency: { verdict: string; pctChange: number | null; provisional: boolean; basis: string | null };
@@ -204,7 +216,14 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
     version: 1,
     strength: disc('strength'),
     run: disc('run'),
-    swim: disc('swim'),
+    swim: {
+      ...disc('swim'),
+      rest: {
+        verdict: r.swimRest?.verdict ?? 'needs_data',
+        pctChange: r.swimRest?.pctChange ?? null,
+        provisional: !!r.swimRestProvisional,
+      },
+    },
     bike: {
       ...disc('bike'),
       power: { ...r.bikeFitness.power },

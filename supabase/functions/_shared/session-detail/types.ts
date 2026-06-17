@@ -149,6 +149,8 @@ export type SessionDetailV1 = {
     avg_hr: number | null;
     /** Swim: seconds per 100 (yd or m depending on swim_unit). */
     swim_pace_per_100_s: number | null;
+    /** D-194: SWIM work:rest readout, preformatted (e.g. "Work 24:00 · Rest 11:00"). Null otherwise. */
+    swim_work_rest: string | null;
   };
   planned_totals: {
     duration_s: number | null;

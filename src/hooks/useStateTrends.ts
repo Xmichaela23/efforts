@@ -20,6 +20,7 @@ import {
   type Headline,
   type StateTrendInputs,
   type ExerciseLogLite,
+  type PerfSummary,
 } from '@shared/state-trend';
 
 interface RawInputs {
@@ -35,6 +36,7 @@ export interface StateTrends {
   cards: DisciplineCard[];
   headline: Headline | null;
   bikeFitness: BikeFitness | null; // the bike row's "Power · Efficiency" dual read
+  swimRest: PerfSummary | null;    // D-194: swim rest-fraction (work:rest) trend
   loading: boolean;
 }
 
@@ -120,7 +122,17 @@ export function useStateTrends(): StateTrends {
         classified_type: runCtById.get(r.workout_id) ?? null,
       }));
 
-      const swimRows = (swimR.data || []).map((r: any) => ({ date: r.date, pace_per_100m: Number(r.swim_facts?.pace_per_100m) }));
+      // Q-061 parity: exclude equipment/drill-contaminated swims — MUST match compute-snapshot's
+      // filter (the structural-equality guarantee), else the live STATE card and the cached spine drift.
+      // D-194: carry rest_fraction + distance_m for the rest-fraction trend (same row shape as server).
+      const swimRows = (swimR.data || [])
+        .filter((r: any) => r.swim_facts?.pace_equipment_contaminated !== true)
+        .map((r: any) => ({
+          date: r.date,
+          pace_per_100m: Number(r.swim_facts?.pace_per_100m),
+          rest_fraction: r.swim_facts?.rest_fraction ?? null,
+          distance_m: Number(r.swim_facts?.distance_m),
+        }));
 
       const plannedBy: Record<string, number> = {};
       const doneBy: Record<string, number> = {};
@@ -136,7 +148,7 @@ export function useStateTrends(): StateTrends {
   }, []);
 
   const loading = liftsLoading || raw == null;
-  if (loading) return { cards: [], headline: null, bikeFitness: null, loading: true };
+  if (loading) return { cards: [], headline: null, bikeFitness: null, swimRest: null, loading: true };
 
   const exerciseRows: ExerciseLogLite[] = (exercises || []).map((e) => ({
     date: e.date,
@@ -146,7 +158,7 @@ export function useStateTrends(): StateTrends {
   }));
 
   const result = assembleStateTrends({ asOf: todayISO(), exerciseRows, ...raw! });
-  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, loading: false };
+  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, swimRest: result.swimRest, loading: false };
 }
 
 // SCALABILITY NOTE (now realized): the assembly is `assembleStateTrends` in @shared/state-trend,

@@ -51,6 +51,7 @@ type EnduranceIntervalTableProps = {
       avg_gap_s_per_mi?: number | null;
       avg_hr?: number | null;
       swim_pace_per_100_s?: number | null;
+      swim_work_rest?: string | null; // D-194
     };
     planned_totals?: {
       duration_s?: number | null;
@@ -556,6 +557,11 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
             <div className="text-[11px] mt-0.5" style={labelStyle}>Duration</div>
           </div>
         </div>
+      )}
+
+      {/* D-194: work:rest readout — "Work 24:00 · Rest 11:00", single-sourced from the server contract. */}
+      {(ct as any).swim_work_rest && (
+        <div className="text-center text-[12px] text-white/55 mb-4" style={tnum}>{(ct as any).swim_work_rest}</div>
       )}
 
       {metrics.length > 0 && (

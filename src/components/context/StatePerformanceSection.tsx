@@ -6,7 +6,7 @@
 // tagged as such; swim is additionally Q-038-clouded.
 
 import React from 'react';
-import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal } from '@shared/state-trend';
+import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary } from '@shared/state-trend';
 import { useStateTrends } from '@/hooks/useStateTrends';
 
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
@@ -76,7 +76,23 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function DisciplineRow({ card }: { card: DisciplineCard }) {
+// D-194: swim rest-fraction (work:rest) trend — a quiet secondary read on the swim row, shown only
+// when it has a verdict. "resting less to cover the same distance" = improving (lowerIsBetter, so the
+// signed-pct helper already gives the right arrow/sign). Observe the trend; never diagnose the cause.
+function RestTag({ rest }: { rest: PerfSummary | null | undefined }) {
+  if (!rest || rest.verdict === 'needs_data') return null;
+  const v = VERDICT[rest.verdict];
+  return (
+    <span className={`inline-flex items-baseline gap-1 ${v.cls}`}>
+      <span className="text-white/40">· rest</span>
+      {v.arr && <span>{v.arr}</span>}
+      <span>{v.word}</span>
+      {rest.pctChange != null && <span className="text-white/40">{verdictSignedPct(rest.verdict, rest.pctChange)}</span>}
+    </span>
+  );
+}
+
+function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: PerfSummary | null }) {
   if (card.primaryAxis === 'performance' && card.headlineVerdict) {
     const v = VERDICT[card.headlineVerdict];
     const pct = card.performance?.pctChange;
@@ -88,6 +104,7 @@ function DisciplineRow({ card }: { card: DisciplineCard }) {
         </span>
         {pct != null && <span className="text-white/40">{verdictSignedPct(card.headlineVerdict, pct)}</span>}
         {PROVISIONAL_PERF.has(card.discipline) && <span className="text-white/30 text-[11px]">provisional</span>}
+        {card.discipline === 'swim' && <RestTag rest={restTrend} />}
       </Row>
     );
   }
@@ -100,12 +117,13 @@ function DisciplineRow({ card }: { card: DisciplineCard }) {
     <Row label={card.discipline}>
       <span className={nd.cls}>{nd.word}</span>
       {card.adherence && <span className="text-white/35">· {card.adherence.ratioLabel}</span>}
+      {card.discipline === 'swim' && <RestTag rest={restTrend} />}
     </Row>
   );
 }
 
 export default function StatePerformanceSection() {
-  const { cards, headline, bikeFitness, loading } = useStateTrends();
+  const { cards, headline, bikeFitness, swimRest, loading } = useStateTrends();
   if (loading || cards.length === 0) return null;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
@@ -119,7 +137,7 @@ export default function StatePerformanceSection() {
       {cards.map((card) =>
         card.discipline === 'bike' && bikeHasSubstance
           ? <BikeFitnessRow key="bike" fitness={bikeFitness!} />
-          : <DisciplineRow key={card.discipline} card={card} />,
+          : <DisciplineRow key={card.discipline} card={card} restTrend={card.discipline === 'swim' ? swimRest : null} />,
       )}
     </div>
   );

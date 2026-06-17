@@ -37,6 +37,7 @@ import {
 import { rewriteSessionLoad, type ExerciseLogRowForLoad } from "../_shared/session-load.ts";
 import { resolveRunScalars } from "../_shared/run/run-scalars.ts";
 import { detectSwimEquipment } from "../_shared/swim/swim-equipment.ts";
+import { resolveSwimScalars } from "../_shared/swim/swim-scalars.ts";
 import { resolveCurrentFtp } from "../../../src/lib/resolve-current-ftp.ts";
 
 // ---------------------------------------------------------------------------
@@ -51,6 +52,7 @@ interface WorkoutRow {
   timestamp: string | null;
   duration: number | null;
   moving_time: number | null;
+  elapsed_time: number | null;
   distance: number | null;
   avg_heart_rate: number | null;
   max_heart_rate: number | null;
@@ -1286,6 +1288,17 @@ function buildSwimFacts(w: WorkoutRow): Record<string, any> {
   facts.pace_equipment_contaminated = equip.contaminated;
   facts.pace_equipment_direction = equip.direction; // 'optimistic' | 'pessimistic' | 'mixed' | null
 
+  // D-194: rest fraction (work:rest) for the rest-fraction trend — the portion of the pool session
+  // spent recovering = (elapsed − moving) / elapsed. Single-sourced via resolveSwimScalars (the SAME
+  // scalar layer as pace/HR, D-182) — moving/elapsed are never recomputed inline. Null when elapsed
+  // isn't a clean superset of moving (some sources carry only one). distance_m (above) is the
+  // comparable-session key the trend filters on. Observe the fraction; never diagnose the cause.
+  const scalars = resolveSwimScalars(w);
+  const mv = scalars.movingSeconds, el = scalars.elapsedSeconds;
+  facts.rest_fraction = (mv != null && el != null && el > mv && mv > 0)
+    ? Math.round(((el - mv) / el) * 1000) / 1000
+    : null;
+
   return facts;
 }
 
@@ -1529,7 +1542,7 @@ serve(async (req: Request) => {
     const { data: workout, error: wErr } = await supabase
       .from("workouts")
       .select(
-        "id, user_id, type, date, timestamp, duration, moving_time, distance, " +
+        "id, user_id, type, date, timestamp, duration, moving_time, elapsed_time, distance, " +
         "avg_heart_rate, max_heart_rate, avg_pace, avg_power, max_power, normalized_power, " +
         "avg_cadence, elevation_gain, strength_exercises, mobility_exercises, " +
         "workout_metadata, computed, planned_id, workout_status, workload_actual, sensor_data, gps_track, start_position_lat, start_position_long",
