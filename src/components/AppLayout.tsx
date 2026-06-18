@@ -161,6 +161,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           if (!isActive) return;
           if (localStorage.getItem('strength_logger_open') !== '1') return;
           if (!hasUncompletedStrengthSession()) return;
+          // Restore the workout identity BEFORE reopening so the draft-restore guard matches.
+          try { const raw = localStorage.getItem('strength_logger_workout'); if (raw) setLoggerScheduledWorkout(JSON.parse(raw)); } catch {}
           setShowStrengthLogger(true);
         });
       } catch {
@@ -234,7 +236,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [currentWorkoutIndex, setCurrentWorkoutIndex] = useState(0);
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
   // Pass a planned strength workout directly into the Strength Logger
-  const [loggerScheduledWorkout, setLoggerScheduledWorkout] = useState<any | null>(null);
+  const [loggerScheduledWorkout, setLoggerScheduledWorkout] = useState<any | null>(() => {
+    // Resume: restore the logger's workout identity on cold-start (same gate as showStrengthLogger) so the
+    // SAME workout reopens and the draft-restore identity-guard matches — otherwise the logger reopens
+    // fresh and "doesn't remember what was logged."
+    try {
+      if (localStorage.getItem('strength_logger_open') !== '1' || !hasUncompletedStrengthSession()) return null;
+      const raw = localStorage.getItem('strength_logger_workout');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
+  // Mirror the logger's workout to localStorage so resume can reopen the SAME one (covers all setters via
+  // one effect). Cleared with the workout (incl. onWorkoutSaved → setLoggerScheduledWorkout(null)).
+  useEffect(() => {
+    try {
+      if (loggerScheduledWorkout) localStorage.setItem('strength_logger_workout', JSON.stringify(loggerScheduledWorkout));
+      else localStorage.removeItem('strength_logger_workout');
+    } catch {}
+  }, [loggerScheduledWorkout]);
   
 
   const containerRef = useRef<HTMLDivElement>(null);

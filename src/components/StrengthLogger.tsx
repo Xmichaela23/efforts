@@ -2148,11 +2148,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (!next[k]) next[k] = { seconds: 90, running: false };
       });
     });
-    // Remove timers for deleted sets
+    // Remove timers for deleted sets. Key is `${exId}-${idx}` (rest) or `${exId}-set-${idx}` (duration),
+    // and exId is a UUID/slug WITH HYPHENS — so `k.split('-')` mis-parsed it (took only the first segment
+    // as exId), matched no exercise, and DELETED valid running timers the instant they armed. That's why
+    // the rest-timer overlay never showed. Parse idx from the END (after the last dash / `-set-`) instead.
     Object.keys(next).forEach(k => {
-      const [exId, idxStr] = k.split('-');
-      const ex = exercises.find(e => e.id === exId);
-      if (!ex || Number(idxStr) >= ex.sets.length) delete next[k];
+      const m = k.match(/^(.+)-(?:set-)?(\d+)$/);
+      if (!m) return;
+      const ex = exercises.find(e => e.id === m[1]);
+      if (!ex || Number(m[2]) >= ex.sets.length) delete next[k];
     });
     if (JSON.stringify(next) !== JSON.stringify(timers)) setTimers(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
