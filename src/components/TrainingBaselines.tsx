@@ -1094,14 +1094,7 @@ return (
                               } : {})
                             }}
                           >
-                            {!isActive && hasBaseline && (
-                              <span 
-                                className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-bold"
-                                style={{ backgroundColor: discipline.color, color: '#000' }}
-                              >
-                                ✓
-                              </span>
-                            )}
+                            {/* Q-070: sport-chip ✓ removed entirely (feature dropped — more trouble than worth). */}
                             <Icon 
                               className="h-4 w-4 transition-colors duration-300" 
                               style={{ color: isActive || hasBaseline ? discipline.color : 'rgba(255,255,255,0.5)' }}
