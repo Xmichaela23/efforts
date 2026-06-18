@@ -14,6 +14,7 @@ import CoreTimer from '@/components/CoreTimer';
 import { NumericKeypadSheet } from '@/components/ui/numeric-keypad-sheet';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { App as CapacitorApp } from '@capacitor/app';
 
 interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
@@ -421,6 +422,30 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
   // Rest rows the user has Skipped — hides that set's rest row until the set is re-completed.
   const [restDismissed, setRestDismissed] = useState<Set<string>>(new Set());
+  // Mirror live timers into a ref so the app-state listener reads current values (not a stale closure).
+  const timersRef = useRef(timers);
+  useEffect(() => { timersRef.current = timers; }, [timers]);
+  // Away-alert: haptic in-app, notification ONLY when away. iOS suspends the JS countdown when the app is
+  // backgrounded, so on background we schedule a notification per running rest timer; on foreground we
+  // cancel them — the resumed JS tick fires the in-app HAPTIC and no foreground banner ever shows.
+  useEffect(() => {
+    let handle: { remove: () => void } | null = null;
+    void (async () => {
+      try {
+        handle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+          const cur = timersRef.current || {};
+          if (!isActive) {
+            for (const k of Object.keys(cur)) {
+              if (!k.includes('-set-') && cur[k]?.running && (cur[k]?.seconds ?? 0) > 0) void scheduleRestNotification(k, cur[k].seconds);
+            }
+          } else {
+            for (const k of Object.keys(cur)) { if (!k.includes('-set-')) void cancelRestNotification(k); }
+          }
+        });
+      } catch { /* web / no plugin */ }
+    })();
+    return () => { try { (handle as any)?.remove?.(); } catch {} };
+  }, []);
   // D-122: prior-session per-set actuals, keyed by normalized exercise name.
   // Populated by the D-097 autofill fetch; feeds the persistent "last:" anchor line.
   const [previousSessionByName, setPreviousSessionByName] = useState<Record<string, LoggedSet[]>>({});
@@ -2185,7 +2210,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               if (!k.includes('-set-')) {
                 playRestEndTone();
                 hapticSuccess();  // D-139: success haptic at rest-end → "start the next set"
-                void cancelRestNotification(k); // in-app timer hit 0 → cancel the scheduled away-buzz (no double-fire)
               }
             }
             
@@ -2628,7 +2652,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         return { ...prev, [restKey]: { seconds: calculatedRest, running: true } };
       });
       hapticLight();
-      void scheduleRestNotification(restKey, calculatedRest);   // away-alert: buzz at rest-end if backgrounded
     } catch {}
   };
 
