@@ -30,8 +30,8 @@ Legend: ✅ shipped · ⏸ staged (needs Michael) · ⏭ deferred (next-session,
 - **L2** — m/yd conversion in two separate sites (any third raw reader is ~9% off).
 - **L3** — `swim200Time`/`swim400Time` vestigial (presence-probed, never parsed).
 
-## ⏸ STAGED — needs Michael's eyeball before flipping
-- **Manual-threshold-wins precedence:** flip `swimSecPer100YdFromArcSwimInputs` so the typed `swimPace100` beats the learned median for the threshold anchor. Changes what plans build from (learned-median → typed `2:30`). Two-minute change once approved.
+## ⏸ HELD (Michael, 2026-06-18) — do NOT flip
+- **Manual-threshold-wins precedence:** would flip `swimSecPer100YdFromArcSwimInputs` so the typed `swimPace100` beats the learned median. **PARKED until the equipment-aware learner produces a real threshold.** Verification found the typed `2:30/100yd` is ~30 s/100 SLOWER than the athlete's actual swimming (median ~1:58/100yd; data verified sound, not a unit bug) — a stale/placeholder number, so flipping would feed plans a too-easy basis. The learned-wins precedence already keeps the contamination-clean median feeding plans meanwhile. Revisit when the Garmin CSS learner lands a true threshold.
 
 ## ⏭ DEFERRED — next-session, sequenced (manual threshold closes swim WITHOUT these)
 1. **Garmin CSS learner** (biggest build on the board): `isCleanThresholdEffort` (reuse `detectSwimEquipment` + `rest-norm`; close the gap that `analyzeSwims` doesn't yet read the flag in its *learning substrate* selection beyond the median) → critical-speed **best-efforts** fit (not median) → NEW `learned_fitness.swim_css_sec_per_100m` field (**do NOT redefine the median `swim_pace_per_100m` — 4 consumers depend on its meaning**) → auto/manual toggle. Garmin per-length data already flows; mirrors the FTP learner; verify on existing Garmin swims (no device). Needs Michael's judgment — fresh head.
