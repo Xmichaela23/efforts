@@ -126,7 +126,7 @@ export function useStateTrends(): StateTrends {
       // filter (the structural-equality guarantee), else the live STATE card and the cached spine drift.
       // D-194: carry rest_fraction + distance_m for the rest-fraction trend (same row shape as server).
       const swimRows = (swimR.data || [])
-        .filter((r: any) => r.swim_facts?.pace_equipment_contaminated !== true)
+        .filter((r: any) => r.swim_facts?.pace_equipment_contaminated !== true && r.swim_facts?.swam_as_planned !== false)
         .map((r: any) => ({
           date: r.date,
           pace_per_100m: Number(r.swim_facts?.pace_per_100m),

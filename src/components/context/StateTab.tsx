@@ -21,6 +21,7 @@ import type { ArcReadiness } from '@/lib/arc-types';
 import { shouldShowNudge } from '@/lib/nudge-policy';
 import StatePerformanceSection from '@/components/context/StatePerformanceSection';
 import { buildLoadHeadline, acwrVolumeLabel } from '@/lib/load-headline';
+import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 
 const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
 
@@ -629,6 +630,7 @@ export default function StateTab({
   // `readiness`/`readiness_state` (cycling form) used further down in render.
   const [checkinReadiness, setCheckinReadiness] = useState<ArcReadiness | null>(null);
   const [nudgeDismissNonce, setNudgeDismissNonce] = useState(0);
+  const swimNudge = useSwimBaselineNudge(); // D-200: honored-swim-gated swim re-test nudge (State only)
 
   useEffect(() => {
     fetchArcContext().then((arc) => {
@@ -1384,6 +1386,29 @@ export default function StateTab({
 
         {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
         <StatePerformanceSection />
+
+        {/* SWIM re-test nudge (D-200) — fires after ≥4 weeks + ≥4 honored swims; auto-clears when the
+            threshold is updated/tested (lastUpdatedAt moves). Dismiss = 7-day snooze (shared pattern). */}
+        {swimNudge?.show && nudgeDismissNonce >= 0 && !isNudgeSnoozed('swim_retest') && (
+          <div className="mt-3 rounded-lg border border-sky-400/20 bg-sky-500/[0.07] px-3 py-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold tracking-[0.12em] text-sky-300/85 uppercase mb-1">Swim check-in</p>
+                <p className="text-[12px] text-white/75 leading-snug">
+                  About {Math.round(swimNudge.weeksSince)} weeks of steady swimming since your last update — a quick CSS test would refresh your threshold.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { snoozeNudge('swim_retest'); setNudgeDismissNonce((n) => n + 1); }}
+                className="text-[11px] text-white/40 hover:text-white/70 shrink-0 touch-manipulation"
+                aria-label="Dismiss swim check-in"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* SIGNAL — longitudinal nudge, only when there's an actionable signal */}
         {showNudge && (

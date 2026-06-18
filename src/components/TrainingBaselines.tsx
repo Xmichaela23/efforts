@@ -622,7 +622,17 @@ const handleSave = async () => {
   try {
     setSaving(true);
     setSaveMessage('');
-    await saveUserBaselines(data as any);
+    // D-200: stamp when the swim threshold CHANGES so the State re-test nudge can measure "weeks since update".
+    let dataToSave: any = data;
+    try {
+      const prevSwim = JSON.parse(originalData || '{}')?.performanceNumbers?.swimPace100;
+      const curSwim = (data as any)?.performanceNumbers?.swimPace100;
+      if (curSwim && curSwim !== prevSwim) {
+        dataToSave = { ...data, performanceNumbers: { ...(data as any).performanceNumbers, swimPace100_updated_at: new Date().toISOString() } };
+        setData(dataToSave);
+      }
+    } catch { void 0; }
+    await saveUserBaselines(dataToSave as any);
 
     // Persist manual HR zone overrides to configured_hr_zones
     const hasManualOverrides = manualRunMaxHR || manualRunLTHR || manualRideMaxHR || manualRideLTHR;

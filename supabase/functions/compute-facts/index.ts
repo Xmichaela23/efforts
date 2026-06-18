@@ -1287,6 +1287,10 @@ function buildSwimFacts(w: WorkoutRow): Record<string, any> {
   const equip = detectSwimEquipment(w.workout_metadata);
   facts.pace_equipment_contaminated = equip.contaminated;
   facts.pace_equipment_direction = equip.direction; // 'optimistic' | 'pessimistic' | 'mixed' | null
+  // D-201 popup clean flag: the athlete's one-tap "Swam as planned" / "Normal swim". Explicit false =
+  // they flagged it deviated/drills → excluded from the swim TREND (alongside equipment contamination).
+  // undefined/true = clean (so historical swims with no flag stay included). Unifies the "clean" definition.
+  facts.swam_as_planned = (w.workout_metadata as any)?.swam_as_planned !== false;
 
   // D-194: rest fraction (work:rest) for the rest-fraction trend — the portion of the pool session
   // spent recovering = (elapsed − moving) / elapsed. Single-sourced via resolveSwimScalars (the SAME

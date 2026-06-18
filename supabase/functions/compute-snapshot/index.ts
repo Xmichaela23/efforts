@@ -634,7 +634,7 @@ serve(async (req: Request) => {
         // min-session gate → needs_data, which is the honest read rather than a contaminated trend.
         const swimRowsAll = (swimR.data ?? []) as any[];
         const swimRows = swimRowsAll
-          .filter((r) => r.swim_facts?.pace_equipment_contaminated !== true)
+          .filter((r) => r.swim_facts?.pace_equipment_contaminated !== true && r.swim_facts?.swam_as_planned !== false)
           .map((r) => ({
             date: r.date,
             pace_per_100m: Number(r.swim_facts?.pace_per_100m),
