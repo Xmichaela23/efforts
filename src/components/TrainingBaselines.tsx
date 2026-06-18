@@ -86,6 +86,7 @@ const [ftpTestDate, setFtpTestDate] = useState(() => {
 });
 const [scheduledFtpTest, setScheduledFtpTest] = useState<{id: string, date: string} | null>(null);
 const [checkingFtpTest, setCheckingFtpTest] = useState(false);
+const [showSwimTest, setShowSwimTest] = useState(false);
 
 // Check for existing scheduled FTP test
 const checkScheduledFtpTest = async () => {
@@ -1426,6 +1427,14 @@ return (
                           </div>
                           <div className="flex items-center gap-2">
                             <label className="text-xs text-white/60">Threshold 100 Pace</label>
+                            <button
+                              type="button"
+                              onClick={() => setShowSwimTest((v) => !v)}
+                              aria-label="How to find your threshold pace"
+                              className="text-white/40 hover:text-white/70 transition-colors"
+                            >
+                              <Info className="h-3.5 w-3.5" />
+                            </button>
                                       <input
                                         type="text"
                                         value={data.performanceNumbers?.swimPace100 || ''}
@@ -1445,6 +1454,16 @@ return (
                           {/* D-199 C1: seed microcopy — plain, science-accurate threshold framing (~20-30 min
                               sustainable; longer than the old "hard 400" cue which biased fast). No "CSS"/Z-names. */}
                           <p className="text-[11px] text-white/40 -mt-1 leading-snug">Your hard, steady 100 pace — the effort you could hold for a strong continuous swim of about 20–30 minutes, not a sprint and not your easy cruise. Your easy / moderate / fast zones are all built from this one number.</p>
+                          {/* D-199: (i) test protocol — how to FIND the threshold (the benchmark). Tappable (iOS:
+                              no hover). The 400/200 CSS test, the formula, a worked example, plus a no-test fallback. */}
+                          {showSwimTest && (
+                            <div className="px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 -mt-0.5 space-y-1.5">
+                              <p className="text-[11px] text-white/70 font-medium">How to find your threshold pace</p>
+                              <p className="text-[11px] text-white/50 leading-snug">Best way is a quick test. Warm up, then swim an all-out <span className="text-white/70">400</span>, rest fully, then an all-out <span className="text-white/70">200</span> — each as fast as you can hold the whole way.</p>
+                              <p className="text-[11px] text-white/50 leading-snug">Threshold 100 pace = (400 time − 200 time) ÷ 2.<br />Example: 400 in 6:40 and 200 in 3:00 → (400s − 180s) ÷ 2 = <span className="text-white/70">1:50 / 100</span>.</p>
+                              <p className="text-[11px] text-white/40 leading-snug">No test handy? Enter your best steady pace for a continuous 20–30 minute swim, and update it after you test.</p>
+                            </div>
+                          )}
                           <div className="space-y-2">
                             <label className="text-xs text-white/60">Equipment</label>
                             <div className="flex flex-wrap gap-2">
