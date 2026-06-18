@@ -124,8 +124,7 @@ export default function PostWorkoutFeedback({
   const [unplannedEquip, setUnplannedEquip] = useState<Set<string>>(new Set());
   // D-199 clean-signal capture: planned swim -> swam-as-planned (default yes); ad-hoc -> session kind.
   // Off-script / ad-hoc gear reuses unplannedEquip (detectSwimEquipment reads swim_equipment_unplanned).
-  const [swamAsPlanned, setSwamAsPlanned] = useState<boolean | null>(null);
-  const [swimSessionKind, setSwimSessionKind] = useState<'straight' | 'drills' | 'mixed' | null>(null);
+  const [swamAsPlanned, setSwamAsPlanned] = useState<boolean>(true); // default-checked clean flag ("Swam as planned" / "Normal swim")
 
   const gearType = workoutType === 'run' ? 'shoe' : 'bike';
   const sportColor = isSwim ? SPORT_COLORS.swim : workoutType === 'run' ? SPORT_COLORS.run : SPORT_COLORS.cycling;
@@ -342,19 +341,16 @@ export default function PostWorkoutFeedback({
           ? (() => { try { return JSON.parse(workoutData.workout_metadata); } catch { return {}; } })()
           : (workoutData?.workout_metadata || {});
         const meta: any = { ...existingMeta };
-        if (prescribedEquip.length > 0) {
-          // Planned swim. "Swam as planned" = used exactly the prescribed gear -> auto-confirm it all
-          // (preserves the contamination flag for drill/equipment steps without per-item taps). "Changed
-          // something" records swam_as_planned=false + any OFF-SCRIPT gear into swim_equipment_unplanned.
-          meta.swim_as_planned = swamAsPlanned !== false; // null/true = as planned
+        // Simplified clean flag (D-201 model): one boolean. checked (true) = clean / as-prescribed →
+        // counts toward fitness markers; unchecked = deviated / drills-kick → excluded. Volume (time +
+        // distance) feeds the markers separately from the activity itself.
+        meta.swim_as_planned = swamAsPlanned;
+        // Planned + as-prescribed → auto-confirm the plan's gear so the contamination flag still reflects
+        // prescribed fins/kick steps (no extra UI; the plan already knows the gear).
+        if (prescribedEquip.length > 0 && swamAsPlanned) {
           meta.swim_steps_equipment_confirmed = prescribedEquip.map((p) => ({ step_index: p.step_index, equipment: p.equipment, used: true }));
-          if (swamAsPlanned === false && unplannedEquip.size > 0) meta.swim_equipment_unplanned = Array.from(unplannedEquip);
-        } else {
-          // Ad-hoc swim — no plan to lean on. Capture the kind + any gear.
-          if (swimSessionKind) meta.swim_session_kind = swimSessionKind;
-          if (unplannedEquip.size > 0) meta.swim_equipment_unplanned = Array.from(unplannedEquip);
         }
-        if (meta.swim_steps_equipment_confirmed || meta.swim_equipment_unplanned || meta.swim_session_kind || meta.swim_as_planned !== undefined) {
+        {
           updateData.workout_metadata = meta;
         }
       }
@@ -635,94 +631,26 @@ export default function PostWorkoutFeedback({
         </div>
       )}
 
-      {/* Swim clean-signal capture (D-199). Planned -> "Swam as planned?" (one confirm replacing the
-          per-item gear rows; Yes auto-confirms the prescribed gear so drill/equipment steps still flag
-          downstream). Ad-hoc -> session kind + gear. Feeds the CSS learner's clean filter; off-script /
-          ad-hoc gear -> swim_equipment_unplanned (read by detectSwimEquipment). */}
-      {isSwim && prescribedEquip.length > 0 && (
+      {/* Swim clean flag (D-201 simplified model): one default-checked box. Planned → "Swam as planned";
+          ad-hoc (no plan) → "Normal swim". Checked = clean → counts toward fitness markers; unchecked =
+          deviated / drills-kick → excluded. Volume (time + distance) feeds the markers from the activity. */}
+      {isSwim && (
         <div>
-          <label className="text-sm font-light text-white/70 mb-1 block">Swam as planned?</label>
-          <p className="text-[11px] text-white/40 mb-2">No equipment except what the plan called for.</p>
-          <div className="flex gap-2">
-            {[{ v: true, t: 'Yes' }, { v: false, t: 'Changed something' }].map((opt) => {
-              const active = (swamAsPlanned ?? true) === opt.v;
-              return (
-                <button
-                  key={String(opt.v)}
-                  onClick={() => setSwamAsPlanned(opt.v)}
-                  className={`flex-1 py-2 text-xs font-light rounded-lg border-2 transition-all duration-300 ${
-                    active ? 'bg-white/[0.15] border-white/40 text-white' : 'bg-white/[0.06] border-white/15 text-white/60 hover:text-white/85'
-                  }`}
-                  style={{ backgroundColor: active ? `rgba(${rgb}, 0.2)` : undefined, borderColor: active ? `rgba(${rgb}, 0.5)` : undefined }}
-                >
-                  {opt.t}
-                </button>
-              );
-            })}
-          </div>
-          {swamAsPlanned === false && (
-            <div className="mt-2">
-              <label className="text-xs text-white/50 mb-1.5 block">Gear the plan didn't call for? (optional)</label>
-              <div className="flex flex-wrap gap-2">
-                {UNPLANNED_EQUIP.map((e) => {
-                  const active = unplannedEquip.has(e);
-                  return (
-                    <button
-                      key={e}
-                      onClick={() => setUnplannedEquip((prev) => { const next = new Set(prev); if (next.has(e)) next.delete(e); else next.add(e); return next; })}
-                      className={`py-1.5 px-3 text-xs font-light rounded-lg border-2 transition-all duration-300 ${
-                        active ? 'bg-white/[0.15] border-white/40 text-white' : 'bg-white/[0.08] border-white/20 text-white/70 hover:text-white/90'
-                      }`}
-                      style={{ backgroundColor: active ? `rgba(${rgb}, 0.2)` : undefined, borderColor: active ? `rgba(${rgb}, 0.5)` : undefined }}
-                    >
-                      {e}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {isSwim && prescribedEquip.length === 0 && (
-        <div>
-          <label className="text-sm font-light text-white/70 mb-2 block">What was this swim?</label>
-          <div className="flex gap-2 mb-2">
-            {[{ v: 'straight', t: 'Straight swim' }, { v: 'drills', t: 'Drills/technique' }, { v: 'mixed', t: 'Mixed' }].map((opt) => {
-              const active = swimSessionKind === opt.v;
-              return (
-                <button
-                  key={opt.v}
-                  onClick={() => setSwimSessionKind(opt.v as 'straight' | 'drills' | 'mixed')}
-                  className={`flex-1 py-2 text-xs font-light rounded-lg border-2 transition-all duration-300 ${
-                    active ? 'bg-white/[0.15] border-white/40 text-white' : 'bg-white/[0.06] border-white/15 text-white/60 hover:text-white/85'
-                  }`}
-                  style={{ backgroundColor: active ? `rgba(${rgb}, 0.2)` : undefined, borderColor: active ? `rgba(${rgb}, 0.5)` : undefined }}
-                >
-                  {opt.t}
-                </button>
-              );
-            })}
-          </div>
-          <label className="text-xs text-white/50 mb-1.5 block">Gear used? (optional)</label>
-          <div className="flex flex-wrap gap-2">
-            {UNPLANNED_EQUIP.map((e) => {
-              const active = unplannedEquip.has(e);
-              return (
-                <button
-                  key={e}
-                  onClick={() => setUnplannedEquip((prev) => { const next = new Set(prev); if (next.has(e)) next.delete(e); else next.add(e); return next; })}
-                  className={`py-2 px-3 text-xs font-light rounded-lg border-2 backdrop-blur-md transition-all duration-300 ${
-                    active ? 'bg-white/[0.15] border-white/40 text-white' : 'bg-white/[0.08] border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white/90'
-                  }`}
-                  style={{ backgroundColor: active ? `rgba(${rgb}, 0.2)` : undefined, borderColor: active ? `rgba(${rgb}, 0.5)` : undefined }}
-                >
-                  {e}
-                </button>
-              );
-            })}
-          </div>
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={swamAsPlanned}
+              onChange={(e) => setSwamAsPlanned(e.target.checked)}
+              className="h-4 w-4 rounded border-white/30 bg-white/[0.08]"
+              style={{ accentColor: `rgb(${rgb})` }}
+            />
+            <span className="text-sm font-light text-white/80">{prescribedEquip.length > 0 ? 'Swam as planned' : 'Normal swim'}</span>
+          </label>
+          <p className="text-[11px] text-white/40 mt-1.5 leading-snug">
+            {prescribedEquip.length > 0
+              ? 'Leave checked if you swam the session as prescribed. Uncheck if you changed it up — keeps your fitness markers clean.'
+              : 'Leave checked for a normal swim. Uncheck if it was mostly drills or kick — keeps your fitness markers clean.'}
+          </p>
         </div>
       )}
 
