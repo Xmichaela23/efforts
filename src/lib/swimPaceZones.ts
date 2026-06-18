@@ -5,7 +5,7 @@
 // Offsets per docs/SWIM-PROTOCOL.md §4–5 (single-sourced with what the plan already prescribes).
 
 export interface SwimPaceBand {
-  label: string;   // plain effort word (Recovery / Easy / Moderate / Threshold / Fast)
+  label: string;   // plain effort word (Recovery / Easy / Moderate / Threshold / Hard) — unified across disciplines
   range: string;   // formatted pace range per 100, e.g. "2:35–2:39"
   anchor: boolean; // true for the Threshold band (≈ the entered pace / internal CSS)
 }
@@ -40,6 +40,6 @@ export function deriveSwimPaceBands(thresholdSecPer100: number): SwimPaceBand[] 
     { label: 'Easy',      range: `${f(c + 8)}–${f(c + 12)}`, anchor: false },
     { label: 'Moderate',  range: `${f(c + 3)}–${f(c + 8)}`,  anchor: false },
     { label: 'Threshold', range: `${f(c - 2)}–${f(c + 3)}`,  anchor: true  },
-    { label: 'Fast',      range: `${f(c - 2)} and faster`,   anchor: false },
+    { label: 'Hard',      range: `${f(c - 2)} and faster`,   anchor: false },
   ];
 }

@@ -678,7 +678,7 @@ const handleSave = async () => {
       }
     }
 
-    setOriginalData(JSON.stringify(data));
+    setOriginalData(JSON.stringify(dataToSave)); // match the SAVED copy (incl. swimPace100_updated_at) so the button greys out post-save
     setInitialManualHR(JSON.stringify({ manualRunMaxHR, manualRunLTHR, manualRideMaxHR, manualRideLTHR }));
     setSaveMessage('Saved!');
     setLastUpdated(new Date().toISOString());
@@ -1463,7 +1463,7 @@ return (
                                     </div>
                           {/* D-199 C1: seed microcopy — plain, science-accurate threshold framing (~20-30 min
                               sustainable; longer than the old "hard 400" cue which biased fast). No "CSS"/Z-names. */}
-                          <p className="text-[11px] text-white/40 -mt-1 leading-snug">Your hard, steady 100 pace — the effort you could hold for a strong continuous swim of about 20–30 minutes, not a sprint and not your easy cruise. Your easy / moderate / fast zones are all built from this one number.</p>
+                          <p className="text-[11px] text-white/40 -mt-1 leading-snug">Your hard, steady 100 pace — the effort you could hold for a strong continuous swim of about 20–30 minutes, not a sprint and not your easy cruise. Your easy / moderate / hard zones are all built from this one number.</p>
                           {/* D-199: (i) test protocol — how to FIND the threshold (the benchmark). Tappable (iOS:
                               no hover). The 400/200 CSS test, the formula, a worked example, plus a no-test fallback. */}
                           {showSwimTest && (
@@ -2160,16 +2160,14 @@ return (
                     {saveMessage}
                   </div>
                 )}
-                {hasChanges && (
                 <button
                   onClick={handleSave}
-                  disabled={saving}
-                    className="w-full py-3 px-4 rounded-full bg-white/[0.12] border border-white/50 text-white hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300 font-medium disabled:bg-white/[0.05] disabled:border-white/20 disabled:text-white/40"
+                  disabled={!hasChanges || saving}
+                    className="w-full py-3 px-4 rounded-full bg-white/[0.12] border border-white/50 text-white hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300 font-medium disabled:bg-white/[0.05] disabled:border-white/20 disabled:text-white/40 disabled:hover:bg-white/[0.05] disabled:hover:border-white/20 disabled:cursor-default"
                     style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                     {saving ? 'Saving...' : 'Save Baselines'}
                 </button>
-                )}
             </div>
           </>
         )}
