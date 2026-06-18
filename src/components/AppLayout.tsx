@@ -36,6 +36,7 @@ import PullToRefresh from './PullToRefresh';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { MobileHeader } from './MobileHeader';
 import { App as CapacitorApp } from '@capacitor/app';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 interface AppLayoutProps {
   onLogout?: () => void;
@@ -54,15 +55,26 @@ function todayDateString(): string {
 
 function hasUncompletedStrengthSession(): boolean {
   try {
-    const key = `strength_logger_session_${todayDateString()}`;
-    const raw = localStorage.getItem(key);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw);
-    const exs = Array.isArray(parsed?.exercises) ? parsed.exercises : [];
-    // "Has data" = at least one exercise with a non-empty sets array (the
-    // shape StrengthLogger writes via saveSessionProgress). Empty wrappers
-    // from a fresh-open-then-close shouldn't trigger reopen.
-    return exs.some((ex: any) => Array.isArray(ex?.sets) && ex.sets.length > 0);
+    // D-132 made the draft key IDENTITY-AWARE (`strength_logger_session_${date}_${id|'adhoc'}`); the
+    // pre-D-132 key was the bare `strength_logger_session_${date}`. This reopen gate used to read ONLY
+    // the bare key — so a planned-workout draft (the common case, keyed `..._${id}`) was invisible here
+    // and the logger NEVER reopened on app-leave. Scan every key with today's prefix (bare OR `_${id}`),
+    // and still only today's date so yesterday's orphan can't trigger a reopen.
+    const prefix = `strength_logger_session_${todayDateString()}`;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || (k !== prefix && !k.startsWith(`${prefix}_`))) continue;
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw);
+        const exs = Array.isArray(parsed?.exercises) ? parsed.exercises : [];
+        // "Has data" = at least one exercise with a non-empty sets array. Empty wrappers
+        // from a fresh-open-then-close shouldn't trigger reopen.
+        if (exs.some((ex: any) => Array.isArray(ex?.sets) && ex.sets.length > 0)) return true;
+      } catch { /* skip malformed */ }
+    }
+    return false;
   } catch { return false; }
 }
 
@@ -162,6 +174,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         listenerHandle.remove().catch(() => {});
       }
     };
+  }, []);
+
+  // One-time notification-permission ask for the rest-timer away-alert. On login, if the permission
+  // hasn't been decided yet, request it once. iOS returns 'prompt' only until asked, so this fires a
+  // single system dialog and never re-prompts after grant/deny. No-op on web / when the plugin is absent.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const perm = await LocalNotifications.checkPermissions();
+        if (perm.display === 'prompt' || perm.display === 'prompt-with-rationale') {
+          await LocalNotifications.requestPermissions();
+        }
+      } catch { /* web / plugin absent */ }
+    })();
   }, []);
 
   const [showPilatesYogaLogger, setShowPilatesYogaLogger] = useState(false);

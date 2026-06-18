@@ -13,6 +13,7 @@ import { createWorkoutMetadata } from '@/utils/workoutMetadata';
 import CoreTimer from '@/components/CoreTimer';
 import { NumericKeypadSheet } from '@/components/ui/numeric-keypad-sheet';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
@@ -122,6 +123,35 @@ const normalizeExerciseName = (raw: string): string =>
     .replace(/\s*\((?:left|right)\)\s*/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
+
+// Rest-end LOCAL NOTIFICATIONS (away-alert): iOS suspends the JS countdown when the app is backgrounded,
+// so a scheduled local notification is the only way to buzz the athlete when rest ends while they're out
+// of the app. Scheduled when a rest is armed; canceled on Skip OR when the in-app timer completes (so the
+// foreground haptic and the notification never double-fire). No-op on web / when permission isn't granted
+// (permission is asked once at login — AppLayout). Stable per-key id so cancel can re-derive it.
+function restNotifId(key: string): number {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) % 1_000_000_000;
+  return h + 1;
+}
+async function scheduleRestNotification(key: string, seconds: number): Promise<void> {
+  if (!(seconds > 0)) return;
+  try {
+    const perm = await LocalNotifications.checkPermissions();
+    if (perm.display !== 'granted') return;
+    await LocalNotifications.schedule({
+      notifications: [{
+        id: restNotifId(key),
+        title: 'Rest complete',
+        body: 'Time for your next set.',
+        schedule: { at: new Date(Date.now() + seconds * 1000) },
+      }],
+    });
+  } catch { /* web / plugin absent */ }
+}
+async function cancelRestNotification(key: string): Promise<void> {
+  try { await LocalNotifications.cancel({ notifications: [{ id: restNotifId(key) }] }); } catch { /* no-op */ }
+}
 
 // Calculate rest time based on exercise type and reps
 const calculateRestTime = (exerciseName: string, reps: number | undefined): number => {
@@ -2151,6 +2181,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               if (!k.includes('-set-')) {
                 playRestEndTone();
                 hapticSuccess();  // D-139: success haptic at rest-end → "start the next set"
+                void cancelRestNotification(k); // in-app timer hit 0 → cancel the scheduled away-buzz (no double-fire)
               }
             }
             
@@ -2593,6 +2624,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         return { ...prev, [restKey]: { seconds: calculatedRest, running: true } };
       });
       hapticLight();
+      void scheduleRestNotification(restKey, calculatedRest);   // away-alert: buzz at rest-end if backgrounded
     } catch {}
   };
 
@@ -3001,13 +3033,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     >
       {/* Spacer for app header */}
       <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
-      {/* Header */}
-      <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 pt-3 pb-3 mb-3 rounded-2xl relative shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]" style={{ zIndex: 1 }}>
-        {/* D-100: active rest-timer countdown. Picks the most-recently-armed
-            rest timer that's running and still has seconds remaining. Rest
-            keys are `${exerciseId}-${setIndex}` (no '-set-' separator —
-            those are duration timers, distinct namespace per the existing
-            tick handler). Tap × to dismiss; tone + haptic fire at zero. */}
+      {/* Rest-timer OVERLAY (D-139 + overlay fix): pinned just below the app header via `sticky`, so it
+          stays visible while you scroll the set list. Auto-armed on Done; Skip ENDS the rest. `sticky`
+          (not `fixed`) so backdrop-blur ancestors don't break it. Renders nothing when no rest runs. */}
+      <div
+        className="sticky z-30 px-4 flex justify-center pointer-events-none"
+        style={{ top: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px) + 8px)' }}
+      >
         {(() => {
           const restEntries = Object.entries(timers)
             .filter(([k, t]) => !k.includes('-set-') && t?.running && (t.seconds ?? 0) > 0);
@@ -3016,31 +3048,32 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           restEntries.sort(([, a], [, b]) => (a.seconds ?? 0) - (b.seconds ?? 0));
           const [activeKey, activeTimer] = restEntries[0];
           const total = activeTimer.seconds ?? 0;
-          const mm = Math.floor(total / 60);
-          const ss = total % 60;
-          const display = `${mm}:${String(ss).padStart(2, '0')}`;
+          const display = `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
           return (
-            <div className="px-4 mb-2 flex items-center justify-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-200">
-                <span className="text-xs uppercase tracking-wide text-amber-300/70">Rest</span>
-                <span className="text-lg font-semibold tabular-nums leading-none">{display}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    // D-139: Skip ENDS the rest (not just pause) — clear the timer and mark its
-                    // set's key dismissed (same dismiss path as the in-row Skip). Pill disappears.
-                    setRestDismissed((prev) => new Set(prev).add(activeKey));
-                    setTimers((prev) => { const next = { ...prev }; delete next[activeKey]; return next; });
-                  }}
-                  className="ml-1 px-2 h-6 rounded-full bg-white/[0.10] hover:bg-white/[0.18] text-amber-200/90 hover:text-white flex items-center justify-center text-xs font-medium"
-                  aria-label="Skip rest"
-                >
-                  Skip
-                </button>
-              </div>
+            <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-100 shadow-lg backdrop-blur-md">
+              <span className="text-xs uppercase tracking-wide text-amber-300/80">Rest</span>
+              <span className="text-lg font-semibold tabular-nums leading-none">{display}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  // Skip ENDS the rest — clear the timer + cancel its scheduled away-notification.
+                  setRestDismissed((prev) => new Set(prev).add(activeKey));
+                  setTimers((prev) => { const next = { ...prev }; delete next[activeKey]; return next; });
+                  cancelRestNotification(activeKey);
+                }}
+                className="ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-amber-100 hover:text-white flex items-center justify-center text-xs font-medium"
+                aria-label="Skip rest"
+              >
+                Skip
+              </button>
             </div>
           );
         })()}
+      </div>
+      {/* Header */}
+      <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 pt-3 pb-3 mb-3 rounded-2xl relative shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]" style={{ zIndex: 1 }}>
+        {/* Rest-timer pill moved to a pinned sticky overlay above the header (stays visible while
+            scrolling the set list). Auto-armed on Done; Skip ends it. */}
         <div className="flex flex-col gap-2 w-full px-4">
           {/* Row 1: workout identity — title + Deload pill (the pill describes the
               workout, so it belongs with the name, not competing with the date/Pick
