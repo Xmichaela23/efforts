@@ -1585,22 +1585,26 @@ Deno.serve(async (req) => {
       analysis.zones.hr = hrZones as any;
     }
     
-    // Power zones: FTP-based (using userFtp variable extracted earlier)
-    const ftpForZones = userFtp || 200;
-    console.log('[POWER ZONES] Using FTP:', ftpForZones, '(userFtp was:', userFtp, ')');
-    const powerZoneBoundaries = [
-      0,
-      ftpForZones * 0.55,   // Z1 max: Active Recovery
-      ftpForZones * 0.75,   // Z2 max: Endurance
-      ftpForZones * 0.90,   // Z3 max: Tempo
-      ftpForZones * 1.05,   // Z4 max: Threshold
-      ftpForZones * 1.20,   // Z5 max: VO2 Max
-      ftpForZones * 1.50,   // Z6 max: Anaerobic
-      Infinity              // Z6+ (anything above)
-    ];
-    console.log('[POWER ZONES] Boundaries:', powerZoneBoundaries.slice(0, -1)); // Omit Infinity
-    const pwrZones = binsForBoundaries(power_watts, time_s, powerZoneBoundaries);
-    if (pwrZones) analysis.zones.power = pwrZones as any;
+    // #5 null-honest: power zones require a REAL FTP. No FTP → NO fabricated zones. Was `userFtp || 200`,
+    // which computed every FTP-less rider's zone distribution off a made-up 200 W — honest absence beats a
+    // fake number. With no FTP, power zones are simply absent; the ride's actual effort still shows via HR
+    // zones / NP / IF. (Planned-session power TARGETS degrade separately — the RPE-degrade contract.)
+    const ftpForZones = (typeof userFtp === 'number' && userFtp > 0) ? userFtp : null;
+    if (ftpForZones) {
+      console.log('[POWER ZONES] Using FTP:', ftpForZones);
+      const powerZoneBoundaries = [
+        0,
+        ftpForZones * 0.55,   // Z1 max: Active Recovery
+        ftpForZones * 0.75,   // Z2 max: Endurance
+        ftpForZones * 0.90,   // Z3 max: Tempo
+        ftpForZones * 1.05,   // Z4 max: Threshold
+        ftpForZones * 1.20,   // Z5 max: VO2 Max
+        ftpForZones * 1.50,   // Z6 max: Anaerobic
+        Infinity              // Z6+ (anything above)
+      ];
+      const pwrZones = binsForBoundaries(power_watts, time_s, powerZoneBoundaries);
+      if (pwrZones) analysis.zones.power = pwrZones as any;
+    }
   } catch {}
 
     // --- DISABLED: Swim 100m splits calculation ---
