@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
 
     const { data: workouts, error: workoutsError } = await supabase
       .from('workouts')
-      .select('id, type, date, duration, moving_time, distance, avg_heart_rate, max_heart_rate, avg_pace, avg_power, normalized_power, avg_speed, workout_status, computed, strava_data, name')
+      .select('id, type, date, duration, moving_time, distance, avg_heart_rate, max_heart_rate, avg_pace, avg_power, normalized_power, avg_speed, workout_status, computed, strava_data, name, rpe, workout_metadata')
       .eq('user_id', user_id)
       .eq('workout_status', 'completed')
       .in('type', [...TYPES_90D_LEARN])
@@ -279,6 +279,14 @@ Deno.serve(async (req) => {
         const dRaw = Number((w as any).distance);
         const distM = dRaw < 1000 ? dRaw * 1000 : dRaw;
         if (!(distM >= 200)) return null;
+        // D-199: honor the popup's clean signal — exclude ad-hoc drills/mixed swims and any planned swim
+        // the athlete flagged as NOT swum-as-planned (deviation). Only continuous full-stroke feeds CSS.
+        let meta: any = (w as any).workout_metadata;
+        if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = {}; } }
+        meta = meta || {};
+        const kind = String(meta.swim_session_kind || '').toLowerCase();
+        if (kind === 'drills' || kind === 'mixed') return null;     // ad-hoc non-straight → not a clean threshold read
+        if (meta.swim_as_planned === false) return null;            // planned but deviated → exclude
         const rpe = Number((w as any).rpe);
         return { distanceM: Math.round(distM), timeS: Math.round((pace as number) * (distM / 100)), confirmedHard: Number.isFinite(rpe) && rpe >= 7, date: String((w as any).date || (w as any).timestamp || '') };
       })
