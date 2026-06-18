@@ -1638,7 +1638,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const identityMatches = !!savedSession && ((savedSession.sourcePlannedId ?? null) === openedId);
 
       // TEMP DIAGNOSTIC (strength restore): shows in the Xcode console which link breaks.
-      try { console.log('[logger-restore] mount ' + JSON.stringify({ openedId, scheduledId: scheduledWorkout?.id ?? null, status: (scheduledWorkout as any)?.workout_status ?? null, hasDraft: !!savedSession, draftPlannedId: savedSession?.sourcePlannedId ?? null, identityMatches, exCount: savedSession?.exercises?.length ?? 0, mode: modeAtOpen })); } catch {}
+      try {
+        const allSets = (savedSession?.exercises ?? []).flatMap((e: any) => e?.sets ?? []);
+        console.log('[logger-restore] mount ' + JSON.stringify({ openedId, scheduledId: scheduledWorkout?.id ?? null, hasDraft: !!savedSession, draftPlannedId: savedSession?.sourcePlannedId ?? null, identityMatches, exCount: savedSession?.exercises?.length ?? 0, totalSets: allSets.length, completedSets: allSets.filter((s: any) => s?.completed).length, sample: allSets[0] ? { reps: allSets[0].reps, weight: allSets[0].weight, completed: !!allSets[0].completed } : null, mode: modeAtOpen }));
+      } catch {}
 
       if (savedSession && identityMatches && modeAtOpen !== 'mobility') {
         const verifiedOrphan = await (async (): Promise<boolean> => {
