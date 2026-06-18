@@ -1442,8 +1442,9 @@ return (
                                       />
                             <span className="text-xs text-white/60">mm:ss</span>
                                     </div>
-                          {/* D-199 C1: seed microcopy — plain effort language, no "CSS"/Z-names, no "sprint" */}
-                          <p className="text-[11px] text-white/40 -mt-1">Your fast-but-steady 100 — the pace you could hold for a hard 400, not an all-out sprint.</p>
+                          {/* D-199 C1: seed microcopy — plain, science-accurate threshold framing (~20-30 min
+                              sustainable; longer than the old "hard 400" cue which biased fast). No "CSS"/Z-names. */}
+                          <p className="text-[11px] text-white/40 -mt-1 leading-snug">Your hard, steady 100 pace — the effort you could hold for a strong continuous swim of about 20–30 minutes, not a sprint and not your easy cruise. Your easy / moderate / fast zones are all built from this one number.</p>
                           <div className="space-y-2">
                             <label className="text-xs text-white/60">Equipment</label>
                             <div className="flex flex-wrap gap-2">
