@@ -763,13 +763,16 @@ async function extractAssessmentBaseline(
             `[assessment] CSS = ${cssSecPer100m} sec/100m  (400yd=${t400}s d=${d400}m, 200yd=${t200}s d=${d200}m)`,
           );
           if (cssSecPer100m > 55 && cssSecPer100m < 200) {
+            // The CSS test is a CLEAN, confirmed threshold → write the dedicated swim_css field, NOT the
+            // median key swim_pace_per_100m (analyzeSwims owns that; writing the threshold there was the
+            // audit's 3-meanings-one-key collision). confidence 'moderate' = 2 confirmed efforts (400+200).
             const newLF = {
               ...existingLF,
-              swim_pace_per_100m: {
+              swim_css_sec_per_100m: {
                 value: cssSecPer100m,
-                confidence: 'high',
+                confidence: 'moderate',
                 source: 'CSS test (400/200 yd time trial)',
-                sample_count: 1,
+                n_efforts: 2,
                 tested_at: new Date().toISOString(),
               },
             };

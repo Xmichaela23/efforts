@@ -32,6 +32,7 @@ import {
   type DisciplineRecency,
 } from '../_shared/athlete-identity-inference.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
+import { fitSwimCss } from '../_shared/swim/swim-css-learner.ts';
 
 // =============================================================================
 // CORS HEADERS
@@ -111,6 +112,8 @@ interface LearnedFitnessProfile {
 
   /** Median sec/100m from ≥3 completed swim workouts (replaces manual swim pace in projections when confident) */
   swim_pace_per_100m: LearnedMetric | null;
+  /** D-199: learned CSS THRESHOLD sec/100m (best-effort critical-speed fit; distinct from the median). null = abstained. */
+  swim_css_sec_per_100m?: unknown;
   
   // Meta
   workouts_analyzed: number;
@@ -263,6 +266,31 @@ Deno.serve(async (req) => {
     const rideProfile = analyzeRides(rides);
     const swimProfile = analyzeSwims(allWorkouts, swimPaceById);
 
+    // D-199 CSS learner — fit a swim THRESHOLD from CLEAN continuous efforts (swimPaceById is already
+    // contamination-filtered; confirmed-hard = RPE>=7). Guarded: ABSTAINS unless the data earns a tier
+    // (>=2 distinct durations, monotonic curve, CSS faster than the median, plausible D', R² floor).
+    // On aerobic-only / dirty data it publishes nothing. Staged off-precedence — the resolver gate
+    // (SWIM_CSS_LIVE in planning-context) controls whether a published value ever drives plans.
+    const swimEfforts = allWorkouts
+      .filter((w) => normType(workoutTypeFromRow(w)) === 'swim')
+      .map((w) => {
+        const pace = swimPaceById.get(String((w as any).id));
+        if (!Number.isFinite(pace as number) || (pace as number) <= 0) return null;
+        const dRaw = Number((w as any).distance);
+        const distM = dRaw < 1000 ? dRaw * 1000 : dRaw;
+        if (!(distM >= 200)) return null;
+        const rpe = Number((w as any).rpe);
+        return { distanceM: Math.round(distM), timeS: Math.round((pace as number) * (distM / 100)), confirmedHard: Number.isFinite(rpe) && rpe >= 7, date: String((w as any).date || (w as any).timestamp || '') };
+      })
+      .filter(Boolean) as { distanceM: number; timeS: number; confirmedHard: boolean; date: string }[];
+    const _swimMedianM = (swimProfile.swim_pace_per_100m as any)?.value ?? null;
+    const _cssFit = fitSwimCss(swimEfforts, _swimMedianM);
+    const swimCss = _cssFit.cssSecPer100m != null ? {
+      value: _cssFit.cssSecPer100m, confidence: _cssFit.confidence, source: 'learner (best-effort CS fit)',
+      n_efforts: _cssFit.nPoints, d_prime_m: _cssFit.dPrimeM, r2: _cssFit.r2, last_updated: new Date().toISOString(),
+    } : null;
+    console.log(`[CSS learner] ${_cssFit.confidence} - ${_cssFit.reason}${swimCss ? ` -> ${_cssFit.cssSecPer100m} s/100m` : ' (abstained, publishing nothing)'}`);
+
     // ==========================================================================
     // BUILD LEARNED PROFILE
     // ==========================================================================
@@ -292,6 +320,7 @@ Deno.serve(async (req) => {
       ride_ftp_estimated: rideProfile.ftp_estimated,
 
       swim_pace_per_100m: swimProfile.swim_pace_per_100m,
+      swim_css_sec_per_100m: swimCss,
       
       // Meta: count run+ride sessions in window (all included rows, not only those with HR)
       workouts_analyzed: runRideSessions,
@@ -330,6 +359,10 @@ Deno.serve(async (req) => {
     };
     if (learnedProfile.swim_pace_per_100m == null && existing?.swim_pace_per_100m) {
       mergedLearned.swim_pace_per_100m = existing.swim_pace_per_100m;
+    }
+    // Preserve a tested/prior CSS when the learner abstains this run (don't wipe a CSS-test result).
+    if ((learnedProfile as any).swim_css_sec_per_100m == null && (existing as any)?.swim_css_sec_per_100m) {
+      (mergedLearned as any).swim_css_sec_per_100m = (existing as any).swim_css_sec_per_100m;
     }
 
     // Tier-cliff guard: block FTP overwrite ONLY when new confidence drops below prior.

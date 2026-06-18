@@ -231,43 +231,70 @@ function parseMmSsToSecondsLocal(s: string | null | undefined): number | null {
  * Seconds per **100 yards** (pool) — learned swims win when confident; else Training Baselines
  * (`swimPace100` mm:ss or numeric sec). Metric baselines store pace per 100m → scaled to 100yd time.
  */
+// STAGED (D-199 swim learner): flip to true ONLY after Michael eyeballs a clean CSS number.
+// true  → clean-beats-dirty precedence: confident swim_css > manual typed > (possibly dirty) median.
+// false → CURRENT behavior unchanged: learned median > manual. Default OFF so nothing moves live.
+const SWIM_CSS_LIVE = false;
+
+/** Confident learned/tested CSS (the clean threshold). Only moderate/high tiers drive. */
+function readSwimCssSecPer100Yd(lf: Record<string, unknown> | null | undefined): number | null {
+  if (!lf || typeof lf !== 'object' || Array.isArray(lf)) return null;
+  const css = lf['swim_css_sec_per_100m'];
+  if (!css || typeof css !== 'object') return null;
+  const o = css as Record<string, unknown>;
+  const v = Number(o.value);
+  const c = String(o.confidence || '').toLowerCase();
+  if (Number.isFinite(v) && v >= 40 && v <= 300 && (c === 'moderate' || c === 'high')) return v * (91.44 / 100);
+  return null;
+}
+
+/** Learned MEDIAN typical pace (≥3 samples). Possibly dirty — last resort under SWIM_CSS_LIVE. */
+function readSwimMedianSecPer100Yd(lf: Record<string, unknown> | null | undefined): number | null {
+  if (!lf || typeof lf !== 'object' || Array.isArray(lf)) return null;
+  const m = lf['swim_pace_per_100m'];
+  if (!m || typeof m !== 'object' || Array.isArray(m)) return null;
+  const o = m as Record<string, unknown>;
+  const sc = Number(o.sample_count) || 0;
+  const c = String(o.confidence || '').toLowerCase();
+  if (sc >= 3 && !(c === 'low' && sc < 5)) {
+    const v = Number(o.value);
+    if (Number.isFinite(v) && v >= 50 && v <= 600) return v * (91.44 / 100);
+  }
+  return null;
+}
+
+/** Manual typed Training-Baselines pace (swimPace100 mm:ss /100yd, or numeric). */
+function readSwimManualSecPer100Yd(perf: Record<string, unknown> | null | undefined, units?: string | null): number | null {
+  if (!perf || typeof perf !== 'object') return null;
+  for (const k of ['swimPace100', 'swim_pace_100_yd', 'swim_pace_100yd']) {
+    const raw = perf[k];
+    if (raw == null) continue;
+    const sec = parseMmSsToSecondsLocal(typeof raw === 'string' ? raw : String(raw));
+    if (sec != null && sec > 0 && sec <= 600) return sec;
+  }
+  const numRaw = perf['swimPacePer100'] ?? perf['swim_pace_per_100_sec'];
+  const n = typeof numRaw === 'number' ? numRaw : Number(numRaw);
+  if (!Number.isFinite(n) || n <= 0 || n > 600) return null;
+  return String(units || '').toLowerCase() === 'metric' ? n * (91.44 / 100) : n;
+}
+
+/**
+ * Seconds per **100 yards** (pool) — the single swim-pace resolver for plan-gen.
+ * STAGED OFF (SWIM_CSS_LIVE=false): current behavior — learned median wins, else manual.
+ * When flipped on: clean swim_css (confident) > manual > median (clean-beats-dirty, the better #4).
+ */
 export function swimSecPer100YdFromArcSwimInputs(opts: {
   performance_numbers?: Record<string, unknown> | null;
   learned_fitness?: Record<string, unknown> | null;
   units?: string | null;
 }): number | null {
   const lf = opts.learned_fitness;
-  if (lf && typeof lf === 'object' && !Array.isArray(lf)) {
-    const m = lf['swim_pace_per_100m'];
-    if (m && typeof m === 'object' && !Array.isArray(m)) {
-      const o = m as Record<string, unknown>;
-      const sc = Number(o.sample_count) || 0;
-      const c = String(o.confidence || '').toLowerCase();
-      if (sc >= 3 && !(c === 'low' && sc < 5)) {
-        const v = Number(o.value);
-        if (Number.isFinite(v) && v >= 50 && v <= 600) {
-          return v * (91.44 / 100);
-        }
-      }
-    }
-  }
-
   const perf = opts.performance_numbers;
-  if (!perf || typeof perf !== 'object') return null;
-
-  for (const k of ['swimPace100', 'swim_pace_100_yd', 'swim_pace_100yd'] as const) {
-    const raw = perf[k];
-    if (raw == null) continue;
-    const sec = parseMmSsToSecondsLocal(typeof raw === 'string' ? raw : String(raw));
-    if (sec != null && sec > 0 && sec <= 600) return sec;
+  if (SWIM_CSS_LIVE) {
+    return readSwimCssSecPer100Yd(lf) ?? readSwimManualSecPer100Yd(perf, opts.units) ?? readSwimMedianSecPer100Yd(lf);
   }
-
-  const numRaw = perf['swimPacePer100'] ?? perf['swim_pace_per_100_sec'];
-  const n = typeof numRaw === 'number' ? numRaw : Number(numRaw);
-  if (!Number.isFinite(n) || n <= 0 || n > 600) return null;
-  const u = String(opts.units || '').toLowerCase();
-  if (u === 'metric') return n * (91.44 / 100);
-  return n;
+  // STAGED OFF — unchanged: learned median > manual
+  return readSwimMedianSecPer100Yd(lf) ?? readSwimManualSecPer100Yd(perf, opts.units);
 }
 
 export interface SwimVolumeMultiplierOpts {
