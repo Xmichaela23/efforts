@@ -4234,6 +4234,30 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-200 — Swim threshold is a USER-ENTERED/TESTED benchmark, not computed; clean per-length passive extraction proven impossible
+
+- **Date:** 2026-06-18
+- **Context:** A long session that re-derived (and finally *proved*) why a clean swim threshold can't be computed from the data we ingest — a wall hit more than once before. Full verification in ENGINE-STATE "Swim clean per-length … UNRECOVERABLE (DO NOT RE-CHASE)". Short version: Strava reconstructs rest into lap times + plan-alignment fails; the Garmin webhook gives synthesized even-splits with no distance axis and empty `swimCadence`; real per-length lives only in the FIT file the webhook doesn't send.
+- **Decision:** Swim fitness = a **user-entered/tested THRESHOLD**, the swim analog of FTP (bike) and threshold pace (run) — all three are tested/entered anchors refreshed periodically, NOT continuously reverse-engineered. The threshold IS the benchmark: it drives the 5 tiers, prescription, race-leg projections, and the cross-discipline fitness read. Found via the **CSS test** (400/200 → threshold 100 = (t400 − t200) ÷ 2; the `(i)` button in `TrainingBaselines` explains it) or a best-steady-20–30-min entry.
+- **Refresh loop:** a **volume-triggered staleness nudge** on Performance + State — once ~3–4 weeks AND meaningful volume (≈4–5 hrs in water / ≈15 km) accrue since the last baseline update, prompt "you may want to update your baseline / do a CSS test." Never auto-changes the number. (Build pending.)
+- **Markers are SECONDARY:** the whole-swim `moving_time` trend (glitch-guarded) is the directional "trending faster?" signal between updates and the thing that motivates the re-test — it never redefines the benchmark. Improvement = the benchmark moving on re-test.
+- **Resolver:** `swimSecPer100YdFromArcSwimInputs` goes **benchmark-first** (`swim_css`/tested > manual > median) — the staged `SWIM_CSS_LIVE` flip (D-199). Flip it once a real tested benchmark exists; the learned median demotes from "drives prescription" to marker substrate. (Held today only because the current manual 2:30 is stale.)
+- **Entry model:** THRESHOLD ONLY (Michael, 2026-06-18) — the 5 tiers derive by offset; no separately-entered moderate.
+- **Cross-ref:** D-199, D-201, ENGINE-STATE (per-length impossible), `SPEC-intensity-baselines.md`, Q-071 (hard swims — the prescription that produces something to test against).
+
+---
+
+## D-201 — Apple = casual/hybrid (run+lift+cycle) wearable, NOT the swim solution; surgical per-length is a future FIT/Apple project
+
+- **Date:** 2026-06-18
+- **Context:** "Build Apple to solve swim per-length" was backwards — **serious swimmers wear Garmin/Form, almost never an Apple Watch.** Apple HealthKit *does* expose clean per-length (segment events + stroke + active/rest), so it's the one source that technically *could* do surgical per-length — but the swim audience isn't on it.
+- **Decision:** Apple integration is justified on the **strength + casual-endurance** pillar (the runner who wants to lift; the cyclist with a bike computer + an Apple Watch on the wrist) — literally the product identity. It is scoped and built as a **general wearable integration**, NOT the swim fix. Swim-via-Apple rides along for free for the rare Apple-swimmer; it is not a deliverable or a justification.
+- **Surgical per-length swim** = a separately-scoped FUTURE project (Garmin FIT-file ingest OR Apple HealthKit native), undertaken only with a way to test it. NOT part of "solid swim v1".
+- **3-lane source model (already baked in):** Garmin/Apple native = richest (computed where possible) · Strava = whole-swim + user-input (Strava API capped at 10 users anyway — 50/50 for launch) · manual = user-input. `swimSourceOverride` (D-173) already routes swim to a different source than the global `source_preference` ("Strava for everything, Garmin for swim"); `mergeSameSwimIfExists` keeps richest fields. "Richest data wins for swim" is therefore mostly built — Apple is the only missing plug (Q-060). TODO: confirm the `swimSourceOverride` is exposed in the Connections UI.
+- **Cross-ref:** D-157 / D-173 (Apple / source-override), Q-060 (Apple deferred), D-200, `SPEC-swim-source-tiers.md`.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

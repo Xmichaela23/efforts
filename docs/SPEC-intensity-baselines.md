@@ -159,6 +159,18 @@ Verification (post-deploy): recompute one historical swim via `recompute-workout
 
 ---
 
+### The honest swim-numbers model (LOCKED 2026-06-18 — D-200/D-201)
+
+This supersedes the "manual-seed → learner" hope in Layer C with what the data actually allows. **Read ENGINE-STATE "Swim clean per-length … UNRECOVERABLE" first** — it proves the constraint this model is built around.
+
+- **The number = a user-entered/tested THRESHOLD = the fitness benchmark.** Swim's FTP. Drives the 5 tiers, prescription, race-leg projections, cross-discipline fitness. Threshold-only entry; tiers derive by offset (no separate moderate). Found via the CSS test (400/200 → (t400 − t200) ÷ 2 per 100; `(i)` button in `TrainingBaselines`) or best-steady-20–30-min entry.
+- **Why not computed:** clean per-length / per-segment pace is **unrecoverable** from Strava (rest-inflated reconstruction, alignment fails) and the Garmin webhook (synthesized even-splits, no distance axis, empty `swimCadence`, FIT not delivered). The whole-swim `moving_time` pace is the only reliable passive signal. So we *test/enter* the number, exactly like FTP and run threshold.
+- **Refresh = volume-triggered nudge** (Performance + State): ~3–4 weeks AND ≈4–5 hrs / ≈15 km since last update → "consider updating / a CSS test." Never auto-writes. Resets on update/test. Reusable for run/bike baselines later.
+- **Markers (secondary):** glitch-guarded whole-swim `moving_time` trend = direction between benchmark updates; motivates the re-test; never redefines the benchmark.
+- **Resolver:** benchmark-first (`swim_css`/tested > manual > median) behind `SWIM_CSS_LIVE` (D-199); flip once a real tested benchmark exists; median demotes to marker substrate.
+- **3 lanes by gear, one zone vocabulary** (recovery / easy / moderate / threshold / hard): Garmin/Apple native compute where possible · Strava + manual take user input. `swimSourceOverride` (D-173) + `mergeSameSwimIfExists` already implement "richest data wins for swim." Surgical per-length = future FIT/Apple project (D-201), not v1.
+- **Prerequisite for any of this to matter:** the program must prescribe HARD swims (Q-071) so there's a threshold effort to test against. That's the active build.
+
 ## LEG 2 — NULL-HONEST CROSS-DISCIPLINE (backlog #5)
 
 **Direction (decided):** No fallbacks. No generics. Null stays null. The app handles "we don't know this baseline yet" honestly rather than substituting a made-up value. A future onboarding plan-wizard step will let users supply baselines (or we derive them from real training) — but until a baseline is *real*, it reads as absent, not faked.
