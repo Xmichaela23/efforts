@@ -837,6 +837,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         (ex) => Array.isArray(ex?.sets) && ex.sets.some((s) => s?.completed)
       );
       if (!hasCompletedSet) {
+        try { console.log('[logger-restore] SAVE-GATE removed draft — no completed set (' + (Array.isArray(exercisesData) ? exercisesData.length : 0) + ' ex) key=' + sessionKey); } catch {}
         try { localStorage.removeItem(sessionKey); } catch {}
         return;
       }
@@ -1691,6 +1692,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Existing init body extracted into a local function so the orphan-cleared
     // path can re-enter it without duplicating ~200 lines.
     function runFreshInit() {
+    try { console.log('[logger-restore] FRESH-INIT — wipes restored sets, scheduledId=' + (scheduledWorkout?.id ?? null)); } catch {}
     // Clear any existing lock when no saved session
     setLockManualPrefill(false);
     setIsInitialized(true);
