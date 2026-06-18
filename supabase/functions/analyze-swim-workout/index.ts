@@ -205,23 +205,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // D-183: fetch the athlete's HR zones / learned threshold so the narrative can anchor HR to the
-    // athlete's OWN physiology — read e.g. 119 bpm as the easy Zone-2 effort it is, not "elevated".
-    // Mirrors the run analyzer (configured_hr_zones → Friel-%LTHR-from-learned-threshold fallback).
-    // When neither is on file the narrative is told to stay neutral on HR (never assert "elevated").
-    let configuredHrZones: any = null;
-    let learnedFitness: any = null;
-    try {
-      const { data: ub } = await supabase
-        .from('user_baselines')
-        .select('configured_hr_zones, learned_fitness')
-        .eq('user_id', workout.user_id)
-        .single();
-      configuredHrZones = (ub as any)?.configured_hr_zones || null;
-      learnedFitness = (ub as any)?.learned_fitness || null;
-    } catch (_e) {
-      // no baselines → narrative stays neutral on HR (D-183)
-    }
+    // D-199 (Layer A): swim HR is NOT anchored to any run-derived threshold. The D-183 fetch here used
+    // configured_hr_zones / learned run_threshold_hr (a run/max-derived set) — directionally WRONG for
+    // swim, which runs ~10–15 bpm below run HR for the same effort (SPEC-honest-swim-inference: horizontal
+    // position, water cooling, smaller muscle mass). Borrowing the run anchor over-reads every swim as
+    // easier than it was. Until a swim-specific intensity model exists (CSS, Layer C), swim HR stays
+    // UNANCHORED and the narrative is told to stay neutral on HR. The fetch is removed (it only fed the
+    // now-deleted run-anchor zone builder).
 
     // Get planned workout if available
     let plannedWorkout: any = null;
@@ -436,24 +426,12 @@ Deno.serve(async (req) => {
         // Build the zone bands the same way the run analyzer does (configured_hr_zones → Friel %LTHR
         // from learned threshold), then classify the AVG HR. hrZoneCtx is null when no threshold is on
         // file → the prompt is told to stay neutral (never call HR "elevated" without zones to judge by).
-        const hrBands = (() => {
-          try {
-            const czArr = (configuredHrZones as any)?.zones as Array<{ min?: number; max?: number | null }> | undefined;
-            if (Array.isArray(czArr) && czArr.length >= 4) {
-              const get = (i: number) => czArr[i];
-              const z1Max = Number(get(0)?.max ?? get(1)?.min ?? 0) - 1;
-              const z2Max = Number(get(1)?.max ?? 0);
-              const z3Max = Number(get(2)?.max ?? 0);
-              const z4Max = Number(get(3)?.max ?? 0);
-              if (z1Max > 0 && z2Max > z1Max && z3Max > z2Max && z4Max > z3Max) {
-                return { z1Max, z2Max, z3Max, z4Max, thr: z4Max };
-              }
-            }
-            const thr = Number((learnedFitness as any)?.run_threshold_hr?.value ?? (learnedFitness as any)?.runThresholdHr?.value);
-            if (!Number.isFinite(thr) || thr <= 0) return null;
-            return { z1Max: Math.round(thr * 0.75), z2Max: Math.round(thr * 0.85), z3Max: Math.round(thr * 0.92), z4Max: Math.round(thr * 0.98), thr };
-          } catch { return null; }
-        })();
+        // D-199 (Layer A): no valid swim HR anchor exists today, so hrBands is null → hrZoneCtx is null →
+        // the prompt stays neutral on HR (never "easy"/"elevated"). This replaces the D-183 run-anchored
+        // builder (run_threshold_hr × Friel %LTHR), which mis-read swim effort. HR is soft context only;
+        // the swim verdict comes from pace (vs CSS once Layer C lands), never HR. Keeping this null also
+        // keeps the narrative consistent with the swim baseline UI, which shows no run-derived HR zones.
+        const hrBands: { z1Max: number; z2Max: number; z3Max: number; z4Max: number; thr: number } | null = null;
         const hrZoneCtx = (() => {
           const h = Number(swimScalars.avgHr);
           if (!hrBands || !(h > 0)) return null;

@@ -1459,6 +1459,15 @@ return (
                               })}
                             </div>
                                     </div>
+                          {/* D-199 Layer A: honest swim pace-zone placeholder — replaces the leaked run HR
+                              card. Neutral, NON-conditional copy: it does NOT reference the 100yd-pace field
+                              (which isn't reliably persisted yet — a C1 BLOCKER) and makes no "no baseline"
+                              claim, so it can't contradict the field in any state. Real CSS-derived swim pace
+                              zones land in Layer C. */}
+                          <div className="px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] mt-1">
+                            <div className="text-xs text-white/60">Pace Zones</div>
+                            <div className="text-xs text-white/40 mt-1">Swim pace zones are coming soon.</div>
+                          </div>
                                   </div>
                                 )}
 
@@ -1704,7 +1713,13 @@ return (
                                     </div>
                                   )}
 
-                  {/* Heart Rate Zones */}
+                  {/* Heart Rate Zones — D-199 Layer A: per-active-sport. This card was GLOBAL (run + cycle
+                      rows on EVERY tab), bleeding run/cycle HR zones + a per-mile run threshold pace onto
+                      swim and strength (which don't use HR zones) and showing cycle on the run tab. Now it
+                      renders ONLY on the run/cycle tabs and ONLY for the active sport (active-sport gate on
+                      each push below). Swim has no valid HR anchor (run HR ≠ swim HR by ~10–15 bpm); swim
+                      zones derive from CSS (Layer C). Strength uses e1RM/RIR, not HR zones. */}
+                  {(activeSport === 'running' || activeSport === 'cycling') && (
                   <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] mt-5">
                     <div className="flex items-center justify-between mb-3">
                       <div>
@@ -1736,7 +1751,7 @@ return (
                         manualLTHR: number | null; setManualLTHR: (v: number | null) => void;
                       }[] = [];
 
-                      if (data.disciplines.includes('running') || learnedFitness?.run_max_hr_observed || learnedFitness?.run_threshold_hr) {
+                      if (activeSport === 'running') {
                         sportSections.push({
                           key: 'run', label: 'Running',
                           icon: <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />,
@@ -1748,7 +1763,7 @@ return (
                           manualLTHR: manualRunLTHR, setManualLTHR: setManualRunLTHR,
                         });
                       }
-                      if (data.disciplines.includes('cycling') || learnedFitness?.ride_max_hr_observed || learnedFitness?.ride_threshold_hr) {
+                      if (activeSport === 'cycling') {
                         sportSections.push({
                           key: 'ride', label: 'Cycling',
                           icon: <Bike className="h-4 w-4" style={{ color: SPORT_COLORS.cycling }} />,
@@ -1948,6 +1963,7 @@ return (
                       );
                     })()}
                   </div>
+                  )}
                 </div>
               ) : (
                 /* Data Import Tab */
