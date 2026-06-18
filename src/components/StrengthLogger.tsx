@@ -1637,6 +1637,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const savedSession = restoreSessionProgress(openedId);
       const identityMatches = !!savedSession && ((savedSession.sourcePlannedId ?? null) === openedId);
 
+      // TEMP DIAGNOSTIC (strength restore): shows in the Xcode console which link breaks.
+      try { console.log('[logger-restore] mount ' + JSON.stringify({ openedId, scheduledId: scheduledWorkout?.id ?? null, status: (scheduledWorkout as any)?.workout_status ?? null, hasDraft: !!savedSession, draftPlannedId: savedSession?.sourcePlannedId ?? null, identityMatches, exCount: savedSession?.exercises?.length ?? 0, mode: modeAtOpen })); } catch {}
+
       if (savedSession && identityMatches && modeAtOpen !== 'mobility') {
         const verifiedOrphan = await (async (): Promise<boolean> => {
           const pid = savedSession.sourcePlannedId;
@@ -1658,6 +1661,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           }
         })();
 
+        try { console.log('[logger-restore] verifiedOrphan=' + verifiedOrphan + ' pid=' + savedSession.sourcePlannedId); } catch {}
         if (verifiedOrphan) {
           // Planned row deleted. Clear the orphan and fall through to fresh init.
           try { clearSessionProgress(); } catch {}
