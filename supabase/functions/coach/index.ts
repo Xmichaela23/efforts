@@ -4169,7 +4169,17 @@ Deno.serve(async (req) => {
         const baselineLines: string[] = [];
         const ftpVal = perfNums?.ftp || perfNums?.bike_ftp || null;
         if (ftpVal) baselineLines.push(`Bike FTP: ${Math.round(ftpVal)}W`);
-        const swimCssSec = perfNums?.swim_pace_per_100_sec || perfNums?.swimPacePer100 || null;
+        // M2 fix: read the CANONICAL swimPace100 (m:ss /100yd string — what TrainingBaselines writes and the
+        // resolver uses), not the orphan keys this line used to read (swim_pace_per_100_sec / swimPacePer100,
+        // which were ~always null, leaving this baseline line silently blank). Legacy numeric key kept as fallback.
+        let swimCssSec: number | null = null;
+        const _swimPaceStr = perfNums?.swimPace100;
+        if (typeof _swimPaceStr === 'string') {
+          const _sm = _swimPaceStr.match(/^(\d{1,2}):(\d{2})$/);
+          if (_sm) swimCssSec = (+_sm[1]) * 60 + (+_sm[2]);
+        } else if (Number.isFinite(Number(perfNums?.swim_pace_per_100_sec))) {
+          swimCssSec = Number(perfNums.swim_pace_per_100_sec);
+        }
         if (swimCssSec) {
           const cssMins = Math.floor(Number(swimCssSec) / 60);
           const cssSecs = Math.round(Number(swimCssSec) % 60);

@@ -773,7 +773,15 @@ async function extractAssessmentBaseline(
                 tested_at: new Date().toISOString(),
               },
             };
-            const newPN = { ...existingPN, swimPace100: cssSecPer100m };
+            // C1 fix: swimPace100 is the canonical /100yd m:ss STRING everywhere else (TrainingBaselines,
+            // the resolver's parseMmSs, AthleticRecord). The CSS test produces sec/100m as a number — writing
+            // it raw corrupted the field (rendered "95"; parseMmSs→null silently dropped it in plan-gen).
+            // Convert m→yd (×0.9144) and format m:ss so every reader gets what it expects.
+            // (learned_fitness.swim_pace_per_100m stays sec/100m — that key IS /100m.)
+            const _cssYd = cssSecPer100m * 0.9144;
+            let _mmYd = Math.floor(_cssYd / 60), _ssYd = Math.round(_cssYd % 60);
+            if (_ssYd === 60) { _mmYd += 1; _ssYd = 0; }
+            const newPN = { ...existingPN, swimPace100: `${_mmYd}:${String(_ssYd).padStart(2, '0')}` };
             await supabase
               .from('user_baselines')
               .update({ learned_fitness: newLF, performance_numbers: newPN, updated_at: new Date().toISOString() })

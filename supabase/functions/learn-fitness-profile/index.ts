@@ -215,7 +215,13 @@ Deno.serve(async (req) => {
         .in('workout_id', swimIds);
       if (sfErr) console.warn('⚠️ swim workout_facts fetch failed (non-fatal):', sfErr.message);
       for (const r of (swimFacts || [])) {
-        const p = Number((r as any)?.swim_facts?.pace_per_100m);
+        const sf = (r as any)?.swim_facts;
+        // Fix: exclude equipment/drill-contaminated swims from the learned baseline, matching the State
+        // trend's filter (compute-snapshot / useStateTrends gate on pace_equipment_contaminated). Was
+        // inconsistent — the trend dropped fins/kick swims but this median kept them, so the baseline that
+        // feeds plan-gen / coach / race-proj ran off a dirtier sample set than the State card.
+        if (sf?.pace_equipment_contaminated === true) continue;
+        const p = Number(sf?.pace_per_100m);
         if (Number.isFinite(p) && p > 0) swimPaceById.set(String((r as any).workout_id), p);
       }
     }

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
+import { detectSwimEquipment } from '../_shared/swim/swim-equipment.ts';
 import { swimPacePer100Seconds } from '../_shared/swim/swim-pace.ts';
 import { resolveSwimScalars } from '../_shared/swim/swim-scalars.ts';
 import { restBandRead } from '../_shared/swim/rest-norm.ts';
@@ -449,26 +450,16 @@ Deno.serve(async (req) => {
         // pace — never quantified. fins/buoy/paddles speed pace UP (optimistic); kickboard/kick/drill slow it
         // DOWN (pessimistic); snorkel ~neutral. D-183 flagged only the fins/optimistic half; D-190 adds the
         // kick/drill pessimistic half. (Trend-substrate exclusion stays in the held swim-cleanup work order.)
-        const equipmentDir = (() => {
-          let meta: any = (workout as any).workout_metadata;
-          if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = {}; } }
-          meta = meta || {};
-          const confirmed = Array.isArray(meta.swim_steps_equipment_confirmed) ? meta.swim_steps_equipment_confirmed : [];
-          const unplanned = Array.isArray(meta.swim_equipment_unplanned) ? meta.swim_equipment_unplanned : [];
-          const used: string[] = [
-            ...confirmed.filter((e: any) => e?.used === true).map((e: any) => String(e?.equipment || '').toLowerCase()),
-            ...unplanned.map((e: any) => String(e || '').toLowerCase()),
-          ];
-          const has = (re: RegExp) => used.some((u) => re.test(u));
-          // D-192 (Bug 1 fix): the ACTUAL equipment names used this swim — the narrative may name ONLY
-          // these. The optimistic/pessimistic flags are INTERNAL direction-logic, never recited as gear.
-          const names = [...new Set(used.map((u) => u.trim()).filter(Boolean))];
-          return {
-            names,                                                  // actual equipment, e.g. ['fins','snorkel']
-            optimistic: has(/fin|buoy|pull|paddle/),                 // reads FASTER than unaided (INTERNAL)
-            pessimistic: has(/kick|board|drill|catch.?up|single.?arm|scull/), // reads SLOWER (INTERNAL)
-          };
-        })();
+        // Single-sourced via the shared detectSwimEquipment (was an inline mirror of the exact same
+        // regexes + metadata keys, kept in manual sync — collapsed per the swim audit). Behavior-identical;
+        // output shape preserved for the prompt fields below. names = actual gear (narrative names ONLY
+        // these, D-192); optimistic/pessimistic are INTERNAL direction flags, never recited as gear.
+        const _swimEquip = detectSwimEquipment((workout as any).workout_metadata);
+        const equipmentDir = {
+          names: _swimEquip.names,
+          optimistic: _swimEquip.direction === 'optimistic' || _swimEquip.direction === 'mixed', // reads FASTER (INTERNAL)
+          pessimistic: _swimEquip.direction === 'pessimistic' || _swimEquip.direction === 'mixed', // reads SLOWER (INTERNAL)
+        };
 
         const workoutContext = {
           type: workout.type,
