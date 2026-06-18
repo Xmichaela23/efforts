@@ -1476,7 +1476,7 @@ return (
                           )}
                           <div className="space-y-2">
                             <label className="text-xs text-white/60">Equipment</label>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="grid grid-cols-2 gap-2">
                               {swimmingEquipmentOptions.map((option) => {
                                 const isSelected = (data.equipment.swimming || []).includes(option);
                                 const hint = swimmingEquipmentHints[option];
@@ -1485,13 +1485,25 @@ return (
                                     key={option}
                                     onClick={() => toggleEquipment('swimming', option)}
                                     title={hint}
-                                    className={`px-2 py-1 text-xs rounded-full transition-all duration-300 ${
+                                    className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg border transition-all duration-300 ${
                                       isSelected
-                                        ? 'bg-white/[0.12] border border-white/50 text-white'
-                                        : 'bg-white/[0.08] border border-white/25 text-white/80 hover:bg-white/[0.12] hover:border-white/35 hover:text-white'
+                                        ? 'text-white'
+                                        : 'border-white/15 bg-white/[0.04] text-white/60 hover:border-white/25 hover:bg-white/[0.08]'
                                     }`}
-                                    style={{ fontFamily: 'Inter, sans-serif' }}
+                                    style={{
+                                      fontFamily: 'Inter, sans-serif',
+                                      ...(isSelected ? { borderColor: `${SPORT_COLORS.swim}80`, backgroundColor: `${SPORT_COLORS.swim}15` } : {}),
+                                    }}
                                   >
+                                    <span
+                                      className="w-3.5 h-3.5 rounded flex items-center justify-center border shrink-0"
+                                      style={{
+                                        borderColor: isSelected ? SPORT_COLORS.swim : 'rgba(255,255,255,0.25)',
+                                        backgroundColor: isSelected ? SPORT_COLORS.swim : 'transparent',
+                                      }}
+                                    >
+                                      {isSelected && <span className="text-[8px] text-black font-bold">✓</span>}
+                                    </span>
                                     {option}
                                   </button>
                                 );
