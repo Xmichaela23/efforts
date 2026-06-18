@@ -847,6 +847,19 @@ const disciplineOptions = [
     return active?.color || '#ffffff';
   };
 
+  // Q-070 fix: the chip ✓ + highlight reflect a baseline ACTUALLY ENTERED (per-sport performance
+  // numbers), NOT membership in data.disciplines. Peeking a chip (which still sets activeSport for
+  // the editor) no longer earns a ✓ or sticky selection state — only entering a number does.
+  const hasBaselineEntered = (id: string): boolean => {
+    const pn = (data.performanceNumbers || {}) as any;
+    const has = (v: any) => v !== undefined && v !== null && String(v).trim() !== '';
+    if (id === 'running') return has(pn.fiveK) || has(pn.easyPace) || has(pn.tenK) || has(pn.halfMarathon) || has(pn.marathon);
+    if (id === 'cycling') return has(pn.ftp);
+    if (id === 'swimming') return has(pn.swimPace100) || has(pn.swim200Time) || has(pn.swim400Time);
+    if (id === 'strength') return has(pn.squat) || has(pn.deadlift) || has(pn.bench);
+    return false;
+  };
+
   const toggleDiscipline = (disciplineId: string) => {
     // If clicking the already active sport, close it
     if (activeSport === disciplineId) {
@@ -1059,7 +1072,7 @@ return (
                       {disciplineOptions.map((discipline) => {
                         const Icon = discipline.icon;
                         const isActive = activeSport === discipline.id;
-                        const hasData = data.disciplines.includes(discipline.id);
+                        const hasBaseline = hasBaselineEntered(discipline.id);
                         return (
                           <button
                             key={discipline.id}
@@ -1067,7 +1080,7 @@ return (
                             className={`relative flex items-center justify-center gap-1.5 py-2.5 rounded-full border text-center transition-all duration-300 backdrop-blur-lg ${
                               isActive
                                 ? 'border-transparent'
-                                : hasData
+                                : hasBaseline
                                   ? 'border-white/20 bg-white/[0.06] hover:bg-white/[0.10]'
                                   : 'border-white/15 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.08]'
                             }`}
@@ -1081,7 +1094,7 @@ return (
                               } : {})
                             }}
                           >
-                            {!isActive && hasData && (
+                            {!isActive && hasBaseline && (
                               <span 
                                 className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-bold"
                                 style={{ backgroundColor: discipline.color, color: '#000' }}
@@ -1091,11 +1104,11 @@ return (
                             )}
                             <Icon 
                               className="h-4 w-4 transition-colors duration-300" 
-                              style={{ color: isActive || hasData ? discipline.color : 'rgba(255,255,255,0.5)' }}
+                              style={{ color: isActive || hasBaseline ? discipline.color : 'rgba(255,255,255,0.5)' }}
                             />
                             <span 
                               className="text-xs font-medium transition-colors duration-300"
-                              style={{ color: isActive ? discipline.color : hasData ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)' }}
+                              style={{ color: isActive ? discipline.color : hasBaseline ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)' }}
                             >
                               {discipline.name}
                             </span>
@@ -1419,7 +1432,7 @@ return (
                             <h3 className="text-sm font-medium text-white/90">Swimming</h3>
                           </div>
                           <div className="flex items-center gap-2">
-                            <label className="text-xs text-white/60">100yd Pace</label>
+                            <label className="text-xs text-white/60">Threshold 100 Pace</label>
                                       <input
                                         type="text"
                                         value={data.performanceNumbers?.swimPace100 || ''}

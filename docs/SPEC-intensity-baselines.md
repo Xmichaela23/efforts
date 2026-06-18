@@ -130,7 +130,14 @@ Verification (post-deploy): recompute one historical swim via `recompute-workout
 - **Mirror the existing FTP learner almost 1:1** (`learn-fitness-profile`, FTP ratchet floor ~:329-344, learned-FTP quality gates). Same shape: accumulate qualifying efforts → fit the model → expose a confidence tier → refine as data arrives → ratchet floor so a single bad session can't tank it.
 - **Model:** fit the 2-param critical-speed model — critical speed + anaerobic distance reserve (the D′ analog) — the asymptote of the speed-duration curve.
 - **Converges only from hard efforts.** Easy aerobic swimming reveals nothing about threshold (same limitation as the FTP learner needing hard rides). Below the threshold of qualifying hard efforts, CSS stays **null** and `learning_status='insufficient_data'`.
-- **Data hygiene (reuse the swim-cleanup machinery):** filter to clean, sustained, continuous efforts; **exclude drills, push-offs, kick sets, short-fast-with-long-rest, and equipment-contaminated sets** (the D-193 `detectSwimEquipment` + rest-fraction hygiene already built for Q-061). A naive "fastest 100" poisons CSS and inflates every zone — same contamination class as the pace trend.
+- **⛔ HARD REQUIREMENT — contamination guard (non-negotiable; auto-learn does NOT go live without it).** When auto-learn is ON, the learner MUST learn ONLY from clean, continuous, full-stroke **freestyle** at **sustained hard** effort. It MUST exclude, reusing the EXISTING tags/machinery (do NOT build new tagging):
+  - any set with **equipment** — fins, paddles, pull buoy, kickboard, snorkel, ankle band → `_shared/swim/swim-equipment.ts detectSwimEquipment` (the D-193 capture);
+  - **drill / technique** sets → `swim-step-equipment.ts` per-step + the `technique`/`drill` intent in `rest-norm.ts`;
+  - **kick-only** sets;
+  - **short reps with high rest fraction** → the `rest-norm.ts` rest-fraction machinery (a fast 10×50 @ 30 s rest is NOT a threshold input).
+  Same principle as the FTP learner: it converges ONLY from genuinely hard, clean efforts; easy / equipment / drill / kick swimming reveals nothing about threshold and would **inflate CSS → inflate every zone.** This filter is the gate before auto-learn ships.
+- **Positive selection (the speed-duration curve):** among the clean-and-hard efforts, fit CSS from the **best sustained efforts across durations** (the critical-speed curve) — exactly as the FTP learner uses best power efforts, not the average of all clean swims.
+- **Manual / auto toggle (the FTP pattern):** a checkbox on the swim baseline. **Unchecked (default):** the manually entered "Threshold 100 Pace" holds (the seed). **Checked:** the threshold number is **learned** from actual swims via this learner; the field shows the learned value, editable to override — same manual/auto pattern as FTP. Persist the flag alongside the seed.
 - **Quality gate:** mirror the learned-FTP split (materialize rejects `learned-low`; only `learned` is trusted for paced targets) — a low-confidence CSS degrades per the RPE contract rather than prescribing fake-precise paces.
 
 ### Units & storage
