@@ -6,6 +6,7 @@ import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
 import { Button } from './ui/button';
 import { SPORT_COLORS } from '@/lib/context-utils';
+import { deriveSwimPaceBands, parsePaceToSeconds } from '@/lib/swimPaceZones';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { refreshGroupRideRouteSnapshotsForUser } from '@/lib/refresh-group-ride-route-snapshots';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -1435,6 +1436,8 @@ return (
                                       />
                             <span className="text-xs text-white/60">mm:ss</span>
                                     </div>
+                          {/* D-199 C1: seed microcopy — plain effort language, no "CSS"/Z-names, no "sprint" */}
+                          <p className="text-[11px] text-white/40 -mt-1">Your fast-but-steady 100 — the pace you could hold for a hard 400, not an all-out sprint.</p>
                           <div className="space-y-2">
                             <label className="text-xs text-white/60">Equipment</label>
                             <div className="flex flex-wrap gap-2">
@@ -1459,15 +1462,41 @@ return (
                               })}
                             </div>
                                     </div>
-                          {/* D-199 Layer A: honest swim pace-zone placeholder — replaces the leaked run HR
-                              card. Neutral, NON-conditional copy: it does NOT reference the 100yd-pace field
-                              (which isn't reliably persisted yet — a C1 BLOCKER) and makes no "no baseline"
-                              claim, so it can't contradict the field in any state. Real CSS-derived swim pace
-                              zones land in Layer C. */}
-                          <div className="px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] mt-1">
-                            <div className="text-xs text-white/60">Pace Zones</div>
-                            <div className="text-xs text-white/40 mt-1">Swim pace zones are coming soon.</div>
-                          </div>
+                          {/* D-199 Layer C1: swim Pace Zones derived from the entered 100 pace (the internal
+                              CSS anchor). PLAIN labels only — no "CSS"/Z-names (Decision A; the 2026-05-22
+                              anti-regression rule holds). All 5 bands show their pace targets (a reference,
+                              like the run HR-zone card); empty until a 100 pace is entered. The swim PROGRAM
+                              only prescribing easy/moderate (no hard/threshold/speed) is a separate item, Q-071. */}
+                          {(() => {
+                            const bands = deriveSwimPaceBands(parsePaceToSeconds(data.performanceNumbers?.swimPace100) ?? 0);
+                            return (
+                              <div className="px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] mt-1">
+                                <div className="flex items-center justify-between">
+                                  <div className="text-xs text-white/60">Pace Zones</div>
+                                  {bands.length > 0 && (
+                                    <div className="text-[10px] text-white/40">Threshold pace · {data.performanceNumbers?.swimPace100}/100yd</div>
+                                  )}
+                                </div>
+                                {bands.length === 0 ? (
+                                  <div className="text-xs text-white/40 mt-1">Enter your 100 pace above to see your swim pace zones.</div>
+                                ) : (
+                                  <div className="mt-2 rounded-lg overflow-hidden border border-white/10">
+                                    {bands.map((b) => (
+                                      <div
+                                        key={b.label}
+                                        className={`flex items-center justify-between px-3 py-1.5 border-b border-white/[0.05] last:border-b-0 ${b.anchor ? 'bg-white/[0.06]' : ''}`}
+                                      >
+                                        <span className={`text-xs ${b.anchor ? 'font-semibold text-white/90' : 'font-medium text-white/80'}`}>
+                                          {b.label}
+                                        </span>
+                                        <span className="text-xs font-mono text-white/60">{b.range} /100yd</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                                   </div>
                                 )}
 

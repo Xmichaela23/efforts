@@ -97,10 +97,20 @@ Verification (post-deploy): recompute one historical swim via `recompute-workout
 | **Z4** | **Threshold (CSS)** | **CSS to CSS − 2 s (≈ CSS)** | `threshold`, `race_specific_aerobic` |
 | Z5 | VO2 / Speed | CSS − 3 s and faster (sprint = off-CSS, all-out) | `speed`, `sprint` |
 
-> ⚠ **ATHLETE-FACING LABELING CONFLICT — product decision needed before the Pace Zones card ships.**
-> The **2026-05-22 anti-regression rule** (SWIM-PROTOCOL.md, LOCKED) forbids the word **"CSS"**, "Critical Swim Speed", "Z3 CSS aerobic", and engine-internal session-type identifiers from appearing on **athlete-facing** surfaces — swims are presented as **easy / moderate / hard** + concrete sets, never zones-with-CSS. The just-locked 5-zone DISPLAY names ("Z4 Threshold-CSS", CSS-as-anchor) collide with that rule *on the baseline card.*
-> **Options:** **(A, recommended)** keep "CSS" engine-internal; the athlete-facing card uses zone names WITHOUT the word CSS and labels the anchor **"Threshold pace /100"** (exactly as the run card shows "Threshold Pace," not the raw model name) — satisfies BOTH locks. **(B)** amend the 2026-05-22 rule to expose "CSS" on the baseline settings screen as a deliberate education choice.
-> **Pending Michael's call.** Until resolved, the card uses the neutral D-199 placeholder.
+> ✅ **RESOLVED 2026-06-17 — Decision A (Michael).** Athlete-facing labels are **plain effort words**; **"CSS" and Z-numbers stay engine-internal, never surfaced** (both 2026-05-22 locks intact). Rationale: users are triathletes/hybrid, not swim-first — "CSS"/"Z4" would glaze them; same pattern as the run card showing "Threshold Pace" (not the model name), and the swim PLAN already translating "Z3 CSS+5s" → "moderate." The card extends that existing translation layer, not a new one.
+>
+> **Athlete-facing band labels (LOCKED). Anchor row surfaced as "Threshold pace /100" (never "CSS"):**
+>
+> | Internal (engine only) | Athlete-facing label | CSS offset (per 100) |
+> |---|---|---|
+> | Z1 Recovery | **Recovery** | CSS + ~12–15 s and slower |
+> | Z2 Endurance | **Easy** | CSS + ~8–12 s |
+> | Z3 Tempo | **Moderate** | CSS + ~3–8 s |
+> | Z4 Threshold (CSS) | **Threshold** ← anchor | CSS − 2 to CSS + 3 (≈ CSS) |
+> | Z5 VO2 / Speed | **Fast** | CSS − 2 s and faster |
+>
+> The 5 bands are a finer-grained version of the plan's existing easy/moderate/hard (Recovery+Easy → "easy"; Moderate → "moderate"; Threshold+Fast → "hard"). The card is a **reference** (all 5 bands show pace targets, like the run HR-zone card) — it does NOT depend on which bands the program prescribes into. The program currently prescribing only easy/moderate is a separate program-work item ([[Q-071]]), NOT a card gap.
+> **Shipped (client helper):** `src/lib/swimPaceZones.ts` (`deriveSwimPaceBands` — offsets here are the single source) + the Pace Zones card in `TrainingBaselines.tsx`, derived from the entered 100 pace (the internal CSS anchor). Layer B (server analyzer verdict) will reuse the same offsets when built.
 
 #### C1 — manual seed field + zone derivation (BUILD FIRST)
 

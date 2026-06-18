@@ -980,6 +980,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-071 — Swim PROGRAM prescribes into only 2 of the 5 intensity bands (no hard/threshold/speed) — future program work, NOT a card bug
+
+- **Status:** filed 2026-06-17 (surfaced reading the active 70.3 plan during the D-199 / Layer-C zone work) · **NOT building now — deferred program enhancement.**
+- **What it is:** the active IRONMAN 70.3 plan's 34 swims map to **EASY (22) + MODERATE (12) only — zero HARD.** Session types present: `technique_swim` (18) + `recovery_swim` (4) = easy; `css_aerobic` (9) + `pull_focus_swim` (3) = moderate. NO threshold (Z4), speed/sprint (Z5), or race_specific_aerobic anywhere in the loaded plan — every "quality" session is explicitly *"moderate, sustainable, conversational"* (Z3 CSS-aerobic), not a hard effort.
+- **Why this is NOT a card bug:** the D-199 Layer-C Pace Zones card is a **reference** — it shows all 5 bands' pace targets derived from the athlete's threshold pace (like the run HR-zone card shows all 5 zones regardless of plan). The card does not look "empty." The gap is in the PROGRAM's prescription distribution, separate from the card.
+- **The work (deferred):** build hard/threshold/speed swim prescription into the later phases of the swim program (`generate-combined-plan` swim path; SWIM-PROTOCOL §5.3 Threshold + the speed session types exist in the protocol but aren't being prescribed) so a 70.3/Ironman build develops threshold + speed, not only aerobic base. **Open question:** is the all-aerobic base intended for the current phase, or a genuine gap across the whole 17-week plan?
+- **Cross-ref:** D-199, `docs/SPEC-intensity-baselines.md` (the 5-band model), `docs/SWIM-PROTOCOL.md` §5.3 (threshold session type that exists but isn't prescribed here).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
