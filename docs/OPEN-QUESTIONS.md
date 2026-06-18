@@ -959,6 +959,27 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-069 — `planned_workouts.session_type` / `hardness` are NULL on all swims — cosmetic (no read site)
+
+- **Status:** filed 2026-06-17 (read-site sweep) · **CLOSED as cosmetic — no build, no backfill.**
+- **What it is:** the structured `planned_workouts.session_type` and `hardness` columns are NULL on every swim (`intensity` is `{}`). A full sweep of `session_type`/`hardness`/`session_intent` across `supabase/functions/` and `src/` found **zero consumers read these DB columns.** Every same-named symbol is one of: an in-memory `SwimSlotTemplate.session_type` build-time field in the generator (never round-tripped — `session-factory.ts`, `swim-program-templates.ts`, `week-builder.ts`); the unrelated pilates `workout_metadata.session_type` JSONB (`disc==='pilates_yoga'`-gated; swim never enters); the library-plan-pool `hardness` descriptor (`pools.schema.json`); or label-string text. No `.select()` names these columns from `planned_workouts`.
+- **Bucket result:** bucket-3 (null alters a score/load/adherence/user text) is **EMPTY.** Swim intent is tag-sourced by design (D-195; `analyze-swim-workout:413-431`, `rest-norm.ts swimIntentFromTags`); load uses `intensity_class`/tokens; adherence is count-based.
+- **D-198 `session_intent` check (the one place a real bug could hide) — CLEAN:** `session_intent` is a NEW column on `workouts` (executed table), not `planned_workouts`; mirrors `rpe`. The D-198 Mode A/B gate routes on `planned_id`, NOT `session_type`/adherence. No code gates on both; the two are independent. D-198 does not read or assume `session_type`/`hardness`.
+- **Verdict:** cosmetic — populating the columns changes no output given current code. Write gap (no insert path writes them) is likely **cross-discipline**, not swim-only (UNVERIFIED extent). A future feature wanting structured intent off the column is net-new (new Q + write path + backfill), not a fix.
+- **Cross-ref:** D-195, D-198, `docs/audit/99-SUMMARY.md` §3.
+
+---
+
+## Q-070 — Sport-chip ✓ means "selected," not "baseline entered"; peeking a chip silently adds a discipline with no un-add
+
+- **Status:** filed 2026-06-17 (surfaced during D-199 Layer A eyeball) · **NOT building now — queued; the un-add half is the real issue.**
+- **(1) Cosmetic — ✓ semantics.** In `TrainingBaselines.tsx` the sport-chip ✓ shows when `hasData = data.disciplines.includes(id)` (`:1061,:1083`) — "this sport is selected," NOT "a baseline was entered." Misleadingly named `hasData` (really `isSelected`). For null-honest consistency, ✓ should mean a baseline is actually entered; rename `hasData → isSelected`.
+- **(2) Real issue — silent add, no un-add.** `toggleDiscipline` (`:849-861`) adds the discipline to `data.disciplines` the moment you TAP the chip to peek (before any entry), with **no way to un-add** (tapping an active chip only closes it). So peeking at a sport you don't train permanently marks it selected — and that selection can **feed plan generation a discipline the athlete doesn't train.** The un-add path (and not-auto-adding on mere peek) is the part worth fixing.
+- **Persistence note (resolved, not a bug):** the related `swimPace100` "doesn't persist" worry was reproduced from code and is FALSE — it round-trips via `performance_numbers` (AppContext `:337/:380/:445/:470`); committed on the Save tap. No fix needed. See `SPEC-intensity-baselines.md` C1.
+- **Cross-ref:** D-199, `src/components/TrainingBaselines.tsx:849-861,1061,1083`.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

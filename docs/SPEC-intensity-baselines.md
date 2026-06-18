@@ -85,9 +85,26 @@ Verification (post-deploy): recompute one historical swim via `recompute-workout
 
 **Ordering is explicit and load-bearing.** The CSS learner only converges from *hard* efforts; an athlete who swims mostly aerobic will sit at null CSS indefinitely. So the **manual seed is the critical path to lighting up swim zones** — build it first. The learner is the refinement layer that sits null until enough hard efforts are logged.
 
+### The swim zone model (LOCKED 2026-06-17 — 5 zones, CSS-anchored)
+
+**Sourced from `docs/SWIM-PROTOCOL.md` §4–5** so the display/verdict zones MATCH what the engine already prescribes (single-source — do NOT invent different offsets; the prescription side already uses these via the 2026-05-22 CSS-kill arc). **CSS is the ONLY measured anchor; Z1/Z2/Z3/Z5 are labeled CSS-relative offsets, not independent thresholds.**
+
+| Zone | Internal name | CSS offset (per 100) | Engine session types that map here |
+|---|---|---|---|
+| Z1 | Recovery | CSS + ~12–15 s and slower | `recovery`, `kick_focused` |
+| Z2 | Endurance | CSS + ~8–10 s | `endurance`, `technique_aerobic`, `css_aerobic` (aerobic end) |
+| Z3 | Tempo | CSS + ~3–5 s (CSS+5 = the Z2–Z3 boundary) | `css_aerobic` (moderate) |
+| **Z4** | **Threshold (CSS)** | **CSS to CSS − 2 s (≈ CSS)** | `threshold`, `race_specific_aerobic` |
+| Z5 | VO2 / Speed | CSS − 3 s and faster (sprint = off-CSS, all-out) | `speed`, `sprint` |
+
+> ⚠ **ATHLETE-FACING LABELING CONFLICT — product decision needed before the Pace Zones card ships.**
+> The **2026-05-22 anti-regression rule** (SWIM-PROTOCOL.md, LOCKED) forbids the word **"CSS"**, "Critical Swim Speed", "Z3 CSS aerobic", and engine-internal session-type identifiers from appearing on **athlete-facing** surfaces — swims are presented as **easy / moderate / hard** + concrete sets, never zones-with-CSS. The just-locked 5-zone DISPLAY names ("Z4 Threshold-CSS", CSS-as-anchor) collide with that rule *on the baseline card.*
+> **Options:** **(A, recommended)** keep "CSS" engine-internal; the athlete-facing card uses zone names WITHOUT the word CSS and labels the anchor **"Threshold pace /100"** (exactly as the run card shows "Threshold Pace," not the raw model name) — satisfies BOTH locks. **(B)** amend the 2026-05-22 rule to expose "CSS" on the baseline settings screen as a deliberate education choice.
+> **Pending Michael's call.** Until resolved, the card uses the neutral D-199 placeholder.
+
 #### C1 — manual seed field + zone derivation (BUILD FIRST)
 
-> **⛔ BLOCKER (confirm before starting C1):** the existing swim "100yd Pace" field (`swimPace100`) does **NOT reliably persist across reload** today (surfaced 2026-06-17 — a value entered in the field can come back empty after a restart). C1 makes this field the **CSS seed**, and the seed is the critical path to lighting up swim zones (the learner sits null until hard efforts log). **A seed that doesn't survive reload = swim zones that vanish on every app restart.** Verify `swimPace100` saves to `performance_numbers` and loads back via `loadBaselines` (does it need an explicit Save? is it in the load mapping?) and fix it FIRST. Do not start C1 until persistence is confirmed. (Tracked in the badge Q-NNN.)
+> **✓ Persistence CONFIRMED (2026-06-17, reproduced from code — NOT a blocker):** `swimPace100` round-trips correctly — `saveUserBaselines` writes the whole `performanceNumbers` blob to `user_baselines.performance_numbers` (AppContext `:337,:380`) and `loadUserBaselines` reads it straight back (`:445,:470`); a delete-app + clean reinstall kept an entered 2:30. NO persistence bug — the earlier "didn't persist" was typed-but-unsaved local state. The CSS seed will persist via this same path. The only UX caveat for C1: the field commits on the **"Save Baselines"** tap, so consider whether the seed wants auto-save vs the explicit button.
 
 - **Location:** the existing swim "100yd Pace" field in `TrainingBaselines.tsx` (the swim section, ~line 1421) is the right *location* — promote it from a loose number to a **CSS seed**.
 - **Treatment:** the entered pace is treated as a CSS seed → swim pace zones derive from it → the learner refines over time. Serves the "I just think in 100 pace" athlete without abandoning CSS as the engine.

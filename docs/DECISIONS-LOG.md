@@ -4219,6 +4219,21 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-199 — Swim intensity = CSS-primary; swim HR un-anchored from run threshold (Layer A shipped)
+
+- **Date:** 2026-06-17
+- **Context:** The swim surface borrowed running's intensity model — the analyzer anchored swim HR to `run_threshold_hr` (and the generic run/max-derived `configured_hr_zones`), and the baselines UI rendered the run Friel %LTHR card + a per-mile run threshold pace on the swim tab. Swim HR runs ~10–15 bpm below run HR for the same effort (horizontal position, water cooling, smaller muscle mass; SPEC-honest-swim-inference), so a run anchor reads every swim as easier than it was — directionally wrong, not a shortcut. D-190/D-183 had already shipped zone-anchored swim HR, risking an analyzer/narrative contradiction.
+- **Decision:** swim intensity is **CSS-primary** (Critical Swim Speed = swim analog of FTP; pace/100 is the verdict, HR demoted to soft context). Run-threshold-as-swim-anchor removed entirely. Discipline → native metric: Run → LTHR/pace, Cycle → FTP/power, **Swim → CSS/pace**.
+- **Layer A (shipped this entry):**
+  - `analyze-swim-workout`: removed the run-anchor `hrBands` builder + the `configured_hr_zones`/`learned_fitness` fetch that fed it → swim HR UNANCHORED → `hrZoneCtx` null → narrative neutral on HR. **Verified** by recomputing the canonical 119-bpm dev swim on the deployed fn: narrative reads HR via RPE+feel coherence and average-over-peak, ZERO run-threshold zone anchoring.
+  - `TrainingBaselines.tsx`: the global HR Zones card (run+cycle rows on every tab) is now **per-active-sport** — Run→run only, Cycle→cycle only, Swim/Strength→none; swim shows a neutral "Pace zones coming soon" placeholder. Kills the run-Friel card + per-mile threshold-pace leak on swim.
+- **Numbering:** D-198 is taken by the unmerged `feat/d198-cycling-intent` branch; this is D-199 to avoid collision.
+- **Staged (NOT Layer A), spec'd in `docs/SPEC-intensity-baselines.md`:** Layer B (CSS-primary verdict in analyzer), Layer C (manual CSS seed FIRST → CSS learner mirroring the FTP learner), and #5 (null-honest baselines + the RPE-degrade contract). **5-zone CSS model LOCKED** (Z1–Z5, CSS-relative offsets sourced from SWIM-PROTOCOL §4–5; CSS is the only measured anchor). **OPEN:** athlete-facing labeling conflict with the 2026-05-22 anti-regression rule (no "CSS" word athlete-facing) — resolution options A/B in the spec, pending decision.
+- **Deployed:** `analyze-swim-workout` (2026-06-17); UI ships with the client (`git push 8ba50fbf`). On-device eyeball confirmed swim/run/cycle/strength tabs.
+- **Cross-ref:** `docs/SPEC-intensity-baselines.md` (full B/C/#5 spec + zone model + conflict), SPEC-honest-swim-inference, SWIM-PROTOCOL.md §4–5, Q-069 (session_type cosmetic), Q-070 (✓-badge items surfaced during the eyeball).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
