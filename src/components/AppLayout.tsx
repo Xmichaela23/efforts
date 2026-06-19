@@ -244,7 +244,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       const open = localStorage.getItem('strength_logger_open');
       const uncompleted = hasUncompletedStrengthSession();
       const raw = localStorage.getItem('strength_logger_workout');
-      try { console.log('[logger-resume] cold-start ' + JSON.stringify({ open, uncompleted, hasWorkout: !!raw, workoutId: raw ? (JSON.parse(raw)?.id ?? null) : null })); } catch {}
       if (open !== '1' || !uncompleted) return null;
       return raw ? JSON.parse(raw) : null;
     } catch { return null; }

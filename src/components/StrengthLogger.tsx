@@ -849,8 +849,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         (ex) => Array.isArray(ex?.sets) && ex.sets.some((s) => s?.completed)
       );
       if (!hasCompletedSet) {
-        try { console.log('[logger-restore] SAVE-GATE removed draft — no completed set (' + (Array.isArray(exercisesData) ? exercisesData.length : 0) + ' ex) key=' + sessionKey); } catch {}
-        try { localStorage.removeItem(sessionKey); } catch {}
+        // Do NOT delete an existing draft here. During a resume rebuild the prescribed workout reloads/
+        // prefills, producing a transient "N exercises, none completed yet" snapshot — and removing on
+        // that was WIPING the good draft (the resume data-loss bug). Just SKIP writing; the draft is
+        // cleared explicitly on finish (clearSessionProgress) or the orphan-verify, never by a passive
+        // no-completed snapshot. (Worst case: a draft lingers slightly stale if the user un-completes
+        // everything — far better than losing logged work on every resume.)
         return;
       }
       const sessionData = {
@@ -1672,12 +1676,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const savedSession = restoreSessionProgress(openedId);
       const identityMatches = !!savedSession && ((savedSession.sourcePlannedId ?? null) === openedId);
 
-      // TEMP DIAGNOSTIC (strength restore): shows in the Xcode console which link breaks.
-      try {
-        const allSets = (savedSession?.exercises ?? []).flatMap((e: any) => e?.sets ?? []);
-        console.log('[logger-restore] mount ' + JSON.stringify({ openedId, scheduledId: scheduledWorkout?.id ?? null, hasDraft: !!savedSession, draftPlannedId: savedSession?.sourcePlannedId ?? null, identityMatches, exCount: savedSession?.exercises?.length ?? 0, totalSets: allSets.length, completedSets: allSets.filter((s: any) => s?.completed).length, sample: allSets[0] ? { reps: allSets[0].reps, weight: allSets[0].weight, completed: !!allSets[0].completed } : null, mode: modeAtOpen }));
-      } catch {}
-
       if (savedSession && identityMatches && modeAtOpen !== 'mobility') {
         const verifiedOrphan = await (async (): Promise<boolean> => {
           const pid = savedSession.sourcePlannedId;
@@ -1699,7 +1697,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           }
         })();
 
-        try { console.log('[logger-restore] verifiedOrphan=' + verifiedOrphan + ' pid=' + savedSession.sourcePlannedId); } catch {}
         if (verifiedOrphan) {
           // Planned row deleted. Clear the orphan and fall through to fresh init.
           try { clearSessionProgress(); } catch {}
@@ -1726,7 +1723,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Existing init body extracted into a local function so the orphan-cleared
     // path can re-enter it without duplicating ~200 lines.
     function runFreshInit() {
-    try { console.log('[logger-restore] FRESH-INIT — wipes restored sets, scheduledId=' + (scheduledWorkout?.id ?? null)); } catch {}
     // Clear any existing lock when no saved session
     setLockManualPrefill(false);
     setIsInitialized(true);
@@ -2738,12 +2734,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
     
-    // D-134 (refines D-126): RIR is not pre-committed, but Done no longer drops into the
-    // numeric keypad. Surface a quick INLINE confirm-or-adjust RIR selector on this set's
-    // card (suggested value pre-highlighted; one tap confirms, a different tap adjusts, both
-    // complete the set; "skip" completes without RIR). The confirmed tap is the post-set
-    // assessment — the suggested value is never auto-committed without it.
-    setRirConfirm({ exerciseId, setIndex });
+    // Done just SAVES (supersedes D-134's forced confirm — Michael 2026-06-18: the CONFIRM RIR panel
+    // read as "you MUST tap a number" and confused). Auto-apply the suggested RIR (target_rir from the
+    // prescription, default 3) and complete the set. RIR stays fully editable afterward via its field.
+    const suggestedRir = typeof exercise.target_rir === 'number' ? exercise.target_rir : 3;
+    updateSet(exerciseId, setIndex, { rir: suggestedRir, completed: true });
+    autoStartRestForSet(exerciseId, setIndex);
   };
 
   // D-134: resolve the inline RIR confirm — a pill tap confirms/adjusts + completes; skip
