@@ -1440,13 +1440,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } catch { return []; }
   };
 
+  // D-204b: run-once guard. Without it, a warm resume that re-mints `scheduledWorkout`
+  // (AppLayout appStateChange) re-fires this effect and setExercises(prefill) wipes the
+  // athlete's live edits/completions back to the prescription — the strength data-loss bug.
+  // Prefill once per open (set the ref only after a successful prefill); never overwrite an
+  // engaged session. Mirrors didAutofillRef / didInitRef on the sibling prefill effects.
+  const didComputedPrefillRef = useRef(false);
   useEffect(() => {
+    if (didComputedPrefillRef.current) return;
     try {
       // prefer scheduledWorkout.computed
       const comp = (scheduledWorkout as any)?.computed;
       if (comp && Array.isArray(comp?.steps)) {
         const exs = parseFromComputed(comp);
-        if (exs.length) { setExercises(exs); setIsInitialized(true); return; }
+        if (exs.length) { setExercises(exs); setIsInitialized(true); didComputedPrefillRef.current = true; return; }
       }
     } catch {}
 
@@ -1474,7 +1481,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           if (plannedStrength && Array.isArray(plannedStrength?.planned?.steps)) {
             const computedLike = { steps: plannedStrength.planned.steps, total_duration_seconds: plannedStrength.planned.total_duration_seconds };
             const exs = parseFromComputed(computedLike);
-            if (exs.length) { setExercises(exs); return; }
+            if (exs.length) { setExercises(exs); didComputedPrefillRef.current = true; return; }
           }
         } catch {}
         // DB planned_workouts row
@@ -1490,7 +1497,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (!data) return;
         if ((data as any)?.computed && Array.isArray((data as any).computed?.steps)) {
           const exs = parseFromComputed((data as any).computed);
-          if (exs.length) { setExercises(exs); return; }
+          if (exs.length) { setExercises(exs); didComputedPrefillRef.current = true; return; }
         }
       } catch {}
     })();

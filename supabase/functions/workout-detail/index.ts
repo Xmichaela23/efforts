@@ -215,7 +215,9 @@ function buildDetailCoreForSession(row: any): { detail: any; processingComplete:
               reps: Number((set?.reps as any) ?? 0) || 0,
               weight: Number((set?.weight as any) ?? 0) || 0,
               rir: typeof set?.rir === 'number' ? set.rir : undefined,
-              completed: Boolean(set?.completed)
+              completed: Boolean(set?.completed),
+              // D-204: preserve prefill provenance so readers can drop untouched prefills.
+              prefilled: Boolean(set?.prefilled)
             }))
           : Array.from({ length: Math.max(1, Number(exercise.sets||0)) }, () => ({ reps: Number(exercise.reps||0)||0, weight: Number(exercise.weight||0)||0, completed: false })),
         reps: Number(exercise.reps || 0) || 0,
@@ -1282,7 +1284,9 @@ Deno.serve(async (req) => {
                 reps: Number((set?.reps as any) ?? 0) || 0,
                 weight: Number((set?.weight as any) ?? 0) || 0,
                 rir: typeof set?.rir === 'number' ? set.rir : undefined,
-                completed: Boolean(set?.completed)
+                completed: Boolean(set?.completed),
+                // D-204: preserve prefill provenance so readers can drop untouched prefills.
+                prefilled: Boolean(set?.prefilled)
               }))
             : Array.from({ length: Math.max(1, Number(exercise.sets||0)) }, () => ({ reps: Number(exercise.reps||0)||0, weight: Number(exercise.weight||0)||0, completed: false })),
           reps: Number(exercise.reps || 0) || 0,

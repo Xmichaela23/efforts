@@ -186,15 +186,22 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     
     // Handle standard format with sets array
     const safeSets = Array.isArray(ex?.sets)
-      ? ex.sets.map((s: any) => ({
-          reps: Number((s?.reps as any) ?? 0) || 0,
-          weight: Number((s?.weight as any) ?? 0) || 0,
-          rir: typeof s?.rir === 'number' ? s.rir : undefined,
-          completed: Boolean(s?.completed)
-        }))
+      ? ex.sets
+          // D-204: drop pure untouched prefills (completed!==true && prefilled) so the
+          // Details receipts + volume reflect what was performed, not the prescription.
+          .filter((s: any) => !(s?.completed !== true && s?.prefilled === true))
+          .map((s: any) => ({
+            reps: Number((s?.reps as any) ?? 0) || 0,
+            weight: Number((s?.weight as any) ?? 0) || 0,
+            rir: typeof s?.rir === 'number' ? s.rir : undefined,
+            completed: Boolean(s?.completed),
+            prefilled: Boolean(s?.prefilled)
+          }))
       : [];
     return { ...ex, name: cleanName, sets: safeSets };
-  });
+  // D-204: drop exercises with no performed sets (pure untouched prefills) so skipped
+  // prescribed exercises don't render as completed in the Details receipts.
+  }).filter((ex: any) => Array.isArray(ex?.sets) && ex.sets.length > 0);
 
   // Calculate total workout statistics
   const workoutStats = useMemo(() => {

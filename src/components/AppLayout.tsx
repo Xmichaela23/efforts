@@ -162,7 +162,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           if (localStorage.getItem('strength_logger_open') !== '1') return;
           if (!hasUncompletedStrengthSession()) return;
           // Restore the workout identity BEFORE reopening so the draft-restore guard matches.
-          try { const raw = localStorage.getItem('strength_logger_workout'); if (raw) setLoggerScheduledWorkout(JSON.parse(raw)); } catch {}
+          // D-204b: only adopt the stored workout if we don't already have one in memory.
+          // Re-parsing on every foreground minted a NEW object reference, re-firing the
+          // logger's prefill effect and wiping live edits. `prev ?? …` stops that churn.
+          try { const raw = localStorage.getItem('strength_logger_workout'); if (raw) setLoggerScheduledWorkout((prev: any) => prev ?? JSON.parse(raw)); } catch {}
           setShowStrengthLogger(true);
         });
       } catch {
