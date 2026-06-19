@@ -1620,8 +1620,19 @@ export const useWorkouts = () => {
         throw new Error("User must be authenticated to delete workouts");
       }
 
-      // Capture the workout we are about to delete so we can repair any attached planned row
+      // Capture the workout we are about to delete (used by the legacy date+type fallback).
       const prior = workouts.find((w) => w.id === id);
+
+      // Capture planned rows EXPLICITLY linked to this completed workout BEFORE deleting it.
+      // auto-attach-planned links via planned_workouts.completed_workout_id (and nulls it on
+      // unlink). Reverting by that link is reliable for EVERY discipline — the old date+type
+      // match silently missed strength, leaving the planned row orphaned at `completed`.
+      // Query before the delete in case an FK clears completed_workout_id on delete.
+      const { data: linkedPlanned } = await supabase
+        .from('planned_workouts')
+        .select('id,training_plan_id,week_number,day_number')
+        .eq('user_id', userId)
+        .eq('completed_workout_id', id);
 
       const { error } = await supabase
         .from("workouts")
@@ -1632,79 +1643,71 @@ export const useWorkouts = () => {
       if (error) throw error;
       setWorkouts((prev) => prev.filter((w) => w.id !== id));
 
-      // If this was a completed workout, revert the related planned row (if any)
+      // Revert the related planned row(s) so the session returns to the calendar.
       try {
-        const wasCompleted = String((prior as any)?.workout_status || '').toLowerCase() === 'completed';
-        const date = (prior as any)?.date as string | undefined;
-        const type = (prior as any)?.type as string | undefined;
-        if (wasCompleted && date && type) {
-          // Find planned rows that were moved to this date when it was completed
-          const { data: movedPlanned } = await supabase
-            .from('planned_workouts')
-            .select('id,training_plan_id,week_number,day_number,date,type,workout_status')
-            .eq('user_id', userId)
-            .eq('date', date)
-            .eq('type', type)
-            .limit(5);
-
-          if (Array.isArray(movedPlanned) && movedPlanned.length) {
-            for (const row of movedPlanned) {
-              // Compute the canonical authored date from week/day anchored to plan week 1 Monday
-              let canonical: string | null = null;
-              try {
-                if (row.training_plan_id) {
-                  const { data: w1 } = await supabase
-                    .from('planned_workouts')
-                    .select('date,day_number')
-                    .eq('training_plan_id', row.training_plan_id)
-                    .eq('week_number', 1)
-                    .order('day_number', { ascending: true })
-                    .limit(1);
-                  if (Array.isArray(w1) && w1.length) {
-                    const anchor = w1[0] as any;
-                    const anchorDate = String(anchor.date);
-                    const anchorDay = Number(anchor.day_number) || 1;
-                    const toJs = (iso: string) => { const p = iso.split('-').map((x)=>parseInt(x,10)); return new Date(p[0], (p[1]||1)-1, p[2]||1); };
-                    const js = toJs(anchorDate);
-                    js.setDate(js.getDate() - (anchorDay - 1)); // Monday of week 1
-                    // add weeks and day offsets
-                    const weeksOffset = Math.max(0, (Number(row.week_number)||1) - 1) * 7;
-                    const dayOffset = Math.max(0, (Number(row.day_number)||1) - 1);
-                    js.setDate(js.getDate() + weeksOffset + dayOffset);
-                    const y = js.getFullYear();
-                    const m = String(js.getMonth()+1).padStart(2,'0');
-                    const d = String(js.getDate()).padStart(2,'0');
-                    canonical = `${y}-${m}-${d}`;
-                  }
-                }
-              } catch {
-                /* canonical date resolution failed for row — still revert status below */
-              }
-
-              // Revert status and date (if we found a canonical date)
-              const updates: any = { workout_status: 'planned' };
-              if (canonical) updates.date = canonical;
-              await supabase.from('planned_workouts').update(updates).eq('id', row.id).eq('user_id', userId);
-            }
-          } else {
-            // Fallback: flip any same-day planned rows back to planned
-            await supabase
+        // Canonical authored date from week/day anchored to plan week 1 Monday.
+        const canonicalDateFor = async (row: any): Promise<string | null> => {
+          try {
+            if (!row?.training_plan_id) return null;
+            const { data: w1 } = await supabase
               .from('planned_workouts')
-              .update({ workout_status: 'planned' })
+              .select('date,day_number')
+              .eq('training_plan_id', row.training_plan_id)
+              .eq('week_number', 1)
+              .order('day_number', { ascending: true })
+              .limit(1);
+            if (!Array.isArray(w1) || !w1.length) return null;
+            const anchor = w1[0] as any;
+            const toJs = (iso: string) => { const p = String(iso).split('-').map((x)=>parseInt(x,10)); return new Date(p[0], (p[1]||1)-1, p[2]||1); };
+            const js = toJs(String(anchor.date));
+            js.setDate(js.getDate() - ((Number(anchor.day_number) || 1) - 1)); // Monday of week 1
+            js.setDate(js.getDate()
+              + Math.max(0, (Number(row.week_number) || 1) - 1) * 7
+              + Math.max(0, (Number(row.day_number) || 1) - 1));
+            const y = js.getFullYear();
+            const m = String(js.getMonth() + 1).padStart(2, '0');
+            const d = String(js.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+          } catch { return null; }
+        };
+        const revertRow = async (row: any) => {
+          const canonical = await canonicalDateFor(row);
+          const updates: any = { workout_status: 'planned', completed_workout_id: null };
+          if (canonical) updates.date = canonical;
+          await supabase.from('planned_workouts').update(updates).eq('id', row.id).eq('user_id', userId);
+        };
+
+        // Primary: explicit completed_workout_id link (reliable across all disciplines).
+        let reverted = 0;
+        if (Array.isArray(linkedPlanned) && linkedPlanned.length) {
+          for (const row of linkedPlanned) { await revertRow(row); reverted += 1; }
+        }
+
+        // Fallback (legacy completions with no completed_workout_id link): match by date+type.
+        if (reverted === 0) {
+          const wasCompleted = String((prior as any)?.workout_status || '').toLowerCase() === 'completed';
+          const date = (prior as any)?.date as string | undefined;
+          const type = (prior as any)?.type as string | undefined;
+          if (wasCompleted && date && type) {
+            const { data: sameDay } = await supabase
+              .from('planned_workouts')
+              .select('id,training_plan_id,week_number,day_number')
               .eq('user_id', userId)
               .eq('date', date)
               .eq('type', type)
-              .in('workout_status', ['completed','in_progress']);
-          }
-
-          try {
-            window.dispatchEvent(new CustomEvent('planned:invalidate'));
-          } catch {
-            /* CustomEvent should not throw */
+              .in('workout_status', ['completed', 'in_progress'])
+              .limit(5);
+            for (const row of (Array.isArray(sameDay) ? sameDay : [])) await revertRow(row);
           }
         }
+
+        try {
+          window.dispatchEvent(new CustomEvent('planned:invalidate'));
+        } catch {
+          /* CustomEvent should not throw */
+        }
       } catch (e) {
-        console.warn('[useWorkouts] deleteWorkout planned-row repair failed:', e);
+        console.warn('[useWorkouts] deleteWorkout planned-row revert failed:', e);
       }
     } catch (err) {
       throw err;
