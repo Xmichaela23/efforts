@@ -1345,9 +1345,14 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null): {
     const rawName: string = ex.name ?? "unknown";
     const canon = canonicalize(rawName);
     const mg = muscleGroup(canon);
+    // D-204: a performed set is `completed !== false` AND not a pure untouched prefill
+    // (completed!==true && prefilled) — a prescription the athlete never engaged is not a
+    // logged set, and must not enter e1RM/volume. Legacy rows lack `prefilled`, so the
+    // historical `!== false` rule is unchanged for them.
+    const isPerformed = (s: any) => s.completed !== false && !(s.completed !== true && s.prefilled === true);
     const completedSets = Array.isArray(ex.sets)
-      ? ex.sets.filter((s: any) => s.completed !== false)
-      : (Array.isArray(ex.completed_sets) ? ex.completed_sets.filter((s: any) => s.completed !== false) : []);
+      ? ex.sets.filter(isPerformed)
+      : (Array.isArray(ex.completed_sets) ? ex.completed_sets.filter(isPerformed) : []);
 
     let exVolume = 0;
     let bestWeight = 0;

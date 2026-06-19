@@ -200,7 +200,11 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     const targetRir = p?.target_rir;
     const cSetsArrRaw = (c as any)?.setsArray as StrengthSet[] | undefined;
     const cSetsArr = Array.isArray(cSetsArrRaw)
-      ? cSetsArrRaw.filter((s:any)=> s && typeof s === 'object') // do not drop zero-weight/zero-rep sets
+      ? cSetsArrRaw.filter((s:any)=> s && typeof s === 'object'
+          // D-204: drop pure untouched prefills (completed!==true && prefilled) — a
+          // prescription the athlete never engaged is not a receipt. Legacy sets lack the
+          // flag and are kept. (Zero-weight/zero-rep real sets are still kept.)
+          && !(s.completed !== true && s.prefilled === true))
       : [];
     const cSets = Array.isArray(cSetsArr) ? cSetsArr.length : 0;
     const cRepsAvg = Array.isArray(cSetsArr) ? avg(cSetsArr.map(s=>s.reps||0)) : 0;

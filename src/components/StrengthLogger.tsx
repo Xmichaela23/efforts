@@ -30,6 +30,13 @@ interface LoggedSet {
    *  observed effort. Cleared the moment the athlete sets RIR themselves. Mirrors
    *  `from_previous` (D-097). Absent on legacy rows = treated as observed. */
   rir_autofilled?: boolean;
+  /** D-204 extension — set-level prefill provenance: true when the whole set was
+   *  created from a prescription (plan or prior session) and the athlete has not
+   *  engaged it. Cleared on ANY athlete edit or Done (mirrors from_previous). A set
+   *  is excluded from receipts + facts as a pure untouched prefill iff
+   *  completed!==true AND prefilled===true. Legacy rows lack it → never excluded.
+   *  (Per-field reps/weight provenance + the deviation strip are the fast-follow.) */
+  prefilled?: boolean;
   completed: boolean;
   barType?: string;
   setType?: 'warmup' | 'working'; // For baseline test workouts
@@ -1414,6 +1421,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             rir: null,
             done: false,
             amrap: isAmrap === true,
+            prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
           };
           
           if (isDurationExercise) {
@@ -1579,6 +1587,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               ...(typeof prior.rir === 'number' ? { rir: prior.rir, rir_autofilled: true } : {}),
               ...(prior.resistance_level ? { resistance_level: prior.resistance_level } : {}),
               from_previous: true,
+              prefilled: true, // D-204: prior-session prefill; cleared on first athlete edit/Done
             } as LoggedSet;
           });
           return { ...ex, sets: newSets };
@@ -1867,7 +1876,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
               barType: 'standard',
               rir: undefined,
-              completed: false
+              completed: false,
+              prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
             };
             
             // Parse reps - handle strings like "20/side", "8-10", "5 min", "Max reps"
@@ -2115,7 +2125,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
                   barType: 'standard',
                   rir: undefined,
-                  completed: false
+                  completed: false,
+                  prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
                 };
                 // Parse reps - handle strings like "20/side", "8-10", "5 min"
                 const rawReps = exercise.reps;
@@ -2586,6 +2597,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           ...newSets[setIndex],
           ...updates,
           ...(isAutofillUpdate ? {} : { from_previous: false }),
+          // D-204: any athlete edit/Done clears the prefill marker (mirrors from_previous),
+          // so an engaged set is never treated as a pure untouched prefill.
+          ...('prefilled' in updates ? {} : { prefilled: false }),
           ...rirProvenanceUpdate,
         };
         newSets[setIndex] = updatedSet;
