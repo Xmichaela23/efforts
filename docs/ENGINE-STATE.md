@@ -46,6 +46,15 @@ Verified-working architecture and fixes. If you think one of these is broken, th
 - **The only reliable swim signal from any current integration = the whole-swim summary (distance + moving_time).** `moving_time` is rest-excluded and usually sane (≈ the learned median 129 s/100m) but intermittently glitched (the 1050m / 1:34 outlier — sanity-bound it).
 - **Consequence (D-200):** the swim NUMBER is a user-entered/tested benchmark, never computed from passive data. Surgical per-length would require **Garmin FIT-file ingest** (new permission scope + a FIT parser) or **Apple HealthKit native** (segment events) — both separately-scoped FUTURE projects, NOT bugs to fix. Apple-Watch swimmers are rare anyway (D-201). **If you're reading this thinking "but we could derive it from X" — X was checked. The answer is no.**
 
+### Strength logger — resume-hardening + rest-timer overlay + away-alert (D-202/D-203, 2026-06-18)
+
+The D-139 rest timer + D-132 draft persistence were documented as shipped but DIDN'T work on device; the bugs are now fixed. Full detail: DECISIONS-LOG D-202/D-203.
+- **Rest timer:** auto-start existed but a UUID-key mis-parse in the "ensure timers exist" prune (`k.split('-')` on hyphenated ids) DELETED it the instant it armed → fixed (parse idx from end). Pill moved from the scrolling header to a `sticky` overlay. Timer persisted to localStorage (`strength_rest_timer`) → survives resume.
+- **Away-alert:** NEW dep `@capacitor/local-notifications` — notification only when backgrounded (haptic in-app, no foreground banner); one-time permission ask on login. (iOS now finds 3 Capacitor plugins; needs a clean Xcode build to link the pod.)
+- **Stay-open / data loss (the real one):** the SAVE-GATE was DELETING good drafts on a transient no-completed prefill snapshot during the resume rebuild (now only SKIPS). Plus: reopen gate read the wrong (pre-D-132) key → fixed; `loggerScheduledWorkout` now persisted/restored on resume; synchronous pre-hydrate added (anti-race). Verified live.
+- **RIR (D-203):** Done auto-saves the suggested RIR + a non-blocking "RIR — tap to change" strip (working sets only; warmups skip) — supersedes D-134's forced confirm.
+- **⚠ Footgun:** the resume rebuild itself (AuthWrapper/AppLayout remount churn) is NOT fixed — it's the auth session expiry / network-flap (Q-072). These fixes harden the logger to SURVIVE the rebuild; they don't stop it. Fix Q-072 to kill the churn at the source.
+
 ### Continuity / single-source invariant across disciplines — audit + the two structural fixes (D-185/D-186, 2026-06-16)
 
 **The invariant:** every meaningful value is computed ONCE, server-side; the client formats, never recomputes; every surface reads that one source. Goals + season planning will build on these numbers, so nothing may drift between screens. **Full map: `docs/AUDIT-continuity-2026-06-16.md`** (read it before adding any new value-computation or display surface — it says where each value's single source is).

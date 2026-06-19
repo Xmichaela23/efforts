@@ -4258,6 +4258,32 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-202 — Strength logger: resume-hardening + rest-timer overlay + background away-alert (the D-139/D-132 features didn't actually work on device)
+
+- **Date:** 2026-06-18
+- **Context:** Rest-timer auto-start (D-139) and draft persistence (D-132) were documented as shipped but did NOT work on device. Xcode-console diagnostics found the real bugs — and the umbrella cause: iOS REBUILDS the logger a few times on resume (AuthWrapper/AppLayout remount churn — see Q-072), racing/wiping in-memory state.
+- **Rest timer — fixed + overlaid:** D-139's auto-start DID exist (`autoStartRestForSet`), but the "ensure timers exist" prune deleted the timer the instant it armed — it parsed the key with `k.split('-')` and exercise ids contain hyphens (UUID/slug) → matched no exercise → deleted the running timer (why the overlay never showed). Fixed: parse idx from the end (`/^(.+)-(?:set-)?(\d+)$/`). The pinned pill lived INSIDE the scrolling header (`overflow-y-auto`) so it scrolled away → moved to a `sticky` overlay below the app header. Timer now PERSISTED to localStorage (`strength_rest_timer` {key, endsAt}) on arm, restored on mount with remaining seconds, cleared on rest-end/skip → survives the rebuild.
+- **Away-alert (NEW plugin `@capacitor/local-notifications`):** iOS suspends the JS countdown when backgrounded, so a notification is the only away-alert. Scheduled ONLY when the app backgrounds with a running timer; canceled on foreground → in-app = haptic only (no foreground banner), away = notification buzz. One-time permission ask on login (AppLayout), only when undecided.
+- **Stay-open + draft restore — the real data-loss fixes:**
+  - `AppLayout.hasUncompletedStrengthSession` read the bare legacy key `strength_logger_session_<date>`, but D-132 writes the identity-aware `<date>_<id>` key → a planned-workout draft was invisible to the reopen gate and the logger NEVER reopened. Fixed: scan all today-prefixed keys.
+  - The resume path set `showStrengthLogger=true` but never restored `loggerScheduledWorkout` → the reopened logger had no workout identity, the restore identity-guard failed → loaded fresh. Fixed: persist the workout, restore on cold-start + warm-resume.
+  - **THE SAVE-GATE WAS DELETING GOOD DRAFTS.** During the rebuild the prescribed workout reloads/prefills → a transient "N exercises, none completed" snapshot → `saveSessionProgress`'s gate removed the draft on it (confirmed via logs: fired 5× right after a clean restore with 2 completed sets). Now it only SKIPS writing; the draft is cleared explicitly on finish/orphan, never by a passive no-completed snapshot. **This was the core resume data-loss bug.**
+  - **Synchronous PRE-HYDRATE** at the top of the init effect: the async restore deferred to a microtask that lost the race vs the blank rebuild (sets flashed in then vanished). The valid same-identity draft now hydrates synchronously in the same render; the async block still runs the orphan-verify.
+- **Verified live** on the dev's device: logger stays open with logged sets across resume; timer shows + persists; away-notification fires backgrounded, not foreground.
+- **Cross-ref:** D-132, D-139, D-108/D-110, Q-072 (the resume-churn root — auth session expiry).
+
+---
+
+## D-203 — RIR capture is friction-free: Done auto-saves the suggested + a non-blocking adjust strip (supersedes D-134)
+
+- **Date:** 2026-06-18
+- **Context:** D-134's forced "CONFIRM RIR" panel read as "you MUST tap a number" and confused (Michael). RIR is load-bearing (autoregulation / e1RM / load progression), so it can't just be dropped — but the forced confirm was friction.
+- **Research (RP Hypertrophy, JuggernautAI, Boostcamp, Strong/Hevy):** logging-first apps make RPE/RIR OPTIONAL; autoregulation apps PROMPT it (the value drives the algorithm) but make accepting the default a quick tap, some only after KEY sets. Takeaway: keep RIR captured, but accepting the suggestion must be one tap, never a hunt.
+- **Decision:** Done SAVES the set immediately with the suggested RIR (`target_rir`, default 3) and starts rest — friction-free, no forced confirm. A small NON-BLOCKING "RIR — tap to change" strip then appears on WORKING sets (warmups skip) so the athlete adjusts only if it felt different. Tap a number → adjusts + closes; Done or "keep" → closes (keeps the suggested) — Done's strip-close is checked BEFORE the set-toggle so it doesn't un-complete. Supersedes D-134.
+- **Cross-ref:** D-134 (superseded), D-126 (prefill), D-122 (last-session anchor).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

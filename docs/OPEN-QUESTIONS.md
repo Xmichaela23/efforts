@@ -990,6 +990,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-072 — `autoRefreshToken: false` → session expires after ~1h → bump-out, and AuthWrapper LOOPS on "Can't verify" instead of dropping to login
+
+- **Status:** filed 2026-06-18 (surfaced when the dev got locked out during a long testing session). **NOT building now.**
+- **What it is:** `src/lib/supabase.ts` sets `autoRefreshToken: false` (deliberate — a comment says it prevents gotrue-js from running a background XHR/fetch, an iOS/WKWebView issue, paired with `lib/native-fetch-shim`). Side effect: the access token expires after ~1h with NO renewal → the next authenticated query (e.g. AuthWrapper's `users.approved` check) fails → the **"Can't verify your account"** screen, which only offers "Try again" (re-uses the same dead token → loops) and "Log out". Escape = tap **Log out** (clears the session → clean login), or delete+reinstall.
+- **IMPORTANT nuance:** that "Can't verify" screen is ALSO literally the no-internet screen ("couldn't reach the server… network blip"). The acute lockout on 2026-06-18 was triggered by **flaky internet**, not purely token expiry — and the flapping auth checks are also the likely driver of the **strength-logger resume rebuild churn** (D-202). So this one issue plausibly underlies BOTH the bump-outs and the logger state-loss.
+- **Fix (not built):** (1) restore token refresh in an iOS-safe way — a manual `supabase.auth.refreshSession()` on resume (appStateChange), or re-enable `autoRefreshToken` now that the native-fetch-shim exists; (2) make AuthWrapper distinguish an expired/invalid session from a transient network blip and drop to a clean login + sign out, instead of looping on "Try again." Either removes the trap.
+- **Cross-ref:** `src/lib/supabase.ts` (the flag), `src/components/AuthWrapper.tsx` (the loop, `fetchApprovalOutcome`), D-202 (the resume churn this likely drives).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
