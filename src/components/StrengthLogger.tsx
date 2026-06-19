@@ -22,6 +22,14 @@ interface LoggedSet {
   weight: number;
   resistance_level?: string;  // Optional - used for band exercises: "Light", "Medium", "Heavy", "Extra Heavy"
   rir?: number;
+  /** D-203/provenance: true when `rir` is a non-observed suggestion — the
+   *  auto-saved target RIR (Done with no manual entry) or a value prefilled from
+   *  the prior session — rather than effort the athlete actively entered or
+   *  confirmed. e1RM (compute-facts) and the RIR-adherence / execution-score
+   *  analyzer MUST exclude auto-filled RIR, else the prescription is read back as
+   *  observed effort. Cleared the moment the athlete sets RIR themselves. Mirrors
+   *  `from_previous` (D-097). Absent on legacy rows = treated as observed. */
+  rir_autofilled?: boolean;
   completed: boolean;
   barType?: string;
   setType?: 'warmup' | 'working'; // For baseline test workouts
@@ -1568,7 +1576,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               weight: prior.weight ?? set.weight,
               ...(typeof prior.reps === 'number' ? { reps: prior.reps } : {}),
               ...(typeof prior.duration_seconds === 'number' ? { duration_seconds: prior.duration_seconds } : {}),
-              ...(typeof prior.rir === 'number' ? { rir: prior.rir } : {}),
+              ...(typeof prior.rir === 'number' ? { rir: prior.rir, rir_autofilled: true } : {}),
               ...(prior.resistance_level ? { resistance_level: prior.resistance_level } : {}),
               from_previous: true,
             } as LoggedSet;
@@ -2566,16 +2574,27 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // Autofill itself sets from_previous: true explicitly; that's the only
         // path that should preserve it.
         const isAutofillUpdate = 'from_previous' in updates;
+        // RIR provenance (mirrors from_previous): an explicit rir_autofilled in
+        // `updates` wins (the D-203 auto-save passes true); otherwise any
+        // athlete-initiated numeric RIR edit — keypad, adjust strip, RIR modal —
+        // is an observed effort signal, so clear the flag.
+        const rirProvenanceUpdate =
+          'rir_autofilled' in updates
+            ? {}
+            : (typeof updates.rir === 'number' ? { rir_autofilled: false } : {});
         const updatedSet = {
           ...newSets[setIndex],
           ...updates,
           ...(isAutofillUpdate ? {} : { from_previous: false }),
+          ...rirProvenanceUpdate,
         };
         newSets[setIndex] = updatedSet;
         
         // Check if this is a baseline test working set that was just completed with RIR 2-3
         // Also check if RIR was just added to an already-completed working set
-        if (updatedSet.setType === 'working' && updatedSet.completed && updatedSet.rir !== undefined && 
+        // !rir_autofilled: a baseline 1RM must come from a confirmed effort, not an
+        // auto-saved/ prefilled RIR that merely happens to fall in the 2–3 gate (D-203).
+        if (updatedSet.setType === 'working' && updatedSet.completed && updatedSet.rir !== undefined && !updatedSet.rir_autofilled &&
             updatedSet.rir >= 2 && updatedSet.rir <= 3 && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0) {
           const baselineKey = getBaselineKeyForExercise(exercise.name);
           if (baselineKey) {
@@ -2740,7 +2759,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // NON-BLOCKING adjust strip so the athlete can tap a different number ONLY if it actually felt
     // different (warmups skip it). Keeps the RIR signal honest without the friction.
     const suggestedRir = typeof exercise.target_rir === 'number' ? exercise.target_rir : 3;
-    updateSet(exerciseId, setIndex, { rir: suggestedRir, completed: true });
+    // D-203: auto-saved with the SUGGESTED RIR, not an observed signal. Mark it so
+    // e1RM + RIR-adherence exclude it; the adjust strip below clears the flag if the
+    // athlete taps a real number.
+    updateSet(exerciseId, setIndex, { rir: suggestedRir, completed: true, rir_autofilled: true });
     autoStartRestForSet(exerciseId, setIndex);
     if (set.setType !== 'warmup') setRirConfirm({ exerciseId, setIndex });
   };

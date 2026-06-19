@@ -4284,6 +4284,21 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-204 — RIR provenance flag: auto-filled RIR is "no effort signal," never "on target"
+
+- **Date:** 2026-06-18
+- **Context:** D-203 made "Done" auto-save the *suggested* RIR (`target_rir`, default 3) so logging is friction-free. Side effect: an auto-saved RIR is byte-identical to one the athlete actually felt and entered. Both the e1RM math (`compute-facts`) and the RIR-adherence/verdict analyzer read `set.rir` as an *observed effort signal* — so post-D-203 a lifter who never taps the adjust strip has their RIR read back as the prescription. e1RM is biased toward the plan and RIR adherence reads as **perfect by construction**; the drift detector the SPEC-strength recalibration model depends on can never fire. This blocks the strength-screens execution score + recalibration, which both require a *real* RIR signal.
+- **Decision:** add `rir_autofilled?: boolean` to `LoggedSet` (mirrors `from_previous`, D-097). Provenance is stamped at every write and honored by every reader of RIR-as-signal:
+  - **Write → `true` (suggestion, not observed):** D-203 auto-save Done (`StrengthLogger.tsx`); prefill-from-previous (inline — the one path that bypasses `updateSet`).
+  - **Write → `false` (observed):** any athlete-initiated numeric RIR — keypad, adjust strip (`confirmRirAndComplete`), RIR modal. `updateSet` defaults this: an explicit `rir_autofilled` in the update wins; otherwise a numeric `rir` edit clears the flag. Self-clearing, no per-site edits needed.
+  - **Readers exclude auto-filled:** e1RM average (`compute-facts/index.ts:1363`); RIR adherence/verdict `executedRIRSets` (`analyze-strength-workout/index.ts:652`).
+  - **Baseline-capture gate kept:** in-logger baseline 1RM auto-capture (`updateSet`, ~:2578) gated on `!rir_autofilled` — a baseline must come from a *confirmed* effort, not an auto-accepted RIR that merely lands in the 2–3 gate. Behavior change accepted by design.
+- **Status:** **landed, NOT deployed** — held for on-device eyeball before shipping `compute-facts` + `analyze-strength-workout` + the client. Legacy rows have no flag → treated as observed (zero retroactive contamination; D-203 only shipped today).
+- **Acceptance bar (honesty — non-negotiable):** auto-filled RIR is *"no effort signal,"* never *"on target."* Execution score and recalibration read provenance-**confirmed** signal only. Same discipline as **D-189** (null e1RM → say nothing rather than fabricate); falls under the narrative-core validator rules (`noNewNumbers`, `noContradiction`). A score or adjust line built on auto-filled RIR is a spec violation, not a degraded-but-acceptable state.
+- **Cross-ref:** D-203 (the auto-save this disambiguates), D-097 (`from_previous` pattern mirrored), D-189 (null-e1RM honesty parallel), Q-040/D-118 (RIR-cap — same "RIR must reflect real effort" premise), Q-073 (re-materialization, the other strength-screens prerequisite), SPEC-strength-performance-details.md (the score + recalibration this unblocks).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

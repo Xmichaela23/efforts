@@ -649,7 +649,11 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
     : plannedSets.find((s: any) => s.rir != null)?.rir ?? null;
 
   // Get executed RIR data
-  const executedRIRSets = completedSets.filter((set: any) => set.rir !== null && set.rir !== undefined);
+  // D-203/provenance: only count RIR the athlete actually entered/confirmed. Auto-filled
+  // RIR (suggested target, or prefill from a prior session) is the prescription, not
+  // observed effort — counting it makes adherence read as perfect by construction. Legacy
+  // rows lack the flag and count as observed.
+  const executedRIRSets = completedSets.filter((set: any) => set.rir !== null && set.rir !== undefined && !set.rir_autofilled);
 
   if (executedRIRSets.length > 0) {
     avgExecutedRIR = executedRIRSets.reduce((sum: number, set: any) => sum + set.rir, 0) / executedRIRSets.length;

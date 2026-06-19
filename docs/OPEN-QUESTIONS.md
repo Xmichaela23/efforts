@@ -992,11 +992,41 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ## Q-072 — `autoRefreshToken: false` → session expires after ~1h → bump-out, and AuthWrapper LOOPS on "Can't verify" instead of dropping to login
 
-- **Status:** filed 2026-06-18 (surfaced when the dev got locked out during a long testing session). **NOT building now.**
+- **Status:** filed 2026-06-18 (surfaced when the dev got locked out during a long testing session). **Acute lockout CONFIRMED to be flaky internet, RESOLVED 2026-06-18 — NOT the token expiry.** The latent `autoRefreshToken: false` ~1h-expiry trap below remains real but has never actually bitten. **NOT building now.**
 - **What it is:** `src/lib/supabase.ts` sets `autoRefreshToken: false` (deliberate — a comment says it prevents gotrue-js from running a background XHR/fetch, an iOS/WKWebView issue, paired with `lib/native-fetch-shim`). Side effect: the access token expires after ~1h with NO renewal → the next authenticated query (e.g. AuthWrapper's `users.approved` check) fails → the **"Can't verify your account"** screen, which only offers "Try again" (re-uses the same dead token → loops) and "Log out". Escape = tap **Log out** (clears the session → clean login), or delete+reinstall.
 - **IMPORTANT nuance:** that "Can't verify" screen is ALSO literally the no-internet screen ("couldn't reach the server… network blip"). The acute lockout on 2026-06-18 was triggered by **flaky internet**, not purely token expiry — and the flapping auth checks are also the likely driver of the **strength-logger resume rebuild churn** (D-202). So this one issue plausibly underlies BOTH the bump-outs and the logger state-loss.
 - **Fix (not built):** (1) restore token refresh in an iOS-safe way — a manual `supabase.auth.refreshSession()` on resume (appStateChange), or re-enable `autoRefreshToken` now that the native-fetch-shim exists; (2) make AuthWrapper distinguish an expired/invalid session from a transient network blip and drop to a clean login + sign out, instead of looping on "Try again." Either removes the trap.
 - **Cross-ref:** `src/lib/supabase.ts` (the flag), `src/components/AuthWrapper.tsx` (the loop, `fetchApprovalOutcome`), D-202 (the resume churn this likely drives).
+
+---
+
+## Q-073 — Re-materialization primitive: one lazy resolver with an explicit PIN POLICY (not "lazy vs eager")
+
+- **Status:** filed 2026-06-18 · **SHAPE RECORDED, NOT BUILT.** Gated behind the two-copy collapse below. The default (pin-to-block vs follow-current) is a daylight decision, parked.
+- **What it is:** when an accepted baseline/e1RM change should reach already-materialized future sessions (the SPEC-strength recalibration "going forward" case), how do future planned loads update? Mapped the chain: strength loads are computed **eagerly at generation+materialize time** into `planned_workouts.computed.steps` and **frozen** — `get-week` reads them as-is and never recomputes from current baseline (`get-week/index.ts:325-330`). A baseline change reaches future sessions today only when something re-invokes `materialize-plan` (only `adapt-plan` auto + the manual-override modal do). Overrides live in `plan_adjustments` and are re-applied on every materialize, so they survive (`adjustment_factor`/`weight_offset` track; `absolute_weight` pins).
+- **The insight — the answer is NOT "lazy vs eager," it is a pin-policy parameter.** One shared lazy/on-read resolver `resolvePlannedStrengthLoad(step, baselines, adjustments, pinPolicy)` where the **caller declares** the baseline source: **recalibration → follow-current** (future sessions track the new e1RM); **season planning → can pin** (block-start snapshot, frozen-plan-safe); **goals materializer → per intent.** One primitive serves all three; the pin policy is what keeps it D-021-safe instead of silently rewriting frozen plans.
+- **Prerequisite (the real blocker):** there are **two** load-compute copies today — `materialize-plan/calculateWeightFromConfig` (`index.ts:573-616`) and the dispatcher `shared/strength-system/protocols/triathlon_performance.ts` (`scaleSessionToRebuildLoads`) — bridged by a pass-through (`materialize-plan/index.ts:1639-1652`) that already exists to stop them drifting (the "Week-17-155lb" bug). A single resolver only pays off once these collapse into one and **generators emit `percent_1rm` + anchor lift instead of absolute lb**. Plus every non-`get-week` reader of `computed.steps` (Garmin export `send-workout-to-garmin`, `useWorkouts`, `StrengthCompareTable`, coach, …) must reach the resolver or it reads stale frozen weights.
+- **Acceptance bar (SSoT — the real criterion):** single-source-of-truth is **not** satisfied by the resolver design alone — only when the two compute copies become one and generators emit percent+anchor. Until then the resolver is a *fourth* copy, not a consolidation. This is the definition of done for the SSoT principle of the strength-screens thread.
+- **Lineage:** **D-021** (frozen plans, "no silent rewrite" — the bias against eager auto-rewrite) and **D-197** (swim `equipment_detail` "derive-at-read-when-absent" — the owner's existing lazy precedent for the analogous problem). **Do NOT cite D-185–D-192** — that is the *narrative* continuity invariant, a different lineage.
+- **Daylight decision (parked):** pin-to-block vs follow-current as the *default*. Some loads are deliberately pinned to the block-start snapshot (`materialize-plan/index.ts:481, 2675`), so a pure follow-current default would change behavior. Decide the default when building.
+- **Scope guard:** the SPEC-strength single-session adjust ships independently (no downstream effects); baseline/"going forward" recalibration is **compute-and-confirm only** until Q-073 resolves — store the intent to recalibrate, defer the re-materialization mechanics.
+- **Cross-ref:** D-021, D-197, D-204 (the other strength-screens prerequisite), SPEC-strength-performance-details.md (the recalibration this gates). Key files: `materialize-plan/index.ts`, `get-week/index.ts`, `shared/strength-system/protocols/triathlon_performance.ts`, `generate-combined-plan/session-factory.ts`, `adapt-plan/index.ts`, `src/components/StrengthAdjustmentModal.tsx`.
+
+---
+
+## Q-074 — Strength execution-score letter-band thresholds (tune on real sessions)
+
+- **Status:** filed 2026-06-18 · **TUNE WHEN SCORE MATH EXISTS.** (Was the placeholder "Q-072" inside SPEC-strength — renumbered; live Q-072 is the auth-token issue.)
+- **What it is:** A = 90+, B = 80–89, etc. — the band cutoffs for the SPEC-strength execution score. Tune against real logged sessions once the intent-weighted score function exists. **Hard check before shipping:** a correctly-executed *maintenance* session must land A/B, never a "C for not progressing" (the demotivation guard). If the math grades a well-executed maintenance session low, the math is wrong.
+- **Cross-ref:** SPEC-strength-performance-details.md (execution score), D-204 (the score reads provenance-confirmed RIR only).
+
+---
+
+## Q-075 — Strength intent correctness: should the athlete be able to correct inferred intent?
+
+- **Status:** filed 2026-06-18 · **RECOMMEND yes-as-quiet-correction; lower priority than score + recalibration.** (Was the placeholder "Q-071" inside SPEC-strength — renumbered; live Q-071 is swim PROGRAM bands.)
+- **What it is:** the Arc infers per-session intent (e.g. "maintenance" from race timeline). Should the athlete override it? Recommendation: yes, but a *quiet* correction — never a prominent toggle, never locked, never silent. The verdict label ("maintaining · holding") is the user-facing signal; intent mode itself stays invisible (settled — no "mode: maintenance" badge).
+- **Cross-ref:** SPEC-strength-performance-details.md, SPEC-strength-intent.md.
 
 ---
 

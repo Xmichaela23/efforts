@@ -1360,7 +1360,11 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null): {
       exVolume += w * r;
       if (w > bestWeight) { bestWeight = w; bestReps = r; }
       if (w === bestWeight && r > bestReps) { bestReps = r; }
-      if (typeof s.rir === "number" && s.rir >= 0) rirValues.push(s.rir);
+      // D-203/provenance: exclude auto-filled RIR (the suggested target echoed back by
+      // the logger, or a value prefilled from a prior session) — it's the prescription,
+      // not observed effort, and would silently bias e1RM. Legacy rows lack the flag and
+      // are treated as observed.
+      if (typeof s.rir === "number" && s.rir >= 0 && !s.rir_autofilled) rirValues.push(s.rir);
     }
 
     const avgRir = rirValues.length > 0
