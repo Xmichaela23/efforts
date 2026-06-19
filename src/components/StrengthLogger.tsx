@@ -2702,17 +2702,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const set = exercise?.sets[setIndex];
     
     if (!exercise || !set) return;
-    
-    // If set is already completed, toggle it off
-    if (set.completed) {
-      updateSet(exerciseId, setIndex, { completed: false });
+
+    // If THIS set's RIR adjust strip is open, Done CLOSES it (keeps the saved set + suggested RIR).
+    // Checked BEFORE the toggle-off below so Done dismisses the strip instead of un-completing the set.
+    // (Tapping a number in the strip also closes it, via confirmRirAndComplete.)
+    if (rirConfirm && rirConfirm.exerciseId === exerciseId && rirConfirm.setIndex === setIndex) {
+      setRirConfirm(null);
       return;
     }
 
-    // D-134: a second Done tap while THIS set's inline RIR confirm is open cancels it
-    // (back out of an accidental Done without committing).
-    if (rirConfirm && rirConfirm.exerciseId === exerciseId && rirConfirm.setIndex === setIndex) {
-      setRirConfirm(null);
+    // If set is already completed, toggle it off
+    if (set.completed) {
+      updateSet(exerciseId, setIndex, { completed: false });
       return;
     }
 
