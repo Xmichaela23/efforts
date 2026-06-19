@@ -2734,12 +2734,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
     
-    // Done just SAVES (supersedes D-134's forced confirm — Michael 2026-06-18: the CONFIRM RIR panel
-    // read as "you MUST tap a number" and confused). Auto-apply the suggested RIR (target_rir from the
-    // prescription, default 3) and complete the set. RIR stays fully editable afterward via its field.
+    // Done SAVES immediately with the suggested RIR (default) + starts rest — friction-free, no forced
+    // "hit the number" step (supersedes D-134's blocking confirm). For WORKING sets, surface a small
+    // NON-BLOCKING adjust strip so the athlete can tap a different number ONLY if it actually felt
+    // different (warmups skip it). Keeps the RIR signal honest without the friction.
     const suggestedRir = typeof exercise.target_rir === 'number' ? exercise.target_rir : 3;
     updateSet(exerciseId, setIndex, { rir: suggestedRir, completed: true });
     autoStartRestForSet(exerciseId, setIndex);
+    if (set.setType !== 'warmup') setRirConfirm({ exerciseId, setIndex });
   };
 
   // D-134: resolve the inline RIR confirm — a pill tap confirms/adjusts + completes; skip
@@ -4062,24 +4064,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </div>
                     )}
                     
-                    {/* D-134: inline RIR confirm-on-Done. Appears on THIS set's card when Done was
-                        tapped with no RIR yet. Suggested value (target_rir) is pre-highlighted with a
-                        ring — one tap confirms, a different tap adjusts; both complete the set. "skip"
-                        completes without RIR. Feels like confirming, not a blocking modal. */}
+                    {/* Non-blocking RIR ADJUST strip. The set is ALREADY saved with the suggested RIR
+                        (default) and rest is already running — this only lets the athlete tap a different
+                        number if it actually felt different. "keep" dismisses (keeps the suggested).
+                        Friction-free + keeps RIR honest, with no forced "hit the number" step. */}
                     {rirConfirm && rirConfirm.exerciseId === exercise.id && rirConfirm.setIndex === setIndex && (() => {
                       const targetRir = exercise.target_rir;
                       return (
-                        <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/[0.08] px-2 py-1.5" role="group" aria-label="Confirm reps in reserve">
+                        <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/[0.08] px-2 py-1.5" role="group" aria-label="Adjust reps in reserve">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-300/90">Confirm RIR</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-300/90">RIR — tap to change</span>
                             <button
                               type="button"
-                              onClick={() => skipRirAndComplete(exercise.id, setIndex)}
+                              onClick={() => setRirConfirm(null)}
                               className="text-[10px] text-white/45 hover:text-white/75 px-1"
                               style={{ fontFamily: 'Inter, sans-serif' }}
-                              aria-label="Skip RIR — complete the set without recording RIR"
+                              aria-label="Keep the suggested RIR"
                             >
-                              skip
+                              keep
                             </button>
                           </div>
                           <div className="flex items-center justify-between">
