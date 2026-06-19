@@ -425,6 +425,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Mirror live timers into a ref so the app-state listener reads current values (not a stale closure).
   const timersRef = useRef(timers);
   useEffect(() => { timersRef.current = timers; }, [timers]);
+  // Restore a running rest timer across resume rebuilds (it lives only in memory otherwise → wiped on
+  // remount). Reads the persisted {key, endsAt}; re-arms with the remaining seconds, or clears if expired.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('strength_rest_timer');
+      if (!raw) return;
+      const { key, endsAt } = JSON.parse(raw);
+      const remaining = Math.ceil((Number(endsAt) - Date.now()) / 1000);
+      if (key && remaining > 0) setTimers((prev) => (prev[key]?.running ? prev : { ...prev, [key]: { seconds: remaining, running: true } }));
+      else localStorage.removeItem('strength_rest_timer');
+    } catch {}
+  }, []);
   // Away-alert: haptic in-app, notification ONLY when away. iOS suspends the JS countdown when the app is
   // backgrounded, so on background we schedule a notification per running rest timer; on foreground we
   // cancel them — the resumed JS tick fires the in-app HAPTIC and no foreground banner ever shows.
@@ -1611,6 +1623,28 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (didInitRef.current) return;
     didInitRef.current = true;
 
+    // ANTI-RACE SYNCHRONOUS PRE-HYDRATE: on a rapid resume remount the async block below defers the
+    // restore to a microtask, which can lose the race vs the blank initial render (sets flash in, then
+    // vanish). Hydrate a valid same-identity draft SYNCHRONOUSLY here so it commits in THIS render; the
+    // async block still runs the orphan-verify and will clear/fresh-init if the planned row was deleted.
+    try {
+      const _mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+      const _openedId = (scheduledWorkout?.id && String((scheduledWorkout as any)?.workout_status || 'planned').toLowerCase() !== 'completed')
+        ? String(scheduledWorkout.id) : null;
+      const _draft = restoreSessionProgress(_openedId);
+      if (_draft && ((_draft.sourcePlannedId ?? null) === _openedId) && _mode !== 'mobility') {
+        setExercises(_draft.exercises);
+        setAttachedAddons(_draft.addons);
+        setNotesText(_draft.notes);
+        setNotesRpe(_draft.rpe);
+        setSourcePlannedName(_draft.sourcePlannedName);
+        setSourcePlannedId(_draft.sourcePlannedId);
+        setSourcePlannedDate(_draft.sourcePlannedDate);
+        setLockManualPrefill(true);
+        setIsInitialized(true);
+      }
+    } catch { /* fall through to the async path */ }
+
     // D-110 A2: async-verify the saved session's sourcePlannedId still exists
     // in planned_workouts BEFORE hydrating. If the planned row was deleted
     // (or any other path orphaned the localStorage key — force-quit mid-
@@ -2219,6 +2253,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               if (!k.includes('-set-')) {
                 playRestEndTone();
                 hapticSuccess();  // D-139: success haptic at rest-end → "start the next set"
+                try { localStorage.removeItem('strength_rest_timer'); } catch {} // rest done → drop the persisted timer
               }
             }
             
@@ -2661,6 +2696,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         return { ...prev, [restKey]: { seconds: calculatedRest, running: true } };
       });
       hapticLight();
+      // Persist the running timer so it survives a resume rebuild (timers are otherwise in-memory only).
+      try { localStorage.setItem('strength_rest_timer', JSON.stringify({ key: restKey, endsAt: Date.now() + calculatedRest * 1000 })); } catch {}
     } catch {}
   };
 
@@ -3096,6 +3133,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   setRestDismissed((prev) => new Set(prev).add(activeKey));
                   setTimers((prev) => { const next = { ...prev }; delete next[activeKey]; return next; });
                   cancelRestNotification(activeKey);
+                  try { localStorage.removeItem('strength_rest_timer'); } catch {} // skipped → drop the persisted timer
                 }}
                 className="ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-amber-100 hover:text-white flex items-center justify-center text-xs font-medium"
                 aria-label="Skip rest"
