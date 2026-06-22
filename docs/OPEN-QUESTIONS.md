@@ -1030,6 +1030,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-076 — Strength Details still shows a skipped exercise as "done" (reported, unverified)
+
+- **Status:** filed 2026-06-21 · **UNVERIFIED** — reported by Michael right after the D-204 prefill stack deployed; the screenshot came through blank, so screen / build state / whether-freshly-logged are all unknown. To be device-tested 2026-06-22.
+- **Symptom:** an exercise the athlete skipped (left as an untouched plan prefill) reportedly renders as completed on a read surface after logging. If real, this contradicts the D-204 chain, whose deterministic logic is internally verified to drop untouched prefills (16/16, `/tmp/d204-strength-test.mjs`).
+- **Hypotheses, cheapest to rule out first:** (1) **stale on-device bundle** — `StrengthCompletedView` is client code; the fix only applies if the app was rebuilt + reinstalled with `a6b5f60d`. (2) **saved data lacks `prefilled`** — if the session was logged/saved by pre-D-204 code (or the save path drops the flag), the filter has nothing to key on → reads as done. (3) **a surface the filter doesn't cover** — Details receipts are filtered; calendar / summary / other read paths may not be.
+- **First step:** read the DB row for the reported session (with go-ahead) — distinguishes a saved-data bug (skip not recorded as a skip) from a display bug (data right, screen stale). Two different fixes.
+- **Cross-ref:** D-204 (the stack this questions), ENGINE-STATE "Questioned" (the on-device-test-pending entry), Q-072 (resume churn — the un-fixed root behind Bug A).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

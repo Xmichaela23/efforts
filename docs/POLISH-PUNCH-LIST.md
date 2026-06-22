@@ -81,6 +81,12 @@ For each numbered item:
 - [x] **Rest timer works + overlaid** — fixed the UUID-key prune that deleted the timer on arm; pill → sticky overlay; persisted across resume. **Away-alert** via new `@capacitor/local-notifications` (haptic in-app, notification when backgrounded; one-time login permission ask).
 - [x] **RIR friction-free (D-203)** — Done auto-saves the suggested + non-blocking "tap to change" strip (working sets only); supersedes D-134.
 
+### Done — deployed + internally verified, ON-DEVICE TEST PENDING (2026-06-19, D-204 extension; detail in DECISIONS-LOG D-204 + ENGINE-STATE "Questioned")
+- [x] **Prefill-honoring across the chain** — one `isPerformedStrengthSet` helper (9 inline predicates collapsed) drops untouched plan prefills; `updateSet` clears `prefilled` on any edit/Done; `workout-detail` preserves the flag (Bug B); Details receipts drop skipped sets + empty exercises. Deterministic logic verified 16/16 (`/tmp/d204-strength-test.mjs`).
+- [x] **Data-loss root (Bug A) — code fix** — prefill effect runs once (`didComputedPrefillRef`); resume listener no longer mints new set objects; delete-restore reverts by `completed_workout_id` (`e3884ec1`). Code reads sound; NOT device-proven.
+- [ ] **ON-DEVICE TEST (2026-06-22)** — log June-19 deviating (edit a set, skip an exercise, set RPE), background+return once, finish & save; confirm edits survive backgrounding, skipped stays uncounted, Details/receipts/narrative honest. Then read the DB to confirm the save.
+- [ ] **Q-076 — "skipped exercise still shows as done"** (reported 2026-06-21, screenshot blank/unverified). Localize saved-data-vs-display by reading the DB row first; suspect a stale on-device bundle or saved data lacking `prefilled`.
+
 ### Done (2026-06-11/12 — strength logger UX overhaul + data-integrity; full detail in DECISIONS-LOG D-122..D-139)
 - [x] **Compact keypad-primary set logger** — Q-048 / D-125: three control rows (reps circles + RIR pills + 2×2 weight stepper) → pre-filled keypad cells (tap = keypad) + ONE thin quick-adjust strip; ~156px shorter per set
 - [x] **Prefill from PLAN prescription** (D-126) + unplanned→last-actual fallback (D-127); persistent "last: w×r @ RIR" per-set anchor, blank-not-faked for brand-new exercises (D-122)
