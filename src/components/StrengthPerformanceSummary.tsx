@@ -180,6 +180,32 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
     : execScore >= 85 ? 'Strong' : execScore >= 70 ? 'Solid' : 'Needs adjustment';
   const execColor = execScore == null ? '' : execScore >= 85 ? 'text-emerald-400' : execScore >= 70 ? 'text-amber-400' : 'text-rose-400';
 
+  // D-208: dynamic "what moved it" line, read from the shared component_attribution structure the
+  // analyzer emits. Null when the session is clean (nothing to explain) — then only the static
+  // metric explainer shows.
+  const execWhatMoved: string | null = (() => {
+    const attr: any = (sessionDetail as any)?.execution?.component_attribution;
+    if (!attr || !attr.primary_mover) return null;
+    const skipped: Array<{ name: string; role: string }> = Array.isArray(attr.skipped) ? attr.skipped : [];
+    if (skipped.length > 0) {
+      const names = skipped.map((s) => s.name).join(', ');
+      const allAccessory = skipped.every((s) => s.role === 'accessory');
+      const noneAccessory = skipped.every((s) => s.role !== 'accessory');
+      // Symmetric reasoning: a skipped MAIN lift gets an honest line too — never explain only the
+      // accessory case while a real miss gets silence.
+      const why = allAccessory
+        ? ' — accessory work, so it dings less'
+        : noneAccessory
+          ? ' — main work, counts in full'
+          : ' — main lifts count in full, accessories less';
+      return `Skipped ${names}${why}.`;
+    }
+    if (attr.primary_mover === 'load') return 'Loads landed off the prescribed targets.';
+    if (attr.primary_mover === 'rir') return 'RIR drifted from the target.';
+    if (attr.primary_mover === 'set_completion') return 'Some sets came in short of the plan.';
+    return null;
+  })();
+
   // Session totals footer — ported from the (now-retired for strength) Details tab so killing
   // that tab loses nothing. Same counting rule as the D-205 fix: every set with reps>0 counts
   // (bodyweight + band included); volume stays weight-gated (a 0 lb set contributes 0 anyway).
@@ -211,6 +237,9 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
           <p className="text-xs text-white/40 mt-0.5 leading-snug">
             How much of the plan you completed, and how closely you hit the prescribed loads and reps-in-reserve.
           </p>
+          {execWhatMoved && (
+            <p className="text-xs text-white/55 mt-1 leading-snug">{execWhatMoved}</p>
+          )}
         </div>
       )}
       <StrengthCompareTable

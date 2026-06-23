@@ -6,6 +6,8 @@ import { arcModeSystemAddon, arcNarrativeFactBlock } from '../_shared/arc-narrat
 // Shared narrative-reasoning core (D-189 — strength leg). Scaffold + validator suite via the strength
 // adapter; strength gets a 2-attempt validator loop (it had none). See docs/WORK-ORDER-narrative-core.md.
 import { buildReasoningScaffold, validateNarrative, strengthAdapter } from '../_shared/narrative-core/index.ts';
+// D-208: role classifier — execution scoring weights a skipped accessory less than a main lift.
+import { roleForExercise, ROLE_WEIGHT } from '../_shared/strength/exercise-role.ts';
 
 /**
  * =============================================================================
@@ -1226,7 +1228,6 @@ function calculateExecutionSummary(
   // This would need to be calculated from timestamps if available
   
   // Calculate overall execution score
-  const exerciseCompletion = overallAdherence.exercise_completion_rate || 0;
   const setCompletion = overallAdherence.set_completion_rate || 0;
   const loadAdherence = matchedExercises.length > 0
     ? matchedExercises.reduce((sum: number, ex: any) => {
@@ -1242,12 +1243,47 @@ function calculateExecutionSummary(
           return sum + rirScore;
         }, 0) / matchedExercises.filter(ex => ex.adherence.rir_adherence != null).length
     : 100; // Default to 100% if no RIR data
-  
-  const overallExecution = (exerciseCompletion * 0.3) + 
-                          (setCompletion * 0.2) + 
-                          (loadAdherence * 0.3) + 
+
+  // D-208: ROLE-WEIGHTED exercise completion. Each planned exercise contributes its role weight
+  // (primary/secondary 1.0, accessory 0.5) to both numerator and denominator, so skipping a
+  // prehab/postural accessory dings ~half of what skipping a main lift does — instead of the old
+  // flat matched/planned that treated every exercise as equal. Only exercise-completion needs
+  // this: set-completion is already computed over matched exercises only (a skip never touches it).
+  // Planned entries = exerciseAdherence rows with a `planned` side (excludes executed-but-unplanned).
+  const plannedEntries = exerciseAdherence.filter((ex: any) => ex?.planned != null);
+  const weightedPlanned = plannedEntries.reduce((s: number, ex: any) => s + ROLE_WEIGHT[roleForExercise(ex.name)], 0);
+  const weightedMatched = plannedEntries
+    .filter((ex: any) => ex.matched)
+    .reduce((s: number, ex: any) => s + ROLE_WEIGHT[roleForExercise(ex.name)], 0);
+  const exerciseCompletion = weightedPlanned > 0
+    ? (weightedMatched / weightedPlanned) * 100
+    : (overallAdherence.exercise_completion_rate || 0);
+
+  const overallExecution = (exerciseCompletion * 0.3) +
+                          (setCompletion * 0.2) +
+                          (loadAdherence * 0.3) +
                           (rirAdherence * 0.2);
-  
+
+  // D-208: component attribution — the SHARED structure consumed by both the score (above) and
+  // the "what moved it" microcopy. Lists each component's score + weighted contribution, the
+  // exercises that were skipped (with role), and which component cost the most points.
+  const skipped = plannedEntries
+    .filter((ex: any) => !ex.matched)
+    .map((ex: any) => ({ name: ex.name, role: roleForExercise(ex.name) }));
+  const components = [
+    { key: 'exercise_completion', label: 'Exercises done', weight: 0.3, score: Math.round(exerciseCompletion) },
+    { key: 'set_completion', label: 'Sets done', weight: 0.2, score: Math.round(setCompletion) },
+    { key: 'load', label: 'Load vs prescribed', weight: 0.3, score: Math.round(loadAdherence) },
+    { key: 'rir', label: 'RIR vs target', weight: 0.2, score: Math.round(rirAdherence) },
+  ].map((c) => ({ ...c, contribution: Math.round(c.score * c.weight), lost: Math.round((100 - c.score) * c.weight) }));
+  // Primary mover = the component that cost the most points (largest weighted shortfall). Null on a clean session.
+  const primaryMover = components.reduce((a, b) => (b.lost > a.lost ? b : a), components[0]);
+  const componentAttribution = {
+    components,
+    skipped,
+    primary_mover: primaryMover && primaryMover.lost > 0 ? primaryMover.key : null,
+  };
+
   return {
     exercises_completed: overallAdherence?.exercises_executed || 0,
     exercises_planned: overallAdherence?.exercises_planned || 0,
@@ -1262,7 +1298,8 @@ function calculateExecutionSummary(
     rep_completion_rate: totalRepsPlanned > 0 ? (totalRepsExecuted / totalRepsPlanned) * 100 : 0,
     load_adherence: loadAdherence,
     rir_adherence: rirAdherence,
-    overall_execution: Math.round(overallExecution)
+    overall_execution: Math.round(overallExecution),
+    component_attribution: componentAttribution,
   };
 }
 

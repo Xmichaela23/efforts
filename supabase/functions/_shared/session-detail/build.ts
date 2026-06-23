@@ -665,6 +665,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       assessed_against: assessedAgainst,
       status_label: sessionState?.glance?.status_label ?? null,
       gap_adjusted: !!perf?.gap_adjusted,
+      // D-208: strength component attribution (per-component score + skipped exercises w/ role +
+      // which component cost the most). Drives the "what moved it" microcopy. Null for endurance.
+      component_attribution:
+        (sessionState?.details?.execution_summary?.component_attribution
+          ?? (wa as any)?.detailed_analysis?.execution_summary?.component_attribution) ?? null,
     },
 
     observations,
