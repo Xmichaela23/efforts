@@ -348,9 +348,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
   useEffect(() => {
-    const desired = initialTab || (isCompleted ? 'summary' : 'planned');
+    let desired = initialTab || (isCompleted ? 'summary' : 'planned');
+    // D-207: the strength family has no 'completed' (Details) tab — fold any request for it into
+    // Performance so an external initialTab='completed' (e.g. AppLayout routing) can't strand the
+    // view on a triggerless tab that still renders the old Details content.
+    if (isStrengthFamily && desired === 'completed') desired = 'summary';
     setActiveTab(desired);
   }, [initialTab, isCompleted, workout?.id]);
+
+  // D-207 enforcement (defense-in-depth for the documented constraint): a strength-family workout
+  // must never rest on 'completed'. Catches ANY setActiveTab('completed') from any call site.
+  useEffect(() => {
+    if (isStrengthFamily && activeTab === 'completed') setActiveTab('summary');
+  }, [isStrengthFamily, activeTab]);
 
   // Strict server coordination on Summary open: ensure attach+compute without client fallbacks
   useEffect(() => {

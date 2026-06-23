@@ -268,9 +268,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     if (selectedWorkout) {
       // Smart tab routing based on workout status and type
       if (selectedWorkout.type === 'strength') {
-        // Strength: if completed, open Completed; otherwise Planned
+        // Strength: completed → Performance (D-207 folded Details into Performance for the
+        // strength family — there is no 'completed' tab to land on anymore); otherwise Planned.
         if (String(selectedWorkout.workout_status || '').toLowerCase() === 'completed') {
-          setActiveTab('completed');
+          setActiveTab('summary');
         } else {
           setActiveTab('planned');
         }
