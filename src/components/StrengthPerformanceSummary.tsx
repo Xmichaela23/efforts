@@ -180,6 +180,25 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
     : execScore >= 85 ? 'Strong' : execScore >= 70 ? 'Solid' : 'Needs adjustment';
   const execColor = execScore == null ? '' : execScore >= 85 ? 'text-emerald-400' : execScore >= 70 ? 'text-amber-400' : 'text-rose-400';
 
+  // Session totals footer — ported from the (now-retired for strength) Details tab so killing
+  // that tab loses nothing. Same counting rule as the D-205 fix: every set with reps>0 counts
+  // (bodyweight + band included); volume stays weight-gated (a 0 lb set contributes 0 anyway).
+  const totals = (completedExercises as Array<{ name: string; setsArray: any[] }>).reduce(
+    (acc, ex) => {
+      const sets = Array.isArray(ex.setsArray) ? ex.setsArray : [];
+      const withReps = sets.filter((s) => (Number(s?.reps) || 0) > 0);
+      acc.sets += withReps.length;
+      acc.reps += withReps.reduce((sum, s) => sum + (Number(s?.reps) || 0), 0);
+      acc.volume += sets.reduce((sum, s) => {
+        const w = Number(s?.weight) || 0;
+        const r = Number(s?.reps) || 0;
+        return sum + (w > 0 && r > 0 ? w * r : 0);
+      }, 0);
+      return acc;
+    },
+    { sets: 0, reps: 0, volume: 0 },
+  );
+
   return (
     <div className="space-y-4">
       {execScore != null && (
@@ -203,6 +222,22 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
           onRecompute?.();
         }}
       />
+      {(totals.sets > 0 || totals.volume > 0) && (
+        <div className="grid grid-cols-3 gap-2 pt-3 mt-1 border-t border-white/10 text-center">
+          <div>
+            <div className="text-lg font-semibold text-white">{totals.sets}</div>
+            <div className="text-xs text-white/50">Total Sets</div>
+          </div>
+          <div>
+            <div className="text-lg font-semibold text-white">{totals.reps}</div>
+            <div className="text-xs text-white/50">Total Reps</div>
+          </div>
+          <div>
+            <div className="text-lg font-semibold text-white">{totals.volume.toLocaleString()}</div>
+            <div className="text-xs text-white/50">Volume (lbs)</div>
+          </div>
+        </div>
+      )}
       {onRecompute && (
         <div className="pt-1">
           {recomputeError && (

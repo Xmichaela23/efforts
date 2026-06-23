@@ -630,7 +630,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const workoutType = String(workout?.type || '').toLowerCase();
   const isMobility = workoutType === 'mobility';
   const isStrength = workoutType === 'strength';
-  
+  // Strength-family workouts (strength/mobility/pilates) no longer get a Details tab — the
+  // Performance tab's compare table is a superset (per-set Completed incl. unplanned via the
+  // union keyset) and now carries the Total Sets/Reps/Volume footer. Endurance KEEPS Details
+  // (it renders CompletedTab — gear etc., not redundant).
+  const isStrengthFamily = isStrength || isMobility || workoutType === 'pilates_yoga';
+
   // Phosphor glow for mobility and strength cards
   const getCardStyle = () => {
     if (isMobility) {
@@ -794,7 +799,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     } catch (e) {
                       console.warn('[UnifiedWorkoutView] unattach invalidate dispatch failed:', e);
                     }
-                    setActiveTab('completed');
+                    setActiveTab(isStrengthFamily ? 'summary' : 'completed');
                   } catch (e) {
                     console.warn('[UnifiedWorkoutView] unattach handler failed:', e);
                   }
@@ -957,7 +962,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList
           className={`grid w-full bg-white/[0.04] backdrop-blur-md border-b border-white/10 mb-0 py-0 ${
-          !isCompleted ? 'grid-cols-1' : (isLinked ? 'grid-cols-3' : 'grid-cols-2')
+          !isCompleted
+            ? 'grid-cols-1'
+            : isStrengthFamily
+              ? (isLinked ? 'grid-cols-2' : 'grid-cols-1')  // Planned+Performance, or Performance only (no Details)
+              : (isLinked ? 'grid-cols-3' : 'grid-cols-2')   // endurance keeps Details
         }`}
           style={{
             borderColor: `rgba(${sportRgb}, 0.16)`,
@@ -979,8 +988,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               Performance
             </TabsTrigger>
           )}
-          {/* Details tab: only show for completed workouts */}
-          {isCompleted && (
+          {/* Details tab: completed endurance only — strength family folds Details into Performance */}
+          {isCompleted && !isStrengthFamily && (
             <TabsTrigger value="completed" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
               <List className="h-4 w-4" />
               Details
