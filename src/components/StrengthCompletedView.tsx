@@ -211,10 +211,13 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     
     completedExercises.forEach((exercise: CompletedExercise) => {
       if (exercise.sets && Array.isArray(exercise.sets)) {
-        // Exercise with sets array
-        const setsWithData = exercise.sets.filter(set => set.reps > 0 && set.weight > 0);
-        totalSets += setsWithData.length;
-        totalReps += setsWithData.reduce((sum, set) => sum + (set.reps || 0), 0);
+        // Exercise with sets array.
+        // Sets/reps count every set that did work (reps > 0), including bodyweight
+        // (pull-ups) and band (face pulls) exercises that carry no external weight.
+        // Volume stays weight-gated — a 0 lb set contributes 0 to volume regardless.
+        const setsWithReps = exercise.sets.filter(set => set.reps > 0);
+        totalSets += setsWithReps.length;
+        totalReps += setsWithReps.reduce((sum, set) => sum + (set.reps || 0), 0);
         totalVolume += calculateExerciseVolume(exercise.sets);
       }
     });

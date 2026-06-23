@@ -2859,10 +2859,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Set loading state
     setIsSaving(true);
     setIsSaved(false);
-    
-    // Clear session progress when workout is completed
-    clearSessionProgress();
-    
+
+    // NOTE: the draft is NOT cleared here. It used to be wiped at the top of finalizeSave,
+    // BEFORE the await save — so a failed/interrupted save (network error, or the iOS resume
+    // remount churn killing the component mid-save) destroyed the draft AND never persisted
+    // the workout = total data loss. The draft is now cleared only AFTER a confirmed save.
     const workoutEndTime = new Date();
     const durationMinutes = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
 
@@ -2947,8 +2948,39 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (editingExisting) {
         saved = await updateWorkout(String(scheduledWorkout?.id), completedWorkout as any);
       } else {
-        saved = await addWorkout(completedWorkout as any);
+        // DUPLICATE-SESSION GUARD: the resume churn (Q-072) can reopen the logger EMPTY
+        // after a clean save; re-logging would otherwise INSERT a second identical session
+        // (observed: weekly Strength volume double-counted to 2× the real number). If this
+        // is a PLANNED workout, look for a completed row already linked to its planned_id
+        // and update that instead. Keyed on planned_id so two genuinely-distinct planned
+        // strength sessions on the same day stay separate — only a re-log of the SAME
+        // planned workout collapses onto its existing row. Best-effort: any lookup error
+        // falls through to insert (never blocks the save).
+        let existingId: string | null = null;
+        if (sourcePlannedId) {
+          try {
+            const dupUserId = getStoredUserId();
+            if (dupUserId) {
+              const { data: dup } = await supabase
+                .from('workouts')
+                .select('id')
+                .eq('user_id', dupUserId)
+                .eq('planned_id', sourcePlannedId)
+                .eq('workout_status', 'completed')
+                .limit(1)
+                .maybeSingle();
+              existingId = (dup as any)?.id ?? null;
+            }
+          } catch { /* fall through to insert */ }
+        }
+        saved = existingId
+          ? await updateWorkout(existingId, completedWorkout as any)
+          : await addWorkout(completedWorkout as any);
       }
+
+      // Save confirmed — NOW it's safe to clear the local draft (see the note in finalizeSave:
+      // clearing before the await risked losing logged work on a failed/interrupted save).
+      clearSessionProgress();
 
       // Readiness check-in dual-write (D-142, Q-049 Phase 1 step 3). The check-in
       // is now a first-class DAILY signal in readiness_checkins (source of truth,
