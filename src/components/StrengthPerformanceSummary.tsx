@@ -169,8 +169,26 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
     Record<string, { date: string; days_ago: number; sets: any[] }> | null
     | undefined) ?? null;
 
+  // Session-level execution score (weight / RIR / set + exercise completion), computed by
+  // analyze-strength-workout and carried on session_detail_v1.execution.execution_score.
+  // Previously never surfaced on the strength Performance screen.
+  const execScore: number | null = (() => {
+    const v = sessionDetail?.execution?.execution_score;
+    return typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null;
+  })();
+  const execLabel = execScore == null ? null
+    : execScore >= 85 ? 'Strong' : execScore >= 70 ? 'Solid' : 'Needs adjustment';
+  const execColor = execScore == null ? '' : execScore >= 85 ? 'text-emerald-400' : execScore >= 70 ? 'text-amber-400' : 'text-rose-400';
+
   return (
     <div className="space-y-4">
+      {execScore != null && (
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Execution</span>
+          <span className={`text-lg font-semibold ${execColor}`}>{execScore}%</span>
+          {execLabel && <span className="text-xs text-gray-400">· {execLabel}</span>}
+        </div>
+      )}
       <StrengthCompareTable
         planned={plannedExercises}
         completed={completedExercises}

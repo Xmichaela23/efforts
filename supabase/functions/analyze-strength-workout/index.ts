@@ -1636,6 +1636,23 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
 }
 
 // Generate enhanced strength-specific insights using GPT-4
+// Narrative brevity + truncation guard (see the call site for why). Splits on sentence
+// terminators, drops a trailing fragment that never terminated (the token-ceiling cut), and
+// caps at `maxSentences` complete sentences. Pure string work — safe on any input.
+function capNarrative(text: string, maxSentences = 4): string {
+  const t = (text || '').trim();
+  if (!t) return t;
+  // Match complete sentences ending in . ! ? (optionally followed by a closing quote/paren).
+  const sentences = t.match(/[^.!?]+[.!?]+["')\]]*/g);
+  if (!sentences || sentences.length === 0) {
+    // No terminal punctuation at all — model output one unterminated run. Return as-is rather
+    // than guessing a cut point; the prompt's word cap is the primary control here.
+    return t;
+  }
+  const kept = sentences.slice(0, maxSentences).map((s) => s.trim()).join(' ');
+  return kept || t;
+}
+
 async function generateEnhancedStrengthInsights(
   workout: any,
   exerciseAdherence: any[],
@@ -2269,11 +2286,12 @@ COACHING INSIGHT
     const systemPrompt = `You write strength session summaries for experienced athletes. You receive pre-calculated facts and translate them into coaching prose.
 
 RULES (HARD):
-- Output EXACTLY 3-4 sentences. No headers, no section dividers, no bullet lists, no all-caps section labels. Single paragraph.
-- S1 (LEDE): RIR + load adherence vs the prescribed target. When one exercise dominates the session story (a missed lift, a PR, a clear RIR break), cite it specifically. When adherence is uniform, summarize at the session level ("Hit every working set on target across squat, bench, and row at RIR 2"). Cite specific numbers (weight, reps, RIR) when they tell the story; otherwise summarize plainly.
-- S2: ONE physiological observation — RIR drift across the set (rising = fatigue), readiness/RPE alignment, or estimated-1RM trend (ONLY when a prior session exists in the e1RM block; never invent one). Pick one; do not list.
-- S3: ONE phase + endurance-load context clause — where the athlete is in the plan (base / build / peak / taper / recovery), cumulative-fatigue read in plain words, or the relationship to nearby endurance load. ONE clause; skip entirely if no notable signal.
-- S4: ONE forward-looking sentence — next-session target adjustment OR recovery cue. ONE.
+- LENGTH: 3 sentences (a 4th ONLY if S3 carries a real signal). Each sentence ≤ 20 words — short and declarative. NO run-ons: do NOT chain clauses with em-dashes, colons, or semicolons into one giant sentence. Total ≤ 55 words. Single paragraph, no headers/dividers/bullets/all-caps labels.
+- DO NOT enumerate every exercise — the dashboard table below already lists each lift with its weight/reps/RIR. Summarize at the session level. Name a specific lift ONLY when ONE lift carries the story (a missed lift, a PR, a clear RIR break).
+- S1 (LEDE): RIR + load adherence vs the prescribed target, in one short sentence ("Every working set landed on the RIR 2 target at prescribed loads.").
+- S2: ONE physiological observation — RIR drift across sets (rising = fatigue), readiness/RPE alignment, or estimated-1RM trend (ONLY when a prior session exists in the e1RM block; never invent one). Pick one; do not list.
+- S3: ONE short phase / endurance-load context clause — plan phase (base/build/peak/taper/recovery), cumulative-fatigue read, or nearby endurance load. Skip entirely if no notable signal.
+- S4: ONE forward-looking sentence — next-session target adjustment OR recovery cue. ONE. Only if it adds something S1-S3 didn't.
 
 HARD CUTS (D-093 pattern):
 - No "this kind of work is exactly what you need..." / "this is exactly what...".
@@ -2296,7 +2314,7 @@ PACKET (authoritative; do not compute outside it): facts come from the user mess
         '\n\n'
       : '') + context + e1rmBlock;
     const callOnce = async (userMsg: string): Promise<string> =>
-      (await callLLM({ system: systemPrompt, user: userMsg, maxTokens: 240, temperature: 0.3, model: 'sonnet' })) ?? '';
+      (await callLLM({ system: systemPrompt, user: userMsg, maxTokens: 300, temperature: 0.3, model: 'sonnet' })) ?? '';
 
     // D-189: 2-attempt validator loop (strength previously had NONE). Shared core catches rules 1/2/4/5 —
     // here the load-bearing ones are rule 6/5 (no fabricated/un-trended e1RM) + rule 4 (no cause-diagnosis
@@ -2315,9 +2333,13 @@ PACKET (authoritative; do not compute outside it): facts come from the user mess
     if (!content || content.trim().length === 0) {
       return ['Analysis completed - check metrics below'];
     }
-    
-    // Return as single comprehensive narrative (like running workouts)
-    return [content.trim()];
+
+    // BREVITY + TRUNCATION GUARD: even with the tightened prompt, the model can over-write
+    // and (a) get cut mid-sentence at the token ceiling — the cause of the "...chasing the
+    // prior numbers, and" wall-of-text — or (b) ship more than 4 sentences. Drop any trailing
+    // incomplete fragment (no terminal . ! ?) and cap at 4 complete sentences so the
+    // Performance screen always reads clean and scannable.
+    return [capNarrative(content.trim())];
     
   } catch (error) {
     clearTimeout(timeoutId);
@@ -2563,12 +2585,21 @@ Deno.serve(async (req) => {
       generated_at: new Date().toISOString(),
       workout_id: workout_id,
       discipline: 'strength',
-      glance: {
-        status_label: typeof performance?.execution_score === 'number'
-          ? (performance.execution_score >= 85 ? 'Strong execution' : performance.execution_score >= 70 ? 'Solid execution' : 'Needs adjustment')
-          : null,
-        execution_score: typeof performance?.execution_score === 'number' ? performance.execution_score : null,
-      },
+      glance: (() => {
+        // The execution score lives in execution_summary.overall_execution (weight 30% /
+        // RIR 20% / set-completion 20% / exercise-completion 30%). The old code read
+        // `performance.execution_score`, a field that never existed on the performance object —
+        // so glance.execution_score was ALWAYS null and the Performance screen showed no score.
+        const execScore = typeof analysis.execution_summary?.overall_execution === 'number'
+          ? analysis.execution_summary.overall_execution
+          : null;
+        return {
+          status_label: execScore != null
+            ? (execScore >= 85 ? 'Strong execution' : execScore >= 70 ? 'Solid execution' : 'Needs adjustment')
+            : null,
+          execution_score: execScore,
+        };
+      })(),
       narrative: {
         text: Array.isArray(analysis.insights) && analysis.insights.length > 0
           ? String(analysis.insights[0] || '')
