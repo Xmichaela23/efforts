@@ -1642,15 +1642,26 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
 function capNarrative(text: string, maxSentences = 4): string {
   const t = (text || '').trim();
   if (!t) return t;
-  // Match complete sentences ending in . ! ? (optionally followed by a closing quote/paren).
-  const sentences = t.match(/[^.!?]+[.!?]+["')\]]*/g);
-  if (!sentences || sentences.length === 0) {
-    // No terminal punctuation at all — model output one unterminated run. Return as-is rather
-    // than guessing a cut point; the prompt's word cap is the primary control here.
-    return t;
+  // A sentence boundary is . ! ? (with any trailing quote/paren) followed by whitespace+capital
+  // (the next sentence) OR end of string. The whitespace+capital requirement is deliberate:
+  // strength narratives are full of decimals ("110.5 lb") and the bare-punctuation version split
+  // those into "110." + "5 lb" and miscounted sentences. A digit/lowercase after the dot is not
+  // a boundary. Anything after the last real boundary (an un-terminated, truncated trailing
+  // fragment — the token-ceiling cut) is dropped. Cap at maxSentences complete sentences.
+  const boundary = /[.!?]+["')\]]*(?=\s+[A-Z]|\s*$)/g;
+  const sentences: string[] = [];
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = boundary.exec(t)) !== null) {
+    const end = m.index + m[0].length;
+    sentences.push(t.slice(lastIndex, end).trim());
+    lastIndex = boundary.lastIndex;
+    if (sentences.length >= maxSentences) break;
   }
-  const kept = sentences.slice(0, maxSentences).map((s) => s.trim()).join(' ');
-  return kept || t;
+  // No terminal punctuation at all — one unterminated run. Return as-is (the prompt word cap is
+  // the primary control); don't guess a cut point.
+  if (sentences.length === 0) return t;
+  return sentences.join(' ');
 }
 
 async function generateEnhancedStrengthInsights(
