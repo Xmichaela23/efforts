@@ -111,6 +111,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // plannedWorkouts context removed; rely on server unified data/routes
   const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
+  // Workout type flags — declared HERE (not later in the body) because the tab-routing effects
+  // below reference `isStrengthFamily` in their dependency arrays, which are evaluated at render
+  // time. A later `const` would be in the temporal dead zone → "Cannot access before initialization".
+  const workoutType = String(workout?.type || '').toLowerCase();
+  const isMobility = workoutType === 'mobility';
+  const isStrength = workoutType === 'strength';
+  // Strength-family workouts (strength/mobility/pilates) have no Details tab — folded into Performance (D-207).
+  const isStrengthFamily = isStrength || isMobility || workoutType === 'pilates_yoga';
   const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'summary' : 'planned'));
   const [editingInline, setEditingInline] = useState(false);
   const [assocOpen, setAssocOpen] = useState(false);
@@ -636,15 +644,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   // Client is now UI-only - all analysis comes from server (workout_analysis.performance)
   // `isLinked` + `currentPlannedId` come from `usePlannedWorkoutLink`
 
-  // Workout type styling for visual continuity with loggers
-  const workoutType = String(workout?.type || '').toLowerCase();
-  const isMobility = workoutType === 'mobility';
-  const isStrength = workoutType === 'strength';
-  // Strength-family workouts (strength/mobility/pilates) no longer get a Details tab — the
-  // Performance tab's compare table is a superset (per-set Completed incl. unplanned via the
-  // union keyset) and now carries the Total Sets/Reps/Volume footer. Endurance KEEPS Details
-  // (it renders CompletedTab — gear etc., not redundant).
-  const isStrengthFamily = isStrength || isMobility || workoutType === 'pilates_yoga';
+  // Workout type styling for visual continuity with loggers.
+  // (workoutType / isMobility / isStrength / isStrengthFamily are declared near the top of the
+  // component — the tab-routing effects depend on isStrengthFamily at render time, so it can't
+  // live this far down without hitting the temporal dead zone. D-207.)
 
   // Phosphor glow for mobility and strength cards
   const getCardStyle = () => {
