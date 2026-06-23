@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import StrengthPerformanceSummary from './StrengthPerformanceSummary';
-import SessionNarrative from './SessionNarrative';
+import SessionNarrative, { NextUp } from './SessionNarrative';
 import EnduranceIntervalTable from './EnduranceIntervalTable';
 import AdherenceChips from './AdherenceChips';
 import { formatDuration } from '@/utils/workoutFormatting';
@@ -161,6 +161,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           recomputing={recomputing}
           recomputeError={recomputeError}
           onRecompute={recomputeAnalysis}
+          hideNextUp
         />
         <StrengthPerformanceSummary
           planned={planned}
@@ -171,6 +172,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           recomputing={recomputing}
           recomputeError={recomputeError}
         />
+        {/* NEXT moved to the bottom of the strength Performance tab (below the compare table) — the
+            up-next session is context to glance at after reviewing the work, not above it. */}
+        {(sd as any)?.next_session && <NextUp session={(sd as any).next_session} />}
       </div>
     );
   }

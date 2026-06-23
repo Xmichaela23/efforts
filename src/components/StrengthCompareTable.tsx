@@ -268,11 +268,13 @@ export default function StrengthCompareTable({ planned, completed, completedWork
 
   return (
     <div className="space-y-3">
-      {/* Adjustment hint at top */}
-      {planId && (
+      {/* Edit hint — describes the real on-screen control (the ✎, which corrects a LOGGED set).
+          The old copy ("Tap Adjust to modify your plan weights going forward") promised a button
+          that doesn't exist here — that feature is StrengthAdjustmentModal on the STATE tab. */}
+      {workoutId && (
         <div className="px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg mb-4">
           <p className="text-xs text-amber-400/80">
-            Tap Adjust to modify your plan weights going forward.
+            Tap the ✎ on any set to fix what you logged. To scale future plan weights, use Adjust on the State tab.
           </p>
         </div>
       )}

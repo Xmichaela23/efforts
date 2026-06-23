@@ -33,7 +33,7 @@ type TrendData = {
   pace_at_hr_basis?: 'gap' | 'raw' | null;
 };
 
-type NextSession = {
+export type NextSession = {
   name: string;
   date: string | null;
   type: string | null;
@@ -136,6 +136,9 @@ interface SessionNarrativeProps {
   recomputeError: string | null;
   onRecompute: () => void;
   recomputeDisabled?: boolean;
+  /** When true, the NEXT/up-next block is NOT rendered inline — the caller renders <NextUp> elsewhere
+   *  (strength Performance tab moves it to the bottom, below the compare table). */
+  hideNextUp?: boolean;
 }
 
 function TrendSparkline({ trend }: { trend: TrendData }) {
@@ -452,7 +455,7 @@ function RouteSparkline({ route }: { route: RouteData }) {
   );
 }
 
-function NextUp({ session }: { session: NextSession }) {
+export function NextUp({ session }: { session: NextSession }) {
   const dayName = session.date ? (() => {
     try {
       const [y, m, d] = session.date.split('-').map(Number);
@@ -525,6 +528,7 @@ export default function SessionNarrative({
   recomputeError,
   onRecompute,
   recomputeDisabled,
+  hideNextUp,
 }: SessionNarrativeProps) {
   const summaryTitle = sd?.summary?.title || 'Insights';
   const summaryBullets = Array.isArray(sd?.summary?.bullets) ? sd!.summary!.bullets! : [];
@@ -759,7 +763,7 @@ export default function SessionNarrative({
       {sd?.race_readiness && isLlmRaceReadinessShape(sd.race_readiness) && (
         <RaceReadinessBlock rr={sd.race_readiness} />
       )}
-      {nextSession && <NextUp session={nextSession} />}
+      {!hideNextUp && nextSession && <NextUp session={nextSession} />}
       {!hasNarrative && hasStructuredForRender && (
         <>
           {technicalInsightsForRender.length > 0 && (
