@@ -4306,6 +4306,30 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-205 — Strength logger: totals count bodyweight/band, dedup by planned_id, draft cleared only after a confirmed save
+
+- **Date:** 2026-06-22
+- **Context:** a user hit a double-logged session (weekly Strength volume read 9,750 = 2×4,875) plus a one-off data-loss event ("came back, logger was open and empty, logged sets gone"). Three distinct save-path correctness bugs.
+- **Decisions:**
+  1. **Totals honest for unweighted work** (`StrengthCompletedView.tsx:215`). Total Sets / Total Reps gated counting on `set.weight > 0`, silently dropping bodyweight (pull-ups) + band (face pulls) sets — showed **11/47** for a 17/104 session. Now counts every set with `reps > 0`; **volume stays weight-gated** (a 0 lb set contributes 0 anyway).
+  2. **Duplicate-session guard by `planned_id`** (`StrengthLogger.tsx` finalizeSave). `addWorkout` was an unconditional INSERT; the only dedup (`editingExisting`) fired solely when reopening an already-completed workout. After the resume churn (Q-072) reopened the logger EMPTY, re-logging a planned workout INSERTed a second identical row. Now a planned save looks up an existing completed row by `planned_id` and **updates it instead of inserting**. Keyed on planned_id so two genuinely-distinct same-day planned strength sessions stay separate; only a re-log of the SAME planned workout collapses onto its row. Best-effort: lookup error falls through to insert.
+  3. **Draft cleared only after a confirmed save** (`StrengthLogger.tsx` finalizeSave). `clearSessionProgress()` ran at the TOP of finalizeSave, BEFORE the `await` save — a failed/interrupted save (network error, or the iOS resume remount killing the component mid-save) wiped the draft AND never persisted = total loss. Moved the clear to after a confirmed save; it now also runs synchronously in the same await chain (not the delayed, mount-guarded success callback), which closes the empty-reopen-after-save window too.
+- **Scope / tradeoff:** does NOT fix the resume churn itself (Q-072 — auth-session/remount). These make the churn HARMLESS — it can no longer duplicate or lose work. **Supersedes the D-202 "verified working on device" claim for the save path** (D-202's draft-restore/save-gate fixes were necessary but the save itself still inserted duplicates and cleared the draft pre-await).
+- **Cross-ref:** D-202 (resume hardening — partially superseded), D-132 (identity-aware draft key), Q-072 (the churn root), D-204 (the performed-set definition the totals now align with).
+
+---
+
+## D-206 — Strength analyzer: narrative hard-capped + truncation-guarded, execution score un-broken
+
+- **Date:** 2026-06-22
+- **Context:** the Performance screen narrative rendered as a truncated wall of text (cut mid-sentence on "…chasing the prior numbers, and"), and no execution score appeared at all.
+- **Decision 1 — narrative brevity (three layers):** the D-102/D-189 prompt capped sentence COUNT but not LENGTH, so the model wrote ~180-word run-ons (clauses chained with em-dashes/colons) that blew past `maxTokens:240` and truncated mid-word. (a) Tightened the prompt: 3 sentences (4 only if S3 carries a real signal), each ≤20 words, ≤55 words total, no clause-chaining, and "don't enumerate exercises — the table below shows them." (b) Bumped `maxTokens` 240→300 for headroom. (c) Added server-side `capNarrative()` — drops a non-terminated trailing fragment (the token-ceiling cut) and caps at 4 complete sentences. **Boundary detection requires the terminator be followed by whitespace+capital or end-of-string** — bare `[.!?]` split decimals ("110.5 lb" → "110." + "5 lb") and miscounted; the whitespace+capital rule keeps decimals and "approx. 3 sets" intact. Tested across decimal/truncation/over-count cases.
+- **Decision 2 — execution score wiring (one-line source fix + render):** `session_state_v1.glance.execution_score` read `performance.execution_score`, **a field that never existed on the `performance` object** → always null → the score never reached the client. Silent contract-drift, same shape as the D-202 claim D-205 just superseded. Fixed to read `execution_summary.overall_execution` (weight 30% / RIR 20% / set-completion 20% / exercise-completion 30%). `build.ts:207` already maps `glance.execution_score` → `session_detail_v1.execution.execution_score`, so no builder change. Added an **Execution % chip** (color-graded ≥85 green / ≥70 amber / else rose) above the strength compare table; the per-exercise `Vol → +N lb` deltas remain underneath (single glance number, per-lift story preserved).
+- **Verified — intent-mode honesty (the one claim that could be quietly false):** load adherence is `(executed − planned) / planned` (`analyze-strength-workout/index.ts:642`). The intent-mode + phase load adjustment is **baked into the stored `planned.weight` at materialize time** — `resolveStrengthPercentForLift` clamps support mode to ≤0.6/≤0.45 of 1RM (`materialize-plan/index.ts:115-130`) at the same step that produces the number the analyzer later reads (weight computed at `:1660`/`:1688`, written `:1736`). So the score is intent-mode-respecting **by construction**: a maintenance/support lift executed to its prescribed lower load scores ~100%, not a false miss. **Caveat (blind spot, not a lie):** qualitative loads ("Light DBs") and %1RM that can't resolve (missing 1RM baseline) leave `planned.weight = 0` → `weightProgression = 0` → scored 100% by default.
+- **Cross-ref:** D-102 (the narrative-cap origin this re-enforces), D-189 (narrative-core scaffold), D-093 (cycling clean-execution cap pattern), D-204 (provenance — execution score reads confirmed signal), Q-077 (the e1RM-direction misread surfaced in the same narrative).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

@@ -1040,6 +1040,19 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-077 — Strength narrative misreads the e1RM-block trend direction
+
+- **Status:** unverified (bug, deferred)
+- **Why it exists:** on the 2026-06-22 Upper session the narrative said *"the overhead press dropped from 105 to 110 lb and the row slipped from 115 to 110 lb"* — 105→110 is an **increase** narrated as a "drop." The e1RM block is fed to the model as `current (prev X → trend)`; the model is reading the prev→current direction backwards (and/or treating the trend word and the numbers inconsistently).
+- **Distinct from the "receipts are fiction" bug:** that bug is the `completed === null` phantom-performed issue (untouched prefills counted as done — addressed by D-204's `isPerformedStrengthSet`). **This is a narrative/e1RM-block formatting/parse bug, not a data-integrity bug.** Filed separately on purpose so it doesn't get lost under receipts.
+- **Fix candidates (preferred first):**
+  1. **Reformat the e1RM block input** to state the delta explicitly — `bench 135 lb (+5 vs last)` / `OHP 110 lb (−5 vs last)` — instead of two bare numbers the model must order itself. Fixing the input format beats validating a bad narrative after the fact.
+  2. Add a `validate-narrative` rule that checks the stated direction word ("rose"/"dropped"/"slipped"/"ticked up") against the signed delta and rejects on mismatch.
+- **Verification owed:** repro across ≥2-3 sessions with a known prior e1RM to confirm it's systematic (the `current (prev → trend)` format) vs a one-off; then ship candidate 1 and recompute.
+- **Cross-ref:** D-206 (the capped narrative this rides on), D-189 (e1RM honesty — null → say nothing), the analyzer's `e1rmBlock` construction (`analyze-strength-workout/index.ts` ~`:2263-2266`).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
