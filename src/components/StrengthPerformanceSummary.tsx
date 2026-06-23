@@ -202,10 +202,15 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
   return (
     <div className="space-y-4">
       {execScore != null && (
-        <div className="flex items-baseline gap-2">
-          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Execution</span>
-          <span className={`text-lg font-semibold ${execColor}`}>{execScore}%</span>
-          {execLabel && <span className="text-xs text-gray-400">· {execLabel}</span>}
+        <div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Execution</span>
+            <span className={`text-lg font-semibold ${execColor}`}>{execScore}%</span>
+            {execLabel && <span className="text-xs text-gray-400">· {execLabel}</span>}
+          </div>
+          <p className="text-xs text-white/40 mt-0.5 leading-snug">
+            How much of the plan you completed, and how closely you hit the prescribed loads and reps-in-reserve.
+          </p>
         </div>
       )}
       <StrengthCompareTable
