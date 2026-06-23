@@ -4330,6 +4330,20 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-207 — Details tab folded into Performance for the strength family (strength/mobility/pilates); endurance keeps Details
+
+- **Date:** 2026-06-22
+- **Context:** the strength Details tab was redundant — the Performance tab's compare table already shows the full per-set Completed data (weight/reps/RIR) plus Planned + Previous + Vol deltas. Three tabs (Planned / Performance / Details) where two carry the same completed numbers.
+- **Decision:** remove the Details tab **for the strength family only** (`isStrengthFamily = strength || mobility || pilates_yoga`, `UnifiedWorkoutView.tsx`). Completed strength now shows Planned + Performance (linked) or Performance only (unplanned). **Endurance (run/ride/swim/walk) KEEPS its Details tab** — there the `completed` TabsContent renders `CompletedTab` (gear, splits, etc.), which is NOT redundant with Performance. The carve-out is the entire safety of the change.
+- **Pre-conditions verified before the kill (the gated trace from POLISH §7):**
+  1. **Unplanned path** — `StrengthCompareTable` builds rows from `allKeys = union(plannedMap, completedMap)` (`:184`), so an ad-hoc strength session with no plan still renders completed-only rows (`status: 'swapped'`). Performance is a usable standalone receipt; killing Details doesn't strand unplanned workouts.
+  2. **Totals footer** — the Total Sets/Reps/Volume footer lived ONLY in `StrengthCompletedView` (Details). Ported it into `StrengthPerformanceSummary` (below the compare table) with the **D-205 counting rule** (every `reps>0` set counts incl. bodyweight/band; volume weight-gated). Nothing lost.
+- **⚠ CONSTRAINT (latent trap — read before adding navigation):** strength-family workouts can no longer land on the `'completed'` tab — there is no trigger for it. **Any `setActiveTab('completed')` MUST guard for the strength family** or a strength workout will select a tab with no trigger (content still renders, but it's inconsistent and the totals/score live on Performance now). The existing Unattach handler was the one such call site — it now does `setActiveTab(isStrengthFamily ? 'summary' : 'completed')`. The completed-tab default for completed workouts is already `'summary'`, so normal open is fine.
+- **Verification status:** endurance Details path is **structurally unchanged** (the `completed` TabsContent endurance branch and the endurance grid arm are untouched; the trigger is hidden only when `isStrengthFamily`). **On-device swim Details visual confirmation is OWED** before treating "endurance unchanged" as device-verified — do not upgrade this to "verified on device" until a completed swim session is opened and its Details tab (CompletedTab) is confirmed rendering.
+- **Cross-ref:** D-205 (the totals counting rule the ported footer reuses), D-206 (the execution chip now living on the single Performance surface), POLISH §7 (the gated punch-list item this closes).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

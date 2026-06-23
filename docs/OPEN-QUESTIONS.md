@@ -1042,8 +1042,9 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ## Q-077 — Strength narrative misreads the e1RM-block trend direction
 
-- **Status:** unverified (bug, deferred)
-- **Why it exists:** on the 2026-06-22 Upper session the narrative said *"the overhead press dropped from 105 to 110 lb and the row slipped from 115 to 110 lb"* — 105→110 is an **increase** narrated as a "drop." The e1RM block is fed to the model as `current (prev X → trend)`; the model is reading the prev→current direction backwards (and/or treating the trend word and the numbers inconsistently).
+- **Status:** unverified (bug, deferred) — **DID NOT REPRO on the first recompute (2026-06-22); priority downgraded, NOT closed.**
+- **Update (2026-06-22):** after the D-206 deploy, the June 22 Upper session was recomputed. The regenerated narrative read *"with bench press e1RM ticking up while overhead press and barbell row trended down"* — directionally coherent, no 105→110 incoherence. **One clean run is not proof of a fix** (the tightened D-206 prompt no longer cites the bare prev/current numbers, which may simply be hiding the misread rather than fixing it). Keep open; watch for recurrence when the narrative does cite specific e1RM numbers.
+- **Why it exists:** on the original 2026-06-22 Upper session the narrative said *"the overhead press dropped from 105 to 110 lb and the row slipped from 115 to 110 lb"* — 105→110 is an **increase** narrated as a "drop." The e1RM block is fed to the model as `current (prev X → trend)`; the model is reading the prev→current direction backwards (and/or treating the trend word and the numbers inconsistently).
 - **Distinct from the "receipts are fiction" bug:** that bug is the `completed === null` phantom-performed issue (untouched prefills counted as done — addressed by D-204's `isPerformedStrengthSet`). **This is a narrative/e1RM-block formatting/parse bug, not a data-integrity bug.** Filed separately on purpose so it doesn't get lost under receipts.
 - **Fix candidates (preferred first):**
   1. **Reformat the e1RM block input** to state the delta explicitly — `bench 135 lb (+5 vs last)` / `OHP 110 lb (−5 vs last)` — instead of two bare numbers the model must order itself. Fixing the input format beats validating a bad narrative after the fact.
