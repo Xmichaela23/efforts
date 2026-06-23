@@ -72,6 +72,17 @@ interface StrengthCompareTableProps {
   onAdjustmentSaved?: () => void;
 }
 
+// Format an ISO date-only string ("2026-05-18") as a short, self-evident label ("May 18").
+// Parsed by parts (not new Date()) so a date-only string never shifts a day across timezones.
+const PREV_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function formatPrevDate(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr));
+  if (!m) return null;
+  const month = PREV_MONTHS[parseInt(m[2], 10) - 1];
+  return month ? `${month} ${parseInt(m[3], 10)}` : null;
+}
+
 export default function StrengthCompareTable({ planned, completed, completedWorkoutRaw, planId: initialPlanId, plannedWorkoutId, rirSummary, previousByExercise, workoutId, onAdjustmentSaved }: StrengthCompareTableProps){
   // editingSet: { exerciseName, setIndex } — which completed set is being edited inline
   const [editingSet, setEditingSet] = useState<{ exerciseName: string; setIndex: number } | null>(null);
@@ -317,7 +328,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
               {r.hasPrevious ? (
                 <>
                   <div className="col-span-3" title={r.previousDate ? `${r.previousDate}${r.previousDaysAgo != null ? ` · ${r.previousDaysAgo} days ago` : ''}` : undefined}>
-                    Previous{r.previousDaysAgo != null ? <span className="text-white/30 font-normal"> · {r.previousDaysAgo}d</span> : null}
+                    Previous{formatPrevDate(r.previousDate) ? <span className="text-white/30 font-normal"> · {formatPrevDate(r.previousDate)}</span> : (r.previousDaysAgo != null ? <span className="text-white/30 font-normal"> · {r.previousDaysAgo}d</span> : null)}
                   </div>
                   <div className="col-span-3">Planned</div>
                   <div className="col-span-4">Completed</div>
