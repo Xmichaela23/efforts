@@ -1054,6 +1054,26 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-078 — Partial-accessory-sets hit set-completion at full weight (the D-208 lie in miniature)
+
+- **Status:** unverified (deferred, by design)
+- **Why it exists:** D-208 role-weights **exercise-completion** (a *skipped* accessory dings 0.5×). But **set-completion** (20% of the execution score) is NOT role-weighted — it's a flat ratio over matched exercises' sets. So doing 1 of 3 sets of an accessory dings set-completion the same as doing 1 of 3 sets of a main lift. Same coaching lie as the skip case, just smaller (it only bites on *partial* accessory completion, and only at 20% weight).
+- **Why deferred:** D-208 fixed the dominant case (a full skip, which only moves exercise-completion). The partial case is rarer and lower-weight; shipping the skip fix first was the right scope.
+- **What "fixing" would require:** role-weight the set-completion contribution per exercise (weight each exercise's sets by `ROLE_WEIGHT[role]`), reusing the same `roleForExercise` classifier — the `component_attribution` structure is already in place to carry it.
+- **Cross-ref:** D-208 (the skip fix this extends), `_shared/strength/exercise-role.ts`.
+
+---
+
+## Q-079 — Role lives in a D-208-only table, separate from the EXERCISE_CONFIG catalog and the user-loggable library
+
+- **Status:** intentional (scoped), worth revisiting if role-weighting expands
+- **Why it exists:** there are three strength-exercise vocabularies: (1) the D-208 role table (`_shared/strength/exercise-role.ts`, 80 keys — prescription vocabulary, role/scoring); (2) `EXERCISE_CONFIG` (`materialize-plan/exercise-config.ts`, 134 entries — research load ratios; has `primaryRef` but no explicit role field); (3) the client `commonExercises` autocomplete (what a user can log). D-208's table is the only one that classifies role, and it covers the **prescribed** vocabulary only.
+- **Why it's fine today:** the execution score role-weights **planned** exercises only (the completion denominator), and every planned exercise comes from the protocols → fully covered (validated 110/110). An unplanned user-added exercise never enters exercise-completion, so its role is irrelevant to the current score. The loud unknown-name tripwire is the safety net if that assumption ever breaks.
+- **When to revisit:** (a) if we role-weight UNPLANNED or user-swapped exercises (then the role table must cover the user-loggable `commonExercises` library too); (b) architectural cleanup — role ideally belongs as a field on the canonical `EXERCISE_CONFIG` (one source of truth for exercise metadata: load ratio + role + unilateral) rather than a parallel table that can drift. Until then the two are independent and the tripwire guards drift.
+- **Cross-ref:** D-208, `materialize-plan/exercise-config.ts`, `StrengthLogger.tsx` `commonExercises`.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

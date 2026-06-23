@@ -4345,6 +4345,20 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-208 — Execution score is role-weighted: a skipped accessory dings half a main lift (accessory = 0.5)
+
+- **Date:** 2026-06-22
+- **Context:** the strength Execution score's exercise-completion component counted every exercise equally (flat matched/planned). So skipping a postural/prehab accessory (Band Pull-Aparts, RIR ~10) dinged the score the *same per-exercise* as bailing on a main lift — the "score that lies" failure mode (a 97 with a skipped band and a 97 with a skipped bench read identically).
+- **Decision — accessory weight = 0.5 (the coaching judgment, locked):** each planned exercise contributes its role weight to both sides of exercise-completion — **primary 1.0, secondary 1.0, accessory 0.5**. For a triathlete's strength block, prehab/postural accessories are **durability insurance, not the primary adaptation driver**; a skip should register as a *proportionate nudge*, not equivalence to dropping a main lift (1.0), nor a free pass (0.0). **0.33 was considered and rejected** as too soft to function as a signal. (`secondary` weights the same as `primary` today; it's a distinct tier for future granularity + display, not a score difference.) On the June-22 session: exercise-completion 83.3% (flat 5/6) → 90.0% (role-weighted 4.5/5.0), so the Band Pull-Aparts skip costs ~3 pts instead of ~5; score 97 → 99.
+- **Why a curated table, not a per-exercise field:** role is a deterministic function of the exercise NAME, so it's classified at read-time from a curated table (`_shared/strength/exercise-role.ts`) over the protocols' KNOWN prescription vocabulary. The alternative — a declared `role` field on every emitted exercise — was **~425 edit sites** across 5 protocol files; the table is one file. Because it's curated over a *known finite vocabulary* (not free-text), it has declared-role correctness at the heuristic's blast radius. **Validated: all 110 emitted exercise names resolve (no false tripwires).**
+- **Unknown-name tripwire:** a name absent from the table logs LOUDLY (`console.warn`, lands in Supabase logs) and defaults to `'primary'` (full weight = today's behavior). So a table drift can never *silently* discount — it scores as it does now and tells us to add the name. Never make the default quiet.
+- **Shared foundation, one pass:** the analyzer emits `execution.component_attribution { components[], skipped[{name,role}], primary_mover }` (per-component score + weighted contribution + which component cost the most). **Both** the weighting (above) and the "what moved it" microcopy consume this one structure — not two passes. The copy is symmetric: a skipped accessory reads "accessory work, so it dings less"; a skipped main lift reads "main work, counts in full" (never explain only the accessory while a real miss gets silence).
+- **Files:** `_shared/strength/exercise-role.ts` (new — the table + classifier; the coaching judgment lives here), `analyze-strength-workout` (role-weighted completion + attribution), `_shared/session-detail/build.ts` (threads attribution into `session_detail_v1.execution`), `StrengthPerformanceSummary.tsx` (dynamic copy). No protocol/materialize/DB-shape changes.
+- **Footgun:** never revert the `exercise-role.ts` canonicalizer to depluralize every word — it strips singular words ending in 's' (soleus→soleu, tibialis→tibiali). Last-word-only is deliberate. (Both caught by the local completeness check pre-deploy.)
+- **Cross-ref:** D-206 (the execution chip this refines), Q-078 (partial-accessory-sets — the same lie in miniature, deferred), Q-079 (unifying role into the EXERCISE_CONFIG catalog / covering the user-loggable library).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

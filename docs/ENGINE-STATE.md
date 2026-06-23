@@ -38,6 +38,14 @@ Completed **strength/mobility/pilates** workouts no longer show a Details tab �
 - **Endurance KEEPS Details** (`CompletedTab` — gear/splits, not redundant). The kill is scoped by `isStrengthFamily` in `UnifiedWorkoutView.tsx`; the endurance `completed` TabsContent branch + grid arm are untouched. **Structurally unchanged for endurance; on-device swim Details visual still OWED** (don't claim "verified on device" until a completed swim is eyeballed).
 - **⚠ FOOTGUN:** strength-family workouts can't land on the `'completed'` tab (no trigger). Any `setActiveTab('completed')` must guard for the strength family (the unattach handler sends strength to `'summary'`). Adding a new nav to `'completed'` without that guard strands strength on a triggerless tab.
 
+### Strength Execution score is role-weighted — a skipped accessory dings half a main lift (D-208, 2026-06-22)
+
+- **The judgment:** accessory = **0.5**, primary/secondary = 1.0, in the exercise-completion component. Prehab/postural accessories are durability insurance, not the adaptation driver. Why 0.5 (not 0.33/1.0/0.0) → DECISIONS-LOG D-208.
+- **Source of truth:** `_shared/strength/exercise-role.ts` — `roleForExercise(name)` over a curated table (80 keys) of the protocols' prescription vocabulary. Classified at read-time (role = f(name)), NOT a per-exercise field (that was ~425 sites). **All 110 emitted names resolve** (completeness-checked). FOOTGUN: never depluralize every word in the canonicalizer (strips soleus→soleu); last-word-only is deliberate.
+- **Tripwire:** unmapped name → loud `console.warn` + default `'primary'` (full weight = today's behavior). Never silently discounts; tells you to add the name.
+- **Shared structure:** `session_detail_v1.execution.component_attribution { components[], skipped[{name,role}], primary_mover }` drives BOTH the weighting and the "what moved it" microcopy (symmetric — a skipped main lift gets an honest line too, not just the accessory).
+- **Scope:** weights PLANNED exercises only (the prescribed vocabulary), which is why the table needn't cover the user-loggable library yet (Q-079). Partial-accessory-sets still hit set-completion at full weight (Q-078).
+
 ### Swim intensity — CSS-primary model, run-anchor killed, baseline single-sourced + closed on the manual threshold (D-199, 2026-06-17/18)
 
 **The arc:** swim borrowed running's intensity model; this rebuilds it on CSS (swim's FTP), kills the run-anchor leaks, single-sources the swim baseline, and closes swim at a defensible manual-threshold resting state. Full design: **`docs/SPEC-intensity-baselines.md`**. Whole-board read-only audit (every swim hole, severity-ranked, file:line): **`docs/AUDIT-swim-2026-06-17.md`**.
