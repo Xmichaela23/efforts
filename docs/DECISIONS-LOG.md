@@ -4359,6 +4359,20 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-209 — Auth resume churn fixed by check-once approval (Option B), not background re-verify
+
+- **Date:** 2026-06-23
+- **Context:** `AuthWrapper` rendered `<Loading/>` in place of `<AppLayout/>` whenever `sessionResolving` was true (line 155), and set it true on EVERY `onAuthStateChange` event (line 119). iOS fires SIGNED_IN / INITIAL_SESSION on each foreground, so every resume unmounted the entire app tree — tearing down the strength logger mid-session. This is Q-072's churn half and the root cause of the D-205 data-loss event (the logger got rebuilt out from under an in-progress save).
+- **Decision (Option B — check-once):** approval is an **onboarding gate, not a per-request check**, so verify it at **cold start / genuine login only**. On resume, if the auth event re-fires for the **same already-approved user**, the handler **no-ops** — doesn't touch `user` / `approval` / `sessionResolving`, so `AppLayout` never unmounts and the logger keeps its state. **No render-gate changes** (gates 1-5 unchanged); the entire fix is the handler early-return.
+- **Rejected — Option A (background re-verify):** keep re-checking on resume but in the background, swallowing transient errors, tearing down only on definitive denial. More robust to mid-session revocation, but adds real complexity (must not downgrade a live `allowed` session to the "Can't verify" screen on a network blip). Not worth it for an onboarding gate.
+- **The ref (load-bearing detail):** the `onAuthStateChange` subscription is set up in a `[]`-deps effect, so its callback closes over the INITIAL `approval`/`user` (both null) forever — reading them directly is a stale closure. So `approvedUserIdRef` mirrors `(approval==='allowed' && user) ? user.id : null` via a sync effect, and the no-op branch reads the ref. The match is keyed on **user.id** — that's what keeps logout (#8) and login-as-different-user (#7) from being wrongly no-op'd back in ("too sticky / wrong user" failure directions).
+- **Tradeoff (documented INLINE at the no-op branch, per request):** revoke-while-backgrounded isn't caught until next cold start. Accepted — approval isn't a security boundary that flips mid-session for this app.
+- **Out of scope:** the `autoRefreshToken: false` / ~1h token-expiry half of Q-072 (latent, never bitten) is untouched. Note the churn fix means a genuinely-expired session no longer shows "Can't verify" on resume either — it keeps AppLayout mounted with a dead token (queries would fail). That's the separate expiry item; pair later with `refreshSession()`-on-resume if it ever bites.
+- **Status:** shipped (`bbee4027`); #1-8 verified by logic/web; **#9-14 device rows owed before the churn is called closed** (esp. #7/#8/#10 — the regression-critical sticky/wrong-user directions).
+- **Cross-ref:** Q-072 (the churn half this fixes + the expiry half it doesn't), D-205 (the data-loss event this root-causes), `AuthWrapper.tsx:130` (the no-op branch).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
