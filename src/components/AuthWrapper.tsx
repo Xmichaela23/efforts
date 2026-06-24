@@ -76,6 +76,13 @@ const AuthWrapper: React.FC = () => {
   const [approval, setApproval] = useState<'allowed' | 'denied' | 'error' | null>(null);
   const [showRegister, setShowRegister] = useState(false);
   const checkGeneration = useRef(0);
+  // Q-072: id of the currently-approved user, mirrored into a ref so the long-lived
+  // onAuthStateChange subscription (set up once in a []-deps effect) can read CURRENT approval
+  // state without a stale closure. Used to skip re-gating on resume re-fires (see the no-op branch).
+  const approvedUserIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    approvedUserIdRef.current = approval === 'allowed' && user ? user.id : null;
+  }, [approval, user]);
 
   useEffect(() => {
     const runApprovalCheck = async (userId: string, gen: number) => {
@@ -109,6 +116,19 @@ const AuthWrapper: React.FC = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const next = session?.user ?? null;
+      // Q-072 — resume churn killer: when the auth event re-fires for the SAME already-approved
+      // user (iOS fires SIGNED_IN / INITIAL_SESSION on every foreground), do NOTHING. The old code
+      // flipped sessionResolving=true here, which rendered <Loading/> in place of <AppLayout/> and
+      // unmounted the entire app — tearing down the strength logger mid-session (the data-loss
+      // vector). Approval is an onboarding gate, not a per-request check, so it is verified once at
+      // cold start / login only.
+      // TRADEOFF (#14, deliberate): if an admin REVOKES approval while the app is backgrounded,
+      // this no-op lets the user keep access until the next COLD START (then they hit the pending
+      // screen). Accepted — approval is not a security boundary that flips mid-session for this app.
+      // Do NOT "fix" this by re-checking here; that reintroduces the churn. Revoke-on-resume needs
+      // its own deliberate design if it ever matters.
+      if (next && next.id === approvedUserIdRef.current) return;
+
       setUser(next);
       if (!next) {
         checkGeneration.current += 1;
