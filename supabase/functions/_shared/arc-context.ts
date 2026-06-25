@@ -16,6 +16,7 @@ import {
   type WorkoutFinishRow,
 } from './goal-finish-from-workouts.ts';
 import { computeLongitudinalSignals, type LongitudinalSignals } from './longitudinal-signals.ts';
+import { type StateTrendsV1 } from './state-trend/assemble.ts';
 
 /** JSON payload from `user_baselines.athlete_identity` */
 export type AthleteIdentity = Record<string, unknown>;
@@ -190,6 +191,18 @@ export interface ArcContext {
    * ai_summary narrative slice (TSB ≥ +5 fresh, ≤ -10 fatigued, else neutral).
    */
   cycling_fitness: { ctl: number; atl: number; tsb: number; form: 'fresh' | 'neutral' | 'fatigued' } | null;
+  /**
+   * The spine's per-discipline fitness verdict — `athlete_snapshot.state_trends_v1`,
+   * surfaced typed and read-only, exactly as the snapshot column holds it (assembled by
+   * `assembleStateTrends`; shape at `state-trend/assemble.ts:172-185`). It already rode
+   * untyped inside `latest_snapshot` (select('*')); pulled out here so it sits beside
+   * `active_goals[].projection` as a sibling verdict for the fitness-verdict reconciliation
+   * (D-212 / SPEC-fitness-verdict-reconciliation.md, Piece 1 step 1). This is the DESCRIPTIVE
+   * backward per-discipline trend ({verdict, pctChange, provisional} per discipline). NOT a
+   * cross-check (separate read, not built yet), NOT computed here, NOT written anywhere —
+   * surface-only. Null when the snapshot has no `state_trends_v1` (pre-spine rows).
+   */
+  state_trends_v1: StateTrendsV1 | null;
   athlete_memory: AthleteMemorySummary | null;
 
   /**
@@ -1008,6 +1021,15 @@ export async function getArcContext(
     }
   }
 
+  // Surface the spine's per-discipline verdict (state_trends_v1) typed + read-only. It already
+  // rides inside latest_snapshot via select('*'); pull it out beside active_goals[].projection
+  // so the two verdicts sit adjacent for the fitness-verdict reconciliation (D-212 / Piece 1
+  // step 1). Descriptive only — no computation, no write. (typeof null === 'object', so the
+  // truthy guard is load-bearing.) Shape per state-trend/assemble.ts:172-185.
+  const stRaw = latest_snapshot ? (latest_snapshot as any).state_trends_v1 : null;
+  const state_trends_v1: StateTrendsV1 | null =
+    stRaw && typeof stRaw === 'object' ? (stRaw as StateTrendsV1) : null;
+
   // Readiness signals (Q-049 Phase 1) — read RAW + DISTINCT from the
   // readiness_checkins source-of-truth table. Q2: never collapsed into a single
   // score here. Q3: absent days are omitted from `recent` and `latest` is null
@@ -1147,6 +1169,7 @@ export async function getArcContext(
     active_plan,
     latest_snapshot,
     cycling_fitness,
+    state_trends_v1,
     athlete_memory,
     swim_training_from_workouts,
     gear,
