@@ -92,7 +92,7 @@ const corsHeaders: Record<string, string> = {
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
 /** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
 /** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
-const COACH_PAYLOAD_VERSION = 45; // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+const COACH_PAYLOAD_VERSION = 46; // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -5156,6 +5156,9 @@ ${narrativeFacts.join('\n')}`;
       goal_prediction: goalPrediction,
       athlete_snapshot: athleteSnapshot,
       race_readiness: raceReadiness,
+      // D-212 Piece 1 step 2 + Cut 2 — the spine↔projection divergence, surfaced top-level beside the
+      // other N-way siblings. Computed on the Arc (read-only); coach just emits it. Empty/null = aligned.
+      fitness_verdict_divergence: arc.fitness_verdict_divergence ?? null,
       primary_race_readiness,
       last_completed_race,
       race_finish_projection_v1: raceFinishProjectionV1,

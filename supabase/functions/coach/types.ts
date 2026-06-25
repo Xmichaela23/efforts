@@ -239,6 +239,8 @@ export type CoachWeekContextResponseV1 = {
   goal_context?: import('../_shared/goal-context.ts').GoalContext;
   goal_prediction?: import('../_shared/goal-predictor/index.ts').GoalPredictionResult;
   race_readiness?: import('../_shared/race-readiness/index.ts').RaceReadinessV1 | null;
+  /** D-212 — spine↔projection divergence (the N-way third read). Empty/null = verdicts aligned. */
+  fitness_verdict_divergence?: import('../_shared/arc-context.ts').FitnessVerdictDivergence[] | null;
   /** Same resolver as terrain; State + Course Strategy read this (coach + coach_cache). */
   race_finish_projection_v1?: import('../_shared/resolve-server-predicted-finish.ts').RaceFinishProjectionV1 | null;
   /** Most recent ≥12mi run with session_detail_v1.race_readiness (State tab KEY RUN); null when gated or none. */

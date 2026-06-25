@@ -5,6 +5,7 @@ import type {
   CoachWeekContextV1,
   RaceReadinessV1,
   RaceFinishProjectionV1,
+  FitnessVerdictDivergence,
 } from '@/hooks/useCoachWeekContext';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
 import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
@@ -240,6 +241,7 @@ function RaceSection({
    */
   postRaceUnofficial,
   blockVerdict,
+  divergence,
 }: {
   projection: RaceFinishProjectionV1 | null;
   rr: RaceReadinessV1 | null;
@@ -263,6 +265,8 @@ function RaceSection({
   postRaceUnofficial: { loggedSeconds: number; workoutId: string; daysAfterRace: number } | null;
   /** D-212 Piece 4 — block-adaptation third axis (the N-way room), rendered compact + drivers-gated. */
   blockVerdict: BlockVerdictResult | null;
+  /** D-212 Cut 2 — spine↔projection divergence for the displayed goal; null/empty = aligned, render nothing. */
+  divergence: FitnessVerdictDivergence | null;
 }) {
   const distLabel = planWizardRaceDistanceDisplay(
     planWizardDistance ?? rr?.goal.distance ?? goalMeta?.distance ?? null,
@@ -611,6 +615,16 @@ function RaceSection({
             }>{blockVerdict.goal_probability_pct}% on track</span>
           </div>
         )
+      )}
+
+      {/* D-212 Cut 2 — spine↔projection divergence: shown ONLY when verdicts genuinely disagree
+          ("on-track finish, but swim sliding"). No divergence → render nothing (never "all agree"). */}
+      {divergence && divergence.observations.length > 0 && (
+        <div className="pt-0.5 space-y-0.5">
+          {divergence.observations.map((o, i) => (
+            <p key={i} className="text-[11px] text-amber-400/70 leading-snug">{o.note}</p>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -1556,6 +1570,11 @@ export default function StateTab({
             projection={raceFinishProjection}
             rr={raceReadiness}
             blockVerdict={data?.goal_prediction?.block_verdict ?? null}
+            divergence={
+              (data?.fitness_verdict_divergence ?? []).find(
+                (d) => d.goal_id === raceReadiness?.goal?.id || d.goal_name === raceReadiness?.goal?.name,
+              ) ?? null
+            }
             goalMeta={goalMeta}
             planWizardDistance={planWizardDistance}
             planWizardTargetSeconds={planWizardTargetSeconds ?? null}

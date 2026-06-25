@@ -67,6 +67,21 @@ export type RaceReadinessV1 = {
   projection_facts?: string[];
 };
 
+/** D-212 — client mirror of arc-context FitnessVerdictDivergence (src/ can't import supabase/functions). */
+export interface FitnessVerdictDivergenceObservation {
+  discipline: 'swim' | 'bike' | 'run';
+  spine_verdict: string;
+  leg_share_pct: number | null;
+  note: string;
+}
+export interface FitnessVerdictDivergence {
+  goal_id: string;
+  goal_name: string;
+  sport: string | null;
+  projection_direction: 'ahead' | 'on_track' | 'behind' | 'well_behind';
+  observations: FitnessVerdictDivergenceObservation[];
+}
+
 export type CoachWeekContextV1 = {
   version: 1;
   /** Present on fresh coach responses; old coach_cache rows omit this. */
@@ -301,6 +316,8 @@ export type CoachWeekContextV1 = {
   /** D-212 Piece 4 — block-adaptation third axis. Top-level on the coach response (coach/index.ts:5156).
    *  Reuses the existing client GoalPredictionResult type; State renders only `block_verdict`. */
   goal_prediction?: GoalPredictionResult | null;
+  /** D-212 — spine↔projection divergence (the N-way third read). Empty/null = verdicts aligned. */
+  fitness_verdict_divergence?: FitnessVerdictDivergence[] | null;
   /** State tab KEY RUN — most recent ≥12mi run with Performance race_readiness */
   primary_race_readiness?: {
     workout_id: string;
