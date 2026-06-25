@@ -15,6 +15,7 @@ Changes committed locally but **not yet pushed/deployed**, plus verifications th
 
 ### D-213 non-race work — the full 486-plan matrix is a post-deploy check
 - **Why:** `scripts/plan-generation-matrix.mjs` **POSTs to the deployed `generate-combined-plan`** — it cannot validate undeployed local changes. Pre-deploy, the local `deno test` suite (the in-process generator tests) is the substitute behavioral proof; the 486-matrix is the **final local-equals-deployed confirmation**.
+- **Schema migration owed:** `supabase db push` to apply `20260625120000_add_target_weeks_to_goals.sql` (D-213 Cut 2 — adds `goals.target_weeks`). Verified by precondition only (REST creds can't run DDL); additive nullable + NULL-passing CHECK, existing event goals unaffected.
 - **On deploy (of any non-race generation cut):** `supabase functions deploy generate-combined-plan` (+ callers per the ingest/recompute fan-out rule).
 - **Post-deploy verify:** `node scripts/plan-generation-matrix.mjs` → expect the matrix to pass (was 486/486; confirm the count). Cut 1 ('retest' vocabulary) is byte-identical to race output by construction, so the matrix should be unchanged after Cut 1 deploys; later cuts (terminal branch, volume anchor) are where it earns its keep.
 
