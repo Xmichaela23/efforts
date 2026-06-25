@@ -1076,6 +1076,17 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-080 — Manually-logged strength never gets `computed.adaptation` → the block-adaptation strength lane is structurally dark
+
+- **Status:** filed 2026-06-25 (surfaced by the D-212 Piece 4 real-block verification) · not fixed · the actionable half of "why is the block_verdict axis dark"
+- **Why it exists:** `compute-adaptation-metrics` is the ONLY writer of `workouts.computed.adaptation`, and it's invoked by exactly two paths — `ingest-activity:1559` (Strava/Garmin imports) and `backfill-adaptation-metrics:129` (manual batch). **`recompute-workout` (the live save path for manually-logged workouts, `useWorkouts.ts:12`) does NOT invoke it** — its fan-out is `compute-workout-analysis → compute-facts → analyze-{sport} → compute-snapshot`, no adaptation step. So a manually-logged **strength** session never gets a `computed.adaptation` object. Verified on real data: all 3 of the sole athlete's recent strength sessions (with `strength_exercises` 2/7/6) had **no adaptation object at all** (`adapt=N`), while imported runs/rides/swims did.
+- **Why it matters:** strength IS a first-class lane in the block-adaptation model (`strength_overall_gain_pct` → `goal-predictor` `block_verdict`). With manual strength producing no adaptation object, that lane **cannot light up via the live save path** even with perfect progression — only the batch backfill (which DOES handle strength) would populate it. This is one of the two reasons the D-212 third axis (`block_verdict`) reads seeded-50 today; the other (aerobic) is just data-thin (needs ≥2 comparable `easy_z2` runs/weeks) and self-resolves with training.
+- **Distinct from the ride/swim "untagged adaptation" finding (which is BY DESIGN):** rides/swims get a bare `adaptation` object with no `workout_type` because `compute-adaptation-metrics` has no ride/swim branch and the model has no ride/swim lane (`backfill-adaptation-metrics:64` — "Only run + strength are currently meaningful"). That's expected, harmless. The strength gap is the real one: strength is *in* the model but the live path doesn't compute it.
+- **Fix shape (deferred, not done):** have `recompute-workout` invoke `compute-adaptation-metrics` for completed strength (mirror the `ingest-activity` fan-out) — or, narrower, trigger it on the strength save path. Register the new downstream in the ingest/recompute fan-out per the CLAUDE.md "any new downstream must register here" rule. Verify the strength branch (`compute-adaptation-metrics:406-455`, tags `'strength'`, reads `strength_exercises`) then produces `strength_overall_gain_pct` once ≥2 weeks of comparable lifts exist.
+- **Cross-ref:** D-212 (the axis this feeds), `compute-adaptation-metrics/index.ts:358/406/460`, `ingest-activity/index.ts:1559`, `backfill-adaptation-metrics/index.ts:64`, `recompute-workout/index.ts` (fan-out), `_shared/block-adaptation/index.ts`, `useWorkouts.ts:12`.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
