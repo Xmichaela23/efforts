@@ -122,16 +122,25 @@ export function buildPhaseTimeline(
     aGoals.push(sortedGoals[0]);
   }
 
-  // Total plan length: end in the A-race week (Monday-indexed week = week 1 containing start)
+  // Total plan length. EVENT goals: end in the A-race week (Monday-indexed). NON-RACE goals
+  // (D-213 Cut 3): no race to count back from — length comes from target_weeks. The non-race branch
+  // fires ONLY for EXPLICIT goal_type capacity/maintenance, so event goals (incl. legacy rows with
+  // goal_type undefined) keep the exact same path → byte-identical.
   const lastAGoal = aGoals[aGoals.length - 1];
-  const aRaceWeek = planWeekForCalendarEvent(startDate, lastAGoal.event_date);
+  const lastAIsNonRace = lastAGoal.goal_type === 'capacity' || lastAGoal.goal_type === 'maintenance';
+  const aRaceWeek = lastAIsNonRace
+    ? (Number.isFinite(Number(lastAGoal.target_weeks)) ? Number(lastAGoal.target_weeks) : 12)
+    : planWeekForCalendarEvent(startDate, lastAGoal.event_date);
   const totalWeeks = Math.min(52, Math.max(4, aRaceWeek));
 
   const blocks: PhaseBlock[] = [];
 
   // Chronological tri goals (includes B-priority) — two 70.3s must not use “A-only” timeline
   const chronoTri = sortedGoals
-    .filter(g => ['triathlon', 'tri'].includes(String(g.sport || '').toLowerCase()))
+    // D-213 Cut 3: exclude EXPLICIT non-race goals — they have no event_date, so raceAnchors (which
+    // derefs event_date below) must never see them. Event goals (incl. goal_type undefined) unaffected.
+    .filter(g => ['triathlon', 'tri'].includes(String(g.sport || '').toLowerCase())
+      && !(g.goal_type === 'capacity' || g.goal_type === 'maintenance'))
     .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
 
   // §8.1: the A-race is the genuine user priority-A tri; absent that, the
@@ -223,8 +232,12 @@ export function buildPhaseTimeline(
     weeksUntil(new Date(aGoals[0].event_date), new Date(aGoals[1]?.event_date ?? aGoals[0].event_date))
   ) === 'sequential') {
     // Single A-race or sequential (> 16 weeks apart): each gets its own full cycle
+    // D-213 Cut 3: non-race goals have no event_date — pass the branched `totalWeeks`. Events keep the
+    // EXACT original (unclamped planWeekForCalendarEvent) so output is byte-identical even at edge dates.
     buildSingleEventBlocks(
-      aGoals[0], 1, planWeekForCalendarEvent(startDate, aGoals[0].event_date), blocks, athleteState, phaseStructureTradeOffs);
+      aGoals[0], 1,
+      lastAIsNonRace ? totalWeeks : planWeekForCalendarEvent(startDate, aGoals[0].event_date),
+      blocks, athleteState, phaseStructureTradeOffs);
     if (aGoals.length > 1) {
       // After first A-race: recovery + new cycle for the second
       const firstRaceWeek = planWeekForCalendarEvent(startDate, aGoals[0].event_date);

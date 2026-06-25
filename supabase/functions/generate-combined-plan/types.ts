@@ -22,10 +22,15 @@ export type LoadingPattern = '3:1' | '2:1';
 export interface GoalInput {
   id: string;
   event_name: string;
-  event_date: string;      // ISO 8601 "YYYY-MM-DD"
-  distance: string;        // "sprint" | "olympic" | "70.3" | "ironman" | "marathon" | "half_marathon" | ...
+  event_date: string | null;  // ISO 8601 for events; NULL for non-race goals (D-213 Cut 3 — length comes from target_weeks)
+  distance: string;        // "sprint" | "olympic" | "70.3" | ...; for non-race, a PLACEHOLDER nearest-distance (Cut 3; real capacity anchor in Cut 5)
   sport: string;           // "triathlon" | "run" | "cycling" | ...
   priority: Priority;
+  /** D-213 Cut 3: 'event' (race) | 'capacity' | 'maintenance'. Undefined ≡ legacy event (back-compat —
+   *  the non-race branch fires ONLY on EXPLICIT capacity/maintenance, so event goals are unchanged). */
+  goal_type?: string;
+  /** D-213 Cut 3: non-race plan length in weeks; the length source (clamped 4..52) when the goal is non-race. */
+  target_weeks?: number | null;
   /** Merged wizard prefs when goals carry embedded metadata into combined-plan. */
   training_prefs?: Record<string, unknown>;
 }
