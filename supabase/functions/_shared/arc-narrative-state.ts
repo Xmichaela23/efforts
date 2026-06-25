@@ -206,7 +206,7 @@ export function pickLastCompletedGoalRaceBefore(
 export function normalizePlanPhase(phaseRaw: string | null | undefined): ArcPlanPhaseBucket {
   const s = String(phaseRaw || '').toLowerCase();
   if (!s.trim()) return 'unspecified';
-  if (/\bpeak\b|race\s*prep|sharpen/.test(s)) return 'peak';
+  if (/\bpeak\b|race\s*prep|sharpen|\bretest\b/.test(s)) return 'peak'; // retest = sharpen-into-test (D-213 Cut 1; no plan emits 'retest' until Cut 4)
   if (/\btaper\b/.test(s)) return 'taper';
   if (/\brecovery\b|\bdeload\b/.test(s)) return 'recovery';
   if (/\bbuild\b|\bthreshold\b|\btempo\b|\bprogress/.test(s)) return 'build';

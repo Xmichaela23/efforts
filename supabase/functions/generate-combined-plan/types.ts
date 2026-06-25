@@ -10,7 +10,10 @@ import type { LongitudinalSignals } from '../_shared/longitudinal-signals.ts';
 
 export type Sport = 'run' | 'bike' | 'swim' | 'strength' | 'race';
 export type Intensity = 'HARD' | 'MODERATE' | 'EASY';
-export type Phase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery' | 'rebuild';
+// 'retest' (D-213 build (a) / Cut 1): the non-race terminal shape — develop-and-retest instead of
+// taper-to-a-date. Added to the vocabulary now; NO producer emits it until Cut 4 (the terminal-shape
+// branch). Sharpen-shaped (taper-ish load). Every consumer arm added in Cut 1 is dead until then.
+export type Phase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery' | 'rebuild' | 'retest';
 export type Priority = 'A' | 'B' | 'C';
 export type LoadingPattern = '3:1' | '2:1';
 

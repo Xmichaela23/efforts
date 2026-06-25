@@ -248,6 +248,9 @@ export const PHASE_TSS_RANGES: Record<Phase, { min: number; max: number }> = {
   // Rebuild = post-race ramp back from recovery toward the next goal's training. Sits between
   // recovery (80-200) and build (400-600); approximates pre-race phase × 0.85.
   rebuild:       { min: 320, max: 500 },
+  // Retest (D-213 Cut 1): non-race sharpen-into-test terminal — rested for the test, taper-ish load.
+  // Not emitted by any producer until Cut 4; values tunable then.
+  retest:        { min: 200, max: 400 },
 };
 
 // TSS/hour by sport × intensity class.
@@ -780,6 +783,8 @@ export const PHASE_ZONE_DIST: Record<Phase, { low: number; tempo: number; high: 
   // Rebuild = ramp-back from recovery; mostly aerobic with a small tempo touch to re-introduce
   // intensity safely. Closer to base than build (no VO2/threshold yet).
   rebuild:       { low: 0.88, tempo: 0.08, high: 0.04 },
+  // Retest (D-213 Cut 1): race_specific-ish mix — keep some sharpness for the test effort.
+  retest:        { low: 0.77, tempo: 0.13, high: 0.10 },
 };
 
 // ── §5.2  Brick frequency by phase ──────────────────────────────────────────
@@ -796,6 +801,8 @@ export const BRICKS_PER_WEEK: Record<Phase, number> = {
   // Forcing 0 bricks in rebuild guarantees a standalone long_ride session that
   // enforceLongDayFloors then lifts to the rebuild floor (peak × 0.85).
   rebuild:       0,
+  // Retest (D-213 Cut 1): a test week, not a brick week.
+  retest:        0,
 };
 
 // ── §6.1  Taper duration in weeks (distance × priority) ─────────────────────

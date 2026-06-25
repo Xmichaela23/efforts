@@ -110,9 +110,13 @@ function checkRecoveryWeeks(weeks: GeneratedWeek[], pattern: '3:1' | '2:1'): boo
 // §6 — Every A-race must be preceded by at least 1 taper week.
 function checkTapersPresent(weeks: GeneratedWeek[], blocks: PhaseBlock[]): boolean {
   const taperBlocks = blocks.filter(b => b.phase === 'taper');
-  // If there are A-race blocks, there must be at least one taper block
+  // D-213 Cut 1: a 'retest' terminal is the non-race shape's valid terminal — it satisfies the
+  // terminal-block requirement WITHOUT a taper. Dead until a producer emits 'retest' (Cut 4); race
+  // plans have no retest blocks, so their validation is unchanged (they still require a taper).
+  const retestBlocks = blocks.filter(b => b.phase === 'retest');
+  // If there are A-race blocks, there must be at least one taper OR retest terminal block
   const hasARace = blocks.some(b => b.phase === 'race_specific' || b.phase === 'build');
-  if (hasARace && taperBlocks.length === 0) return false;
+  if (hasARace && taperBlocks.length === 0 && retestBlocks.length === 0) return false;
   return true;
 }
 

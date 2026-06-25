@@ -2225,6 +2225,9 @@ function toStrengthPhase(phase: Phase): { name: string; start_week: number; end_
     // Rebuild routes through `Rebuild` so triathlon_performance dispatcher can emit
     // scaled-load build sessions (peak × 0.90 +5%/wk) instead of resetting to base week-1 loads.
     rebuild: 'Rebuild',
+    // Retest (D-213 Cut 1): non-race sharpen/test terminal → strength is primed/reduced, taper-shaped.
+    // Dead until a producer emits 'retest' (Cut 4).
+    retest: 'Taper',
   };
   const name = nameMap[phase] ?? 'Base';
   console.log(`[strength] combined-plan phase=${phase} → strength phase name=${name}`);
