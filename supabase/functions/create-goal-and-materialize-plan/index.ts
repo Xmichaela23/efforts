@@ -41,6 +41,8 @@ import {
   readStrengthFrequencyForOptimizer,
   readSwimsPerWeekForOptimizer,
 } from '../_shared/tri-optimizer-prefs.ts';
+// D-214: non-race routing helpers (extracted + unit-tested; the wrapper itself can't run locally).
+import { selectGoalsForCombined, isNonRaceGoalType, placeholderDistanceForSport } from './non-race-routing.ts';
 import {
   deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
@@ -83,11 +85,15 @@ interface CreateGoalRequest {
   plan_id?: string | null;
   goal?: {
     name: string;
-    target_date: string;
+    target_date: string | null;  // D-214: null for non-race goals (they anchor on target_weeks)
     sport: string;
     distance: string | null;
     training_prefs: Record<string, any>;
     notes?: string | null;
+    /** D-214: ROW goal_type — 'event' | 'capacity' | 'maintenance'. NOT training_prefs.goal_type. */
+    goal_type?: string;
+    /** D-214: non-race plan length in weeks (the length source when goal_type is non-race). */
+    target_weeks?: number | null;
   };
   /** When set, combined-plan + run/tri generators use this anchor instead of guessing. */
   plan_start_date?: string | null;
@@ -1138,7 +1144,7 @@ async function buildCombinedPlan(
   serviceKey: string,
   user_id: string,
   newGoalId: string,
-  newGoal: { name: string; target_date: string; sport: string; distance: string | null; training_prefs: Record<string, any> },
+  newGoal: { name: string; target_date: string | null; sport: string; distance: string | null; training_prefs: Record<string, any>; goal_type?: string; target_weeks?: number | null }, // D-214: goal_type is the ROW column
   fitness: string,
   /** Propagate Arc post-marathon / recent-race recovery into generate-combined-plan. */
   combinedTransition?: {
@@ -1169,19 +1175,35 @@ async function buildCombinedPlan(
     .order('created_at', { ascending: false })
     .limit(10); // fetch a small window, dedupe below
 
-  // Always include newGoalId; take the first non-newGoalId sibling as the partner.
-  const allEventGoals = (() => {
-    if (!rawEventGoals || rawEventGoals.length === 0) return rawEventGoals;
-    const primary = rawEventGoals.find(g => g.id === newGoalId);
-    const siblings = rawEventGoals.filter(g => g.id !== newGoalId);
-    // Partner: the sibling with the earliest created_at among the top-10 recents
-    // (most likely the other goal from the same confirm flow, not an old orphan).
-    const partner = siblings[0] ?? null;
-    if (!primary) return rawEventGoals.slice(0, 2); // fallback
-    return partner ? [primary, partner] : [primary];
-  })();
+  // D-214: the non-race predicate — computed ONCE from the ROW goal_type passed in (newGoal.goal_type),
+  // NEVER from training_prefs.goal_type. This single value is the only thing that gates E1/E2 below.
+  const newGoalIsNonRace = isNonRaceGoalType(newGoal.goal_type);
 
-  if (!allEventGoals || allEventGoals.length < 2) return null; // No sibling goals; fall through
+  // E1 (D-214): the events query above is UNCHANGED (still .eq('goal_type','event')). A non-race new
+  // goal is therefore NOT in rawEventGoals, so fetch its ROW separately (selecting the ROW goal_type +
+  // target_weeks). Events: newGoalRow comes straight from rawEventGoals → no extra read, no change.
+  let newGoalRow = rawEventGoals?.find(g => g.id === newGoalId) ?? null;
+  if (newGoalIsNonRace && !newGoalRow) {
+    const { data: nrRow } = await supabase
+      .from('goals')
+      .select('id, name, sport, distance, target_date, priority, training_prefs, status, projection, created_at, goal_type, target_weeks')
+      .eq('id', newGoalId)
+      .eq('user_id', user_id)
+      .maybeSingle();
+    // Fallback (e.g. preview before the row is persisted): synthesize from the newGoal param.
+    newGoalRow = (nrRow ?? {
+      id: newGoalId, name: newGoal.name, sport: newGoal.sport, distance: newGoal.distance,
+      target_date: newGoal.target_date, priority: 'A', training_prefs: newGoal.training_prefs,
+      status: 'active', projection: null, created_at: null,
+      goal_type: newGoal.goal_type, target_weeks: newGoal.target_weeks,
+    }) as any;
+  }
+
+  // E2 (D-214): the <2-goal gate is relaxed EXCLUSIVELY for the non-race new goal, inside the extracted
+  // + unit-tested helper (non-race-routing.test.ts proves the EVENT path is byte-identical). Event
+  // inputs return the identical goal set + identical null-at-<2 decision as today.
+  const allEventGoals = selectGoalsForCombined(rawEventGoals as any[], newGoalRow as any, newGoalIsNonRace);
+  if (!allEventGoals) return null; // events: <2 → null (unchanged); non-race: only if no row at all
 
   const workingGoals = planPreview
     ? allEventGoals.map((g) => (g.id === newGoalId ? { ...g, training_prefs: newGoal.training_prefs } : g))
@@ -1230,14 +1252,25 @@ async function buildCombinedPlan(
   // Build GoalInput array for the combined engine
   const goalsForCombined = workingGoals.map(g => {
     const isNew = g.id === newGoalId;
+    const isNonRaceNew = isNew && newGoalIsNonRace; // D-214: ROW goal_type, via the single predicate
     const rawPriority = String((isNew ? (newGoal.training_prefs as any)?.priority : g.priority) || g.priority || 'A');
     return {
       id: g.id,
       event_name: g.name,
-      event_date: g.target_date,
-      distance: normalizeDistance(g.sport || '', isNew ? newGoal.distance : g.distance),
+      // E3 (D-214): non-race has no event_date and no race distance. Keep event_date null (the generator's
+      // Cut 3 branch reads target_weeks), and use the placeholder nearest-distance by sport instead of
+      // normalizeDistance's silent null→'marathon' default.
+      event_date: g.target_date ?? null,
+      distance: isNonRaceNew
+        ? placeholderDistanceForSport(g.sport)
+        : normalizeDistance(g.sport || '', isNew ? newGoal.distance : g.distance),
       sport: (g.sport || 'run').toLowerCase(),
       priority: (['A', 'B', 'C'].includes(rawPriority) ? rawPriority : 'A') as 'A' | 'B' | 'C',
+      // E7 (D-214): carry the ROW goal_type + target_weeks onto the engine payload. Undefined for event
+      // goals (rawEventGoals never selects them; generator treats undefined goal_type as 'event'); set
+      // for the non-race new goal (its row was fetched with both columns).
+      goal_type: (g as any).goal_type,
+      target_weeks: (g as any).target_weeks,
     };
   });
 
@@ -2122,12 +2155,18 @@ Deno.serve(async (req: Request) => {
       );
     }
     // Extract combine flag from body (set by UI "Build combined plan" / season build)
-    const combine = !!(raw as CreateGoalRequest & { combine?: boolean }).combine;
+    // D-214: non-race goals MUST route through the combined engine (D-213 #1) — force combine so a
+    // non-race goal never falls to the legacy generators. ROW goal_type only (raw.goal.goal_type).
+    const combine = !!(raw as CreateGoalRequest & { combine?: boolean }).combine || isNonRaceGoalType((raw.goal as any)?.goal_type);
 
     if (mode === 'create') {
-      if (!goal?.name || !goal?.target_date || !goal?.sport) throw new AppError('missing_goal_fields', 'goal name, target_date, and sport are required');
+      // D-214: non-race goals (ROW goal_type capacity/maintenance) anchor on target_weeks, not a date —
+      // require target_weeks (4–52) instead of target_date, and skip the run race-distance gate.
+      const createIsNonRace = isNonRaceGoalType(goal?.goal_type);
+      if (!goal?.name || !goal?.sport || (!goal?.target_date && !createIsNonRace)) throw new AppError('missing_goal_fields', 'goal name, target_date, and sport are required');
+      if (createIsNonRace && !(Number((goal as any)?.target_weeks) >= 4 && Number((goal as any)?.target_weeks) <= 52)) throw new AppError('missing_target_weeks', 'A non-race goal needs target_weeks (4–52).');
       if (!action || !['keep', 'replace'].includes(action)) throw new AppError('invalid_action', 'action must be keep or replace');
-      if (String(goal.sport || '').toLowerCase() === 'run' && !goal.distance) {
+      if (String(goal.sport || '').toLowerCase() === 'run' && !goal.distance && !createIsNonRace) {
         throw new AppError('missing_distance', 'Select a race distance to build a plan.');
       }
 
@@ -2243,16 +2282,21 @@ Deno.serve(async (req: Request) => {
     if (!resolvedGoal) {
       throw new AppError('missing_goal', 'Goal required to build a plan.');
     }
-    if (resolvedGoal.target_date == null || String(resolvedGoal.target_date).trim() === '') {
-      throw new AppError('missing_race_date', 'A race date is required to build a plan.');
+    // D-214: non-race goals (ROW goal_type capacity/maintenance) have no race date — skip BOTH the
+    // missing-date gate AND the date normalization. The generator's Cut 3 branch reads target_weeks.
+    const resolvedIsNonRace = isNonRaceGoalType((resolvedGoal as any).goal_type);
+    if (!resolvedIsNonRace) {
+      if (resolvedGoal.target_date == null || String(resolvedGoal.target_date).trim() === '') {
+        throw new AppError('missing_race_date', 'A race date is required to build a plan.');
+      }
+      const raceYmd = normalizeDateOnlyYmd(resolvedGoal.target_date);
+      if (!raceYmd) {
+        throw new AppError('invalid_race_date', 'Race date must be a valid calendar day (YYYY-MM-DD).');
+      }
+      // Postgres `date` is usually YYYY-MM-DD, but clients may send ISO datetimes — normalize so
+      // weeksUntilRace / downstream generators never see `...ZT12:00:00` (Invalid Date → NaN weeks).
+      resolvedGoal = { ...resolvedGoal, target_date: raceYmd };
     }
-    const raceYmd = normalizeDateOnlyYmd(resolvedGoal.target_date);
-    if (!raceYmd) {
-      throw new AppError('invalid_race_date', 'Race date must be a valid calendar day (YYYY-MM-DD).');
-    }
-    // Postgres `date` is usually YYYY-MM-DD, but clients may send ISO datetimes — normalize so
-    // weeksUntilRace / downstream generators never see `...ZT12:00:00` (Invalid Date → NaN weeks).
-    resolvedGoal = { ...resolvedGoal, target_date: raceYmd };
 
     const sport = String(resolvedGoal.sport || '').toLowerCase();
     const isTri = sport === 'triathlon' || sport === 'tri';
@@ -2295,8 +2339,11 @@ Deno.serve(async (req: Request) => {
           .insert({
             user_id,
             name: String(resolvedGoal?.name || '').trim(),
-            goal_type: 'event',
-            target_date: resolvedGoal?.target_date,
+            // D-214: ROW goal_type from the resolved request goal (NOT training_prefs.goal_type); a
+            // non-race goal persists target_weeks + a null target_date.
+            goal_type: String((resolvedGoal as any)?.goal_type || 'event'),
+            target_date: resolvedGoal?.target_date ?? null,
+            target_weeks: (resolvedGoal as any)?.target_weeks ?? null,
             sport: 'triathlon',
             distance: resolvedGoal?.distance || null,
             course_profile: {},
@@ -2761,8 +2808,11 @@ Deno.serve(async (req: Request) => {
         .insert({
           user_id,
           name: String(resolvedGoal?.name || '').trim(),
-          goal_type: 'event',
-          target_date: resolvedGoal?.target_date,
+          // D-214: ROW goal_type from the resolved request goal (NOT training_prefs.goal_type); a
+          // non-race goal persists target_weeks + a null target_date.
+          goal_type: String((resolvedGoal as any)?.goal_type || 'event'),
+          target_date: resolvedGoal?.target_date ?? null,
+          target_weeks: (resolvedGoal as any)?.target_weeks ?? null,
           sport,
           distance: resolvedGoal?.distance || null,
           course_profile: {},

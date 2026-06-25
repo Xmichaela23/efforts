@@ -4440,6 +4440,32 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-214 — The non-race routing predicate: widen `buildCombinedPlan`'s event-only gates ONLY when the just-created goal is non-race (D-213 build (a) / Cut 3b)
+
+- **Date:** 2026-06-25
+- **What this decides:** how a non-race goal (`goal_type ∈ {capacity, maintenance}`) reaches the ONE engine through `buildCombinedPlan` **without** forking a separate single-goal path and **without** silently altering any event athlete's plan. This is the wrinkle D-213 anticipated ("first Goals contact AMENDS the standard") — `buildCombinedPlan` is architecturally a **combiner of 2+ goals** (`create-goal-and-materialize-plan/index.ts:1184`, `if (length < 2) return null`), and its goal-fetch is **event-only** (`:1164`, `.eq('goal_type','event')`). A lone non-race goal — the primary use case — is never even fetched, so it falls through to the legacy standalone generators (which D-213 guard-rail #1 forbids for non-race).
+
+- **The predicate (the whole safety story — every relaxation gates on THIS, nothing else):**
+  > **`newGoalIsNonRace = newGoal.goal_type === 'capacity' || newGoal.goal_type === 'maintenance'`** — computed from the **just-created goal only.**
+
+  Every non-race relaxation fires **exclusively** when `newGoalIsNonRace` is true:
+  - **E1 (the events query, `:1164`) is left UNCHANGED** — it still filters siblings to `goal_type='event'`. The non-race new goal is fetched **separately by id** (no goal_type filter) and injected as `primary` **only when `newGoalIsNonRace`**. So for event-only inputs the query result is byte-identical (an event new goal is already in `rawEventGoals`; the separate fetch + injection never runs).
+  - **E2 (the `<2 → null` gate, `:1184`) relaxes ONLY for non-race:** `if (length < 2 && !newGoalIsNonRace) return null`. An event new goal with no sibling still returns null and falls through **exactly as today**; a single non-race goal proceeds with `[primary]`.
+  - **E3 (the `normalizeDistance` null→'marathon' default, `:1217`/`:1231`)** is bypassed for the non-race new goal — it gets a placeholder nearest-distance by sport instead of a silently-fabricated marathon (Cut 3 generator placeholder; real capacity anchor in Cut 5).
+  - **E7 (`goal_type` + `target_weeks` onto the engine payload, `goalsForCombined`/`:1670`)** — additive fields; the event path leaves them undefined, which the generator already treats as `event` (D-213 Cut 3).
+  - **Entry-path gates** (`:2128`/`:2246` target_date, `:2130` run-distance, `:2249` date-norm, `:2260` sport, `combine` routing) relax on the create-path equivalent of the same predicate (the request goal's `goal_type`). All of these throw if missed (LOUD, safe).
+
+- **Why this predicate and not a looser one:** E1/E2 are **shared input gates**, not isNonRace-branchable in isolation. A naive widening (e.g. `.eq('goal_type','event')` dropped unconditionally, or `<2` relaxed globally) would let a stray active capacity goal become an **event** build's "sibling," silently mutating an event athlete's combined plan, schedule-pref merge, and retired-plan set. Scoping every relaxation to *the new goal being non-race* is what guarantees event-only inputs produce the **identical query result, identical `<2` decision, and identical plan** as today.
+
+- **What it explicitly is NOT:** not a separate single-goal generator (reuses all ~800 lines of `buildCombinedPlan`'s athlete_state/schedule plumbing); not a direct `generate-combined-plan` invocation that bypasses that plumbing; not an extension of the legacy generators. Routes through the ONE engine (D-213 guard-rail #1).
+
+- **Verification posture (honest):** event-side byte-identity is proven **locally** (the generate-combined-plan deno suite + the event query/`<2`/plan being provably unchanged). The non-race **end-to-end** (a real non-race goal through the deployed wrapper+generator) is **deploy-gated** — Docker is unavailable here, so `supabase functions serve` can't run it locally. Cut 3b is therefore **inspection-verified + deploy-gated**, NOT runtime-verified; the end-to-end is logged in `DEPLOY-OWED.md`. No runtime claim is made that can't be made locally.
+
+- **Status:** predicate adopted; Cut 3b built against it. Amends D-213 (the anticipated first-contact wrinkle), does not supersede it.
+- **Cross-ref:** D-213 (`SPEC-one-engine-two-shapes.md`), the Cut 3 generator commit (race-date-free timeline), `DEPLOY-OWED.md` (the non-race end-to-end test), `create-goal-and-materialize-plan/index.ts:1135-1184` (`buildCombinedPlan` head + the E1/E2 gates).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
