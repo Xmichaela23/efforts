@@ -85,7 +85,7 @@ Until they are retired, they are the **standing exception** to "one engine" — 
 
 ## 7. Status / D-log pointer
 
-- **STANDARD, pending a D-NNN.** When confirmed, this earns a DECISIONS-LOG entry — the load-bearing decision a future session would violate by reaching for the path of least resistance is: **"plan-gen is one engine; season and goals are two output shapes; extend the one engine + retire the legacy forks, never widen them."** (Next available is D-213; not written until confirmed.)
+- **STANDARD, adopted as D-213 (2026-06-25).** Logged as an *adopted standard, pre-implementation* — not a battle-tested result (see D-213's "Nature of this entry"). The load-bearing line a future session would violate by reaching for the path of least resistance: **"plan-gen is one engine; season and goals are two output shapes; extend the one engine + retire the legacy forks, never widen them."** A wrinkle from first Goals contact AMENDS this standard; it does not falsify a result.
 - **Scope:** a governing constraint on *how* plan/Goals features are built — it does not itself build anything. It does not touch prescription beyond requiring that new prescription flow through the shared engine.
 
 ---

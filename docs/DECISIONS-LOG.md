@@ -4422,6 +4422,24 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-213 — One engine, two output shapes: extend the engine, retire the forks, never widen them (adopted standard, pre-implementation)
+
+- **Date:** 2026-06-25
+- **Nature of this entry — read first:** D-213 is **not** the same kind of entry as D-210/D-212. Those were decisions *reasoned to completion* — a problem traced, options weighed, a result locked. **D-213 is a governing principle adopted *before* the first non-race-goal build** — a standard we're committing to up front, not a battle-tested outcome. The distinction matters for how to treat it: if first contact with actual Goals work surfaces a wrinkle, the wrinkle **amends this standard** (a follow-up that refines the rule); it does **not** falsify a claimed result, because no result was claimed. Full standard: `docs/SPEC-one-engine-two-shapes.md`.
+
+- **The standard (the load-bearing line):** **plan-gen is one engine; season and goals are two output shapes; extend the one engine and retire the legacy forks, never widen them.** Season (race-targeted) and goals (non-race / develop-and-retest) differ in **terminal shape only** (taper-to-a-date vs develop-and-retest) — both route `create-goal-and-materialize-plan → generate-combined-plan → phase-structure (one timeline) → race-date-free content`, read fitness from the D-212 adjacent siblings, and read finish from `goals.projection.total_sec`. This extends D-185/D-186 up one level: those won *numbers*-continuity (compute each value once); this is *engine*-continuity (generate through one engine; season and goals are shapes, not systems).
+
+- **Why it's non-negotiable (the failure mode it prevents):** a future session violates this by **reaching for the path of least resistance** — extending a legacy generator (`generate-run-plan` / `generate-triathlon-plan`) for a non-race goal *because it's the nearest path* — and that reintroduces the silo problem **D-212 just resolved one level down**. The forks already exist (two legacy generators, each with its own `determinePhaseStructure`; four projection estimators; three fitness brains). Adding a goal-specific copy of any of them is how the engine fragments further. Recorded because the temptation is structural, not a one-off: **the nearest path is always the fork.**
+
+- **The two genuine builds (extensions, not forks):** (a) a **phase-structure variant** that synthesizes a timeline + phases with **no event-date anchor** and a non-taper terminal (since `event_date` today sets `totalWeeks` and every phase boundary); (b) a **distance-equivalent capacity target** to drive volume below the seam (since `science.ts` has no race-agnostic volume anchor). Everything below the `phase-structure ↔ science.ts` seam — keyed on `(distance, phase, weekInPhase)`, no race date — is reused as-is.
+
+- **Standing exception (named honestly):** `generate-run-plan` and `generate-triathlon-plan` are existing race-season **forks** of the engine, live today via `combine === false`; `generate-plan` is dead. Until retired they are the standing exception to "one engine." Non-race-goal work is the occasion to retire them, not to feed them.
+
+- **Status:** ADOPTED STANDARD, not yet exercised by a build. Will be amended (not superseded) if first Goals contact adds a wrinkle. Governs *how* Goals features are built; builds nothing itself.
+- **Cross-ref:** `docs/SPEC-one-engine-two-shapes.md` (the full standard + guard-rails), D-185/D-186 (numbers-continuity, the level below), D-212 (`SPEC-fitness-verdict-reconciliation.md` — the three-brains silo this prevents repeating), D-210 (`SPEC-per-discipline-periodization.md` — per-discipline phase extends the one timeline).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
