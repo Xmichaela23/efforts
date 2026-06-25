@@ -32,6 +32,8 @@ On the post-session grade/RPE popup, let the user tag what the session actually 
 
 This is the foundational data-capture step. Everything else depends on it accumulating.
 
+> ✅ **DUPLICATE RESOLVED (Michael, 2026-06-24 — D-211).** Layer 1 here overlaps `WORKORDER-deviation-reason.md` — both capture the same post-session "what was this session?" reason tag. **The chosen capture model is the deviation-reason one: as-planned default, divergence-gated** (silent when execution matches the plan; asks only when executed ≠ planned, default-yes). This spec's original **always-shown-on-the-RPE-popup** framing for Layer 1 is **superseded** — Layer 1's capture is built once in `WORKORDER-deviation-reason.md`, and this spec's Layer 2/3 read that single source. **Vocab status: bike reason dropdown drafted; run vocab TBD.** Cross-ref: `WORKORDER-deviation-reason.md`.
+
 ### Layer 2 — Per-ride read
 For a single session, show the context tag alongside its performance signal:
 - HR-at-power (aerobic efficiency for that ride)
@@ -106,6 +108,13 @@ Forced order — cannot shortcut to the insight:
 
 So Layer 1 is the thing to build first even though Layer 3 is the payoff — the trends are
 worthless without the tagged data underneath them.
+
+**Cross-work-order coupling (drawn 2026-06-24):** Layer 1's capture is the *same* feature as
+`WORKORDER-deviation-reason.md` (see the NEEDS-DECISION flag under Layer 1). That work order is
+gated on **Q-061** (`WORKORDER-swim-cleanup.md`'s first item). So if Layer 1 is built via the
+deviation-reason path, **Layer 3 is transitively gated on Q-061** — a three-doc chain
+(swim-cleanup Q-061 → deviation-reason → this spec's Layer 3) that none of the docs drew until
+now. Sequence them together, not as three independent items.
 
 ## Connections to existing work
 

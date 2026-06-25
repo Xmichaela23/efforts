@@ -4373,6 +4373,37 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-210 — Per-discipline periodization: two primitives never fused; the spine stays descriptive
+
+- **Date:** 2026-06-24
+- **Context:** Investigation into supporting per-discipline training postures ("bike building, run maintaining") — the substrate for strength-led plans, per-discipline adaptation styles, and interference-cost-as-data. Full design, phasing, reusable-as-is, and do-not-touch lists: `docs/SPEC-per-discipline-periodization.md`. This entry records ONLY the two decisions a future session would otherwise re-litigate or silently violate.
+
+- **Decision 1 — Per-discipline PHASE and INTENT/aggressiveness are TWO primitives; never fuse them into one per-discipline `{phase, intent}` object.** Per-discipline phase (base/build/race-specific posture per discipline) is the foundational one — adaptation-style and interference-cost both key off it. Intent/aggressiveness (how hard you climb) is a separate axis. **Why non-negotiable:** ramp rate is already owned by `training_intent` (the 3:1/2:1/1:1 loading patterns + VO2 gating + rep caps — D-061) and `tri_approach`; build/maintain does NOT imply a ramp rate. Bundling a build/maintain enum into the phase primitive creates a SECOND intent axis competing with `training_intent`, and every future aggressiveness feature then has to reconcile two intent models. Recorded because the natural "simplification" — one tidy per-discipline object — IS the fork; without this why on record, someone collapses them back and reintroduces it.
+
+- **Decision 2 — Per-discipline intent/phase sits ADJACENT to the spine (`state_trends_v1`), never inside `DisciplineTrendCache`.** Intent is prescriptive; the spine is descriptive and row-derived. The primitive's source of truth is the plan contract, denormalized forward as a read-cache (the `swim_intent → SWIM_POSTURE` path), read beside the spine — not folded into it. **Why non-negotiable (two reasons):** (a) it breaks the spine's structural-equality invariant — client == server holds only because both compute from identical observed rows; intent isn't row-derived, so an intent field inside the cache forces a separate fetch and the cached==live guarantee no longer holds for it. (b) It collapses the pairing that IS the signal — "intent says *building*, spine verdict says *holding*": the disagreement between prescription and observed outcome is the coaching read, and merging them into one struct destroys it. Recorded because denormalizing intent into the spine looks convenient and a future session won't realize what it broke. (Same adjacency rule for the snapshot — per-week mirror only, authoritative block lives in the contract, per ADR-0002 — and for Arc — beside `longitudinal_signals`, not inside `active_plan`.)
+
+- **Status:** SPEC ONLY — not built, **sign-off-gated (touches prescription).** Both primitives change session content and load distribution, so they fall under the spine's Step-4 prescription gate; do not build without that review.
+- **Cross-ref:** `docs/SPEC-per-discipline-periodization.md` (full design + phasing + reusable/do-not-touch), `docs/adr/0002-phaseblock-one-week-rows.md` (the snapshot one-week-row rule), `docs/SPEC-athlete-state-spine.md` + D-150/D-151 (the descriptive-spine contract), D-061 (the `training_intent` axis Decision 1 protects).
+
+---
+
+## D-211 — Session capture: as-planned default, deviation-gated (not always-ask)
+
+- **Date:** 2026-06-24
+- **Context:** reconciling the duplicate capture designs across `WORKORDER-deviation-reason.md` and `SPEC-session-context-behavioral-trends.md` Layer 1 — both specced the same post-session "what was this session?" tag with different trigger models. Recording the resolution as a decision rather than silently editing one spec away.
+
+- **Decision — as-planned default, deviation-gated.** A followed planned session defaults to "as planned" — **silent, no prompt.** Capture surfaces ONLY on divergence (executed ≠ planned) or a free/unplanned ride. This **supersedes session-context Layer 1's "always-shown on the RPE popup" framing**; the capture is **built once, in deviation-reason**, and session-context Layer 2/3 read that single source.
+
+- **Why non-negotiable (two reasons):**
+  - **(a) Always-ask is friction for zero signal.** Most sessions go to plan; prompting the common case trains the user to reflexively dismiss the prompt — eroding the signal of the one prompt that matters. Recorded so no one reintroduces always-ask thinking it "captures more data": it captures noise and degrades the deviation prompt.
+  - **(b) The tag must carry DIRECTION (harder vs easier), not just deviation y/n.** An accidental deload and a chased KOM both "deviate" but mean opposite things for load. Direction is what lets the Arc separate **quiet overreaching** (consistently harder than planned) from **accumulating deloads** (consistently easier). A flat deviation-y/n tag is the easy build and silently discards the exact signal the feature exists for.
+
+- **Status:** SPEC ONLY — not built. Narrative-core gate ✅ landed; remaining gate is the integrity fast-follow **Q-061** (the swim-cleanup ↔ deviation-reason coupling). Build once, in deviation-reason.
+- **Vocab status:** bike reason vocab drafted (the deviation-reason dropdown options); **run vocab TBD.**
+- **Cross-ref:** `WORKORDER-deviation-reason.md` (the chosen model + build home), `SPEC-session-context-behavioral-trends.md` (Layer 1 superseded; Layer 2/3 read this single source), Q-061 (the integrity gate), D-147 (the off-plan verdict the direction-carrying tag feeds).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

@@ -24,7 +24,7 @@ Picking up fresh context on **Efforts** (solo-dev hybrid endurance + strength ap
 
 ## ITEM 1 — Rest-timer regression (REGRESSION — likely touches D-125–D-139)
 
-**Symptom (observed on-device):** When the user taps **Done** on a set's reps, **no rest timer appears.** There was previously a **manual** timer as well — now **neither the auto nor the manual timer exists.** Both entry points are gone.
+**Symptom (observed on-device):** When the user taps **Done** on a set's reps, **no rest timer appears.** (The "there was previously a manual timer too" recollection is the **superseded D-121 opt-in** state — D-139 deliberately REMOVED the in-row manual block, so the *only* surface expected today is the D-139 auto-start top pill. The regression is therefore narrowly: **the D-139 auto-start isn't firing/surfacing** — not "two entry points are gone.")
 
 **Why this matters:** the live design (D-139) is auto-start-on-Done into the top pill. Suspicion is the auto-start mount/entry point regressed so nothing surfaces, AND any manual fallback control is gone.
 
@@ -34,7 +34,7 @@ Picking up fresh context on **Efforts** (solo-dev hybrid endurance + strength ap
 3. Find where any manual timer control used to render and why it's no longer in the tree (D-139 deliberately REMOVED the in-row block — confirm whether the user wants a manual fallback re-added).
 4. Determine whether this is **one** regression (shared mount point) or **two** (auto gate broke + manual control removed separately).
 
-**Deliverable:** restore (a) auto rest-timer-on-Done per D-139, and (b) a manual control if the user wants one back. Match to a D-NNN if this reverts a known change; else open a new Q-NNN.
+**Deliverable:** restore the **D-139 auto-start-on-Done into the top pill** (the live design intent). A manual-control fallback is **NOT in scope unless Michael re-decides** — re-adding the in-row manual block reverses D-139 and needs a new superseding D-NNN, not a silent restore. Match to a D-NNN if the regression reverted a known change; else open a new Q-NNN.
 
 ---
 

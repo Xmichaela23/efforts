@@ -356,6 +356,7 @@ The cached single source of athlete truth. Several items below were re-deriving 
 - [~] **Load/BODY fold-in** — **label half DONE (D-153):** one volume verdict (`acwrVolumeLabel`) single-sourced across 3 surfaces, readiness ≠ load. The D-146/D-147 ACWR-compute fold-into-`state_trends_v1` (verdicts as spine outputs; the last read-limb) REMAINS. (Lockstep with ENGINE-STATE Tier-3.)
 - [ ] 🔒 **Step 4 — plan builder reads spine** (GATED — changes prescription).
 - [ ] 🔒 **Step 5 — plan adjustment / autoregulation** (GATED).
+- [ ] 🔒 **Per-discipline periodization** (`SPEC-per-discipline-periodization.md`, D-210) — two primitives: per-discipline phase (foundational) + a separate intent/aggressiveness axis; spine stays descriptive (intent adjacent to `state_trends_v1`). **Specced, not built, sign-off-gated (touches prescription — session content + load distribution).** Substrate for strength-led plans / per-discipline adaptation styles / interference-cost-as-data.
 
 ### Subsumes / unblocks existing items
 - **§6 "adaptive intent tracking"** → **substrate now exists.** The cross-session drift signal it wants (systematic ride-above-zone) is the per-session engine's Read-2 (zone adherence) aggregated over `state_trends_v1`. Re-scope as a spine/per-session follow-on, not a standalone.

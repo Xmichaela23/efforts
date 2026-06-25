@@ -1,6 +1,6 @@
 # WORK ORDER — Swim Cleanup (integrity + rest-fraction features)
 
-**Status:** SPECCED, NOT BUILT. **Do not start until the narrative-core consolidation has landed.** This is the remaining swim work after the D-159→D-184 arc. Items are dependency-ordered — Q-061 first (it's an integrity correctness requirement AND it gates D-181).
+**Status:** SPECCED, NOT BUILT. **Narrative-core gate CLEARED** (D-187→D-192 complete). This is the remaining swim work after the D-159→D-184 arc. Items are dependency-ordered — Q-061 first (it's an integrity correctness requirement, it gates D-181, AND it gates `WORKORDER-deviation-reason.md`'s integrity fast-follow — see the coupling note there). ⚠️ **Q-061's *narrative* half is already DONE** (D-190, the narrative-core swim leg) — only the **trend-substrate** half remains; see Item 1.
 
 **Relates to:** SPEC-honest-swim-inference.md (the boundaries), SPEC-universal-narrative-inference.md (swim addendum). D-176/D-180/D-181 are filed-designed in DECISIONS-LOG; Q-061 in OPEN-QUESTIONS.
 
@@ -20,7 +20,7 @@ Contamination is **bidirectional** (not fins-only):
 The equipment data is captured per step (D-162, `swim_steps_equipment_confirmed`) and currently has zero readers in the trend path. Build:
 - Flag/down-weight non-unaided-swimming sets in the pace substrate that feeds the trend (session-level confirmation is enough to flag; surgical per-step removal needs per-length data, which is a later ceiling).
 - Both directions — a "faster" trend that's just more fin days AND a "slower" trend that's just more kick days are both lies.
-- **Also completes the D-183 follow-up:** the shipped narrative flags only the fins/optimistic direction in prose; add the kick/drill pessimistic-direction flag. (NOTE: if the narrative-core swim migration already completed this kick/drill flag through the shared core, confirm and don't duplicate.)
+- **D-183 follow-up — NARRATIVE HALF DONE, do not redo:** the kick/drill pessimistic-direction flag was completed through the shared core by the **narrative-core swim leg (D-190)** — the shipped swim narrative now flags BOTH fins/optimistic AND kick/drill/pessimistic directions. **This bullet's remaining scope is ONLY the trend-substrate exclusion** (the data path in `compute-facts` `pace_per_100m` → `state-trend/swim`), NOT the narrative prose. Verify against the live `analyze-swim-workout` before touching anything narrative-side.
 
 **Why first:** it's a correctness requirement (the trend is dishonest until done) AND D-181's growth reward depends on a clean, fin-flagged pace substrate (otherwise the reward fires on contaminated pace).
 
@@ -43,4 +43,4 @@ Recognition-only, never penalty. Fires a warm growth sentiment ONLY on convergen
 - Every value single-sourced (`resolveSwimScalars` / the trend spine) — don't introduce new client recompute (continuity invariant, D-185/D-186).
 - Honesty boundaries per SPEC-honest-swim-inference.md — observe don't diagnose, anchor to athlete, honest blanks.
 - Verify each on real swim data before claiming done; deploys flagged; log per-item.
-- Do NOT start until narrative-core has landed.
+- Narrative-core gate is CLEARED (D-187→D-192); the gating item now is correctness — Q-061 is itself the first integrity item, and it also unblocks `WORKORDER-deviation-reason.md`.

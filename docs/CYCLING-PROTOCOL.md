@@ -184,7 +184,8 @@ Rounding precision: **0.25hr** (matches the existing `longRideFloorHours` `Math.
 
 ### 5.1 Long Ride
 **Purpose:** aerobic capacity + durability + race-rehearsal of fueling cadence.
-**Structure:** Z2 throughout; nutrition cadence (40-45 min eat intervals); cadence 60-70 rpm in base, 70-85 in build/RS.
+**Structure:** Z2 throughout; nutrition cadence (40-45 min eat intervals); **endurance cadence 85-95 rpm** (§8.1 canonical — the Long Ride default at every phase).
+> **Cadence — RESOLVED 2026-06-24.** The Long Ride endurance default is **85-95 rpm** (§8.1). Low-cadence riding (~60-70 rpm) is a **distinct torque/force stimulus**, NOT the endurance default — it belongs only in a **labeled torque-interval block** (see §8.3 cadence-drill), never folded into the steady Z2 of the Long Ride. The former "60-70 base / 70-85 build/RS" line was the contradiction; it is reclassified, not deleted.
 **Phase use:** every phase, with phase-progressive duration per §4.5.
 **Engine:** `longRide(day, hours, goalId)` (`session-factory.ts:570`). Within-phase lerp via `longRideHoursForWeek` — **shipped D-028 (2026-05-21)**.
 
@@ -235,7 +236,7 @@ Rounding precision: **0.25hr** (matches the existing `longRideFloorHours` `Math.
 
 ### 5.9 Recovery Ride
 **Purpose:** active recovery, blood flow, no training stimulus.
-**Structure:** 30-45 min Z1 (very easy); cadence 75-85; no intervals.
+**Structure:** 30-45 min Z1 (very easy); cadence **80-90 rpm** (§8.1 canonical Recovery band); no intervals.
 **Phase use:** Recovery weeks; day after a hard ride.
 **Engine:** today realized via `easyBike(...)` at low duration; no separate helper. A dedicated `recoveryBike` helper is Phase 2 candidate work.
 
@@ -315,7 +316,7 @@ Fall back to RPE / HR labels in copy ("conversational", "comfortably hard", "har
 
 ## 8. Cadence
 
-> **Status — GAP.** The targets in this section are the canonical reference, but they are **not currently prescribed by the engine**. Today's cycling sessions describe duration / power / RPE without cadence cues; the LLM narrative does not receive cadence context; the per-interval step targets in `materialize-plan` carry no cadence field. The existing scattered cadence mentions in §5.1 (Long Ride: "60-70 rpm in base, 70-85 in build/RS") and §5.9 (Recovery: "cadence 75-85") **contradict the canonical table below** and should be reconciled against it when the implementation gap is closed. See §8.4 for the implementation surfaces that need to read this section.
+> **Status — implementation GAP; cadence-source contradiction RESOLVED 2026-06-24.** The targets in this section are the canonical reference, but they are **not currently prescribed by the engine** — today's cycling sessions describe duration / power / RPE without cadence cues; the LLM narrative does not receive cadence context; the per-interval step targets in `materialize-plan` carry no cadence field. **§8.1 is now the single source of truth.** The former conflicting inline values were reconciled to it: §5.1 (Long Ride) → endurance **85-95 rpm**; §5.9 (Recovery) → **80-90 rpm**. Low-cadence ~60-70 rpm is **reclassified** as a distinct torque/force stimulus that belongs only in a labeled torque-interval block (§8.3 cadence-drill), never the endurance default. See §8.4 for the implementation surfaces that need to read this section; the §6 cadence-prescription punch-list item is **unblocked — build against §8.1**.
 
 ### 8.1 Cadence by session type (canonical reference)
 
@@ -345,7 +346,7 @@ This is the rationale for the gap between §8.1's training cadence bands (85-95)
 
 > **Status — does not exist in the engine.** Today there is no dedicated cadence-drill session helper. This is a NEW session type proposed alongside the cadence-prescription gap.
 
-**Purpose:** deliberate low-cadence muscular-strength training on the bike. Develops force-per-pedal-stroke and bike-specific muscular endurance separately from the gym strength work.
+**Purpose:** deliberate low-cadence muscular-strength training on the bike. Develops force-per-pedal-stroke and bike-specific muscular endurance separately from the gym strength work. **This is the canonical home for low-cadence (~60-70 rpm) torque work** — the stimulus reclassified out of the §5.1 Long Ride default (2026-06-24); low cadence is a labeled torque-interval block here, never the endurance default.
 
 **Structure:** WU 15 min at endurance cadence → 4-6 × 5 min at **50-70 rpm** in a hard gear, holding Z3 (sweet-spot wattage) with 3 min easy spin recovery → CD 10 min easy. Total ~60-75 min. Emphasize smooth power application across the entire pedal stroke; no mashing.
 

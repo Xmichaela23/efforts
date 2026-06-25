@@ -1,9 +1,12 @@
 # WORK ORDER — Deviation-Reason Capture (cross-discipline)
 
-**Status:** SPECCED, NOT BUILT. **Do not start until the narrative-core consolidation has landed** (it feeds the narrative; building it against the four pre-consolidation paths means wiring it four times then redoing it). Sequenced AFTER the narrative-core + after the integrity fast-follows (Q-061, run-GAP persistence) — correctness before new features.
+**Status:** SPECCED, NOT BUILT. **Narrative-core gate CLEARED** (D-187→D-192 — the narrative-core consolidation is COMPLETE, so the original "wire it four times then redo it" risk is gone). The remaining gate is the **integrity fast-follows: Q-061 + run-GAP persistence** — correctness before new features.
 
-**Depends on:** narrative-core (the stated reason is consumed by the shared reasoning core). 
+**Depends on:** narrative-core (✅ landed — the stated reason is consumed by the shared reasoning core) + the integrity fast-follows.
+**⚠️ Q-061 coupling (drawn 2026-06-24 — read `WORKORDER-swim-cleanup.md`):** Q-061 is *that* work order's **first** item. So swim-cleanup's Q-061 must land before this work order can start — the two held work orders are chained through Q-061; neither is independent.
 **Relates to:** SPEC-universal-narrative-inference.md (rule 4 — observe-don't-diagnose; this feature is how the app gets the *cause* honestly: the athlete declares it, the app never infers it).
+
+> ✅ **DUPLICATE RESOLVED (Michael, 2026-06-24 — D-211).** This work order overlaps `SPEC-session-context-behavioral-trends.md` Layer 1 — both capture the same post-session "what was this session?" reason tag. **The chosen capture model is THIS one: as-planned default, divergence-gated** (the app stays silent when execution matches the plan; asks only when executed ≠ planned, default-yes). Session-context Layer 1's original **always-shown** framing is **superseded** — build the capture once, here; session-context Layer 2/3 read this single source. **Vocab status: the bike reason dropdown is drafted (the options below); run vocab is TBD.** Cross-ref: `SPEC-session-context-behavioral-trends.md` → "Layer 1 — Capture".
 
 ---
 
@@ -56,4 +59,4 @@ The value is the athlete DECLARING the reason — never the app INFERRING it. Th
 5. The narrative adapter reads it (reason from stated intent) — via the shared core.
 6. Pattern surfacing (observe-only, no diagnosis) — optional later layer.
 
-**Do not build until narrative-core has landed and the integrity fast-follows (Q-061, run-GAP) are done.**
+**Narrative-core has landed (D-187→D-192). Remaining gate before building: the integrity fast-follows — Q-061 (which is `WORKORDER-swim-cleanup.md`'s first item — see the coupling note up top) + run-GAP persistence.**
