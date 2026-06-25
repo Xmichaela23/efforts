@@ -1087,6 +1087,15 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-081 — Goals screen: clarify goal-vs-plan, reweight for non-race parity (surface-later, gated behind the non-race keystone)
+
+- **Status:** filed 2026-06-25 · UI/clarity note · **do not build now** — gated behind the non-race generation keystone (D-213 build (a), Cuts 1–5). Surface-later, same split as the divergence read.
+- **Why it exists:** the Goals screen blurs two concepts — a **goal** (the target: a race, or non-race like "get stronger" / "build the bike") vs a **plan** (the engine's output: the periodized weeks). "Plan my season" and "Add Goal" read as *different features* when they're the same system: a goal + the engine produces a **season** (race shape) or a **block** (non-race shape) — exactly D-213's one-engine-two-shapes.
+- **The two changes (when the surfacing workstream lands):** (1) **Clarify labeling** so `goal = target`, `plan = output` is legible. (2) **Reweight layout** — "Add Goal" should sit **above** "Plan my season" and feel co-equal; the current prominence of "Plan my season" encodes the endurance-first/race-primary bias the non-race work is growing past. Once a goal can be a non-race block, "Plan my season" won't even *apply* to it.
+- **Cross-ref:** D-213 (`SPEC-one-engine-two-shapes.md` — one engine, two shapes), the non-race keystone (Cuts 1–5), `GoalsScreen.tsx`.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
