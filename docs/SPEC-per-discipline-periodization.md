@@ -155,6 +155,8 @@ Today the weekly TSS budget is a **single whole-week envelope** keyed on the one
 
 Phase 2 is: independent per-sport TSS budgets (each from its own discipline's phase) reconciling against **one athlete's shared CTL / ramp ceiling and hours pool**. The whole-athlete caps in §5 are exactly the reconciliation constraints. This also means generalizing the consumers that assume one budget/one ratio: the week-1 load clamp (`week-builder.ts:757`), the validator budget check (`validator.ts:73`), the persisted `weekly_tss_target` (`index.ts:606`), and `enforce8020`'s whole-week 80/20 ceiling (`week-builder.ts:397-437`, target `:399`) which must split per sport once distribution is per-discipline.
 
+**Peer-reviewed grounding for the distribution rules:** `docs/SCIENCE-concurrent-training-interference.md` — the citable rationale for *why* the Phase-2 split is shaped this way. Load-bearing takeaways the budget logic must encode: cycling interferes far less than running (so "strength + bike build, run maintain" is the compatible shape, not a guess); interference scales with endurance volume/frequency (so it's a bounded *budget*, not a binary); `strength_intent` modulates the cardio cap (power focus bounds endurance tightest, hypertrophy/max-strength is permissive); spacing already satisfies the separation science (no new same-day logic). **The literature gives direction + guardrails, NOT a coefficient** — Phase 2 must not invent a precise bike-to-strength volume ratio; the athlete's own response / benchmark re-test calibrates the exact volume over the block.
+
 Do not attempt Phase 2 until Phase 1 is shipped and verified.
 
 ---
@@ -205,3 +207,4 @@ Per-discipline phase **changes prescription** (it drives session content and loa
 - `docs/ENGINE-STATE.md` — Athlete-State Spine, STATE v2 trend model, continuity invariant.
 - D-061 / `training-intent-differentiation.test.ts` — the existing `training_intent` axis (Primitive B, Decision 1).
 - `coach/index.ts:323-339,547-550,4399` — `swim_intent → SWIM_POSTURE`, the reference path to generalize (Decision 2 / §6).
+- `docs/SCIENCE-concurrent-training-interference.md` — peer-reviewed grounding for the Phase-2 load-distribution rules (Wilson 2012; Schumann/Petré 2023; Frontiers 2025; Hickson 1980). Direction + guardrails, not coefficients.

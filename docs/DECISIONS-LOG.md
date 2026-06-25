@@ -4404,6 +4404,24 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-212 — Fitness-verdict reconciliation: three axes, N-way adjacency, none folded
+
+- **Date:** 2026-06-24
+- **Context:** The app computes fitness three independent ways that never cross-check: the **spine** (`state_trends_v1` — per-discipline trend, backward), the **projection/readiness** (race finish time vs target, forward), and the **goal-predictor** (`block_verdict` — block adaptation rate, mid-block). Full design + the build/file split + the code anchors: `docs/SPEC-fitness-verdict-reconciliation.md`. The fix is an **N-way meeting room**: each verdict sits as a sibling and a divergence read sits *above* them. This entry records ONLY the decisions a future session would re-litigate or silently violate.
+
+- **Decision 1 — N-way adjacency, nothing folded (D-210 extended from two to N).** The three verdicts are **mutually non-expressible**: the projection has no per-discipline verdict, the spine has no finish time, the block-rate has neither. **Why non-negotiable:** because none can be derived from another without loss, folding any into another is destructive — adjacency is the only non-destructive shape. Build the cross-check as a set of sibling verdicts with the divergence read computed over them, never a hardwired two-way diff; leave a named empty third slot from day one. Recorded because a two-way comparator is the natural first build and it would have to be torn up when the third axis arrives.
+
+- **Decision 2 — the divergence IS the signal, not noise to resolve.** "On-track for your finish time, **but** swim fitness is sliding" is the coaching read that exists nowhere today (the projection structurally can't see per-discipline decline; the spine supplies the verdict it lacks). **Why non-negotiable:** merging the verdicts into one reconciled number destroys exactly the disagreement that is the value. The divergence read observes the mismatch (observe-don't-diagnose); it does not collapse it. Same logic as D-210's "intent says building, spine says holding."
+
+- **Decision 3 — the third brain joins as a peer that reweights, never folds.** The goal-predictor's inputs are spine-family observed deltas, reweighted by goal profile — but sharing inputs ≠ being the same verdict (the reweighting and the rate/slope semantics are its own axis). **Why non-negotiable:** the temptation will be "just compute block-rate from the spine deltas," which loses the axis. It must read the same observed substrate and reweight it, never be computed-from or folded-into the spine.
+
+- **⚠️ The trap (record it):** on coach and training-context, `runGoalPredictor` is called **without its `block` data** (`coach/index.ts:2451`, `generate-training-context/index.ts:946`), so `buildBlockVerdict` returns null (`goal-predictor/index.ts:292`) and only weekly *readiness* survives. **Anyone seating the goal-predictor in the third chair without first wiring the `block` arg is adding a duplicate of readiness, not the third axis.** If `block_verdict` is null in the shared scope, stop — you're about to seat a clone.
+
+- **Scope:** Build target is **Piece 1** (spine↔projection, two verdicts seated, the N-shaped room). The **third brain is filed and gated** behind Piece 1 existing. The divergence read is **display/synthesis only** — acting on it (adjusting prescription) is a separate prescription gate, like the spine's Step-5.
+- **Cross-ref:** `docs/SPEC-fitness-verdict-reconciliation.md` (full design, Piece 1/Piece 4 split, the trap, code anchors), D-210 (spine-stays-descriptive, the rule this extends from two to N), `coach/index.ts:1097` (the existing spine-into-readiness fold Piece 1 unwinds).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

@@ -3,6 +3,12 @@
 > From static plans to goal-driven, rolling training.
 > The athlete says what they want. The system figures out the rest.
 
+> ⚠️ **STALE — VERIFY-FIRST (flagged 2026-06-24). Same hygiene class as `APP_ARCHITECTURE.md`.** This doc is **not** a description of the running system. What to trust vs not:
+> - **TRUSTWORTHY — schema + intent:** the `goals` table shape (event/capacity/maintenance, priority A/B/C, `training_prefs`, `course_profile`) matches the live migration line-for-line, and the *intent* (goals on top, plans serve goals, multiple goals coexist, season arc) is real.
+> - **NEVER BUILT — the rolling-generation mechanism (fiction relative to live code):** `generate-macro`, `advance-plan`, `generate-run-plan` `mode:'weekly'`, `get-week` auto-advance, and the `macro_phases` / `last_advanced_at/week` / `plan_mode:'rolling'` columns. None of these exist or are read; the columns are vestigial. **Do not build from §4–§8's data-flow / edge-function plan.**
+> - **What the system actually does instead:** macro periodization was solved with a **single full-materialized multi-goal plan** — `create-goal-and-materialize-plan` → `generate-combined-plan` (`phase-structure.ts` builds the multi-race season arc with recovery + rebuild blocks) → `activate-plan` materializes all `sessions_by_week` at once. Not rolling weekly generation.
+> - **Also note:** capacity + maintenance goal *types* exist as data shells only — every plan/projection/completion path is hard-gated to `goal_type='event'`. See ENGINE-STATE / DECISIONS-LOG / the `docs/audit/` corpus for live truth.
+
 ---
 
 ## 1. The Problem
