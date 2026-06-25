@@ -14,6 +14,7 @@ import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } fro
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { pickRaceFinishProjectionV1FromCoachData, pickRaceReadinessFromCoachData } from '@/lib/coach-payload';
+import type { BlockVerdictResult } from '@/lib/analysis/goal-predictor';
 import { planWizardRaceDistanceDisplay } from '@/lib/plan-wizard-distance-label';
 import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
@@ -238,6 +239,7 @@ function RaceSection({
    * Replaces the big “Projected” block until the user records an official result and ends the plan.
    */
   postRaceUnofficial,
+  blockVerdict,
 }: {
   projection: RaceFinishProjectionV1 | null;
   rr: RaceReadinessV1 | null;
@@ -259,6 +261,8 @@ function RaceSection({
     modelProjected?: { seconds: number; display: string } | null;
   } | null;
   postRaceUnofficial: { loggedSeconds: number; workoutId: string; daysAfterRace: number } | null;
+  /** D-212 Piece 4 — block-adaptation third axis (the N-way room), rendered compact + drivers-gated. */
+  blockVerdict: BlockVerdictResult | null;
 }) {
   const distLabel = planWizardRaceDistanceDisplay(
     planWizardDistance ?? rr?.goal.distance ?? goalMeta?.distance ?? null,
@@ -588,6 +592,25 @@ function RaceSection({
             <span>Confidence adj +{rr.confidence_adjustment_pct.toFixed(1)}%</span>
           )}
         </div>
+      )}
+
+      {/* Fitness verdicts (D-212 N-way room) — the block-adaptation third axis, beside the projection.
+          Drivers-gated honesty: a seeded block_verdict (empty drivers, e.g. goal_probability 50) is the
+          DORMANT "needs data" state, NOT a real probability — show a muted line, never a fake %. block_verdict
+          null → hide. The colored-% branch is dark until block-adaptation data exists (Q-080). */}
+      {blockVerdict && (
+        blockVerdict.drivers.length === 0 ? (
+          <p className="text-[11px] text-white/40 pt-0.5">Goal trajectory · needs more comparable sessions</p>
+        ) : (
+          <div className="flex items-baseline gap-2 pt-0.5 text-[11px]">
+            <span className="text-white/50">Goal trajectory</span>
+            <span className={
+              blockVerdict.goal_probability_pct >= 70 ? 'text-emerald-400/85'
+              : blockVerdict.goal_probability_pct >= 40 ? 'text-amber-400/85'
+              : 'text-rose-400/85'
+            }>{blockVerdict.goal_probability_pct}% on track</span>
+          </div>
+        )
       )}
     </div>
   );
@@ -1532,6 +1555,7 @@ export default function StateTab({
           <RaceSection
             projection={raceFinishProjection}
             rr={raceReadiness}
+            blockVerdict={data?.goal_prediction?.block_verdict ?? null}
             goalMeta={goalMeta}
             planWizardDistance={planWizardDistance}
             planWizardTargetSeconds={planWizardTargetSeconds ?? null}

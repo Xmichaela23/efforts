@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { COACH_CLIENT_MIN_PAYLOAD_VERSION } from '@/lib/coach-contract';
 import { supabase, getStoredUserId } from '@/lib/supabase';
+import type { GoalPredictionResult } from '@/lib/analysis/goal-predictor';
 
 /** Same Monday boundary logic as the coach's week (local calendar date, en-CA). */
 function weekStartMondayEnCA(ymd: string): string {
@@ -297,6 +298,9 @@ export type CoachWeekContextV1 = {
   };
   race_readiness?: RaceReadinessV1 | null;
   race_finish_projection_v1?: RaceFinishProjectionV1 | null;
+  /** D-212 Piece 4 — block-adaptation third axis. Top-level on the coach response (coach/index.ts:5156).
+   *  Reuses the existing client GoalPredictionResult type; State renders only `block_verdict`. */
+  goal_prediction?: GoalPredictionResult | null;
   /** State tab KEY RUN — most recent ≥12mi run with Performance race_readiness */
   primary_race_readiness?: {
     workout_id: string;
