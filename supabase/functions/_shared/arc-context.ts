@@ -58,6 +58,8 @@ export interface Goal {
   target_metric: string | null;
   target_value: number | null;
   current_value: number | null;
+  /** `goals.target_time` — finish-time target in seconds; null when no time goal is set. */
+  target_time: number | null;
   /** v1 tri projection — see _shared/race-projections.ts */
   projection: Record<string, unknown> | null;
   /** Per-goal prefs (e.g. `preferred_days`) — included so Arc chat is grounded in saved goals */
@@ -203,6 +205,15 @@ export interface ArcContext {
    * surface-only. Null when the snapshot has no `state_trends_v1` (pre-spine rows).
    */
   state_trends_v1: StateTrendsV1 | null;
+  /**
+   * D-212 Piece 1 step 2 — the fitness-verdict divergence read. Per active event goal where
+   * the goal projection's whole-race outlook and the spine's per-discipline verdict DISAGREE
+   * ("on-track finish, but swim sliding"). A computed SIBLING over `state_trends_v1` +
+   * `active_goals[].projection` — neither source folded into the other (D-212). Observe-don't-
+   * diagnose: names the mismatch, never recommends or adjusts (acting on it is a separate
+   * prescription gate). `[]` = computed, nothing diverges; `null` = no spine to compare against.
+   */
+  fitness_verdict_divergence: FitnessVerdictDivergence[] | null;
   athlete_memory: AthleteMemorySummary | null;
 
   /**
@@ -281,6 +292,8 @@ export function arcContextForFreshSetup(arc: ArcContext): ArcContext {
     athlete_memory: null,
     latest_snapshot: null,
     cycling_fitness: null,
+    state_trends_v1: null,
+    fitness_verdict_divergence: null,
     swim_training_from_workouts: null,
     active_plan: null,
     recent_completed_events: [],
@@ -311,10 +324,118 @@ function toGoalRow(r: Record<string, unknown>): Goal {
     target_metric: r.target_metric != null ? String(r.target_metric) : null,
     target_value: r.target_value != null && Number.isFinite(Number(r.target_value)) ? Number(r.target_value) : null,
     current_value: r.current_value != null && Number.isFinite(Number(r.current_value)) ? Number(r.current_value) : null,
+    target_time: r.target_time != null && Number.isFinite(Number(r.target_time)) ? Number(r.target_time) : null,
     projection: proj && typeof proj === 'object' && !Array.isArray(proj) ? (proj as Record<string, unknown>) : null,
     training_prefs: parseGoalTrainingPrefs(r.training_prefs),
     courses: null,
   };
+}
+
+// =============================================================================
+// D-212 Piece 1 step 2 — fitness-verdict divergence (the cross-check / sibling-over read)
+// =============================================================================
+// Holds the spine's per-discipline verdict (state_trends_v1) BESIDE the goal projection's
+// whole-race outlook and names where they DISAGREE — observe-don't-diagnose, the
+// "on-track finish, but swim sliding" signal. Pure + read-only: reads the two already-
+// assembled siblings, computes nothing back into either, persists nothing. Neither source
+// is folded into the other (D-212 / SPEC-fitness-verdict-reconciliation.md).
+//
+// Degrades to no-signal (never a crash, never a fabricated verdict):
+//   no spine              → returns null (nothing to compare against)
+//   goal w/o projection   → skipped (capacity/maintenance, or not yet projected)
+//   no target_time        → that goal skipped (no "on-track" without a target)
+//   discipline needs_data → that discipline skipped (don't invent a trend)
+//   verdicts agree        → no observation (signal only on disagreement)
+//
+// SINGLE-SOURCE CAVEAT: the projection-direction banding mirrors the AUTHORITATIVE
+// assessment in race-readiness/index.ts:293-305. This is a coarse Arc-side read for the
+// divergence only; keep it consistent if those bands change (or extract a shared helper).
+export interface FitnessVerdictDivergenceObservation {
+  discipline: 'swim' | 'bike' | 'run';
+  spine_verdict: string;
+  /** Tri: this leg's share of projected total minutes (rounded %). Single-sport: null. */
+  leg_share_pct: number | null;
+  /** Observe-don't-diagnose: names the mismatch; never a recommendation. */
+  note: string;
+}
+
+export interface FitnessVerdictDivergence {
+  goal_id: string;
+  goal_name: string;
+  sport: string | null;
+  /** Derived from projection total_sec vs goal.target_time (mirrors race-readiness bands). */
+  projection_direction: 'ahead' | 'on_track' | 'behind' | 'well_behind';
+  observations: FitnessVerdictDivergenceObservation[];
+}
+
+type ProjectionDirection = FitnessVerdictDivergence['projection_direction'];
+
+function projectionDirectionFromDelta(predictedSec: number, targetSec: number): ProjectionDirection {
+  const pctOff = (predictedSec - targetSec) / targetSec; // + = predicted slower than target
+  if (pctOff <= -0.05) return 'ahead';
+  if (pctOff <= 0.03) return 'on_track';
+  if (pctOff <= 0.08) return 'behind';
+  return 'well_behind';
+}
+
+function projNum(proj: Record<string, unknown> | null, key: string): number | null {
+  if (!proj) return null;
+  const n = Number((proj as Record<string, unknown>)[key]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function computeFitnessVerdictDivergence(
+  goals: Goal[],
+  stv1: StateTrendsV1 | null,
+): FitnessVerdictDivergence[] | null {
+  if (!stv1) return null; // no spine → nothing to compare against (no fabricated verdict)
+  const isReal = (v: unknown): v is string => typeof v === 'string' && v !== '' && v !== 'needs_data';
+  const favorable = (d: ProjectionDirection) => d === 'ahead' || d === 'on_track';
+  const out: FitnessVerdictDivergence[] = [];
+
+  for (const g of goals) {
+    if (g.goal_type !== 'event' || !g.projection) continue;
+    const predicted = projNum(g.projection, 'total_sec');
+    if (predicted == null || g.target_time == null || g.target_time <= 0) continue; // no target → no on-track
+    const dir = projectionDirectionFromDelta(predicted, g.target_time);
+
+    const swimMin = projNum(g.projection, 'swim_min');
+    const bikeMin = projNum(g.projection, 'bike_min');
+    const runMin = projNum(g.projection, 'run_min');
+    const totalMin = projNum(g.projection, 'total_min');
+    const isTri = g.sport === 'triathlon' || (swimMin != null && bikeMin != null && runMin != null);
+
+    const legs: Array<{ disc: 'swim' | 'bike' | 'run'; min: number | null }> = isTri
+      ? [{ disc: 'swim', min: swimMin }, { disc: 'bike', min: bikeMin }, { disc: 'run', min: runMin }]
+      : (() => {
+          const d = g.sport === 'ride' ? 'bike' : g.sport === 'swim' ? 'swim' : g.sport === 'run' ? 'run' : null;
+          return d ? [{ disc: d as 'swim' | 'bike' | 'run', min: null }] : [];
+        })();
+
+    const sumLegs = (swimMin ?? 0) + (bikeMin ?? 0) + (runMin ?? 0);
+    const denom = totalMin ?? (sumLegs > 0 ? sumLegs : null);
+
+    const observations: FitnessVerdictDivergenceObservation[] = [];
+    for (const { disc, min } of legs) {
+      const verdict = stv1[disc]?.verdict;
+      if (!isReal(verdict)) continue; // don't invent a trend where there's no signal
+      const share = min != null && denom ? Math.round((min / denom) * 100) : null;
+      const dirLabel = dir.replace('_', '-');
+      let note: string | null = null;
+      if (favorable(dir) && verdict === 'sliding') {
+        note = `Finish projection is ${dirLabel}, but ${disc} fitness is sliding${share != null ? ` (${share}% of projected time)` : ''}.`;
+      } else if (!favorable(dir) && verdict === 'improving') {
+        note = `Finish projection is ${dirLabel}, though ${disc} fitness is improving${share != null ? ` (${share}% of projected time)` : ''}.`;
+      }
+      if (note) observations.push({ discipline: disc, spine_verdict: verdict, leg_share_pct: share, note });
+    }
+
+    if (observations.length > 0) {
+      out.push({ goal_id: g.id, goal_name: g.name, sport: g.sport, projection_direction: dir, observations });
+    }
+  }
+
+  return out;
 }
 
 function parseJsonObject(value: unknown): Record<string, unknown> | null {
@@ -767,8 +888,10 @@ export async function getArcContext(
   });
 
   // Omit `completed_at` until universally migrated — selecting a missing column empty-errors the query and silently starves Arc.
+  // target_time added for the D-212 divergence read (projection-vs-target band). Migration
+  // 20260312 — universally present, so safe to select (unlike completed_at, omitted above).
   const goalsArcRowSelect =
-    'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection, training_prefs, created_at';
+    'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, target_time, projection, training_prefs, created_at';
 
   const [
     baselinesRes,
@@ -1030,6 +1153,11 @@ export async function getArcContext(
   const state_trends_v1: StateTrendsV1 | null =
     stRaw && typeof stRaw === 'object' ? (stRaw as StateTrendsV1) : null;
 
+  // D-212 Piece 1 step 2 — cross-check the two adjacent verdicts (spine per-discipline trend
+  // vs goal projection outlook) and surface where they DISAGREE. Read-only computed sibling;
+  // nothing written back into either source. Graceful no-signal on missing inputs.
+  const fitness_verdict_divergence = computeFitnessVerdictDivergence(active_goals, state_trends_v1);
+
   // Readiness signals (Q-049 Phase 1) — read RAW + DISTINCT from the
   // readiness_checkins source-of-truth table. Q2: never collapsed into a single
   // score here. Q3: absent days are omitted from `recent` and `latest` is null
@@ -1170,6 +1298,7 @@ export async function getArcContext(
     latest_snapshot,
     cycling_fitness,
     state_trends_v1,
+    fitness_verdict_divergence,
     athlete_memory,
     swim_training_from_workouts,
     gear,
