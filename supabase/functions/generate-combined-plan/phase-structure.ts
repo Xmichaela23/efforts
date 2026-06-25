@@ -237,7 +237,8 @@ export function buildPhaseTimeline(
     buildSingleEventBlocks(
       aGoals[0], 1,
       lastAIsNonRace ? totalWeeks : planWeekForCalendarEvent(startDate, aGoals[0].event_date),
-      blocks, athleteState, phaseStructureTradeOffs);
+      blocks, athleteState, phaseStructureTradeOffs,
+      lastAIsNonRace ? 'retest' : 'taper'); // D-213 Cut 4: non-race terminal = retest, events stay taper
     if (aGoals.length > 1) {
       // After first A-race: recovery + new cycle for the second
       const firstRaceWeek = planWeekForCalendarEvent(startDate, aGoals[0].event_date);
@@ -340,6 +341,9 @@ function buildSingleEventBlocks(
   blocks: PhaseBlock[],
   as: AthleteState,
   tradeOffs?: PlanGenerationTradeOff[],
+  // D-213 Cut 4: the terminal phase shape. 'taper' (race-season, default — events byte-identical) vs
+  // 'retest' (non-race develop-and-retest). 'retest' is a valid Phase since Cut 1 (all Record tables).
+  terminalShape: 'taper' | 'retest' = 'taper',
 ) {
   const taperWks  = taperWeeks(goal.distance, goal.priority);
   const approach  = as.tri_approach ?? 'race_peak';
@@ -354,7 +358,7 @@ function buildSingleEventBlocks(
   if (totalWeeks < 4) {
     // Just taper + brief race-specific (too short to apply approach ratios)
     pushBlock(blocks, { phase: 'race_specific', startWeek, endWeek: Math.max(startWeek, startWeek + totalWeeks - taperWks - 1), goal, dist, as });
-    pushBlock(blocks, { phase: 'taper', startWeek: startWeek + totalWeeks - taperWks, endWeek: startWeek + totalWeeks - 1, goal, dist, as });
+    pushBlock(blocks, { phase: terminalShape, startWeek: startWeek + totalWeeks - taperWks, endWeek: startWeek + totalWeeks - 1, goal, dist, as }); // D-213 Cut 4: terminal shape (taper | retest)
     // D-048 POLISH §1 Bug 1 — surface the silent base+build skip for very short plans.
     if (tradeOffs) {
       tradeOffs.push({
@@ -391,7 +395,7 @@ function buildSingleEventBlocks(
     pushBlockRange(blocks, 'build', buildStart, rsStart - 1, goal, dist, as);
   }
   pushBlockRange(blocks, 'race_specific', rsStart, taperStart - 1, goal, dist, as);
-  pushBlockRange(blocks, 'taper', taperStart, startWeek + totalWeeks - 1, goal, dist, as);
+  pushBlockRange(blocks, terminalShape, taperStart, startWeek + totalWeeks - 1, goal, dist, as); // D-213 Cut 4: terminal shape (taper | retest)
 }
 
 // Base recovery distribution. Focus shifts match the SWIM_FOCUS_SHIFTS table so
