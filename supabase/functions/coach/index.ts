@@ -41,6 +41,7 @@ import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
 import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext, type GoalLite } from '../_shared/goal-context.ts';
 import { coachLegacyPriorRaceLine, coachPromptPriorRaceBlock } from '../_shared/prior-similar-race-coach.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
+import { getBlockAdaptation } from '../_shared/block-adaptation/index.ts';
 import { computeRaceReadiness, type RaceReadinessV1 } from '../_shared/race-readiness/index.ts';
 import { buildRaceProjectionDisplay } from '../_shared/race-readiness/projection-facts.ts';
 import {
@@ -2434,6 +2435,31 @@ Deno.serve(async (req) => {
       },
     });
 
+    // D-212 Piece 4 (wire-now) — feed the block-adaptation substrate so goal_prediction.block_verdict
+    // is non-null and sits adjacent to fitness_direction + race_readiness in the payload. The THIRD
+    // axis is block_verdict specifically — NEVER weekly_verdict (that's the readiness clone). No focus:
+    // getBlockAdaptation self-derives from sample counts. Service client so the cache upsert works.
+    // Computed ABOVE the sync IIFE (awaiting inside would make goalPrediction a Promise). Graceful
+    // null on failure — a missing block leaves block_verdict null, never a crash.
+    let block: {
+      aerobic_efficiency_improvement_pct: number | null;
+      long_run_improvement_pct: number | null;
+      strength_overall_gain_pct: number | null;
+    } | null = null;
+    try {
+      const blockEnd = asOfDate;
+      const blockStart = addDaysISO(asOfDate, -28); // 4-week block, matches generate-overall-context weeks_back=4
+      const ba: any = await getBlockAdaptation(userId, blockStart, blockEnd, supabaseService);
+      block = ba != null ? {
+        aerobic_efficiency_improvement_pct: ba.aerobic_efficiency?.improvement_pct ?? null,
+        long_run_improvement_pct: ba.long_run_endurance?.improvement_pct ?? null,
+        strength_overall_gain_pct: ba.strength_progression?.overall_gain_pct ?? null,
+      } : null;
+    } catch (baErr: any) {
+      console.warn('[coach] getBlockAdaptation failed (non-fatal):', baErr?.message ?? baErr);
+      block = null;
+    }
+
     const goalPrediction = (() => {
       const weeklyInput = responseModelToWeeklyInput(weeklyResponseModel);
       const raceName = goalContext.primary_event?.name ?? activePlan?.name ?? null;
@@ -2446,6 +2472,7 @@ Deno.serve(async (req) => {
       })();
       return runGoalPredictor({
         weekly: weeklyInput,
+        block,
         plan: raceName ? { target_finish_time_seconds: targetSeconds, race_name: raceName } : null,
         weekly_plan_context: activePlan ? {
           week_intent: weekIntent as any,
