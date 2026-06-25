@@ -1079,9 +1079,8 @@ function buildRaceReadinessDrivers(args: {
     session_rpe_avg: number | null;
     execution_score_avg: number | null;
   };
-  fitnessDirection: string | null | undefined;
 }): RaceReadinessDriver[] {
-  const { reaction, norms28d, fitnessDirection } = args;
+  const { reaction, norms28d } = args;
   const readinessDrivers: RaceReadinessDriver[] = [];
   const keyPlanned = reaction.key_sessions_planned;
   const keyLinked = reaction.key_sessions_linked;
@@ -1094,13 +1093,10 @@ function buildRaceReadinessDrivers(args: {
     });
   }
 
-  const fitDir = fitnessDirection ?? 'stable';
-  readinessDrivers.push({
-    label: 'Fitness trend',
-    value: fitDir,
-    tone: fitDir === 'improving' ? 'positive' : fitDir === 'declining' ? 'warning' : 'neutral',
-  });
-
+  // D-212 Piece 1 step 3: the spine fitness verdict is NOT folded in here as a "Fitness trend"
+  // driver. It stays adjacent on the payload as `trends.fitness_direction` (the D-212-correct
+  // home). Re-surfacing it near readiness would recreate the fold; if the spine should appear
+  // beside readiness later, the step-2 divergence read is the vehicle, not a driver row.
   if (reaction.hr_drift_avg_bpm != null && norms28d.hr_drift_avg_bpm != null && reaction.hr_drift_sample_size >= 2) {
     const driftDelta = reaction.hr_drift_avg_bpm - norms28d.hr_drift_avg_bpm;
     readinessDrivers.push({
@@ -2829,7 +2825,7 @@ Deno.serve(async (req) => {
         if (distance && targetDate) {
           const weeksOutVal = goalContext.upcoming_races.find(r => r.name === runGoalForReadiness!.name)?.weeks_out ?? 0;
 
-          const readinessDrivers = buildRaceReadinessDrivers({ reaction, norms28d, fitnessDirection });
+          const readinessDrivers = buildRaceReadinessDrivers({ reaction, norms28d });
 
           const easyRunType = runSessionTypes7d.find(rt => rt.type === 'easy' || rt.type === 'z2');
           const easyDecoupling = easyRunType?.avg_decoupling_pct ?? null;
@@ -3033,7 +3029,7 @@ Deno.serve(async (req) => {
         if (!sportL || sportL === 'run' || sportL === 'running') {
           const weeksOutVal = goalContext.upcoming_races.find(r => r.name === mg.name)?.weeks_out ?? 0;
           const planOwnsGoal = mg.id ? mergeActivePlanRaceConfigForGoal(mg.id) : false;
-          const readinessDrivers = buildRaceReadinessDrivers({ reaction, norms28d, fitnessDirection });
+          const readinessDrivers = buildRaceReadinessDrivers({ reaction, norms28d });
           const easyRunType = runSessionTypes7d.find(rt => rt.type === 'easy' || rt.type === 'z2');
           const easyDecoupling = easyRunType?.avg_decoupling_pct ?? null;
 
