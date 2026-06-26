@@ -15,14 +15,38 @@ export function isNonRaceGoalType(rowGoalType: unknown): boolean {
 }
 
 /**
- * Placeholder nearest-distance for a non-race goal — the Cut 3 generator placeholder (real
- * capacity-driven volume anchor arrives in Cut 5). Replaces the silent null→'marathon' default
- * (E3) so a non-race goal never gets a fabricated marathon distance by accident.
+ * D-213 Cut 5 (A) — the PROXY distance for a non-race goal.
+ *
+ * IMPORTANT, read before changing: this is NOT a capacity target, and it is NOT what makes a non-race
+ * plan "develop from current fitness." That already happens below the seam: weekly volume is driven by
+ * the athlete's CTL + weekly_hours via `scaledWeeklyTSS` (science.ts) — fitness-appropriate by
+ * construction, with NO distance input. The ONLY thing this proxy distance does is set the ABSOLUTE
+ * ceiling of the long sessions on the TRI path (long-run / long-ride / swim peaks), and the mid-week
+ * MP-run ceiling on the run path — both are distance-keyed and NOT CTL-scaled. On the run-only path the
+ * proxy is nearly inert (the long run is CTL-driven). So this picks a defensible develop-toward ceiling
+ * from the goal's SHAPE (sport + length + fitness tier) — there is no capacity-target metric to scale to
+ * (none is collected today — see Q-082 / D-213 Cut 5 (B)).
+ *
+ * Returns an existing enum distance (open union + every science.ts table has a `?? default`, so this is
+ * always a legal, seam-clean value — a target shape, not a date). Canonical 12-week intermediate cases
+ * resolve to the Cut 4 values ('marathon' run / '70.3' tri) so the proven timeline is unchanged.
  */
-export function placeholderDistanceForSport(sport: unknown): string {
+export function proxyDistanceForNonRaceGoal(sport: unknown, targetWeeks: unknown, fitness?: unknown): string {
   const s = String(sport ?? '').toLowerCase();
-  if (s === 'triathlon' || s === 'tri') return '70.3';
-  return 'marathon'; // run / default single-sport
+  const wks = Number(targetWeeks);
+  // Guard the Number(null)===0 footgun: null / undefined / NaN / non-positive all mean "missing" → 12.
+  const w = Number.isFinite(wks) && wks > 0 ? wks : 12;
+  const tier = String(fitness ?? 'intermediate').toLowerCase();
+  if (s === 'triathlon' || s === 'tri') {
+    // Length sets the develop-toward ceiling; cap beginners below the IM ceiling (it is NOT CTL-scaled,
+    // so a beginner must not be handed a 6h long-ride peak). 12wk → '70.3' (= Cut 4).
+    let d = w < 8 ? 'olympic' : w <= 16 ? '70.3' : 'ironman';
+    if (tier === 'beginner' && d === 'ironman') d = '70.3';
+    return d;
+  }
+  // run / default single-sport: proxy is nearly inert (run-long is CTL-driven on the run-only path); it
+  // only sets the mid-week MP-run ceiling. Length picks the run ceiling. 12wk → 'marathon' (= Cut 4).
+  return w < 8 ? 'half_marathon' : 'marathon';
 }
 
 /**

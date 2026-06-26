@@ -1096,6 +1096,15 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-082 — Non-race capacity targets: wire a real target metric through to volume (the deferred Cut 5 (B))
+
+- **Status:** filed 2026-06-25 · **future product build, do NOT build blind** · gated on a product decision. This is the half of "Cut 5" we deliberately did NOT build — D-213 Cut 5 shipped (A) (the fitness-driven close), and (B) is logged here as the real feature it is.
+- **Why it exists:** the non-race arc (D-213 Cuts 1–5) develops an athlete from current fitness toward a retest — volume is CTL/hours-driven via `scaledWeeklyTSS` (`generate-combined-plan/science.ts`), fitness-appropriate by construction. It does **not** scale to a *capacity target* (e.g. "reach FTP 250" / "80 km/wk" / "squat 1.5×BW") because **nothing collects or carries one**: `goals.target_metric/target_value/current_value` exist in the schema but are hardcoded null at creation (`create-goal-and-materialize-plan/index.ts` ~:2350/:2819), never selected into the engine (~:1189), and never on the engine payload (~:1253-1275) — three null hops.
+- **What (B) would require (all three, in order):** (1) a **product decision** on what a "capacity target" *is* per sport (FTP? weekly volume km? 1RM? a pace?) and how a plan should bend toward it; (2) **goal-creation UI** to collect it (none today); (3) **plumbing** the value through the 3 null hops (select → payload → generator) and a **target→volume mapping** below the seam (the current proxy distance — `proxyDistanceForNonRaceGoal` — only sets the tri long-session ceiling; a real target would drive magnitudes). Until (1)+(2) exist there is no input to map from, so building (3) blind would be a half-feature.
+- **Cross-ref:** D-213 (`SPEC-one-engine-two-shapes.md` §4b — "a distance-equivalent capacity target"), Cut 5 (A) (`non-race-routing.ts:proxyDistanceForNonRaceGoal` — the fitness-driven close that made (B) unnecessary for v1), `scaledWeeklyTSS` (the CTL/hours volume engine).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

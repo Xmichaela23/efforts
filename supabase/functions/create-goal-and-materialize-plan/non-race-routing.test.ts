@@ -1,7 +1,7 @@
 // D-214 — prove selectGoalsForCombined's EVENT path is byte-identical to the original inline logic,
 // and that the non-race path lets a lone goal through. Run: ~/.deno/bin/deno test --no-check <this>
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { selectGoalsForCombined, isNonRaceGoalType, placeholderDistanceForSport } from './non-race-routing.ts';
+import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal } from './non-race-routing.ts';
 
 type G = { id: string };
 
@@ -58,9 +58,22 @@ Deno.test('isNonRaceGoalType is the predicate, ROW goal_type only', () => {
   assertEquals(isNonRaceGoalType('complete'), false);  // a training_prefs value must NOT read as non-race
 });
 
-Deno.test('placeholderDistanceForSport', () => {
-  assertEquals(placeholderDistanceForSport('triathlon'), '70.3');
-  assertEquals(placeholderDistanceForSport('tri'), '70.3');
-  assertEquals(placeholderDistanceForSport('run'), 'marathon');
-  assertEquals(placeholderDistanceForSport(null), 'marathon');
+Deno.test('proxyDistanceForNonRaceGoal — canonical 12wk cases MATCH Cut 4 (timeline unchanged)', () => {
+  assertEquals(proxyDistanceForNonRaceGoal('run', 12, 'intermediate'), 'marathon');     // = Cut 4 run placeholder
+  assertEquals(proxyDistanceForNonRaceGoal('triathlon', 12, 'intermediate'), '70.3');   // = Cut 4 tri placeholder
+});
+
+Deno.test('proxyDistanceForNonRaceGoal — length-aware, beginner IM ceiling capped (not CTL-scaled)', () => {
+  // run: short block → shorter ceiling; the proxy is nearly inert on the run-only path anyway
+  assertEquals(proxyDistanceForNonRaceGoal('run', 6, 'intermediate'), 'half_marathon');
+  assertEquals(proxyDistanceForNonRaceGoal('run', 16, 'advanced'), 'marathon');
+  // tri: length sets the develop-toward ceiling
+  assertEquals(proxyDistanceForNonRaceGoal('tri', 6, 'intermediate'), 'olympic');
+  assertEquals(proxyDistanceForNonRaceGoal('tri', 12, 'advanced'), '70.3');
+  assertEquals(proxyDistanceForNonRaceGoal('tri', 20, 'advanced'), 'ironman');
+  // beginner must NOT get the un-CTL-scaled IM long-ride ceiling
+  assertEquals(proxyDistanceForNonRaceGoal('tri', 20, 'beginner'), '70.3');
+  // defaults: missing weeks → 12wk behavior; missing fitness → intermediate
+  assertEquals(proxyDistanceForNonRaceGoal('run', undefined), 'marathon');
+  assertEquals(proxyDistanceForNonRaceGoal('tri', null), '70.3');
 });

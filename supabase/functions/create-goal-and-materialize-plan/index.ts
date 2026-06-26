@@ -42,7 +42,7 @@ import {
   readSwimsPerWeekForOptimizer,
 } from '../_shared/tri-optimizer-prefs.ts';
 // D-214: non-race routing helpers (extracted + unit-tested; the wrapper itself can't run locally).
-import { selectGoalsForCombined, isNonRaceGoalType, placeholderDistanceForSport } from './non-race-routing.ts';
+import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal } from './non-race-routing.ts';
 import {
   deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
@@ -1257,12 +1257,14 @@ async function buildCombinedPlan(
     return {
       id: g.id,
       event_name: g.name,
-      // E3 (D-214): non-race has no event_date and no race distance. Keep event_date null (the generator's
-      // Cut 3 branch reads target_weeks), and use the placeholder nearest-distance by sport instead of
-      // normalizeDistance's silent null→'marathon' default.
+      // E3 (D-214) + Cut 5 (A): non-race has no event_date and no race distance. Keep event_date null
+      // (the generator's Cut 3 branch reads target_weeks), and derive a PROXY distance from the goal's
+      // shape (sport + target_weeks + fitness tier). The proxy only sets the tri long-session ceiling —
+      // the real, fitness-appropriate volume is CTL/hours via scaledWeeklyTSS (NOT a capacity target;
+      // none is collected today — Q-082). 12wk cases resolve to the Cut 4 values, so the timeline is unchanged.
       event_date: g.target_date ?? null,
       distance: isNonRaceNew
-        ? placeholderDistanceForSport(g.sport)
+        ? proxyDistanceForNonRaceGoal(g.sport, (g as any).target_weeks, fitness)
         : normalizeDistance(g.sport || '', isNew ? newGoal.distance : g.distance),
       sport: (g.sport || 'run').toLowerCase(),
       priority: (['A', 'B', 'C'].includes(rawPriority) ? rawPriority : 'A') as 'A' | 'B' | 'C',
