@@ -8,24 +8,18 @@ Changes committed locally but **not yet pushed/deployed**, plus verifications th
 
 ## Owed
 
-### D-212 Cut 2 — coach payload (divergence) → `supabase functions deploy coach`
-- **Why:** Cut 2 changed the coach payload (`COACH_PAYLOAD_VERSION` 45→46; new top-level `fitness_verdict_divergence`). The new field doesn't reach the client until the deployed function emits it.
-- **On deploy:** `supabase functions deploy coach`. Also re-deploy any function bundling the changed `_shared/arc-context.ts` (divergence is computed there) if you want the field fresh everywhere.
-- **Post-deploy verify:** the spine↔projection divergence renders in the State RACE-block verdicts subsection **only on a real disagreement** — currently none exists for the sole athlete, so the render path is verified by reading, not runtime. Confirm on a live divergence when one occurs. (Block-verdict line shows the dormant "needs more comparable sessions" today.)
-
-### D-213 non-race work — the full 486-plan matrix is a post-deploy check
-- **Why:** `scripts/plan-generation-matrix.mjs` **POSTs to the deployed `generate-combined-plan`** — it cannot validate undeployed local changes. Pre-deploy, the local `deno test` suite (the in-process generator tests) is the substitute behavioral proof; the 486-matrix is the **final local-equals-deployed confirmation**.
-- **⚠ SEQUENCED — these two are dependent, do them in order:**
-  1. **(Cut 2) Schema migration** — `supabase db push` to apply `20260625120000_add_target_weeks_to_goals.sql` (adds `goals.target_weeks`). Verified by precondition only (REST creds can't run DDL); additive nullable + NULL-passing CHECK, existing event goals unaffected. **The non-race end-to-end below CANNOT run until this column exists** (the wrapper inserts `target_weeks`).
-  2. **(Cut 3b) Non-race end-to-end** — the dependent gate (see the 🔴 item below). Runs only after step 1.
-- **On deploy (of any non-race generation cut):** `supabase functions deploy generate-combined-plan` (+ callers per the ingest/recompute fan-out rule). **Cut 3b also touches the wrapper:** `supabase functions deploy create-goal-and-materialize-plan`.
-- **🔴 Cut 3b non-race END-TO-END (the gate that closes Cut 3b's loop):** Cut 3b (D-214 — route a non-race goal through `buildCombinedPlan`) is **inspection-verified + deploy-gated**, NOT runtime-verified. Only the extracted E1/E2 decision (`selectGoalsForCombined`) is runtime-proven locally (`non-race-routing.test.ts` — event byte-identity); the entry gates, inserts, E3/E7, and the full wrapper path have **no local runtime oracle** (no Docker → no `supabase functions serve`). **After deploy:** create a real non-race goal (e.g. `goal_type='capacity'`, `sport='run'`, `target_weeks=12`, no `target_date`) and confirm it routes through `buildCombinedPlan` → `generate-combined-plan` and produces a contiguous block plan ending in **retest** (base→build→race_specific→retest, Cut 4; volumes from the Cut 5 proxy distance + CTL/hours). Requires the Cut 2 `target_weeks` migration applied first.
-- **Post-deploy verify:** `node scripts/plan-generation-matrix.mjs` → expect the matrix to pass (was 486/486; confirm the count). Cut 1 ('retest' vocabulary) is byte-identical to race output by construction, so the matrix should be unchanged after Cut 1 deploys; later cuts (terminal branch, volume anchor) are where it earns its keep.
-
-### Standing — the whole D-212/D-213 arc is committed but unpushed
-- Multiple commits on `main` (D-212 Piece 1/4 + Cut 2, the standards SPECs + D-210/D-211/D-212/D-213, the non-race Cut 1) are **not pushed**. `git push origin main` when ready; Netlify auto-deploys the client, edge functions deploy separately (above).
+### D-212 divergence render — verifiable only on a REAL disagreement (genuinely blocked)
+- **What:** the spine↔projection `fitness_verdict_divergence` renders in the State RACE-block verdicts subsection **only when the two brains actually disagree**. The coach is deployed (payload v46) and the client render path is in production (StateTab) — but it's been verified **by reading, not by runtime**, because **no real divergence exists for the sole athlete** (the block-verdict line shows the dormant "needs more comparable sessions" today).
+- **Why it stays here:** there is nothing to *do* — it can't be tested until a genuine spine-vs-projection disagreement occurs in real data. Confirm the render the first time one appears. Not actionable until then; left as a standing reminder, not a task.
+- **Cross-ref:** D-212 (`SPEC-fitness-verdict-reconciliation.md`), `arc-context.ts` (`computeFitnessVerdictDivergence`), `StateTab.tsx` (the render).
 
 ---
 
 ## Done
-_(move items here once deployed + post-deploy-verified, with the date)_
+
+### 2026-06-26 — the full D-213 non-race arc + D-212 deploy, live and verified
+- **Pushed:** the whole arc (22 commits, D-212 work + D-213 Cuts 1–5 + the Cut 3b fix) through `3c7a55f8` → `origin/main`. Netlify build triggered (client diff = the dormant D-212 block_verdict/divergence render in `StateTab.tsx` + `useCoachWeekContext.ts` — additive, dormant, safe).
+- **Cut 2 migration applied:** `goals.target_weeks` is live; existing goals NULL-safe; nothing rode along (the 4 recent older migrations were already present). Verified via REST.
+- **Functions deployed:** `generate-combined-plan` (Cuts 3/4/5), `create-goal-and-materialize-plan` (Cut 3b routing — redeployed once for the D-214-amendment fix), `coach` (divergence payload v45→46). All ACTIVE with fresh versions.
+- **Cut 3b non-race END-TO-END: PASS** (deploy-gated test, run as a throwaway test user — never touched real user `45d122e7`). All four criteria green: (1) routed through `buildCombinedPlan` (`combined:true`, `multi_sport`); (2) contiguous 1..12, `base→build→race_specific→retest`, no taper, no race date; (3) volumes present + CTL-shaped (57 sessions, 3:1 loading + retest ramp-down); (4) real user byte-identical (no plan retired — D-214 scoping held). Test data cleaned up; real user byte-identical post-cleanup. **This test first caught the per-sport-legacy-gate bug, then verified its fix (D-214 amendment / `3c7a55f8`).**
+- **486-matrix:** `node scripts/plan-generation-matrix.mjs` → **486/486 pass, errored=0**, freshly generated against the deployed code (974 stale cached files cleared first). Confirms deployed **event** generation is byte-identical / unregressed by the non-race arc.
