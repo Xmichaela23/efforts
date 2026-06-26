@@ -749,10 +749,9 @@ export function getBaseDistribution(
   posture?: PerDisciplinePosture,
 ): Record<Sport, number> {
   void phase; // intentionally unused in Cut 1 (the seam)
-  // D-210 Cut 2: substrate only — compute the collapsed posture but apply NO shift yet. With the default
-  // (absent posture ≡ all-develop) this is a no-op → byte-identical. Cut 3 = maintain floor, Cut 4 = out.
+  // D-210: per-discipline posture, terminal-collapsed (§3). The maintain clamp (Cut 3) acts on it below,
+  // after the swim_intent + limiter shifts. Default (absent ≡ all-develop) → effPosture {} → no-op.
   const effPosture = effectiveDisciplinePosture(posture, phase);
-  void effPosture;
   let dist: Record<Sport, number>;
 
   const isTri = ['triathlon', 'tri'].includes(primaryGoalSport.toLowerCase());
@@ -781,6 +780,29 @@ export function getBaseDistribution(
     dist[limiterSport] = newVal;
     const others = (Object.keys(dist) as Sport[]).filter(s => s !== limiterSport);
     others.forEach(s => { dist[s] = Math.max(0, (dist[s] ?? 0) - delta / others.length); });
+  }
+
+  // D-210 Cut 3: maintain clamp. A discipline whose posture is 'maintain' takes exactly its
+  // MAINTENANCE_FLOORS.pct share (a maintenance dose); the freed budget (or borrowed, if base < floor)
+  // redistributes ZERO-SUM across the non-maintain disciplines proportionally — the same proportional-
+  // funding mechanic the limiter shift uses. effPosture is already terminal-collapsed (§3), so a maintain
+  // posture never clamps a taper/recovery/rebuild/retest block. No-op when nothing is 'maintain' (default).
+  const maintainSports = (Object.keys(dist) as Sport[]).filter(s => effPosture[s] === 'maintain');
+  if (maintainSports.length) {
+    let freed = 0;
+    for (const s of maintainSports) {
+      const floor = MAINTENANCE_FLOORS[s]?.pct ?? 0;
+      freed += (dist[s] ?? 0) - floor;
+      dist[s] = floor;
+    }
+    // Redistribute to the develop set (non-maintain). Cut 4 will also exclude 'out' and zero it.
+    const developSports = (Object.keys(dist) as Sport[]).filter(s => effPosture[s] !== 'maintain');
+    const developTotal = developSports.reduce((sum, s) => sum + (dist[s] ?? 0), 0);
+    if (developTotal > 0) {
+      for (const s of developSports) {
+        dist[s] = Math.max(0, (dist[s] ?? 0) + freed * ((dist[s] ?? 0) / developTotal));
+      }
+    }
   }
 
   return dist;
