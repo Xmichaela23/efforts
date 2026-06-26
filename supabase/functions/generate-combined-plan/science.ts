@@ -730,7 +730,11 @@ export function getBaseDistribution(
   limiterSport?: Sport,
   swimIntent?: 'focus' | 'race' | null,
   swimLoadSource?: 'split' | 'protect_run' | 'protect_bike' | null,
+  // D-210 Cut 1: the per-block phase. Threaded so callers recompute per block, but UNUSED here — the
+  // distribution is still phase-blind. Cuts 2-4 make it phase/posture-aware (the maintain/out behavior).
+  phase?: Phase,
 ): Record<Sport, number> {
+  void phase; // intentionally unused in Cut 1 (the seam)
   let dist: Record<Sport, number>;
 
   const isTri = ['triathlon', 'tri'].includes(primaryGoalSport.toLowerCase());
