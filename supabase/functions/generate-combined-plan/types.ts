@@ -17,6 +17,14 @@ export type Phase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery' | 
 export type Priority = 'A' | 'B' | 'C';
 export type LoadingPattern = '3:1' | '2:1';
 
+// D-210 — per-discipline posture (Primitive A; the user-facing develop/maintain/out). 'develop' = the
+// discipline claims budget (default — and the only state today's plans express); 'maintain' = holds its
+// MAINTENANCE_FLOORS.pct floor (Cut 3); 'out' = excluded, 0 budget (Cut 4). A discipline ABSENT from the
+// map ≡ 'develop'. Collapses to all-develop at the whole-athlete terminals (taper/recovery/rebuild/retest,
+// §3) — see effectiveDisciplinePosture. Cut 2 carries it; Cuts 3-4 act on it.
+export type DisciplinePosture = 'develop' | 'maintain' | 'out';
+export type PerDisciplinePosture = Partial<Record<Sport, DisciplinePosture>>;
+
 // ── Request ──────────────────────────────────────────────────────────────────
 
 export interface GoalInput {
@@ -44,6 +52,8 @@ export interface AthleteState {
   weekly_hours_available: number;
   loading_pattern: LoadingPattern;
   limiter_sport?: Sport;
+  /** D-210: per-discipline posture (develop/maintain/out). Absent ≡ all-develop = today's plan (byte-parity). */
+  per_discipline_posture?: PerDisciplinePosture;
   /** 0=Sunday … 6=Saturday (defaults to [] if omitted in API payload) */
   rest_days?: number[];
   long_run_day?: number;

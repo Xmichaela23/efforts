@@ -4,7 +4,7 @@
 // Sources: Friel "Triathlete's Training Bible" 5e, Fitzgerald & Warden "80/20 Triathlon",
 // Seiler 2010, Hickson 1980, Couzens ramp rate tables.
 
-import type { Phase, Sport, Intensity, Priority, RunObservedFitness } from './types.ts';
+import type { Phase, Sport, Intensity, Priority, RunObservedFitness, PerDisciplinePosture } from './types.ts';
 
 // ── D-033 / Phase 1 — run pace reconciler (LOCKED parameters) ───────────────
 //
@@ -724,6 +724,18 @@ const SWIM_FOCUS_SHIFTS: Record<
   protect_bike: { swim: +0.06, bike:  0,    run: -0.06 },
 };
 
+// D-210 Cut 2: per-discipline posture collapses to all-develop at the whole-athlete terminals
+// (taper/recovery/rebuild/retest, §3). Absent posture OR a terminal phase → {} (≡ all-develop, no
+// override). Pure + exported for unit tests; Cuts 3-4 act on the returned (collapsed) posture.
+const POSTURE_TERMINAL_PHASES = new Set<Phase>(['taper', 'recovery', 'rebuild', 'retest']);
+export function effectiveDisciplinePosture(
+  posture: PerDisciplinePosture | undefined,
+  phase: Phase | undefined,
+): PerDisciplinePosture {
+  if (!posture || (phase != null && POSTURE_TERMINAL_PHASES.has(phase))) return {};
+  return posture;
+}
+
 export function getBaseDistribution(
   primaryGoalSport: string,
   primaryDistance: string,
@@ -733,8 +745,14 @@ export function getBaseDistribution(
   // D-210 Cut 1: the per-block phase. Threaded so callers recompute per block, but UNUSED here — the
   // distribution is still phase-blind. Cuts 2-4 make it phase/posture-aware (the maintain/out behavior).
   phase?: Phase,
+  // D-210 Cut 2: per-discipline posture (develop/maintain/out), collapsed to all-develop at terminals.
+  posture?: PerDisciplinePosture,
 ): Record<Sport, number> {
   void phase; // intentionally unused in Cut 1 (the seam)
+  // D-210 Cut 2: substrate only — compute the collapsed posture but apply NO shift yet. With the default
+  // (absent posture ≡ all-develop) this is a no-op → byte-identical. Cut 3 = maintain floor, Cut 4 = out.
+  const effPosture = effectiveDisciplinePosture(posture, phase);
+  void effPosture;
   let dist: Record<Sport, number>;
 
   const isTri = ['triathlon', 'tri'].includes(primaryGoalSport.toLowerCase());
