@@ -2319,6 +2319,64 @@ Deno.serve(async (req: Request) => {
     })();
     const postRaceRecovery = findPostRaceRecoveryContext(arcForPlanning.recent_completed_events, sport);
 
+    // ── Non-race short-circuit (D-213 guard-rail #1 — Cut 3b amendment) ────
+    // Non-race goals (ROW goal_type capacity/maintenance) route through the ONE engine and must NEVER
+    // reach the legacy per-sport build paths below: their distance/date gates (:tri / :run) assume a
+    // race and threw on a non-race goal (the deploy-gated end-to-end caught this). Branch here, before
+    // the tri/run split, so a non-race goal skips every legacy-path gate by construction. The
+    // buildCombinedPlan call is identical to the per-sport ones — they pass no per-sport setup, only
+    // what is already in scope here — so nothing the combine path needs is skipped. Covers create +
+    // build_existing. Events (resolvedIsNonRace=false) are unaffected → byte-identical.
+    if (resolvedIsNonRace) {
+      if (mode === 'create') {
+        const newGoalPriority = action === 'keep' && existing_goal_id ? 'B' : 'A';
+        const { data: createdGoal, error: goalInsertErr } = await supabase
+          .from('goals')
+          .insert({
+            user_id,
+            name: String(resolvedGoal?.name || '').trim(),
+            goal_type: String((resolvedGoal as any)?.goal_type || 'capacity'), // ROW goal_type (capacity/maintenance)
+            target_date: null,                                                  // non-race: no race date
+            target_weeks: (resolvedGoal as any)?.target_weeks ?? null,
+            sport,                                                              // resolvedGoal's sport (run/tri) — NOT hardcoded
+            distance: resolvedGoal?.distance || null,
+            course_profile: {}, target_metric: null, target_value: null, current_value: null,
+            priority: newGoalPriority, status: 'active',
+            training_prefs: resolvedGoal?.training_prefs || {}, notes: resolvedGoal?.notes || null,
+          })
+          .select('*').single();
+        if (goalInsertErr || !createdGoal) throw new AppError('goal_create_failed', goalInsertErr?.message || 'Failed to create goal');
+        createdGoalId = createdGoal.id;
+      } else {
+        createdGoalId = resolvedBuildId || existing_goal_id || null;
+      }
+      const combinedResult = createdGoalId ? await buildCombinedPlan(
+        supabase, functionsBaseUrl, serviceKey, user_id, createdGoalId, resolvedGoal!, fitness,
+        combinedTransitionFromPostRace(postRaceRecovery), plan_start_date ?? null, bodyPreview, strictSchedulePrefs,
+      ) : null;
+      if (combinedResult) {
+        if (combinedResult.preview) {
+          return new Response(JSON.stringify({
+            success: true, mode, goal_id: createdGoalId, preview: true,
+            combined_preview: combinedResult.combined_preview, schedule_signals: combinedResult.schedule_signals,
+            sport: 'multi_sport', combined: true,
+          }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        createdPlanId = combinedResult.plan_id;
+        await bustTrainingCachesAfterPlanChange('combined_plan');
+        return new Response(JSON.stringify({
+          success: true, mode, goal_id: createdGoalId, plan_id: combinedResult.plan_id,
+          schedule_signals: combinedResult.schedule_signals, sport: 'multi_sport', combined: true,
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      // null → roll back the orphan goal; do NOT fall through to the legacy paths (the whole point of #1)
+      await rollbackCombinedPlanUnavailable();
+      return new Response(JSON.stringify({
+        success: false, combined: true, error_code: 'non_race_plan_failed',
+        error: 'Non-race plan generation failed (combined engine returned no plan). Standalone generation was not run.',
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // ── Triathlon path ────────────────────────────────────────────────────
     if (isTri) {
       const triDistanceApi = TRI_DISTANCE_TO_API[String(resolvedGoal?.distance || '')] ?? null;
