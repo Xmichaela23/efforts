@@ -42,7 +42,7 @@ import {
   readSwimsPerWeekForOptimizer,
 } from '../_shared/tri-optimizer-prefs.ts';
 // D-214: non-race routing helpers (extracted + unit-tested; the wrapper itself can't run locally).
-import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal } from './non-race-routing.ts';
+import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol } from './non-race-routing.ts';
 import {
   deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
@@ -1407,13 +1407,27 @@ async function buildCombinedPlan(
     );
   }
 
-  const resolvedCombinedStrengthProtocol = resolveCombinedTriStrengthProtocol(
+  // Cut A (A2): non-race strength is sport-context-aware (§13.1) — honor the builder's explicit protocol
+  // (validated, default durability) instead of the tri-coercing resolver, which would turn a runner's
+  // five_by_five into triathlon. EVENTS keep resolveCombinedTriStrengthProtocol → byte-identical.
+  const rawCombinedStrengthProtocol =
     combinedSchedulePrefs.strength_protocol != null
       ? String(combinedSchedulePrefs.strength_protocol)
-      : undefined,
-    combinedSchedulePrefs.strength_intent != null
-      ? String(combinedSchedulePrefs.strength_intent)
-      : undefined,
+      : undefined;
+  const resolvedCombinedStrengthProtocol = isNonRaceGoalType(newGoal.goal_type)
+    ? resolveNonRaceStrengthProtocol(rawCombinedStrengthProtocol)
+    : resolveCombinedTriStrengthProtocol(
+        rawCombinedStrengthProtocol,
+        combinedSchedulePrefs.strength_intent != null
+          ? String(combinedSchedulePrefs.strength_intent)
+          : undefined,
+      );
+
+  // Cut A (A1): per_discipline_posture (D-210 consumer) — read DIRECTLY from the goal's training_prefs
+  // (mergeCombinedSchedulePrefs filters to known schedule keys), sanitize, thread into athlete_state
+  // below via a conditional spread (absent → omitted → byte-identical for events).
+  const perDisciplinePosture = sanitizePerDisciplinePosture(
+    (newGoal.training_prefs as Record<string, unknown> | undefined)?.per_discipline_posture,
   );
 
   // Re-derive combinedSchedulePrefs from the backfilled training_prefs so that
@@ -1863,6 +1877,8 @@ async function buildCombinedPlan(
         ? { group_ride_route_snapshot: freshCombinedPrefs.group_ride_route_snapshot }
         : {}),
       strength_protocol: resolvedCombinedStrengthProtocol,
+      // Cut A (A1): per-discipline posture (D-210) — conditional spread, absent → byte-identical.
+      ...(perDisciplinePosture ? { per_discipline_posture: perDisciplinePosture } : {}),
       ...(freshCombinedPrefs.strength_intent
         ? { strength_intent: freshCombinedPrefs.strength_intent }
         : {}),

@@ -8,11 +8,16 @@ Changes committed locally but **not yet pushed/deployed**, plus verifications th
 
 ## Owed
 
-### 5×5 strength protocol (Cuts 1–4) — deploy `generate-combined-plan` + post-deploy end-to-end check (safe, not urgent)
-- **What:** the `five_by_five` protocol (block-linear 70→85% curve, 40–50% deload, 2×/week) + the two resolver generalizations (`runStrength`, the tri-combined resolver) + the `FULLBODY_STRENGTH` intent all live in `generate-combined-plan` and the shared `strength-system/protocols/` module it imports. **Deploy `generate-combined-plan`** to make them live. (`create-goal-and-materialize-plan` needs no change yet — nothing populates `strength_protocol='five_by_five'` until the non-race builder lands.)
-- **Post-deploy check:** against deployed code, generate a plan for a throwaway athlete with `strength_protocol='five_by_five'` and confirm the strength sessions materialize as 5×5 (name "5×5 Workout", `protocol:five_by_five` tag), **not** durability — the local integration test (`generate-combined-plan/five-by-five-integration.test.ts`) proved this in-tree; the deploy check confirms local-equals-deployed. Use a throwaway test user; never touch real user `45d122e7`.
-- **Why safe-but-not-urgent:** **dormant** — no client path sets `strength_protocol='five_by_five'` yet (the builder selects it later), so deploying changes nothing for existing athletes (event plans byte-identical, verified `432/3 = baseline` across all four cuts). Deploy when convenient; it's a prerequisite for the builder, not a live-bug fix.
-- **Cross-ref:** Cuts 1–4 (`28f0b9eb`, `0a036d3d`, `bfe2e4e6`, `5f6570a2`), `SCIENCE-5x5-linear-progression.md`, `RESUME-5x5-cut4.md`, Q-083 (the cadence-engine follow-up).
+### 5×5 protocol (Cuts 1–4) + non-race posture wiring (Cut A) — deploy BOTH functions + 3 end-to-end checks (safe, not urgent)
+- **Deploy together (same moment, both functions):**
+  - **`generate-combined-plan`** — carries the `five_by_five` protocol (block-linear 70→85% curve, 40–50% deload, 2×/week), the two resolver generalizations (`runStrength`, the tri-combined resolver), the `FULLBODY_STRENGTH` intent + the shared `strength-system/protocols/` module.
+  - **`create-goal-and-materialize-plan`** — Cut A threads `per_discipline_posture` into `athlete_state` (A1) and resolves non-race strength sport-aware instead of tri-coercing (A2). This is the consumer wiring; the 5×5 arc owes this same deploy.
+- **Three post-deploy end-to-end checks** (against deployed code, **throwaway test user only — never real user `45d122e7`**):
+  1. **`swim:out` non-race goal → 0 swim sessions** (posture reaches the engine — proves A1 end-to-end).
+  2. **run+strength, `strength=develop`, `strength_protocol='five_by_five'` → 5×5 sessions** (name "5×5 Workout", `protocol:five_by_five` tag), **NOT** triathlon (proves A2 de-coercion; also the 5×5-arc check).
+  3. **tri-shaped develop → `triathlon_performance`** (proves the sport-context split + the engine's `hasTri` run-vs-tri dispatch classification — the build-time confirm (b) that has no local oracle).
+- **Why safe-but-not-urgent:** **dormant** — no client path sends `per_discipline_posture` or a non-race `strength_protocol` yet (the builder, Cut B+, selects them). Events byte-identical: 5×5 verified `432/3 = baseline` (engine); Cut A by-construction (A1 conditional spread absent for events; A2 non-race-scoped → event branch identical) + helpers unit-tested 8/8. Prerequisite for the builder, not a live-bug fix.
+- **Cross-ref:** 5×5 Cuts 1–4 (`28f0b9eb`, `0a036d3d`, `bfe2e4e6`, `5f6570a2`); Cut A (this commit); `SPEC-per-discipline-periodization.md §13.1` (the strength contract the checks validate); `non-race-routing.ts` (the unit-tested helpers); `RESUME-5x5-cut4.md`; Q-083 / Q-084.
 
 ### D-212 divergence render — verifiable only on a REAL disagreement (genuinely blocked)
 - **What:** the spine↔projection `fitness_verdict_divergence` renders in the State RACE-block verdicts subsection **only when the two brains actually disagree**. The coach is deployed (payload v46) and the client render path is in production (StateTab) — but it's been verified **by reading, not by runtime**, because **no real divergence exists for the sole athlete** (the block-verdict line shows the dormant "needs more comparable sessions" today).

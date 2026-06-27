@@ -1,7 +1,7 @@
 // D-214 — prove selectGoalsForCombined's EVENT path is byte-identical to the original inline logic,
 // and that the non-race path lets a lone goal through. Run: ~/.deno/bin/deno test --no-check <this>
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal } from './non-race-routing.ts';
+import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol } from './non-race-routing.ts';
 
 type G = { id: string };
 
@@ -76,4 +76,35 @@ Deno.test('proxyDistanceForNonRaceGoal — length-aware, beginner IM ceiling cap
   // defaults: missing weeks → 12wk behavior; missing fitness → intermediate
   assertEquals(proxyDistanceForNonRaceGoal('run', undefined), 'marathon');
   assertEquals(proxyDistanceForNonRaceGoal('tri', null), '70.3');
+});
+
+// ── Cut A (A1) — sanitizePerDisciplinePosture ──────────────────────────────────────────────────────
+Deno.test('sanitizePerDisciplinePosture — keeps valid {sport×state}, drops everything else', () => {
+  assertEquals(sanitizePerDisciplinePosture({ swim: 'out', bike: 'maintain', run: 'maintain', strength: 'develop' }),
+    { swim: 'out', bike: 'maintain', run: 'maintain', strength: 'develop' });
+  // unknown sport key + bad value dropped; valid ones survive
+  assertEquals(sanitizePerDisciplinePosture({ run: 'develop', yoga: 'develop', bike: 'sprint' }), { run: 'develop' });
+  assertEquals(sanitizePerDisciplinePosture({ swim: 42, strength: 'maintain' }), { strength: 'maintain' }); // non-string dropped
+});
+
+Deno.test('sanitizePerDisciplinePosture — absent/empty/non-object → undefined (athlete_state omits → byte-identical)', () => {
+  assertEquals(sanitizePerDisciplinePosture(undefined), undefined);
+  assertEquals(sanitizePerDisciplinePosture(null), undefined);
+  assertEquals(sanitizePerDisciplinePosture('out'), undefined);            // not an object
+  assertEquals(sanitizePerDisciplinePosture({}), undefined);              // empty → undefined
+  assertEquals(sanitizePerDisciplinePosture({ foo: 'bar' }), undefined);  // nothing valid → undefined
+});
+
+// ── Cut A (A2) — resolveNonRaceStrengthProtocol (sport-aware, no tri coercion) ──────────────────────
+Deno.test('resolveNonRaceStrengthProtocol — honors a registered protocol; invalid/absent → durability', () => {
+  // the §13.1 develop choices survive (NOT coerced to triathlon)
+  assertEquals(resolveNonRaceStrengthProtocol('five_by_five'), 'five_by_five');
+  assertEquals(resolveNonRaceStrengthProtocol('upper_aesthetics'), 'upper_aesthetics');
+  assertEquals(resolveNonRaceStrengthProtocol('neural_speed'), 'neural_speed');
+  assertEquals(resolveNonRaceStrengthProtocol('triathlon_performance'), 'triathlon_performance'); // tri-shaped develop
+  assertEquals(resolveNonRaceStrengthProtocol('durability'), 'durability');                        // maintain anchor
+  // absent / unknown → the durability default (the maintain anchor)
+  assertEquals(resolveNonRaceStrengthProtocol(undefined), 'durability');
+  assertEquals(resolveNonRaceStrengthProtocol('not_a_protocol'), 'durability');
+  assertEquals(resolveNonRaceStrengthProtocol('minimum_dose'), 'durability'); // excluded from allow-list → falls back
 });

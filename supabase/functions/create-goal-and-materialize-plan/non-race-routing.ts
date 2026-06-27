@@ -5,6 +5,44 @@
 // covered by `deno test`. Everything in this file is the ROW `goal_type` ('event' | 'capacity' |
 // 'maintenance') — NEVER `training_prefs.goal_type` ('complete' | 'performance' | 'speed').
 
+import { isValidProtocol } from '../shared/strength-system/protocols/selector.ts';
+
+// ── Cut A (D-210 posture wiring) ───────────────────────────────────────────────────────────────────
+// The two pure helpers the non-race posture wiring needs, extracted here for the same reason as above
+// (the wrapper can't run locally). A1 sanitizes the posture bag; A2 resolves the non-race strength
+// protocol sport-agnostically (honor the builder's explicit choice — §13.1 — instead of tri-coercing).
+
+const POSTURE_SPORTS = new Set(['swim', 'bike', 'run', 'strength']);
+const POSTURE_VALUES = new Set(['develop', 'maintain', 'out']);
+
+/**
+ * Cut A (A1) — sanitize a `per_discipline_posture` bag read from a goal's `training_prefs`. Only
+ * {swim,bike,run,strength} keys with {develop,maintain,out} values survive; a non-object or an empty
+ * result → `undefined` so the athlete_state spread omits the key entirely (byte-identical for events,
+ * which never carry posture). The engine reads `athlete_state.per_discipline_posture` (D-210 Cut 2).
+ */
+export function sanitizePerDisciplinePosture(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (POSTURE_SPORTS.has(k) && typeof v === 'string' && POSTURE_VALUES.has(v)) out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Cut A (A2) — the NON-RACE strength protocol resolver. Non-race strength is sport-context-aware
+ * (`SPEC-per-discipline-periodization.md §13.1`): the builder resolves the posture→protocol contract
+ * (maintain→durability; develop→upper_aesthetics/neural_speed/five_by_five for run, triathlon_performance
+ * for tri) and sends the explicit id — so HONOR it (validated), defaulting to `durability` (the maintain
+ * anchor) when absent/invalid. This deliberately does NOT run the tri-coercing
+ * `resolveProtocolIdForCombinedTriPlan`, which would turn a runner's `five_by_five` into `triathlon`.
+ * Used on the non-race path only; events keep the tri resolver → byte-identical.
+ */
+export function resolveNonRaceStrengthProtocol(rawProtocol: string | undefined): string {
+  return rawProtocol && isValidProtocol(rawProtocol) ? rawProtocol : 'durability';
+}
+
 /**
  * The D-214 predicate — the SINGLE SOURCE OF TRUTH for "is this a non-race goal?".
  * Always called on the ROW goal_type. Undefined/null ≡ 'event' (legacy back-compat).
