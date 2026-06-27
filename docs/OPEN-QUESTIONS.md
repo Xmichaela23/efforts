@@ -1105,6 +1105,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-083 — Strength progression ladder: one recovery-aware cadence-engine, not module-per-program (scope after 5×5)
+
+- **Status:** filed 2026-06-26 · **scope after 5×5 ships, do not build now.**
+- **The idea:** Texas Method / Madcow (weekly cadence) and 5/3/1 (monthly cadence) are the rungs *past* 5×5 (session→week→month progression cadence). Research suggests they are **configurations of ONE progression engine** — a **cadence axis** (session / week / month) × a **heavy-light-medium structure** — **not separate bespoke modules**. 5×5, Texas, Madcow, 5/3/1 would all be configs of the same engine.
+- **Our edge:** make that engine **recovery-aware** — the spine / fitness-recovery signals tune progression + deload off the *body*, not a fixed schedule. The blind spreadsheet versions (StrongLifts/Madcow apps) progress regardless of how the athlete recovered; recovery-awareness is the differentiator. (Mirrors the §5.5 "reads the body, never the birthday" rule.)
+- **Scope:** after 5×5 ships, scope ONE cadence-engine (session→week→month cadence + HLM) the four programs are configs of — avoid module-per-program. Needs the observed-1RM feedback loop wired first (`ProtocolContext.history`, currently unused).
+- **Cross-ref:** `SCIENCE-5x5-linear-progression.md` (5×5 is the first rung), the 5×5 module work, D-210 (strength develop-posture + the chassis `selector.ts`/`StrengthProtocol`), the strength audit (the `context.history` feedback gap).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
