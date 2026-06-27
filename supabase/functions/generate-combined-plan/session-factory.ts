@@ -16,7 +16,7 @@ import {
 import type { StrengthProtocol } from '../shared/strength-system/protocols/types.ts';
 import { triathlonProtocol } from '../shared/strength-system/protocols/triathlon.ts';
 import { triathlonPerformanceProtocol } from '../shared/strength-system/protocols/triathlon_performance.ts';
-import { getProtocol, resolveProtocolIdForCombinedTriPlan } from '../shared/strength-system/protocols/selector.ts';
+import { getProtocol, resolveProtocolIdForCombinedTriPlan, isValidProtocol } from '../shared/strength-system/protocols/selector.ts';
 import type { ProtocolContext, IntentSession } from '../shared/strength-system/protocols/types.ts';
 import {
   buildSwimGearLine,
@@ -2546,8 +2546,12 @@ export function runStrength(day: string, phase: Phase, goalId: string, options?:
   equipmentType?: 'home_gym' | 'commercial_gym';
   longRunDayName?: string;
   qualityRunDayName?: string;
+  strengthProtocolId?: string; // D-210/5×5 Cut 1: the athlete's chosen strength protocol (was hardcoded to durability)
 }): PlannedSession {
-  const protocol = getProtocol('durability');
+  // D-210/5×5 Cut 1: honor the chosen strength protocol (threaded from training_prefs, the same source the
+  // tri path reads); unknown/unset id → fall back to 'durability' (today's behavior → byte-identical).
+  const requestedId = options?.strengthProtocolId;
+  const protocol = getProtocol(requestedId && isValidProtocol(requestedId) ? requestedId : 'durability');
   const longDay = options?.longRunDayName ?? 'Sunday';
   const q1 = options?.qualityRunDayName ?? 'Tuesday';
   const q2 = shiftWeekday(q1, 2);

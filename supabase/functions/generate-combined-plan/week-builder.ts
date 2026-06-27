@@ -1902,6 +1902,7 @@ export function buildWeek(
               equipmentType: equipmentTypeOpt,
               longRunDayName: longRunActualDay,
               qualityRunDayName: runQualityDay,
+              strengthProtocolId: athleteState.strength_protocol, // D-210/5×5 Cut 1: honor chosen protocol (default durability)
             }),
           );
         }
@@ -1976,6 +1977,7 @@ export function buildWeek(
             equipmentType,
             longRunDayName: longRunActualDay,
             qualityRunDayName: runQualityDay,
+            strengthProtocolId: athleteState.strength_protocol, // D-210/5×5 Cut 1: honor chosen protocol (default durability)
           }));
         }
       }
@@ -2041,6 +2043,7 @@ export function buildWeek(
               equipmentType: equipmentType2,
               longRunDayName: longRunActualDay,
               qualityRunDayName: runQualityDay,
+              strengthProtocolId: athleteState.strength_protocol, // D-210/5×5 Cut 1: honor chosen protocol (default durability)
             }));
           }
         }
