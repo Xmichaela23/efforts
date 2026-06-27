@@ -2,11 +2,12 @@
 // 5×5 LINEAR PROGRESSION PROTOCOL
 //
 // Universal novice/early-intermediate barbell strength: 5×5 on compound lifts,
-// A/B alternating, 3×/week, deadlift at reduced volume. See
-// docs/SCIENCE-5x5-linear-progression.md (cited).
+// A/B alternating, 2×/week (endurance-adapted develop frequency), deadlift at
+// reduced volume. See docs/SCIENCE-5x5-linear-progression.md (cited).
 //
-// Cut 3 (this file): STRUCTURE at a single anchor load. The block-linear weekly
-// %1RM curve (70→85) + the deeper deload (40-50%) land in Cut 4.
+// Cut 4: the block-linear weekly %1RM curve (70→85 by week-in-block) + the deeper
+// deload (recovery weeks → ~45%). The duration ceiling (= target_weeks) and the
+// retest terminal are the non-race phase timeline's job (D-213), not this module's.
 // ============================================================================
 
 import {
@@ -16,16 +17,27 @@ import {
   StrengthExercise,
 } from './types.ts';
 
-// Cut 3: a single placeholder anchor load. Cut 4 replaces this with the block-linear 70→85% curve
-// (by week-in-block) and the 40-50% deload. Recovery/taper weeks lighten here as a placeholder only.
-const ANCHOR_PCT = 75;
+// Block-linear progression (SCIENCE §2): a fixed weekly load increment from 70% toward the 85% strength
+// zone. The plateau at 85% is itself the signal the linear block is nearing its ceiling (§4 → retest).
+const START_PCT = 70;
+const PEAK_PCT = 85;
+const STEP_PCT = 1.25; // ~1-3%/week (SCIENCE §2) — the fixed weekly increment that IS linear progression
+// Deload (SCIENCE §3): recovery weeks drop to ~45% (the 40-50% band) — deeper than a maintenance deload.
+const DELOAD_PCT = 45;
+
+// Working %1RM for a given week-in-block. Deload weeks → the deload load; otherwise the linear ramp,
+// clamped at the 85% ceiling.
+function loadForWeek(weekInBlock: number, isDeload: boolean): number {
+  if (isDeload) return DELOAD_PCT;
+  return Math.min(PEAK_PCT, START_PCT + Math.max(0, weekInBlock - 1) * STEP_PCT);
+}
 
 export const fiveByFiveProtocol: StrengthProtocol = {
   id: 'five_by_five',
   name: '5×5 Linear Progression',
   description:
-    'Linear-progression barbell strength: 5×5 on compound lifts, A/B alternating, 3×/week ' +
-    '(deadlift 1×5). Cut 3 = structure at a single anchor load; the 70→85% weekly curve is Cut 4.',
+    'Linear-progression barbell strength: 5×5 on compound lifts, A/B alternating, 2×/week ' +
+    '(deadlift 1×5). Load climbs 70→85% 1RM by week-in-block; recovery weeks deload to ~45%.',
   tradeoffs: [
     'Barbell-dependent (squat / bench / deadlift / overhead press / row)',
     'Linear progression is finite (~16–20 weeks) — the block ends in a retest',
@@ -69,16 +81,18 @@ function session(which: 'A' | 'B', load: number): IntentSession {
 }
 
 function createWeekSessions(context: ProtocolContext): IntentSession[] {
-  const { weekIndex, isRecovery, strengthFrequency, phase } = context;
+  const { weekIndex, weekInPhase, isRecovery, strengthFrequency, phase } = context;
   const isTaper = phase.name === 'Taper';
 
-  // A/B alternation by week parity: one week leads A → [A,B,A]; the next leads B → [B,A,B].
+  // A/B alternation by absolute-week parity: a week is A-B, the next B-A.
   const lead: 'A' | 'B' = weekIndex % 2 === 1 ? 'A' : 'B';
   const other: 'A' | 'B' = lead === 'A' ? 'B' : 'A';
-  const pattern: Array<'A' | 'B'> = strengthFrequency >= 3 ? [lead, other, lead] : [lead, other];
+  // 2×/week — the endurance-adapted develop frequency (SCIENCE §1; Rønnestad 2× develop / 1× maintain).
+  // Capped at 2 even when strengthFrequency is 3 (a third slot would be maintenance, not this develop module's job).
+  const pattern: Array<'A' | 'B'> = strengthFrequency <= 1 ? [lead] : [lead, other];
 
-  // Cut 3: single anchor load; recovery/taper lighten as a placeholder (Cut 4 = block-linear curve + 40-50% deload).
-  const load = isRecovery || isTaper ? Math.round(ANCHOR_PCT * 0.6) : ANCHOR_PCT;
+  // Block-linear curve by week-in-block; recovery (and taper) weeks deload.
+  const load = loadForWeek(weekInPhase, isRecovery || isTaper);
 
   return pattern.map((w) => session(w, load));
 }
