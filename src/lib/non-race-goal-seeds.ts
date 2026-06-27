@@ -67,6 +67,32 @@ export const COMMITMENT_TIERS: Array<{ id: CommitmentTier; label: string; blurb:
   { id: 'committed', label: 'Committed', blurb: 'Training is a priority right now' },
 ];
 
+// Cut G — the schedule cluster. preferred_days assembly, POSTURE-GATED: a long day only for a present
+// (not-out) endurance discipline; the hard-day anchor (the kept club session) emits a quality_* day ONLY
+// when a day is set — unanchored quality/easy slots are deliberately omitted so the planner places them
+// (mirrors ArcSetupWizard's design). Strength days are the co-equal Mon/Thu when strength is present.
+export type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+export type ScheduleInput = {
+  longRunDay?: string;
+  longRideDay?: string;
+  anchorDiscipline?: 'run' | 'bike' | null;
+  anchorDay?: string;
+};
+export function buildPreferredDays(
+  posture: Partial<Record<Discipline, Posture>>,
+  sched: ScheduleInput,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const present = (d: Discipline) => posture[d] != null && posture[d] !== 'out';
+  if (present('run')) out.long_run = sched.longRunDay || 'sunday';
+  if (present('bike')) out.long_ride = sched.longRideDay || 'saturday';
+  if (sched.anchorDiscipline && sched.anchorDay && present(sched.anchorDiscipline)) {
+    out[`quality_${sched.anchorDiscipline}`] = sched.anchorDay; // the kept club session = a hard day
+  }
+  if (present('strength')) out.strength = ['monday', 'thursday'];
+  return out;
+}
+
 // sport from the endurance disciplines that are present (not out): all 3 → triathlon; else run>bike>swim.
 // This is what makes the §13.1 strength split fall out for free — strength-focus goals (swim out) are
 // never tri-shaped, so their develop strength resolves to the general developer, not triathlon_performance.

@@ -3,7 +3,7 @@
 import { assertEquals, assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   seedFromGoal, derivePlanShape, developCount, canSetDevelop, athleteDisciplinesFromBaselines,
-  floorForGoal, hoursForTier,
+  floorForGoal, hoursForTier, buildPreferredDays,
   type Discipline,
 } from './non-race-goal-seeds.ts';
 
@@ -102,6 +102,31 @@ Deno.test('floorForGoal — per-goal science floors (§13.2); slowest adaptation
   assertEquals(floorForGoal('maintain'), 4);        // shortest
   assertEquals(floorForGoal('starting_over'), 6);
   assertEquals(floorForGoal(null), 4);              // defensive default
+});
+
+Deno.test('buildPreferredDays — posture-gated; out → no long day; anchor → quality day; unanchored omitted', () => {
+  // tri present, run develops, run anchor on tuesday
+  const tri = { swim: 'maintain', bike: 'maintain', run: 'develop', strength: 'maintain' };
+  const pd = buildPreferredDays(tri, { longRunDay: 'sunday', longRideDay: 'saturday', anchorDiscipline: 'run', anchorDay: 'tuesday' });
+  assertEquals(pd.long_run, 'sunday');
+  assertEquals(pd.long_ride, 'saturday');
+  assertEquals(pd.quality_run, 'tuesday');          // anchor present → quality day
+  assertEquals(pd.strength, ['monday', 'thursday']);
+
+  // bike out → no long_ride; an anchor on the out discipline is omitted
+  const runOnly = { swim: 'out', bike: 'out', run: 'develop', strength: 'maintain' };
+  const pd2 = buildPreferredDays(runOnly, { anchorDiscipline: 'bike', anchorDay: 'tuesday' });
+  assertEquals(pd2.long_ride, undefined);           // bike out → no long ride
+  assertEquals(pd2.quality_bike, undefined);        // anchor on an out discipline → omitted
+  assertEquals(pd2.long_run, 'sunday');             // default day when none picked
+
+  // no anchor → no quality_* (the planner places them)
+  const pd3 = buildPreferredDays(runOnly, {});
+  assertEquals(pd3.quality_run, undefined);
+  assertEquals(pd3.quality_bike, undefined);
+
+  // strength out → no strength days
+  assertEquals(buildPreferredDays({ run: 'develop', strength: 'out' }, {}).strength, undefined);
 });
 
 Deno.test('hoursForTier — tier → weekly-hours band (hours as OUTPUT); light is the low default, monotonic', () => {

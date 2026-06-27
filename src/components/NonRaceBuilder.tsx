@@ -15,6 +15,7 @@ import {
   floorForGoal,
   hoursForTier,
   COMMITMENT_TIERS,
+  buildPreferredDays,
   GOAL_LABELS,
   GOALS_NEEDING_DISCIPLINE,
   STRENGTH_DEVELOPERS,
@@ -23,6 +24,7 @@ import {
   type Discipline,
   type Posture,
   type CommitmentTier,
+  type DayName,
 } from '@/lib/non-race-goal-seeds';
 
 // Cut C/D — the goal-first non-race builder. The goal SEEDS everything (goal_type + per-discipline
@@ -38,6 +40,25 @@ const DISCIPLINE_ICONS: Record<Discipline, React.ComponentType<{ className?: str
 const GOAL_ORDER: NonRaceGoalId[] = [
   'build_endurance', 'build_speed', 'get_stronger', 'build_muscle', 'maintain', 'starting_over',
 ];
+const DAYS: DayName[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const DAY_SHORT: Record<DayName, string> = {
+  monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
+};
+
+function DayPicker({ value, onChange }: { value: DayName | ''; onChange: (d: DayName) => void }) {
+  return (
+    <div className="grid grid-cols-7 gap-1">
+      {DAYS.map((d) => (
+        <button
+          key={d} type="button" onClick={() => onChange(d)}
+          className={`py-2 rounded-lg text-xs ${value === d ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/60 border border-white/12'}`}
+        >
+          {DAY_SHORT[d]}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type NonRaceState = {
   goal: NonRaceGoalId | null;
@@ -46,12 +67,17 @@ type NonRaceState = {
   strengthProtocol: string | undefined;
   commitment: CommitmentTier;
   targetWeeks: number;
+  daysPerWeek: number;
+  longRunDay: DayName | '';
+  longRideDay: DayName | '';
+  anchorDiscipline: 'run' | 'bike' | null;
+  anchorDay: DayName | '';
 };
 
-type StepKey = 'goal' | 'posture' | 'commitment' | 'length' | 'confirm';
+type StepKey = 'goal' | 'posture' | 'commitment' | 'length' | 'schedule' | 'confirm';
 
 function getSteps(_state: NonRaceState): StepKey[] {
-  return ['goal', 'posture', 'commitment', 'length', 'confirm'];
+  return ['goal', 'posture', 'commitment', 'length', 'schedule', 'confirm'];
 }
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -73,10 +99,14 @@ function assemblePayload(state: NonRaceState): ArcSetupPayload {
         training_prefs: {
           training_intent: 'completion',
           fitness: 'intermediate',
-          days_per_week: 5,
+          days_per_week: state.daysPerWeek,
           strength_frequency: 2,
           weekly_hours_available: hoursForTier(state.commitment),
           per_discipline_posture: state.posture,
+          preferred_days: buildPreferredDays(state.posture, {
+            longRunDay: state.longRunDay, longRideDay: state.longRideDay,
+            anchorDiscipline: state.anchorDiscipline, anchorDay: state.anchorDay,
+          }),
           ...(shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {}),
         },
       },
@@ -98,6 +128,7 @@ export default function NonRaceBuilder() {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '',
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -131,6 +162,9 @@ export default function NonRaceBuilder() {
   const goalCanContinue = state.goal != null && (!needsDiscipline || state.discipline != null);
   const postureCanContinue = Object.values(state.posture).some((p) => p !== 'out');
   const rows = DISCIPLINE_ORDER.filter((d) => athleteDisciplines.includes(d));
+  const posturePresent = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
+  const anchorChoices = (['run', 'bike'] as const).filter((d) => posturePresent(d));
+  const strengthDeveloperLabel = (id?: string) => STRENGTH_DEVELOPERS.find((x) => x.id === id)?.label ?? id;
 
   const handleConfirm = () => { if (state.goal) void complete(assemblePayload(state)); };
 
@@ -269,17 +303,101 @@ export default function NonRaceBuilder() {
         );
       })()}
 
+      {currentStep === 'schedule' && (
+        <StepLayout
+          step={5} totalSteps={steps.length} title="When can you train?"
+          subtitle="Days per week, your long days, and any fixed club session to keep."
+          onBack={back} onContinue={next} canContinue={state.daysPerWeek >= 4 && state.daysPerWeek <= 7}
+        >
+          <div className="space-y-5">
+            <div>
+              <p className="text-white/55 text-sm mb-2">Days per week</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[4, 5, 6, 7].map((n) => (
+                  <button
+                    key={n} type="button" onClick={() => setState((s) => ({ ...s, daysPerWeek: n }))}
+                    className={`py-2 rounded-lg text-sm ${state.daysPerWeek === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/60 border border-white/12'}`}
+                  >{n}</button>
+                ))}
+              </div>
+            </div>
+            {posturePresent('run') && (
+              <div>
+                <p className="text-white/55 text-sm mb-2">Long run day</p>
+                <DayPicker value={state.longRunDay} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))} />
+              </div>
+            )}
+            {posturePresent('bike') && (
+              <div>
+                <p className="text-white/55 text-sm mb-2">Long ride day</p>
+                <DayPicker value={state.longRideDay} onChange={(d) => setState((s) => ({ ...s, longRideDay: d }))} />
+              </div>
+            )}
+            {anchorChoices.length > 0 && (
+              <div>
+                <p className="text-white/55 text-sm mb-2">Keep a fixed hard session? (e.g. a club run or ride)</p>
+                <div className="grid grid-cols-2 gap-1.5 mb-2">
+                  <button
+                    type="button" onClick={() => setState((s) => ({ ...s, anchorDiscipline: null, anchorDay: '' }))}
+                    className={`py-2 rounded-lg text-sm border ${state.anchorDiscipline === null ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
+                  >No</button>
+                  <button
+                    type="button" onClick={() => setState((s) => ({ ...s, anchorDiscipline: s.anchorDiscipline ?? anchorChoices[0] }))}
+                    className={`py-2 rounded-lg text-sm border ${state.anchorDiscipline !== null ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
+                  >Yes</button>
+                </div>
+                {state.anchorDiscipline !== null && (
+                  <div className="space-y-2">
+                    {anchorChoices.length > 1 && (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {anchorChoices.map((d) => (
+                          <button
+                            key={d} type="button" onClick={() => setState((s) => ({ ...s, anchorDiscipline: d }))}
+                            className={`py-2 rounded-lg text-sm border ${state.anchorDiscipline === d ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
+                          >{DISCIPLINE_LABEL[d]}</button>
+                        ))}
+                      </div>
+                    )}
+                    <DayPicker value={state.anchorDay} onChange={(d) => setState((s) => ({ ...s, anchorDay: d }))} />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </StepLayout>
+      )}
+
       {currentStep === 'confirm' && (
         <StepLayout
-          step={5} totalSteps={steps.length} title="Build this plan?"
-          subtitle={`${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — a ${state.targetWeeks}-week block, develop then retest.`}
+          step={6} totalSteps={steps.length} title="Build this plan?"
+          subtitle={`${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — an ${state.targetWeeks}-week block.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
         >
-          <p className="text-white/60 text-sm">
-            We'll build a {state.targetWeeks}-week plan from your current fitness, ending in a retest, with the
-            per-discipline focus you set.
-          </p>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-2">
+              {rows.map((d) => {
+                const p = state.posture[d] ?? 'maintain';
+                const color = getDisciplineColor(d);
+                const Icon = DISCIPLINE_ICONS[d];
+                const label = p === 'develop' ? 'Develop' : p === 'maintain' ? 'Maintain' : 'Out';
+                const proto = d === 'strength' && p === 'develop' && state.strengthProtocol
+                  ? ` · ${strengthDeveloperLabel(state.strengthProtocol)}` : '';
+                return (
+                  <div key={d} className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2" style={{ color }}>
+                      <Icon className="h-4 w-4" /> {DISCIPLINE_LABEL[d]}
+                    </span>
+                    <span className="text-white/60">{label}{proto}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-white/60 text-sm">
+              An {state.targetWeeks}-week block from your current fitness (≈ {hoursForTier(state.commitment)} h/wk),
+              ending in a <span className="text-white/80">retest</span>.
+            </p>
+          </div>
         </StepLayout>
       )}
     </div>
