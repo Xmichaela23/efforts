@@ -5,7 +5,7 @@
 // the plan is rejected and the caller receives an error.
 
 import type {
-  GeneratedWeek, PhaseBlock, PlanValidation, AthleteState, RaceAnchor,
+  GeneratedWeek, PhaseBlock, PlanValidation, AthleteState, RaceAnchor, PerDisciplinePosture, Sport,
 } from './types.ts';
 import {
   MAINTENANCE_FLOORS, rampThresholds, projectedCTL,
@@ -126,6 +126,7 @@ function checkMaintenanceFloors(
   weeks: GeneratedWeek[],
   hasTriGoal: boolean,
   transitionMode?: AthleteState['transition_mode'],
+  perDisciplinePosture?: PerDisciplinePosture,
 ): boolean {
   const nonRecovery = weeks.filter(w => !w.isRecovery && w.phase !== 'recovery' && w.phase !== 'taper');
   for (const w of nonRecovery) {
@@ -133,6 +134,8 @@ function checkMaintenanceFloors(
       if (!floor) continue;
       const count = w.sessions.filter(s => s.type === sport).length;
       if (count < floor.sessions) {
+        // D-210 Cut 4: an 'out' discipline emits no sessions by design — exempt it from the floor.
+        if (perDisciplinePosture?.[sport as Sport] === 'out') continue;
         // Swim floor only applies to triathlon/multi-sport athletes.
         // Bike floor only applies when bike is in the plan at all.
         if (sport === 'swim' && !hasTriGoal) continue;
@@ -310,6 +313,7 @@ export function validatePlan(
   loadingPattern: '3:1' | '2:1',
   hasTriGoal: boolean,
   transitionMode?: AthleteState['transition_mode'],
+  perDisciplinePosture?: PerDisciplinePosture, // D-210 Cut 4: exempt 'out' disciplines from the session floor
 ): PlanValidation {
   return {
     no_consecutive_hard_days:     checkNoConsecutiveHardDays(weeks),
@@ -318,7 +322,7 @@ export function validatePlan(
     ramp_rate_safe:               checkRampRate(weeks, initialCTL),
     recovery_weeks_present:       checkRecoveryWeeks(weeks, loadingPattern),
     tapers_present:               checkTapersPresent(weeks, blocks),
-    maintenance_floors_met:       checkMaintenanceFloors(weeks, hasTriGoal, transitionMode),
+    maintenance_floors_met:       checkMaintenanceFloors(weeks, hasTriGoal, transitionMode, perDisciplinePosture),
     post_race_recovery_inserted:  checkPostRaceRecovery(blocks),
     brick_placement_valid:        checkBrickPlacement(weeks),
     run_impact_multiplier_applied: checkRunMultiplierApplied(weeks),

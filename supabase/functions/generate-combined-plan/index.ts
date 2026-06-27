@@ -467,6 +467,7 @@ Deno.serve(async (req: Request) => {
       loadingPattern,
       hasTriGoal,
       scheduleState.transition_mode,
+      state.per_discipline_posture, // D-210 Cut 4: exempt 'out' disciplines from the session floor
     );
     const failures = failedChecks(validation);
     if (failures.length > 0) {

@@ -732,7 +732,17 @@ export function effectiveDisciplinePosture(
   posture: PerDisciplinePosture | undefined,
   phase: Phase | undefined,
 ): PerDisciplinePosture {
-  if (!posture || (phase != null && POSTURE_TERMINAL_PHASES.has(phase))) return {};
+  if (!posture) return {};
+  if (phase != null && POSTURE_TERMINAL_PHASES.has(phase)) {
+    // §3 collapse: phase postures (maintain) → develop at the whole-athlete terminal. But 'out' (D-210
+    // Cut 4) is a PRESENCE flag, not a phase — an out discipline stays out through taper/recovery/rebuild/
+    // retest (it must not reappear in the taper). So at terminals, keep ONLY the out entries.
+    const outOnly: PerDisciplinePosture = {};
+    for (const s of Object.keys(posture) as Sport[]) {
+      if (posture[s] === 'out') outOnly[s] = 'out';
+    }
+    return outOnly;
+  }
   return posture;
 }
 
@@ -782,21 +792,21 @@ export function getBaseDistribution(
     others.forEach(s => { dist[s] = Math.max(0, (dist[s] ?? 0) - delta / others.length); });
   }
 
-  // D-210 Cut 3: maintain clamp. A discipline whose posture is 'maintain' takes exactly its
-  // MAINTENANCE_FLOORS.pct share (a maintenance dose); the freed budget (or borrowed, if base < floor)
-  // redistributes ZERO-SUM across the non-maintain disciplines proportionally — the same proportional-
-  // funding mechanic the limiter shift uses. effPosture is already terminal-collapsed (§3), so a maintain
-  // posture never clamps a taper/recovery/rebuild/retest block. No-op when nothing is 'maintain' (default).
-  const maintainSports = (Object.keys(dist) as Sport[]).filter(s => effPosture[s] === 'maintain');
-  if (maintainSports.length) {
+  // D-210 Cut 3 (maintain) + Cut 4 (out): a 'maintain' discipline takes exactly its MAINTENANCE_FLOORS.pct
+  // share (a maintenance dose); an 'out' discipline takes 0. The freed budget (or borrowed, if base <
+  // floor) redistributes ZERO-SUM across the DEVELOP set (neither maintain nor out), proportionally — the
+  // same proportional-funding mechanic the limiter shift uses. effPosture is terminal-collapsed (§3:
+  // maintain→develop at terminals, out persists). No-op when nothing is maintain/out (the default).
+  const isShifted = (s: Sport) => effPosture[s] === 'maintain' || effPosture[s] === 'out';
+  const shiftedSports = (Object.keys(dist) as Sport[]).filter(isShifted);
+  if (shiftedSports.length) {
     let freed = 0;
-    for (const s of maintainSports) {
-      const floor = MAINTENANCE_FLOORS[s]?.pct ?? 0;
-      freed += (dist[s] ?? 0) - floor;
-      dist[s] = floor;
+    for (const s of shiftedSports) {
+      const target = effPosture[s] === 'out' ? 0 : (MAINTENANCE_FLOORS[s]?.pct ?? 0);
+      freed += (dist[s] ?? 0) - target;
+      dist[s] = target;
     }
-    // Redistribute to the develop set (non-maintain). Cut 4 will also exclude 'out' and zero it.
-    const developSports = (Object.keys(dist) as Sport[]).filter(s => effPosture[s] !== 'maintain');
+    const developSports = (Object.keys(dist) as Sport[]).filter(s => !isShifted(s));
     const developTotal = developSports.reduce((sum, s) => sum + (dist[s] ?? 0), 0);
     if (developTotal > 0) {
       for (const s of developSports) {

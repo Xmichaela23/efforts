@@ -2230,7 +2230,11 @@ export function buildWeek(
 
   // ── Steps 6 & 7: TSS + ramp rate validation handled in validator.ts ───────
 
-  const allSessions = gridSessions(grid);
+  // D-210 Cut 4: drop sessions for disciplines posture-flagged 'out'. Keyed on POSTURE, not 0 share —
+  // keying on share would strip run-plan cross-training (rides the Math.max(60) floor at ~0 share). 'out'
+  // persists across all phases incl. taper, so the raw posture is the right read. No-op when nothing is out.
+  const outPosture = athleteState.per_discipline_posture;
+  const allSessions = gridSessions(grid).filter(s => !outPosture || outPosture[s.type as Sport] !== 'out');
   // §6.2 / §6.5 (W-005 / W-006): attach AM/PM ordering + 6h gap metadata to constrained same-day
   // pairings (Lower strength + Quality Run / Quality Bike / Long Ride / Easy Run / Easy Bike).
   // Conformance validator (Task F) hard-fails missing metadata on these pairings.
