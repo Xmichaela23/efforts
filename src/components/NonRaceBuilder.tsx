@@ -3,38 +3,56 @@ import { useNavigate } from 'react-router-dom';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
+import {
+  seedFromGoal,
+  GOAL_LABELS,
+  GOALS_NEEDING_DISCIPLINE,
+  type NonRaceGoalId,
+  type Discipline,
+} from '@/lib/non-race-goal-seeds';
 
-// Cut B3 — the NonRaceBuilder shell. Minimal end-to-end: a length step + a confirm that submits a
-// non-race (capacity) goal through the SAME complete() path the race wizard uses → materializes a plan.
-// Later cuts plug additional steps into getSteps (goal picker, per-discipline posture, length-floor,
-// commitment tier, schedule). Default posture = all-develop (omit per_discipline_posture → the engine
-// treats absent as all-develop, byte-identical to today's non-race plan). Draft persistence (B4) deferred.
+// Cut C — the goal picker is the first, load-bearing step: one pick seeds goal_type + per-discipline
+// posture + sport + strength protocol (seedFromGoal, §13/§13.1), intersected with the athlete's actual
+// disciplines. assemblePayload sends the seeds → the Cut A wiring finally has a real consumer. Later cuts
+// add the posture-confirm / commitment / schedule steps; B4 draft persistence is still deferred.
+
+// TODO(Cut C follow-up): source the athlete's real disciplines from profile (ArcContext / baselines).
+// seedFromGoal already intersects correctly (a runner-only athlete never maintains swim/bike); this
+// default just needs to become the real per-athlete list so the intersection fires in production.
+const ATHLETE_DISCIPLINES: Discipline[] = ['swim', 'bike', 'run', 'strength'];
+
+const GOAL_ORDER: NonRaceGoalId[] = [
+  'build_endurance', 'build_speed', 'get_stronger', 'build_muscle', 'maintain', 'starting_over',
+];
 
 type NonRaceState = {
-  goalType: 'capacity' | 'maintenance';
-  sport: string;
+  goal: NonRaceGoalId | null;
+  discipline: Discipline | undefined;
   targetWeeks: number;
 };
 
-type StepKey = 'length' | 'confirm';
+type StepKey = 'goal' | 'length' | 'confirm';
 
-// Static for B3; later cuts insert 'goal' / 'posture' / 'commitment' / 'schedule' before 'confirm'.
+// Static for C; later cuts insert 'posture' / 'commitment' / 'schedule' before 'confirm'.
 function getSteps(_state: NonRaceState): StepKey[] {
-  return ['length', 'confirm'];
+  return ['goal', 'length', 'confirm'];
 }
 
-// The non-race analog of ArcSetupWizard.assemblePayload: a capacity/maintenance goal (target_date null,
-// target_weeks the length source) + the kept generic scheduling prefs; every race-specific field dropped.
+// The non-race analog of ArcSetupWizard.assemblePayload: the goal seeds goal_type + per_discipline_posture
+// + sport + strength_protocol (intersected); the length supplies target_weeks; the generic scheduling
+// prefs are kept. Every race-specific field is dropped.
 function assemblePayload(state: NonRaceState): ArcSetupPayload {
+  const goal = state.goal!;
+  const seed = seedFromGoal(goal, state.discipline, ATHLETE_DISCIPLINES);
   return {
-    summary: `${state.targetWeeks}-week ${state.goalType} block`,
+    summary: `${state.targetWeeks}-week ${GOAL_LABELS[goal]} block`,
     goals: [
       {
-        name: state.goalType === 'capacity' ? 'Build fitness' : 'Maintain fitness',
-        goal_type: state.goalType,
+        name: GOAL_LABELS[goal],
+        goal_type: seed.goal_type,
         target_date: null,
         target_weeks: state.targetWeeks,
-        sport: state.sport,
+        sport: seed.sport,
         distance: null,
         priority: 'A',
         training_prefs: {
@@ -43,6 +61,8 @@ function assemblePayload(state: NonRaceState): ArcSetupPayload {
           days_per_week: 5,
           weekly_hours_available: 6,
           strength_frequency: 2,
+          per_discipline_posture: seed.per_discipline_posture,
+          ...(seed.strength_protocol ? { strength_protocol: seed.strength_protocol } : {}),
         },
       },
     ],
@@ -53,7 +73,7 @@ function assemblePayload(state: NonRaceState): ArcSetupPayload {
 export default function NonRaceBuilder() {
   const navigate = useNavigate();
   const { complete, saving } = useArcSetupComplete();
-  const [state, setState] = useState<NonRaceState>({ goalType: 'capacity', sport: 'run', targetWeeks: 12 });
+  const [state, setState] = useState<NonRaceState>({ goal: null, discipline: undefined, targetWeeks: 12 });
   const [stepIdx, setStepIdx] = useState(0);
 
   const steps = getSteps(state);
@@ -65,15 +85,64 @@ export default function NonRaceBuilder() {
     else setStepIdx((i) => i - 1);
   };
 
+  const needsDiscipline = state.goal != null && GOALS_NEEDING_DISCIPLINE.includes(state.goal);
+  const enduranceChoices = ATHLETE_DISCIPLINES.filter((d) => d !== 'strength');
+  const goalCanContinue = state.goal != null && (!needsDiscipline || state.discipline != null);
+
   const handleConfirm = () => {
-    void complete(assemblePayload(state));
+    if (state.goal) void complete(assemblePayload(state));
   };
+
+  const btn = (active: boolean) =>
+    `w-full text-left px-4 py-3 rounded-xl border ${
+      active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'
+    } text-white`;
 
   return (
     <div className="h-[100dvh] bg-zinc-950 text-white flex flex-col">
-      {currentStep === 'length' && (
+      {currentStep === 'goal' && (
         <StepLayout
           step={1}
+          totalSteps={steps.length}
+          title="What's the goal?"
+          subtitle="Pick one — we seed the rest (which disciplines develop, maintain, or sit out)."
+          onBack={back}
+          onContinue={next}
+          canContinue={goalCanContinue}
+        >
+          <div className="space-y-2">
+            {GOAL_ORDER.map((g) => (
+              <button
+                key={g}
+                type="button"
+                className={btn(state.goal === g)}
+                onClick={() => setState((s) => ({ ...s, goal: g, discipline: undefined }))}
+              >
+                {GOAL_LABELS[g]}
+              </button>
+            ))}
+          </div>
+          {needsDiscipline && (
+            <div className="mt-4 space-y-2">
+              <p className="text-white/55 text-sm">Which discipline?</p>
+              {enduranceChoices.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className={btn(state.discipline === d)}
+                  onClick={() => setState((s) => ({ ...s, discipline: d }))}
+                >
+                  {d.charAt(0).toUpperCase() + d.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
+        </StepLayout>
+      )}
+
+      {currentStep === 'length' && (
+        <StepLayout
+          step={2}
           totalSteps={steps.length}
           title="How long is this block?"
           subtitle="Pick the number of weeks — you develop, then retest and start the next block."
@@ -99,10 +168,10 @@ export default function NonRaceBuilder() {
 
       {currentStep === 'confirm' && (
         <StepLayout
-          step={2}
+          step={3}
           totalSteps={steps.length}
           title="Build this plan?"
-          subtitle={`A ${state.targetWeeks}-week ${state.sport} block — develop, then retest.`}
+          subtitle={`${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — a ${state.targetWeeks}-week block, develop then retest.`}
           onBack={back}
           onContinue={handleConfirm}
           canContinue={!saving}
@@ -111,7 +180,7 @@ export default function NonRaceBuilder() {
         >
           <p className="text-white/60 text-sm">
             We'll build a {state.targetWeeks}-week plan from your current fitness, ending in a retest.
-            Goal type, per-discipline focus, and schedule arrive in later steps.
+            Per-discipline focus is seeded from your goal; you'll be able to fine-tune it in a later step.
           </p>
         </StepLayout>
       )}

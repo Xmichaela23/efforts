@@ -27,5 +27,6 @@
       "@shared/*": ["./supabase/functions/_shared/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
 }
