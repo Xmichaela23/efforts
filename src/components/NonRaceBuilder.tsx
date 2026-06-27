@@ -12,6 +12,7 @@ import {
   canSetDevelop,
   developCount,
   athleteDisciplinesFromBaselines,
+  floorForGoal,
   GOAL_LABELS,
   GOALS_NEEDING_DISCIPLINE,
   STRENGTH_DEVELOPERS,
@@ -104,7 +105,13 @@ export default function NonRaceBuilder() {
   // Picking a goal (or its discipline sub-choice) re-seeds the posture + the default strength protocol.
   const reseed = (goal: NonRaceGoalId, discipline: Discipline | undefined) => {
     const seed = seedFromGoal(goal, discipline, athleteDisciplines);
-    setState((s) => ({ ...s, goal, discipline, posture: seed.per_discipline_posture, strengthProtocol: seed.strength_protocol }));
+    const floor = floorForGoal(goal);
+    setState((s) => ({
+      ...s, goal, discipline,
+      posture: seed.per_discipline_posture,
+      strengthProtocol: seed.strength_protocol,
+      targetWeeks: Math.max(s.targetWeeks, floor), // never start below the goal's science floor (§13.2)
+    }));
   };
   const setPosture = (d: Discipline, p: Posture) => {
     setState((s) => {
@@ -214,23 +221,26 @@ export default function NonRaceBuilder() {
         </StepLayout>
       )}
 
-      {currentStep === 'length' && (
-        <StepLayout
-          step={3} totalSteps={steps.length} title="How long is this block?"
-          subtitle="Pick the number of weeks — you develop, then retest and start the next block."
-          onBack={back} onContinue={next} canContinue={state.targetWeeks >= 4 && state.targetWeeks <= 52}
-        >
-          <div className="space-y-4">
-            <div className="text-3xl font-semibold tabular-nums">{state.targetWeeks} weeks</div>
-            <input
-              type="range" min={4} max={52} step={1} value={state.targetWeeks}
-              onChange={(e) => setState((s) => ({ ...s, targetWeeks: Number(e.target.value) }))}
-              className="w-full accent-teal-500"
-            />
-            <p className="text-white/45 text-sm">4–52 weeks. Defaults to 12.</p>
-          </div>
-        </StepLayout>
-      )}
+      {currentStep === 'length' && (() => {
+        const floor = floorForGoal(state.goal); // §13.2 — the minimum where the adaptation shows in a retest
+        return (
+          <StepLayout
+            step={3} totalSteps={steps.length} title="How long is this block?"
+            subtitle={`At least ${floor} weeks for ${state.goal ? GOAL_LABELS[state.goal] : 'this goal'} — that's where the change shows in a retest.`}
+            onBack={back} onContinue={next} canContinue={state.targetWeeks >= floor && state.targetWeeks <= 52}
+          >
+            <div className="space-y-4">
+              <div className="text-3xl font-semibold tabular-nums">{state.targetWeeks} weeks</div>
+              <input
+                type="range" min={floor} max={52} step={1} value={state.targetWeeks}
+                onChange={(e) => setState((s) => ({ ...s, targetWeeks: Number(e.target.value) }))}
+                className="w-full accent-teal-500"
+              />
+              <p className="text-white/45 text-sm">{floor}–52 weeks. Shorter than {floor} wouldn't show in a retest.</p>
+            </div>
+          </StepLayout>
+        );
+      })()}
 
       {currentStep === 'confirm' && (
         <StepLayout

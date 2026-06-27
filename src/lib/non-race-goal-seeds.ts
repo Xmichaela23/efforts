@@ -32,6 +32,22 @@ export const GOAL_LABELS: Record<NonRaceGoalId, string> = {
 // Only these 3 need a "which discipline develops?" sub-choice; the other 3 are fully determined.
 export const GOALS_NEEDING_DISCIPLINE: NonRaceGoalId[] = ['build_endurance', 'build_speed', 'starting_over'];
 
+// §13.2 — per-goal length floor (minimum target_weeks): the shortest block where the goal's adaptation
+// shows in a retest. Science-anchored, not picked (see SPEC §13.2 citations). Keyed by the goal (the
+// adaptation intent), NOT the edited posture — editing which disciplines develop doesn't change the
+// adaptation's timeline.
+export const LENGTH_FLOOR_WEEKS: Record<NonRaceGoalId, number> = {
+  build_endurance: 8, // ~6-8wk aerobic adaptation + the 6wk base ramp
+  build_speed: 6,     // ~6wk threshold/VO2 + neuromuscular
+  get_stronger: 8,    // ~2 deload cycles + measurable 1RM (SCIENCE-5x5 §2-3)
+  build_muscle: 12,   // hypertrophy is structural/slower (~8-12wk, Schoenfeld)
+  maintain: 4,        // minimal coherent maintenance block
+  starting_over: 6,   // re-adaptation is faster than from scratch
+};
+export function floorForGoal(goal: NonRaceGoalId | null): number {
+  return goal ? LENGTH_FLOOR_WEEKS[goal] : 4;
+}
+
 // sport from the endurance disciplines that are present (not out): all 3 → triathlon; else run>bike>swim.
 // This is what makes the §13.1 strength split fall out for free — strength-focus goals (swim out) are
 // never tri-shaped, so their develop strength resolves to the general developer, not triathlon_performance.

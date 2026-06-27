@@ -257,6 +257,23 @@ The builder must speak the **same strength language the system already ships**, 
 - **`minimum_dose` is NOT offered** — it is excluded from the runtime allow-list (`selector.ts`) until frontend support lands.
 - **This contract is the builder's, not the race wizards'.** Harmonizing ArcSetupWizard's tri strength onto named protocols is a separate cleanup — see the OPEN-QUESTIONS harmonization entry; it is **not** in scope for the builder wiring (Cut A).
 
+### 13.2 Length floor-by-goal — the minimum `target_weeks` (DG-1, captured 2026-06-27)
+
+The length step offers `target_weeks` from a **per-goal floor** upward. The floor is **science-backed, not picked**: it is the **shortest block in which the goal's adaptation actually shows in a retest**. Show a shorter option and the retest lies — the block ends before the adaptation is measurable. The floor IS the bottom of the menu.
+
+| Goal | Floor (wk) | Where the adaptation shows in a retest — the citation |
+|---|---|---|
+| **Build endurance** | **8** | Measurable aerobic adaptation (mitochondrial/capillary density, plasma volume, stroke volume) needs ~6–8 wk; the engine's base ramp is **6 wk** (`science.ts` `rampWeeksForPhase` base; `RUN-PROTOCOL.md`). 8 wk = the ramp + a retest that reflects it. |
+| **Build speed** | **6** | Threshold/VO2 + neuromuscular adaptations show in ~6 wk (the neural component is faster than aerobic structural change); a coherent speed block layered on existing base. |
+| **Get stronger (5×5)** | **8** | `SCIENCE-5x5-linear-progression.md §2–3`: ~1–3%/wk over 70→85% 1RM with a deload every 4–6 wk → 8 wk ≈ **2 deload cycles + a measurable 1RM gain**. Below the §4 ~16–20 wk linear ceiling; the floor is where it first shows. |
+| **Build muscle + train** | **12** | Hypertrophy is **structural, slower than neural strength**: measurable muscle growth needs ~8–12 wk (Schoenfeld 2017, cited in `SCIENCE-5x5 §6`). 12 wk is the conservative floor where a hypertrophy retest is honest — deliberately longer than Get-stronger (neural gains show first, mass later). |
+| **Maintain** | **4** | No develop-to-retest — maintenance holds fitness through a constrained period on minimal stimulus (1–2×/wk retains for weeks). 4 wk is the shortest coherent block worth materializing a plan for. |
+| **Starting over** | **6** | Re-adaptation from detraining is **faster than from scratch** (muscle memory / rapid early reacquisition), but a coherent return block is ~6 wk; gentler than a full develop. |
+
+- **Keyed by the GOAL (the adaptation intent), not the edited posture.** The goal sets the adaptation *type* (aerobic / threshold / strength / hypertrophy); editing *which* disciplines develop (the posture step) doesn't change the timeline of the adaptation, so `floorForGoal(goal)` is the lookup. (Edge: a `Maintain` goal edited to develop a discipline keeps the 4 wk floor — the floor is a minimum, not a maximum; the user can still pick longer.)
+- **Range:** every floor sits inside the `target_weeks` **4–52** band (the migration CHECK). The slider runs from the goal's floor to 52; the default lands at `max(floor, 12)`.
+- **Sign-off-gated prescription** (like the maintain floors §11, the commitment tier §13). These are defensible adaptation-timeline floors a coach may tune — but they must stay **science-anchored**: the shortest length shown is a claim that the retest will be honest at that length.
+
 ---
 
 ## 14. Design language — the builder UI skin (out of D-210 ENGINE scope; captured 2026-06-26)

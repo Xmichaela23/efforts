@@ -3,6 +3,7 @@
 import { assertEquals, assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   seedFromGoal, derivePlanShape, developCount, canSetDevelop, athleteDisciplinesFromBaselines,
+  floorForGoal,
   type Discipline,
 } from './non-race-goal-seeds.ts';
 
@@ -91,6 +92,16 @@ Deno.test('derivePlanShape — protocol override applies ONLY when strength deve
   assertEquals(derivePlanShape(dev, 'five_by_five').strength_protocol, 'five_by_five'); // user picked 5×5
   const maint = { run: 'maintain', strength: 'maintain' };
   assertEquals(derivePlanShape(maint, 'five_by_five').strength_protocol, 'durability'); // override ignored on maintain
+});
+
+Deno.test('floorForGoal — per-goal science floors (§13.2); slowest adaptation = longest floor', () => {
+  assertEquals(floorForGoal('build_endurance'), 8);
+  assertEquals(floorForGoal('build_speed'), 6);
+  assertEquals(floorForGoal('get_stronger'), 8);
+  assertEquals(floorForGoal('build_muscle'), 12);   // hypertrophy = the longest floor
+  assertEquals(floorForGoal('maintain'), 4);        // shortest
+  assertEquals(floorForGoal('starting_over'), 6);
+  assertEquals(floorForGoal(null), 4);              // defensive default
 });
 
 Deno.test('athleteDisciplinesFromBaselines — long→short, strength always, fallback', () => {
