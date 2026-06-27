@@ -13,6 +13,8 @@ import {
   developCount,
   athleteDisciplinesFromBaselines,
   floorForGoal,
+  hoursForTier,
+  COMMITMENT_TIERS,
   GOAL_LABELS,
   GOALS_NEEDING_DISCIPLINE,
   STRENGTH_DEVELOPERS,
@@ -20,6 +22,7 @@ import {
   type NonRaceGoalId,
   type Discipline,
   type Posture,
+  type CommitmentTier,
 } from '@/lib/non-race-goal-seeds';
 
 // Cut C/D — the goal-first non-race builder. The goal SEEDS everything (goal_type + per-discipline
@@ -41,13 +44,14 @@ type NonRaceState = {
   discipline: Discipline | undefined;
   posture: Partial<Record<Discipline, Posture>>;
   strengthProtocol: string | undefined;
+  commitment: CommitmentTier;
   targetWeeks: number;
 };
 
-type StepKey = 'goal' | 'posture' | 'length' | 'confirm';
+type StepKey = 'goal' | 'posture' | 'commitment' | 'length' | 'confirm';
 
 function getSteps(_state: NonRaceState): StepKey[] {
-  return ['goal', 'posture', 'length', 'confirm'];
+  return ['goal', 'posture', 'commitment', 'length', 'confirm'];
 }
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -70,8 +74,8 @@ function assemblePayload(state: NonRaceState): ArcSetupPayload {
           training_intent: 'completion',
           fitness: 'intermediate',
           days_per_week: 5,
-          weekly_hours_available: 6,
           strength_frequency: 2,
+          weekly_hours_available: hoursForTier(state.commitment),
           per_discipline_posture: state.posture,
           ...(shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {}),
         },
@@ -93,7 +97,7 @@ export default function NonRaceBuilder() {
   );
 
   const [state, setState] = useState<NonRaceState>({
-    goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, targetWeeks: 12,
+    goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -221,11 +225,34 @@ export default function NonRaceBuilder() {
         </StepLayout>
       )}
 
+      {currentStep === 'commitment' && (
+        <StepLayout
+          step={3} totalSteps={steps.length} title="What can you sustain?"
+          subtitle="Not how many hours — what fits your life right now. We set the volume to match."
+          onBack={back} onContinue={next} canContinue={true}
+        >
+          <div className="space-y-2">
+            {COMMITMENT_TIERS.map((t) => (
+              <button
+                key={t.id} type="button" className={optBtn(state.commitment === t.id)}
+                onClick={() => setState((s) => ({ ...s, commitment: t.id }))}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{t.label}</span>
+                  <span className="text-white/45 text-sm tabular-nums">≈ {hoursForTier(t.id)} h/wk</span>
+                </div>
+                <p className="text-white/50 text-sm mt-0.5">{t.blurb}</p>
+              </button>
+            ))}
+          </div>
+        </StepLayout>
+      )}
+
       {currentStep === 'length' && (() => {
         const floor = floorForGoal(state.goal); // §13.2 — the minimum where the adaptation shows in a retest
         return (
           <StepLayout
-            step={3} totalSteps={steps.length} title="How long is this block?"
+            step={4} totalSteps={steps.length} title="How long is this block?"
             subtitle={`At least ${floor} weeks for ${state.goal ? GOAL_LABELS[state.goal] : 'this goal'} — that's where the change shows in a retest.`}
             onBack={back} onContinue={next} canContinue={state.targetWeeks >= floor && state.targetWeeks <= 52}
           >
@@ -244,7 +271,7 @@ export default function NonRaceBuilder() {
 
       {currentStep === 'confirm' && (
         <StepLayout
-          step={4} totalSteps={steps.length} title="Build this plan?"
+          step={5} totalSteps={steps.length} title="Build this plan?"
           subtitle={`${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — a ${state.targetWeeks}-week block, develop then retest.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}

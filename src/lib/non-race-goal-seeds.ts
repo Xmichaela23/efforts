@@ -48,6 +48,25 @@ export function floorForGoal(goal: NonRaceGoalId | null): number {
   return goal ? LENGTH_FLOOR_WEEKS[goal] : 4;
 }
 
+// §13 commitment tier — the volume envelope as a qualitative tier with HOURS AS OUTPUT (the research:
+// ask "what can you sustain," not "how many hours"). The tier maps onto the existing
+// `weekly_hours_available` lever (→ `scaledWeeklyTSS` hour-factor) — it sits ON the CTL engine, it does
+// NOT fight it. Defaulted to the lower end (light).
+export type CommitmentTier = 'light' | 'moderate' | 'committed';
+export const COMMITMENT_HOURS: Record<CommitmentTier, number> = {
+  light: 6,
+  moderate: 9,
+  committed: 12,
+};
+export function hoursForTier(tier: CommitmentTier): number {
+  return COMMITMENT_HOURS[tier];
+}
+export const COMMITMENT_TIERS: Array<{ id: CommitmentTier; label: string; blurb: string }> = [
+  { id: 'light', label: 'Light', blurb: 'Fits around a busy life' },
+  { id: 'moderate', label: 'Moderate', blurb: 'A steady, sustainable rhythm' },
+  { id: 'committed', label: 'Committed', blurb: 'Training is a priority right now' },
+];
+
 // sport from the endurance disciplines that are present (not out): all 3 → triathlon; else run>bike>swim.
 // This is what makes the §13.1 strength split fall out for free — strength-focus goals (swim out) are
 // never tri-shaped, so their develop strength resolves to the general developer, not triathlon_performance.
