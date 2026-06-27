@@ -1140,6 +1140,30 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-087 — `strength-overlay.ts:620` deletes the upper session from "Upper Aesthetics" at freq 2 (legacy run wizard) — real latent bug
+
+- **Status:** filed 2026-06-27 · **real bug, NOT on the non-race builder's path** (it routes through the combined plan, no filter). Affects the **legacy `generate-run-plan`** path.
+- **The bug:** `generate-run-plan/strength-overlay.ts:619-624` strips `UPPER_STRENGTH`/`UPPER_MAINTENANCE` whenever `protocol.id === 'upper_aesthetics' && frequency === 2`. Since `upper_aesthetics` at freq 2 emits exactly Lower(Mon) + Upper(Wed) (`upper-priority-hybrid.ts:85,88`), the filter leaves **one lower-maintenance session/week and zero upper** — a protocol literally named "Upper Aesthetics" emitting no upper work. The filter fires unconditionally on `id + frequency`, with no check that endurance is actually present (it was meant for the concurrent run case: when only 2 strength slots exist around running, cover legs). A run athlete who picks "Upper Aesthetics" at 2×/wk gets the one thing the name promises deleted.
+- **The fix:** gate the filter on "endurance actually present / this is a concurrent run plan," or drop it. Verify against the legacy run wizard.
+- **Cross-ref:** `strength-overlay.ts:620`, `upper-priority-hybrid.ts:62-99`, the standalone-strength audit, `SPEC-per-discipline-periodization.md §13.1` (which is why the builder defaults to 5×5, not upper_aesthetics).
+
+## Q-088 — Standalone-strength frequency gap: the system caps strength at 2–3×/wk (built concurrent), no 3–4-day block
+
+- **Status:** filed 2026-06-27 · **architectural gap surfaced by the pure-strength builder case — scope deliberately, touches every strength cell.**
+- **The gap:** the whole `shared/strength-system/` was built for **hybrid/concurrent** athletes (strength as a 2-session slot around endurance). `ProtocolContext.strengthFrequency` is typed `2 | 3` (`types.ts:88`), the run path allows `0|2|3` — **no 4**, and at freq 3 the extra day is *another lower* (`upper-priority-hybrid.ts:93`), never a 4-day upper/lower split. `five_by_five` deliberately caps at 2 too (the endurance-adapted dose). So a **pure strength block** (everything else out, strength develop) maxes at 2 full-body sessions — defensible (each pattern ~2×/wk via 5×5 A/B) but **below the 3–4 days a textbook standalone strength block wants**. The builder hardcodes `strength_frequency: 2` with no UI control.
+- **Why it's not a quick fix:** the frequency cap is woven through the protocol modules, the `ProtocolContext` type, and the week-builder; raising it for the standalone case touches **every strength cell** (concurrent + standalone), not just pure-strength. Needs the concurrent-matrix audit first (in progress) to map the whole picture before deciding the frequency architecture.
+- **Cross-ref:** `ProtocolContext.strengthFrequency` (`types.ts:88`), `upper-priority-hybrid.ts:62-99`, `five-by-five.ts:88-92` (the 2× cap), the standalone-strength audit + the concurrent-matrix audit, `SCIENCE-5x5-linear-progression.md §1` (2× is endurance-adapted; standalone wants more), Q-086 (the live-1RM loop, also strength-system debt).
+
+## Q-089 — `runStrength` emits `sessions[0]` twice, never `sessions[1]` — the dominant non-race-builder bug (also a live event bug)
+
+- **Status:** filed 2026-06-27 · **the real blocker for the builder's strength-develop story; also degrades live event run plans. Higher priority than Q-088.**
+- **The bug:** `generate-combined-plan/session-factory.ts:runStrength` (~:2549) does `const chosen = sessions[0]` — **no `sessionIndex` param**. `triathlonStrength` (~:2480) correctly does `sessions[Math.min(idx, len-1)]`. All 3 run-strength call sites (`week-builder.ts:1897/1972/2038`) pass no index, so **both weekly strength slots emit `sessions[0]`; `sessions[1]` is never emitted.** In any 2×/week run-path strength block (the base/rebuild phases; build/RS are 1×), the second session is a duplicate of the first.
+- **What it breaks (the concurrent-matrix audit):** every run-path strength-**develop** cell is BROKEN — `five_by_five` → Workout A twice, no B (OHP/deadlift absent); `upper_aesthetics` → Lower-maintenance twice, the Upper "gains" session never emitted; `neural_speed` → Lower twice, Upper never; `durability` → Lower-A twice, no Upper-Posture. Strength-**maintain** cells are thinned (lower-only in base). The **tri path is immune** (`triathlonStrength` is index-aware) — which is exactly why the `five-by-five-integration.test.ts` (tri-only) stayed green while the run path ships half a week.
+- **Scope caution — it's SHARED, not builder-only:** the fix (thread `sessionIndex` into `runStrength` + the 3 call sites, mirror `triathlonStrength`) also changes **live event run plans** (which currently get the duplicated `sessions[0]` too). It is a bug fix, but **not byte-identical for events** — needs a deliberate cut with the event-path change acknowledged + the run path added to the integration test (assert two distinct sessions).
+- **Cross-ref:** `session-factory.ts:2549` (`runStrength`) vs `:2480` (`triathlonStrength`), `week-builder.ts:1897/1972/2038` (call sites), `five-by-five-integration.test.ts` (tri-only — the gap), the standalone-strength audit, Q-088 (the frequency gap — downstream of this; fix the duplicate first).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

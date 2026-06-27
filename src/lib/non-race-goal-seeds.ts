@@ -96,18 +96,26 @@ export function buildPreferredDays(
 // sport from the endurance disciplines that are present (not out): all 3 → triathlon; else run>bike>swim.
 // This is what makes the §13.1 strength split fall out for free — strength-focus goals (swim out) are
 // never tri-shaped, so their develop strength resolves to the general developer, not triathlon_performance.
-function sportFromPosture(p: Partial<Record<Discipline, Posture>>): string {
+export function sportFromPosture(p: Partial<Record<Discipline, Posture>>): string {
   const present = ENDURANCE.filter((d) => p[d] && p[d] !== 'out');
   if ((['swim', 'bike', 'run'] as Discipline[]).every((d) => present.includes(d))) return 'triathlon';
   return (['run', 'bike', 'swim'] as Discipline[]).find((d) => present.includes(d)) ?? 'run';
 }
 
-// §13.1: develop → upper_aesthetics (run) / triathlon_performance (tri); maintain → durability (run) /
-// triathlon (tri). out → no strength protocol.
-function strengthProtocolFor(s: Posture, sport: string): string | undefined {
-  const tri = sport === 'triathlon';
-  if (s === 'develop') return tri ? 'triathlon_performance' : 'upper_aesthetics';
-  if (s === 'maintain') return tri ? 'triathlon' : 'durability';
+// §13.1 strength DEVELOP default — equipment-aware, the honest coherent standalone default. Barbell/DB →
+// five_by_five (full-body, balanced, real periodization, name matches). Bodyweight/bands → durability
+// (5×5's linear %1RM needs loadable resistance; durability progresses via tempo/RIR/tiers). Tri-shaped
+// develop → triathlon_performance. Replaces the old upper_aesthetics default, which is a concurrent run-
+// overlay SLOT (1 upper + 1 lower at 2×/wk — thin standalone, name over-promises; see the audit).
+export function defaultStrengthDeveloper(sport: string, equipmentTier?: string): string {
+  if (sport === 'triathlon') return 'triathlon_performance';
+  return equipmentTier === 'bodyweight_bands' ? 'durability' : 'five_by_five';
+}
+
+// develop → the equipment-aware default developer; maintain → durability (run) / triathlon (tri); out → none.
+function strengthProtocolFor(s: Posture, sport: string, equipmentTier?: string): string | undefined {
+  if (s === 'develop') return defaultStrengthDeveloper(sport, equipmentTier);
+  if (s === 'maintain') return sport === 'triathlon' ? 'triathlon' : 'durability';
   return undefined;
 }
 
@@ -129,6 +137,7 @@ export function canSetDevelop(p: Partial<Record<Discipline, Posture>>, d: Discip
 export function derivePlanShape(
   posture: Partial<Record<Discipline, Posture>>,
   strengthProtocol?: string,
+  equipmentTier?: string,
 ): { goal_type: 'capacity' | 'maintenance'; sport: string; strength_protocol?: string } {
   const sport = sportFromPosture(posture);
   const goal_type: 'capacity' | 'maintenance' =
@@ -136,19 +145,32 @@ export function derivePlanShape(
   const sPos: Posture = posture.strength ?? 'maintain';
   const strength_protocol =
     sPos === 'develop'
-      ? (strengthProtocol ?? strengthProtocolFor('develop', sport))
-      : strengthProtocolFor(sPos, sport);
+      ? (strengthProtocol ?? defaultStrengthDeveloper(sport, equipmentTier))
+      : strengthProtocolFor(sPos, sport, equipmentTier);
   return { goal_type, sport, strength_protocol };
 }
 
 // The strength DEVELOP picker (§13.1, run-shaped): Upper Aesthetics is the default. A tri-shaped develop
 // resolves to triathlon_performance (derivePlanShape handles it) — but no default goal develops strength
 // tri-shaped, so this menu is the run developers; a manually-edited tri case is the only edge.
-export const STRENGTH_DEVELOPERS: Array<{ id: string; label: string }> = [
+// The strength DEVELOP picker, equipment-aware. Barbell/DB → 5×5 (default, first) / Upper Aesthetics /
+// Neural Speed. Bodyweight/bands → only Durability works (the others need loadable resistance).
+const BARBELL_DEVELOPERS: Array<{ id: string; label: string }> = [
+  { id: 'five_by_five', label: '5×5' },
   { id: 'upper_aesthetics', label: 'Upper Aesthetics' },
   { id: 'neural_speed', label: 'Neural Speed' },
-  { id: 'five_by_five', label: '5×5' },
 ];
+export function strengthDevelopersFor(equipmentTier?: string): Array<{ id: string; label: string }> {
+  return equipmentTier === 'bodyweight_bands' ? [{ id: 'durability', label: 'Durability' }] : BARBELL_DEVELOPERS;
+}
+export const STRENGTH_PROTOCOL_LABELS: Record<string, string> = {
+  five_by_five: '5×5',
+  upper_aesthetics: 'Upper Aesthetics',
+  neural_speed: 'Neural Speed',
+  durability: 'Durability',
+  triathlon_performance: 'Triathlon Performance',
+  triathlon: 'Durability',
+};
 
 // Map user_baselines.disciplines (LONG: running/cycling/swimming/strength) to short Discipline names;
 // strength is always present. No endurance declared → all-4 fallback (so the builder still works).
@@ -171,6 +193,7 @@ export function seedFromGoal(
   goal: NonRaceGoalId,
   discipline: Discipline | undefined,
   athleteDisciplines: Discipline[],
+  equipmentTier?: string,
 ): GoalSeed {
   const have = ENDURANCE.filter((d) => athleteDisciplines.includes(d));
   const posture: Partial<Record<Discipline, Posture>> = {};
@@ -210,6 +233,6 @@ export function seedFromGoal(
     }
   }
   posture.strength = strength;
-  const { goal_type, sport, strength_protocol } = derivePlanShape(posture);
+  const { goal_type, sport, strength_protocol } = derivePlanShape(posture, undefined, equipmentTier);
   return { goal_type, per_discipline_posture: posture, sport, strength_protocol };
 }

@@ -27,19 +27,19 @@ Deno.test('build_endurance (runner-only) — intersection: no swim/bike maintain
   assertEquals(s.strength_protocol, 'durability');  // maintain + run
 });
 
-Deno.test('get_stronger — swim out, bike+run maintain, strength develops; run-shaped → upper_aesthetics', () => {
+Deno.test('get_stronger — swim out, bike+run maintain, strength develops; run-shaped → five_by_five (default)', () => {
   const s = seedFromGoal('get_stronger', undefined, TRI);
   assertEquals(s.per_discipline_posture, { swim: 'out', bike: 'maintain', run: 'maintain', strength: 'develop' });
   assertEquals(s.goal_type, 'capacity');
   assertEquals(s.sport, 'run');                     // swim out → not tri → run
-  assertEquals(s.strength_protocol, 'upper_aesthetics'); // develop + run → the §13.1 default developer (NOT triathlon_performance)
+  assertEquals(s.strength_protocol, 'five_by_five'); // develop + run → 5×5 (full-body, honest default; NOT upper_aesthetics/triathlon_performance)
 });
 
-Deno.test('build_muscle — swim+bike out, run maintain, strength develops → upper_aesthetics', () => {
+Deno.test('build_muscle — swim+bike out, run maintain, strength develops → five_by_five (default)', () => {
   const s = seedFromGoal('build_muscle', undefined, TRI);
   assertEquals(s.per_discipline_posture, { swim: 'out', bike: 'out', run: 'maintain', strength: 'develop' });
   assertEquals(s.sport, 'run');
-  assertEquals(s.strength_protocol, 'upper_aesthetics');
+  assertEquals(s.strength_protocol, 'five_by_five');
 });
 
 Deno.test('maintain — all maintain → maintenance goal_type; tri stays triathlon', () => {
@@ -86,12 +86,21 @@ Deno.test('derivePlanShape — re-derives goal_type/sport/protocol from the EDIT
   assertEquals(derivePlanShape({ run: 'maintain', strength: 'maintain' }).goal_type, 'maintenance');
 });
 
-Deno.test('derivePlanShape — protocol override applies ONLY when strength develops', () => {
+Deno.test('derivePlanShape — develop default is five_by_five; override applies ONLY when strength develops', () => {
   const dev = { run: 'maintain', strength: 'develop' };
-  assertEquals(derivePlanShape(dev).strength_protocol, 'upper_aesthetics');          // run-shaped develop default
-  assertEquals(derivePlanShape(dev, 'five_by_five').strength_protocol, 'five_by_five'); // user picked 5×5
+  assertEquals(derivePlanShape(dev).strength_protocol, 'five_by_five');                 // run-shaped develop default = 5×5
+  assertEquals(derivePlanShape(dev, 'upper_aesthetics').strength_protocol, 'upper_aesthetics'); // user picked Upper Aesthetics
   const maint = { run: 'maintain', strength: 'maintain' };
-  assertEquals(derivePlanShape(maint, 'five_by_five').strength_protocol, 'durability'); // override ignored on maintain
+  assertEquals(derivePlanShape(maint, 'upper_aesthetics').strength_protocol, 'durability'); // override ignored on maintain
+});
+
+Deno.test('equipment fallback — bodyweight/bands develop → durability (5×5 needs load); barbell/DB → 5×5', () => {
+  const dev = { run: 'maintain', strength: 'develop' };
+  assertEquals(derivePlanShape(dev, undefined, 'full_barbell').strength_protocol, 'five_by_five');
+  assertEquals(derivePlanShape(dev, undefined, 'dumbbell_based').strength_protocol, 'five_by_five');
+  assertEquals(derivePlanShape(dev, undefined, 'bodyweight_bands').strength_protocol, 'durability');
+  // through the seed too: a bodyweight athlete's get_stronger → durability (not a broken barbell 5×5)
+  assertEquals(seedFromGoal('get_stronger', undefined, RUNNER, 'bodyweight_bands').strength_protocol, 'durability');
 });
 
 Deno.test('floorForGoal — per-goal science floors (§13.2); slowest adaptation = longest floor', () => {

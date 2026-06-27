@@ -18,7 +18,10 @@ import {
   buildPreferredDays,
   GOAL_LABELS,
   GOALS_NEEDING_DISCIPLINE,
-  STRENGTH_DEVELOPERS,
+  strengthDevelopersFor,
+  defaultStrengthDeveloper,
+  sportFromPosture,
+  STRENGTH_PROTOCOL_LABELS,
   TWO_BUILD_CEILING,
   type NonRaceGoalId,
   type Discipline,
@@ -60,6 +63,19 @@ function DayPicker({ value, onChange }: { value: DayName | ''; onChange: (d: Day
   );
 }
 
+// Mirror ArcSetupWizard's chip→tier derivation (:2103-2109): barbell present → full_barbell; else DB
+// present → dumbbell_based; else bodyweight_bands. Drives the equipment-aware strength developer default
+// (5×5 needs loadable resistance; a bodyweight/bands athlete falls back to durability).
+function equipmentTierFromArc(arc: unknown): 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands' {
+  const chips = ((((arc as { equipment?: { strength?: unknown } } | null)?.equipment?.strength) as string[] | undefined) ?? [])
+    .map((s) => String(s).toLowerCase());
+  const hasBarbell = chips.some((s) => s.includes('barbell') || s.includes('rack') || /\bbar\b/.test(s));
+  const hasDumbbell = chips.some((s) => s.includes('dumbbell') || /\bdb\b/.test(s));
+  if (hasBarbell) return 'full_barbell';
+  if (hasDumbbell) return 'dumbbell_based';
+  return 'bodyweight_bands';
+}
+
 type NonRaceState = {
   goal: NonRaceGoalId | null;
   discipline: Discipline | undefined;
@@ -82,9 +98,9 @@ function getSteps(_state: NonRaceState): StepKey[] {
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
 // from the EDITED posture (derivePlanShape), not from seedFromGoal. Generic scheduling prefs kept.
-function assemblePayload(state: NonRaceState): ArcSetupPayload {
+function assemblePayload(state: NonRaceState, equipmentTier?: string): ArcSetupPayload {
   const goal = state.goal!;
-  const shape = derivePlanShape(state.posture, state.strengthProtocol);
+  const shape = derivePlanShape(state.posture, state.strengthProtocol, equipmentTier);
   return {
     summary: `${state.targetWeeks}-week ${GOAL_LABELS[goal]} block`,
     goals: [
@@ -125,6 +141,7 @@ export default function NonRaceBuilder() {
     () => athleteDisciplinesFromBaselines((arc as { disciplines?: unknown } | null)?.disciplines),
     [arc],
   );
+  const equipmentTier = useMemo(() => equipmentTierFromArc(arc), [arc]);
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
@@ -139,7 +156,7 @@ export default function NonRaceBuilder() {
 
   // Picking a goal (or its discipline sub-choice) re-seeds the posture + the default strength protocol.
   const reseed = (goal: NonRaceGoalId, discipline: Discipline | undefined) => {
-    const seed = seedFromGoal(goal, discipline, athleteDisciplines);
+    const seed = seedFromGoal(goal, discipline, athleteDisciplines, equipmentTier);
     const floor = floorForGoal(goal);
     setState((s) => ({
       ...s, goal, discipline,
@@ -152,7 +169,9 @@ export default function NonRaceBuilder() {
     setState((s) => {
       const posture = { ...s.posture, [d]: p };
       let strengthProtocol = s.strengthProtocol;
-      if (d === 'strength' && p === 'develop' && !strengthProtocol) strengthProtocol = 'upper_aesthetics';
+      if (d === 'strength' && p === 'develop' && !strengthProtocol) {
+        strengthProtocol = defaultStrengthDeveloper(sportFromPosture(posture), equipmentTier);
+      }
       return { ...s, posture, strengthProtocol };
     });
   };
@@ -164,9 +183,9 @@ export default function NonRaceBuilder() {
   const rows = DISCIPLINE_ORDER.filter((d) => athleteDisciplines.includes(d));
   const posturePresent = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
   const anchorChoices = (['run', 'bike'] as const).filter((d) => posturePresent(d));
-  const strengthDeveloperLabel = (id?: string) => STRENGTH_DEVELOPERS.find((x) => x.id === id)?.label ?? id;
+  const strengthDeveloperLabel = (id?: string) => (id ? STRENGTH_PROTOCOL_LABELS[id] ?? id : id);
 
-  const handleConfirm = () => { if (state.goal) void complete(assemblePayload(state)); };
+  const handleConfirm = () => { if (state.goal) void complete(assemblePayload(state, equipmentTier)); };
 
   const optBtn = (active: boolean) =>
     `w-full text-left px-4 py-3 rounded-xl border ${active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'} text-white`;
@@ -235,7 +254,7 @@ export default function NonRaceBuilder() {
                     <div className="mt-3 space-y-1.5">
                       <p className="text-white/55 text-xs">Strength protocol</p>
                       <div className="grid grid-cols-3 gap-1.5">
-                        {STRENGTH_DEVELOPERS.map((sp) => (
+                        {strengthDevelopersFor(equipmentTier).map((sp) => (
                           <button
                             key={sp.id} type="button"
                             onClick={() => setState((s) => ({ ...s, strengthProtocol: sp.id }))}
