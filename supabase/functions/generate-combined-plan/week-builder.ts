@@ -1900,6 +1900,7 @@ export function buildWeek(
               totalWeeks: planTotalWeeksOpt,
               isRecovery,
               equipmentType: equipmentTypeOpt,
+              sessionIndex: slot.session_index, // Q-089: mirror the optimizer tri call (:1879)
               longRunDayName: longRunActualDay,
               qualityRunDayName: runQualityDay,
               strengthProtocolId: athleteState.strength_protocol, // D-210/5×5 Cut 1: honor chosen protocol (default durability)
@@ -1975,6 +1976,7 @@ export function buildWeek(
             totalWeeks: planTotalWeeks,
             isRecovery,
             equipmentType,
+            sessionIndex: 1, // Q-089: slot 1 → sessions[1] (mirror tri slot-1 :1956); both slots now distinct
             longRunDayName: longRunActualDay,
             qualityRunDayName: runQualityDay,
             strengthProtocolId: athleteState.strength_protocol, // D-210/5×5 Cut 1: honor chosen protocol (default durability)
@@ -2041,6 +2043,7 @@ export function buildWeek(
               totalWeeks: planTotalWeeks,
               isRecovery,
               equipmentType: equipmentType2,
+              sessionIndex: 0, // Q-089: slot 2 → sessions[0] (mirror tri slot-2 :2026)
               longRunDayName: longRunActualDay,
               qualityRunDayName: runQualityDay,
               strengthProtocolId: athleteState.strength_protocol, // D-210/5×5 Cut 1: honor chosen protocol (default durability)

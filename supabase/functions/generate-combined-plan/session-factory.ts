@@ -2555,6 +2555,7 @@ export function runStrength(day: string, phase: Phase, goalId: string, options?:
   longRunDayName?: string;
   qualityRunDayName?: string;
   strengthProtocolId?: string; // D-210/5×5 Cut 1: the athlete's chosen strength protocol (was hardcoded to durability)
+  sessionIndex?: number; // Q-089: which weekly session this slot emits (mirror triathlonStrength); was always sessions[0]
 }): PlannedSession {
   // D-210/5×5 Cut 1: honor the chosen strength protocol (threaded from training_prefs, the same source the
   // tri path reads); unknown/unset id → fall back to 'durability' (today's behavior → byte-identical).
@@ -2580,7 +2581,10 @@ export function runStrength(day: string, phase: Phase, goalId: string, options?:
   };
 
   const sessions = protocol.createWeekSessions(ctx);
-  const chosen = sessions[0];
+  // Q-089: pick the slot's session (was always sessions[0] → both weekly slots emitted a duplicate and
+  // sessions[1] was never produced — e.g. 5×5 Workout A twice, no B). Mirrors triathlonStrength.
+  const idx = options?.sessionIndex ?? 0;
+  const chosen = sessions[Math.min(idx, sessions.length - 1)] ?? sessions[0];
   if (!chosen) {
     const fallbackTSS = estimateSessionTSS('strength', 'EASY', 30);
     return {
