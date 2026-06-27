@@ -50,6 +50,62 @@ function strengthProtocolFor(s: Posture, sport: string): string | undefined {
   return undefined;
 }
 
+export const TWO_BUILD_CEILING = 2;
+
+// Count of disciplines set to develop (for the two-build interference ceiling).
+export function developCount(p: Partial<Record<Discipline, Posture>>): number {
+  return Object.values(p).filter((v) => v === 'develop').length;
+}
+
+// May `d` be set to develop? Yes if it already is, or if under the ceiling. Used to BLOCK a 3rd develop.
+export function canSetDevelop(p: Partial<Record<Discipline, Posture>>, d: Discipline): boolean {
+  return p[d] === 'develop' || developCount(p) < TWO_BUILD_CEILING;
+}
+
+// Derive the plan shape from a (possibly user-edited) posture: goal_type (any develop → capacity), sport
+// (tri-shaped vs single), and the §13.1 strength protocol. An explicit strengthProtocol overrides the
+// default ONLY when strength develops (the develop picker); maintain/out use the §13.1 resolution.
+export function derivePlanShape(
+  posture: Partial<Record<Discipline, Posture>>,
+  strengthProtocol?: string,
+): { goal_type: 'capacity' | 'maintenance'; sport: string; strength_protocol?: string } {
+  const sport = sportFromPosture(posture);
+  const goal_type: 'capacity' | 'maintenance' =
+    Object.values(posture).some((v) => v === 'develop') ? 'capacity' : 'maintenance';
+  const sPos: Posture = posture.strength ?? 'maintain';
+  const strength_protocol =
+    sPos === 'develop'
+      ? (strengthProtocol ?? strengthProtocolFor('develop', sport))
+      : strengthProtocolFor(sPos, sport);
+  return { goal_type, sport, strength_protocol };
+}
+
+// The strength DEVELOP picker (§13.1, run-shaped): Upper Aesthetics is the default. A tri-shaped develop
+// resolves to triathlon_performance (derivePlanShape handles it) — but no default goal develops strength
+// tri-shaped, so this menu is the run developers; a manually-edited tri case is the only edge.
+export const STRENGTH_DEVELOPERS: Array<{ id: string; label: string }> = [
+  { id: 'upper_aesthetics', label: 'Upper Aesthetics' },
+  { id: 'neural_speed', label: 'Neural Speed' },
+  { id: 'five_by_five', label: '5×5' },
+];
+
+// Map user_baselines.disciplines (LONG: running/cycling/swimming/strength) to short Discipline names;
+// strength is always present. No endurance declared → all-4 fallback (so the builder still works).
+const LONG_TO_SHORT: Record<string, Discipline> = {
+  running: 'run', run: 'run', cycling: 'bike', bike: 'bike', ride: 'bike',
+  swimming: 'swim', swim: 'swim', strength: 'strength',
+};
+export function athleteDisciplinesFromBaselines(raw: unknown): Discipline[] {
+  const out = new Set<Discipline>();
+  for (const x of Array.isArray(raw) ? raw : []) {
+    const d = LONG_TO_SHORT[String(x).toLowerCase()];
+    if (d) out.add(d);
+  }
+  out.add('strength'); // always present (core to every athlete)
+  const result = (['swim', 'bike', 'run', 'strength'] as Discipline[]).filter((d) => out.has(d));
+  return result.some((d) => d !== 'strength') ? result : ['swim', 'bike', 'run', 'strength'];
+}
+
 export function seedFromGoal(
   goal: NonRaceGoalId,
   discipline: Discipline | undefined,
@@ -93,14 +149,6 @@ export function seedFromGoal(
     }
   }
   posture.strength = strength;
-
-  const sport = sportFromPosture(posture);
-  const goal_type: 'capacity' | 'maintenance' =
-    Object.values(posture).some((p) => p === 'develop') ? 'capacity' : 'maintenance';
-  return {
-    goal_type,
-    per_discipline_posture: posture,
-    sport,
-    strength_protocol: strengthProtocolFor(strength, sport),
-  };
+  const { goal_type, sport, strength_protocol } = derivePlanShape(posture);
+  return { goal_type, per_discipline_posture: posture, sport, strength_protocol };
 }

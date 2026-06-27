@@ -1,26 +1,36 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Activity, Bike, Waves, Dumbbell } from 'lucide-react';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
+import { useArcSetupContext } from '@/hooks/useArcSetupContext';
+import { getDisciplineColor } from '@/lib/context-utils';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import {
   seedFromGoal,
+  derivePlanShape,
+  canSetDevelop,
+  developCount,
+  athleteDisciplinesFromBaselines,
   GOAL_LABELS,
   GOALS_NEEDING_DISCIPLINE,
+  STRENGTH_DEVELOPERS,
+  TWO_BUILD_CEILING,
   type NonRaceGoalId,
   type Discipline,
+  type Posture,
 } from '@/lib/non-race-goal-seeds';
 
-// Cut C — the goal picker is the first, load-bearing step: one pick seeds goal_type + per-discipline
-// posture + sport + strength protocol (seedFromGoal, §13/§13.1), intersected with the athlete's actual
-// disciplines. assemblePayload sends the seeds → the Cut A wiring finally has a real consumer. Later cuts
-// add the posture-confirm / commitment / schedule steps; B4 draft persistence is still deferred.
+// Cut C/D — the goal-first non-race builder. The goal SEEDS everything (goal_type + per-discipline
+// posture + sport + strength protocol, intersected with the athlete's real disciplines); the posture
+// step lets the user confirm/edit those seeds (two-build ceiling blocked at the UI), and picks the
+// strength developer when strength=develop. assemblePayload sends the EDITED posture. B4 draft deferred.
 
-// TODO(Cut C follow-up): source the athlete's real disciplines from profile (ArcContext / baselines).
-// seedFromGoal already intersects correctly (a runner-only athlete never maintains swim/bike); this
-// default just needs to become the real per-athlete list so the intersection fires in production.
-const ATHLETE_DISCIPLINES: Discipline[] = ['swim', 'bike', 'run', 'strength'];
-
+const DISCIPLINE_ORDER: Discipline[] = ['swim', 'bike', 'run', 'strength'];
+const DISCIPLINE_LABEL: Record<Discipline, string> = { swim: 'Swim', bike: 'Bike', run: 'Run', strength: 'Strength' };
+const DISCIPLINE_ICONS: Record<Discipline, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+  run: Activity, bike: Bike, swim: Waves, strength: Dumbbell,
+};
 const GOAL_ORDER: NonRaceGoalId[] = [
   'build_endurance', 'build_speed', 'get_stronger', 'build_muscle', 'maintain', 'starting_over',
 ];
@@ -28,31 +38,31 @@ const GOAL_ORDER: NonRaceGoalId[] = [
 type NonRaceState = {
   goal: NonRaceGoalId | null;
   discipline: Discipline | undefined;
+  posture: Partial<Record<Discipline, Posture>>;
+  strengthProtocol: string | undefined;
   targetWeeks: number;
 };
 
-type StepKey = 'goal' | 'length' | 'confirm';
+type StepKey = 'goal' | 'posture' | 'length' | 'confirm';
 
-// Static for C; later cuts insert 'posture' / 'commitment' / 'schedule' before 'confirm'.
 function getSteps(_state: NonRaceState): StepKey[] {
-  return ['goal', 'length', 'confirm'];
+  return ['goal', 'posture', 'length', 'confirm'];
 }
 
-// The non-race analog of ArcSetupWizard.assemblePayload: the goal seeds goal_type + per_discipline_posture
-// + sport + strength_protocol (intersected); the length supplies target_weeks; the generic scheduling
-// prefs are kept. Every race-specific field is dropped.
+// The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
+// from the EDITED posture (derivePlanShape), not from seedFromGoal. Generic scheduling prefs kept.
 function assemblePayload(state: NonRaceState): ArcSetupPayload {
   const goal = state.goal!;
-  const seed = seedFromGoal(goal, state.discipline, ATHLETE_DISCIPLINES);
+  const shape = derivePlanShape(state.posture, state.strengthProtocol);
   return {
     summary: `${state.targetWeeks}-week ${GOAL_LABELS[goal]} block`,
     goals: [
       {
         name: GOAL_LABELS[goal],
-        goal_type: seed.goal_type,
+        goal_type: shape.goal_type,
         target_date: null,
         target_weeks: state.targetWeeks,
-        sport: seed.sport,
+        sport: shape.sport,
         distance: null,
         priority: 'A',
         training_prefs: {
@@ -61,8 +71,8 @@ function assemblePayload(state: NonRaceState): ArcSetupPayload {
           days_per_week: 5,
           weekly_hours_available: 6,
           strength_frequency: 2,
-          per_discipline_posture: seed.per_discipline_posture,
-          ...(seed.strength_protocol ? { strength_protocol: seed.strength_protocol } : {}),
+          per_discipline_posture: state.posture,
+          ...(shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {}),
         },
       },
     ],
@@ -73,51 +83,60 @@ function assemblePayload(state: NonRaceState): ArcSetupPayload {
 export default function NonRaceBuilder() {
   const navigate = useNavigate();
   const { complete, saving } = useArcSetupComplete();
-  const [state, setState] = useState<NonRaceState>({ goal: null, discipline: undefined, targetWeeks: 12 });
+  const { arc } = useArcSetupContext();
+
+  // Real per-athlete disciplines (declared baselines), long→short, strength always, fallback all-3.
+  const athleteDisciplines = useMemo(
+    () => athleteDisciplinesFromBaselines((arc as { disciplines?: unknown } | null)?.disciplines),
+    [arc],
+  );
+
+  const [state, setState] = useState<NonRaceState>({
+    goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, targetWeeks: 12,
+  });
   const [stepIdx, setStepIdx] = useState(0);
 
   const steps = getSteps(state);
   const currentStep = steps[stepIdx] ?? 'confirm';
-
   const next = () => setStepIdx((i) => Math.min(i + 1, steps.length - 1));
-  const back = () => {
-    if (stepIdx === 0) navigate(-1);
-    else setStepIdx((i) => i - 1);
+  const back = () => { if (stepIdx === 0) navigate(-1); else setStepIdx((i) => i - 1); };
+
+  // Picking a goal (or its discipline sub-choice) re-seeds the posture + the default strength protocol.
+  const reseed = (goal: NonRaceGoalId, discipline: Discipline | undefined) => {
+    const seed = seedFromGoal(goal, discipline, athleteDisciplines);
+    setState((s) => ({ ...s, goal, discipline, posture: seed.per_discipline_posture, strengthProtocol: seed.strength_protocol }));
+  };
+  const setPosture = (d: Discipline, p: Posture) => {
+    setState((s) => {
+      const posture = { ...s.posture, [d]: p };
+      let strengthProtocol = s.strengthProtocol;
+      if (d === 'strength' && p === 'develop' && !strengthProtocol) strengthProtocol = 'upper_aesthetics';
+      return { ...s, posture, strengthProtocol };
+    });
   };
 
   const needsDiscipline = state.goal != null && GOALS_NEEDING_DISCIPLINE.includes(state.goal);
-  const enduranceChoices = ATHLETE_DISCIPLINES.filter((d) => d !== 'strength');
+  const enduranceChoices = athleteDisciplines.filter((d) => d !== 'strength');
   const goalCanContinue = state.goal != null && (!needsDiscipline || state.discipline != null);
+  const postureCanContinue = Object.values(state.posture).some((p) => p !== 'out');
+  const rows = DISCIPLINE_ORDER.filter((d) => athleteDisciplines.includes(d));
 
-  const handleConfirm = () => {
-    if (state.goal) void complete(assemblePayload(state));
-  };
+  const handleConfirm = () => { if (state.goal) void complete(assemblePayload(state)); };
 
-  const btn = (active: boolean) =>
-    `w-full text-left px-4 py-3 rounded-xl border ${
-      active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'
-    } text-white`;
+  const optBtn = (active: boolean) =>
+    `w-full text-left px-4 py-3 rounded-xl border ${active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'} text-white`;
 
   return (
     <div className="h-[100dvh] bg-zinc-950 text-white flex flex-col">
       {currentStep === 'goal' && (
         <StepLayout
-          step={1}
-          totalSteps={steps.length}
-          title="What's the goal?"
+          step={1} totalSteps={steps.length} title="What's the goal?"
           subtitle="Pick one — we seed the rest (which disciplines develop, maintain, or sit out)."
-          onBack={back}
-          onContinue={next}
-          canContinue={goalCanContinue}
+          onBack={back} onContinue={next} canContinue={goalCanContinue}
         >
           <div className="space-y-2">
             {GOAL_ORDER.map((g) => (
-              <button
-                key={g}
-                type="button"
-                className={btn(state.goal === g)}
-                onClick={() => setState((s) => ({ ...s, goal: g, discipline: undefined }))}
-              >
+              <button key={g} type="button" className={optBtn(state.goal === g)} onClick={() => reseed(g, undefined)}>
                 {GOAL_LABELS[g]}
               </button>
             ))}
@@ -126,13 +145,8 @@ export default function NonRaceBuilder() {
             <div className="mt-4 space-y-2">
               <p className="text-white/55 text-sm">Which discipline?</p>
               {enduranceChoices.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  className={btn(state.discipline === d)}
-                  onClick={() => setState((s) => ({ ...s, discipline: d }))}
-                >
-                  {d.charAt(0).toUpperCase() + d.slice(1)}
+                <button key={d} type="button" className={optBtn(state.discipline === d)} onClick={() => reseed(state.goal!, d)}>
+                  {DISCIPLINE_LABEL[d]}
                 </button>
               ))}
             </div>
@@ -140,24 +154,76 @@ export default function NonRaceBuilder() {
         </StepLayout>
       )}
 
+      {currentStep === 'posture' && (
+        <StepLayout
+          step={2} totalSteps={steps.length} title="Per-discipline focus"
+          subtitle="Seeded from your goal — adjust as you like. At most 2 disciplines develop at once."
+          onBack={back} onContinue={next} canContinue={postureCanContinue}
+        >
+          <div className="space-y-3">
+            {rows.map((d) => {
+              const color = getDisciplineColor(d);
+              const Icon = DISCIPLINE_ICONS[d];
+              const cur = state.posture[d] ?? 'maintain';
+              return (
+                <div key={d} className="rounded-xl border border-white/12 bg-white/[0.03] p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon className="h-4 w-4" style={{ color }} />
+                    <span className="font-medium" style={{ color }}>{DISCIPLINE_LABEL[d]}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['develop', 'maintain', 'out'] as Posture[]).map((p) => {
+                      const disabled = p === 'develop' && !canSetDevelop(state.posture, d);
+                      const active = cur === p;
+                      return (
+                        <button
+                          key={p} type="button" disabled={disabled} onClick={() => setPosture(d, p)}
+                          className={`px-2 py-2 rounded-lg text-sm border ${active ? 'border-transparent text-zinc-950 font-semibold' : 'border-white/12 text-white/70'} ${disabled ? 'opacity-30' : ''}`}
+                          style={active ? { background: color } : undefined}
+                        >
+                          {p === 'develop' ? 'Develop' : p === 'maintain' ? 'Maintain' : 'Out'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {d === 'strength' && cur === 'develop' && (
+                    <div className="mt-3 space-y-1.5">
+                      <p className="text-white/55 text-xs">Strength protocol</p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {STRENGTH_DEVELOPERS.map((sp) => (
+                          <button
+                            key={sp.id} type="button"
+                            onClick={() => setState((s) => ({ ...s, strengthProtocol: sp.id }))}
+                            className={`px-2 py-2 rounded-lg text-xs border ${state.strengthProtocol === sp.id ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
+                          >
+                            {sp.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {developCount(state.posture) >= TWO_BUILD_CEILING && (
+              <p className="text-white/45 text-xs">
+                At most 2 disciplines develop together — the interference ceiling. Set one to maintain to develop another.
+              </p>
+            )}
+          </div>
+        </StepLayout>
+      )}
+
       {currentStep === 'length' && (
         <StepLayout
-          step={2}
-          totalSteps={steps.length}
-          title="How long is this block?"
+          step={3} totalSteps={steps.length} title="How long is this block?"
           subtitle="Pick the number of weeks — you develop, then retest and start the next block."
-          onBack={back}
-          onContinue={next}
-          canContinue={state.targetWeeks >= 4 && state.targetWeeks <= 52}
+          onBack={back} onContinue={next} canContinue={state.targetWeeks >= 4 && state.targetWeeks <= 52}
         >
           <div className="space-y-4">
             <div className="text-3xl font-semibold tabular-nums">{state.targetWeeks} weeks</div>
             <input
-              type="range"
-              min={4}
-              max={52}
-              step={1}
-              value={state.targetWeeks}
+              type="range" min={4} max={52} step={1} value={state.targetWeeks}
               onChange={(e) => setState((s) => ({ ...s, targetWeeks: Number(e.target.value) }))}
               className="w-full accent-teal-500"
             />
@@ -168,19 +234,14 @@ export default function NonRaceBuilder() {
 
       {currentStep === 'confirm' && (
         <StepLayout
-          step={3}
-          totalSteps={steps.length}
-          title="Build this plan?"
+          step={4} totalSteps={steps.length} title="Build this plan?"
           subtitle={`${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — a ${state.targetWeeks}-week block, develop then retest.`}
-          onBack={back}
-          onContinue={handleConfirm}
-          canContinue={!saving}
-          continueLabel={saving ? 'Building…' : 'Build plan'}
-          saving={saving}
+          onBack={back} onContinue={handleConfirm} canContinue={!saving}
+          continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
         >
           <p className="text-white/60 text-sm">
-            We'll build a {state.targetWeeks}-week plan from your current fitness, ending in a retest.
-            Per-discipline focus is seeded from your goal; you'll be able to fine-tune it in a later step.
+            We'll build a {state.targetWeeks}-week plan from your current fitness, ending in a retest, with the
+            per-discipline focus you set.
           </p>
         </StepLayout>
       )}

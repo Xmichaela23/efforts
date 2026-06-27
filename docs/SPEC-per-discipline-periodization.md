@@ -71,12 +71,14 @@ Reference implementation to copy: `swimPostureFactLine` / `deriveTriSwimIntentFo
 
 ## 3. DECISION 3 — Taper / recovery scope boundary (part of the definition, not a caveat)
 
-Per-discipline phase is coherent **only** for `base` / `build` / `race_specific`. `taper`, `recovery`, and `rebuild` are **race-anchored, whole-athlete** concepts:
+**Amendment locked 2026-06-26 (post non-race arc):** the terminal-collapse set now includes **`retest`** (D-213 Cut 4 — the non-race terminal). `taper` / `recovery` / `rebuild` are **race-anchored**; `retest` is **length-anchored** (`target_weeks`, no race date) — but all four are equally **whole-athlete terminals** (you develop-then-retest the *whole* block; there is no "retest the bike while the run keeps building"), so per-discipline phase collapses to global at `retest` on the same logic. The collapse rule below reads `{taper, recovery, rebuild, retest}`.
+
+Per-discipline phase is coherent **only** for `base` / `build` / `race_specific`. `taper`, `recovery`, `rebuild`, and `retest` are **whole-athlete terminal** concepts:
 
 - Taper is defined per race (`taperWeeks(distance, priority)`, `phase-structure.ts:191`) and read cross-sport (`week-builder.ts:924`, `:1483`, `:1752`). You cannot taper the bike but keep the run in build *for the same race* — the race date is shared across all of the athlete's disciplines.
 - Recovery (`insertRecoveryBlock`, `phase-structure.ts:185`; `isRecovery` block boolean) and rebuild (`insertRebuildBlock`, `:212`) are likewise race/athlete-anchored.
 
-**The primitive's definition therefore includes its own collapse rule:** when the macrocycle reaches taper / recovery / rebuild, per-discipline phase **collapses back to a single global phase**. This is a structural property of the primitive, specced here, not a downstream special case. Implementations must treat "all disciplines share the taper/recovery phase" as invariant, and the per-discipline representation must degrade cleanly to the global one (e.g. all disciplines read the same value) rather than carrying independent taper states.
+**The primitive's definition therefore includes its own collapse rule:** when the macrocycle reaches taper / recovery / rebuild / **retest**, per-discipline phase **collapses back to a single global phase**. This is a structural property of the primitive, specced here, not a downstream special case. Implementations must treat "all disciplines share the taper/recovery phase" as invariant, and the per-discipline representation must degrade cleanly to the global one (e.g. all disciplines read the same value) rather than carrying independent taper states.
 
 ---
 
@@ -208,3 +210,61 @@ Per-discipline phase **changes prescription** (it drives session content and loa
 - D-061 / `training-intent-differentiation.test.ts` — the existing `training_intent` axis (Primitive B, Decision 1).
 - `coach/index.ts:323-339,547-550,4399` — `swim_intent → SWIM_POSTURE`, the reference path to generalize (Decision 2 / §6).
 - `docs/SCIENCE-concurrent-training-interference.md` — peer-reviewed grounding for the Phase-2 load-distribution rules (Wilson 2012; Schumann/Petré 2023; Frontiers 2025; Hickson 1980). Direction + guardrails, not coefficients.
+
+---
+
+## 13. Builder requirements — what D-210 must support (captured 2026-06-26)
+
+The non-race builder (D-213 surfacing, future) is the consumer that needs this primitive. Its requirements ARE D-210's requirements:
+
+- **Goal-first, 4 disciplines, three states.** The builder is goal-first. Each of the 4 disciplines (swim / bike / run / strength) is set to **develop / maintain / out**, **seeded by the goal** — the user *confirms*, does not configure from scratch.
+- **`develop/maintain/out` is the user-facing face of Primitive A, NOT a new intent enum (Decision 1).** Under the hood: **develop** = the discipline runs a building per-discipline phase sequence and *claims budget* (§5); **maintain** = the discipline holds a maintenance-shaped phase and *drops to its floor* (`MAINTENANCE_FLOORS.pct`, §5); **out** = the discipline is *excluded* from the plan (0 budget, no sessions). This is per-discipline **phase** posture + presence — it must **not** be modeled as a parallel build/maintain ramp-rate enum competing with `training_intent` (that is the Decision-1 failure mode). The three-state knob maps onto the foundational primitive, and "out" is the one genuinely new state beyond base/build/race_specific (a presence flag, not a phase).
+- **The 6 goals → default per-discipline seeds:**
+
+  | Goal | swim | bike | run | strength |
+  |---|---|---|---|---|
+  | Build endurance | the goal's endurance discipline **develops**; the *other* endurance disciplines **maintain** | | | **maintain** |
+  | Build speed | same shape — one endurance **develops**, others **maintain** | | | **maintain** |
+  | Get stronger | **out** | **maintain** | **maintain** | **develop** |
+  | Build muscle + train | **out** | **out** | **maintain** | **develop** |
+  | Maintain | **maintain** | **maintain** | **maintain** | **maintain** |
+  | Starting over | a gentle **single develop** (one discipline), rest maintain/out | | | |
+
+  (For "build endurance / speed," exactly one endurance discipline develops — the one the goal names — the rest maintain; strength maintains.)
+- **Hard constraint — the two-build ceiling (interference science):** **at most 2 develop-disciplines at once.** None of the 6 default seeds exceed it (they develop 1 discipline each). This is the citable bound from `SCIENCE-concurrent-training-interference.md` (interference is a bounded budget; "strength + one cardio build" is the compatible shape) — it is a **config invariant**, not a soft preference. See the scout (where it's enforced).
+
+- **Commitment tier — the volume envelope, as a tier not an hours input (captured 2026-06-26).** Alongside goal + per-discipline states, the builder asks **"how much can you commit?"** as a tier — **light / moderate / committed** — **defaulted to low (light)**. **Hours are an OUTPUT, not an input:** the user picks the qualitative tier; the engine derives the weekly-hours band and shows it back ("≈ N h/wk"), never asking the athlete to type hours. Engine mapping: the tier is a qualitative front-end for the **existing `weekly_hours_available` lever** (→ `scaledWeeklyTSS` hour-factor) — it is **not a new engine primitive**, and it is distinct from Primitive B ramp-rate intent (commitment bounds *volume*, intent bounds *how hard you climb*). Default-light keeps the conservative-by-default posture. The tier→hours-band numbers are sign-off-gated prescription (like the maintain floors, §11).
+
+This table is the expressiveness contract: if the per-discipline primitive cannot represent every row above (incl. "out"), it is underbuilt. The commitment tier is the volume envelope that sits over it.
+
+### 13.1 Strength protocol contract — posture → protocol → label (captured 2026-06-26)
+
+The builder must speak the **same strength language the system already ships**, not a parallel story. Today three surfaces disagree: **PlanWizard (legacy run)** offers a *named-protocol* picker ("Durability" / "Neural Speed" / "Upper Aesthetics"); **ArcSetupWizard (tri)** offers *intent-role* labels ("Strength as a training priority" / "Durability-Focused", → `strength_intent` only); and a **marathoner in ArcSetupWizard sees no strength step at all**. The reconciliation rules:
+
+- **"Durability" is the consistency anchor.** It is the one term shared across *both* wizards *and* the engine (the `durability` protocol; the `triathlon` protocol's own name is "…(Durability)"). **`maintain` → label "Durability"** everywhere.
+- **Adopt PlanWizard's named-protocol vocabulary** ("Durability" / "Upper Aesthetics" / "Neural Speed") **+ "5×5"** — so a runner sees the *same words* in the legacy picker and the builder. **Do NOT invent "hypertrophy" / "upper-focus"** (that is a fourth vocabulary; `upper_aesthetics` already ships as **"Upper Aesthetics"** — use it). **Do NOT copy Arc's tri intent-role labels** (they carry no named choice).
+- **`develop` is sport-context-aware** — the menu depends on whether the goal's *developing* disciplines are tri-shaped or run/general, mirroring `resolveStrengthProtocolForGoal`'s sport split (`selector.ts`). A tri-shaped goal's "develop strength" must resolve to the **tri developer**, not a run protocol.
+
+**The contract table** (the label is constant; the underlying protocol is sport-context-aware):
+
+| Posture | User-facing label | Resolves to — run / general context | Resolves to — tri-shaped context (swim+bike+run developing) |
+|---|---|---|---|
+| **maintain** | **"Durability"** | `durability` | `triathlon` (its name is "Triathlon Multi-Sport (Durability)") |
+| **develop** | run/general → a **choice**: **"Upper Aesthetics"** (default) / **"Neural Speed"** / **"5×5"**. tri-shaped → **"Triathlon Performance"** (auto — the general menu does not fit the tri full-body context) | `upper_aesthetics` (default) / `neural_speed` / `five_by_five` | `triathlon_performance` |
+| **out** | — (discipline excluded) | excluded (0 budget, no sessions) | excluded |
+
+- **Default developer = `upper_aesthetics`** ("Upper Aesthetics") when `develop` and the user doesn't pick — the broad general-strength/hypertrophy protocol; **5×5 (`five_by_five`) and Neural Speed are deliberate opt-ins.** (Per the science audit, "hypertrophy" and "upper-focus" both map to `upper_aesthetics` — it is the one general strength/hypertrophy protocol; 5×5 is the dedicated linear-progression one.)
+- **`minimum_dose` is NOT offered** — it is excluded from the runtime allow-list (`selector.ts`) until frontend support lands.
+- **This contract is the builder's, not the race wizards'.** Harmonizing ArcSetupWizard's tri strength onto named protocols is a separate cleanup — see the OPEN-QUESTIONS harmonization entry; it is **not** in scope for the builder wiring (Cut A).
+
+---
+
+## 14. Design language — the builder UI skin (out of D-210 ENGINE scope; captured 2026-06-26)
+
+Noted so the eventual non-race builder UI inherits today's design language rather than a generic scheme. **This is UI skin, not engine architecture — D-210 builds none of it; it is here so the builder wears the right skin when it's built.**
+
+- **Discipline colors:** swim = **blue** (`#4A9EFF`), bike = **green** (`#50C878`), run = **amber/yellow** (`#FFD700`), strength = **orange** (`#FF8C42`). **(DG-2 resolved 2026-06-27:** aligned to the live `SPORT_COLORS` token in `src/lib/context-utils.ts:27` — strength is **orange** in code, not neutral; the token is the source of truth, the doc was wrong. `getDisciplineColor(d)` is the accessor.)
+- **Compact session codes:** `SW`, `BK-THR` (bike threshold), `RN-INT-SP` (run interval/speed), `SM-DRL` (swim drill), `BK-BRK` (bike brick), `RN-LR` (run long run).
+- **Discipline glyphs:** waves (swim), bike (bike), pulse (run), dumbbell (strength).
+- **Dark-mode native.**
+- The non-race builder must **wear this skin** (these colors / codes / glyphs / dark-mode), not a generic scheme. Cross-ref `DESIGN_GUIDELINES.md`.

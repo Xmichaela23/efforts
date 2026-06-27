@@ -1115,6 +1115,31 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-084 — Harmonize ArcSetupWizard's tri strength onto named protocols (the strength-vocabulary cleanup)
+
+- **Status:** filed 2026-06-26 · **future cleanup, NOT in the non-race builder scope.**
+- **The split today:** three strength surfaces speak different languages. **PlanWizard (legacy run)** = named-protocol picker ("Durability" / "Neural Speed" / "Upper Aesthetics" → `strength_protocol`). **ArcSetupWizard (tri)** = intent-role labels ("Strength as a training priority" / "Durability-Focused" → `strength_intent` only, no named choice; `:2142-2361`). **Marathoner in ArcSetupWizard** = no strength step at all (`if (tri)` gate, `:2825`). The non-race builder adopts the **named-protocol + "Durability"-anchor** vocabulary (`SPEC-per-discipline-periodization.md §13.1`).
+- **The question:** should ArcSetupWizard's tri strength step be migrated to the same named-protocol vocabulary (so a triathlete sees "Durability" / "Triathlon Performance" rather than role-labels), unifying all surfaces? That makes one strength language app-wide — but it touches a live race-wizard step (regression surface) and the tri protocols (`triathlon` / `triathlon_performance`) would need user-facing names. **Deliberately deferred** so the builder ships against a stable contract first.
+- **Cross-ref:** `SPEC-per-discipline-periodization.md §13.1` (the builder's strength contract — the target vocabulary), `ArcSetupWizard.tsx:2142-2361` (the tri intent-role step), `PlanWizard.tsx:2242-2368` (the named-protocol picker to match), `selector.ts` (`resolveStrengthProtocolForGoal` — the sport-aware resolution), D-210.
+
+---
+
+## Q-085 — Recent-history posture suggestion (advisory nudge in the posture step)
+
+- **Status:** filed 2026-06-27 · **future, advisory-only; does NOT block Cut D.**
+- **The idea:** in the non-race builder's posture step, optionally surface a soft nudge from recent training history — e.g. *"no swim logged in 8 weeks — set swim to maintain or out?"* — a **suggestion the user can accept, never an override**. The discipline list + postures stay user-controlled.
+- **The boundary:** **declared baselines (`user_baselines.disciplines`) remain the source of truth** for which disciplines exist (Cut D wires this). This nudge is an **advisory layer on top** — declared-vs-demonstrated: the athlete *declared* swim, but hasn't *demonstrated* it recently, so gently ask. Never auto-flip a posture.
+- **Cross-ref:** Cut D posture step (`NonRaceBuilder.tsx`), `seedFromGoal` (the seed it would nudge), the declared-vs-has-data distinction (Q-070, `TrainingBaselines.tsx:861`), `athlete_snapshot` / recent session history (the signal source).
+
+## Q-086 — Live strength baselines: wire the observed-1RM feedback loop
+
+- **Status:** filed 2026-06-27 · **future; the strength-side twin of the run pace-reconciler disconnect.**
+- **The gap:** strength baselines (the 1RMs the engine anchors %1RM loads to) should **update from actual logged lifting** — get stronger → the baseline rises → the next block builds off the new number. Today this is **disconnected**: the observed-1RM estimator exists (Epley/Brzycki, `compute-adaptation-metrics/index.ts:94`, `compute-facts/index.ts:119`) and writes `estimated_1rm`, but that output **does not flow back into `user_baselines` / `ProtocolContext.userBaselines`** — so the next prescription anchors to the same static 1RM. This mirrors the run reconciler's sec/km↔sec/mi dead-end (CLAUDE.md "Pace-unit footgun").
+- **Why it matters:** **5×5's linear progression assumes a real, live anchor** (`SCIENCE-5x5-linear-progression.md §5.5` Rule 1 — "reads the body"). Without the loop, the anchor never moves; wiring it makes baselines live and the progression honest.
+- **Cross-ref:** the 5×5 work (Cuts 1–4; `five-by-five.ts`), the strength audit's `context.history`-unused finding, Q-083 (the cadence-engine, which also needs the loop), the run pace-reconciler disconnect (D-033 / `science.ts:110`).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

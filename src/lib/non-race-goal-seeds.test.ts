@@ -1,7 +1,10 @@
 // Cut C — seedFromGoal: the §13 seed table, intersected with athlete disciplines.
 // Run: ~/.deno/bin/deno test --no-check src/lib/non-race-goal-seeds.test.ts
 import { assertEquals, assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { seedFromGoal, type Discipline } from './non-race-goal-seeds.ts';
+import {
+  seedFromGoal, derivePlanShape, developCount, canSetDevelop, athleteDisciplinesFromBaselines,
+  type Discipline,
+} from './non-race-goal-seeds.ts';
 
 const TRI: Discipline[] = ['swim', 'bike', 'run', 'strength'];
 const RUNNER: Discipline[] = ['run', 'strength'];
@@ -59,4 +62,41 @@ Deno.test('two-build ceiling — no goal develops more than 2 disciplines (the i
       assert(develops(seedFromGoal(g, 'run', ath)).length <= 2, `${g} (${ath.join('+')}) must develop ≤2`);
     }
   }
+});
+
+// ── Cut D — the ceiling + derive helpers (for the editable posture step) ──
+Deno.test('canSetDevelop — blocks a 3rd develop; allows the 2 already-develop to stay', () => {
+  const two = { swim: 'develop', bike: 'develop', run: 'maintain', strength: 'maintain' } as const;
+  assertEquals(developCount(two), 2);
+  assertEquals(canSetDevelop(two, 'run'), false);     // a 3rd develop is blocked
+  assertEquals(canSetDevelop(two, 'swim'), true);     // already develop → stays selectable
+  const one = { swim: 'develop', bike: 'maintain' } as const;
+  assertEquals(canSetDevelop(one, 'bike'), true);     // under the ceiling → allowed
+});
+
+Deno.test('derivePlanShape — re-derives goal_type/sport/protocol from the EDITED posture', () => {
+  // user edits an all-maintain tri posture → develop run: flips to capacity, stays triathlon, strength maintain→triathlon
+  const edited = { swim: 'maintain', bike: 'maintain', run: 'develop', strength: 'maintain' };
+  const s = derivePlanShape(edited);
+  assertEquals(s.goal_type, 'capacity');
+  assertEquals(s.sport, 'triathlon');
+  assertEquals(s.strength_protocol, 'triathlon');     // maintain + tri
+  // all maintain → maintenance
+  assertEquals(derivePlanShape({ run: 'maintain', strength: 'maintain' }).goal_type, 'maintenance');
+});
+
+Deno.test('derivePlanShape — protocol override applies ONLY when strength develops', () => {
+  const dev = { run: 'maintain', strength: 'develop' };
+  assertEquals(derivePlanShape(dev).strength_protocol, 'upper_aesthetics');          // run-shaped develop default
+  assertEquals(derivePlanShape(dev, 'five_by_five').strength_protocol, 'five_by_five'); // user picked 5×5
+  const maint = { run: 'maintain', strength: 'maintain' };
+  assertEquals(derivePlanShape(maint, 'five_by_five').strength_protocol, 'durability'); // override ignored on maintain
+});
+
+Deno.test('athleteDisciplinesFromBaselines — long→short, strength always, fallback', () => {
+  assertEquals(athleteDisciplinesFromBaselines(['running', 'strength']), ['run', 'strength']);
+  assertEquals(athleteDisciplinesFromBaselines(['swimming', 'cycling', 'running']), ['swim', 'bike', 'run', 'strength']);
+  assertEquals(athleteDisciplinesFromBaselines(['running']), ['run', 'strength']); // strength appended
+  assertEquals(athleteDisciplinesFromBaselines([]), ['swim', 'bike', 'run', 'strength']);   // no endurance → fallback
+  assertEquals(athleteDisciplinesFromBaselines(null), ['swim', 'bike', 'run', 'strength']); // null → fallback
 });
