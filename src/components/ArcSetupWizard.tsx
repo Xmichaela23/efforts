@@ -22,6 +22,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, Plus, Trash2, ChevronLeft } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
+import { StepLayout } from '@/components/wizard/StepLayout';
 import { supabase, getStoredUserId, invokeFunction } from '@/lib/supabase';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import { loadArcWizardDraft, saveArcWizardDraft, clearArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
@@ -810,65 +811,7 @@ function DayPicker({
   );
 }
 
-function StepLayout({
-  step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false,
-}: {
-  step: number; totalSteps: number; title: string; subtitle?: string;
-  onBack?: () => void; children: React.ReactNode;
-  onContinue: () => void; canContinue: boolean; continueLabel?: string; saving?: boolean;
-}) {
-  return (
-    <div className="flex flex-col h-full min-h-0">
-      {/* Progress */}
-      <div className="shrink-0 px-4 pt-3 pb-2">
-        <div className="flex gap-1">
-          {Array.from({ length: totalSteps }).map((_, i) => (
-            <div
-              key={i}
-              className={`h-1 flex-1 rounded-full transition-colors ${i < step ? 'bg-teal-400' : 'bg-white/15'}`}
-            />
-          ))}
-        </div>
-        <p className="mt-1.5 text-[11px] text-white/35 text-right">{step} of {totalSteps}</p>
-      </div>
-
-      {/* Back */}
-      {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className="shrink-0 self-start flex items-center gap-1 text-white/50 hover:text-white/80 text-sm px-4 py-1 mb-1"
-        >
-          <ChevronLeft className="h-4 w-4" /> Back
-        </button>
-      )}
-
-      {/* Title */}
-      <div className="shrink-0 px-4 pb-4">
-        <h2 className="text-[1.3rem] font-semibold text-white leading-snug tracking-tight">{title}</h2>
-        {subtitle && <p className="mt-1.5 text-[15px] text-white/55 leading-relaxed">{subtitle}</p>}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 space-y-3">
-        {children}
-      </div>
-
-      {/* Continue */}
-      <div className="shrink-0 px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-white/10 bg-zinc-950">
-        <button
-          type="button"
-          onClick={onContinue}
-          disabled={!canContinue || saving}
-          className="w-full min-h-[52px] rounded-xl bg-teal-500 text-white font-semibold text-base disabled:opacity-40 flex items-center justify-center gap-2"
-        >
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-          {continueLabel}
-        </button>
-      </div>
-    </div>
-  );
-}
+// StepLayout extracted to @/components/wizard/StepLayout (Cut B2) — imported above; render unchanged.
 
 // ─── Step components ──────────────────────────────────────────────────────────
 
