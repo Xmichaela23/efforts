@@ -2189,6 +2189,14 @@ function resolveTriCombinedStrengthProtocol(options: {
   /** True when the equipment-tier gate downgraded the requested protocol to durability. */
   gateDowngraded: boolean;
 } {
+  // 5×5 Cut 2: honor an explicit, REGISTERED strength protocol that the tri intent-resolution doesn't
+  // handle (i.e. anything other than the two tri protocols) — route it directly; the module handles its
+  // own equipment scaling (db-prescription), so no tier gate. Unset / a tri id / an unregistered id (e.g.
+  // five_by_five before it is registered) all fall through to the existing logic below → byte-identical.
+  const explicitId = options.strengthProtocolId;
+  if (explicitId && explicitId !== 'triathlon' && explicitId !== 'triathlon_performance' && isValidProtocol(explicitId)) {
+    return { protocol: getProtocol(explicitId), gateDowngraded: false };
+  }
   const wantedId =
     options.strengthIntent === 'performance' || options.strengthProtocolId === 'triathlon_performance'
       ? 'triathlon_performance'
