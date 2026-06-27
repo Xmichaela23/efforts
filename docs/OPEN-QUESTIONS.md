@@ -1162,6 +1162,13 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 - **Scope caution — it's SHARED, not builder-only:** the fix (thread `sessionIndex` into `runStrength` + the 3 call sites, mirror `triathlonStrength`) also changes **live event run plans** (which currently get the duplicated `sessions[0]` too). It is a bug fix, but **not byte-identical for events** — needs a deliberate cut with the event-path change acknowledged + the run path added to the integration test (assert two distinct sessions).
 - **Cross-ref:** `session-factory.ts:2549` (`runStrength`) vs `:2480` (`triathlonStrength`), `week-builder.ts:1897/1972/2038` (call sites), `five-by-five-integration.test.ts` (tri-only — the gap), the standalone-strength audit, Q-088 (the frequency gap — downstream of this; fix the duplicate first).
 
+## Q-090 — minimum_dose intensity: recovery-economy tradeoff vs the literature's intensity-preservation
+
+- **Status:** filed 2026-06-27 · **documented divergence, future tuning question (not a bug).**
+- **The divergence (from `SCIENCE-minimum-dose-maintenance.md §3`):** the strength-maintenance literature (Bickel 2011, Spiering 2021) optimizes by **preserving intensity** — keep lifting heavy, cut volume hard. `minimum_dose` instead uses **moderate intensity (~60–73% 1RM, RIR 3–4)** to minimize recovery cost for an athlete spending their budget on endurance. So it's a **conservative "won't lose much" hold, not the intensity-preserving maintenance the literature optimizes.**
+- **The question:** add a **heavier maintenance variant** (higher load, lower volume — literature-optimal) as an option, OR keep the moderate-intensity version as the deliberate time/recovery tradeoff? It's a real fork: literature-optimal maintenance vs minimal-recovery-cost maintenance serve different athletes.
+- **Cross-ref:** `SCIENCE-minimum-dose-maintenance.md` (the flag), `minimum-dose.ts` (the protocol — currently excluded from the runtime allow-list), Q-088 (the broader strength-frequency/dose architecture).
+
 ---
 
 ## When to add an entry
