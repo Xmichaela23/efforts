@@ -151,6 +151,12 @@ function normalizeGoalInput(
     goal_type,
     target_date,
     target_time,
+    // Non-race length source (B3): persist so it reaches the goal row → B1 forwards it → the server's
+    // non-race short-circuit uses it. Events send no target_weeks → null (unchanged).
+    target_weeks:
+      typeof g.target_weeks === 'number' && Number.isFinite(g.target_weeks) && g.target_weeks > 0
+        ? Math.round(g.target_weeks)
+        : null,
     sport,
     distance,
     course_profile:
