@@ -11,8 +11,8 @@
 5×5 is the canonical **novice/early-intermediate linear-progression** strength protocol. The defining shape, consistent across the source programs:
 
 - **5 sets × 5 reps** on a small set of **compound, multi-joint barbell lifts** (squat, bench press, deadlift, overhead press, barbell row). 5 reps sits in the **strength-biased** end of the load–rep continuum (heavy enough to drive maximal-strength adaptation, enough volume to drive hypertrophy support) [ACSM 2009; Schoenfeld 2017].
-- **3 sessions/week**, full-body, on non-consecutive days (e.g. Mon/Wed/Fri) — the frequency that lets each lift be trained ~2–3×/week, the dose novices adapt to fastest [Rippetoe & Baker 2014].
-- **A/B alternating sessions** — two complementary full-body templates rotated across the 3 weekly slots (so a given week is A-B-A, the next B-A-B). Alternation balances squat/pull/press frequency and manages per-lift fatigue [Starr 1976; "Madcow 5×5"].
+- **2 sessions/week** (the **endurance-adapted develop frequency**), full-body, on **non-consecutive days**. The classic *non-concurrent* 5×5 is 3×/week [Rippetoe & Baker 2014] — but **concurrent with endurance training the develop dose is 2×/week**: a third weekly strength session competes with cardio recovery and amplifies the interference effect, so 2× *develops* strength while a third slot (if used at all) is **maintenance only** [Rønnestad et al. — 2× develop / 1× maintain; see `SCIENCE-concurrent-training-interference.md`].
+- **A/B alternating sessions** — two complementary full-body templates rotated across the weekly slots (at 2×/week: a given week is A-B, the next B-A). Alternation balances squat/pull/press frequency and manages per-lift fatigue [Starr 1976; "Madcow 5×5"].
 - The deadlift is typically trained at **lower set volume** (e.g. 1×5 work set) than the other lifts because of its disproportionate systemic/recovery cost [Rippetoe & Baker 2014].
 
 ## 2. The progression model (weekly %1RM ramp)
@@ -45,7 +45,7 @@ Linear progression is **finite by definition** — load cannot rise forever on a
 
 The module is faithful to the science if it expresses:
 
-1. **5×5 on compound lifts, 3×/week, A/B alternating** (deadlift at reduced set volume).
+1. **5×5 on compound lifts, 2×/week (endurance-adapted develop frequency), A/B alternating** (deadlift at reduced set volume).
 2. A **weekly working-load % that climbs ~70→85% 1RM** across the block at **~1–3%/week** — anchored to the athlete's known/estimated 1RM, **never** a fixed absolute load.
 3. A **deload every 4–6 weeks at ~40–50% load** (rides the plan's existing 3:1 recovery cadence where present).
 4. A **block length bounded by the ~16–20-week linear ceiling**, terminating in a **retest** (the D-213 retest terminal), with a stall fallback (repeated missed targets → retest early).
@@ -76,6 +76,7 @@ The boundary: **age in at the cold-start seed; body out for everything ongoing.*
 - **"Madcow 5×5"** (practitioner program, widely documented). — the **weekly-progression** intermediate 5×5 with set-ramp to a top 5-rep set. *Practitioner source, not peer-reviewed — cited for the weekly-ramp structure, not as evidence.*
 - **Epley (1985); Brzycki (1993).** 1RM-from-submaximal-reps estimation formulas. — the **observed** 1RM anchor (Rule 1, §5.5): re-base load from logged work. Already implemented in the engine (`compute-adaptation-metrics/index.ts:94` Epley+RIR; `compute-facts/index.ts:119` Brzycki).
 - **NSCA, *Essentials of Strength Training and Conditioning* (4th ed.); population strength standards by bodyweight/sex/training-age.** — grounding for the **cold-start** conservative starting-load seed (Rule 2, §5.5), the only place age legitimately enters.
+- **Rønnestad, B. R. et al. (concurrent strength + endurance training).** — grounds the **2×/week develop frequency** (§1): **2× develop / 1× maintain** weekly strength dose, an **8–12-week block** paired with a **~20–30% reduction in concurrent endurance volume**, and **non-consecutive** strength/endurance days to limit the interference effect. See `SCIENCE-concurrent-training-interference.md` for the full concurrent-training treatment + the two-build ceiling.
 
 ## 7. Cross-references
 
