@@ -27,6 +27,10 @@ export type InsertedGoalRow = {
   distance: string | null;
   training_prefs: Record<string, unknown> | null;
   notes: string | null;
+  // B1 (non-race builder): the ROW goal_type + length must reach the server so the non-race short-circuit
+  // fires. Events carry 'event'/null → server isNonRaceGoalType('event') === false → identical event path.
+  goal_type?: string | null;
+  target_weeks?: number | null;
 };
 
 export type PersistResult = {
@@ -47,6 +51,9 @@ export type CompleteContext = {
     distance: string | null;
     training_prefs: Record<string, unknown> | null;
     notes: string | null;
+    // B1: forwarded so the server can see a non-race goal. Event → 'event'/null ≡ today's undefined.
+    goal_type: string | null;
+    target_weeks: number | null;
   } | null;
 };
 
@@ -329,7 +336,7 @@ export async function persistArcSetup(payload: ArcSetupPayload): Promise<Persist
       const { data, error } = await supabase
         .from('goals')
         .insert(rows)
-        .select('id, priority, target_date, sport, name, distance, training_prefs, notes');
+        .select('id, priority, target_date, sport, name, distance, training_prefs, notes, goal_type, target_weeks');
       if (error) {
         return { ok: false, error: error.message };
       }
@@ -408,7 +415,7 @@ export async function buildCompleteContext(
   if (eventGoals.length === 0) {
     const { data: evRows, error: evErr } = await supabase
       .from('goals')
-      .select('id, priority, target_date, sport, name, distance, training_prefs, notes')
+      .select('id, priority, target_date, sport, name, distance, training_prefs, notes, goal_type, target_weeks')
       .eq('user_id', userId)
       .eq('goal_type', 'event')
       .eq('status', 'active');
@@ -429,6 +436,11 @@ export async function buildCompleteContext(
         distance: primaryGoalRow.distance ?? null,
         training_prefs: (primaryGoalRow.training_prefs as Record<string, unknown> | null) ?? null,
         notes: primaryGoalRow.notes ?? null,
+        // B1: ROW goal_type + length forwarded to the server. Event rows → 'event'/null → server treats
+        // as event (isNonRaceGoalType('event') === false), identical to today's undefined. The non-race
+        // short-circuit (index.ts:2178/2305) fires only for capacity/maintenance.
+        goal_type: primaryGoalRow.goal_type ?? null,
+        target_weeks: primaryGoalRow.target_weeks ?? null,
       }
     : null;
 
