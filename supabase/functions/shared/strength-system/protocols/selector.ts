@@ -11,6 +11,7 @@ import { performanceNeuralProtocol } from './performance-neural.ts';
 import { minimumDoseProtocol } from './minimum-dose.ts';
 import { triathlonProtocol } from './triathlon.ts';
 import { triathlonPerformanceProtocol } from './triathlon_performance.ts';
+import { fiveByFiveProtocol } from './five-by-five.ts';
 
 // Canonical protocol IDs (new canonical format)
 export type ProtocolId =
@@ -19,7 +20,8 @@ export type ProtocolId =
   | 'upper_aesthetics'
   | 'minimum_dose'
   | 'triathlon'
-  | 'triathlon_performance';
+  | 'triathlon_performance'
+  | 'five_by_five';
 
 // Legacy IDs (temporary backward compatibility - TODO: Remove after 2025-03-01)
 type LegacyProtocolId = 'upper_priority_hybrid' | 'foundation_durability' | 'performance_neural';
@@ -39,6 +41,7 @@ export function normalizeProtocolId(protocolId: string): ProtocolId {
     'upper_aesthetics',
     'triathlon',
     'triathlon_performance',
+    'five_by_five',
   ]);
   
   // If already canonical, return as-is
@@ -74,6 +77,7 @@ export function isValidProtocol(protocolId: string): boolean {
     'upper_aesthetics',
     'triathlon',
     'triathlon_performance',
+    'five_by_five',
   ]);
   const legacyProtocols: LegacyProtocolId[] = ['upper_priority_hybrid', 'foundation_durability', 'performance_neural'];
   return canonical.has(protocolId as ProtocolId) 
@@ -272,6 +276,8 @@ export function getProtocol(protocolId?: string): StrengthProtocol {
       return triathlonProtocol;
     case 'triathlon_performance':
       return triathlonPerformanceProtocol;
+    case 'five_by_five':
+      return fiveByFiveProtocol;
     default:
       // Should not reach here due to validation, but TypeScript needs this
       throw new Error(`Protocol "${canonicalId}" is not implemented`);
@@ -283,5 +289,5 @@ export function getProtocol(protocolId?: string): StrengthProtocol {
  * Note: minimum_dose is excluded until frontend support is added
  */
 export function listProtocols(): ProtocolId[] {
-  return ['durability', 'neural_speed', 'upper_aesthetics', 'triathlon', 'triathlon_performance'];
+  return ['durability', 'neural_speed', 'upper_aesthetics', 'triathlon', 'triathlon_performance', 'five_by_five'];
 }

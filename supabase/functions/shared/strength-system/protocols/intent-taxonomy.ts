@@ -21,7 +21,8 @@ export type StrengthIntent =
   | 'UPPER_POSTURE'
   | 'UPPER_MAINTENANCE'
   // Full Body
-  | 'FULLBODY_MAINTENANCE';
+  | 'FULLBODY_MAINTENANCE'
+  | 'FULLBODY_STRENGTH';
 
 export type IntentPriority = 'required' | 'preferred' | 'optional';
 export type SessionCost = 'low' | 'medium' | 'high';
@@ -215,6 +216,23 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     repRange: [5, 8],
     intensityRange: [65, 75],
     allowedProtocols: ['minimum_dose', 'durability', 'neural_speed', 'triathlon'],
+  },
+  // 5×5 (D-210 / SCIENCE-5x5-linear-progression): full-body compound STRENGTH — the intent the taxonomy
+  // lacked. Dormant for events (only five_by_five emits it). Caps generous so 5×5 volume isn't clipped.
+  FULLBODY_STRENGTH: {
+    category: 'fullbody',
+    isNeural: true,
+    isDurability: false,
+    priorityDefault: 'required',
+    sessionCost: 'high',
+    avoidWithinHoursOf: undefined,
+    maxWeeklySets: 60,
+    maxWeeklyWorkingReps: 300,
+    repProfileDefaults: ['strength'],
+    exerciseFamilies: ['compound'],
+    repRange: [5, 5],
+    intensityRange: [70, 85],
+    allowedProtocols: ['five_by_five'],
   },
 };
 
