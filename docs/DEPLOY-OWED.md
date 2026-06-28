@@ -8,6 +8,11 @@ Changes committed locally but **not yet pushed/deployed**, plus verifications th
 
 ## Owed
 
+### Q-087 fix — deploy `generate-run-plan`, then confirm marathon Upper Aesthetics ships its upper session
+- **Deploy:** `generate-run-plan` (function) — carries the `strength-overlay.ts:620` filter removal.
+- **Event-behavior change (strictly an improvement, narrow):** the ONLY plans affected are **single-race RUN goals (combine falsy) with `strength_protocol='upper_aesthetics'` at `strength_frequency=2`** (via PlanWizard). Before: the upper session was stripped → **1 lower-only session/week, zero upper** (the protocol's namesake work missing). After: **both sessions emit** (1 lower + 1 upper). The lower session is unchanged; the upper is *added* — no loss, strictly better. Durability / Neural Speed / freq-3 plans are **untouched** (the filter only fired for `upper_aesthetics && frequency===2`).
+- **Deploy-gated check** (against deployed code, **throwaway `Claudecode@test.com` only — never `45d122e7`**): build a **marathon** (single-race run) goal with **Upper Aesthetics @ 2 days/week** → confirm the strength weeks contain **both a lower and an UPPER session** (not lower-only). Locally proven by `generate-run-plan/strength-overlay-q087.test.ts` (fails on HEAD, passes after); deploy confirms local-equals-deployed.
+
 ### 5×5 protocol (Cuts 1–4) + non-race builder (Cuts A–G) — deploy BOTH functions + the client, then 5 end-to-end checks
 - **Deploy together (same moment) — two functions + the client:**
   - **`generate-combined-plan`** (function) — carries the `five_by_five` protocol (block-linear 70→85% curve, 40–50% deload, 2×/week), the two resolver generalizations (`runStrength`, the tri-combined resolver), the `FULLBODY_STRENGTH` intent, the shared `strength-system/protocols/` module, **+ the Q-089 `runStrength` `sessionIndex` fix** (run-path 2×/wk strength now emits two **distinct** sessions, not `sessions[0]` twice — the first deliberate event-behavior change of the arc; see check 4).

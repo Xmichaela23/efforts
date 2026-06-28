@@ -616,12 +616,12 @@ function computeStrengthForPlanWeek(args: {
     intentSessions = filterToTaperFrequency(intentSessions, taperParams.effectiveFrequency);
   }
 
-  let filteredSessions = intentSessions;
-  if (protocol.id === 'upper_aesthetics' && args.frequency === 2) {
-    filteredSessions = intentSessions.filter(
-      s => s.intent !== 'UPPER_STRENGTH' && s.intent !== 'UPPER_MAINTENANCE',
-    );
-  }
+  // Q-087 (removed): a filter here stripped UPPER_STRENGTH/UPPER_MAINTENANCE from `upper_aesthetics` at
+  // frequency 2 — deleting the protocol's namesake "gains" upper session and shipping a single lower-only
+  // session for an athlete who explicitly chose upper development. At freq 2 the protocol emits exactly
+  // [LOWER_MAINTENANCE, UPPER_STRENGTH] (the Friday lower is freq≥3 only), so there was never anything to
+  // trim — the filter only ever reduced 2 requested sessions to 1, zero upper. Both sessions now emit.
+  const filteredSessions = intentSessions;
 
   const guardrails: any[] = [];
   const placementFrequency = taperParams
