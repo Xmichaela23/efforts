@@ -4477,6 +4477,29 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-215 — Strength contract for the non-race builder: named-protocol vocabulary, posture→protocol, 5×5 the standalone default, equipment-aware (§13.1)
+
+- **Date:** 2026-06-27
+- **What this decides:** the strength options the non-race builder offers + how they map to protocols, captured in `SPEC-per-discipline-periodization.md §13.1`, grounded in the standalone-strength audit + the science sourcing pass.
+- **Vocabulary:** adopt the **named-protocol** vocabulary PlanWizard already ships — "Durability" / "Upper Aesthetics" / "Neural Speed" — **+ "5×5"**. NOT new words ("hypertrophy"/"upper-focus"), NOT ArcSetupWizard's intent-role labels. **"Durability" is the cross-surface anchor** (the one term shared by both wizards + the engine). Harmonizing Arc's tri strength onto this is deferred (Q-084).
+- **Posture→protocol:** maintain → `durability` (run) / `triathlon` (tri); develop → a user choice; out → excluded. **Sport-context-aware** (a tri-shaped develop → `triathlon_performance`) — falls out of the resolver's sport split for free.
+- **The default developer is `five_by_five`, NOT `upper_aesthetics`** (corrected after the audit). `upper_aesthetics` is a **supplementary upper-aesthetic overlay for endurance athletes, not a standalone developer** — its lower day is maintenance-intent and the name over-promises; nothing in code stopped it being mis-assigned. `five_by_five` is the **only standalone-capable** program (full-body, balanced, honest name). Upper Aesthetics + Neural Speed stay explicit opt-ins. **Equipment-aware:** 5×5 needs loadable resistance → bodyweight/bands fall back to `durability`.
+- **Roster truth (the map before building):** one standalone program (5×5), six supplementary slots; all 7 science-documented (`SCIENCE-*.md`). Strength-program *expansion* is gated on the Q-088 frequency unlock (`ROADMAP-strength-engine.md`).
+- **Cross-ref:** D-210 (the per-discipline primitive this surfaces), `SPEC-per-discipline-periodization.md §13.1/§13.2/§14`, the `SCIENCE-*.md` strength docs, `non-race-goal-seeds.ts` (the unit-tested mapping), `ROADMAP-strength-engine.md`.
+
+---
+
+## D-216 — The strength arc's first deliberate event-behavior changes (Q-089 `runStrength` + Q-087 filter): bug fixes to shipped run plans, owned not assumed
+
+- **Date:** 2026-06-27
+- **What this decides:** how to treat two strength fixes that DO change live event run plans — the first intentional breaks of the events-byte-identical invariant the whole non-race arc otherwise held. The principle: **a bug fix that improves a shipped path is not a regression, but it IS a behavior change — so it gets a guard test (fail-on-HEAD), a fixture-change enumeration, and a deploy-gated check, NOT a byte-identical assertion.**
+- **Q-089:** `generate-combined-plan` `runStrength` selected `sessions[0]` for every slot → a 2×/wk run-strength week was a duplicate (5×5 Workout A twice, no B; `upper_aesthetics` Lower twice, the Upper "gains" session dropped). Fixed by threading `sessionIndex` (mirror `triathlonStrength`). **Run-shaped COMBINED event plans change `{A,A}→{A,B}`** — strictly an improvement. The fixture-change dig confirmed **CASE 1 (true gap):** zero pre-existing gcp fixtures exercised a run-shaped strength week, so nothing to update.
+- **Q-087:** `generate-run-plan/strength-overlay.ts:620` stripped the upper session from `upper_aesthetics` @ freq 2 → zero upper. **Always a bug, never legitimate** (at freq 2 the protocol emits exactly `[LOWER, UPPER]` — nothing to trim). Removed. **Single-race run goals with `upper_aesthetics` @ freq 2 change** (1 lower-only → 1 lower + 1 upper) — strictly an improvement, narrow.
+- **Path consolidation (scoped + DEFERRED):** retiring the legacy run-strength path is a **snag-laden migration**, not a clean swap — `runStrength` is a content function entangled with the combined week-builder/optimizer-slot context that `generate-run-plan` (+ `adapt-plan`) lack, and legacy carries features (sensitivity-gated taper, `noDoubles`, the intent→`neural_speed` resolver upgrade) combined would lose. Best done **alongside Q-088** (rebuilding the engine's guts anyway), not before; **optional once Q-087 is fixed.**
+- **Cross-ref:** Q-089/Q-087/Q-088 (`OPEN-QUESTIONS.md`), `ROADMAP-strength-engine.md` (the path-consolidation finding + the phase sequencing), `DEPLOY-OWED.md` (the deploy-gated event-behavior checks), the guard tests (`runstrength-session-index.test.ts`, `strength-overlay-q087.test.ts`).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
