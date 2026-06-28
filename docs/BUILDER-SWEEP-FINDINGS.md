@@ -135,3 +135,40 @@ Prompted by the equipment screen (Commercial/Home + 8 gear checkboxes: barbell, 
 - **F-5 (bands) → CORRECTED.** A bands signal **does** exist — `hasResistanceBands` in materialize (`:919`), reading the "Resistance bands" checkbox, used to *choose* band variants for face-pull/leg-curl/lateral-raise substitutions. BUT (a) it's absent from `ProtocolContext` (protocols can't see bands), and (b) it's used to substitute *toward* bands, never to gate *away* protocol-emitted band exercises ("Band Pull-Aparts", "Band Face Pulls") when the user has no bands. So F-5 is not "no flag" — it's **split-brain**: the bands checkbox is half-consumed (materialize substitution) and invisible to the protocols that emit band work directly.
 
 **Root systemic issue:** equipment correctness is split across the protocol layer (`ProtocolContext.has*`) and the materialize layer (`substituteExerciseForEquipment`), with **non-overlapping exercise coverage and different gear vocabularies** (one has `hasBands`/no `hasBox`-checkbox; the other has band substitution but no pull-up/box substitution). Anything un-gated by the protocol AND un-substituted by materialize (Pull-ups, Box Jumps, 5×5 barbell lifts → F-2/F-3/F-4) reaches the athlete unfixed. The fix isn't per-exercise whack-a-mole — it's **one equipment-substitution authority** both layers (or a single post-pass) consult, covering the full exercise vocabulary.
+
+---
+
+## F-9 — Cold-start (zero-baseline) non-race RUN goal can't materialize: long-run TSS-share backstop trips  [P1]
+
+- **Symptom:** *surfaced behind F-1* (once the distance guard was fixed + deployed). Building a non-race "Get stronger" run-shaped goal on a **no-baseline** account (live, `newclaudetest`, v222) now passes F-1 but fails downstream: `200 {success:false, error_code:"downstream_function_failed", "Week 1: long-run raw TSS is 82.4% of weekly total raw TSS (limit 70%)"}`. No plan materializes (inserted goal rolled back cleanly — verified no stray data).
+- **Root cause:** `generate-combined-plan/validate-training-floors.ts:52` `LONG_RUN_TSS_SHARE_MAX = 0.7` (message at :241; wrapped by `index.ts:383`). The comment itself: *"Not a coaching constraint… a backstop that flags weeks where some other system has gone wildly wrong (e.g. 90%+ of a week's TSS on one session)."* So the cap firing is a **symptom**: on a zero-fitness account the weekly volume is degenerate-low while the long-run **duration floor** (`longRunFloorMiles`) sizes a normal long run → it eats 82.4% of the tiny week.
+- **Severity P1:** blocks the non-race builder for **brand-new, zero-history athletes** — precisely the "Get stronger" onboarding cohort the builder targets. F-1 fixed the guard; the builder still can't produce a plan for a cold-start run athlete.
+- **Hypothesis (needs the baselined account to confirm):** with real baselines/CTL the weekly volume is realistic → long-run share drops below 70% → passes. If so, the gap is "cold-start volume sizing for non-race run is incoherent" — the engine should floor weekly volume (or gentle the long run) for zero-fitness athletes so the backstop never trips. **This is exactly why the baselined throwaway account is needed to finish the F-1 end-to-end proof.** If it fails WITH baselines too, it's a deeper proxy-distance/validator bug.
+- **Note:** tri-shaped and event paths unaffected (different volume basis); this is the single-sport run + zero-CTL corner.
+
+### F-1 live-verify status (updated)
+- **Guard: PROVEN FIXED live** (v222) — the build no longer returns `missing_distance`; it passes F-1 into the engine. ✅
+- **Full materialize: still owed** — blocked on F-9 for cold-start; re-run on a **baselined** account to confirm a plan actually persists + is right-shaped (swim:out→0 swim, retest end). 486 matrix (event byte-identity) = **486/486 pass** post-deploy.
+
+---
+
+## F-8 fix — SCOUT: one equipment-substitution authority (design, not cut)
+
+**Goal:** every exercise the athlete sees is doable with their declared equipment, regardless of which protocol emitted it — closing F-2/F-3/F-4/F-5 as a class, not per-exercise.
+
+**Placement — expand `materialize-plan` `substituteExerciseForEquipment` into THE authority.** Why here: it's the last stage before the athlete sees the plan, runs **per-exercise on every strength exercise** (`index.ts:1593`/`:1776`), and sees the FINAL names + the full equipment label set + the resolved `% 1RM`. The protocol-layer flags (durability's gating) can stay as defense-in-depth, but this chokepoint is what *guarantees* coverage no matter what a protocol emits. Today it covers only face pulls / leg curls / leg extensions / lateral raises (`:905-1008`), and only substitutes *toward* bands.
+
+**What the authority must add (the gaps):**
+| Gap | Exercise(s) | Rule |
+|---|---|---|
+| F-3 | `Pull-ups` | `!hasPullUpBar` → `Band Pull-Down` (bands) / `Inverted Row` (else) |
+| F-4 | `Box Jumps` | `!hasBox` → `Broad Jumps` / `Squat Jumps` |
+| F-2 | `Back Squat`,`Bench Press`,`Barbell Row`,`Overhead Press`,`Deadlift` | `!hasBarbell && hasDumbbells` → DB variant **+ `dbPrescription` load conversion**; neither → bodyweight variant |
+| F-5 | `Band Pull-Aparts`,`Band Face Pulls`,… | `!hasResistanceBands` → `Reverse Flyes (bodyweight)` etc. (currently only ever substitutes *toward* bands) |
+
+**Three design decisions to lock before cutting:**
+1. **One gear-need map.** Promote `exerciseRequiredGearKeys` (`_shared/strength-equipment-tier.ts`) to the shared source of truth for "what gear does this exercise need," consumed by BOTH the substitution authority AND `buildStrengthEquipmentLine` — same map → no drift, and it fixes **F-6** (rings/step-ups/barbell misclassification) in the same stroke. Broaden the regexes to match unprefixed names (`Back Squat`, not just `Barbell Back Squat`).
+2. **One equipment vocabulary.** Today protocol detectors use substring-on-chips; materialize uses exact-label. Align both on the canonical `athleteEquipmentToKeys` chip→key mapping so there's one reader.
+3. **Barbell→DB is the hard part** (not a name swap): must call `dbPrescription(barbell1RM, %, dbMaxLb)` to re-prescribe load — materialize already has the `%` and the 1RMs; `dbPrescription` would need importing here. This is what makes F-2 a real cut, not a regex.
+
+**Scope:** this is a substantial cut (new substitution branches + load conversion + the shared map refactor), not a one-liner. Recommend it as its own arc: (1) extract/expand the gear-need map + vocabulary unification (closes F-6), (2) add the pull-up/box/band-away substitutions (closes F-3/F-4/F-5), (3) barbell→DB with `dbPrescription` (closes F-2). Each independently testable on the local deno sweep (re-run `strength-sweep.ts` → expect 0 unowned-gear mismatches).
