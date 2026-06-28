@@ -2202,8 +2202,11 @@ Deno.serve(async (req: Request) => {
         // Goal data was forwarded by the client (from the insert return value).
         // No DB read needed — we already have the authoritative data.
         resolvedBuildId = existing_goal_id ?? undefined;
-        // Validate fields that the plan engine requires.
-        if (String(resolvedGoal.sport || '').toLowerCase() === 'run' && !resolvedGoal.distance) {
+        // Validate fields that the plan engine requires. Non-race goals (capacity/maintenance) carry
+        // no race distance by design — the non-race short-circuit (:2346) proxies it. Guard on
+        // goal_type, mirroring the date gate at :2306. (F-1)
+        if (!isNonRaceGoalType((resolvedGoal as any).goal_type) &&
+            String(resolvedGoal.sport || '').toLowerCase() === 'run' && !resolvedGoal.distance) {
           throw new AppError('missing_distance', 'Set a race distance on this goal before building a plan.');
         }
       } else {
