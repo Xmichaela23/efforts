@@ -60,6 +60,7 @@ Retiring the legacy run-strength path (`generate-run-plan/strength-overlay.ts`) 
 
 ## Cross-references
 
+- **`SPEC-non-race-goal-plan-contract.md`** — the non-race goal→plan contract (two peer tracks: endurance + strength-as-co-headliner + the interference contract; the one-engine/two-knobs architecture). The first real non-race consumer of this roadmap's engine; **Q-088 is its hard dependency** (peer-level strength frequency). Defines what the F-9 fix must supply. See also `BUILDER-SWEEP-FINDINGS.md` (the sweep that proved non-race materializes 0/16).
 - **D-213** (`SPEC-one-engine-two-shapes.md`) — the "extend, don't fork" principle this roadmap applies to strength.
 - The seven `SCIENCE-*.md` strength docs + `STRENGTH-PROTOCOL.md` — the documented protocol foundation (what each is, who it's for, standalone vs supplementary, science status).
 - `SPEC-per-discipline-periodization.md §13.1` — the builder's posture→protocol→label contract (the vocabulary Phase-1 unifies toward).
