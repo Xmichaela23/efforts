@@ -18,6 +18,7 @@ import {
   IntentSession,
 } from '../shared/strength-system/protocols/types.ts';
 import type { PlanningMemoryContext } from '../_shared/athlete-memory.ts';
+import { canonicalizePhaseName, isRestedTerminal, protocolPhaseName } from '../_shared/periodization/index.ts';
 
 /** Interference risk threshold above which we force noDoubles. Science: AMPK/mTOR conflict is highest within 6 hrs of concurrent sessions. */
 const INTERFERENCE_RISK_NO_DOUBLES_THRESHOLD = 0.65;
@@ -271,7 +272,7 @@ export function overlayStrength(
   for (const [weekStr, sessions] of Object.entries(plan.sessions_by_week)) {
     const week = parseInt(weekStr, 10);
     const phase = getCurrentPhase(week, phaseStructure);
-    const isTaperPhase = phase.name === 'Taper';
+    const isTaperPhase = isRestedTerminal(canonicalizePhaseName(phase.name));
     if (isTaperPhase) {
       const taperParams = getTaperStrengthParams(
         week - phase.start_week + 1,
@@ -328,7 +329,10 @@ export function overlayStrength(
 
 function convertPhase(phase: Phase): StrengthPhase {
   return {
-    name: phase.name,
+    // Bridge: the shared protocols still gate taper on the literal name 'Taper' (Phase 4 moves their
+    // load curves into the periodization authority). Hand a rested terminal (taper OR retest) the name
+    // they understand so their step-down fires — mirrors combined session-factory.ts:2238.
+    name: protocolPhaseName(canonicalizePhaseName(phase.name), phase.name),
     start_week: phase.start_week,
     end_week: phase.end_week,
     weeks_in_phase: phase.end_week - phase.start_week + 1,

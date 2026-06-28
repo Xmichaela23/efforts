@@ -12,6 +12,7 @@
 
 import { BaseGenerator } from './base-generator.ts';
 import { TrainingPlan, Session, Phase, PhaseStructure, TOKEN_PATTERNS } from '../types.ts';
+import { canonicalizePhaseName, isRestedTerminal } from '../../_shared/periodization/index.ts';
 
 // Long run progression by fitness level (in miles)
 // SMOOTH progression: max +1 mile per week, recovery weeks reduce by ~30%
@@ -179,8 +180,8 @@ export class SustainableGenerator extends BaseGenerator {
 
     let usedMiles = sessions.length > 0 ? longRunMiles : 0;
 
-    // Add optional speedwork (not in recovery weeks or taper)
-    if (!isRecovery && phase.name !== 'Taper') {
+    // Add optional speedwork (not in recovery weeks or a rested terminal — taper OR retest)
+    if (!isRecovery && !isRestedTerminal(canonicalizePhaseName(phase.name))) {
       // Light speedwork: strides or fartlek (only 1x per week, optional feel)
       if (weekNumber >= 3 && runningDays >= 4) {
         const speedworkMiles = 4;
@@ -326,7 +327,7 @@ export class SustainableGenerator extends BaseGenerator {
     // respecting ACWR fatigue and volume trend signals.
     const effectiveStart = this.resolveEffectiveStartVolume(start, peak);
 
-    const taperPhase = phaseStructure.phases.find(p => p.name === 'Taper');
+    const taperPhase = phaseStructure.phases.find(p => isRestedTerminal(canonicalizePhaseName(p.name)));
     const taperStart = taperPhase?.start_week || this.params.duration_weeks;
 
     let targetMiles: number;

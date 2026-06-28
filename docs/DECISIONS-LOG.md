@@ -4500,6 +4500,18 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-217 — Strength periodization authority ("the strength island"), Phase One: typed-phase classification replaces phase-name string-matching; the run retest becomes a real rested week
+
+- **Date:** 2026-06-28
+- **What this decides:** where the run engine's *terminal* periodization decision lives, and how it is made. Promote it from each engine string-matching `phase.name === 'Taper'` to a **shared typed authority** — `supabase/functions/_shared/periodization/` — that every modality (run / tri / combined / future bike) will eventually query. Phase one seeds the **classification half only** (`PhaseKind`, `canonicalizePhaseName`, `isRestedTerminal`, `protocolPhaseName`) and migrates the live run-engine terminal consumers; later phases relocate the step-down / frequency / load logic itself (see `ISLAND-PROPOSAL.md` §5).
+- **The bug it fixes (at the root):** `generate-run-plan`'s `applyRetestTail` renamed `Taper→Retest`, but the terminal consumers string-matched the literal `'Taper'` — so a "retest" week kept speedwork ON, full strength load, and near-build mileage (a cosmetic retest; see `STATE-OF-BOARD.md` row 4, `STRENGTH-SCOUT-REPORT.md`). Phase one routes those consumers (`sustainable.ts:183/329`, `strength-overlay.ts:275/587` + the `convertPhase` protocol bridge) through `isRestedTerminal(canonicalizePhaseName(...))`. The retest now behaves as a **real rested week** — speedwork off, volume to taper level (proven live: 20mi vs build's 31mi), strength stepped down (2 full → 1 light session) — using the **existing** taper logic. Deliberately NOT a rename, and NOT importing `generate-combined-plan`'s retest intensity placeholders (those are equally unsourced — importing them would trade a cosmetic retest for an arbitrary one; the correct retest prescription is a sourcing question, gate-#2).
+- **Invariant held:** only `generate-run-plan` files + the new shared module changed; tri and combined import none of them → **byte-identical by construction** (matrix 486/486 on combined v268). Run **races** proven structurally identical (v140 vs v141, names+tags+mileage across all 12 weeks); the only call-to-call variance is pre-existing random easy-run flavor text, unrelated to this change.
+- **Architectural intent on record:** ONE strength-periodization authority every modality queries, so strength and endurance scale across run/tri/combined/bike without chasing logic through separate engines. Migrate at our pace — each phase independently shippable and revertible. **Supersedes routing-tension thread T-3:** `generate-run-plan`'s `terminalShape='retest'` path is the live non-race-run path (the (b)-run fork, D-NNN owed separately for the routing supersession of D-213/D-214).
+- **Deferred (named):** Phase 2 (relocate taper logic into the authority), Phase 3 (Q-088 frequency cap becomes an authority property), Phase 4 (protocol load curves); the `"Race Week: Light Movement"` microcopy (protocol taper-session label — correct behavior, wrong word for a retest); the combined-plan retest volume-floor leak (`science.ts:608`, scout thread D2); the endurance-number sourcing debt (`ENDURANCE-PROVENANCE.md`: 0 SOURCED — a separate, larger debt this does NOT touch).
+- **Cross-ref:** `SPEC-strength-island-phase1.md`, `ISLAND-PROPOSAL.md`, `STRENGTH-SCOUT-REPORT.md`, `STATE-OF-BOARD.md`; tests `retest-behavior.test.ts`, `retest-tail.test.ts`.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
