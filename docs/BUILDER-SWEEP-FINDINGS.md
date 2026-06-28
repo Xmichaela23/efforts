@@ -172,3 +172,63 @@ Prompted by the equipment screen (Commercial/Home + 8 gear checkboxes: barbell, 
 3. **Barbell→DB is the hard part** (not a name swap): must call `dbPrescription(barbell1RM, %, dbMaxLb)` to re-prescribe load — materialize already has the `%` and the 1RMs; `dbPrescription` would need importing here. This is what makes F-2 a real cut, not a regex.
 
 **Scope:** this is a substantial cut (new substitution branches + load conversion + the shared map refactor), not a one-liner. Recommend it as its own arc: (1) extract/expand the gear-need map + vocabulary unification (closes F-6), (2) add the pull-up/box/band-away substitutions (closes F-3/F-4/F-5), (3) barbell→DB with `dbPrescription` (closes F-2). Each independently testable on the local deno sweep (re-run `strength-sweep.ts` → expect 0 unowned-gear mismatches).
+
+---
+
+## F-10 — Non-race auto-build only supports run + triathlon; bike/swim-shaped goals are rejected  [P1]
+
+- **Symptom:** *surfaced behind F-1 on the baselined account `claudemore`* (swim+bike+strength athlete, no declared run discipline). Building a non-race "Get stronger" goal that resolves to **sport=bike** returns `200 {success:false, error_code:"unsupported_sport", "Auto-build is not yet supported for \"bike\" goals. Supported: run, triathlon."}`. A swim-shaped goal hits the same gate. No plan materializes (rolled back, no stray data).
+- **Root cause:** `create-goal-and-materialize-plan/index.ts:2322` — `if (!['run','triathlon','tri'].includes(sport)) throw unsupported_sport`. The non-race **builder offers** bike/swim-shaped goals (any discipline can be the develop/maintain focus), but the materializer only auto-builds run + triathlon.
+- **Severity P1:** a cyclist, a swimmer, or any athlete whose disciplines exclude run and aren't full-tri **cannot materialize a non-race goal at all** — the builder lets them build it, the server rejects it. The builder should either not offer unsupported sports or the materializer should support them.
+- **Sub-finding (discipline ↔ baselines mismatch):** `claudemore`'s `performance_numbers` carries run paces (`fiveK`, `easyPace`) but `arc.disciplines` = swim+bike, so the builder shows only Swim/Bike/Strength postures (no Run). The builder's discipline set comes from `arc.disciplines`, not from what baselines exist — worth a closer look.
+
+### F-1 / F-9 verification status (updated — STILL OWED)
+- **F-1 distance guard: PROVEN fixed** — passed on both `newclaudetest` and `claudemore` (no `missing_distance`).
+- **F-1 full materialize + F-9 (70% backstop with real baselines): STILL UNVERIFIED.** `newclaudetest` (cold-start) hit F-9; `claudemore` (swim+bike, no run) hits F-10 — neither reached a successful materialize. **Need a baselined account with RUN as a declared discipline (or full swim+bike+run triathlon)** so a goal resolves to a supported sport AND exercises the run long-run backstop.
+
+---
+
+# MATERIALIZE-PATH SWEEP (2026-06-28) — direct preview calls, account `claudemore` (f28c36a9, baselined; run NOT declared)
+
+**Method:** `create-goal-and-materialize-plan` with `mode:'build_existing', preview:true` + forwarded goal payload (full shape control via `goal.training_prefs.per_discipline_posture`), called in-browser with the user JWT. Preview = no persist for the non-race path (`plan_id:null` confirmed). Scope-safe: throwaway account, never `45d122e7`. **Note:** the `non_race_plan_failed` error path DID leak 2 orphan active plans (goal_id null) — deleted (HTTP 204), 0 stray remaining. **No deploy, no commits during the sweep.**
+
+## Results — NON-RACE: 0 / 16 materialized
+
+| shape | configs tried | result |
+|---|---|---|
+| **run** | tw 6/12/52, develop/maintain, completion/performance, strength on/off | **F-9** — long-run raw TSS **82.1–100%** of weekly (limit 70%). Worst: performance 92.4%, no-strength 100% |
+| **run (extreme vol)** | h4/d3, h12/d6 | **F-11** — `non_race_plan_failed` (+ leaked orphan plan) |
+| **tri** | tw 12/16/52, maintain & all-develop postures | **F-9b** — run-discipline long-run share **100%** |
+| **bike** | tw 8/12 | **F-10** — `unsupported_sport` |
+| **swim** | tw 12 | **F-10** — `unsupported_sport` |
+| **strength-only** | tw 12 | **F-10** — `unsupported_sport` |
+
+**No config of any shape, length, intent, or volume materialized a non-race plan.**
+
+## Results — RACE
+- **Tri events (70.3 / ironman):** materialize cleanly — covered by the 486/486 matrix. Sampled block: weekly TSS 499→650 with 3:1 recovery weeks, run long-run share **0.46** (healthy), tier-appropriate strength. **This is the smoking gun for F-9's root** (see below).
+- **Single-sport run races (marathon/half/10K):** route to the separate `generate-run-plan` — not exercised by this sweep (different function; a `build_existing` event call hit an FK artifact `plan_link_failed` because the event path attempts a plan insert and doesn't honor `preview`).
+- **Single-sport bike/swim races:** would hit F-10 (`create-goal:2322` allows run/triathlon only).
+
+## Findings (new / escalated)
+
+### F-9 — ESCALATE to **P0, structural**: non-race RUN goals can never materialize
+- **Symptom:** long-run raw TSS share 82–100% > 70% (`validate-training-floors.ts:52` backstop) across EVERY config. Not mitigable by hours/days/intent/posture/length/strength.
+- **Root cause (now clear from the race-vs-non-race contrast):** the **non-race plan schedules essentially only the long run** for the run discipline → it's 82–100% of the week. The **race** tri block schedules a full run week → share 0.46. So it's a **non-race plan-sizing bug** (too few non-long-run sessions), NOT a baselines/CTL issue. `validate-training-floors` is just the messenger.
+- **Residual unknown:** `claudemore` has run paces but run isn't a *declared* discipline, so run CTL may be cold-started here. But the structural contrast (race 0.46 vs non-race 1.00) makes baseline-dependence very unlikely. A run-*declared* account would fully confirm.
+
+### F-9b — NEW [P0/P1]: non-race TRI goals — run-discipline long-run share 100%
+Same root as F-9: the tri non-race plan schedules only the long run on the run discipline.
+
+### F-10 — CONFIRMED [P1]: non-race bike/swim/strength → `unsupported_sport`
+`create-goal-and-materialize-plan:2322` allows only run/triathlon. Confirmed across bike, swim, strength. The builder offers these shapes; the server rejects them.
+
+### F-11 — NEW [P2]: `non_race_plan_failed` at extreme volume + ORPHAN-PLAN LEAK
+- Non-race run at h4/d3 and h12/d6 → `non_race_plan_failed` (distinct from the share backstop).
+- **More important:** this error path **inserted a plan that then failed to link → orphan active plan (goal_id null), persisted despite `preview:true`.** Two orphans leaked in this sweep (cleaned up). The preview/rollback contract is not honored on this failure path — a real-flow stray-data risk.
+
+### F-12 — META [P0]: the non-race builder materializes 0% of goals
+F-1 unblocked the entry (distance guard), but **every shape fails behind it** (F-9 run, F-9b tri, F-10 bike/swim/strength). The non-race builder is **end-to-end non-functional** for plan creation. This is the headline: the feature shipped (client live) but cannot produce a plan.
+
+## Plan-quality (Q-class) — none triggered
+The user's ask was to flag "builds clean but looks like bad training" as Q-findings. **Nothing non-race builds**, so there's no non-race plan to assess. The one block that does build cleanly — the **race tri block** — looks like *good* training (sensible TSS ramp, 3:1 recovery, healthy long-run share, tier-appropriate strength). **No Q- findings.** The marathon and "get stronger" quality blocks requested can't be produced (get-stronger doesn't materialize; marathon is the legacy `generate-run-plan` path).
