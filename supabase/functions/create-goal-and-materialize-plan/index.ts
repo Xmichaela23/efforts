@@ -2365,6 +2365,57 @@ Deno.serve(async (req: Request) => {
       } else {
         createdGoalId = resolvedBuildId || existing_goal_id || null;
       }
+
+      // ── (b)-run: run-shaped non-race → generate-run-plan with a RETEST head ────────
+      // The combined engine is triathlon-shaped and cannot produce a single-sport run week (F-9/F-12).
+      // Route run-shaped non-race goals to the working single-sport engine with terminalShape='retest'
+      // (no peak/taper). Tri-shaped non-race falls through to buildCombinedPlan below (unchanged).
+      // See docs/SPEC-non-race-run-retest.md.
+      if (sport === 'run') {
+        const tw = Number((resolvedGoal as any)?.target_weeks) || 12;
+        const tp = (resolvedGoal?.training_prefs ?? {}) as Record<string, any>;
+        const proxyRaw = proxyDistanceForNonRaceGoal(sport, tw, fitness); // 'half_marathon' | 'marathon'
+        const runRetestBody: Record<string, any> = {
+          user_id,
+          distance: proxyRaw === 'marathon' ? 'marathon' : 'half',
+          fitness,
+          goal: 'complete',          // non-race base-building, not a speed/race target
+          duration_weeks: tw,        // length anchors on target_weeks, not a race date
+          approach: 'sustainable',   // no race peak
+          days_per_week: tp.days_per_week
+            ? `${tp.days_per_week}-${Math.min(7, Number(tp.days_per_week) + 1)}`
+            : '4-5',
+          terminalShape: 'retest',   // (b)-run head — Build → Retest, no taper/peak
+          race_date: null,
+          strength_frequency: Number(tp.strength_frequency) || 0,
+          strength_protocol: resolveNonRaceStrengthProtocol(tp.strength_protocol),
+          ...(plan_start_date ? { start_date: plan_start_date } : {}),
+          ...(bodyPreview ? { preview: true } : {}),
+        };
+        const runGen = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-run-plan', runRetestBody);
+        if (bodyPreview) {
+          return new Response(JSON.stringify({
+            success: true, mode, goal_id: createdGoalId, preview: true,
+            sport: 'run', combined: false,
+            run_preview: runGen?.preview ?? null, plan: runGen?.plan ?? null,
+          }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const runPlanId = runGen?.plan_id;
+        if (!runPlanId) throw new AppError('plan_generation_failed', runGen?.error || 'Non-race run plan returned no plan_id');
+        createdPlanId = runPlanId;
+        const { error: runLinkErr } = await supabase
+          .from('plans').update({ goal_id: createdGoalId, plan_mode: 'rolling' })
+          .eq('id', runPlanId).eq('user_id', user_id);
+        if (runLinkErr) throw new AppError('plan_link_failed', runLinkErr.message);
+        await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: runPlanId });
+        await retireCompetingActivePlans(supabase, user_id, runPlanId, { mode, existing_goal_id, replace_plan_id });
+        await bustTrainingCachesAfterPlanChange('run_plan');
+        return new Response(JSON.stringify({
+          success: true, mode, goal_id: createdGoalId, plan_id: runPlanId, sport: 'run', combined: false,
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      // ── End (b)-run; tri-shaped non-race continues to buildCombinedPlan ───────────
+
       const combinedResult = createdGoalId ? await buildCombinedPlan(
         supabase, functionsBaseUrl, serviceKey, user_id, createdGoalId, resolvedGoal!, fitness,
         combinedTransitionFromPostRace(postRaceRecovery), plan_start_date ?? null, bodyPreview, strictSchedulePrefs,

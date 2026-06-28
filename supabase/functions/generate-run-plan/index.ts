@@ -143,6 +143,7 @@ Deno.serve(async (req: Request) => {
       user_id: request.user_id,
       start_date: startDate,
       race_date: request.race_date,
+      terminalShape: request.terminalShape, // (b)-run: non-race retest head (default taper)
       race_name: request.race_name,
       current_weekly_miles: request.current_weekly_miles,
       recent_long_run_miles: request.recent_long_run_miles,
@@ -315,6 +316,15 @@ Deno.serve(async (req: Request) => {
       },
       source: 'request',
     });
+
+    // (b)-run preview: generate without persisting — no plans insert, no baseline write. Returns the
+    // full plan for inspection (used to verify non-race run materializes a non-degenerate week).
+    if (request.preview === true) {
+      return new Response(
+        JSON.stringify({ success: true, plan_id: null, preview: generatePreview(plan, phaseStructure), plan }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
 
     const { data: insertedPlan, error: insertError } = await supabase
       .from('plans')

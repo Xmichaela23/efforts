@@ -418,7 +418,31 @@ export abstract class BaseGenerator {
       recovery_weeks.push(week);
     }
 
+    // (b)-run retest head: non-race goals end in a Retest terminal, not a race Taper. Applied AFTER
+    // recovery_weeks (computed against 'Taper' above) so the exclusion stays correct, then renamed.
+    // See docs/SPEC-non-race-run-retest.md.
+    if (this.params.terminalShape === 'retest') {
+      this.applyRetestTail(phases);
+    }
+
     return { phases, recovery_weeks };
+  }
+
+  /**
+   * Convert the race tail (… Race Prep → Taper) into a non-race tail (… Build → Retest) in place,
+   * preserving week boundaries. The low-volume terminal becomes a hold-and-retest week; race-prep
+   * sharpening becomes continued build. Mirrors generate-combined-plan's `terminalShape` (D-213).
+   */
+  private applyRetestTail(phases: Phase[]): void {
+    for (const p of phases) {
+      if (p.name === 'Taper') {
+        p.name = 'Retest';
+        p.focus = 'Hold fitness + retest — light week to re-benchmark, no race taper';
+      } else if (p.name === 'Race Prep') {
+        p.name = 'Build';
+        p.focus = 'Continued build — no race-specific sharpening';
+      }
+    }
   }
 
   /**
@@ -651,8 +675,8 @@ export abstract class BaseGenerator {
     const isRecovery = this.isRecoveryWeek(weekNumber, phaseStructure);
     const phase = this.getCurrentPhase(weekNumber, phaseStructure);
     
-    // Recovery weeks and taper: use minimum days
-    if (isRecovery || phase.name === 'Taper') {
+    // Recovery weeks, taper, and the non-race retest terminal: use minimum days (light week)
+    if (isRecovery || phase.name === 'Taper' || phase.name === 'Retest') {
       return Math.min(6, min);
     }
     

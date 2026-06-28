@@ -11,6 +11,12 @@ export interface GeneratePlanRequest {
   goal: 'complete' | 'speed';
   duration_weeks: number;
   start_date?: string; // ISO date string (YYYY-MM-DD)
+  // (b)-run: 'taper' (default) = race head; 'retest' = non-race head (hold + re-benchmark terminal,
+  // no peak/taper). Defaulting to 'taper' keeps race plans byte-identical. See docs/SPEC-non-race-run-retest.md.
+  terminalShape?: 'taper' | 'retest';
+  // (b)-run: when true, generate the plan but DON'T persist (no plans insert, no baseline write) —
+  // returns { plan, preview, plan_id:null } for inspection. Default false (persist as before).
+  preview?: boolean;
   approach: 'sustainable' | 'performance_build';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
   strength_frequency?: 0 | 2 | 3;
@@ -101,6 +107,7 @@ export interface GeneratorParams {
   units?: 'imperial' | 'metric';
   start_date?: string;  // ISO date string (YYYY-MM-DD) - plan start date
   race_date?: string;   // ISO date string (YYYY-MM-DD) - race day
+  terminalShape?: 'taper' | 'retest'; // (b)-run: non-race retest head vs race taper head (default taper)
   race_name?: string;   // Optional race name (e.g., "Boston Marathon")
   // User's current weekly mileage (for scaling starting volume)
   current_weekly_miles?: number;
