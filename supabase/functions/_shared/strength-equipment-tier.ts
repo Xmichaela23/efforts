@@ -226,15 +226,21 @@ const STRENGTH_GEAR_LABEL: Record<string, string> = {
  * Map a single strength exercise name → set of canonical equipment keys it requires.
  * Order doesn't matter; the formatter de-dupes and rendering uses {@link STRENGTH_GEAR_LABEL}.
  */
-function exerciseRequiredGearKeys(name: string): string[] {
+export function exerciseRequiredGearKeys(name: string): string[] {
   const n = String(name ?? '').toLowerCase();
   if (!n) return [];
-  // Barbell-anchored compounds — rack required for back squat / OHP / standing press.
-  if (/barbell\s+back\s+squat|back\s+squat\s*\(barbell/.test(n)) return ['barbell', 'rack'];
-  if (/standing\s+barbell\s+overhead\s+press|standing\s+ohp|barbell\s+ohp|push\s+press/.test(n)) {
+  // (F-6) Names that offer an equipment CHOICE ("X or Y") — the athlete picks the variant they own,
+  // so require nothing (e.g. "Box Jumps or Broad Jumps", "Inverted Ring Row or Band Row",
+  // "Goblet Squat or Bodyweight Squat"). Must precede the single-variant patterns below.
+  if (/\bor\b/.test(n)) return [];
+  // Barbell-anchored compounds — rack required for back squat / OHP / standing press. (F-6) Match the
+  // unprefixed names the protocols actually emit (5×5: "Back Squat" / "Overhead Press" / "Deadlift"),
+  // guarding against DB/band/RDL variants that have their own rules below.
+  if (/\bback\s+squat\b/.test(n)) return ['barbell', 'rack'];
+  if ((/overhead\s+press|push\s+press|\bohp\b/.test(n)) && !/\b(db|dumbbell|band)\b/.test(n)) {
     return ['barbell', 'rack'];
   }
-  if (/conventional\s+deadlift|trap\s+bar\s+deadlift/.test(n)) return ['barbell'];
+  if (/\bdeadlift\b/.test(n) && !/\b(db|dumbbell|romanian|rdl|single-leg)\b/.test(n)) return ['barbell'];
   if (/^bench\s+press$|^bench\s+press\s+\(barbell/.test(n)) return ['barbell', 'rack', 'bench'];
   if (/barbell\s+row/.test(n)) return ['barbell'];
   if (/hip\s+thrusts?\b/.test(n)) {
@@ -253,7 +259,7 @@ function exerciseRequiredGearKeys(name: string): string[] {
   // Pull-up patterns.
   if (/^pull-?ups?\b|^pull-?ups\s+\(explosive/.test(n)) return ['pull_up_bar'];
   if (/band-?assisted\s+pull-?up/.test(n)) return ['pull_up_bar', 'bands'];
-  if (/inverted\s+(ring\s+)?rows?|ring\s+rows?/.test(n)) return ['rings'];
+  if (/ring\s+rows?/.test(n)) return ['rings']; // (F-6) explicit rings only; plain "Inverted Rows" falls through to [] ("…or band row" choices handled by the top or-guard)
   // Plyo / power.
   if (/box\s+jumps?/.test(n)) return ['box'];
   // Kettlebell-specific.
@@ -267,8 +273,8 @@ function exerciseRequiredGearKeys(name: string): string[] {
     return /cable/.test(n) ? ['cable'] : ['bands'];
   }
   if (/external\s+rotation/.test(n)) return ['bands'];
-  // Step-ups / lunges land on a bench-class platform; box jumps already handled.
-  if (/step-?ups?/.test(n)) return ['bench'];
+  // (F-6) Step-ups: any elevated surface (box / step / stair / bench) — improvisable, not a specific
+  // gear requirement → falls through to [] (was wrongly requiring a bench).
   // Bodyweight-only patterns: push-ups, plank variants, bird dog, dead bug, glute bridges,
   // calf raises, BW squat, single-leg RDL (BW), broad jumps, jump squats, plyo.
   return [];
@@ -288,7 +294,7 @@ function exerciseSuggestedOptionalGearKeys(name: string): string[] {
 }
 
 /** Athlete equipment chip → canonical key (for matching against session needs). */
-function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string> {
+export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string> {
   const out = new Set<string>();
   const n = normStrengthEquipmentStrings(strengthEquipment);
   for (const s of n) {
