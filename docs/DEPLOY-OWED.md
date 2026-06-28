@@ -1,12 +1,27 @@
 # Deploy-Owed / Post-Deploy Verification
 
-Changes committed locally but **not yet pushed/deployed**, plus verifications that can only run **against the deployed code** (not the local working tree). When a push/deploy happens, work this list: deploy the named functions, then run the post-deploy checks here. This is the bucket for "local-verified, deployed-equals-local still owed."
+Changes committed plus verifications that can only run **against the deployed code** (not the local working tree). Work this list: deploy the named functions, then run the post-deploy checks here. This is the bucket for "local-verified, deployed-equals-local still owed."
 
 > Convention: nothing here blocks local work. These are the checks that close the loop once code is live.
 
+> **STATUS (verified read-only against git + Netlify + Supabase, 2026-06-28).** The non-race-builder / 5×5 / Q-087 arc is now **DEPLOYED and the client is LIVE — the post-deploy checks are NOT yet run (blocked on a clean test account).**
+> - **Code pushed:** `origin/main == b0bc050e`. (The prior end-of-session note's "NOT pushed" was wrong — the docs push carried the whole arc to origin.)
+> - **Edge functions DEPLOYED 2026-06-28 04:27 UTC:** `generate-combined-plan` **v264**, `create-goal-and-materialize-plan` **v221**, `generate-run-plan` **v139** (all carry `b0bc050e`).
+> - **Client LIVE on Netlify** (production host = `efforts.work`, `server: Netlify`; the `vercel[bot]` GitHub deploys are a dead relic that serves nothing). Served bundle contains `goals/build` / `five_by_five` / `per_discipline_posture`. Builder is live at `/goals/build`, still **URL-only (not linked from GoalsScreen)**.
+> - **Verified live on prod (browser, test account `newclaudetest@test.com` — never `45d122e7`):** the whole builder UI chain (6 steps), the seed logic (Get stronger → swim:Out / strength:Develop), the equipment-aware durability default (bodyweight → durability, correct per `non-race-goal-seeds.ts`), the §13.2 length floor (slider min 8), `target_weeks` propagation (16→"16-week block"), commitment ("≈9 h/wk"), retest summary, and **Cut B1 forwarding** (`create-goal-and-materialize-plan` request carries `goal_type:"capacity"` + `target_weeks:12`).
+> - **Materialization checks (1–5 + Q-087) NOT run — BLOCKED on account state.** On `newclaudetest@test.com` the build returns `200 {success:false, "Set a race distance on this goal before building a plan."}` because it goes out as `mode:"build_existing"` against a phantom current-goal id (`8f1075c5…`, not in the DB) → hits the race path, not the non-race create path. The account also has no equipment (5×5 can't surface) and isn't clean (pre-existing active event goals). No stray data was created (every failed build persisted nothing). **A clean throwaway account is required to close the checks — see Next-session pickup below.**
+
+## Next-session pickup — run the post-deploy checks FRESH
+
+Do this in a new session, against the already-deployed code (v264/v221/v139), via a throwaway test account — **never** real user `45d122e7`.
+1. **Provision a CLEAN account** with a **barbell/DB equipment tier** (so 5×5 surfaces) and **no active goal / no lingering current-goal state** (the dirty-account `build_existing` artifact is what blocked tonight). Sign out and register fresh, or use a known-clean throwaway.
+2. **Re-run the five builder checks + Q-087** (the five end-to-end checks below + the Q-087 marathon Upper-Aesthetics check). Browser note: CDP mouse clicks were timing out tonight — JS `.click()` (and slider value-set + `input`/`change` dispatch) drove the flow reliably; **wait ≥10s on "Build plan" without navigating** (the engine chain takes a while and the builder does NOT auto-navigate after build).
+3. **Clean repro of the `build_existing` non-race question (the one real open concern):** confirm whether, on a CLEAN account, the non-race "Get stronger" build takes the **create-new** path (not `build_existing`) and materializes a `goal_type:capacity` plan. If a non-race goal can reach `build_existing` mode and the server still demands a race distance despite `goal_type:"capacity"`, that's a real routing gap (non-race short-circuit only wired into create-new, not build_existing) — file it. If clean-account create-new works (as Cut 3b did), the build_existing failure was a dirty-account artifact only.
+4. **On green:** update this file + ENGINE-STATE to "fully live + verified," with the materialized-plan evidence (swim:out → 0 swim, target_weeks→length, retest end, 5×5 sessions on the equipped account).
+
 ---
 
-## Owed
+## Owed (the checks — pending the clean account above)
 
 ### Q-087 fix — deploy `generate-run-plan`, then confirm marathon Upper Aesthetics ships its upper session
 - **Deploy:** `generate-run-plan` (function) — carries the `strength-overlay.ts:620` filter removal.
