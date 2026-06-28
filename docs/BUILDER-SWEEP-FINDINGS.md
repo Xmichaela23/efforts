@@ -23,6 +23,7 @@ Survey of the non-race builder + strength-prescription engine, started 2026-06-2
       String(resolvedGoal.sport || '').toLowerCase() === 'run' && !resolvedGoal.distance) { … }
   ```
   `isNonRaceGoalType` is already imported (line 45). Check the DB-lookup branch (2223-2226) too: it rejects non-event with `'Only event goals can auto-build'` (2223) — if a non-race build can ever reach that branch (goal not forwarded), it's a second gap.
+- **✅ FIXED (2026-06-28):** both doors closed via one shared `buildExistingGuardError()` in `non-race-routing.ts`. Commit `254271c9` (forwarded-branch one-liner) → `e5a2fca2` (extracted shared guard + 12-case test battery; closed the DB-lookup second gap too). Local: `non-race-routing.test.ts` 9/9, `deno check` +0 errors, events byte-identical. **Live-verify owed post-deploy:** clean materialize (both doors) + 486 matrix.
 
 ---
 <!-- new findings appended below -->
@@ -94,7 +95,7 @@ Not a bug — the counter-example proving the contract is implementable. `founda
 
 | # | Finding | Sev | One-line fix |
 |---|---------|-----|--------------|
-| **F-1** | Non-race run goal can't materialize — `build_existing` demands race distance | **P0** | add `!isNonRaceGoalType(goal_type)` guard at `create-goal-and-materialize-plan/index.ts:2206` |
+| **F-1** | Non-race run goal can't materialize — `build_existing` demands race distance | **P0** | ✅ **FIXED** `254271c9`+`e5a2fca2` (shared `buildExistingGuardError`, both doors, 9/9 tests); live-verify owed |
 | **F-2** | `five_by_five` (default for `dumbbell_based`) prescribes barbell-only lifts | **P1** | gate 5×5 to `full_barbell`; give `dumbbell_based` a DB developer default |
 | **F-3** | `neural_speed` + `upper_aesthetics` prescribe Pull-ups though `hasPullUpBar` IS populated from the user's checkbox → **broken user promise** (F-8) | **P1** | shared `hasPullUpBar ? Pull-ups : Band Pull-Down` gate |
 | **F-4** | `upper_aesthetics` Box Jumps un-gated — and no box checkbox exists, so always un-doable for home athletes (F-8) | **P2** | gate → Broad/Squat Jumps fallback; add box checkbox if box work matters |
