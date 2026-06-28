@@ -1,7 +1,7 @@
 // D-214 — prove selectGoalsForCombined's EVENT path is byte-identical to the original inline logic,
 // and that the non-race path lets a lone goal through. Run: ~/.deno/bin/deno test --no-check <this>
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol } from './non-race-routing.ts';
+import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, buildExistingGuardError } from './non-race-routing.ts';
 
 type G = { id: string };
 
@@ -107,4 +107,26 @@ Deno.test('resolveNonRaceStrengthProtocol — honors a registered protocol; inva
   assertEquals(resolveNonRaceStrengthProtocol(undefined), 'durability');
   assertEquals(resolveNonRaceStrengthProtocol('not_a_protocol'), 'durability');
   assertEquals(resolveNonRaceStrengthProtocol('minimum_dose'), 'durability'); // excluded from allow-list → falls back
+});
+
+// F-1 — buildExistingGuardError: the single guard both build_existing doors call.
+Deno.test('buildExistingGuardError — event/non-race eligibility, distance + status gates', () => {
+  // RACE (event)
+  assertEquals(buildExistingGuardError({ goal_type: 'event', sport: 'run', distance: 'marathon' }), null);
+  assertEquals(buildExistingGuardError({ goal_type: 'event', sport: 'run', distance: null })?.code, 'missing_distance');
+  assertEquals(buildExistingGuardError({ goal_type: 'event', sport: 'triathlon', distance: null }), null); // distance gate is run-only
+
+  // NON-RACE — the F-1 fix: no distance required
+  assertEquals(buildExistingGuardError({ goal_type: 'capacity', sport: 'run', distance: null }), null);
+  assertEquals(buildExistingGuardError({ goal_type: 'maintenance', sport: 'run', distance: null }), null);
+  assertEquals(buildExistingGuardError({ goal_type: 'capacity', sport: 'triathlon', distance: null }), null);
+
+  // INELIGIBLE goal types (preserves old :2226 reject, incl. null)
+  assertEquals(buildExistingGuardError({ goal_type: 'pr', sport: 'run', distance: 'marathon' })?.code, 'invalid_goal_type');
+  assertEquals(buildExistingGuardError({ goal_type: null, sport: 'run', distance: 'marathon' })?.code, 'invalid_goal_type');
+
+  // STATUS gate — only when checkStatus (DB-lookup branch); forwarded path ignores status
+  assertEquals(buildExistingGuardError({ goal_type: 'event', sport: 'run', distance: 'marathon', status: 'completed' }, { checkStatus: true })?.code, 'goal_not_active');
+  assertEquals(buildExistingGuardError({ goal_type: 'event', sport: 'run', distance: 'marathon', status: 'completed' }), null); // no checkStatus → ignored
+  assertEquals(buildExistingGuardError({ goal_type: 'event', sport: 'run', distance: 'marathon', status: 'active' }, { checkStatus: true }), null);
 });

@@ -53,6 +53,31 @@ export function isNonRaceGoalType(rowGoalType: unknown): boolean {
 }
 
 /**
+ * Build-eligibility guard for `build_existing` mode — the SINGLE source of truth for "can this goal
+ * auto-build a plan?". Returns {code,message} to throw, or null when OK. Both branches of the
+ * build_existing handler (forwarded-goal fast path + DB-lookup fallback) call this, so the non-race
+ * exemption can never drift between the two doors (F-1 trap-door class). Each clause preserves the
+ * original inline semantics, adding only the `!nonRace` exemption (capacity/maintenance carry no race
+ * distance by design — proxied downstream). Events evaluate byte-identically.
+ */
+export function buildExistingGuardError(
+  goal: { goal_type?: unknown; sport?: unknown; distance?: unknown; status?: unknown },
+  opts: { checkStatus?: boolean } = {},
+): { code: string; message: string } | null {
+  const nonRace = isNonRaceGoalType(goal.goal_type);
+  if (!nonRace && goal.goal_type !== 'event') {
+    return { code: 'invalid_goal_type', message: 'Only event or non-race goals can auto-build' };
+  }
+  if (opts.checkStatus && (goal.status || 'active') !== 'active') {
+    return { code: 'goal_not_active', message: 'Goal must be active to build a plan' };
+  }
+  if (!nonRace && String(goal.sport || '').toLowerCase() === 'run' && !goal.distance) {
+    return { code: 'missing_distance', message: 'Set a race distance on this goal before building a plan.' };
+  }
+  return null;
+}
+
+/**
  * D-213 Cut 5 (A) — the PROXY distance for a non-race goal.
  *
  * IMPORTANT, read before changing: this is NOT a capacity target, and it is NOT what makes a non-race

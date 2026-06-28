@@ -42,7 +42,7 @@ import {
   readSwimsPerWeekForOptimizer,
 } from '../_shared/tri-optimizer-prefs.ts';
 // D-214: non-race routing helpers (extracted + unit-tested; the wrapper itself can't run locally).
-import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol } from './non-race-routing.ts';
+import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, buildExistingGuardError } from './non-race-routing.ts';
 import {
   deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
@@ -2202,13 +2202,10 @@ Deno.serve(async (req: Request) => {
         // Goal data was forwarded by the client (from the insert return value).
         // No DB read needed — we already have the authoritative data.
         resolvedBuildId = existing_goal_id ?? undefined;
-        // Validate fields that the plan engine requires. Non-race goals (capacity/maintenance) carry
-        // no race distance by design — the non-race short-circuit (:2346) proxies it. Guard on
-        // goal_type, mirroring the date gate at :2306. (F-1)
-        if (!isNonRaceGoalType((resolvedGoal as any).goal_type) &&
-            String(resolvedGoal.sport || '').toLowerCase() === 'run' && !resolvedGoal.distance) {
-          throw new AppError('missing_distance', 'Set a race distance on this goal before building a plan.');
-        }
+        // Build-eligibility guard — shared with the DB-lookup branch so the non-race exemption can't
+        // drift between the two doors (F-1). Forwarded goals are freshly inserted (active) → no status check.
+        const fwdGuardErr = buildExistingGuardError(resolvedGoal as any);
+        if (fwdGuardErr) throw new AppError(fwdGuardErr.code, fwdGuardErr.message);
       } else {
         // No goal data forwarded — fall back to a DB lookup (covers calls from other clients,
         // webhooks, or the Goals screen "Build Plan" button which doesn't forward goal data).
@@ -2223,11 +2220,10 @@ Deno.serve(async (req: Request) => {
           console.error('[create-goal] goal_not_found', { existing_goal_id, user_id, err: existingGoalErr?.message });
           throw new AppError('goal_not_found', existingGoalErr?.message || 'Goal not found', 404);
         }
-        if (existingGoal.goal_type !== 'event') throw new AppError('invalid_goal_type', 'Only event goals can auto-build');
-        if ((existingGoal.status || 'active') !== 'active') throw new AppError('goal_not_active', 'Goal must be active to build a plan');
-        if (String(existingGoal.sport || '').toLowerCase() === 'run' && !existingGoal.distance) {
-          throw new AppError('missing_distance', 'Set a race distance on this goal before building a plan.');
-        }
+        // Build-eligibility guard — same predicate as the forwarded branch; status checked here since
+        // a DB-looked-up goal may be inactive (the forwarded path's goal was just inserted). (F-1)
+        const dbGuardErr = buildExistingGuardError(existingGoal, { checkStatus: true });
+        if (dbGuardErr) throw new AppError(dbGuardErr.code, dbGuardErr.message);
         resolvedBuildId = String(existing_goal_id);
         resolvedGoal = {
           name: existingGoal.name,
