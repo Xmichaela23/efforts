@@ -2397,6 +2397,27 @@ Deno.serve(async (req: Request) => {
           ...(plan_start_date ? { start_date: plan_start_date } : {}),
           ...(bodyPreview ? { preview: true } : {}),
         };
+
+        // Q-088 (D-220): the (b)-run path IS the non-race run engine (the run-fork the record
+        // correction T-3 is about). Thread the endurance (run) posture so generate-run-plan's
+        // frequency policy can permit freq-4, and apply the strength-focus lane upgrade when the
+        // goal qualifies (endurance held + strength develops). Absent posture ≡ develop (safe).
+        // THREAD-ONLY — no UI fader yet (engine-first, like E3b/D-219).
+        const runDisciplinePosture = sanitizePerDisciplinePosture(
+          tp.per_discipline_posture as Record<string, unknown> | undefined,
+        );
+        if (runDisciplinePosture?.run) {
+          runRetestBody.endurance_posture = runDisciplinePosture.run;
+        }
+        const focus = resolveStrengthFocusMode(runDisciplinePosture, runRetestBody.strength_protocol);
+        if (focus) {
+          runRetestBody.strength_protocol = focus.protocol;
+          runRetestBody.strength_frequency = focus.frequency;
+          console.log(
+            `[create-goal] Q-088 strength-focus mode (b)-run: ${focus.protocol} @ freq ${focus.frequency} (endurance ${focus.endurancePosture})`,
+          );
+        }
+
         const runGen = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-run-plan', runRetestBody);
         if (bodyPreview) {
           return new Response(JSON.stringify({
@@ -3088,33 +3109,9 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Q-088 (D-220): the endurance (run) posture gates the strength-frequency ceiling.
-    // Thread it so the run engine's frequency policy can permit freq-4 (strength-focus
-    // mode). Absent ≡ develop (safe) on the engine side. THREAD-ONLY — no UI fader yet.
-    const runDisciplinePosture = sanitizePerDisciplinePosture(
-      resolvedGoal?.training_prefs?.per_discipline_posture as Record<string, unknown> | undefined,
-    );
-    if (runDisciplinePosture?.run) {
-      generateBody.endurance_posture = runDisciplinePosture.run;
-    }
-
     if (resolvedGoal?.training_prefs?.strength_protocol && resolvedGoal.training_prefs.strength_protocol !== 'none') {
       generateBody.strength_protocol = resolvedGoal.training_prefs.strength_protocol;
       generateBody.strength_frequency = resolvedGoal.training_prefs.strength_frequency || 2;
-
-      // Q-088 (D-220): strength-focus mode — endurance held + strength develops →
-      // upgrade the chosen developer to its 4-day U/L/U/L lane @ freq 4 (the producer
-      // that supplies what the frequency policy permits). Lane follows the developer
-      // (five_by_five→build, neural_speed→power). No-op for ineligible developers.
-      const focus = resolveStrengthFocusMode(runDisciplinePosture, generateBody.strength_protocol);
-      if (focus) {
-        generateBody.strength_protocol = focus.protocol;
-        generateBody.strength_frequency = focus.frequency;
-        console.log(
-          `[create-goal] Q-088 strength-focus mode: ${focus.protocol} @ freq ${focus.frequency} (endurance ${focus.endurancePosture})`,
-        );
-      }
-
       const runEquipmentType = resolveStrengthEquipmentTypeForPlan(
         resolvedGoal?.training_prefs?.equipment_type,
         baseline?.equipment?.strength ?? [],
