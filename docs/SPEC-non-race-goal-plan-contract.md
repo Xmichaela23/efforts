@@ -91,6 +91,7 @@ For each: **intent**, **endurance track**, **strength track** (peer program), **
 - **MUST differ from Build endurance.** Currently both seed identically (`non-race-goal-seeds.ts:209-213`) → the menu lies. **Real bug, part of the F-9 arc.**
 
 ### 3. Get stronger
+- **✅ CELLS APPROVED 2026-06-29 — filled + sourced in `SPEC-getstronger-contract-row.md` (first non-race contract row + the F-9 plumbing cut sheet). Copy locked to STRENGTH/5×5 language (NOT power — that routes to the build lane; a power goal is a separate tile, later).**
 - **Intent:** force production — get measurably stronger without chasing size. **Dead-center the Efforts thesis.**
 - **Endurance track:** maintenance — held so strength can lead. (Endurance is the support act *here* — the one goal where it inverts.)
 - **Strength track:** the lead — linear/strength progression (`five_by_five` → the ladder), at real frequency (needs Q-088).
