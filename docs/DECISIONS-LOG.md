@@ -4529,6 +4529,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-219 — E3b: the hours budget sizes the non-race run week (budget-anchored volume), within RUN-PROTOCOL bounds, glass-box on excess; one budget number, strength reserved off the top
+
+- **Date:** 2026-06-28
+- **What this decides:** how much a single-sport run non-race week trains. **Answer: the athlete's weekly TIME budget (`weekly_hours`) drives the weekly target (hours→miles via pace), replacing the placeholder `WEEKLY_MILEAGE`/`LONG_RUN_PROGRESSION` tables.** Realizes `SPEC-e3b-bottom-up-volume.md` (budget-anchored model — supersedes the overturned "bottom-up from the long-run ramp" draft).
+- **Part 1 — budget sizes the week, legally:** weekly target = `runHrs × 60 ÷ pace` (pace from VDOT/E3a, fitness-default fallback). Sized **within RUN-PROTOCOL's shape rules**: long run distance-precise (§4.5 spine ramp, `_shared/endurance/volume.ts`), easy runs 3–5mi (§5.2) on the **≤3 Mon/Wed/Fri slots** (`assignDaysToSessions`). Budget beyond what a legal week holds is **surfaced glass-box** (`plan.volume_notes`) — never crammed into oversized "easy" runs, never silently exceeded. **Gated on `weekly_hours` present** → races/no-budget callers hit the legacy tables (the no-budget default) and stay byte-identical. `sustainable.ts`.
+- **Part 2 — one budget, no double-count:** strength reserved off the top (`strength_frequency × ~1hr`, replacing the `STRENGTH_PROGRAM_HRS` placeholder), endurance = remainder, run/ride split by `run_lean` (run-only = 1.0). `budgetSplit()` guarantees `reserveHrs + runHrs + rideHrs === weekly_hours` exactly (rideHrs is the remainder, no FP drift). `rideHrs` computed + threaded now (no consumer) so the future bike engine plugs in with zero rework.
+- **Coefficient picked deliberately:** `EASY_SLOTS = 3` mirrors the Mon/Wed/Fri day grid in `assignDaysToSessions`. **Not baked as fixed-forever** — "budget drives day-count" (more hours → more days, not just a glass-box flag) is a deliberately-deferred later lever. Strength reserve = `frequency × 1.0h` (the near-fixed reservation, SPEC §1).
+- **Verification:** 20/20 `generate-run-plan` tests (incl. the §4 sum-acceptance sweep, under-utilization→glass-box, no-session-violates-its-bound). **Proven in the live Deno runtime** via a preview probe (real `index.ts`, injected budget, no DB write): `8h = strength 3h + run 5h + ride 0h`, run week sized to 5h, legal sessions, glass-box on the excess — matched the engine prediction.
+- **Deploy status (IMPORTANT):** committed + pushed — `4a9a63e8` (Part 1), `f7377311` (Part 2). **NOT deployed.** Live `generate-run-plan`/`create-goal` still run the old versions, **by deliberate choice (engine-first):** deploy when the budget has a real source (the intake faders supply it), so it lands on a reachable feature, not a room with no door. Proven via probe instead of prod.
+- **Cross-ref:** `SPEC-e3b-bottom-up-volume.md`, `ISLANDS-ORIENTATION.md`, E3a zones (`94f1c58f`), the spine (`_shared/endurance/`). Deferred: faders supply the budget; completion-race volume move (SPEC §7); the day-count lever; bike consumes `rideHrs`. See OPEN-QUESTIONS Q-091.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

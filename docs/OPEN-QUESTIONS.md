@@ -1171,6 +1171,28 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-091 — E3b budget-anchored volume: the deferred wiring to make it reachable + complete
+
+- **Status:** filed 2026-06-28 · **deliberately deferred, not bugs** (the engine is built, committed, pushed, proven live — D-219 — but unreachable until these land).
+- **The deferrals:**
+  1. **Faders supply the budget.** The engine consumes `weekly_hours`, but it arrives from `training_prefs.weekly_hours_available`, which the intake faders (`src/lib/non-race-intake.ts allocateTime`) don't set yet. Tonight the budget was *injected* (preview probe). Until the faders are wired (and the builder linked from GoalsScreen — still URL-only at `/goals/build`), a real plan falls to the legacy no-budget tables. **This is why E3b is NOT deployed** — engine-first, deploy when there's a real source.
+  2. **Completion-race volume move (SPEC §7).** E3b is non-race only; the race path (`create-goal generateBody`) doesn't pass `weekly_hours`, so completion races still use the legacy table. Moving them is a thread + guard-test (D-216 pattern).
+  3. **Budget-drives-day-count lever.** `EASY_SLOTS = 3` mirrors the Mon/Wed/Fri grid; a big budget trips the glass-box flag instead of adding days. "More hours → more days" is the real resolution — a later lever, deliberately not baked as fixed-forever.
+  4. **Bike consumes `rideHrs`.** Computed + threaded now (run-only → 0); no bike engine yet.
+- **Cross-ref:** D-219, `SPEC-e3b-bottom-up-volume.md`, `ISLANDS-ORIENTATION.md`.
+
+---
+
+## Q-092 — Admin "Import JSON Plan → plans" runs on the LEGACY library lineage, not the current goal/token engine
+
+- **Status:** filed 2026-06-28 · **unverified architecture seam — flagged, not traced.**
+- **The seam:** the admin importer lands a pre-made plan in `plans` and maps it onto the user's baselines via the **older library infrastructure** (`src/services/plans/` — `normalizer.ts`, the `bake`/templates/pools system, `universal_plan.schema.json`), which **predates** the goal engine + the edge `materialize-plan` token expander. Tonight's hand-authored Hyrox week was verified (tokens, `strength_exercises`, bare-load passthrough) against **`materialize-plan` (the current engine)** — those guarantees **may not transfer** if the legacy library mapper materializes it instead. Untraced.
+- **The question:** when an admin-imported `plans` row is assigned/materialized onto baselines, which mapper fires — legacy `src/services/plans/` or edge `materialize-plan`? Resolve empirically (assign it, inspect the materialized week) before trusting hand-imported plans, or trace the library path.
+- **Related modeling gap (Hyrox / compromised circuits):** one session = one discipline (ingest routes to a single analyzer; `computed.steps` is single-discipline). A run↔strength interleaved circuit has **no first-class home** — the inter-station runs materialize as run intervals with strength crammed into "rest" + prose, or flip to strength-primary and the runs drop to prose. A true hybrid/circuit primitive (interleaved steps + transitions, Garmin-multisport-shaped) is a real feature, not a hack. Tonight's Hyrox JSON is staged at `~/Desktop/hyrox-week-hack.json` (valid JSON) — a contained, labeled one-off, NOT a library template.
+- **Cross-ref:** `src/services/plans/normalizer.ts`, `materialize-plan/index.ts`, `scripts/bake-one.mjs`, D-219.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

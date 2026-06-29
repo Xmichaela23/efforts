@@ -73,7 +73,7 @@ The project's own written record still describes an **old path we abandoned for 
 
 **Wins:**
 - **LIVE:** run non-race plans prescribe real HR + pace zones, resolved from baselines the way the baselines screen does (manual → learned → age-estimated → RPE fallback). The `hr-zones` + `pace-zones` halves are plugged in.
-- **BUILT, NOT WIRED:** `volume.ts`. The engine still uses the placeholder mileage tables (`WEEKLY_MILEAGE`, `LONG_RUN_PROGRESSION` in `sustainable.ts`). Wiring volume is the next cut — and the agreed anchor is the **hours budget**, not the long-run ramp alone.
+- **WIRED (E3b, 2026-06-28):** the hours budget sizes the non-race run week — `volume.ts` (long-run ramp) + a budget→miles conversion via pace, within RUN-PROTOCOL bounds (easy 3–5mi on ≤3 slots), glass-box on excess (`plan.volume_notes`), strength reserved off the top. Committed + pushed (`4a9a63e8`/`f7377311`), proven live via preview probe, **NOT yet deployed** (engine-first — deploy when the intake faders supply the budget). The placeholder `WEEKLY_MILEAGE`/`LONG_RUN_PROGRESSION` tables are now the **no-budget fallback only**. See D-219.
 
 **Consumers (wired):** `generate-run-plan/generators/sustainable.ts` only (zones).
 
