@@ -13,6 +13,21 @@
 
 ---
 
+## Standalone strength = ALWAYS BALANCED (locks D-220; resolves audit gap #6)
+
+**Decision 2026-06-29 (Michael):** standalone strength is **always a balanced U/L/U/L** — real upper, never leg-dominant. The D-220 build lane already realizes this:
+- **Upper:** Bench Press · Barbell Row · Overhead Press · Pull-Up — compound press/pull, horizontal + vertical.
+- **Lower:** Back Squat · Romanian Deadlift · Deadlift.
+- **All compound, posture-justified** (rows/pull-ups = posterior chain/posture for running; presses = position-holding for the bike). **Zero isolation / mirror work.**
+
+**The aesthetic ("the look") comes FREE from balanced heavy compound work** — it is NOT a separate lane. Product may skew *which compounds and how framed* lightly toward it, but:
+- **HARD LINE:** upper stays **compound + posture-justified** (press / pull / posterior-chain), never isolation. The skew is framing, not an aesthetic lane.
+- **Copy is functional/posture only** — the aesthetic payoff is **never stated in copy.**
+- **`upper_aesthetics` stays supplementary** (per `SCIENCE-upper-aesthetics-hypertrophy.md`) — **never promoted to the developer.**
+- **Audit gap #6 ("look better" / hypertrophy) = RESOLVED-BY-BALANCE → stays PARKED. No hypertrophy build.** The balance is the aesthetic engine.
+
+---
+
 ## Track 1 — STRENGTH (the lead)
 | Cell | Value | CITED / CONVENTION |
 |---|---|---|
