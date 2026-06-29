@@ -2389,6 +2389,10 @@ Deno.serve(async (req: Request) => {
           race_date: null,
           strength_frequency: Number(tp.strength_frequency) || 0,
           strength_protocol: resolveNonRaceStrengthProtocol(tp.strength_protocol),
+          // E3b — the run-endurance time budget sizes the week. Part 1 passes the athlete's stated
+          // weekly hours as the run-endurance slice (strength reservation/split is Part 2). Absent →
+          // the engine falls back to the legacy table (races/no-budget byte-identical).
+          ...(Number(tp.weekly_hours_available) > 0 ? { weekly_hours: Number(tp.weekly_hours_available) } : {}),
           ...(plan_start_date ? { start_date: plan_start_date } : {}),
           ...(bodyPreview ? { preview: true } : {}),
         };

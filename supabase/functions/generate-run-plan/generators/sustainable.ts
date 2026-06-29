@@ -13,7 +13,7 @@
 import { BaseGenerator } from './base-generator.ts';
 import { TrainingPlan, Session, Phase, PhaseStructure, TOKEN_PATTERNS } from '../types.ts';
 import { canonicalizePhaseName, isRestedTerminal } from '../../_shared/periodization/index.ts';
-import { hrZones, paceZonesFromVdot } from '../../_shared/endurance/index.ts';
+import { hrZones, paceZonesFromVdot, longRunMilesForWeek, rampWeeksForPhase, type PhaseKey } from '../../_shared/endurance/index.ts';
 import { formatPace } from '../effort-score.ts';
 
 // Long run progression by fitness level (in miles)
@@ -94,12 +94,13 @@ export class SustainableGenerator extends BaseGenerator {
     const phaseStructure = this.determinePhaseStructure();
     const sessions_by_week: Record<string, Session[]> = {};
     const weekly_summaries: Record<string, any> = {};
+    const volume_notes: string[] = []; // E3b glass-box: budget-vs-legal-week reconciliation surfaced here
 
     for (let week = 1; week <= this.params.duration_weeks; week++) {
       const phase = this.getCurrentPhase(week, phaseStructure);
       const isRecovery = this.isRecoveryWeek(week, phaseStructure);
 
-      const weekSessions = this.generateWeekSessions(week, phase, phaseStructure, isRecovery);
+      const weekSessions = this.generateWeekSessions(week, phase, phaseStructure, isRecovery, volume_notes);
       sessions_by_week[week.toString()] = weekSessions;
       weekly_summaries[week.toString()] = this.generateWeeklySummary(
         week, weekSessions, phase, isRecovery
@@ -115,7 +116,8 @@ export class SustainableGenerator extends BaseGenerator {
         run: ['easyPace'] // Only need easy pace - effort-based training
       },
       weekly_summaries,
-      sessions_by_week
+      sessions_by_week,
+      ...(volume_notes.length ? { volume_notes } : {})
     };
   }
 
@@ -147,18 +149,27 @@ export class SustainableGenerator extends BaseGenerator {
     weekNumber: number,
     phase: Phase,
     phaseStructure: PhaseStructure,
-    isRecovery: boolean
+    isRecovery: boolean,
+    volumeNotes: string[] = []
   ): Session[] {
     const sessions: Session[] = [];
     // Use week-specific day count (fewer days on recovery weeks)
     const runningDays = this.getRunningDaysForWeek(weekNumber, phaseStructure);
 
-    // Get target weekly mileage
-    const weeklyMiles = this.calculateWeeklyMileage(weekNumber, phase, isRecovery, phaseStructure);
-    
-    // Get long run distance
-    const longRunMiles = this.getLongRunMiles(weekNumber);
-    
+    // E3b: budget-anchored when a weekly_hours budget is supplied (non-race); else the legacy tables
+    // (the no-budget default — races/no-budget callers stay byte-identical). SPEC-e3b-bottom-up-volume.md.
+    const budgeted = (this.params.weekly_hours ?? 0) > 0;
+
+    // Weekly target — hours budget (→ miles via pace) when budgeted, else the legacy table.
+    const weeklyMiles = budgeted
+      ? this.budgetWeeklyMiles(isRecovery)
+      : this.calculateWeeklyMileage(weekNumber, phase, isRecovery, phaseStructure);
+
+    // Long run — distance-precise spine ramp when budgeted, else the legacy table.
+    const longRunMiles = budgeted
+      ? this.spineLongRunMiles(weekNumber, phase)
+      : this.getLongRunMiles(weekNumber);
+
     // Check race proximity for each day - this enables smart tapering
     const raceProximity = this.checkWeekRaceProximity(weekNumber);
     
@@ -192,8 +203,22 @@ export class SustainableGenerator extends BaseGenerator {
       }
     }
 
-    // Fill remaining days with easy runs
-    this.fillWithSimpleEasyRuns(sessions, runningDays, weeklyMiles - usedMiles);
+    // Glass-box reconciliation (never cram): a LEGAL week = current sessions + easy runs maxed at the
+    // protocol's 5mi ceiling on the ≤3 easy-day slots (Mon/Wed/Fri). Surface the gap when the budget
+    // wants more than that holds, or when the distance-precise long run alone overruns the budget.
+    if (budgeted) {
+      const easyDays = Math.max(0, Math.min(3, runningDays - sessions.length));
+      const legalMax = usedMiles + easyDays * 5; // protocol §5.2 easy ceiling
+      if (longRunMiles > weeklyMiles) {
+        volumeNotes.push(`Week ${weekNumber}: the distance-precise long run (${longRunMiles}mi) alone exceeds this week's time budget (${weeklyMiles}mi). Long run kept; week kept minimal — raise hours or accept a larger long-run share.`);
+      } else if (weeklyMiles > legalMax + 1) {
+        const overHrs = (weeklyMiles - legalMax) * this.enduranceEasyPaceMinPerMile() / 60;
+        volumeNotes.push(`Week ${weekNumber}: your time budget allows ~${overHrs.toFixed(1)}h more than a legal ${runningDays}-day week holds (long run + ${easyDays} easy runs ≤5mi). Add a training day or accept a lighter week — not crammed.`);
+      }
+    }
+
+    // Fill remaining days with easy runs (budget-aware: easy ∈ [3,5]mi on ≤3 slots — never cram)
+    this.fillWithSimpleEasyRuns(sessions, runningDays, weeklyMiles - usedMiles, budgeted);
 
     // Assign days
     return this.assignDaysToSessions(sessions, runningDays);
@@ -554,18 +579,71 @@ export class SustainableGenerator extends BaseGenerator {
    * Fill remaining days with easy runs
    */
   private fillWithSimpleEasyRuns(
-    sessions: Session[], 
+    sessions: Session[],
     targetDays: number,
-    remainingMiles: number
+    remainingMiles: number,
+    respectBudget: boolean = false
   ): void {
     const remainingDays = Math.max(0, targetDays - sessions.length);
     if (remainingDays <= 0) return;
 
+    // E3b: budget-anchored — cap easy runs by the remaining time budget; never silently exceed it.
+    // If the distance-precise long run already consumed the budget, add nothing.
+    if (respectBudget) {
+      if (remainingMiles < 3) return; // no budget left for even one (legal, ≥3mi) easy run
+      // PROTOCOL §5.2: easy runs are 3–5mi (genuinely easy, Z1–Z2). Easy days follow the Mon/Wed/Fri
+      // grid in assignDaysToSessions → at most 3 slots. Size within [3,5] toward the budget; NEVER
+      // inflate an easy run past 5mi to cram the budget — the caller surfaces any excess glass-box.
+      const EASY_SLOTS = 3;
+      const numEasy = Math.min(EASY_SLOTS, remainingDays, Math.max(1, Math.floor(remainingMiles / 3)));
+      if (numEasy <= 0) return;
+      const easyMiles = Math.max(3, Math.min(5, Math.round(remainingMiles / numEasy)));
+      for (let i = 0; i < numEasy; i++) {
+        sessions.push(this.createSimpleEasyRun(easyMiles));
+      }
+      return;
+    }
+
     const milesPerDay = Math.max(3, Math.round(remainingMiles / remainingDays));
     const easyMiles = Math.max(3, Math.min(6, milesPerDay)); // Cap at 6 miles for easy runs
-    
+
     for (let i = 0; i < remainingDays; i++) {
       sessions.push(this.createSimpleEasyRun(easyMiles));
     }
+  }
+
+  // ── E3b helpers: budget-anchored sizing (active only when weekly_hours is supplied) ──
+
+  /** Map the generator's phase name → the shared volume PhaseKey (spine vocabulary). */
+  private toVolumePhaseKey(name: string): PhaseKey {
+    switch (name) {
+      case 'Base': return 'base';
+      case 'Speed': return 'build';
+      case 'Race Prep': return 'race_specific';
+      case 'Build': return 'race_specific'; // retest rename of Race Prep — same ramp position
+      case 'Taper': return 'taper';
+      case 'Retest': return 'retest';
+      default: return 'base';
+    }
+  }
+
+  /** Athlete easy pace (min/mi) — from VDOT (E3a zone inputs) when present, else the fitness default. */
+  private enduranceEasyPaceMinPerMile(): number {
+    if (this.params.vdot && this.params.vdot > 0) return paceZonesFromVdot(this.params.vdot).base / 60;
+    return this.getEasyPaceMinPerMile();
+  }
+
+  /** Weekly mileage from the time budget (hours → miles via pace); recovery weeks deloaded. */
+  private budgetWeeklyMiles(isRecovery: boolean): number {
+    const hrs = this.params.weekly_hours ?? 0;
+    const miles = (hrs * 60) / this.enduranceEasyPaceMinPerMile();
+    return Math.round(miles * (isRecovery ? 0.7 : 1.0));
+  }
+
+  /** Distance-precise long run from the shared spine ramp (RUN-PROTOCOL §4.5). */
+  private spineLongRunMiles(weekNumber: number, phase: Phase): number {
+    const key = this.toVolumePhaseKey(phase.name);
+    const weekInPhase = Math.max(1, weekNumber - phase.start_week + 1);
+    return longRunMilesForWeek(this.params.distance, key, weekInPhase, rampWeeksForPhase(key));
   }
 }

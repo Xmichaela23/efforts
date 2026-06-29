@@ -201,6 +201,8 @@ Deno.serve(async (req: Request) => {
       max_hr: zoneMaxHr,
       resting_hr: zoneRestingHr,
       vdot: zoneVdot,
+      weekly_hours: request.weekly_hours, // E3b — run-endurance time budget; sizes the week when present
+
       goal: request.goal,
       duration_weeks: request.duration_weeks,
       days_per_week: request.days_per_week,

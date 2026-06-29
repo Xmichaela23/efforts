@@ -17,6 +17,10 @@ export interface GeneratePlanRequest {
   // (b)-run: when true, generate the plan but DON'T persist (no plans insert, no baseline write) —
   // returns { plan, preview, plan_id:null } for inspection. Default false (persist as before).
   preview?: boolean;
+  // E3b — the athlete's weekly TIME budget (hours), the run-endurance slice. When present, it sizes the
+  // week (hours → miles via pace), replacing the WEEKLY_MILEAGE table. Absent → the table (no-budget
+  // default; races stay byte-identical). See SPEC-e3b-bottom-up-volume.md.
+  weekly_hours?: number;
   approach: 'sustainable' | 'performance_build';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
   strength_frequency?: 0 | 2 | 3;
@@ -133,6 +137,8 @@ export interface GeneratorParams {
   max_hr?: number;      // observed/seeded max HR (→ Karvonen fallback)
   resting_hr?: number;  // resting HR (→ Karvonen fallback)
   vdot?: number;        // Daniels VDOT (→ pace zones), derived from learned threshold pace
+  // E3b — weekly run-endurance TIME budget (hours). Present → sizes the week (hours→miles via pace).
+  weekly_hours?: number;
 }
 
 export interface TrainingPlan {
@@ -141,6 +147,9 @@ export interface TrainingPlan {
   duration_weeks: number;
   swim_unit?: 'yd' | 'm';
   units: 'imperial' | 'metric';
+  // E3b — glass-box volume reconciliation: per-week notes when the time budget exceeds what a legal
+  // week (long-run distance-precise + easy runs 3–5mi on ≤3 days) can hold. Surfaced, never crammed.
+  volume_notes?: string[];
   baselines_required: {
     run?: string[];
     bike?: string[];
