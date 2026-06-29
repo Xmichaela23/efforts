@@ -105,7 +105,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
 // BASE HYPERTROPHY SESSION (new — fires before neural loading in base phase)
 // ============================================================================
 
-function createBaseHypertrophyLower(
+export function createBaseHypertrophyLower(
   tier: 'barbell' | 'bodyweight',
   weekInPhase: number,
 ): IntentSession {
@@ -206,7 +206,7 @@ function createPerfRecoverySession(tier: 'barbell' | 'bodyweight'): IntentSessio
 // LOWER NEURAL SESSION (Heavy, low-volume)
 // ============================================================================
 
-function createLowerNeuralSession(
+export function createLowerNeuralSession(
   phase: StrengthPhase,
   weekInPhase: number,
   isRecovery: boolean,
@@ -305,7 +305,7 @@ function createLowerNeuralSession(
 // LOWER MAINTENANCE SESSION (Bodyweight fallback)
 // ============================================================================
 
-function createLowerMaintenanceSession(
+export function createLowerMaintenanceSession(
   phase: StrengthPhase,
   weekInPhase: number,
   isRecovery: boolean,
@@ -374,7 +374,7 @@ function createLowerMaintenanceSession(
 // UPPER STRENGTH SESSION
 // ============================================================================
 
-function createUpperStrengthSession(
+export function createUpperStrengthSession(
   phase: StrengthPhase,
   weekInPhase: number,
   isRecovery: boolean,
@@ -512,7 +512,7 @@ function createUpperStrengthSession(
 // UPPER MAINTENANCE SESSION (Optional, for 3x frequency)
 // ============================================================================
 
-function createUpperMaintenanceSession(
+export function createUpperMaintenanceSession(
   phase: StrengthPhase,
   weekInPhase: number,
   isRecovery: boolean,

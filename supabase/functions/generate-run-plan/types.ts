@@ -25,7 +25,15 @@ export interface GeneratePlanRequest {
   run_lean?: number; // 0..1 endurance split to run (1.0 = run-only). rideHrs carried for the future bike engine.
   approach: 'sustainable' | 'performance_build';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
-  strength_frequency?: 0 | 2 | 3;
+  strength_frequency?: 0 | 2 | 3 | 4; // 4 = Q-088 strength-focus mode; gated by endurance_posture (frequency-policy.ts)
+  /**
+   * Q-088: the athlete's ENDURANCE (run) discipline posture — 'develop' | 'maintain' | 'out'
+   * (per_discipline_posture.run). Gates the strength-frequency ceiling: develop → ≤3,
+   * maintain/out → may reach 4. Absent ≡ develop (safe). Engine-first: today the producer
+   * (create-goal) does not set it yet, so freq-4 is provable only via an injected value
+   * (like E3b's budget). See docs/SPEC-q088-freq4-run-path.md.
+   */
+  endurance_posture?: 'develop' | 'maintain' | 'out';
   strength_tier?: 'injury_prevention' | 'strength_power';
   equipment_type?: 'home_gym' | 'commercial_gym';
   strength_protocol?: string; // Optional protocol ID (canonical: 'durability' | 'neural_speed' | 'upper_aesthetics'). Legacy IDs accepted and normalized. Note: 'minimum_dose' is deferred until frontend support.
@@ -142,7 +150,7 @@ export interface GeneratorParams {
   // E3b — weekly TOTAL time budget (hours). The engine reserves strength off the top
   // (strength_frequency × ~1hr), then sizes endurance from the remainder, split run/ride by run_lean.
   weekly_hours?: number;
-  strength_frequency?: 0 | 2 | 3;  // sessions/week — drives the strength reservation (× ~1hr)
+  strength_frequency?: 0 | 2 | 3 | 4;  // sessions/week — drives the strength reservation (× ~1hr)
   run_lean?: number;               // 0..1 endurance split to run (1.0 = run-only). rideHrs = endurance × (1−run_lean)
 }
 

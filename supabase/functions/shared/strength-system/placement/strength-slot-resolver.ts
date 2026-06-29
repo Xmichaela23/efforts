@@ -33,6 +33,14 @@ export interface ResolveStrengthRoleOptions {
   excludeDayBeforeLong?: boolean;
   /** For lower/durability, exclude the day before each quality session. */
   lowerBufferQuality?: boolean;
+  /**
+   * Q-088 strength-focus mode (freq 4): allow strength on NON-run days. Normally
+   * strength is confined to run days (concurrent doubles model); in a strength-
+   * focus block endurance is maintained/parked, so rest days become lift days —
+   * the only way to fit 4 distinct strength days around a few runs. Defaults
+   * false → freq ≤ 3 behavior is byte-identical.
+   */
+  allowNonRunDays?: boolean;
 }
 
 const SUN_RING: Weekday[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -66,11 +74,13 @@ export function focusToSlot(focus: StrengthFocus, optional?: boolean): Slot {
   }
 }
 
-function buildEasyDays(sched: ResolverSchedule): Weekday[] {
+function buildEasyDays(sched: ResolverSchedule, allowNonRunDays = false): Weekday[] {
   const long = sched.longRunDay;
   const qual = new Set(sched.qualityDays);
+  // Strength-focus mode (allowNonRunDays): every non-long, non-quality day is a
+  // candidate (rest days included). Otherwise confine to run days as before.
   const run =
-    sched.runDays.length > 0 ? new Set(sched.runDays) : new Set(SUN_RING);
+    allowNonRunDays || sched.runDays.length === 0 ? new Set(SUN_RING) : new Set(sched.runDays);
   const out: Weekday[] = [];
   for (const d of SUN_RING) {
     if (!run.has(d)) continue;
@@ -107,6 +117,7 @@ export function resolveStrengthRoleSlots(
   const {
     excludeDayBeforeLong = true,
     lowerBufferQuality = true,
+    allowNonRunDays = false,
   } = opts;
 
   const longIdx = widx(sched.longRunDay);
@@ -114,7 +125,7 @@ export function resolveStrengthRoleSlots(
   const dayBeforeLong = wfrom(longIdx - 1);
   const dayAfterLong = wfrom(longIdx + 1);
 
-  const easyBase = buildEasyDays(sched);
+  const easyBase = buildEasyDays(sched, allowNonRunDays);
   const sortedEasy = [...easyBase].sort(
     (a, b) => scoreDay(b, longIdx, qualityIdxs) - scoreDay(a, longIdx, qualityIdxs),
   );
@@ -133,7 +144,7 @@ export function resolveStrengthRoleSlots(
   const out: Partial<Record<Weekday, Slot>> = {};
 
   const runOk = (d: Weekday) =>
-    sched.runDays.length === 0 || sched.runDays.includes(d);
+    allowNonRunDays || sched.runDays.length === 0 || sched.runDays.includes(d);
 
   const pick = (orderedCandidates: Weekday[], spec: StrengthRoleSlot): Weekday | null => {
     const forbid = isLowerish(spec) ? forbiddenLower : forbiddenAll;

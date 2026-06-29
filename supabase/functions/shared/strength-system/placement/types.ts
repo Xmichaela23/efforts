@@ -5,7 +5,13 @@
 // ============================================================================
 
 export type MethodologyId = 'hal_higdon_complete' | 'jack_daniels_performance' | 'triathlon';
-export type StrengthProtocolId = 'durability' | 'neural_speed' | 'upper_aesthetics' | 'triathlon';
+export type StrengthProtocolId =
+  | 'durability'
+  | 'neural_speed'
+  | 'upper_aesthetics'
+  | 'triathlon'
+  | 'strength_focus_build'   // Q-088 freq-4 U/L/U/L (build lane)
+  | 'strength_focus_power';  // Q-088 freq-4 U/L/U/L (power lane)
 
 export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 export type Slot =
@@ -19,7 +25,7 @@ export type Slot =
 export interface PlacementContext {
   methodology: MethodologyId;
   protocol: StrengthProtocolId;
-  strengthFrequency: 0 | 1 | 2 | 3;
+  strengthFrequency: 0 | 1 | 2 | 3 | 4;
   noDoubles: boolean; // cannot do Tue AM + Tue PM
   qualityDays: Weekday[]; // e.g. ['tue','thu']
   longRunDay: Weekday; // e.g. 'sun'

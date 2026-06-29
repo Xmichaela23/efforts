@@ -85,7 +85,9 @@ export interface ProtocolContext {
   };
   
   // Strength training configuration
-  strengthFrequency: 2 | 3; // How many strength sessions per week
+  // 4 = the Q-088 strength-focus mode (4-day U/L/U/L split); gated by the
+  // frequency policy on endurance posture (../frequency-policy.ts, D-220).
+  strengthFrequency: 2 | 3 | 4; // How many strength sessions per week
   
   // Constraints
   constraints: {

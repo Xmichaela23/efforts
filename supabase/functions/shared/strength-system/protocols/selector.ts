@@ -12,6 +12,7 @@ import { minimumDoseProtocol } from './minimum-dose.ts';
 import { triathlonProtocol } from './triathlon.ts';
 import { triathlonPerformanceProtocol } from './triathlon_performance.ts';
 import { fiveByFiveProtocol } from './five-by-five.ts';
+import { strengthFocusBuildProtocol, strengthFocusPowerProtocol } from './strength-focus-split.ts';
 
 // Canonical protocol IDs (new canonical format)
 export type ProtocolId =
@@ -21,7 +22,9 @@ export type ProtocolId =
   | 'minimum_dose'
   | 'triathlon'
   | 'triathlon_performance'
-  | 'five_by_five';
+  | 'five_by_five'
+  | 'strength_focus_build'   // Q-088 freq-4 U/L/U/L (build lane)
+  | 'strength_focus_power';  // Q-088 freq-4 U/L/U/L (power lane)
 
 // Legacy IDs (temporary backward compatibility - TODO: Remove after 2025-03-01)
 type LegacyProtocolId = 'upper_priority_hybrid' | 'foundation_durability' | 'performance_neural';
@@ -42,6 +45,8 @@ export function normalizeProtocolId(protocolId: string): ProtocolId {
     'triathlon',
     'triathlon_performance',
     'five_by_five',
+    'strength_focus_build',
+    'strength_focus_power',
   ]);
   
   // If already canonical, return as-is
@@ -78,6 +83,8 @@ export function isValidProtocol(protocolId: string): boolean {
     'triathlon',
     'triathlon_performance',
     'five_by_five',
+    'strength_focus_build',
+    'strength_focus_power',
   ]);
   const legacyProtocols: LegacyProtocolId[] = ['upper_priority_hybrid', 'foundation_durability', 'performance_neural'];
   return canonical.has(protocolId as ProtocolId) 
@@ -104,6 +111,8 @@ export const RUN_CENTRIC_STRENGTH_PROTOCOL_IDS = new Set<string>([
   'upper_priority_hybrid',
   'foundation_durability',
   'performance_neural',
+  'strength_focus_build',  // Q-088 — run-path freq-4 developer lanes
+  'strength_focus_power',
 ]);
 
 /**
@@ -278,6 +287,10 @@ export function getProtocol(protocolId?: string): StrengthProtocol {
       return triathlonPerformanceProtocol;
     case 'five_by_five':
       return fiveByFiveProtocol;
+    case 'strength_focus_build':
+      return strengthFocusBuildProtocol;
+    case 'strength_focus_power':
+      return strengthFocusPowerProtocol;
     default:
       // Should not reach here due to validation, but TypeScript needs this
       throw new Error(`Protocol "${canonicalId}" is not implemented`);
@@ -289,5 +302,5 @@ export function getProtocol(protocolId?: string): StrengthProtocol {
  * Note: minimum_dose is excluded until frontend support is added
  */
 export function listProtocols(): ProtocolId[] {
-  return ['durability', 'neural_speed', 'upper_aesthetics', 'triathlon', 'triathlon_performance', 'five_by_five'];
+  return ['durability', 'neural_speed', 'upper_aesthetics', 'triathlon', 'triathlon_performance', 'five_by_five', 'strength_focus_build', 'strength_focus_power'];
 }

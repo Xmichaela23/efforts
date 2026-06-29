@@ -66,7 +66,12 @@ function getHigdonStrategy(ctx: PlacementContext): PlacementStrategy {
     { role: 'day_after_long', focus: 'upper' },
     { role: 'mid_week_easy', focus: 'lower' },
   ];
-  if (ctx.strengthFrequency >= 3) {
+  if (ctx.strengthFrequency >= 4) {
+    // Q-088 strength-focus mode: a full 4-day U/L/U/L (2 upper + 2 lower) on 4
+    // distinct days. Endurance is maintained/parked, so allow non-run (rest) days.
+    roleSlots.push({ role: 'second_easy', focus: 'upper' });
+    roleSlots.push({ role: 'any_easy', focus: 'lower' });
+  } else if (ctx.strengthFrequency >= 3) {
     roleSlots.push({
       role: 'second_easy',
       focus: lowerBodyRisk ? 'upper' : 'lower',
@@ -76,13 +81,15 @@ function getHigdonStrategy(ctx: PlacementContext): PlacementStrategy {
   const slotsByDay = resolveStrengthRoleSlots(roleSlots, sched, {
     excludeDayBeforeLong: true,
     lowerBufferQuality: true,
+    allowNonRunDays: ctx.strengthFrequency >= 4,
   });
 
   return {
     name: 'Hal Higdon (Completion)',
     slotsByDay,
-    notes:
-      'Upper after the long run; lower on the best-buffered easy day; optional third slot respects injury flags.',
+    notes: ctx.strengthFrequency >= 4
+      ? 'Strength-focus 4-day U/L/U/L: upper after the long run, lower mid-week, plus a second upper and lower on the best-buffered days (rest days allowed).'
+      : 'Upper after the long run; lower on the best-buffered easy day; optional third slot respects injury flags.',
   };
 }
 
@@ -110,12 +117,17 @@ function getDanielsStrategy(ctx: PlacementContext): PlacementStrategy {
       { role: 'day_after_long', focus: 'upper' },
       { role: 'mid_week_easy', focus: 'lower' },
     ];
-    if (ctx.strengthFrequency >= 3) {
+    if (ctx.strengthFrequency >= 4) {
+      // Q-088 strength-focus 4-day U/L/U/L (2 upper + 2 lower) on distinct days.
+      roleSlots.push({ role: 'second_easy', focus: 'upper' });
+      roleSlots.push({ role: 'any_easy', focus: 'lower' });
+    } else if (ctx.strengthFrequency >= 3) {
       roleSlots.push({ role: 'second_easy', focus: 'upper', optional: true });
     }
     const slotsByDay = resolveStrengthRoleSlots(roleSlots, sched, {
       excludeDayBeforeLong: true,
       lowerBufferQuality: true,
+      allowNonRunDays: ctx.strengthFrequency >= 4,
     });
     // JD distributed: strength is intentionally confined to **easy** days only (resolver never
     // picks quality). We still stamp quality weekdays as `none` so any future slot logic or

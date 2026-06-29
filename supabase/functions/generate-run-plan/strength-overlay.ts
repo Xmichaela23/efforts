@@ -121,7 +121,7 @@ function resolveExerciseWeights(
 }
 
 type StrengthTier = 'bodyweight' | 'barbell';
-type StrengthFrequency = 2 | 3;
+type StrengthFrequency = 2 | 3 | 4; // 4 = Q-088 strength-focus mode (gated upstream by the frequency policy)
 
 // ============================================================================
 // SENSITIVITY-GATED TAPER STEP-DOWN
@@ -629,7 +629,7 @@ function computeStrengthForPlanWeek(args: {
 
   const guardrails: any[] = [];
   const placementFrequency = taperParams
-    ? (taperParams.effectiveFrequency as 0 | 1 | 2 | 3)
+    ? (taperParams.effectiveFrequency as 0 | 1 | 2 | 3 | 4)
     : args.frequency;
 
   const placedSessions = simplePlacementPolicy.assignSessions(
@@ -662,7 +662,7 @@ export function buildStrengthSessionsForPlanWeek(params: {
   totalWeeks: number;
   enduranceSessions: Session[];
   phaseStructure: PhaseStructure;
-  frequency: 2 | 3;
+  frequency: 2 | 3 | 4;
   tier: 'bodyweight' | 'barbell';
   protocolId?: string;
   methodology: 'hal_higdon_complete' | 'jack_daniels_performance';
@@ -702,7 +702,7 @@ export function buildStrengthSessionsForPlanWeek(params: {
 
 export function overlayStrengthLegacy(
   plan: TrainingPlan,
-  frequency: 2 | 3,
+  frequency: 2 | 3 | 4,
   phaseStructure: PhaseStructure,
   tier: 'injury_prevention' | 'strength_power' = 'injury_prevention',
   _equipment: 'home_gym' | 'commercial_gym' = 'home_gym',

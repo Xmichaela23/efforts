@@ -24,6 +24,7 @@ import { PerformanceBuildGenerator } from './generators/performance-build.ts';
 import { overlayStrength, overlayStrengthLegacy } from './strength-overlay.ts';
 import { buildAthleteSnapshot } from '../_shared/athlete-snapshot.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
+import { effectiveStrengthFrequency } from '../shared/strength-system/frequency-policy.ts';
 import { addTimingLogic } from './timing-logic.ts';
 import {
   calculateEffortScore,
@@ -280,13 +281,22 @@ Deno.serve(async (req: Request) => {
         // Map approach to methodology for placement strategy
         const methodology = request.approach ? mapApproachToMethodology(request.approach) : undefined;
         const noDoubles = request.no_doubles || false; // Default to allowing doubles
-        
+
+        // Q-088 (D-220): the frequency policy is the SINGLE owner of the strength-frequency
+        // ceiling. Freq-4 (the U/L/U/L strength-focus mode) is permitted only when the endurance
+        // posture is maintain/out; develop (and absent posture) clamp to ≤3. Provably a no-op for
+        // any requested ≤3 → byte-identical for every existing plan. See frequency-policy.ts.
+        const gatedFrequency = effectiveStrengthFrequency(
+          request.strength_frequency,
+          request.endurance_posture,
+        );
+
         // Use legacy function to map old tier names ('injury_prevention', 'strength_power') to new ('bodyweight', 'barbell').
         // strength_intent + equipment_tier flow through so the resolver in strength-overlay can
         // upgrade an unset/durability protocol to `neural_speed` when the athlete chose performance.
         plan = overlayStrengthLegacy(
           plan,
-          request.strength_frequency as 2 | 3,
+          gatedFrequency as 2 | 3 | 4,
           phaseStructure,
           tier,
           equipment,

@@ -133,8 +133,8 @@ function assignSessionsWithStrategy(
 
   const ctx: PlacementContext = {
     methodology: placementContext.methodology,
-    protocol: (placementContext.protocol || 'durability') as 'durability' | 'neural_speed' | 'upper_aesthetics' | 'triathlon',
-    strengthFrequency: (placementContext.strengthFrequency || 2) as 0 | 1 | 2 | 3,
+    protocol: (placementContext.protocol || 'durability') as PlacementContext['protocol'],
+    strengthFrequency: (placementContext.strengthFrequency || 2) as 0 | 1 | 2 | 3 | 4,
     noDoubles: placementContext.noDoubles || false,
     qualityDays,
     longRunDay,
