@@ -2393,6 +2393,7 @@ Deno.serve(async (req: Request) => {
           // weekly hours as the run-endurance slice (strength reservation/split is Part 2). Absent →
           // the engine falls back to the legacy table (races/no-budget byte-identical).
           ...(Number(tp.weekly_hours_available) > 0 ? { weekly_hours: Number(tp.weekly_hours_available) } : {}),
+          run_lean: 1.0, // run-only single-sport path → all endurance to run; the fader supplies the split when bike develops
           ...(plan_start_date ? { start_date: plan_start_date } : {}),
           ...(bodyPreview ? { preview: true } : {}),
         };

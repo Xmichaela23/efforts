@@ -2,7 +2,7 @@
 // easy runs 3–5mi (§5.2) on ≤3 day-slots (Mon/Wed/Fri), long run distance-precise. Budget beyond
 // what a LEGAL week holds is surfaced glass-box (volume_notes), never crammed.
 // Run: ~/.deno/bin/deno test --allow-read --no-check supabase/functions/generate-run-plan/e3b-budget.test.ts
-import { assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { SustainableGenerator } from './generators/sustainable.ts';
 
 const base = {
@@ -63,4 +63,47 @@ Deno.test('E3b: NO budget → legacy path, no volume_notes (races/no-budget byte
   const p = makePlan({});
   assert(weekMiles(p) > 0, 'legacy path still builds a week');
   assert(!p.volume_notes, 'no budget → no reconciliation notes (legacy path untouched)');
+});
+
+// ════════════════ Part 2 — strength-reservation basis + the §4 sum acceptance ════════════════
+type Split = { total: number; reserveHrs: number; enduranceHrs: number; runHrs: number; rideHrs: number };
+const splitOf = (extra: Record<string, unknown>): Split =>
+  (new SustainableGenerator({ ...base, ...extra } as never) as unknown as { budgetSplit(): Split }).budgetSplit();
+
+// ── §4 ACCEPTANCE — the worked example: reserve goes real, total still sums EXACTLY ──
+Deno.test('E3b Part 2: ONE budget — 3 strength + 5 run + 0 ride === 8 (run-only, no double-count)', () => {
+  const s = splitOf({ weekly_hours: 8, strength_frequency: 3, run_lean: 1.0 });
+  assertEquals(s.reserveHrs, 3, 'strength 3×/wk → 3h reserved off the top');
+  assertEquals(s.enduranceHrs, 5, 'endurance = 8 − 3 = 5');
+  assertEquals(s.runHrs, 5, 'run-only → all 5 endurance hours to run');
+  assertEquals(s.rideHrs, 0, 'run-only → 0 ride hours (carried for bike)');
+  assertEquals(s.reserveHrs + s.runHrs + s.rideHrs, s.total, '§4: 3 + 5 + 0 === 8, exactly');
+});
+
+Deno.test('E3b Part 2: run+bike split sums clean too — 3 + 3 + 2 === 8', () => {
+  const s = splitOf({ weekly_hours: 8, strength_frequency: 3, run_lean: 0.6 });
+  assertEquals(s.reserveHrs, 3);
+  assertEquals(Math.round(s.runHrs), 3);  // 5 × 0.6
+  assertEquals(Math.round(s.rideHrs), 2); // 5 × 0.4 (remainder)
+  assertEquals(s.reserveHrs + s.runHrs + s.rideHrs, s.total, 'split sums to the total exactly');
+});
+
+Deno.test('E3b Part 2: sum holds across a sweep (no hour double-counted)', () => {
+  for (const total of [4, 6, 8, 10, 12]) {
+    for (const freq of [0, 2, 3] as const) {
+      for (const lean of [1.0, 0.6, 0.0]) {
+        const s = splitOf({ weekly_hours: total, strength_frequency: freq, run_lean: lean });
+        assertEquals(s.reserveHrs + s.runHrs + s.rideHrs, s.total, `sum @ total=${total} freq=${freq} lean=${lean}`);
+        assert(s.reserveHrs === freq * 1.0, 'reserve = frequency × ~1hr');
+      }
+    }
+  }
+});
+
+Deno.test('E3b Part 2: the run week sizes to ENDURANCE hours, not the total (strength shrinks the run budget)', () => {
+  // 5h total: with strength 3×/wk the run slice is 2h (below the legal cap, so the shrink is visible);
+  // without strength it's the full 5h (which the legal week caps). Strength visibly shrinks the run week.
+  const withStr = makePlan({ weekly_hours: 5, strength_frequency: 3 }); // run budget 2h
+  const noStr = makePlan({ weekly_hours: 5, strength_frequency: 0 });   // run budget 5h
+  assert(weekMiles(withStr) < weekMiles(noStr), 'reserving strength off the top shrinks the run week');
 });

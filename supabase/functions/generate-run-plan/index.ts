@@ -201,7 +201,9 @@ Deno.serve(async (req: Request) => {
       max_hr: zoneMaxHr,
       resting_hr: zoneRestingHr,
       vdot: zoneVdot,
-      weekly_hours: request.weekly_hours, // E3b — run-endurance time budget; sizes the week when present
+      weekly_hours: request.weekly_hours,           // E3b — TOTAL time budget; engine reserves strength, sizes endurance
+      strength_frequency: request.strength_frequency, // E3b — drives the strength reservation (× ~1hr)
+      run_lean: request.run_lean,                   // E3b — endurance split to run (1.0 run-only); rideHrs carried for bike
 
       goal: request.goal,
       duration_weeks: request.duration_weeks,

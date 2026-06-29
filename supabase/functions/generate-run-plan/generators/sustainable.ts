@@ -107,6 +107,13 @@ export class SustainableGenerator extends BaseGenerator {
       );
     }
 
+    // E3b Part 2 — carry the budget split (one number, no double-count). rideHrs has no consumer yet;
+    // the future bike engine reads it through this same path with zero rework.
+    if ((this.params.weekly_hours ?? 0) > 0) {
+      const s = this.budgetSplit();
+      console.log(`[PlanGen] E3b budget split: total ${s.total}h = strength ${s.reserveHrs}h + run ${s.runHrs}h + ride ${s.rideHrs}h  (sum ${s.reserveHrs + s.runHrs + s.rideHrs}h)`);
+    }
+
     return {
       name: this.generatePlanName(),
       description: this.generatePlanDescription(),
@@ -633,10 +640,27 @@ export class SustainableGenerator extends BaseGenerator {
     return this.getEasyPaceMinPerMile();
   }
 
-  /** Weekly mileage from the time budget (hours → miles via pace); recovery weeks deloaded. */
+  /**
+   * E3b Part 2 — split the ONE total budget: strength reserved off the top (frequency × ~1hr), the
+   * endurance remainder split run/ride by run_lean. One budget number, no hour double-counted:
+   * reserveHrs + runHrs + rideHrs === weekly_hours, always. rideHrs is carried for the future bike
+   * engine (run-only → 0). Replaces Part 1's "weekly_hours IS the run budget" simplification.
+   */
+  private budgetSplit(): { total: number; reserveHrs: number; enduranceHrs: number; runHrs: number; rideHrs: number } {
+    const STRENGTH_SESSION_HOURS = 1.0; // ~1hr per strength session — the near-fixed reservation (SPEC §1)
+    const total = this.params.weekly_hours ?? 0;
+    const reserveHrs = Math.max(0, Number(this.params.strength_frequency) || 0) * STRENGTH_SESSION_HOURS;
+    const enduranceHrs = Math.max(0, total - reserveHrs);
+    const runLean = Math.max(0, Math.min(1, this.params.run_lean ?? 1.0));
+    const runHrs = enduranceHrs * runLean;
+    const rideHrs = enduranceHrs - runHrs; // remainder (= endurance × (1−run_lean)) so the split sums EXACTLY
+    return { total, reserveHrs, enduranceHrs, runHrs, rideHrs };
+  }
+
+  /** Weekly run mileage from the run-endurance hours (total − strength reserve, run slice); recovery deloaded. */
   private budgetWeeklyMiles(isRecovery: boolean): number {
-    const hrs = this.params.weekly_hours ?? 0;
-    const miles = (hrs * 60) / this.enduranceEasyPaceMinPerMile();
+    const { runHrs } = this.budgetSplit();
+    const miles = (runHrs * 60) / this.enduranceEasyPaceMinPerMile();
     return Math.round(miles * (isRecovery ? 0.7 : 1.0));
   }
 

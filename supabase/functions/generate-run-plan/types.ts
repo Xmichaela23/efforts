@@ -17,10 +17,12 @@ export interface GeneratePlanRequest {
   // (b)-run: when true, generate the plan but DON'T persist (no plans insert, no baseline write) —
   // returns { plan, preview, plan_id:null } for inspection. Default false (persist as before).
   preview?: boolean;
-  // E3b — the athlete's weekly TIME budget (hours), the run-endurance slice. When present, it sizes the
-  // week (hours → miles via pace), replacing the WEEKLY_MILEAGE table. Absent → the table (no-budget
-  // default; races stay byte-identical). See SPEC-e3b-bottom-up-volume.md.
+  // E3b — the athlete's weekly TOTAL time budget (hours). Engine reserves strength (strength_frequency
+  // × ~1hr) off the top, sizes endurance from the remainder, splits run/ride by run_lean. When present
+  // it sizes the week (hours→miles via pace), replacing WEEKLY_MILEAGE. Absent → table (no-budget
+  // default; races byte-identical). See SPEC-e3b-bottom-up-volume.md.
   weekly_hours?: number;
+  run_lean?: number; // 0..1 endurance split to run (1.0 = run-only). rideHrs carried for the future bike engine.
   approach: 'sustainable' | 'performance_build';
   days_per_week: '3-4' | '4-5' | '5-6' | '6-7';
   strength_frequency?: 0 | 2 | 3;
@@ -137,8 +139,11 @@ export interface GeneratorParams {
   max_hr?: number;      // observed/seeded max HR (→ Karvonen fallback)
   resting_hr?: number;  // resting HR (→ Karvonen fallback)
   vdot?: number;        // Daniels VDOT (→ pace zones), derived from learned threshold pace
-  // E3b — weekly run-endurance TIME budget (hours). Present → sizes the week (hours→miles via pace).
+  // E3b — weekly TOTAL time budget (hours). The engine reserves strength off the top
+  // (strength_frequency × ~1hr), then sizes endurance from the remainder, split run/ride by run_lean.
   weekly_hours?: number;
+  strength_frequency?: 0 | 2 | 3;  // sessions/week — drives the strength reservation (× ~1hr)
+  run_lean?: number;               // 0..1 endurance split to run (1.0 = run-only). rideHrs = endurance × (1−run_lean)
 }
 
 export interface TrainingPlan {
