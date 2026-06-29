@@ -13,6 +13,8 @@
 import { BaseGenerator } from './base-generator.ts';
 import { TrainingPlan, Session, Phase, PhaseStructure, TOKEN_PATTERNS } from '../types.ts';
 import { canonicalizePhaseName, isRestedTerminal } from '../../_shared/periodization/index.ts';
+import { hrZones, paceZonesFromVdot } from '../../_shared/endurance/index.ts';
+import { formatPace } from '../effort-score.ts';
 
 // Long run progression by fitness level (in miles)
 // SMOOTH progression: max +1 mile per week, recovery weeks reduce by ~30%
@@ -443,15 +445,35 @@ export class SustainableGenerator extends BaseGenerator {
   // ============================================================================
 
   /**
-   * Create simple long run - effort-based description
+   * E3a: dual-anchor zone target (HR via Friel/Karvonen + pace via Daniels VDOT) for a zone index
+   * (0=Z1 … 4=Z5) + pace key, from the shared endurance spine. Returns '' when no learned data on
+   * file → the caller falls back to RPE wording. Demotes RPE to a no-data fallback (SPEC-e3a-nonrace-zones).
+   */
+  private enduranceZoneTag(zoneIdx: number, paceKey: 'base' | 'steady' | 'power' | 'speed'): string {
+    const hr = hrZones(this.params.lthr ?? null, this.params.max_hr ?? null, this.params.resting_hr ?? null);
+    const paces = (this.params.vdot && this.params.vdot > 0) ? paceZonesFromVdot(this.params.vdot) : null;
+    const parts: string[] = [];
+    if (hr && hr[zoneIdx]) {
+      const z = hr[zoneIdx];
+      parts.push(`HR ${z.min}–${z.max ?? '+'}`);
+    }
+    if (paces) parts.push(`~${formatPace(paces[paceKey])}/mi`);
+    return parts.join(' · ');
+  }
+
+  /**
+   * Create simple long run — zone-led (Z2 aerobic) when learned data exists; RPE fallback otherwise.
    */
   private createSimpleLongRun(miles: number): Session {
     const duration = this.milesToMinutes(miles);
-    
+    const zt = this.enduranceZoneTag(1, 'base'); // Z2 aerobic
+    const description = zt
+      ? `${miles} miles — Z2 aerobic (${zt}). Easy and conversational; talk in full sentences throughout. Time on feet, not speed.`
+      : `${miles} miles at easy, conversational pace. You should be able to talk in full sentences throughout. Focus on time on your feet, not speed.`;
     return this.createSession(
       'Sunday',
       'Long Run',
-      `${miles} miles at easy, conversational pace. You should be able to talk in full sentences throughout. Focus on time on your feet, not speed.`,
+      description,
       duration,
       [TOKEN_PATTERNS.long_run_miles(miles)],
       ['long_run']
@@ -467,22 +489,31 @@ export class SustainableGenerator extends BaseGenerator {
     const useStrides = weekNumber % 2 === 0;
     const baseMiles = 4;
     const baseDuration = this.milesToMinutes(baseMiles);
-    
+    const baseTag = this.enduranceZoneTag(1, 'base'); // Z2 easy base
+
     if (useStrides) {
+      const z5 = this.enduranceZoneTag(4, 'speed'); // Z5 for the strides
+      const description = z5
+        ? `${baseMiles} miles easy${baseTag ? ` (${baseTag})` : ''}, then 6×100m strides at Z5 effort (${z5}) — quick, relaxed, full recovery. Strides optional; skip if tired.`
+        : `${baseMiles} miles easy, then 6×100m strides (quick but relaxed sprints with full recovery). Strides are optional - skip if tired. Focus on good form and having fun.`;
       return this.createSession(
         'Tuesday',
         'Easy Run + Strides',
-        `${baseMiles} miles easy, then 6×100m strides (quick but relaxed sprints with full recovery). Strides are optional - skip if tired. Focus on good form and having fun.`,
+        description,
         baseDuration + 10, // 10 min for strides
         [TOKEN_PATTERNS.easy_run_miles(baseMiles), TOKEN_PATTERNS.strides_4x100m],
         ['easy_run', 'strides']
       );
     } else {
       const pickups = Math.min(8, 5 + Math.floor(weekNumber / 4));
+      const z4 = this.enduranceZoneTag(3, 'power'); // Z4 for the pickups
+      const description = z4
+        ? `${baseMiles} miles with ${pickups} pickups at Z4–Z5 effort (${z4}): 30–60s comfortably hard, then easy jog to recover. Easy base${baseTag ? ` (${baseTag})` : ''}.`
+        : `${baseMiles} miles with ${pickups} pick-ups: run comfortably hard for 30-60 seconds when you feel like it, then easy jog to recover. No watch needed - run by feel and enjoy it!`;
       return this.createSession(
         'Tuesday',
         'Fartlek Run',
-        `${baseMiles} miles with ${pickups} pick-ups: run comfortably hard for 30-60 seconds when you feel like it, then easy jog to recover. No watch needed - run by feel and enjoy it!`,
+        description,
         baseDuration, // Fartlek is within the 4 mile run, not additional
         [TOKEN_PATTERNS.easy_run_miles(baseMiles), TOKEN_PATTERNS.fartlek(pickups)],
         ['easy_run', 'fartlek']
@@ -495,15 +526,20 @@ export class SustainableGenerator extends BaseGenerator {
    */
   private createSimpleEasyRun(miles: number, day: string = ''): Session {
     const duration = this.milesToMinutes(miles);
-    
-    const descriptions = [
-      `${miles} miles at easy, conversational pace.`,
-      `${miles} miles nice and easy. Enjoy the run!`,
-      `${miles} miles at a comfortable effort. Chat with a friend or enjoy some music.`
-    ];
-    
-    const description = descriptions[Math.floor(Math.random() * descriptions.length)];
-    
+
+    const zt = this.enduranceZoneTag(1, 'base'); // Z1–Z2 easy aerobic
+    let description: string;
+    if (zt) {
+      description = `${miles} miles — easy aerobic, Z1–Z2 (${zt}). Conversational throughout.`;
+    } else {
+      const descriptions = [
+        `${miles} miles at easy, conversational pace.`,
+        `${miles} miles nice and easy. Enjoy the run!`,
+        `${miles} miles at a comfortable effort. Chat with a friend or enjoy some music.`
+      ];
+      description = descriptions[Math.floor(Math.random() * descriptions.length)];
+    }
+
     return this.createSession(
       day,
       'Easy Run',

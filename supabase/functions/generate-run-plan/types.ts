@@ -127,6 +127,12 @@ export interface GeneratorParams {
     power: number;   // seconds per mile
     speed: number;   // seconds per mile
   };
+  // E3a — the athlete's learned zone inputs for the shared endurance zone model (SPEC-e3a-nonrace-zones).
+  // Consumed by the non-race (sustainable) prescription; performance_build ignores them (uses effort_paces).
+  lthr?: number;        // learned run lactate-threshold HR (→ Friel %LTHR zones)
+  max_hr?: number;      // observed/seeded max HR (→ Karvonen fallback)
+  resting_hr?: number;  // resting HR (→ Karvonen fallback)
+  vdot?: number;        // Daniels VDOT (→ pace zones), derived from learned threshold pace
 }
 
 export interface TrainingPlan {

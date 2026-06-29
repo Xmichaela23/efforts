@@ -25,11 +25,12 @@ import { overlayStrength, overlayStrengthLegacy } from './strength-overlay.ts';
 import { buildAthleteSnapshot } from '../_shared/athlete-snapshot.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
 import { addTimingLogic } from './timing-logic.ts';
-import { 
-  calculateEffortScore, 
-  getPacesFromScore, 
+import {
+  calculateEffortScore,
+  getPacesFromScore,
   getTargetTime,
-  type TrainingPaces 
+  estimateVdotFromPace,
+  type TrainingPaces
 } from './effort-score.ts';
 import {
   getLatestAthleteMemory,
@@ -133,10 +134,73 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // E3a: resolve the athlete's HR/pace zone inputs the SAME WAY the baselines screen does
+    // (TrainingBaselines.tsx:1869-1875) — manual override → learned/observed → age-estimated → none.
+    // The plan must use whatever baselines holds (incl. age-estimated zones the screen shows), not only
+    // learned. Read-only; consumed only by the non-race (sustainable) prescription — performance_build
+    // ignores these (uses effort_paces), so race plans are unaffected. See SPEC-e3a-nonrace-zones.md.
+    let zoneLthr: number | undefined;
+    let zoneMaxHr: number | undefined;
+    let zoneRestingHr: number | undefined;
+    let zoneVdot: number | undefined;
+    try {
+      const sbZones = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      );
+      const { data: ubZones } = await sbZones
+        .from('user_baselines')
+        .select('performance_numbers, learned_fitness, configured_hr_zones, birthday')
+        .eq('user_id', request.user_id)
+        .maybeSingle();
+      const parse = (v: unknown): Record<string, any> => {
+        if (!v) return {};
+        if (typeof v === 'string') { try { return JSON.parse(v) as Record<string, any>; } catch { return {}; } }
+        return v as Record<string, any>;
+      };
+      const pn = parse(ubZones?.performance_numbers);
+      const lf = parse(ubZones?.learned_fitness);
+      const cfg = parse(ubZones?.configured_hr_zones); // manual overrides / Strava / FIT
+      const num = (v: any): number | undefined => {
+        const n = Number(v?.value ?? v);
+        return Number.isFinite(n) && n > 0 ? n : undefined;
+      };
+      // Age-estimated tier — mirrors getAgeBasedHREstimates (maxHR = 220 − age, LTHR = round(maxHR × 0.88)).
+      let ageMaxHr: number | undefined;
+      let ageLthr: number | undefined;
+      const bd = ubZones?.birthday ? String(ubZones.birthday) : null;
+      if (bd) {
+        const d = new Date(bd);
+        if (!isNaN(d.getTime())) {
+          const t = new Date();
+          let age = t.getFullYear() - d.getFullYear();
+          const m = t.getMonth() - d.getMonth();
+          if (m < 0 || (m === 0 && t.getDate() < d.getDate())) age--;
+          if (age > 0 && age < 120) { ageMaxHr = 220 - age; ageLthr = Math.round(ageMaxHr * 0.88); }
+        }
+      }
+      // The resolution chain, identical to TrainingBaselines.tsx:1869-1875.
+      zoneMaxHr = num(cfg.manual_run_max_hr) ?? num(lf.run_max_hr_observed) ?? ageMaxHr;
+      zoneLthr = num(cfg.manual_run_lthr) ?? num(lf.run_threshold_hr) ?? ageLthr;
+      zoneRestingHr = num(pn.restingHeartRate) ?? num(pn.resting_hr) ?? num(cfg.resting_heart_rate) ?? 60;
+      // VDOT (pace zones) — from the learned threshold pace; else a 5K-derived score. Pace has no
+      // age-estimated tier (you can't estimate pace from age) → no learned pace = RPE pace fallback.
+      const thrSecPerKm = num(lf.run_threshold_pace_sec_per_km);
+      if (thrSecPerKm) zoneVdot = estimateVdotFromPace(thrSecPerKm * 1.60934) ?? undefined;
+      if (zoneVdot === undefined && typeof effortScore === 'number' && effortScore > 0) zoneVdot = effortScore;
+      console.log(`[PlanGen] zone inputs (manual→learned→age): lthr=${zoneLthr ?? '-'} maxHR=${zoneMaxHr ?? '-'} restHR=${zoneRestingHr ?? '-'} vdot=${zoneVdot ?? '-'}`);
+    } catch (zErr) {
+      console.warn('[PlanGen] zone-input fetch failed (non-fatal, RPE fallback):', zErr);
+    }
+
     // Select and run generator
     const generatorParams = {
       distance: request.distance,
       fitness: request.fitness,
+      lthr: zoneLthr,
+      max_hr: zoneMaxHr,
+      resting_hr: zoneRestingHr,
+      vdot: zoneVdot,
       goal: request.goal,
       duration_weeks: request.duration_weeks,
       days_per_week: request.days_per_week,
