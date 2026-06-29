@@ -42,7 +42,7 @@ import {
   readSwimsPerWeekForOptimizer,
 } from '../_shared/tri-optimizer-prefs.ts';
 // D-214: non-race routing helpers (extracted + unit-tested; the wrapper itself can't run locally).
-import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, buildExistingGuardError } from './non-race-routing.ts';
+import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, resolveStrengthFocusMode, buildExistingGuardError } from './non-race-routing.ts';
 import {
   deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
@@ -3088,9 +3088,33 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Q-088 (D-220): the endurance (run) posture gates the strength-frequency ceiling.
+    // Thread it so the run engine's frequency policy can permit freq-4 (strength-focus
+    // mode). Absent ≡ develop (safe) on the engine side. THREAD-ONLY — no UI fader yet.
+    const runDisciplinePosture = sanitizePerDisciplinePosture(
+      resolvedGoal?.training_prefs?.per_discipline_posture as Record<string, unknown> | undefined,
+    );
+    if (runDisciplinePosture?.run) {
+      generateBody.endurance_posture = runDisciplinePosture.run;
+    }
+
     if (resolvedGoal?.training_prefs?.strength_protocol && resolvedGoal.training_prefs.strength_protocol !== 'none') {
       generateBody.strength_protocol = resolvedGoal.training_prefs.strength_protocol;
       generateBody.strength_frequency = resolvedGoal.training_prefs.strength_frequency || 2;
+
+      // Q-088 (D-220): strength-focus mode — endurance held + strength develops →
+      // upgrade the chosen developer to its 4-day U/L/U/L lane @ freq 4 (the producer
+      // that supplies what the frequency policy permits). Lane follows the developer
+      // (five_by_five→build, neural_speed→power). No-op for ineligible developers.
+      const focus = resolveStrengthFocusMode(runDisciplinePosture, generateBody.strength_protocol);
+      if (focus) {
+        generateBody.strength_protocol = focus.protocol;
+        generateBody.strength_frequency = focus.frequency;
+        console.log(
+          `[create-goal] Q-088 strength-focus mode: ${focus.protocol} @ freq ${focus.frequency} (endurance ${focus.endurancePosture})`,
+        );
+      }
+
       const runEquipmentType = resolveStrengthEquipmentTypeForPlan(
         resolvedGoal?.training_prefs?.equipment_type,
         baseline?.equipment?.strength ?? [],

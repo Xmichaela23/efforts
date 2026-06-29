@@ -44,6 +44,40 @@ export function resolveNonRaceStrengthProtocol(rawProtocol: string | undefined):
 }
 
 /**
+ * Q-088 / D-220 — the strength-focus mode producer (run path, THREAD-ONLY; no UI).
+ *
+ * Maps an eligible run strength developer to its 4-day U/L/U/L lane at frequency 4
+ * when the goal is a strength-focus block: endurance HELD (no endurance discipline
+ * develops) while strength develops. The lane is keyed off the chosen developer —
+ * `five_by_five` → build, `neural_speed` → power — so lane selection follows the
+ * seed's developer pick (D-220), with NO new UI control. `upper_aesthetics`,
+ * `durability`, bodyweight, and tri developers are NOT eligible (stay as-is).
+ *
+ * Returns null when not eligible. The frequency-policy gate (shared/strength-system/
+ * frequency-policy.ts) is the engine-side backstop; this is the value's source.
+ */
+export const STRENGTH_FOCUS_LANE: Record<string, string> = {
+  five_by_five: 'strength_focus_build',
+  neural_speed: 'strength_focus_power',
+};
+
+export function resolveStrengthFocusMode(
+  posture: Record<string, string> | undefined,
+  baseProtocol: string | undefined,
+): { protocol: string; frequency: 4; endurancePosture: 'maintain' | 'out' } | null {
+  if (!posture) return null;
+  if (posture.strength !== 'develop') return null;
+  const runPosture = posture.run;
+  // Endurance must be HELD on the run path: run maintained (or parked) and no
+  // endurance discipline developing (the interference-budget condition, D-220).
+  if (runPosture !== 'maintain' && runPosture !== 'out') return null;
+  if (['run', 'bike', 'swim'].some((d) => posture[d] === 'develop')) return null;
+  const lane = STRENGTH_FOCUS_LANE[String(baseProtocol ?? '')];
+  if (!lane) return null;
+  return { protocol: lane, frequency: 4, endurancePosture: runPosture };
+}
+
+/**
  * The D-214 predicate — the SINGLE SOURCE OF TRUTH for "is this a non-race goal?".
  * Always called on the ROW goal_type. Undefined/null ≡ 'event' (legacy back-compat).
  */

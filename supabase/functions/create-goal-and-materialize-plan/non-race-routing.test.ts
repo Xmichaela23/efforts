@@ -1,7 +1,38 @@
 // D-214 — prove selectGoalsForCombined's EVENT path is byte-identical to the original inline logic,
 // and that the non-race path lets a lone goal through. Run: ~/.deno/bin/deno test --no-check <this>
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, buildExistingGuardError } from './non-race-routing.ts';
+import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, resolveStrengthFocusMode, buildExistingGuardError } from './non-race-routing.ts';
+
+// Q-088 / D-220 — strength-focus mode producer (lane selection + freq-4 derivation).
+Deno.test('resolveStrengthFocusMode — five_by_five develop + run held → build lane @ freq 4', () => {
+  assertEquals(
+    resolveStrengthFocusMode({ run: 'maintain', strength: 'develop' }, 'five_by_five'),
+    { protocol: 'strength_focus_build', frequency: 4, endurancePosture: 'maintain' });
+});
+
+Deno.test('resolveStrengthFocusMode — neural_speed develop + run held → power lane', () => {
+  assertEquals(
+    resolveStrengthFocusMode({ run: 'maintain', strength: 'develop' }, 'neural_speed')?.protocol,
+    'strength_focus_power');
+  // run 'out' also qualifies (endurance fully parked)
+  assertEquals(
+    resolveStrengthFocusMode({ run: 'out', strength: 'develop' }, 'five_by_five')?.endurancePosture,
+    'out');
+});
+
+Deno.test('resolveStrengthFocusMode — NOT eligible cases → null', () => {
+  // endurance develops → not a strength-focus block
+  assertEquals(resolveStrengthFocusMode({ run: 'develop', strength: 'develop' }, 'five_by_five'), null);
+  // another endurance discipline develops
+  assertEquals(resolveStrengthFocusMode({ run: 'maintain', bike: 'develop', strength: 'develop' }, 'five_by_five'), null);
+  // strength only maintained
+  assertEquals(resolveStrengthFocusMode({ run: 'maintain', strength: 'maintain' }, 'five_by_five'), null);
+  // ineligible developers — durability + upper_aesthetics (the latter is OUT per D-220)
+  assertEquals(resolveStrengthFocusMode({ run: 'maintain', strength: 'develop' }, 'durability'), null);
+  assertEquals(resolveStrengthFocusMode({ run: 'maintain', strength: 'develop' }, 'upper_aesthetics'), null);
+  // absent posture
+  assertEquals(resolveStrengthFocusMode(undefined, 'five_by_five'), null);
+});
 
 type G = { id: string };
 
