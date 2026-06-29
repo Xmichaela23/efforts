@@ -177,10 +177,14 @@ export default function NonRaceBuilder() {
   };
 
   const needsDiscipline = state.goal != null && GOALS_NEEDING_DISCIPLINE.includes(state.goal);
-  const enduranceChoices = athleteDisciplines.filter((d) => d !== 'strength');
+  // Don't gate disciplines: everyone is offered all of them (people come in exclusive but switch
+  // gears). The athlete picks develop/maintain/out per discipline — the engine never decides what
+  // they're "allowed" to train. Missing baselines for a developed discipline are handled downstream
+  // (calibration prompt), not by hiding the option.
+  const enduranceChoices = DISCIPLINE_ORDER.filter((d) => d !== 'strength');
   const goalCanContinue = state.goal != null && (!needsDiscipline || state.discipline != null);
   const postureCanContinue = Object.values(state.posture).some((p) => p !== 'out');
-  const rows = DISCIPLINE_ORDER.filter((d) => athleteDisciplines.includes(d));
+  const rows = DISCIPLINE_ORDER; // ungated — always show all four disciplines (don't gate)
   const posturePresent = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
   const anchorChoices = (['run', 'bike'] as const).filter((d) => posturePresent(d));
   const strengthDeveloperLabel = (id?: string) => (id ? STRENGTH_PROTOCOL_LABELS[id] ?? id : id);
