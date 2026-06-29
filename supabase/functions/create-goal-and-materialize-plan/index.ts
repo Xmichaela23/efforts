@@ -2398,6 +2398,25 @@ Deno.serve(async (req: Request) => {
           ...(bodyPreview ? { preview: true } : {}),
         };
 
+        // Q-093 Lock 1: thread strength_tier/strength_intent/equipment so generate-run-plan's tier
+        // gate (`index.ts:271`, honors a protocol only at tier==='strength_power') stops dropping the
+        // chosen developer to durability. Without this, EVERY non-race run developer silently
+        // downgrades. Mirrors the event-path equipment resolution (`:2654`/`:3115`) — barbell-capable
+        // → strength_power (developer honored); bodyweight → injury_prevention (durability, correct,
+        // byte-identical). `baseline` isn't in scope at this block, so fetch equipment narrowly.
+        if (Number(runRetestBody.strength_frequency) > 0) {
+          const { data: runStrBaseline } = await supabase
+            .from('user_baselines').select('equipment, performance_numbers').eq('user_id', user_id).maybeSingle();
+          const runEquipmentType = resolveStrengthEquipmentTypeForPlan(
+            tp.equipment_type,
+            runStrBaseline?.equipment?.strength ?? [],
+            runStrBaseline?.performance_numbers,
+          );
+          runRetestBody.equipment_type = runEquipmentType;
+          runRetestBody.strength_tier = runEquipmentType === 'commercial_gym' ? 'strength_power' : 'injury_prevention';
+          if (tp.strength_intent) runRetestBody.strength_intent = tp.strength_intent;
+        }
+
         // Q-088 (D-220): the (b)-run path IS the non-race run engine (the run-fork the record
         // correction T-3 is about). Thread the endurance (run) posture so generate-run-plan's
         // frequency policy can permit freq-4, and apply the strength-focus lane upgrade when the

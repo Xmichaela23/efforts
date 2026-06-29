@@ -89,6 +89,20 @@ Deno.test('overlay resolver: strength_focus_* ids survive the run-sport resolver
     'strength_focus_build');
 });
 
+// ── Q-093 Lock 2 — run-sport resolver honors five_by_five; everything else byte-identical ──
+Deno.test('Q-093 Lock 2: five_by_five survives the run resolver; other protocols unchanged', () => {
+  // The fix: five_by_five was coerced to durability on the run path.
+  assertEquals(resolveStrengthProtocolForGoal({ rawProtocol: 'five_by_five', sport: 'run' }).protocolId, 'five_by_five');
+  // Byte-identical guard — these already resolved correctly and must not move:
+  for (const p of ['neural_speed', 'durability', 'upper_aesthetics', 'strength_focus_build', 'strength_focus_power']) {
+    assertEquals(resolveStrengthProtocolForGoal({ rawProtocol: p, sport: 'run' }).protocolId, p, `${p} must be unchanged`);
+  }
+  // Intent-performance default (no protocol) still → neural_speed (unchanged).
+  assertEquals(resolveStrengthProtocolForGoal({ strengthIntent: 'performance', sport: 'run' }).protocolId, 'neural_speed');
+  // No protocol, no intent → durability (unchanged).
+  assertEquals(resolveStrengthProtocolForGoal({ sport: 'run' }).protocolId, 'durability');
+});
+
 // ── placement: 4 distinct days, 2 upper + 2 lower ───────────────────────────
 function placementCtx(freq: 0 | 1 | 2 | 3 | 4): PlacementContext {
   return {

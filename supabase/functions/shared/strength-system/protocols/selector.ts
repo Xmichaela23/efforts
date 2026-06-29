@@ -111,6 +111,7 @@ export const RUN_CENTRIC_STRENGTH_PROTOCOL_IDS = new Set<string>([
   'upper_priority_hybrid',
   'foundation_durability',
   'performance_neural',
+  'five_by_five',          // Q-093 Lock 2 — the §13.1 standalone develop default; was coerced to durability on the run path
   'strength_focus_build',  // Q-088 — run-path freq-4 developer lanes
   'strength_focus_power',
 ]);
