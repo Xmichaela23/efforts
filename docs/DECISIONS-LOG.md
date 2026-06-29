@@ -4434,6 +4434,8 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ## D-213 — One engine, two output shapes: extend the engine, retire the forks, never widen them (adopted standard, pre-implementation)
 
+> **⚠ SUPERSEDED IN PART by [D-218] (2026-06-28).** For **single-sport RUN non-race** goals, the shipped path is the `generate-run-plan` fork (the b-run retest head), NOT the combined "one engine" — because the combined engine cannot produce a single-sport week (F-9/F-12). D-213's "retire the forks / never widen" principle still holds for **non-race tri** (which does run on the combined engine). Read D-218 before assuming non-race run routes through `buildCombinedPlan`.
+
 - **Date:** 2026-06-25
 - **Nature of this entry — read first:** D-213 is **not** the same kind of entry as D-210/D-212. Those were decisions *reasoned to completion* — a problem traced, options weighed, a result locked. **D-213 is a governing principle adopted *before* the first non-race-goal build** — a standard we're committing to up front, not a battle-tested outcome. The distinction matters for how to treat it: if first contact with actual Goals work surfaces a wrinkle, the wrinkle **amends this standard** (a follow-up that refines the rule); it does **not** falsify a claimed result, because no result was claimed. Full standard: `docs/SPEC-one-engine-two-shapes.md`.
 
@@ -4451,6 +4453,8 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 ---
 
 ## D-214 — The non-race routing predicate: widen `buildCombinedPlan`'s event-only gates ONLY when the just-created goal is non-race (D-213 build (a) / Cut 3b)
+
+> **⚠ SUPERSEDED IN PART by [D-218] (2026-06-28).** This predicate (route non-race through `buildCombinedPlan`) still applies to **non-race tri**, but **single-sport RUN non-race** never routes through `buildCombinedPlan` — it forks to `generate-run-plan` (D-218), because the combined engine returns no single-sport plan (F-9/F-12). The `create-goal:~2374` `if (sport === 'run')` branch is the live router, not the combined predicate.
 
 - **Date:** 2026-06-25
 - **What this decides:** how a non-race goal (`goal_type ∈ {capacity, maintenance}`) reaches the ONE engine through `buildCombinedPlan` **without** forking a separate single-goal path and **without** silently altering any event athlete's plan. This is the wrinkle D-213 anticipated ("first Goals contact AMENDS the standard") — `buildCombinedPlan` is architecturally a **combiner of 2+ goals** (`create-goal-and-materialize-plan/index.ts:1184`, `if (length < 2) return null`), and its goal-fetch is **event-only** (`:1164`, `.eq('goal_type','event')`). A lone non-race goal — the primary use case — is never even fetched, so it falls through to the legacy standalone generators (which D-213 guard-rail #1 forbids for non-race).
@@ -4509,6 +4513,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 - **Architectural intent on record:** ONE strength-periodization authority every modality queries, so strength and endurance scale across run/tri/combined/bike without chasing logic through separate engines. Migrate at our pace — each phase independently shippable and revertible. **Supersedes routing-tension thread T-3:** `generate-run-plan`'s `terminalShape='retest'` path is the live non-race-run path (the (b)-run fork, D-NNN owed separately for the routing supersession of D-213/D-214).
 - **Deferred (named):** Phase 2 (relocate taper logic into the authority), Phase 3 (Q-088 frequency cap becomes an authority property), Phase 4 (protocol load curves); the `"Race Week: Light Movement"` microcopy (protocol taper-session label — correct behavior, wrong word for a retest); the combined-plan retest volume-floor leak (`science.ts:608`, scout thread D2); the endurance-number sourcing debt (`ENDURANCE-PROVENANCE.md`: 0 SOURCED — a separate, larger debt this does NOT touch).
 - **Cross-ref:** `SPEC-strength-island-phase1.md`, `ISLAND-PROPOSAL.md`, `STRENGTH-SCOUT-REPORT.md`, `STATE-OF-BOARD.md`; tests `retest-behavior.test.ts`, `retest-tail.test.ts`.
+
+---
+
+## D-218 — Single-sport RUN non-race runs on `generate-run-plan` (the b-run fork), superseding D-213/D-214's "route through the combined engine" for this case
+
+- **Date:** 2026-06-28
+- **Supersedes (in part):** **D-213** (one engine, retire the forks) and **D-214** (route non-race through `buildCombinedPlan` via the event-gate predicate) — **for single-sport run non-race only.** Both still govern **non-race tri**.
+- **What this decides:** where a single-sport **run** non-race goal (`goal_type ∈ {capacity, maintenance}`, sport `run`) actually generates its plan. **Answer: `generate-run-plan` with a retest head (`terminalShape: 'retest'`), via the `create-goal-and-materialize-plan/index.ts:~2374` `if (sport === 'run')` branch — NOT `buildCombinedPlan`.**
+- **Why D-213/D-214's "one engine" doesn't hold here:** the combined engine is architecturally a **multi-discipline combiner** — proven empirically (F-9/F-12, `BUILDER-SWEEP-FINDINGS.md`) to return **no plan** for a single-sport week (the optimizer pins phantom swim/bike sessions; the week-builder degenerates). The stashed F-9 provisional cut confirmed making it single-sport-capable is a real engine build, not a config. So forcing run non-race through combined produced 0/16 materialization. The b-run fork routes to the **working** single-sport run engine instead — exactly the case D-213 said a "first-contact wrinkle amends the standard."
+- **The architecture this lands:** "one engine, two knobs" becomes **two engines, the same two knobs** — combined for multi-discipline (tri) non-race; the single-sport engines (`generate-run-plan` now; bike later) for single-sport non-race. The retest-vs-taper head + the shared spine (`_shared/endurance/`, `_shared/periodization/`) are the cross-engine continuity, not a single monolith.
+- **Shipped:** `generate-run-plan` v143, `create-goal` v223 (commits `b10bcf9d` b-run, `94f1c58f` E3a zones, `b743edb6` retest/D-217).
+- **Closes:** open thread **T-3** in `STATE-OF-BOARD.md`.
+- **Cross-ref:** `ISLANDS-ORIENTATION.md`, `SPEC-non-race-run-retest.md`, D-213/D-214 (annotated superseded-in-part), the stash (`F-9 provisional combined single-sport cut` — step-1 for bike).
 
 ---
 
