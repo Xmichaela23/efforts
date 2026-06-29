@@ -4542,6 +4542,26 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-220 — Q-088 strength frequency unlock: U/L/U/L 4-day container, endurance-posture–gated strength-focus mode, two developer lanes (build/power), run-path first
+
+- **Date:** 2026-06-29
+- **What this decides:** the SHAPE, SCOPE, and SEQUENCING of the strength frequency unlock (Q-088), ahead of any builder code. Grounded in `AUDIT-strength-frequency-concurrent-matrix-2026-06-29.md` (the concurrent-matrix audit Q-088 required). **Decisions only — Tier-1.3 builders NOT started.**
+- **Shape — U/L/U/L, structure only:** the 4-day container is Upper/Lower/Upper/Lower. It is a *frequency structure*, NOT an imported hypertrophy-split philosophy. The split decides when/how-many; the lane (below) decides what.
+- **Sequencing:** **run-path (`generate-run-plan`) first** — the simpler single-number flow and the case Q-088 is named for. **No optimizer 4th-day placer this cut** → combined/tri stay ≤3 (audit Tier 2.7 deferred; the optimizer has no `placeFourthStrength` and won't get one here). `five_by_five` is **untouched** — stays full-body A/B 2×; it does not gain a 4-day variant.
+- **Scope — endurance-posture gate (REVISES the audit §6 "standalone-only" option):** freq-4 is gated on ENDURANCE posture, because interference budget scales with endurance recovery load (Rønnestad — develop blocks pair with reduced endurance volume):
+  - endurance `develop` → strength **≤3** (concurrent ceiling; tri **2**).
+  - endurance `maintenance` / `parked` → strength **may reach 4**.
+  This is a plan **MODE (strength-focus)**, funded by **hours-budget reallocation**, NOT a standalone-only carve-out.
+- **Developer lanes — the U/L/U/L container takes exactly TWO content lanes:**
+  - **build** — `five_by_five` *lineage* (compound, linear 70→85%). Borrows the lineage; realized as **net-new** upper/lower split sessions (5×5 itself stays full-body 2×).
+  - **power** — `neural_speed` *lineage* (heavy / low-rep / RFD). **Reuses `performance_neural`'s existing upper + lower builders, REBALANCED to an even U/L/U/L distribution** — today neural is upper-tilted (1 lower + 2 upper); a real U/L/U/L is balanced 2 lower / 2 upper. **Components exist; the distribution is net-new work.**
+  - **EXCLUDED:** aesthetic/isolation as a 4-day developer. `upper_aesthetics` stays a supplementary overlay per `SCIENCE-upper-aesthetics-hypertrophy.md`.
+- **Soft sequencing link to E3b (not a hard block):** the parked-endurance posture that unlocks freq-4 is *funded* by the E3b hours-budget reallocation (`budgetSplit()` reserves `strength_frequency × ~1hr` off the top; at freq 4 the strength reserve grows and the endurance remainder shrinks) — so the two touch. But **builder work does NOT block on E3b:** the strength-focus mode scopes against the endurance **posture flag**, and the budget plumbing finishes in parallel. The freq-4 engine logic is provable independently (E3b is proven-not-deployed, D-219).
+- **Status:** decisions recorded; implementation (Tier 1.3 builders) deferred to a later cut.
+- **Cross-ref:** `AUDIT-strength-frequency-concurrent-matrix-2026-06-29.md`, Q-088, `ROADMAP-strength-engine.md` Phase 2, D-219 (E3b budget), `SCIENCE-upper-aesthetics-hypertrophy.md`, `SCIENCE-concurrent-training-interference.md`, `SPEC-non-race-goal-plan-contract.md`.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
