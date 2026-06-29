@@ -87,7 +87,14 @@ export function validateRequest(request: GeneratePlanRequest): ValidationResult 
       errors.push('strength_protocol is required for strength_power tier');
     } else {
       // Supported protocols (runtime list - excludes minimum_dose until frontend supports it)
-      const validProtocols = new Set<string>(['durability', 'neural_speed', 'upper_aesthetics']);
+      // Q-093 Lock 3: five_by_five (the §13.1 standalone developer) + the Q-088 freq-4 U/L/U/L lanes
+      // were missing here — this HTTP-validation allowlist is a THIRD copy of the protocol list
+      // (selector canonical + RUN_CENTRIC + here); local tests bypass it, so the live 400 only
+      // surfaced on the deployed probe. Consolidation owed (see Q-093).
+      const validProtocols = new Set<string>([
+        'durability', 'neural_speed', 'upper_aesthetics',
+        'five_by_five', 'strength_focus_build', 'strength_focus_power',
+      ]);
       // Also accept legacy IDs for temporary backward compatibility (will be normalized)
       const legacyProtocols = new Set<string>(['foundation_durability', 'performance_neural', 'upper_priority_hybrid']);
       
