@@ -75,8 +75,11 @@ export function validateRequest(request: GeneratePlanRequest): ValidationResult 
 
   // Strength frequency validation
   if (request.strength_frequency !== undefined) {
-    if (![0, 1, 2, 3].includes(request.strength_frequency)) {
-      errors.push('strength_frequency must be 0, 1, 2, or 3');
+    // Q-088 Lock 4: 4 = the strength-focus mode (U/L/U/L). The frequency POLICY
+    // (frequency-policy.ts) gates whether 4 is actually permitted (by endurance posture);
+    // this is just the request-shape range. Was [0,1,2,3] → 400'd freq-4 before the policy ran.
+    if (![0, 1, 2, 3, 4].includes(request.strength_frequency)) {
+      errors.push('strength_frequency must be 0, 1, 2, 3, or 4');
     }
   }
 
