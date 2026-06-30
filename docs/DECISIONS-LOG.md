@@ -4562,6 +4562,20 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-221 — Strength-primary engine (Program 1): own loading, block-periodization curve, safe estimated retest, "promise + enforcing test" rule
+
+- **Date:** 2026-06-30
+- **Architecture:** a dedicated sport-agnostic strength-primary path (`generate-strength-plan` + `composeStrengthPrimaryPlan`) — strength is the SPINE, maintenance endurance underneath. Does NOT delegate to the overlay protocols (their concurrent maintenance fillers + 0.85 cap are wrong for a develop block). Reachable via the UI (Q-096 `tp` fix). **Rejected:** refine `(b)-run` (run-only stopgap, marathon-shaped), combined non-race (F-9, fragile).
+- **Loading curve (block periodization, off the entered 1RM, no phase reset):** accumulate 5×5 72→82 → intensify 5×3 84→90 → **DELOAD wk7** (~50% drop — required; a block this long needs recovery every 6–8wk; the prior continuous wk1→11 ramp had none) → peak 3×2→2×1, a **97% single** in the final loading week → retest. The **ATR arc + 12wk length + heavy-strength→economy (neural) mechanism are CITED** (Rønnestad/Mujika 2014; Piacentini 2013 = intensity+masters population, **6wk — NOT the timeline**; Filipas 2018 = the 12wk arc). The **exact %s, deload timing, retest-from-submax are CONVENTION**, calibrated by the retest. (`SCIENCE-strength-primary-loading.md`, with the explicit Piacentini-timeline guard.)
+- **Materialize "smart server" fixes (scoped to `protocol:strength_primary` rows ONLY; concurrent untouched, 17/17 tests):** (1) lifted the systemic **0.85 %1RM clamp → 1.05** (`resolveStrengthPercentForLift`) — the cap that collapsed every peak/test to 85% (~145 lb); (2) **bypassed the rep-scale** (`calculateWeightFromConfig`, `applyRepScale=false`) — it double-counts an explicit %. Result: the block renders EXACT off the entered 1RM.
+- **Safe retest:** a heavy sub-max **TRIPLE → estimate e1RM** (Epley/Brzycki, ±3–5%), NOT a solo near-max single (high-risk/low-reward for a masters athlete training alone). CONVENTION.
+- **RULE — every program states a PROMISE + an ENFORCING TEST:** Get Strong promises a *measured* 1RM gain (modest, honest — concurrent gains ~+4–16%, not a hyped PR) and enforces it with the retest terminal. The promise lives in the plan copy; the test is the terminal. **Generalize to future programs.**
+- **Tradeoff / OPEN:** the retest→1RM **write-back does NOT close yet (Q-097)** — blocks don't compound until it fires; do not call "blocks compound" done. Loads anchor to the stored max; barbell-only (Q-098).
+- **Verification:** built + materialized live on `45d122e7` (bench 160): wk1 115 → wk6 145 → wk7 105 (deload) → wk11 155 (97% single) → wk12 145 (3-rep retest). Commits `fd0e8e9c` → `f1337caa` → `89578531` → `2b5458d8` → `6891e902`; deploys generate-strength-plan v4, create-goal v228, materialize-plan, generate-run-plan v147.
+- **Cross-ref:** `SPEC-product-shape.md` (Program 1), `SPEC-strength-primary-shape.md`, `SCIENCE-strength-primary-loading.md`, `strength-primary-plan.ts`, Q-096 (closed), Q-097/Q-098 (open/parked).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

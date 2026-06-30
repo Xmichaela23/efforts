@@ -1223,6 +1223,26 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 - **The fix:** add `'deadlift': 'primary'` to `ROLE_TABLE` (fixes `five_by_five` in the same edit). Q-088's build lane sidesteps it by emitting `Conventional Deadlift` (resolves).
 - **Cross-ref:** `_shared/strength/exercise-role.ts` (ROLE_TABLE), `five-by-five.ts` (emits bare Deadlift), `strength-focus-split.ts` (uses Conventional Deadlift), D-208.
 
+## Q-096 — Get Strong UI routing → combine — CLOSED 2026-06-30
+
+- **Status:** CLOSED 2026-06-30. Built ≠ reachable until the front door routes right; now it does.
+- **Root:** the Get Strong routing block read `tp.per_discipline_posture`, but `tp` was **undefined** in that scope (a local inside `mergeTrainingPrefsWithArcDefaults`, a different function) → ReferenceError on the block's FIRST line, before any gate → EVERY non-race build rolled back (the fast-200 we chased). Found by reading + `deno check` TS2304, NOT logs (the project's Supabase Logs tab never captures console output — confirmed; that's why we were blind all session).
+- **Fix:** read `resolvedGoal.training_prefs` (local `gsTp`). Commit `d9057c85`, create-goal **v228**. **Verified:** a UI Get Strong build → `plans` row `config.source = strength_primary` (plan `4d642b43`, goal "Get stronger"). The front door routes Get Strong → `generate-strength-plan`.
+- **Cross-ref:** `create-goal-and-materialize-plan/index.ts` (Get Strong block), D-221.
+
+## Q-097 — Strength-primary 1RM write-back does NOT close — blocks don't compound yet (LAST OPEN THREAD)
+
+- **Status:** filed 2026-06-30 · **OPEN. Built but not closed — the lifecycle is NOT real until this fires. Do NOT log "blocks compound" as done.**
+- **Traced (definitive):** logging the wk12 retest triple computes an e1RM into `exercise_log.estimated_1rm` (via `compute-facts`), but it **never reaches `performance_numbers`** — the field `materialize-plan`'s `mergeAnchor1RmLb` reads FIRST (e1RM is only a fallback). Three breaks: (1) `isBaselineTestWorkout` (`StrengthLogger.tsx:689`) matches ONLY `name.includes('baseline test')` — the retest is named "Retest — …" → never enters baseline mode → `saveBaselineResults` (the one client path that writes `performance_numbers`) never fires; (2) the `baseline_test` / `1rm_test` / `estimate_1rm` tags have **zero consumers** (the gate checks the name, not tags); (3) **no server path** promotes the strength e1RM → `performance_numbers` (the only such write, `compute-workout-analysis:790`, is swim CSS). So the next block loads off the stale entered max.
+- **THE FIX (a named CUT, not a re-diagnosis — the clean first move next session):** honor the **`1rm_test` TAG** in `isBaselineTestWorkout` (tag-match, not name-match) + map the retest lifts (`getBaselineKeyForExercise` already maps bench/squat/deadlift/OHP) → so logging the retest flows through the existing `saveBaselineResults` and **writes the e1RM to `performance_numbers`**. Then "blocks compound" is real.
+- **Cross-ref:** `StrengthLogger.tsx` (`isBaselineTestWorkout` / `getBaselineKeyForExercise` / `saveBaselineResults`), `materialize-plan` (`mergeAnchor1RmLb`), `compute-facts` (`exercise_log.estimated_1rm`), `strength-primary-plan.ts` (the retest tags), D-221.
+
+## Q-098 — No bodyweight strength-primary lane — bodyweight Get Strong → `(b)-run` durability
+
+- **Status:** filed 2026-06-30 · **parked follow-up; intentional scope cut.**
+- **The thing:** the strength-primary arc (5×5/neural barbell lanes) is barbell-only; the Get Strong routing gates on `commercial_gym`, so a bodyweight athlete's Get Strong falls to the `(b)-run` durability path (correct — can't run the barbell arc). A bodyweight strength-primary lane (calisthenic progressions) is a clean future add on demand.
+- **Cross-ref:** D-221, `create-goal…index.ts` (the `gsEquip === 'commercial_gym'` gate), `strength-primary-plan.ts`.
+
 ---
 
 ## When to add an entry
