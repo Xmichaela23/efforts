@@ -83,6 +83,22 @@ Deno.test('guard — real barbell every work phase, maintenance runs, sport-agno
   assertEquals(bike.sessions_by_week['2'].filter((s) => s.type === 'ride').length, 2);
 });
 
+Deno.test('maintenance band — typed miles clamped to floor/ceiling (pace-mapped), flat, glass-box', () => {
+  const mk = (miles: number) => composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2, targetWeeklyMiles: miles, easyPaceMinPerMile: 9.5 });
+  // 9.5 min/mi → floor 6 (60/9.5), ceiling 16 (150/9.5)
+  assertEquals(mk(12).volume_notes, null, '12mi is inside the band — build it, no friction');
+  const over = mk(30); assert(over.volume_notes !== null && /held to 16/.test(over.volume_notes) && /Wilson/.test(over.volume_notes), 'over-ask → capped at ceiling + Wilson note');
+  const under = mk(3); assert(under.volume_notes !== null && /bumped to 6/.test(under.volume_notes) && /Hickson/.test(under.volume_notes), 'under-ask → floor bump + Hickson/Spiering note');
+  // flat: maintenance run duration is the same every work week (no ramp)
+  const inBand = mk(12);
+  const rd = (w: string) => inBand.sessions_by_week[w].find((s) => s.type === 'run')!.duration;
+  assertEquals(rd('2'), rd('9'), 'maintenance is FLAT — no ramp');
+  // absent (no typed miles) → the fixed default, backward-compatible
+  const def = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2 });
+  assertEquals(def.volume_notes, null);
+  assertEquals(def.sessions_by_week['2'].find((s) => s.type === 'run')!.duration, 35, 'no typed miles → fixed ~35min default');
+});
+
 Deno.test('NO-1RMs path — week 1 is a baseline test (offered, not forced); weeks 2-12 train', () => {
   const no = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2, needsBaseline: true });
   const wk1 = no.sessions_by_week['1'].filter((s) => s.type === 'strength');

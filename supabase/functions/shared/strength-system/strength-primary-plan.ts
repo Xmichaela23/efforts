@@ -30,6 +30,12 @@ export type StrengthPrimaryArgs = {
   /** "Do you know your 1RMs?" → NO. Week 1 becomes a baseline test (offered, not forced); weeks 2-12
    *  train off the result. Default false (the athlete entered their 1RMs → train from week 1). */
   needsBaseline?: boolean;
+  /** Get Strong maintenance-endurance band (run only). Typed weekly miles + the athlete's easy pace
+   *  (min/mi) → the run volume, clamped to the science band: floor holds the aerobic base (Hickson/
+   *  Spiering, freq 2-3×/wk), ceiling caps interference (Wilson, running>cycling). Flat, no ramp.
+   *  Absent → the fixed ~2×35min default. See SCIENCE-strength-primary-loading.md. */
+  targetWeeklyMiles?: number;
+  easyPaceMinPerMile?: number;
 };
 
 type StrengthExercise = { name: string; sets: number; reps: number | string; weight: string };
@@ -157,8 +163,8 @@ function retestSessions(): { name: string; focus: 'upper' | 'lower'; kind: 'chec
   ];
 }
 
-function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean): PlanSession {
-  const mins = sport === 'bike' ? (isRetestWeek ? 35 : 45) : (isRetestWeek ? 25 : 35);
+function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean, overrideMins?: number): PlanSession {
+  const mins = overrideMins ?? (sport === 'bike' ? (isRetestWeek ? 35 : 45) : (isRetestWeek ? 25 : 35));
   const label = sport === 'bike' ? 'Easy Ride' : 'Easy Run';
   return {
     day,
@@ -205,11 +211,30 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   duration_weeks: number;
   sessions_by_week: Record<string, PlanSession[]>;
   phaseStructure: { phases: ArcPhase[]; recovery_weeks: number[] };
+  volume_notes: string | null;
 } {
   const { durationWeeks, strengthFrequency, enduranceSport, enduranceFrequency } = args;
   const phaseStructure = buildArcPhases(durationWeeks);
   const grid = GRID[`${strengthFrequency}+${enduranceSport ? enduranceFrequency : 0}`]
     ?? GRID[`${strengthFrequency}+2`] ?? GRID['4+2'];
+
+  // Maintenance-endurance band (run only): typed weekly miles → run volume, CLAMPED to the science band.
+  // 60 / 150 weekly minutes = the 2-3×/wk × ~20-25 / ~40-min dose (CONVENTION on exact minutes; CITED on
+  // freq/duration/interference — Hickson 1981/82, Spiering 2021, Wilson 2012), pace-mapped to miles. Flat,
+  // no ramp. Honor up to the science, never past it: over-ask → capped max + note; under → bumped to floor.
+  const runDays = grid.endurance.length;
+  let runOverrideMins: number | undefined;
+  let volume_notes: string | null = null;
+  if (enduranceSport === 'run' && (args.easyPaceMinPerMile ?? 0) > 0 && (args.targetWeeklyMiles ?? 0) > 0 && runDays > 0) {
+    const pace = args.easyPaceMinPerMile!;
+    const floor = Math.round(60 / pace);
+    const ceiling = Math.round(150 / pace);
+    const asked = Math.round(args.targetWeeklyMiles!);
+    const held = Math.max(floor, Math.min(ceiling, asked));
+    if (asked > ceiling) volume_notes = `Maintenance running held to ${ceiling} mi/wk (you asked ${asked}) — above this, running eats strength recovery; strength leads [Wilson 2012].`;
+    else if (asked < floor) volume_notes = `Maintenance running bumped to ${floor} mi/wk (you asked ${asked}) — the floor that holds your aerobic base [Hickson 1981/82, Spiering 2021].`;
+    runOverrideMins = Math.max(15, Math.round((held / runDays) * pace));
+  }
 
   const sessions_by_week: Record<string, PlanSession[]> = {};
 
@@ -261,7 +286,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
 
     // Endurance = maintenance, underneath, on the off-days.
     if (enduranceSport) {
-      grid.endurance.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day, isRetestWeek)));
+      grid.endurance.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day, isRetestWeek, enduranceSport === 'run' ? runOverrideMins : undefined)));
     }
 
     weekSessions.sort((a, b) => DAYS.indexOf(a.day as typeof DAYS[number]) - DAYS.indexOf(b.day as typeof DAYS[number]));
@@ -291,5 +316,6 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     duration_weeks: durationWeeks,
     sessions_by_week,
     phaseStructure,
+    volume_notes,
   };
 }
