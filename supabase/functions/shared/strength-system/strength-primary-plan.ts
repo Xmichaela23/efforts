@@ -80,8 +80,13 @@ function phaseFor(week: number, phases: ArcPhase[]): ArcPhase {
   return phases.find((p) => week >= p.start_week && week <= p.end_week) ?? phases[phases.length - 1];
 }
 
-// ── The continuous loading scheme (block periodization; no phase reset) ──────────────────
-type WorkLoad = { sets: number; reps: number; secSets: number; pct: number; label: string };
+// ── The loading scheme — block periodization that PROGRESSES THE MAX (no phase reset) ─────
+// accumulate → intensify → REALIZE (heavy singles ≥96%) → TEST (open PR ≥100%). The peak phase
+// exposes the CNS to a near-maximal single so the retest can express a new max; the retest opens
+// at 100% and prescribes a PR attempt above it. Primary lifts carry the heavy load; accessories
+// stay at back-off volume so a 97% "single" never lands on a Pull-Up or RDL.
+type Scheme = { sets: number; reps: number | string; pct: number };
+type WorkLoad = { primary: Scheme; secondary: Scheme; deadlift: Scheme; label: string };
 
 /** Linear-interpolate the % across a phase and round to the nearest 0.5. */
 function rampPct(phase: ArcPhase, week: number, start: number, end: number): number {
@@ -90,46 +95,59 @@ function rampPct(phase: ArcPhase, week: number, start: number, end: number): num
   return Math.round((start + t * (end - start)) * 2) / 2;
 }
 
-/** Sets/reps/% for a WORK week (base/power/sharpen). The % climbs continuously, reps drop by phase. */
+/** Per-week primary/secondary/deadlift schemes. The PEAK's last week is a heavy single (96–97%). */
 function workLoad(phase: ArcPhase, week: number): WorkLoad {
   switch (phase.name) {
-    case 'Power':
-      return { sets: 5, reps: 3, secSets: 3, pct: rampPct(phase, week, 80, 87), label: 'Power (5×3, heavier)' };
-    case 'Sharpen':
-      return { sets: 3, reps: 3, secSets: 2, pct: rampPct(phase, week, 88, 92), label: 'Sharpen (3×3, peak intensity)' };
+    case 'Power': {
+      const p = rampPct(phase, week, 83, 90); // intensify — heavy triples
+      return { primary: { sets: 5, reps: 3, pct: p }, secondary: { sets: 3, reps: 3, pct: p }, deadlift: { sets: 1, reps: 3, pct: p }, label: 'Power — heavy triples (intensify)' };
+    }
+    case 'Sharpen': {
+      // REALIZE: taper volume, push intensity to a near-maximal single that primes a new max.
+      if (week === phase.end_week) {
+        return { primary: { sets: 2, reps: 1, pct: 97 }, secondary: { sets: 2, reps: 3, pct: 85 }, deadlift: { sets: 1, reps: 1, pct: 95 }, label: 'Peak — heavy single 97% (primes the new max)' };
+      }
+      const p = rampPct(phase, week, 92, 94);
+      return { primary: { sets: 3, reps: 2, pct: p }, secondary: { sets: 2, reps: 3, pct: 85 }, deadlift: { sets: 1, reps: 2, pct: p }, label: 'Peak — heavy doubles' };
+    }
     case 'Base':
-    default:
-      return { sets: 5, reps: 5, secSets: 3, pct: rampPct(phase, week, 70, 77), label: 'Strength base (5×5)' };
+    default: {
+      const p = rampPct(phase, week, 72, 82); // accumulate — work capacity + hypertrophy base
+      return { primary: { sets: 5, reps: 5, pct: p }, secondary: { sets: 3, reps: 5, pct: p }, deadlift: { sets: 1, reps: 5, pct: p }, label: 'Base — 5×5 (accumulate)' };
+    }
   }
 }
 
-function exer(name: string, sets: number, reps: number | string, pct: number): StrengthExercise {
-  return { name, sets, reps, weight: `${pct}% 1RM` };
+function exer(name: string, s: Scheme): StrengthExercise {
+  return { name, sets: s.sets, reps: s.reps, weight: `${s.pct}% 1RM` };
 }
 
-/** The 4 REAL barbell sessions (U/L/U/L) for a work week — same clean structure every phase. */
+/** The 4 REAL barbell sessions (U/L/U/L) for a work week. Primary lift heavy, accessory at back-off. */
 function workSessions(load: WorkLoad): { name: string; focus: 'upper' | 'lower'; ex: StrengthExercise[] }[] {
-  const { sets, reps, secSets, pct } = load;
+  const { primary: P, secondary: S, deadlift: D } = load;
   return [
-    { name: 'Upper A', focus: 'upper', ex: [exer('Bench Press', sets, reps, pct), exer('Barbell Row', sets, reps, pct)] },
-    { name: 'Lower A', focus: 'lower', ex: [exer('Back Squat', sets, reps, pct), exer('Romanian Deadlift', secSets, reps, pct)] },
-    { name: 'Upper B', focus: 'upper', ex: [exer('Overhead Press', sets, reps, pct), exer('Pull Up', secSets, reps, pct)] },
-    { name: 'Lower B', focus: 'lower', ex: [exer('Back Squat', secSets, reps, pct), exer('Conventional Deadlift', 1, reps, pct)] },
+    { name: 'Upper A', focus: 'upper', ex: [exer('Bench Press', P), exer('Barbell Row', S)] },
+    { name: 'Lower A', focus: 'lower', ex: [exer('Back Squat', P), exer('Romanian Deadlift', S)] },
+    { name: 'Upper B', focus: 'upper', ex: [exer('Overhead Press', P), exer('Pull Up', S)] },
+    { name: 'Lower B', focus: 'lower', ex: [exer('Back Squat', S), exer('Conventional Deadlift', D)] },
   ];
 }
 
-/** Retest week: work up to a heavy single on each main lift to RE-BASELINE the 1RM (not a deload). */
-function retestSessions(): { name: string; focus: 'upper' | 'lower'; ex: StrengthExercise[]; test: string }[] {
-  const ramp = (lift: string): StrengthExercise[] => [
-    { name: `${lift} — warm-up`, sets: 1, reps: '5 / 3 / 2 / 1', weight: 'ramp 50→85% 1RM' },
-    { name: `${lift} — top single`, sets: 1, reps: 1, weight: 'work up to a NEW max (≥100% of current 1RM)' },
-  ];
-  return [
-    { name: 'Bench Press', focus: 'upper', ex: ramp('Bench Press'), test: 'Bench Press' },
-    { name: 'Back Squat', focus: 'lower', ex: ramp('Back Squat'), test: 'Back Squat' },
-    { name: 'Overhead Press', focus: 'upper', ex: ramp('Overhead Press'), test: 'Overhead Press' },
-    { name: 'Deadlift', focus: 'lower', ex: ramp('Deadlift'), test: 'Deadlift' },
-  ];
+/**
+ * Retest week: an OPEN re-baseline. Each main lift opens at 100% (the current max — so it renders
+ * AT/ABOVE the start, never below) then prescribes a PR attempt at 102.5%, framed open ("work up,
+ * log what you hit"). Clean `% 1RM` strings so the materializer renders them (the prior free-text
+ * "work up to a NEW max" string failed to parse and fell back to the prior week's load — fixed).
+ */
+function retestSessions(): { name: string; focus: 'upper' | 'lower'; ex: StrengthExercise[] }[] {
+  const lift = (name: string, focus: 'upper' | 'lower') => ({
+    name, focus,
+    ex: [
+      { name: `${name} — opener (single @ current max)`, sets: 1, reps: 1, weight: '100% 1RM' },
+      { name: `${name} — NEW-max attempt`, sets: 1, reps: 1, weight: '102.5% 1RM' },
+    ],
+  });
+  return [lift('Bench Press', 'upper'), lift('Back Squat', 'lower'), lift('Overhead Press', 'upper'), lift('Deadlift', 'lower')];
 }
 
 function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean): PlanSession {
@@ -174,11 +192,15 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         weekSessions.push({
           day: grid.strength[i],
           type: 'strength',
-          name: `Retest — ${s.name} (work up to a new max)`,
-          description: `Re-baseline your 1RM. Warm up, then work up in singles to a NEW max ${s.test}. Log it — the next block loads off this number.`,
+          name: `Retest — ${s.name} (work up to a NEW max)`,
+          description:
+            `Re-baseline your 1RM. Warm up in singles (bar → 50 → 70 → 85 → 93%), hit your current max ` +
+            `(opener @ 100%), then add load and ATTEMPT A NEW MAX (~102.5–105%). Work up — log what you ` +
+            `actually hit; the result becomes your new 1RM and the next block loads off the bigger number.`,
           duration: 60,
           strength_exercises: s.ex,
-          tags: ['strength', s.focus, 'phase:retest', 'retest', 'protocol:strength_primary'],
+          // 1rm_test / baseline_test tags so logging the result feeds the 1RM write-back (lifecycle).
+          tags: ['strength', s.focus, 'phase:retest', 'retest', '1rm_test', 'baseline_test', 'protocol:strength_primary'],
         });
       });
     } else {
@@ -191,7 +213,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
           name: `Strength Focus — ${s.name}`,
           description:
             `${load.label} — 4-day split. ` +
-            `${s.ex.map((e) => `${e.name} ${e.sets}×${e.reps}`).join(' · ')}. Target ${load.pct}% 1RM.`,
+            `${s.ex.map((e) => `${e.name} ${e.sets}×${e.reps} @ ${e.weight}`).join(' · ')}. Top set ${load.primary.pct}% 1RM.`,
           duration: 60,
           strength_exercises: s.ex,
           tags: ['strength', s.focus, `phase:${phase.name.toLowerCase()}`, 'protocol:strength_primary'],

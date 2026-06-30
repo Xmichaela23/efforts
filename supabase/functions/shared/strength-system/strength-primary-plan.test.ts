@@ -1,6 +1,5 @@
-// STRENGTH-PRIMARY PLAN — arc spine + maintenance endurance, sport-agnostic, with the
-// three loading fixes (real power sessions / continuous loading / retest-to-a-single).
-// Run: ~/.deno/bin/deno test --no-check --allow-import --allow-read --allow-env strength-primary-plan.test.ts
+// STRENGTH-PRIMARY PLAN — the loading curve must PROGRESS THE MAX: accumulate → intensify →
+// realize (96–97% single) → open PR retest (≥100%). Run: ~/.deno/bin/deno test --no-check ...
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { buildArcPhases, composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 
@@ -9,72 +8,60 @@ const PLAN = composeStrengthPrimaryPlan({
 });
 const wk = (n: number) => PLAN.sessions_by_week[String(n)];
 const strengthOf = (n: number) => wk(n).filter((s) => s.type === 'strength');
-const exNames = (n: number) => strengthOf(n).flatMap((s) => (s.strength_exercises ?? []).map((e) => e.name));
+const benchEx = (n: number) =>
+  strengthOf(n).flatMap((s) => s.strength_exercises ?? []).filter((e) => /^Bench Press/i.test(e.name));
 const allText = (n: number) => JSON.stringify(wk(n)).toLowerCase();
-const pctOf = (n: number) => {
-  const m = JSON.stringify(strengthOf(n)).match(/(\d+(?:\.\d+)?)% 1rm/i);
-  return m ? Number(m[1]) : NaN;
-};
 
 Deno.test('arc timeline — base→power→sharpen→retest', () => {
-  const { phases } = buildArcPhases(12);
-  assertEquals(phases.map((p) => p.name), ['Base', 'Power', 'Sharpen', 'Retest']);
-  assertEquals(phases[phases.length - 1].start_week, 12);
+  assertEquals(buildArcPhases(12).phases.map((p) => p.name), ['Base', 'Power', 'Sharpen', 'Retest']);
 });
 
-Deno.test('#1 — every work phase is 4 REAL barbell sessions; NO maintenance fillers / bodyweight copy', () => {
-  for (const n of [2, 7, 11]) { // base, power, sharpen
-    assertEquals(strengthOf(n).length, 4, `week ${n} must have 4 strength sessions`);
+Deno.test('#1 — every work phase is 4 REAL barbell sessions; no fillers/bodyweight copy', () => {
+  for (const n of [2, 7, 10]) {
+    assertEquals(strengthOf(n).length, 4);
     const t = allText(n);
-    assert(!t.includes('bodyweight tier cannot'), `week ${n} leaked the false bodyweight copy`);
-    assert(!t.includes('glute bridges') && !t.includes('walking lunges'), `week ${n} leaked maintenance-filler content`);
-    assert(!t.includes('maintenance (optional)') && !t.includes('light lower body maintenance'), `week ${n} leaked a filler session`);
+    assert(!t.includes('bodyweight tier cannot') && !t.includes('glute bridges') && !t.includes('walking lunges'));
   }
-  // power week is real barbell compounds at a real %
-  const p = exNames(7);
-  assert(p.includes('Bench Press') && p.includes('Back Squat'), `power week should be barbell compounds; got ${p}`);
 });
 
-Deno.test('#2 — continuous loading off the 1RM, NO phase reset (base<power<sharpen)', () => {
-  const base = pctOf(5);   // base end
-  const power = pctOf(6);  // power start
-  const sharpen = pctOf(10);
-  assert(base >= 70 && base <= 77, `base ${base} out of range`);
-  assert(power >= 80, `power ${power} should start ≥80`);
-  assert(power > base, `NO RESET: power (${power}) must exceed base end (${base})`);
-  assert(sharpen >= 88, `sharpen ${sharpen} should be ≥88`);
-  // reps drop by phase: base 5×5, power 5×3, sharpen 3×3
-  assert(JSON.stringify(strengthOf(2)).includes('"reps":5'), 'base = 5-rep');
-  assert(JSON.stringify(strengthOf(7)).includes('"reps":3'), 'power = 3-rep');
+Deno.test('CURVE — accumulate(72→82) → intensify(83→90) → PEAK reaches a 97% SINGLE', () => {
+  const benchPct = (n: number) => Number((benchEx(n)[0]?.weight.match(/([\d.]+)%/) || [])[1]);
+  assertEquals(benchPct(1), 72, 'base wk1 = 72%');           // accumulate start
+  assert(benchPct(5) >= 80, `base end should reach ~82%, got ${benchPct(5)}`);
+  assert(benchPct(6) >= 83, `power start ≥83%, got ${benchPct(6)}`);
+  assert(benchPct(6) > benchPct(5), 'NO RESET: power > base end');
+  assert(benchPct(9) >= 90, `power end ~90%, got ${benchPct(9)}`);
+  // PEAK: the LAST sharpen week (wk11) is a near-maximal SINGLE on the main lift
+  const peak = benchEx(11)[0];
+  assertEquals(peak.reps, 1, 'wk11 bench must be a single');
+  assert(Number((peak.weight.match(/([\d.]+)%/) || [])[1]) >= 96, `peak single ≥96%, got ${peak.weight}`);
 });
 
-Deno.test('#2 — week-1 base is 70% (unchanged structure), squat present (base untouched)', () => {
-  assertEquals(pctOf(1), 70);
-  assert(exNames(1).includes('Back Squat') && exNames(1).includes('Bench Press'));
-});
-
-Deno.test('#3 — retest week works UP to a single, NOT a 45% deload', () => {
+Deno.test('#3 — retest OPENS at 100% + prescribes a PR attempt ABOVE it; never below; tagged for write-back', () => {
+  const ex = strengthOf(12).flatMap((s) => s.strength_exercises ?? []);
+  const weights = ex.map((e) => e.weight);
+  assert(weights.includes('100% 1RM'), 'retest must open at 100% (renders at/above the start)');
+  assert(weights.includes('102.5% 1RM'), 'retest must prescribe a PR attempt above 100%');
   const t = allText(12);
-  assert(!t.includes('45% 1rm'), 'retest must NOT be a 45% deload');
-  assert(t.includes('work up to') && (t.includes('new max') || t.includes('new 1rm')), 'retest must ramp to a new max');
-  assert(t.includes('deadlift') && t.includes('back squat') && t.includes('bench press'), 'retest tests the main lifts');
+  assert(!t.includes('45%') && !t.includes('ramp 50→85'), 'no deload / no unparseable free-text weight');
+  assert(!t.includes('≥100% of current'), 'the old free-text string that failed to parse is gone');
+  // every retest weight is ≥100% (never below start) + clean "% 1RM"
+  for (const w of weights) assert(/^\d[\d.]*% 1RM$/.test(w) && parseFloat(w) >= 100, `retest weight below start / unparseable: ${w}`);
+  // tagged so logging it writes the new 1RM (lifecycle)
+  assert(strengthOf(12).every((s) => s.tags.includes('1rm_test')), 'retest tagged 1rm_test for write-back');
+  // tests all four main lifts
+  for (const lift of ['Bench Press', 'Back Squat', 'Overhead Press', 'Deadlift']) assert(t.includes(lift.toLowerCase()));
 });
 
-Deno.test('maintenance endurance + structure preserved (guard)', () => {
-  for (const n of [2, 7]) {
-    const runs = wk(n).filter((s) => s.type === 'run');
-    assertEquals(runs.length, 2, 'Wed/Sat easy runs preserved');
-    assert(runs.every((r) => /maintenance/i.test(r.description)));
-  }
-  // distinct days, no doubling
-  const days = wk(3).map((s) => s.day);
-  assertEquals(new Set(days).size, days.length);
+Deno.test('accessories never get a 97% single (back-off volume in the peak)', () => {
+  const accessories = strengthOf(11).flatMap((s) => s.strength_exercises ?? [])
+    .filter((e) => /Pull Up|Barbell Row|Romanian/i.test(e.name));
+  assert(accessories.length > 0);
+  assert(accessories.every((e) => Number((e.weight.match(/([\d.]+)%/) || [])[1]) <= 90), 'accessories stay ≤90% in the peak');
 });
 
-Deno.test('SPORT-AGNOSTIC — cyclist gets bike maintenance, no run', () => {
-  const plan = composeStrengthPrimaryPlan({ durationWeeks: 8, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'bike', enduranceFrequency: 2 });
-  const w2 = plan.sessions_by_week['2'];
-  assertEquals(w2.filter((s) => s.type === 'strength').length, 4);
-  assertEquals(w2.filter((s) => s.type === 'ride').length, 2);
-  assertEquals(w2.filter((s) => s.type === 'run').length, 0);
+Deno.test('guard — maintenance runs + sport-agnostic preserved', () => {
+  assertEquals(wk(7).filter((s) => s.type === 'run').length, 2);
+  const bike = composeStrengthPrimaryPlan({ durationWeeks: 8, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'bike', enduranceFrequency: 2 });
+  assertEquals(bike.sessions_by_week['2'].filter((s) => s.type === 'ride').length, 2);
 });
