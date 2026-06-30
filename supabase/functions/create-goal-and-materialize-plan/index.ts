@@ -2387,6 +2387,21 @@ Deno.serve(async (req: Request) => {
             gsTp.equipment_type, gsBaseline?.equipment?.strength ?? [], gsBaseline?.performance_numbers,
           );
           if (gsEquip === 'commercial_gym') {
+            // ENTRY gate (Q-097a): a strength-primary block loads off % of 1RM — no anchor, no block. If
+            // the athlete has no strength baselines, REQUIRE a Baseline Test first (don't build off a
+            // guess). HAS 1RMs → build (the wk12 retest is the optional courtesy). The Baseline Test now
+            // writes performance_numbers via the wired isBaselineTestWorkout path (Q-097b).
+            const gsPN = (gsBaseline?.performance_numbers ?? {}) as Record<string, any>;
+            const hasStrengthAnchor = Number(gsPN.bench) > 0 && Number(gsPN.squat) > 0;
+            if (!hasStrengthAnchor) {
+              if (mode === 'create' && createdGoalId) {
+                await supabase.from('goals').delete().eq('id', createdGoalId).eq('user_id', user_id);
+              }
+              return new Response(JSON.stringify({
+                success: false, error_code: 'baseline_required', mode,
+                error: 'Get Strong loads off your 1RMs — log a quick Baseline Test (squat + bench; we calculate the rest) to set them, then build your block.',
+              }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
             const gsSport = gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null;
             const gsBody: Record<string, any> = {
               user_id,

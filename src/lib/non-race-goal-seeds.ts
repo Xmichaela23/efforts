@@ -89,7 +89,13 @@ export function buildPreferredDays(
   if (sched.anchorDiscipline && sched.anchorDay && present(sched.anchorDiscipline)) {
     out[`quality_${sched.anchorDiscipline}`] = sched.anchorDay; // the kept club session = a hard day
   }
-  if (present('strength')) out.strength = ['monday', 'thursday'];
+  // Develop (Get Strong) = the 4-day U/L/U/L arc — match the engine grid so the intake header doesn't
+  // contradict the plan (Mon/Tue/Thu/Fri). Maintain/support strength stays the 2-day concurrent slot.
+  if (present('strength')) {
+    out.strength = posture.strength === 'develop'
+      ? ['monday', 'tuesday', 'thursday', 'friday']
+      : ['monday', 'thursday'];
+  }
   return out;
 }
 
