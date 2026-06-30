@@ -2366,6 +2366,58 @@ Deno.serve(async (req: Request) => {
         createdGoalId = resolvedBuildId || existing_goal_id || null;
       }
 
+      // ── GET STRONG (strength-primary) — SPEC-product-shape Program 1 ───────────────
+      // Strength develops while endurance is HELD → strength is the SPINE, not an overlay. Route to the
+      // sport-agnostic strength-primary engine (the conductor's arc + maintenance endurance) instead of
+      // the (b)-run marathon stopgap. Serves runners AND cyclists. Barbell-only for now (the arc is the
+      // 5×5/neural lanes); bodyweight Get Strong falls through to (b)-run durability until a bodyweight
+      // strength-primary lane exists.
+      {
+        const gsPosture = sanitizePerDisciplinePosture(tp.per_discipline_posture as Record<string, unknown> | undefined);
+        const gsEnduranceDevelops = ['run', 'bike', 'swim'].some((d) => gsPosture?.[d] === 'develop');
+        if (gsPosture?.strength === 'develop' && !gsEnduranceDevelops) {
+          const { data: gsBaseline } = await supabase
+            .from('user_baselines').select('equipment, performance_numbers').eq('user_id', user_id).maybeSingle();
+          const gsEquip = resolveStrengthEquipmentTypeForPlan(
+            tp.equipment_type, gsBaseline?.equipment?.strength ?? [], gsBaseline?.performance_numbers,
+          );
+          if (gsEquip === 'commercial_gym') {
+            const gsSport = gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null;
+            const gsBody: Record<string, any> = {
+              user_id,
+              duration_weeks: Number((resolvedGoal as any)?.target_weeks) || 12,
+              strength_frequency: 4,            // the full 4-day U/L/U/L arc (barbell)
+              strength_tier: 'strength_power',
+              endurance_sport: gsSport,         // sport-agnostic maintenance (run / bike / none)
+              endurance_frequency: 2,
+              goal_name: String(resolvedGoal?.name || 'Get Stronger'),
+              ...(plan_start_date ? { start_date: plan_start_date } : {}),
+              ...(bodyPreview ? { preview: true } : {}),
+            };
+            console.log(`[create-goal] Get Strong → strength-primary: sport=${gsSport ?? 'strength-only'} weeks=${gsBody.duration_weeks}`);
+            const gsGen = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-strength-plan', gsBody);
+            if (bodyPreview) {
+              return new Response(JSON.stringify({
+                success: true, mode, goal_id: createdGoalId, preview: true, sport: 'strength', combined: false,
+                plan: gsGen?.plan ?? null,
+              }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+            const gsPlanId = gsGen?.plan_id;
+            if (!gsPlanId) throw new AppError('plan_generation_failed', gsGen?.error || 'Strength plan returned no plan_id');
+            createdPlanId = gsPlanId;
+            const { error: gsLinkErr } = await supabase
+              .from('plans').update({ goal_id: createdGoalId, plan_mode: 'rolling' }).eq('id', gsPlanId).eq('user_id', user_id);
+            if (gsLinkErr) throw new AppError('plan_link_failed', gsLinkErr.message);
+            await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: gsPlanId });
+            await retireCompetingActivePlans(supabase, user_id, gsPlanId, { mode, existing_goal_id, replace_plan_id });
+            await bustTrainingCachesAfterPlanChange('strength_plan');
+            return new Response(JSON.stringify({
+              success: true, mode, goal_id: createdGoalId, plan_id: gsPlanId, sport: 'strength', combined: false,
+            }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
+      }
+
       // ── (b)-run: run-shaped non-race → generate-run-plan with a RETEST head ────────
       // The combined engine is triathlon-shaped and cannot produce a single-sport run week (F-9/F-12).
       // Route run-shaped non-race goals to the working single-sport engine with terminalShape='retest'

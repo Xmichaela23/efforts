@@ -1,6 +1,16 @@
 # SCOPE — Strength-Primary Plan Shape (the real Program 1; replaces the `(b)-run` stopgap)
 
-**Status:** SCOPE for review (2026-06-29). The conductor (phase→protocol arc) is built; this is the **shape** it runs inside. Decision needed on architecture (§Fork). Do not build until reviewed — the fork is a real choice.
+**Status: BUILT (Option B) 2026-06-29 — staged, NOT deployed.** Michael chose B (strength-primary, sport-agnostic). Built:
+- **`shared/strength-system/strength-primary-plan.ts`** — `composeStrengthPrimaryPlan`: the conductor's arc (base→power→sharpen→retest) as the SPINE + maintenance endurance (run/bike/none) underneath, on a clean strength-primary day grid (no doubling). Sport-agnostic. **Tested: 5/5** (arc timeline, spine sequencing, cyclist, strength-only, distinct days).
+- **`generate-strength-plan/`** — the new edge engine: composes + persists the standard `plans` row + `sessions_by_week`, returns plan_id. Type-checks clean.
+- **`create-goal` routing** — a Get Strong goal (strength develops + endurance held + **barbell**) now routes to `generate-strength-plan` BEFORE the `(b)-run`/combine forks. Bodyweight Get Strong still falls to `(b)-run` durability (no bodyweight strength-primary lane yet).
+- **OWED on deploy (live verification):** (1) deploy `generate-strength-plan` (new) + `create-goal`; (2) confirm **`activate-plan` materializes the session shape** — the strength sessions match `convertToSession`'s shape, but the maintenance run/bike sessions are simple `{day,type,name,description,duration}` (no run tokens/steps) — verify they land as calendar workouts (may need a token/step or a default); (3) the **1RM retest terminal** is v1 (retest week = deload + "test top sets" label) — the full re-baseline (log a 1RM, re-anchor `userBaselines`) is the next refinement (audit gap #4, ties to Q-086).
+
+The original scope (the fork + the levers) is preserved below for context.
+
+---
+
+**(Original scope — for context)** The conductor (phase→protocol arc) is built; this is the **shape** it runs inside.
 
 ---
 

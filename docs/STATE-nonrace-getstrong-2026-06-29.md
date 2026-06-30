@@ -25,13 +25,14 @@ The whole **pipe works** — builder → goal → plan → calendar, in-app — 
 3. **Equipment mis-classification** — `equipmentTierFromArc` didn't recognize "Commercial gym" → bodyweight → durability. Fixed (string match). The deeper fix: **smart-server developer resolution** — the engine now picks the developer from reliable server-side equipment when strength develops (`create-goal` v226), per the spec's "dumb client" principle.
 4. **Routing** — non-race run-shaped goals route `(b)-run` (NOT combined); the `:2178` "must route combined" comment is stale (T-3/D-218). Confirmed by trace.
 
-## The ONE real build left (Program 1's shape)
-The conductor sequences the strength *protocol*. It does **not** fix the plan **shape**. The `(b)-run` stopgap makes the plan **run-primary**:
-- **"Marathon Completion Plan" label** — it proxies `distance:'marathon'`.
-- **days/week not honored, strength doubling** — the run engine sizes/places the running week; strength is overlaid into it.
-- **run leads, strength tags along** — the INVERSE of Get Strong.
+## Program 1's shape — BUILT (Option B), staged
+**UPDATE (later 2026-06-29):** the strength-primary path is now **built** (chose Option B — sport-agnostic). See `SCOPE-strength-primary-shape.md` (BUILT). The conductor sequences the protocol; the strength-primary engine makes strength the **spine**:
+- **`composeStrengthPrimaryPlan`** (`shared/strength-system/strength-primary-plan.ts`) — the conductor's arc (base→power→sharpen→retest) IS the structure; maintenance endurance (run/bike/none) on the off-days; clean grid, no doubling; **5/5 tests**.
+- **`generate-strength-plan`** — new edge engine; persists the standard plan row; type-checks.
+- **`create-goal`** — Get Strong (strength develops + endurance held + barbell) routes here BEFORE `(b)-run`/combine. Bodyweight → `(b)-run` durability still.
+- **OWED on deploy:** deploy the new engine + create-goal; verify `activate-plan` materializes the session shape (maintenance run/bike sessions are simple — may need a token/default); the 1RM-retest terminal is v1 (deload + label) — full re-baseline is the next refinement (gap #4).
 
-**The real Program 1 = strength is the spine:** the strength arc (base→power→sharpen, conductor-driven) is the plan; endurance runs underneath at maintenance; the terminal is a **1RM strength retest** (audit gap #4, not built). This **supersedes the `(b)-run` stopgap** — it shouldn't be patched further, it should be replaced. Architecture: the spec's "one engine, two knobs" (`SPEC-non-race-goal-plan-contract.md`) — `buildCombinedPlan` non-race-aware with the strength-role knob — OR a dedicated strength-primary path. **This is the next scope.**
+This **supersedes the `(b)-run` stopgap for Get Strong** (the stopgap stays for endurance-develop run goals). The old run-primary symptoms (marathon label, doubling, days ignored) don't apply to the strength-primary path.
 
 ## HELD (do not touch)
 - **Bike / multi-sport non-race** (F-9 combined engine) — separate cut, fragile surface, 486-guard each step.
