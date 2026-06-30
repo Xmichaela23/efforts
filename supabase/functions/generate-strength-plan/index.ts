@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const {
       user_id, duration_weeks, strength_frequency, strength_tier,
-      endurance_sport, endurance_frequency, goal_name, start_date, preview,
+      endurance_sport, endurance_frequency, goal_name, start_date, preview, needs_baseline,
     } = body as Record<string, unknown>;
 
     if (!user_id) return json({ success: false, error: 'user_id is required' }, 400);
@@ -45,6 +45,7 @@ Deno.serve(async (req: Request) => {
       enduranceSport: sport,
       enduranceFrequency: Number.isFinite(Number(endurance_frequency)) ? Number(endurance_frequency) : 2,
       goalName: typeof goal_name === 'string' ? goal_name : undefined,
+      needsBaseline: needs_baseline === true,
     });
     console.log(`[strength-plan] composed: ${plan.name} (${plan.duration_weeks}wk, freq ${freq}, ${sport ?? 'strength-only'}, tier ${tier})`);
 

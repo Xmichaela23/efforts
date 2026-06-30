@@ -82,3 +82,17 @@ Deno.test('guard — real barbell every work phase, maintenance runs, sport-agno
   const bike = composeStrengthPrimaryPlan({ durationWeeks: 8, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'bike', enduranceFrequency: 2 });
   assertEquals(bike.sessions_by_week['2'].filter((s) => s.type === 'ride').length, 2);
 });
+
+Deno.test('NO-1RMs path — week 1 is a baseline test (offered, not forced); weeks 2-12 train', () => {
+  const no = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2, needsBaseline: true });
+  const wk1 = no.sessions_by_week['1'].filter((s) => s.type === 'strength');
+  assertEquals(wk1.length, 2, 'week 1 = 2 baseline tests (lower + upper), not 4 training days');
+  assert(wk1.every((s) => /^Baseline Test:/.test(s.name)), 'named "Baseline Test: …" so the logger recognizes it by name + writes performance_numbers');
+  assert(JSON.stringify(wk1).includes('Back Squat') && JSON.stringify(wk1).includes('Bench Press'));
+  assert(no.sessions_by_week['2'].some((s) => s.type === 'strength' && /Strength Focus/.test(s.name)), 'weeks 2+ train');
+  assertEquals(no.sessions_by_week['1'].filter((s) => s.type === 'run').length, 2, 'easy maintenance still fills the baseline week');
+
+  // YES / unset path (default): week 1 trains, no baseline test, no bounce-out
+  const yes = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2 });
+  assert(!JSON.stringify(yes.sessions_by_week['1']).includes('Baseline Test'), 'YES path: week 1 is training');
+});

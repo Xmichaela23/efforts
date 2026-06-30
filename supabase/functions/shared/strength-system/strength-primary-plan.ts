@@ -27,6 +27,9 @@ export type StrengthPrimaryArgs = {
   enduranceSport: 'run' | 'bike' | null;
   enduranceFrequency: number; // ~2 maintenance sessions/week
   goalName?: string;
+  /** "Do you know your 1RMs?" → NO. Week 1 becomes a baseline test (offered, not forced); weeks 2-12
+   *  train off the result. Default false (the athlete entered their 1RMs → train from week 1). */
+  needsBaseline?: boolean;
 };
 
 type StrengthExercise = { name: string; sets: number; reps: number | string; weight: string };
@@ -167,6 +170,31 @@ function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: bool
   };
 }
 
+/** Week-1 baseline test (NO-1RMs path): two NAMED "Baseline Test: Lower/Upper" sessions the logger
+ *  recognizes by name — it runs the warmup-to-max flow and writes performance_numbers (the existing
+ *  baseline path). Spread Mon/Thu, easy maintenance fills the rest. */
+function baselineTestWeek(
+  grid: { strength: string[]; endurance: string[] },
+  enduranceSport: 'run' | 'bike' | null,
+): PlanSession[] {
+  const test = (day: string, region: 'Lower' | 'Upper', lifts: string[], focus: 'lower' | 'upper'): PlanSession => ({
+    day, type: 'strength', name: `Baseline Test: ${region} Body`,
+    description:
+      `Establish your 1RMs — warm up, then work up to a heavy set on ${lifts.join(' + ')}. The app reads ` +
+      `it as your max (no % yet; this sets the numbers the rest of the block loads off).`,
+    duration: 60,
+    strength_exercises: lifts.map((name) => ({ name, sets: 1, reps: 3, weight: 'work up to a heavy 3' })),
+    tags: ['strength', focus, 'phase:baseline', 'baseline_test', '1rm_test', 'protocol:strength_primary'],
+  });
+  const sessions: PlanSession[] = [
+    test(grid.strength[0], 'Lower', ['Back Squat', 'Deadlift'], 'lower'),
+    test(grid.strength[2] ?? grid.strength[1], 'Upper', ['Bench Press', 'Overhead Press'], 'upper'),
+  ];
+  if (enduranceSport) grid.endurance.forEach((day) => sessions.push(enduranceSession(enduranceSport, day, false)));
+  sessions.sort((a, b) => DAYS.indexOf(a.day as typeof DAYS[number]) - DAYS.indexOf(b.day as typeof DAYS[number]));
+  return sessions;
+}
+
 /**
  * Compose a strength-primary plan: the arc as the spine + maintenance endurance underneath.
  * Returns the standard plan structure — the caller persists it and runs activate-plan.
@@ -238,6 +266,14 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
 
     weekSessions.sort((a, b) => DAYS.indexOf(a.day as typeof DAYS[number]) - DAYS.indexOf(b.day as typeof DAYS[number]));
     sessions_by_week[String(week)] = weekSessions;
+  }
+
+  // "Do you know your 1RMs?" → NO: week 1 IS a baseline test (offered, not forced). It replaces the arc's
+  // week-1 base session (which can't load % without an anchor anyway); weeks 2-12 train off the result.
+  // The named "Baseline Test: Lower/Upper" sessions flow through the logger's baseline path (writes
+  // performance_numbers), then UnifiedWorkoutView re-materializes the % weeks.
+  if (args.needsBaseline) {
+    sessions_by_week['1'] = baselineTestWeek(grid, enduranceSport);
   }
 
   const enduranceNote = enduranceSport
