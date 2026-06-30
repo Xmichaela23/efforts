@@ -56,24 +56,25 @@ const GRID: Record<string, { strength: string[]; endurance: string[] }> = {
 };
 
 /**
- * The Get Strong arc timeline: base → power → sharpen → strength retest. Proportional to the block
- * length; the final week is always the retest (1RM re-baseline).
+ * The Get Strong ATR arc: accumulate → intensify → DELOAD → realize(peak) → strength retest.
+ * A block this long needs recovery every 6–8 wk (CONVENTION/consensus) — the deload sits between
+ * intensify and peak so the athlete recovers BEFORE the heavy singles. The final week is the retest.
  */
 export function buildArcPhases(weeks: number): { phases: ArcPhase[]; recovery_weeks: number[] } {
-  const body = Math.max(1, weeks - 1); // reserve the last week for the retest
-  const baseLen = Math.max(1, Math.round(body * 0.45));
-  const powerLen = Math.max(1, Math.round(body * 0.35));
-  const sharpenLen = Math.max(0, body - baseLen - powerLen);
+  const loading = Math.max(3, weeks - 1); // reserve the last week for the retest
+  const baseLen = Math.max(1, Math.round(loading * 0.36));
+  const powerLen = Math.max(1, Math.round(loading * 0.18));
+  const deloadLen = 1;
+  const peakLen = Math.max(1, loading - baseLen - powerLen - deloadLen);
   const phases: ArcPhase[] = [];
   let w = 1;
   phases.push({ name: 'Base', start_week: w, end_week: w + baseLen - 1, weeks_in_phase: baseLen }); w += baseLen;
   phases.push({ name: 'Power', start_week: w, end_week: w + powerLen - 1, weeks_in_phase: powerLen }); w += powerLen;
-  if (sharpenLen > 0) {
-    phases.push({ name: 'Sharpen', start_week: w, end_week: w + sharpenLen - 1, weeks_in_phase: sharpenLen });
-    w += sharpenLen;
-  }
+  const deloadWeek = w;
+  phases.push({ name: 'Deload', start_week: w, end_week: w + deloadLen - 1, weeks_in_phase: deloadLen }); w += deloadLen;
+  phases.push({ name: 'Peak', start_week: w, end_week: w + peakLen - 1, weeks_in_phase: peakLen }); w += peakLen;
   phases.push({ name: 'Retest', start_week: weeks, end_week: weeks, weeks_in_phase: 1 });
-  return { phases, recovery_weeks: [] };
+  return { phases, recovery_weeks: [deloadWeek] };
 }
 
 function phaseFor(week: number, phases: ArcPhase[]): ArcPhase {
@@ -99,16 +100,21 @@ function rampPct(phase: ArcPhase, week: number, start: number, end: number): num
 function workLoad(phase: ArcPhase, week: number): WorkLoad {
   switch (phase.name) {
     case 'Power': {
-      const p = rampPct(phase, week, 83, 90); // intensify — heavy triples
+      const p = rampPct(phase, week, 84, 90); // intensify — heavy triples
       return { primary: { sets: 5, reps: 3, pct: p }, secondary: { sets: 3, reps: 3, pct: p }, deadlift: { sets: 1, reps: 3, pct: p }, label: 'Power — heavy triples (intensify)' };
     }
-    case 'Sharpen': {
-      // REALIZE: taper volume, push intensity to a near-maximal single that primes a new max.
+    case 'Deload': {
+      // Recover before the heavy singles: ~50% volume + intensity drop (CONVENTION).
+      return { primary: { sets: 2, reps: 5, pct: 65 }, secondary: { sets: 2, reps: 5, pct: 60 }, deadlift: { sets: 1, reps: 5, pct: 60 }, label: 'Deload — recover before the peak (≈50% volume + intensity drop)' };
+    }
+    case 'Peak': {
+      // REALIZE post-deload: re-intensify and taper volume to a near-maximal single in the final
+      // loading week that primes the new max.
       if (week === phase.end_week) {
         return { primary: { sets: 2, reps: 1, pct: 97 }, secondary: { sets: 2, reps: 3, pct: 85 }, deadlift: { sets: 1, reps: 1, pct: 95 }, label: 'Peak — heavy single 97% (primes the new max)' };
       }
-      const p = rampPct(phase, week, 92, 94);
-      return { primary: { sets: 3, reps: 2, pct: p }, secondary: { sets: 2, reps: 3, pct: 85 }, deadlift: { sets: 1, reps: 2, pct: p }, label: 'Peak — heavy doubles' };
+      const p = rampPct(phase, week, 88, 94);
+      return { primary: { sets: 3, reps: 2, pct: p }, secondary: { sets: 2, reps: 3, pct: 85 }, deadlift: { sets: 1, reps: 2, pct: p }, label: 'Peak — heavy doubles (realize)' };
     }
     case 'Base':
     default: {
@@ -134,17 +140,16 @@ function workSessions(load: WorkLoad): { name: string; focus: 'upper' | 'lower';
 }
 
 /**
- * Retest week: an OPEN re-baseline. Each main lift opens at 100% (the current max — so it renders
- * AT/ABOVE the start, never below) then prescribes a PR attempt at 102.5%, framed open ("work up,
- * log what you hit"). Clean `% 1RM` strings so the materializer renders them (the prior free-text
- * "work up to a NEW max" string failed to parse and fell back to the prior week's load — fixed).
+ * Retest week: re-baseline the 1RM the SAFE way — a heavy sub-max TRIPLE, then ESTIMATE the new max
+ * (Epley/Brzycki e1RM, ±3–5% accurate from 1–6 reps near failure — practitioner CONVENTION). Drops
+ * the high-risk/low-reward solo near-max single. The athlete works up to their heaviest CLEAN triple;
+ * the logged weight×reps → estimated new 1RM → stored max, and the next block compounds off it.
  */
 function retestSessions(): { name: string; focus: 'upper' | 'lower'; ex: StrengthExercise[] }[] {
   const lift = (name: string, focus: 'upper' | 'lower') => ({
     name, focus,
     ex: [
-      { name: `${name} — opener (single @ current max)`, sets: 1, reps: 1, weight: '100% 1RM' },
-      { name: `${name} — NEW-max attempt`, sets: 1, reps: 1, weight: '102.5% 1RM' },
+      { name: `${name} — heaviest clean triple`, sets: 1, reps: 3, weight: '90% 1RM' },
     ],
   });
   return [lift('Bench Press', 'upper'), lift('Back Squat', 'lower'), lift('Overhead Press', 'upper'), lift('Deadlift', 'lower')];
@@ -192,15 +197,16 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         weekSessions.push({
           day: grid.strength[i],
           type: 'strength',
-          name: `Retest — ${s.name} (work up to a NEW max)`,
+          name: `Retest — ${s.name} (heavy triple → estimate new 1RM)`,
           description:
-            `Re-baseline your 1RM. Warm up in singles (bar → 50 → 70 → 85 → 93%), hit your current max ` +
-            `(opener @ 100%), then add load and ATTEMPT A NEW MAX (~102.5–105%). Work up — log what you ` +
-            `actually hit; the result becomes your new 1RM and the next block loads off the bigger number.`,
+            `Re-baseline your 1RM the SAFE way — no solo max-grind. Warm up, then work up to your ` +
+            `heaviest CLEAN triple (3 reps, ~RPE 9 — strong, ~1 rep in reserve, never to failure on a ` +
+            `barbell alone). Log weight × reps; the engine estimates your new 1RM (Epley/Brzycki, ±3–5%) ` +
+            `and stores it — the next block loads off the bigger number.`,
           duration: 60,
           strength_exercises: s.ex,
-          // 1rm_test / baseline_test tags so logging the result feeds the 1RM write-back (lifecycle).
-          tags: ['strength', s.focus, 'phase:retest', 'retest', '1rm_test', 'baseline_test', 'protocol:strength_primary'],
+          // 1rm_test / estimate_1rm tags so logging the triple feeds the e1RM write-back (lifecycle).
+          tags: ['strength', s.focus, 'phase:retest', 'retest', '1rm_test', 'baseline_test', 'estimate_1rm', 'protocol:strength_primary'],
         });
       });
     } else {
@@ -236,8 +242,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   return {
     name: args.goalName?.trim() || `Get Stronger — ${durationWeeks} Weeks`,
     description:
-      `Strength-led block: a continuous base→power→sharpen arc on heavy barbell compounds ` +
-      `(balanced upper/lower), ending in a 1RM retest.${enduranceNote} The athlete picked the outcome; the engine runs the arc.`,
+      `Strength-led ATR block on heavy barbell compounds (balanced upper/lower): accumulate → ` +
+      `intensify → deload → peak, ending in a 1RM retest estimated from a heavy sub-max set ` +
+      `(no solo max attempt).${enduranceNote} Expect a MEASURED gain — concurrent strength gains are ` +
+      `real but modest (typically a few %); honest progression, not a hyped PR. The athlete picks the ` +
+      `outcome; the engine runs the arc.`,
     duration_weeks: durationWeeks,
     sessions_by_week,
     phaseStructure,
