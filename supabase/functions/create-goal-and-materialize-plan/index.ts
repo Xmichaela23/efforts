@@ -2343,7 +2343,6 @@ Deno.serve(async (req: Request) => {
     // what is already in scope here — so nothing the combine path needs is skipped. Covers create +
     // build_existing. Events (resolvedIsNonRace=false) are unaffected → byte-identical.
     if (resolvedIsNonRace) {
-      console.log('[create-goal][DIAG] NON-RACE route →', JSON.stringify({ mode, sport, goal_type: (resolvedGoal as any)?.goal_type, willHitBRun: sport === 'run' }));
       if (mode === 'create') {
         const newGoalPriority = action === 'keep' && existing_goal_id ? 'B' : 'A';
         const { data: createdGoal, error: goalInsertErr } = await supabase
@@ -2445,9 +2444,10 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        console.log('[create-goal][DIAG] (b)-run FIRED →', JSON.stringify({ mode, sport, goal_type: (resolvedGoal as any)?.goal_type, strength_protocol: runRetestBody.strength_protocol, strength_tier: runRetestBody.strength_tier, strength_frequency: runRetestBody.strength_frequency, endurance_posture: runRetestBody.endurance_posture, weekly_hours: runRetestBody.weekly_hours, distance: runRetestBody.distance }));
+        // Ops observability for the non-race run path (kept; replaces the throwaway debug logs).
+        console.log(`[create-goal] (b)-run → generate-run-plan: protocol=${runRetestBody.strength_protocol} tier=${runRetestBody.strength_tier} freq=${runRetestBody.strength_frequency} endurance=${runRetestBody.endurance_posture ?? 'n/a'}`);
         const runGen = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-run-plan', runRetestBody);
-        console.log('[create-goal][DIAG] generate-run-plan RETURNED →', JSON.stringify({ plan_id: runGen?.plan_id ?? null, success: runGen?.success ?? null, error: runGen?.error ?? null, validation_errors: runGen?.validation_errors ?? null }));
+        if (!runGen?.plan_id) console.warn('[create-goal] (b)-run generate-run-plan returned no plan_id:', JSON.stringify({ error: runGen?.error, validation_errors: runGen?.validation_errors }));
         if (bodyPreview) {
           return new Response(JSON.stringify({
             success: true, mode, goal_id: createdGoalId, preview: true,

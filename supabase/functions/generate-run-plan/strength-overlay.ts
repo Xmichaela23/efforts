@@ -10,6 +10,7 @@ import {
   resolveStrengthProtocolForGoal,
 } from '../shared/strength-system/protocols/selector.ts';
 import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
+import { isGetStrongArc, resolveStrengthArcProtocol } from '../shared/strength-system/strength-arc.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
 import {
   ProtocolContext,
@@ -576,9 +577,20 @@ function computeStrengthForPlanWeek(args: {
       `[PlanGen] strength resolver: rawProtocol=${args.protocolId ?? 'none'} intent=${args.strengthIntent ?? 'none'} tier=${args.equipmentTier ?? 'none'} → ${resolved.protocolId}${resolved.performanceGateFired ? ' (gate fired)' : ''}`,
     );
   }
-  const protocol = getProtocol(resolved.protocolId);
   const week = args.week;
   const phase = getCurrentPhase(week, args.phaseStructure);
+  // THE CONDUCTOR (SPEC-product-shape, Program 1): the strength-focus lanes ARE the Get Strong arc —
+  // sequence the protocol BY PHASE (base → strength_focus_build, build/speed → strength_focus_power,
+  // sharpen/hold → deload) instead of one flat lane across the whole block. Non-arc protocols
+  // (durability, neural_speed, five_by_five, …) pass through unchanged → byte-identical for every
+  // existing plan. See shared/strength-system/strength-arc.ts.
+  const effectiveProtocolId = isGetStrongArc(resolved.protocolId)
+    ? resolveStrengthArcProtocol(phase.name, 'get_strong')
+    : resolved.protocolId;
+  if (effectiveProtocolId !== resolved.protocolId) {
+    console.log(`[PlanGen] strength arc: ${resolved.protocolId} → ${effectiveProtocolId} for phase '${phase.name}' (week ${week})`);
+  }
+  const protocol = getProtocol(effectiveProtocolId);
   const isRecovery = args.phaseStructure.recovery_weeks.includes(week);
   let weekInPhase = 0;
   for (let w = phase.start_week; w <= week; w++) {
