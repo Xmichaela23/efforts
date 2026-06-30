@@ -2387,12 +2387,13 @@ Deno.serve(async (req: Request) => {
             gsTp.equipment_type, gsBaseline?.equipment?.strength ?? [], gsBaseline?.performance_numbers,
           );
           if (gsEquip === 'commercial_gym') {
-            // ONE intake question, two paths — NO bounce-out (don't block, don't auto-decide). The wizard
-            // asks "Do you know your 1RMs?" and sets knows_1rms. NO → week 1 of the block IS a baseline
-            // test (offered, not forced); weeks 2-12 train off the result (the baseline writes
-            // performance_numbers via the wired path, then UnifiedWorkoutView re-materializes the % weeks).
-            // YES / unset → build straight into training off the entered 1RMs. Always builds.
-            const gsNeedsBaseline = (gsTp.knows_1rms === false);
+            // CHECK, don't ask (no question, no bounce-out). The app already knows if the numbers exist:
+            // HAS squat+bench → build silently, train from week 1. EMPTY → week 1 IS a baseline test, weeks
+            // 2-12 train off the result (the named "Baseline Test" sessions write performance_numbers via
+            // the existing logger path, then UnifiedWorkoutView re-materializes the % weeks). Filled-in
+            // users never see friction.
+            const gsPN = (gsBaseline?.performance_numbers ?? {}) as Record<string, any>;
+            const gsNeedsBaseline = !(Number(gsPN.bench) > 0 && Number(gsPN.squat) > 0);
             const gsSport = gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null;
             const gsBody: Record<string, any> = {
               user_id,

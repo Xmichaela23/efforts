@@ -91,7 +91,6 @@ type NonRaceState = {
   longRideDay: DayName | '';
   anchorDiscipline: 'run' | 'bike' | null;
   anchorDay: DayName | '';
-  knows1RMs: boolean; // Get Strong: "Do you know your 1RMs?" — NO → week 1 of the block is a baseline test
 };
 
 type StepKey = 'goal' | 'posture' | 'commitment' | 'length' | 'schedule' | 'confirm';
@@ -121,7 +120,6 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string): ArcSetupP
           fitness: 'intermediate',
           days_per_week: state.daysPerWeek,
           strength_frequency: state.posture?.strength === 'develop' ? 4 : 2, // Get Strong = the 4-day develop arc; don't offer 2×/week the engine overrides
-          knows_1rms: state.knows1RMs, // NO → week 1 of the strength-primary block is a baseline test (engine-side)
           weekly_hours_available: hoursForTier(state.commitment),
           per_discipline_posture: state.posture,
           preferred_days: buildPreferredDays(state.posture, {
@@ -152,7 +150,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', knows1RMs: true,
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '',
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -430,26 +428,6 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 );
               })}
             </div>
-            {state.posture?.strength === 'develop' && (
-              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-2">
-                <p className="text-white/80 text-sm font-medium">Do you know your 1RMs?</p>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setState((s) => ({ ...s, knows1RMs: true }))}
-                    className={`flex-1 rounded-lg px-3 py-2 text-sm border ${state.knows1RMs ? 'border-white/40 bg-white/10 text-white' : 'border-white/12 text-white/55'}`}>
-                    Yes — use my numbers
-                  </button>
-                  <button type="button" onClick={() => setState((s) => ({ ...s, knows1RMs: false }))}
-                    className={`flex-1 rounded-lg px-3 py-2 text-sm border ${!state.knows1RMs ? 'border-white/40 bg-white/10 text-white' : 'border-white/12 text-white/55'}`}>
-                    No — test me in week 1
-                  </button>
-                </div>
-                <p className="text-white/45 text-xs">
-                  {state.knows1RMs
-                    ? 'Loads off your entered 1RMs — make sure they’re in your Performance Numbers. Training starts week 1.'
-                    : 'Week 1 is a baseline test to set your maxes; weeks 2–12 train off the result.'}
-                </p>
-              </div>
-            )}
             <p className="text-white/60 text-sm">
               An {state.targetWeeks}-week block from your current fitness (≈ {hoursForTier(state.commitment)} h/wk),
               ending in a <span className="text-white/80">retest</span>.
