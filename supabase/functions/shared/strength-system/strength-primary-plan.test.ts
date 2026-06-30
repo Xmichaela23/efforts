@@ -33,30 +33,43 @@ Deno.test('DELOAD week recovers — lower volume + intensity than the weeks arou
   assert(deSets <= 3, `deload volume should drop (sets ${deSets})`);
 });
 
-Deno.test('CURVE — peak still lands a 96–97% SINGLE in the final loading week (post-deload)', () => {
+Deno.test('CURVE — peak is heavy DOUBLES (no near-max single); the single is the retest check only', () => {
   const peak = buildArcPhases(12).phases.find((p) => p.name === 'Peak')!;
-  const lastLoad = benchEx(peak.end_week)[0];
-  assertEquals(lastLoad.reps, 1, 'final peak week = a single');
-  assert(Number((lastLoad.weight.match(/([\d.]+)%/) || [])[1]) >= 96, `peak single ≥96%, got ${lastLoad.weight}`);
+  const last = benchEx(peak.end_week)[0];
+  assertEquals(last.reps, 2, 'final peak week = a double, NOT a single (one near-max moment, at retest)');
+  const pk = Number((last.weight.match(/([\d.]+)%/) || [])[1]);
+  assert(pk >= 92 && pk <= 95, `peak double ~94%, got ${last.weight}`);
+  // the ONE near-max single lives at the retest (wk12 check), and it's ABOVE the peak double
+  const retestSingle = Math.max(...strengthOf(12).filter((s) => s.tags.includes('optional'))
+    .flatMap((s) => s.strength_exercises ?? []).map((e) => parseFloat(e.weight)));
+  assert(retestSingle > pk, `the retest check (${retestSingle}%) must exceed the peak double (${pk}%)`);
   assertEquals(benchPct(1), 72, 'base wk1 = 72%');
 });
 
-Deno.test('SAFE RETEST — heavy sub-max TRIPLE → estimate e1RM (NOT a solo max single)', () => {
-  const ex = strengthOf(12).flatMap((s) => s.strength_exercises ?? []);
-  assert(ex.length > 0);
-  assert(ex.every((e) => e.reps === 3), 'retest is a TRIPLE, not a single');
-  assert(ex.every((e) => parseFloat(e.weight) <= 92), 'retest is sub-max (≤~90%), not a near-max grind');
+Deno.test('COURTESY RETEST — sparing, NOT four max-out days; the CHECK expresses a gain (above the peak)', () => {
+  const sessions = strengthOf(12);
+  // exactly the 2 KEY lifts are optional max-CHECKS; the other 2 estimate from a working set
+  const checks = sessions.filter((s) => s.tags.includes('optional'));
+  assertEquals(checks.length, 2, 'only 2 optional max-checks (squat+bench), not 4 max-out days');
+  const checkText = JSON.stringify(checks).toLowerCase();
+  assert(/bench press/.test(checkText) && /back squat/.test(checkText), 'the checks are squat + bench');
+  // the CHECK expresses a gain: prescribed ABOVE the wk11 peak single (97%), e1RM > start
+  const checkPct = checks.flatMap((s) => s.strength_exercises ?? []).map((e) => parseFloat(e.weight));
+  assert(checkPct.every((p) => p >= 100), `the check must work up ABOVE the old max (≥100%), got ${checkPct}`);
+  assert(Math.max(...checkPct) > 97, 'the check renders above the wk11 peak single (97%)');
+  // the other 2 ESTIMATE from a top working set (not a formal max)
+  const estimates = sessions.filter((s) => !s.tags.includes('optional'));
+  assertEquals(estimates.length, 2);
+  assert(estimates.flatMap((s) => s.strength_exercises ?? []).every((e) => e.reps === 3), 'estimates are a working triple');
   const t = allText(12);
-  assert(!t.includes('102.5%') && !t.includes('attempt a new max'), 'no solo near-max single attempt');
-  assert(t.includes('triple') && (t.includes('epley') || t.includes('estimate')), 'estimate e1RM from a triple');
-  assert(strengthOf(12).every((s) => s.tags.includes('estimate_1rm') && s.tags.includes('1rm_test')), 'tagged for e1RM write-back');
-  for (const lift of ['Bench Press', 'Back Squat', 'Overhead Press', 'Deadlift']) assert(t.includes(lift.toLowerCase()));
+  assert(t.includes('optional') && (t.includes('epley') || t.includes('estimate')), 'optional + estimate framing');
+  assert(sessions.every((s) => s.tags.includes('1rm_test') && s.tags.includes('estimate_1rm')), 'tagged for e1RM write-back');
 });
 
-Deno.test('honest copy — measured gain, not a hyped PR; no solo max attempt', () => {
+Deno.test('honest copy — measured gain, optional courtesy retest (not mandatory max-out)', () => {
   const d = PLAN.description.toLowerCase();
   assert(d.includes('measured') && d.includes('modest'), 'promise is tempered');
-  assert(d.includes('deload') && d.includes('no solo max'), 'arc names the deload + the safe retest');
+  assert(d.includes('deload') && d.includes('optional') && d.includes('no mandatory max-out'), 'names the deload + courtesy retest');
 });
 
 Deno.test('guard — real barbell every work phase, maintenance runs, sport-agnostic', () => {

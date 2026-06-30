@@ -108,11 +108,8 @@ function workLoad(phase: ArcPhase, week: number): WorkLoad {
       return { primary: { sets: 2, reps: 5, pct: 65 }, secondary: { sets: 2, reps: 5, pct: 60 }, deadlift: { sets: 1, reps: 5, pct: 60 }, label: 'Deload — recover before the peak (≈50% volume + intensity drop)' };
     }
     case 'Peak': {
-      // REALIZE post-deload: re-intensify and taper volume to a near-maximal single in the final
-      // loading week that primes the new max.
-      if (week === phase.end_week) {
-        return { primary: { sets: 2, reps: 1, pct: 97 }, secondary: { sets: 2, reps: 3, pct: 85 }, deadlift: { sets: 1, reps: 1, pct: 95 }, label: 'Peak — heavy single 97% (primes the new max)' };
-      }
+      // REALIZE post-deload: heavy DOUBLES ramping to ~94% — primes the CNS without a near-max single.
+      // The ONE near-max single is the retest check (wk12), so squat/bench aren't maxed two weeks running.
       const p = rampPct(phase, week, 88, 94);
       return { primary: { sets: 3, reps: 2, pct: p }, secondary: { sets: 2, reps: 3, pct: 85 }, deadlift: { sets: 1, reps: 2, pct: p }, label: 'Peak — heavy doubles (realize)' };
     }
@@ -140,19 +137,21 @@ function workSessions(load: WorkLoad): { name: string; focus: 'upper' | 'lower';
 }
 
 /**
- * Retest week: re-baseline the 1RM the SAFE way — a heavy sub-max TRIPLE, then ESTIMATE the new max
- * (Epley/Brzycki e1RM, ±3–5% accurate from 1–6 reps near failure — practitioner CONVENTION). Drops
- * the high-risk/low-reward solo near-max single. The athlete works up to their heaviest CLEAN triple;
- * the logged weight×reps → estimated new 1RM → stored max, and the next block compounds off it.
+ * Retest week (HAS-1RMs default): an OPTIONAL COURTESY, not a 4-lift max-out ceremony. The peak week
+ * already did the heavy near-max work, so this is sparing:
+ *   - Squat + Bench = a light, OPTIONAL max-CHECK that EXPRESSES the gain — work up to a SMALL PR
+ *     above the old max (~102.5%), so it renders ABOVE the peak single (fixes retest-below-peak).
+ *   - Deadlift + OHP = a top working set → ESTIMATE the e1RM (Epley/Brzycki). No formal max-out.
+ * (The HAS/NO-1RM conditional — required up-front baseline when there's no anchor — is a create-goal
+ * gate that depends on the write-back wire, Q-097.)
  */
-function retestSessions(): { name: string; focus: 'upper' | 'lower'; ex: StrengthExercise[] }[] {
-  const lift = (name: string, focus: 'upper' | 'lower') => ({
-    name, focus,
-    ex: [
-      { name: `${name} — heaviest clean triple`, sets: 1, reps: 3, weight: '90% 1RM' },
-    ],
-  });
-  return [lift('Bench Press', 'upper'), lift('Back Squat', 'lower'), lift('Overhead Press', 'upper'), lift('Deadlift', 'lower')];
+function retestSessions(): { name: string; focus: 'upper' | 'lower'; kind: 'check' | 'estimate'; ex: StrengthExercise[] }[] {
+  return [
+    { name: 'Bench Press', focus: 'upper', kind: 'check', ex: [{ name: 'Bench Press — optional max-check (aim small PR)', sets: 1, reps: 1, weight: '102.5% 1RM' }] },
+    { name: 'Back Squat', focus: 'lower', kind: 'check', ex: [{ name: 'Back Squat — optional max-check (aim small PR)', sets: 1, reps: 1, weight: '102.5% 1RM' }] },
+    { name: 'Overhead Press', focus: 'upper', kind: 'estimate', ex: [{ name: 'Overhead Press — top working set', sets: 1, reps: 3, weight: '88% 1RM' }] },
+    { name: 'Deadlift', focus: 'lower', kind: 'estimate', ex: [{ name: 'Deadlift — top working set', sets: 1, reps: 3, weight: '88% 1RM' }] },
+  ];
 }
 
 function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean): PlanSession {
@@ -194,19 +193,24 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     if (isRetestWeek) {
       // #3 — retest: ramp to a heavy single on each main lift. NOT a deload.
       retestSessions().slice(0, grid.strength.length).forEach((s, i) => {
+        const isCheck = s.kind === 'check';
         weekSessions.push({
           day: grid.strength[i],
           type: 'strength',
-          name: `Retest — ${s.name} (heavy triple → estimate new 1RM)`,
-          description:
-            `Re-baseline your 1RM the SAFE way — no solo max-grind. Warm up, then work up to your ` +
-            `heaviest CLEAN triple (3 reps, ~RPE 9 — strong, ~1 rep in reserve, never to failure on a ` +
-            `barbell alone). Log weight × reps; the engine estimates your new 1RM (Epley/Brzycki, ±3–5%) ` +
-            `and stores it — the next block loads off the bigger number.`,
+          name: isCheck
+            ? `Retest — ${s.name} (optional courtesy max-check)`
+            : `Retest — ${s.name} (top working set → estimate e1RM)`,
+          description: isCheck
+            ? `Optional courtesy check — you already have a baseline, so this is "see your new max if ` +
+              `you want." Feeling fresh? Work up to a heavy single and aim for a SMALL PR above your old ` +
+              `max (~102.5%); the engine logs your new 1RM. Not feeling it? A light top set is fine — no ` +
+              `grinding, no spotter-less max-out.`
+            : `Top working set — one heavy set of 3 near your working max; the engine ESTIMATES your ` +
+              `e1RM from it (Epley/Brzycki, ±3–5%). No formal max-out on this lift.`,
           duration: 60,
           strength_exercises: s.ex,
-          // 1rm_test / estimate_1rm tags so logging the triple feeds the e1RM write-back (lifecycle).
-          tags: ['strength', s.focus, 'phase:retest', 'retest', '1rm_test', 'baseline_test', 'estimate_1rm', 'protocol:strength_primary'],
+          // 1rm_test / estimate_1rm so logging feeds the e1RM write-back (Q-097); 'optional' on the courtesy check.
+          tags: ['strength', s.focus, 'phase:retest', 'retest', '1rm_test', 'estimate_1rm', 'protocol:strength_primary', ...(isCheck ? ['optional'] : [])],
         });
       });
     } else {
@@ -243,8 +247,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     name: args.goalName?.trim() || `Get Stronger — ${durationWeeks} Weeks`,
     description:
       `Strength-led ATR block on heavy barbell compounds (balanced upper/lower): accumulate → ` +
-      `intensify → deload → peak, ending in a 1RM retest estimated from a heavy sub-max set ` +
-      `(no solo max attempt).${enduranceNote} Expect a MEASURED gain — concurrent strength gains are ` +
+      `intensify → deload → peak, ending in an OPTIONAL courtesy 1RM check on the key lifts (you have ` +
+      `a baseline) — a small PR if you're fresh, estimates from working sets on the rest; no mandatory ` +
+      `max-out.${enduranceNote} Expect a MEASURED gain — concurrent strength gains are ` +
       `real but modest (typically a few %); honest progression, not a hyped PR. The athlete picks the ` +
       `outcome; the engine runs the arc.`,
     duration_weeks: durationWeeks,
