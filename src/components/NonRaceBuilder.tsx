@@ -11,7 +11,6 @@ import {
   derivePlanShape,
   canSetDevelop,
   developCount,
-  athleteDisciplinesFromBaselines,
   floorForGoal,
   hoursForTier,
   COMMITMENT_TIERS,
@@ -136,11 +135,13 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   const { complete, saving } = useArcSetupComplete();
   const { arc } = useArcSetupContext();
 
-  // Real per-athlete disciplines (declared baselines), long→short, strength always, fallback all-3.
-  const athleteDisciplines = useMemo(
-    () => athleteDisciplinesFromBaselines((arc as { disciplines?: unknown } | null)?.disciplines),
-    [arc],
-  );
+  // Don't gate: every athlete is OFFERED all four disciplines (matches the ungated matrix). The seed
+  // defaults sensibly per goal; the athlete flips develop/maintain/out. Previously this read the stale
+  // declared `disciplines` array, which dropped sports that have real baselines but aren't listed
+  // (e.g. claudemore has run pace but 'running' isn't in disciplines) → the seed forced run 'out' →
+  // the goal went bike-shaped → unsupported. A developed discipline without baselines is handled
+  // downstream (calibration prompt), not by hiding it.
+  const athleteDisciplines = useMemo<Discipline[]>(() => DISCIPLINE_ORDER, []);
   const equipmentTier = useMemo(() => equipmentTierFromArc(arc), [arc]);
 
   const [state, setState] = useState<NonRaceState>({
