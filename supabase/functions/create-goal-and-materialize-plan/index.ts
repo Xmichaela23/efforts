@@ -2382,7 +2382,7 @@ Deno.serve(async (req: Request) => {
         const gsEnduranceDevelops = ['run', 'bike', 'swim'].some((d) => gsPosture?.[d] === 'develop');
         if (gsPosture?.strength === 'develop' && !gsEnduranceDevelops) {
           const { data: gsBaseline } = await supabase
-            .from('user_baselines').select('equipment, performance_numbers').eq('user_id', user_id).maybeSingle();
+            .from('user_baselines').select('equipment, performance_numbers, learned_fitness').eq('user_id', user_id).maybeSingle();
           const gsEquip = resolveStrengthEquipmentTypeForPlan(
             gsTp.equipment_type, gsBaseline?.equipment?.strength ?? [], gsBaseline?.performance_numbers,
           );
@@ -2395,6 +2395,12 @@ Deno.serve(async (req: Request) => {
             const gsPN = (gsBaseline?.performance_numbers ?? {}) as Record<string, any>;
             const gsNeedsBaseline = !(Number(gsPN.bench) > 0 && Number(gsPN.squat) > 0);
             const gsSport = gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null;
+            // Maintenance-endurance band (run only): the athlete's typed weekly miles + their learned easy
+            // pace → the composer clamps to the science band. sec/km → min/mi = ×1.609344 ÷ 60. Absent
+            // either → the composer falls to its fixed default (no band, no friction).
+            const gsEasyPaceSecPerKm = Number((gsBaseline?.learned_fitness as any)?.run_easy_pace_sec_per_km);
+            const gsEasyPaceMinPerMile = gsEasyPaceSecPerKm > 0 ? (gsEasyPaceSecPerKm * 1.609344) / 60 : undefined;
+            const gsTargetWeeklyMiles = Number(gsTp.target_weekly_miles) > 0 ? Number(gsTp.target_weekly_miles) : undefined;
             const gsBody: Record<string, any> = {
               user_id,
               duration_weeks: Number((resolvedGoal as any)?.target_weeks) || 12,
@@ -2404,6 +2410,8 @@ Deno.serve(async (req: Request) => {
               endurance_frequency: 2,
               needs_baseline: gsNeedsBaseline,  // NO-path → week 1 = baseline test
               goal_name: String(resolvedGoal?.name || 'Get Stronger'),
+              ...(gsTargetWeeklyMiles ? { target_weekly_miles: gsTargetWeeklyMiles } : {}),
+              ...(gsEasyPaceMinPerMile ? { easy_pace_min_per_mile: gsEasyPaceMinPerMile } : {}),
               ...(plan_start_date ? { start_date: plan_start_date } : {}),
               ...(bodyPreview ? { preview: true } : {}),
             };

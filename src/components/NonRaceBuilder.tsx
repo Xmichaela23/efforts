@@ -91,6 +91,7 @@ type NonRaceState = {
   longRideDay: DayName | '';
   anchorDiscipline: 'run' | 'bike' | null;
   anchorDay: DayName | '';
+  targetMiles: number | ''; // Get Strong: typed maintenance mileage, in the user's display unit; canonicalized to miles at confirm
 };
 
 type StepKey = 'goal' | 'posture' | 'commitment' | 'length' | 'schedule' | 'confirm';
@@ -101,7 +102,7 @@ function getSteps(_state: NonRaceState): StepKey[] {
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
 // from the EDITED posture (derivePlanShape), not from seedFromGoal. Generic scheduling prefs kept.
-function assemblePayload(state: NonRaceState, equipmentTier?: string): ArcSetupPayload {
+function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeeklyMiles?: number): ArcSetupPayload {
   const goal = state.goal!;
   const shape = derivePlanShape(state.posture, state.strengthProtocol, equipmentTier);
   return {
@@ -127,6 +128,7 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string): ArcSetupP
             anchorDiscipline: state.anchorDiscipline, anchorDay: state.anchorDay,
           }),
           ...(shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {}),
+          ...(typeof targetWeeklyMiles === 'number' && targetWeeklyMiles > 0 ? { target_weekly_miles: targetWeeklyMiles } : {}), // Get Strong maintenance mileage (canonical miles); engine guardrails it to the band
         },
       },
     ],
@@ -147,10 +149,11 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   // downstream (calibration prompt), not by hiding it.
   const athleteDisciplines = useMemo<Discipline[]>(() => DISCIPLINE_ORDER, []);
   const equipmentTier = useMemo(() => equipmentTierFromArc(arc), [arc]);
+  const unit = (arc as { units?: string } | null)?.units === 'metric' ? 'km' : 'mi'; // display unit for typed mileage; store canonical miles
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '',
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '',
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -199,7 +202,14 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   const anchorChoices = (['run', 'bike'] as const).filter((d) => posturePresent(d));
   const strengthDeveloperLabel = (id?: string) => (id ? STRENGTH_PROTOCOL_LABELS[id] ?? id : id);
 
-  const handleConfirm = () => { if (state.goal) void complete(assemblePayload(state, equipmentTier)); };
+  const handleConfirm = () => {
+    if (!state.goal) return;
+    // canonicalize the typed mileage (display unit → miles) before it leaves the client
+    const canonMiles = typeof state.targetMiles === 'number' && state.targetMiles > 0
+      ? (unit === 'km' ? Math.round(state.targetMiles / 1.609344) : state.targetMiles)
+      : undefined;
+    void complete(assemblePayload(state, equipmentTier, canonMiles));
+  };
 
   const optBtn = (active: boolean) =>
     `w-full text-left px-4 py-3 rounded-xl border ${active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'} text-white`;
@@ -360,6 +370,22 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               <div>
                 <p className="text-white/55 text-sm mb-2">Long run day</p>
                 <DayPicker value={state.longRunDay} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))} />
+              </div>
+            )}
+            {state.posture?.strength === 'develop' && posturePresent('run') && (
+              <div>
+                <p className="text-white/55 text-sm mb-2">Weekly running to hold <span className="text-white/35">(maintenance)</span></p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" inputMode="numeric" min={0}
+                    value={state.targetMiles === '' ? '' : state.targetMiles}
+                    onChange={(e) => setState((s) => ({ ...s, targetMiles: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    placeholder="e.g. 12"
+                    className="w-24 py-2 px-3 rounded-lg bg-white/[0.04] text-white border border-white/12 text-sm"
+                  />
+                  <span className="text-white/45 text-sm">{unit}/wk</span>
+                </div>
+                <p className="text-white/35 text-xs mt-1.5">Strength leads — we hold your aerobic base and guardrail this to the science.</p>
               </div>
             )}
             {posturePresent('bike') && (
