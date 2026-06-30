@@ -334,7 +334,7 @@ export function createLowerMaintenanceSession(
         { name: 'Walking Lunges', sets: 2, reps: '10/leg', weight: 'Bodyweight' }
       );
       duration = 25;
-      description = `Week ${displayWeek} - Light lower body maintenance. Bodyweight tier cannot do true neural loading.`;
+      description = `Week ${displayWeek} - Light lower body maintenance. Loaded posterior-chain accessory between primary sessions (low fatigue).`;
     }
   } else {
     if (isRecovery) {
