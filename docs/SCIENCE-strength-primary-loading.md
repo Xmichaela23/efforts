@@ -56,4 +56,26 @@ Expect a **MEASURED** gain. Concurrent strength gains are real but **modest** (~
 
 ---
 
-*Cross-ref: `strength-primary-plan.ts` (the curve + deload + retest), `SPEC-product-shape.md` (Program 1), D-221 (the engine decision), the materialize-plan clamp + rep-scale fixes (commits `89578531`, `2b5458d8`).*
+## The maintenance-endurance band (Get Strong: typed mileage, science-guardrailed)
+
+In a Get Strong block the endurance work is **held, not developed** — strength leads (Rønnestad/Mujika, D-221), so running gets a budget, not a build. The athlete **types the weekly mileage they want to hold** (they know their own volume); the band is a **guardrail on that number**, not a menu. Unit = the athlete's `user_baselines.units`; miles convert/bound via their real easy pace (`arc.easy`).
+
+**Floor — hold the aerobic base (frequency, not mileage, is the lever):**
+- **CITED — Hickson & Rosenkoetter (1981)** *Med Sci Sports Exerc* 13(1):13–16 [(PubMed 7219129)](https://pubmed.ncbi.nlm.nih.gov/7219129/): frequency cut to **2 d/wk** held VO₂max for 15 wk (intensity + duration held).
+- **CITED — Hickson et al. (1982)** *J Appl Physiol* 53(1):225–229 [(PubMed 6214534)](https://pubmed.ncbi.nlm.nih.gov/6214534/): duration cut to **13–26 min/session** held VO₂max for 15 wk (frequency + intensity held).
+- **CITED (modern receipt) — Spiering et al. (2021)** *Strength Cond J / J Strength Cond Res*, *Maintaining Physical Performance: The Minimal Dose…* [(review)](https://www.researchgate.net/publication/349637321): restates exactly this for endurance — maintained ≤15 wk at **2×/wk or 33–66% volume reduction**, intensity held. **"Established 1981, confirmed 2021."**
+- → **floor ≈ 2–3×/wk**, pace-mapped to miles (a faster runner's floor is more miles in the same dose).
+
+**Ceiling — protect strength (cap running, it's the interfering modality):**
+- **CITED — Wilson et al. (2012)** *J Strength Cond Res* 26(8):2293–2307 [(PubMed 22002517)](https://pubmed.ncbi.nlm.nih.gov/22002517/): concurrent interference is **dose-dependent on endurance frequency + duration**, and **running (not cycling)** produced significant strength/hypertrophy decrements (hypertrophy ES 1.23→0.85; strength 1.76→1.44 concurrent). → cap running volume so it doesn't eat strength recovery.
+
+**The intensity caveat (decides the honest framing) — Option A, all-easy:**
+- **CITED — Hickson et al. (1985)** *J Appl Physiol* 58(2):492–499 [(PubMed 3156841)](https://pubmed.ncbi.nlm.nih.gov/3156841/) + Spiering 2021: cutting **intensity** loses VO₂max — intensity is the maintenance non-negotiable. Get Strong maintenance is deliberately **all-easy** (no quality session — don't spend interference budget defending a metric the block sets down). So it **maintains the AEROBIC BASE, not VO₂max** — frame it exactly that way; the literature makes that honest, not a hedge. **VO₂max sharpening returns in the endurance block** (the agreed tradeoff, D-221 lifecycle).
+
+**CONVENTION (practitioner calibration, flagged):** the exact session minutes (~20–25 floor / ~40 ceiling), the **3×/wk** anchor, and the precise ceiling mileage sit on top of the cited frequency/duration/interference findings — the studies establish *that* low volume holds and *that* running interferes by dose, not the exact running prescription.
+
+**The guardrail (engine behavior):** typed miles **inside the band → build it, no friction**; **above the ceiling → glass-box flag + build the capped max**; **below the floor → flag + bump to floor**. Honor up to the science, never past it. **Flat — no ramp** (it's maintenance, not a build). Develop modes (Maintain / run-forward) instead clamp to the §4.5 legal range with a ramp. The commitment tier is **retired for endurance volume** — pace + science bound it, not a fixed hours band.
+
+---
+
+*Cross-ref: `strength-primary-plan.ts` (the curve + deload + retest), `SPEC-product-shape.md` (Program 1), D-221 (the engine decision), `SCIENCE-minimum-dose-maintenance.md` (Spiering 2021 also grounds strength minimum-dose), the materialize-plan clamp + rep-scale fixes (commits `89578531`, `2b5458d8`).*
