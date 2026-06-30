@@ -68,7 +68,11 @@ function DayPicker({ value, onChange }: { value: DayName | ''; onChange: (d: Day
 function equipmentTierFromArc(arc: unknown): 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands' {
   const chips = ((((arc as { equipment?: { strength?: unknown } } | null)?.equipment?.strength) as string[] | undefined) ?? [])
     .map((s) => String(s).toLowerCase());
-  const hasBarbell = chips.some((s) => s.includes('barbell') || s.includes('rack') || /\bbar\b/.test(s));
+  // A commercial / full gym HAS barbells — recognize it (was falling through to bodyweight_bands →
+  // durability instead of 5×5; the engine-side resolver already treats 'Commercial gym' as barbell).
+  const hasBarbell = chips.some((s) =>
+    s.includes('barbell') || s.includes('rack') || /\bbar\b/.test(s) ||
+    s.includes('commercial') || s.includes('full gym'));
   const hasDumbbell = chips.some((s) => s.includes('dumbbell') || /\bdb\b/.test(s));
   if (hasBarbell) return 'full_barbell';
   if (hasDumbbell) return 'dumbbell_based';
