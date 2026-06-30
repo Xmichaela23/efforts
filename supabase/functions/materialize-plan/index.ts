@@ -105,16 +105,22 @@ type SwimIntentMat = 'focus' | 'race' | null;
 
 import { readAthleteSnapshotOrLive } from '../_shared/athlete-snapshot.ts';
 
-/** Clamp %1RM from goal strength_intent: performance ≥60%; support ≤60% (bench/squat lower). */
+/**
+ * Clamp %1RM from goal strength_intent: performance ≥60%; support ≤60% (bench/squat lower).
+ * `maxPct` is the upper ceiling (default 0.85 — the safety cap for programmed concurrent sets). The
+ * strength-PRIMARY engine periodizes its own peak + 1RM retest (≥100%) and passes maxPct=1.05 so its
+ * explicit % (97% singles, 100/102.5% test) render at face value instead of collapsing to 85%.
+ */
 function resolveStrengthPercentForLift(
   exerciseName: string,
   explicitPercent: number | undefined,
   strengthIntent: StrengthIntentMat,
+  maxPct: number = 0.85,
 ): number {
   const n = String(exerciseName || '').toLowerCase();
   if (strengthIntent === 'performance') {
     const base = typeof explicitPercent === 'number' && explicitPercent > 0 ? explicitPercent : 0.7;
-    return Math.max(0.6, Math.min(0.85, base));
+    return Math.max(0.6, Math.min(maxPct, base));
   }
   if (strengthIntent === 'support') {
     let p = typeof explicitPercent === 'number' && explicitPercent > 0
@@ -127,7 +133,7 @@ function resolveStrengthPercentForLift(
     return p;
   }
   const base = typeof explicitPercent === 'number' && explicitPercent > 0 ? explicitPercent : 0.7;
-  return Math.max(0.6, Math.min(0.85, base));
+  return Math.max(0.6, Math.min(maxPct, base));
 }
 
 function parseTrainingPrefs(tp: unknown): Record<string, unknown> | null {
@@ -1558,6 +1564,12 @@ function expandTokensForRow(
   planWeekNumber: number | null = null,
 ): { steps: any[]; total_s: number; swim_equipment_suggested?: string[]; swim_equipment_optional_suggested?: string[] } {
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
+  // Strength-PRIMARY rows (Get Strong arc) periodize their own peak + 1RM retest: lift the 0.85 clamp
+  // to 1.05 so 97% singles / 100–102.5% test render at face value, and skip the auto working-load
+  // progression (the composer already owns the ramp). Concurrent strength is untouched.
+  const isStrengthPrimary = Array.isArray((row as any)?.tags)
+    && (row as any).tags.some((t: any) => String(t).toLowerCase() === 'protocol:strength_primary');
+  const strengthMaxPct = isStrengthPrimary ? 1.05 : 0.85;
   const discipline = String(row?.type||'').toLowerCase();
   const workoutDate = row?.date || new Date().toISOString().split('T')[0];
   const steps: any[] = [];
@@ -1656,6 +1668,7 @@ function expandTokensForRow(
               name,
               typeof percentRaw === 'number' ? percentRaw : undefined,
               strengthIntent,
+              strengthMaxPct,
             );
             const result = calculateWeightFromConfig(name, targetPercent, baselines as any, reps);
             if (result.weight != null && result.weight > 0) {
@@ -1684,6 +1697,7 @@ function expandTokensForRow(
                 name,
                 typeof percentRaw === 'number' ? percentRaw : undefined,
                 strengthIntent,
+                strengthMaxPct,
               );
               const scaled = inferred1RM * resolvedPctLegacy0 * repScaleFor(reps);
               prescribed = roundToIncrement(scaled, isMetric);
@@ -1713,7 +1727,7 @@ function expandTokensForRow(
           // Extract target RIR from the exercise (if present from overlay)
           const target_rir = typeof ex?.target_rir === 'number' ? ex.target_rir : undefined;
           
-          const progressed = adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);
+          const progressed = isStrengthPrimary ? prescribed : adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);
           // Apply plan adjustments if any
           const adjustResult = applyAdjustment(name, progressed, adjustments, workoutDate);
           const finalWeight = adjustResult.weight;
@@ -1826,6 +1840,7 @@ function expandTokensForRow(
               name,
               typeof percentRaw === 'number' ? percentRaw : undefined,
               strengthIntent,
+              strengthMaxPct,
             );
             const result = calculateWeightFromConfig(name, targetPercent, baselines as any, typeof reps === 'number' ? reps : undefined);
             if (result.weight != null && result.weight > 0) {
@@ -1854,6 +1869,7 @@ function expandTokensForRow(
                 name,
                 typeof percentRaw === 'number' ? percentRaw : undefined,
                 strengthIntent,
+                strengthMaxPct,
               );
               const scaled = inferred1RM * resolvedPctLegacy * repScaleFor(typeof reps==='number'? reps : undefined);
               prescribed = roundToIncrement(scaled, isMetric);
@@ -1883,7 +1899,7 @@ function expandTokensForRow(
           // Extract target RIR from the exercise (if present from overlay)
           const target_rir = typeof ex?.target_rir === 'number' ? ex.target_rir : undefined;
           
-          const progressed = adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);
+          const progressed = isStrengthPrimary ? prescribed : adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);
           const adjustResult = applyAdjustment(name, progressed, adjustments, workoutDate);
           const finalWeight = adjustResult.weight;
           const wasAdjusted = adjustResult.adjusted;
