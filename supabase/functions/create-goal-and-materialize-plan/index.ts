@@ -2373,13 +2373,18 @@ Deno.serve(async (req: Request) => {
       // 5×5/neural lanes); bodyweight Get Strong falls through to (b)-run durability until a bodyweight
       // strength-primary lane exists.
       {
-        const gsPosture = sanitizePerDisciplinePosture(tp.per_discipline_posture as Record<string, unknown> | undefined);
+        // BUG FIX (Q-096): `tp` is NOT in scope here (it's a local in mergeTrainingPrefsWithArcDefaults) —
+        // the resolved goal's prefs in this scope are `resolvedGoal.training_prefs`. The prior `tp.*` refs
+        // threw a ReferenceError the instant this block ran, before any gate → every non-race build rolled
+        // back. Read the correct source.
+        const gsTp = (resolvedGoal?.training_prefs ?? {}) as Record<string, any>;
+        const gsPosture = sanitizePerDisciplinePosture(gsTp.per_discipline_posture as Record<string, unknown> | undefined);
         const gsEnduranceDevelops = ['run', 'bike', 'swim'].some((d) => gsPosture?.[d] === 'develop');
         if (gsPosture?.strength === 'develop' && !gsEnduranceDevelops) {
           const { data: gsBaseline } = await supabase
             .from('user_baselines').select('equipment, performance_numbers').eq('user_id', user_id).maybeSingle();
           const gsEquip = resolveStrengthEquipmentTypeForPlan(
-            tp.equipment_type, gsBaseline?.equipment?.strength ?? [], gsBaseline?.performance_numbers,
+            gsTp.equipment_type, gsBaseline?.equipment?.strength ?? [], gsBaseline?.performance_numbers,
           );
           if (gsEquip === 'commercial_gym') {
             const gsSport = gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null;
