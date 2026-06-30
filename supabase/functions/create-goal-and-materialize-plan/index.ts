@@ -2343,6 +2343,7 @@ Deno.serve(async (req: Request) => {
     // what is already in scope here — so nothing the combine path needs is skipped. Covers create +
     // build_existing. Events (resolvedIsNonRace=false) are unaffected → byte-identical.
     if (resolvedIsNonRace) {
+      console.log('[create-goal][DIAG] NON-RACE route →', JSON.stringify({ mode, sport, goal_type: (resolvedGoal as any)?.goal_type, willHitBRun: sport === 'run' }));
       if (mode === 'create') {
         const newGoalPriority = action === 'keep' && existing_goal_id ? 'B' : 'A';
         const { data: createdGoal, error: goalInsertErr } = await supabase
@@ -2404,6 +2405,12 @@ Deno.serve(async (req: Request) => {
         // downgrades. Mirrors the event-path equipment resolution (`:2654`/`:3115`) — barbell-capable
         // → strength_power (developer honored); bodyweight → injury_prevention (durability, correct,
         // byte-identical). `baseline` isn't in scope at this block, so fetch equipment narrowly.
+        const runDisciplinePosture = sanitizePerDisciplinePosture(
+          tp.per_discipline_posture as Record<string, unknown> | undefined,
+        );
+        if (runDisciplinePosture?.run) {
+          runRetestBody.endurance_posture = runDisciplinePosture.run;
+        }
         if (Number(runRetestBody.strength_frequency) > 0) {
           const { data: runStrBaseline } = await supabase
             .from('user_baselines').select('equipment, performance_numbers').eq('user_id', user_id).maybeSingle();
@@ -2415,19 +2422,20 @@ Deno.serve(async (req: Request) => {
           runRetestBody.equipment_type = runEquipmentType;
           runRetestBody.strength_tier = runEquipmentType === 'commercial_gym' ? 'strength_power' : 'injury_prevention';
           if (tp.strength_intent) runRetestBody.strength_intent = tp.strength_intent;
+
+          // SMART SERVER (SPEC-product-shape): when strength DEVELOPS, the ENGINE picks the developer
+          // from the RELIABLE server-side equipment — barbell → five_by_five (the strength base of the
+          // arc), bodyweight → durability. This OVERRIDES whatever protocol the client stored: the
+          // builder's equipment read is flaky (it seeded durability for a barbell athlete), and the
+          // dumb client should only express the OUTCOME ("get stronger" = strength develops), not pick
+          // the protocol. Maintain/support strength keeps the client's choice (durability/minimum_dose).
+          if (runDisciplinePosture?.strength === 'develop') {
+            runRetestBody.strength_protocol = runEquipmentType === 'commercial_gym' ? 'five_by_five' : 'durability';
+          }
         }
 
-        // Q-088 (D-220): the (b)-run path IS the non-race run engine (the run-fork the record
-        // correction T-3 is about). Thread the endurance (run) posture so generate-run-plan's
-        // frequency policy can permit freq-4, and apply the strength-focus lane upgrade when the
-        // goal qualifies (endurance held + strength develops). Absent posture ≡ develop (safe).
-        // THREAD-ONLY — no UI fader yet (engine-first, like E3b/D-219).
-        const runDisciplinePosture = sanitizePerDisciplinePosture(
-          tp.per_discipline_posture as Record<string, unknown> | undefined,
-        );
-        if (runDisciplinePosture?.run) {
-          runRetestBody.endurance_posture = runDisciplinePosture.run;
-        }
+        // Q-088 (D-220): strength-focus mode — endurance held + strength develops → upgrade the
+        // resolved developer to its 4-day U/L/U/L lane @ freq 4 (five_by_five → strength_focus_build).
         const focus = resolveStrengthFocusMode(runDisciplinePosture, runRetestBody.strength_protocol);
         if (focus) {
           runRetestBody.strength_protocol = focus.protocol;
@@ -2437,7 +2445,9 @@ Deno.serve(async (req: Request) => {
           );
         }
 
+        console.log('[create-goal][DIAG] (b)-run FIRED →', JSON.stringify({ mode, sport, goal_type: (resolvedGoal as any)?.goal_type, strength_protocol: runRetestBody.strength_protocol, strength_tier: runRetestBody.strength_tier, strength_frequency: runRetestBody.strength_frequency, endurance_posture: runRetestBody.endurance_posture, weekly_hours: runRetestBody.weekly_hours, distance: runRetestBody.distance }));
         const runGen = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-run-plan', runRetestBody);
+        console.log('[create-goal][DIAG] generate-run-plan RETURNED →', JSON.stringify({ plan_id: runGen?.plan_id ?? null, success: runGen?.success ?? null, error: runGen?.error ?? null, validation_errors: runGen?.validation_errors ?? null }));
         if (bodyPreview) {
           return new Response(JSON.stringify({
             success: true, mode, goal_id: createdGoalId, preview: true,
