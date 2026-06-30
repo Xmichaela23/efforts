@@ -686,7 +686,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Helper: detect if this is a baseline test workout
   const isBaselineTestWorkout = (workout: any): boolean => {
     const name = String(workout?.name || '').toLowerCase();
-    return name.includes('baseline test');
+    if (name.includes('baseline test')) return true;
+    // Q-097: the strength-primary retest writes its e1RM back via the `1rm_test` TAG — its name is
+    // "Retest — …", not "Baseline Test", so match the tag, not the name.
+    const tags = Array.isArray(workout?.tags) ? workout.tags.map((t: any) => String(t).toLowerCase()) : [];
+    return tags.includes('1rm_test');
   };
 
   // Helper: get baseline test type (lower/upper)
@@ -1844,23 +1848,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }
     }
     
-    // Check if this is a baseline test workout
+    // Named "Baseline Test: Lower/Upper" → rebuild the fixed warmup-to-max structure. A TAG-based
+    // 1rm_test (the strength-primary retest, named "Retest — …") has no lower/upper type, so fall
+    // through to its OWN planned exercises below — but the baselineTestResults compute + the
+    // Save-baselines button still fire because isBaselineTestWorkout is true (Q-097 write-back).
     if (isBaselineTestWorkout(workoutToLoad)) {
       const testType = getBaselineTestType(workoutToLoad);
-      let testExercises: string[] = [];
-      
-      if (testType === 'lower') {
-        testExercises = ['Back Squat', 'Deadlift'];
-      } else if (testType === 'upper') {
-        testExercises = ['Bench Press', 'Overhead Press'];
+      if (testType) {
+        const testExercises = testType === 'lower' ? ['Back Squat', 'Deadlift'] : ['Bench Press', 'Overhead Press'];
+        setExercises(testExercises.map(name => createBaselineTestExercise(name)));
+        exercisesLoadedFromWorkout = true;
+        setIsInitialized(true);
+        return;
       }
-      
-      // Create baseline test structure for each exercise
-      const baselineExercises = testExercises.map(name => createBaselineTestExercise(name));
-      setExercises(baselineExercises);
-      exercisesLoadedFromWorkout = true;
-      setIsInitialized(true);
-      return;
     }
 
     if (workoutToLoad && workoutToLoad.strength_exercises && workoutToLoad.strength_exercises.length > 0) {
@@ -2615,8 +2615,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // Also check if RIR was just added to an already-completed working set
         // !rir_autofilled: a baseline 1RM must come from a confirmed effort, not an
         // auto-saved/ prefilled RIR that merely happens to fall in the 2–3 gate (D-203).
+        // A TAG-based 1rm_test retest accepts a near-max SINGLE too (RIR 0–3): the courtesy max-check is
+        // a heavy single, not a sub-max working set. Named baselines stay 2–3 (sub-max estimate path).
+        const isTagRetest = isBaselineTestWorkout(scheduledWorkout) && !getBaselineTestType(scheduledWorkout);
+        const minRirForBaseline = isTagRetest ? 0 : 2;
         if (updatedSet.setType === 'working' && updatedSet.completed && updatedSet.rir !== undefined && !updatedSet.rir_autofilled &&
-            updatedSet.rir >= 2 && updatedSet.rir <= 3 && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0) {
+            updatedSet.rir >= minRirForBaseline && updatedSet.rir <= 3 && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0) {
           const baselineKey = getBaselineKeyForExercise(exercise.name);
           if (baselineKey) {
             const estimated1RM = calculate1RM(updatedSet.weight, updatedSet.reps);
