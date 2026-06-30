@@ -119,7 +119,7 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string): ArcSetupP
           training_intent: 'completion',
           fitness: 'intermediate',
           days_per_week: state.daysPerWeek,
-          strength_frequency: 2,
+          strength_frequency: state.posture?.strength === 'develop' ? 4 : 2, // Get Strong = the 4-day develop arc; don't offer 2×/week the engine overrides
           weekly_hours_available: hoursForTier(state.commitment),
           per_discipline_posture: state.posture,
           preferred_days: buildPreferredDays(state.posture, {
@@ -130,7 +130,7 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string): ArcSetupP
         },
       },
     ],
-    strength_frequency: 2,
+    strength_frequency: state.posture?.strength === 'develop' ? 4 : 2, // Get Strong = the 4-day develop arc; don't offer 2×/week the engine overrides
   };
 }
 
