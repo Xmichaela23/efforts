@@ -581,7 +581,8 @@ function calculateWeightFromConfig(
   exerciseName: string,
   targetPercent: number,
   baselines: any,
-  reps?: number
+  reps?: number,
+  applyRepScale: boolean = true,
 ): { weight: number | null; displayFormat: string; notes?: string } {
   const config = getExerciseConfig(exerciseName);
   
@@ -602,8 +603,10 @@ function calculateWeightFromConfig(
   // Calculate inferred 1RM for this exercise
   const inferred1RM = base1RM * config.ratio;
   
-  // Apply target percentage and rep adjustment
-  const repScale = repScaleFor(reps);
+  // Apply target percentage and rep adjustment. Strength-primary passes applyRepScale=false: its
+  // explicit % ALREADY encodes intensity (the composer periodized it), so the rep-scale would
+  // double-count — the % renders straight off the entered 1RM (100% = the real max, not 106%).
+  const repScale = applyRepScale ? repScaleFor(reps) : 1;
   let prescribedWeight = inferred1RM * targetPercent * repScale;
   
   // For perHand exercises: divide BEFORE rounding (so we round to real dumbbell weights)
@@ -1670,7 +1673,7 @@ function expandTokensForRow(
               strengthIntent,
               strengthMaxPct,
             );
-            const result = calculateWeightFromConfig(name, targetPercent, baselines as any, reps);
+            const result = calculateWeightFromConfig(name, targetPercent, baselines as any, reps, !isStrengthPrimary);
             if (result.weight != null && result.weight > 0) {
               prescribed = result.weight;
               weightDisplay = formatWeightDisplay(result.weight, result.displayFormat);
@@ -1842,7 +1845,7 @@ function expandTokensForRow(
               strengthIntent,
               strengthMaxPct,
             );
-            const result = calculateWeightFromConfig(name, targetPercent, baselines as any, typeof reps === 'number' ? reps : undefined);
+            const result = calculateWeightFromConfig(name, targetPercent, baselines as any, typeof reps === 'number' ? reps : undefined, !isStrengthPrimary);
             if (result.weight != null && result.weight > 0) {
               prescribed = result.weight;
               weightDisplay = formatWeightDisplay(result.weight, result.displayFormat);
