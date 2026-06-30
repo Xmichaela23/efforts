@@ -6,6 +6,7 @@ import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
 import { supabase, invokeFunction, invokeFunctionFormData, getStoredUserId } from '@/lib/supabase';
 import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
+import NonRaceBuilder from '@/components/NonRaceBuilder';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import { parseLocalDate } from '@/lib/dateUtils';
@@ -328,6 +329,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const { toast } = useToast();
 
   const [showAddGoal, setShowAddGoal] = useState(false);
+  // Embedded non-race builder (the rich goal builder, in-app — replaces the orphaned /goals/build route).
+  const [showBuilder, setShowBuilder] = useState(false);
   // Default to past goals expanded so completed events are visible immediately.
   const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
@@ -385,6 +388,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const emptyState = !st || Object.keys(st).length === 0;
 
     if (!emptyState) {
+      setShowBuilder(false); // builder completed (or arc-setup returned) → close the embedded view, show the result
       if (st.needPaceCalibration) setShowCalibration(true);
 
       if (st.seasonPlanJustBuilt) {
@@ -1825,6 +1829,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               }
       : null;
 
+  if (showBuilder) return <div className="h-full"><NonRaceBuilder onClose={() => setShowBuilder(false)} /></div>;
   if (showEventForm) return renderEventForm();
   if (showCapacityForm) return renderCapacityForm();
   if (showMaintenanceForm) return renderMaintenanceForm();
@@ -2239,7 +2244,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           <CalendarRange className="h-5 w-5 opacity-90" />
           Plan my season
         </button>
-        <button onClick={() => setShowAddGoal(true)} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] py-3 text-white/70 font-medium hover:bg-white/[0.10] transition-all">
+        <button onClick={() => setShowBuilder(true)} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] py-3 text-white/70 font-medium hover:bg-white/[0.10] transition-all">
           <Plus className="h-5 w-5" />Add Goal
         </button>
         {inactiveGoals.length > 0 && (

@@ -131,7 +131,7 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string): ArcSetupP
   };
 }
 
-export default function NonRaceBuilder() {
+export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {}) {
   const navigate = useNavigate();
   const { complete, saving } = useArcSetupComplete();
   const { arc } = useArcSetupContext();
@@ -152,7 +152,12 @@ export default function NonRaceBuilder() {
   const steps = getSteps(state);
   const currentStep = steps[stepIdx] ?? 'confirm';
   const next = () => setStepIdx((i) => Math.min(i + 1, steps.length - 1));
-  const back = () => { if (stepIdx === 0) navigate(-1); else setStepIdx((i) => i - 1); };
+  // Embedded in GoalsScreen → step-0 back closes the builder view (onClose); standalone route falls
+  // back to history navigation.
+  const back = () => {
+    if (stepIdx === 0) { if (onClose) onClose(); else navigate(-1); }
+    else setStepIdx((i) => i - 1);
+  };
 
   // Picking a goal (or its discipline sub-choice) re-seeds the posture + the default strength protocol.
   const reseed = (goal: NonRaceGoalId, discipline: Discipline | undefined) => {
@@ -195,7 +200,9 @@ export default function NonRaceBuilder() {
     `w-full text-left px-4 py-3 rounded-xl border ${active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'} text-white`;
 
   return (
-    <div className="h-[100dvh] bg-zinc-950 text-white flex flex-col">
+    // h-full (not 100dvh) so it fills GoalsScreen's content area and keeps the app nav/banner when
+    // embedded; standalone route still fills its container.
+    <div className="h-full bg-zinc-950 text-white flex flex-col">
       {currentStep === 'goal' && (
         <StepLayout
           step={1} totalSteps={steps.length} title="What's the goal?"
