@@ -135,6 +135,33 @@ function getSportIcon(s: string | null) {
   return SPORT_ICONS[String(s).toLowerCase()] ?? null;
 }
 
+// Active strength-primary (Get Strong) block → a live summary for the goal card: phase·week, this
+// week's session counts, progress. Derived entirely from the persisted plan config (no extra fetch).
+type BlockSummary = { phaseName: string; wk: number; totalWeeks: number; strengthN: number; endSport: 'run' | 'bike' | null; endN: number };
+function strengthBlockSummary(plan: { currentWeek?: number; config?: any } | undefined): BlockSummary | null {
+  const cfg = plan?.config;
+  if (!cfg || cfg.source !== 'strength_primary') return null;
+  const phases: Array<{ name: string; start_week: number; end_week: number }> = cfg.phase_structure?.phases ?? [];
+  const totalWeeks = phases.length ? Math.max(...phases.map((p) => Number(p.end_week) || 0)) : (Number(plan?.currentWeek) || 0);
+  const wk = Math.max(1, Number(plan?.currentWeek) || 1);
+  const phase = phases.find((p) => wk >= p.start_week && wk <= p.end_week) ?? phases[0];
+  const endSport = cfg.endurance_sport === 'run' || cfg.endurance_sport === 'bike' ? cfg.endurance_sport : null;
+  return {
+    phaseName: phase?.name ?? 'Training',
+    wk, totalWeeks,
+    strengthN: Number(cfg.strength_frequency) || 0,
+    endSport,
+    endN: endSport ? (Number(cfg.endurance_frequency) || 0) : 0,
+  };
+}
+// Discipline glyphs the plan actually contains — the home-screen icon language (barbell + run/bike).
+function disciplineIconsFor(bs: BlockSummary): React.FC<{ className?: string }>[] {
+  const icons: React.FC<{ className?: string }>[] = [Dumbbell];
+  if (bs.endSport === 'run') icons.push(Activity);
+  else if (bs.endSport === 'bike') icons.push(Bike);
+  return icons;
+}
+
 function formatPastRaceDate(date: string | null): string | null {
   if (!date) return null;
   return format(new Date(date + 'T12:00:00'), 'M/d/yy');
@@ -1394,6 +1421,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   function renderGoalCard(goal: Goal) {
     const TypeIcon = getGoalTypeIcon(goal.goal_type);
+    const blockSummary = strengthBlockSummary(plansByGoalId.get(goal.id)); // active Get Strong → live block dashboard + real discipline icons
     const SportIcon = getSportIcon(goal.sport);
     const linkedPlan = plansByGoalId.get(goal.id);
     const rrCard = coachWeek.data?.race_readiness;
@@ -1420,9 +1448,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       <div key={goal.id} className={`rounded-2xl border p-4 transition-all duration-200 ${isExpanded ? 'border-white/20 bg-white/[0.06]' : 'border-white/10 bg-white/[0.04]'}`}>
         <button className="w-full text-left" onClick={() => setExpandedGoalId(isExpanded ? null : goal.id)}>
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex items-center gap-2">
-              <TypeIcon className="h-5 w-5 text-white/50" />
-              {SportIcon && <SportIcon className="h-4 w-4 text-white/40" />}
+            <div className="mt-0.5 flex items-center gap-1.5">
+              {blockSummary
+                ? disciplineIconsFor(blockSummary).map((D, i) => <D key={i} className="h-5 w-5 text-white/50" />)
+                : (<>
+                    <TypeIcon className="h-5 w-5 text-white/50" />
+                    {SportIcon && <SportIcon className="h-4 w-4 text-white/40" />}
+                  </>)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
@@ -1457,6 +1489,30 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               )}
               {goal.goal_type === 'maintenance' && (
                 <p className="mt-1 text-sm text-white/50">{goal.sport ? `${goal.sport.charAt(0).toUpperCase() + goal.sport.slice(1)} · ` : ''}Ongoing</p>
+              )}
+              {blockSummary && goal.status === 'active' && (
+                <div className="mt-2.5 space-y-2">
+                  <p className="text-sm text-white/70">
+                    {blockSummary.phaseName}
+                    {blockSummary.totalWeeks > 0 && <span className="text-white/40"> · Week {blockSummary.wk} of {blockSummary.totalWeeks}</span>}
+                  </p>
+                  <div className="flex items-center gap-3 text-xs text-white/55">
+                    {blockSummary.strengthN > 0 && (
+                      <span className="flex items-center gap-1"><Dumbbell className="h-3.5 w-3.5 text-white/40" />{blockSummary.strengthN} strength</span>
+                    )}
+                    {blockSummary.endN > 0 && (
+                      <span className="flex items-center gap-1">
+                        {blockSummary.endSport === 'bike' ? <Bike className="h-3.5 w-3.5 text-white/40" /> : <Activity className="h-3.5 w-3.5 text-white/40" />}
+                        {blockSummary.endN} {blockSummary.endSport === 'bike' ? (blockSummary.endN === 1 ? 'ride' : 'rides') : (blockSummary.endN === 1 ? 'run' : 'runs')}
+                      </span>
+                    )}
+                  </div>
+                  {blockSummary.totalWeeks > 0 && (
+                    <div className="h-1 w-full overflow-hidden rounded-full bg-white/10" aria-hidden>
+                      <div className="h-full rounded-full bg-teal-400/70" style={{ width: `${Math.min(100, Math.round((blockSummary.wk / blockSummary.totalWeeks) * 100))}%` }} />
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
