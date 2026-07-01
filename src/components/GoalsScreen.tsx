@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Target, Calendar, CalendarRange, TrendingUp, Plus, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List } from 'lucide-react';
+import { X, Target, Calendar, CalendarRange, TrendingUp, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List, Crosshair } from 'lucide-react';
 import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
 import { supabase, invokeFunction, invokeFunctionFormData, getStoredUserId } from '@/lib/supabase';
@@ -126,7 +126,8 @@ const METRIC_OPTIONS: Record<string, string[]> = {
 };
 
 function getGoalTypeIcon(t: string) {
-  return t === 'event' ? Flag : t === 'capacity' ? TrendingUp : t === 'maintenance' ? Activity : Target;
+  // A goal is a target → crosshair. Events keep the race flag; maintenance keeps the pulse.
+  return t === 'event' ? Flag : t === 'maintenance' ? Activity : Crosshair;
 }
 
 function getSportIcon(s: string | null) {
@@ -1447,7 +1448,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                   </span>
                 </div>
               )}
-              {goal.goal_type === 'capacity' && (
+              {goal.goal_type === 'capacity' && (goal.current_value != null || goal.target_value != null) && (
                 <div className="mt-1 flex items-center gap-2 text-sm text-white/50">
                   <TrendingUp className="h-3.5 w-3.5" />
                   <span>{goal.current_value ?? '?'} → {goal.target_value}</span>
@@ -2239,13 +2240,24 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             onClose();
             navigate('/arc-setup');
           }}
-          className="w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all"
+          className="w-full flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-left hover:bg-white/[0.10] transition-all"
         >
-          <CalendarRange className="h-5 w-5 opacity-90" />
-          Plan my season
+          <CalendarRange className="h-5 w-5 shrink-0 mt-0.5 text-white/70" />
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-white/90">Plan a season</div>
+            <div className="mt-0.5 text-xs text-white/50">Build a plan for an upcoming race, or a full season of them.</div>
+          </div>
         </button>
-        <button onClick={() => setShowBuilder(true)} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] py-3 text-white/70 font-medium hover:bg-white/[0.10] transition-all">
-          <Plus className="h-5 w-5" />Add Goal
+        <button
+          type="button"
+          onClick={() => setShowBuilder(true)}
+          className="w-full flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-left hover:bg-white/[0.10] transition-all"
+        >
+          <Crosshair className="h-5 w-5 shrink-0 mt-0.5 text-white/70" />
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-white/90">Add a goal</div>
+            <div className="mt-0.5 text-xs text-white/50">Focused work to build speed, strength, or endurance.</div>
+          </div>
         </button>
         {inactiveGoals.length > 0 && (
           <button
