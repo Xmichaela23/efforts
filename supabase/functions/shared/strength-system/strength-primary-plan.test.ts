@@ -13,9 +13,9 @@ const benchEx = (n: number) =>
 const benchPct = (n: number) => Number((benchEx(n)[0]?.weight.match(/([\d.]+)%/) || [])[1]);
 const allText = (n: number) => JSON.stringify(wk(n)).toLowerCase();
 
-Deno.test('ATR arc with a DELOAD — accumulate→intensify→deload→peak→consolidation', () => {
+Deno.test('ATR arc with a DELOAD — accumulate→intensify→deload→peak→retest', () => {
   const { phases, recovery_weeks } = buildArcPhases(12);
-  assertEquals(phases.map((p) => p.name), ['Base', 'Power', 'Deload', 'Peak', 'Consolidation']);
+  assertEquals(phases.map((p) => p.name), ['Base', 'Power', 'Deload', 'Peak', 'Retest']);
   // deload sits BETWEEN intensify and peak, ~6–8 wk in
   const deload = phases.find((p) => p.name === 'Deload')!;
   assert(deload.start_week >= 6 && deload.start_week <= 8, `deload at wk ${deload.start_week}, want 6–8`);
@@ -42,27 +42,28 @@ Deno.test('CURVE — peak is heavy DOUBLES (no near-max single); base opens at 7
   assertEquals(benchPct(1), 72, 'base wk1 = 72%');
 });
 
-Deno.test('CONSOLIDATION — the block ends light, NOT on a broken prescribed retest (D-223)', () => {
+Deno.test('AMRAP RETEST — fixed ~88% + OPEN reps (can show a gain); 1rm_test tagged; deadlift-conservative note (D-224)', () => {
   const wk12 = strengthOf(12);
-  assertEquals(wk12.length, 4, 'final week is the normal 4-day split (run light), not a 2-lift test');
-  // NO retest/estimate tags anywhere — nothing writes a 1RM off a sub-max estimate (the score-that-lies path is gone)
-  assert(
-    wk12.every((s) => !s.tags.includes('1rm_test') && !s.tags.includes('estimate_1rm') && !s.tags.includes('retest')),
-    'no 1rm_test / estimate_1rm / retest tags remain',
-  );
-  // light + loggable: top sets sit well below the 94% peak double
-  const pcts = wk12.flatMap((s) => s.strength_exercises ?? []).map((e) => parseFloat(e.weight));
-  assert(Math.max(...pcts) <= 82, `consolidation is light (≤82%), got ${Math.max(...pcts)}`);
-  assert(wk12.flatMap((s) => s.strength_exercises ?? []).some((e) => e.reps === 3), 'loggable top triples');
-  // honest copy: block complete, real retest pending — no fake test
+  assertEquals(wk12.length, 4, 'four AMRAP retest sessions (one per key lift)');
+  wk12.forEach((s) => {
+    const ex = s.strength_exercises ?? [];
+    assertEquals(ex.length, 1, 'ONE scored set only (warm-up is copy-guided) so the estimate is clean');
+    assertEquals(String(ex[0].reps).toLowerCase(), 'amrap', 'reps are OPEN (AMRAP), not a fixed number');
+    assert(/88% 1RM/.test(ex[0].weight), `fixed ~88% test weight, got ${ex[0].weight}`);
+    assert(s.tags.includes('1rm_test'), 'tagged 1rm_test → cluster-e1RM + ratchet-up write-back');
+  });
+  // the D-223 bug is gone: no fixed-rep estimate set anywhere
+  assert(!wk12.some((s) => (s.strength_exercises ?? []).some((e) => e.reps === 3)), 'no fixed-3 estimate remains');
+  // load-bearing copy: AMRAP, the RPE-9 near-failure stop, and the deadlift-conservative note (LeSuer)
   const t = allText(12);
-  assert(t.includes('consolidation') && t.includes('block complete') && t.includes('retest'), 'honest consolidation copy');
+  assert(t.includes('amrap') && t.includes('rpe 9'), 'copy names AMRAP + the RPE-9 stop (accuracy-critical)');
+  assert(t.includes('lesuer') && t.includes('conservative'), 'deadlift-conservative note cites LeSuer');
 });
 
-Deno.test('honest copy — measured gain, ends on consolidation (no fake test)', () => {
+Deno.test('honest copy — measured gain, ends on an AMRAP retest', () => {
   const d = PLAN.description.toLowerCase();
   assert(d.includes('measured') && d.includes('modest'), 'promise is tempered');
-  assert(d.includes('consolidation') && d.includes('retest is coming') && !d.includes('courtesy'), 'ends on consolidation; honest that the real retest is pending');
+  assert(d.includes('amrap retest') && d.includes('open'), 'ends on an AMRAP retest (open reps)');
 });
 
 Deno.test('guard — real barbell every work phase, maintenance runs, sport-agnostic', () => {

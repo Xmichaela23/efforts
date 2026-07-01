@@ -40,6 +40,7 @@ interface LoggedSet {
   completed: boolean;
   barType?: string;
   setType?: 'warmup' | 'working'; // For baseline test workouts
+  amrap?: boolean; // AMRAP working set (baseline/retest) — open reps, RIR gate accepts 0–3 (D-224)
   setHint?: string; // Hint text for baseline test sets
   /** D-097: true when the value was prefilled from the athlete's previous
    *  session for this exercise (autofill on logger open). UI dims the value
@@ -694,9 +695,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   // Helper: get baseline test type (lower/upper)
-  const getBaselineTestType = (workout: any): 'lower' | 'upper' | null => {
+  const getBaselineTestType = (workout: any): 'lower' | 'upper' | 'full' | null => {
     if (!isBaselineTestWorkout(workout)) return null;
     const name = String(workout?.name || '').toLowerCase();
+    if (name.includes('full') || name.includes('both')) return 'full';
     if (name.includes('lower')) return 'lower';
     if (name.includes('upper')) return 'upper';
     return null;
@@ -749,12 +751,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           barType: 'standard',
           completed: false
         },
-        // Working set placeholder
+        // Working set — ONE all-out AMRAP set (open reps). SAME shape as the wk12 retest → same cluster
+        // e1RM + ratchet-up guard. amrap:true → the RIR gate accepts RIR 0–3 (AMRAP is near-failure). (D-224)
         {
           weight: 0,
-          reps: undefined, // 5-8 reps, user fills in
+          reps: undefined, // AMRAP — athlete logs actual reps
           setType: 'working',
-          setHint: 'Target: 5-8 reps at RIR 2-3 (moderately hard)',
+          amrap: true,
+          setHint: 'AMRAP: as many CLEAN reps as you can (aim ~3–6). Stop at ~RPE 9 (one hard rep left) or on form break — never grind solo.',
           barType: 'standard',
           completed: false
         }
@@ -762,10 +766,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     };
   };
 
-  // Helper: calculate 1RM from weight and reps (Epley formula)
+  // Helper: estimate 1RM from an AMRAP set — CLUSTER Epley + Brzycki (they bracket the true max).
+  // Epley = w×(1+r/30), Brzycki = w/(1.0278−0.0278·r). Reps capped at 10: estimator accuracy degrades
+  // above ~10 reps and Brzycki diverges (denominator → 0), so a heavier/lower-rep test is more accurate
+  // [LeSuer et al. 1997, J Strength Cond Res 11(4):211–213]. A true single logs as itself.
   const calculate1RM = (weight: number, reps: number): number => {
     if (!weight || !reps || reps <= 0) return 0;
-    return Math.round(weight * (1 + reps / 30));
+    const r = Math.min(Math.round(reps), 10);
+    if (r === 1) return Math.round(weight);
+    const epley = weight * (1 + r / 30);
+    const brzycki = weight / (1.0278 - 0.0278 * r);
+    return Math.round((epley + brzycki) / 2); // cluster
   };
 
   // State for baseline test results
@@ -802,9 +813,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       // RATCHET-UP-ONLY GUARD (D-223): a test/estimate result may only RAISE a stored 1RM, never lower it.
       // A first-time baseline (no prior) writes freely; a re-test overwrites ONLY if it's a new best. This is
       // a permanent guard against the "score that lies" — a sub-max estimate logging the athlete weaker.
+      // OHP-key write guard (D-224): OHP has ONE canonical key, `overheadPress1RM` (what materialize reads).
+      // Never let a result land under an OHP variant (`overhead`/`ohp`/`overhead_press`) and drift into the void.
+      const canonKey = (k: string): string =>
+        (k === 'overhead' || k === 'ohp' || k === 'overhead_press') ? 'overheadPress1RM' : k;
       const held: string[] = [];
       Object.values(baselineTestResults).forEach(result => {
-        const key = result.baselineKey;
+        const key = canonKey(result.baselineKey);
         const prior = Number(currentPerf[key]);
         const next = Number(result.rounded1RM);
         if (!(prior > 0) || next > prior) {
@@ -1868,7 +1883,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (isBaselineTestWorkout(workoutToLoad)) {
       const testType = getBaselineTestType(workoutToLoad);
       if (testType) {
-        const testExercises = testType === 'lower' ? ['Back Squat', 'Deadlift'] : ['Bench Press', 'Overhead Press'];
+        const testExercises = testType === 'lower' ? ['Back Squat', 'Deadlift']
+          : testType === 'upper' ? ['Bench Press', 'Overhead Press']
+          : ['Back Squat', 'Deadlift', 'Bench Press', 'Overhead Press']; // 'full' / both
         setExercises(testExercises.map(name => createBaselineTestExercise(name)));
         exercisesLoadedFromWorkout = true;
         setIsInitialized(true);
@@ -2631,7 +2648,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // A TAG-based 1rm_test retest accepts a near-max SINGLE too (RIR 0–3): the courtesy max-check is
         // a heavy single, not a sub-max working set. Named baselines stay 2–3 (sub-max estimate path).
         const isTagRetest = isBaselineTestWorkout(scheduledWorkout) && !getBaselineTestType(scheduledWorkout);
-        const minRirForBaseline = isTagRetest ? 0 : 2;
+        // AMRAP baseline/retest sets are taken to ~RPE 9 (RIR ~1), so accept RIR 0–3 for them (tag-retest OR any
+        // set flagged amrap). Named non-AMRAP baselines keep the 2–3 sub-max gate. (D-224)
+        const minRirForBaseline = (isTagRetest || (updatedSet as any).amrap === true) ? 0 : 2;
         if (updatedSet.setType === 'working' && updatedSet.completed && updatedSet.rir !== undefined && !updatedSet.rir_autofilled &&
             updatedSet.rir >= minRirForBaseline && updatedSet.rir <= 3 && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0) {
           const baselineKey = getBaselineKeyForExercise(exercise.name);

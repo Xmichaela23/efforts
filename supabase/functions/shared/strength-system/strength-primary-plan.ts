@@ -82,10 +82,10 @@ export function buildArcPhases(weeks: number): { phases: ArcPhase[]; recovery_we
   const deloadWeek = w;
   phases.push({ name: 'Deload', start_week: w, end_week: w + deloadLen - 1, weeks_in_phase: deloadLen }); w += deloadLen;
   phases.push({ name: 'Peak', start_week: w, end_week: w + peakLen - 1, weeks_in_phase: peakLen }); w += peakLen;
-  // The block ends on a light CONSOLIDATION week — NOT a retest. The prescribed-% retest was broken by
-  // construction (a fixed 88%×3 "estimate" back-projects ~97% of the entered 1RM → a guaranteed ~3% LOSS,
-  // mathematically incapable of showing a gain). Removed until a real work-up-to-max retest exists. (D-223)
-  phases.push({ name: 'Consolidation', start_week: weeks, end_week: weeks, weeks_in_phase: 1 });
+  // The block ends on an AMRAP RETEST week (D-224, replacing the D-223 consolidation stopgap). AMRAP holds a
+  // FIXED ~88% weight and OPENS the reps — getting stronger shows up as MORE reps → higher e1RM, so it can't
+  // force a loss the way the old fixed-88%×3 "estimate" did (that back-projected ~97% of the old max every time).
+  phases.push({ name: 'Retest', start_week: weeks, end_week: weeks, weeks_in_phase: 1 });
   return { phases, recovery_weeks: [deloadWeek] };
 }
 
@@ -118,11 +118,6 @@ function workLoad(phase: ArcPhase, week: number): WorkLoad {
     case 'Deload': {
       // Recover before the heavy singles: ~50% volume + intensity drop (CONVENTION).
       return { primary: { sets: 2, reps: 5, pct: 65 }, secondary: { sets: 2, reps: 5, pct: 60 }, deadlift: { sets: 1, reps: 5, pct: 60 }, label: 'Deload — recover before the peak (≈50% volume + intensity drop)' };
-    }
-    case 'Consolidation': {
-      // Block-closing light week (replaces the broken retest): moderate, loggable top triples — decompress
-      // from the peak, no max-out, nothing that writes a 1RM off a sub-max estimate.
-      return { primary: { sets: 3, reps: 3, pct: 80 }, secondary: { sets: 2, reps: 3, pct: 75 }, deadlift: { sets: 1, reps: 3, pct: 78 }, label: 'Consolidation — light top sets (block complete)' };
     }
     case 'Peak': {
       // REALIZE post-deload: heavy DOUBLES ramping to ~94% — primes the CNS without a near-max single.
@@ -174,9 +169,44 @@ function workSessions(load: WorkLoad): { name: string; focus: 'upper' | 'lower';
   ];
 }
 
-// (The prescribed-% retest was REMOVED — D-223. A fixed 88%×3 "estimate" back-projects ~97% of the entered
-//  1RM, so it could only ever log a ~3% LOSS — mathematically incapable of showing a gain. The block now ends
-//  on a light consolidation week; a real work-up-to-max retest will replace it.)
+// ── AMRAP baseline/retest — ONE tool, two jobs (D-224) ───────────────────────────────────────────────
+// The SAME guided session both ESTABLISHES baselines (entry, no 1RM → athlete picks a ~5-rep weight) and
+// RE-MEASURES them (exit, has 1RM → prescribe ~88%). Warm up, then ONE all-out set: as many CLEAN reps as
+// you can. Reps are OPEN (AMRAP) — more reps than last time = the gain, measured not assumed; a fixed-rep
+// prescription off the old max can't show a gain (the D-223 bug). The logger clusters Epley+Brzycki (≤10 reps,
+// [LeSuer 1997]) and the write-back is ratchet-UP only (D-223).
+function amrapCopy(isDeadlift: boolean): string {
+  return (
+    `Warm up with a ramp (to ~85%), then ONE all-out set: as many CLEAN reps as you can at the test weight. ` +
+    `Stop at ~RPE 9 — about one hard rep left — or the moment form breaks. Never grind to failure alone. ` +
+    `More reps than last time is your gain, measured not assumed.` +
+    (isDeadlift ? ` (Deadlift e1RM reads conservative — a flat number here isn't necessarily a flat lift [LeSuer 1997].)` : '')
+  );
+}
+// One AMRAP working set. Exit passes a %1RM weight (materialize → lb); entry passes an athlete-chosen hint.
+function amrapTestSet(lift: string, weight: string): StrengthExercise {
+  return { name: `${lift} — AMRAP test set`, sets: 1, reps: 'AMRAP', weight };
+}
+/** Exit retest week: one AMRAP session per key lift at a fixed ~88% (a 3–5RM zone; deadlift ≤5). */
+function retestAmrapSessions(grid: { strength: string[] }): PlanSession[] {
+  const lifts: { name: string; focus: 'upper' | 'lower' }[] = [
+    { name: 'Bench Press', focus: 'upper' },
+    { name: 'Back Squat', focus: 'lower' },
+    { name: 'Overhead Press', focus: 'upper' },
+    { name: 'Deadlift', focus: 'lower' },
+  ];
+  return lifts.map((l, i) => l && grid.strength[i] ? ({
+    day: grid.strength[i],
+    type: 'strength' as const,
+    name: `Retest — ${l.name} (AMRAP → e1RM)`,
+    description: amrapCopy(/deadlift/i.test(l.name)),
+    duration: 45,
+    // ONE working set only (warm-up is copy-guided + the logger's warm-up add-on) so the estimate can only
+    // come from the scored AMRAP set. tag 1rm_test → the logger's cluster-e1RM + ratchet-up write-back.
+    strength_exercises: [amrapTestSet(l.name, '88% 1RM')],
+    tags: ['strength', l.focus, 'phase:retest', 'retest', '1rm_test', 'protocol:strength_primary'],
+  }) : null).filter(Boolean) as PlanSession[];
+}
 
 function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean, overrideMins?: number): PlanSession {
   const mins = overrideMins ?? (sport === 'bike' ? (isRetestWeek ? 35 : 45) : (isRetestWeek ? 25 : 35));
@@ -201,10 +231,13 @@ function baselineTestWeek(
   const test = (day: string, region: 'Lower' | 'Upper', lifts: string[], focus: 'lower' | 'upper'): PlanSession => ({
     day, type: 'strength', name: `Baseline Test: ${region} Body`,
     description:
-      `Establish your 1RMs — warm up, then work up to a heavy set on ${lifts.join(' + ')}. The app reads ` +
-      `it as your max (no % yet; this sets the numbers the rest of the block loads off).`,
+      `Establish your 1RMs (${lifts.join(' + ')}) — same AMRAP test the block ends with, so entry and retest ` +
+      `speak the same language. ${amrapCopy(lifts.some((l) => /deadlift/i.test(l)))} No % yet — pick a weight ` +
+      `you can do for ~5 clean reps; the app estimates your max from weight × reps.`,
     duration: 60,
-    strength_exercises: lifts.map((name) => ({ name, sets: 1, reps: 3, weight: 'work up to a heavy 3' })),
+    // AMRAP working set per lift; athlete-chosen weight (no 1RM yet). Same shape as the exit retest → same
+    // logger flow, same cluster e1RM, same ratchet-up guard.
+    strength_exercises: lifts.map((name) => amrapTestSet(name, 'pick a ~5-rep weight')),
     tags: ['strength', focus, 'phase:baseline', 'baseline_test', '1rm_test', 'protocol:strength_primary'],
   });
   const sessions: PlanSession[] = [
@@ -282,29 +315,30 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
 
   for (let week = 1; week <= durationWeeks; week++) {
     const phase = phaseFor(week, phaseStructure.phases);
-    const isFinalWeek = phase.name === 'Consolidation'; // block-closing light week (NOT a test)
+    const isRetestWeek = phase.name === 'Retest';
     const weekSessions: PlanSession[] = [];
 
-    // 4 real barbell sessions every week, continuous loading off the real 1RM. The final week is a light
-    // consolidation — honest copy, no fake test, and crucially NO 1rm_test/estimate tags (nothing writes
-    // a 1RM off a sub-max estimate; the broken retest is gone until a real work-up-to-max exists — D-223).
-    const load = workLoad(phase, week);
-    workSessions(load).slice(0, grid.strength.length).forEach((s, i) => {
-      weekSessions.push({
-        day: grid.strength[i],
-        type: 'strength',
-        name: isFinalWeek ? `Consolidation — ${s.name}` : `Strength Focus — ${s.name}`,
-        description: isFinalWeek
-          ? `Block complete — a light consolidation week. A proper retest is coming soon; for now, log your ` +
-            `top sets so we track your progress honestly. ` +
-            `${s.ex.map((e) => `${e.name} ${e.sets}×${e.reps} @ ${e.weight}`).join(' · ')}.`
-          : `${load.label} — 4-day split. ` +
+    if (isRetestWeek) {
+      // AMRAP retest — the SAME test shape as the entry baseline (one tool). Fixed ~88%, open reps → the
+      // gain shows up as more reps. Logger clusters Epley+Brzycki and ratchet-UP-only writes the new 1RM.
+      retestAmrapSessions(grid).forEach((s) => weekSessions.push(s));
+    } else {
+      // 4 real barbell sessions, continuous loading off the real 1RM.
+      const load = workLoad(phase, week);
+      workSessions(load).slice(0, grid.strength.length).forEach((s, i) => {
+        weekSessions.push({
+          day: grid.strength[i],
+          type: 'strength',
+          name: `Strength Focus — ${s.name}`,
+          description:
+            `${load.label} — 4-day split. ` +
             `${s.ex.map((e) => `${e.name} ${e.sets}×${e.reps} @ ${e.weight}`).join(' · ')}. Top set ${load.primary.pct}% 1RM.`,
-        duration: 60,
-        strength_exercises: s.ex,
-        tags: ['strength', s.focus, `phase:${phase.name.toLowerCase()}`, 'protocol:strength_primary'],
+          duration: 60,
+          strength_exercises: s.ex,
+          tags: ['strength', s.focus, `phase:${phase.name.toLowerCase()}`, 'protocol:strength_primary'],
+        });
       });
-    });
+    }
 
     // Endurance = maintenance, underneath. Runs spread across runDayList (run-only days + stacked upper days),
     // each with its distributed duration; bike keeps its off-day default.
@@ -339,10 +373,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     name: args.goalName?.trim() || `Get Stronger — ${durationWeeks} Weeks`,
     description:
       `Strength-led ATR block on heavy barbell compounds (balanced upper/lower): accumulate → ` +
-      `intensify → deload → peak, ending in a light consolidation week — the block is complete, and a proper ` +
-      `retest is coming soon; log your top sets for now.${enduranceNote} Expect a MEASURED gain — concurrent ` +
-      `strength gains are real but modest (typically a few %); honest progression, not a hyped PR. The ` +
-      `athlete picks the outcome; the engine runs the arc.`,
+      `intensify → deload → peak, ending in an AMRAP retest — one all-out set per lift at a fixed ~88%, reps ` +
+      `open, so more reps than baseline reads as your gain (measured, not assumed).${enduranceNote} Expect a ` +
+      `MEASURED gain — concurrent strength gains are real but modest (typically a few %); honest progression, ` +
+      `not a hyped PR. The athlete picks the outcome; the engine runs the arc.`,
     duration_weeks: durationWeeks,
     sessions_by_week,
     phaseStructure,

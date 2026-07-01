@@ -1571,29 +1571,29 @@ return (
                             <p className="text-xs text-white/70 mb-2">
                               Log a{' '}
                               <button
-                                onClick={() => {
-                                  if (onOpenBaselineTest) {
-                                    onOpenBaselineTest('Baseline Test: Lower Body');
-                                  }
-                                }}
+                                onClick={() => onOpenBaselineTest?.('Baseline Test: Lower Body')}
                                 className="underline font-medium hover:opacity-80"
                                 style={{ color: SPORT_COLORS.strength }}
                               >
-                                Baseline Test: Lower Body
+                                Lower
+                              </button>
+                              ,{' '}
+                              <button
+                                onClick={() => onOpenBaselineTest?.('Baseline Test: Upper Body')}
+                                className="underline font-medium hover:opacity-80"
+                                style={{ color: SPORT_COLORS.strength }}
+                              >
+                                Upper
                               </button>
                               {' '}or{' '}
                               <button
-                                onClick={() => {
-                                  if (onOpenBaselineTest) {
-                                    onOpenBaselineTest('Baseline Test: Upper Body');
-                                  }
-                                }}
+                                onClick={() => onOpenBaselineTest?.('Baseline Test: Full Body')}
                                 className="underline font-medium hover:opacity-80"
                                 style={{ color: SPORT_COLORS.strength }}
                               >
-                                Upper Body
+                                Full Body
                               </button>
-                              {' '}workout. We'll guide you through warmups and calculate your 1RM automatically.
+                              {' '}baseline test. One all-out AMRAP set per lift after guided warmups — we cluster Epley + Brzycki for your 1RM. Same test the Get Strong block ends with, so entry and retest match.
                             </p>
                             <p className="text-xs text-white/60 italic">
                               Tip: Retest every 8-12 weeks to track progress.

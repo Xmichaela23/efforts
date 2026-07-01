@@ -4601,6 +4601,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-224 — AMRAP retest: one reusable baseline/retest tool (entry establishes, exit re-measures), cluster e1RM, OHP-key guard
+
+- **Date:** 2026-07-01
+- **The fix for D-223's removal:** re-add the retest, correctly. **AMRAP** holds a **fixed ~88% weight** and **opens the reps** — getting stronger shows up as MORE reps → higher e1RM. It cannot force a loss the way the old fixed-`88%×3` estimate did (that back-projected 0.88×1.10 = 0.968 of the old max every time). The wk12 phase is `Retest` again (superseding the D-223 consolidation stopgap): one AMRAP session per key lift, ONE scored working set (warm-up is copy-guided so the estimate is clean), tag `1rm_test`, per-lift rep zones (squat/bench 3–5, deadlift ≤5, hard ≤10).
+- **ONE tool, two jobs (the reusable-baseline framing):** the SAME guided AMRAP session both **ESTABLISHES** baselines (entry / no-1RM → athlete picks a ~5-rep weight; the composer's `baselineTestWeek` + the standalone "Baseline Test: Lower/Upper/**Full** Body" launcher in `TrainingBaselines` → `AppLayout.onOpenBaselineTest`) and **RE-MEASURES** them (exit / wk12 → ratchet-up write-back → next block compounds). Same logger flow, same math, same guard. Closes the no-1RM entry gap AND block-to-block compounding on one surface. Added the "Full Body" type (all 4 lifts) to `getBaselineTestType` + the logger rebuild.
+- **Math — cluster Epley + Brzycki, ≤10 cap:** `calculate1RM` now averages Epley `w×(1+r/30)` and Brzycki `w/(1.0278−0.0278r)`, reps **capped at 10** (accuracy degrades above ~10; Brzycki's denominator collapses). A logged single returns itself. **CITED — LeSuer et al. (1997)**, *J Strength Cond Res* 11(4):211–213 (error within ~3% for 2–10 reps; Epley/Brzycki best at low reps; **all equations underestimate the deadlift** → the deadlift retest copy flags "reads conservative"). **⚠ The PMID Michael supplied (9355611) was a legal case report — 5th misattributed citation the verify-gate caught; real cite is by journal/vol/pages.**
+- **Accuracy-critical copy:** the estimate assumes a set taken **to/near failure**, so the framing lands on **"stop at ~RPE 9" (≈1 rep in reserve)** — near enough to hold accuracy, safe enough solo. Not "stop early." The RIR-acceptance gate was widened: an AMRAP set (or a tag-retest) registers at **RIR 0–3** (AMRAP is near-failure); named non-AMRAP baselines keep the 2–3 sub-max gate.
+- **OHP-key write guard:** `saveBaselineResults` canonicalizes any OHP variant key (`overhead`/`ohp`/`overhead_press`) → `overheadPress1RM` before writing, so a result can never drift into a key materialize doesn't read. (Anchor read confirmed the stored keys are clean: `bench/squat/deadlift/overheadPress1RM`, no duplicates; squat=OHP=110 is **real data**, not a mapping bug — safe to re-enter.)
+- **Verification:** 11/11 composer tests (the CONSOLIDATION test replaced by an AMRAP-RETEST test: 4 sessions, one AMRAP set each, fixed 88%, open reps, `1rm_test`, RPE-9 + LeSuer-deadlift copy, no fixed-3). Client type-checks clean (the one TrainingBaselines error at :779 is pre-existing, unrelated). Deployed generate-strength-plan; StrengthLogger + TrainingBaselines pushed.
+- **Cross-ref:** `SPEC-amrap-retest.md`, `strength-primary-plan.ts` (amrap helpers + retest week + baseline week), `StrengthLogger.tsx` (cluster math, RIR gate, OHP guard, Full type, AMRAP working set), `TrainingBaselines.tsx` (Lower/Upper/Full launcher), D-223 (removal this corrects), D-221/D-222.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
