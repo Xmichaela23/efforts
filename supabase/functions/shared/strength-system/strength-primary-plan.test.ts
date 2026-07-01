@@ -85,10 +85,10 @@ Deno.test('guard — real barbell every work phase, maintenance runs, sport-agno
 
 Deno.test('maintenance band — typed miles clamped to floor/ceiling (pace-mapped), flat, glass-box', () => {
   const mk = (miles: number) => composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2, targetWeeklyMiles: miles, easyPaceMinPerMile: 9.5 });
-  // 9.5 min/mi → floor 6 (60/9.5), ceiling 16 (150/9.5)
+  // 9.5 min/mi → floor 6 (60/9.5), ceiling 19 (180/9.5)
   assertEquals(mk(12).volume_notes, null, '12mi is inside the band — build it, no friction');
-  const over = mk(30); assert(over.volume_notes !== null && /held to 16/.test(over.volume_notes) && /Wilson/.test(over.volume_notes), 'over-ask → capped at ceiling + Wilson note');
-  const under = mk(3); assert(under.volume_notes !== null && /bumped to 6/.test(under.volume_notes) && /Hickson/.test(under.volume_notes), 'under-ask → floor bump + Hickson/Spiering note');
+  const over = mk(30); assert(over.volume_notes !== null && /Held to 19/.test(over.volume_notes) && /Wilson/.test(over.volume_notes), 'over-ask → capped at ceiling + Wilson note');
+  const under = mk(3); assert(under.volume_notes !== null && /Bumped to 6/.test(under.volume_notes) && /Hickson/.test(under.volume_notes), 'under-ask → floor bump + Hickson/Spiering note');
   // flat: maintenance run duration is the same every work week (no ramp)
   const inBand = mk(12);
   const rd = (w: string) => inBand.sessions_by_week[w].find((s) => s.type === 'run')!.duration;
@@ -97,6 +97,27 @@ Deno.test('maintenance band — typed miles clamped to floor/ceiling (pace-mappe
   const def = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2 });
   assertEquals(def.volume_notes, null);
   assertEquals(def.sessions_by_week['2'].find((s) => s.type === 'run')!.duration, 35, 'no typed miles → fixed ~35min default');
+});
+
+Deno.test('SQUAT FREQUENCY — one heavy back squat/week; Lower B is hinge (deadlift + lighter front squat), never stacked', () => {
+  // across a work week, Back Squat appears exactly once (Lower A, primary heavy) — not on both lower days
+  const lifts = strengthOf(2).flatMap((s) => s.strength_exercises ?? []).map((e) => e.name);
+  assertEquals(lifts.filter((n) => /^Back Squat/i.test(n)).length, 1, 'only ONE heavy back squat/week (was two)');
+  // the hinge day carries the deadlift + a LIGHTER front squat — no heavy back-squat + deadlift in one session
+  const lowerB = strengthOf(2).find((s) => /Lower B/i.test(s.name))!;
+  const lbNames = (lowerB.strength_exercises ?? []).map((e) => e.name).join(' ');
+  assert(/Conventional Deadlift/i.test(lbNames) && /Front Squat/i.test(lbNames), `Lower B = deadlift + front squat, got ${lbNames}`);
+  assert(!/Back Squat/i.test(lbNames), 'Lower B must NOT stack a heavy back squat with the deadlift');
+});
+
+Deno.test('MILEAGE never silently dropped — typed miles honored even without a learned easy pace (estimate + disclose)', () => {
+  // pace UNKNOWN but miles typed → must NOT fall to the fixed 35min default; estimate + say so
+  const noPace = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2, targetWeeklyMiles: 25 });
+  const mins = noPace.sessions_by_week['2'].find((s) => s.type === 'run')!.duration;
+  assert(mins !== 35, `typed 25mi must not collapse to the 35min default (got ${mins})`);
+  assert(noPace.volume_notes !== null && /estimated/i.test(noPace.volume_notes), 'missing pace → disclosed estimate note');
+  // 25mi over a 10:00/mi fallback → ceiling 18 (180/10) → capped, so the Wilson note fires too
+  assert(/Held to 18/.test(noPace.volume_notes!) && /Wilson/.test(noPace.volume_notes!), 'over-ask still caps on the fallback pace');
 });
 
 Deno.test('NO-1RMs path — week 1 is a baseline test (offered, not forced); weeks 2-12 train', () => {

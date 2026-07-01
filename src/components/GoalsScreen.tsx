@@ -1571,6 +1571,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                   </span>
                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/30" />
                 </button>
+                {(() => {
+                  // Glass-box: surface the maintenance-band note (mileage capped/bumped) so the guardrail is never silent.
+                  const vn = (linkedPlan.config as { volume_notes?: string | null } | undefined)?.volume_notes;
+                  return vn ? <p className="text-xs leading-relaxed text-white/45">{vn}</p> : null;
+                })()}
               </div>
             )
           ) : (() => {

@@ -4576,6 +4576,18 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-222 — Get Strong maintenance-mileage band: typed-miles guardrail, ceiling 180 min/wk, hinge/squat re-split, no-silent-drop
+
+- **Date:** 2026-06-30
+- **The band (typed mileage, science-guardrailed):** the athlete TYPES the weekly miles they want to hold; the engine clamps to a maintenance band (not a menu). **Floor 60 min/wk** (holds aerobic base — Hickson 1981, Spiering 2021); **ceiling 180 min/wk** (interference cap — Wilson 2012), pace-mapped to miles via the athlete's learned easy pace. Inside → build, **no note**; over → cap + note; under → bump + note. Flat, no ramp (maintenance). Wired end-to-end: builder input → `training_prefs.target_weekly_miles` → create-goal (reads it + learned easy pace) → generate-strength-plan → composer → `plans.config.volume_notes`, surfaced on the goal card.
+- **Ceiling raised 150 → 180 (~2.5h → ~3h, ≈18 mi at 10:00/mi):** interference scales with **intensity/duration, not easy volume** (Wilson 2012) — all-easy zone-2 is the lowest-interference modality, so 150 over-protected an established base (capped a real 20–25 mi runner at ~14). 180 lets them sit near true maintenance while strength still clearly leads. CONVENTION on the exact minutes; the cited finding is *that* running interferes by dose. **Note copy = plain-language reason first, citation as the receipt.**
+- **No silent drop (the bug this fixed):** a Get Strong plan showed 2×35 min runs against a typed 25 mi — the fixed default, NOT a cap (at the ceiling, sessions are always ~ceiling/2·pace ≈ 75–90 min regardless of pace). Root cause: the band guard required a learned easy pace AND typed miles; missing pace → typed miles silently dropped to the default. **Fix:** honor typed miles whenever they exist — if pace is unlearned, estimate at a **10:00/mi fallback + disclose** ("re-maps once you log easy runs"), never drop. Plus the note was stored in `config.volume_notes` but **nothing rendered it** — now surfaced on the goal-card plan link.
+- **Squat frequency re-split (concurrent recovery):** the U/L/U/L split squatted heavy on BOTH lower days (Lower A primary + Lower B secondary) AND Lower B stacked back-squat + deadlift — too much heavy lower on untrained legs. **Fix:** Lower A = the one heavy Back Squat day (+ RDL); **Lower B = hinge day** (Conventional Deadlift low-volume + a lighter **Front Squat**) — one heavy back squat/week, no session stacks heavy back-squat + heavy deadlift. The split/progression/deadlift-volume were already sound (kept). **Mon/Tue/Thu/Fri spacing is correct** (standard U/L/U/L — back-to-back days alternate upper/lower, no muscle hit two days running) — NOT changed.
+- **Verification:** 10/10 composer tests (added squat-frequency + no-silent-drop cases); proven on `45d122e7`'s real pace. **Rejected:** flat hours-band tier (retired — pace + science bound volume); dropping typed miles when pace unlearned; keeping 150 ceiling.
+- **Cross-ref:** `strength-primary-plan.ts`, `SCIENCE-strength-primary-loading.md` (band section), `generate-strength-plan/index.ts`, `create-goal-and-materialize-plan/index.ts` (Hop 1), `NonRaceBuilder.tsx` (typed input), `GoalsScreen.tsx` (note surfacing), D-221 (the engine).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

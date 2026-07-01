@@ -139,9 +139,12 @@ function workSessions(load: WorkLoad): { name: string; focus: 'upper' | 'lower';
   const { primary: P, secondary: S, deadlift: D } = load;
   return [
     { name: 'Upper A', focus: 'upper', ex: [exer('Bench Press', P), exer('Barbell Row', S)] },
-    { name: 'Lower A', focus: 'lower', ex: [exer('Back Squat', P), exer('Romanian Deadlift', S)] },
+    { name: 'Lower A (squat)', focus: 'lower', ex: [exer('Back Squat', P), exer('Romanian Deadlift', S)] },
     { name: 'Upper B', focus: 'upper', ex: [exer('Overhead Press', P), exer('Pull Up', S)] },
-    { name: 'Lower B', focus: 'lower', ex: [exer('Back Squat', S), exer('Conventional Deadlift', D)] },
+    // Lower B is the HINGE/lighter day — one heavy back squat/week (Lower A) is plenty for untrained legs.
+    // Deadlift stays low-volume (highest-fatigue lift); the squat pattern here is a lighter Front Squat, so
+    // no session stacks heavy back-squat + heavy deadlift and the legs aren't hammered twice. [concurrent recovery]
+    { name: 'Lower B (hinge)', focus: 'lower', ex: [exer('Conventional Deadlift', D), exer('Front Squat', S)] },
   ];
 }
 
@@ -223,16 +226,26 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // freq/duration/interference — Hickson 1981/82, Spiering 2021, Wilson 2012), pace-mapped to miles. Flat,
   // no ramp. Honor up to the science, never past it: over-ask → capped max + note; under → bumped to floor.
   const runDays = grid.endurance.length;
+  const FLOOR_MIN = 60;   // ~2×/wk maintenance dose floor [Hickson 1981, Spiering 2021] — CONVENTION on exact minutes
+  // Ceiling = ~3hrs/wk. Interference scales with intensity/DURATION, not easy volume [Wilson 2012] — easy zone-2
+  // is low-interference, so a tighter cap over-protects an established base. 180 lets a real 20-25mi runner sit
+  // near true maintenance while strength still clearly leads. (Raised from 150; D-222.)
+  const CEILING_MIN = 180;
+  const FALLBACK_EASY_MIN_PER_MILE = 10; // if we haven't learned the athlete's easy pace, estimate rather than DROP the typed miles
   let runOverrideMins: number | undefined;
   let volume_notes: string | null = null;
-  if (enduranceSport === 'run' && (args.easyPaceMinPerMile ?? 0) > 0 && (args.targetWeeklyMiles ?? 0) > 0 && runDays > 0) {
-    const pace = args.easyPaceMinPerMile!;
-    const floor = Math.round(60 / pace);
-    const ceiling = Math.round(150 / pace);
+  // Honor typed miles whenever they exist — never silently drop them to the fixed default just because the
+  // easy pace is unlearned. Missing pace → estimate + disclose (it re-maps once easy runs are logged).
+  if (enduranceSport === 'run' && (args.targetWeeklyMiles ?? 0) > 0 && runDays > 0) {
+    const paceKnown = (args.easyPaceMinPerMile ?? 0) > 0;
+    const pace = paceKnown ? args.easyPaceMinPerMile! : FALLBACK_EASY_MIN_PER_MILE;
+    const floor = Math.round(FLOOR_MIN / pace);
+    const ceiling = Math.round(CEILING_MIN / pace);
     const asked = Math.round(args.targetWeeklyMiles!);
     const held = Math.max(floor, Math.min(ceiling, asked));
-    if (asked > ceiling) volume_notes = `Maintenance running held to ${ceiling} mi/wk (you asked ${asked}) — above this, running eats strength recovery; strength leads [Wilson 2012].`;
-    else if (asked < floor) volume_notes = `Maintenance running bumped to ${floor} mi/wk (you asked ${asked}) — the floor that holds your aerobic base [Hickson 1981/82, Spiering 2021].`;
+    if (asked > ceiling) volume_notes = `Held to ${ceiling} mi/wk — in a strength-focus block, easy running past ~3hrs/wk competes with lifting recovery; we hold it so strength leads. [Wilson 2012]`;
+    else if (asked < floor) volume_notes = `Bumped to ${floor} mi/wk — below this you'd lose aerobic base; this floor holds it. [Hickson 1981, Spiering 2021]`;
+    if (!paceKnown) volume_notes = `${volume_notes ? volume_notes + ' ' : ''}Run durations estimated at ${FALLBACK_EASY_MIN_PER_MILE}:00/mi until we learn your easy pace — they re-map once you log a few easy runs.`;
     runOverrideMins = Math.max(15, Math.round((held / runDays) * pace));
   }
 

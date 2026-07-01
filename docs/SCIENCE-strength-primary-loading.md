@@ -68,13 +68,20 @@ In a Get Strong block the endurance work is **held, not developed** — strength
 
 **Ceiling — protect strength (cap running, it's the interfering modality):**
 - **CITED — Wilson et al. (2012)** *J Strength Cond Res* 26(8):2293–2307 [(PubMed 22002517)](https://pubmed.ncbi.nlm.nih.gov/22002517/): concurrent interference is **dose-dependent on endurance frequency + duration**, and **running (not cycling)** produced significant strength/hypertrophy decrements (hypertrophy ES 1.23→0.85; strength 1.76→1.44 concurrent). → cap running volume so it doesn't eat strength recovery.
+- → **ceiling = ~3 hrs/wk (180 min)**, pace-mapped to miles (≈18 mi at 10:00/mi). Interference scales with **intensity + duration**, *not* easy volume — Get Strong maintenance is all-easy zone-2 (the lowest-interference modality), so a tighter cap over-protects an established base. 180 lets a real 20–25 mi/wk runner sit near true maintenance while strength still clearly leads. **Raised from 150 → 180 (D-222).**
 
 **The intensity caveat (decides the honest framing) — Option A, all-easy:**
 - **CITED — Hickson et al. (1985)** *J Appl Physiol* 58(2):492–499 [(PubMed 3156841)](https://pubmed.ncbi.nlm.nih.gov/3156841/) + Spiering 2021: cutting **intensity** loses VO₂max — intensity is the maintenance non-negotiable. Get Strong maintenance is deliberately **all-easy** (no quality session — don't spend interference budget defending a metric the block sets down). So it **maintains the AEROBIC BASE, not VO₂max** — frame it exactly that way; the literature makes that honest, not a hedge. **VO₂max sharpening returns in the endurance block** (the agreed tradeoff, D-221 lifecycle).
 
-**CONVENTION (practitioner calibration, flagged):** the exact session minutes (~20–25 floor / ~40 ceiling), the **3×/wk** anchor, and the precise ceiling mileage sit on top of the cited frequency/duration/interference findings — the studies establish *that* low volume holds and *that* running interferes by dose, not the exact running prescription.
+**CONVENTION (practitioner calibration, flagged):** the exact weekly minutes (**60 floor / 180 ceiling**) and the precise mileage sit on top of the cited frequency/duration/interference findings — the studies establish *that* low volume holds and *that* running interferes by dose, not the exact running prescription.
 
-**The guardrail (engine behavior):** typed miles **inside the band → build it, no friction**; **above the ceiling → glass-box flag + build the capped max**; **below the floor → flag + bump to floor**. Honor up to the science, never past it. **Flat — no ramp** (it's maintenance, not a build). Develop modes (Maintain / run-forward) instead clamp to the §4.5 legal range with a ramp. The commitment tier is **retired for endurance volume** — pace + science bound it, not a fixed hours band.
+**The guardrail (engine behavior):** typed miles **inside the band → build it, no friction (no note)**; **above the ceiling → glass-box cap + note**; **below the floor → bump + note**. Honor up to the science, never past it. **Flat — no ramp** (it's maintenance, not a build). Notes are plain-language-first with the citation as the receipt:
+- **Cap:** *"Held to {ceiling} mi/wk — in a strength-focus block, easy running past ~3hrs/wk competes with lifting recovery; we hold it so strength leads. [Wilson 2012]"*
+- **Bump:** *"Bumped to {floor} mi/wk — below this you'd lose aerobic base; this floor holds it. [Hickson 1981, Spiering 2021]"*
+- **In-band:** no note.
+- **Pace unlearned:** typed miles are still honored (estimated at a 10:00/mi fallback + disclosed, re-maps once easy runs are logged) — never silently dropped to the fixed default.
+
+Develop modes (Maintain / run-forward) instead clamp to the §4.5 legal range with a ramp. The commitment tier is **retired for endurance volume** — pace + science bound it, not a fixed hours band.
 
 ---
 
