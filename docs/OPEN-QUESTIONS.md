@@ -1244,6 +1244,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 - **The thing:** the strength-primary arc (5×5/neural barbell lanes) is barbell-only; the Get Strong routing gates on `commercial_gym`, so a bodyweight athlete's Get Strong falls to the `(b)-run` durability path (correct — can't run the barbell arc). A bodyweight strength-primary lane (calisthenic progressions) is a clean future add on demand.
 - **Cross-ref:** D-221, `create-goal…index.ts` (the `gsEquip === 'commercial_gym'` gate), `strength-primary-plan.ts`.
 
+## Q-099 — NEXT ROCK: "Plan Your Week" day-mover (drag sessions across days, science as the rails)
+- **Status:** filed 2026-07-01 · **scoped, not built — the next big rock.**
+- **The thing:** a touch-native board where the athlete drags the plan's sessions across days; the locked constraints become drag rails (same-day matrix, U/L/U/L, no hard-run-near-heavy-lower, lift-first on stacks). Glass-box on conflict only. **Fully scoped in `CONCEPT-plan-your-week.md`** — honest size **L/XL** (Frame has NO drag code; it's ground-up), recommended v1 = **reschedule-only, mobile-first, alongside intake, optimistic-client + server-authoritative** via a NEW per-move validator over `week-optimizer`. Real dep: the board needs per-week sessions readable + a validated day-move write path. Read the concept doc first.
+
+## Q-100 — NEXT: Get Strong accessory ADD-ONS — pull-ups, glute-building, HYROX/hybrid options
+- **Status:** filed 2026-07-01 · **wanted direction, not built.** Add-on menu on top of the Get Strong split (which already carries Pull-Up + RDL/front-squat accessories).
+- **Foundation already on disk:** `STRENGTH-PROTOCOL.md:5` explicitly reserved **HYROX/Spartan/hybrid** protocols for **separate docs with their own accessory rotations + selection logic** (do NOT extend the tri protocol doc into them); `STRENGTH-PROTOCOL.md` also carries the **glute/posterior-chain science** (hip thrusts required in lower sessions — Contreras EMG, Distefano single-leg; glute bridges); `SCIENCE-upper-aesthetics-hypertrophy.md` grounds the **upper/pull** add-on.
+- **⚠ Reconciliation:** the "Hyrox parked" note referred to a *hand-authored one-off week* (a hack, don't chase THAT). A hyrox **accessory add-on** is a different, legitimate thing — exactly the "separate doc" STRENGTH-PROTOCOL.md anticipated. Treat hyrox add-ons as IN scope going forward.
+- **Shape (to spec in the new chat):** an add-on layer (pull-up progressions, glute/posterior block, hyrox/hybrid accessory rotation) that attaches to the Get Strong plan without breaking the concurrent-recovery rules (glute/posterior eccentric volume competes with heavy Lower + long runs — see `STRENGTH-PROTOCOL.md` interference sections). Verify any new citations before baking (verify-before-cite, as always).
+
 ---
 
 ## When to add an entry
