@@ -714,11 +714,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return null;
   };
 
-  // Helper: create baseline test exercise structure
-  const createBaselineTestExercise = (exerciseName: string): LoggedExercise => {
+  // Helper: create baseline/retest exercise structure — warm-up ramp + ONE AMRAP working set.
+  // `suggestedWeight` (the wk12 retest's ~88% top weight, in lb) pre-fills a %-based ramp + the test set.
+  // Entry (no 1RM) passes nothing → the athlete-chosen hint ramp. Same structure both ways. (D-224)
+  const createBaselineTestExercise = (exerciseName: string, suggestedWeight?: number): LoggedExercise => {
     const isOHP = exerciseName.toLowerCase().includes('overhead') || exerciseName.toLowerCase().includes('ohp');
     const emptyBarWeight = isOHP ? 0 : 45; // OHP might need lighter start
-    
+    const hasSug = typeof suggestedWeight === 'number' && suggestedWeight > 0;
+    const round5 = (w: number) => Math.max(0, Math.round(w / 5) * 5);
+
     return {
       id: `ex-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: exerciseName,
@@ -733,31 +737,32 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           barType: 'standard',
           completed: false
         },
-        // Warmup 2: Add 25-50 lbs
+        // Warmup 2: ~55% (retest) or "add 25-50 lbs" (entry)
         {
-          weight: 0,
+          weight: hasSug ? round5(suggestedWeight! * 0.55) : 0,
           reps: 5,
           setType: 'warmup',
-          setHint: 'Add 25-50 lbs, should feel easy',
+          setHint: hasSug ? '~55% — should feel easy' : 'Add 25-50 lbs, should feel easy',
           barType: 'standard',
           completed: false
         },
-        // Warmup 3: Add 25-50 lbs more
+        // Warmup 3: ~75% (retest) or "add 25-50 lbs more" (entry)
         {
-          weight: 0,
+          weight: hasSug ? round5(suggestedWeight! * 0.75) : 0,
           reps: 3,
           setType: 'warmup',
-          setHint: 'Add 25-50 lbs, should feel moderate',
+          setHint: hasSug ? '~75% — moderate, one last primer' : 'Add 25-50 lbs, should feel moderate',
           barType: 'standard',
           completed: false
         },
         // Working set — ONE all-out AMRAP set (open reps). SAME shape as the wk12 retest → same cluster
         // e1RM + ratchet-up guard. amrap:true → the RIR gate accepts RIR 0–3 (AMRAP is near-failure). (D-224)
         {
-          weight: 0,
+          weight: hasSug ? round5(suggestedWeight!) : 0, // ~88% suggested top weight (retest) — athlete can adjust
           reps: undefined, // AMRAP — athlete logs actual reps
           setType: 'working',
           amrap: true,
+          prefilled: hasSug, // D-204: pre-filled weight; cleared on first athlete edit
           setHint: 'AMRAP: as many CLEAN reps as you can (aim ~3–6). Stop at ~RPE 9 (one hard rep left) or on form break — never grind solo.',
           barType: 'standard',
           completed: false
@@ -1887,6 +1892,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           : testType === 'upper' ? ['Bench Press', 'Overhead Press']
           : ['Back Squat', 'Deadlift', 'Bench Press', 'Overhead Press']; // 'full' / both
         setExercises(testExercises.map(name => createBaselineTestExercise(name)));
+        exercisesLoadedFromWorkout = true;
+        setIsInitialized(true);
+        return;
+      }
+      // TAG-retest ("Retest — Bench Press", 1rm_test but no lower/upper/full): rebuild each planned lift with
+      // the SAME warm-up ramp + AMRAP working set as the baseline test, pre-filling the ~88% suggested weight
+      // (materialize already converted 88% 1RM → lb). One tool — entry and retest share this exact structure.
+      const plannedRetest = (workoutToLoad?.strength_exercises ?? []) as any[];
+      if (plannedRetest.length > 0) {
+        setExercises(plannedRetest.map((ex) => {
+          const liftName = String(ex?.name || '').split('—')[0].trim(); // "Bench Press — AMRAP test set" → "Bench Press"
+          const w = Number(ex?.weight);
+          return createBaselineTestExercise(liftName || String(ex?.name || ''), Number.isFinite(w) && w > 0 ? w : undefined);
+        }));
         exercisesLoadedFromWorkout = true;
         setIsInitialized(true);
         return;
