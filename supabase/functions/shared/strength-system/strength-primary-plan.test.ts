@@ -137,6 +137,17 @@ Deno.test('DISTRIBUTION — spread as long-run + easy fill (not total÷N), extra
   assert(!runDays4.some((d) => lowerDays.includes(d)), 'no run stacked on a heavy-lower day (Tue/Fri)');
 });
 
+Deno.test('STACKED-DAY NOTE — shown ONCE (wk1 first lift+run day), never repeated; absent when nothing stacks', () => {
+  const p = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 18, easyPaceMinPerMile: 10 });
+  const noted = Object.values(p.sessions_by_week).flat().filter((s) => s.type === 'run' && /lift first/i.test(s.description));
+  assertEquals(noted.length, 1, 'the stacked-day note appears exactly once across the whole plan');
+  assert(/Petr/.test(noted[0].description), 'note carries its citation');
+  // 2 run days never stack onto a lift day → no note anywhere (self-gating)
+  const p2 = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2, targetWeeklyMiles: 12, easyPaceMinPerMile: 10 });
+  const noted2 = Object.values(p2.sessions_by_week).flat().filter((s) => s.type === 'run' && /lift first/i.test(s.description));
+  assertEquals(noted2.length, 0, 'no stacking (2 run days) → no note');
+});
+
 Deno.test('NO-1RMs path — week 1 is a baseline test (offered, not forced); weeks 2-12 train', () => {
   const no = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2, needsBaseline: true });
   const wk1 = no.sessions_by_week['1'].filter((s) => s.type === 'strength');

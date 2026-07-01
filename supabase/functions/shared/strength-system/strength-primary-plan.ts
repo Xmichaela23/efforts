@@ -208,14 +208,14 @@ function retestAmrapSessions(grid: { strength: string[] }): PlanSession[] {
   }) : null).filter(Boolean) as PlanSession[];
 }
 
-function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean, overrideMins?: number): PlanSession {
+function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean, overrideMins?: number, extraNote?: string): PlanSession {
   const mins = overrideMins ?? (sport === 'bike' ? (isRetestWeek ? 35 : 45) : (isRetestWeek ? 25 : 35));
   const label = sport === 'bike' ? 'Easy Ride' : 'Easy Run';
   return {
     day,
     type: sport === 'bike' ? 'ride' : 'run',
     name: label,
-    description: `~${mins} min easy aerobic, conversational — maintenance only (held so strength leads).`,
+    description: `~${mins} min easy aerobic, conversational — maintenance only (held so strength leads).${extraNote ?? ''}`,
     duration: mins,
     tags: ['easy', 'maintenance', 'aerobic'],
   };
@@ -287,6 +287,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const runDayList: string[] = [...grid.endurance];
   for (const d of upperLiftDays) { if (runDayList.length >= runFreq) break; if (!runDayList.includes(d)) runDayList.push(d); }
   const longRunDay = grid.endurance[grid.endurance.length - 1] ?? runDayList[runDayList.length - 1]; // the long run lands on a run-only day (Sat)
+  // Explain stacking ONCE — on the first lift+run day (week 1), silent everywhere after. Self-gates: if no run
+  // stacks onto a lift day (e.g. 2 run days), there's nothing to explain and the note never appears.
+  const firstStackedRunDay = runDayList
+    .filter((d) => grid.strength.includes(d))
+    .sort((a, b) => DAYS.indexOf(a as typeof DAYS[number]) - DAYS.indexOf(b as typeof DAYS[number]))[0];
 
   const runMinutesByDay: Record<string, number> = {};
   let volume_notes: string | null = null;
@@ -343,7 +348,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // Endurance = maintenance, underneath. Runs spread across runDayList (run-only days + stacked upper days),
     // each with its distributed duration; bike keeps its off-day default.
     if (enduranceSport === 'run') {
-      runDayList.forEach((day) => weekSessions.push(enduranceSession('run', day, false, runMinutesByDay[day])));
+      runDayList.forEach((day) => {
+        // The one-time "how stacked days work" note: week 1, first lift+run day only.
+        const note = (week === 1 && day === firstStackedRunDay)
+          ? ` On a lift + run day, lift first — then the easy run. Run later in the day if you can (a few hours), but back-to-back is fine; your runs are easy [Petré 2021].`
+          : undefined;
+        weekSessions.push(enduranceSession('run', day, false, runMinutesByDay[day], note));
+      });
     } else if (enduranceSport) {
       grid.endurance.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day, false, undefined)));
     }
