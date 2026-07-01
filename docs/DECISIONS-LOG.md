@@ -4588,6 +4588,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-223 — Get Strong retest REMOVED (broken by construction) → consolidation week; ratchet-up-only write-back guard
+
+- **Date:** 2026-07-01
+- **The bug (caught from a real materialized plan):** the wk12 "estimate" retest prescribed a **fixed `1×3 @ 88% 1RM`** for OHP + Deadlift. Epley e1RM from a triple = weight × 1.10, so 0.88 × 1.10 = **0.968 → it back-projects ~97% of the entered 1RM every time.** The estimate retest was **mathematically incapable of showing a gain** — it logged a guaranteed ~3% LOSS. In the dogfood plan: OHP peaked 105×2 then "retested" 95×3 (est ~105, below the entered 110); DL peaked 140×2 then 130×3 (est ~143, below 152). The check lifts (Bench/Squat `1×1 @ 102.5%`) had the inverse flaw — they *assumed* a +2.5% PR off the old max rather than measuring one.
+- **Decision — REMOVE the retest, don't patch it.** A retest that prescribes a load off the OLD max is circular; it can't measure a new one. The block now ends on a **light Consolidation week** (3×3 @ ~80% loggable top triples, decompress from the peak) with honest copy: *"Block complete — a light consolidation week. A proper retest is coming soon; log your top sets for now."* No cliff, no fake test. **Crucially, no `1rm_test`/`estimate_1rm`/`retest` tags remain anywhere** — nothing writes a 1RM off a sub-max estimate. A real *work-up-to-max* (AMRAP/true rep-max) retest will replace it later.
+- **Permanent guard (kept even with retest gone) — ratchet-UP-only write-back:** `StrengthLogger.saveBaselineResults` now only overwrites a stored 1RM when the new result **exceeds** the prior (a first-time baseline with no prior still writes freely). A test/estimate may only RAISE a 1RM, never lower it — permanent guard against the "score that lies." Honest UI: the save toast names any lift held at its higher stored max.
+- **Anchor-mapping trace (squat 110 = OHP 110, squat < bench 160) — LOOKED, did not fix:** `materialize-plan` resolution is **clean** — `pickPrimary1RMAndBase` reads OHP from `overheadPress1RM/ohp/overhead_press/overhead` and squat from `squat/squat1RM/squat_1rm`; **no code path makes OHP borrow the squat value** (a missing OHP anchor renders "baseline missing," not a weight). So the equality is in the stored `performance_numbers` data, not the read. One real smell found: the OHP 1RM lives under **multiple key names** across paths (`overheadPress1RM` vs `overhead` vs `ohp`) — a read/write key-drift footgun (cf. the documented fiveK/fiveK_pace one). **Open:** confirm the stored value (DB read, needs go-ahead) before re-entering — could be a write/seed issue or the key-drift, not real numbers. Low-load rounding stalls (wk2/wk3 squat both 85 lb) noted, not fixed.
+- **Kept sound (per Michael):** the arc itself — accumulate→intensify→deload→peak — and the run distribution/spread. Untouched.
+- **Verification:** 11/11 composer tests (retest tests replaced by a CONSOLIDATION test asserting no test-tags + light loggable triples + honest copy). Deployed generate-strength-plan; StrengthLogger pushed.
+- **Cross-ref:** `strength-primary-plan.ts` (buildArcPhases/workLoad/week-loop), `strength-primary-plan.test.ts`, `StrengthLogger.tsx` (saveBaselineResults guard), `materialize-plan/index.ts` (anchor resolution — read only), D-221 (the engine), D-222 (the band).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

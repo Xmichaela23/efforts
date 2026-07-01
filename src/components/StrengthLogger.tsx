@@ -795,12 +795,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         throw fetchError;
       }
 
-      // Merge new results into performance_numbers
+      // Merge new results into performance_numbers.
       const currentPerf = (currentBaselines?.performance_numbers || {}) as any;
       const updatedPerf = { ...currentPerf };
-      
+
+      // RATCHET-UP-ONLY GUARD (D-223): a test/estimate result may only RAISE a stored 1RM, never lower it.
+      // A first-time baseline (no prior) writes freely; a re-test overwrites ONLY if it's a new best. This is
+      // a permanent guard against the "score that lies" — a sub-max estimate logging the athlete weaker.
+      const held: string[] = [];
       Object.values(baselineTestResults).forEach(result => {
-        updatedPerf[result.baselineKey] = result.rounded1RM;
+        const key = result.baselineKey;
+        const prior = Number(currentPerf[key]);
+        const next = Number(result.rounded1RM);
+        if (!(prior > 0) || next > prior) {
+          updatedPerf[key] = result.rounded1RM;
+        } else {
+          held.push(`${key} held at ${prior} (logged ${next})`); // kept the higher stored max
+        }
       });
 
       // Update or insert baselines
@@ -822,7 +833,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (error) throw error;
       }
 
-      alert('Baselines saved successfully!');
+      alert(held.length
+        ? `Baselines saved. Kept your higher stored max on: ${held.join('; ')} — a test only raises a 1RM, never lowers it.`
+        : 'Baselines saved successfully!');
       setBaselineTestResults({});
       
       // Dispatch event to notify TrainingBaselines to reload

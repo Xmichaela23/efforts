@@ -82,7 +82,10 @@ export function buildArcPhases(weeks: number): { phases: ArcPhase[]; recovery_we
   const deloadWeek = w;
   phases.push({ name: 'Deload', start_week: w, end_week: w + deloadLen - 1, weeks_in_phase: deloadLen }); w += deloadLen;
   phases.push({ name: 'Peak', start_week: w, end_week: w + peakLen - 1, weeks_in_phase: peakLen }); w += peakLen;
-  phases.push({ name: 'Retest', start_week: weeks, end_week: weeks, weeks_in_phase: 1 });
+  // The block ends on a light CONSOLIDATION week — NOT a retest. The prescribed-% retest was broken by
+  // construction (a fixed 88%×3 "estimate" back-projects ~97% of the entered 1RM → a guaranteed ~3% LOSS,
+  // mathematically incapable of showing a gain). Removed until a real work-up-to-max retest exists. (D-223)
+  phases.push({ name: 'Consolidation', start_week: weeks, end_week: weeks, weeks_in_phase: 1 });
   return { phases, recovery_weeks: [deloadWeek] };
 }
 
@@ -115,6 +118,11 @@ function workLoad(phase: ArcPhase, week: number): WorkLoad {
     case 'Deload': {
       // Recover before the heavy singles: ~50% volume + intensity drop (CONVENTION).
       return { primary: { sets: 2, reps: 5, pct: 65 }, secondary: { sets: 2, reps: 5, pct: 60 }, deadlift: { sets: 1, reps: 5, pct: 60 }, label: 'Deload — recover before the peak (≈50% volume + intensity drop)' };
+    }
+    case 'Consolidation': {
+      // Block-closing light week (replaces the broken retest): moderate, loggable top triples — decompress
+      // from the peak, no max-out, nothing that writes a 1RM off a sub-max estimate.
+      return { primary: { sets: 3, reps: 3, pct: 80 }, secondary: { sets: 2, reps: 3, pct: 75 }, deadlift: { sets: 1, reps: 3, pct: 78 }, label: 'Consolidation — light top sets (block complete)' };
     }
     case 'Peak': {
       // REALIZE post-deload: heavy DOUBLES ramping to ~94% — primes the CNS without a near-max single.
@@ -166,23 +174,9 @@ function workSessions(load: WorkLoad): { name: string; focus: 'upper' | 'lower';
   ];
 }
 
-/**
- * Retest week (HAS-1RMs default): an OPTIONAL COURTESY, not a 4-lift max-out ceremony. The peak week
- * already did the heavy near-max work, so this is sparing:
- *   - Squat + Bench = a light, OPTIONAL max-CHECK that EXPRESSES the gain — work up to a SMALL PR
- *     above the old max (~102.5%), so it renders ABOVE the peak single (fixes retest-below-peak).
- *   - Deadlift + OHP = a top working set → ESTIMATE the e1RM (Epley/Brzycki). No formal max-out.
- * (The HAS/NO-1RM conditional — required up-front baseline when there's no anchor — is a create-goal
- * gate that depends on the write-back wire, Q-097.)
- */
-function retestSessions(): { name: string; focus: 'upper' | 'lower'; kind: 'check' | 'estimate'; ex: StrengthExercise[] }[] {
-  return [
-    { name: 'Bench Press', focus: 'upper', kind: 'check', ex: [{ name: 'Bench Press — optional max-check (aim small PR)', sets: 1, reps: 1, weight: '102.5% 1RM' }] },
-    { name: 'Back Squat', focus: 'lower', kind: 'check', ex: [{ name: 'Back Squat — optional max-check (aim small PR)', sets: 1, reps: 1, weight: '102.5% 1RM' }] },
-    { name: 'Overhead Press', focus: 'upper', kind: 'estimate', ex: [{ name: 'Overhead Press — top working set', sets: 1, reps: 3, weight: '88% 1RM' }] },
-    { name: 'Deadlift', focus: 'lower', kind: 'estimate', ex: [{ name: 'Deadlift — top working set', sets: 1, reps: 3, weight: '88% 1RM' }] },
-  ];
-}
+// (The prescribed-% retest was REMOVED — D-223. A fixed 88%×3 "estimate" back-projects ~97% of the entered
+//  1RM, so it could only ever log a ~3% LOSS — mathematically incapable of showing a gain. The block now ends
+//  on a light consolidation week; a real work-up-to-max retest will replace it.)
 
 function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean, overrideMins?: number): PlanSession {
   const mins = overrideMins ?? (sport === 'bike' ? (isRetestWeek ? 35 : 45) : (isRetestWeek ? 25 : 35));
@@ -288,56 +282,36 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
 
   for (let week = 1; week <= durationWeeks; week++) {
     const phase = phaseFor(week, phaseStructure.phases);
-    const isRetestWeek = phase.name === 'Retest';
+    const isFinalWeek = phase.name === 'Consolidation'; // block-closing light week (NOT a test)
     const weekSessions: PlanSession[] = [];
 
-    if (isRetestWeek) {
-      // #3 — retest: ramp to a heavy single on each main lift. NOT a deload.
-      retestSessions().slice(0, grid.strength.length).forEach((s, i) => {
-        const isCheck = s.kind === 'check';
-        weekSessions.push({
-          day: grid.strength[i],
-          type: 'strength',
-          name: isCheck
-            ? `Retest — ${s.name} (optional courtesy max-check)`
-            : `Retest — ${s.name} (top working set → estimate e1RM)`,
-          description: isCheck
-            ? `Optional courtesy check — you already have a baseline, so this is "see your new max if ` +
-              `you want." Feeling fresh? Work up to a heavy single and aim for a SMALL PR above your old ` +
-              `max (~102.5%); the engine logs your new 1RM. Not feeling it? A light top set is fine — no ` +
-              `grinding, no spotter-less max-out.`
-            : `Top working set — one heavy set of 3 near your working max; the engine ESTIMATES your ` +
-              `e1RM from it (Epley/Brzycki, ±3–5%). No formal max-out on this lift.`,
-          duration: 60,
-          strength_exercises: s.ex,
-          // 1rm_test / estimate_1rm so logging feeds the e1RM write-back (Q-097); 'optional' on the courtesy check.
-          tags: ['strength', s.focus, 'phase:retest', 'retest', '1rm_test', 'estimate_1rm', 'protocol:strength_primary', ...(isCheck ? ['optional'] : [])],
-        });
-      });
-    } else {
-      // #1 + #2 — 4 real barbell sessions every work phase, continuous loading off the real 1RM.
-      const load = workLoad(phase, week);
-      workSessions(load).slice(0, grid.strength.length).forEach((s, i) => {
-        weekSessions.push({
-          day: grid.strength[i],
-          type: 'strength',
-          name: `Strength Focus — ${s.name}`,
-          description:
-            `${load.label} — 4-day split. ` +
+    // 4 real barbell sessions every week, continuous loading off the real 1RM. The final week is a light
+    // consolidation — honest copy, no fake test, and crucially NO 1rm_test/estimate tags (nothing writes
+    // a 1RM off a sub-max estimate; the broken retest is gone until a real work-up-to-max exists — D-223).
+    const load = workLoad(phase, week);
+    workSessions(load).slice(0, grid.strength.length).forEach((s, i) => {
+      weekSessions.push({
+        day: grid.strength[i],
+        type: 'strength',
+        name: isFinalWeek ? `Consolidation — ${s.name}` : `Strength Focus — ${s.name}`,
+        description: isFinalWeek
+          ? `Block complete — a light consolidation week. A proper retest is coming soon; for now, log your ` +
+            `top sets so we track your progress honestly. ` +
+            `${s.ex.map((e) => `${e.name} ${e.sets}×${e.reps} @ ${e.weight}`).join(' · ')}.`
+          : `${load.label} — 4-day split. ` +
             `${s.ex.map((e) => `${e.name} ${e.sets}×${e.reps} @ ${e.weight}`).join(' · ')}. Top set ${load.primary.pct}% 1RM.`,
-          duration: 60,
-          strength_exercises: s.ex,
-          tags: ['strength', s.focus, `phase:${phase.name.toLowerCase()}`, 'protocol:strength_primary'],
-        });
+        duration: 60,
+        strength_exercises: s.ex,
+        tags: ['strength', s.focus, `phase:${phase.name.toLowerCase()}`, 'protocol:strength_primary'],
       });
-    }
+    });
 
     // Endurance = maintenance, underneath. Runs spread across runDayList (run-only days + stacked upper days),
     // each with its distributed duration; bike keeps its off-day default.
     if (enduranceSport === 'run') {
-      runDayList.forEach((day) => weekSessions.push(enduranceSession('run', day, isRetestWeek, runMinutesByDay[day])));
+      runDayList.forEach((day) => weekSessions.push(enduranceSession('run', day, false, runMinutesByDay[day])));
     } else if (enduranceSport) {
-      grid.endurance.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day, isRetestWeek, undefined)));
+      grid.endurance.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day, false, undefined)));
     }
 
     weekSessions.sort((a, b) => {
@@ -365,11 +339,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     name: args.goalName?.trim() || `Get Stronger — ${durationWeeks} Weeks`,
     description:
       `Strength-led ATR block on heavy barbell compounds (balanced upper/lower): accumulate → ` +
-      `intensify → deload → peak, ending in an OPTIONAL courtesy 1RM check on the key lifts (you have ` +
-      `a baseline) — a small PR if you're fresh, estimates from working sets on the rest; no mandatory ` +
-      `max-out.${enduranceNote} Expect a MEASURED gain — concurrent strength gains are ` +
-      `real but modest (typically a few %); honest progression, not a hyped PR. The athlete picks the ` +
-      `outcome; the engine runs the arc.`,
+      `intensify → deload → peak, ending in a light consolidation week — the block is complete, and a proper ` +
+      `retest is coming soon; log your top sets for now.${enduranceNote} Expect a MEASURED gain — concurrent ` +
+      `strength gains are real but modest (typically a few %); honest progression, not a hyped PR. The ` +
+      `athlete picks the outcome; the engine runs the arc.`,
     duration_weeks: durationWeeks,
     sessions_by_week,
     phaseStructure,
