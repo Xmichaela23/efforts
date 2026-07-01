@@ -93,6 +93,7 @@ type NonRaceState = {
   anchorDay: DayName | '';
   targetMiles: number | ''; // Get Strong: typed maintenance mileage, in the user's display unit; canonicalized to miles at confirm
   runDays: number; // Get Strong: how many days to run (2/3/4) — engine spreads the miles + stacks extras onto upper lift days
+  startDate: string; // Week 1 start (YYYY-MM-DD); plans are Monday-based so this snaps to that week server-side
 };
 
 type StepKey = 'goal' | 'posture' | 'commitment' | 'length' | 'schedule' | 'confirm';
@@ -103,6 +104,14 @@ function getSteps(_state: NonRaceState): StepKey[] {
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
 // from the EDITED posture (derivePlanShape), not from seedFromGoal. Generic scheduling prefs kept.
+// Default Week-1 start = the upcoming Monday (plans are Monday-based; the server snaps to the week anyway).
+function nextMondayISO(): string {
+  const d = new Date();
+  const delta = (8 - d.getDay()) % 7 || 7; // days until next Monday (getDay: Sun=0…Sat=6)
+  d.setDate(d.getDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
 function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeeklyMiles?: number): ArcSetupPayload {
   const goal = state.goal!;
   const shape = derivePlanShape(state.posture, state.strengthProtocol, equipmentTier);
@@ -135,6 +144,7 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
       },
     ],
     strength_frequency: state.posture?.strength === 'develop' ? 4 : 2, // Get Strong = the 4-day develop arc; don't offer 2×/week the engine overrides
+    ...(state.startDate ? { plan_start_date: state.startDate } : {}), // Week 1 start → create-goal → the plan's calendar
   };
 }
 
@@ -160,7 +170,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3,
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3, startDate: nextMondayISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -479,6 +489,17 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   </div>
                 );
               })}
+            </div>
+            <div>
+              <p className="text-white/55 text-sm mb-2">Start the week of</p>
+              <input
+                type="date"
+                value={state.startDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setState((s) => ({ ...s, startDate: e.target.value }))}
+                className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 focus:outline-none focus:border-teal-500/50"
+              />
+              <p className="text-white/35 text-xs mt-1.5">Week 1 begins this week — plans run Monday to Sunday.</p>
             </div>
             <p className="text-white/60 text-sm">
               An {state.targetWeeks}-week block from your current fitness (≈ {hoursForTier(state.commitment)} h/wk),
