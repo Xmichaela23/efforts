@@ -2407,7 +2407,8 @@ Deno.serve(async (req: Request) => {
               strength_frequency: 4,            // the full 4-day U/L/U/L arc (barbell)
               strength_tier: 'strength_power',
               endurance_sport: gsSport,         // sport-agnostic maintenance (run / bike / none)
-              endurance_frequency: 2,
+              // run frequency from intake (2/3/4); engine spreads miles + stacks extras onto upper lift days
+              endurance_frequency: Number(gsTp.run_days) >= 2 && Number(gsTp.run_days) <= 4 ? Number(gsTp.run_days) : 2,
               needs_baseline: gsNeedsBaseline,  // NO-path → week 1 = baseline test
               goal_name: String(resolvedGoal?.name || 'Get Stronger'),
               ...(gsTargetWeeklyMiles ? { target_weekly_miles: gsTargetWeeklyMiles } : {}),

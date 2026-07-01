@@ -120,6 +120,29 @@ Deno.test('MILEAGE never silently dropped — typed miles honored even without a
   assert(/Held to 18/.test(noPace.volume_notes!) && /Wilson/.test(noPace.volume_notes!), 'over-ask still caps on the fallback pace');
 });
 
+Deno.test('DISTRIBUTION — spread as long-run + easy fill (not total÷N), extra runs stacked on UPPER days, lift-first', () => {
+  const mk = (freq: number) => composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: freq, targetWeeklyMiles: 18, easyPaceMinPerMile: 10 });
+  // 3 run days: only 2 run-only slots (Wed/Sat) → the 3rd stacks onto an upper lift day (Mon)
+  const w3 = mk(3).sessions_by_week['2'];
+  const runs3 = w3.filter((s) => s.type === 'run');
+  assertEquals(runs3.length, 3, '3 run days materialize (stacked beyond the 2 run-only slots)');
+  const durs3 = runs3.map((r) => r.duration).sort((a, b) => b - a);
+  assert(durs3[0] > durs3[durs3.length - 1], 'NOT equal split — a long run + smaller fill runs');
+  // the long run lands on the run-only day (Saturday), never on a lift day
+  const longRun = runs3.reduce((m, r) => (r.duration > m.duration ? r : m));
+  assertEquals(longRun.day, 'Saturday', 'the long run is on the run-only day, not stacked on a lift day');
+  // a stacked day (Monday has both) orders LIFT before RUN
+  const monday = w3.filter((s) => s.day === 'Monday');
+  assert(monday.length === 2 && monday[0].type === 'strength' && monday[1].type === 'run', 'stacked day: lift first, then the easy run');
+
+  // 4 run days → 2 stacked (both upper days), never a stacked heavy-lower day
+  const w4 = mk(4).sessions_by_week['2'];
+  const runDays4 = w4.filter((s) => s.type === 'run').map((r) => r.day);
+  assertEquals(runDays4.length, 4);
+  const lowerDays = w4.filter((s) => s.type === 'strength' && /Lower/.test(s.name)).map((s) => s.day);
+  assert(!runDays4.some((d) => lowerDays.includes(d)), 'no run stacked on a heavy-lower day (Tue/Fri)');
+});
+
 Deno.test('NO-1RMs path — week 1 is a baseline test (offered, not forced); weeks 2-12 train', () => {
   const no = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2, needsBaseline: true });
   const wk1 = no.sessions_by_week['1'].filter((s) => s.type === 'strength');

@@ -92,6 +92,7 @@ type NonRaceState = {
   anchorDiscipline: 'run' | 'bike' | null;
   anchorDay: DayName | '';
   targetMiles: number | ''; // Get Strong: typed maintenance mileage, in the user's display unit; canonicalized to miles at confirm
+  runDays: number; // Get Strong: how many days to run (2/3/4) — engine spreads the miles + stacks extras onto upper lift days
 };
 
 type StepKey = 'goal' | 'posture' | 'commitment' | 'length' | 'schedule' | 'confirm';
@@ -129,6 +130,7 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
           }),
           ...(shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {}),
           ...(typeof targetWeeklyMiles === 'number' && targetWeeklyMiles > 0 ? { target_weekly_miles: targetWeeklyMiles } : {}), // Get Strong maintenance mileage (canonical miles); engine guardrails it to the band
+          ...(state.posture?.strength === 'develop' && state.runDays >= 2 ? { run_days: state.runDays } : {}), // Get Strong run frequency (2/3/4); engine spreads miles + stacks extras onto upper lift days
         },
       },
     ],
@@ -150,10 +152,15 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   const athleteDisciplines = useMemo<Discipline[]>(() => DISCIPLINE_ORDER, []);
   const equipmentTier = useMemo(() => equipmentTierFromArc(arc), [arc]);
   const unit = (arc as { units?: string } | null)?.units === 'metric' ? 'km' : 'mi'; // display unit for typed mileage; store canonical miles
+  // Inline maintenance cap (shown live as the athlete types) = 180 min/wk ÷ their easy pace [Wilson 2012, D-222].
+  const easySecPerKm = Number((arc as { easy?: { sec_per_km?: number } } | null)?.easy?.sec_per_km);
+  const paceMinPerMile = easySecPerKm > 0 ? (easySecPerKm * 1.609344) / 60 : 10; // fallback ~10:00/mi until pace is learned
+  const capMiles = Math.round(180 / paceMinPerMile);
+  const capDisplay = unit === 'km' ? Math.round(capMiles * 1.609344) : capMiles; // ceiling in the athlete's unit
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '',
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3,
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -373,19 +380,38 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               </div>
             )}
             {state.posture?.strength === 'develop' && posturePresent('run') && (
-              <div>
-                <p className="text-white/55 text-sm mb-2">Weekly running to hold <span className="text-white/35">(maintenance)</span></p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number" inputMode="numeric" min={0}
-                    value={state.targetMiles === '' ? '' : state.targetMiles}
-                    onChange={(e) => setState((s) => ({ ...s, targetMiles: e.target.value === '' ? '' : Number(e.target.value) }))}
-                    placeholder="e.g. 12"
-                    className="w-24 py-2 px-3 rounded-lg bg-white/[0.04] text-white border border-white/12 text-sm"
-                  />
-                  <span className="text-white/45 text-sm">{unit}/wk</span>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-white/55 text-sm mb-2">Weekly running to hold <span className="text-white/35">(maintenance)</span></p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" inputMode="numeric" min={0}
+                      value={state.targetMiles === '' ? '' : state.targetMiles}
+                      onChange={(e) => setState((s) => ({ ...s, targetMiles: e.target.value === '' ? '' : Number(e.target.value) }))}
+                      placeholder={`e.g. ${Math.max(4, capDisplay - 4)}`}
+                      className="w-24 py-2 px-3 rounded-lg bg-white/[0.04] text-white border border-white/12 text-sm"
+                    />
+                    <span className="text-white/45 text-sm">{unit}/wk</span>
+                  </div>
+                  {/* Live cap — shown AS they type, not discovered later in the plan */}
+                  <p className={`text-xs mt-1.5 ${typeof state.targetMiles === 'number' && state.targetMiles > capDisplay ? 'text-amber-400/80' : 'text-white/35'}`}>
+                    {typeof state.targetMiles === 'number' && state.targetMiles > capDisplay
+                      ? `We'll hold this to ${capDisplay} ${unit} — past that, easy running competes with lifting recovery [Wilson 2012].`
+                      : `Up to ${capDisplay} ${unit} — strength leads, so we hold running to your aerobic base.`}
+                  </p>
                 </div>
-                <p className="text-white/35 text-xs mt-1.5">Strength leads — we hold your aerobic base and guardrail this to the science.</p>
+                <div>
+                  <p className="text-white/55 text-sm mb-2">How many days to run</p>
+                  <div className="grid grid-cols-3 gap-1.5 max-w-[220px]">
+                    {[2, 3, 4].map((n) => (
+                      <button
+                        key={n} type="button" onClick={() => setState((s) => ({ ...s, runDays: n }))}
+                        className={`py-2 rounded-lg text-sm ${state.runDays === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/60 border border-white/12'}`}
+                      >{n}</button>
+                    ))}
+                  </div>
+                  <p className="text-white/35 text-xs mt-1.5">We spread your miles across these — a longer run plus easy fill, not the same run twice.</p>
+                </div>
               </div>
             )}
             {posturePresent('bike') && (

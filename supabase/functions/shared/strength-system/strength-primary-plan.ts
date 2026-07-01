@@ -134,6 +134,24 @@ function exer(name: string, s: Scheme): StrengthExercise {
   return { name, sets: s.sets, reps: s.reps, weight: `${s.pct}% 1RM` };
 }
 
+// Spread the weekly maintenance miles across N runs as a LONG-RUN share + easy fill — NOT total÷N
+// (the two-equal-runs bug). Descending: index 0 is the long run. Weights graduate (flatter as N grows:
+// 3d ≈ 9/6/5, 4d ≈ 6/5/5/4), then rounded so the parts sum back to the total.
+function distributeRunMiles(total: number, n: number): number[] {
+  if (n <= 1) return [Math.max(1, Math.round(total))];
+  const WEIGHTS: Record<number, number[]> = {
+    2: [1.4, 1.0],
+    3: [1.5, 1.0, 0.85],
+    4: [1.2, 1.0, 1.0, 0.85],
+  };
+  const w = WEIGHTS[n] ?? Array.from({ length: n }, (_, i) => (i === 0 ? 1.4 : 1)); // fallback: long + even fill
+  const sum = w.reduce((a, b) => a + b, 0);
+  const miles = w.map((x) => Math.max(1, Math.round((total * x) / sum)));
+  const drift = Math.round(total) - miles.reduce((a, b) => a + b, 0); // absorb rounding on the long run
+  miles[0] = Math.max(1, miles[0] + drift);
+  return miles;
+}
+
 /** The 4 REAL barbell sessions (U/L/U/L) for a work week. Primary lift heavy, accessory at back-off. */
 function workSessions(load: WorkLoad): { name: string; focus: 'upper' | 'lower'; ex: StrengthExercise[] }[] {
   const { primary: P, secondary: S, deadlift: D } = load;
@@ -225,18 +243,29 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // 60 / 150 weekly minutes = the 2-3×/wk × ~20-25 / ~40-min dose (CONVENTION on exact minutes; CITED on
   // freq/duration/interference — Hickson 1981/82, Spiering 2021, Wilson 2012), pace-mapped to miles. Flat,
   // no ramp. Honor up to the science, never past it: over-ask → capped max + note; under → bumped to floor.
-  const runDays = grid.endurance.length;
   const FLOOR_MIN = 60;   // ~2×/wk maintenance dose floor [Hickson 1981, Spiering 2021] — CONVENTION on exact minutes
   // Ceiling = ~3hrs/wk. Interference scales with intensity/DURATION, not easy volume [Wilson 2012] — easy zone-2
   // is low-interference, so a tighter cap over-protects an established base. 180 lets a real 20-25mi runner sit
   // near true maintenance while strength still clearly leads. (Raised from 150; D-222.)
   const CEILING_MIN = 180;
   const FALLBACK_EASY_MIN_PER_MILE = 10; // if we haven't learned the athlete's easy pace, estimate rather than DROP the typed miles
-  let runOverrideMins: number | undefined;
+
+  // Run frequency (2–4): strength-4 leaves only ~2 run-only days (Wed/Sat), so extra runs STACK onto the UPPER
+  // lift days (Mon/Thu). Keeps extras off the heavy-LOWER days, and heavy-lift + easy-run is the safe recreational
+  // stack [Petré 2021, Wilson 2012]. Stacking is also what opens enough slots to size runs sanely (not total÷2).
+  const runFreq = enduranceSport === 'run'
+    ? Math.max(grid.endurance.length, Math.min(4, Math.round(Number(args.enduranceFrequency) || grid.endurance.length)))
+    : grid.endurance.length;
+  const upperLiftDays = [grid.strength[0], grid.strength[2]].filter(Boolean); // Upper A, Upper B — the non-leg lift days
+  const runDayList: string[] = [...grid.endurance];
+  for (const d of upperLiftDays) { if (runDayList.length >= runFreq) break; if (!runDayList.includes(d)) runDayList.push(d); }
+  const longRunDay = grid.endurance[grid.endurance.length - 1] ?? runDayList[runDayList.length - 1]; // the long run lands on a run-only day (Sat)
+
+  const runMinutesByDay: Record<string, number> = {};
   let volume_notes: string | null = null;
   // Honor typed miles whenever they exist — never silently drop them to the fixed default just because the
   // easy pace is unlearned. Missing pace → estimate + disclose (it re-maps once easy runs are logged).
-  if (enduranceSport === 'run' && (args.targetWeeklyMiles ?? 0) > 0 && runDays > 0) {
+  if (enduranceSport === 'run' && (args.targetWeeklyMiles ?? 0) > 0 && runDayList.length > 0) {
     const paceKnown = (args.easyPaceMinPerMile ?? 0) > 0;
     const pace = paceKnown ? args.easyPaceMinPerMile! : FALLBACK_EASY_MIN_PER_MILE;
     const floor = Math.round(FLOOR_MIN / pace);
@@ -246,7 +275,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     if (asked > ceiling) volume_notes = `Held to ${ceiling} mi/wk — in a strength-focus block, easy running past ~3hrs/wk competes with lifting recovery; we hold it so strength leads. [Wilson 2012]`;
     else if (asked < floor) volume_notes = `Bumped to ${floor} mi/wk — below this you'd lose aerobic base; this floor holds it. [Hickson 1981, Spiering 2021]`;
     if (!paceKnown) volume_notes = `${volume_notes ? volume_notes + ' ' : ''}Run durations estimated at ${FALLBACK_EASY_MIN_PER_MILE}:00/mi until we learn your easy pace — they re-map once you log a few easy runs.`;
-    runOverrideMins = Math.max(15, Math.round((held / runDays) * pace));
+    // spread the held total: long-run share + easy fill → per-day minutes; the long run goes on the run-only long day
+    const perMile = distributeRunMiles(held, runDayList.length);
+    const daysLongFirst = [longRunDay, ...runDayList.filter((d) => d !== longRunDay)];
+    daysLongFirst.forEach((day, i) => {
+      const mi = perMile[i] ?? perMile[perMile.length - 1];
+      runMinutesByDay[day] = Math.max(15, Math.round(mi * pace));
+    });
   }
 
   const sessions_by_week: Record<string, PlanSession[]> = {};
@@ -297,12 +332,21 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       });
     }
 
-    // Endurance = maintenance, underneath, on the off-days.
-    if (enduranceSport) {
-      grid.endurance.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day, isRetestWeek, enduranceSport === 'run' ? runOverrideMins : undefined)));
+    // Endurance = maintenance, underneath. Runs spread across runDayList (run-only days + stacked upper days),
+    // each with its distributed duration; bike keeps its off-day default.
+    if (enduranceSport === 'run') {
+      runDayList.forEach((day) => weekSessions.push(enduranceSession('run', day, isRetestWeek, runMinutesByDay[day])));
+    } else if (enduranceSport) {
+      grid.endurance.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day, isRetestWeek, undefined)));
     }
 
-    weekSessions.sort((a, b) => DAYS.indexOf(a.day as typeof DAYS[number]) - DAYS.indexOf(b.day as typeof DAYS[number]));
+    weekSessions.sort((a, b) => {
+      const d = DAYS.indexOf(a.day as typeof DAYS[number]) - DAYS.indexOf(b.day as typeof DAYS[number]);
+      if (d !== 0) return d;
+      // Same day (a stacked lift+run): LIFT FIRST — strength is the goal, so it gets the fresh adaptive
+      // signal; the easy maintenance run follows [Eddens 2018, Zhang 2026, Tundidor-Duque 2026].
+      return (a.type === 'strength' ? 0 : 1) - (b.type === 'strength' ? 0 : 1);
+    });
     sessions_by_week[String(week)] = weekSessions;
   }
 

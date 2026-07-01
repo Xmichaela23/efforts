@@ -11,8 +11,8 @@ export type ArcSetupPayload = {
    * @see `src/lib/training-intent.ts`
    */
   default_intent?: TrainingIntent;
-  /** Optional top-level; merged into each goal's training_prefs when saving */
-  strength_frequency?: 0 | 1 | 2 | 3;
+  /** Optional top-level; merged into each goal's training_prefs when saving. 4 = the Get Strong develop arc (D-220). */
+  strength_frequency?: 0 | 1 | 2 | 3 | 4;
   strength_focus?: 'general' | 'power' | 'maintenance';
   /**
    * First calendar day of plan Week 1 (YYYY-MM-DD). Combined planner maps this to the Monday-based week.
