@@ -2967,6 +2967,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // (the in-row rest block was removed). Re-arms a previously-skipped set. Light haptic.
   const autoStartRestForSet = (exerciseId: string, setIndex: number) => {
     try {
+      // Q-097/Q-102: no auto rest timer on a 1RM/baseline TEST. Rest is self-directed (rest as long as you
+      // need before an all-out AMRAP; the warmup copy already says "rest ~2 min") — an auto countdown is
+      // training scaffolding that just clutters the clean, feel-based test cards. Tests carry no timer.
+      if (isBaselineTestWorkout(scheduledWorkout || {})) return;
       const ex = exercises.find((e) => e.id === exerciseId);
       const set = ex?.sets[setIndex];
       if (!ex || !set) return;
