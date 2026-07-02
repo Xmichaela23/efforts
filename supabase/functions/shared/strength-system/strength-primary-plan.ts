@@ -278,6 +278,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   sessions_by_week: Record<string, PlanSession[]>;
   phaseStructure: { phases: ArcPhase[]; recovery_weeks: number[] };
   volume_notes: string | null;
+  volume_state: 'above' | 'below' | 'in_band' | null;
 } {
   const { durationWeeks, strengthFrequency, enduranceSport, enduranceFrequency } = args;
   const phaseStructure = buildArcPhases(durationWeeks);
@@ -313,18 +314,28 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
 
   const runMinutesByDay: Record<string, number> = {};
   let volume_notes: string | null = null;
+  // Mileage-band STATE for the client to render the honest tradeoff copy (the three copy strings live
+  // client-side, unshipped until the Q-097 build). Server no longer caps/bumps — it reports the state.
+  let volume_state: 'above' | 'below' | 'in_band' | null = null;
   // Honor typed miles whenever they exist — never silently drop them to the fixed default just because the
   // easy pace is unlearned. Missing pace → estimate + disclose (it re-maps once easy runs are logged).
   if (enduranceSport === 'run' && (args.targetWeeklyMiles ?? 0) > 0 && runDayList.length > 0) {
     const paceKnown = (args.easyPaceMinPerMile ?? 0) > 0;
     const pace = paceKnown ? args.easyPaceMinPerMile! : FALLBACK_EASY_MIN_PER_MILE;
+    // Soft reference band — NOT a clamp (the D-222 hard ceiling is retired; mileage amendment 2026-07-01).
+    // The interference literature puts no hard wall here: cost scales with total WORK and lands on POWER,
+    // not max strength (Schumann 2022 max SMD −0.06 p=0.446 vs explosive −0.28 p=0.007; Fyfe 2016 —
+    // endurance intensity does NOT mediate, total work does). HONOR the athlete's typed miles; surface the
+    // honest tradeoff client-side (volume_state → the three copy strings), never cap or bump. Easy-intensity
+    // guardrail STAYS: maintenance runs are all-easy zone-2 (enduranceSession) — loosen volume, hold
+    // intensity [Wilson 2012]. A high-mileage HARD week is the only real interference case, gated by copy.
     const floor = Math.round(FLOOR_MIN / pace);
     const ceiling = Math.round(CEILING_MIN / pace);
     const asked = Math.round(args.targetWeeklyMiles!);
-    const held = Math.max(floor, Math.min(ceiling, asked));
-    if (asked > ceiling) volume_notes = `Held to ${ceiling} mi/wk — in a strength-focus block, easy running past ~3hrs/wk competes with lifting recovery; we hold it so strength leads. [Wilson 2012]`;
-    else if (asked < floor) volume_notes = `Bumped to ${floor} mi/wk — below this you'd lose aerobic base; this floor holds it. [Hickson 1981, Spiering 2021]`;
-    if (!paceKnown) volume_notes = `${volume_notes ? volume_notes + ' ' : ''}Run durations estimated at ${FALLBACK_EASY_MIN_PER_MILE}:00/mi until we learn your easy pace — they re-map once you log a few easy runs.`;
+    const held = Math.max(1, asked); // honor typed miles exactly — no ceiling clamp, no floor bump
+    volume_state = asked > ceiling ? 'above' : (asked < floor ? 'below' : 'in_band');
+    // Pace-estimate disclosure is factual (not the tradeoff copy) — keep it server-side.
+    if (!paceKnown) volume_notes = `Run durations estimated at ${FALLBACK_EASY_MIN_PER_MILE}:00/mi until we learn your easy pace — they re-map once you log a few easy runs.`;
     // spread the held total: long-run share + easy fill → per-day minutes; the long run goes on the run-only long day
     const perMile = distributeRunMiles(held, runDayList.length);
     const daysLongFirst = [longRunDay, ...runDayList.filter((d) => d !== longRunDay)];
@@ -410,5 +421,6 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     sessions_by_week,
     phaseStructure,
     volume_notes,
+    volume_state,
   };
 }

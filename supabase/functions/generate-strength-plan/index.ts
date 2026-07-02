@@ -76,7 +76,8 @@ Deno.serve(async (req: Request) => {
           endurance_sport: sport,
           endurance_frequency: Number(endurance_frequency ?? 2),
           phase_structure: plan.phaseStructure,
-          volume_notes: plan.volume_notes ?? null, // maintenance-band glass-box (over/under-ask)
+          volume_notes: plan.volume_notes ?? null, // pace-estimate disclosure only (cap logic retired)
+          volume_state: (plan as any).volume_state ?? null, // above|below|in_band → client renders the tradeoff copy
           user_selected_start_date: start_date ?? null,
         },
         sessions_by_week: plan.sessions_by_week,

@@ -1628,9 +1628,25 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/30" />
                 </button>
                 {(() => {
-                  // Glass-box: surface the maintenance-band note (mileage capped/bumped) so the guardrail is never silent.
-                  const vn = (linkedPlan.config as { volume_notes?: string | null } | undefined)?.volume_notes;
-                  return vn ? <p className="text-xs leading-relaxed text-white/45">{vn}</p> : null;
+                  // Mileage amendment (2026-07-01): the hard cap is retired server-side — we HONOR the
+                  // athlete's typed miles and surface the honest tradeoff by state, never clamp. The three
+                  // copy strings are client-side (unshipped to device until the Q-097 build). volume_notes
+                  // now carries only the factual pace-estimate disclosure.
+                  const cfg = linkedPlan.config as { volume_notes?: string | null; volume_state?: 'above' | 'below' | 'in_band' | null } | undefined;
+                  const vn = cfg?.volume_notes;
+                  const vs = cfg?.volume_state;
+                  // The three copy strings (soft ceiling / low-mileage-no-penalty / marathon-gate):
+                  const SOFT_CEILING = "The more you run, the more your strength gain settles toward the low end of the range — you'll still get stronger, just modestly.";
+                  const LOW_MILEAGE = "Low mileage isn't penalized — less running means more recovery for your lifts, so your gain lands nearer the top of the range. A down week can help the block.";
+                  const MARATHON_GATE = "This is a strength plan — you won't want to marathon-train on it.";
+                  const stateCopy = vs === 'above' ? `${SOFT_CEILING} ${MARATHON_GATE}` : vs === 'below' ? LOW_MILEAGE : null;
+                  if (!vn && !stateCopy) return null;
+                  return (
+                    <div className="space-y-1">
+                      {stateCopy ? <p className="text-xs leading-relaxed text-white/45">{stateCopy}</p> : null}
+                      {vn ? <p className="text-xs leading-relaxed text-white/40">{vn}</p> : null}
+                    </div>
+                  );
                 })()}
               </div>
             )

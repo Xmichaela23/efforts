@@ -77,19 +77,24 @@ Deno.test('guard — real barbell every work phase, maintenance runs, sport-agno
   assertEquals(bike.sessions_by_week['2'].filter((s) => s.type === 'ride').length, 2);
 });
 
-Deno.test('maintenance band — typed miles clamped to floor/ceiling (pace-mapped), flat, glass-box', () => {
+Deno.test('maintenance band — typed miles HONORED (cap retired); state reported; flat; pace-estimate disclosed', () => {
   const mk = (miles: number) => composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2, targetWeeklyMiles: miles, easyPaceMinPerMile: 9.5 });
-  // 9.5 min/mi → floor 6 (60/9.5), ceiling 19 (180/9.5)
-  assertEquals(mk(12).volume_notes, null, '12mi is inside the band — build it, no friction');
-  const over = mk(30); assert(over.volume_notes !== null && /Held to 19/.test(over.volume_notes) && /Wilson/.test(over.volume_notes), 'over-ask → capped at ceiling + Wilson note');
-  const under = mk(3); assert(under.volume_notes !== null && /Bumped to 6/.test(under.volume_notes) && /Hickson/.test(under.volume_notes), 'under-ask → floor bump + Hickson/Spiering note');
+  // 9.5 min/mi → soft floor 6 (60/9.5), soft ceiling 19 (180/9.5) — REFERENCE only, NOT a clamp (D-222 retired)
+  const inb = mk(12); assertEquals(inb.volume_state, 'in_band'); assertEquals(inb.volume_notes, null, '12mi in band — no note');
+  const over = mk(30); assertEquals(over.volume_state, 'above', 'over the soft ceiling → state above');
+  assertEquals(over.volume_notes, null, 'no cap note — miles honored; the tradeoff copy is client-side');
+  const under = mk(3); assertEquals(under.volume_state, 'below', 'under the soft floor → state below');
+  assertEquals(under.volume_notes, null, 'no bump note — low mileage honored, not penalized');
+  // miles are HONORED, not clamped: 30mi produces MORE weekly run volume than 12mi, and exceeds the old 19mi cap
+  const runMin = (p: ReturnType<typeof mk>) => p.sessions_by_week['2'].filter((s) => s.type === 'run').reduce((a, s) => a + s.duration, 0);
+  assert(runMin(mk(30)) > runMin(mk(12)), 'more miles → more run volume (honored, not capped)');
+  assert(runMin(mk(30)) > 200, `30mi honored, not capped at the old 19mi ceiling (~180min); got ${runMin(mk(30))}min`);
   // flat: maintenance run duration is the same every work week (no ramp)
-  const inBand = mk(12);
-  const rd = (w: string) => inBand.sessions_by_week[w].find((s) => s.type === 'run')!.duration;
+  const rd = (w: string) => mk(12).sessions_by_week[w].find((s) => s.type === 'run')!.duration;
   assertEquals(rd('2'), rd('9'), 'maintenance is FLAT — no ramp');
   // absent (no typed miles) → the fixed default, backward-compatible
   const def = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2 });
-  assertEquals(def.volume_notes, null);
+  assertEquals(def.volume_notes, null); assertEquals(def.volume_state, null, 'no typed miles → no band state');
   assertEquals(def.sessions_by_week['2'].find((s) => s.type === 'run')!.duration, 35, 'no typed miles → fixed ~35min default');
 });
 
@@ -110,8 +115,9 @@ Deno.test('MILEAGE never silently dropped — typed miles honored even without a
   const mins = noPace.sessions_by_week['2'].find((s) => s.type === 'run')!.duration;
   assert(mins !== 35, `typed 25mi must not collapse to the 35min default (got ${mins})`);
   assert(noPace.volume_notes !== null && /estimated/i.test(noPace.volume_notes), 'missing pace → disclosed estimate note');
-  // 25mi over a 10:00/mi fallback → ceiling 18 (180/10) → capped, so the Wilson note fires too
-  assert(/Held to 18/.test(noPace.volume_notes!) && /Wilson/.test(noPace.volume_notes!), 'over-ask still caps on the fallback pace');
+  // 25mi over the 10:00/mi fallback → state 'above', but NO cap note (the hard ceiling is retired)
+  assertEquals(noPace.volume_state, 'above', 'over the soft ceiling on fallback pace → above');
+  assert(!/Held to/.test(noPace.volume_notes!), 'no cap note — miles honored, only the pace-estimate disclosure remains');
 });
 
 Deno.test('DISTRIBUTION — spread as long-run + easy fill (not total÷N), extra runs stacked on UPPER days, lift-first', () => {
