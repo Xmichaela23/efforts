@@ -386,6 +386,26 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 ))}
               </div>
             </div>
+            {/* Add-on focus ABOVE the mileage input — a numeric input buries anything below it on mobile
+                (keyboard + Continue eclipse it), which locked users out of this toggle. */}
+            {state.posture?.strength === 'develop' && (
+              <div>
+                <p className="text-white/55 text-sm mb-2">Add-on focus (optional)</p>
+                <div className="grid grid-cols-3 gap-1.5 max-w-[300px]">
+                  {([['None', null], ['Glutes', 'glute'], ['Hyrox', 'hyrox']] as const).map(([label, val]) => (
+                    <button
+                      key={label} type="button" onClick={() => setState((s) => ({ ...s, accessoryBias: val }))}
+                      className={`py-2 rounded-lg text-sm border ${state.accessoryBias === val ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
+                    >{label}</button>
+                  ))}
+                </div>
+                <p className="text-white/35 text-xs mt-1.5">
+                  {state.accessoryBias === 'glute' ? 'One posterior-chain slot on your upper day — stronger, more durable hips (not a speed promise).'
+                    : state.accessoryBias === 'hyrox' ? 'Adds one station accessory during the week, plus a run→station combo on your long-run day — back-to-back, on tired legs. Adds volume; this is the Hyrox opt-in.'
+                    : 'Just the strength block — no add-on.'}
+                </p>
+              </div>
+            )}
             {posturePresent('run') && (
               <div>
                 <p className="text-white/55 text-sm mb-2">Long run day</p>
@@ -431,24 +451,6 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   </div>
                   <p className="text-white/35 text-xs mt-1.5">We spread your miles across these — a longer run plus easy fill, not the same run twice.</p>
                 </div>
-              </div>
-            )}
-            {state.posture?.strength === 'develop' && (
-              <div>
-                <p className="text-white/55 text-sm mb-2">Add-on focus (optional)</p>
-                <div className="grid grid-cols-3 gap-1.5 max-w-[300px]">
-                  {([['None', null], ['Glutes', 'glute'], ['Hyrox', 'hyrox']] as const).map(([label, val]) => (
-                    <button
-                      key={label} type="button" onClick={() => setState((s) => ({ ...s, accessoryBias: val }))}
-                      className={`py-2 rounded-lg text-sm border ${state.accessoryBias === val ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
-                    >{label}</button>
-                  ))}
-                </div>
-                <p className="text-white/35 text-xs mt-1.5">
-                  {state.accessoryBias === 'glute' ? 'One posterior-chain slot on your upper day — stronger, more durable hips (not a speed promise).'
-                    : state.accessoryBias === 'hyrox' ? 'Adds one station accessory during the week, plus a run→station combo on your long-run day — back-to-back, on tired legs. Adds volume; this is the Hyrox opt-in.'
-                    : 'Just the strength block — no add-on.'}
-                </p>
               </div>
             )}
             {posturePresent('bike') && (
