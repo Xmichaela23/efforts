@@ -1714,7 +1714,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // they get last-actual (dimmed via `from_previous`) instead of empty. The
         // deload contradiction stays fixed: a deload session is planned, so its box
         // shows the (lighter) prescription, never last-actual.
+        // Q-097/Q-102: NEVER prior-fill a baseline/1RM TEST — the whole workout. Warmups are feel-based
+        // (reps open, per-lift weight dosing) and the scored set is open reps / no RIR. Prior-filling
+        // stamped the warmups with last session's 85×5 and the scored set with stale reps/RIR.
+        const isTestWorkoutForFill = isBaselineTestWorkout(scheduledWorkout || {});
         setExercises((prev) => prev.map((ex) => {
+          if (isTestWorkoutForFill) return ex;
           const priorSets = previousByName[normalizeExerciseName(ex.name)];
           if (!priorSets) return ex;
           const newSets = ex.sets.map((set, i) => {
@@ -1724,12 +1729,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               !set.reps &&
               !set.duration_seconds &&
               set.rir === undefined &&
-              !set.resistance_level &&
-              // Q-097/Q-102: NEVER prior-fill a baseline/1RM TEST scored set. The AMRAP (open reps) and
-              // pull-up rep-max sets must stay clean — the athlete logs the actual result fresh, and the
-              // test carries no RIR. Prior-filling stamped it with last session's reps/weight/RIR-2.
-              !set.amrap &&
-              !set.repMaxTest;
+              !set.resistance_level;
             if (!untouched) return set;
             const prior = priorSets[i] ?? priorSets[priorSets.length - 1];
             if (!prior) return set;
