@@ -1593,7 +1593,7 @@ return (
                               >
                                 Full Body
                               </button>
-                              {' '}baseline test. One all-out AMRAP set per lift after guided warmups — we cluster Epley + Brzycki for your 1RM. Same test the Get Strong block ends with, so entry and retest match.
+                              {' '}baseline test. One all-out AMRAP set per lift after guided warmups — we'll help you find your working weight and estimate your 1RM from it; the number firms up over the first few weeks. Same test the Get Strong block ends with, so entry and retest match.
                             </p>
                             <p className="text-xs text-white/60 italic">
                               Tip: Retest every 8-12 weeks to track progress.

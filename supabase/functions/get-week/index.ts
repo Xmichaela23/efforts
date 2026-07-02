@@ -183,6 +183,12 @@ Deno.serve(async (req)=>{
               } catch  {}
             }
             if (!isISO(startIso)) continue; // cannot map without anchor
+            // Week numbering MUST use the Monday-of-start anchor, exactly like activate-plan
+            // (anchorMonday = mondayOf(startDate)). Using the raw startIso here drifts the week
+            // boundaries by up to 6 days for any non-Monday start, so a date one week past the
+            // plan's end gets numbered as the last week → get-week backfills a phantom duplicate
+            // (the retest-week doubling: a Monday retest re-inserted on the following Monday).
+            const anchorMonday = mondayOf(startIso);
             if (debug) debugNotes.push({
               where: 'plan_anchor',
               plan_id: String(plan.id),
@@ -192,7 +198,7 @@ Deno.serve(async (req)=>{
             // For each date in range, see if plan covers it and ensure a row per authored session
             if (debug) console.log('[get-week] Processing plan:', plan.id, 'dates:', dates.length, 'startIso:', startIso);
             for (const iso of dates){
-              const wk = weekNumberFor(iso, startIso);
+              const wk = weekNumberFor(iso, anchorMonday);
               if (debug) console.log('[get-week] Date:', iso, 'week:', wk, 'durWeeks:', durWeeks);
               if (!(wk >= 1 && (durWeeks ? wk <= durWeeks : true))) {
                 if (debug) console.log('[get-week] Skipping date', iso, '- out of bounds');
@@ -204,6 +210,10 @@ Deno.serve(async (req)=>{
                 });
                 continue;
               }
+              // Week-1 partial: activate-plan skips pre-start days (weekNum===1 && date < startDate),
+              // so a mid-week start has no week-1 rows before startIso. get-week must skip them too,
+              // or it backfills a phantom Monday for weeks that legitimately start mid-week.
+              if (wk === 1 && iso < startIso) continue;
               const dayName = String(dayNameFromISO(iso));
               if (debug) console.log('[get-week] Date:', iso, 'day:', dayName, 'looking for week', wk, 'in sessions_by_week');
               // Be tolerant of structure: array preferred; object -> flatten values; single -> box
