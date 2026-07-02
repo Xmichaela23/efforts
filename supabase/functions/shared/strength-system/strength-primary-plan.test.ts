@@ -267,3 +267,31 @@ Deno.test('ACCESSORY-BIAS — glute/hyrox inject ONE slot on Upper A; main lifts
     for (const e of biasExs) assert(!/\d/.test(e.weight) && !e.weight.includes('%'), `${e.name} weight must be qualitative (no %1RM), got "${e.weight}"`);
   }
 });
+
+Deno.test('LONG-RUN PICK (Get Strong) — Sat/Sun only; Sunday moves the long run + Hyrox combo; strength days clean; illegal→Sat', () => {
+  const base = { durationWeeks: 12, strengthFrequency: 4 as const, tier: 'barbell' as const, enduranceSport: 'run' as const, enduranceFrequency: 2, targetWeeklyMiles: 20, easyPaceMinPerMile: 9.5, accessoryBias: 'hyrox' as const };
+  const sat = composeStrengthPrimaryPlan({ ...base });                       // default → Saturday
+  const sun = composeStrengthPrimaryPlan({ ...base, longRunDay: 'sunday' }); // pick Sunday
+  const mon = composeStrengthPrimaryPlan({ ...base, longRunDay: 'monday' }); // illegal → falls back to Saturday
+  const longDay = (p: ReturnType<typeof composeStrengthPrimaryPlan>, w: string) => p.sessions_by_week[w].reduce((m: any, s: any) => s.type === 'run' && (!m || s.duration > m.duration) ? s : m, null).day;
+  const comboDay = (p: ReturnType<typeof composeStrengthPrimaryPlan>, w: string) => p.sessions_by_week[w].find((s) => (s.tags || []).includes('fatigued_legs'))?.day;
+
+  // default + illegal → Saturday (never a weekday adjacent to Tue squat); Sunday → Sunday
+  assertEquals(longDay(sat, '2'), 'Saturday'); assertEquals(comboDay(sat, '2'), 'Saturday');
+  assertEquals(longDay(mon, '2'), 'Saturday', 'illegal pick (Monday) falls back to Saturday');
+  assertEquals(longDay(sun, '2'), 'Sunday'); assertEquals(comboDay(sun, '2'), 'Sunday', 'Sunday → long run + combo on Sunday');
+
+  // Sunday pick: Monday is Upper A only (no run/combo stacked) — 24h before Tue squat is CLEAR
+  const sunWk2 = sun.sessions_by_week['2'];
+  assert(sunWk2.filter((s) => s.day === 'Monday').every((s) => s.type === 'strength'), 'Monday: no run/combo (24h pre-squat clear)');
+  assert(!sunWk2.some((s) => s.day === 'Monday' && ((s.tags || []).includes('fatigued_legs') || s.type === 'run')), 'no leg-load on Monday');
+  // Sunday combo is 48h before Tue squat — legal. The four strength days are byte-identical vs the Saturday plan.
+  for (const n of ['Upper A', 'Lower A', 'Upper B', 'Lower B']) {
+    assertEquals(JSON.stringify(sunWk2.find((s) => s.name.includes(n))), JSON.stringify(sat.sessions_by_week['2'].find((s) => s.name.includes(n))), `${n} identical Sat-plan vs Sun-plan (strength days don't move)`);
+  }
+
+  // plain (no bias) byte-identical under the same pick
+  const a = composeStrengthPrimaryPlan({ ...base, accessoryBias: null, longRunDay: 'sunday' });
+  const b = composeStrengthPrimaryPlan({ ...base, accessoryBias: undefined, longRunDay: 'sunday' });
+  assertEquals(JSON.stringify(a), JSON.stringify(b), 'plain byte-identical under the same pick');
+});

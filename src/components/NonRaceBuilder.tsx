@@ -47,13 +47,14 @@ const DAY_SHORT: Record<DayName, string> = {
   monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
 };
 
-function DayPicker({ value, onChange }: { value: DayName | ''; onChange: (d: DayName) => void }) {
+function DayPicker({ value, onChange, allowed }: { value: DayName | ''; onChange: (d: DayName) => void; allowed?: DayName[] }) {
+  const days = allowed ?? DAYS;
   return (
-    <div className="grid grid-cols-7 gap-1">
-      {DAYS.map((d) => (
+    <div className={allowed ? 'flex gap-1' : 'grid grid-cols-7 gap-1'}>
+      {days.map((d) => (
         <button
           key={d} type="button" onClick={() => onChange(d)}
-          className={`py-2 rounded-lg text-xs ${value === d ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/60 border border-white/12'}`}
+          className={`${allowed ? 'flex-1 ' : ''}py-2 rounded-lg text-xs ${value === d ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/60 border border-white/12'}`}
         >
           {DAY_SHORT[d]}
         </button>
@@ -388,7 +389,11 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             {posturePresent('run') && (
               <div>
                 <p className="text-white/55 text-sm mb-2">Long run day</p>
-                <DayPicker value={state.longRunDay} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))} />
+                <DayPicker value={state.longRunDay} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))}
+                  allowed={state.posture?.strength === 'develop' ? (['saturday', 'sunday'] as DayName[]) : undefined} />
+                {state.posture?.strength === 'develop' && (
+                  <p className="text-white/35 text-xs mt-1.5">Sat or Sun — your heavy lower days (Tue/Fri) need clear space around them.</p>
+                )}
               </div>
             )}
             {state.posture?.strength === 'develop' && posturePresent('run') && (

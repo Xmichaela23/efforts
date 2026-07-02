@@ -41,6 +41,9 @@ export type StrengthPrimaryArgs = {
    *  to a plain Get Stronger plan. Qualitative loading only (never %1RM). See SCIENCE-glute-accessory-bias.md
    *  + SCIENCE-hyrox-accessory-bias.md. */
   accessoryBias?: 'glute' | 'hyrox' | null;
+  /** Preferred long-run day from intake. CONSTRAINED to Sat/Sun (heavy lower is Tue/Fri) — only 'sunday'
+   *  moves it off the grid default (Saturday). The Hyrox fatigued-legs combo follows the long run. */
+  longRunDay?: string;
 };
 
 type StrengthExercise = { name: string; sets: number; reps: number | string; weight: string };
@@ -356,9 +359,17 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     ? Math.max(grid.endurance.length, Math.min(4, Math.round(Number(args.enduranceFrequency) || grid.endurance.length)))
     : grid.endurance.length;
   const upperLiftDays = [grid.strength[0], grid.strength[2]].filter(Boolean); // Upper A, Upper B — the non-leg lift days
-  const runDayList: string[] = [...grid.endurance];
+  // Long-run day = user pick CONSTRAINED to Sat/Sun. Heavy lower is fixed at Tue (squat) + Fri (hinge); only
+  // the weekend clears the 24h-pre/48h-post windows (Sat = 4 days from Tue squat; Sun = 48h before it). A
+  // Sunday pick moves the long run — and the Hyrox combo — to Sunday; anything else → the grid default (Sat).
+  // (Option A: user-driven within what's safe. B = composer adjacency validation, C = optimizer routing are
+  // the Q-088-lineage upgrades if the fixed strength grid ever unfixes — see docs.)
+  const gridLongDefault = grid.endurance[grid.endurance.length - 1]; // 'Saturday'
+  const pickedLong = String(args.longRunDay ?? '').trim().toLowerCase() === 'sunday' ? 'Sunday' : gridLongDefault;
+  const enduranceDays = pickedLong === gridLongDefault ? grid.endurance : grid.endurance.map((d) => d === gridLongDefault ? pickedLong : d);
+  const runDayList: string[] = [...enduranceDays];
   for (const d of upperLiftDays) { if (runDayList.length >= runFreq) break; if (!runDayList.includes(d)) runDayList.push(d); }
-  const longRunDay = grid.endurance[grid.endurance.length - 1] ?? runDayList[runDayList.length - 1]; // the long run lands on a run-only day (Sat)
+  const longRunDay = pickedLong; // the long run (and any Hyrox combo) lands here
   // Explain stacking ONCE — on the first lift+run day (week 1), silent everywhere after. Self-gates: if no run
   // stacks onto a lift day (e.g. 2 run days), there's nothing to explain and the note never appears.
   const firstStackedRunDay = runDayList

@@ -28,7 +28,7 @@ Deno.serve(async (req: Request) => {
     const {
       user_id, duration_weeks, strength_frequency, strength_tier,
       endurance_sport, endurance_frequency, goal_name, start_date, preview, needs_baseline,
-      target_weekly_miles, easy_pace_min_per_mile, accessory_bias,
+      target_weekly_miles, easy_pace_min_per_mile, accessory_bias, long_run_day,
     } = body as Record<string, unknown>;
 
     if (!user_id) return json({ success: false, error: 'user_id is required' }, 400);
@@ -53,6 +53,7 @@ Deno.serve(async (req: Request) => {
       targetWeeklyMiles: Number(target_weekly_miles) > 0 ? Number(target_weekly_miles) : undefined,
       easyPaceMinPerMile: Number(easy_pace_min_per_mile) > 0 ? Number(easy_pace_min_per_mile) : undefined,
       accessoryBias: bias,
+      longRunDay: typeof long_run_day === 'string' ? long_run_day : undefined,
     });
     console.log(`[strength-plan] composed: ${plan.name} (${plan.duration_weeks}wk, freq ${freq}, ${sport ?? 'strength-only'}, tier ${tier})`);
 

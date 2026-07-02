@@ -2415,6 +2415,8 @@ Deno.serve(async (req: Request) => {
               ...(gsEasyPaceMinPerMile ? { easy_pace_min_per_mile: gsEasyPaceMinPerMile } : {}),
               // Accessory-bias add-on (glute | hyrox) from the builder's training_prefs; else omitted (plain plan).
               ...(gsTp.accessory_bias === 'glute' || gsTp.accessory_bias === 'hyrox' ? { accessory_bias: gsTp.accessory_bias } : {}),
+              // Long-run day from intake (composer constrains to Sat/Sun); the Hyrox combo follows it.
+              ...((gsTp.preferred_days as Record<string, unknown> | undefined)?.long_run ? { long_run_day: (gsTp.preferred_days as Record<string, string>).long_run } : {}),
               ...(plan_start_date ? { start_date: plan_start_date } : {}),
               ...(bodyPreview ? { preview: true } : {}),
             };
