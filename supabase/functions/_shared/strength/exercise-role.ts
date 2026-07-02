@@ -131,8 +131,9 @@ const ROLE_TABLE: Record<string, StrengthRole> = {
   'sandbag lunge': 'accessory',
   'farmers carry': 'accessory',
   // Equipment-fallback names (substituteExerciseForEquipment) for the bias stations — accessory role.
-  'dumbbell reverse lunge': 'accessory',
-  'barbell reverse lunge': 'accessory',
+  'dumbbell walking lunge': 'accessory',
+  'barbell walking lunge': 'accessory',
+  'walking lunge': 'accessory',
   'dumbbell row': 'accessory',
   'bent over row': 'accessory',
   'band row': 'accessory',

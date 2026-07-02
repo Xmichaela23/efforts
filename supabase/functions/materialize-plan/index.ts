@@ -1002,12 +1002,12 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
   // Hyrox stations: sled/sandbag need commercial-gym (turf/sled/prowler) access → same-PATTERN barbell/DB
   // fallbacks for a home gym.
   if (name.includes('sled push') && !hasGymAccess) {
-    resultName = hasDumbbells ? 'Dumbbell Reverse Lunge' : hasBarbell ? 'Barbell Reverse Lunge' : 'Reverse Lunge';
-    notes = 'No sled — heavy horizontal-drive pattern under load';
+    resultName = hasDumbbells ? 'Dumbbell Walking Lunge' : hasBarbell ? 'Barbell Walking Lunge' : 'Walking Lunge';
+    notes = 'No sled — loaded walking lunge (forward horizontal drive under load)';
   }
   if (name.includes('sandbag lunge') && !hasGymAccess) {
-    resultName = hasDumbbells ? 'Dumbbell Reverse Lunge' : hasBarbell ? 'Barbell Reverse Lunge' : 'Reverse Lunge';
-    notes = 'No sandbag — loaded reverse lunge';
+    resultName = hasDumbbells ? 'Dumbbell Walking Lunge' : hasBarbell ? 'Barbell Walking Lunge' : 'Walking Lunge';
+    notes = 'No sandbag — loaded walking lunge';
   }
   if (name.includes('sled pull') && !hasGymAccess) {
     resultName = hasDumbbells ? 'Dumbbell Row' : hasBarbell ? 'Bent-Over Row' : hasResistanceBands ? 'Band Row' : 'Inverted Row';
