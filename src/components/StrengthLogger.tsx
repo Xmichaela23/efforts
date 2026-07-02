@@ -755,40 +755,48 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         ],
       };
     }
-    const isOHP = exerciseName.toLowerCase().includes('overhead') || exerciseName.toLowerCase().includes('ohp');
-    const emptyBarWeight = isOHP ? 0 : 45; // OHP might need lighter start
+    // Q-097/Q-102: one ramp SHAPE, per-lift DOSING (Michael's OHP session — a press is not a deadlift).
+    // Reps are guidance, not prescription — feel hints carry the warmup; the reps field stays empty/optional
+    // (only the AMRAP test set is structured). Weight dosing scales per lift: when a 1RM exists, express the
+    // ramp as %-of-max anchors (self-scaling to any lift/athlete); otherwise per-lift add-hints for discovery.
+    const nlow = exerciseName.toLowerCase();
+    const isOHP = nlow.includes('overhead') || nlow.includes('ohp');
+    const emptyBarWeight = isOHP ? 0 : 45; // OHP might need a lighter start (DBs / empty bar)
     const hasSug = typeof suggestedWeight === 'number' && suggestedWeight > 0;
     const round5 = (w: number) => Math.max(0, Math.round(w / 5) * 5);
+    // Per-lift add increment for the no-1RM discovery path — generic "25–50 lb" overshoots a press.
+    const addBy = isOHP ? '10–20 lb' : nlow.includes('bench') ? '20–30 lb' : '25–50 lb';
+    // suggestedWeight is the ~88% test weight, so % of 1RM ≈ ×(pct/0.88) of it: ~50% → ×0.57, ~70% → ×0.80.
 
     return {
       id: `ex-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: exerciseName,
       expanded: true,
       sets: [
-        // Warmup 1: Empty bar
+        // Warmup 1: empty bar — groove the movement (reps by feel)
         {
           weight: emptyBarWeight,
-          reps: 10,
+          reps: undefined,
           setType: 'warmup',
-          setHint: 'Should feel easy',
+          setHint: 'Empty bar — a few easy reps to groove the movement.',
           barType: 'standard',
           completed: false
         },
-        // Warmup 2: ~55% (retest) or "add 25-50 lbs" (entry)
+        // Warmup 2: ~50% of max (1RM known) or a per-lift add (discovery) — easy
         {
-          weight: hasSug ? round5(suggestedWeight! * 0.55) : 0,
-          reps: 5,
+          weight: hasSug ? round5(suggestedWeight! * 0.57) : 0,
+          reps: undefined,
           setType: 'warmup',
-          setHint: hasSug ? '~55% — should feel easy' : 'Add 25-50 lbs, should feel easy',
+          setHint: hasSug ? '~50% of max — easy' : `Add ${addBy} — should feel easy.`,
           barType: 'standard',
           completed: false
         },
-        // Warmup 3: ~75% (retest) or "add 25-50 lbs more" (entry)
+        // Warmup 3: ~70% of max (1RM known) or a per-lift add (discovery) — moderate, one last primer
         {
-          weight: hasSug ? round5(suggestedWeight! * 0.75) : 0,
-          reps: 3,
+          weight: hasSug ? round5(suggestedWeight! * 0.80) : 0,
+          reps: undefined,
           setType: 'warmup',
-          setHint: hasSug ? '~75% — moderate, one last primer' : 'Add 25-50 lbs, should feel moderate',
+          setHint: hasSug ? '~70% of max — moderate, one last primer' : `Add ${addBy} more — moderate, one last primer.`,
           barType: 'standard',
           completed: false
         },
@@ -3968,7 +3976,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // (open reps — the athlete's actual rep count IS the measurement). It must
                         // still show an editable, empty-by-default reps field, or the 1RM test has
                         // nowhere to record the reps and saves "0 reps" → e1RM never computes. (D-224)
-                        (set.reps === undefined && !set.amrap && !set.repMaxTest) ? null : (
+                        (set.reps === undefined && !set.amrap && !set.repMaxTest && !isBaselineTestWorkout(scheduledWorkout || {})) ? null : (
                           // D-131: weighted flex-[2] (reps) so the cell shares the strip's reps column.
                           <div className="flex-[2] flex flex-col items-center gap-0.5">
                             <button
@@ -3989,7 +3997,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               {/* D-097: muted text when value came from previous-session autofill */}
                               <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
                                 {/* Q-097: AMRAP starts empty (open reps), not "—" — the athlete types the count. */}
-                                {set.reps === 0 ? '' : (set.reps ?? ((set.amrap || set.repMaxTest) ? '' : '—'))}
+                                {set.reps === 0 ? '' : (set.reps ?? ((set.amrap || set.repMaxTest || isBaselineTestWorkout(scheduledWorkout || {})) ? '' : '—'))}
                               </span>
                               {/* Q-042: subtle tap-to-type affordance */}
                               <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />

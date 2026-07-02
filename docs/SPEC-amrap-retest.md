@@ -74,3 +74,18 @@ Squat = same (3–5 zone). OHP = same (3–5). Deadlift = same (≤5; conservati
 5. Doc: fold the verified LeSuer + ≤10 consensus into `SCIENCE-strength-primary-loading.md`.
 
 *Cross-ref: D-221 (engine), D-222 (band), D-223 (retest removed + ratchet guard — this un-removes it correctly), `strength-primary-plan.ts`, `StrengthLogger.tsx`.*
+
+---
+
+## Warmup ramp — one shape, per-lift DOSING (Q-097/Q-102, added 2026-07-02)
+
+**Evidence case:** Michael's OHP baseline test. The generic warmup ("10/5/3 reps", "add 25–50 lb") was *false precision twice over* — a press is not a deadlift:
+- **Reps were prescribed** (10/5/3) onto **athlete-chosen weights** — half-prescribed, and 10 empty-bar OHP reps is more fatigue than a test warmup wants.
+- **Weight jumps were deadlift-scale.** 25–50 lb increments overshoot a press — OHP's whole working range is ~45–95 lb for many athletes, so two 25–50 jumps blow past the test weight (his set-3 felt too heavy).
+
+**The rule: one ramp SHAPE, per-lift DOSING.**
+- **Reps: guidance, not prescription.** Drop the hard 10/5/3; the warmup reps field is **empty/optional**. Feel hints carry it ("empty bar — groove it" → "easy" → "moderate, one last primer"). Only the **AMRAP test set** stays structured.
+- **Weight: scales per lift.**
+  - **1RM known (retest):** express the ramp as **%-of-max anchors** — "~50% — easy", "~70% — moderate, one last primer" — self-scaling to any lift/athlete (the elegant, deterministic-engine version). Seeded off the ~88% test weight (×0.57 ≈ 50%, ×0.80 ≈ 70% of 1RM).
+  - **No 1RM (discovery):** per-lift **add-hints** — OHP `add 10–20 lb`, bench `add 20–30 lb`, squat/deadlift `add 25–50 lb`.
+- **Implementation:** `StrengthLogger.tsx` `createBaselineTestExercise` (warmup sets) + the reps-field render gate (shows an empty reps field on any baseline-test set). Applies to all four lifts' test warmups.
