@@ -1716,7 +1716,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               !set.reps &&
               !set.duration_seconds &&
               set.rir === undefined &&
-              !set.resistance_level;
+              !set.resistance_level &&
+              // Q-097/Q-102: NEVER prior-fill a baseline/1RM TEST scored set. The AMRAP (open reps) and
+              // pull-up rep-max sets must stay clean — the athlete logs the actual result fresh, and the
+              // test carries no RIR. Prior-filling stamped it with last session's reps/weight/RIR-2.
+              !set.amrap &&
+              !set.repMaxTest;
             if (!untouched) return set;
             const prior = priorSets[i] ?? priorSets[priorSets.length - 1];
             if (!prior) return set;
