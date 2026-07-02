@@ -926,7 +926,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   // Resolve the down-write reconciliation: apply each Keep/Update choice, then write once.
-  const resolveDownWrites = async () => {
+  // Takes the decisions explicitly so a choice tap can auto-commit without waiting on async setState.
+  const resolveDownWrites = async (decisions: Record<string, 'keep' | 'update'> = downDecisions) => {
     if (!downWriteReview) return;
     const { userId, hasRow, basePerf, downs } = downWriteReview;
     try {
@@ -935,7 +936,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const updated: string[] = [];
       const kept: string[] = [];
       downs.forEach(d => {
-        if (downDecisions[d.key] === 'update') {
+        if (decisions[d.key] === 'update') {
           finalPerf[d.key] = d.next;
           updated.push(`${d.lift} → ${d.next}`);
         } else {
@@ -953,6 +954,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } finally {
       setSavingBaseline(false);
     }
+  };
+
+  // A Keep/Update tap in the reconciliation dialog. Auto-commits the moment every down-lift is decided —
+  // so there's no separate "Save" step (the choice IS the save; the athlete is asked once). (Michael, on device)
+  const chooseDown = (key: string, choice: 'keep' | 'update') => {
+    const next = { ...downDecisions, [key]: choice };
+    setDownDecisions(next);
+    if (downWriteReview && downWriteReview.downs.every(d => next[d.key])) resolveDownWrites(next);
   };
   
   // Session persistence key based on performed date (so logging on a different day keeps the right draft)
@@ -2786,9 +2795,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           }
         }
 
-        const minRirForBaseline = (isTagRetest || (updatedSet as any).amrap === true) ? 0 : 2;
-        if (updatedSet.setType === 'working' && updatedSet.completed && updatedSet.rir !== undefined && !updatedSet.rir_autofilled &&
-            updatedSet.rir >= minRirForBaseline && updatedSet.rir <= 3 && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0) {
+        // AMRAP 1RM test (tag-retest OR any amrap-flagged working set): NO RIR gate — the AMRAP protocol is
+        // the near-max signal; compute the e1RM straight from weight×reps on completion. A legacy NON-amrap
+        // working set in a baseline-tagged workout keeps the sub-max RIR 2–3 !autofilled gate. (Q-097)
+        const isAmrapBaseline = isTagRetest || (updatedSet as any).amrap === true;
+        const amrapReady = isAmrapBaseline && updatedSet.setType === 'working' && updatedSet.completed
+          && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0;
+        const submaxReady = !isAmrapBaseline && updatedSet.setType === 'working' && updatedSet.completed
+          && updatedSet.rir !== undefined && !updatedSet.rir_autofilled
+          && updatedSet.rir >= 2 && updatedSet.rir <= 3
+          && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0;
+        if (amrapReady || submaxReady) {
           const baselineKey = getBaselineKeyForExercise(exercise.name);
           if (baselineKey) {
             const estimated1RM = calculate1RM(updatedSet.weight, updatedSet.reps);
@@ -2947,23 +2964,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
     
-    // Pull-up rep-max test: RIR is meaningless (the clean-rep COUNT is the whole result). Just complete —
-    // no RIR autofill, no confirm strip. The populate below stores the count (0 is valid). (Q-102)
-    if (set.repMaxTest === true) {
+    // Baseline/retest TEST sets — AMRAP 1RM tests AND pull-up rep-max tests — do NOT use RIR. The AMRAP
+    // protocol itself ("stop at ~RPE 9 / on form break") IS the near-max signal, and the measurement is the
+    // rep count at the fixed weight (→ e1RM) or the clean-rep count. Asking for RIR here is pure friction
+    // (Michael, on device). Just complete — no RIR autofill, no confirm strip. The populate computes the
+    // result from weight×reps (AMRAP) or the count (rep-max); neither gates on RIR. (Q-097 / Q-102)
+    if (set.amrap === true || set.repMaxTest === true) {
       updateSet(exerciseId, setIndex, { completed: true });
       autoStartRestForSet(exerciseId, setIndex);
-      return;
-    }
-
-    // Q-097 piece 3: a 1RM AMRAP test's RIR is the load-bearing signal — an untouched RIR-3
-    // default would both misrepresent an ~RPE-9 near-max effort AND (being rir_autofilled) fail
-    // the !rir_autofilled baseline gate, so the test would never compound. Complete the set with
-    // RIR EMPTY and surface the confirm strip so the athlete enters the real number; that pill tap
-    // (rir_autofilled:false) is what lands the e1RM in performance_numbers. (D-224)
-    if (set.amrap === true) {
-      updateSet(exerciseId, setIndex, { completed: true });
-      autoStartRestForSet(exerciseId, setIndex);
-      setRirConfirm({ exerciseId, setIndex });
       return;
     }
 
@@ -4601,8 +4609,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <h3 className="text-lg font-semibold mb-1 text-white/90">Lower than your stored max</h3>
             <p className="text-sm text-white/60 mb-4">
               {downWriteReview.downs.length > 1 ? 'These tests came' : 'This test came'} in below what's on file.
-              If it was a true near-max effort, update it. If you stopped early, keep the higher number.
-              Your call — nothing changes until you choose.
+              If it was a true near-max effort, tap Update. If you stopped early, Keep the higher number.
+              Your call — {downWriteReview.downs.length > 1 ? 'it saves once every lift is decided' : 'your tap saves it'}.
             </p>
             <div className="space-y-3">
               {downWriteReview.downs.map(d => {
@@ -4615,15 +4623,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => setDownDecisions(p => ({ ...p, [d.key]: 'keep' }))}
-                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all ${choice === 'keep' ? 'bg-white/[0.18] border-white/45 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
+                        onClick={() => chooseDown(d.key, 'keep')}
+                        disabled={savingBaseline}
+                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'keep' ? 'bg-white/[0.18] border-white/45 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         Keep {d.prior}
                       </button>
                       <button
-                        onClick={() => setDownDecisions(p => ({ ...p, [d.key]: 'update' }))}
-                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all ${choice === 'update' ? 'bg-amber-500/25 border-amber-400/60 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
+                        onClick={() => chooseDown(d.key, 'update')}
+                        disabled={savingBaseline}
+                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'update' ? 'bg-amber-500/25 border-amber-400/60 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         Update to {d.next}
@@ -4641,14 +4651,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               >
                 Cancel
               </button>
-              <button
-                onClick={resolveDownWrites}
-                disabled={savingBaseline || !downWriteReview.downs.every(d => downDecisions[d.key])}
-                className="text-sm text-white rounded-full px-4 py-1.5 bg-white/[0.12] border-2 border-white/35 hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ fontFamily: 'Inter, sans-serif' }}
-              >
-                {savingBaseline ? 'Saving...' : 'Save'}
-              </button>
+              {savingBaseline && <span className="text-sm text-white/60">Saving…</span>}
             </div>
           </div>
         </div>
