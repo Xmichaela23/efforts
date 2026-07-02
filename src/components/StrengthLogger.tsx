@@ -2839,6 +2839,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
     
+    // Q-097 piece 3: a 1RM AMRAP test's RIR is the load-bearing signal — an untouched RIR-3
+    // default would both misrepresent an ~RPE-9 near-max effort AND (being rir_autofilled) fail
+    // the !rir_autofilled baseline gate, so the test would never compound. Complete the set with
+    // RIR EMPTY and surface the confirm strip so the athlete enters the real number; that pill tap
+    // (rir_autofilled:false) is what lands the e1RM in performance_numbers. (D-224)
+    if (set.amrap === true) {
+      updateSet(exerciseId, setIndex, { completed: true });
+      autoStartRestForSet(exerciseId, setIndex);
+      setRirConfirm({ exerciseId, setIndex });
+      return;
+    }
+
     // Done SAVES immediately with the suggested RIR (default) + starts rest — friction-free, no forced
     // "hit the number" step (supersedes D-134's blocking confirm). For WORKING sets, surface a small
     // NON-BLOCKING adjust strip so the athlete can tap a different number ONLY if it actually felt
@@ -3822,8 +3834,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </div>
                         ) : (
                         // REP-BASED EXERCISE (e.g., Squat, Bench Press)
-                        // Hide reps input if no reps are prescribed (for "until" patterns)
-                        set.reps === undefined ? null : (
+                        // Hide reps input if no reps are prescribed (for "until" patterns).
+                        // EXCEPTION (Q-097): an AMRAP working set has reps:undefined BY DESIGN
+                        // (open reps — the athlete's actual rep count IS the measurement). It must
+                        // still show an editable, empty-by-default reps field, or the 1RM test has
+                        // nowhere to record the reps and saves "0 reps" → e1RM never computes. (D-224)
+                        (set.reps === undefined && !set.amrap) ? null : (
                           // D-131: weighted flex-[2] (reps) so the cell shares the strip's reps column.
                           <div className="flex-[2] flex flex-col items-center gap-0.5">
                             <button
@@ -3843,7 +3859,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             >
                               {/* D-097: muted text when value came from previous-session autofill */}
                               <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
-                                {set.reps === 0 ? '' : (set.reps ?? '—')}
+                                {/* Q-097: AMRAP starts empty (open reps), not "—" — the athlete types the count. */}
+                                {set.reps === 0 ? '' : (set.reps ?? (set.amrap ? '' : '—'))}
                               </span>
                               {/* Q-042: subtle tap-to-type affordance */}
                               <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
