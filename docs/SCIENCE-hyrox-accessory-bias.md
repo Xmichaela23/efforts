@@ -21,20 +21,20 @@ The add-on trains **local muscular endurance and loaded-movement competence unde
 - **CITED — Hyrox is endurance-dominated; the aerobic engine is the determinant.** The only lab study (n=11) found VO₂max the strongest performance correlate; station blood lactate exceeded run lactate (≈79% of the race at "very hard" %HRmax). Crucially, **grip strength and muscle mass did NOT correlate with performance.** Small, correlational, hypothesis-generating — cite as such.
   - **Brandt T, Ebel C, Lebahn C, Schmidt A (2025).** *Acute physiological responses and performance determinants in Hyrox.* Front Physiol **16:1519240.** doi:10.3389/fphys.2025.1519240. PMID 40230601.
   - → **DO NOT sell grip as a performance lever** (grip ρ≈0.09, non-significant). Grip is a floor to not fail a station, not a trainable edge.
-- **CITED (review framing) — strength is a FLOOR, the demands are aerobic + local muscular endurance.** Narrative performance analysis of the event (aerobic capacity + LME + sled mechanics as determinants; maximal strength a threshold, not the limiter).
-  - **Davids CJ (2025).** *A Performance Analysis of HYROX.* Strength & Conditioning Journal. doi:10.1519/SSC.0000000000000913. *(⚠ S&C Journal is not PubMed-indexed; cite by DOI. Confirm final volume/pages when the print citation lands.)*
+- **CITED (review) — the demands are aerobic capacity + local muscular endurance; maximal strength is one of four determinants, with the aerobic system called "foundational."** The review lists aerobic capacity, anaerobic power, LME, and maximal strength; strength/power "underpin sled pushes and running economy." **Honesty flag:** the "strength is a **floor/threshold, not the limiter**" phrasing is *our reading* of that hierarchy (aerobic foundational + Brandt's grip/mass non-correlation), **not a verbatim finding** — full text paywalled.
+  - **Davids CJ (2025/2026).** *A Performance Analysis of HYROX: A Review of the Physiologic, Mechanical, and Technical Demands.* Strength & Conditioning Journal (online-first 2025; print **48(1):88–100**, Feb 2026). doi:10.1519/SSC.0000000000000913. *(Not PubMed-indexed; cite by DOI.)*
 - **CITED — concurrent interference is real, dose-dependent, and running interferes more than cycling.** The ground for keeping the bias LOW-dose and off the heavy-Lower / long-run recovery window — Hyrox stacks *running* with functional strength, the higher-interference pairing.
   - **Wilson JM, Marín PJ, Rhea MR, Wilson SMC, Loenneke JP, Anderson JC (2012).** *Concurrent training: a meta-analysis examining interference of aerobic and resistance exercises.* J Strength Cond Res **26(8):2293–2307.** doi:10.1519/JSC.0b013e31823a3e2d. PMID 22002517. *(Already load-bearing across this codebase.)*
-- **CITED (provided, confirm ref) — muscle-fiber / strength-endurance basis for the interference direction.**
-  - **Methenitis S, et al. (2018).** *(Provided in the Track-2 spine as a second interference ground.)* **⚠ CONFIRM exact title / journal / DOI against the primary before this doc is called final** — included per the verify-before-cite rule as *pending confirmation*, not yet independently checked here.
+- **CITED (verified 2026-07-01) — the concurrent-training interference effect is real and dose-modulated** (by endurance volume/intensity/type/frequency; HIIT/SIT minimize it; molecular AMPK↔mTOR basis). Grounds the "keep the bias LOW-dose, off the heavy-Lower/long-run recovery window" posture. **Scope note:** this is a *concurrent-interference* review — do NOT cite it for muscle-fiber-type-composition claims (that's separate Methenitis work).
+  - **Methenitis S (2018).** *A Brief Review on Concurrent Training: From Laboratory to the Field.* Sports (Basel) **6(4):127.** doi:10.3390/sports6040127. PMID 30355976.
 
 ## 3. Accessory-movement evidence (what actually transfers — grade honestly)
 
 - **Sled push/pull — strongest of the accessory literature, but it's SPRINT-ACCELERATION evidence transferred by analogy** to the Hyrox grinding sled. Resisted-sled training improves acceleration / horizontal force; the Hyrox-specific work-capacity/metabolic transfer is unstudied. **SOUND for sprint; EXTRAPOLATED to Hyrox** [Petrakos 2016; Alcaraz 2018].
 - **Loaded carries / farmers walk — acute trunk-stabilizer + grip load is well-quantified; the TRAINING ADAPTATION (grip endurance, work capacity) is CONVENTION**, not RCT-proven [Hindle 2019 systematic review notes the data gap].
 - **Wall ball / thruster — demand is characterized at the WORKOUT level, not the isolated movement** (high glycolytic + strength-endurance limited); per-rep energy cost is CONVENTION [Sousa Neto 2022; Leitão 2021].
-- **Sandbag — WEAKEST-evidenced station.** The relevant EMG study found the "sandbag > barbell for core" claim came from a *water* bag; the sandbag ≈ barbell [Calatayud 2015]. Do not oversell.
-- **Burpee — best-supported for an aerobic training effect** (burpee-HIIT raised VO₂max ~11%) [Menz 2019].
+- **Sandbag — WEAKEST-evidenced station.** The relevant EMG study found the "sandbag > barbell for core" claim came from a *water* bag (oblique 60%, glute med 29%, lumbar erectors 85% MVIC higher on the water bag only); the sandbag ≈ barbell [Calatayud 2015, *Int J Sports Phys Ther* 10(6):950–958, PMID 26618060]. Do not oversell.
+- **Burpee — best-supported for an aerobic training effect** (functional low-volume HIIT raised VO₂max ~11%, comparable to running HIIT's ~13%) [Menz 2019, *J Sports Sci Med* 18(3):497–504, PMID 31427872].
 
 ## 4. What is CONVENTION (flag honestly — NOT peer-reviewed)
 
@@ -49,9 +49,9 @@ The add-on trains **local muscular endurance and loaded-movement competence unde
 |---|---|---|
 | Hyrox is endurance-dominated; VO₂max is the determinant | **SOUND (thin)** | Brandt 2025 (n=11) |
 | Grip does NOT correlate — don't sell it as a lever | **SOUND (thin)** | Brandt 2025 (ρ≈0.09) |
-| Strength is a floor, not the limiter | **SOUND (review)** | Davids 2025 |
+| Strength is one of 4 determinants ("floor not limiter" is our gloss) | **SOUND (review, interpretive)** | Davids 2025 + Brandt 2025 grip/mass ns |
 | Interference real, dose-dependent, running > cycling | **SOUND** | Wilson 2012 |
-| Fiber/strength-endurance interference basis | **PENDING** | Methenitis 2018 (confirm ref) |
+| Concurrent-interference effect is real + dose-modulated | **SOUND** | Methenitis 2018 (verified) |
 | Sled transfers to the Hyrox sled | **SOUND for sprint; EXTRAPOLATED** | Petrakos 2016, Alcaraz 2018 |
 | Loaded carries build grip endurance / work capacity | **CONVENTION** | no RCT |
 | Wall ball/thruster isolated per-rep cost | **CONVENTION / GAP** | workout-level only |
@@ -60,7 +60,7 @@ The add-on trains **local muscular endurance and loaded-movement competence unde
 
 ## 6. Quarantined (do NOT cite until verified)
 
-- **⚠ Doma 2017 — QUARANTINED.** Blocked from this doc until its primary is checked. The 2017 paper is a review/perspective, and the acute "running economy drops for hours post-lifting" result is commonly *mis-attributed* to it (it traces to Doma & Deakin's earlier acute experiments). The interference claim here rests on **Wilson 2012 + Methenitis 2018 (pending)** — NOT Doma. This is the same misattribution class the citation gate has caught repeatedly; do not reintroduce Doma 2017 as a load-bearing cite without checking the primary. (Also re-check the `STRENGTH-PROTOCOL.md:425` "Doma 2017: strength force-production 24–48h" line against its primary.)
+- **⚠ Doma 2017 — QUARANTINED.** Blocked from this doc until its primary is checked. The 2017 paper is a review/perspective, and the acute "running economy drops for hours post-lifting" result is commonly *mis-attributed* to it (it traces to Doma & Deakin's earlier acute experiments). The interference claim here rests on **Wilson 2012 + Methenitis 2018 (both verified)** — NOT Doma. This is the same misattribution class the citation gate has caught repeatedly; do not reintroduce Doma 2017 as a load-bearing cite without checking the primary. (Also re-check the `STRENGTH-PROTOCOL.md:425` "Doma 2017: strength force-production 24–48h" line against its primary.)
 
 ---
 
