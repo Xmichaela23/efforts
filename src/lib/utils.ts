@@ -110,3 +110,22 @@ export function typeAbbrev(typeLike: string | undefined, workout?: any): string 
   if (t.includes('walk')) return 'WK';
   return 'WO';
 }
+
+/**
+ * Detect a strength baseline / 1RM test workout (planned or completed).
+ * A test is measurement, not training, and should display as its own class (Q-097/Q-102).
+ * Marker: the `1rm_test` tag OR a name containing "baseline test" (mirrors StrengthLogger's
+ * `isBaselineTestWorkout`). `tags` may arrive as an array or a JSON string.
+ */
+export function isBaselineTestWorkout(workout?: { name?: any; tags?: any; workout_structure?: any } | null): boolean {
+  if (!workout) return false;
+  const name = String(
+    workout.name || (workout as any)?.workout_structure?.title || ''
+  ).toLowerCase();
+  if (name.includes('baseline test')) return true;
+  let tags: any[] = [];
+  const raw = (workout as any).tags;
+  if (Array.isArray(raw)) tags = raw;
+  else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch { /* not JSON */ } }
+  return tags.map((t) => String(t).toLowerCase()).includes('1rm_test');
+}

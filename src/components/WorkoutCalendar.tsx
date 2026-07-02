@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
-import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
+import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout } from '@/lib/utils';
 import { getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
@@ -268,6 +268,8 @@ function derivePlannedCellLabel(w: any): string | null {
 
     // STRENGTH - Abbreviate names consistently for calendar cells
     if (type === 'strength') {
+      // A 1RM/baseline TEST is measurement, not training — label it as such (Q-097/Q-102).
+      if (isBaselineTestWorkout(w)) return 'TEST';
       // For optional strength, just show "OPT STG"
       if (isOptional) {
         return 'OPT STG';
@@ -746,6 +748,10 @@ export default function WorkoutCalendar({
           }
         }
         
+        // A 1RM/baseline TEST reads as a test on the calendar, not a strength session (Q-097/Q-102).
+        // Covers unlinked completed tests via name; linked ones already resolve via the planned label above.
+        if (isBaselineTestWorkout(w)) labelBase = 'TEST';
+
         return {
           date: w.date,
           label: `${labelBase}${checkmark}`,

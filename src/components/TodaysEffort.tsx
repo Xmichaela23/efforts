@@ -9,7 +9,7 @@ import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell, Activity, X, Copy } from 'lucide-react';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 import { formatSwimPace } from '@/utils/workoutFormatting';
-import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
+import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
@@ -1096,6 +1096,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // Display label: prefer provider sport when present (e.g., Hike, Gravel Ride)
   // Also detect indoor/treadmill runs from trainer flag or missing GPS
   const getDisplaySport = (workout: any): string => {
+    // A 1RM/baseline test is measurement, not training — surface it as a test on Today (Q-097/Q-102).
+    if (isBaselineTestWorkout(workout)) return '1RM Test';
     const type = String(workout?.type || '').toLowerCase();
     const provider = workout?.strava_data?.original_activity?.sport_type
       || workout?.provider_sport
