@@ -365,11 +365,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     .filter((d) => grid.strength.includes(d))
     .sort((a, b) => DAYS.indexOf(a as typeof DAYS[number]) - DAYS.indexOf(b as typeof DAYS[number]))[0];
 
-  // Hyrox fatigued-legs combo day: a run-ONLY mid-week day (not a heavy-Lower/strength day, not the long
-  // run). The short run + station pair lands here. Self-gates: undefined (no eligible day) → no combo.
-  const fatiguedLegsDay = (args.accessoryBias === 'hyrox' && enduranceSport === 'run')
-    ? (runDayList.find((d) => !grid.strength.includes(d) && d !== longRunDay) ?? null)
-    : null;
+  // Hyrox fatigued-legs combo day = the LONG-RUN day (Saturday). ~1 combo/week is the standard Hyrox dose,
+  // and it's the ONLY slot that protects the heavy days: the heavy back squat (Tue) is 4 days away, and the
+  // long run already carries the day's leg load — so the station piggybacks on existing fatigue rather than
+  // adding a new leg day near the heavy work. long-run→station is the real compromised-running stimulus.
+  // (Honest caveat: Sat is ~24h after the LIGHT Fri hinge day — low-volume deadlift + light front squat — not
+  // the heavy squat; it adds volume to an already-loaded day, which the copy discloses.)
+  const fatiguedLegsDay = (args.accessoryBias === 'hyrox' && enduranceSport === 'run') ? longRunDay : null;
 
   const runMinutesByDay: Record<string, number> = {};
   let volume_notes: string | null = null;
@@ -422,10 +424,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // Accessory-bias slot: ONE per week, on Upper A only (interference-safe day), skipped on deload
         // (keep it byte-identical). +1 exercise max; NEVER touches the main lifts. Absent bias → the exact
         // pre-add-on output (ex === s.ex, no note, no bias tag).
-        const bias = (args.accessoryBias && phase.name !== 'Deload' && s.name === 'Upper A')
-          ? biasAccessoryFor(args.accessoryBias, week) : null;
+        // GLUTE-ONLY Upper A accessory. Hyrox does NOT touch any strength day — its station work lives
+        // entirely in the Saturday long-run→station combo (keeps all four strength days byte-identical).
+        const bias = (args.accessoryBias === 'glute' && phase.name !== 'Deload' && s.name === 'Upper A')
+          ? biasAccessoryFor('glute', week) : null;
         const ex = bias ? [...s.ex, bias] : s.ex;
-        const biasNote = bias ? ` ${biasMicrocopy(args.accessoryBias!, enduranceSport)}` : '';
+        const biasNote = bias ? ` ${biasMicrocopy('glute', enduranceSport)}` : '';
         weekSessions.push({
           day: grid.strength[i],
           type: 'strength',
@@ -435,7 +439,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
             `${ex.map((e) => `${e.name} ${e.sets}×${e.reps} @ ${e.weight}`).join(' · ')}. Top set ${load.primary.pct}% 1RM.${biasNote}`,
           duration: 60,
           strength_exercises: ex,
-          tags: ['strength', s.focus, `phase:${phase.name.toLowerCase()}`, 'protocol:strength_primary', ...(bias ? [`bias:${args.accessoryBias}`] : [])],
+          tags: ['strength', s.focus, `phase:${phase.name.toLowerCase()}`, 'protocol:strength_primary', ...(bias ? ['bias:glute'] : [])],
         });
       });
     }
@@ -448,19 +452,18 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         const note = (week === 1 && day === firstStackedRunDay)
           ? ` On a lift + run day, lift first — then the easy run. Run later in the day if you can (a few hours), but back-to-back is fine; your runs are easy [Petré 2021].`
           : undefined;
-        // Hyrox fatigued-legs combo (work weeks only): SHORTEN this run and pair a station AFTER it
-        // (run-first — see the sort). Non-hyrox → fatiguedLegsDay is null → this whole branch is inert
-        // and the run push below is byte-identical to the pre-combo output.
+        // Hyrox fatigued-legs combo (work weeks only): on the LONG-RUN day, append a station AFTER the long
+        // run (run-first — see the sort). The long run is NOT shortened — it IS the fatigue source. Non-hyrox
+        // → fatiguedLegsDay is null → this branch is inert and the run push below is byte-identical to plain.
         const isFatigued = day === fatiguedLegsDay && !isRetestWeek && phase.name !== 'Deload';
-        const runMin = isFatigued ? Math.min(runMinutesByDay[day] ?? 30, 22) : runMinutesByDay[day];
-        const fatNote = isFatigued ? ' Keep this run SHORT — then hit the station on tired legs (the Hyrox run→station stimulus).' : '';
-        weekSessions.push(enduranceSession('run', day, false, runMin, (`${note ?? ''}${fatNote}`) || undefined));
+        const fatNote = isFatigued ? ' Right after the long run, on tired legs: hit the station (the Hyrox run→station stimulus). This ADDS volume — it is the Hyrox opt-in.' : '';
+        weekSessions.push(enduranceSession('run', day, false, runMinutesByDay[day], (`${note ?? ''}${fatNote}`) || undefined));
         if (isFatigued) {
           const st = fatiguedLegsStation(week);
           weekSessions.push({
-            day, type: 'strength', name: 'Fatigued-Legs Station (after the run)',
-            description: `On tired legs from the short run: ${st.name} ${st.sets}×${st.reps} @ ${st.weight}. The Hyrox run→station stimulus — handle the load fatigued, not for a faster finish.`,
-            duration: 25, strength_exercises: [st],
+            day, type: 'strength', name: 'Fatigued-Legs Station (after the long run)',
+            description: `On legs tired from the long run: ${st.name} ${st.sets}×${st.reps} @ ${st.weight}. The Hyrox run→station stimulus — handle the load fatigued, not for a faster finish. This ADDS volume (the Hyrox opt-in). To rehearse the real event, aim for ~2 dedicated station sessions a month at a Hyrox-equipped gym.`,
+            duration: 30, strength_exercises: [st],
             tags: ['strength', 'lower', 'fatigued_legs', 'bias:hyrox', 'protocol:strength_primary'],
           });
         }

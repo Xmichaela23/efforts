@@ -199,7 +199,7 @@ Deno.test('BASELINE seed (piece 1) — no-1RM path emits a bar-start bare-number
 });
 
 Deno.test('ACCESSORY-BIAS — glute/hyrox inject ONE slot on Upper A; main lifts/arc/deload/retest byte-identical; names resolve; qualitative', () => {
-  const base = { durationWeeks: 12, strengthFrequency: 4 as const, tier: 'barbell' as const, enduranceSport: 'run' as const, enduranceFrequency: 2 };
+  const base = { durationWeeks: 12, strengthFrequency: 4 as const, tier: 'barbell' as const, enduranceSport: 'run' as const, enduranceFrequency: 2, targetWeeklyMiles: 20, easyPaceMinPerMile: 9.5 };
   const plain = composeStrengthPrimaryPlan({ ...base });
   const glute = composeStrengthPrimaryPlan({ ...base, accessoryBias: 'glute' });
   const hyrox = composeStrengthPrimaryPlan({ ...base, accessoryBias: 'hyrox' });
@@ -226,19 +226,27 @@ Deno.test('ACCESSORY-BIAS — glute/hyrox inject ONE slot on Upper A; main lifts
   assertEquals(JSON.stringify(glute.sessions_by_week['7']), JSON.stringify(plain.sessions_by_week['7']), 'glute deload byte-identical');
   assertEquals(JSON.stringify(glute.sessions_by_week['12']), JSON.stringify(plain.sessions_by_week['12']), 'glute retest byte-identical');
 
-  // HYROX — relaxed: plain unchanged; hyrox adds (1 accessory on Upper A) + (1 run-combo: a SHORTENED run
-  // + a Fatigued-Legs Station on ONE run-only work-week day, station AFTER the run). Deload/retest untouched.
+  // HYROX — Upper A accessory DROPPED (glute-only). Hyrox's ONLY change is the Saturday long-run combo, so
+  // ALL FOUR STRENGTH DAYS stay byte-identical to plain; the long-run day gains a station AFTER the (full,
+  // NOT shortened) long run. Deload/retest untouched.
+  const strengthDay = /Upper A|Lower A|Upper B|Lower B/;
   for (const w of ['2', '5', '9']) { // a Base, a Power, a Peak work week
     const p = plain.sessions_by_week[w], b = hyrox.sessions_by_week[w];
-    const upA = b.find((s) => /Upper A/.test(s.name))!, upAp = p.find((s) => /Upper A/.test(s.name))!;
-    assertEquals((upA.strength_exercises || []).length, (upAp.strength_exercises || []).length + 1, `hyrox wk${w}: Upper A +1 accessory`);
+    // (i) all four strength days byte-identical (no Upper A accessory for hyrox)
+    for (const ps of p.filter((s) => strengthDay.test(s.name))) {
+      const bs = b.find((s) => s.name === ps.name)!;
+      assertEquals(JSON.stringify(bs), JSON.stringify(ps), `hyrox wk${w}: strength day "${ps.name}" byte-identical`);
+    }
+    // (ii) exactly one fatigued-legs station, on the long-run day, AFTER the (unshortened) long run
     const fat = b.filter((s) => (s.tags || []).includes('fatigued_legs'));
-    assertEquals(fat.length, 1, `hyrox wk${w}: exactly one fatigued-legs station session`);
+    assertEquals(fat.length, 1, `hyrox wk${w}: exactly one fatigued-legs station`);
     assert((fat[0].tags || []).includes('bias:hyrox') && fat[0].type === 'strength', `hyrox wk${w}: station is a tagged strength session`);
     const sameDay = b.filter((s) => s.day === fat[0].day);
     const runIdx = sameDay.findIndex((s) => s.type === 'run'), fatIdx = sameDay.findIndex((s) => (s.tags || []).includes('fatigued_legs'));
     assert(runIdx >= 0 && runIdx < fatIdx, `hyrox wk${w}: run sorts BEFORE the station (run→station)`);
-    assert((sameDay[runIdx].duration ?? 999) <= 22, `hyrox wk${w}: combo run shortened (<=22m), got ${sameDay[runIdx].duration}`);
+    const plainRun = p.find((s) => s.day === fat[0].day && s.type === 'run')!;
+    assertEquals(sameDay[runIdx].duration, plainRun.duration, `hyrox wk${w}: long run NOT shortened (== plain)`);
+    assertEquals(fat[0].day, plain.sessions_by_week[w].reduce((m: any, s: any) => s.type === 'run' && (!m || s.duration > m.duration) ? s : m, null).day, `hyrox wk${w}: combo is on the LONG-run day`);
     assertEquals(b.length, p.length + 1, `hyrox wk${w}: exactly +1 session vs plain (the station)`);
   }
   for (const w of ['7', '12']) { // deload + retest: no combo, byte-identical
