@@ -33,6 +33,32 @@ Deno.serve(async (req: Request) => {
 
     if (!user_id) return json({ success: false, error: 'user_id is required' }, 400);
 
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    // Q-105: resolve the athlete's easy pace from baselines when the caller didn't pass one, so the
+    // "run durations estimated at 10:00/mi until we learn your easy pace" NOTE isn't shown to someone whose
+    // pace is already known. The materialized run durations already honor a known pace — this fixes the
+    // generation-time COPY (paceKnown → the note is suppressed). Pace-unit footgun: learned_fitness is
+    // sec/km; performance_numbers.easyPace carries a /mi or /km suffix.
+    let easyPaceMin: number | undefined = Number(easy_pace_min_per_mile) > 0 ? Number(easy_pace_min_per_mile) : undefined;
+    if (easyPaceMin === undefined) {
+      try {
+        const { data: ub } = await supabase
+          .from('user_baselines').select('learned_fitness, performance_numbers').eq('user_id', String(user_id)).maybeSingle();
+        const secPerKm = Number((ub?.learned_fitness as any)?.run_easy_pace_sec_per_km?.value);
+        if (Number.isFinite(secPerKm) && secPerKm > 0) {
+          easyPaceMin = (secPerKm * 1.60934) / 60; // sec/km → min/mi
+        } else {
+          const ep = String((ub?.performance_numbers as any)?.easyPace || '').trim();
+          const m = ep.match(/(\d{1,2}):(\d{2})/);
+          if (m) {
+            const perUnit = parseInt(m[1], 10) + parseInt(m[2], 10) / 60;
+            easyPaceMin = /km/i.test(ep) ? perUnit * 1.60934 : perUnit; // min/km → min/mi, else already min/mi
+          }
+        }
+      } catch { /* no baselines → the 10:00/mi fallback note is honest */ }
+    }
+
     // Accessory-bias add-on (glute | hyrox); anything else → none (byte-identical plain plan).
     const bias: 'glute' | 'hyrox' | null = accessory_bias === 'glute' || accessory_bias === 'hyrox' ? accessory_bias : null;
 
@@ -51,7 +77,7 @@ Deno.serve(async (req: Request) => {
       goalName: typeof goal_name === 'string' ? goal_name : undefined,
       needsBaseline: needs_baseline === true,
       targetWeeklyMiles: Number(target_weekly_miles) > 0 ? Number(target_weekly_miles) : undefined,
-      easyPaceMinPerMile: Number(easy_pace_min_per_mile) > 0 ? Number(easy_pace_min_per_mile) : undefined,
+      easyPaceMinPerMile: easyPaceMin,
       accessoryBias: bias,
       longRunDay: typeof long_run_day === 'string' ? long_run_day : undefined,
     });
@@ -61,7 +87,6 @@ Deno.serve(async (req: Request) => {
       return json({ success: true, plan_id: null, plan, phase_structure: plan.phaseStructure }, 200);
     }
 
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const { data: inserted, error } = await supabase
       .from('plans')
       .insert({
