@@ -1654,7 +1654,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                   if (bias !== 'hyrox') return null;
                   return (
                     <p className="text-xs leading-relaxed text-white/45 mt-1">
-                      Hyrox add-on (movement familiarity — not full race conditioning): your barbell days carry the station patterns (sled / carry / lunge). Where you can, get to a Hyrox-equipped gym ~1–2×/month to rehearse the real sled and SkiErg — a normal gym can't load them.
+                      Experience the benefits of Hyrox training while getting stronger — develop or maintain your Hyrox fitness. This is not race prep. The plan includes a weekly fatigued-legs session with your equipment; we also suggest ~2 real station sessions a month to rehearse actual race conditions.
                     </p>
                   );
                 })()}
