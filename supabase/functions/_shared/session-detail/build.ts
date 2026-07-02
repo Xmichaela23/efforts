@@ -179,6 +179,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
   const type = normType(workoutType) as SessionDetailV1['type'];
   const wa = workoutAnalysis || {};
+  // Q-097/Q-102 phase 2: a 1RM/baseline TEST is measurement, not training. When flagged by the analyzer
+  // (top-level or session_state_v1), the Performance screen renders the test-result frame INSTEAD of the
+  // training table + execution/volume — so suppress the execution score + training narrative here.
+  const isTest = (wa as any).is_test === true || (wa as any)?.session_state_v1?.is_test === true;
+  const testResult = ((wa as any).test_result_v1 || (wa as any)?.session_state_v1?.test_result_v1) ?? null;
   const isGoalRace = (wa as any).is_goal_race === true;
   const perf = (wa as any).performance || {};
   const sessionState = (wa as any).session_state_v1 || {};
@@ -221,6 +226,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       }
     }
   }
+  // A test has no execution score — never let one leak onto the Performance screen (Q-097/Q-102).
+  if (isTest) executionScore = null;
 
   const assessedAgainst = factPacket?.derived?.execution?.assessed_against ?? null;
   /** Any link to a planned row — ledger can expose match.planned_id before planned hydrate is present. */
@@ -673,7 +680,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     },
 
     observations,
-    narrative_text: performanceNarrativeText,
+    // A test tells its story through the test-result frame, not a training narrative (Q-097/Q-102).
+    narrative_text: isTest ? null : performanceNarrativeText,
     coaching_note: plannedComp?.coaching_note ?? null,
     arc_performance: arcPerformance,
     race_debrief_text: raceDebriefText,
@@ -942,10 +950,15 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     })(),
 
     display: {
-      show_adherence_chips: showAdherenceChips,
+      show_adherence_chips: isTest ? false : showAdherenceChips,
       interval_display_reason: intervalDisplay?.reason ?? null,
-      has_measured_execution: hasMeasuredExecution,
+      has_measured_execution: isTest ? false : hasMeasuredExecution,
     },
+
+    // Q-097/Q-102 phase 2 — a 1RM/baseline TEST + its per-lift result. The Performance screen renders the
+    // test-result frame instead of the training table + execution/volume when is_test is true.
+    is_test: isTest,
+    test_result: testResult,
 
     strength_weight_deviation: weightDev,
     strength_volume_deviation: volumeDev,

@@ -4,6 +4,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import StrengthPerformanceSummary from './StrengthPerformanceSummary';
 import SessionNarrative, { NextUp } from './SessionNarrative';
+import { StrengthTestResult } from './StrengthTestResult';
 import EnduranceIntervalTable from './EnduranceIntervalTable';
 import AdherenceChips from './AdherenceChips';
 import { formatDuration } from '@/utils/workoutFormatting';
@@ -135,6 +136,23 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
 
   // Strength and Mobility — show plan vs completed immediately; session_detail enriches RIR/adherence (may be slow).
   if (type === 'strength' || type === 'mobility') {
+    // Q-097/Q-102 phase 2: a 1RM/baseline TEST renders as a test RESULT (per-lift e1RM + delta + outcome),
+    // NOT the training table + execution/volume. It's measurement, not a session.
+    if ((sd as any)?.is_test && (sd as any)?.test_result) {
+      return (
+        <div className="w-full space-y-2">
+          {sessionDetailLoading && !sd && (
+            <div className="text-xs text-white/50 px-0.5" aria-live="polite">Loading test result…</div>
+          )}
+          <StrengthTestResult
+            result={(sd as any).test_result}
+            onRecompute={recomputeAnalysis}
+            recomputing={recomputing}
+          />
+          {(sd as any)?.next_session && <NextUp session={(sd as any).next_session} />}
+        </div>
+      );
+    }
     return (
       <div className="w-full space-y-2">
         {sessionDetailLoading && !sd && (

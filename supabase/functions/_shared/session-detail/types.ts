@@ -60,6 +60,34 @@ export type SessionRaceReadinessLlmV1 = {
   taper_guidance: string;
 };
 
+/** Strength 1RM/baseline TEST result (Q-097/Q-102). A test is measurement, not training — the
+ *  Performance screen renders this frame INSTEAD of the training table + execution/volume/adherence. */
+export type StrengthTestLiftResult = {
+  name: string;
+  key: 'squat' | 'deadlift' | 'bench' | 'overheadPress1RM' | 'pullupMaxReps';
+  reps: number | null;
+  /** Working weight (lb) for 1RM lifts; null for bodyweight rep-max (pull-ups). */
+  weight: number | null;
+  unit: 'lb' | 'reps';
+  /** Estimated 1RM (lb) for barbell lifts; the rep count for pull-ups. */
+  e1rm: number | null;
+  /** Prior TEST's value → drives the "160 → 150" delta line. Null if no prior test. */
+  prior_e1rm: number | null;
+  /** Stored baseline at analysis time (for the outcome). */
+  stored: number | null;
+  /** Baseline outcome vs stored. Null when zero_rep (no valid measurement). */
+  outcome: 'new_baseline' | 'updated' | 'kept' | null;
+  /** True → "test set logged 0 reps — retest for a number." Never narrated as success. */
+  zero_rep: boolean;
+  /** Optional per-lift note (e.g. the deadlift-conservative caveat). */
+  note: string | null;
+};
+
+export type StrengthTestResultV1 = {
+  headline: string; // "1RM Test"
+  lifts: StrengthTestLiftResult[];
+};
+
 export type SessionDetailV1 = {
   version: 1;
   generated_at: string;
@@ -341,6 +369,11 @@ export type SessionDetailV1 = {
     interval_display_reason: string | null;
     has_measured_execution: boolean;
   };
+
+  /** Strength 1RM/baseline TEST (Q-097/Q-102). When true, the Performance screen renders `test_result`
+   *  instead of the training table + execution/volume/adherence — a measurement, not a session. */
+  is_test?: boolean;
+  test_result?: StrengthTestResultV1 | null;
 
   /** Strength only: per-exercise RIR verdict from analyzer. */
   strength_rir_summary?: Array<{

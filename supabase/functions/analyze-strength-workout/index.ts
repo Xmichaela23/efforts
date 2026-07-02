@@ -851,6 +851,86 @@ async function getE1rmTrend(
   }
 }
 
+// ── 1RM / baseline TEST recognition + result (Q-097/Q-102 phase 2) ──────────────
+// A test is measurement, not training: no execution/volume/adherence framing. It reports the
+// per-lift result (reps × weight → e1RM), the prior-test → this-test delta, and the baseline
+// outcome (computed fresh at display time from performance_numbers — see build.ts). Marker: the
+// `1rm_test` tag OR a name containing "baseline test" (mirrors StrengthLogger's isBaselineTestWorkout).
+function detectStrengthTest(workout: any, plannedWorkout: any): boolean {
+  const nm = (s: any) => String(s || '').toLowerCase();
+  if (nm(workout?.name).includes('baseline test') || nm(plannedWorkout?.name).includes('baseline test')) return true;
+  const tags = [
+    ...(Array.isArray(workout?.tags) ? workout.tags : []),
+    ...(Array.isArray(plannedWorkout?.tags) ? plannedWorkout.tags : []),
+  ].map((t: any) => nm(t));
+  return tags.includes('1rm_test');
+}
+
+// Canonical baseline key from an exercise name — mirrors StrengthLogger.getBaselineKeyForExercise.
+function strengthTestKey(name: string): 'squat' | 'deadlift' | 'bench' | 'overheadPress1RM' | 'pullupMaxReps' | null {
+  const n = String(name || '').toLowerCase();
+  if (n.includes('squat') && !n.includes('goblet') && !n.includes('jump')) return 'squat';
+  if (n.includes('deadlift')) return 'deadlift';
+  if (n.includes('bench') && n.includes('press')) return 'bench';
+  if ((n.includes('overhead') || n.includes('ohp')) && n.includes('press')) return 'overheadPress1RM';
+  if (n.includes('pull-up') || n.includes('pullup') || n.includes('pull up')) return 'pullupMaxReps';
+  return null;
+}
+
+const DEADLIFT_TEST_NOTE = "e1RM formulas read deadlift conservative — a flat number isn't necessarily a flat lift.";
+
+// Per-lift test result: the measured facts (reps × weight → e1RM), the prior→now e1RM delta, and the
+// baseline outcome vs the stored 1RM. Outcome uses performance_numbers AT ANALYSIS TIME — accurate when
+// baselines are saved before the workout is finalized (the natural order) or after a recompute.
+function buildStrengthTestResult(executedExercises: any[], e1rmTrend: any[], perf: any): any {
+  const lifts: any[] = [];
+  for (const ex of (Array.isArray(executedExercises) ? executedExercises : [])) {
+    const key = strengthTestKey(ex?.name || '');
+    if (!key) continue;
+    const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+    // The scored set: the amrap/rep-max flag first; else the last performed working set; else the heaviest.
+    const working =
+      sets.find((s: any) => s?.amrap === true || s?.repMaxTest === true) ||
+      [...sets].reverse().find((s: any) => s?.setType === 'working' && isPerformedStrengthSet(s)) ||
+      [...sets].filter(isPerformedStrengthSet).sort((a: any, b: any) => (Number(b?.weight) || 0) - (Number(a?.weight) || 0))[0] ||
+      null;
+    if (!working) continue;
+    const reps = Number(working.reps);
+    const weight = Number(working.weight);
+    const isPullup = key === 'pullupMaxReps';
+    const zeroRep = !(reps > 0);
+    const trendRow = (Array.isArray(e1rmTrend) ? e1rmTrend : []).find((e: any) =>
+      strengthTestKey(String(e?.canonical || e?.exercise || '')) === key);
+    // 1RM lifts: e1RM from the canonical trend. Pull-ups: the rep count IS the value (no e1RM).
+    const e1rm = isPullup ? (Number.isFinite(reps) ? reps : null) : (trendRow?.current_e1rm ?? null);
+    const priorE1rm = isPullup ? (null) : (trendRow?.prior_e1rm ?? null);
+    // Baseline outcome vs the stored 1RM (pull-ups compare rep count; 1RM lifts compare e1RM).
+    const storedRaw = Number(perf?.[key]);
+    const stored = Number.isFinite(storedRaw) && storedRaw > 0 ? storedRaw : null;
+    const value = e1rm; // e1rm already holds reps for pull-ups
+    let outcome: 'new_baseline' | 'updated' | 'kept' | null = null;
+    if (zeroRep) outcome = null;
+    else if (stored == null) outcome = 'new_baseline';
+    else if (value != null && Math.round(value) >= stored) outcome = 'updated';
+    else outcome = 'kept';
+    lifts.push({
+      name: ex.name,
+      key,
+      reps: Number.isFinite(reps) ? reps : null,
+      weight: isPullup ? null : (Number.isFinite(weight) && weight > 0 ? weight : null),
+      unit: isPullup ? 'reps' : 'lb',
+      e1rm: e1rm != null ? Math.round(e1rm) : null,
+      prior_e1rm: priorE1rm != null ? Math.round(priorE1rm) : null,
+      stored,
+      outcome,
+      zero_rep: zeroRep,
+      note: key === 'deadlift' ? DEADLIFT_TEST_NOTE : null,
+    });
+  }
+  if (lifts.length === 0) return null;
+  return { headline: '1RM Test', lifts };
+}
+
 /**
  * Generate comprehensive exercise-by-exercise breakdown
  */
@@ -1534,6 +1614,13 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   const e1rmTrend = await getE1rmTrend(supabase, workout.user_id, workout.id, workout.date);
   console.log(`📊 e1RM: ${e1rmTrend.length} exercises with canonical estimated_1rm (${e1rmTrend.filter((e: any) => e.prior_e1rm != null).length} with a prior to trend)`);
 
+  // Q-097/Q-102 phase 2: a 1RM/baseline TEST is measurement, not training. When detected, emit the
+  // structured test result (reps×weight→e1RM + prior→now delta) and let downstream SUPPRESS the
+  // execution/volume/adherence framing and the training narrative — a test has no "execution score."
+  const isTest = detectStrengthTest(workout, plannedWorkout);
+  const testResultV1 = isTest ? buildStrengthTestResult(executedExercises, e1rmTrend, userBaselines?.performance_numbers || {}) : null;
+  if (isTest) console.log(`🧪 TEST detected → ${testResultV1?.lifts?.length ?? 0} lift result(s); execution/narrative suppressed`);
+
   // Generate comprehensive exercise-by-exercise breakdown
   let exerciseBreakdown: any[] = [];
   try {
@@ -1668,7 +1755,10 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     exercise_breakdown: exerciseBreakdown,
     rir_progression: rirProgression,
     volume_analysis: volumeAnalysis,
-    data_quality: dataQuality
+    data_quality: dataQuality,
+    // Q-097/Q-102 phase 2 — a test carries its result + a flag so downstream drops training framing.
+    is_test: isTest,
+    test_result_v1: testResultV1,
   };
 }
 
@@ -2634,6 +2724,9 @@ Deno.serve(async (req) => {
       workout_id: workout_id,
       discipline: 'strength',
       glance: (() => {
+        // A 1RM/baseline TEST has NO execution score — it's a measurement, not a session. Suppressing
+        // it here stops the "Execution %" chip from narrating a test as a graded workout (Q-097/Q-102).
+        if (analysis.is_test) return { status_label: '1RM Test', execution_score: null };
         // The execution score lives in execution_summary.overall_execution (weight 30% /
         // RIR 20% / set-completion 20% / exercise-completion 30%). The old code read
         // `performance.execution_score`, a field that never existed on the performance object —
@@ -2648,6 +2741,9 @@ Deno.serve(async (req) => {
           execution_score: execScore,
         };
       })(),
+      // Q-097/Q-102 phase 2 — test flag + structured result, threaded to session_detail_v1 by build.ts.
+      is_test: analysis.is_test === true,
+      test_result_v1: analysis.test_result_v1 || null,
       narrative: {
         text: Array.isArray(analysis.insights) && analysis.insights.length > 0
           ? String(analysis.insights[0] || '')
@@ -2744,9 +2840,13 @@ Deno.serve(async (req) => {
     // and run analyzers expose it at workout_analysis.ai_summary for client
     // parity (used by the cached-summary path in workout-detail + the
     // session_detail_v1 builder). This makes strength match.
-    const liftedAiSummary: string | null = Array.isArray(analysis.insights) && analysis.insights.length > 0
-      ? String(analysis.insights[0] || '').trim() || null
-      : null;
+    // A TEST has no training narrative — the test-result frame (per-lift e1RM + delta) IS the story.
+    // Null the ai_summary so no "phase/volume/execution" prose is shown for a measurement. (Q-097/Q-102)
+    const liftedAiSummary: string | null = analysis.is_test
+      ? null
+      : (Array.isArray(analysis.insights) && analysis.insights.length > 0
+        ? String(analysis.insights[0] || '').trim() || null
+        : null);
 
     const updatePayload = {
       workout_analysis: {
@@ -2756,6 +2856,9 @@ Deno.serve(async (req) => {
         session_state_v1: sessionStateV1,
         red_flags: [], // Extract from adherence if needed
         strength_facts: { exercises: strengthFactsExercises },
+        // Q-097/Q-102 phase 2 — top-level test flag + result for the session_detail_v1 builder.
+        is_test: analysis.is_test === true,
+        test_result_v1: analysis.test_result_v1 || null,
         // D-102: top-level ai_summary + fact packet (matches run/cycling parity).
         ai_summary: liftedAiSummary,
         ai_summary_generated_at: liftedAiSummary ? new Date().toISOString() : null,
