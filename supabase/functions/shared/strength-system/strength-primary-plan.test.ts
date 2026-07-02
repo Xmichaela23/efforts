@@ -2,6 +2,7 @@
 // (heavy sub-max triple → estimate e1RM, no solo max-grind). Off the entered 1RM, no inflation.
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { buildArcPhases, composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
+import { roleForExercise } from '../../_shared/strength/exercise-role.ts';
 
 const PLAN = composeStrengthPrimaryPlan({
   durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2,
@@ -195,4 +196,42 @@ Deno.test('BASELINE seed (piece 1) — no-1RM path emits a bar-start bare-number
   // stored-1RM path (the exit retest) stays %-based — one pipeline, the % resolves off the stored anchor
   const wk12 = strengthOf(12);
   assert(wk12.every((s) => (s.strength_exercises ?? []).every((e) => /% 1RM/.test(e.weight))), 'retest stays %-based (resolves off the stored 1RM)');
+});
+
+Deno.test('ACCESSORY-BIAS — glute/hyrox inject ONE slot on Upper A; main lifts/arc/deload/retest byte-identical; names resolve; qualitative', () => {
+  const base = { durationWeeks: 12, strengthFrequency: 4 as const, tier: 'barbell' as const, enduranceSport: 'run' as const, enduranceFrequency: 2 };
+  const plain = composeStrengthPrimaryPlan({ ...base });
+  const glute = composeStrengthPrimaryPlan({ ...base, accessoryBias: 'glute' });
+  const hyrox = composeStrengthPrimaryPlan({ ...base, accessoryBias: 'hyrox' });
+
+  // (a) byte-identical when bias absent: undefined === null, and no bias artifacts anywhere
+  assertEquals(JSON.stringify(plain), JSON.stringify(composeStrengthPrimaryPlan({ ...base, accessoryBias: null })), 'absent/null bias → byte-identical');
+  assert(!JSON.stringify(plain).includes('bias:') && !/Hip Thrust|Sled|Sandbag|Farmers/.test(JSON.stringify(plain)), 'plain plan carries no bias artifacts');
+
+  for (const [name, biased] of [['glute', glute], ['hyrox', hyrox]] as const) {
+    for (const w of Object.keys(plain.sessions_by_week)) {
+      const p = plain.sessions_by_week[w], b = biased.sessions_by_week[w];
+      assertEquals(b.length, p.length, `${name} wk${w}: same session count`);
+      for (let i = 0; i < p.length; i++) {
+        const isBiasSlot = /Upper A/.test(p[i].name) && !(p[i].tags || []).join(' ').match(/deload|retest/);
+        if (isBiasSlot) {
+          // +1 accessory; the two MAIN lifts are byte-identical; a bias tag is added; no NEW protocol tag
+          assertEquals((b[i].strength_exercises || []).length, (p[i].strength_exercises || []).length + 1, `${name} wk${w} Upper A: exactly +1 accessory`);
+          assertEquals(JSON.stringify((b[i].strength_exercises || []).slice(0, 2)), JSON.stringify(p[i].strength_exercises || []), `${name} wk${w}: main lifts untouched`);
+          assert((b[i].tags || []).includes(`bias:${name}`), `${name} wk${w}: bias tag present`);
+          assert((b[i].tags || []).filter((t) => t.startsWith('protocol:')).join() === 'protocol:strength_primary', 'no new protocol tag');
+        } else {
+          assertEquals(JSON.stringify(b[i]), JSON.stringify(p[i]), `${name} wk${w} session ${i}: byte-identical (no bias)`);
+        }
+      }
+    }
+    // (b) deload (wk7) + retest (wk12) fully byte-identical — bias is skipped there
+    assertEquals(JSON.stringify(biased.sessions_by_week['7']), JSON.stringify(plain.sessions_by_week['7']), `${name}: deload wk7 byte-identical`);
+    assertEquals(JSON.stringify(biased.sessions_by_week['12']), JSON.stringify(plain.sessions_by_week['12']), `${name}: retest wk12 byte-identical`);
+    // (c) every bias exercise name resolves to 'accessory' (zero D-208 tripwire) + qualitative loading (no %1RM)
+    const biasExs = Object.values(biased.sessions_by_week).flat().flatMap((s) => (s.strength_exercises || []).filter((e) => /Hip Thrust|Single-Leg|Back Extension|Sled|Sandbag|Farmers/.test(e.name)));
+    assert(biasExs.length > 0, `${name}: bias slots present on work weeks`);
+    for (const n of [...new Set(biasExs.map((e) => e.name))]) assertEquals(roleForExercise(n), 'accessory', `${n} → accessory role`);
+    for (const e of biasExs) assert(!/\d/.test(e.weight) && !e.weight.includes('%'), `${e.name} weight must be qualitative (no %1RM), got "${e.weight}"`);
+  }
 });

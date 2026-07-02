@@ -2413,6 +2413,8 @@ Deno.serve(async (req: Request) => {
               goal_name: String(resolvedGoal?.name || 'Get Stronger'),
               ...(gsTargetWeeklyMiles ? { target_weekly_miles: gsTargetWeeklyMiles } : {}),
               ...(gsEasyPaceMinPerMile ? { easy_pace_min_per_mile: gsEasyPaceMinPerMile } : {}),
+              // Accessory-bias add-on (glute | hyrox) from the builder's training_prefs; else omitted (plain plan).
+              ...(gsTp.accessory_bias === 'glute' || gsTp.accessory_bias === 'hyrox' ? { accessory_bias: gsTp.accessory_bias } : {}),
               ...(plan_start_date ? { start_date: plan_start_date } : {}),
               ...(bodyPreview ? { preview: true } : {}),
             };

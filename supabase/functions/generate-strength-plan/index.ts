@@ -28,10 +28,13 @@ Deno.serve(async (req: Request) => {
     const {
       user_id, duration_weeks, strength_frequency, strength_tier,
       endurance_sport, endurance_frequency, goal_name, start_date, preview, needs_baseline,
-      target_weekly_miles, easy_pace_min_per_mile,
+      target_weekly_miles, easy_pace_min_per_mile, accessory_bias,
     } = body as Record<string, unknown>;
 
     if (!user_id) return json({ success: false, error: 'user_id is required' }, 400);
+
+    // Accessory-bias add-on (glute | hyrox); anything else → none (byte-identical plain plan).
+    const bias: 'glute' | 'hyrox' | null = accessory_bias === 'glute' || accessory_bias === 'hyrox' ? accessory_bias : null;
 
     const tier: 'barbell' | 'bodyweight' =
       strength_tier === 'strength_power' || strength_tier === 'barbell' ? 'barbell' : 'bodyweight';
@@ -49,6 +52,7 @@ Deno.serve(async (req: Request) => {
       needsBaseline: needs_baseline === true,
       targetWeeklyMiles: Number(target_weekly_miles) > 0 ? Number(target_weekly_miles) : undefined,
       easyPaceMinPerMile: Number(easy_pace_min_per_mile) > 0 ? Number(easy_pace_min_per_mile) : undefined,
+      accessoryBias: bias,
     });
     console.log(`[strength-plan] composed: ${plan.name} (${plan.duration_weeks}wk, freq ${freq}, ${sport ?? 'strength-only'}, tier ${tier})`);
 
@@ -78,6 +82,7 @@ Deno.serve(async (req: Request) => {
           phase_structure: plan.phaseStructure,
           volume_notes: plan.volume_notes ?? null, // pace-estimate disclosure only (cap logic retired)
           volume_state: (plan as any).volume_state ?? null, // above|below|in_band → client renders the tradeoff copy
+          accessory_bias: bias, // glute|hyrox|null — the add-on selection (for the card + record)
           user_selected_start_date: start_date ?? null,
         },
         sessions_by_week: plan.sessions_by_week,

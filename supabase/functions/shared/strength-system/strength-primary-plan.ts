@@ -36,6 +36,11 @@ export type StrengthPrimaryArgs = {
    *  Absent → the fixed ~2×35min default. See SCIENCE-strength-primary-loading.md. */
   targetWeeklyMiles?: number;
   easyPaceMinPerMile?: number;
+  /** Optional accessory-bias add-on: injects ONE posterior-chain accessory slot on Upper A — glute
+   *  (hip-extension/single-leg) or the Hyrox station rotation (sled/carry/lunge). Absent → byte-identical
+   *  to a plain Get Stronger plan. Qualitative loading only (never %1RM). See SCIENCE-glute-accessory-bias.md
+   *  + SCIENCE-hyrox-accessory-bias.md. */
+  accessoryBias?: 'glute' | 'hyrox' | null;
 };
 
 type StrengthExercise = { name: string; sets: number; reps: number | string; weight: string };
@@ -167,6 +172,39 @@ function workSessions(load: WorkLoad): { name: string; focus: 'upper' | 'lower';
     // no session stacks heavy back-squat + heavy deadlift and the legs aren't hammered twice. [concurrent recovery]
     { name: 'Lower B (hinge)', focus: 'lower', ex: [exer('Conventional Deadlift', D), exer('Front Squat', S)] },
   ];
+}
+
+// ── Accessory-bias add-on (glute | hyrox) — ONE shared mechanism ──────────────────────────────────────
+// Placement: the single bias slot lands on Upper A ONLY — an upper day (no heavy-Lower conflict) and the
+// earliest in the week, maximally removed from the weekend long run. This satisfies "no posterior-chain
+// eccentric volume on heavy-Lower or long-run days" for ANY selection [Wilson 2012 running>cycling;
+// running is eccentric-impact-dominant]. Skipped on the deload week (byte-identical) and absent on the
+// retest week (no work sessions). Qualitative loading only — the weight is coaching text (no digits/%), so
+// materialize's qualitative path renders it verbatim; these are NOT %1RM-anchored barbell lifts.
+const GLUTE_ROTATION: StrengthExercise[] = [
+  { name: 'Barbell Hip Thrust', sets: 3, reps: '8-12', weight: 'Heavy' },       // Contreras 2015 (glute-specific)
+  { name: 'Single-Leg Squat', sets: 3, reps: '8/leg', weight: 'Add weight if able' }, // DiStefano 2009 (max glute-max recruitment)
+  { name: 'Back Extension', sets: 3, reps: '12-15', weight: 'Bodyweight' },
+];
+const HYROX_ROTATION: StrengthExercise[] = [
+  { name: 'Sled Push', sets: 3, reps: '20 m', weight: 'Heavy' },
+  { name: 'Farmers Carry', sets: 3, reps: '40 m', weight: 'Heavy' },
+  { name: 'Sandbag Lunge', sets: 3, reps: '20 m', weight: 'Moderate' },
+  { name: 'Sled Pull', sets: 3, reps: '20 m', weight: 'Heavy' },
+  { name: 'Back Extension', sets: 3, reps: '15', weight: 'Bodyweight' },
+];
+function biasAccessoryFor(preset: 'glute' | 'hyrox', week: number): StrengthExercise {
+  const rot = preset === 'glute' ? GLUTE_ROTATION : HYROX_ROTATION;
+  return { ...rot[(week - 1) % rot.length] }; // rotate for variety across weeks
+}
+// Endurance-benefit microcopy — honest per the verified science (NOT a speed promise; transfer is unproven).
+function biasMicrocopy(preset: 'glute' | 'hyrox', sport: 'run' | 'bike' | null): string {
+  if (preset === 'glute') {
+    return sport === 'bike'
+      ? 'Glute slot: the pedal stroke leaves the glutes under-loaded — direct hip-extension builds the power the saddle does not.'
+      : 'Glute slot: direct hip-extension + single-leg work — builds the hip strength and stability that hold up over long mileage.';
+  }
+  return 'Hyrox slot: station patterns (sled / carry / lunge) — trained to handle the competition loads under fatigue, not for a faster finish.';
 }
 
 // ── AMRAP baseline/retest — ONE tool, two jobs (D-224) ───────────────────────────────────────────────
@@ -360,16 +398,23 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // 4 real barbell sessions, continuous loading off the real 1RM.
       const load = workLoad(phase, week);
       workSessions(load).slice(0, grid.strength.length).forEach((s, i) => {
+        // Accessory-bias slot: ONE per week, on Upper A only (interference-safe day), skipped on deload
+        // (keep it byte-identical). +1 exercise max; NEVER touches the main lifts. Absent bias → the exact
+        // pre-add-on output (ex === s.ex, no note, no bias tag).
+        const bias = (args.accessoryBias && phase.name !== 'Deload' && s.name === 'Upper A')
+          ? biasAccessoryFor(args.accessoryBias, week) : null;
+        const ex = bias ? [...s.ex, bias] : s.ex;
+        const biasNote = bias ? ` ${biasMicrocopy(args.accessoryBias!, enduranceSport)}` : '';
         weekSessions.push({
           day: grid.strength[i],
           type: 'strength',
           name: `Strength Focus — ${s.name}`,
           description:
             `${load.label} — 4-day split. ` +
-            `${s.ex.map((e) => `${e.name} ${e.sets}×${e.reps} @ ${e.weight}`).join(' · ')}. Top set ${load.primary.pct}% 1RM.`,
+            `${ex.map((e) => `${e.name} ${e.sets}×${e.reps} @ ${e.weight}`).join(' · ')}. Top set ${load.primary.pct}% 1RM.${biasNote}`,
           duration: 60,
-          strength_exercises: s.ex,
-          tags: ['strength', s.focus, `phase:${phase.name.toLowerCase()}`, 'protocol:strength_primary'],
+          strength_exercises: ex,
+          tags: ['strength', s.focus, `phase:${phase.name.toLowerCase()}`, 'protocol:strength_primary', ...(bias ? [`bias:${args.accessoryBias}`] : [])],
         });
       });
     }

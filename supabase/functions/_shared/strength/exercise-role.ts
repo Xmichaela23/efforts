@@ -118,6 +118,18 @@ const ROLE_TABLE: Record<string, StrengthRole> = {
   'clamshell': 'accessory',
   'glute bridge': 'accessory',
   'single leg glute bridge': 'accessory',
+  // Accessory-bias add-on (glute | hyrox) — strength-primary. Keys are canonical() space-forms (hyphens
+  // are stripped to spaces, so "Single-Leg Squat" → "single leg squat"). Qualitative-loaded, accessory role.
+  // NOTE: bare 'hip thrust' already maps to 'primary' above (line ~75) — looks inconsistent with S-005
+  // (hip thrust = required ACCESSORY), but left untouched to avoid changing other protocols' scoring.
+  // The glute bias uses the precise 'barbell hip thrust' → accessory. FLAGGED for review.
+  'barbell hip thrust': 'accessory',
+  'single leg squat': 'accessory',
+  'back extension': 'accessory',
+  'sled push': 'accessory',
+  'sled pull': 'accessory',
+  'sandbag lunge': 'accessory',
+  'farmers carry': 'accessory',
   'prone y t w raise': 'accessory',
   'external rotation': 'accessory',
   'bird dog': 'accessory',
