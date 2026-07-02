@@ -442,6 +442,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Mirror live timers into a ref so the app-state listener reads current values (not a stale closure).
   const timersRef = useRef(timers);
   useEffect(() => { timersRef.current = timers; }, [timers]);
+  // Live exercises snapshot for the rest-timer tick — so the countdown interval doesn't depend on
+  // `exercises` (which would tear it down + restart on every set edit → the stuttering timer). (Q-timer)
+  const exercisesRef = useRef(exercises);
+  useEffect(() => { exercisesRef.current = exercises; }, [exercises]);
   // Restore a running rest timer across resume rebuilds (it lives only in memory otherwise → wiped on
   // remount). Reads the persisted {key, endsAt}; re-arms with the remaining seconds, or clears if expired.
   useEffect(() => {
@@ -2461,10 +2465,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   }, [exercises]);
   
 
-  // Tick timers
+  // Tick timers. Keyed off a STABLE "any running" boolean (not the whole `timers`/`exercises` objects),
+  // so the interval is created ONCE per run-burst and torn down when nothing runs — instead of being
+  // destroyed + recreated on every 1-second tick (setTimers) and every set edit (exercises), which
+  // restarted the 1s clock mid-count and made the countdown stutter/skip. The tick reads live timers via
+  // the functional setTimers(prev) and live exercises via exercisesRef. (Q-timer)
+  const anyTimerRunning = Object.values(timers).some(t => t.running && t.seconds > 0);
   useEffect(() => {
-    const anyRunning = Object.values(timers).some(t => t.running && t.seconds > 0);
-    if (!anyRunning) return;
+    if (!anyTimerRunning) return;
     const id = window.setInterval(() => {
       setTimers(prev => {
         const copy: typeof prev = { ...prev };
@@ -2486,7 +2494,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 try { localStorage.removeItem('strength_rest_timer'); } catch {} // rest done → drop the persisted timer
               }
             }
-            
+
             // For duration timers (key format: `${exerciseId}-set-${setIndex}`), update the set's actual duration
             if (k.includes('-set-')) {
               const parts = k.split('-set-');
@@ -2494,8 +2502,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 const exId = parts[0];
                 const setIdx = parseInt(parts[1], 10);
                 if (!isNaN(setIdx)) {
-                  // Update the set's duration_seconds to reflect the actual time achieved
-                  const ex = exercises.find(e => e.id === exId);
+                  // Update the set's duration_seconds to reflect the actual time achieved (live snapshot via ref)
+                  const ex = exercisesRef.current.find(e => e.id === exId);
                   if (ex && ex.sets[setIdx] && ex.sets[setIdx].duration_seconds !== undefined) {
                     // When timer reaches 0, record the original target duration as completed
                     if (ns === 0) {
@@ -2512,7 +2520,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       });
     }, 1000);
     return () => window.clearInterval(id);
-  }, [timers, exercises]);
+  }, [anyTimerRunning]);
 
   // Tick addon timers
   useEffect(() => {
