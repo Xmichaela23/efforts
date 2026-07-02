@@ -789,6 +789,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     [exerciseId: string]: { weight: number; reps: number; estimated1RM: number; rounded1RM: number; baselineKey: string }
   }>({});
   const [savingBaseline, setSavingBaseline] = useState(false);
+  // Down-write reconciliation (supersedes D-223 silent ratchet-hold): when a test result lands
+  // BELOW the stored 1RM, the lower number may be the truth (a real near-max) OR a sub-max estimate
+  // reading the athlete weak — the app can't know which, so it must ask instead of silently holding
+  // OR silently overwriting. Holds the pending write while the athlete decides Keep vs Update per lift.
+  const [downWriteReview, setDownWriteReview] = useState<null | {
+    userId: string;
+    hasRow: boolean;
+    basePerf: Record<string, any>; // currentPerf + all raises/first-times already applied
+    downs: Array<{ key: string; lift: string; prior: number; next: number }>;
+  }>(null);
+  const [downDecisions, setDownDecisions] = useState<Record<string, 'keep' | 'update'>>({});
 
   // Save baseline test results to user_baselines
   const saveBaselineResults = async () => {
@@ -814,52 +825,90 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       // Merge new results into performance_numbers.
       const currentPerf = (currentBaselines?.performance_numbers || {}) as any;
       const updatedPerf = { ...currentPerf };
+      const hasRow = !!currentBaselines;
 
-      // RATCHET-UP-ONLY GUARD (D-223): a test/estimate result may only RAISE a stored 1RM, never lower it.
-      // A first-time baseline (no prior) writes freely; a re-test overwrites ONLY if it's a new best. This is
-      // a permanent guard against the "score that lies" — a sub-max estimate logging the athlete weaker.
       // OHP-key write guard (D-224): OHP has ONE canonical key, `overheadPress1RM` (what materialize reads).
       // Never let a result land under an OHP variant (`overhead`/`ohp`/`overhead_press`) and drift into the void.
       const canonKey = (k: string): string =>
         (k === 'overhead' || k === 'ohp' || k === 'overhead_press') ? 'overheadPress1RM' : k;
-      const held: string[] = [];
+      const liftLabel = (k: string): string =>
+        ({ bench: 'Bench Press', squat: 'Squat', deadlift: 'Deadlift', overheadPress1RM: 'Overhead Press' } as any)[k] || k;
+
+      // Partition results: a RAISE / first-time / equal auto-writes (an unambiguous improvement — no friction).
+      // A DOWN result (tested < stored) is NOT silently held (superseding D-223's ratchet-up-only) NOR silently
+      // overwritten — the athlete decides Keep vs Update, because only they know if the lower number is real.
+      const downs: Array<{ key: string; lift: string; prior: number; next: number }> = [];
       Object.values(baselineTestResults).forEach(result => {
         const key = canonKey(result.baselineKey);
         const prior = Number(currentPerf[key]);
         const next = Number(result.rounded1RM);
-        if (!(prior > 0) || next > prior) {
-          updatedPerf[key] = result.rounded1RM;
+        if (!(prior > 0) || next >= prior) {
+          updatedPerf[key] = result.rounded1RM; // raise / first-time / equal → auto-write
         } else {
-          held.push(`${key} held at ${prior} (logged ${next})`); // kept the higher stored max
+          downs.push({ key, lift: liftLabel(key), prior, next }); // down → reconcile with the athlete
         }
       });
 
-      // Update or insert baselines
-      if (currentBaselines) {
-        const { error } = await supabase
-          .from('user_baselines')
-          .update({ performance_numbers: updatedPerf })
-          .eq('user_id', userId);
-        
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('user_baselines')
-          .insert([{
-            user_id: userId,
-            performance_numbers: updatedPerf
-          }]);
-        
-        if (error) throw error;
+      if (downs.length === 0) {
+        await commitPerformanceNumbers(updatedPerf, hasRow, userId, 'Baselines saved successfully!');
+        return;
       }
 
-      alert(held.length
-        ? `Baselines saved. Kept your higher stored max on: ${held.join('; ')} — a test only raises a 1RM, never lowers it.`
-        : 'Baselines saved successfully!');
-      setBaselineTestResults({});
-      
-      // Dispatch event to notify TrainingBaselines to reload
-      window.dispatchEvent(new CustomEvent('baseline:saved'));
+      // Hand off to the reconciliation dialog; the actual write happens in resolveDownWrites.
+      setDownWriteReview({ userId, hasRow, basePerf: updatedPerf, downs });
+      setDownDecisions({});
+    } catch (error: any) {
+      alert('Failed to save baselines: ' + (error.message || 'Unknown error'));
+    } finally {
+      setSavingBaseline(false);
+    }
+  };
+
+  // Shared DB write for performance_numbers (update-or-insert) + success toast + reload signal.
+  const commitPerformanceNumbers = async (
+    updatedPerf: Record<string, any>, hasRow: boolean, userId: string, message: string
+  ) => {
+    if (hasRow) {
+      const { error } = await supabase
+        .from('user_baselines')
+        .update({ performance_numbers: updatedPerf })
+        .eq('user_id', userId);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('user_baselines')
+        .insert([{ user_id: userId, performance_numbers: updatedPerf }]);
+      if (error) throw error;
+    }
+    alert(message);
+    setBaselineTestResults({});
+    // Dispatch event to notify TrainingBaselines to reload
+    window.dispatchEvent(new CustomEvent('baseline:saved'));
+  };
+
+  // Resolve the down-write reconciliation: apply each Keep/Update choice, then write once.
+  const resolveDownWrites = async () => {
+    if (!downWriteReview) return;
+    const { userId, hasRow, basePerf, downs } = downWriteReview;
+    try {
+      setSavingBaseline(true);
+      const finalPerf = { ...basePerf }; // already holds prior values (Keep = leave as-is)
+      const updated: string[] = [];
+      const kept: string[] = [];
+      downs.forEach(d => {
+        if (downDecisions[d.key] === 'update') {
+          finalPerf[d.key] = d.next;
+          updated.push(`${d.lift} → ${d.next}`);
+        } else {
+          kept.push(`${d.lift} stays ${d.prior}`);
+        }
+      });
+      const msg = 'Baselines saved.'
+        + (updated.length ? ` Updated: ${updated.join(', ')}.` : '')
+        + (kept.length ? ` Kept: ${kept.join(', ')}.` : '');
+      await commitPerformanceNumbers(finalPerf, hasRow, userId, msg);
+      setDownWriteReview(null);
+      setDownDecisions({});
     } catch (error: any) {
       alert('Failed to save baselines: ' + (error.message || 'Unknown error'));
     } finally {
@@ -4466,6 +4515,73 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   </>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Down-write reconciliation — a test result below the stored 1RM (supersedes D-223's silent hold) */}
+      {downWriteReview && (
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={savingBaseline ? undefined : () => { setDownWriteReview(null); setDownDecisions({}); }}
+          />
+          <div
+            className="relative w-full sm:w-[520px] bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-t-2xl sm:rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-4 sm:p-6 z-10 max-h-[80vh] overflow-auto"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+          >
+            <h3 className="text-lg font-semibold mb-1 text-white/90">Lower than your stored max</h3>
+            <p className="text-sm text-white/60 mb-4">
+              {downWriteReview.downs.length > 1 ? 'These tests came' : 'This test came'} in below what's on file.
+              If it was a true near-max effort, update it. If you stopped early, keep the higher number.
+              Your call — nothing changes until you choose.
+            </p>
+            <div className="space-y-3">
+              {downWriteReview.downs.map(d => {
+                const choice = downDecisions[d.key];
+                return (
+                  <div key={d.key} className="bg-white/[0.06] border-2 border-white/15 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-white/90">{d.lift}</span>
+                      <span className="text-xs text-white/50 tabular-nums">stored {d.prior} · tested {d.next}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setDownDecisions(p => ({ ...p, [d.key]: 'keep' }))}
+                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all ${choice === 'keep' ? 'bg-white/[0.18] border-white/45 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
+                        style={{ fontFamily: 'Inter, sans-serif' }}
+                      >
+                        Keep {d.prior}
+                      </button>
+                      <button
+                        onClick={() => setDownDecisions(p => ({ ...p, [d.key]: 'update' }))}
+                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all ${choice === 'update' ? 'bg-amber-500/25 border-amber-400/60 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
+                        style={{ fontFamily: 'Inter, sans-serif' }}
+                      >
+                        Update to {d.next}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-4">
+              <button
+                onClick={() => { setDownWriteReview(null); setDownDecisions({}); }}
+                disabled={savingBaseline}
+                className="text-sm text-white/70 hover:text-white/90 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={resolveDownWrites}
+                disabled={savingBaseline || !downWriteReview.downs.every(d => downDecisions[d.key])}
+                className="text-sm text-white rounded-full px-4 py-1.5 bg-white/[0.12] border-2 border-white/35 hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              >
+                {savingBaseline ? 'Saving...' : 'Save'}
+              </button>
             </div>
           </div>
         </div>
