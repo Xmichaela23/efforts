@@ -247,6 +247,8 @@ Deno.test('ACCESSORY-BIAS — glute/hyrox inject ONE slot on Upper A; main lifts
     const sameDay = b.filter((s) => s.day === fat[0].day);
     const runIdx = sameDay.findIndex((s) => s.type === 'run'), fatIdx = sameDay.findIndex((s) => (s.tags || []).includes('fatigued_legs'));
     assert(runIdx >= 0 && runIdx < fatIdx, `hyrox wk${w}: run BEFORE station (run→station)`);
+    assert(/1 of 2/.test(sameDay[runIdx].name), `hyrox wk${w}: combo run titled "1 of 2"`);
+    assert(/2 of 2/.test(fat[0].name) && /10 min/i.test(fat[0].name), `hyrox wk${w}: station titled "2 of 2 · ~10 min"`);
     const plainRun = p.find((s) => s.day === fat[0].day && s.type === 'run')!;
     assertEquals(sameDay[runIdx].duration, plainRun.duration, `hyrox wk${w}: long run NOT shortened`);
     assertEquals(fat[0].day, plain.sessions_by_week[w].reduce((m: any, s: any) => s.type === 'run' && (!m || s.duration > m.duration) ? s : m, null).day, `hyrox wk${w}: combo on the LONG-run day`);

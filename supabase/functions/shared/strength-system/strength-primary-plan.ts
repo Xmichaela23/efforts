@@ -277,13 +277,13 @@ function retestAmrapSessions(grid: { strength: string[] }): PlanSession[] {
   }) : null).filter(Boolean) as PlanSession[];
 }
 
-function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean, overrideMins?: number, extraNote?: string): PlanSession {
+function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean, overrideMins?: number, extraNote?: string, nameOverride?: string): PlanSession {
   const mins = overrideMins ?? (sport === 'bike' ? (isRetestWeek ? 35 : 45) : (isRetestWeek ? 25 : 35));
   const label = sport === 'bike' ? 'Easy Ride' : 'Easy Run';
   return {
     day,
     type: sport === 'bike' ? 'ride' : 'run',
-    name: label,
+    name: nameOverride ?? label,
     description: `~${mins} min easy aerobic, conversational — maintenance only (held so strength leads).${extraNote ?? ''}`,
     duration: mins,
     tags: ['easy', 'maintenance', 'aerobic'],
@@ -458,13 +458,17 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // run (run-first — see the sort). The long run is NOT shortened — it IS the fatigue source. Non-hyrox
         // → fatiguedLegsDay is null → this branch is inert and the run push below is byte-identical to plain.
         const isFatigued = day === fatiguedLegsDay && !isRetestWeek && phase.name !== 'Deload';
-        const fatNote = isFatigued ? ' Right after the long run, on tired legs: hit the station (the Hyrox run→station stimulus). This ADDS volume — it is the Hyrox opt-in.' : '';
-        weekSessions.push(enduranceSession('run', day, false, runMinutesByDay[day], (`${note ?? ''}${fatNote}`) || undefined));
+        // Phase-1 combo clarity (copy only): retitle the pair as "1 of 2" / "2 of 2" so the calendar reads
+        // as one session in two parts; the grouped-card UI is phase 2 (client bundle, post-Q-097).
+        const fatNote = isFatigued ? ' This run loads your legs for part 2 — start the station within ~10 min of finishing.' : '';
+        weekSessions.push(enduranceSession('run', day, false, runMinutesByDay[day], (`${note ?? ''}${fatNote}`) || undefined,
+          isFatigued ? 'Saturday combo 1 of 2 — Long run' : undefined));
         if (isFatigued) {
           const st = fatiguedLegsStation(week);
           weekSessions.push({
-            day, type: 'strength', name: 'Fatigued-Legs Station (after the long run)',
-            description: `On legs tired from the long run: ${st.name} ${st.sets}×${st.reps} @ ${st.weight}. The Hyrox run→station stimulus — handle the load fatigued, not for a faster finish. This ADDS volume (the Hyrox opt-in). To rehearse the real event, aim for ~2 dedicated station sessions a month at a Hyrox-equipped gym.`,
+            day, type: 'strength',
+            name: 'Saturday combo 2 of 2 — Fatigued-legs station · start within ~10 min of finishing the run',
+            description: `${st.name} ${st.sets}×${st.reps} @ ${st.weight} — on tired legs, that's the point. The Hyrox run→station stimulus; handle the load fatigued, not for a faster finish. This ADDS volume (the Hyrox opt-in). To rehearse the real event, aim for ~2 dedicated station sessions a month at a Hyrox-equipped gym.`,
             duration: 30, strength_exercises: [st],
             tags: ['strength', 'lower', 'fatigued_legs', 'bias:hyrox', 'protocol:strength_primary'],
           });

@@ -1289,6 +1289,15 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-104 — Hyrox combo: grouped calendar card (phase 2, client bundle — post-Q-097)
+- **Status:** filed 2026-07-02 · **client UI, bundled with pieces 2-3 (post-Q-097). Phase 1 (server copy) SHIPPED; phase 2 (this) NOT built.**
+- **Phase 1 (DONE, server-side copy):** the Saturday combo pair is retitled so the calendar reads as one session in two parts — run: **"Saturday combo 1 of 2 — Long run"** (desc adds "…loads your legs for part 2 — start the station within ~10 min of finishing"); station: **"Saturday combo 2 of 2 — Fatigued-legs station · start within ~10 min of finishing the run"** (desc keeps "on tired legs, that's the point"). Still two cards; now clearly numbered.
+- **Phase 2 (THIS — not built):** a **grouped calendar treatment** — ONE container card titled **"Hyrox combo — one session, two parts"**, a single **total duration** in the header (long run + station, e.g. 2h 30m), **numbered steps** (1. Long run · 2. Fatigued-legs station), a **connector line** between the two carrying the **"↓ start part 2 within ~10 min"** note in the gap, and a link/chain icon. Mock provided in chat (2026-07-02). Renders the two same-day sessions (run-first) as one visual unit.
+- **Where:** the calendar/week day-cell rendering. Detect the pair by the `fatigued_legs` + `bias:hyrox` tags on the station + the same-day run; group into one card with two steps. Read-time only (the underlying two sessions stay as they are — this is display grouping).
+- **Cross-ref:** `SCIENCE-hyrox-accessory-bias.md §7`; the pieces-2-3 client bundle (gated on the Q-097 dogfood); the Saturday-combo emission in `strength-primary-plan.ts` (run-loop).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
