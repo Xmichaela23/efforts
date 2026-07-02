@@ -507,6 +507,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // pre-highlighted, one tap to accept) instead of opening the numeric keypad. RIR stays
   // NOT pre-committed (D-126) — the tap is the post-set assessment.
   const [rirConfirm, setRirConfirm] = useState<{ exerciseId: string; setIndex: number } | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false); // quiet discard: two-tap confirm
   // Menus
   const [showPlannedMenu, setShowPlannedMenu] = useState(false);
   const [showAddonsMenu, setShowAddonsMenu] = useState(false);
@@ -1091,6 +1092,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       localStorage.removeItem(legacySessionKey());  // also drop any pre-D-132 date-only draft for this date
     } catch {
     }
+  };
+
+  // Discard the draft and leave. Reps otherwise persist across nav/backgrounding (saveSessionProgress),
+  // so this is the deliberate "throw this away" — mainly for a session opened by mistake or a test dry-run.
+  // Quiet by design (a muted link with a two-tap confirm); persistence covers accidental navigation.
+  const discardSession = () => {
+    try { clearSessionProgress(); } catch { /* draft already gone */ }
+    setExercises([createEmptyExercise()]);
+    setAttachedAddons([]);
+    setNotesText('');
+    setNotesRpe('');
+    setSourcePlannedName('');
+    setSourcePlannedId(null);
+    setSourcePlannedDate(null);
+    onClose();
   };
 
   // D-132 Layer 3 — one-time LEGACY CLEANUP. Pre-D-132 drafts were keyed by date alone
@@ -4882,13 +4898,32 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           paddingBottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 24px))'
         }}
       >
-        <button 
+        <button
           onClick={saveWorkout}
           className={`w-full h-14 text-base font-medium text-white transition-all duration-200 rounded-full backdrop-blur-lg border-2 ${themeColors.saveBg} ${themeColors.saveBorder} ${themeColors.saveHoverBg} ${themeColors.saveHoverBorder} ${themeColors.saveShadow}`}
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
           Save Workout
         </button>
+        {/* Quiet discard — muted, two-tap confirm. Reps persist across nav/backgrounding, so this is the
+            deliberate throw-away (a mistaken open, a test dry-run), not a save-guard. */}
+        <div className="mt-3 flex justify-center" aria-live="polite">
+          {confirmDiscard ? (
+            <div className="flex items-center gap-3 text-xs" style={{ fontFamily: 'Inter, sans-serif' }}>
+              <span className="text-white/40">Discard this session?</span>
+              <button onClick={discardSession} className="text-red-400/80 hover:text-red-300">Discard</button>
+              <button onClick={() => setConfirmDiscard(false)} className="text-white/50 hover:text-white/75">Keep</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDiscard(true)}
+              className="text-xs text-white/30 hover:text-white/55 transition-colors"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              Discard
+            </button>
+          )}
+        </div>
       </div>
     </div>
     </div>
