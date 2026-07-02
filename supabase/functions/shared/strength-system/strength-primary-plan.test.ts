@@ -208,29 +208,48 @@ Deno.test('ACCESSORY-BIAS — glute/hyrox inject ONE slot on Upper A; main lifts
   assertEquals(JSON.stringify(plain), JSON.stringify(composeStrengthPrimaryPlan({ ...base, accessoryBias: null })), 'absent/null bias → byte-identical');
   assert(!JSON.stringify(plain).includes('bias:') && !/Hip Thrust|Sled|Sandbag|Farmers/.test(JSON.stringify(plain)), 'plain plan carries no bias artifacts');
 
-  for (const [name, biased] of [['glute', glute], ['hyrox', hyrox]] as const) {
-    for (const w of Object.keys(plain.sessions_by_week)) {
-      const p = plain.sessions_by_week[w], b = biased.sessions_by_week[w];
-      assertEquals(b.length, p.length, `${name} wk${w}: same session count`);
-      for (let i = 0; i < p.length; i++) {
-        const isBiasSlot = /Upper A/.test(p[i].name) && !(p[i].tags || []).join(' ').match(/deload|retest/);
-        if (isBiasSlot) {
-          // +1 accessory; the two MAIN lifts are byte-identical; a bias tag is added; no NEW protocol tag
-          assertEquals((b[i].strength_exercises || []).length, (p[i].strength_exercises || []).length + 1, `${name} wk${w} Upper A: exactly +1 accessory`);
-          assertEquals(JSON.stringify((b[i].strength_exercises || []).slice(0, 2)), JSON.stringify(p[i].strength_exercises || []), `${name} wk${w}: main lifts untouched`);
-          assert((b[i].tags || []).includes(`bias:${name}`), `${name} wk${w}: bias tag present`);
-          assert((b[i].tags || []).filter((t) => t.startsWith('protocol:')).join() === 'protocol:strength_primary', 'no new protocol tag');
-        } else {
-          assertEquals(JSON.stringify(b[i]), JSON.stringify(p[i]), `${name} wk${w} session ${i}: byte-identical (no bias)`);
-        }
+  // GLUTE — strict: byte-identical to plain EXCEPT Upper A work weeks (+1 accessory). No new sessions.
+  for (const w of Object.keys(plain.sessions_by_week)) {
+    const p = plain.sessions_by_week[w], b = glute.sessions_by_week[w];
+    assertEquals(b.length, p.length, `glute wk${w}: same session count`);
+    for (let i = 0; i < p.length; i++) {
+      const isBiasSlot = /Upper A/.test(p[i].name) && !(p[i].tags || []).join(' ').match(/deload|retest/);
+      if (isBiasSlot) {
+        assertEquals((b[i].strength_exercises || []).length, (p[i].strength_exercises || []).length + 1, `glute wk${w} Upper A: +1 accessory`);
+        assertEquals(JSON.stringify((b[i].strength_exercises || []).slice(0, 2)), JSON.stringify(p[i].strength_exercises || []), `glute wk${w}: main lifts untouched`);
+        assert((b[i].tags || []).includes('bias:glute'), `glute wk${w}: bias tag present`);
+      } else {
+        assertEquals(JSON.stringify(b[i]), JSON.stringify(p[i]), `glute wk${w} session ${i}: byte-identical (no bias)`);
       }
     }
-    // (b) deload (wk7) + retest (wk12) fully byte-identical — bias is skipped there
-    assertEquals(JSON.stringify(biased.sessions_by_week['7']), JSON.stringify(plain.sessions_by_week['7']), `${name}: deload wk7 byte-identical`);
-    assertEquals(JSON.stringify(biased.sessions_by_week['12']), JSON.stringify(plain.sessions_by_week['12']), `${name}: retest wk12 byte-identical`);
-    // (c) every bias exercise name resolves to 'accessory' (zero D-208 tripwire) + qualitative loading (no %1RM)
+  }
+  assertEquals(JSON.stringify(glute.sessions_by_week['7']), JSON.stringify(plain.sessions_by_week['7']), 'glute deload byte-identical');
+  assertEquals(JSON.stringify(glute.sessions_by_week['12']), JSON.stringify(plain.sessions_by_week['12']), 'glute retest byte-identical');
+
+  // HYROX — relaxed: plain unchanged; hyrox adds (1 accessory on Upper A) + (1 run-combo: a SHORTENED run
+  // + a Fatigued-Legs Station on ONE run-only work-week day, station AFTER the run). Deload/retest untouched.
+  for (const w of ['2', '5', '9']) { // a Base, a Power, a Peak work week
+    const p = plain.sessions_by_week[w], b = hyrox.sessions_by_week[w];
+    const upA = b.find((s) => /Upper A/.test(s.name))!, upAp = p.find((s) => /Upper A/.test(s.name))!;
+    assertEquals((upA.strength_exercises || []).length, (upAp.strength_exercises || []).length + 1, `hyrox wk${w}: Upper A +1 accessory`);
+    const fat = b.filter((s) => (s.tags || []).includes('fatigued_legs'));
+    assertEquals(fat.length, 1, `hyrox wk${w}: exactly one fatigued-legs station session`);
+    assert((fat[0].tags || []).includes('bias:hyrox') && fat[0].type === 'strength', `hyrox wk${w}: station is a tagged strength session`);
+    const sameDay = b.filter((s) => s.day === fat[0].day);
+    const runIdx = sameDay.findIndex((s) => s.type === 'run'), fatIdx = sameDay.findIndex((s) => (s.tags || []).includes('fatigued_legs'));
+    assert(runIdx >= 0 && runIdx < fatIdx, `hyrox wk${w}: run sorts BEFORE the station (run→station)`);
+    assert((sameDay[runIdx].duration ?? 999) <= 22, `hyrox wk${w}: combo run shortened (<=22m), got ${sameDay[runIdx].duration}`);
+    assertEquals(b.length, p.length + 1, `hyrox wk${w}: exactly +1 session vs plain (the station)`);
+  }
+  for (const w of ['7', '12']) { // deload + retest: no combo, byte-identical
+    assert(!JSON.stringify(hyrox.sessions_by_week[w]).includes('fatigued_legs'), `hyrox wk${w}: no fatigued-legs on deload/retest`);
+    assertEquals(JSON.stringify(hyrox.sessions_by_week[w]), JSON.stringify(plain.sessions_by_week[w]), `hyrox wk${w}: byte-identical to plain`);
+  }
+
+  // both presets: bias exercise names resolve to accessory (zero D-208 tripwire) + qualitative loading
+  for (const biased of [glute, hyrox]) {
     const biasExs = Object.values(biased.sessions_by_week).flat().flatMap((s) => (s.strength_exercises || []).filter((e) => /Hip Thrust|Single-Leg|Back Extension|Sled|Sandbag|Farmers/.test(e.name)));
-    assert(biasExs.length > 0, `${name}: bias slots present on work weeks`);
+    assert(biasExs.length > 0, 'bias slots present on work weeks');
     for (const n of [...new Set(biasExs.map((e) => e.name))]) assertEquals(roleForExercise(n), 'accessory', `${n} → accessory role`);
     for (const e of biasExs) assert(!/\d/.test(e.weight) && !e.weight.includes('%'), `${e.name} weight must be qualitative (no %1RM), got "${e.weight}"`);
   }

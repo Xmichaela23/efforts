@@ -207,6 +207,21 @@ function biasMicrocopy(preset: 'glute' | 'hyrox', sport: 'run' | 'bike' | null):
   return 'Hyrox slot: station patterns (sled / carry / lunge) — trained to handle the competition loads under fatigue, not for a faster finish.';
 }
 
+// ── Fatigued-legs combo (Hyrox preset only) ──────────────────────────────────────────────────────────
+// The signature Hyrox stimulus: run → station on TIRED legs. Delivered as a same-day PAIRING — a SHORT run
+// followed by a station strength session (run-first) — NOT a single mixed run+strength row (materialize is
+// single-type per session; a true mixed row needs new code, the flagged balloon). One per work week, on a
+// run-only mid-week day (not heavy-Lower, not the long run). Station is equipment-substituted at materialize
+// via substituteExerciseForEquipment (home gym → DB/barbell). Skipped on deload + retest (kept byte-identical).
+const FATIGUED_LEGS_STATION: StrengthExercise[] = [
+  { name: 'Sled Push', sets: 4, reps: '25 m', weight: 'Heavy' },
+  { name: 'Sandbag Lunge', sets: 4, reps: '20 m', weight: 'Moderate' },
+  { name: 'Farmers Carry', sets: 4, reps: '40 m', weight: 'Heavy' },
+];
+function fatiguedLegsStation(week: number): StrengthExercise {
+  return { ...FATIGUED_LEGS_STATION[(week - 1) % FATIGUED_LEGS_STATION.length] };
+}
+
 // ── AMRAP baseline/retest — ONE tool, two jobs (D-224) ───────────────────────────────────────────────
 // The SAME guided session both ESTABLISHES baselines (entry, no 1RM → athlete picks a ~5-rep weight) and
 // RE-MEASURES them (exit, has 1RM → prescribe ~88%). Warm up, then ONE all-out set: as many CLEAN reps as
@@ -350,6 +365,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     .filter((d) => grid.strength.includes(d))
     .sort((a, b) => DAYS.indexOf(a as typeof DAYS[number]) - DAYS.indexOf(b as typeof DAYS[number]))[0];
 
+  // Hyrox fatigued-legs combo day: a run-ONLY mid-week day (not a heavy-Lower/strength day, not the long
+  // run). The short run + station pair lands here. Self-gates: undefined (no eligible day) → no combo.
+  const fatiguedLegsDay = (args.accessoryBias === 'hyrox' && enduranceSport === 'run')
+    ? (runDayList.find((d) => !grid.strength.includes(d) && d !== longRunDay) ?? null)
+    : null;
+
   const runMinutesByDay: Record<string, number> = {};
   let volume_notes: string | null = null;
   // Mileage-band STATE for the client to render the honest tradeoff copy (the three copy strings live
@@ -427,7 +448,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         const note = (week === 1 && day === firstStackedRunDay)
           ? ` On a lift + run day, lift first — then the easy run. Run later in the day if you can (a few hours), but back-to-back is fine; your runs are easy [Petré 2021].`
           : undefined;
-        weekSessions.push(enduranceSession('run', day, false, runMinutesByDay[day], note));
+        // Hyrox fatigued-legs combo (work weeks only): SHORTEN this run and pair a station AFTER it
+        // (run-first — see the sort). Non-hyrox → fatiguedLegsDay is null → this whole branch is inert
+        // and the run push below is byte-identical to the pre-combo output.
+        const isFatigued = day === fatiguedLegsDay && !isRetestWeek && phase.name !== 'Deload';
+        const runMin = isFatigued ? Math.min(runMinutesByDay[day] ?? 30, 22) : runMinutesByDay[day];
+        const fatNote = isFatigued ? ' Keep this run SHORT — then hit the station on tired legs (the Hyrox run→station stimulus).' : '';
+        weekSessions.push(enduranceSession('run', day, false, runMin, (`${note ?? ''}${fatNote}`) || undefined));
+        if (isFatigued) {
+          const st = fatiguedLegsStation(week);
+          weekSessions.push({
+            day, type: 'strength', name: 'Fatigued-Legs Station (after the run)',
+            description: `On tired legs from the short run: ${st.name} ${st.sets}×${st.reps} @ ${st.weight}. The Hyrox run→station stimulus — handle the load fatigued, not for a faster finish.`,
+            duration: 25, strength_exercises: [st],
+            tags: ['strength', 'lower', 'fatigued_legs', 'bias:hyrox', 'protocol:strength_primary'],
+          });
+        }
       });
     } else if (enduranceSport) {
       grid.endurance.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day, false, undefined)));
@@ -436,9 +472,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     weekSessions.sort((a, b) => {
       const d = DAYS.indexOf(a.day as typeof DAYS[number]) - DAYS.indexOf(b.day as typeof DAYS[number]);
       if (d !== 0) return d;
-      // Same day (a stacked lift+run): LIFT FIRST — strength is the goal, so it gets the fresh adaptive
-      // signal; the easy maintenance run follows [Eddens 2018, Zhang 2026, Tundidor-Duque 2026].
-      return (a.type === 'strength' ? 0 : 1) - (b.type === 'strength' ? 0 : 1);
+      // Same day: LIFT FIRST — strength is the goal, so it gets the fresh adaptive signal; the easy
+      // maintenance run follows [Eddens 2018, Zhang 2026, Tundidor-Duque 2026]. EXCEPTION: the Hyrox
+      // fatigued-legs station sorts AFTER the run (that's the whole point — station on tired legs).
+      const ord = (s: PlanSession) => (s.tags ?? []).includes('fatigued_legs') ? 2 : (s.type === 'strength' ? 0 : 1);
+      return ord(a) - ord(b);
     });
     sessions_by_week[String(week)] = weekSessions;
   }
