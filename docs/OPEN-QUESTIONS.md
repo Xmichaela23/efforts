@@ -1280,6 +1280,15 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-103 — Full Hyrox training ENGINE: its own goal-type arc, NOT the accessory bias (parked; decided B 2026-07-02)
+- **Status:** filed 2026-07-02 · **parked, deliberate scope cut.** Decided **B** — keep the shipped accessory bias, honestly labeled "movement familiarity." **A** (a real Hyrox program) is recorded here as its own future arc, NOT built.
+- **Why (the 4-gap finding):** sample-plan review vs Brandt 2025 found the accessory-bias slot misses four event demands (full detail in `SCIENCE-hyrox-accessory-bias.md §7`): (1) **high-intensity endurance** — the block's runs generate but are all-easy; Brandt needs moderate **and** high intensity; (2) **power/RFD** — none; Schumann 2022 (verified) says concurrent training attenuates power (SMD −0.28) → must be deliberate, CONVENTION (no Hyrox study validates dosing); (3) **fatigued-legs / compromised running** — the signature run→station→run demand, absent; (4) **equipment-gated stations**. Together these make Hyrox a real PROGRAM, not a +1 accessory delta.
+- **The build (A), when picked up:** its OWN goal-type arc (the parked-Hyrox lineage of Q-088 — but the hand-authored circuit-week hack is NOT this; this is a real engine), deliberately OFF the accessory-only chassis, with its OWN byte-identical guards: quality endurance (intervals/tempo, accepting the interference cost), a power/RFD slot, a fatigued-legs brick (station→run), equipment-gated stations. **Do NOT bolt it onto `composeStrengthPrimaryPlan`'s accessory mechanism** — it needs its own structure + guards.
+- **What stands (B):** the glute accessory bias (a genuine thin delta) + the Hyrox **movement-familiarity** bias (shipped, honestly labeled). The equipment-substitution fallbacks (`substituteExerciseForEquipment`) are wired direction-agnostically (glute + station gear fallbacks).
+- **Cross-ref:** `SCIENCE-hyrox-accessory-bias.md §7` (the finding + A/B decision); `ROADMAP-hybrid-strength-addons.md §2b`; Q-088 (parked-hyrox lineage); Schumann 2022 (power attenuation); Brandt 2025 (endurance-intensity requirement).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

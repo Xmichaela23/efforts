@@ -992,6 +992,33 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
     }
   }
   
+  // ── Accessory-bias add-on (glute | hyrox) — equipment fallbacks (direction-agnostic; also honors user
+  // gear prefs via the same userEquipment signal) ────────────────────────────────────────────────────
+  // Glute: the barbell hip thrust needs a barbell + bench; a bodyweight-only home falls to a glute bridge.
+  if (name.includes('barbell hip thrust') && !hasBarbell) {
+    resultName = 'Single-Leg Glute Bridge';
+    notes = 'No barbell — single-leg glute bridge; add weight on the hip if able';
+  }
+  // Hyrox stations: sled/sandbag need commercial-gym (turf/sled/prowler) access → same-PATTERN barbell/DB
+  // fallbacks for a home gym.
+  if (name.includes('sled push') && !hasGymAccess) {
+    resultName = hasDumbbells ? 'Dumbbell Reverse Lunge' : hasBarbell ? 'Barbell Reverse Lunge' : 'Reverse Lunge';
+    notes = 'No sled — heavy horizontal-drive pattern under load';
+  }
+  if (name.includes('sandbag lunge') && !hasGymAccess) {
+    resultName = hasDumbbells ? 'Dumbbell Reverse Lunge' : hasBarbell ? 'Barbell Reverse Lunge' : 'Reverse Lunge';
+    notes = 'No sandbag — loaded reverse lunge';
+  }
+  if (name.includes('sled pull') && !hasGymAccess) {
+    resultName = hasDumbbells ? 'Dumbbell Row' : hasBarbell ? 'Bent-Over Row' : hasResistanceBands ? 'Band Row' : 'Inverted Row';
+    notes = 'No sled — heavy horizontal pull';
+  }
+  // Farmers carry works with any load (DB/KB/barbell); only fall back when there is none at all.
+  if (name.includes('farmers carry') && !hasDumbbells && !hasKettlebells && !hasBarbell && !hasGymAccess) {
+    resultName = 'Backpack Carry';
+    notes = 'Load a backpack — any carry stimulus works';
+  }
+
   // Add band notes for any band exercises that don't already have them (fallback)
   const finalName = String(resultName).toLowerCase();
   if (finalName.includes('band') && !notes) {
