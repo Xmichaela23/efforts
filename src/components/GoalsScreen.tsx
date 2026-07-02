@@ -2323,6 +2323,17 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       <div className="shrink-0 px-4 pb-4 pt-2 space-y-2">
         <button
           type="button"
+          onClick={() => setShowBuilder(true)}
+          className="w-full flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-left hover:bg-white/[0.10] transition-all"
+        >
+          <Crosshair className="h-5 w-5 shrink-0 mt-0.5 text-white/70" />
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-white/90">Add a goal</div>
+            <div className="mt-0.5 text-xs text-white/50">Focused work to build speed, strength, or endurance.</div>
+          </div>
+        </button>
+        <button
+          type="button"
           onClick={() => {
             onClose();
             navigate('/arc-setup');
@@ -2333,17 +2344,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           <div className="min-w-0">
             <div className="text-sm font-medium text-white/90">Plan a season</div>
             <div className="mt-0.5 text-xs text-white/50">Build a plan for an upcoming race, or a full season of them.</div>
-          </div>
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowBuilder(true)}
-          className="w-full flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-left hover:bg-white/[0.10] transition-all"
-        >
-          <Crosshair className="h-5 w-5 shrink-0 mt-0.5 text-white/70" />
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-white/90">Add a goal</div>
-            <div className="mt-0.5 text-xs text-white/50">Focused work to build speed, strength, or endurance.</div>
           </div>
         </button>
         {inactiveGoals.length > 0 && (
