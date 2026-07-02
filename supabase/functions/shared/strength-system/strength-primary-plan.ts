@@ -424,12 +424,14 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // Accessory-bias slot: ONE per week, on Upper A only (interference-safe day), skipped on deload
         // (keep it byte-identical). +1 exercise max; NEVER touches the main lifts. Absent bias → the exact
         // pre-add-on output (ex === s.ex, no note, no bias tag).
-        // GLUTE-ONLY Upper A accessory. Hyrox does NOT touch any strength day — its station work lives
-        // entirely in the Saturday long-run→station combo (keeps all four strength days byte-identical).
-        const bias = (args.accessoryBias === 'glute' && phase.name !== 'Deload' && s.name === 'Upper A')
-          ? biasAccessoryFor('glute', week) : null;
+        // Accessory-bias slot: BOTH glute + hyrox get a +1 accessory on Upper A (the movement-familiarity
+        // station). Skipped on deload (byte-identical). +1 exercise max; NEVER touches the main lifts. Plain
+        // (no bias) → the exact pre-add-on output. Hyrox ALSO gets the Saturday combo (below). The guard
+        // protects the PLAIN plan, not Hyrox's own strength days.
+        const bias = (args.accessoryBias && phase.name !== 'Deload' && s.name === 'Upper A')
+          ? biasAccessoryFor(args.accessoryBias, week) : null;
         const ex = bias ? [...s.ex, bias] : s.ex;
-        const biasNote = bias ? ` ${biasMicrocopy('glute', enduranceSport)}` : '';
+        const biasNote = bias ? ` ${biasMicrocopy(args.accessoryBias!, enduranceSport)}` : '';
         weekSessions.push({
           day: grid.strength[i],
           type: 'strength',
@@ -439,7 +441,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
             `${ex.map((e) => `${e.name} ${e.sets}×${e.reps} @ ${e.weight}`).join(' · ')}. Top set ${load.primary.pct}% 1RM.${biasNote}`,
           duration: 60,
           strength_exercises: ex,
-          tags: ['strength', s.focus, `phase:${phase.name.toLowerCase()}`, 'protocol:strength_primary', ...(bias ? ['bias:glute'] : [])],
+          tags: ['strength', s.focus, `phase:${phase.name.toLowerCase()}`, 'protocol:strength_primary', ...(bias ? [`bias:${args.accessoryBias}`] : [])],
         });
       });
     }

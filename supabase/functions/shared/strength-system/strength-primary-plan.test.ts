@@ -226,28 +226,31 @@ Deno.test('ACCESSORY-BIAS — glute/hyrox inject ONE slot on Upper A; main lifts
   assertEquals(JSON.stringify(glute.sessions_by_week['7']), JSON.stringify(plain.sessions_by_week['7']), 'glute deload byte-identical');
   assertEquals(JSON.stringify(glute.sessions_by_week['12']), JSON.stringify(plain.sessions_by_week['12']), 'glute retest byte-identical');
 
-  // HYROX — Upper A accessory DROPPED (glute-only). Hyrox's ONLY change is the Saturday long-run combo, so
-  // ALL FOUR STRENGTH DAYS stay byte-identical to plain; the long-run day gains a station AFTER the (full,
-  // NOT shortened) long run. Deload/retest untouched.
-  const strengthDay = /Upper A|Lower A|Upper B|Lower B/;
+  // HYROX — relaxed (same as glute + the Saturday combo): plain unchanged; hyrox = +1 Upper A accessory
+  // + 1 Saturday long-run→station combo. The three non-Upper-A strength days stay byte-identical; the
+  // long-run day gains a station AFTER the (unshortened) long run. Deload/retest untouched.
   for (const w of ['2', '5', '9']) { // a Base, a Power, a Peak work week
     const p = plain.sessions_by_week[w], b = hyrox.sessions_by_week[w];
-    // (i) all four strength days byte-identical (no Upper A accessory for hyrox)
-    for (const ps of p.filter((s) => strengthDay.test(s.name))) {
-      const bs = b.find((s) => s.name === ps.name)!;
-      assertEquals(JSON.stringify(bs), JSON.stringify(ps), `hyrox wk${w}: strength day "${ps.name}" byte-identical`);
+    // Upper A: +1 accessory, main lifts intact, bias:hyrox tag
+    const upA = b.find((s) => /Upper A/.test(s.name))!, upAp = p.find((s) => /Upper A/.test(s.name))!;
+    assertEquals((upA.strength_exercises || []).length, (upAp.strength_exercises || []).length + 1, `hyrox wk${w}: Upper A +1 accessory`);
+    assertEquals(JSON.stringify((upA.strength_exercises || []).slice(0, 2)), JSON.stringify(upAp.strength_exercises || []), `hyrox wk${w}: Upper A main lifts intact`);
+    assert((upA.tags || []).includes('bias:hyrox'), `hyrox wk${w}: Upper A bias:hyrox tag`);
+    // the other three strength days byte-identical
+    for (const n of ['Lower A', 'Upper B', 'Lower B']) {
+      assertEquals(JSON.stringify(b.find((s) => s.name.includes(n))), JSON.stringify(p.find((s) => s.name.includes(n))), `hyrox wk${w}: ${n} byte-identical`);
     }
-    // (ii) exactly one fatigued-legs station, on the long-run day, AFTER the (unshortened) long run
+    // Saturday combo: one fatigued-legs station on the long-run day, run unshortened, run-first
     const fat = b.filter((s) => (s.tags || []).includes('fatigued_legs'));
-    assertEquals(fat.length, 1, `hyrox wk${w}: exactly one fatigued-legs station`);
-    assert((fat[0].tags || []).includes('bias:hyrox') && fat[0].type === 'strength', `hyrox wk${w}: station is a tagged strength session`);
+    assertEquals(fat.length, 1, `hyrox wk${w}: one fatigued-legs station`);
+    assert((fat[0].tags || []).includes('bias:hyrox') && fat[0].type === 'strength', `hyrox wk${w}: station tagged strength session`);
     const sameDay = b.filter((s) => s.day === fat[0].day);
     const runIdx = sameDay.findIndex((s) => s.type === 'run'), fatIdx = sameDay.findIndex((s) => (s.tags || []).includes('fatigued_legs'));
-    assert(runIdx >= 0 && runIdx < fatIdx, `hyrox wk${w}: run sorts BEFORE the station (run→station)`);
+    assert(runIdx >= 0 && runIdx < fatIdx, `hyrox wk${w}: run BEFORE station (run→station)`);
     const plainRun = p.find((s) => s.day === fat[0].day && s.type === 'run')!;
-    assertEquals(sameDay[runIdx].duration, plainRun.duration, `hyrox wk${w}: long run NOT shortened (== plain)`);
-    assertEquals(fat[0].day, plain.sessions_by_week[w].reduce((m: any, s: any) => s.type === 'run' && (!m || s.duration > m.duration) ? s : m, null).day, `hyrox wk${w}: combo is on the LONG-run day`);
-    assertEquals(b.length, p.length + 1, `hyrox wk${w}: exactly +1 session vs plain (the station)`);
+    assertEquals(sameDay[runIdx].duration, plainRun.duration, `hyrox wk${w}: long run NOT shortened`);
+    assertEquals(fat[0].day, plain.sessions_by_week[w].reduce((m: any, s: any) => s.type === 'run' && (!m || s.duration > m.duration) ? s : m, null).day, `hyrox wk${w}: combo on the LONG-run day`);
+    assertEquals(b.length, p.length + 1, `hyrox wk${w}: +1 session (the station); Upper A accessory is +1 exercise not +1 session`);
   }
   for (const w of ['7', '12']) { // deload + retest: no combo, byte-identical
     assert(!JSON.stringify(hyrox.sessions_by_week[w]).includes('fatigued_legs'), `hyrox wk${w}: no fatigued-legs on deload/retest`);
