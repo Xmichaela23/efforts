@@ -439,7 +439,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 </div>
                 <p className="text-white/35 text-xs mt-1.5">
                   {state.accessoryBias === 'glute' ? 'One posterior-chain slot on your upper day — stronger, more durable hips (not a speed promise).'
-                    : state.accessoryBias === 'hyrox' ? 'Station patterns (sled / carry / lunge) to handle the competition loads under fatigue — plus a nudge to practice at a Hyrox-equipped gym.'
+                    : state.accessoryBias === 'hyrox' ? 'Adds Hyrox station movements (sled / carry / lunge) to your strength block for movement familiarity — not full race conditioning.'
                     : 'Just the strength block — no add-on.'}
                 </p>
               </div>

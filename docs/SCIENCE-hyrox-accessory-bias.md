@@ -58,6 +58,17 @@ The add-on trains **local muscular endurance and loaded-movement competence unde
 | Sandbag > barbell for core | **CONTRADICTED** | Calatayud 2015 |
 | Hyrox-specific programming / pacing / visit cadence | **CONVENTION** | coaching consensus |
 
+## 7. SCOPE BOUNDARY — the accessory bias is NOT full Hyrox race prep (finding, 2026-07-02)
+
+Sample-plan review against Brandt 2025 exposed **four event demands the accessory-bias slot does not cover.** The honest boundary: the shipped "Hyrox bias" adds posterior-chain volume + station **movement familiarity** to the Get Stronger block — it is **NOT a Hyrox training program.**
+
+1. **High-intensity endurance — MISSING.** Runs generate (3/wk) but are **ALL EASY** (the Get Stronger maintenance band). Brandt 2025 requires endurance at **moderate AND high** intensity; all-easy meets neither quality tier. A real Hyrox block needs quality running — which *deliberately raises interference* (the exact trade the all-easy band exists to avoid).
+2. **Power / RFD — MISSING.** The block is max-strength (5×5, heavy singles) + grind-durability only; Hyrox is full of power (sled, wall ball, broad jump). Schumann 2022 (verified): concurrent training specifically attenuates **power** (SMD −0.28) — so it must be programmed **deliberately**, not assumed. **Any added power dosing is CONVENTION — no Hyrox study validates it.**
+3. **Fatigued-legs / compromised running — MISSING.** The signature Hyrox demand is running on **pre-fatigued legs** (run→station→run). The block separates easy runs from lifting; there is no deliberate station-then-run (brick-like) fatigued-legs stimulus.
+4. **Equipment-gated stations — MISSING.** Sled/sandbag emit unconditionally; a home gym has no sled. `materialize-plan:substituteExerciseForEquipment` is the existing per-user gear-substitution hook where barbell/DB fallbacks for the same patterns belong (also covers gear prefs) — not yet wired.
+
+**The design decision (for Michael):** **(A)** build Hyrox as its OWN preset — quality run + a power slot + a fatigued-legs brick + equipment-gated stations — which **breaks the "+1 accessory bias only" chassis** (a real v2 build); or **(B)** keep the shipped bias but **label it honestly** as *"Hyrox movement familiarity, not race conditioning."* Per the "don't half-wire it" rule, these four were **not** crammed into the one-slot mechanism. **The GLUTE bias is unaffected** — it is genuinely a thin accessory delta and stands as built.
+
 ## 6. Quarantined (do NOT cite until verified)
 
 - **⚠ Doma 2017 — QUARANTINED.** Blocked from this doc until its primary is checked. The 2017 paper is a review/perspective, and the acute "running economy drops for hours post-lifting" result is commonly *mis-attributed* to it (it traces to Doma & Deakin's earlier acute experiments). The interference claim here rests on **Wilson 2012 + Methenitis 2018 (both verified)** — NOT Doma. This is the same misattribution class the citation gate has caught repeatedly; do not reintroduce Doma 2017 as a load-bearing cite without checking the primary. (Also re-check the `STRENGTH-PROTOCOL.md:425` "Doma 2017: strength force-production 24–48h" line against its primary.)
