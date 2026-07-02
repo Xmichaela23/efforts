@@ -1299,6 +1299,17 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-105 — Get Stronger run durations + copy ignore an EXISTING easy-pace baseline (fall back to 10:00/mi)
+
+- **Status:** filed 2026-07-02 · **real defect, NOT copy-only — deferred, not yet fixed.** Seen on Michael's own "Get stronger · Base · Week 1 of 12" plan: the plan blurb reads *"Run durations estimated at 10:00/mi until we learn your easy pace — they re-map once you log a few easy runs,"* even though he already has a known easy pace. So both the copy AND the actual run durations are computed off the fallback, not his real pace.
+- **Traced (definitive):** run durations + the copy are both gated on one input, `easyPaceMinPerMile`:
+  - `strength-primary-plan.ts:395` `const paceKnown = (args.easyPaceMinPerMile ?? 0) > 0;` → `:396` `pace = paceKnown ? easyPaceMinPerMile : FALLBACK_EASY_MIN_PER_MILE (10)` → `:410` emits the "estimated at 10:00/mi…" note only when `!paceKnown`. So a false `paceKnown` mis-computes durations, not just the note.
+  - `generate-strength-plan/index.ts:31/54` sources `easy_pace_min_per_mile` **only from the request body** and passes `undefined` when absent. **There is NO server-side fallback** that reads the athlete's stored easy pace (`user_baselines.learned_fitness` easy pace / `effort_paces` / fiveK-derived) when the client omits it. So a user WITH a known easy pace still lands on the 10:00/mi fallback if the caller didn't thread the pace through.
+- **THE FIX (named cut):** in `generate-strength-plan`, when `easy_pace_min_per_mile` is not provided (or ≤0), resolve it from the user's baselines before `composeStrengthPrimaryPlan` — reuse the existing easy-pace resolution (`generate-combined-plan/science.ts:resolveRunEasyPace`, sec/km → min/mi) rather than re-deriving. Then `paceKnown` is true for returning athletes → real durations + the copy drops. Watch the pace-unit footgun (learned_fitness = sec/km, performance_numbers.fiveK_pace = sec/mi — see CLAUDE.md).
+- **Cross-ref:** `strength-primary-plan.ts:353/395-396/410`, `generate-strength-plan/index.ts:31/54`, `generate-combined-plan/science.ts:110 resolveRunEasyPace`; pace-unit note in `CLAUDE.md`.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
