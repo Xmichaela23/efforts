@@ -89,3 +89,14 @@ Squat = same (3–5 zone). OHP = same (3–5). Deadlift = same (≤5; conservati
   - **1RM known (retest):** express the ramp as **%-of-max anchors** — "~50% — easy", "~70% — moderate, one last primer" — self-scaling to any lift/athlete (the elegant, deterministic-engine version). Seeded off the ~88% test weight (×0.57 ≈ 50%, ×0.80 ≈ 70% of 1RM).
   - **No 1RM (discovery):** per-lift **add-hints** — OHP `add 10–20 lb`, bench `add 20–30 lb`, squat/deadlift `add 25–50 lb`.
 - **Implementation:** `StrengthLogger.tsx` `createBaselineTestExercise` (warmup sets) + the reps-field render gate (shows an empty reps field on any baseline-test set). Applies to all four lifts' test warmups.
+
+---
+
+## Baselines launcher — one flow, two entry points (Q-097/Q-102, added 2026-07-02)
+
+The Lower / Upper / Full Body links on `TrainingBaselines` launch the **same** guided AMRAP flow as the plan retest — there is no separate "entry test" math:
+- **1RM known:** each lift's test set is **seeded ~88% off the stored 1RM** (`baselineSeedFor`), with the %-anchor warmup copy (~50% / ~70%). Identical to the wk12 retest (which seeds ~88% off `computed.steps`).
+- **No 1RM (discovery):** the test set **bar-starts** — 45 lb (deadlift 95), with the per-lift add-hint warmups and the **discovery-loop** copy on the AMRAP set: *"…if you got more than ~8, it was too light — rest, add weight, and go again."* The athlete walks up to a real 3–6RM.
+- **Load timing:** `performance_numbers` loads async, so the named test builds bar-start first and a one-shot **re-seed effect** fills the ~88% weights when the 1RM arrives — pristine-guarded (no set completed) so it never clobbers athlete entries.
+- **On a test, no "last:" anchor** — prior data is a different context (training, or a broken 0-rep attempt) and re-introduces RIR language on the clean feel-based cards. Anchor stays on normal training sessions.
+- **Implementation:** `StrengthLogger.tsx` — `baselineSeedFor`, the named-test build, the re-seed effect, `createBaselineTestExercise` (bar-start + discovery copy), the anchor render gate.

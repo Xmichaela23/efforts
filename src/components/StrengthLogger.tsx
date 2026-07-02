@@ -721,6 +721,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return null;
   };
 
+  // Baselines launcher (Q-097/Q-102): ~88% top-set seed off a stored 1RM (canonical keys, mirrors materialize's
+  // read side); undefined → no stored 1RM → createBaselineTestExercise bar-starts into the discovery loop.
+  const baselineSeedFor = (name: string, perf: any): number | undefined => {
+    const k = getBaselineKeyForExercise(name);
+    const p = perf || {};
+    const stored =
+      k === 'overheadPress1RM' ? Number(p.overheadPress1RM ?? p.overhead)
+      : k === 'bench' ? Number(p.bench ?? p.bench_press ?? p.benchPress)
+      : k === 'squat' ? Number(p.squat ?? p.squat1RM ?? p.squat_1rm)
+      : k === 'deadlift' ? Number(p.deadlift ?? p.dead_lift)
+      : NaN; // pull-ups / unknown → bodyweight, no seed
+    return Number.isFinite(stored) && stored > 0 ? Math.max(5, Math.round((stored * 0.88) / 5) * 5) : undefined;
+  };
+
   // Helper: create baseline/retest exercise structure — warm-up ramp + ONE AMRAP working set.
   // `suggestedWeight` (the wk12 retest's ~88% top weight, in lb) pre-fills a %-based ramp + the test set.
   // Entry (no 1RM) passes nothing → the athlete-chosen hint ramp. Same structure both ways. (D-224)
@@ -766,6 +780,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const round5 = (w: number) => Math.max(0, Math.round(w / 5) * 5);
     // Per-lift add increment for the no-1RM discovery path — generic "25–50 lb" overshoots a press.
     const addBy = isOHP ? '10–20 lb' : nlow.includes('bench') ? '20–30 lb' : '25–50 lb';
+    // Bar-start for the no-1RM discovery test set: an empty bar (95 for deadlift — bumpers off the floor).
+    const barStart = nlow.includes('deadlift') ? 95 : 45;
     // suggestedWeight is the ~88% test weight, so % of 1RM ≈ ×(pct/0.88) of it: ~50% → ×0.57, ~70% → ×0.80.
 
     return {
@@ -803,12 +819,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // Working set — ONE all-out AMRAP set (open reps). SAME shape as the wk12 retest → same cluster
         // e1RM + ratchet-up guard. amrap:true → the RIR gate accepts RIR 0–3 (AMRAP is near-failure). (D-224)
         {
-          weight: hasSug ? round5(suggestedWeight!) : 0, // ~88% suggested top weight (retest) — athlete can adjust
+          // 1RM known → ~88% top set (retest). No 1RM → bar-start (45 / DL 95); the discovery loop below
+          // walks the athlete up to a real 3–6RM test weight. Either way, athlete can adjust.
+          weight: hasSug ? round5(suggestedWeight!) : barStart,
           reps: undefined, // AMRAP — athlete logs actual reps
           setType: 'working',
           amrap: true,
           prefilled: hasSug, // D-204: pre-filled weight; cleared on first athlete edit
-          setHint: 'AMRAP: as many CLEAN reps as you can (aim ~3–6). Stop at ~RPE 9 (one hard rep left) or on form break — never grind solo.',
+          setHint: hasSug
+            ? 'AMRAP: as many CLEAN reps as you can (aim ~3–6). Stop at ~RPE 9 (one hard rep left) or on form break — never grind solo.'
+            : 'AMRAP: as many CLEAN reps as you can. Aim ~3–6. If you got more than ~8, it was too light — rest, add weight, and go again. Stop at ~RPE 9 or on form break — never grind solo.',
           barType: 'standard',
           completed: false
         }
@@ -1791,6 +1811,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     };
   }, []);
 
+  // Baselines launcher (Q-097/Q-102): the named test builds synchronously, before the async 1RM load
+  // resolves → it first lands on bar-start. When performance_numbers arrives, re-seed the ~88% weights
+  // ONCE, and only while the test is pristine (no set completed), so we never clobber the athlete's own
+  // entries. Tag-retests (no lower/upper type) seed from computed.steps instead → skipped here.
+  const baselineReseededRef = useRef(false);
+  useEffect(() => {
+    if (baselineReseededRef.current || !performanceNumbers) return;
+    if (!isBaselineTestWorkout(scheduledWorkout || {}) || !getBaselineTestType(scheduledWorkout)) return;
+    baselineReseededRef.current = true;
+    setExercises((prev) => {
+      if (!prev.length || !prev.every((ex) => ex.sets.every((s) => !s.completed))) return prev;
+      return prev.map((ex) => createBaselineTestExercise(ex.name, baselineSeedFor(ex.name, performanceNumbers)));
+    });
+  }, [performanceNumbers, scheduledWorkout]);
+
   // Guard to ensure initialization runs only once per open
   const didInitRef = useRef(false);
 
@@ -2004,7 +2039,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const testExercises = testType === 'lower' ? ['Back Squat', 'Deadlift']
           : testType === 'upper' ? ['Bench Press', 'Overhead Press', 'Pull-ups']
           : ['Back Squat', 'Deadlift', 'Bench Press', 'Overhead Press', 'Pull-ups']; // 'full' / both
-        setExercises(testExercises.map(name => createBaselineTestExercise(name)));
+        // Baselines launcher (Q-097/Q-102): the Lower/Upper/Full links run the SAME guided AMRAP flow as the
+        // plan retest — seed each lift's test set at ~88% off the stored 1RM when one exists; otherwise
+        // createBaselineTestExercise bar-starts (45 / DL 95) into the discovery loop. One flow, two entry
+        // points, no separate math. `performanceNumbers` loads async — if it isn't in yet this first build
+        // bar-starts, and the re-seed effect below fills the ~88% weights the moment the 1RM arrives.
+        setExercises(testExercises.map(name => createBaselineTestExercise(name, baselineSeedFor(name, performanceNumbers))));
         exercisesLoadedFromWorkout = true;
         setIsInitialized(true);
         return;
@@ -4182,6 +4222,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           or placeholder anchor. Indented to the set-number leader; stays put
                           regardless of edits (unlike the from_previous prefill, which clears). */}
                       {(() => {
+                        // Q-097/Q-102: no "last:" anchor on a TEST. Prior data is from a different context
+                        // (a training session, or a broken 0-rep attempt) and it re-introduces RIR language on
+                        // the clean, feel-based test cards. Tests don't anchor to training history mid-test.
+                        if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
                         const priorSets = previousSessionByName[normalizeExerciseName(exercise.name)];
                         const txt = priorSets ? formatLastSet(priorSets[setIndex]) : null;
                         if (!txt) return null;
