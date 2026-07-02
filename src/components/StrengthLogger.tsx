@@ -4129,6 +4129,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         {(() => {
                           const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                           if (loggerMode === 'mobility' || isDurationBased || isPlyometric(exercise.name)) return null;
+                          // A 1RM/baseline TEST has no RIR — the AMRAP protocol is the signal, not RIR. Hide
+                          // the RIR cell entirely on a test (reps + weight only). (Q-097/Q-102)
+                          if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
                           const targetRir = exercise.target_rir;
                           const hasValue = set.rir !== undefined && set.rir !== null;
                           return (
@@ -4191,9 +4194,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       {(() => {
                         const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                         const exType = getExerciseType(exercise.name);
+                        // A 1RM/baseline TEST has no RIR (the AMRAP protocol is the signal) — hide the rir ±1 nudges too. (Q-097/Q-102)
+                        const isTestWorkout = isBaselineTestWorkout(scheduledWorkout || {});
                         const showReps = !isDurationBased && set.reps !== undefined;
                         const showWeight = !isDurationBased && !isBodyweightMove(exercise.name) && exType !== 'band';
-                        const showRir = loggerMode !== 'mobility' && !isDurationBased && !isPlyometric(exercise.name);
+                        const showRir = !isTestWorkout && loggerMode !== 'mobility' && !isDurationBased && !isPlyometric(exercise.name);
                         if (!showReps && !showWeight && !showRir) return null;
                         // D-129: buttons are `flex-1` (basis-0) so they GROW to fill the real row
                         // width — comfortable thumb targets on 390–430px phones — while still
