@@ -773,12 +773,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       name: exerciseName,
       expanded: true,
       sets: [
-        // Warmup 1: empty bar — groove the movement (reps by feel)
+        // Warmup 1: empty bar — groove the movement (rep range is guidance in the hint, field stays empty)
         {
           weight: emptyBarWeight,
           reps: undefined,
           setType: 'warmup',
-          setHint: 'Empty bar — a few easy reps to groove the movement.',
+          setHint: 'Empty bar — a few easy reps to groove the movement (5–10 is plenty).',
           barType: 'standard',
           completed: false
         },
@@ -787,7 +787,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           weight: hasSug ? round5(suggestedWeight! * 0.57) : 0,
           reps: undefined,
           setType: 'warmup',
-          setHint: hasSug ? '~50% of max — easy' : `Add ${addBy} — should feel easy.`,
+          setHint: hasSug ? '~50% of max — easy (3–5 reps)' : `Add ${addBy} — should feel easy (3–5 reps).`,
           barType: 'standard',
           completed: false
         },
@@ -796,7 +796,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           weight: hasSug ? round5(suggestedWeight! * 0.80) : 0,
           reps: undefined,
           setType: 'warmup',
-          setHint: hasSug ? '~70% of max — moderate, one last primer' : `Add ${addBy} more — moderate, one last primer.`,
+          setHint: hasSug ? '~70% of max — moderate, one last primer (2–3 reps)' : `Add ${addBy} more — moderate, one last primer (2–3 reps).`,
           barType: 'standard',
           completed: false
         },
