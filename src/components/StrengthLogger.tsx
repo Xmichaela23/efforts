@@ -1845,7 +1845,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }
     }
 
-    if ((workoutToLoad as any)?.computed && Array.isArray((workoutToLoad as any).computed?.steps)) {
+    // A baseline/retest (1rm_test) must build its warm-up ramp via createBaselineTestExercise below —
+    // NOT load raw from computed.steps (which is the single scored AMRAP set and would return early,
+    // skipping the ramp). Gate this branch out for those so control reaches the baseline builder.
+    if (!isBaselineTestWorkout(workoutToLoad) && (workoutToLoad as any)?.computed && Array.isArray((workoutToLoad as any).computed?.steps)) {
       const srcHdr = (workoutToLoad as any).rendered_description || (workoutToLoad as any).description || '';
       const orOpts = extractOrOptions(srcHdr);
       let exs = parseFromComputed((workoutToLoad as any).computed);
@@ -1901,9 +1904,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       // (materialize already converted 88% 1RM → lb). One tool — entry and retest share this exact structure.
       const plannedRetest = (workoutToLoad?.strength_exercises ?? []) as any[];
       if (plannedRetest.length > 0) {
-        setExercises(plannedRetest.map((ex) => {
+        // The resolved ~88% lb lives in computed.steps — materialize does NOT write it back into
+        // strength_exercises, whose weight stays the "88% 1RM" string. Seed the ramp's top set from
+        // the resolved computed weight; fall back to a numeric strength_exercises weight if present.
+        const resolved = ((workoutToLoad as any)?.computed && Array.isArray((workoutToLoad as any).computed?.steps))
+          ? parseFromComputed((workoutToLoad as any).computed) : [];
+        setExercises(plannedRetest.map((ex, i) => {
           const liftName = String(ex?.name || '').split('—')[0].trim(); // "Bench Press — AMRAP test set" → "Bench Press"
-          const w = Number(ex?.weight);
+          const rw = Number(resolved[i]?.sets?.[0]?.weight);
+          const w = Number.isFinite(rw) && rw > 0 ? rw : Number(ex?.weight);
           return createBaselineTestExercise(liftName || String(ex?.name || ''), Number.isFinite(w) && w > 0 ? w : undefined);
         }));
         exercisesLoadedFromWorkout = true;
