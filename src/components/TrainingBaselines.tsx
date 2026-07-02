@@ -44,6 +44,7 @@ performanceNumbers: {
     deadlift?: number;
     bench?: number;
     overheadPress1RM?: number;
+    pullupMaxReps?: number; // rep-based bodyweight lift — max clean reps (integer), NOT %1RM; 0 is valid (Q-102)
 };
 
   // Equipment (only for swimming and strength)
@@ -1668,6 +1669,30 @@ return (
                                 className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
                                 style={{ fontFamily: 'Inter, sans-serif' }}
                                       />
+                                    </div>
+                            {/* Pull-ups — rep-based, NOT %1RM (Q-102). Max clean reps; 0 is a valid baseline. */}
+                            <div className="flex items-center gap-1">
+                              <label className="text-xs text-white/60">Pull-ups</label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={data.performanceNumbers?.pullupMaxReps ?? ''}
+                                        onChange={(e) => {
+                                          const raw = e.target.value;
+                                          setData(prev => ({
+                                            ...prev,
+                                            performanceNumbers: {
+                                              ...prev.performanceNumbers,
+                                              // preserve 0 ("goal: your first pull-up"); blank clears
+                                              pullupMaxReps: raw === '' ? undefined : Math.max(0, parseInt(raw) || 0)
+                                            }
+                                          }));
+                                        }}
+                                placeholder="8"
+                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                                style={{ fontFamily: 'Inter, sans-serif' }}
+                                      />
+                              <span className="text-[10px] text-white/40">reps</span>
                                     </div>
                                   </div>
                           <div className="space-y-4 mt-4 pt-4 border-t border-white/10">

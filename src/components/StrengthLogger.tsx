@@ -41,6 +41,7 @@ interface LoggedSet {
   barType?: string;
   setType?: 'warmup' | 'working'; // For baseline test workouts
   amrap?: boolean; // AMRAP working set (baseline/retest) — open reps, RIR gate accepts 0–3 (D-224)
+  repMaxTest?: boolean; // Bodyweight rep-max test (pull-ups): the clean-rep COUNT is the result — no weight, no e1RM, no RIR; 0 is valid (Q-102 baseline model)
   setHint?: string; // Hint text for baseline test sets
   /** D-097: true when the value was prefilled from the athlete's previous
    *  session for this exercise (autofill on logger open). UI dims the value
@@ -606,8 +607,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const isValidNumber = raw.length > 0 && Number.isFinite(n);
 
     if (ctx.field === 'reps') {
-      // Q-039: a logged rep count is an integer ≥1; invalid/empty entry clears to 0.
-      updateSet(ctx.exerciseId, ctx.setIndex, { reps: isValidNumber ? Math.max(1, Math.round(n)) : 0 });
+      // Q-039: a normal logged rep count is an integer ≥1; invalid/empty entry clears to 0.
+      // Q-102 exception: a pull-up rep-MAX test set allows 0 ("goal: your first pull-up") — a typed 0 is the
+      // result, not a clear, so it must NOT be bumped to 1.
+      const tgtSet = exercises.find(e => e.id === ctx.exerciseId)?.sets?.[ctx.setIndex] as any;
+      const repFloor = tgtSet?.repMaxTest === true ? 0 : 1;
+      updateSet(ctx.exerciseId, ctx.setIndex, { reps: isValidNumber ? Math.max(repFloor, Math.round(n)) : 0 });
     } else if (ctx.field === 'weight') {
       updateSet(ctx.exerciseId, ctx.setIndex, { weight: isValidNumber ? Math.max(0, n) : 0 });
     } else if (ctx.field === 'rir') {
@@ -705,12 +710,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   // Helper: identify which baseline this exercise maps to
-  const getBaselineKeyForExercise = (exerciseName: string): 'squat' | 'deadlift' | 'bench' | 'overheadPress1RM' | null => {
+  const getBaselineKeyForExercise = (exerciseName: string): 'squat' | 'deadlift' | 'bench' | 'overheadPress1RM' | 'pullupMaxReps' | null => {
     const name = exerciseName.toLowerCase();
     if (name.includes('squat') && !name.includes('goblet') && !name.includes('jump')) return 'squat';
     if (name.includes('deadlift')) return 'deadlift';
     if (name.includes('bench') && name.includes('press')) return 'bench';
     if ((name.includes('overhead') || name.includes('ohp')) && name.includes('press')) return 'overheadPress1RM';
+    // Pull-ups: rep-based bodyweight tracked lift — the max-clean-rep COUNT is stored (integer), NOT a %1RM (Q-102).
+    if (name.includes('pull-up') || name.includes('pullup') || name.includes('pull up')) return 'pullupMaxReps';
     return null;
   };
 
@@ -718,6 +725,36 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // `suggestedWeight` (the wk12 retest's ~88% top weight, in lb) pre-fills a %-based ramp + the test set.
   // Entry (no 1RM) passes nothing → the athlete-chosen hint ramp. Same structure both ways. (D-224)
   const createBaselineTestExercise = (exerciseName: string, suggestedWeight?: number): LoggedExercise => {
+    // Pull-ups: a rep-MAX test, not a %1RM lift. Bodyweight warm-up guidance, then ONE all-out set — the
+    // clean-rep COUNT is the result (no working weight, no e1RM). 0 reps is a valid baseline. (Q-102 baseline model)
+    const pn = exerciseName.toLowerCase();
+    if (pn.includes('pull-up') || pn.includes('pullup') || pn.includes('pull up')) {
+      return {
+        id: `ex-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: exerciseName,
+        expanded: true,
+        sets: [
+          {
+            weight: 0, reps: 5, setType: 'warmup',
+            setHint: 'Scap pulls — hang and draw the shoulder blades down/back, no elbow bend.',
+            barType: 'standard', completed: false,
+          },
+          {
+            weight: 0, reps: 3, setType: 'warmup',
+            setHint: '2–3 easy pull-ups, then rest ~2 min before the test set.',
+            barType: 'standard', completed: false,
+          },
+          {
+            weight: 0,
+            reps: undefined, // open — the athlete logs the actual clean-rep count (0 is valid)
+            setType: 'working',
+            repMaxTest: true,
+            setHint: 'ONE all-out set: strict, full range, no kipping — the count only means something if the reps are clean. Stop the moment form breaks.',
+            barType: 'standard', completed: false,
+          },
+        ],
+      };
+    }
     const isOHP = exerciseName.toLowerCase().includes('overhead') || exerciseName.toLowerCase().includes('ohp');
     const emptyBarWeight = isOHP ? 0 : 45; // OHP might need lighter start
     const hasSug = typeof suggestedWeight === 'number' && suggestedWeight > 0;
@@ -830,9 +867,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       // OHP-key write guard (D-224): OHP has ONE canonical key, `overheadPress1RM` (what materialize reads).
       // Never let a result land under an OHP variant (`overhead`/`ohp`/`overhead_press`) and drift into the void.
       const canonKey = (k: string): string =>
-        (k === 'overhead' || k === 'ohp' || k === 'overhead_press') ? 'overheadPress1RM' : k;
+        (k === 'overhead' || k === 'ohp' || k === 'overhead_press') ? 'overheadPress1RM'
+        : (k === 'pullup' || k === 'pull_up' || k === 'pullups' || k === 'pullupmaxreps') ? 'pullupMaxReps'
+        : k;
       const liftLabel = (k: string): string =>
-        ({ bench: 'Bench Press', squat: 'Squat', deadlift: 'Deadlift', overheadPress1RM: 'Overhead Press' } as any)[k] || k;
+        ({ bench: 'Bench Press', squat: 'Squat', deadlift: 'Deadlift', overheadPress1RM: 'Overhead Press', pullupMaxReps: 'Pull-ups' } as any)[k] || k;
 
       // Partition results: a RAISE / first-time / equal auto-writes (an unambiguous improvement — no friction).
       // A DOWN result (tested < stored) is NOT silently held (superseding D-223's ratchet-up-only) NOR silently
@@ -1941,8 +1980,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const testType = getBaselineTestType(workoutToLoad);
       if (testType) {
         const testExercises = testType === 'lower' ? ['Back Squat', 'Deadlift']
-          : testType === 'upper' ? ['Bench Press', 'Overhead Press']
-          : ['Back Squat', 'Deadlift', 'Bench Press', 'Overhead Press']; // 'full' / both
+          : testType === 'upper' ? ['Bench Press', 'Overhead Press', 'Pull-ups']
+          : ['Back Squat', 'Deadlift', 'Bench Press', 'Overhead Press', 'Pull-ups']; // 'full' / both
         setExercises(testExercises.map(name => createBaselineTestExercise(name)));
         exercisesLoadedFromWorkout = true;
         setIsInitialized(true);
@@ -2727,6 +2766,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const isTagRetest = isBaselineTestWorkout(scheduledWorkout) && !getBaselineTestType(scheduledWorkout);
         // AMRAP baseline/retest sets are taken to ~RPE 9 (RIR ~1), so accept RIR 0–3 for them (tag-retest OR any
         // set flagged amrap). Named non-AMRAP baselines keep the 2–3 sub-max gate. (D-224)
+        // Pull-up rep-max test: the clean-rep COUNT is the result — no weight, no e1RM, no RIR gate. 0 is a
+        // valid baseline ("goal: your first pull-up"). Stored via the same {rounded1RM,baselineKey} shape (value
+        // = reps) so the ratchet-up / down-write write path treats "more reps = better" like "more weight = better". (Q-102)
+        if ((updatedSet as any).repMaxTest === true && updatedSet.setType === 'working' && updatedSet.completed
+            && typeof updatedSet.reps === 'number' && updatedSet.reps >= 0) {
+          const baselineKey = getBaselineKeyForExercise(exercise.name);
+          if (baselineKey) {
+            setBaselineTestResults(prev => ({
+              ...prev,
+              [exerciseId]: {
+                weight: 0,
+                reps: updatedSet.reps!,
+                estimated1RM: updatedSet.reps!,
+                rounded1RM: updatedSet.reps!, // rep count IS the stored value (no 5-lb rounding)
+                baselineKey,
+              },
+            }));
+          }
+        }
+
         const minRirForBaseline = (isTagRetest || (updatedSet as any).amrap === true) ? 0 : 2;
         if (updatedSet.setType === 'working' && updatedSet.completed && updatedSet.rir !== undefined && !updatedSet.rir_autofilled &&
             updatedSet.rir >= minRirForBaseline && updatedSet.rir <= 3 && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0) {
@@ -2734,7 +2793,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           if (baselineKey) {
             const estimated1RM = calculate1RM(updatedSet.weight, updatedSet.reps);
             const rounded1RM = Math.floor(estimated1RM / 5) * 5; // Round down to nearest 5
-            
+
             setBaselineTestResults(prev => ({
               ...prev,
               [exerciseId]: {
@@ -2888,6 +2947,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
     
+    // Pull-up rep-max test: RIR is meaningless (the clean-rep COUNT is the whole result). Just complete —
+    // no RIR autofill, no confirm strip. The populate below stores the count (0 is valid). (Q-102)
+    if (set.repMaxTest === true) {
+      updateSet(exerciseId, setIndex, { completed: true });
+      autoStartRestForSet(exerciseId, setIndex);
+      return;
+    }
+
     // Q-097 piece 3: a 1RM AMRAP test's RIR is the load-bearing signal — an untouched RIR-3
     // default would both misrepresent an ~RPE-9 near-max effort AND (being rir_autofilled) fail
     // the !rir_autofilled baseline gate, so the test would never compound. Complete the set with
@@ -3888,7 +3955,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // (open reps — the athlete's actual rep count IS the measurement). It must
                         // still show an editable, empty-by-default reps field, or the 1RM test has
                         // nowhere to record the reps and saves "0 reps" → e1RM never computes. (D-224)
-                        (set.reps === undefined && !set.amrap) ? null : (
+                        (set.reps === undefined && !set.amrap && !set.repMaxTest) ? null : (
                           // D-131: weighted flex-[2] (reps) so the cell shares the strip's reps column.
                           <div className="flex-[2] flex flex-col items-center gap-0.5">
                             <button
@@ -3909,7 +3976,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               {/* D-097: muted text when value came from previous-session autofill */}
                               <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
                                 {/* Q-097: AMRAP starts empty (open reps), not "—" — the athlete types the count. */}
-                                {set.reps === 0 ? '' : (set.reps ?? (set.amrap ? '' : '—'))}
+                                {set.reps === 0 ? '' : (set.reps ?? ((set.amrap || set.repMaxTest) ? '' : '—'))}
                               </span>
                               {/* Q-042: subtle tap-to-type affordance */}
                               <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />

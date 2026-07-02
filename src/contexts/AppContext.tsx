@@ -99,6 +99,7 @@ interface BaselineData {
     deadlift?: number;
     bench?: number;
     overheadPress1RM?: number;
+    pullupMaxReps?: number; // rep-based bodyweight lift — max clean reps (integer), NOT %1RM; 0 valid (Q-102)
   };
   injuryHistory: string;
   injuryRegions: string[];
