@@ -405,11 +405,13 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     />
                     <span className="text-white/45 text-sm">{unit}/wk</span>
                   </div>
-                  {/* Live cap — shown AS they type, not discovered later in the plan */}
+                  {/* Live honest tradeoff — shown AS they type. D-222 hard cap RETIRED: we honor the typed
+                      miles (no clamp); ~${capDisplay} is a soft reference, not a wall. Matches the server
+                      amendment + the Get-Strong card copy. */}
                   <p className={`text-xs mt-1.5 ${typeof state.targetMiles === 'number' && state.targetMiles > capDisplay ? 'text-amber-400/80' : 'text-white/35'}`}>
                     {typeof state.targetMiles === 'number' && state.targetMiles > capDisplay
-                      ? `We'll hold this to ${capDisplay} ${unit} — past that, easy running competes with lifting recovery [Wilson 2012].`
-                      : `Up to ${capDisplay} ${unit} — strength leads, so we hold running to your aerobic base.`}
+                      ? `Above ~${capDisplay} ${unit} your strength gain trends toward the low end — you'll still get stronger, just modestly. Not a cap; it's a strength plan. [Wilson 2012]`
+                      : `Run what you'll actually do — it's all easy, strength leads. Low weeks aren't penalized (more recovery for the lifts).`}
                   </p>
                 </div>
                 <div>
@@ -439,7 +441,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 </div>
                 <p className="text-white/35 text-xs mt-1.5">
                   {state.accessoryBias === 'glute' ? 'One posterior-chain slot on your upper day — stronger, more durable hips (not a speed promise).'
-                    : state.accessoryBias === 'hyrox' ? 'Experience Hyrox training while getting stronger — develop or maintain your Hyrox fitness. Not race prep. Includes a weekly fatigued-legs session (your gear); we suggest ~2 real station sessions a month.'
+                    : state.accessoryBias === 'hyrox' ? 'Adds one station accessory during the week, plus a run→station combo on your long-run day — back-to-back, on tired legs. Adds volume; this is the Hyrox opt-in.'
                     : 'Just the strength block — no add-on.'}
                 </p>
               </div>
