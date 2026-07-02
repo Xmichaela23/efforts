@@ -187,6 +187,22 @@ function amrapCopy(isDeadlift: boolean): string {
 function amrapTestSet(lift: string, weight: string): StrengthExercise {
   return { name: `${lift} — AMRAP test set`, sets: 1, reps: 'AMRAP', weight };
 }
+// No-1RM baseline SEED: start at the empty bar and CLIMB. Deadlift starts higher (the bar sits on plates
+// at pulling height). This is the STARTING weight for the discovery loop, not the test set — the athlete
+// adds weight until they land 3–6 hard clean reps; the logged set (not this seed) drives the e1RM.
+function barStartLb(lift: string): number {
+  return /deadlift/i.test(lift) ? 95 : 45;
+}
+// No-1RM discovery copy: FIND the working weight by REP COUNT, never RPE self-report — a novice can't yet
+// feel "one rep left," so ">~8 reps = too light" is the objective, teachable signal. Keeps the form-break stop.
+function baselineDiscoveryCopy(isDeadlift: boolean): string {
+  return (
+    `No max yet — we FIND your working weight. Start at the bar and do a set. More than ~8 reps? Too light — ` +
+    `rest ~2 min, add weight (upper +10–20 lb, lower +20–30 lb) and go again. When you land 3–6 hard, CLEAN ` +
+    `reps, that's your test set — log it. Stop on any form break; never grind to failure alone.` +
+    (isDeadlift ? ` (Deadlift e1RM reads conservative — a flat number isn't necessarily a flat lift [LeSuer 1997].)` : '')
+  );
+}
 /** Exit retest week: one AMRAP session per key lift at a fixed ~88% (a 3–5RM zone; deadlift ≤5). */
 function retestAmrapSessions(grid: { strength: string[] }): PlanSession[] {
   const lifts: { name: string; focus: 'upper' | 'lower' }[] = [
@@ -231,13 +247,15 @@ function baselineTestWeek(
   const test = (day: string, region: 'Lower' | 'Upper', lifts: string[], focus: 'lower' | 'upper'): PlanSession => ({
     day, type: 'strength', name: `Baseline Test: ${region} Body`,
     description:
-      `Establish your 1RMs (${lifts.join(' + ')}) — same AMRAP test the block ends with, so entry and retest ` +
-      `speak the same language. ${amrapCopy(lifts.some((l) => /deadlift/i.test(l)))} No % yet — pick a weight ` +
-      `you can do for ~5 clean reps; the app estimates your max from weight × reps.`,
+      `Establish your working weights (${lifts.join(' + ')}) — the same AMRAP test the block ends with, so ` +
+      `entry and retest speak the same language. ${baselineDiscoveryCopy(lifts.some((l) => /deadlift/i.test(l)))}`,
     duration: 60,
-    // AMRAP working set per lift; athlete-chosen weight (no 1RM yet). Same shape as the exit retest → same
-    // logger flow, same cluster e1RM, same ratchet-up guard.
-    strength_exercises: lifts.map((name) => amrapTestSet(name, 'pick a ~5-rep weight')),
+    // No 1RM yet → no % to resolve. Seed each lift at the empty bar (deadlift higher) as a BARE-NUMBER lb
+    // string so materialize passes it straight through (the pre-resolved-numeric path) instead of hunting a
+    // missing anchor — that missing-anchor hunt is exactly what rendered the blank box. The athlete climbs
+    // from this seed; the logged test set (not the seed) drives the e1RM. Same AMRAP shape + 1rm_test tag →
+    // same cluster e1RM + ratchet-up guard as the exit retest (ONE pipeline, no separate baseline math).
+    strength_exercises: lifts.map((name) => amrapTestSet(name, String(barStartLb(name)))),
     tags: ['strength', focus, 'phase:baseline', 'baseline_test', '1rm_test', 'protocol:strength_primary'],
   });
   const sessions: PlanSession[] = [

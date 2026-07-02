@@ -161,3 +161,32 @@ Deno.test('NO-1RMs path — week 1 is a baseline test (offered, not forced); wee
   const yes = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2 });
   assert(!JSON.stringify(yes.sessions_by_week['1']).includes('Baseline Test'), 'YES path: week 1 is training');
 });
+
+Deno.test('BASELINE seed (piece 1) — no-1RM path emits a bar-start bare-number lb (materialize pass-through), NOT a blank placeholder; rep-count discovery copy; stored path stays %-based', () => {
+  const no = composeStrengthPrimaryPlan({ durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2, needsBaseline: true });
+  const wk1 = no.sessions_by_week['1'].filter((s) => s.type === 'strength');
+  const seeds = wk1.flatMap((s) => s.strength_exercises ?? []);
+  // the blank-box placeholder is gone
+  assert(!seeds.some((e) => /pick a/i.test(e.weight)), 'no "pick a ~5-rep weight" placeholder (the string that rendered blank)');
+  // every seed is a BARE NUMBER string → materialize's pre-resolved-numeric pass-through (real editable lb),
+  // sidestepping the missing-anchor hunt that produced the blank box for a no-1RM athlete
+  assert(seeds.every((e) => /^\d+$/.test(e.weight)), `every baseline seed is a bare-number lb, got: ${seeds.map((e) => e.weight).join(', ')}`);
+  // bar-start: 45 default, deadlift 95 (bar at pulling height)
+  const byLift = Object.fromEntries(seeds.map((e) => [e.name.replace(/ — AMRAP test set$/, ''), e.weight]));
+  assertEquals(byLift['Back Squat'], '45');
+  assertEquals(byLift['Bench Press'], '45');
+  assertEquals(byLift['Overhead Press'], '45');
+  assertEquals(byLift['Deadlift'], '95');
+  // AMRAP shape + the 1rm_test tag preserved → SAME write-back pipeline as the exit retest
+  assert(seeds.every((e) => String(e.reps).toLowerCase() === 'amrap'), 'AMRAP (open) reps preserved on the seed set');
+  assert(wk1.every((s) => s.tags.includes('1rm_test')), 'baseline stays 1rm_test tagged → one pipeline, no separate baseline math');
+  // discovery copy is REP-COUNT driven (never RPE self-report for a novice) + keeps the form-break safety stop
+  const c = wk1.map((s) => s.description.toLowerCase()).join(' ');
+  assert(c.includes('more than ~8 reps'), 'copy drives the pick by rep count (>~8 reps = too light), not RPE');
+  assert(c.includes('3–6'), 'copy names the 3–6 clean-rep target = the test set');
+  assert(c.includes('form break'), 'safety stop on form break preserved');
+
+  // stored-1RM path (the exit retest) stays %-based — one pipeline, the % resolves off the stored anchor
+  const wk12 = strengthOf(12);
+  assert(wk12.every((s) => (s.strength_exercises ?? []).every((e) => /% 1RM/.test(e.weight))), 'retest stays %-based (resolves off the stored 1RM)');
+});
