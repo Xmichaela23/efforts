@@ -112,6 +112,10 @@ export async function computeLongitudinalSignals(
     detectStrengthRirGap(facts, plannedById, signals);
   }
 
+  // Q-049: soreness → overreaching + chronic short sleep, from the check-in (the highest-value
+  // overreaching signal per the evidence — subjective > objective). Advisory only.
+  await detectReadinessSignals(supabase, userId, asOfDate, signals);
+
   signals.sort((a, b) => {
     const sev = { concern: 0, warning: 1, info: 2 };
     return (sev[a.severity] ?? 2) - (sev[b.severity] ?? 2);
@@ -595,6 +599,82 @@ function detectStrengthRirGap(
         `Avg RIR is higher than targets on multiple lifts — you may be undershooting intensity if the goal was near-prescription effort.`,
       evidence: `${above}/${compared} lift-comparisons high vs prescribed (${aboveLifts.join(', ')})`,
     });
+  }
+}
+
+/**
+ * Readiness longitudinal signals (Q-049) — the check-in's soreness/sleep, finally read.
+ *
+ * Evidence: subjective soreness/readiness OUTPERFORM objective markers for overreaching detection
+ * (BJSM systematic review). The gold standard is acute-vs-chronic-baseline in SDs (consensus /
+ * AthleteMonitoring; the runner-overreaching study used median ± individual SD) — but that needs
+ * ~3–4 weeks of check-in history. So this is a TWO-STAGE cold-start signal:
+ *   v1 (now): an ABSOLUTE floor (≥6/10 soreness on ≥4 of the last 6 check-ins) — works from day one,
+ *             resists a single noisy day.
+ *   v2 (when ≥3–4 weeks exist): SWAP the predicate below for rising-trend-vs-own-baseline (median ±
+ *             individual SD), mirroring the pace/HR-drift signals. The fetch + emit stay identical —
+ *             this is a threshold swap, not a rewrite.
+ *
+ * ADVISORY ONLY — never touches the State/Performance score (a reported rough week must not mark the
+ * athlete down; it informs). Deload autoregulation is a deliberate later question, not this.
+ */
+async function detectReadinessSignals(
+  supabase: any,
+  userId: string,
+  asOfDate: string,
+  signals: LongitudinalSignal[],
+): Promise<void> {
+  try {
+    const { data: rows } = await supabase
+      .from('readiness_checkins')
+      .select('date, soreness, sleep')
+      .eq('user_id', userId)
+      .lte('date', asOfDate)
+      .order('date', { ascending: false })
+      .limit(30); // enough for v1 (last 6) and future v2 (3–4 weeks of baseline)
+    const series: Array<{ date: string; soreness: number; sleep: number }> = (rows ?? [])
+      .map((r: any) => ({ date: String(r?.date), soreness: Number(r?.soreness), sleep: Number(r?.sleep) }));
+
+    // ── Soreness → possible overreaching ──────────────────────────────────────
+    // v1 detection: absolute floor. (v2: replace this predicate with baseline-relative — see header.)
+    const SORE_HIGH = 6;   // 0–10 scale, higher = worse
+    const WINDOW = 6;      // last N check-ins
+    const NEED = 4;        // ≥N of them high
+    const soreRecent = series.slice(0, WINDOW).filter((r) => Number.isFinite(r.soreness));
+    const highCount = soreRecent.filter((r) => r.soreness >= SORE_HIGH).length;
+    if (soreRecent.length >= NEED && highCount >= NEED) {
+      signals.push({
+        id: 'soreness_overreaching',
+        category: 'pattern',
+        severity: highCount >= 5 ? 'concern' : 'warning',
+        headline: 'High muscle soreness across several sessions — possible overreaching',
+        detail:
+          `You've flagged high soreness (≥${SORE_HIGH}/10) on ${highCount} of your last ${soreRecent.length} check-ins. ` +
+          `Persistent soreness is one of the strongest early signals of accumulated fatigue — consider a lighter week ` +
+          `or a short deload, protect sleep and protein, and don't stack more hard sessions until it settles.`,
+        evidence: `soreness ≥${SORE_HIGH} on ${highCount}/${soreRecent.length} recent check-ins`,
+      });
+    }
+
+    // ── Chronic short sleep → fatigue-picture context (light, info-level) ──────
+    const sleepRecent = series.slice(0, WINDOW).map((r) => r.sleep).filter((v) => Number.isFinite(v));
+    if (sleepRecent.length >= 4) {
+      const avgSleep = sleepRecent.reduce((a, b) => a + b, 0) / sleepRecent.length;
+      if (avgSleep < 6) {
+        signals.push({
+          id: 'chronic_short_sleep',
+          category: 'pattern',
+          severity: 'info',
+          headline: `Sleep running short lately (~${avgSleep.toFixed(1)}h avg)`,
+          detail:
+            `Logged sleep has averaged under 6h across your recent check-ins. Short sleep blunts recovery and raises ` +
+            `perceived effort — worth weighing alongside soreness and load when a week feels harder than the numbers suggest.`,
+          evidence: `avg ${avgSleep.toFixed(1)}h over last ${sleepRecent.length} check-ins`,
+        });
+      }
+    }
+  } catch (_e) {
+    // readiness_checkins absent / transient — never break the signal set on the readiness rollup.
   }
 }
 
