@@ -4614,6 +4614,28 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-225 — Get Strong hybrid add-ons: accessory-bias engine (glute | hyrox), the Hyrox long-run→station combo, day-agnostic long-run pick (Sat/Sun)
+
+- **Date:** 2026-07-02
+- **Accessory-bias chassis (`strength-primary-plan.ts`, `accessoryBias?: 'glute' | 'hyrox'`):** a `+1` accessory slot on **Upper A** only (movement-familiarity station, qualitative loading so it needs no config entry), skipped on deload/retest. **Guard = protect the PLAIN plan, not the add-on's own days:** plain (no bias) is **byte-identical** to the pre-add-on output; glute = +1 Upper A accessory; hyrox = +1 Upper A accessory **plus** the combo below. (The byte-identical requirement is about plain vs bias under the SAME args — it was briefly mis-scoped to forbid hyrox touching its own strength days; corrected same session.)
+- **Hyrox fatigued-legs = ONE long-run→station combo, on the long-run day.** The signature Hyrox stimulus (running on pre-fatigued legs) is delivered as a same-day PAIRING: the (unshortened) long run, then a fatigued-legs station appended after it (run-first via sort), tagged `fatigued_legs` + `bias:hyrox`. **Placement is the ONLY legal slot** — heavy lower is fixed at Tue (squat) + Fri (hinge); the long run already carries the day's leg load, so the station piggybacks on real fatigue instead of adding a new leg day near heavy work. Verified: no legal standalone leg-fatiguing slot exists on the 4-day U/L/U/L week (every non-lower day is inside a heavy-lower 24h-pre/48h-post window). NOT a mixed run+strength row (that needs new materialization — not forced); the real full-Hyrox engine (quality endurance + power/RFD, own arc) stays parked as **Q-103** (Q-088 lineage).
+- **Day-agnostic long-run pick — Option A (chosen over B/C):** the long-run day is a **user pick CONSTRAINED to Sat/Sun** (intake picker limited; `preferred_days.long_run` → create-goal → generate-strength-plan → composer). Only the weekend clears the heavy-lower windows (Sat = 4d from Tue squat; Sun = 48h before it); a Monday pick would drop the combo 24h before the squat and there is **NO optimizer on the strength-primary path** to catch it. So: honor Sat/Sun, fall back to Saturday for anything else. **B** (add adjacency validation to the composer) and **C** (route Get Strong through the real week-optimizer) are the **Q-088-lineage upgrades** for if the fixed grid ever unfixes. Glass-box microcopy on the picker: "Sat or Sun — your heavy lower days (Tue/Fri) need clear space around them."
+- **Combo clarity (copy):** the pair reads "Combo 1 of 2 — Long run" / "Combo 2 of 2 — Fatigued-legs station · start within ~10 min of finishing the run" (day-agnostic; "Saturday" removed). The grouped calendar card (one container, total duration, numbered steps, connector line) is **Q-104**, phase 2, client bundle post-Q-097.
+- **Equipment substitution:** station movements route through `materialize-plan:substituteExerciseForEquipment` (home gym → Dumbbell/Walking-Lunge fallbacks; verified live). Mileage: **D-222 hard cap RETIRED** — typed miles honored (no clamp), `volume_state` emitted, honest client tradeoff copy replaces the old "Up to X" cap string (staged in the client bundle).
+- **Verification:** 101/101 composer/guard tests (plain byte-identical; glute strict; hyrox = +1 Upper A + one long-run combo, run unshortened, deload/retest untouched; long-run pick: Sunday moves the combo + strength days don't move + Monday clear, illegal→Sat). Live sample plans confirmed. Deployed generate-strength-plan + create-goal-and-materialize-plan; client (NonRaceBuilder toggle/picker/copy) pushed to web, on-device only after an Xcode rebuild.
+- **Cross-ref:** `SCIENCE-glute-accessory-bias.md`, `SCIENCE-hyrox-accessory-bias.md` (§7), `strength-primary-plan.ts`, Q-103 (parked full-Hyrox engine), Q-104 (grouped card), D-222 (mileage cap retired).
+
+---
+
+## D-226 — Never hardcode Michael's data: user state goes through the app, always
+
+- **Date:** 2026-07-02
+- **Decision:** never manually write / hardcode Michael's account data (baselines/1RMs, plans, logged sets — anything he does in the app) into Supabase / `performance_numbers`. It MUST flow through the app's real path (baseline-test / logger → `saveBaselineResults`, intake → create-goal, etc.).
+- **Why:** he's dogfooding. A direct DB write bypasses the exact path he's testing, **MASKS bugs** (a write-back that isn't firing looks "fixed"), and isn't what a real user gets. He vetoed a direct PATCH of his bench 1RM hard: *"by the app! do not hardcode anything i do anywhere!!!"* Service-role DB access is for **read-only diagnosis + isolated throwaway-user verification ONLY.** If a value needs to land in his account, route it through the UI or FIX the app path — never a DB write. (Ties to the Q-097 tester fix: the real fix is making the write-back fire, not patching the row.)
+- **Cross-ref:** memory `feedback-no-hardcoding-user-data`, `feedback_db_credential_access`, Q-097.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
