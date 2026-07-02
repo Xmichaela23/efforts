@@ -93,6 +93,7 @@ type NonRaceState = {
   anchorDay: DayName | '';
   targetMiles: number | ''; // Get Strong: typed maintenance mileage, in the user's display unit; canonicalized to miles at confirm
   runDays: number; // Get Strong: how many days to run (2/3/4) — engine spreads the miles + stacks extras onto upper lift days
+  accessoryBias: 'glute' | 'hyrox' | null; // Get Strong add-on: one posterior-chain accessory slot (glute) or the Hyrox station rotation
   startDate: string; // Week 1 start (YYYY-MM-DD); plans are Monday-based so this snaps to that week server-side
 };
 
@@ -140,6 +141,7 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
           ...(shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {}),
           ...(typeof targetWeeklyMiles === 'number' && targetWeeklyMiles > 0 ? { target_weekly_miles: targetWeeklyMiles } : {}), // Get Strong maintenance mileage (canonical miles); engine guardrails it to the band
           ...(state.posture?.strength === 'develop' && state.runDays >= 2 ? { run_days: state.runDays } : {}), // Get Strong run frequency (2/3/4); engine spreads miles + stacks extras onto upper lift days
+          ...(state.posture?.strength === 'develop' && (state.accessoryBias === 'glute' || state.accessoryBias === 'hyrox') ? { accessory_bias: state.accessoryBias } : {}), // Get Strong add-on: one accessory-bias slot (engine injects on Upper A)
         },
       },
     ],
@@ -170,7 +172,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3, startDate: nextMondayISO(),
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3, accessoryBias: null, startDate: nextMondayISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -422,6 +424,24 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   </div>
                   <p className="text-white/35 text-xs mt-1.5">We spread your miles across these — a longer run plus easy fill, not the same run twice.</p>
                 </div>
+              </div>
+            )}
+            {state.posture?.strength === 'develop' && (
+              <div>
+                <p className="text-white/55 text-sm mb-2">Add-on focus (optional)</p>
+                <div className="grid grid-cols-3 gap-1.5 max-w-[300px]">
+                  {([['None', null], ['Glutes', 'glute'], ['Hyrox', 'hyrox']] as const).map(([label, val]) => (
+                    <button
+                      key={label} type="button" onClick={() => setState((s) => ({ ...s, accessoryBias: val }))}
+                      className={`py-2 rounded-lg text-sm border ${state.accessoryBias === val ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
+                    >{label}</button>
+                  ))}
+                </div>
+                <p className="text-white/35 text-xs mt-1.5">
+                  {state.accessoryBias === 'glute' ? 'One posterior-chain slot on your upper day — stronger, more durable hips (not a speed promise).'
+                    : state.accessoryBias === 'hyrox' ? 'Station patterns (sled / carry / lunge) to handle the competition loads under fatigue — plus a nudge to practice at a Hyrox-equipped gym.'
+                    : 'Just the strength block — no add-on.'}
+                </p>
               </div>
             )}
             {posturePresent('bike') && (

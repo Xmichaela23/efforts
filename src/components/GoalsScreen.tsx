@@ -1648,6 +1648,16 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                     </div>
                   );
                 })()}
+                {(() => {
+                  // Hyrox add-on: the static "practice at a Hyrox-equipped gym" card (no facility-finder — v2).
+                  const bias = (linkedPlan.config as { accessory_bias?: string | null } | undefined)?.accessory_bias;
+                  if (bias !== 'hyrox') return null;
+                  return (
+                    <p className="text-xs leading-relaxed text-white/45 mt-1">
+                      Hyrox add-on: your barbell days carry the station patterns (sled / carry / lunge). Where you can, get to a Hyrox-equipped gym ~1–2×/month to rehearse the real sled and SkiErg — a normal gym can't load them.
+                    </p>
+                  );
+                })()}
               </div>
             )
           ) : (() => {
