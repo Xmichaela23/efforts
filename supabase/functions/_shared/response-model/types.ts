@@ -75,6 +75,8 @@ export type LiftTrend = {
   best_weight: number | null;
   /** Server-computed next weight when verdict is actionable. Null when no change needed. */
   suggested_weight: number | null;
+  /** D-231 typed 1RM anchor (150) this verdict was judged against; null = accessory/gap-fill (baseline-blind, legacy). Client renders the self-explanatory "vs your {anchor} baseline" row. */
+  anchor_1rm: number | null;
 };
 
 export type StrengthResponse = {
@@ -336,6 +338,8 @@ export type StrengthLiftSnapshot = {
   target_rir: number | null;
   sessions_in_window: number;
   best_weight: number | null;       // most recent top working weight logged
+  /** D-231 typed-anchored 1RM (canonical lifts only; null for accessories / gap-fill). Judge + suggest consult this. */
+  anchor_1rm?: number | null;
 };
 
 export type CrossDomainPair = {

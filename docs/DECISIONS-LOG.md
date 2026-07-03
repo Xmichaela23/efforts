@@ -4669,6 +4669,18 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 - **Why:** every athlete-visible "score that lies" (the bench verdict, the contradictory State rows) is the same root — a surface computing its own truth instead of reading the one source. This records the audited state + the agreed direction so the next session starts from the map.
 - **Cross-ref:** `AUDIT-app-synthesis-2026-07-02.md`, `AUDIT-spine-conformance-2026-07-02.md`, `AUDIT-state-screen-2026-07-02.md`, `SCREEN-CONNECTIVITY.md`, D-149/D-150/D-151/D-213, Q-106/Q-107/Q-108.
 
+## D-231 — Canonical Capacity Resolver: typed is SSOT, learned suggests, one resolver is the sole answer
+
+- **Date:** 2026-07-02
+- **Decision (ratified, build gated — see below):** there will be **one canonical resolver function** — the sole answer to "how strong/fast is this athlete for lift/discipline X." **Precedence:**
+  1. **Typed `performance_numbers` wins when fresher than the last retest** — the athlete's declared/tested capacity is the anchor. It is what the plan already prescribes off (`materialize-plan mergeAnchor1RmLb`), and it is what judgement must also use.
+  2. **`learned_fitness.strength_1rms` (and the learned pace/FTP aggregates) fill gaps** where no typed value exists, and **surface drift as a *suggestion*** when they diverge from typed (the existing `_shared/state-trend/reconcile.ts` bridge: ≥3 samples, ≥5% divergence → *suggest* updating typed). **Learned never silently overrides typed.**
+  3. **Raw `exercise_log.estimated_1rm` is never truth** — per-session only, feeds learning, not resolution.
+- **Enforcement:** **direct substrate reads for a capacity answer are forbidden going forward.** Both the **prescribe** path (`materialize-plan`) and the **judge** path (the coach's strength per-lift verdict, `coach/index.ts:1969`/`2275`) call the resolver. This collapses the flagship **150-vs-125 inversion** (plan loads off typed-150 while coach grades off learned-125 → the "Bench 125→115" score-that-lies), the State strength contradiction (H1/H3), and folds the key-alias (`bench_press`/`benchPress`/`ohp`) and unit (sec/km vs sec/mi) footguns into one canonicalizer.
+- **Why:** the **user is the source of truth for declared capacity** — consistent with **D-213 (extend the engine, retire the forks; Arc-as-SSOT)** and the athlete-continuity bet (D-149/150/151). A learned aggregate that silently overrode the athlete's own tested number would be the engine telling the athlete they're wrong about themselves — the exact "two truths about one person" failure the spine exists to end. Typed-anchored keeps the athlete's declared reality primary while still letting the app *notice* and *offer* when logged performance has moved.
+- **Build gate:** implementation is **gated on Q-097's write-back convergence fully landing** (learned↔typed cannot reconcile until the down-write path is closed). This entry ratifies the precedence + the single-resolver rule now so it's settled before code; the resolver itself is step 1 of the D-230 roadmap.
+- **Cross-ref:** D-230 (the audited finding + roadmap), D-213 (retire forks / SSOT), D-151 (the proven single-axis migration), D-224 (strength write-key canon), D-226 (user data goes through the app), Q-097 (convergence gate), Q-106 (roadmap); `AUDIT-spine-conformance-2026-07-02.md` §4/§6/§7, `_shared/state-trend/reconcile.ts`, `materialize-plan`, `coach/index.ts`.
+
 ---
 
 ## When to add an entry

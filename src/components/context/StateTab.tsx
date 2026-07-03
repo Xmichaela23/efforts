@@ -1502,18 +1502,33 @@ export default function StateTab({
                   : lt.e1rm_current != null && lt.e1rm_previous != null && lt.e1rm_previous > 0
                   ? Math.min(100, Math.round((lt.e1rm_current / (lt.e1rm_previous * 1.1)) * 100))
                   : null;
+                // D-231 / Q-107 H1: self-explanatory row (My Record pattern) — what we measured, versus
+                // the typed baseline anchor, and the action. Only when a typed anchor (anchor_1rm) exists;
+                // accessories / gap-fill lifts (no anchor) keep the legacy "best → suggested" pair.
+                const anchor1rm: number | null = lt.anchor_1rm ?? null;
+                const tone: string = lt.verdict_tone ?? 'neutral';
+                const actionText: string = hasWeightSuggestion
+                  ? (verdictLabel === 'add weight' ? `add to ${suggestedWeight} next session`
+                     : verdictLabel === 'back off weight' ? (tone === 'caution' ? `ease to ${suggestedWeight} this week` : `suggest ${suggestedWeight} this week`)
+                     : `to ${suggestedWeight}`)
+                  : verdictLabel;
+                const rowText: string = (anchor1rm != null && bestWeight != null && bestWeight > 0)
+                  ? `Working ~${bestWeight} vs your ${anchor1rm} baseline — ${actionText}`
+                  : hasWeightSuggestion
+                    ? `${bestWeight} → ${suggestedWeight} lbs`
+                    : verdictLabel;
                 return (
                   <div key={lt.canonical_name} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[12px] text-white/80">{lt.display_name}</span>
-                      <span className="relative">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[12px] text-white/80 shrink-0">{lt.display_name}</span>
+                      <span className="relative max-w-[68%]">
                         {hasWeightSuggestion ? (
                           <button
                             onClick={() => setAdjustingLift(adjustingLift === lt.canonical_name ? null : lt.canonical_name)}
-                            className={`text-[12px] ${verdictColor} underline decoration-dotted underline-offset-2 hover:opacity-80`}
-                          >{bestWeight} → {suggestedWeight} lbs</button>
+                            className={`text-[12px] ${verdictColor} underline decoration-dotted underline-offset-2 hover:opacity-80 text-right`}
+                          >{rowText}</button>
                         ) : (
-                          <span className={`text-[12px] ${verdictColor}`}>{verdictLabel}</span>
+                          <span className={`text-[12px] ${verdictColor} text-right`}>{rowText}</span>
                         )}
                         {adjustingLift === lt.canonical_name && (
                           <StrengthAdjustmentModal

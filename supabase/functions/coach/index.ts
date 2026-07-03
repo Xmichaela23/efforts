@@ -28,7 +28,7 @@ import {
 } from '../_shared/acwr-state.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
-import { rollupFitnessDirection, type FitnessDirection } from '../_shared/state-trend/index.ts';
+import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey } from '../_shared/state-trend/index.ts';
 import {
   computeWeeklyResponse,
   type WeeklyResponseState,
@@ -92,7 +92,8 @@ const corsHeaders: Record<string, string> = {
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
 /** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
 /** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
-const COACH_PAYLOAD_VERSION = 46; // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+/** v47: D-231 — response_model.strength.per_lift gains `anchor_1rm` (typed baseline) + the verdict/suggested-weight now consult it (de-alarmed tone on headroom); bump so cached baseline-blind "125→115" rows recompute with the anchor-aware row. */
+const COACH_PAYLOAD_VERSION = 47; // 47 (D-231): per_lift.anchor_1rm + anchor-aware strength verdict/suggested-weight. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2000,24 +2001,30 @@ Deno.serve(async (req) => {
     if (!shouldSuppressBaselineDriftSuggestions) {
       for (const p of driftPairs) {
         if (!Number.isFinite(p.baseline) || p.baseline <= 0) continue;
-        const rawLearned = p.learned;
-        const rounded = Math.floor(rawLearned / 5) * 5;
-        if (!Number.isFinite(rounded) || rounded < p.baseline * 1.05) continue;
-        const liftData = strength[p.lift as keyof typeof strength];
-        const conf = liftData?.confidence;
-        if (conf !== 'high' && conf !== 'medium') continue;
+        // D-231: the divergence decision is now the ONE shared capacity gate (typed-anchored baseline,
+        // learned computed, ≥5% ∧ ≥3 samples ∧ ≥medium confidence ∧ fresh) — resolveStrengthCapacity's
+        // `.suggestion` — instead of a parallel hand-rolled `floor(learned/5)*5 ≥ baseline×1.05`. This is
+        // the same "learned surfaces drift as a SUGGESTION, never a verdict" object the resolver owns, so
+        // suggestion and verdict can no longer disagree. Plan-aware suppression, the 30-day dismissal, and
+        // the ≥4-session surface floor are preserved; the shared gate also adds a freshness bound (≤6wk).
+        const cap = resolveStrengthCapacity({ key: p.lift, typed: perf, learnedStrength1rms: strength, asOf: today });
+        const sug = cap.suggestion;
+        if (!sug || sug.divergencePct <= 0) continue; // upward drift only (learned above typed)
+        if (sug.sampleCount < 4) continue;             // preserve the existing ≥4-session surface floor
         const dismissedAt = dismissedDrift[p.lift];
         if (dismissedAt) {
           const d = new Date(dismissedAt).getTime();
           const t = new Date(today).getTime();
           if (t - d < 30 * 24 * 60 * 60 * 1000) continue;
         }
-        const sessions = Number(liftData?.sample_count ?? 0);
-        if (sessions < 4) continue;
+        const rounded = Math.floor(sug.computed / 5) * 5;
+        if (rounded < p.baseline) continue;            // display floor: rounded-down learned still above typed
         baseline_drift_suggestions.push({
-          ...p,
+          lift: p.lift,
+          label: p.label,
+          baseline: p.baseline,
           learned: rounded,
-          basis: `Estimated 1RM from ${sessions} session${sessions !== 1 ? 's' : ''} (${conf} confidence)`,
+          basis: `Estimated 1RM from ${sug.sampleCount} session${sug.sampleCount !== 1 ? 's' : ''} (${sug.confidence} confidence)`,
         });
       }
     }
@@ -2281,7 +2288,16 @@ Deno.serve(async (req) => {
         };
         return Object.entries(s1rms)
           .filter(([_, v]: [string, any]) => v && typeof v === 'object' && v.value > 0)
-          .map(([key, v]: [string, any]) => ({
+          .map(([key, v]: [string, any]) => {
+            // D-231: `current_e1rm` stays the LEARNED estimate (it feeds the e1rm trend); the TYPED
+            // baseline (e.g. bench 150) rides on `anchor_1rm`, which the response-model verdict +
+            // suggested-weight now CONSULT — so "125→115 · back off" is no longer baseline-blind
+            // (Q-107 H1). Accessory / gap-fill lifts (hip_thrust, trap_bar_deadlift, barbell_row) have
+            // no typed anchor → anchor_1rm null → legacy behavior. Full plan/history-aware tone = Q-111.
+            const canon = canonicalizeLiftKey(key);
+            const cap = canon ? resolveStrengthCapacity({ key, typed: perf, learnedStrength1rms: s1rms, asOf: asOfDate }) : null;
+            const anchor1rm = cap && cap.source === 'typed' ? cap.value : null;
+            return {
             canonical_name: key,
             display_name: LIFT_DISPLAY[key] || key.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
             current_e1rm: Number(v.value) || null,
@@ -2291,7 +2307,9 @@ Deno.serve(async (req) => {
             target_rir: getTargetRir(strengthProfile, key),
             sessions_in_window: Number(v.sample_count ?? 0),
             best_weight: perLiftRir.bestWeightByLift.get(key) ?? null,
-          }));
+            anchor_1rm: anchor1rm,
+            };
+          });
       } catch { return []; }
     })();
 
@@ -2712,7 +2730,12 @@ Deno.serve(async (req) => {
     try {
       const { data: snapRows } = await supabase
         .from('athlete_snapshot')
-        .select('interference, run_easy_pace_at_hr_trend, strength_volume_trend, strength_top_lifts, acwr, rpe_trend, intensity_distribution, state_trends_v1')
+        // D-231 / Q-109 step-4: only the columns the coach actually consumes. `run_easy_pace_at_hr_trend,
+        // strength_volume_trend, strength_top_lifts, acwr, rpe_trend` were SELECTed-and-never-read (the coach
+        // recomputes those in parallel); dropped to remove the dead fetch + PostgREST projection footgun. The
+        // real migrations live elsewhere: ACWR → step 6 (persisted body_response is the single substrate),
+        // strength → the resolver (above), RPE+easy-pace trend → Q-110 (shape-mismatch, separate design task).
+        .select('interference, intensity_distribution, state_trends_v1')
         .eq('user_id', userId)
         .order('week_start', { ascending: false })
         .limit(1);

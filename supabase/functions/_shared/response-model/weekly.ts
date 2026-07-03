@@ -131,12 +131,18 @@ function computeEndurance(signals: WeeklySignalInputs, norms: BaselineNorms): En
 
 import { isLowerBodyLift } from '../strength-profiles.ts';
 
-function computeLiftVerdict(
+// D-231: a working weight at or below this fraction of the tested 1RM has clear headroom — a RIR-driven
+// back-off there is normal sub-max training, not overreach, so we keep the label but drop the alarm tone.
+const ANCHOR_HEADROOM_FRAC = 0.90;
+
+export function computeLiftVerdict(
   rir: number | null,
   targetRir: number | null,
   e1rmTrend: TrendDirection,
   weekIntent: string,
   _canonical: string,
+  anchor: number | null = null,
+  bestWeight: number | null = null,
 ): { label: string; tone: LiftVerdictTone } {
   if (weekIntent === 'recovery') return { label: 'lighter this week', tone: 'muted' };
   if (weekIntent === 'taper') return { label: 'maintain', tone: 'neutral' };
@@ -159,31 +165,47 @@ function computeLiftVerdict(
 
   const deviation = rir - targetRir;
 
-  if (deviation <= VERDICT_DEVIATION.BACK_OFF) return { label: 'back off weight', tone: 'caution' };
+  if (deviation <= VERDICT_DEVIATION.BACK_OFF) {
+    // D-231 baseline-aware de-alarm: a RIR back-off on a weight well under the tested 1RM (150) is
+    // headroom, not overreach — keep the informative label, drop the alarm tone. No anchor (accessory /
+    // gap-fill) → current behavior unchanged. Full plan/history-aware tone is Q-111.
+    const hasHeadroom = anchor != null && anchor > 0 && bestWeight != null && bestWeight <= anchor * ANCHOR_HEADROOM_FRAC;
+    return { label: 'back off weight', tone: hasHeadroom ? 'neutral' : 'caution' };
+  }
   if (deviation >= VERDICT_DEVIATION.ADD_WEIGHT) return { label: 'add weight', tone: 'action' };
   if (e1rmTrend === 'improving') return { label: 'getting stronger', tone: 'positive' };
   return { label: 'on track', tone: 'neutral' };
 }
 
-function computeSuggestedWeight(
+export function computeSuggestedWeight(
   verdict: string,
   bestWeight: number | null,
   canonical: string,
+  anchor: number | null = null,
 ): number | null {
   if (bestWeight == null || bestWeight <= 0) return null;
   const lower = isLowerBodyLift(canonical);
 
+  let suggested: number | null = null;
   if (verdict === 'add weight') {
     const increment = lower ? 10 : 5;
-    return Math.round((bestWeight + increment) / 5) * 5;
+    suggested = Math.round((bestWeight + increment) / 5) * 5;
+  } else if (verdict === 'back off weight') {
+    suggested = Math.round((bestWeight * 0.9) / 5) * 5;
+  } else {
+    return null;
   }
-  if (verdict === 'back off weight') {
-    return Math.round((bestWeight * 0.9) / 5) * 5;
+
+  // D-231: never suggest a working weight at or above the tested 1RM (anchor as a sanity bound). No
+  // anchor → unchanged. For the bench case (suggest 115 vs 150 anchor) this is a no-op; it only bites
+  // an add-weight suggestion that would otherwise breach the tested max.
+  if (suggested != null && anchor != null && anchor > 0 && suggested >= anchor) {
+    suggested = Math.floor((anchor * 0.95) / 5) * 5;
   }
-  return null;
+  return suggested;
 }
 
-function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: string): StrengthResponse {
+export function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: string): StrengthResponse {
   const per_lift: LiftTrend[] = lifts.map((l) => {
     const sufficient = l.sessions_in_window >= MIN_SAMPLES_FOR_SIGNAL;
     const e1rmDelta = (l.current_e1rm != null && l.previous_e1rm != null && l.previous_e1rm > 0)
@@ -203,8 +225,9 @@ function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: string): Str
       : rirDelta != null && rirDelta <= -0.5 ? 'declining'
       : 'stable';
 
-    const verdict = computeLiftVerdict(l.current_avg_rir, l.target_rir, e1rm_trend, weekIntent, l.canonical_name);
+    const anchor_1rm = l.anchor_1rm ?? null;
     const best_weight = l.best_weight ?? null;
+    const verdict = computeLiftVerdict(l.current_avg_rir, l.target_rir, e1rm_trend, weekIntent, l.canonical_name, anchor_1rm, best_weight);
 
     return {
       canonical_name: l.canonical_name,
@@ -223,7 +246,8 @@ function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: string): Str
       verdict_label: verdict.label,
       verdict_tone: verdict.tone,
       best_weight,
-      suggested_weight: computeSuggestedWeight(verdict.label, best_weight, l.canonical_name),
+      suggested_weight: computeSuggestedWeight(verdict.label, best_weight, l.canonical_name, anchor_1rm),
+      anchor_1rm,
     };
   });
 

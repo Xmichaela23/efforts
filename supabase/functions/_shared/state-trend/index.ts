@@ -39,6 +39,13 @@ export {
   type BaselineSuggestion,
 } from './reconcile.ts';
 export {
+  resolveStrengthCapacity,
+  canonicalizeLiftKey,
+  type CanonicalLiftKey,
+  type CapacitySource,
+  type CapacityResolution,
+} from './capacity-resolver.ts';
+export {
   computeAdherenceState,
   type AdherenceInput,
   type AdherenceState,
