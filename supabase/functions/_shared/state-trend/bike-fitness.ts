@@ -56,6 +56,10 @@ export interface BikeSignal {
   pctChange: number | null;
   provisional: boolean;
   basis: string | null; // e.g. the bin name (power) or null (efficiency)
+  /** D-232 glass-box receipt evidence — rides in the trend, newest ride age (days), window length (days). */
+  sampleCount?: number;
+  newestAgeDays?: number | null;
+  windowDays?: number;
 }
 
 export interface BikeFitness {
@@ -77,14 +81,14 @@ export function computeTerrainBinnedPower(rides: BikeEffortRide[], asOf: string,
     const newest = t.points.length ? t.points.map((p) => p.date).sort().pop()! : '';
     if (!best || newest > (best.t.points.map((p) => p.date).sort().pop() || '')) best = { verdict: t.verdict, t, bin };
   }
-  if (!best) return { verdict: 'needs_data', pctChange: null, provisional: false, basis: null };
-  return { verdict: best.verdict, pctChange: best.t.pctChange, provisional: isProvisionalTrend(best.t), basis: best.bin };
+  if (!best) return { verdict: 'needs_data', pctChange: null, provisional: false, basis: null, sampleCount: 0, newestAgeDays: null, windowDays: thresholds.windowDays };
+  return { verdict: best.verdict, pctChange: best.t.pctChange, provisional: isProvisionalTrend(best.t), basis: best.bin, sampleCount: best.t.sampleCount, newestAgeDays: best.t.newestAgeDays, windowDays: best.t.window?.days };
 }
 
 /** B — HR-at-power efficiency. `hrAtBand` = per-ride mean HR in the reference band ({date,value}). */
 export function computeEfficiencyTrend(hrAtBand: TrendPoint[], asOf: string, spw: number): BikeSignal {
   const t = classifyTrend(hrAtBand, efficiencyThresholds(spw), asOf);
-  return { verdict: t.verdict, pctChange: t.pctChange, provisional: isProvisionalTrend(t), basis: null };
+  return { verdict: t.verdict, pctChange: t.pctChange, provisional: isProvisionalTrend(t), basis: null, sampleCount: t.sampleCount, newestAgeDays: t.newestAgeDays, windowDays: t.window?.days };
 }
 
 /** Combine into the bike fitness read. Power leads; efficiency is the secondary, alongside. */

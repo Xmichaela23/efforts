@@ -16,6 +16,11 @@ export type AxisMode = 'performance' | 'adherence';
 export interface PerfSummary {
   verdict: TrendVerdict;
   pctChange: number | null;
+  /** D-232 glass-box receipt evidence — sample count, newest-point age (days), window length (days).
+   *  Optional: strength passes {overall, overallPctChange} with no series, so these are absent there. */
+  sampleCount?: number;
+  newestAgeDays?: number | null;
+  windowDays?: number;
 }
 
 export interface DisciplineCard {
@@ -62,5 +67,11 @@ export function resolveDisciplineCard(args: {
 
 /** Convenience: a TrendResult (bike) → PerfSummary. Strength passes {overall, overallPctChange}. */
 export function perfFromTrend(t: TrendResult | null): PerfSummary | null {
-  return t ? { verdict: t.verdict, pctChange: t.pctChange } : null;
+  return t ? {
+    verdict: t.verdict,
+    pctChange: t.pctChange,
+    sampleCount: t.sampleCount,
+    newestAgeDays: t.newestAgeDays,
+    windowDays: t.window?.days,
+  } : null;
 }

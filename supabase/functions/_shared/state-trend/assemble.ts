@@ -108,9 +108,10 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     .map((r) => ({ date: r.date, value: Number(r.hr_at_band) }));
   const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike);
   bikeFitness.efficiency.basis = inp.bikeRows.map((r) => r.band_source).find((s) => s) ?? null;
-  const bikeLeadVerdict = bikeFitness.power.verdict !== 'needs_data' ? bikeFitness.power.verdict : bikeFitness.efficiency.verdict;
-  const bikeLeadPct = bikeFitness.power.verdict !== 'needs_data' ? bikeFitness.power.pctChange : bikeFitness.efficiency.pctChange;
-  const bike: PerfSummary | null = bikeLeadVerdict !== 'needs_data' ? { verdict: bikeLeadVerdict, pctChange: bikeLeadPct } : null;
+  const bikeLead = bikeFitness.power.verdict !== 'needs_data' ? bikeFitness.power : bikeFitness.efficiency;
+  const bike: PerfSummary | null = bikeLead.verdict !== 'needs_data'
+    ? { verdict: bikeLead.verdict, pctChange: bikeLead.pctChange, sampleCount: bikeLead.sampleCount, newestAgeDays: bikeLead.newestAgeDays, windowDays: bikeLead.windowDays }
+    : null;
 
   // run
   const runState = computeRunState(routeMetricsToSeries(inp.runJoined), asOf, spw.run);
@@ -169,7 +170,15 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
 }
 
 // ---- cache shape: athlete_snapshot.state_trends_v1 ----
-export interface DisciplineTrendCache { verdict: string; pctChange: number | null; provisional: boolean }
+export interface DisciplineTrendCache {
+  verdict: string;
+  pctChange: number | null;
+  provisional: boolean;
+  /** D-232 glass-box receipt evidence — part of the spine's cached truth. Optional for back-compat. */
+  sampleCount?: number;
+  newestAgeDays?: number | null;
+  windowDays?: number;
+}
 export interface StateTrendsV1 {
   as_of: string;
   version: 1;
@@ -209,7 +218,14 @@ export function rollupFitnessDirection(v1: StateTrendsV1 | null | undefined): Fi
 export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV1 {
   const disc = (k: string): DisciplineTrendCache => {
     const p = r.perfByDisc[k];
-    return { verdict: p?.verdict ?? 'needs_data', pctChange: p?.pctChange ?? null, provisional: !!r.provisionalByDisc[k] };
+    return {
+      verdict: p?.verdict ?? 'needs_data',
+      pctChange: p?.pctChange ?? null,
+      provisional: !!r.provisionalByDisc[k],
+      sampleCount: p?.sampleCount,
+      newestAgeDays: p?.newestAgeDays,
+      windowDays: p?.windowDays,
+    };
   };
   return {
     as_of: asOf,
