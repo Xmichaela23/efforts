@@ -76,6 +76,7 @@ import {
   resolveWeekStartDowFromPlanConfig,
   weekStartOf,
   planHasStarted,
+  planHasEnded,
   planWeek1StartIso,
   buildPlanContextLine,
 } from '../_shared/plan-week.ts';
@@ -111,7 +112,8 @@ const corsHeaders: Record<string, string> = {
 /** v56: Q-111 §2 — the LEGS LOADED Why NAMES the novel movements from a ~6–8wk strength-history read; same novel fact the strength INSIGHTS uses (one fact, two surfaces). */
 /** v57: honesty (D-233) — the novel phrase cites the WINDOW actually checked ("in 8 weeks"), not "in months" (a duration the 56-day read can't establish). Bump so cached "in months" rows recompute. */
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
-const COACH_PAYLOAD_VERSION = 58; // 58: novelty = "not in your recent training" (no window). // 57: "in 8 weeks". // 56 (Q-111): novel-movement naming. // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+/** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
+const COACH_PAYLOAD_VERSION = 59; // 59: plan-week END-gated. // 58: novelty = "not in your recent training". // 57: "in 8 weeks". // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -1221,6 +1223,13 @@ Deno.serve(async (req) => {
     // to 1, so a plan starting NEXT week reads as "week 1" — narrated as in-block over this week's
     // off-plan sessions. This gate keeps the narrative + week chip honest about pre-start.
     const planStarted = activePlan ? planHasStarted(planConfig, asOfDate) : true;
+    // Stale-anchor class closure (2026-07-03): status→'ended' only fires on plan REPLACEMENT, not natural
+    // expiry, and resolvePlanWeekIndex clamps a past date to the last week — so an expired-but-unreplaced
+    // plan would narrate "week {duration}" forever. planActiveNow adds the END boundary (covers-today),
+    // matching the arc phase gate. Used for the user-facing week CLAIMS (narrative line + week chip); the
+    // pre-start branch at ~2884 stays on planStarted (an ended plan is not pre-start).
+    const planEnded = activePlan ? planHasEnded(planConfig, activePlan.duration_weeks || null, asOfDate) : false;
+    const planActiveNow = planStarted && !planEnded;
 
     // Plan transition period: first two plan weeks.
     // During this window, load-ratio comparisons are often contaminated by the prior cycle.
@@ -3869,7 +3878,7 @@ Deno.serve(async (req) => {
             totalWeeks,
             weekIndex,
             weekIntent: weekIntent && weekIntent !== 'unknown' ? weekIntent : null,
-            hasStarted: planStarted,
+            hasStarted: planActiveNow,
             planStartDisplay,
           });
           narrativeFacts.push(planLine);
@@ -4942,7 +4951,7 @@ ${narrativeFacts.join('\n')}`;
         end_date: weekEndDate,
         week_start_dow: weekStartDow,
         // D-232: pre-start → null so the chip shows "WEEK", not a false "WK 1" (plan hasn't begun).
-        index: planStarted ? weekIndex : null,
+        index: planActiveNow ? weekIndex : null,
         intent: weekIntent,
         focus_label: weekFocusLabel,
         intent_summary: (() => {

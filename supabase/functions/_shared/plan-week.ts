@@ -88,6 +88,25 @@ export function planWeek1StartIso(planConfig: any): string | null {
 }
 
 /**
+ * Has the plan's window fully ENDED as of `asOfIso`? (week-1 start + durationWeeks*7 days ≤ today).
+ * The END-boundary companion to `planHasStarted` — closes the stale-anchor class (Q-113 generalized): plan
+ * status only transitions to 'ended' on REPLACEMENT (create-goal-and-materialize-plan), not on natural
+ * expiry, and `resolvePlanWeekIndex` clamps a past date to the LAST week rather than null — so a naturally-
+ * expired, never-replaced plan would otherwise narrate as "week {duration}" forever. No start / no duration
+ * → false (can't bound; preserve legacy narration). The final week stays valid — only AT/AFTER the exclusive
+ * end does this return true.
+ */
+export function planHasEnded(planConfig: any, durationWeeks: number | null | undefined, asOfIso: string): boolean {
+  const start = String(planConfig?.user_selected_start_date || planConfig?.start_date || '');
+  if (!start || !durationWeeks || durationWeeks <= 0) return false;
+  const week1 = weekStartOf(start, resolveWeekStartDowFromPlanConfig(planConfig));
+  const d = parseISODateOnly(week1);
+  d.setDate(d.getDate() + Math.floor(durationWeeks) * 7);
+  const endExclusiveIso = d.toISOString().slice(0, 10);
+  return String(asOfIso) >= endExclusiveIso; // YYYY-MM-DD lexical compare == chronological
+}
+
+/**
  * The plan-context line for the coach narrative — grounded in whether the plan has started (D-232
  * claim-grounding). Pre-start → NO "week N" / in-block claim; the LLM is told these sessions are
  * pre-plan and to narrate the lead-in. Started → the normal in-block phase line.

@@ -10,7 +10,7 @@
  */
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { planHasStarted, planWeek1StartIso, buildPlanContextLine } from './plan-week.ts';
+import { planHasStarted, planHasEnded, planWeek1StartIso, buildPlanContextLine } from './plan-week.ts';
 
 // week_start defaults to Monday. A plan starting Mon 2026-07-06.
 const PLAN = { start_date: '2026-07-06', plan_contract_v1: { week_start: 'mon' } };
@@ -23,6 +23,20 @@ Deno.test('planHasStarted: today ON/AFTER plan week-1 start → true', () => {
   assertEquals(planHasStarted(PLAN, '2026-07-06'), true); // the Monday itself
   assertEquals(planHasStarted(PLAN, '2026-07-10'), true);
 });
+// planHasEnded — the end-boundary companion that closes the stale-anchor class (a naturally-expired,
+// never-replaced plan must stop narrating "week N"; status→'ended' only fires on replacement).
+Deno.test('planHasEnded: within the window → false (final week stays valid)', () => {
+  // 4-week plan from Mon 07-06 → end-exclusive 08-03; 07-30 is in week 4.
+  assertEquals(planHasEnded(PLAN, 4, '2026-07-30'), false);
+});
+Deno.test('planHasEnded: at/after the exclusive end → true (no stale "week N" — the marathon-plan case)', () => {
+  assertEquals(planHasEnded(PLAN, 4, '2026-08-03'), true); // exact end (exclusive)
+  assertEquals(planHasEnded(PLAN, 4, '2026-08-20'), true); // well past
+});
+Deno.test('planHasEnded: no duration → false (cannot bound)', () => {
+  assertEquals(planHasEnded(PLAN, null, '2026-08-20'), false);
+});
+
 Deno.test('planHasStarted: mid-week start resolves to its week-start Monday', () => {
   // start on Wed 2026-07-08 → week-1 start is Mon 2026-07-06; a Sun 07-05 view is pre-start
   const midweek = { start_date: '2026-07-08', plan_contract_v1: { week_start: 'mon' } };
