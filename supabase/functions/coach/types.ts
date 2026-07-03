@@ -429,8 +429,10 @@ export type CoachWeekContextResponseV1 = {
       fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
       readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
       readiness_label: string | null;
-      /** D-232: FATIGUED/OVERREACHED factor breakdown for "open for more" — "Why: effort up (5.3 vs 4.4 typical) · load balanced · 1 body signal declining". Null otherwise. */
+      /** D-232: FATIGUED/OVERREACHED factor breakdown for "open for more" — "Why: perceived effort up (5.3 vs 4.4 typical) · load balanced". Null otherwise. */
       readiness_why?: string | null;
+      /** D-232: loaded-legs one-line suggestion under the Why (conditional, never overrides plan). Null except LEGS LOADED/SORE. */
+      readiness_suggestion?: string | null;
       signals: Array<{
         metric: 'aerobic_efficiency' | 'strength_reserve' | 'effort_level' | 'execution_quality';
         direction: 'improving' | 'stable' | 'declining';

@@ -39,6 +39,7 @@ import {
 } from '../_shared/response-model/index.ts';
 import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
 import { buildReadinessWhy, buildCrossTrainingReceipt } from '../_shared/response-model/readiness-receipts.ts';
+import { buildLoadedLegsDiagnosis, classifyFatigueLabel, type LoadedLegsDiagnosis } from '../_shared/response-model/loaded-legs.ts';
 import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext, type GoalLite } from '../_shared/goal-context.ts';
 import { coachLegacyPriorRaceLine, coachPromptPriorRaceBlock } from '../_shared/prior-similar-race-coach.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
@@ -101,7 +102,8 @@ const corsHeaders: Record<string, string> = {
 /** v49: D-232 — cross_training_signal strain label cites the distinct fired signals ("Effort up (5.3 vs 4.4)", no false "across disciplines" on a single signal) + trends.readiness_why factor breakdown for the FATIGUED "open for more"; bump so cached rows recompute. */
 /** v50: D-232 claim-grounding — pre-start plans no longer narrate as "week 1 in-block" (planHasStarted gates the narrative planLine + the week-chip index → null pre-start); bump so cached pre-start rows recompute. */
 /** v51: D-232 concision — readiness_why NAMES the marker ("perceived effort up (5.3 vs 4.4 typical) · load balanced") + drops the redundant "N signals declining" count; narrative tightened to ≤3 terse sentences with a NO-DASHBOARD-RECAP rule. Bump so cached verbose rows recompute. */
-const COACH_PAYLOAD_VERSION = 51; // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+/** v52: D-232 surgical readiness — the `fatigued` catch-all resolves to LEGS LOADED / LEGS SORE / EFFORT UP / FATIGUED (systemic only); loaded-legs Why names the session+mechanism+effect + a conditional suggestion (readiness_suggestion). Bump so cached "FATIGUED" rows recompute. */
+const COACH_PAYLOAD_VERSION = 52; // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2799,6 +2801,67 @@ Deno.serve(async (req) => {
       return 'normal';
     })() as 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
 
+    // D-232 surgical readiness: refine the `fatigued` catch-all (over-fires on a single signal) into a
+    // load-language display — LEGS LOADED (cross-domain lower-body attribution), LEGS SORE (athlete
+    // DECLARED it via Q-049), FATIGUED (genuinely systemic: elevated ACWR or ≥2 signals), or EFFORT UP
+    // (single unattributed signal + balanced load). Novel-movement NAMING is deferred to Q-111 (needs
+    // 6–8wk exercise history; the coach has 28d).
+    const fatigueRefinement: { label: string; loadedLegs: LoadedLegsDiagnosis | null } | null = (() => {
+      if (readinessState !== 'fatigued') return null;
+      const rm = weeklyResponseModel;
+      const e = rm.endurance;
+      const effortUp = e.rpe.sufficient && e.rpe.trend === 'declining' && e.rpe.current_avg != null && e.rpe.baseline_avg != null;
+      const acwr = metrics.acwr;
+      const systemic = (acwr != null && acwr >= 1.2) || rm.assessment.signals_concerning >= 2;
+      const loadLabel = (acwr != null && acwr >= 1.2) ? `load elevated (ACWR ${acwr.toFixed(2)})` : 'load balanced';
+      const daysAgo = (iso: string) => (parseISODateOnly(asOfDate).getTime() - parseISODateOnly(iso).getTime()) / 86400000;
+
+      // Most recent LOWER-BODY strength session within 4 days (logged day + session RPE).
+      let lower: { dayName: string; rpe: number | null } | null = null;
+      try {
+        const rows = (Array.isArray(normWorkouts) ? normWorkouts : [])
+          .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed'
+            && String(w?.type || '').toLowerCase() === 'strength'
+            && strengthFocusFromWorkout(w) === 'lower')
+          .map((w: any) => ({ date: String(w?.date || ''), rpe: sessionRpeFromWorkout(w) }))
+          .filter((r) => r.date && daysAgo(r.date) >= 0 && daysAgo(r.date) <= 4)
+          .sort((a, b) => b.date.localeCompare(a.date));
+        if (rows.length) lower = { dayName: parseISODateOnly(rows[0].date).toLocaleDateString('en-US', { weekday: 'long' }), rpe: rows[0].rpe };
+      } catch { lower = null; }
+
+      // Athlete-DECLARED soreness (Q-049, 1–10, higher = sorer): recent (≤2d) + clearly sore (≥7).
+      const soreness = (() => {
+        const L = arc.readiness?.latest;
+        if (!L || L.soreness == null || !L.date) return false;
+        return daysAgo(String(L.date)) <= 2 && Number(L.soreness) >= 7;
+      })();
+
+      // Plan-start proximity (cheap): plan not started + starts within the clearing window → "{Day}'s opener".
+      const planEvent = (() => {
+        if (planStarted || !activePlan) return null;
+        const startIso = planWeek1StartIso(planConfig);
+        if (!startIso) return null;
+        const d = -daysAgo(startIso); // days until start
+        return (d >= 0 && d <= 4) ? `${parseISODateOnly(startIso).toLocaleDateString('en-US', { weekday: 'long' })}'s opener` : null;
+      })();
+
+      let loadedLegs: LoadedLegsDiagnosis | null = null;
+      if (lower && (lower.rpe == null || lower.rpe >= 8) && effortUp) {
+        loadedLegs = buildLoadedLegsDiagnosis({
+          dayName: lower.dayName,
+          sessionRpe: lower.rpe,
+          movement: null,   // novelty naming deferred to Q-111 (28d history in coach)
+          isNovel: false,
+          effortCurrent: Number(e.rpe.current_avg),
+          effortBaseline: Number(e.rpe.baseline_avg),
+          loadLabel,
+          athleteReportedSoreness: soreness,
+          planEvent,
+        });
+      }
+      return { label: classifyFatigueLabel({ loadedLegs, systemic }), loadedLegs };
+    })();
+
     // Race-course goal ids + unified run goal (State + terrain + VDOT readiness). Hoisted so race_readiness
     // runs when primary_event is null but the plan still points at a run goal (e.g. race date in the past).
     let raceCourseGoalIdsForRace: string[] = [];
@@ -5107,7 +5170,8 @@ ${narrativeFacts.join('\n')}`;
           // READINESS chip — the category error that showed "HIGH LOAD" in green while readiness was
           // 'fresh'. Removed: load never wears the readiness label, readiness never wears load.
           if (readinessState === 'overreached') return 'OVERREACHED';
-          if (readinessState === 'fatigued') return 'FATIGUED';
+          // D-232: the `fatigued` catch-all resolves to LEGS LOADED / LEGS SORE / EFFORT UP / FATIGUED.
+          if (readinessState === 'fatigued') return fatigueRefinement?.label ?? 'FATIGUED';
           if (readinessState === 'fresh') return 'LOW FATIGUE';
           if (readinessState === 'adapting') return 'ABSORBING';
           if (readinessState === 'normal' && isAcwrDetrainedSignal(metrics.acwr)) {
@@ -5122,6 +5186,9 @@ ${narrativeFacts.join('\n')}`;
         // D-232 glass-box: the FATIGUED/OVERREACHED headline expands to its factors — the real declining
         // signals with values + load + count — instead of a bare state. Rendered in "open for more".
         readiness_why: (() => {
+          // D-232: a surgical loaded-legs attribution supplies its own Why (names the session +
+          // mechanism + effect); otherwise the generic factor breakdown.
+          if (fatigueRefinement?.loadedLegs) return fatigueRefinement.loadedLegs.why;
           if (readinessState !== 'fatigued' && readinessState !== 'overreached') return null;
           const e = weeklyResponseModel.endurance;
           const acwr = metrics.acwr;
@@ -5138,6 +5205,8 @@ ${narrativeFacts.join('\n')}`;
             concerningCount: weeklyResponseModel.assessment.signals_concerning,
           });
         })(),
+        // D-232: the loaded-legs suggestion line (rendered under the Why). Null for systemic/EFFORT-UP.
+        readiness_suggestion: fatigueRefinement?.loadedLegs?.suggestion ?? null,
         signals: trendSignals,
       },
       details: {

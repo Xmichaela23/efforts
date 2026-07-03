@@ -1153,6 +1153,7 @@ export default function StateTab({
   const readinessLabel = trends.readiness_label;
   const readiness = trends.readiness_state;
   const readinessWhy = trends.readiness_why ?? null; // D-232: FATIGUED "Why:" factor breakdown
+  const readinessSuggestion = trends.readiness_suggestion ?? null; // D-232: loaded-legs one-line suggestion
   const readinessColor =
     readiness === 'fresh' ? 'text-emerald-400/90' :
     readiness === 'adapting' ? 'text-sky-400/85' :
@@ -1232,8 +1233,9 @@ export default function StateTab({
                   </button>
                   {narrativeOpen && (
                     <>
-                      {/* D-232: the FATIGUED headline expands to its real factors (values + load + count). */}
+                      {/* D-232: the FATIGUED headline expands to its real factors, then the loaded-legs suggestion, then prose. */}
                       {readinessWhy && <span className="text-[12px] text-amber-300/70 leading-snug mt-1">{readinessWhy}</span>}
+                      {readinessSuggestion && <span className="text-[12px] text-white/60 leading-snug mt-1">{readinessSuggestion}</span>}
                       {weekNarrative && <span className="text-[12px] text-white/55 leading-snug mt-1">{weekNarrative}</span>}
                     </>
                   )}
