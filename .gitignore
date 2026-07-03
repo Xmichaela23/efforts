@@ -29,3 +29,8 @@ dist-ssr
 
 # Throwaway local verification/debug scripts (D-NNN verify, dbg, etc.)
 scripts/_*
+
+# Screenshot tool — saved login session (holds an auth token; never commit)
+scripts/screens/.screenshot-auth.json
+# Captured app screenshots (personal data) — keep local unless you choose to share
+docs/screens/
