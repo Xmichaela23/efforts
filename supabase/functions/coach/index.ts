@@ -72,6 +72,9 @@ import {
   resolvePlanWeekIndex,
   resolveWeekStartDowFromPlanConfig,
   weekStartOf,
+  planHasStarted,
+  planWeek1StartIso,
+  buildPlanContextLine,
 } from '../_shared/plan-week.ts';
 import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
 import { swimSecPer100YdFromArcSwimInputs } from '../_shared/planning-context.ts';
@@ -96,7 +99,8 @@ const corsHeaders: Record<string, string> = {
 /** v47: D-231 — response_model.strength.per_lift gains `anchor_1rm` (typed baseline) + the verdict/suggested-weight now consult it (de-alarmed tone on headroom); bump so cached baseline-blind "125→115" rows recompute with the anchor-aware row. */
 /** v48: D-232 — glass-box RPE row: visible_signal "How hard it feels" detail is now a plain verdict + receipt ("Sessions feeling a bit harder than usual (avg 6.4 vs your typical 5.5)") instead of "feels 0.9 harder"; bump so cached bare-delta rows recompute. */
 /** v49: D-232 — cross_training_signal strain label cites the distinct fired signals ("Effort up (5.3 vs 4.4)", no false "across disciplines" on a single signal) + trends.readiness_why factor breakdown for the FATIGUED "open for more"; bump so cached rows recompute. */
-const COACH_PAYLOAD_VERSION = 49; // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm + anchor-aware strength verdict/suggested-weight. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+/** v50: D-232 claim-grounding — pre-start plans no longer narrate as "week 1 in-block" (planHasStarted gates the narrative planLine + the week-chip index → null pre-start); bump so cached pre-start rows recompute. */
+const COACH_PAYLOAD_VERSION = 50; // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -1202,6 +1206,10 @@ Deno.serve(async (req) => {
     const weekStartDate = weekStartOf(asOfDate, weekStartDow);
     const weekEndDate = addDaysISO(weekStartDate, 6);
     const weekIndex = activePlan ? computeWeekIndex(planConfig, asOfDate, weekStartDow, activePlan.duration_weeks || null) : null;
+    // D-232 claim-grounding: has the plan actually started? resolvePlanWeekIndex clamps pre-start weeks
+    // to 1, so a plan starting NEXT week reads as "week 1" — narrated as in-block over this week's
+    // off-plan sessions. This gate keeps the narrative + week chip honest about pre-start.
+    const planStarted = activePlan ? planHasStarted(planConfig, asOfDate) : true;
 
     // Plan transition period: first two plan weeks.
     // During this window, load-ratio comparisons are often contaminated by the prior cycle.
@@ -3741,14 +3749,19 @@ Deno.serve(async (req) => {
         if (activePlan) {
           const planName = activePlan.name || 'training plan';
           const totalWeeks = activePlan.duration_weeks || null;
-          const weekNum = weekIndex ?? '?';
-          const intentStr = weekIntent && weekIntent !== 'unknown' ? weekIntent : null;
-          let planLine = `The athlete is on "${planName}"`;
-          if (totalWeeks) planLine += ` (${totalWeeks} weeks total)`;
-          planLine += `, currently in week ${weekNum}`;
-          if (intentStr) planLine += ` which is a ${intentStr} week`;
-          planLine +=
-            '. Plan phase (taper / peak / build / recovery / baseline) is defined by the plan contract (PlanContractV1); do not rename it or infer it only from training volume or missed sessions.';
+          // D-232: pre-start plans are narrated as pre-start, never as "week 1 in-block".
+          const planStartIso = planWeek1StartIso(planConfig);
+          const planStartDisplay = planStartIso
+            ? parseISODateOnly(planStartIso).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+            : null;
+          const planLine = buildPlanContextLine({
+            planName,
+            totalWeeks,
+            weekIndex,
+            weekIntent: weekIntent && weekIntent !== 'unknown' ? weekIntent : null,
+            hasStarted: planStarted,
+            planStartDisplay,
+          });
           narrativeFacts.push(planLine);
 
           // Multi-event: surface each secondary active plan with its own race date + phase
@@ -4798,7 +4811,8 @@ ${narrativeFacts.join('\n')}`;
         start_date: weekStartDate,
         end_date: weekEndDate,
         week_start_dow: weekStartDow,
-        index: weekIndex,
+        // D-232: pre-start → null so the chip shows "WEEK", not a false "WK 1" (plan hasn't begun).
+        index: planStarted ? weekIndex : null,
         intent: weekIntent,
         focus_label: weekFocusLabel,
         intent_summary: (() => {

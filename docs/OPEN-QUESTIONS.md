@@ -1377,6 +1377,13 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 - **Deliverable:** proposed **verdict strings + detection logic** to Michael **before any code** (same gate as the small wins).
 - **Cross-ref:** Q-107 (State H1 fixed; H3/H4 folded), D-231, D-232 (+ its progressive-disclosure/provenance extension — the contract this designs within), D-225 (Get Stronger add-ons/blocks), Q-097; `AUDIT-state-screen-2026-07-02.md` H1/H3, `coach/index.ts:2754-2789` (FATIGUED).
 
+## Q-112 — Narrative claim-grounding audit (the LLM-narration seam the app synthesis flagged as unaudited)
+
+- **Status:** filed 2026-07-03 · **audit owed — one confirmed defect fixed, the sweep is not done.** The `AUDIT-app-synthesis` §7 named the coach's LLM narrative / claim-grounding as *thinner-on, not asserted correct*. First confirmed defect (fixed 2026-07-03): the "open for more" prose claimed **"one week into Get Stronger"** and treated this week's off-plan sessions as the block, for a plan that **starts next week** — root cause `resolvePlanWeekIndex` clamping pre-start to week 1 (`plan-week.ts:56`, `Math.max(1, …)`) feeding the narrative "currently in week 1". Grounded via `planHasStarted` (narrative planLine + chip index).
+- **The standard to enforce (D-232 extension 2):** every narrative assertion must cite a **grounded deterministic fact** (plan state, session counts, trend verdicts, dates). No fact → no claim.
+- **The audit sweep (owed):** trace ALL narrative claims the coach LLM can make against their deterministic sources — plan phase/week, "N weeks into", completed/missed session framing, load/recovery language, race-week guidance, strength/endurance verdicts in prose — and gate each on a fact. Candidate systemic fixes: (1) fix `resolvePlanWeekIndex`'s pre-start clamp at the root (currently 5 consumers: coach, arc-context, generate-training-context, plan-context — blast radius deferred tonight); (2) a narrative-facts contract that the prompt can't exceed.
+- **Cross-ref:** D-232 (+ extension 2), `AUDIT-app-synthesis-2026-07-02.md` §7, `plan-week.ts` (`planHasStarted`/`buildPlanContextLine`), Q-106 (the coach-onto-spine work this rhymes with).
+
 ---
 
 ## When to add an entry
