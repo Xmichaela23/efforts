@@ -34,7 +34,7 @@ const BASE = {
 Deno.test('novel + plan-start: names the movement, plan-aware suggestion', () => {
   const d = buildLoadedLegsDiagnosis({ ...BASE, movement: 'lunges', isNovel: true, planEvent: "Monday's opener" });
   assertEquals(d.label, 'LEGS LOADED');
-  assertEquals(d.why, "Why: Monday's lower-body work — first lunges in 8 weeks, RPE 9 — efforts since feeling harder (5.3 vs 4.4) · load balanced, nothing systemic");
+  assertEquals(d.why, "Why: Monday's lower-body work — lunges (not in your recent training), RPE 9 — efforts since feeling harder (5.3 vs 4.4) · load balanced, nothing systemic");
   assertEquals(d.suggestion, "Expect this to ease over 2–3 days — new movements hit hardest the first time. Fine to keep rides/runs easy until it clears; you'll be fresh for Monday's opener.");
 });
 
@@ -42,7 +42,7 @@ Deno.test('novel + plan-start: names the movement, plan-aware suggestion', () =>
 Deno.test('novel + no plan event: generic ease-over-2-3-days suggestion', () => {
   const d = buildLoadedLegsDiagnosis({ ...BASE, movement: 'lunges', isNovel: true, planEvent: null });
   assertEquals(d.label, 'LEGS LOADED');
-  assertEquals(d.why, "Why: Monday's lower-body work — first lunges in 8 weeks, RPE 9 — efforts since feeling harder (5.3 vs 4.4) · load balanced, nothing systemic");
+  assertEquals(d.why, "Why: Monday's lower-body work — lunges (not in your recent training), RPE 9 — efforts since feeling harder (5.3 vs 4.4) · load balanced, nothing systemic");
   assertEquals(d.suggestion, 'Expect this to ease over 2–3 days — easy movement helps more than rest.');
 });
 
@@ -69,5 +69,5 @@ Deno.test('athlete-reported soreness + plan-start: appends the plan clause', () 
 // ── edge: missing RPE (no fabricated number) ──────────────────────────────────────────────────────
 Deno.test('missing session RPE: omit the RPE clause, keep the rest', () => {
   const d = buildLoadedLegsDiagnosis({ ...BASE, sessionRpe: null, movement: 'lunges', isNovel: true, planEvent: null });
-  assertEquals(d.why, "Why: Monday's lower-body work — first lunges in 8 weeks — efforts since feeling harder (5.3 vs 4.4) · load balanced, nothing systemic");
+  assertEquals(d.why, "Why: Monday's lower-body work — lunges (not in your recent training) — efforts since feeling harder (5.3 vs 4.4) · load balanced, nothing systemic");
 });

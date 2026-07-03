@@ -21,6 +21,9 @@ const DISC_SYNONYMS: Record<DisciplineVerdict['discipline'], RegExp> = {
 const UP_WORDS = /\b(improv\w*|climb\w*|rising|ticking up|trending up|building|gain\w*|stronger|going up|on the up)\b/i;
 const DOWN_WORDS = /\b(declin\w*|slipp\w*|dropp\w*|falling|fading|regress\w*|weaker|sliding|going down|trending down)\b/i;
 const FLAT_WORDS = /\b(holding steady|hold\w* steady|holding|steady|flat|plateau\w*|maintain\w*|unchanged|stable|stagnat\w*)\b/i;
+// Rule 8 — target / plan-adherence vocabulary. "target" is required to co-occur with an RIR/on-off/harder-
+// easier/plan context so it can't false-fire on "target race"/"target pace".
+const PLAN_TARGET_CLAIM = /\b(on target|off target|to target|easier side of (?:the )?target|harder than [^.]{0,24}\btarget\b|\brir\b[^.]{0,14}\btarget\b|\btarget\b[^.]{0,14}\brir\b|target rir|prescribed|as planned|per the plan|to plan|plan adherence|\badherence\b|hit the plan|missed the plan|against (?:the |your )?target)/i;
 function verdictDir(v: string): 'up' | 'down' | 'flat' | null {
   const s = String(v || '').toLowerCase();
   if (s === 'improving') return 'up';
@@ -156,6 +159,27 @@ export function validateNarrative(summary: string, ctx: NarrativeContext): Valid
     const m = text.match(new RegExp(`[+\\-]?${mag.toString().replace('.', '\\.')}\\s*%`));
     if (m) {
       failures.push({ rule: 7, code: 'receipt_recap', why: `Do not restate "${m[0]}" — the ${v.discipline} figure is already shown as a receipt on screen. Interpret, don't recap.` });
+    }
+  }
+
+  // ── Rule 8 — no plan → no target: any target / plan-adherence claim on a session with NO linked plan
+  //    is fabrication (Michael 2026-07-03: "'on target' on an unplanned session invents a plan"). Only
+  //    fires when hasLinkedPlan is EXPLICITLY false — surfaces that don't set it are unaffected.
+  if (ctx.hasLinkedPlan === false && PLAN_TARGET_CLAIM.test(text)) {
+    failures.push({ rule: 8, code: 'no_plan_target_claim', why: 'This session has no linked plan, so there is no target/prescription — do not say "on target", compare RIR to a target, or reference plan adherence. Report RIR/effort as raw observation.' });
+  }
+
+  // ── Rule 9 — name the movements: when the fact names specific novel movements, a vague "movements"/
+  //    "exercises" that names none of them blurs known specifics (Michael 2026-07-03).
+  if (ctx.mustNameMovements?.length) {
+    const lower = text.toLowerCase();
+    const namedAny = ctx.mustNameMovements.some((m) =>
+      String(m).toLowerCase().split(/\s+/).filter((w) => w.length > 3).some((w) => lower.includes(w.replace(/s$/, '')))
+    );
+    const vagueNovelty = /\b(movements?|exercises?|lifts?|work)\b/i.test(text) &&
+      /\b(new|novel|unfamiliar|introduc\w*|absent|recent routine|haven'?t|first time|returning|away)\b/i.test(text);
+    if (vagueNovelty && !namedAny) {
+      failures.push({ rule: 9, code: 'unnamed_movements', why: `The novel movements are known (${ctx.mustNameMovements.join(', ')}) — name them; do not generalize to "movements".` });
     }
   }
 

@@ -6,7 +6,7 @@ import { arcModeSystemAddon, arcNarrativeFactBlock } from '../_shared/arc-narrat
 // Shared narrative-reasoning core (D-189 — strength leg). Scaffold + validator suite via the strength
 // adapter; strength gets a 2-attempt validator loop (it had none). See docs/WORK-ORDER-narrative-core.md.
 import { buildReasoningScaffold, validateNarrative, strengthAdapter } from '../_shared/narrative-core/index.ts';
-import { detectNovelMovements, novelMovementsPhrase } from '../_shared/novel-movements.ts';
+import { detectNovelMovements, novelMovementsNames, novelMovementNames } from '../_shared/novel-movements.ts';
 // D-208: role classifier — execution scoring weights a skipped accessory less than a main lift.
 import { roleForExercise, ROLE_WEIGHT } from '../_shared/strength/exercise-role.ts';
 
@@ -1726,7 +1726,7 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   // Q-111 §2: the novel-movement fact — computed HERE (the caller has supabase + workout), passed to the
   // narrator as a plain string (matching the file's receive-don't-fetch convention). SAME detection the
   // State LEGS LOADED uses — one fact, two surfaces. Movements in THIS session absent from ~6–8wk history.
-  const novelPhrase: string | null = await (async () => {
+  const novelFact = await (async () => {
     try {
       const cutoff = new Date(new Date(workout.date + 'T12:00:00Z').getTime() - 56 * 86400000).toISOString().slice(0, 10);
       const { data: hist } = await supabase.from('workouts')
@@ -1742,9 +1742,12 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
         const reps = sets.reduce((s: number, st: any) => s + (Number(st?.reps ?? st?.completed_reps ?? st?.actual_reps ?? 0) || 0), 0);
         return { name: String(ex?.name || ''), reps };
       }).filter((m: any) => !!m.name);
-      return novelMovementsPhrase(detectNovelMovements({ sessionMovements, historyMovementNames: [...historyNames] }));
-    } catch { return null; }
+      const novels = detectNovelMovements({ sessionMovements, historyMovementNames: [...historyNames] });
+      return { names: novelMovementsNames(novels), list: novelMovementNames(novels) };
+    } catch { return { names: null, list: [] as string[] }; }
   })();
+  // Unplanned = no linked plan session. Rule 8 (no plan → no target claim) is enforced from this.
+  const isUnplannedSession = !plannedWorkout;
 
   const insights = await generateEnhancedStrengthInsights(
     workout,
@@ -1762,7 +1765,9 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     dataQuality,
     arc_narrative_for_summary,
     e1rmTrend, // D-189: canonical e1RM per exercise (+ prior/trend) for the narrative core
-    novelPhrase, // Q-111 §2: novel-movement attribution fact (one fact, two surfaces)
+    novelFact.names, // Q-111 §2: novel movement names (no window/reps — honest absence only)
+    novelFact.list,  // the "must name these" list for validator Rule 9
+    isUnplannedSession, // Rule 8: no plan → no target claim
   );
 
   return {
@@ -1832,7 +1837,9 @@ async function generateEnhancedStrengthInsights(
   dataQuality: any,
   arcNarrative: ArcNarrativeContextV1 | null = null,
   e1rmTrend: Array<{ exercise: string; canonical: string; current_e1rm: number; prior_e1rm: number | null; trend: 'up' | 'down' | 'flat' | null }> = [], // D-189: canonical e1RM per exercise
-  novelPhrase: string | null = null, // Q-111 §2: novel-movement attribution fact (computed by the caller)
+  novelNames: string | null = null,   // Q-111 §2: novel movement names ("reverse lunges and …") — no window/reps
+  novelList: string[] = [],            // the raw novel names → validator Rule 9 (must be named, not "movements")
+  isUnplanned: boolean = false,        // Rule 8: no linked plan → no target/adherence claim allowed
 ): Promise<string[]> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     return ['AI analysis not available - ANTHROPIC_API_KEY not configured'];
@@ -2446,11 +2453,18 @@ COACHING INSIGHT
         e1rmTrend.map((e) => `- ${e.exercise}: ${e.current_e1rm} lb${e.prior_e1rm != null ? ` (prev ${e.prior_e1rm} lb → ${e.trend})` : ' — NO prior session, so NO trend exists; do not claim one'}`).join('\n')
       : '\n\nESTIMATED 1RM: not available this session — do NOT mention or invent an estimated 1RM.';
     const ncCtx = strengthAdapter.buildContext({ e1rm_by_exercise: e1rmTrend });
-    // Q-111 §2: the novel-movement fact (computed by the caller; we only RECEIVE it here). Feeds the
-    // attribution so an RPE-vs-RIR gap cites the real evidence instead of a generic "accumulated fatigue".
-    const novelBlock = novelPhrase
-      ? `\n\nNOVEL MOVEMENTS THIS SESSION (absent ~6–8wk from history): ${novelPhrase}. If the session RPE runs higher than the per-set RIR would indicate, attribute the gap to this novel volume ("consistent with", "likely") — NOT to a generic "accumulated fatigue".`
+    (ncCtx as any).hasLinkedPlan = !isUnplanned;   // Rule 8: unplanned → target/adherence claims rejected
+    (ncCtx as any).mustNameMovements = novelList;  // Rule 9: these must be named, not "movements"
+    // Q-111 §2 (corrected 2026-07-03): name the movements; NO time window; effect as POSSIBILITY not cause.
+    const novelBlock = novelNames
+      ? `\n\nNEW MOVEMENTS THIS SESSION: ${novelNames} — not part of the athlete's recent logged training. ` +
+        `NO time window (do NOT say "in N weeks" / "in months" — the data shows only absence from recent history, not a last-performed date). ` +
+        `NAME them (do NOT generalize to "movements"/"exercises"). New movements like these CAN make efforts feel harder — if you mention effort, state it as a POSSIBILITY ("you may feel these", "can make efforts feel harder"), NEVER as a claimed cause ("the RPE reflects/was driven by …").`
       : '';
+    const unplannedBlock = isUnplanned
+      ? `\n\nUNPLANNED SESSION — there was NO prescribed plan or target. Do NOT say "on target" / "easier side of target" / "harder than the RIR N target", do NOT compare RIR to any target, do NOT grade execution or adherence. RIR values are raw observations only. State what was done.`
+      : '';
+    const registerBlock = `\n\nVOICE: state what's known plainly. No hedging to sound authoritative, no "not a X deficit"-style reassurances, do NOT invent a concern in order to dismiss it. Report the facts; stop.`;
     // D-189: scaffold APPENDED to the existing strength prompt (assembly not unified — guardrail #1).
     const systemPrompt = `You write strength session summaries for experienced athletes. You receive pre-calculated facts and translate them into coaching prose.
 
@@ -2471,8 +2485,9 @@ HARD CUTS (D-093 pattern):
 
 PLAIN LANGUAGE:
 - Never print %1RM, ACWR, TSS, or workload as a number. Translate to words ("near-threshold load" / "high cumulative fatigue" / "well-rested for this").
-- Never print absolute target_rir / actual_rir as labelled values (e.g. "target RIR 2 vs actual 1.5"). Translate ("a touch harder than the RIR 2 target" / "right on target").
-- RIR adherence verdict: rir_verdict in the packet maps to "too easy" / "on target" / "too hard". Use those words.
+${isUnplanned
+  ? '- UNPLANNED SESSION: there is NO target/prescription. Do NOT reference target_rir / rir_verdict / adherence / "on target" / "on the easier side of target". Report RIR as a raw observation only ("left about 2 reps in reserve").'
+  : '- Never print absolute target_rir / actual_rir as labelled values (e.g. "target RIR 2 vs actual 1.5"). Translate ("a touch harder than the RIR 2 target" / "right on target").\n- RIR adherence verdict: rir_verdict in the packet maps to "too easy" / "on target" / "too hard". Use those words.'}
 
 ARC CONTEXT: temporal Arc context (days since/until a race; phase; recovery state) may appear only as a TRAILING clause, never the lede.
 
@@ -2481,7 +2496,7 @@ PACKET (authoritative; do not compute outside it): facts come from the user mess
       ? 'TEMPORAL ARC CONTEXT (do not contradict; paraphrase for the athlete — these are facts for THIS workout date, not invented load):\n' +
         arcNarrativeFactBlock(arcNarrative) +
         '\n\n'
-      : '') + context + e1rmBlock + novelBlock;
+      : '') + context + e1rmBlock + novelBlock + unplannedBlock + registerBlock;
     const callOnce = async (userMsg: string): Promise<string> =>
       (await callLLM({ system: systemPrompt, user: userMsg, maxTokens: 300, temperature: 0.3, model: 'sonnet' })) ?? '';
 
@@ -2489,14 +2504,21 @@ PACKET (authoritative; do not compute outside it): facts come from the user mess
     // here the load-bearing ones are rule 6/5 (no fabricated/un-trended e1RM) + rule 4 (no cause-diagnosis
     // of a missed lift) + rule 3 (no endurance HR framing). Retry-then-soft-accept (never regress to empty).
     let content = await callOnce(baseUser);
-    const nc1 = validateNarrative(content, ncCtx);
-    if (!nc1.ok && content) {
-      console.warn('[analyze-strength] narrative rejected:', JSON.stringify(nc1.failures.map((f) => f.code)));
-      const corrective = baseUser + '\n\nYour previous draft violated the reasoning rules:\n' + nc1.failures.map((f) => '- ' + f.why).join('\n') + '\nRewrite as 3-4 sentences fixing these.';
+    let nc = validateNarrative(content, ncCtx);
+    if (!nc.ok && content) {
+      console.warn('[analyze-strength] narrative rejected:', JSON.stringify(nc.failures.map((f) => f.code)));
+      const corrective = baseUser + '\n\nYour previous draft violated the reasoning rules:\n' + nc.failures.map((f) => '- ' + f.why).join('\n') + '\nRewrite as 3-4 sentences fixing these.';
       const s2 = await callOnce(corrective);
-      if (s2) content = s2;
+      if (s2) { content = s2; nc = validateNarrative(content, ncCtx); }
     }
-    
+    // HARD grounding rules (8 no-plan target claim, 9 unnamed movements) are fabrication-class — they must
+    // NOT ship. If one survives the retry, drop the prose to the metrics-only fallback (honest empty beats
+    // a fabricated target or a blurred "movements"). Other (soft) rules keep the retry-then-soft-accept.
+    if (content && nc.failures.some((f) => f.rule === 8 || f.rule === 9)) {
+      console.warn('[analyze-strength] HARD grounding violation survived retry — dropping prose:', JSON.stringify(nc.failures.filter((f) => f.rule === 8 || f.rule === 9).map((f) => f.code)));
+      return ['Analysis completed - check metrics below'];
+    }
+
     // Return the full structured analysis as a single string
     // Don't split it - the UI should display it as formatted text
     if (!content || content.trim().length === 0) {

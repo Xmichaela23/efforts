@@ -6,7 +6,7 @@
  */
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { detectNovelMovements, novelMovementsPhrase, headlineNovelMovement, novelMovementsNames } from './novel-movements.ts';
+import { detectNovelMovements, novelMovementNames, novelMovementsNames } from './novel-movements.ts';
 
 // Michael's Monday session: Bulgarian split squats + reverse lunges absent from history; back squat present.
 const SESSION = [
@@ -22,27 +22,21 @@ Deno.test('detect: Bulgarian split squats + reverse lunges are novel; back squat
   assertEquals(n.map((x) => x.name), ['Bulgarian Split Squats', 'Reverse Lunge']);
 });
 
-Deno.test('phrase: names the two biggest novel movements + rounded total reps', () => {
-  const n = detectNovelMovements({ sessionMovements: SESSION, historyMovementNames: HISTORY });
-  // 52 + 78 = 130 → rounded to 130
-  assertEquals(novelMovementsPhrase(n), 'first Reverse Lunges and Bulgarian Split Squats in 8 weeks (~130 reps)');
-});
-
-Deno.test('headline: the single biggest novel movement (for the State chip Why)', () => {
-  const n = detectNovelMovements({ sessionMovements: SESSION, historyMovementNames: HISTORY });
-  assertEquals(headlineNovelMovement(n), 'Reverse Lunge');
-});
-
-Deno.test('names-only (State Why): pluralized, lowercase, no reps, biggest first', () => {
+Deno.test('names (both surfaces): pluralized, lowercase, NO window, NO reps, biggest first', () => {
   const n = detectNovelMovements({ sessionMovements: SESSION, historyMovementNames: HISTORY });
   assertEquals(novelMovementsNames(n), 'reverse lunges and bulgarian split squats');
 });
 
-Deno.test('nothing novel → null phrase, empty list', () => {
+Deno.test('raw names list (the validator "must name" list)', () => {
+  const n = detectNovelMovements({ sessionMovements: SESSION, historyMovementNames: HISTORY });
+  assertEquals(novelMovementNames(n), ['Bulgarian Split Squats', 'Reverse Lunge']);
+});
+
+Deno.test('nothing novel → null names, empty list', () => {
   const n = detectNovelMovements({ sessionMovements: [{ name: 'Back Squat', reps: 9 }], historyMovementNames: HISTORY });
   assertEquals(n, []);
-  assertEquals(novelMovementsPhrase(n), null);
-  assertEquals(headlineNovelMovement(n), null);
+  assertEquals(novelMovementsNames(n), null);
+  assertEquals(novelMovementNames(n), []);
 });
 
 Deno.test('normalization: "Bulgarian split squat" in history suppresses "Bulgarian Split Squats" in session', () => {

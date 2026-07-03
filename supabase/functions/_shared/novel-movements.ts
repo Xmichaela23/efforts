@@ -39,7 +39,7 @@ export function detectNovelMovements(args: {
   return out;
 }
 
-/** naive plural for the phrase — the movement names are already noun phrases ("Bulgarian split squat"). */
+/** naive plural — the movement names are already noun phrases ("Bulgarian split squat"). */
 function pluralize(name: string): string {
   const n = String(name || '').trim();
   if (!n) return n;
@@ -48,31 +48,19 @@ function pluralize(name: string): string {
   return `${n}s`;
 }
 
-/**
- * The attribution phrase for the INSIGHTS narrator + the State Why:
- *   "first Bulgarian split squats and reverse lunges in 8 weeks (~130 reps)"
- * HONESTY (D-233): the window is what we actually checked (~8wk history) — NOT "in months", which claims
- * a duration the 56-day read can't establish. Null when nothing is novel. Names the 2 biggest by reps.
- */
-export function novelMovementsPhrase(novels: NovelMovement[]): string | null {
-  if (!novels?.length) return null;
-  const totalReps = novels.reduce((s, n) => s + (Number(n.reps) || 0), 0);
-  const named = [...novels].sort((a, b) => (b.reps || 0) - (a.reps || 0)).slice(0, 2);
-  const names = named.map((n) => pluralize(n.name)).join(' and ');
-  const repsPart = totalReps > 0 ? ` (~${Math.round(totalReps / 10) * 10} reps)` : '';
-  return `first ${names} in 8 weeks${repsPart}`;
-}
-
-/** The single headline movement to name on the State chip Why (biggest novel by reps). */
-export function headlineNovelMovement(novels: NovelMovement[]): string | null {
-  if (!novels?.length) return null;
-  return [...novels].sort((a, b) => (b.reps || 0) - (a.reps || 0))[0].name;
+/** The distinct novel movement names (raw, as logged) — the validator's "these MUST be named" list. */
+export function novelMovementNames(novels: NovelMovement[]): string[] {
+  return (novels || []).map((n) => n.name).filter(Boolean);
 }
 
 /**
- * Names-only phrase for the State loaded-legs Why (no rep count — the State row is tight; the rep count
- * lives in the INSIGHTS phrase). Lowercased + pluralized, up to 2, biggest first:
+ * The names both surfaces cite — lowercased + pluralized, up to 2, biggest first:
  *   "reverse lunges and bulgarian split squats"
+ * HONESTY (D-233, corrected 2026-07-03): NO time window and NO rep count. The detection only establishes
+ * that these are ABSENT FROM RECENT LOGGED HISTORY — not a specific interval ("8 weeks" asserted a
+ * last-performed date the lookback edge can't pin) and not a volume-as-cause. Callers add the honest
+ * frame: "…which haven't been part of your recent routine." Names only; the reader supplies the effect
+ * as a POSSIBILITY, never a claimed cause.
  */
 export function novelMovementsNames(novels: NovelMovement[]): string | null {
   if (!novels?.length) return null;

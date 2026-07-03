@@ -49,6 +49,10 @@ export interface NarrativeContext {
   establishedCauses: string[];              // Rule 4 — lowercase causes the packet deterministically proved
   disciplineVerdicts?: DisciplineVerdict[]; // Rule 6/7 — the spine verdicts to not contradict / not recap.
                                             //   Absent/empty ⇒ those rules skip (surfaces with no spine verdicts).
+  hasLinkedPlan?: boolean;                  // Rule 8 — when explicitly FALSE, any target / plan-adherence
+                                            //   claim is fabrication (no plan → no target). undefined ⇒ skip.
+  mustNameMovements?: string[];             // Rule 9 — the fact names these specific movements; a vague
+                                            //   "movements"/"exercises" that names none of them is rejected.
 }
 
 export interface DisciplineAdapter {

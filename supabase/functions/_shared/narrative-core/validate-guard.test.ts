@@ -54,6 +54,35 @@ Deno.test('non-receipt numbers (12-week, week one, 9/10) are not recap', () => {
   assertEquals(r.ok, true, JSON.stringify(r.failures));
 });
 
+// ── Rule 8 (no plan → no target) + Rule 9 (name the movements) — fabrication-class grounding ─────────
+Deno.test('rule 8: "on target" on an unplanned session → rejected', () => {
+  const r = validateNarrative('Your sets landed on target across the board.', { ...ctx([]), hasLinkedPlan: false });
+  assert(!r.ok);
+  assert(r.failures.some((f) => f.rule === 8));
+});
+Deno.test('rule 8: "harder than a strict RIR 2 target" on unplanned → rejected', () => {
+  const r = validateNarrative('Sets landed a touch harder than a strict RIR 2 target.', { ...ctx([]), hasLinkedPlan: false });
+  assert(!r.ok);
+  assert(r.failures.some((f) => f.rule === 8));
+});
+Deno.test('rule 8: same "on target" WITH a linked plan → allowed', () => {
+  const r = validateNarrative('Your sets landed on target across the board.', { ...ctx([]), hasLinkedPlan: true });
+  assertEquals(r.ok, true, JSON.stringify(r.failures));
+});
+Deno.test('rule 8: "target race" is not a plan-target claim (no false fire)', () => {
+  const r = validateNarrative('This keeps you on track for your target race in the fall.', { ...ctx([]), hasLinkedPlan: false });
+  assertEquals(r.ok, true, JSON.stringify(r.failures));
+});
+Deno.test('rule 9: vague "movements absent for eight weeks" when names are known → rejected', () => {
+  const r = validateNarrative('The RPE reflects the volume on movements absent for eight weeks.', { ...ctx([]), mustNameMovements: ['Bulgarian Split Squats', 'Reverse Lunge'] });
+  assert(!r.ok);
+  assert(r.failures.some((f) => f.rule === 9));
+});
+Deno.test('rule 9: naming the movements → allowed', () => {
+  const r = validateNarrative('You introduced reverse lunges and Bulgarian split squats, new to your recent training.', { ...ctx([]), mustNameMovements: ['Bulgarian Split Squats', 'Reverse Lunge'] });
+  assertEquals(r.ok, true, JSON.stringify(r.failures));
+});
+
 // ── mixed-clocks safety (step 2: Rule 6 on single-session INSIGHTS) ─────────────────────────────────
 // The per-workout INSIGHTS speaks at the SESSION clock; the spine verdict is the 6-week clock. Rule 6
 // keys on TREND vocabulary, so a session observation must NOT be flagged as contradicting the trend.
