@@ -1389,6 +1389,15 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-113 — Arc post-race framing has no relevance window (stale temporal anchor)
+
+- **Status:** filed 2026-07-03 (Michael's eyeball of the Monday strength INSIGHTS). The narrator led with **"Seventy-one days post-marathon, this unplanned session…"** — the arc supplies `days_since_last_goal_race` (71) and the LLM foregrounds it, treating a 2.5-month-old race as current framing. At >~4–6 weeks post-race the recovery/return arc is over; the *relevant* fact is "unplanned session, no active block", not the race day-count.
+- **The fix (deferred — separate from Q-111 §2 novel-movements):** an arc relevance-window gate in `arc-narrative-ai-appendix.ts` / the `days_since_last_goal_race` consumer — stop leading with (or citing) the last race once it's beyond ~4–6 weeks. Distinct from the LAST_GOAL_RACE forward-lede ban already there (that's about not anchoring FUTURE load); this is about a PAST race going stale.
+- **The pattern it exemplifies (Michael 2026-07-03):** *the LLM loyally repeats whatever temporal framing we feed it, so honesty must live in the emitted fact, not a prompt instruction.* Same lesson as the "in months"→"in 8 weeks" fix (the phrase overclaimed a duration; grounding it at the source fixed it — a "be honest about time" prompt rule would not have). Any "time since X" the arc hands the narrator needs a relevance gate at the source.
+- **Cross-ref:** Q-112 (narrative claim-grounding — this is a relevance sibling of contradiction/recap), D-233 (voice standard — cite what's relevant + verified), `arc-narrative-ai-appendix.ts`.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
