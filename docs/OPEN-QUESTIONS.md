@@ -1398,6 +1398,15 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-114 — Known low-risk edge: a session linked to a FINISHED plan's planned workout can carry stale phase_focus / progression_history
+
+- **Status:** filed 2026-07-03 (on record from the stale-anchor sweep — low-risk, not fixed). The strength narrator's `phase_focus` / `phase_description` / `progression_history` come from `extractEnhancedPlanContext(plannedWorkout)` — the plan metadata of THIS session's linked planned workout. That's session-scoped (null when unplanned — Michael's case is clean), so it is NOT the stale-completed-plan fallback vector the class fix closed (days_since, plan_phase, hasActiveTemporalPlan, coach plan-week — all now covers-today gated).
+- **The edge:** if a session *links* to a planned workout that belongs to a plan whose window has since ENDED (executing an old, never-cleaned planned session), those fields would carry that finished plan's phase text into the narrative. Normal linkage is the current plan, so this needs an unusual state (stale planned rows executed post-plan-end) to trigger.
+- **Why deferred:** low probability + low blast radius (a phase-focus phrase, not a fabricated verdict), and the general Rule 10 (no invented phase label) + the arc phase gate catch the most visible symptom. A full fix would apply the same covers-today gate to `plannedWorkout`'s owning plan in `extractEnhancedPlanContext`.
+- **Cross-ref:** the stale-anchor class (Q-113 generalized), `plan-week.ts` `planHasEnded`, `arc-context.ts` `activePlanCoversFocus`, D-233.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
