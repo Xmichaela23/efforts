@@ -40,6 +40,7 @@ import {
 import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
 import { buildReadinessWhy, buildCrossTrainingReceipt } from '../_shared/response-model/readiness-receipts.ts';
 import { buildLoadedLegsDiagnosis, classifyFatigueLabel, type LoadedLegsDiagnosis } from '../_shared/response-model/loaded-legs.ts';
+import { validateNarrative, resolveGuardedNarrative, violationsPrompt, type DisciplineVerdict } from '../_shared/response-model/narrative-guard.ts';
 import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext, type GoalLite } from '../_shared/goal-context.ts';
 import { coachLegacyPriorRaceLine, coachPromptPriorRaceBlock } from '../_shared/prior-similar-race-coach.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
@@ -104,7 +105,8 @@ const corsHeaders: Record<string, string> = {
 /** v51: D-232 concision — readiness_why NAMES the marker ("perceived effort up (5.3 vs 4.4 typical) · load balanced") + drops the redundant "N signals declining" count; narrative tightened to ≤3 terse sentences with a NO-DASHBOARD-RECAP rule. Bump so cached verbose rows recompute. */
 /** v52: D-232 surgical readiness — the `fatigued` catch-all resolves to LEGS LOADED / LEGS SORE / EFFORT UP / FATIGUED (systemic only); loaded-legs Why names the session+mechanism+effect + a conditional suggestion (readiness_suggestion). Bump so cached "FATIGUED" rows recompute. */
 /** v53: D-232 loaded-legs detection now fires on FULL-body days too (legs load from squats inside a full session, not just pure lower); Why says "lower-body work". Bump so cached EFFORT-UP-on-a-full-day rows recompute to LEGS LOADED. */
-const COACH_PAYLOAD_VERSION = 53; // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+/** v54: Q-112 narrative-grounding guard — the week narrative is validated against the spine verdicts (no trend-state contradiction, no receipt-number recap); one regeneration, else prose is dropped (honest empty). Bump so cached ungrounded narratives recompute. */
+const COACH_PAYLOAD_VERSION = 54; // 54 (Q-112): narrative-grounding guard. // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -4641,29 +4643,49 @@ ${narrativeFacts.join('\n')}`;
           : 'You are an expert endurance and strength coach. Write a single paragraph, AT MOST 3 sentences (fewer is better), TERSE — the reader already sees the numbers. No bullets, no headers, no jargon. Second person. Conversational but knowledgeable. Open with plan phase and goal stakes, not a day-by-day workout list.';
 
         if (anthropicKey) {
-          const resp = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': anthropicKey,
-              'anthropic-version': '2023-06-01',
-            },
-            body: JSON.stringify({
-              model: 'claude-sonnet-4-5-20250929',
-              system: systemPrompt,
-              messages: [{ role: 'user', content: narrativePrompt }],
-              max_tokens: 260, // ≤3-sentence terse contract (D-232: no dashboard recap; the athlete sees the receipts)
-              temperature: 0,
-            }),
-          });
-          if (resp.ok) {
-            const aiData = await resp.json();
-            const raw = String(aiData?.content?.[0]?.text || '').trim();
-            week_narrative = raw || null;
-          } else {
-            const errBody = await resp.text().catch(() => '');
-            console.warn(`[coach] narrative Anthropic non-ok: ${resp.status} ${resp.statusText} — ${errBody.slice(0, 200)}`);
+          // Q-112 narrative-grounding guard: the prose must not contradict the spine's per-discipline
+          // verdicts or restate a receipt number. Build the ground-truth verdicts from state_trends_v1.
+          const spineVerdicts: DisciplineVerdict[] = (() => {
+            const st: any = latestSnapshot?.state_trends_v1;
+            if (!st) return [];
+            const out: DisciplineVerdict[] = [];
+            for (const d of ['run', 'bike', 'swim', 'strength'] as const) {
+              const c = st[d];
+              if (c && c.verdict) out.push({ discipline: d, verdict: String(c.verdict), pctChange: c.pctChange ?? null });
+            }
+            return out;
+          })();
+
+          const genOnce = async (userContent: string): Promise<string | null> => {
+            const resp = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' },
+              body: JSON.stringify({
+                model: 'claude-sonnet-4-5-20250929',
+                system: systemPrompt,
+                messages: [{ role: 'user', content: userContent }],
+                max_tokens: 260,
+                temperature: 0,
+              }),
+            });
+            if (resp.ok) return String((await resp.json())?.content?.[0]?.text || '').trim() || null;
+            console.warn(`[coach] narrative Anthropic non-ok: ${resp.status} ${resp.statusText} — ${(await resp.text().catch(() => '')).slice(0, 200)}`);
+            return null;
+          };
+
+          const draft = await genOnce(narrativePrompt);
+          let retry: string | null = null;
+          if (draft && spineVerdicts.length) {
+            const check = validateNarrative(draft, spineVerdicts);
+            if (!check.ok) {
+              console.warn(`[coach][narrative-guard] draft rejected — ${check.violations.map((v) => `${v.rule}:${v.claim}`).join(' | ')}`);
+              // Regenerate ONCE with the violation named.
+              retry = await genOnce(`${narrativePrompt}\n\nYOUR PREVIOUS DRAFT WAS REJECTED for asserting things the deterministic layer contradicts or already shows. ${violationsPrompt(check.violations)} Rewrite obeying these — describe the plan/state without those claims.`);
+            }
           }
+          const resolved = spineVerdicts.length ? resolveGuardedNarrative(draft, retry, spineVerdicts) : { narrative: draft, dropped: false };
+          if (resolved.dropped) console.warn('[coach][narrative-guard] second failure — rendering prose-less');
+          week_narrative = resolved.narrative;
         }
       }
     } catch (narErr: any) {
