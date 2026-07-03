@@ -42,13 +42,28 @@ HARD BAN (${opts.mode}) — backward temporal anchors:
 - Treat the LAST_GOAL_RACE line in the ARC FACT BLOCK as if it's not in the prompt. Lead with current fitness signals + the upcoming build context only.`;
 }
 
+// Q-113 — a PAST race earns its place in the narrator's facts only while it's still ACTING on the
+// athlete: the acute/residual recovery window. Physiology: marathon recovery clears by ~4wk, residual
+// deep fatigue by ~6wk; beyond that the race is no longer a current influence (and any base loss is
+// carried by the trend, not the race date). We gate at the DATA level, not with a prompt instruction —
+// the existing "never lead with days_since" prompt rule was ignored by the LLM. If the fact never leaves
+// the data, the model can't recite "71 days post-marathon". `runs_since_race_estimate` stays available
+// to is_first_post_race_run's own (separate, tighter) gate.
+export const RACE_ANCHOR_RELEVANCE_DAYS = 42; // ~6 weeks — acute + residual recovery
+export function raceAnchorStillRelevant(nc: ArcNarrativeContextV1): boolean {
+  const d = nc.days_since_last_goal_race;
+  return nc.last_goal_race != null && d != null && d <= RACE_ANCHOR_RELEVANCE_DAYS;
+}
+
 export function arcNarrativeFactBlock(nc: ArcNarrativeContextV1): string {
   const lr = nc.last_goal_race;
   const ng = nc.next_primary_goal;
+  const raceRelevant = raceAnchorStillRelevant(nc);
   const lines = [
     `ARC_FOCUS_DATE=${nc.focus_date}`,
     `NARRATIVE_MODE=${nc.mode}`,
-    lr
+    // Emit the race + day-count ONLY inside the recovery window. Stale → null, so it can't be recited.
+    lr && raceRelevant
       ? `LAST_GOAL_RACE=${lr.name}|${lr.distance ?? 'event'}|${lr.target_date}|days_since=${nc.days_since_last_goal_race ?? '?'}` +
           `|runs_since_race_estimate=${nc.runs_since_last_race ?? '?'}`
       : `LAST_GOAL_RACE=null`,
