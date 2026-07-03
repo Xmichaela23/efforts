@@ -6,6 +6,7 @@ import { arcModeSystemAddon, arcNarrativeFactBlock } from '../_shared/arc-narrat
 // Shared narrative-reasoning core (D-189 — strength leg). Scaffold + validator suite via the strength
 // adapter; strength gets a 2-attempt validator loop (it had none). See docs/WORK-ORDER-narrative-core.md.
 import { buildReasoningScaffold, validateNarrative, strengthAdapter } from '../_shared/narrative-core/index.ts';
+import { detectNovelMovements, novelMovementsPhrase } from '../_shared/novel-movements.ts';
 // D-208: role classifier — execution scoring weights a skipped accessory less than a main lift.
 import { roleForExercise, ROLE_WEIGHT } from '../_shared/strength/exercise-role.ts';
 
@@ -1722,6 +1723,29 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   }
 
   // Generate enhanced insights using GPT-4
+  // Q-111 §2: the novel-movement fact — computed HERE (the caller has supabase + workout), passed to the
+  // narrator as a plain string (matching the file's receive-don't-fetch convention). SAME detection the
+  // State LEGS LOADED uses — one fact, two surfaces. Movements in THIS session absent from ~6–8wk history.
+  const novelPhrase: string | null = await (async () => {
+    try {
+      const cutoff = new Date(new Date(workout.date + 'T12:00:00Z').getTime() - 56 * 86400000).toISOString().slice(0, 10);
+      const { data: hist } = await supabase.from('workouts')
+        .select('date, strength_exercises')
+        .eq('user_id', workout.user_id).eq('type', 'strength').eq('workout_status', 'completed')
+        .gte('date', cutoff).lt('date', workout.date);
+      const historyNames = new Set<string>();
+      for (const w of (hist ?? []) as any[]) {
+        for (const ex of parseStrengthExercises((w as any).strength_exercises)) { const n = String((ex as any)?.name || '').trim(); if (n) historyNames.add(n); }
+      }
+      const sessionMovements = parseStrengthExercises(workout?.strength_exercises).map((ex: any) => {
+        const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+        const reps = sets.reduce((s: number, st: any) => s + (Number(st?.reps ?? st?.completed_reps ?? st?.actual_reps ?? 0) || 0), 0);
+        return { name: String(ex?.name || ''), reps };
+      }).filter((m: any) => !!m.name);
+      return novelMovementsPhrase(detectNovelMovements({ sessionMovements, historyMovementNames: [...historyNames] }));
+    } catch { return null; }
+  })();
+
   const insights = await generateEnhancedStrengthInsights(
     workout,
     exerciseAdherence,
@@ -1738,6 +1762,7 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     dataQuality,
     arc_narrative_for_summary,
     e1rmTrend, // D-189: canonical e1RM per exercise (+ prior/trend) for the narrative core
+    novelPhrase, // Q-111 §2: novel-movement attribution fact (one fact, two surfaces)
   );
 
   return {
@@ -1807,6 +1832,7 @@ async function generateEnhancedStrengthInsights(
   dataQuality: any,
   arcNarrative: ArcNarrativeContextV1 | null = null,
   e1rmTrend: Array<{ exercise: string; canonical: string; current_e1rm: number; prior_e1rm: number | null; trend: 'up' | 'down' | 'flat' | null }> = [], // D-189: canonical e1RM per exercise
+  novelPhrase: string | null = null, // Q-111 §2: novel-movement attribution fact (computed by the caller)
 ): Promise<string[]> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     return ['AI analysis not available - ANTHROPIC_API_KEY not configured'];
@@ -2420,6 +2446,11 @@ COACHING INSIGHT
         e1rmTrend.map((e) => `- ${e.exercise}: ${e.current_e1rm} lb${e.prior_e1rm != null ? ` (prev ${e.prior_e1rm} lb → ${e.trend})` : ' — NO prior session, so NO trend exists; do not claim one'}`).join('\n')
       : '\n\nESTIMATED 1RM: not available this session — do NOT mention or invent an estimated 1RM.';
     const ncCtx = strengthAdapter.buildContext({ e1rm_by_exercise: e1rmTrend });
+    // Q-111 §2: the novel-movement fact (computed by the caller; we only RECEIVE it here). Feeds the
+    // attribution so an RPE-vs-RIR gap cites the real evidence instead of a generic "accumulated fatigue".
+    const novelBlock = novelPhrase
+      ? `\n\nNOVEL MOVEMENTS THIS SESSION (absent ~6–8wk from history): ${novelPhrase}. If the session RPE runs higher than the per-set RIR would indicate, attribute the gap to this novel volume ("consistent with", "likely") — NOT to a generic "accumulated fatigue".`
+      : '';
     // D-189: scaffold APPENDED to the existing strength prompt (assembly not unified — guardrail #1).
     const systemPrompt = `You write strength session summaries for experienced athletes. You receive pre-calculated facts and translate them into coaching prose.
 
@@ -2450,7 +2481,7 @@ PACKET (authoritative; do not compute outside it): facts come from the user mess
       ? 'TEMPORAL ARC CONTEXT (do not contradict; paraphrase for the athlete — these are facts for THIS workout date, not invented load):\n' +
         arcNarrativeFactBlock(arcNarrative) +
         '\n\n'
-      : '') + context + e1rmBlock;
+      : '') + context + e1rmBlock + novelBlock;
     const callOnce = async (userMsg: string): Promise<string> =>
       (await callLLM({ system: systemPrompt, user: userMsg, maxTokens: 300, temperature: 0.3, model: 'sonnet' })) ?? '';
 
