@@ -27,7 +27,7 @@ Each axis = a surface reasoning from a specific part of the substrate, with a sp
 
 ### Axis 1 — discipline ↔ discipline (cross-domain carryover)
 *A card reasons from another discipline's recent load: "Monday's lift is why Thursday's ride felt hard."* The hybrid app's signature axis.
-- **Status: designed → next to build.** Reasoning exists coach-side (`crossDomainPairs` coach `:2347`, `loaded-legs.ts`) and reaches State's LEGS LOADED — but is **not** threaded into the per-workout cards. Detailed design: **`docs/DESIGN-cross-domain-carryover.md`**.
+- **Status: BUILDING (ratified 2026-07-03, thresholds approved).** Reasoning exists coach-side (`crossDomainPairs` coach `:2347`, `loaded-legs.ts`) and reaches State's LEGS LOADED — being packaged as a shared per-session detector + threaded into the per-workout cards. Detailed design: **`docs/DESIGN-cross-domain-carryover.md`**. → "live" once it ships and passes Michael's eyeball.
 - **Honesty gate:** the evidence gate — antecedent load exists AND target effort genuinely elevated vs the athlete's own baseline AND not better explained by terrain/heat/prescription AND not systemic (§9 cross-discipline). Any failure or missing data → **say nothing**.
 
 ### Axis 2 — session ↔ trajectory
@@ -65,3 +65,4 @@ Each axis = a surface reasoning from a specific part of the substrate, with a sp
 
 ## Changelog (axis status transitions)
 - **2026-07-03** — Map created. Nervous-system layers 1–4 marked built (spine + grounding convergence completed this session). Axis 1 marked designed→next (`DESIGN-cross-domain-carryover.md`). Axes 2–5 marked partial with named gaps.
+- **2026-07-03** — Axis 1 ratified (thresholds approved; novelty weights confidence not duration) → status **building**; detector fixtures-first.

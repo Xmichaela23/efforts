@@ -66,7 +66,9 @@ If effort is elevated in the leg-driven session but ALSO elevated across non-leg
 
 ## 2. Carryover window (reconcile — mostly settled)
 
-`crossDomainPairs` uses ≤2d, `loaded-legs` ≤4d. Physiology (DOMS + neuromuscular): peaks 24–48h, repeated-bout tail to ~72h, largely gone by 96h. **Settle on ≤3 days (72h)**, superseding both, with claim strength decaying — strong ≤2d, weaker at 3d, none >3d. One grounded window for both the detector and the narration. (Novelty amplifies it — a *novel* lower-body movement, per Q-111 §2, carries longer/harder; the detector can weight novel antecedents, but the window stays ≤3d.)
+`crossDomainPairs` uses ≤2d, `loaded-legs` ≤4d. Physiology (DOMS + neuromuscular): peaks 24–48h, repeated-bout tail to ~72h, largely gone by 96h. **Settle on ≤3 days (72h)**, superseding both, with claim strength decaying — strong ≤2d, weaker at 3d, none >3d. One grounded window for both the detector and the narration.
+
+**Novelty interaction — pinned (Michael 2026-07-03): novelty weights CONFIDENCE, not DURATION.** A novel antecedent (a movement absent from recent history, per Q-111 §2) *strengthens* the carryover claim **within** the ≤3d window — it does NOT extend the window past 3d. The window is fixed at ≤3d regardless of novelty; a novel lift on day 4 is still out of window and gets no claim. Mechanically: `isNovel` raises the claim's confidence (and can sharpen the string — "first heavy single-leg work in a while"), but plays no role in the in-window/out-of-window test. Two independent axes: **duration = the fixed ≤3d gate; confidence = weighted by novelty + how far above baseline the residual sits.**
 
 ---
 
