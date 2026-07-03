@@ -40,7 +40,8 @@ import {
 import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
 import { buildReadinessWhy, buildCrossTrainingReceipt } from '../_shared/response-model/readiness-receipts.ts';
 import { buildLoadedLegsDiagnosis, classifyFatigueLabel, type LoadedLegsDiagnosis } from '../_shared/response-model/loaded-legs.ts';
-import { validateNarrative, resolveGuardedNarrative, violationsPrompt, type DisciplineVerdict } from '../_shared/response-model/narrative-guard.ts';
+import { detectNovelMovements, novelMovementsNames, type SessionMovement } from '../_shared/novel-movements.ts';
+import { runGuardedNarrative, type NarrativeContext, type DisciplineVerdict } from '../_shared/narrative-core/index.ts';
 import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext, type GoalLite } from '../_shared/goal-context.ts';
 import { coachLegacyPriorRaceLine, coachPromptPriorRaceBlock } from '../_shared/prior-similar-race-coach.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
@@ -106,7 +107,8 @@ const corsHeaders: Record<string, string> = {
 /** v52: D-232 surgical readiness — the `fatigued` catch-all resolves to LEGS LOADED / LEGS SORE / EFFORT UP / FATIGUED (systemic only); loaded-legs Why names the session+mechanism+effect + a conditional suggestion (readiness_suggestion). Bump so cached "FATIGUED" rows recompute. */
 /** v53: D-232 loaded-legs detection now fires on FULL-body days too (legs load from squats inside a full session, not just pure lower); Why says "lower-body work". Bump so cached EFFORT-UP-on-a-full-day rows recompute to LEGS LOADED. */
 /** v54: Q-112 narrative-grounding guard — the week narrative is validated against the spine verdicts (no trend-state contradiction, no receipt-number recap); one regeneration, else prose is dropped (honest empty). Bump so cached ungrounded narratives recompute. */
-const COACH_PAYLOAD_VERSION = 54; // 54 (Q-112): narrative-grounding guard. // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+/** v55: Q-112 convergence — the coach week narrative now runs through the ONE shared narrative-core guard (rules 6/7 absorbed into it; standalone response-model/narrative-guard deleted; one retry-then-drop policy + rejection logging). Behavior-equivalent to v54; bump for cleanliness. */
+const COACH_PAYLOAD_VERSION = 55; // 55 (Q-112): narrative via shared narrative-core. // 54 (Q-112): narrative-grounding guard. // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2767,6 +2769,36 @@ Deno.serve(async (req) => {
     // matches the prior derivation's catch-all default, so the degraded contract is unchanged.
     const fitnessDirection: FitnessDirection = rollupFitnessDirection(latestSnapshot?.state_trends_v1);
 
+    // Q-111 §2: the ~6–8wk strength-movement history (5–56d back — excludes the recent trigger window so a
+    // session isn't its own baseline), for the novel-movement fact (one detection, two surfaces). Distinct
+    // logged movement names; the loaded-legs attribution checks the trigger session against it.
+    const strengthHistoryNames: string[] = await (async () => {
+      try {
+        const { data } = await supabase.from('workouts')
+          .select('date, strength_exercises')
+          .eq('user_id', userId).eq('type', 'strength').eq('workout_status', 'completed')
+          .gte('date', addDaysISO(asOfDate, -56)).lte('date', addDaysISO(asOfDate, -5));
+        const names = new Set<string>();
+        for (const w of (data ?? []) as any[]) {
+          const exRaw = (w as any)?.strength_exercises;
+          const ex = Array.isArray(exRaw) ? exRaw : (typeof exRaw === 'string' ? (parseJson(exRaw) || []) : []);
+          for (const e of (Array.isArray(ex) ? ex : [])) { const n = String((e as any)?.name || '').trim(); if (n) names.add(n); }
+        }
+        return [...names];
+      } catch { return []; }
+    })();
+    const sessionMovementsFromWorkout = (w: any): SessionMovement[] => {
+      try {
+        const exRaw = (w as any)?.strength_exercises;
+        const ex = Array.isArray(exRaw) ? exRaw : (typeof exRaw === 'string' ? (parseJson(exRaw) || []) : []);
+        return (Array.isArray(ex) ? ex : []).map((e: any) => {
+          const sets = Array.isArray(e?.sets) ? e.sets : [];
+          const reps = sets.reduce((s: number, st: any) => s + (Number(st?.reps ?? st?.completed_reps ?? st?.actual_reps ?? 0) || 0), 0);
+          return { name: String(e?.name || ''), reps } as SessionMovement;
+        }).filter((m: SessionMovement) => !!m.name);
+      } catch { return []; }
+    };
+
     const readinessState = (() => {
       const rm = weeklyResponseModel;
 
@@ -2819,8 +2851,8 @@ Deno.serve(async (req) => {
       const loadLabel = (acwr != null && acwr >= 1.2) ? `load elevated (ACWR ${acwr.toFixed(2)})` : 'load balanced';
       const daysAgo = (iso: string) => (parseISODateOnly(asOfDate).getTime() - parseISODateOnly(iso).getTime()) / 86400000;
 
-      // Most recent LOWER-BODY strength session within 4 days (logged day + session RPE).
-      let lower: { dayName: string; rpe: number | null } | null = null;
+      // Most recent LOWER-BODY strength session within 4 days (logged day + session RPE + its exercises).
+      let lower: { dayName: string; rpe: number | null; w: any } | null = null;
       try {
         const rows = (Array.isArray(normWorkouts) ? normWorkouts : [])
           .filter((w: any) => {
@@ -2831,10 +2863,10 @@ Deno.serve(async (req) => {
             const f = strengthFocusFromWorkout(w);
             return f === 'lower' || f === 'full';
           })
-          .map((w: any) => ({ date: String(w?.date || ''), rpe: sessionRpeFromWorkout(w) }))
+          .map((w: any) => ({ date: String(w?.date || ''), rpe: sessionRpeFromWorkout(w), w }))
           .filter((r) => r.date && daysAgo(r.date) >= 0 && daysAgo(r.date) <= 4)
           .sort((a, b) => b.date.localeCompare(a.date));
-        if (rows.length) lower = { dayName: parseISODateOnly(rows[0].date).toLocaleDateString('en-US', { weekday: 'long' }), rpe: rows[0].rpe };
+        if (rows.length) lower = { dayName: parseISODateOnly(rows[0].date).toLocaleDateString('en-US', { weekday: 'long' }), rpe: rows[0].rpe, w: rows[0].w };
       } catch { lower = null; }
 
       // Athlete-DECLARED soreness (Q-049, 1–10, higher = sorer): recent (≤2d) + clearly sore (≥7).
@@ -2855,11 +2887,14 @@ Deno.serve(async (req) => {
 
       let loadedLegs: LoadedLegsDiagnosis | null = null;
       if (lower && (lower.rpe == null || lower.rpe >= 8) && effortUp) {
+        // Q-111 §2: novel movements in the trigger session (absent ~6–8wk) name the Why ("first reverse
+        // lunges and bulgarian split squats in months"). Same fact the INSIGHTS narrator uses.
+        const novels = detectNovelMovements({ sessionMovements: sessionMovementsFromWorkout(lower.w), historyMovementNames: strengthHistoryNames });
         loadedLegs = buildLoadedLegsDiagnosis({
           dayName: lower.dayName,
           sessionRpe: lower.rpe,
-          movement: null,   // novelty naming deferred to Q-111 (28d history in coach)
-          isNovel: false,
+          movement: novelMovementsNames(novels),  // names-only (State row is tight); null → non-novel Why
+          isNovel: novels.length > 0,
           effortCurrent: Number(e.rpe.current_avg),
           effortBaseline: Number(e.rpe.baseline_avg),
           loadLabel,
@@ -4643,8 +4678,10 @@ ${narrativeFacts.join('\n')}`;
           : 'You are an expert endurance and strength coach. Write a single paragraph, AT MOST 3 sentences (fewer is better), TERSE — the reader already sees the numbers. No bullets, no headers, no jargon. Second person. Conversational but knowledgeable. Open with plan phase and goal stakes, not a day-by-day workout list.';
 
         if (anthropicKey) {
-          // Q-112 narrative-grounding guard: the prose must not contradict the spine's per-discipline
-          // verdicts or restate a receipt number. Build the ground-truth verdicts from state_trends_v1.
+          // Q-112 convergence: the coach WEEK narrative runs through the ONE shared narrative-core guard
+          // (validate → regenerate once → drop). Spine verdicts (state_trends_v1) are the ground truth for
+          // the contradiction (rule 6) + recap (rule 7) rules; hasTrendField/hasFitnessTrend=true because
+          // the spine verdicts ARE the trend backing (so rules 5b/5c don't false-fire on grounded claims).
           const spineVerdicts: DisciplineVerdict[] = (() => {
             const st: any = latestSnapshot?.state_trends_v1;
             if (!st) return [];
@@ -4655,15 +4692,21 @@ ${narrativeFacts.join('\n')}`;
             }
             return out;
           })();
+          const coachCtx: NarrativeContext = {
+            notableLeadSignals: [], atypicalSignals: [], anchors: {},
+            hasTrendField: true, hasFitnessTrend: true, establishedCauses: [],
+            disciplineVerdicts: spineVerdicts,
+          };
 
-          const genOnce = async (userContent: string): Promise<string | null> => {
+          const generate = async (retryNote: string | null): Promise<string | null> => {
+            const content = retryNote ? `${narrativePrompt}\n\n${retryNote}\nRewrite obeying these — describe the plan/state without the flagged claims.` : narrativePrompt;
             const resp = await fetch('https://api.anthropic.com/v1/messages', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' },
               body: JSON.stringify({
                 model: 'claude-sonnet-4-5-20250929',
                 system: systemPrompt,
-                messages: [{ role: 'user', content: userContent }],
+                messages: [{ role: 'user', content }],
                 max_tokens: 260,
                 temperature: 0,
               }),
@@ -4673,19 +4716,10 @@ ${narrativeFacts.join('\n')}`;
             return null;
           };
 
-          const draft = await genOnce(narrativePrompt);
-          let retry: string | null = null;
-          if (draft && spineVerdicts.length) {
-            const check = validateNarrative(draft, spineVerdicts);
-            if (!check.ok) {
-              console.warn(`[coach][narrative-guard] draft rejected — ${check.violations.map((v) => `${v.rule}:${v.claim}`).join(' | ')}`);
-              // Regenerate ONCE with the violation named.
-              retry = await genOnce(`${narrativePrompt}\n\nYOUR PREVIOUS DRAFT WAS REJECTED for asserting things the deterministic layer contradicts or already shows. ${violationsPrompt(check.violations)} Rewrite obeying these — describe the plan/state without those claims.`);
-            }
-          }
-          const resolved = spineVerdicts.length ? resolveGuardedNarrative(draft, retry, spineVerdicts) : { narrative: draft, dropped: false };
-          if (resolved.dropped) console.warn('[coach][narrative-guard] second failure — rendering prose-less');
-          week_narrative = resolved.narrative;
+          const result = spineVerdicts.length
+            ? await runGuardedNarrative({ surface: 'coach', ctx: coachCtx, generate })
+            : { narrative: await generate(null), dropped: false };
+          week_narrative = result.narrative;
         }
       }
     } catch (narErr: any) {

@@ -6,7 +6,7 @@
  */
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { detectNovelMovements, novelMovementsPhrase, headlineNovelMovement } from './novel-movements.ts';
+import { detectNovelMovements, novelMovementsPhrase, headlineNovelMovement, novelMovementsNames } from './novel-movements.ts';
 
 // Michael's Monday session: Bulgarian split squats + reverse lunges absent from history; back squat present.
 const SESSION = [
@@ -31,6 +31,11 @@ Deno.test('phrase: names the two biggest novel movements + rounded total reps', 
 Deno.test('headline: the single biggest novel movement (for the State chip Why)', () => {
   const n = detectNovelMovements({ sessionMovements: SESSION, historyMovementNames: HISTORY });
   assertEquals(headlineNovelMovement(n), 'Reverse Lunge');
+});
+
+Deno.test('names-only (State Why): pluralized, lowercase, no reps, biggest first', () => {
+  const n = detectNovelMovements({ sessionMovements: SESSION, historyMovementNames: HISTORY });
+  assertEquals(novelMovementsNames(n), 'reverse lunges and bulgarian split squats');
 });
 
 Deno.test('nothing novel → null phrase, empty list', () => {

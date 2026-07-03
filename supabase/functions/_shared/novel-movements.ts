@@ -67,3 +67,14 @@ export function headlineNovelMovement(novels: NovelMovement[]): string | null {
   if (!novels?.length) return null;
   return [...novels].sort((a, b) => (b.reps || 0) - (a.reps || 0))[0].name;
 }
+
+/**
+ * Names-only phrase for the State loaded-legs Why (no rep count — the State row is tight; the rep count
+ * lives in the INSIGHTS phrase). Lowercased + pluralized, up to 2, biggest first:
+ *   "reverse lunges and bulgarian split squats"
+ */
+export function novelMovementsNames(novels: NovelMovement[]): string | null {
+  if (!novels?.length) return null;
+  const named = [...novels].sort((a, b) => (b.reps || 0) - (a.reps || 0)).slice(0, 2);
+  return named.map((n) => pluralize(n.name).toLowerCase()).join(' and ');
+}
