@@ -431,6 +431,7 @@ export type CoachWeekContextV1 = {
       fitness_direction: string;
       readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
       readiness_label: string | null;
+      readiness_why?: string | null;
       signals: Array<{
         metric: string;
         direction: string;

@@ -38,6 +38,7 @@ import {
   type CrossDomainPair,
 } from '../_shared/response-model/index.ts';
 import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
+import { buildReadinessWhy, buildCrossTrainingReceipt } from '../_shared/response-model/readiness-receipts.ts';
 import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext, type GoalLite } from '../_shared/goal-context.ts';
 import { coachLegacyPriorRaceLine, coachPromptPriorRaceBlock } from '../_shared/prior-similar-race-coach.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
@@ -94,7 +95,8 @@ const corsHeaders: Record<string, string> = {
 /** v36: D-146/D-147 load verdict fixes (spike-on-empty-base guard + unplanned-load ACWR≥1.0 gate + off-plan wording) change load_status/intent_summary VALUES — bump so cached "high load → back off" rows recompute instead of serving stale. */
 /** v47: D-231 — response_model.strength.per_lift gains `anchor_1rm` (typed baseline) + the verdict/suggested-weight now consult it (de-alarmed tone on headroom); bump so cached baseline-blind "125→115" rows recompute with the anchor-aware row. */
 /** v48: D-232 — glass-box RPE row: visible_signal "How hard it feels" detail is now a plain verdict + receipt ("Sessions feeling a bit harder than usual (avg 6.4 vs your typical 5.5)") instead of "feels 0.9 harder"; bump so cached bare-delta rows recompute. */
-const COACH_PAYLOAD_VERSION = 48; // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm + anchor-aware strength verdict/suggested-weight. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+/** v49: D-232 — cross_training_signal strain label cites the distinct fired signals ("Effort up (5.3 vs 4.4)", no false "across disciplines" on a single signal) + trends.readiness_why factor breakdown for the FATIGUED "open for more"; bump so cached rows recompute. */
+const COACH_PAYLOAD_VERSION = 49; // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm + anchor-aware strength verdict/suggested-weight. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -5056,7 +5058,16 @@ ${narrativeFacts.join('\n')}`;
           const stressSignals = [rpeRising, driftWorsening, strengthFading, rirDropping, bodyConcerned].filter(Boolean).length;
 
           if (stressSignals >= 2) {
-            return { label: 'Body showing strain across disciplines', tone: 'warning' as const };
+            // D-232 glass-box: cite the DISTINCT signals that fired, never a bare "strain across
+            // disciplines". A single distinct signal (RPE double-counted via bodyConcerned) → just that
+            // factor, no "across disciplines" overstatement. (Detection over-fire tracked in Q-111.)
+            const receipt = buildCrossTrainingReceipt({
+              rpe: { declining: rpeRising, current: endur.rpe.current_avg, baseline: endur.rpe.baseline_avg },
+              hrDrift: { declining: driftWorsening },
+              strength: { declining: strengthFading },
+              rirDropping,
+            });
+            return { label: receipt ?? 'Body showing strain across disciplines', tone: 'warning' as const };
           }
 
           if (stressSignals === 0 && assess.signals_concerning === 0) {
@@ -5091,6 +5102,25 @@ ${narrativeFacts.join('\n')}`;
           }
           if (readinessState === 'detrained') return 'LOW vs BASELINE';
           return null;
+        })(),
+        // D-232 glass-box: the FATIGUED/OVERREACHED headline expands to its factors — the real declining
+        // signals with values + load + count — instead of a bare state. Rendered in "open for more".
+        readiness_why: (() => {
+          if (readinessState !== 'fatigued' && readinessState !== 'overreached') return null;
+          const e = weeklyResponseModel.endurance;
+          const acwr = metrics.acwr;
+          const loadLabel = (acwr != null && acwr >= 1.2) ? `load elevated (ACWR ${acwr.toFixed(2)})` : 'load balanced';
+          return buildReadinessWhy({
+            signals: {
+              rpe: { declining: e.rpe.sufficient && e.rpe.trend === 'declining', current: e.rpe.current_avg, baseline: e.rpe.baseline_avg },
+              execution: { declining: e.execution.sufficient && e.execution.trend === 'declining' },
+              hrDrift: { declining: e.hr_drift.sufficient && e.hr_drift.trend === 'declining' },
+              cardiacEff: { declining: e.cardiac_efficiency.sufficient && e.cardiac_efficiency.trend === 'declining' },
+              strength: { declining: weeklyResponseModel.strength.overall.trend === 'declining' },
+            },
+            loadLabel,
+            concerningCount: weeklyResponseModel.assessment.signals_concerning,
+          });
         })(),
         signals: trendSignals,
       },

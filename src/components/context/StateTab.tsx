@@ -1152,6 +1152,7 @@ export default function StateTab({
   const trends = wsv.trends;
   const readinessLabel = trends.readiness_label;
   const readiness = trends.readiness_state;
+  const readinessWhy = trends.readiness_why ?? null; // D-232: FATIGUED "Why:" factor breakdown
   const readinessColor =
     readiness === 'fresh' ? 'text-emerald-400/90' :
     readiness === 'adapting' ? 'text-sky-400/85' :
@@ -1218,7 +1219,7 @@ export default function StateTab({
               {loadHeadline && (
                 <span className="text-[13px] font-medium text-white/80 leading-snug">{loadHeadline}</span>
               )}
-              {weekNarrative && (
+              {(weekNarrative || readinessWhy) && (
                 <div className="flex flex-col">
                   <button
                     type="button"
@@ -1230,7 +1231,11 @@ export default function StateTab({
                     <ChevronDown className={`w-3 h-3 transition-transform ${narrativeOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {narrativeOpen && (
-                    <span className="text-[12px] text-white/55 leading-snug mt-1">{weekNarrative}</span>
+                    <>
+                      {/* D-232: the FATIGUED headline expands to its real factors (values + load + count). */}
+                      {readinessWhy && <span className="text-[12px] text-amber-300/70 leading-snug mt-1">{readinessWhy}</span>}
+                      {weekNarrative && <span className="text-[12px] text-white/55 leading-snug mt-1">{weekNarrative}</span>}
+                    </>
                   )}
                 </div>
               )}
