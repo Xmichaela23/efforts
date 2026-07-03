@@ -5,7 +5,7 @@ import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { arcModeSystemAddon, arcNarrativeFactBlock } from '../_shared/arc-narrative-ai-appendix.ts';
 // Shared narrative-reasoning core (D-189 — strength leg). Scaffold + validator suite via the strength
 // adapter; strength gets a 2-attempt validator loop (it had none). See docs/WORK-ORDER-narrative-core.md.
-import { buildReasoningScaffold, validateNarrative, strengthAdapter } from '../_shared/narrative-core/index.ts';
+import { buildReasoningScaffold, validateNarrative, strengthAdapter, applyGroundingContext } from '../_shared/narrative-core/index.ts';
 import { detectNovelMovements, novelMovementsNames, novelMovementNames } from '../_shared/novel-movements.ts';
 // D-208: role classifier — execution scoring weights a skipped accessory less than a main lift.
 import { roleForExercise, ROLE_WEIGHT } from '../_shared/strength/exercise-role.ts';
@@ -2453,11 +2453,13 @@ COACHING INSIGHT
         e1rmTrend.map((e) => `- ${e.exercise}: ${e.current_e1rm} lb${e.prior_e1rm != null ? ` (prev ${e.prior_e1rm} lb → ${e.trend})` : ' — NO prior session, so NO trend exists; do not claim one'}`).join('\n')
       : '\n\nESTIMATED 1RM: not available this session — do NOT mention or invent an estimated 1RM.';
     const ncCtx = strengthAdapter.buildContext({ e1rm_by_exercise: e1rmTrend });
-    (ncCtx as any).hasLinkedPlan = !isUnplanned;   // Rule 8: unplanned → target/adherence claims rejected
-    (ncCtx as any).mustNameMovements = novelList;  // Rule 9: these must be named, not "movements"
-    // Rule 10: phase is grounded only when the arc reports a real current phase (a stale/ended plan now
-    // resolves to 'unspecified' at source, so an invented "taper" for a not-started plan is rejected).
-    (ncCtx as any).hasGroundedPhase = !!(arcNarrative?.plan_phase_normalized && arcNarrative.plan_phase_normalized !== 'unspecified');
+    // App-wide grounding (shared helper): rule 8 (unplanned → no target/adherence), rule 9 (name the novel
+    // movements), rule 10 (no invented phase — a stale/ended plan resolves to 'unspecified' at source).
+    applyGroundingContext(ncCtx, {
+      isUnplanned,
+      planPhaseNormalized: (arcNarrative as any)?.plan_phase_normalized ?? null,
+      mustNameMovements: novelList,
+    });
     // Q-111 §2 (corrected 2026-07-03): name the movements; NO time window; effect as POSSIBILITY not cause.
     const novelBlock = novelNames
       ? `\n\nNEW MOVEMENTS THIS SESSION: ${novelNames} — not part of the athlete's recent logged training. ` +

@@ -4,7 +4,27 @@
 // rule, claim) from day one so future keep/retire calls run on counts, not comments.
 
 import { validateNarrative } from './validate.ts';
-import type { NarrativeContext, ValidationFailure } from './types.ts';
+import type { NarrativeContext, ValidationFailure, DisciplineVerdict } from './types.ts';
+
+/**
+ * Apply the grounding context UNIFORMLY across every discipline surface (run/bike/swim/strength INSIGHTS
+ * + the coach/State narrative), so rules 6/7 (spine), 8 (no-plan→no-target), 9 (name movements), and 10
+ * (no invented phase) fire everywhere — not re-wired per analyzer. Each caller computes the inputs from
+ * its own plan-linkage / arc phase / spine verdict and calls this once. Undefined inputs leave the
+ * corresponding rule inert (so a surface opts into exactly what it can ground).
+ */
+export function applyGroundingContext(ctx: NarrativeContext, g: {
+  isUnplanned?: boolean;                // → hasLinkedPlan (rule 8): unplanned ⇒ no target/adherence claim
+  planPhaseNormalized?: string | null;  // → hasGroundedPhase (rule 10): 'unspecified'/null ⇒ no phase label
+  spineVerdict?: DisciplineVerdict | null; // → disciplineVerdicts (rules 6/7): no contradiction / no recap
+  mustNameMovements?: string[];         // → rule 9 (strength novel movements)
+}): NarrativeContext {
+  if (g.isUnplanned !== undefined) ctx.hasLinkedPlan = !g.isUnplanned;
+  if (g.planPhaseNormalized !== undefined) ctx.hasGroundedPhase = !!(g.planPhaseNormalized && g.planPhaseNormalized !== 'unspecified');
+  if (g.spineVerdict) ctx.disciplineVerdicts = [g.spineVerdict];
+  if (g.mustNameMovements?.length) ctx.mustNameMovements = g.mustNameMovements;
+  return ctx;
+}
 
 export interface RejectionLogEntry { surface: string; rule: number; code: string; claim: string; }
 

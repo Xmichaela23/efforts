@@ -7,7 +7,7 @@
  */
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { validateNarrative, resolveGuardedNarrative } from './index.ts';
+import { validateNarrative, resolveGuardedNarrative, applyGroundingContext } from './index.ts';
 import type { NarrativeContext, DisciplineVerdict } from './types.ts';
 
 const V: DisciplineVerdict[] = [
@@ -81,6 +81,26 @@ Deno.test('rule 9: vague "movements absent for eight weeks" when names are known
 Deno.test('rule 9: naming the movements → allowed', () => {
   const r = validateNarrative('You introduced reverse lunges and Bulgarian split squats, new to your recent training.', { ...ctx([]), mustNameMovements: ['Bulgarian Split Squats', 'Reverse Lunge'] });
   assertEquals(r.ok, true, JSON.stringify(r.failures));
+});
+
+// ── applyGroundingContext: the one helper every discipline surface calls (app-wide uniformity) ────────
+Deno.test('applyGroundingContext: unplanned + unspecified phase → rules 8 + 10 both fire', () => {
+  const c = applyGroundingContext(ctx([]), { isUnplanned: true, planPhaseNormalized: 'unspecified' });
+  const r = validateNarrative('Held on target within the taper.', c);
+  assert(!r.ok);
+  assert(r.failures.some((f) => f.rule === 8));
+  assert(r.failures.some((f) => f.rule === 10));
+});
+Deno.test('applyGroundingContext: planned + grounded phase + spine verdict → clean claim allowed (any discipline)', () => {
+  const c = applyGroundingContext(ctx([]), { isUnplanned: false, planPhaseNormalized: 'build', spineVerdict: { discipline: 'bike', verdict: 'improving', pctChange: 3 } });
+  const r = validateNarrative('Solid build-phase ride; power is improving.', c);
+  assertEquals(r.ok, true, JSON.stringify(r.failures));
+});
+Deno.test('applyGroundingContext: spine contradiction still caught after helper (bike sliding)', () => {
+  const c = applyGroundingContext(ctx([]), { spineVerdict: { discipline: 'bike', verdict: 'improving', pctChange: 3 } });
+  const r = validateNarrative('Your cycling is sliding lately.', c);
+  assert(!r.ok);
+  assert(r.failures.some((f) => f.rule === 6));
 });
 
 // ── Rule 10 (no invented phase label) ───────────────────────────────────────────────────────────────

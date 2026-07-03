@@ -4708,6 +4708,10 @@ ${narrativeFacts.join('\n')}`;
             notableLeadSignals: [], atypicalSignals: [], anchors: {},
             hasTrendField: true, hasFitnessTrend: true, establishedCauses: [],
             disciplineVerdicts: spineVerdicts,
+            // App-wide grounding: no active plan → no target/adherence claim (rule 8) and no grounded phase
+            // to name (rule 10). planActiveNow already carries the started-AND-not-ended gate.
+            hasLinkedPlan: planActiveNow,
+            hasGroundedPhase: planActiveNow,
           };
 
           const generate = async (retryNote: string | null): Promise<string | null> => {

@@ -3,7 +3,7 @@ import { coerceNumber, secondsToPaceString } from './utils.ts';
 import { callLLM } from '../llm.ts';
 // Shared narrative-reasoning core (continuity leg #3 — D-187). The 7-rule scaffold + the shared
 // validator suite, single-sourced; run plugs in via the run adapter. See docs/WORK-ORDER-narrative-core.md.
-import { buildReasoningScaffold, validateNarrative, runAdapter, type DisciplineVerdict } from '../narrative-core/index.ts';
+import { buildReasoningScaffold, validateNarrative, runAdapter, applyGroundingContext, type DisciplineVerdict } from '../narrative-core/index.ts';
 import type { ArcNarrativeContextV1, ArcNarrativeMode } from '../arc-narrative-state.ts';
 import { arcModeSystemAddon, arcNarrativeFactBlock, arcPostRaceComparisonAddon, arcUnplannedBackwardAnchorAddon } from '../arc-narrative-ai-appendix.ts';
 
@@ -1181,10 +1181,14 @@ export async function generateAISummaryV1(
   // heat-silo; Rule 2 reconcile atypical drift; Rule 4 cause allowlist; + the run addendum). Assembly is
   // NOT unified — the scaffold is APPENDED to the existing sectional run prompt (work-order guardrail #1).
   const ncCtx = runAdapter.buildContext(factPacket);
-  // Q-112 step 2: carry the spine's run verdict so rules 6 (no trend-direction claim contradicting the
-  // spine) + 7 (no recap of the on-screen receipt %) apply to the per-workout INSIGHTS — the same core
-  // the coach week narrative uses. Rule 6 keys on trend vocabulary, so single-session prose is unaffected.
-  if (spineVerdict) (ncCtx as any).disciplineVerdicts = [spineVerdict];
+  // App-wide grounding (one shared helper, every discipline): rules 6/7 (spine no-contradict/no-recap),
+  // 8 (unplanned ⇒ no pace-target/adherence claim), 10 (no invented phase). Rule 6 keys on trend
+  // vocabulary, so single-session prose is unaffected.
+  applyGroundingContext(ncCtx, {
+    isUnplanned: unplannedGate?.isUnplanned === true,
+    planPhaseNormalized: (arcNarrative as any)?.plan_phase_normalized ?? null,
+    spineVerdict: spineVerdict ?? null,
+  });
   const systemPrompt =
     `${arcTemporalSystemPrefix(arcNarrative)}${COACHING_SYSTEM_PROMPT}${arcModeSystemAddon(arcNarrative)}${arcPostRaceComparisonAddon(arcNarrative)}${arcUnplannedBackwardAnchorAddon(arcNarrative, unplannedGate?.isUnplanned === true)}${buildReasoningScaffold(runAdapter, factPacket)}`;
   const numericAllowAnchors =

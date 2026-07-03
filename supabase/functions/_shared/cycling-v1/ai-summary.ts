@@ -2,7 +2,7 @@ import type { CyclingFactPacketV1, CyclingFlagV1 } from './types.ts';
 import { callLLM } from '../llm.ts';
 // Shared narrative-reasoning core (D-188 — ride leg). Scaffold appended to the existing prompt + the
 // shared validator suite folded into the loop; ride is the no-regression case. See WORK-ORDER-narrative-core.md.
-import { buildReasoningScaffold, validateNarrative, rideAdapter } from '../narrative-core/index.ts';
+import { buildReasoningScaffold, validateNarrative, rideAdapter, applyGroundingContext } from '../narrative-core/index.ts';
 import type { ArcNarrativeContextV1 } from '../arc-narrative-state.ts';
 import { arcModeSystemAddon, arcNarrativeFactBlock, arcUnplannedBackwardAnchorAddon } from '../arc-narrative-ai-appendix.ts';
 
@@ -511,6 +511,12 @@ ${packetStr}
   // for no-regression: ride's compliant output passes the shared validators (empty notable/atypical;
   // hasFitnessTrend tracks the spine cross_workout.trend so grounded "fitness is building" is allowed).
   const ncCtx = rideAdapter.buildContext(display);
+  // App-wide grounding (shared helper): rule 8 (unplanned ⇒ no power/pace-target or adherence claim) +
+  // rule 10 (no invented phase). Rules 6/7 (bike spine verdict) follow when the caller threads it, as run does.
+  applyGroundingContext(ncCtx, {
+    isUnplanned,
+    planPhaseNormalized: (arcNarrative as any)?.plan_phase_normalized ?? null,
+  });
   const systemPrompt =
     'You are a precise endurance coach. Follow the rules exactly.' +
     (arcNarrative ? arcModeSystemAddon(arcNarrative) : '') +
