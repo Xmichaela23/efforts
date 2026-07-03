@@ -11,28 +11,34 @@ import { buildReadinessWhy, buildCrossTrainingReceipt } from './readiness-receip
 const RPE = (declining: boolean, current: number | null, baseline: number | null) => ({ rpe: { declining, current, baseline } });
 
 // ── FATIGUED "Why:" ─────────────────────────────────────────────────────────────────────────────
-Deno.test('why: RPE-driven (Michael\'s case) — effort up + load balanced + 1 declining', () => {
+Deno.test('why: RPE-driven (Michael\'s case) — NAMES the marker, no redundant count', () => {
   assertEquals(
     buildReadinessWhy({ signals: RPE(true, 5.3, 4.4), loadLabel: 'load balanced', concerningCount: 1 }),
-    'Why: effort up (5.3 vs 4.4 typical) · load balanced · 1 body signal declining',
+    'Why: perceived effort up (5.3 vs 4.4 typical) · load balanced',
   );
 });
-Deno.test('why: RPE + HR drift — two drivers + 2 declining', () => {
+Deno.test('why: RPE + HR drift — two named markers', () => {
   assertEquals(
     buildReadinessWhy({ signals: { rpe: { declining: true, current: 5.3, baseline: 4.4 }, hrDrift: { declining: true } }, loadLabel: 'load balanced', concerningCount: 2 }),
-    'Why: effort up (5.3 vs 4.4 typical) · HR drift rising · load balanced · 2 body signals declining',
+    'Why: perceived effort up (5.3 vs 4.4 typical) · HR drift rising · load balanced',
   );
 });
 Deno.test('why: ACWR-elevated + effort', () => {
   assertEquals(
     buildReadinessWhy({ signals: RPE(true, 5.3, 4.4), loadLabel: 'load elevated (ACWR 1.3)', concerningCount: 2 }),
-    'Why: effort up (5.3 vs 4.4 typical) · load elevated (ACWR 1.3) · 2 body signals declining',
+    'Why: perceived effort up (5.3 vs 4.4 typical) · load elevated (ACWR 1.3)',
   );
 });
 Deno.test('why: execution-driven (no rpe values)', () => {
   assertEquals(
     buildReadinessWhy({ signals: { execution: { declining: true } }, loadLabel: 'load balanced', concerningCount: 1 }),
-    'Why: run execution down · load balanced · 1 body signal declining',
+    'Why: run execution down · load balanced',
+  );
+});
+Deno.test('why: no nameable driver but something tripped → fallback count', () => {
+  assertEquals(
+    buildReadinessWhy({ signals: {}, loadLabel: 'load balanced', concerningCount: 1 }),
+    'Why: 1 concerning signal · load balanced',
   );
 });
 Deno.test('why: nothing to explain → null', () => {

@@ -100,7 +100,8 @@ const corsHeaders: Record<string, string> = {
 /** v48: D-232 — glass-box RPE row: visible_signal "How hard it feels" detail is now a plain verdict + receipt ("Sessions feeling a bit harder than usual (avg 6.4 vs your typical 5.5)") instead of "feels 0.9 harder"; bump so cached bare-delta rows recompute. */
 /** v49: D-232 — cross_training_signal strain label cites the distinct fired signals ("Effort up (5.3 vs 4.4)", no false "across disciplines" on a single signal) + trends.readiness_why factor breakdown for the FATIGUED "open for more"; bump so cached rows recompute. */
 /** v50: D-232 claim-grounding — pre-start plans no longer narrate as "week 1 in-block" (planHasStarted gates the narrative planLine + the week-chip index → null pre-start); bump so cached pre-start rows recompute. */
-const COACH_PAYLOAD_VERSION = 50; // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+/** v51: D-232 concision — readiness_why NAMES the marker ("perceived effort up (5.3 vs 4.4 typical) · load balanced") + drops the redundant "N signals declining" count; narrative tightened to ≤3 terse sentences with a NO-DASHBOARD-RECAP rule. Bump so cached verbose rows recompute. */
+const COACH_PAYLOAD_VERSION = 51; // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -4502,15 +4503,16 @@ Deno.serve(async (req) => {
           ? `You are a multi-sport triathlon coach writing a weekly check-in for your athlete.`
           : `You are a personal coach writing a weekly check-in for your athlete.`;
 
-        const narrativePrompt = `${coachPersona} Today is ${todayDay}, ${asOfDate}${userTz ? ` (${userTz})` : ''}. You have detailed facts about plan position, goals, load, readiness, and sessions. Write exactly 4 sentences in second person (a 5th only if unavoidable). Be specific and practical. Use day names instead of raw dates when naming a session.
+        const narrativePrompt = `${coachPersona} Today is ${todayDay}, ${asOfDate}${userTz ? ` (${userTz})` : ''}. You have detailed facts about plan position, goals, load, readiness, and sessions. Write AT MOST 3 sentences in second person — fewer is better, never more. Be specific, practical, and TERSE: the reader is an experienced self-coached athlete who already sees the numbers. Use day names instead of raw dates when naming a session.
 
-NARRATIVE CONTRACT (Training Status) — sentences 1–3 anchor phase and goal tension; they must NOT be a session inventory.
+NO DASHBOARD RECAP (hard rule): the athlete already sees, as on-screen receipts, the trend percentages (bike/run/strength), the perceived-effort rating and its delta, load/ACWR, and the readiness "Why" line that names the concerning marker. Do NOT restate any of those numbers, and do NOT re-explain WHY they're fatigued — that line is right above you. Add only the interpretation and the next action (the so-what and the do-this), never a recap of the data on screen.
+
+NARRATIVE CONTRACT (Training Status) — sentences anchor phase and goal tension; they must NOT be a session inventory.
 - Sentence 1 — PHASE ANCHOR: Where they are in the macrocycle. Draw from FACTS: plan name/week index, week intent or phase if present, and Overall status, readiness, or fitness direction in plain language. No day-by-day recap; no listing which sessions were skipped or completed.
 - Sentence 2 — GOAL TENSION: What the primary race or active goal implies right now. Draw from FACTS: weeks to event, goal or race name, TAPER CONTEXT if present, target vs predicted finish or stretch framing if FACTS mention it. If no race or goal line exists in FACTS, state what this block or week intent is trying to preserve or build toward. Still no session inventory.
-- Sentence 3 — INTERPRETATION: What this week does to sentences 1–2 — tradeoffs (e.g. volume vs freshness, load vs plan at aggregate level), interference or cross-domain signals only as they bear on readiness for the goal. You may cite aggregate stats (session completion, weekly load vs plan, intensity split) from FACTS without naming each day. Do not run Monday-through-Sunday or "Monday … Tuesday …" chronology.
-- Sentence 4 — NEXT ACTION: One concrete, actionable suggestion (see CRITICAL below).
+- Sentence 3 — INTERPRETATION + NEXT ACTION: What this week does to sentences 1–2 (tradeoffs like volume vs freshness) AND the one concrete next action (see CRITICAL below), in plain language. Do NOT restate the trend/effort/load numbers (they are on-screen receipts) and do NOT run a day-by-day chronology.
 
-SESSION INVENTORY: Forbidden in sentences 1–3. In sentence 4, at most one named session example if it sharpens the action; never a list of days.
+SESSION INVENTORY: Forbidden in sentences 1–2. In the final sentence, at most one named session example if it sharpens the action; never a list of days.
 
 OPENING — CREDIT BEFORE DEFICIT (hard rule): Sentences 1–2 lead with where the athlete IS (phase, readiness, fitness direction) and the real training they HAVE done — including off-plan work, which IS real training and is credited as work done, never framed as "behind." Do NOT open with a shortfall or a completion deficit. If consistency is genuinely behind, that is an INTERPRETATION point for sentence 3 — framed as what the block needs next — never the first thing the athlete reads. The athlete already knows what they missed; the opening earns trust by naming the state and the work done, not by leading with the gap.
 
@@ -4566,8 +4568,8 @@ ${narrativeFacts.join('\n')}`;
 
         // Use Anthropic Sonnet for the athlete-facing narrative (best prose quality)
         const systemPrompt = hasTri
-          ? 'You are an expert multi-sport triathlon coach fluent in swim, bike, run, and strength. Write a single paragraph (4 sentences; 5 only if unavoidable). No bullets, no headers, no jargon. Second person. Conversational but knowledgeable. Open with plan phase and goal stakes, not a day-by-day workout list. When referencing workouts, use the sport-specific context (e.g., power for bike, pace per 100 for swim, pace per mile for run). For brick sessions, acknowledge the transition component.'
-          : 'You are an expert endurance and strength coach. Write a single paragraph (4 sentences; 5 only if unavoidable). No bullets, no headers, no jargon. Second person. Conversational but knowledgeable. Open with plan phase and goal stakes, not a day-by-day workout list.';
+          ? 'You are an expert multi-sport triathlon coach fluent in swim, bike, run, and strength. Write a single paragraph, AT MOST 3 sentences (fewer is better), TERSE — the reader already sees the numbers. No bullets, no headers, no jargon. Second person. Conversational but knowledgeable. Open with plan phase and goal stakes, not a day-by-day workout list. When referencing workouts, use the sport-specific context (e.g., power for bike, pace per 100 for swim, pace per mile for run). For brick sessions, acknowledge the transition component.'
+          : 'You are an expert endurance and strength coach. Write a single paragraph, AT MOST 3 sentences (fewer is better), TERSE — the reader already sees the numbers. No bullets, no headers, no jargon. Second person. Conversational but knowledgeable. Open with plan phase and goal stakes, not a day-by-day workout list.';
 
         if (anthropicKey) {
           const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -4581,7 +4583,7 @@ ${narrativeFacts.join('\n')}`;
               model: 'claude-sonnet-4-5-20250929',
               system: systemPrompt,
               messages: [{ role: 'user', content: narrativePrompt }],
-              max_tokens: 500, // was 300 — the 4–5 sentence contract truncated mid-sentence ("…if you can only add one more, make—")
+              max_tokens: 260, // ≤3-sentence terse contract (D-232: no dashboard recap; the athlete sees the receipts)
               temperature: 0,
             }),
           });

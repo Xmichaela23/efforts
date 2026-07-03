@@ -26,17 +26,22 @@ export function buildReadinessWhy(args: {
   concerningCount: number;  // assessment.signals_concerning
 }): string | null {
   const s = args.signals;
+  // NAME the marker(s) that tripped — the driver IS the concerning signal, so no redundant
+  // "N body signals declining" count alongside it (Michael 2026-07-03).
   const drivers: string[] = [];
   if (s.rpe?.declining && s.rpe.current != null && s.rpe.baseline != null) {
-    drivers.push(`effort up (${s.rpe.current.toFixed(1)} vs ${s.rpe.baseline.toFixed(1)} typical)`);
+    drivers.push(`perceived effort up (${s.rpe.current.toFixed(1)} vs ${s.rpe.baseline.toFixed(1)} typical)`);
   }
   if (s.execution?.declining) drivers.push('run execution down');
   if (s.hrDrift?.declining) drivers.push('HR drift rising');
   if (s.cardiacEff?.declining) drivers.push('aerobic efficiency down');
   if (s.strength?.declining) drivers.push('strength fading');
-  if (!drivers.length && args.concerningCount === 0) return null;
-  const count = `${args.concerningCount} body signal${args.concerningCount === 1 ? '' : 's'} declining`;
-  return `Why: ${[...drivers, args.loadLabel, count].join(' · ')}`;
+  if (drivers.length) return `Why: ${[...drivers, args.loadLabel].join(' · ')}`;
+  // No nameable driver but something tripped → say how many (fallback only).
+  if (args.concerningCount > 0) {
+    return `Why: ${args.concerningCount} concerning signal${args.concerningCount === 1 ? '' : 's'} · ${args.loadLabel}`;
+  }
+  return null;
 }
 
 /**
