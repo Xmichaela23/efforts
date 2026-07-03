@@ -1,7 +1,7 @@
 // D-232 surgical readiness: when the elevated-effort signal traces to a recent lower-body strength
 // session (cross-domain interference), the diagnosis names the SESSION, the MECHANISM, and the EFFECT
 // — not a blunt "FATIGUED". Load language, never state language: we say "legs loaded" (a measured fact —
-// a lower-body session happened) not "legs sore" (an unmeasured sensation) UNLESS the athlete declared
+// a lower-body work happened) not "legs sore" (an unmeasured sensation) UNLESS the athlete declared
 // soreness via the Q-049 sliders — then it's his own truth (typed-beats-learned, D-231 applied to
 // sensations). Industry precedent: Whoop "muscular load"; the failure we avoid is Garmin claiming a
 // feeling it can't measure. Plain FATIGUED stays reserved for systemic cases (handled by the caller).
@@ -15,7 +15,7 @@
 // repeated-bout-effect physiology, not a per-athlete prediction.
 
 export interface LoadedLegsInput {
-  dayName: string;                    // "Monday" — the lower-body session's day (logged)
+  dayName: string;                    // "Monday" — the lower-body work's day (logged)
   sessionRpe: number | null;          // 9 — logged session RPE
   movement: string | null;            // "lunges" — headline movement to name (novelty), null if not naming
   isNovel: boolean;                   // movement absent from ~6–8wk exercise history
@@ -61,16 +61,16 @@ export function buildLoadedLegsDiagnosis(input: LoadedLegsInput): LoadedLegsDiag
   if (athleteReportedSoreness) {
     // LEGS SORE — the athlete DECLARED soreness (Q-049). State language is now his own truth.
     const rpePart = rpe ? ` (${rpe})` : '';
-    const why = `Why: ${dayName}'s lower-body session${rpePart} — you reported sore legs, ${effort} · ${loadLabel}`;
+    const why = `Why: ${dayName}'s lower-body work${rpePart} — you reported sore legs, ${effort} · ${loadLabel}`;
     return { label: 'LEGS SORE', why, suggestion: soreSuggestion(planEvent) };
   }
 
   const suggestion = suggestionFor(isNovel, movement, planEvent);
 
-  // LEGS LOADED — a lower-body session happened (measured fact); no soreness claim.
+  // LEGS LOADED — a lower-body work happened (measured fact); no soreness claim.
   const noveltyClause = isNovel && movement ? `first ${movement} in months, ` : '';
   const mid = rpe ? `${noveltyClause}${rpe}` : noveltyClause.replace(/, $/, '');
-  const why = `Why: ${dayName}'s lower-body session — ${mid} — ${effort} · ${loadLabel}, nothing systemic`;
+  const why = `Why: ${dayName}'s lower-body work — ${mid} — ${effort} · ${loadLabel}, nothing systemic`;
   return { label: 'LEGS LOADED', why, suggestion };
 }
 

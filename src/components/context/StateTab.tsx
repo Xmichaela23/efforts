@@ -1166,6 +1166,7 @@ export default function StateTab({
   const loadHeadline = buildLoadHeadline({
     loadLabel: acwrVolumeLabel(load.acwr),
     readinessState: readiness,
+    readinessLabel, // D-232: refined chip label wins so the headline can't contradict the chip
     fitnessDirection: (trends as any).fitness_direction,
     isTaperOrPeak: week.intent === 'taper' || week.intent === 'peak',
   });

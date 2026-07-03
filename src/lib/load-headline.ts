@@ -17,20 +17,31 @@ export function acwrVolumeLabel(v: number | null | undefined): string {
   return 'rest now';
 }
 
+// D-232/D-233: the refined display label (LEGS LOADED / LEGS SORE / EFFORT UP / FATIGUED) wins over the
+// raw readinessState so the headline can never contradict the chip. Only FATIGUED is systemic.
+function refinedReadinessPhrase(label: string | null | undefined): string | null {
+  const u = String(label || '').toUpperCase();
+  if (u === 'LEGS LOADED') return 'legs loaded';
+  if (u === 'LEGS SORE') return 'legs sore';
+  if (u === 'EFFORT UP') return 'effort up';
+  if (u === 'FATIGUED') return 'fatigued';
+  return null; // other labels (LOW FATIGUE/ABSORBING/…) fall back to the readinessState mapping
+}
+
 // Slot 1 — STATE: load verdict + readiness, the honest lead (never the deficit).
-function stateSlot(loadLabel: string, readiness: string | null | undefined): string | null {
+function stateSlot(loadLabel: string, readiness: string | null | undefined, readinessLabel?: string | null): string | null {
   const l =
     loadLabel === 'balanced'   ? 'Balanced load' :
     loadLabel === 'build more' ? 'Room to build' :
     loadLabel === 'back off'   ? 'Load running high' :
     loadLabel === 'rest now'   ? 'Load very high' : null;
-  const r =
+  const r = refinedReadinessPhrase(readinessLabel) ?? (
     readiness === 'fresh'       ? 'fresh' :
     readiness === 'adapting'    ? 'adapting' :
     readiness === 'fatigued'    ? 'fatigued' :
     readiness === 'overreached' ? 'overreached' :
     readiness === 'detrained'   ? 'detrained' :
-    readiness === 'normal'      ? 'steady' : null;
+    readiness === 'normal'      ? 'steady' : null);
   if (l && r) return `${l}, ${r}`;
   if (l) return l;
   if (r) return r.charAt(0).toUpperCase() + r.slice(1);
@@ -49,8 +60,11 @@ function fitnessSlot(fd: string | null | undefined): string | null {
 // Slot 3 — OBSERVATION: a state-implied direction only. Pure physiological reads off the spine.
 // Deliberately sparse: fires only where the state clearly implies one, omits otherwise (the state
 // slot already carries "Load running high" etc., so we don't double it).
-function observationSlot(loadLabel: string, readiness: string | null | undefined): string | null {
-  if (readiness === 'overreached' || readiness === 'fatigued') return "you're carrying fatigue";
+function observationSlot(loadLabel: string, readiness: string | null | undefined, readinessLabel?: string | null): string | null {
+  // "carrying fatigue" is a SYSTEMIC read — only for overreached or the systemic FATIGUED label.
+  // A localized LEGS LOADED / LEGS SORE / EFFORT UP must NOT claim systemic fatigue (the Why carries it).
+  const u = String(readinessLabel || '').toUpperCase();
+  if (readiness === 'overreached' || u === 'FATIGUED') return "you're carrying fatigue";
   // headroom only on balanced+fresh — "Room to build" (build-more state) already conveys headroom.
   if (loadLabel === 'balanced' && readiness === 'fresh') return 'you have headroom';
   return null;
@@ -59,17 +73,18 @@ function observationSlot(loadLabel: string, readiness: string | null | undefined
 export function buildLoadHeadline(opts: {
   loadLabel: string;                 // from acwrVolumeLabel(load.acwr)
   readinessState?: string | null;
+  readinessLabel?: string | null;    // the refined chip label (LEGS LOADED / EFFORT UP / FATIGUED / …)
   fitnessDirection?: string | null;
   isTaperOrPeak?: boolean;
 }): string | null {
-  const { loadLabel, readinessState, fitnessDirection, isTaperOrPeak } = opts;
+  const { loadLabel, readinessState, readinessLabel, fitnessDirection, isTaperOrPeak } = opts;
   if (loadLabel === '—') return null;
   // In taper/peak, a "build more" reading is by-design low volume — don't lead the glance with it.
   const effLoad = isTaperOrPeak && loadLabel === 'build more' ? 'balanced' : loadLabel;
-  const state = stateSlot(effLoad, readinessState);
+  const state = stateSlot(effLoad, readinessState, readinessLabel);
   if (!state) return null;
   const fit = fitnessSlot(fitnessDirection);
-  const obs = observationSlot(effLoad, readinessState);
+  const obs = observationSlot(effLoad, readinessState, readinessLabel);
   const lead = [state, fit].filter(Boolean).join(' · ');
   return obs ? `${lead} — ${obs}.` : `${lead}.`;
 }

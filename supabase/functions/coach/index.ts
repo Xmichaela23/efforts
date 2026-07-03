@@ -103,7 +103,8 @@ const corsHeaders: Record<string, string> = {
 /** v50: D-232 claim-grounding — pre-start plans no longer narrate as "week 1 in-block" (planHasStarted gates the narrative planLine + the week-chip index → null pre-start); bump so cached pre-start rows recompute. */
 /** v51: D-232 concision — readiness_why NAMES the marker ("perceived effort up (5.3 vs 4.4 typical) · load balanced") + drops the redundant "N signals declining" count; narrative tightened to ≤3 terse sentences with a NO-DASHBOARD-RECAP rule. Bump so cached verbose rows recompute. */
 /** v52: D-232 surgical readiness — the `fatigued` catch-all resolves to LEGS LOADED / LEGS SORE / EFFORT UP / FATIGUED (systemic only); loaded-legs Why names the session+mechanism+effect + a conditional suggestion (readiness_suggestion). Bump so cached "FATIGUED" rows recompute. */
-const COACH_PAYLOAD_VERSION = 52; // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+/** v53: D-232 loaded-legs detection now fires on FULL-body days too (legs load from squats inside a full session, not just pure lower); Why says "lower-body work". Bump so cached EFFORT-UP-on-a-full-day rows recompute to LEGS LOADED. */
+const COACH_PAYLOAD_VERSION = 53; // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2820,9 +2821,14 @@ Deno.serve(async (req) => {
       let lower: { dayName: string; rpe: number | null } | null = null;
       try {
         const rows = (Array.isArray(normWorkouts) ? normWorkouts : [])
-          .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed'
-            && String(w?.type || '').toLowerCase() === 'strength'
-            && strengthFocusFromWorkout(w) === 'lower')
+          .filter((w: any) => {
+            if (String(w?.workout_status || '').toLowerCase() !== 'completed') return false;
+            if (String(w?.type || '').toLowerCase() !== 'strength') return false;
+            // 'lower' OR 'full': legs get loaded by the squat/lower work INSIDE a full-body day too
+            // (Michael's squat+bench session classifies 'full'). 'upper' has no leg load.
+            const f = strengthFocusFromWorkout(w);
+            return f === 'lower' || f === 'full';
+          })
           .map((w: any) => ({ date: String(w?.date || ''), rpe: sessionRpeFromWorkout(w) }))
           .filter((r) => r.date && daysAgo(r.date) >= 0 && daysAgo(r.date) <= 4)
           .sort((a, b) => b.date.localeCompare(a.date));
