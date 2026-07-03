@@ -445,6 +445,39 @@ function samplesLabel(n: number, category: 'endurance' | 'strength'): string {
   return n === 1 ? '1 run' : `${n} sessions`;
 }
 
+// D-232 glass-box: turn the RPE 7d-vs-28d delta into a plain verdict + its receipt (never a bare
+// "feels 0.9 harder"). The row LABEL ("How hard it feels") carries the subject, so the sentence starts
+// with the magnitude. Buckets, word escalating with the number:
+//   |Δ| < 0.5  → "About as hard as usual"
+//   0.5 ≤ |Δ| < 1.0 → "A bit {harder|easier}"
+//   |Δ| ≥ 1.0  → "Noticeably {harder|easier}"
+// Receipt always cites "avg {current} vs your typical {baseline}" so the athlete can check the claim.
+export function rpeFeelVerdict(
+  currentAvg: number | null,
+  baselineAvg: number | null,
+  delta: number | null,
+): string {
+  if (delta == null || currentAvg == null || baselineAvg == null) return 'steady';
+  const receipt = `avg ${currentAvg.toFixed(1)} vs your typical ${baselineAvg.toFixed(1)}`;
+  const abs = Math.abs(delta);
+  if (abs < 0.5) return `About as hard as usual (${receipt})`;
+  const mag = abs >= 1.0 ? 'Noticeably' : 'A bit';
+  const dir = delta > 0 ? 'harder' : 'easier';
+  return `${mag} ${dir} than usual (${receipt})`;
+}
+
+// D-232 color escalation for the "How hard it feels" row (Michael 2026-07-02): magnitude drives tone,
+// but only HARDER escalates — feeling easier never alarms.
+//   |Δ| < 0.5 → neutral · harder 0.5–1.0 → the current default (danger) · harder ≥1.0 → amber (warning)
+//   easier (any magnitude) → positive (recovering well), never a warning.
+export function rpeFeelTone(delta: number | null): VisibleSignal['trend_tone'] {
+  if (delta == null) return 'neutral';
+  const abs = Math.abs(delta);
+  if (abs < 0.5) return 'neutral';
+  if (delta < 0) return 'positive';               // easier — don't alarm on easy weeks
+  return abs >= 1.0 ? 'warning' : 'danger';        // harder: ≥1.0 amber, 0.5–1.0 current default
+}
+
 /** Days from today to a YYYY-MM-DD; positive = future, negative = past. Null when invalid. */
 function daysUntilYmd(asOfYmd: string, targetYmd: string | null | undefined): number | null {
   if (!targetYmd) return null;
@@ -681,8 +714,10 @@ function computeVisibleSignals(endurance: EnduranceResponse, strength: StrengthR
   if (endurance.rpe.sufficient) {
     out.push({
       label: 'How hard it feels', category: 'endurance',
-      trend: endurance.rpe.trend, trend_icon: trendIcon(endurance.rpe.trend), trend_tone: trendTone(endurance.rpe.trend),
-      detail: humanDetail(endurance.rpe.delta, 'RPE', 'feels easier', 'feels harder', 'steady'),
+      // D-232 glass-box: plain verdict + receipt instead of a bare "feels 0.9 harder", with
+      // magnitude-driven tone (harder escalates neutral→default→amber; easier never alarms).
+      trend: endurance.rpe.trend, trend_icon: trendIcon(endurance.rpe.trend), trend_tone: rpeFeelTone(endurance.rpe.delta),
+      detail: rpeFeelVerdict(endurance.rpe.current_avg, endurance.rpe.baseline_avg, endurance.rpe.delta),
       samples: endurance.rpe.samples,
       samples_label: samplesLabel(endurance.rpe.samples, 'endurance'),
     });

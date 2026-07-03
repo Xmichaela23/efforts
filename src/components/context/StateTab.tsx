@@ -17,6 +17,7 @@ import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { pickRaceFinishProjectionV1FromCoachData, pickRaceReadinessFromCoachData } from '@/lib/coach-payload';
 import type { BlockVerdictResult } from '@/lib/analysis/goal-predictor';
 import { planWizardRaceDistanceDisplay } from '@/lib/plan-wizard-distance-label';
+import { resolveRaceHeader } from '@/lib/race-header';
 import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import type { ArcReadiness } from '@/lib/arc-types';
@@ -271,7 +272,8 @@ function RaceSection({
   const distLabel = planWizardRaceDistanceDisplay(
     planWizardDistance ?? rr?.goal.distance ?? goalMeta?.distance ?? null,
   );
-  const weeksOut = rr?.goal.weeks_out ?? goalMeta?.weeks_out ?? 0;
+  // H4 (Q-107): the weeks-out + real-race gate are resolved below (they need hasAnyFinishTime) via
+  // resolveRaceHeader — never fabricate a "0w out" countdown from the `?? 0` default.
 
   const statedSec = goalMeta?.target_time_seconds ?? null;
   const wizardSec =
@@ -389,13 +391,21 @@ function RaceSection({
   const hasProjection = projectedFromTraining != null;
   const showProjectionPlaceholder = statedGoalDisplay != null && !hasProjection;
   const hasAnyFinishTime = statedGoalDisplay != null || hasProjection;
+  // H4 (Q-107): gate the RACE header on a REAL race — no fabricated "0w out" from the `?? 0` default.
+  const { hasRealRace, weeksOut: raceWeeksOut } = resolveRaceHeader({
+    readinessWeeksOut: rr?.goal?.weeks_out ?? null,
+    goalMetaWeeksOut: goalMeta?.weeks_out ?? null,
+    hasAnyFinishTime,
+  });
 
   return (
     <div className="px-3 py-3 space-y-2.5">
       {/* Header: goal + weeks out */}
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">RACE</span>
-        <span className="text-[11px] text-white/55">{distLabel} — {weeksOut}w out</span>
+        {hasRealRace && (
+          <span className="text-[11px] text-white/55">{distLabel}{raceWeeksOut != null ? ` — ${raceWeeksOut}w out` : ''}</span>
+        )}
       </div>
 
       {/* Goal (intent) vs projected finish (server fitness); terrain refines projected server-side when applicable. */}

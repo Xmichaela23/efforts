@@ -4681,6 +4681,17 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 - **Build gate:** implementation is **gated on Q-097's write-back convergence fully landing** (learned↔typed cannot reconcile until the down-write path is closed). This entry ratifies the precedence + the single-resolver rule now so it's settled before code; the resolver itself is step 1 of the D-230 roadmap.
 - **Cross-ref:** D-230 (the audited finding + roadmap), D-213 (retire forks / SSOT), D-151 (the proven single-axis migration), D-224 (strength write-key canon), D-226 (user data goes through the app), Q-097 (convergence gate), Q-106 (roadmap); `AUDIT-spine-conformance-2026-07-02.md` §4/§6/§7, `_shared/state-trend/reconcile.ts`, `materialize-plan`, `coach/index.ts`.
 
+## D-232 — Glass-box verdict language: every athlete-facing verdict is a plain sentence citing its evidence
+
+- **Date:** 2026-07-02
+- **Decision (standard, applies to ALL current + future State/athlete-facing rows):** no athlete-facing surface renders a **raw engine value or a bare delta**. Every verdict is a **plain-language sentence that cites its own evidence** — the "My Record" / bench-row pattern: **what we measured, versus what, and what it means.**
+  - Not `125 → 115 lbs` → **`Working ~125 vs your 150 baseline — suggest 115 this week`** (D-231, shipped).
+  - Not `feels 0.9 harder` → **`Sessions feeling a bit harder than usual (avg 6.4 vs your typical 5.5)`** (the RPE-row change, this session).
+  - Not `Marathon — 0w out` next to "Add a race target" → **no fabricated countdown at all** (H4, this session).
+- **Why:** a bare number or delta is a **black-box assertion** — the athlete can't see what it's comparing or why, so a wrong/placeholder value (the `?? 0` countdown, the baseline-blind back-off) reads as authoritative fact. Citing the receipt makes the surface **falsifiable by the athlete** — they can see the comparison and catch the lie. This is the display-layer half of the same "single honest truth" bet the spine/resolver work serves (D-149/151/213/231): the engine computes one truth; the surface must *show its work*, not just its conclusion.
+- **Scope + enforcement:** the rule the next State-row / verdict-string change is measured against. **Q-111 designs against this** — its plan/history-aware verdict strings must be glass-box (plain verdict + receipt + the plan/history context, e.g. "Bench down ~10% over the marathon block — expected. Rebuild started, Week 1 of 12"). Word-mapped magnitude buckets (tone escalates with the number) are the mechanism for turning a delta into a plain verdict without losing the receipt.
+- **Cross-ref:** D-231 (the bench-row exemplar), Q-107 (H1/H4 the "score that lies" catalog this ends), Q-111 (the design round that applies it to strength tone), D-226 (user-facing honesty); `StateTab.tsx`, `src/lib/race-header.ts`, `_shared/response-model/weekly.ts`.
+
 ---
 
 ## When to add an entry
