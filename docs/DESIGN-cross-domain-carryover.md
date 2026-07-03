@@ -33,6 +33,20 @@ The elevation must not be cleanly attributable to the target session's OWN condi
 - **Harder prescription** — a genuinely harder planned session (intervals vs easy). If prescribed hard, "hard" isn't carryover.
 If any condition **materially explains** the elevation → carryover is not the cleanest attribution → **don't claim it** (the card's existing terrain/heat call already tells the honest story).
 
+**Gate 2+3 as ONE rigorous procedure — "confound-adjusted residual" (removes the judgment call).**
+Do NOT ask "is it elevated?" and then, separately, "does terrain explain it?" — that arbitration ("materially explains") is a fuzzy seam. Instead, a strict sequence:
+1. **Adjust the effort signal for the session's OWN conditions first.** The analyzers already produce these: grade-adjusted pace (the run/ride's terrain correction the card already shows), a heat correction on HR-at-pace, and the prescribed-difficulty frame. Compute the effort signal *net of* terrain + heat + prescription.
+2. **Test the RESIDUAL against baseline.** Carryover is claimable only if, *after* removing the session's own conditions, the effort is STILL elevated vs the athlete's own discipline baseline by the threshold below.
+3. **If the adjusted signal sits at baseline, the conditions fully explained it → silence.** No arbitration, no "which is bigger" — the confound is subtracted, and only genuine residual elevation survives.
+
+This makes Gate 3 mechanical: terrain/heat/prescription don't "compete" with carryover — they're *removed first*, and carryover must clear the bar on what's left. It's the §9 confound discipline as arithmetic, not judgment.
+
+**Thresholds (proposed — the numbers to ratify):**
+- **RPE** (declared, strongest): residual RPE ≥ baseline + **1.0** (the glass-box "a bit harder" bucket).
+- **HR-at-pace / HR-at-power** (endurance): residual drift ≥ **the discipline's own efficiency-trend noise band** (reuse the `state_trends_v1` efficiency gate's sensitivity — don't invent a new one).
+- **Execution**: residual `next_endurance_execution` below `baseline_execution` by ≥ the margin `crossDomainPairs` already uses (reconcile to its existing constant, don't add a second).
+- **Baseline source**: the athlete's own per-discipline baseline from the spine/history — the SAME baseline the discipline's trend uses (one baseline, not a carryover-specific one). Single source, per the whole architecture.
+
 **Gate 4 — Concentration, not systemic (Q-111 §9, cross-discipline).**
 If effort is elevated in the leg-driven session but ALSO elevated across non-leg-dependent efforts (a systemic picture — sleep/illness/overreach), it's not *specifically* the leg carryover → route to systemic / say nothing, not "Monday's legs." (Only fires when a non-leg baseline is available; else fall back — the §9 graceful degradation.)
 
@@ -40,12 +54,13 @@ If effort is elevated in the leg-driven session but ALSO elevated across non-leg
 
 **Fixtures (the gate is the artifact that must be bulletproof):**
 - lift + genuinely elevated RPE + flat/cool/easy conditions → **claim** (the true positive)
-- lift + elevated pace but **big positive grade** → **silent** (terrain wins, Gate 3)
-- lift + elevated HR but **hot day** → **silent** (heat wins, Gate 3)
+- lift + raw pace elevated but **grade-adjusted pace AT baseline** → **silent** (terrain subtracted, no residual — Gate 3 procedure)
+- **DISCRIMINATOR:** lift + hilly day AND **grade-adjusted pace STILL elevated** → **claim** (residual survives the confound subtraction — carryover isn't suppressed just because it was hilly)
+- lift + raw HR elevated but **heat-adjusted HR at baseline** → **silent** (heat subtracted)
 - lift + **RPE at baseline** → **silent** (no elevation, Gate 2)
 - lift + elevation **everywhere incl. swim** → **silent/systemic** (Gate 4)
 - **no lift** in window → **silent** (Gate 1)
-- lift + elevation + **no baseline/RPE available** → **silent** (data-availability default)
+- lift + elevation + **no baseline/RPE/adjustment available** → **silent** (data-availability default)
 
 ---
 
