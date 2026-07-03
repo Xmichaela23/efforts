@@ -15,8 +15,11 @@ const DISC_SYNONYMS: Record<DisciplineVerdict['discipline'], RegExp> = {
   swim: /\b(swim|swimming|swims)\b/i,
   strength: /\b(strength|lift|lifting|lifts|weights)\b/i,
 };
-const UP_WORDS = /\b(improv\w*|climb\w*|ris\w*|ticking up|trending up|building|gain\w*|stronger|going up|on the up|up\b)\b/i;
-const DOWN_WORDS = /\b(declin\w*|slipp\w*|dropp\w*|falling|fading|regress\w*|weaker|going down|down\b)\b/i;
+// Trend vocabulary ONLY — deliberately NOT bare "up"/"down" (they false-fire on session prose like
+// "HR was up today" once Rule 6 runs on single-session INSIGHTS, not just the coach week narrative), and
+// "ris\w*" is "rising" (not "risk"). A real trend claim uses these words; a session observation doesn't.
+const UP_WORDS = /\b(improv\w*|climb\w*|rising|ticking up|trending up|building|gain\w*|stronger|going up|on the up)\b/i;
+const DOWN_WORDS = /\b(declin\w*|slipp\w*|dropp\w*|falling|fading|regress\w*|weaker|sliding|going down|trending down)\b/i;
 const FLAT_WORDS = /\b(holding steady|hold\w* steady|holding|steady|flat|plateau\w*|maintain\w*|unchanged|stable|stagnat\w*)\b/i;
 function verdictDir(v: string): 'up' | 'down' | 'flat' | null {
   const s = String(v || '').toLowerCase();

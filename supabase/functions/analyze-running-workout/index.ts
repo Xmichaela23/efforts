@@ -2100,6 +2100,7 @@ Deno.serve(async (req) => {
     // aerobic_direction. D-060 (2026-05-25): DB column renamed
     // run_easy_hr_trend → run_easy_pace_at_hr_trend to match.
     let arc_run_easy_pace_at_hr_trend: number | null = null;
+    let run_spine_verdict: { discipline: 'run'; verdict: string; pctChange: number | null } | null = null; // Q-112 step 2
     try {
       const wdSlice = String(workout.date || '').slice(0, 10);
       if (/^\d{4}-\d{2}-\d{2}$/.test(wdSlice) && workout.user_id) {
@@ -2107,6 +2108,9 @@ Deno.serve(async (req) => {
         arc_narrative_for_summary = arc.arc_narrative_context ?? null;
         const rEasyTrend = Number((arc.latest_snapshot as any)?.run_easy_pace_at_hr_trend);
         arc_run_easy_pace_at_hr_trend = Number.isFinite(rEasyTrend) ? rEasyTrend : null;
+        // Q-112 step 2: capture the run's spine verdict here (arc is in scope) for rules 6/7 downstream.
+        const rv: any = (arc.latest_snapshot as any)?.state_trends_v1?.run;
+        run_spine_verdict = rv && rv.verdict ? { discipline: 'run', verdict: String(rv.verdict), pctChange: rv.pctChange ?? null } : null;
         const lr = arc_narrative_for_summary?.last_goal_race;
         console.log(
           `[analyze-running-workout] arc_narrative workout=${workout_id} date=${wdSlice} mode=${arc_narrative_for_summary?.mode ?? 'n/a'} ` +
@@ -2169,6 +2173,8 @@ Deno.serve(async (req) => {
     let ai_summary_generated_at: string | null = null;
     try {
       if (fact_packet_v1 && flags_v1) {
+        // Q-112 step 2: run_spine_verdict (state_trends_v1) was captured above where getArcContext ran →
+        // rules 6/7 on the per-workout INSIGHTS (no trend claim contradicting the spine; no receipt recap).
         ai_summary = await generateAISummaryV1(
           fact_packet_v1, flags_v1, null, null, arc_narrative_for_summary,
           { isMixedEffort: _varGate.is_mixed_effort, intervalBreakdown: detailedAnalysis?.interval_breakdown ?? null },
@@ -2179,6 +2185,7 @@ Deno.serve(async (req) => {
           // Drives AEROBIC EFFICIENCY TREND prompt rule. Field name reflects
           // what the value actually is (pace-at-HR delta, not HR-over-time).
           { runEasyPaceAtHrTrendPct: arc_run_easy_pace_at_hr_trend },
+          run_spine_verdict,
         );
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
       }

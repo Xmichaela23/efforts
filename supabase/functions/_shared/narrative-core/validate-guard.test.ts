@@ -54,6 +54,23 @@ Deno.test('non-receipt numbers (12-week, week one, 9/10) are not recap', () => {
   assertEquals(r.ok, true, JSON.stringify(r.failures));
 });
 
+// ── mixed-clocks safety (step 2: Rule 6 on single-session INSIGHTS) ─────────────────────────────────
+// The per-workout INSIGHTS speaks at the SESSION clock; the spine verdict is the 6-week clock. Rule 6
+// keys on TREND vocabulary, so a session observation must NOT be flagged as contradicting the trend.
+Deno.test('mixed-clocks: "showed up ready, ran well today" does NOT contradict a sliding spine (bare "up" ignored)', () => {
+  const r = validateNarrative('You showed up ready and ran well today.', ctx([{ discipline: 'run', verdict: 'sliding', pctChange: -2 }]));
+  assertEquals(r.ok, true, JSON.stringify(r.failures));
+});
+Deno.test('mixed-clocks: "this run was slower than recent efforts" passes vs an improving trend', () => {
+  const r = validateNarrative('This run was slower than your recent similar efforts on a warm day.', ctx([{ discipline: 'run', verdict: 'improving', pctChange: 3 }]));
+  assertEquals(r.ok, true, JSON.stringify(r.failures));
+});
+Deno.test('trend claim STILL caught: "your running is sliding" contradicts an improving spine', () => {
+  const r = validateNarrative('Your running is sliding over the block.', ctx([{ discipline: 'run', verdict: 'improving', pctChange: 3 }]));
+  assert(!r.ok);
+  assert(r.failures.some((f) => f.rule === 6));
+});
+
 // ── retry-then-drop policy ────────────────────────────────────────────────────────────────────────
 const CLEAN = 'Bike and run are improving; strength needs more sessions. Head in fresh.';
 const BAD = 'Run is holding steady while bike improves (+3.6%).';
