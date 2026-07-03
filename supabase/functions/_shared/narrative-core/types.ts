@@ -28,6 +28,15 @@ export interface NotableLeadSignal {
   detail: string;       // e.g. 'it was 82°F'
 }
 
+/** A spine per-discipline verdict (state_trends_v1). The prose may not CONTRADICT the verdict (Rule 6),
+ *  and its pctChange is an on-screen receipt the prose may not RECAP (Rule 7). Discipline keys match
+ *  state_trends_v1 ('bike', not the core's 'ride'). */
+export interface DisciplineVerdict {
+  discipline: 'run' | 'bike' | 'swim' | 'strength';
+  verdict: string;            // 'improving' | 'sliding' | 'declining' | 'holding' | 'stable' | 'needs_data'
+  pctChange: number | null;   // receipt magnitude the prose may not restate
+}
+
 /** The generic context the core reasons over — built by the adapter from the discipline's packet. */
 export interface NarrativeContext {
   notableLeadSignals: NotableLeadSignal[];  // Rule 1 — must be reasoned about, not dropped
@@ -38,6 +47,8 @@ export interface NarrativeContext {
                                             //          verdict, not just a similarity trend. Ride's spine cross_workout.trend
                                             //          qualifies; run's pace-similarity trend does NOT. The adapter decides.
   establishedCauses: string[];              // Rule 4 — lowercase causes the packet deterministically proved
+  disciplineVerdicts?: DisciplineVerdict[]; // Rule 6/7 — the spine verdicts to not contradict / not recap.
+                                            //   Absent/empty ⇒ those rules skip (surfaces with no spine verdicts).
 }
 
 export interface DisciplineAdapter {

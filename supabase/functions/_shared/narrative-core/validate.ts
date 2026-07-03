@@ -5,7 +5,32 @@
 // violations) so a compliant narrative never trips — the swim acceptance gate proves this. The scaffold
 // is the primary enforcement (reason right first); these catch what slips.
 
-import type { NarrativeContext, ValidationResult, ValidationFailure } from './types.ts';
+import type { NarrativeContext, ValidationResult, ValidationFailure, DisciplineVerdict } from './types.ts';
+
+// ── Rule 6/7 helpers — map spine verdicts + narrative trend-words to a direction (absorbed from the
+//    former response-model/narrative-guard; deleted in this convergence). ──
+const DISC_SYNONYMS: Record<DisciplineVerdict['discipline'], RegExp> = {
+  run: /\b(run|running|runs)\b/i,
+  bike: /\b(bike|biking|cycling|ride|rides|riding|power)\b/i,
+  swim: /\b(swim|swimming|swims)\b/i,
+  strength: /\b(strength|lift|lifting|lifts|weights)\b/i,
+};
+const UP_WORDS = /\b(improv\w*|climb\w*|ris\w*|ticking up|trending up|building|gain\w*|stronger|going up|on the up|up\b)\b/i;
+const DOWN_WORDS = /\b(declin\w*|slipp\w*|dropp\w*|falling|fading|regress\w*|weaker|going down|down\b)\b/i;
+const FLAT_WORDS = /\b(holding steady|hold\w* steady|holding|steady|flat|plateau\w*|maintain\w*|unchanged|stable|stagnat\w*)\b/i;
+function verdictDir(v: string): 'up' | 'down' | 'flat' | null {
+  const s = String(v || '').toLowerCase();
+  if (s === 'improving') return 'up';
+  if (s === 'sliding' || s === 'declining') return 'down';
+  if (s === 'holding' || s === 'stable') return 'flat';
+  return null;
+}
+function sentenceDir(sentence: string): 'up' | 'down' | 'flat' | null {
+  if (FLAT_WORDS.test(sentence)) return 'flat'; // "holding steady" has no up/down word — check first
+  if (UP_WORDS.test(sentence)) return 'up';
+  if (DOWN_WORDS.test(sentence)) return 'down';
+  return null;
+}
 
 const firstSentence = (s: string): string => {
   const m = s.match(/^[\s\S]*?[.!?](\s|$)/);
@@ -100,6 +125,34 @@ export function validateNarrative(summary: string, ctx: NarrativeContext): Valid
     const hedged = HEDGE.test(text.slice(Math.max(0, idx - 28), idx));
     if (!hedged) {
       failures.push({ rule: 4, code: 'state_diagnosed', why: `"${stateMatch[0]}" is a physiological-state diagnosis the data can't prove. Observe the pattern instead (e.g. "load climbed while readiness dipped"), or hedge it ("may be", "signals suggest").` });
+    }
+  }
+
+  // ── Rule 6 — spine contradiction: a trend-direction claim about a discipline that conflicts with that
+  //    discipline's state_trends_v1 verdict ("run holding steady" when the spine says run is improving).
+  //    Multi-discipline (the coach week case); per-workout surfaces pass a single-discipline verdict.
+  for (const v of ctx.disciplineVerdicts ?? []) {
+    const vd = verdictDir(v.verdict);
+    if (!vd) continue; // needs_data ⇒ no ground truth to defend
+    const syn = DISC_SYNONYMS[v.discipline];
+    for (const s of text.split(/(?<=[.!?])\s+/)) {
+      if (!syn.test(s)) continue;
+      const sd = sentenceDir(s);
+      if (sd && sd !== vd) {
+        failures.push({ rule: 6, code: 'spine_contradiction', why: `The narrative implies ${v.discipline} is ${sd}, but the spine verdict is ${v.verdict}. Do not contradict the on-screen trend — describe the plan/state, not a conflicting direction.` });
+        break;
+      }
+    }
+  }
+
+  // ── Rule 7 — receipt recap: restating a number already rendered as a receipt (the "+3.6%" class).
+  for (const v of ctx.disciplineVerdicts ?? []) {
+    if (v.pctChange == null) continue;
+    const mag = Math.round(Math.abs(v.pctChange) * 10) / 10;
+    if (mag === 0) continue;
+    const m = text.match(new RegExp(`[+\\-]?${mag.toString().replace('.', '\\.')}\\s*%`));
+    if (m) {
+      failures.push({ rule: 7, code: 'receipt_recap', why: `Do not restate "${m[0]}" — the ${v.discipline} figure is already shown as a receipt on screen. Interpret, don't recap.` });
     }
   }
 
