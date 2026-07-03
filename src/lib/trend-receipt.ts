@@ -64,6 +64,15 @@ export function trendReceipt(args: {
   return `Holding ${evidence}`; // holding / steady
 }
 
+/** The verdict-colored headline of a single-metric row, split from the (dimmed) evidence tail:
+ *  "↑6.5%" / "↓4.2%" / "Holding". Pair with trendEvidence() for the dimmed remainder. */
+export function trendHeadline(verdict: string, pctChange: number | null): string {
+  const pct = pctChange == null ? null : Math.abs(pctChange);
+  if (verdict === 'improving') return `↑${pct}%`;
+  if (verdict === 'sliding' || verdict === 'declining') return `↓${pct}%`;
+  return 'Holding';
+}
+
 /** One sub-trend headline for a MULTI-metric row (bike power/efficiency): "Power ↑3.6%". */
 export function subTrendVerdict(label: string, verdict: string, pctChange: number | null): string {
   const pct = pctChange == null ? null : Math.abs(pctChange);

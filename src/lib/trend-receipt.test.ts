@@ -6,7 +6,14 @@
  */
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { trendReceipt, trendEvidence, subTrendVerdict, windowLabel, recencyLabel, unitLabel } from './trend-receipt.ts';
+import { trendReceipt, trendEvidence, trendHeadline, subTrendVerdict, windowLabel, recencyLabel, unitLabel } from './trend-receipt.ts';
+
+// ── trendHeadline (verdict-colored delta, split from the dimmed evidence tail) ──────────────────
+Deno.test('trendHeadline: improving/sliding/holding', () => {
+  assertEquals(trendHeadline('improving', -6.5), '↑6.5%');
+  assertEquals(trendHeadline('sliding', 4.2), '↓4.2%');
+  assertEquals(trendHeadline('holding', 0.8), 'Holding');
+});
 
 // ── helpers ─────────────────────────────────────────────────────────────────────────────────────
 Deno.test('windowLabel: 42→6wk, 56→8wk', () => {

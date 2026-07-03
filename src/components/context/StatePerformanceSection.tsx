@@ -8,7 +8,7 @@
 import React from 'react';
 import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary } from '@shared/state-trend';
 import { useStateTrends } from '@/hooks/useStateTrends';
-import { trendReceipt, trendEvidence, type Discipline } from '@/lib/trend-receipt';
+import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
 
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
   improving: { word: 'improving', cls: 'text-emerald-400', arr: '↑' },
@@ -104,15 +104,19 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
   if (card.primaryAxis === 'performance' && card.headlineVerdict) {
     const v = VERDICT[card.headlineVerdict];
     const perf = card.performance;
-    // D-232 glass-box: verdict + receipt (window · samples · recency). Falls back to the legacy
-    // verdict+pct render for any row whose spine evidence hasn't populated yet.
-    const receipt = (perf?.sampleCount != null && perf.windowDays != null)
-      ? trendReceipt({ verdict: card.headlineVerdict, pctChange: perf.pctChange, windowDays: perf.windowDays, sampleCount: perf.sampleCount, newestAgeDays: perf.newestAgeDays, discipline: card.discipline as Discipline })
+    // D-232 glass-box: verdict-colored delta + a DIMMED evidence tail (window · samples · recency).
+    // Falls back to the legacy verdict+pct render for any row whose spine evidence hasn't populated yet.
+    const hasEvidence = perf?.sampleCount != null && perf.windowDays != null;
+    const evidence = hasEvidence
+      ? trendEvidence({ windowDays: perf!.windowDays!, sampleCount: perf!.sampleCount!, newestAgeDays: perf!.newestAgeDays, discipline: card.discipline as Discipline })
       : null;
     return (
       <Row label={card.discipline}>
-        {receipt ? (
-          <span className={`text-[12px] ${v.cls}`}>{receipt}</span>
+        {hasEvidence ? (
+          <>
+            <span className={`text-[12px] ${v.cls}`}>{trendHeadline(card.headlineVerdict, perf!.pctChange)}</span>
+            <span className="text-white/35 text-[11px]">{evidence}</span>
+          </>
         ) : (
           <>
             <span className={`inline-flex items-baseline gap-1 ${v.cls}`}>
