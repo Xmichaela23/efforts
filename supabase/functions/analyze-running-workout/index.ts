@@ -2209,11 +2209,11 @@ Deno.serve(async (req) => {
               const names = (Array.isArray(ex) ? ex : []).map((e: any) => String(e?.name || ''));
               return { date: String(w?.date || ''), type: 'strength', strengthFocus: classifyStrengthFocus(names), workload: Number(w?.workload_actual || 0), isNovel: false };
             });
-            // Signal: HR drift vs the athlete's OWN typical for similar runs (already computed + baselined).
-            // Unlike pace, drift is terrain-INDEPENDENT — so a rolling run isn't falsely suppressed (the
-            // discriminator holds naturally). Heat is drift's real confound; a hard prescription drifts more.
-            const thisDrift = Number((detailedAnalysis as any)?.heart_rate_analysis?.hr_drift_bpm
-              ?? (detailedAnalysis as any)?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm);
+            // Signal: HR drift vs the athlete's OWN typical for similar runs (the values the card renders,
+            // hrAnalysisResult.drift + historicalDriftData.avgDriftBpm). Unlike pace, drift is terrain-
+            // INDEPENDENT — a rolling run isn't falsely suppressed (discriminator holds). Heat is drift's
+            // real confound; a hard prescription drifts more.
+            const thisDrift = Number((hrAnalysisResult as any)?.drift?.driftBpm);
             const typicalDrift = Number((historicalDriftData as any)?.avgDriftBpm);
             const haveDrift = Number.isFinite(thisDrift) && Number.isFinite(typicalDrift);
             const tempF = Number((workout as any)?.avg_temperature);
@@ -2228,9 +2228,14 @@ Deno.serve(async (req) => {
               confounds: { grade: false, heat: heatConfound, prescribedHard },
               recentSessions, nonLegElevated: null,
             });
-            const clause = buildCarryoverClause(carry, 'run');
+            // DECLARED-TRUTH VETO (D-231, Axis 1 defers to Axis 4): an inferred "effort above usual" from
+            // drift must NOT contradict a declared easy RPE. If the athlete logged a low RPE (felt good),
+            // his perception wins — no carryover claim, no matter what the drift says.
+            const thisRpe = Number((workout as any)?.rpe);
+            const rpeVeto = Number.isFinite(thisRpe) && thisRpe > 0 && thisRpe <= 4;
+            const clause = rpeVeto ? null : buildCarryoverClause(carry, 'run');
             if (clause) { ai_summary = ai_summary ? `${ai_summary} ${clause}` : clause; if (!ai_summary_generated_at) ai_summary_generated_at = new Date().toISOString(); }
-            console.log(`[analyze-running-workout] carryover ${carry?.claimable ? `CLAIMED (${carry.confidence}, ${carry.antecedent?.dayName})` : `silent (${carry?.suppressedBy})`}`);
+            console.log(`[analyze-running-workout] carryover ${rpeVeto ? `silent (declared_easy RPE ${thisRpe})` : (carry?.claimable ? `CLAIMED (${carry.confidence}, ${carry.antecedent?.dayName})` : `silent (${carry?.suppressedBy})`)}`);
           }
         } catch (carryErr) {
           console.warn('[analyze-running-workout] carryover skipped:', carryErr);
