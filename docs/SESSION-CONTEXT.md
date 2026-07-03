@@ -1,3 +1,28 @@
+# ⭐ CURRENT HANDOFF — 2026-07-02 (read this first; the cycling section below is a prior arc)
+
+**This session shipped the strength-test honesty arc and produced the app's architecture map.** Start here:
+
+**What closed / shipped (all committed + pushed; strength client changes need an Xcode reinstall to reach the phone):**
+- **Q-097 CLOSED** (D-227) — the 1RM baseline write-back fires, live-confirmed on device (bench 160→150, OHP 110→100 landed through the app). Blocks compound. Hardened the whole strength-test path: reps-field fix, **down-write reconciliation prompt** (supersedes D-223's silent hold), **RIR removed from test sets**, **tests-as-a-class** ("TEST" on calendar + a test-result Performance frame + no timer/anchor/prefill), a 0-rep analysis guard.
+- **Pull-ups = 5th tracked lift** (`pullupMaxReps`, rep-based — D-229; settles Q-102's *baseline* model, not the plan-loading half).
+- **Feel-based test warmups + Baselines launcher** (D-228).
+- **Timer** stabilized (stable interval) + removed from tests; **quiet Discard** added to the logger.
+- **Q-105** (Get Stronger "10:00/mi" copy) fixed at generation — deployed.
+- **Q-049 Phase 1a** — the readiness check-in's soreness/sleep finally wired as an advisory longitudinal signal (deployed coach + get-arc-context).
+
+**The architecture map (the big deliverable — read the stack top-down):**
+- `AUDIT-app-synthesis-2026-07-02.md` ⭐ (the crown) → `AUDIT-spine-conformance-2026-07-02.md` → `AUDIT-state-screen-2026-07-02.md` → `SCREEN-CONNECTIVITY.md` (+ `SCREEN-INVENTORY.md`).
+- **The finding (D-230, Q-106):** the app is a coherent bet on *athlete continuity through one deterministic spine*, **~half-migrated.** The voice contracts (Arc, session_detail) read the spine; but the **coach reads it for ~6% of its verdicts** and there's **no canonical capacity truth** (prescribe-off-typed-150 vs judge-off-learned-125 — the root of the "Bench 125→115" bug).
+
+**Where to start next (the roadmap is in Q-106 / the spine-conformance audit):**
+1. **One canonical capacity resolver** (typed-anchored; both prescribe + judge call it) — collapses the 150-vs-125 fork app-wide. The structural fix.
+2. **Move the coach's readiness + strength verdicts onto the spine** ("read the columns you already fetch") — the fastest athlete-visible honesty win. *Recommended first.*
+3. Then: collapse the rest onto the spine + retire dead layers (Q-108) + State fix list (Q-107).
+
+**Tools:** `scripts/screens/save-auth.mjs` + `capture.mjs` auto-capture every screen (run in your own terminal; needs a one-time login).
+
+---
+
 # Session Context — Cycling Analysis Build (handoff)
 
 **Last updated:** 2026-05-17. **Status:** cycling-analysis arc **PAUSED 2026-05-17** — correctness pass complete, moving to a new app section (see §6 for the resumable state). **Scope:** the cycling-analysis arc — running→cycling parity, intent-aware analysis, segment intelligence, Arc integration. This is the live handoff doc; pair with `docs/CYCLING-ANALYSIS-DESIGN.md` (the work order) and `docs/RUNNING-CYCLING-DELTA.md` (the upstream 31-item delta).

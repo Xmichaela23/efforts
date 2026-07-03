@@ -18,6 +18,10 @@ Previous: 2026-06-11 (Q-048 follow-up fixes. D-127: unplanned-only last-actual f
 
 Verified-working architecture and fixes. If you think one of these is broken, the bug is probably elsewhere — read the verification method before changing anything.
 
+### Q-097 CLOSED — the 1RM write-back fires; strength tests are their own honest class (D-227, 2026-07-02)
+
+The strength baseline-test e1RM reaches `performance_numbers` — **live-confirmed on device: bench 160→150 and OHP 110→100 both landed through the app** (via the down-write reconciliation prompt). Blocks compound. The dogfood-hardened test path: AMRAP reps field renders (was hidden); a below-stored result **prompts Keep/Update, never silently holds** (supersedes D-223's ratchet-up-only); **RIR is gone from test sets** (the AMRAP protocol is the signal); tests read as **"TEST"** on the calendar and render a **test-result frame** on the Performance screen (no execution score/volume, no timer, no "last:" anchor, no prefill); a 0-rep test is flagged, never narrated as success. **Pull-ups** are a 5th tracked lift (`pullupMaxReps`, rep-based — D-229). **Verification:** on-device dogfood; the write path shares `user_baselines.performance_numbers` with materialize's `mergeAnchor1RmLb` reader. Files: `StrengthLogger.tsx`, `analyze-strength-workout`, `session-detail/build.ts`, `MobileSummary.tsx`, `TrainingBaselines.tsx`.
+
 ### Get Strong hybrid add-ons — glute + Hyrox accessory bias, the long-run→station combo, day-agnostic Sat/Sun long-run pick (D-225, 2026-07-02)
 Deployed (`generate-strength-plan` + `create-goal-and-materialize-plan`); client (`NonRaceBuilder` add-on toggle / Sat-Sun picker / no-cap mileage copy, `GoalsScreen` CTA order) pushed to web — **on-device only after an Xcode rebuild**. 101/101 composer/guard tests + live sample plans.
 - **Accessory bias (`accessoryBias: 'glute' | 'hyrox'`):** +1 qualitative accessory on **Upper A** only, skipped on deload/retest. Guard **protects the PLAIN plan** (byte-identical, no bias) — not the add-on's own days: glute = +1 accessory; hyrox = +1 accessory **plus** the combo.
@@ -956,6 +960,11 @@ Autonomous batch from POLISH-PUNCH-LIST. Five items: two clean (no code), three 
 ## Known broken (filed, not blocking)
 
 Behaviors that are demonstrably wrong but intentionally deferred. Don't propose fixes unless you have new information — the deferral was a scoping call, and the list below documents the cost so the next implementer can pick up cleanly.
+
+### "Spine is truth" is ~6% enforced on the coach; capacity truth is forked (audited 2026-07-02, Q-106)
+- **Symptom:** the coach engine reads the cached spine (`state_trends_v1`) for only `fitness_direction` (1 of ~17 verdict families) and recomputes the rest in parallel — even shadowing snapshot columns it fetches (`acwr`, `strength_volume_trend`, `body_response`, `strength_top_lifts`). And there's no canonical capacity truth: `materialize` prescribes load off the typed `performance_numbers` (150) while the coach judges off `learned_fitness.strength_1rms` (125). The athlete-visible face: the State screen's "Bench 125→115 · back off" (baseline-blind), two contradictory strength rows, FATIGUED triple-echo.
+- **Not blocking:** the *voice* contracts (Arc, `session_detail_v1`) read the spine faithfully; endurance micro→macro continuity is finished (the proof the bet works). This is the strength/coach axis of the migration D-151 started and stopped.
+- **The fix (deferred, roadmapped):** Q-106 / D-230 / `AUDIT-spine-conformance-2026-07-02.md` — one canonical capacity resolver + move coach verdicts onto the spine + retire the forks (D-213). State-specific catalog: Q-107 / `AUDIT-state-screen-2026-07-02.md`. Dead-layer cleanup: Q-108.
 
 ### `limiter_sport` intensity-side handling not implemented
 - **Symptom:** spec at `docs/SESSION-FREQUENCY-DEFAULTS.md §4` says "Run limiter is handled through intensity, not frequency. Adding run sessions increases injury risk disproportionately. The engine addresses a run limiter by making existing run sessions more productive (longer long run, higher-quality intervals, strides on easy days) rather than adding a 4th session." Implementation today: frequency side is correctly a no-op for run limiter; intensity side has zero implementation. The +7% TSS allocation bump in `science.ts:268-278 getBaseDistribution()` is a percentage shift across all phases, not a per-session intensity boost.

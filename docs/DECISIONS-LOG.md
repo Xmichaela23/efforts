@@ -4636,6 +4636,41 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-227 — Q-097 CLOSED: 1RM write-back live-confirmed; the strength-test honesty arc
+
+- **Date:** 2026-07-02
+- **Decision / what shipped:** Q-097 is **live-confirmed CLOSED** — the baseline-test e1RM reaches `performance_numbers`, verified on device (**bench 160→150, OHP 110→100** both landed through the app). Blocks compound. The dogfood surfaced five bugs no test suite would catch; the fixes hardened the whole strength-test path into "tests are their own class":
+  - **The reps field bug (the blocker):** the AMRAP working set rendered no reps input (`reps===undefined` hid it) — a 140×3 saved as "0 reps @ 140". Fixed the render gate to keep the reps field for `amrap`/`repMaxTest` sets.
+  - **Down-write reconciliation prompt (supersedes D-223's silent ratchet-up-only):** a test result BELOW the stored 1RM no longer silently holds — it prompts **Keep X / Update to Y**, per lift, one-tap auto-commit. Silent-hold and silent-overwrite are equally dishonest; the athlete decides. (Bench 160→150 landed via this.)
+  - **RIR removed from test sets:** the AMRAP protocol ("stop at ~RPE 9 / form break") IS the near-max signal; asking for RIR is friction. Done on an amrap/repMaxTest set completes with no RIR, no confirm strip; the populate computes e1RM from reps×weight with no RIR gate. The RIR cell + nudges are hidden entirely on a baseline test.
+  - **Tests-as-a-class:** calendar/Today read **"TEST"** not a strength session; the Performance screen renders a **test-result frame** (per-lift reps×weight→e1RM, prior→now delta, kept/updated/new-baseline, deadlift-conservative note, 0-rep "retest for a number") instead of the training table + execution/volume; **no auto rest timer, no "last:" anchor, no previous-session prefill** on a test.
+  - **Piece 2 backstop:** analyze-strength-workout suppresses the execution score + nulls the training narrative for a test (an 0-rep test can't be narrated as "Execution 160%").
+- **Why:** the write-back was the last open thread on "blocks compound." The dogfood proved it fires; the honesty fixes ensure a test never lies (up or down) and never reads as training.
+- **Cross-ref:** Q-097 (CLOSED), D-223 (superseded), D-224 (AMRAP), `SPEC-amrap-retest.md`, `StrengthLogger.tsx`, `analyze-strength-workout`, `session-detail/build.ts`, `MobileSummary.tsx`.
+
+## D-228 — Feel-based test warmup (one shape, per-lift dosing) + Baselines launcher (one flow, two entry points)
+
+- **Date:** 2026-07-02
+- **Decision:** the baseline-test **warmup ramp** is guidance, not prescription — reps are unseeded (feel hints carry it), and weight dosing scales **per lift**: when a 1RM exists, %-of-max anchors ("~50% — easy / ~70% — moderate"); when none, per-lift add-hints (OHP `add 10–20`, bench `add 20–30`, squat/DL `add 25–50`). Generic "add 25–50 lb / 10 reps" was false precision twice over (a press is not a deadlift — Michael's OHP session was the evidence). The **Baselines launcher** (Lower/Upper/Full links on TrainingBaselines) runs the SAME guided AMRAP flow as the plan retest: seed each lift's test set ~88% off the stored 1RM when one exists, else bar-start (45 / DL 95) into the **discovery loop** ("more than ~8 clean reps? too light — rest, add, go again"). One flow, two entry points, no separate math.
+- **Why:** one ramp shape, per-lift dosing; the named test and the plan retest must be the same tool. Load-timing handled by a pristine-guarded one-shot re-seed effect (performance_numbers loads async).
+- **Cross-ref:** `SPEC-amrap-retest.md` (warmup-dosing + launcher sections), `StrengthLogger.tsx` (`createBaselineTestExercise`, `baselineSeedFor`), D-227.
+
+## D-229 — Pull-ups as a 5th tracked lift: rep-based, NOT %1RM (Q-102 baseline model settled)
+
+- **Date:** 2026-07-02
+- **Decision:** `performance_numbers.pullupMaxReps` — an integer max-clean-reps baseline (0 is valid, "goal: your first pull-up"), added to the canonicalization guard. Fifth field on TrainingBaselines; a pull-up rep-max set in the baseline test (bodyweight, no e1RM, no RIR — the count IS the result). Write-back reuses the pipeline (ratchet-up auto / down-write prompt). **This settles the Q-102 baseline-model question (rep-based, not %1RM) for the BASELINE layer only** — the Pull-Up `%1RM` *plan loading* bug stays open under Q-102 (settles with the skill lane / Q-098).
+- **Why:** the app was scoring pull-ups as a %1RM lift (a nonsensical "115 lb Pull Up"). A bodyweight lift is rep-based; the baseline captures reps.
+- **Cross-ref:** Q-102, Q-098, Q-100; `TrainingBaselines.tsx`, `StrengthLogger.tsx`, `materialize-plan` read-side.
+
+## D-230 — "Spine is truth, arc is voice" is ~6% enforced on the coach; finish the D-151 migration, don't re-invent
+
+- **Date:** 2026-07-02
+- **Decision / finding:** the 2026-07-02 audit stack (see `AUDIT-app-synthesis-2026-07-02.md`) established that the app's athlete-continuity bet — one deterministic spine every surface reads — is **architecturally real but ~half-wired.** The "voice" contracts (Arc, `session_detail_v1`) read the cached `state_trends_v1` faithfully; but the shared **coach engine reads the spine for ~1 of ~17 verdict families (≈6%)**, recomputing the rest in parallel (even shadowing snapshot columns it fetches), and there is **no canonical capacity truth** — the plan PRESCRIBES load off the typed baseline (150) while the coach JUDGES off the learned aggregate (125). **Direction (not yet built):** finish the migration D-151 already proved on one axis — one canonical capacity resolver (typed-anchored) that both prescribe + judge call; move the coach's verdicts onto the spine ("read the columns you already fetch"); retire the forks (D-213), don't widen them.
+- **Why:** every athlete-visible "score that lies" (the bench verdict, the contradictory State rows) is the same root — a surface computing its own truth instead of reading the one source. This records the audited state + the agreed direction so the next session starts from the map.
+- **Cross-ref:** `AUDIT-app-synthesis-2026-07-02.md`, `AUDIT-spine-conformance-2026-07-02.md`, `AUDIT-state-screen-2026-07-02.md`, `SCREEN-CONNECTIVITY.md`, D-149/D-150/D-151/D-213, Q-106/Q-107/Q-108.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
