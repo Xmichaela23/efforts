@@ -1291,7 +1291,7 @@ export async function getArcContext(
     goalRowsForPrimary,
     completedGoalRowsForLastRace: completedGoalRowsForNarrative,
     activePlanPhase: activePlanCoversFocus ? (active_plan?.phase ?? null) : null, // stale fallback → no phase
-    hasActiveTemporalPlan: hasTemporalPlanAsOf,
+    hasActiveTemporalPlan: hasTemporalPlanAsOf && activePlanCoversFocus, // stale fallback ≠ active plan (mode input)
     runsSinceLastRace: runsSinceLastRaceCount,
   });
 
