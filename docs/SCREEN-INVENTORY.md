@@ -2,6 +2,8 @@
 
 Generated 2026-07-02 (code-derived map, so Michael never has to screen-grab to show what exists). Update when screens are added/removed.
 
+> **Wiring map:** for *what each screen is connected to* (reads/writes, edge functions, contracts, smart-server vs direct-query), see the companion **`docs/SCREEN-CONNECTIVITY.md`**. To auto-capture screenshots of every screen (no manual grabs), see `scripts/screens/` (`save-auth.mjs` once → `capture.mjs` anytime).
+
 > **Architecture note.** Efforts is a single-page app with only a thin router (`src/App.tsx`). Almost everything the user sees lives **inside one shell** (`src/components/AppLayout.tsx`) and is switched by boolean state flags (`showAllPlans`, `showStrengthLogger`, `showGoals`, …), not by URLs. The bottom-nav "tabs" and the workout-detail "tabs" are two different tab systems. Deep-link routes (`/goals`, `/profile/athletic-record`) just flip the matching flag inside the shell.
 
 ---
@@ -122,8 +124,10 @@ Environment select (`EnvironmentSelector`) → pre-run sensors (`PreRunScreen`) 
 | **Athletic Record** | header menu; `/profile/athletic-record` | Race records, baseline suggestions, goal creation | `AthleticRecordPage.tsx` |
 | **Gear** | header menu → Gear | Manage shoes/bikes | `Gear.tsx` |
 | **State (Context) tab** | State bottom-nav | Coaching intelligence wrapper | `ContextTabs.tsx` → `context/StateTab.tsx` |
-| — Block Summary | inside State | Block progression, trend cards | `context/BlockSummaryTab.tsx` |
-| — Coach Week | inside State | Adherence matrix, readiness, projections | `context/CoachWeekTab.tsx` |
+| — Block Summary | ⚠ **UNMOUNTED** (no importer in `src`) | Block progression, trend cards | `context/BlockSummaryTab.tsx` |
+| — Coach Week | ⚠ **UNMOUNTED** (no importer in `src`) | Adherence matrix, readiness, projections | `context/CoachWeekTab.tsx` |
+
+> ⚠ Connectivity trace (2026-07-02) found `BlockSummaryTab` and `CoachWeekTab` have **no importer anywhere in `src`** — self-contained (own hooks) but currently not rendered. Only `StateTab` is live via `ContextTabs`. Wire them or move to §9. See `SCREEN-CONNECTIVITY.md` §6.
 
 ---
 
