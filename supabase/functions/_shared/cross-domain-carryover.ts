@@ -107,3 +107,22 @@ export function detectCrossDomainCarryover(input: CarryoverInput): CarryoverResu
   const strong = antecedent.isNovel || input.adjustedElevation >= input.threshold * 2;
   return { antecedent, claimable: true, confidence: strong ? 'strong' : 'moderate', suppressedBy: null };
 }
+
+/**
+ * The ONE carryover clause both surfaces speak (card + State), so they never diverge. Voice standard
+ * (D-233): possibility not cause ("may still be carrying"), load language ("lower-body session"), cite
+ * the antecedent (day + focus) AND the elevation, hedged, one clause. Returns null when not claimable —
+ * the caller says nothing (silence-on-uncertain). Novel antecedents get the stronger framing.
+ */
+export function buildCarryoverClause(r: CarryoverResult | null, discipline: CarryoverDiscipline): string | null {
+  if (!r || !r.claimable || !r.antecedent) return null;
+  const day = r.antecedent.dayName;
+  const activity = discipline === 'ride' ? 'ride' : discipline === 'swim' ? 'swim' : 'run';
+  if (discipline === 'swim') {
+    return `${day}'s upper-body work may still be in your arms here — the effort sat a touch above your usual.`;
+  }
+  if (r.antecedent.isNovel) {
+    return `${day}'s session brought novel lower-body work, and this ${activity}'s effort sat above your usual — the legs may still be paying it off.`;
+  }
+  return `Your legs may still be carrying ${day}'s lower-body session — this ${activity}'s effort ran a bit above your usual.`;
+}
