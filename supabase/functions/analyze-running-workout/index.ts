@@ -2195,10 +2195,9 @@ Deno.serve(async (req) => {
         // heat/hard-prescription → suppress (favors silence). Antecedent = a lower/full strength session in
         // the ≤3d window. Detector + shared clause; appended deterministically (guaranteed honest wording).
         try {
-          const thisRpe = Number((workout as any)?.rpe);
           const uid = (workout as any)?.user_id;
           const wDate = String((workout as any)?.date || '').slice(0, 10);
-          if (Number.isFinite(thisRpe) && thisRpe > 0 && uid && /^\d{4}-\d{2}-\d{2}$/.test(wDate)) {
+          if (uid && /^\d{4}-\d{2}-\d{2}$/.test(wDate)) {
             const winStart = new Date(new Date(wDate + 'T12:00:00Z').getTime() - CARRYOVER_WINDOW_DAYS * 86400000).toISOString().slice(0, 10);
             const { data: recentStr } = await supabase.from('workouts')
               .select('date, strength_exercises, workload_actual')
@@ -2210,27 +2209,23 @@ Deno.serve(async (req) => {
               const names = (Array.isArray(ex) ? ex : []).map((e: any) => String(e?.name || ''));
               return { date: String(w?.date || ''), type: 'strength', strengthFocus: classifyStrengthFocus(names), workload: Number(w?.workload_actual || 0), isNovel: false };
             });
-            // baseline RPE — the athlete's own recent-run RPE avg (≥3 samples in ≤42d, else no_data → silent)
-            const rpeStart = new Date(new Date(wDate + 'T12:00:00Z').getTime() - 42 * 86400000).toISOString().slice(0, 10);
-            const { data: recentRuns } = await supabase.from('workouts')
-              .select('rpe').eq('user_id', uid).eq('type', 'run').eq('workout_status', 'completed')
-              .gte('date', rpeStart).lt('date', wDate);
-            const rpes = ((recentRuns ?? []) as any[]).map((w) => Number(w?.rpe)).filter((n) => Number.isFinite(n) && n > 0);
-            const baselineRpe = rpes.length >= 3 ? rpes.reduce((a, b) => a + b, 0) / rpes.length : null;
-            // confounds (RPE → any material one suppresses): terrain (ft/mi), heat (°F), hard prescription
-            const elevFt = Number((workout as any)?.elevation_gain || 0) * 3.28084;
-            const distMi = Number((workout as any)?.distance || 0) / 1609.34;
-            const gradeConfound = distMi > 0 ? (elevFt / distMi) >= 100 : false;
+            // Signal: HR drift vs the athlete's OWN typical for similar runs (already computed + baselined).
+            // Unlike pace, drift is terrain-INDEPENDENT — so a rolling run isn't falsely suppressed (the
+            // discriminator holds naturally). Heat is drift's real confound; a hard prescription drifts more.
+            const thisDrift = Number((detailedAnalysis as any)?.heart_rate_analysis?.hr_drift_bpm
+              ?? (detailedAnalysis as any)?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm);
+            const typicalDrift = Number((historicalDriftData as any)?.avgDriftBpm);
+            const haveDrift = Number.isFinite(thisDrift) && Number.isFinite(typicalDrift);
             const tempF = Number((workout as any)?.avg_temperature);
-            const heatConfound = Number.isFinite(tempF) && tempF >= 77;
+            const heatConfound = Number.isFinite(tempF) && tempF >= 82; // genuinely hot — a 76°F day is not
             const prescribedHard = /tempo|threshold|interval|fartlek|vo2|race|speed/i.test(String((plannedWorkout as any)?.type || '') + ' ' + String(classifiedTypeKey || ''));
-            const anyConfound = gradeConfound || heatConfound || prescribedHard;
-            const rawElevation = baselineRpe != null ? thisRpe - baselineRpe : null;
+            const confounded = heatConfound || prescribedHard; // NO terrain — drift isn't terrain-driven
+            const rawElevation = haveDrift ? thisDrift - typicalDrift : null;
             const carry = detectCrossDomainCarryover({
               targetDate: wDate, targetDiscipline: 'run',
-              effortSignal: baselineRpe != null ? 'rpe' : null,
-              rawElevation, adjustedElevation: anyConfound ? 0 : rawElevation, threshold: 1.0,
-              confounds: { grade: gradeConfound, heat: heatConfound, prescribedHard },
+              effortSignal: haveDrift ? 'hr_at_pace' : null,
+              rawElevation, adjustedElevation: confounded ? 0 : rawElevation, threshold: 3, // ~noise band (bpm)
+              confounds: { grade: false, heat: heatConfound, prescribedHard },
               recentSessions, nonLegElevated: null,
             });
             const clause = buildCarryoverClause(carry, 'run');
