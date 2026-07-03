@@ -53,6 +53,8 @@ export interface NarrativeContext {
                                             //   claim is fabrication (no plan → no target). undefined ⇒ skip.
   mustNameMovements?: string[];             // Rule 9 — the fact names these specific movements; a vague
                                             //   "movements"/"exercises" that names none of them is rejected.
+  hasGroundedPhase?: boolean;               // Rule 10 — when explicitly FALSE, a training-phase label
+                                            //   (taper/build/peak/base/deload) is invented → rejected.
 }
 
 export interface DisciplineAdapter {

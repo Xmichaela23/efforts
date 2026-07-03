@@ -1112,6 +1112,22 @@ export async function getArcContext(
       focusDateISO,
     );
   }
+  // Q-113 sibling (2026-07-03): resolveTemporalPlanRow returns a STALE fallback (latest-started plan) when
+  // no plan's window covers the focus date — e.g. a plan that begins next week, so the last completed plan
+  // (a marathon block) is selected and its final "taper" phase leaks as if current. A phase from a
+  // window-ended plan is NOT the current phase. Only treat it as grounded when the window covers focus.
+  const activePlanCoversFocus = (() => {
+    if (!temporalPlanRow) return false;
+    const start = planCreatedAtToYmd(String(temporalPlanRow.created_at || ''));
+    if (!start) return false;
+    const cfg = temporalPlanRow.config && typeof temporalPlanRow.config === 'object' && !Array.isArray(temporalPlanRow.config)
+      ? (temporalPlanRow.config as Record<string, unknown>) : {};
+    const durW = Number(temporalPlanRow.duration_weeks ?? cfg.duration_weeks);
+    const weeks = Number.isFinite(durW) && durW > 0 ? durW : 52;
+    const endExclusive = arcAddDaysYmd(start, weeks * 7);
+    const focus = focusYmd.slice(0, 10);
+    return focus >= start && focus < endExclusive;
+  })();
 
   let latest_snapshot: AthleteSnapshot | null = null;
   if (snapshotRes?.error) {
@@ -1274,7 +1290,7 @@ export async function getArcContext(
     focusYmd,
     goalRowsForPrimary,
     completedGoalRowsForLastRace: completedGoalRowsForNarrative,
-    activePlanPhase: active_plan?.phase ?? null,
+    activePlanPhase: activePlanCoversFocus ? (active_plan?.phase ?? null) : null, // stale fallback → no phase
     hasActiveTemporalPlan: hasTemporalPlanAsOf,
     runsSinceLastRace: runsSinceLastRaceCount,
   });

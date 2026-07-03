@@ -83,6 +83,21 @@ Deno.test('rule 9: naming the movements → allowed', () => {
   assertEquals(r.ok, true, JSON.stringify(r.failures));
 });
 
+// ── Rule 10 (no invented phase label) ───────────────────────────────────────────────────────────────
+Deno.test('rule 10: "taper-phase window" with no grounded phase → rejected', () => {
+  const r = validateNarrative('This reads as an unstructured session within a taper-phase window.', { ...ctx([]), hasGroundedPhase: false });
+  assert(!r.ok);
+  assert(r.failures.some((f) => f.rule === 10));
+});
+Deno.test('rule 10: same phrase WITH a grounded phase → allowed', () => {
+  const r = validateNarrative('This reads as an unstructured session within a taper-phase window.', { ...ctx([]), hasGroundedPhase: true });
+  assertEquals(r.ok, true, JSON.stringify(r.failures));
+});
+Deno.test('rule 10: "build strength"/"peak performance" are not phase labels (no false fire)', () => {
+  const r = validateNarrative('Solid session to build strength and chase peak performance.', { ...ctx([]), hasGroundedPhase: false });
+  assertEquals(r.ok, true, JSON.stringify(r.failures));
+});
+
 // ── mixed-clocks safety (step 2: Rule 6 on single-session INSIGHTS) ─────────────────────────────────
 // The per-workout INSIGHTS speaks at the SESSION clock; the spine verdict is the 6-week clock. Rule 6
 // keys on TREND vocabulary, so a session observation must NOT be flagged as contradicting the trend.

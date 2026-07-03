@@ -2455,11 +2455,15 @@ COACHING INSIGHT
     const ncCtx = strengthAdapter.buildContext({ e1rm_by_exercise: e1rmTrend });
     (ncCtx as any).hasLinkedPlan = !isUnplanned;   // Rule 8: unplanned → target/adherence claims rejected
     (ncCtx as any).mustNameMovements = novelList;  // Rule 9: these must be named, not "movements"
+    // Rule 10: phase is grounded only when the arc reports a real current phase (a stale/ended plan now
+    // resolves to 'unspecified' at source, so an invented "taper" for a not-started plan is rejected).
+    (ncCtx as any).hasGroundedPhase = !!(arcNarrative?.plan_phase_normalized && arcNarrative.plan_phase_normalized !== 'unspecified');
     // Q-111 §2 (corrected 2026-07-03): name the movements; NO time window; effect as POSSIBILITY not cause.
     const novelBlock = novelNames
       ? `\n\nNEW MOVEMENTS THIS SESSION: ${novelNames} — not part of the athlete's recent logged training. ` +
         `NO time window (do NOT say "in N weeks" / "in months" — the data shows only absence from recent history, not a last-performed date). ` +
-        `NAME them (do NOT generalize to "movements"/"exercises"). New movements like these CAN make efforts feel harder — if you mention effort, state it as a POSSIBILITY ("you may feel these", "can make efforts feel harder"), NEVER as a claimed cause ("the RPE reflects/was driven by …").`
+        `NAME them (do NOT generalize to "movements"/"exercises"). New movements like these CAN make efforts feel harder — if you mention effort, state it as a POSSIBILITY ("you may feel these", "can make efforts feel harder"), NEVER as a claimed cause ("the RPE reflects/was driven by …"). ` +
+        `Then add ONE forward-looking, hedged soreness cue (repeated-bout effect): new movements like these often bring next-day soreness, so it's worth keeping easy efforts genuinely easy for a day or two if the legs feel it. Conditional ("if"), never prescriptive.`
       : '';
     const unplannedBlock = isUnplanned
       ? `\n\nUNPLANNED SESSION — there was NO prescribed plan or target. Do NOT say "on target" / "easier side of target" / "harder than the RIR N target", do NOT compare RIR to any target, do NOT grade execution or adherence. RIR values are raw observations only. State what was done.`
@@ -2514,8 +2518,8 @@ PACKET (authoritative; do not compute outside it): facts come from the user mess
     // HARD grounding rules (8 no-plan target claim, 9 unnamed movements) are fabrication-class — they must
     // NOT ship. If one survives the retry, drop the prose to the metrics-only fallback (honest empty beats
     // a fabricated target or a blurred "movements"). Other (soft) rules keep the retry-then-soft-accept.
-    if (content && nc.failures.some((f) => f.rule === 8 || f.rule === 9)) {
-      console.warn('[analyze-strength] HARD grounding violation survived retry — dropping prose:', JSON.stringify(nc.failures.filter((f) => f.rule === 8 || f.rule === 9).map((f) => f.code)));
+    if (content && nc.failures.some((f) => f.rule === 8 || f.rule === 9 || f.rule === 10)) {
+      console.warn('[analyze-strength] HARD grounding violation survived retry — dropping prose:', JSON.stringify(nc.failures.filter((f) => f.rule === 8 || f.rule === 9 || f.rule === 10).map((f) => f.code)));
       return ['Analysis completed - check metrics below'];
     }
 

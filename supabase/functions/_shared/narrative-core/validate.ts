@@ -24,6 +24,10 @@ const FLAT_WORDS = /\b(holding steady|hold\w* steady|holding|steady|flat|plateau
 // Rule 8 — target / plan-adherence vocabulary. "target" is required to co-occur with an RIR/on-off/harder-
 // easier/plan context so it can't false-fire on "target race"/"target pace".
 const PLAN_TARGET_CLAIM = /\b(on target|off target|to target|easier side of (?:the )?target|harder than [^.]{0,24}\btarget\b|\brir\b[^.]{0,14}\btarget\b|\btarget\b[^.]{0,14}\brir\b|target rir|prescribed|as planned|per the plan|to plan|plan adherence|\badherence\b|hit the plan|missed the plan|against (?:the |your )?target)/i;
+// Rule 10 — training-phase labels. "taper"/"deload"/"peaking" are distinctive; the generic base/build/
+// peak/recovery only count when tagged as a phase/block/window ("build phase", "in a taper") so they
+// don't false-fire on "peak performance"/"build strength".
+const PHASE_LABEL = /\b(taper|deload|peaking|base[- ]building|(?:taper|base|build|peak|recovery|deload)[- ](?:phase|block|window|cycle)|(?:in|during|within|into)\s+(?:a\s+|the\s+|your\s+)?(?:taper|base|build|peak|recovery|deload)\b)/i;
 function verdictDir(v: string): 'up' | 'down' | 'flat' | null {
   const s = String(v || '').toLowerCase();
   if (s === 'improving') return 'up';
@@ -181,6 +185,13 @@ export function validateNarrative(summary: string, ctx: NarrativeContext): Valid
     if (vagueNovelty && !namedAny) {
       failures.push({ rule: 9, code: 'unnamed_movements', why: `The novel movements are known (${ctx.mustNameMovements.join(', ')}) — name them; do not generalize to "movements".` });
     }
+  }
+
+  // ── Rule 10 — no invented phase: a training-phase label with no grounded plan phase is fabrication
+  //    (Michael 2026-07-03: "taper-phase window" for a plan that hasn't started + no race — same class
+  //    as the invented RIR target). Fires only when hasGroundedPhase is EXPLICITLY false.
+  if (ctx.hasGroundedPhase === false && PHASE_LABEL.test(text)) {
+    failures.push({ rule: 10, code: 'invented_phase', why: 'No active plan phase is grounded for this session — do not label a training phase (taper/build/peak/base/deload). Describe what was done without a phase frame.' });
   }
 
   const retryNote = failures.length
