@@ -20,9 +20,14 @@ export function recencyLabel(ageDays: number | null | undefined): string {
   return `${ageDays}d ago`;
 }
 
+/** singular noun: "run" / "ride" / "swim" / "session". */
+export function unitNoun(discipline: Discipline): string {
+  return discipline === 'run' ? 'run' : discipline === 'bike' ? 'ride' : discipline === 'swim' ? 'swim' : 'session';
+}
+
 /** "5 runs" / "1 ride" / "3 swims". */
 export function unitLabel(discipline: Discipline, n: number): string {
-  const u = discipline === 'run' ? 'run' : discipline === 'bike' ? 'ride' : discipline === 'swim' ? 'swim' : 'session';
+  const u = unitNoun(discipline);
   return `${n} ${u}${n === 1 ? '' : 's'}`;
 }
 
@@ -50,11 +55,19 @@ export function trendReceipt(args: {
   sampleCount: number;
   newestAgeDays: number | null | undefined;
   discipline: Discipline;
+  stale?: boolean; // needs_data is a staleness decay (enough samples, too old) — cite recency, not count
   floor?: number; // minSessions floor for the needs_data message
 }): string {
-  const { verdict, pctChange, windowDays, sampleCount, discipline, floor = 3 } = args;
+  const { verdict, pctChange, windowDays, sampleCount, newestAgeDays, discipline, stale, floor = 3 } = args;
   const win = windowLabel(windowDays);
   if (verdict === 'needs_data') {
+    // Two distinct causes, honestly distinguished: STALE (enough samples, newest too old) cites recency
+    // and NEVER the count floor (the bug: a stale 6-swim window read "need 3"); TOO-FEW cites count vs floor.
+    if (stale) {
+      return newestAgeDays != null
+        ? `Last ${unitNoun(discipline)} ${newestAgeDays}d ago — too old to trend (${sampleCount} in ${win})`
+        : `No recent ${unitNoun(discipline)}s to trend (${sampleCount} in ${win})`;
+    }
     return `Not enough data yet — ${unitLabel(discipline, sampleCount)} in ${win} (need ${floor})`;
   }
   const evidence = trendEvidence(args);

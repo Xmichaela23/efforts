@@ -21,6 +21,9 @@ export interface PerfSummary {
   sampleCount?: number;
   newestAgeDays?: number | null;
   windowDays?: number;
+  /** true when needs_data is a STALENESS decay (enough samples, newest too old) — NOT too-few. Distinguishes
+   *  the two needs_data causes so the receipt cites recency ("last swim Nd ago") vs count ("need 3"). */
+  stale?: boolean;
 }
 
 export interface DisciplineCard {
@@ -73,5 +76,6 @@ export function perfFromTrend(t: TrendResult | null): PerfSummary | null {
     sampleCount: t.sampleCount,
     newestAgeDays: t.newestAgeDays,
     windowDays: t.window?.days,
+    stale: t.stale,
   } : null;
 }

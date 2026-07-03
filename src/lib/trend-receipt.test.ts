@@ -52,10 +52,24 @@ Deno.test('run holding', () => {
     'Holding over 6wk · 6 runs · 2d ago',
   );
 });
-Deno.test('run needs_data — says how many / how many needed', () => {
+Deno.test('run needs_data (TOO FEW) — says how many / how many needed', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'needs_data', pctChange: null, sampleCount: 2, newestAgeDays: 5 }),
     'Not enough data yet — 2 runs in 6wk (need 3)',
+  );
+});
+
+// ── BUG FIX (Michael 2026-07-02): a STALE needs_data must NOT say "(need 3)" when there are ≥3 ────
+Deno.test('swim needs_data (STALE) — 6 swims but too old → cites recency, not the count floor', () => {
+  assertEquals(
+    trendReceipt({ windowDays: 56, discipline: 'swim', verdict: 'needs_data', pctChange: null, sampleCount: 6, newestAgeDays: 20, stale: true }),
+    'Last swim 20d ago — too old to trend (6 in 8wk)',
+  );
+});
+Deno.test('stale without a known age → still never says "need X" (no contradiction)', () => {
+  assertEquals(
+    trendReceipt({ windowDays: 56, discipline: 'swim', verdict: 'needs_data', pctChange: null, sampleCount: 6, newestAgeDays: null, stale: true }),
+    'No recent swims to trend (6 in 8wk)',
   );
 });
 Deno.test('run improving — newest today', () => {

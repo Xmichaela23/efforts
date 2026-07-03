@@ -141,7 +141,7 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
   // where the spine carries the series count (run/swim). Strength has no series here → legacy fallback
   // ("needs data · N unplanned"), left for the H3 strength-row reconciliation (Q-111).
   const ndReceipt = (perf?.sampleCount != null && perf.windowDays != null)
-    ? trendReceipt({ verdict: 'needs_data', pctChange: null, windowDays: perf.windowDays, sampleCount: perf.sampleCount, newestAgeDays: perf.newestAgeDays, discipline: card.discipline as Discipline })
+    ? trendReceipt({ verdict: 'needs_data', pctChange: null, windowDays: perf.windowDays, sampleCount: perf.sampleCount, newestAgeDays: perf.newestAgeDays, stale: perf.stale, discipline: card.discipline as Discipline })
     : null;
   return (
     <Row label={card.discipline}>

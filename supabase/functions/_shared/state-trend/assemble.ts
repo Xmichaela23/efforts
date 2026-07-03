@@ -178,6 +178,8 @@ export interface DisciplineTrendCache {
   sampleCount?: number;
   newestAgeDays?: number | null;
   windowDays?: number;
+  /** true = needs_data is a staleness decay (enough samples, too old), not too-few. */
+  stale?: boolean;
 }
 export interface StateTrendsV1 {
   as_of: string;
@@ -225,6 +227,7 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       sampleCount: p?.sampleCount,
       newestAgeDays: p?.newestAgeDays,
       windowDays: p?.windowDays,
+      stale: p?.stale,
     };
   };
   return {
