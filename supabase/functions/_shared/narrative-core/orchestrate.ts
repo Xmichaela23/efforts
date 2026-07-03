@@ -13,6 +13,19 @@ import type { NarrativeContext, ValidationFailure, DisciplineVerdict } from './t
  * its own plan-linkage / arc phase / spine verdict and calls this once. Undefined inputs leave the
  * corresponding rule inert (so a surface opts into exactly what it can ground).
  */
+/**
+ * Extract a discipline's spine verdict from a `state_trends_v1` payload → a DisciplineVerdict for rules
+ * 6/7. Access is uniform: every discipline exposes a top-level `.verdict` + `.pctChange` (bike's is the
+ * power-or-efficiency LEAD; swim/strength/run are flat). null when the discipline has no real verdict
+ * (needs_data / missing) — so rule 6 has no ground truth to defend and stays inert. The single mapping
+ * point from the deterministic spine to the guardrails, so all four disciplines bind to one data layer.
+ */
+export function spineVerdictFor(stateTrendsV1: any, discipline: DisciplineVerdict['discipline']): DisciplineVerdict | null {
+  const c = stateTrendsV1?.[discipline];
+  if (!c || !c.verdict || c.verdict === 'needs_data') return null; // no real trend → rules 6/7 inert
+  return { discipline, verdict: String(c.verdict), pctChange: c.pctChange ?? null };
+}
+
 export function applyGroundingContext(ctx: NarrativeContext, g: {
   isUnplanned?: boolean;                // → hasLinkedPlan (rule 8): unplanned ⇒ no target/adherence claim
   planPhaseNormalized?: string | null;  // → hasGroundedPhase (rule 10): 'unspecified'/null ⇒ no phase label

@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
+import { spineVerdictFor } from '../_shared/narrative-core/index.ts';
 // Step 2 (spine): first server consumer of the relocated deterministic core. The narrative
 // DESCRIBES the spine's bike verdict (terrain-matched + staleness-gated), never infers direction.
 import { computeBikeState, pwr20ToSeries, resolveZoneBand } from '../_shared/state-trend/index.ts';
@@ -2421,11 +2422,13 @@ Deno.serve(async (req) => {
     // Temporal Arc frame (post-race recovery / taper / race proximity / plan
     // phase) — same resolution + guard as analyze-running-workout:1985-1988.
     let arc_narrative_for_summary: ArcNarrativeContextV1 | null = null;
+    let bike_spine_verdict: any = null; // rules 6/7: state_trends_v1.bike (power-or-efficiency lead)
     try {
       const wdSlice = String((workout as any).date || '').slice(0, 10);
       if (/^\d{4}-\d{2}-\d{2}$/.test(wdSlice) && (workout as any).user_id) {
         const arc = await getArcContext(supabase as any, (workout as any).user_id as string, `${wdSlice}T12:00:00.000Z`);
         arc_narrative_for_summary = arc.arc_narrative_context ?? null;
+        bike_spine_verdict = spineVerdictFor((arc.latest_snapshot as any)?.state_trends_v1, 'bike');
         console.log(`[analyze-cycling-workout] arc_narrative workout=${workout_id} mode=${arc_narrative_for_summary?.mode ?? 'n/a'} days_since_last_race=${arc_narrative_for_summary?.days_since_last_goal_race ?? 'n/a'}`);
       }
     } catch (arcSummErr) {
@@ -2545,6 +2548,7 @@ Deno.serve(async (req) => {
         // so the cited ride count/type match what the row shows.
         pwr20Trend: pwr20TrendV1,
         spineBikeTrend, // Step 2: deterministic, staleness-gated verdict the narrative describes
+        spineVerdict: bike_spine_verdict, // rules 6/7: state_trends_v1.bike (single source)
         limiter: cyclingLimiter,
         fitness: fitnessV1, // design #9 — CTL/ATL/TSB into the INSIGHTS narrative
       }, arc_narrative_for_summary, {

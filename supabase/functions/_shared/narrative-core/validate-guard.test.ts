@@ -7,7 +7,7 @@
  */
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { validateNarrative, resolveGuardedNarrative, applyGroundingContext } from './index.ts';
+import { validateNarrative, resolveGuardedNarrative, applyGroundingContext, spineVerdictFor } from './index.ts';
 import type { NarrativeContext, DisciplineVerdict } from './types.ts';
 
 const V: DisciplineVerdict[] = [
@@ -81,6 +81,21 @@ Deno.test('rule 9: vague "movements absent for eight weeks" when names are known
 Deno.test('rule 9: naming the movements → allowed', () => {
   const r = validateNarrative('You introduced reverse lunges and Bulgarian split squats, new to your recent training.', { ...ctx([]), mustNameMovements: ['Bulgarian Split Squats', 'Reverse Lunge'] });
   assertEquals(r.ok, true, JSON.stringify(r.failures));
+});
+
+// ── spineVerdictFor: the single mapping from state_trends_v1 → the guardrails (all disciplines) ────────
+Deno.test('spineVerdictFor: maps each discipline key uniformly; needs_data/missing → null (inert)', () => {
+  const st = { bike: { verdict: 'improving', pctChange: 3.2 }, swim: { verdict: 'needs_data', pctChange: null }, strength: {} };
+  assertEquals(spineVerdictFor(st, 'bike'), { discipline: 'bike', verdict: 'improving', pctChange: 3.2 });
+  assertEquals(spineVerdictFor(st, 'swim'), null); // needs_data → null
+  assertEquals(spineVerdictFor(st, 'strength'), null); // no verdict → null
+  assertEquals(spineVerdictFor(null, 'run'), null);
+});
+Deno.test('spineVerdictFor → applyGroundingContext → rule 6 catches a bike contradiction end-to-end', () => {
+  const v = spineVerdictFor({ bike: { verdict: 'sliding', pctChange: -4 } }, 'bike');
+  const r = validateNarrative('Your cycling engine is clearly building.', applyGroundingContext(ctx([]), { spineVerdict: v }));
+  assert(!r.ok);
+  assert(r.failures.some((f) => f.rule === 6));
 });
 
 // ── applyGroundingContext: the one helper every discipline surface calls (app-wide uniformity) ────────

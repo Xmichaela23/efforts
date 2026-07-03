@@ -8,7 +8,7 @@ import { restBandRead } from '../_shared/swim/rest-norm.ts';
 // Shared narrative-reasoning core (D-190 — swim leg, the reference). Swim's inline honesty rules were
 // the source of the 7 universal rules; this brings its prompt onto the shared scaffold + validators like
 // the other three. See docs/WORK-ORDER-narrative-core.md.
-import { buildReasoningScaffold, validateNarrative, swimAdapter, applyGroundingContext } from '../_shared/narrative-core/index.ts';
+import { buildReasoningScaffold, validateNarrative, swimAdapter, applyGroundingContext, spineVerdictFor } from '../_shared/narrative-core/index.ts';
 
 // =============================================================================
 // ANALYZE-SWIM-WORKOUT - SWIMMING ANALYSIS EDGE FUNCTION
@@ -584,9 +584,18 @@ Write 3-4 plain-prose observations addressed to the swimmer as "you" (one or two
         // validators must PASS its compliant output (acceptance gate, now AS the live path); the loop is a
         // backstop, the scaffold/inline-rules are the primary driver. Assembly NOT unified (guardrail #1).
         const ncCtx = swimAdapter.buildContext(workoutContext);
-        // App-wide grounding (shared helper): rule 8 (unplanned ⇒ no pace-target/adherence claim) + rule 10
-        // (swim has no arc phase source, so any phase label is invented → rejected).
-        applyGroundingContext(ncCtx, { isUnplanned: !plannedWorkout, planPhaseNormalized: null });
+        // rules 6/7: swim spine verdict from state_trends_v1 (swim has no getArcContext, so a minimal
+        // latest-snapshot read — the single source, same as the other disciplines).
+        let swim_spine_verdict: any = null;
+        try {
+          const { data: snap } = await supabase.from('athlete_snapshot')
+            .select('state_trends_v1').eq('user_id', workout.user_id)
+            .order('week_start', { ascending: false }).limit(1).maybeSingle();
+          swim_spine_verdict = spineVerdictFor((snap as any)?.state_trends_v1, 'swim');
+        } catch { swim_spine_verdict = null; }
+        // App-wide grounding (shared helper): rule 8 (unplanned ⇒ no pace-target/adherence claim), rule 10
+        // (swim has no arc phase source, so any phase label is invented → rejected), rules 6/7 (spine).
+        applyGroundingContext(ncCtx, { isUnplanned: !plannedWorkout, planPhaseNormalized: null, spineVerdict: swim_spine_verdict });
         const swimSystem = 'You are a swimming coach giving an athlete feedback on their swim. Write in the second person (address them as "you"), in plain prose sentences only — never Markdown, headers, bold, or numbered section titles.'
           + buildReasoningScaffold(swimAdapter, workoutContext);
         const callSwim = (userMsg: string) => callLLM({ system: swimSystem, user: userMsg, maxTokens: 500, temperature: 0.3 });

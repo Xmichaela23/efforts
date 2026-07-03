@@ -363,7 +363,7 @@ function buildCyclingIntervalSummary(
 function toDisplayPacket(
   fp: CyclingFactPacketV1,
   flags: CyclingFlagV1[],
-  crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; pwr20Trend?: any; spineBikeTrend?: any; limiter?: any; fitness?: any } | null,
+  crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; pwr20Trend?: any; spineBikeTrend?: any; limiter?: any; fitness?: any; spineVerdict?: any } | null,
   varianceGate?: CyclingVarianceGateOptions | null,
   unplannedGate?: CyclingUnplannedGateOptions | null,
 ): any {
@@ -435,7 +435,7 @@ export async function generateCyclingAISummaryV1(
   factPacket: CyclingFactPacketV1,
   flags: CyclingFlagV1[],
   coachingContext?: string | null,
-  crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; pwr20Trend?: any; spineBikeTrend?: any; limiter?: any; fitness?: any } | null,
+  crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; pwr20Trend?: any; spineBikeTrend?: any; limiter?: any; fitness?: any; spineVerdict?: any } | null,
   arcNarrative?: ArcNarrativeContextV1 | null,
   varianceGate?: CyclingVarianceGateOptions | null,
   unplannedGate?: CyclingUnplannedGateOptions | null,
@@ -516,6 +516,7 @@ ${packetStr}
   applyGroundingContext(ncCtx, {
     isUnplanned,
     planPhaseNormalized: (arcNarrative as any)?.plan_phase_normalized ?? null,
+    spineVerdict: crossWorkout?.spineVerdict ?? null, // rules 6/7: state_trends_v1.bike (single source)
   });
   const systemPrompt =
     'You are a precise endurance coach. Follow the rules exactly.' +

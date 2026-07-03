@@ -5,7 +5,7 @@ import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { arcModeSystemAddon, arcNarrativeFactBlock } from '../_shared/arc-narrative-ai-appendix.ts';
 // Shared narrative-reasoning core (D-189 — strength leg). Scaffold + validator suite via the strength
 // adapter; strength gets a 2-attempt validator loop (it had none). See docs/WORK-ORDER-narrative-core.md.
-import { buildReasoningScaffold, validateNarrative, strengthAdapter, applyGroundingContext } from '../_shared/narrative-core/index.ts';
+import { buildReasoningScaffold, validateNarrative, strengthAdapter, applyGroundingContext, spineVerdictFor } from '../_shared/narrative-core/index.ts';
 import { detectNovelMovements, novelMovementsNames, novelMovementNames } from '../_shared/novel-movements.ts';
 // D-208: role classifier — execution scoring weights a skipped accessory less than a main lift.
 import { roleForExercise, ROLE_WEIGHT } from '../_shared/strength/exercise-role.ts';
@@ -1711,11 +1711,13 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   // Temporal Arc frame (post-race recovery / taper / race proximity / plan
   // phase) — same resolution + guard as analyze-running-workout:1985-1988.
   let arc_narrative_for_summary: ArcNarrativeContextV1 | null = null;
+  let strength_spine_verdict: any = null; // rules 6/7: state_trends_v1.strength (mostly needs_data → inert)
   try {
     const wdSlice = String(workout?.date || '').slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}$/.test(wdSlice) && workout?.user_id) {
       const arc = await getArcContext(supabase, workout.user_id as string, `${wdSlice}T12:00:00.000Z`);
       arc_narrative_for_summary = arc.arc_narrative_context ?? null;
+      strength_spine_verdict = spineVerdictFor((arc.latest_snapshot as any)?.state_trends_v1, 'strength');
       console.log(`[analyze-strength-workout] arc_narrative mode=${arc_narrative_for_summary?.mode ?? 'n/a'} days_since_last_race=${arc_narrative_for_summary?.days_since_last_goal_race ?? 'n/a'}`);
     }
   } catch (arcSummErr) {
@@ -1768,6 +1770,7 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     novelFact.names, // Q-111 §2: novel movement names (no window/reps — honest absence only)
     novelFact.list,  // the "must name these" list for validator Rule 9
     isUnplannedSession, // Rule 8: no plan → no target claim
+    strength_spine_verdict, // rules 6/7: spine strength verdict
   );
 
   return {
@@ -1840,6 +1843,7 @@ async function generateEnhancedStrengthInsights(
   novelNames: string | null = null,   // Q-111 §2: novel movement names ("reverse lunges and …") — no window/reps
   novelList: string[] = [],            // the raw novel names → validator Rule 9 (must be named, not "movements")
   isUnplanned: boolean = false,        // Rule 8: no linked plan → no target/adherence claim allowed
+  spineVerdict: any = null,            // rules 6/7: state_trends_v1.strength verdict
 ): Promise<string[]> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     return ['AI analysis not available - ANTHROPIC_API_KEY not configured'];
@@ -2459,6 +2463,7 @@ COACHING INSIGHT
       isUnplanned,
       planPhaseNormalized: (arcNarrative as any)?.plan_phase_normalized ?? null,
       mustNameMovements: novelList,
+      spineVerdict,
     });
     // Q-111 §2 (corrected 2026-07-03): name the movements; NO time window; effect as POSSIBILITY not cause.
     const novelBlock = novelNames

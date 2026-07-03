@@ -7,7 +7,7 @@
 export type { Discipline, DisciplineAdapter, NarrativeContext, AnchorSet, SignalFlag, NotableLeadSignal, ValidationResult, ValidationFailure, DisciplineVerdict } from './types.ts';
 export { buildReasoningScaffold } from './scaffold.ts';
 export { validateNarrative } from './validate.ts';
-export { runGuardedNarrative, resolveGuardedNarrative, applyGroundingContext, type RejectionLogEntry } from './orchestrate.ts';
+export { runGuardedNarrative, resolveGuardedNarrative, applyGroundingContext, spineVerdictFor, type RejectionLogEntry } from './orchestrate.ts';
 export { runAdapter } from './adapters/run.ts';
 export { rideAdapter } from './adapters/ride.ts';
 export { strengthAdapter } from './adapters/strength.ts';
