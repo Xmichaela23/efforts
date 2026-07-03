@@ -69,6 +69,21 @@ Deno.test('no data: no usable effort signal → silent (no_data)', () => {
   assertEquals(r?.suppressedBy, 'no_data');
 });
 
+// ── Michael's June 14: confound-subtraction PRIMARY, declared-RPE veto SECONDARY (order matters) ──────
+Deno.test('June 14 (warm+hilly, raw drift +5, conditions explain → adjusted 0, RPE 3) → no_elevation, NOT declared_easy', () => {
+  const r = detectCrossDomainCarryover(base({ rawElevation: 5, adjustedElevation: 0, declaredEasy: true }));
+  assertEquals(r?.claimable, false);
+  assertEquals(r?.suppressedBy, 'no_elevation'); // confound-subtraction is primary; the honest reason
+});
+Deno.test('declared_easy is the BACKSTOP: residual SURVIVES confounds but athlete declared easy → declared_easy', () => {
+  const r = detectCrossDomainCarryover(base({ rawElevation: 5, adjustedElevation: 5, declaredEasy: true }));
+  assertEquals(r?.suppressedBy, 'declared_easy'); // only reached because the residual survived
+});
+Deno.test('residual survives + not declared easy → claim (the true positive)', () => {
+  const r = detectCrossDomainCarryover(base({ rawElevation: 5, adjustedElevation: 5, declaredEasy: false }));
+  assertEquals(r?.claimable, true);
+});
+
 // ── the pins ──────────────────────────────────────────────────────────────────────────────────────
 Deno.test('novelty does NOT widen the window: a novel lift 4 days out is still out of window', () => {
   const r = detectCrossDomainCarryover(base({

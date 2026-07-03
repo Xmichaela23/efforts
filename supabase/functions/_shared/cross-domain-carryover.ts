@@ -36,7 +36,7 @@ export function classifyStrengthFocus(exerciseNames: string[]): StrengthFocus {
 }
 export type EffortSignal = 'rpe' | 'hr_at_pace' | 'execution' | null;
 export type SuppressReason =
-  | 'no_antecedent' | 'no_data' | 'no_elevation' | 'terrain' | 'heat' | 'prescribed' | 'systemic' | null;
+  | 'no_antecedent' | 'no_data' | 'no_elevation' | 'terrain' | 'heat' | 'prescribed' | 'systemic' | 'declared_easy' | null;
 
 export interface RecentSession {
   date: string;                 // YYYY-MM-DD
@@ -56,6 +56,8 @@ export interface CarryoverInput {
   confounds: { grade: boolean; heat: boolean; prescribedHard: boolean }; // which were materially present
   recentSessions: RecentSession[];
   nonLegElevated?: boolean | null;       // Gate 4 systemic check; null/undefined = unknown → skip (graceful)
+  declaredEasy?: boolean;                // Axis 1 → Axis 4 (D-231): athlete declared this session EASY
+                                         // (low RPE) → his perception vetoes an inferred "effort up" claim
 }
 
 export interface CarryoverResult {
@@ -120,6 +122,11 @@ export function detectCrossDomainCarryover(input: CarryoverInput): CarryoverResu
 
   // ── Gate 4 — concentration, not systemic (§9 cross-discipline). Only when a non-leg baseline is known.
   if (input.nonLegElevated === true) return suppress('systemic');
+
+  // ── Backstop (Axis 1 → Axis 4, D-231) — the athlete DECLARED this session easy (low RPE). Even if a
+  //    residual survived confound-subtraction, his perception vetoes an inferred "effort up" claim. This
+  //    is SECONDARY: confound-subtraction above is the primary silencer (its reason is the honest one).
+  if (input.declaredEasy) return suppress('declared_easy');
 
   // All four gates pass → claimable. Novelty OR a large residual (≥2× the bar) → strong confidence.
   const strong = antecedent.isNovel || input.adjustedElevation >= input.threshold * 2;

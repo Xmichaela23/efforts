@@ -2209,33 +2209,34 @@ Deno.serve(async (req) => {
               const names = (Array.isArray(ex) ? ex : []).map((e: any) => String(e?.name || ''));
               return { date: String(w?.date || ''), type: 'strength', strengthFocus: classifyStrengthFocus(names), workload: Number(w?.workload_actual || 0), isNovel: false };
             });
-            // Signal: HR drift vs the athlete's OWN typical for similar runs (the values the card renders,
-            // hrAnalysisResult.drift + historicalDriftData.avgDriftBpm). Unlike pace, drift is terrain-
-            // INDEPENDENT — a rolling run isn't falsely suppressed (discriminator holds). Heat is drift's
-            // real confound; a hard prescription drifts more.
+            // CONFOUND SUBTRACTION IS PRIMARY (Gate 3). The analyzer already judges whether the drift is
+            // controlled FOR the conditions (heat + terrain + duration) — hrAnalysisResult.drift.assessment.
+            // Feed THAT as the confound-adjusted residual, not raw drift: 'normal/good/excellent' = the
+            // conditions explain it → residual at baseline → no_elevation (the honest reason for a warm,
+            // hilly run). Only 'elevated'/'high' (beyond what conditions explain) leaves a real residual.
             const thisDrift = Number((hrAnalysisResult as any)?.drift?.driftBpm);
             const typicalDrift = Number((historicalDriftData as any)?.avgDriftBpm);
-            const haveDrift = Number.isFinite(thisDrift) && Number.isFinite(typicalDrift);
-            const tempF = Number((workout as any)?.avg_temperature);
-            const heatConfound = Number.isFinite(tempF) && tempF >= 82; // genuinely hot — a 76°F day is not
-            const prescribedHard = /tempo|threshold|interval|fartlek|vo2|race|speed/i.test(String((plannedWorkout as any)?.type || '') + ' ' + String(classifiedTypeKey || ''));
-            const confounded = heatConfound || prescribedHard; // NO terrain — drift isn't terrain-driven
+            const driftAssess = String((hrAnalysisResult as any)?.drift?.assessment || '');
+            const assessKnown = /^(excellent|good|normal|elevated|high)$/.test(driftAssess);
+            const haveDrift = Number.isFinite(thisDrift) && Number.isFinite(typicalDrift) && assessKnown;
+            const controlledForConditions = /^(excellent|good|normal)$/.test(driftAssess);
             const rawElevation = haveDrift ? thisDrift - typicalDrift : null;
+            // conditions explain it → 0 (→ no_elevation); genuinely elevated beyond conditions → survives.
+            const adjustedElevation = haveDrift ? (controlledForConditions ? 0 : rawElevation) : null;
+            // Axis 4 backstop (D-231): a declared easy RPE vetoes even a surviving residual. SECONDARY —
+            // confound-subtraction above is primary, so a warm/hilly run silences by no_elevation first.
+            const thisRpe = Number((workout as any)?.rpe);
+            const declaredEasy = Number.isFinite(thisRpe) && thisRpe > 0 && thisRpe <= 4;
             const carry = detectCrossDomainCarryover({
               targetDate: wDate, targetDiscipline: 'run',
               effortSignal: haveDrift ? 'hr_at_pace' : null,
-              rawElevation, adjustedElevation: confounded ? 0 : rawElevation, threshold: 3, // ~noise band (bpm)
-              confounds: { grade: false, heat: heatConfound, prescribedHard },
-              recentSessions, nonLegElevated: null,
+              rawElevation, adjustedElevation, threshold: 3, // ~noise band (bpm)
+              confounds: { grade: false, heat: false, prescribedHard: false }, // subtraction is via drift.assessment
+              recentSessions, nonLegElevated: null, declaredEasy,
             });
-            // DECLARED-TRUTH VETO (D-231, Axis 1 defers to Axis 4): an inferred "effort above usual" from
-            // drift must NOT contradict a declared easy RPE. If the athlete logged a low RPE (felt good),
-            // his perception wins — no carryover claim, no matter what the drift says.
-            const thisRpe = Number((workout as any)?.rpe);
-            const rpeVeto = Number.isFinite(thisRpe) && thisRpe > 0 && thisRpe <= 4;
-            const clause = rpeVeto ? null : buildCarryoverClause(carry, 'run');
+            const clause = buildCarryoverClause(carry, 'run');
             if (clause) { ai_summary = ai_summary ? `${ai_summary} ${clause}` : clause; if (!ai_summary_generated_at) ai_summary_generated_at = new Date().toISOString(); }
-            console.log(`[analyze-running-workout] carryover ${rpeVeto ? `silent (declared_easy RPE ${thisRpe})` : (carry?.claimable ? `CLAIMED (${carry.confidence}, ${carry.antecedent?.dayName})` : `silent (${carry?.suppressedBy})`)}`);
+            console.log(`[analyze-running-workout] carryover ${carry?.claimable ? `CLAIMED (${carry.confidence}, ${carry.antecedent?.dayName})` : `silent (${carry?.suppressedBy})`} [drift ${thisDrift}/${typicalDrift} assess=${driftAssess} rpe=${thisRpe}]`);
           }
         } catch (carryErr) {
           console.warn('[analyze-running-workout] carryover skipped:', carryErr);
