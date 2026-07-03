@@ -16,6 +16,24 @@ export const CARRYOVER_WINDOW_DAYS = 3; // ≤72h; supersedes crossDomainPairs' 
 
 export type CarryoverDiscipline = 'run' | 'ride' | 'swim';
 export type StrengthFocus = 'upper' | 'lower' | 'full' | 'unknown';
+
+const LOWER_RE = /\b(squat|lunge|deadlift|rdl|leg press|leg curl|leg extension|hip thrust|calf|glute|step[- ]?up|split squat|bulgarian)\b/i;
+const UPPER_RE = /\b(bench|press|overhead|ohp|row|pull[- ]?up|chin[- ]?up|pulldown|curl|dip|fly|lateral raise|push[- ]?up|face pull)\b/i;
+
+/** Classify a strength session's focus from its exercise names — the antecedent's directional key.
+ *  Shared (coach will migrate onto this during the loaded-legs step, retiring its private closure). */
+export function classifyStrengthFocus(exerciseNames: string[]): StrengthFocus {
+  let lower = false, upper = false;
+  for (const raw of exerciseNames || []) {
+    const n = String(raw || '');
+    if (LOWER_RE.test(n)) lower = true;
+    if (UPPER_RE.test(n)) upper = true;
+  }
+  if (lower && upper) return 'full';
+  if (lower) return 'lower';
+  if (upper) return 'upper';
+  return 'unknown';
+}
 export type EffortSignal = 'rpe' | 'hr_at_pace' | 'execution' | null;
 export type SuppressReason =
   | 'no_antecedent' | 'no_data' | 'no_elevation' | 'terrain' | 'heat' | 'prescribed' | 'systemic' | null;

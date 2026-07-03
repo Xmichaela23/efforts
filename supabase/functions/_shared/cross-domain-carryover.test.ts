@@ -7,7 +7,7 @@
  */
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { detectCrossDomainCarryover, buildCarryoverClause, type CarryoverInput } from './cross-domain-carryover.ts';
+import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, type CarryoverInput } from './cross-domain-carryover.ts';
 
 // A lower-body lift Tue 06-23, target ride Thu 06-25 (2 days out — in the ≤3d window). RPE signal, bar 1.0.
 function base(over: Partial<CarryoverInput> = {}): CarryoverInput {
@@ -105,6 +105,16 @@ Deno.test('trivial antecedent load (workload 0) does not qualify', () => {
     recentSessions: [{ date: '2026-06-23', type: 'strength', strengthFocus: 'lower', workload: 0, isNovel: false }],
   }));
   assertEquals(r?.suppressedBy, 'no_antecedent');
+});
+
+// ── strength focus classification (the antecedent's directional key) ──
+Deno.test('classifyStrengthFocus: Michael\'s Monday session (squats + lunges) → lower', () => {
+  assertEquals(classifyStrengthFocus(['Back Squat', 'Bulgarian Split Squats', 'Reverse Lunge']), 'lower');
+});
+Deno.test('classifyStrengthFocus: bench + row → upper; mixed → full; nothing → unknown', () => {
+  assertEquals(classifyStrengthFocus(['Bench Press', 'Barbell Row']), 'upper');
+  assertEquals(classifyStrengthFocus(['Back Squat', 'Bench Press']), 'full');
+  assertEquals(classifyStrengthFocus(['Plank', 'Farmer Carry']), 'unknown');
 });
 
 // ── narration: the ONE clause both surfaces speak (possibility, load language, cite the antecedent) ──

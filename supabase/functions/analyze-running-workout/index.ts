@@ -16,6 +16,7 @@ import { fetchGoalRaceCompletionForWorkout, type GoalRaceCompletionMatch } from 
 import { buildMarathonGoalRaceAdherenceSummary } from './lib/analysis/marathon-race-narrative.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
+import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, CARRYOVER_WINDOW_DAYS } from '../_shared/cross-domain-carryover.ts';
 // D-036: GAP enrichment lifted to top-level so both pace-adherence and the
 // HR analyzer consume the same grade-adjusted sample series.
 import { enrichSamplesWithGAP } from '../_shared/gap.ts';
@@ -2188,6 +2189,57 @@ Deno.serve(async (req) => {
           run_spine_verdict,
         );
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
+
+        // Axis 1 — cross-domain carryover (run card, greenfield, CONSERVATIVE first ship). Signal = RPE
+        // (athlete-declared, strongest). RPE can't be mechanically deconfounded, so any material terrain/
+        // heat/hard-prescription → suppress (favors silence). Antecedent = a lower/full strength session in
+        // the ≤3d window. Detector + shared clause; appended deterministically (guaranteed honest wording).
+        try {
+          const thisRpe = Number((workout as any)?.rpe);
+          const uid = (workout as any)?.user_id;
+          const wDate = String((workout as any)?.date || '').slice(0, 10);
+          if (Number.isFinite(thisRpe) && thisRpe > 0 && uid && /^\d{4}-\d{2}-\d{2}$/.test(wDate)) {
+            const winStart = new Date(new Date(wDate + 'T12:00:00Z').getTime() - CARRYOVER_WINDOW_DAYS * 86400000).toISOString().slice(0, 10);
+            const { data: recentStr } = await supabase.from('workouts')
+              .select('date, strength_exercises, workload_actual')
+              .eq('user_id', uid).eq('type', 'strength').eq('workout_status', 'completed')
+              .gte('date', winStart).lt('date', wDate);
+            const recentSessions = ((recentStr ?? []) as any[]).map((w) => {
+              const exRaw = w?.strength_exercises;
+              const ex = Array.isArray(exRaw) ? exRaw : (typeof exRaw === 'string' ? (JSON.parse(exRaw || '[]')) : []);
+              const names = (Array.isArray(ex) ? ex : []).map((e: any) => String(e?.name || ''));
+              return { date: String(w?.date || ''), type: 'strength', strengthFocus: classifyStrengthFocus(names), workload: Number(w?.workload_actual || 0), isNovel: false };
+            });
+            // baseline RPE — the athlete's own recent-run RPE avg (≥3 samples in ≤42d, else no_data → silent)
+            const rpeStart = new Date(new Date(wDate + 'T12:00:00Z').getTime() - 42 * 86400000).toISOString().slice(0, 10);
+            const { data: recentRuns } = await supabase.from('workouts')
+              .select('rpe').eq('user_id', uid).eq('type', 'run').eq('workout_status', 'completed')
+              .gte('date', rpeStart).lt('date', wDate);
+            const rpes = ((recentRuns ?? []) as any[]).map((w) => Number(w?.rpe)).filter((n) => Number.isFinite(n) && n > 0);
+            const baselineRpe = rpes.length >= 3 ? rpes.reduce((a, b) => a + b, 0) / rpes.length : null;
+            // confounds (RPE → any material one suppresses): terrain (ft/mi), heat (°F), hard prescription
+            const elevFt = Number((workout as any)?.elevation_gain || 0) * 3.28084;
+            const distMi = Number((workout as any)?.distance || 0) / 1609.34;
+            const gradeConfound = distMi > 0 ? (elevFt / distMi) >= 100 : false;
+            const tempF = Number((workout as any)?.avg_temperature);
+            const heatConfound = Number.isFinite(tempF) && tempF >= 77;
+            const prescribedHard = /tempo|threshold|interval|fartlek|vo2|race|speed/i.test(String((plannedWorkout as any)?.type || '') + ' ' + String(classifiedTypeKey || ''));
+            const anyConfound = gradeConfound || heatConfound || prescribedHard;
+            const rawElevation = baselineRpe != null ? thisRpe - baselineRpe : null;
+            const carry = detectCrossDomainCarryover({
+              targetDate: wDate, targetDiscipline: 'run',
+              effortSignal: baselineRpe != null ? 'rpe' : null,
+              rawElevation, adjustedElevation: anyConfound ? 0 : rawElevation, threshold: 1.0,
+              confounds: { grade: gradeConfound, heat: heatConfound, prescribedHard },
+              recentSessions, nonLegElevated: null,
+            });
+            const clause = buildCarryoverClause(carry, 'run');
+            if (clause) { ai_summary = ai_summary ? `${ai_summary} ${clause}` : clause; if (!ai_summary_generated_at) ai_summary_generated_at = new Date().toISOString(); }
+            console.log(`[analyze-running-workout] carryover ${carry?.claimable ? `CLAIMED (${carry.confidence}, ${carry.antecedent?.dayName})` : `silent (${carry?.suppressedBy})`}`);
+          }
+        } catch (carryErr) {
+          console.warn('[analyze-running-workout] carryover skipped:', carryErr);
+        }
       }
     } catch (e) {
       console.warn('[analyze-running-workout] ai_summary generation failed:', e);

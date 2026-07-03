@@ -66,3 +66,4 @@ Each axis = a surface reasoning from a specific part of the substrate, with a sp
 ## Changelog (axis status transitions)
 - **2026-07-03** — Map created. Nervous-system layers 1–4 marked built (spine + grounding convergence completed this session). Axis 1 marked designed→next (`DESIGN-cross-domain-carryover.md`). Axes 2–5 marked partial with named gaps.
 - **2026-07-03** — Axis 1 ratified (thresholds approved; novelty weights confidence not duration) → status **building**; detector fixtures-first.
+- **2026-07-03** — Axis 1 detector + narration + focus classifier built (19 fixtures). RUN CARD wired (first surface, greenfield): RPE signal, confound → suppress, ≤3d antecedent, shared clause appended. Deployed, awaiting Michael's eyeball on a real run (carryover-flagged vs hilly-silent) before → live. Bike/swim next, then loaded-legs migration.
