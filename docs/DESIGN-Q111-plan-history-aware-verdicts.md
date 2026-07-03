@@ -33,7 +33,7 @@ All of this is one idea: **a verdict must know (a) what the plan is trying to do
 
 ## 2. Novelty in the fact-packet (one detection, two surfaces)
 
-**Problem (from the Monday INSIGHTS eyeball).** The per-workout narrator attributed an RPE-9-vs-RIR-2/3 gap to generic *"accumulated fatigue plausibly drove perceived effort higher."* The real evidence: **first Bulgarian split squats and reverse lunges in months — ~130 reps of novel single-leg eccentric volume.** The narrator didn't have the novelty fact.
+**Problem (from the Monday INSIGHTS eyeball).** The per-workout narrator attributed an RPE-9-vs-RIR-2/3 gap to generic *"accumulated fatigue plausibly drove perceived effort higher."* The real evidence: **first Bulgarian split squats and reverse lunges in 8 weeks — ~130 reps of novel single-leg eccentric volume.** The narrator didn't have the novelty fact.
 
 > **Counting rule (reconciled 2026-07-03 vs the session record):** the rep figure in the Why is the **sum of the logged reps of the NAMED novel movements** — Bulgarian split squats (52) + reverse lunges (78) = **130**. NOT the whole-session total (179, which also counts the non-novel back squat + thruster). An earlier draft of this doc said "~180" by conflating the two; `novel-movements.ts` already computes the correct 130 (novel-movements-only), so the string matches the record.
 
@@ -42,8 +42,8 @@ All of this is one idea: **a verdict must know (a) what the plan is trying to do
 **Detection (the shared fact).** Compute `novel_movements` = movements in the session absent from the trailing ~6–8 wk history, with rep/volume context (e.g. `[{name:'Bulgarian split squat', reps:52, pattern:'single-leg eccentric'}, {name:'reverse lunge', reps:78}]`). **This one fact is carried in the fact-packet AND consumed by the State-screen loaded-legs detection — one detection, two surfaces** (the cross-layer requirement). The `loaded-legs.ts` module already accepts `isNovel`/`movement`; this supplies them.
 
 **Strings.**
-- Session INSIGHTS (hedge discipline unchanged — "consistent with", "likely"): `The RPE 9 against RIR 2–3 is consistent with the novel single-leg eccentric volume — first Bulgarian split squats and reverse lunges in months (~130 reps) — more than accumulated fatigue.`
-- State screen (already designed): `Why: Monday's lower-body work — first Bulgarian split squats in months, RPE 9 — efforts since feeling harder (5.3 vs 4.4) · load balanced, nothing systemic`
+- Session INSIGHTS (hedge discipline unchanged — "consistent with", "likely"): `The RPE 9 against RIR 2–3 is consistent with the novel single-leg eccentric volume — first Bulgarian split squats and reverse lunges in 8 weeks (~130 reps) — more than accumulated fatigue.`
+- State screen (already designed): `Why: Monday's lower-body work — first Bulgarian split squats in 8 weeks, RPE 9 — efforts since feeling harder (5.3 vs 4.4) · load balanced, nothing systemic`
 
 **Fixtures.** novel movement present → `novel_movements` fact populated + attribution string · movement in history → no novelty claim (generic honest) · both surfaces read the same fact (assert identical `novel_movements` drives INSIGHTS + LEGS LOADED).
 
@@ -100,10 +100,10 @@ All of this is one idea: **a verdict must know (a) what the plan is trying to do
 
 **Design.**
 - **Magnitude re-check:** the Why asserts "feeling harder" only when |Δ| ≥ the RPE glass-box threshold (≥0.5, matching the "a bit harder" bucket); below that → "about as hard as usual" / no loaded claim (routes to EFFORT UP or nothing).
-- **Novelty window:** ~6–8 wk absence = "in months"; ≤6 wk = weaker/"first this block" or omit.
+- **Novelty window:** ~6–8 wk absence = "in 8 weeks"; ≤6 wk = weaker/"first this block" or omit.
 - **Persistence:** LEGS LOADED persists while the endurance RPEs remain elevated vs baseline (not a fixed N-day window) — it clears when RPE renormalizes. Detection re-evaluates each coach run.
 
-**Fixtures.** Δ 0.3 → no "harder" claim · Δ 0.6 → "a bit harder" · movement absent 7wk → "in months" · absent 4wk → weaker/omit · RPE renormalized → LEGS LOADED clears.
+**Fixtures.** Δ 0.3 → no "harder" claim · Δ 0.6 → "a bit harder" · movement absent 7wk → "in 8 weeks" · absent 4wk → weaker/omit · RPE renormalized → LEGS LOADED clears.
 
 ---
 

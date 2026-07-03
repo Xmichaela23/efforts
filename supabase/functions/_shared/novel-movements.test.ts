@@ -25,7 +25,7 @@ Deno.test('detect: Bulgarian split squats + reverse lunges are novel; back squat
 Deno.test('phrase: names the two biggest novel movements + rounded total reps', () => {
   const n = detectNovelMovements({ sessionMovements: SESSION, historyMovementNames: HISTORY });
   // 52 + 78 = 130 → rounded to 130
-  assertEquals(novelMovementsPhrase(n), 'first Reverse Lunges and Bulgarian Split Squats in months (~130 reps)');
+  assertEquals(novelMovementsPhrase(n), 'first Reverse Lunges and Bulgarian Split Squats in 8 weeks (~130 reps)');
 });
 
 Deno.test('headline: the single biggest novel movement (for the State chip Why)', () => {

@@ -50,8 +50,9 @@ function pluralize(name: string): string {
 
 /**
  * The attribution phrase for the INSIGHTS narrator + the State Why:
- *   "first Bulgarian split squats and reverse lunges in months (~180 reps)"
- * Null when nothing is novel. Caps the named list at 2 (the two biggest by reps) so the phrase stays tight.
+ *   "first Bulgarian split squats and reverse lunges in 8 weeks (~130 reps)"
+ * HONESTY (D-233): the window is what we actually checked (~8wk history) — NOT "in months", which claims
+ * a duration the 56-day read can't establish. Null when nothing is novel. Names the 2 biggest by reps.
  */
 export function novelMovementsPhrase(novels: NovelMovement[]): string | null {
   if (!novels?.length) return null;
@@ -59,7 +60,7 @@ export function novelMovementsPhrase(novels: NovelMovement[]): string | null {
   const named = [...novels].sort((a, b) => (b.reps || 0) - (a.reps || 0)).slice(0, 2);
   const names = named.map((n) => pluralize(n.name)).join(' and ');
   const repsPart = totalReps > 0 ? ` (~${Math.round(totalReps / 10) * 10} reps)` : '';
-  return `first ${names} in months${repsPart}`;
+  return `first ${names} in 8 weeks${repsPart}`;
 }
 
 /** The single headline movement to name on the State chip Why (biggest novel by reps). */

@@ -68,7 +68,7 @@ export function buildLoadedLegsDiagnosis(input: LoadedLegsInput): LoadedLegsDiag
   const suggestion = suggestionFor(isNovel, movement, planEvent);
 
   // LEGS LOADED — a lower-body work happened (measured fact); no soreness claim.
-  const noveltyClause = isNovel && movement ? `first ${movement} in months, ` : '';
+  const noveltyClause = isNovel && movement ? `first ${movement} in 8 weeks, ` : '';
   const mid = rpe ? `${noveltyClause}${rpe}` : noveltyClause.replace(/, $/, '');
   const why = `Why: ${dayName}'s lower-body work — ${mid} — ${effort} · ${loadLabel}, nothing systemic`;
   return { label: 'LEGS LOADED', why, suggestion };
