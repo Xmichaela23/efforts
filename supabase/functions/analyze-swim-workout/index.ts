@@ -9,6 +9,7 @@ import { restBandRead } from '../_shared/swim/rest-norm.ts';
 // the source of the 7 universal rules; this brings its prompt onto the shared scaffold + validators like
 // the other three. See docs/WORK-ORDER-narrative-core.md.
 import { buildReasoningScaffold, validateNarrative, swimAdapter, applyGroundingContext, spineVerdictFor } from '../_shared/narrative-core/index.ts';
+import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, CARRYOVER_WINDOW_DAYS } from '../_shared/cross-domain-carryover.ts';
 
 // =============================================================================
 // ANALYZE-SWIM-WORKOUT - SWIMMING ANALYSIS EDGE FUNCTION
@@ -654,6 +655,54 @@ Write 3-4 plain-prose observations addressed to the swimmer as "you" (one or two
 
           if (narrativeInsights.length === 0) {
             narrativeInsights = [stripMd(swContent).substring(0, 200)];
+          }
+
+          // Axis 1 — cross-domain carryover (SWIM card). Directionality: UPPER/full lift → swim. Swim's
+          // objective effort signal is the WEAKEST of the three (in-water HR unreliable; comparable swims
+          // sparse), so this is gated TIGHTLY to avoid fabrication: pace-per-100 slower than the athlete's
+          // recent SAME-STROKE baseline (≥3 comparables) by a meaningful margin, declared-easy vetoes.
+          // Rarely fires — which is the honest outcome until a reliable swim-efficiency signal exists.
+          try {
+            const uid2 = (workout as any)?.user_id;
+            const wDate2 = String((workout as any)?.date || '').slice(0, 10);
+            const stroke = String((swimData as any)?.strokeType || 'Freestyle');
+            if (uid2 && /^\d{4}-\d{2}-\d{2}$/.test(wDate2) && Number(avgPacePer100) > 0) {
+              const winS = new Date(new Date(wDate2 + 'T12:00:00Z').getTime() - CARRYOVER_WINDOW_DAYS * 86400000).toISOString().slice(0, 10);
+              const { data: recStr2 } = await supabase.from('workouts')
+                .select('date, strength_exercises, workload_actual')
+                .eq('user_id', uid2).eq('type', 'strength').eq('workout_status', 'completed')
+                .gte('date', winS).lt('date', wDate2);
+              const recentSessions2 = ((recStr2 ?? []) as any[]).map((w) => {
+                const exRaw = w?.strength_exercises;
+                const ex = Array.isArray(exRaw) ? exRaw : (typeof exRaw === 'string' ? (JSON.parse(exRaw || '[]')) : []);
+                const names = (Array.isArray(ex) ? ex : []).map((e: any) => String(e?.name || ''));
+                return { date: String(w?.date || ''), type: 'strength', strengthFocus: classifyStrengthFocus(names), workload: Number(w?.workload_actual || 0), isNovel: false };
+              });
+              // baseline: recent SAME-STROKE swims' avg pace_per_100 (≥3), else no_data → silent
+              const { data: recSwims } = await supabase.from('workouts')
+                .select('computed, swim_data').eq('user_id', uid2).eq('type', 'swim').eq('workout_status', 'completed')
+                .gte('date', new Date(new Date(wDate2 + 'T12:00:00Z').getTime() - 60 * 86400000).toISOString().slice(0, 10)).lt('date', wDate2);
+              const paces = ((recSwims ?? []) as any[])
+                .filter((w) => String(w?.swim_data?.strokeType || 'Freestyle') === stroke)
+                .map((w) => Number(w?.computed?.overall?.avg_pace_per_100_s ?? w?.swim_data?.avg_pace_per_100))
+                .filter((n) => Number.isFinite(n) && n > 20);
+              const baseP = paces.length >= 3 ? paces.reduce((a, b) => a + b, 0) / paces.length : null;
+              const slower = baseP != null ? (Number(avgPacePer100) - baseP) : null; // + sec/100 = slower = arm deficit
+              const rpe2 = Number((workout as any)?.rpe);
+              const carryS = detectCrossDomainCarryover({
+                targetDate: wDate2, targetDiscipline: 'swim',
+                effortSignal: baseP != null ? 'hr_at_pace' : null,
+                rawElevation: slower, adjustedElevation: slower, threshold: 4, // ≥4 s/100 slower = meaningful
+                confounds: { grade: false, heat: false, prescribedHard: false },
+                recentSessions: recentSessions2, nonLegElevated: null,
+                declaredEasy: Number.isFinite(rpe2) && rpe2 > 0 && rpe2 <= 4,
+              });
+              const clauseS = buildCarryoverClause(carryS, 'swim');
+              if (clauseS) narrativeInsights = [...narrativeInsights, clauseS].slice(0, 5);
+              console.log(`[analyze-swim] carryover ${carryS?.claimable ? 'CLAIMED' : `silent (${carryS?.suppressedBy})`} [pace ${avgPacePer100}/${baseP} stroke=${stroke}]`);
+            }
+          } catch (carryErr) {
+            console.warn('[analyze-swim] carryover skipped:', carryErr);
           }
         }
       } catch (error) {
