@@ -32,7 +32,7 @@ import {
   getMobilityIntensity,
   calculateMobilityWorkload,
   calculatePilatesYogaWorkload,
-  calculateTRIMPWorkload,
+  inferIntensityFromPerformance,
   calculateDurationWorkload,
   classifyWorkloadMethod,
 } from '../_shared/workload.ts'
@@ -59,9 +59,8 @@ interface WorkoutData {
   avg_power?: number; // watts (cycling)
   avg_heart_rate?: number; // bpm
   functional_threshold_power?: number; // watts (for cycling intensity zones)
-  threshold_heart_rate?: number; // bpm (for HR zones)
-  max_heart_rate?: number; // bpm (for TRIMP calculation)
-  resting_heart_rate?: number; // bpm (for TRIMP calculation)
+  threshold_heart_rate?: number; // bpm (LTHR, for HR-vs-threshold intensity + zones)
+  max_heart_rate?: number; // bpm (sensor max; zones)
   workout_metadata?: any; // Unified metadata: { session_rpe?, notes?, readiness? }
 }
 
@@ -88,19 +87,8 @@ function calculateWorkload(workout: WorkoutData, sessionRPE?: number): number {
 
   const isCardio = workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim';
 
-  if (isCardio && workout.avg_heart_rate && workout.max_heart_rate) {
-    let durationMinutes = workout.duration;
-    if (workout.moving_time && workout.moving_time > 0) durationMinutes = workout.moving_time;
-    const trimpResult = calculateTRIMPWorkload({
-      avgHR: workout.avg_heart_rate,
-      maxHR: workout.max_heart_rate,
-      restingHR: workout.resting_heart_rate,
-      thresholdHR: workout.threshold_heart_rate,
-      durationMinutes,
-    });
-    if (trimpResult !== null && trimpResult > 0) return trimpResult;
-  }
-
+  // D-238: no TRIMP/resting-HR path. Cardio load flows through getSessionIntensity, which is
+  // output-first (power/pace → HR%LTHR → sRPE → duration default) via inferIntensityFromPerformance.
   let effectiveDuration = workout.duration;
   if (isCardio && workout.moving_time && workout.moving_time > 0) {
     effectiveDuration = workout.moving_time;
@@ -132,7 +120,14 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
     return getStepsIntensity(workout.steps_preset, workout.type);
   }
   if (workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim') {
-    const inferred = inferIntensityFromPerformance(workout);
+    const inferred = inferIntensityFromPerformance({
+      type: workout.type,
+      avgHr: workout.avg_heart_rate,
+      thresholdHr: workout.threshold_heart_rate,
+      avgPower: workout.avg_power,
+      ftp: workout.functional_threshold_power,
+      avgPace: workout.avg_pace,
+    });
     if (inferred > 0) return inferred;
     // sRPE (D-237): no HR/power/pace, but a logged RPE → RPE-derived intensity (session-RPE
     // is a field-standard load proxy, r≈0.68–0.74) instead of the flat default. Kept on the
@@ -144,58 +139,8 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
   return getDefaultIntensityForType(workout.type);
 }
 
-/**
- * Infer intensity from actual performance metrics (freeform workouts).
- * This is the only logic unique to calculate-workload (not shared)
- * because get-week doesn't have HR/power/pace data.
- */
-function inferIntensityFromPerformance(workout: WorkoutData): number {
-  if (workout.type === 'run') {
-    if (workout.avg_heart_rate && workout.threshold_heart_rate) {
-      const hrPercent = workout.avg_heart_rate / workout.threshold_heart_rate;
-      if (hrPercent >= 1.05) return 1.10;
-      if (hrPercent >= 0.95) return 1.00;
-      if (hrPercent >= 0.88) return 0.88;
-      if (hrPercent >= 0.80) return 0.80;
-      if (hrPercent >= 0.70) return 0.70;
-      return 0.60;
-    }
-    return 0;
-  }
-
-  if ((workout.type === 'ride' || workout.type === 'bike') && workout.avg_power && workout.functional_threshold_power) {
-    const ifactor = workout.avg_power / workout.functional_threshold_power;
-    if (ifactor >= 1.05) return 1.15;
-    if (ifactor >= 0.95) return 1.00;
-    if (ifactor >= 0.85) return 0.90;
-    if (ifactor >= 0.75) return 0.80;
-    if (ifactor >= 0.60) return 0.70;
-    if (ifactor >= 0.55) return 0.65;
-    return 0.55;
-  }
-
-  if ((workout.type === 'ride' || workout.type === 'bike') && workout.avg_heart_rate && workout.threshold_heart_rate) {
-    const hrPercent = workout.avg_heart_rate / workout.threshold_heart_rate;
-    if (hrPercent >= 0.95) return 1.00;
-    if (hrPercent >= 0.90) return 0.90;
-    if (hrPercent >= 0.85) return 0.80;
-    if (hrPercent >= 0.75) return 0.70;
-    return 0.60;
-  }
-
-  if (workout.type === 'ride' || workout.type === 'bike') return 0;
-
-  if (workout.type === 'swim' && workout.avg_pace) {
-    const paceMinPer100m = workout.avg_pace / 60;
-    if (paceMinPer100m < 1.5) return 1.00;
-    if (paceMinPer100m < 2.0) return 0.95;
-    if (paceMinPer100m < 2.5) return 0.85;
-    if (paceMinPer100m < 3.0) return 0.75;
-    return 0.65;
-  }
-
-  return 0;
-}
+// (D-238) The cardio performance-inference logic now lives in the shared
+// inferIntensityFromPerformance (_shared/workload.ts), output-first and resting-HR-free.
 
 serve(async (req) => {
   try {
@@ -266,7 +211,6 @@ serve(async (req) => {
     let rideThresholdHr: number | null = null;
     let runMaxHr: number | null = null;
     let rideMaxHr: number | null = null;
-    let restingHr: number | null = null;
     if (userId) {
       try {
         const { data: baseline } = await supabaseClient
@@ -328,11 +272,6 @@ serve(async (req) => {
           if (!runMaxHr && (perfNumbers?.maxHeartRate || perfNumbers?.max_heart_rate)) {
             runMaxHr = Number(perfNumbers.maxHeartRate || perfNumbers.max_heart_rate);
             rideMaxHr = runMaxHr; // Use same for ride if not learned
-          }
-          
-          // Resting HR (for TRIMP calculation)
-          if (perfNumbers?.restingHeartRate || perfNumbers?.resting_heart_rate) {
-            restingHr = Number(perfNumbers.restingHeartRate || perfNumbers.resting_heart_rate);
           }
         }
       } catch {}
@@ -444,11 +383,6 @@ serve(async (req) => {
       }
     }
     
-    // Inject resting HR for TRIMP calculation
-    if (!finalWorkoutData.resting_heart_rate && restingHr) {
-      finalWorkoutData.resting_heart_rate = restingHr;
-    }
-    
     // Parse workout_metadata if it's a string (JSONB from database)
     let parsedMetadata: any = {};
     if (workoutMetadata) {
@@ -484,26 +418,29 @@ serve(async (req) => {
     // D-237: classify HOW this workload was derived so an ESTIMATED load (default
     // intensity / assumed resting HR) is distinguishable from a MEASURED one. Persisted
     // below into workout_metadata; the ACWR receipt discloses when a window is meaningfully
-    // estimated. intensityDefaulted = cardio fell through to the default-intensity path;
-    // restingAssumed = TRIMP ran but no real resting HR was available (finalWorkoutData
-    // still lacks resting_heart_rate after the baseline injection above).
+    // estimated. noPerformanceInference = cardio had no output/threshold signal (D-238:
+    // output-first ladder, no resting-HR TRIMP), so it fell to sRPE or the duration default.
     const _wt = String(finalWorkoutData.type || '').toLowerCase()
     const _isCardio = _wt === 'run' || _wt === 'ride' || _wt === 'bike' || _wt === 'swim'
     const _rpeVal = sessionRPE ?? (finalWorkoutData.workout_metadata || {}).session_rpe
-    const noPerformanceInference = _isCardio && inferIntensityFromPerformance(finalWorkoutData) === 0
+    const noPerformanceInference = _isCardio && inferIntensityFromPerformance({
+      type: _wt,
+      avgHr: finalWorkoutData.avg_heart_rate,
+      thresholdHr: finalWorkoutData.threshold_heart_rate,
+      avgPower: finalWorkoutData.avg_power,
+      ftp: finalWorkoutData.functional_threshold_power,
+      avgPace: finalWorkoutData.avg_pace,
+    }) === 0
     const rpeAvailable = typeof _rpeVal === 'number' && _rpeVal >= 1 && _rpeVal <= 10
-    const restingAssumed = Boolean(_isCardio && finalWorkoutData.avg_heart_rate && finalWorkoutData.max_heart_rate && !finalWorkoutData.resting_heart_rate)
     const { method: workloadMethodClassified, estimated: workloadEstimated } = classifyWorkloadMethod({
       type: _wt,
       hasAvgHr: Boolean(finalWorkoutData.avg_heart_rate),
-      hasMaxHr: Boolean(finalWorkoutData.max_heart_rate),
       hasThresholdHr: Boolean(finalWorkoutData.threshold_heart_rate),
       hasFtp: Boolean(finalWorkoutData.functional_threshold_power),
       hasAvgPower: Boolean(finalWorkoutData.avg_power),
       hasStepsPreset: Boolean(finalWorkoutData.steps_preset?.length),
       noPerformanceInference,
       rpeAvailable,
-      restingAssumed,
     })
     
     // If workout is attached to a planned workout, fetch planned workload for comparison
@@ -576,7 +513,6 @@ serve(async (req) => {
         ride_threshold_hr: rideThresholdHr,
         run_max_hr: runMaxHr,
         ride_max_hr: rideMaxHr,
-        resting_hr: restingHr,
         avg_power: finalWorkoutData?.avg_power,
         avg_heart_rate: finalWorkoutData?.avg_heart_rate,
         threshold_heart_rate: finalWorkoutData?.threshold_heart_rate,

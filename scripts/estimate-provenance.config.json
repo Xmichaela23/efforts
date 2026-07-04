@@ -14,7 +14,6 @@
   "_declaredDefaultProviders_doc": "Functions whose SOLE job is to supply a default. Their internal literal fallback is the sanctioned source; the obligation to DECLARE falls on callers that persist/render the value. Keep this list SHORT and auditable.",
   "declaredDefaultProviders": [
     "getDefaultIntensityForType",
-    "calculateTRIMPWorkload",
     "getStrengthIntensity"
   ],
 

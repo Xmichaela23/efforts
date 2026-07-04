@@ -21,12 +21,11 @@ import {
   calculateStrengthWorkload,
   calculateMobilityWorkload,
   calculatePilatesYogaWorkload,
-  calculateTRIMPWorkload,
+  inferIntensityFromPerformance,
   calculateDurationWorkload,
   getStepsIntensity,
   getDefaultIntensityForType,
   mapRPEToIntensity,
-  type TRIMPInput,
 } from "../_shared/workload.ts";
 import { assessHrPlausibility, resolveMaxHrCeiling } from "../_shared/hr-plausibility.ts";
 import { canonicalize, muscleGroup, bigFourLift } from "../_shared/canonicalize.ts";
@@ -907,7 +906,9 @@ async function upsertRouteIntelligence(
   // effort_adjusted is null (raw pace stands), NEVER 0.
   const avgHrRaw = toNum(runFacts?.hr_avg);
   const avgHr = avgHrRaw != null && avgHrRaw > 0 ? avgHrRaw : null;
-  const refHr = toNum((w.workout_metadata as any)?.readiness?.threshold_hr) ?? 145;
+  // D-237: no fabricated threshold HR. Absent → effort-adjustment is skipped below (raw pace
+  // stands via the refHr > 0 guard), never HR-normalized against a guessed threshold.
+  const refHr = toNum((w.workout_metadata as any)?.readiness?.threshold_hr);
   const effortAdjusted = plausiblePace(
     paceSecPerKm != null && avgHr != null && refHr > 0
       ? Math.round((paceSecPerKm * (avgHr / refHr)) * 10) / 10
@@ -1163,12 +1164,16 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null): Record<strin
       (i: any) => i.planned_label && !/(warm|cool|rest|recovery)/i.test(i.planned_label)
     );
     if (workIntervals.length > 0) {
-      const hit = workIntervals.filter((i: any) => {
-        const adh = i.adherence_pct ?? i.pace_adherence_pct ?? 100;
+      // D-237: an interval with NO measured adherence is UNKNOWN, not a hit. Count only
+      // measured intervals in BOTH numerator and denominator — an unmeasured interval must
+      // never silently count as 100% and inflate execution.
+      const measured = workIntervals.filter((i: any) => (i.adherence_pct ?? i.pace_adherence_pct) != null);
+      const hit = measured.filter((i: any) => {
+        const adh = i.adherence_pct ?? i.pace_adherence_pct;
         return adh >= 85 && adh <= 115;
       }).length;
       facts.intervals_hit = hit;
-      facts.intervals_total = workIntervals.length;
+      facts.intervals_total = measured.length;
     }
   }
 
@@ -1249,12 +1254,14 @@ function buildRideFacts(w: WorkoutRow, baselines: Baselines | null): Record<stri
       (i: any) => i.planned_label && !/(warm|cool|rest|recovery)/i.test(i.planned_label)
     );
     if (workIntervals.length > 0) {
-      const hit = workIntervals.filter((i: any) => {
-        const adh = i.adherence_pct ?? i.power_adherence_pct ?? 100;
+      // D-237: unmeasured interval = UNKNOWN, not a hit. Measured-only, both sides (same as run).
+      const measured = workIntervals.filter((i: any) => (i.adherence_pct ?? i.power_adherence_pct) != null);
+      const hit = measured.filter((i: any) => {
+        const adh = i.adherence_pct ?? i.power_adherence_pct;
         return adh >= 85 && adh <= 115;
       }).length;
       facts.intervals_hit = hit;
-      facts.intervals_total = workIntervals.length;
+      facts.intervals_total = measured.length;
     }
   }
 
@@ -1463,10 +1470,13 @@ function computeAdherence(w: WorkoutRow, planned: PlannedRow | null): Record<str
       (i: any) => i.planned_label && !/(warm|cool|rest|recovery)/i.test(i.planned_label)
     );
     if (workIntervals.length > 0) {
-      const avgAdh = workIntervals.reduce((sum: number, i: any) => {
-        return sum + (i.adherence_pct ?? i.pace_adherence_pct ?? 100);
-      }, 0) / workIntervals.length;
-      result.interval_adherence_pct = Math.round(avgAdh);
+      // D-237: average only intervals with a measured adherence; an unknown is not "100%".
+      const measured = workIntervals.filter((i: any) => (i.adherence_pct ?? i.pace_adherence_pct) != null);
+      if (measured.length > 0) {
+        const avgAdh = measured.reduce((sum: number, i: any) =>
+          sum + (i.adherence_pct ?? i.pace_adherence_pct), 0) / measured.length;
+        result.interval_adherence_pct = Math.round(avgAdh);
+      }
     }
   }
 
@@ -1506,20 +1516,27 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt =
     return calculatePilatesYogaWorkload(dur, sessionRPE);
   }
 
-  // Cardio: TRIMP first — but ONLY when the HR is trusted (not corrupt).
-  if (!hrCorrupt && w.avg_heart_rate && w.max_heart_rate && dur > 0) {
-    const restHR = baselines?.performance_numbers?.resting_heart_rate
-      ?? baselines?.learned_fitness?.[type]?.resting_hr ?? 60;
-    const trimp = calculateTRIMPWorkload({
-      avgHR: w.avg_heart_rate,
-      maxHR: w.max_heart_rate,
-      restingHR: restHR,
-      durationMinutes: dur,
+  // Cardio (D-238): OUTPUT-FIRST — power(FTP)/pace, then HR vs LTHR. No TRIMP, no resting HR.
+  // (This is the fallback path; the canonical load is calculate-workload's workload_actual,
+  // preferred above. When HR is corrupt, `avgHr` is withheld so it can't feed intensity.)
+  const isCardio = type === "run" || type === "ride" || type === "bike" || type === "swim";
+  if (isCardio && dur > 0) {
+    const lf: any = baselines?.learned_fitness ?? {};
+    const thresholdHr = (type === "run" ? lf?.running?.threshold_hr : lf?.cycling?.threshold_hr)
+      ?? baselines?.performance_numbers?.threshold_heart_rate ?? null;
+    const ftp = resolveCurrentFtp(baselines)?.value ?? null;
+    const outIntensity = inferIntensityFromPerformance({
+      type,
+      avgHr: hrCorrupt ? null : w.avg_heart_rate,
+      thresholdHr,
+      avgPower: w.avg_power,
+      ftp,
+      avgPace: w.avg_pace,
     });
-    if (trimp !== null) return trimp;
+    if (outIntensity > 0) return calculateDurationWorkload(dur, outIntensity);
   }
 
-  // Estimate path (no trusted HR): sRPE if a logged RPE exists, else the flat default.
+  // Estimate path (no output signal): sRPE if a logged RPE exists, else the flat default.
   if (typeof sessionRPE === "number" && sessionRPE >= 1 && sessionRPE <= 10) {
     return calculateDurationWorkload(dur, mapRPEToIntensity(sessionRPE));
   }

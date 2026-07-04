@@ -247,32 +247,68 @@ export function calculatePilatesYogaWorkload(durationMinutes: number, sessionRPE
 }
 
 // ---------------------------------------------------------------------------
-// TRIMP (cardio with HR data)
+// Output/threshold intensity inference (D-238)
 // ---------------------------------------------------------------------------
+// The cardio load ladder keys on MEASURABLE OUTPUT (power vs FTP, pace) and
+// THRESHOLD HR (LTHR) — never resting HR. Returns an intensity factor (fed to
+// duration × IF² × 100), or 0 when no output signal exists (the caller then falls
+// through to sRPE, then the duration default). It NEVER fabricates an input to keep
+// a tier alive. Supersedes the resting-HR TRIMP path (D-238).
 
-export interface TRIMPInput {
-  avgHR: number;
-  maxHR: number;
-  restingHR?: number;
-  thresholdHR?: number;
-  durationMinutes: number;
+export interface PerfIntensityInput {
+  type: string;
+  avgHr?: number | null;
+  thresholdHr?: number | null; // LTHR — threshold HR, NOT resting HR
+  avgPower?: number | null;
+  ftp?: number | null;
+  avgPace?: number | null;     // swim: seconds per 100m
 }
 
-export function calculateTRIMPWorkload(input: TRIMPInput): number | null {
-  const { avgHR, maxHR, durationMinutes } = input;
-  const restingHR = input.restingHR
-    || (input.thresholdHR ? Math.max(input.thresholdHR - 90, 45) : 60);
+export function inferIntensityFromPerformance(inp: PerfIntensityInput): number {
+  const type = (inp.type || '').toLowerCase();
+  const isRide = type === 'ride' || type === 'bike';
 
-  if (!avgHR || !maxHR || avgHR <= 0 || maxHR <= 0) return null;
-  if (avgHR < restingHR || avgHR > maxHR) return null;
-  if (!durationMinutes || durationMinutes <= 0) return null;
+  // Bike: power vs FTP (the primary output metric).
+  if (isRide && inp.avgPower && inp.ftp) {
+    const ifactor = inp.avgPower / inp.ftp;
+    if (ifactor >= 1.05) return 1.15;
+    if (ifactor >= 0.95) return 1.00;
+    if (ifactor >= 0.85) return 0.90;
+    if (ifactor >= 0.75) return 0.80;
+    if (ifactor >= 0.60) return 0.70;
+    if (ifactor >= 0.55) return 0.65;
+    return 0.55;
+  }
 
-  const hrReserve = maxHR - restingHR;
-  const hrRatio = (avgHR - restingHR) / hrReserve;
-  const weightingFactor = 0.64 * Math.exp(1.92 * hrRatio);
-  const rawTRIMP = durationMinutes * hrRatio * weightingFactor;
+  // Run / bike: HR vs THRESHOLD HR (LTHR). Never resting HR.
+  if ((type === 'run' || isRide) && inp.avgHr && inp.thresholdHr) {
+    const p = inp.avgHr / inp.thresholdHr;
+    if (type === 'run') {
+      if (p >= 1.05) return 1.10;
+      if (p >= 0.95) return 1.00;
+      if (p >= 0.88) return 0.88;
+      if (p >= 0.80) return 0.80;
+      if (p >= 0.70) return 0.70;
+      return 0.60;
+    }
+    if (p >= 0.95) return 1.00;
+    if (p >= 0.90) return 0.90;
+    if (p >= 0.85) return 0.80;
+    if (p >= 0.75) return 0.70;
+    return 0.60;
+  }
 
-  return Math.round(rawTRIMP * 0.6);
+  // Swim: pace (seconds per 100m).
+  if (type === 'swim' && inp.avgPace) {
+    const per100 = inp.avgPace / 60;
+    if (per100 < 1.5) return 1.00;
+    if (per100 < 2.0) return 0.95;
+    if (per100 < 2.5) return 0.85;
+    if (per100 < 3.0) return 0.75;
+    return 0.65;
+  }
+
+  return 0; // no output signal → caller falls through to sRPE / duration default
 }
 
 // ---------------------------------------------------------------------------
@@ -296,8 +332,8 @@ export function calculateDurationWorkload(
 // ---------------------------------------------------------------------------
 
 export type WorkloadMethod =
-  | 'trimp_hr_based'         // measured: HR + max HR (+ real resting HR)
-  | 'trimp_resting_assumed'  // ESTIMATED (low trust): TRIMP but no stored resting HR → assumed (W2)
+  | 'trimp_hr_based'         // RETIRED D-238 (historical rows only) — resting-HR TRIMP
+  | 'trimp_resting_assumed'  // RETIRED D-238 (historical rows only) — TRIMP w/ assumed resting HR (W2)
   | 'power_intensity'        // measured: power vs FTP
   | 'hr_intensity'           // measured: HR vs threshold
   | 'steps_preset'           // structured prescription
@@ -326,7 +362,8 @@ export function isLowTrustWorkload(method: string | null | undefined): boolean {
 export function classifyWorkloadMethod(args: {
   type: string;
   hasAvgHr: boolean;
-  hasMaxHr: boolean;
+  /** @deprecated D-238 — TRIMP/HR-reserve retired; ignored. */
+  hasMaxHr?: boolean;
   hasThresholdHr: boolean;
   hasFtp: boolean;
   hasAvgPower: boolean;
@@ -335,27 +372,23 @@ export function classifyWorkloadMethod(args: {
   noPerformanceInference: boolean;
   /** a valid logged session RPE (1–10) is available → RPE-derived intensity instead of the flat default. */
   rpeAvailable: boolean;
-  /** TRIMP path but no stored resting HR → workload.ts assumes one. */
-  restingAssumed: boolean;
+  /** @deprecated D-238 — resting HR is never used in load; ignored. */
+  restingAssumed?: boolean;
 }): { method: WorkloadMethod; estimated: boolean } {
   const t = (args.type || '').toLowerCase();
   const isCardio = t === 'run' || t === 'ride' || t === 'bike' || t === 'swim';
 
   if (t === 'strength') return { method: 'volume_based', estimated: false };
-  // TRIMP takes precedence for cardio with HR + max HR.
-  if (isCardio && args.hasAvgHr && args.hasMaxHr) {
-    return args.restingAssumed
-      ? { method: 'trimp_resting_assumed', estimated: true }
-      : { method: 'trimp_hr_based', estimated: false };
-  }
-  // No performance signal: RPE-derived (field-standard) beats the flat default (double-missing).
+  // D-238: OUTPUT-FIRST. Power (ride) then threshold HR (LTHR) — measured signals. No TRIMP /
+  // resting-HR tier. Mirror inferIntensityFromPerformance's order so label ↔ number agree.
+  if ((t === 'ride' || t === 'bike') && args.hasFtp && args.hasAvgPower) return { method: 'power_intensity', estimated: false };
+  if (isCardio && args.hasAvgHr && args.hasThresholdHr) return { method: 'hr_intensity', estimated: false };
+  // No output/threshold signal: RPE-derived (field-standard) beats the flat default (double-missing).
   if (isCardio && args.noPerformanceInference) {
     return args.rpeAvailable
       ? { method: 'srpe_estimated', estimated: true }
       : { method: 'duration_default', estimated: true };
   }
-  if (t === 'run' && args.hasAvgHr && args.hasThresholdHr) return { method: 'hr_intensity', estimated: false };
-  if ((t === 'ride' || t === 'bike') && args.hasFtp && args.hasAvgPower) return { method: 'power_intensity', estimated: false };
   if (args.hasStepsPreset) return { method: 'steps_preset', estimated: false };
   return { method: 'duration_intensity', estimated: false };
 }

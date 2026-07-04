@@ -6,33 +6,25 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import {
   getStepsIntensity,
-  calculateTRIMPWorkload,
   calculateDurationWorkload,
   getDefaultIntensityForType,
 } from '../_shared/workload.ts'
 
 /**
- * Estimate planned workload for a session using the same TRIMP formula
- * as actual workouts. Without this, planned loads are duration-based
- * estimates that can't be compared to HR-based actual loads.
+ * Estimate planned workload from the PRESCRIPTION (D-238): duration × prescribed
+ * intensity² — the same output-based scale actual load now uses, so planned and actual
+ * are directly comparable. No TRIMP on a synthesized HR / resting HR (that fabricated
+ * two inputs — an avgHR and a resting HR — to feed an HR-reserve formula).
  */
 function estimatePlannedWorkload(
   type: string,
   durationMinutes: number,
   stepsTokens: string[],
-  maxHR: number | null,
-  restingHR: number | null,
+  _maxHR?: number | null,
+  _restingHR?: number | null,
 ): number {
   if (!durationMinutes || durationMinutes <= 0) return 0;
   const intensity = getStepsIntensity(stepsTokens, type) || getDefaultIntensityForType(type) || 0.70;
-  if (maxHR && maxHR > 0) {
-    const rhr = restingHR && restingHR > 0 ? restingHR : 55;
-    const hrReserve = maxHR - rhr;
-    const avgHR = Math.round(rhr + intensity * hrReserve);
-    const trimp = calculateTRIMPWorkload({ avgHR, maxHR, restingHR: rhr, durationMinutes });
-    if (trimp !== null && trimp > 0) return Math.round(trimp);
-  }
-  // Fallback: duration × intensity (same as get-week fallback)
   return Math.round(calculateDurationWorkload(durationMinutes, intensity));
 }
 

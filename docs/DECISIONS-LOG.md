@@ -4808,6 +4808,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-238 — Load is anchored on measurable outputs + effort, never fabricated physiology (TRIMP/resting-HR retired)
+
+- **Decision (settled architectural principle — do not re-introduce):** cardio training load is anchored on **measurable outputs** — power (FTP) for the bike, pace (threshold pace / GAP) for the run — and on **effort (sRPE = RPE × duration)** as the no-output fallback. HR-based load, if used at all, keys on **threshold HR (LTHR)**, **never resting HR**. Tiers fall through on missing data; the engine **never fabricates an input to keep a tier alive**. Rationale: TrainingPeaks anchors TSS on threshold (FTP / threshold pace / LTHR), not resting HR; sRPE is the field-validated no-sensor proxy (McLaren 2018 — sRPE ≥ TRIMP for load validity); Efforts is a **non-wearable-first** app. **No future session may re-introduce resting-HR-dependent load.**
+- **What was wrong (traced 2026-07-04):** RHR-based **TRIMP was the PRIMARY cardio load metric** — tier 1 in BOTH writers (`calculate-workload.calculateActivityWorkload`, `compute-facts.computeWorkload`) *and* in `classifyWorkloadMethod` — sitting **above** power and pace, the inverse of TrainingPeaks. Resting HR was fabricated (`?? 60`, or `thresholdHR−90`) whenever absent. **Impact on Michael's real data (gated count, `verify-load-ladder-impact.mjs`): 247 cardio workouts, 0 stored resting HR → EVERY TRIMP used the fabricated 60; 238 had HR (TRIMP fired on ~all); 215 had real wattage that TRIMP ignored.** Not cosmetic.
+- **The fix:** deleted `calculateTRIMPWorkload` + the TRIMP-first block from both writers and every `resting_heart_rate` read; extracted the output/threshold ladder to shared `inferIntensityFromPerformance` (`_shared/workload.ts`) and gave compute-facts a power/pace tier (it previously jumped TRIMP→sRPE). New cardio ladder: **power(FTP) / pace → HR%LTHR → sRPE → duration default.** `classifyWorkloadMethod` reordered output-first (label ↔ number agree); `trimp_*` enum members kept for historical rows only, never emitted. Planned-load callers (`activate-plan`, `backfill-planned-workload`) — which fabricated an avgHR from a default `rhr=55` to run TRIMP — now score planned load from the **prescription** (duration × prescribed IF²), the same scale as actual load, so planned/actual stay comparable.
+- **Run tier (option-b, chosen):** runs key on **HR%LTHR** (threshold HR, never resting HR); a dedicated threshold-pace / GAP run-TSS tier is deferred (overlaps Q-118 critical-pace). Filed as a follow-up, not a defect.
+- **Scale note:** `TRIMP×0.6` and `duration×IF²×100` are both anchored to ~100 load/hr at threshold, so magnitudes agree for well-matched sessions; the corrections concentrate on HR-decoupled sessions (heat/drift/fatigue → TRIMP over-read vs real power).
+- **Verification:** `_shared/workload-ladder.test.ts` (power ride → power; HR-only run → %LTHR; RPE-only → sRPE; power ride load = duration×IF², never TRIMP; classifier never emits trimp) + updated `workload-method.test.ts` (13 pass). `grep calculateTRIMPWorkload|TRIMPInput` → none; no `resting_heart_rate` read remains in the load path. **Before/after on real history shown to Michael via `verify-load-ladder-impact.mjs` BEFORE deploy** (window ACWR shift + dramatic movers) per the ACWR-readout discipline.
+- **Supersedes:** the TRIMP-first cardio path and the W2 resting-HR-`?? 60` fallback (D-237 inventory) — resting HR is now gone from load entirely, not merely declared.
+- **Cross-ref:** D-236 (ACWR substrate = `workload_actual`), D-237 (declare-or-refuse; W2), Q-118 (FTP/critical-pace baseline model), `verify-load-ladder-impact.mjs`.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
