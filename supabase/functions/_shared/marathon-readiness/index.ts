@@ -101,16 +101,16 @@ export async function computeMarathonReadiness(
   const rows = facts as WorkoutFactRow[];
 
   // --- Resolve thresholds ---
+  // Q-120 (KNOWN OPEN BUG, tracked as a guard exception): these no-plan/marathon-default targets
+  // are the C3 finding — the readiness verdict should be GATED ON A SET RACE GOAL and be
+  // discipline-aware, not defaulted to marathon. Left un-annotated on purpose so the guard keeps
+  // flagging it as unresolved. Do NOT "declare" this away; the fix is gating (Q-120), not copy.
   const distKey = (planCtx?.raceDistance || 'marathon').toLowerCase().replace(/\s+/g, '_');
-  // estimate-ok: no-plan → standard per-distance defaults; disclosed in summary_line (usingDefaultTargets).
   const defaults = DISTANCE_DEFAULTS[distKey] ?? DISTANCE_DEFAULTS.marathon;
 
-  // estimate-ok: no-plan target defaults; the summary line DECLARES "assessed against standard
-  // {distance} targets — set a goal to tailor this", so the verdict never reads as plan-measured.
   const longRunTargetMi = planCtx?.peakLongRunMi ?? defaults.longRunMi;
   const mpwTarget = planCtx?.peakWeekMi ?? planCtx?.avgWeekMi ?? defaults.mpw;
   const longRunTargetM = longRunTargetMi * M_PER_MI;
-  const usingDefaultTargets = planCtx?.peakLongRunMi == null && planCtx?.peakWeekMi == null;
 
   const phase = planCtx?.phase?.toLowerCase() ?? null;
   const weeksOut = planCtx?.weeksOut ?? null;
@@ -250,12 +250,7 @@ export async function computeMarathonReadiness(
   if (passCount === totalItems) summary = 'on_track';
   else if (passCount >= 1 || rows.length > 0) summary = 'needs_work';
 
-  let summary_line = buildSummaryLine(summary, items, avgMpw, mpwTarget, longRunTargetMi, acwr, planCtx);
-  // D-237 declare: when readiness was assessed against DEFAULT targets (no plan), say so — don't
-  // let the verdict read as if it were measured against the athlete's own plan.
-  if (usingDefaultTargets && summary !== 'insufficient_data') {
-    summary_line += ` (Assessed against standard ${distKey.replace(/_/g, ' ')} targets — set a goal to tailor this.)`;
-  }
+  const summary_line = buildSummaryLine(summary, items, avgMpw, mpwTarget, longRunTargetMi, acwr, planCtx);
 
   return {
     applicable: true,

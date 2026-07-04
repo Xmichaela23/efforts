@@ -4,26 +4,25 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (roadmap as of 2026-07-04)
+## 🧭 NEXT SESSION — START HERE (roadmap as of 2026-07-04, D-237-guard + D-238-ladder session)
 
-**What the last session shipped (all deployed):** **D-236** — Step 6 ACWR single-authority (`_shared/acwr.ts`), compute-snapshot coupled-rolling (acceptance-verified 1.10), asOf-timezone fix, fact-layer reclassification, RPE dedup. **D-237 "no silent impersonation"** — the run-cadence floor fix (scales off comparable-easy-run cadence), C2 (killed the fabricated 140-bpm "your norm"), W1/W2 workload provenance (`workload_method`/`workload_estimated`), sRPE tier, Stage-2 ACWR estimated-load disclosure (30/40), and the **HR-plausibility filter** (`_shared/hr-plausibility.ts` — ceiling + cadence-lock + slew → `hr_rejected_corrupt`, wired in compute-facts) — **mechanism deployed + 9 fixtures pass, but its real-data catch is UNVERIFIED: `verify-hr-194.mjs` was never run (gated prod read), and by the ceiling logic the 194 ride is NOT rejected (194 < 197); whether any real ride is flagged is unobserved. See D-237 HR-plausibility correction.** Bike-row EF/decoupling rework was **built then REVERTED** (raw EF conflates intensity with efficiency; HR-at-power is the correct metric — **Q-117 metric-choice resolved; but the ~5.5% "improving" reading is OPEN/unverified, never confirmed vs matched-power SQL**). FTP verified correct at **176W**.
+**What THIS session shipped:**
+- **D-237 estimate-provenance guard — BUILT + committed + CI-wired (not yet required).** `scripts/check-estimate-provenance.mjs` (TS-AST) + config + `npm run lint:provenance` + `.github/workflows/provenance.yml`. Rule A (source-site) only; declared via provider-allowlist / provenance-token / `/* estimate-ok */`. **Guard state: 0 NEW undeclared, all 16 in-scope fallbacks resolved** (W4/refHr refused; C1/C5/geo/trend-receipt annotated as model-priors/heuristics; startKm declared distance-only). **C3 marathon-readiness is a KNOWN-UNRESOLVED tracked exception → Q-120** (the guard lists it loudly, doesn't fail on it). Design doc: `docs/DESIGN-D237-lint-guard.md`.
+- **D-238 — output-first cardio load ladder; TRIMP + resting HR RETIRED. DEPLOYED (forward-only).** Was: resting-HR TRIMP the PRIMARY cardio metric, RHR fabricated `?? 60` (247 cardio, 0 stored RHR, 215 rides with real wattage TRIMP ignored). Now: power(FTP)/pace → HR%LTHR → sRPE → duration. Deployed `calculate-workload`, `compute-facts`, `activate-plan`, `backfill-planned-workload`. Before/after shown on real data (chronic-28 877→589, ACWR 1.10→1.24, **run-safety canary 0/145 spiked** — run-power never ÷ cycling-FTP). Fixtures: `workload-ladder.test.ts` + updated `workload-method.test.ts` (13 pass). **NO historical backfill** — history keeps stored loads; State screen unchanged until new ingests.
+- **Doc corrections:** Q-117 ~5.5% bike-efficiency reading downgraded to OPEN/unverified; D-237 HR-plausibility marked real-data-catch UNVERIFIED.
 
-**Do these next, in order:**
+**OPEN QUEUE (pick up here):**
+1. **D-238 historical backfill** — separate gated decision. Deploy-forward is live; recomputing history rewrites ACWR/CTL (62 movers). Michael watches a few real ingests first, THEN decides. Tool: `verify-load-ladder-impact.mjs`.
+2. **Q-120 — race/marathon readiness gating** (design-before-build) — gate on a SET goal; reconcile-or-retire marathon-readiness vs race-readiness (two systems); discipline-aware (suppress Hyrox/non-running). Currently firing on Michael's live screen against a marathon he never set (pre-existing; `coach` un-deployed for it). Same tier as Q-118.
+3. **Q-118 — FTP baseline model** (power-curve/CP + suggest-not-apply). Highest athlete value.
+4. **Make the CI `provenance` check REQUIRED** — GitHub → Settings → Branches (or Rulesets) → require the `provenance` status check on `main`. The known-exception mechanism means only NEW silent fallbacks block; C3/Q-120 won't.
+5. **Q-119 — corrupt ~3200-load row** (2025-09-01 run, ~39 h duration) — data cleanup + consider an ingest-time duration plausibility clamp.
+6. **Stage-3 estimated-load census** (gated) + **second silent-fallback sweep** (un-audited ~2/3: plan-gen, scheduling, get-week, client) — grow the guard's `files` list as it covers more.
+7. **HR-plausibility real-data check** — run `verify-hr-194.mjs` (gated) to confirm whether ANY ride is actually flagged `hr_rejected_corrupt` (unobserved). **Q-117 ~5.5%** — matched-power SQL check before calling the bike-efficiency reading true.
 
-**Tier 1 — finish the D-237 arc (small, high-value):**
-1. **D-237 lint/CI guard** — *design-before-build; bring the design for Michael's review first.* Fails the build when a numeric fallback flows into a user-facing string undeclared. The durable "clean = enforced, not asserted" backstop; protects the un-audited 2/3 passively. See D-237 THE STANDARD.
-2. **C1 + C3–C5** — the rest of the silent-fallback compliance batch (declare-or-refuse each): **C1** REF_SPW (`state-trend/thresholds.ts:48` — unknown cadence must not fabricate a floor); **C3** marathon-readiness defaults (`marathon-readiness/index.ts:104`); **C4** restingHR 60 (`workload.ts:263`); **C5** session_load 0.7/0.8 (`session-load.ts:57-94`). See D-237 inventory.
-3. **Stage-3 backfill census** (gated prod read) — count Michael's estimated-load rows (`workload_method='hr_rejected_corrupt'`/`duration_default` etc.) BEFORE repairing; likely near-no-op for him. See D-237 Stage 3.
+**Parallel track (separate arc):** "self-aware app" axes — `SELF-AWARENESS-MAP.md` → **Q-111** / **Q-112** + Axis 1 live positive (data-gated on Michael logging soreness/RPE).
 
-**Tier 2 — features (own sessions):**
-4. **Q-118 — FTP baseline model** — power-curve/CP estimator (vs "20-min × 0.95") + auto-**SUGGEST-not-apply** (reuse `AthleticRecordPage` suggest-with-confirm) + test-as-tiebreaker. Highest athlete value.
-5. **Second silent-fallback sweep** — the un-audited ~2/3 (plan generation, scheduling, get-week, client components), same 3-agent method as the ingest sweep (D-237).
-
-**Tier 3 — polish:** value-forward run/swim performance rows (pace value + arrow, done right — Q-117 follow-on); zone-distribution corrupt-max (HR-filter follow-on, D-237); **Q-116** EWMA ACWR option.
-
-**Parallel track (separate arc, still open):** the "self-aware app" reasoning axes — `SELF-AWARENESS-MAP.md` → **Q-111** (Axis 3 plan/history-aware strength verdicts, design doc drafted) + **Q-112** (Axis 2 narrative claim-grounding) + Axis 1's real-data live positive (data-gated on Michael logging soreness/RPE). Independent of the D-237 data-honesty work above; pick either track.
-
-**Process lessons banked (inherit these):** (a) **verify the DATA is populated, not just the code path** — the bike EF regression shipped because EF existed in code but was empty in his rides; (b) **clean = enforced, not asserted** — every fix got a fixture; the lint guard generalizes it; (c) **prod reads are gated** — the auto-classifier won't accept a chat "go ahead"; hand Michael a **one-line curl+python** command via the `!` prefix (multi-line pastes break quote-matching; deno scripts fought the terminal). Key docs: `DECISIONS-LOG.md` **D-236/D-237**, `OPEN-QUESTIONS.md` **Q-116/Q-117/Q-118**.
+**Process lessons banked (inherit):** (a) **verify the DATA is populated, not just the code path**; (b) **clean = enforced, not asserted** — the guard generalizes it; a KNOWN-EXCEPTION with a ticket is honest tracking, a disclosure band-aid over a design bug is NOT (C3 lesson); (c) **prod reads are gated** — but Michael may explicitly authorize a specific read-only script for Claude to run + report (he did for the D-238 before/after); (d) **guard granularity matters** — provenance tokens must be a specific vocabulary (generic `_method`/`confidence` collided with `match_method`). Key docs: `DECISIONS-LOG.md` **D-236/D-237/D-238**, `OPEN-QUESTIONS.md` **Q-116/Q-117/Q-118/Q-119/Q-120**.
 
 ---
 

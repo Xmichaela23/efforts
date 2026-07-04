@@ -34,5 +34,12 @@
   "defaultNamePattern": "REF_|_DEFAULT|DEFAULT_|_FALLBACK|FALLBACK_|(^|\\.)defaults?($|\\.|\\[)",
 
   "_ignoreValues_doc": "Numeric fallbacks equal to these are treated as 'empty/none' sentinels, not fabricated estimates (e.g. `x ?? 0`, `Number(v) || 0`). 0 only by default.",
-  "ignoreValues": [0]
+  "ignoreValues": [0],
+
+  "_knownExceptions_doc": "EXPLICITLY ACKNOWLEDGED open bugs — NOT declared-OK. Matched by file+fallback text (line-independent). The guard lists them loudly as KNOWN-UNRESOLVED with their ticket and does NOT count them as failures, so CI can be made required and only NEW silent fallbacks block. Each MUST carry a ticket. Remove the entry when the ticket lands. This is the opposite of the band-aid: it flags the bug as open, it does not hide it behind a disclosure.",
+  "knownExceptions": [
+    { "file": "supabase/functions/_shared/marathon-readiness/index.ts", "fallback": "DISTANCE_DEFAULTS.marathon", "ticket": "Q-120", "reason": "C3 — readiness must gate on a SET race goal, not default to marathon; discipline-aware. Fix is gating, not declaration." },
+    { "file": "supabase/functions/_shared/marathon-readiness/index.ts", "fallback": "defaults.longRunMi", "ticket": "Q-120", "reason": "C3 — marathon-default long-run target for a no-goal / non-running athlete." },
+    { "file": "supabase/functions/_shared/marathon-readiness/index.ts", "fallback": "defaults.mpw", "ticket": "Q-120", "reason": "C3 — marathon-default weekly-mileage target for a no-goal / non-running athlete." }
+  ]
 }

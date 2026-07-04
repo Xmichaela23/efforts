@@ -1460,6 +1460,17 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-120 — gate race/marathon readiness on a SET goal; reconcile-or-retire the two readiness systems; make it discipline-aware
+
+- **Status:** SCOPED NEXT-SESSION ITEM (feature/architecture, same tier as Q-118). **Design-before-build; Michael's review first.** NOT part of the D-237/D-238 guard-cleanup batch — pulled out deliberately. Tracked as a **known guard exception** (`scripts/estimate-provenance.config.json` `knownExceptions`, 3 sites in `marathon-readiness/index.ts`) so the guard keeps flagging it as OPEN, not declared.
+- **The bug (C3, traced 2026-07-04):** `computeMarathonReadiness` (`_shared/marathon-readiness`, bundled into `coach`, surfaced as `CoachWeekContextResponseV1.marathon_readiness`) fires whenever the athlete has **≥1 run in `workout_facts` in 6 weeks** — the ONLY null-gate (`:97`). It is **NOT gated on a race goal**, and the call (`coach/index.ts:4935`) sits OUTSIDE `if (activePlan)`, so `planCtx` is null with no plan → `distKey = planCtx?.raceDistance || 'marathon'` → it assesses against fabricated **18 mi long-run / 35 mpw** marathon targets. **It is firing on Michael's live screen right now against a marathon he never set** (pre-existing behavior — the C3 disclosure band-aid was reverted, never deployed; `coach` stays on old code).
+- **Why marathon-by-construction:** `DISTANCE_DEFAULTS` (`:20`) is running-races only (marathon/half/50k/50mi/100k/100mi) — **no 5K, no Hyrox, nothing non-running**; unknown distance → `?? DISTANCE_DEFAULTS.marathon`. Wrong-shaped for a hybrid athlete.
+- **Two-systems collision:** `coach` ALSO imports `computeRaceReadiness` (`_shared/race-readiness/`) — the goal-gated "RACE section" that correctly shows "add a race target to see your goal and projection." `marathon-readiness` looks like a **legacy duplicate** that contradicts it. The redesign must **reconcile or retire** one against the other.
+- **Preferred fix (Michael):** gate the verdict on an actual race goal — no goal → return null / "set a race goal to see readiness" (match the RACE section); goal set → assess against THAT distance/targets; **suppress entirely for non-running goals** (Hyrox/strength). Discipline-aware. Design-before-build.
+- **Cross-ref:** D-237 (the guard that surfaced it), the reverted band-aid (`marathon-readiness` in-code Q-120 marker), `race-readiness`, `goal-context.ts`, Q-118 (peer feature item).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

@@ -51,6 +51,13 @@ const PROV_TOKENS = new RegExp((config.provenanceTokens || []).map(escapeRe).joi
 const DEFAULT_NAME = new RegExp(config.defaultNamePattern || 'REF_|_DEFAULT', 'i');
 const IGNORE_VALUES = new Set(config.ignoreValues || [0]);
 const ANNOTATION = /estimate-ok\s*:/;
+const KNOWN_EXCEPTIONS = config.knownExceptions || [];
+
+/** A violation matches a known (ticketed) exception by file + fallback text — line-independent. */
+function matchException(v) {
+  return KNOWN_EXCEPTIONS.find((e) =>
+    (v.file === e.file || v.file.endsWith(e.file)) && v.fallback === e.fallback);
+}
 
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
@@ -285,32 +292,44 @@ for (const f of FILES) {
 }
 if (hadError) process.exit(2);
 
-const violations = all.filter((f) => !f.declared);
+const allViolations = all.filter((f) => !f.declared);
 const passed = all.filter((f) => f.declared);
+// Known (ticketed) exceptions are acknowledged open bugs — surfaced loudly, but not build failures.
+const known = allViolations.map((v) => ({ v, e: matchException(v) })).filter((x) => x.e);
+const violations = allViolations.filter((v) => !matchException(v)); // FRESH = un-acknowledged
 
 if (AS_JSON) {
-  console.log(JSON.stringify({ violations, passed }, null, 2));
+  console.log(JSON.stringify({ violations, known: known.map((x) => ({ ...x.v, ticket: x.e.ticket, reason: x.e.reason })), passed }, null, 2));
   process.exit(violations.length ? 1 : 0);
 }
+
+const printKnown = () => {
+  if (!known.length) return;
+  console.log(`\n⚠ ${known.length} KNOWN-UNRESOLVED (acknowledged open bug, NOT declared — tracked, does not fail the build):`);
+  for (const { v, e } of known) console.log(`  • ${v.file}:${v.line} \`${v.fallback}\` — ${e.ticket}: ${e.reason}`);
+};
 
 // Human report
 const byFile = new Map();
 for (const v of violations) { if (!byFile.has(v.file)) byFile.set(v.file, []); byFile.get(v.file).push(v); }
 
 if (violations.length === 0) {
-  console.log(`✓ estimate-provenance: ${all.length} fallback(s) inspected across ${FILES.length} file(s), all declared.`);
+  console.log(`✓ estimate-provenance: ${all.length} fallback(s) inspected across ${FILES.length} file(s), 0 new undeclared.`);
+  printKnown();
   process.exit(0);
 }
 
-console.log(`\nD-237 estimate-provenance — ${violations.length} undeclared numeric fallback(s):\n`);
+console.log(`\nD-237 estimate-provenance — ${violations.length} NEW undeclared numeric fallback(s):\n`);
 for (const [file, vs] of byFile) {
   for (const v of vs) {
     console.log(`✗ ${file}:${v.line}:${v.col}`);
     console.log(`    ${v.snippet}`);
     console.log(`    ↳ [${v.form}] bare fallback \`${v.fallback}\` in a load-bearing module, no provenance marker.`);
     console.log(`      Fix: declare a sibling *_method / *_estimated marker in this function,`);
-    console.log(`           or annotate /* estimate-ok: <where-disclosed> */ if genuinely display-only.\n`);
+    console.log(`           or annotate /* estimate-ok: <where-disclosed> */ if genuinely display-only,`);
+    console.log(`           or add to knownExceptions with a ticket if it's a tracked open bug.\n`);
   }
 }
 console.log(`${passed.length} declared fallback(s) passed. "clean = enforced, not asserted" — D-237.`);
+printKnown();
 process.exit(1);
