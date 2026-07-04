@@ -3416,8 +3416,14 @@ Deno.serve(async (req) => {
       });
 
       const snapshotNorms = {
-        easy_hr_at_pace: baselines?.norms_28d?.hr_drift_avg_bpm != null
-          ? 140 + (baselines.norms_28d.hr_drift_avg_bpm || 0) : null,
+        // D-237 (no silent impersonation): there is NO stored easy-HR-at-pace norm —
+        // only hr_drift_avg_bpm (a within-session drift DELTA) exists. The prior code
+        // fabricated `140 + drift`, a made-up population constant plus a dimensionally
+        // wrong delta, then surfaced it as "N bpm above YOUR norm for this pace". Refuse:
+        // null → the observer emits "HR X bpm." with no false norm claim (matching
+        // workout-detail, which already passes null). Restore a real value only if/when
+        // an actual easy-HR-at-pace baseline is computed + stored.
+        easy_hr_at_pace: null,
         threshold_pace_sec_per_mi: null,
         avg_execution_score: baselines?.norms_28d?.execution_score_avg ?? null,
         avg_rpe: baselines?.norms_28d?.session_rpe_avg ?? null,
