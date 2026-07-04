@@ -46,6 +46,23 @@ This popup fires **after** the session. The carryover read (`resolveCarriedInSor
 ## Coordination / sequencing
 Ship this client scale-switch **with** the D-234 migration (`supabase db push`) so there's no window where the client writes 1–10 into a rescaled 1–7 world. Until both land, the server's `>7` scale-guard catches 8–10 leaks (1–7-range legacy values are low-impact given sparse logging).
 
+## Sibling controls — the readiness check-in (D-235)
+The same 7-chip component is reused for the **subjective** wellness items; **sleep is the exception**:
+- **Energy** → 7-chip row, anchors **1 low · 4 moderate · 7 high** (now Hooper 1–7, was a 1–10 slider).
+- **Soreness** → 7-chip row, anchors **1 none · 4 moderate · 7 extremely sore**.
+- **Sleep** → **stays an hours slider** (`0–12h, step 0.5`, shown "Xh") — objective measure, NOT a 1–7 rating (D-235). Do not convert it to chips.
+
+`StrengthLogger.tsx` sliders must switch with this: energy `max=10`→`max=7`, soreness `min=0 max=10`→`min=1 max=7`; sleep unchanged.
+
+## Mobile ergonomics (verify at Capacitor viewport before build)
+- **Tap targets ≥44px** (Apple HIG minimum). Seven chips across the smallest supported width (~320–360px CSS px inside the WKWebView) leaves ~40–46px per chip after gaps — **borderline**. Verify on-device/simulator at the Capacitor width before committing to a single row.
+- **One-thumb reachable** — the row sits in the lower half of the completion sheet, within thumb arc; no reach to the top edge.
+- **Fallback layouts if seven chips are cramped** (propose in spec, do NOT build until Michael picks):
+  - **(A) Segmented bar** — a single 1–7 track split into 7 equal hit-zones (full-width tap targets, no inter-chip gaps) with anchor labels under 1/4/7. Recommended fallback — maximizes target size.
+  - **(B) 4+3 two-row wrap** — chips 1–4 then 5–7; keeps circular chips but doubles height.
+  - **(C) Stepper** — `−  [n]  +` with the anchor scale shown; smallest footprint, but two taps to reach extremes (worse compliance).
+- Selected state must be legible in both themes; the numeric value echoes above the control (as the current sliders do).
+
 ## Open for Michael
 - Confirm the anchor wording (`none / moderate / extremely sore`) and the helper prompt.
 - Confirm skippable (recommended) vs required.

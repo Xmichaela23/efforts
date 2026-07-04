@@ -218,6 +218,16 @@ Deno.test('soreness MIXED-SCALE never blends: an un-migrated 1–10 value (9) is
   const r = resolveCarriedInSoreness(entries, { workoutId: 'TARGET', startTime: '2026-06-25T16:00:00Z' });
   assertEquals(r.mean != null && r.mean < 3, true, `mean must exclude the 9: ${r.mean}`);
 });
+Deno.test('soreness STORED-0 edge: a legacy 0 (old 0–10 slider) is dropped by the ≥1 guard, never blended', () => {
+  const entries = [
+    { workoutId: 'mon', startTime: '2026-06-23T18:00:00Z', soreness: 5 },
+    { workoutId: 'zero', startTime: '2026-06-08T12:00:00Z', soreness: 0 }, // legacy 0 — out of 1–7, must drop
+    ...Array.from({ length: 5 }, (_, i) => ({ workoutId: `b${i}`, startTime: `2026-06-1${i}T12:00:00Z`, soreness: 2 })),
+  ];
+  const r = resolveCarriedInSoreness(entries, { workoutId: 'TARGET', startTime: '2026-06-25T16:00:00Z' });
+  // the 0 is excluded → baseline is the five 2s (mean 2), not pulled down by a 0
+  assertEquals(r.mean, 2);
+});
 Deno.test('soreness baseline thin: fewer than 5 comparable entries → not elevated (silence-on-uncertain)', () => {
   const entries = [
     { workoutId: 'mon', startTime: '2026-06-23T18:00:00Z', soreness: 6 },

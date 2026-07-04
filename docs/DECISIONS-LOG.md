@@ -4732,6 +4732,24 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-235 — Wellness set standardization: energy+soreness on Hooper 1–7, sleep stays HOURS (documented exception)
+
+- **Date:** 2026-07-03 (extends D-234 from soreness-only to the full readiness set)
+- **Context:** D-234 put soreness on Hooper 1–7. Extending to the set, a consumer trace found **sleep is not a Likert — it's HOURS** (client slider `0–12h step 0.5`, shown "Xh", thresholds `≥8/≥7/≥6h`, normalizer `sleep/12`). The linear rescale can't apply to hours, and there's no principled hours→quality map.
+- **Decision:**
+  1. **energy → Hooper 1–7** (was 1–10 Likert), same linear rescale `round(1+(v−1)·6/9)`. Joins soreness.
+  2. **sleep STAYS hours** — objective, arguably better than a subjective quality Likert; documented exception. So the set = **two 1–7 subjective ratings (energy, soreness) + one objective measure (sleep hours)**.
+  3. **Extracted `_shared/readiness-scale.ts`** (rescale + `energyLevel`/`sorenessLevel`/`sleepQuality` bands + `overallReadinessLabel`), unit-tested — because D-234 had **missed** the `calculateOverallReadiness` normalizer (still `(10−soreness)/10`), which the extraction fixes and the matrix fixture now guards against recurring for the next skipped consumer.
+- **Energy consumer retune map (analyze-strength, 1–10 → 1–7):** `energy_level` `≥8/≥6` → `≥6/≥4`; displays `/10` → `/7`; `energyGood ≥7` → `≥5`; `energy-low <6` → `<4`. **Normalizer fixes** in `overallReadinessLabel`: energy `energy/10` → `(energy−1)/6`; soreness `(10−soreness)/10` → `(7−soreness)/6`; sleep `sleep/12` unchanged. compute-snapshot avg + coach raw echo: no threshold change (rescale unifies history). **Scale guard:** energy/soreness values outside 1–7 are dropped from the overall score (un-migrated 1–10 leak can't blend).
+- **Fixtures:** `readiness-scale.test.ts` — rescale 7→5; band labels; `overallReadinessLabel` pinned matrix (Excellent/Good/Fair/Poor over 1–7 energy/soreness + hours sleep); mixed-scale `>7` drop; partial inputs. Plus `cross-domain-carryover.test.ts` stored-0 soreness edge (0 dropped by ≥1 guard).
+- **ATOMIC SHIP (Michael applies manually — same deploy):**
+  1. **Migration** `supabase/migrations/20260703120000_soreness_hooper_1to7_rescale.sql` (soreness + energy, both fields; sleep untouched). Apply via the **Supabase SQL editor** (per the `readiness_checkins` precedent — that table is created/managed via SQL editor, NOT `supabase db push`). Command if using CLI against the linked project: `supabase db execute --file supabase/migrations/20260703120000_soreness_hooper_1to7_rescale.sql` — but SQL-editor paste is the established path.
+  2. **Client files that MUST land in the same deploy** (else a legacy client writes 1–10 into a rescaled world): `src/components/StrengthLogger.tsx` — energy slider `max=10`→`max=7`, soreness slider `min=0 max=10`→`min=1 max=7`; sleep slider UNCHANGED (hours). Plus the new all-discipline post-completion popup component (after spec approval, `docs/DESIGN-soreness-input.md`).
+  3. Backend consumers (this pass) already deployed expecting 1–7 — so the migration + client must go together to close the window.
+- **Cross-ref:** D-234, `readiness-scale.ts`, `DESIGN-soreness-input.md`.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

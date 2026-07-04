@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { energyLevel, sorenessLevel, sleepQuality, overallReadinessLabel } from '../_shared/readiness-scale.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
@@ -1413,40 +1414,23 @@ function analyzeReadinessCheck(readiness: any): any {
     return null;
   }
   
+  // Bands + overall label from the shared, unit-tested readiness scale (D-235): energy/soreness Hooper 1–7,
+  // sleep objective HOURS. Centralized so the missed-normalizer class (D-234) can't recur silently.
   return {
     energy: energy || null,
     soreness: soreness || null,
     sleep: sleep || null,
-    energy_level: energy ? (energy >= 8 ? 'High' : energy >= 6 ? 'Moderate' : 'Low') : null,
-    soreness_level: soreness ? (soreness <= 2 ? 'Low' : soreness <= 4 ? 'Moderate' : 'High') : null,
-    sleep_quality: sleep ? (sleep >= 8 ? 'Excellent' : sleep >= 7 ? 'Good' : sleep >= 6 ? 'Fair' : 'Poor') : null,
-    overall_readiness: calculateOverallReadiness(energy, soreness, sleep)
+    energy_level: energyLevel(energy ?? null),
+    soreness_level: sorenessLevel(soreness ?? null),
+    sleep_quality: sleepQuality(sleep ?? null),
+    overall_readiness: overallReadinessLabel(energy ?? null, soreness ?? null, sleep ?? null)
   };
 }
 
 // Helper function to calculate overall readiness score
-function calculateOverallReadiness(energy: number | null, soreness: number | null, sleep: number | null): string | null {
-  const scores: number[] = [];
-  
-  if (energy !== null) {
-    scores.push(energy / 10);
-  }
-  if (soreness !== null) {
-    scores.push((10 - soreness) / 10); // Invert soreness (lower is better)
-  }
-  if (sleep !== null) {
-    scores.push(sleep / 12); // Normalize sleep to 0-1 scale
-  }
-  
-  if (scores.length === 0) return null;
-  
-  const avgScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-  
-  if (avgScore >= 0.8) return 'Excellent';
-  if (avgScore >= 0.6) return 'Good';
-  if (avgScore >= 0.4) return 'Fair';
-  return 'Poor';
-}
+// calculateOverallReadiness → moved to _shared/readiness-scale.ts (overallReadinessLabel), D-235:
+// unit-tested + scale-guarded. The old local version assumed 0–10 for energy/soreness and was missed by
+// the D-234 soreness pass — the extracted, fixtured version prevents that recurring.
 
 // Main strength workout analysis function
 async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBaselines: any, supabase: any): Promise<any> {
@@ -2059,7 +2043,7 @@ Pre-workout status:`;
     
     if (readinessData.energy !== null) {
       context += `
-- Energy level: ${readinessData.energy}/10 (${readinessData.energy_level})`;
+- Energy level: ${readinessData.energy}/7 (${readinessData.energy_level})`;
     }
     
     if (readinessData.soreness !== null) {
@@ -2078,7 +2062,7 @@ Pre-workout status:`;
     }
     
     // Add assessment based on readiness
-    const energyGood = readinessData.energy !== null && readinessData.energy >= 7;
+    const energyGood = readinessData.energy !== null && readinessData.energy >= 5;
     const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 2;
     const sleepAdequate = readinessData.sleep !== null && readinessData.sleep >= 7;
     
@@ -2086,7 +2070,7 @@ Pre-workout status:`;
       context += `
 
 Assessment: Strong readiness indicators support progressive training loads.`;
-    } else if (readinessData.energy !== null && readinessData.energy < 6) {
+    } else if (readinessData.energy !== null && readinessData.energy < 4) {
       context += `
 
 Assessment: Lower energy levels may impact performance. Consider maintaining current loads.`;
@@ -2117,7 +2101,7 @@ EXECUTION SUMMARY
 PRE-WORKOUT READINESS:`;
     if (readinessData.energy !== null) {
       context += `
-• Energy level: ${readinessData.energy}/10 (${readinessData.energy_level})`;
+• Energy level: ${readinessData.energy}/7 (${readinessData.energy_level})`;
     }
     if (readinessData.soreness !== null) {
       context += `
@@ -2132,7 +2116,7 @@ PRE-WORKOUT READINESS:`;
 • Session RPE: ${sessionRPEData.value}/10 (${sessionRPEData.intensity_level})`;
     }
     
-    const energyGood = readinessData.energy !== null && readinessData.energy >= 7;
+    const energyGood = readinessData.energy !== null && readinessData.energy >= 5;
     const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 2;
     const sleepAdequate = readinessData.sleep !== null && readinessData.sleep >= 7;
     
@@ -2140,7 +2124,7 @@ PRE-WORKOUT READINESS:`;
       context += `
 
 Assessment: Strong readiness indicators support progressive training loads.`;
-    } else if (readinessData.energy !== null && readinessData.energy < 6) {
+    } else if (readinessData.energy !== null && readinessData.energy < 4) {
       context += `
 
 Assessment: Lower energy levels may impact performance. Consider maintaining current loads.`;
@@ -2274,7 +2258,7 @@ FATIGUE & RECOVERY ANALYSIS
 Pre-workout recovery status:`;
       if (readinessData.energy !== null) {
         context += `
-• Energy: ${readinessData.energy}/10 (${readinessData.energy_level})`;
+• Energy: ${readinessData.energy}/7 (${readinessData.energy_level})`;
       }
       if (readinessData.soreness !== null) {
         context += `
@@ -2311,15 +2295,15 @@ ${pattern.exercise_name}:`;
       
       // Add readiness-aware assessment
       if (readinessData) {
-        const energyGood = readinessData.energy !== null && readinessData.energy >= 7;
+        const energyGood = readinessData.energy !== null && readinessData.energy >= 5;
         const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 2;
         
         if (energyGood && sorenessLow && !allZero) {
           context += `
-  • Readiness context: Given strong pre-workout readiness (Energy ${readinessData.energy}/10, minimal soreness ${readinessData.soreness}/7), this RIR pattern indicates capacity for load progression.`;
-        } else if (readinessData.energy !== null && readinessData.energy < 6 && !allZero) {
+  • Readiness context: Given strong pre-workout readiness (Energy ${readinessData.energy}/7, minimal soreness ${readinessData.soreness}/7), this RIR pattern indicates capacity for load progression.`;
+        } else if (readinessData.energy !== null && readinessData.energy < 4 && !allZero) {
           context += `
-  • Readiness context: Lower energy (${readinessData.energy}/10) may have impacted performance. Maintain current loads until recovery improves.`;
+  • Readiness context: Lower energy (${readinessData.energy}/7) may have impacted performance. Maintain current loads until recovery improves.`;
         }
       }
     }
