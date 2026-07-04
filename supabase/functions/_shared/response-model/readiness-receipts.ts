@@ -63,3 +63,42 @@ export function buildCrossTrainingReceipt(signals: ReadinessSignalInput): string
   if (!factors.length) return null;
   return factors.length >= 2 ? `${cap(factors[0])} + ${factors[1]}` : cap(factors[0]);
 }
+
+export interface CrossTrainingStressInput {
+  rpeRising: boolean;
+  driftWorsening: boolean;
+  strengthFading: boolean;
+  rirDropping: boolean;
+  bodyConcerned: boolean;         // assessment.signals_concerning > 0
+  rpe: { current: number | null; baseline: number | null };
+}
+
+/**
+ * The cross-training strain ROW decision for the State BODY section. Fires only
+ * on ≥2 stress signals.
+ *
+ * D-236 Part C — glance-tier dedup: when RPE is the SOLE distinct signal, the ≥2
+ * gate is met only because `bodyConcerned` double-counts the same elevated RPE
+ * (a declining RPE IS the concerning signal). The resulting "Effort up (X vs Y)"
+ * receipt merely restates the glance-level "How hard it feels" row, so suppress
+ * it (return null). Multi-factor and non-RPE-single cases are UNCHANGED. The
+ * LEGS LOADED "why" keeps its RPE receipt — the dedup is glance-tier only, and
+ * receipts cite their evidence per D-232.
+ */
+export function crossTrainingStressReceipt(
+  input: CrossTrainingStressInput,
+): { label: string; tone: 'warning' } | null {
+  const { rpeRising, driftWorsening, strengthFading, rirDropping, bodyConcerned } = input;
+  const stressSignals =
+    [rpeRising, driftWorsening, strengthFading, rirDropping, bodyConcerned].filter(Boolean).length;
+  if (stressSignals < 2) return null;
+  // RPE-sole: the ≥2 was reached only via the bodyConcerned double-count of RPE.
+  if (rpeRising && !driftWorsening && !strengthFading && !rirDropping) return null;
+  const receipt = buildCrossTrainingReceipt({
+    rpe: { declining: rpeRising, current: input.rpe.current, baseline: input.rpe.baseline },
+    hrDrift: { declining: driftWorsening },
+    strength: { declining: strengthFading },
+    rirDropping,
+  });
+  return { label: receipt ?? 'Body showing strain across disciplines', tone: 'warning' };
+}

@@ -40,7 +40,7 @@ import {
   type CrossDomainPair,
 } from '../_shared/response-model/index.ts';
 import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
-import { buildReadinessWhy, buildCrossTrainingReceipt } from '../_shared/response-model/readiness-receipts.ts';
+import { buildReadinessWhy, buildCrossTrainingReceipt, crossTrainingStressReceipt } from '../_shared/response-model/readiness-receipts.ts';
 import { buildLoadedLegsDiagnosis, classifyFatigueLabel, type LoadedLegsDiagnosis } from '../_shared/response-model/loaded-legs.ts';
 import { detectNovelMovements, novelMovementsNames, type SessionMovement } from '../_shared/novel-movements.ts';
 import { classifyStrengthFocus } from '../_shared/cross-domain-carryover.ts';
@@ -5217,18 +5217,16 @@ ${narrativeFacts.join('\n')}`;
 
           const stressSignals = [rpeRising, driftWorsening, strengthFading, rirDropping, bodyConcerned].filter(Boolean).length;
 
-          if (stressSignals >= 2) {
-            // D-232 glass-box: cite the DISTINCT signals that fired, never a bare "strain across
-            // disciplines". A single distinct signal (RPE double-counted via bodyConcerned) → just that
-            // factor, no "across disciplines" overstatement. (Detection over-fire tracked in Q-111.)
-            const receipt = buildCrossTrainingReceipt({
-              rpe: { declining: rpeRising, current: endur.rpe.current_avg, baseline: endur.rpe.baseline_avg },
-              hrDrift: { declining: driftWorsening },
-              strength: { declining: strengthFading },
-              rirDropping,
-            });
-            return { label: receipt ?? 'Body showing strain across disciplines', tone: 'warning' as const };
-          }
+          // D-232 glass-box + D-236 Part C glance-tier dedup: fires on ≥2 stress
+          // signals and cites the DISTINCT factors, but SUPPRESSES the row when RPE
+          // is the sole distinct signal (the ≥2 met only via bodyConcerned double-
+          // counting RPE) — that receipt would just restate the "How hard it feels"
+          // row. Multi-factor / non-RPE-single unchanged. (Over-fire history: Q-111.)
+          const stressReceipt = crossTrainingStressReceipt({
+            rpeRising, driftWorsening, strengthFading, rirDropping, bodyConcerned,
+            rpe: { current: endur.rpe.current_avg, baseline: endur.rpe.baseline_avg },
+          });
+          if (stressReceipt) return stressReceipt;
 
           if (stressSignals === 0 && assess.signals_concerning === 0) {
             if (buildingDiscs.length > 0) {
