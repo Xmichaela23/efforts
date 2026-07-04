@@ -1416,6 +1416,16 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-116 — EWMA model option in `_shared/acwr.ts` (exponentially-weighted, vs the flat rolling default)
+
+- **Status:** filed 2026-07-03 (Michael, design input). Deferred by priority — **do NOT sequence into the current Step 6 work.** Priority: **post-Part-A / post-Part-C.** The D-236 ACWR authority (`_shared/acwr.ts`) currently computes a flat coupled-rolling ratio (unweighted daily averages over 7d / 28d windows). The literature favours **exponentially-weighted moving averages (EWMA)** over flat rolling averages for ACWR — EWMA weights recent load more heavily, giving better day-to-day sensitivity to acute spikes and decay.
+- **Scope:** add `opts.model: 'rolling' | 'ewma'` to `computeAcwr`. In `'ewma'` mode, decay constants replace the fixed windows — λ = 2/(N+1) convention (acute λ from N≈7d, chronic λ from N≈28d equivalents). **Everything else stays identical:** same rows input, same `weightFn` discipline hook, same `chronicLoadFloor`, and `acwr-state.ts` remains the sole ratio→status classifier. The model choice changes only how acute/chronic loads are aggregated from the per-day series, not the contract around it.
+- **Rollout pattern (mirrors the Formula A retirement):** EWMA lands **fixture-proven with `'rolling'` as the default**, so nothing changes on merge. Callers then flip to `'ewma'` **individually**, each with an old-vs-new convergence readout (the same `acwr_convergence`-style side-by-side used for the coupled-rolling cutover). **compute-snapshot flips LAST**, because it moves the persisted `athlete_snapshot.acwr` number and needs the acceptance eyeball — same discipline as D-236 Gate 2.
+- **Rationale:** EWMA is the better-supported model for injury-risk ACWR (recency-weighted vs equal-weight flat windows); the flat rolling default was chosen for D-236 only to make the five-way convergence tractable and number-comparable to the existing implementations. This is the natural next refinement once the single authority is in place and the fact-layer relocation (Part A) + RPE dedup (Part C) are done.
+- **Cross-ref:** D-236, `_shared/acwr.ts`, `_shared/acwr-state.ts`, `_shared/acwr.test.ts`.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

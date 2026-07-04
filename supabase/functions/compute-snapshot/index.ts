@@ -31,6 +31,7 @@ import {
   type StateTrendsV1,
 } from "../_shared/state-trend/index.ts";
 import { computeAcwr, type LoadRow } from "../_shared/acwr.ts";
+import { localDateInTz } from "../_shared/local-date.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -392,8 +393,15 @@ serve(async (req: Request) => {
     //
     // "As of" day: today for the in-progress current week; the target week's
     // Sunday (rangeEnd) for a completed/backfilled week — whichever is earlier.
+    //
+    // "Today" is the ATHLETE-LOCAL date, matching coach's asOfDate convention
+    // (coach/index.ts:1171) so persisted == live at all hours — server UTC would
+    // roll to tomorrow during the athlete's evening and window a day off coach.
+    // Timezone from the request if provided, else America/Los_Angeles (a
+    // headless/ingest recompute has no client tz; the server clock is UTC).
     // -----------------------------------------------------------------------
-    const nowYmd = todayISO();
+    const userTz = body.timezone ? String(body.timezone) : 'America/Los_Angeles';
+    const nowYmd = localDateInTz(new Date(), userTz);
     const acwrAsOf = nowYmd < rangeEnd ? nowYmd : rangeEnd;
     const acwrResult = computeAcwr(acwrLoadRows, { asOfDate: acwrAsOf });
     const acwr = acwrResult.ratio;
