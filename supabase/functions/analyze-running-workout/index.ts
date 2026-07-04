@@ -2237,16 +2237,31 @@ Deno.serve(async (req) => {
             // SUPPORTING — pace-at-HR decoupling beyond conditions (capped weight; HR-rises-with-DOMS caveat).
             const decoupAssess = String((hrAnalysisResult as any)?.summary?.decouplingAssessment || '');
             const decoupElevated = /elevated|high|poor/i.test(decoupAssess);
-            // CONFIRMER / VETO (Axis 4, D-231): declared RPE. Low → veto. (Leg-specific Q-049 soreness is the
-            // stronger confirmer; not yet wired into the run analyzer — noted as the next Axis-4 upgrade.)
+            // Two-way RPE gauge (Axis 4): this run's RPE vs the athlete's OWN baseline RPE for comparable-
+            // INTENSITY runs (avg HR ±8 bpm — same effort band). Above expected → carryover trigger (catches
+            // easy runs the cadence signal misses); below → veto. ≥3 comparables required, else gauge off.
             const thisRpe = Number((workout as any)?.rpe);
-            const declaredEasy = Number.isFinite(thisRpe) && thisRpe > 0 && thisRpe <= 4;
+            const thisAvgHr = Number((hrAnalysisResult as any)?.summary?.avgHr);
+            let declaredRpeGap: number | null = null;
+            let declaredBaselineOk = false;
+            if (Number.isFinite(thisRpe) && thisRpe > 0 && Number.isFinite(thisAvgHr) && thisAvgHr > 0) {
+              const { data: recRuns } = await supabase.from('workouts')
+                .select('rpe, workout_analysis').eq('user_id', uid).eq('type', 'run').eq('workout_status', 'completed')
+                .gte('date', new Date(new Date(wDate + 'T12:00:00Z').getTime() - 90 * 86400000).toISOString().slice(0, 10)).lt('date', wDate);
+              const comps = ((recRuns ?? []) as any[])
+                .map((w) => ({ rpe: Number(w?.rpe), hr: Number(w?.workout_analysis?.granular_analysis?.heart_rate_analysis?.average_heart_rate ?? w?.workout_analysis?.heart_rate_summary?.avg_hr) }))
+                .filter((x) => Number.isFinite(x.rpe) && x.rpe > 0 && Number.isFinite(x.hr) && Math.abs(x.hr - thisAvgHr) <= 8);
+              if (comps.length >= 3) {
+                declaredRpeGap = thisRpe - (comps.reduce((a, b) => a + b.rpe, 0) / comps.length);
+                declaredBaselineOk = true;
+              }
+            }
             const carry = detectCrossDomainCarryover({
               targetDate: wDate, targetDiscipline: 'run',
               effortSignal: haveCadence ? 'cadence' : null, // primary = cadence (heat-immune → no confound subtraction)
               rawElevation: cadenceDrop, adjustedElevation: cadenceDrop, threshold: 3, // ~3 spm drop = notable
               confounds: { grade: false, heat: false, prescribedHard: false },
-              recentSessions, nonLegElevated: null, declaredEasy, corroborated: decoupElevated,
+              recentSessions, nonLegElevated: null, declaredRpeGap, declaredBaselineOk, corroborated: decoupElevated,
             });
             const clause = buildCarryoverClause(carry, 'run');
             if (clause) { ai_summary = ai_summary ? `${ai_summary} ${clause}` : clause; if (!ai_summary_generated_at) ai_summary_generated_at = new Date().toISOString(); }

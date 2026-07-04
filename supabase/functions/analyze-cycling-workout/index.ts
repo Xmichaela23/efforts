@@ -2588,14 +2588,32 @@ Deno.serve(async (req) => {
           const prescribedHard = /interval|threshold|vo2|race|sweet.?spot|\bftp\b|hard/i.test(String((plannedWorkout as any)?.type || '') + ' ' + String((plannedWorkout as any)?.name || ''));
           const confounded = heatConfound || prescribedHard;
           const rawElevation = decoupPct - 5; // >5% aerobic (power-at-HR) decoupling = notable; ≥3 over base to fire
+          // Two-way RPE gauge: this ride's RPE vs the athlete's OWN baseline RPE for comparable-INTENSITY
+          // rides (IF ±0.1). Above expected → carryover trigger (catches easy rides the objective misses);
+          // below → veto. Requires ≥3 comparable rides (solid baseline) or the gap is noise → gauge disabled.
           const thisRpe = Number((workout as any)?.rpe);
-          const declaredEasy = Number.isFinite(thisRpe) && thisRpe > 0 && thisRpe <= 4;
+          const thisIF = Number((cyclingFactPacketV1 as any)?.facts?.intensity_factor);
+          let declaredRpeGap: number | null = null;
+          let declaredBaselineOk = false;
+          if (Number.isFinite(thisRpe) && thisRpe > 0 && Number.isFinite(thisIF) && thisIF > 0) {
+            const { data: recRides } = await supabase.from('workouts')
+              .select('rpe, computed, workout_analysis').eq('user_id', uid).eq('type', 'ride').eq('workout_status', 'completed')
+              .gte('date', new Date(new Date(wDate + 'T12:00:00Z').getTime() - 90 * 86400000).toISOString().slice(0, 10)).lt('date', wDate);
+            const comps = ((recRides ?? []) as any[])
+              .map((w) => ({ rpe: Number(w?.rpe), iff: Number(w?.computed?.analysis?.power?.intensity_factor ?? w?.workout_analysis?.fact_packet_v1?.facts?.intensity_factor) }))
+              .filter((x) => Number.isFinite(x.rpe) && x.rpe > 0 && Number.isFinite(x.iff) && Math.abs(x.iff - thisIF) <= 0.1);
+            if (comps.length >= 3) {
+              const expected = comps.reduce((a, b) => a + b.rpe, 0) / comps.length;
+              declaredRpeGap = thisRpe - expected;
+              declaredBaselineOk = true;
+            }
+          }
           const carry = detectCrossDomainCarryover({
             targetDate: wDate, targetDiscipline: 'ride',
             effortSignal: 'hr_at_pace',
             rawElevation, adjustedElevation: confounded ? 0 : rawElevation, threshold: 3,
             confounds: { grade: false, heat: heatConfound, prescribedHard },
-            recentSessions, nonLegElevated: null, declaredEasy,
+            recentSessions, nonLegElevated: null, declaredRpeGap, declaredBaselineOk,
           });
           const clause = buildCarryoverClause(carry, 'ride');
           if (clause) { ai_summary = ai_summary ? `${ai_summary} ${clause}` : clause; if (!ai_summary_generated_at) ai_summary_generated_at = new Date().toISOString(); }

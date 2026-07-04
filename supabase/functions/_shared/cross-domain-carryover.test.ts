@@ -100,6 +100,59 @@ Deno.test('residual survives + not declared easy → claim (the true positive)',
   assertEquals(r?.claimable, true);
 });
 
+// ── THE TWO-WAY RPE GAUGE — Michael's two real cases as the acceptance set ───────────────────────────
+Deno.test('YESTERDAY bike: objective quiet (easy, negative drift) but RPE ABOVE output + solid baseline → CLAIM, recovery-positive', () => {
+  const r = detectCrossDomainCarryover(base({
+    targetDiscipline: 'ride',
+    effortSignal: 'hr_at_pace', rawElevation: -9, adjustedElevation: -9, threshold: 3, // decoupling negative → objective quiet
+    declaredRpeGap: 1.5, declaredBaselineOk: true, // RPE 4 vs expected ~2.5 on a well-known easy route
+  }));
+  assertEquals(r?.claimable, true);
+  assertEquals(r?.source, 'declared');
+  assertEquals(r?.recoveryPositive, true);
+});
+Deno.test('JUNE 14 run: objective quiet (cadence normal) + RPE at/below expected → silent', () => {
+  const r = detectCrossDomainCarryover(base({
+    targetDiscipline: 'run',
+    effortSignal: 'cadence', rawElevation: 0.5, adjustedElevation: 0.5, threshold: 3,
+    declaredRpeGap: -0.5, declaredBaselineOk: true, // RPE ≈ expected → no trigger, no veto
+  }));
+  assertEquals(r?.claimable, false);
+  assertEquals(r?.suppressedBy, 'no_elevation');
+});
+Deno.test('gauge low side: objective residual SURVIVES but RPE below output → declared_easy veto', () => {
+  const r = detectCrossDomainCarryover(base({
+    effortSignal: 'hr_at_pace', rawElevation: 5, adjustedElevation: 5, threshold: 3,
+    declaredRpeGap: -1.5, declaredBaselineOk: true, // felt easier than the objective difficulty
+  }));
+  assertEquals(r?.suppressedBy, 'declared_easy');
+});
+Deno.test('SAFEGUARD — thin baseline: RPE gap is noise, gauge disabled → does NOT fire', () => {
+  const r = detectCrossDomainCarryover(base({
+    targetDiscipline: 'ride',
+    effortSignal: 'hr_at_pace', rawElevation: -9, adjustedElevation: -9, threshold: 3,
+    declaredRpeGap: 1.5, declaredBaselineOk: false, // baseline thin → gap ignored
+  }));
+  assertEquals(r?.claimable, false);
+  assertEquals(r?.suppressedBy, 'no_elevation');
+});
+Deno.test('SAFEGUARD — RPE trigger still needs the antecedent: no lift → no_antecedent', () => {
+  const r = detectCrossDomainCarryover(base({
+    recentSessions: [], effortSignal: 'hr_at_pace', rawElevation: -9, adjustedElevation: -9, threshold: 3,
+    declaredRpeGap: 2, declaredBaselineOk: true,
+  }));
+  assertEquals(r?.suppressedBy, 'no_antecedent');
+});
+Deno.test('objective survives AND RPE above → source both, strong, NOT recovery-positive', () => {
+  const r = detectCrossDomainCarryover(base({
+    effortSignal: 'cadence', rawElevation: 5, adjustedElevation: 5, threshold: 3,
+    declaredRpeGap: 1.5, declaredBaselineOk: true,
+  }));
+  assertEquals(r?.source, 'both');
+  assertEquals(r?.confidence, 'strong');
+  assertEquals(r?.recoveryPositive, false);
+});
+
 // ── the pins ──────────────────────────────────────────────────────────────────────────────────────
 Deno.test('novelty does NOT widen the window: a novel lift 4 days out is still out of window', () => {
   const r = detectCrossDomainCarryover(base({
@@ -165,6 +218,11 @@ Deno.test('clause: novel antecedent → stronger "paying it off" framing', () =>
 Deno.test('clause: swim → upper-body framing', () => {
   const r = detectCrossDomainCarryover(base({ targetDiscipline: 'swim', recentSessions: [{ date: '2026-06-23', type: 'strength', strengthFocus: 'upper', workload: 100, isNovel: false }] }));
   assertEquals(buildCarryoverClause(r, 'swim'), "Tuesday's upper-body work may still be in your arms here — the effort sat a touch above your usual.");
+});
+Deno.test('clause: recovery-positive (ride) → managed-well framing (Q-115), not fatigue-cost', () => {
+  const r = detectCrossDomainCarryover(base({ targetDiscipline: 'ride', effortSignal: 'hr_at_pace', rawElevation: -9, adjustedElevation: -9, threshold: 3, declaredRpeGap: 1.5, declaredBaselineOk: true }));
+  const c = buildCarryoverClause(r, 'ride') || '';
+  assertEquals(c.includes('keeping it easy was the right call') && c.includes('recover') && !c.includes('cost'), true, c);
 });
 Deno.test('clause: suppressed → null (say nothing)', () => {
   const r = detectCrossDomainCarryover(base({ confounds: { grade: true, heat: false, prescribedHard: false }, adjustedElevation: 0.3 }));

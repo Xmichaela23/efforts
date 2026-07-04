@@ -56,10 +56,17 @@ export interface CarryoverInput {
   confounds: { grade: boolean; heat: boolean; prescribedHard: boolean }; // which were materially present
   recentSessions: RecentSession[];
   nonLegElevated?: boolean | null;       // Gate 4 systemic check; null/undefined = unknown → skip (graceful)
-  declaredEasy?: boolean;                // Axis 1 → Axis 4 (D-231): athlete declared this session EASY
-                                         // (low RPE) → his perception vetoes an inferred "effort up" claim
+  declaredEasy?: boolean;                // DEPRECATED one-way veto (still honored) — superseded by the gauge.
   corroborated?: boolean;                // a SUPPORTING signal agrees (pace-at-HR decoupling elevated, or
                                          // declared leg-feel) → upgrades a claim's confidence to strong
+  // ── Two-way declared RPE gauge (Michael 2026-07-03): RPE relative to the session's OBJECTIVE output,
+  //    measured against the athlete's OWN baseline RPE for comparable-intensity sessions. Below expected →
+  //    suppresses (June 14: felt easier than the objective difficulty). Above expected → carryover trigger
+  //    (yesterday's easy ride he rated a 4 → legs made easy work feel hard). ONE signal, both directions.
+  declaredRpeGap?: number | null;        // logged RPE − expected-for-output (+ = felt harder; − = felt easier)
+  declaredBaselineOk?: boolean;          // the comparable-effort RPE baseline is ESTABLISHED. Required for the
+                                         // gauge to fire — a thin baseline makes the gap noise → stay silent.
+  rpeThreshold?: number;                 // gap magnitude to act on (default 1.0 RPE point)
 }
 
 export interface CarryoverResult {
@@ -67,6 +74,10 @@ export interface CarryoverResult {
   claimable: boolean;
   confidence: 'strong' | 'moderate' | null;
   suppressedBy: SuppressReason;
+  source?: 'objective' | 'declared' | 'both' | null; // which signal fired
+  recoveryPositive?: boolean;                        // RPE-above-output fired but the session was objectively
+                                                     // fine (easy) → sore-but-managed-well framing (Q-115),
+                                                     // NOT fatigue-cost ("your legs cost you" would be false)
 }
 
 function daysBetween(fromYmd: string, toYmd: string): number | null {
@@ -107,33 +118,50 @@ export function detectCrossDomainCarryover(input: CarryoverInput): CarryoverResu
   const antecedent = { date: ant.date, dayName: dayName(ant.date), focus: ant.strengthFocus, isNovel: !!ant.isNovel };
   const suppress = (r: SuppressReason): CarryoverResult => ({ antecedent, claimable: false, confidence: null, suppressedBy: r });
 
-  // ── Gate 2 precheck — usable signal + baseline present, else silence (data-availability default).
-  if (!input.effortSignal || input.rawElevation == null || input.adjustedElevation == null) return suppress('no_data');
+  // ── The two-way declared RPE gauge — ONLY when the comparable-effort baseline is solid (else it's noise:
+  //    silence-on-uncertain applies to the baseline quality itself). ──
+  const rpeThreshold = input.rpeThreshold ?? 1.0;
+  const rpeGap = (input.declaredBaselineOk && input.declaredRpeGap != null) ? input.declaredRpeGap : null;
+  const rpeVeto = (rpeGap != null && rpeGap <= -rpeThreshold) || input.declaredEasy === true; // felt EASIER than output
+  const rpeTrigger = rpeGap != null && rpeGap >= rpeThreshold;                                 // felt HARDER than output
 
-  // ── Gate 2 — elevation is real (raw effort above the athlete's own baseline by the threshold).
-  if (input.rawElevation < input.threshold) return suppress('no_elevation');
+  // ── Objective signal (cadence/decoupling/power-at-HR), confound-subtracted per Gate 3. ──
+  const haveObjective = !!input.effortSignal && input.rawElevation != null && input.adjustedElevation != null;
+  const objRawElevated = haveObjective && (input.rawElevation as number) >= input.threshold;
+  const objResidualSurvives = haveObjective && (input.adjustedElevation as number) >= input.threshold;
 
-  // ── Gate 3 — confound-adjusted RESIDUAL: after removing the session's own conditions, is it STILL
-  //    elevated? If the residual falls below the bar, a confound explained it — name the present one.
-  if (input.adjustedElevation < input.threshold) {
-    if (input.confounds?.grade) return suppress('terrain');
-    if (input.confounds?.heat) return suppress('heat');
-    if (input.confounds?.prescribedHard) return suppress('prescribed');
-    return suppress('no_elevation'); // adjusted<bar with no flagged confound → treat as not genuinely elevated
+  // Data availability: need at least ONE usable signal (objective or a solid RPE gauge).
+  if (!haveObjective && rpeGap == null) return suppress('no_data');
+
+  // ── ELEVATION FIRST — a claim needs a source: the objective residual survives, OR RPE ran above output.
+  //    (Confound-subtraction stays the primary silencer: a confound-explained session reports no_elevation,
+  //    never a declared reason.) ──
+  if (!objResidualSurvives && !rpeTrigger) {
+    if (objRawElevated) { // raw-elevated but confound-explained (and no RPE trigger) → name the confound
+      if (input.confounds?.grade) return suppress('terrain');
+      if (input.confounds?.heat) return suppress('heat');
+      if (input.confounds?.prescribedHard) return suppress('prescribed');
+    }
+    return suppress('no_elevation');
   }
 
-  // ── Gate 4 — concentration, not systemic (§9 cross-discipline). Only when a non-leg baseline is known.
+  // ── DECLARED VETO (gauge, low side / D-231) — only reached once an elevation source exists: perceived
+  //    effort BELOW what the output warrants → the athlete's own perception overrides a surviving objective
+  //    residual → no carryover. (rpeVeto and rpeTrigger are mutually exclusive, so this only vetoes the
+  //    objective-driven case, never contradicts an RPE trigger.) ──
+  if (rpeVeto) return suppress('declared_easy');
+
+  // ── Gate 4 — concentration, not systemic (§9). RPE-above-output opens the candidate; the gates still gate.
   if (input.nonLegElevated === true) return suppress('systemic');
 
-  // ── Backstop (Axis 1 → Axis 4, D-231) — the athlete DECLARED this session easy (low RPE). Even if a
-  //    residual survived confound-subtraction, his perception vetoes an inferred "effort up" claim. This
-  //    is SECONDARY: confound-subtraction above is the primary silencer (its reason is the honest one).
-  if (input.declaredEasy) return suppress('declared_easy');
-
-  // All gates pass → claimable. Strong when a SUPPORTING signal corroborates (decoupling / declared
-  // leg-feel), or the movement was novel, or the residual is large (≥2× the bar). Else moderate.
-  const strong = !!input.corroborated || antecedent.isNovel || input.adjustedElevation >= input.threshold * 2;
-  return { antecedent, claimable: true, confidence: strong ? 'strong' : 'moderate', suppressedBy: null };
+  // ── CLAIM. Source + recovery-positive framing: RPE fired but the objective residual did NOT survive →
+  //    the session was objectively fine (easy) and the athlete just felt the legs → managed-well framing
+  //    (Q-115), not fatigue-cost. Strong when both signals agree, corroborated, novel, or a large residual.
+  const source: 'objective' | 'declared' | 'both' = objResidualSurvives && rpeTrigger ? 'both' : objResidualSurvives ? 'objective' : 'declared';
+  const recoveryPositive = rpeTrigger && !objResidualSurvives;
+  const bigResidual = haveObjective && (input.adjustedElevation as number) >= input.threshold * 2;
+  const strong = !!input.corroborated || (objResidualSurvives && rpeTrigger) || antecedent.isNovel || bigResidual;
+  return { antecedent, claimable: true, confidence: strong ? 'strong' : 'moderate', suppressedBy: null, source, recoveryPositive };
 }
 
 /**
@@ -148,6 +176,12 @@ export function buildCarryoverClause(r: CarryoverResult | null, discipline: Carr
   const activity = discipline === 'ride' ? 'ride' : discipline === 'swim' ? 'swim' : 'run';
   if (discipline === 'swim') {
     return `${day}'s upper-body work may still be in your arms here — the effort sat a touch above your usual.`;
+  }
+  // RECOVERY-POSITIVE (Q-115): RPE ran above the easy output but the session was objectively fine — the
+  // legs are sore but you managed it well. Honest framing is "smart call", NOT "your legs cost you" (false).
+  if (r.recoveryPositive) {
+    const easyHelp = discipline === 'ride' ? 'low-impact spinning like this aids their recovery' : 'keeping it easy like this aids their recovery';
+    return `Your legs are likely still carrying ${day}'s lower-body session — this felt a bit harder than the easy output suggests, but keeping it easy was the right call; ${easyHelp}.`;
   }
   if (r.antecedent.isNovel) {
     return `${day}'s session brought novel lower-body work, and this ${activity}'s effort sat above your usual — the legs may still be paying it off.`;
