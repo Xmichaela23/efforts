@@ -11,22 +11,22 @@ import { buildReadinessWhy, buildCrossTrainingReceipt } from './readiness-receip
 const RPE = (declining: boolean, current: number | null, baseline: number | null) => ({ rpe: { declining, current, baseline } });
 
 // ── FATIGUED "Why:" ─────────────────────────────────────────────────────────────────────────────
-Deno.test('why: RPE-driven (Michael\'s case) — NAMES the marker, no redundant count', () => {
+Deno.test('why: RPE-driven — NAMES the marker as a BARE verdict (item 3: numeric receipt lives on BODY)', () => {
   assertEquals(
     buildReadinessWhy({ signals: RPE(true, 5.3, 4.4), loadLabel: 'load balanced', concerningCount: 1 }),
-    'Why: perceived effort up (5.3 vs 4.4 typical) · load balanced',
+    'Why: perceived effort up · load balanced',
   );
 });
 Deno.test('why: RPE + HR drift — two named markers', () => {
   assertEquals(
     buildReadinessWhy({ signals: { rpe: { declining: true, current: 5.3, baseline: 4.4 }, hrDrift: { declining: true } }, loadLabel: 'load balanced', concerningCount: 2 }),
-    'Why: perceived effort up (5.3 vs 4.4 typical) · HR drift rising · load balanced',
+    'Why: perceived effort up · HR drift rising · load balanced',
   );
 });
 Deno.test('why: ACWR-elevated + effort', () => {
   assertEquals(
     buildReadinessWhy({ signals: RPE(true, 5.3, 4.4), loadLabel: 'load elevated (ACWR 1.3)', concerningCount: 2 }),
-    'Why: perceived effort up (5.3 vs 4.4 typical) · load elevated (ACWR 1.3)',
+    'Why: perceived effort up · load elevated (ACWR 1.3)',
   );
 });
 Deno.test('why: execution-driven (no rpe values)', () => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
-import { acwrVolumeLabel } from '@/lib/load-headline';
+import { acwrVolumeLabel, acwrZone } from '@/lib/load-headline';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,11 +84,14 @@ function AcwrGauge({ value, readinessState }: { value: number | null; readinessS
   return (
     <span className="inline-flex items-center gap-2">
       <span className="relative inline-flex items-center w-24 h-1.5 rounded-full overflow-visible">
+        {/* item 0: band boundaries ALIGNED to acwrVolumeLabel / acwrZone (0.8 / 1.3 / 1.5) over the
+            gauge range 0.6–1.7, so the marker's zone color matches the verdict word + the zone label.
+            widths = (0.8-0.6)/1.1, (1.3-0.8)/1.1, (1.5-1.3)/1.1, (1.7-1.5)/1.1. */}
         <span className="absolute inset-0 flex rounded-full overflow-hidden">
-          <span className="h-full bg-sky-400/25"     style={{ width: '18%' }} />
-          <span className="h-full bg-emerald-400/30"  style={{ width: '55%' }} />
-          <span className="h-full bg-amber-400/25"   style={{ width: '18%' }} />
-          <span className="h-full bg-red-400/20"     style={{ width: '9%' }} />
+          <span className="h-full bg-sky-400/25"     style={{ width: '18.2%' }} />
+          <span className="h-full bg-emerald-400/30"  style={{ width: '45.5%' }} />
+          <span className="h-full bg-amber-400/25"   style={{ width: '18.2%' }} />
+          <span className="h-full bg-red-400/20"     style={{ width: '18.1%' }} />
         </span>
         <span
           className="absolute w-2.5 h-2.5 rounded-full -translate-x-1/2 shadow-md"
@@ -117,25 +120,23 @@ export default function LoadBar({ load, loadStatus, readinessState, weekIntent, 
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">LOAD</span>
         <div className="flex items-center gap-2">
-          <AcwrGauge value={load.acwr} readinessState={readinessState} />
+          {/* item 0 (Option 2): the ACWR number rides WITH the gauge as one unit — number + zone word
+              directly under the marker, so it reads against its scale (TP/Garmin style) instead of as a
+              naked figure. Our plain-language verdict ("balanced") still leads to its right. ACWR is the
+              D-236 canonical acute:chronic ratio the verdict already reads; WTD stays "pts" (not TSS). */}
+          <div className="flex flex-col items-end gap-0.5">
+            <AcwrGauge value={load.acwr} readinessState={readinessState} />
+            {load.acwr != null && acwrZone(load.acwr) && (
+              <span className="text-[10px] tabular-nums text-white/40 leading-none">ACWR {load.acwr.toFixed(1)} · {acwrZone(load.acwr)}</span>
+            )}
+          </div>
           {/* The LOAD label reads the VOLUME verdict (the same ACWR band the gauge shows) — one load
-              verdict, so gauge + label can never disagree. Body-response/overreaching is NOT load: it
-              lives on the readiness axis (the gauge color + the readiness row), never the LOAD label.
-              (load fragmentation fix — was reading loadStatus.status, the body-response verdict.) */}
+              verdict, so gauge + label can never disagree. Body-response/overreaching is NOT load; it
+              lives on the readiness axis (the gauge color + the readiness row), never the LOAD label. */}
           {(() => {
             const vl = acwrLabel(load.acwr);
             if (vl === '—' || (isTaperOrPeak && vl === 'build more')) return null;
-            return (
-              <>
-                <Dot /><span className={`text-[14px] font-semibold tracking-tight ${loadVolumeColor(vl)}`}>{vl}</span>
-                {/* Approach-C bridge: our plain-language verdict LEADS; the standard term (ACWR — the
-                    D-236 canonical acute:chronic ratio this label already reads) rides alongside, dimmer,
-                    for TrainingPeaks/Garmin users. Only ACWR is bridged; WTD stays "pts" (our unit, not TSS). */}
-                {load.acwr != null && (
-                  <><Dot /><span className="text-[11px] tabular-nums text-white/45">ACWR {load.acwr.toFixed(1)}</span></>
-                )}
-              </>
-            );
+            return <><Dot /><span className={`text-[14px] font-semibold tracking-tight ${loadVolumeColor(vl)}`}>{vl}</span></>;
           })()}
         </div>
       </div>

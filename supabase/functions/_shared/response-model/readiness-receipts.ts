@@ -29,8 +29,11 @@ export function buildReadinessWhy(args: {
   // NAME the marker(s) that tripped — the driver IS the concerning signal, so no redundant
   // "N body signals declining" count alongside it (Michael 2026-07-03).
   const drivers: string[] = [];
-  if (s.rpe?.declining && s.rpe.current != null && s.rpe.baseline != null) {
-    drivers.push(`perceived effort up (${s.rpe.current.toFixed(1)} vs ${s.rpe.baseline.toFixed(1)} typical)`);
+  if (s.rpe?.declining) {
+    // item 3 (rule 7, no receipt recap): the headline Why names the BARE verdict only. The numeric
+    // receipt (e.g. "4.8 vs 4.3 typical") lives on the BODY "how hard it feels" row — its labeled
+    // home — so the same figures don't render twice, ~6 lines apart, on one screen.
+    drivers.push('perceived effort up');
   }
   if (s.execution?.declining) drivers.push('run execution down');
   if (s.hrDrift?.declining) drivers.push('HR drift rising');

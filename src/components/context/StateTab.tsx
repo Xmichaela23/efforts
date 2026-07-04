@@ -1595,8 +1595,12 @@ export default function StateTab({
 
         {/* RACE — visible during the build and through race week; disappears 7 days after the race. */}
         {(() => {
+          // item 5 (Arc source-gate — relevance earned by live data, else null): RACE requires an
+          // actual race signal, NOT a bare active plan. A non-race plan (e.g. Get Stronger) has
+          // has_active_plan=true but no goal/projection → this used to render an empty RACE header.
+          // (This is the QUICK half of the Q-120 overlap — a render narrowing, no logic added, so it
+          // does not complicate the full Q-120 readiness-gating redesign.)
           const hasRaceContent =
-            wsv.plan?.has_active_plan ||
             raceFinishProjection ||
             raceReadiness ||
             goalMeta ||

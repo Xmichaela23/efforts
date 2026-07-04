@@ -17,6 +17,18 @@ export function acwrVolumeLabel(v: number | null | undefined): string {
   return 'rest now';
 }
 
+// The ACWR standard-app ZONE name (item 0) — the TrainingPeaks/Garmin vocabulary for the same
+// bands `acwrVolumeLabel` reads, so the naked number gets a scale word ("ACWR 1.1 · optimal").
+// Boundaries MUST match acwrVolumeLabel (0.8 / 1.3 / 1.5) and the LoadBar gauge bands — else the
+// marker color, the verdict word, and the zone word could disagree (the honesty gap item 0 fixes).
+export function acwrZone(v: number | null | undefined): string | null {
+  if (v == null) return null;
+  if (v < 0.8) return 'building';
+  if (v <= 1.3) return 'optimal';
+  if (v <= 1.5) return 'pushing';
+  return 'spike';
+}
+
 // D-232/D-233: the refined display label (LEGS LOADED / LEGS SORE / EFFORT UP / FATIGUED) wins over the
 // raw readinessState so the headline can never contradict the chip. Only FATIGUED is systemic.
 function refinedReadinessPhrase(label: string | null | undefined): string | null {

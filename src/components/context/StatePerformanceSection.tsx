@@ -65,7 +65,10 @@ function BikeFitnessRow({ fitness }: { fitness: BikeFitness }) {
         <Signal label="Power" sig={fitness.power} />
         <span className="inline-flex items-baseline gap-1">
           <Signal label="Efficiency" sig={fitness.efficiency} />
-          {showEffN && <span className="text-white/30 text-[10px]">· {effN} ride{effN === 1 ? '' : 's'}</span>}
+          {/* item 2: efficiency rests on a SUBSET of the row's rides (D-237 excludes corrupt-HR rides
+              from efficiency, not power). Label it "N clean-HR" so it reads as efficiency's own count,
+              not a leftover of the tail's window ride-count. */}
+          {showEffN && <span className="text-white/30 text-[10px]">· {effN} clean-HR</span>}
         </span>
         {tail && <span className="text-white/35 text-[10px]">{tail}</span>}
         {src && <span className="text-white/25 text-[10px]">{src}</span>}
@@ -111,28 +114,37 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
   if (card.primaryAxis === 'performance' && card.headlineVerdict) {
     const v = VERDICT[card.headlineVerdict];
     const perf = card.performance;
+    // item 1: name the metric the way bike names Power/Efficiency — run/swim both read PACE
+    // (run = GAP pace at comparable easy effort; swim = pace per 100). Static label per discipline.
+    const metricLabel = (card.discipline === 'run' || card.discipline === 'swim') ? 'Pace'
+      : card.discipline === 'bike' ? 'Power' : null;
+    // item 4: a THIN + STALE trend must not render at full confidence. De-weight (dim + "limited
+    // data") when < 5 samples AND newest point > 21d old — the counts are already at the render.
+    const thinStale = (perf?.sampleCount ?? 99) < 5 && (perf?.newestAgeDays ?? 0) > 21;
+    const vCls = thinStale ? 'text-white/40' : v.cls;
     // D-232 glass-box: verdict-colored delta + a DIMMED evidence tail (window · samples · recency).
-    // Falls back to the legacy verdict+pct render for any row whose spine evidence hasn't populated yet.
     const hasEvidence = perf?.sampleCount != null && perf.windowDays != null;
     const evidence = hasEvidence
       ? trendEvidence({ windowDays: perf!.windowDays!, sampleCount: perf!.sampleCount!, newestAgeDays: perf!.newestAgeDays, discipline: card.discipline as Discipline })
       : null;
     return (
       <Row label={card.discipline}>
+        {metricLabel && <span className="text-white/50 text-[12px]">{metricLabel}</span>}
         {hasEvidence ? (
           <>
-            <span className={`text-[12px] ${v.cls}`}>{trendHeadline(card.headlineVerdict, perf!.pctChange)}</span>
+            <span className={`text-[12px] ${vCls}`}>{trendHeadline(card.headlineVerdict, perf!.pctChange)}</span>
             <span className="text-white/35 text-[11px]">{evidence}</span>
           </>
         ) : (
           <>
-            <span className={`inline-flex items-baseline gap-1 ${v.cls}`}>
+            <span className={`inline-flex items-baseline gap-1 ${vCls}`}>
               {v.arr && <span>{v.arr}</span>}
               <span>{v.word}</span>
             </span>
-            {perf?.pctChange != null && <span className="text-white/40">{verdictSignedPct(card.headlineVerdict, perf.pctChange)}</span>}
+            {perf?.pctChange != null && <span className={thinStale ? 'text-white/30' : 'text-white/40'}>{verdictSignedPct(card.headlineVerdict, perf.pctChange)}</span>}
           </>
         )}
+        {thinStale && <span className="text-white/30 text-[10px]">limited data</span>}
         {PROVISIONAL_PERF.has(card.discipline) && <span className="text-white/30 text-[11px]">provisional</span>}
         {card.discipline === 'swim' && <RestTag rest={restTrend} />}
       </Row>
