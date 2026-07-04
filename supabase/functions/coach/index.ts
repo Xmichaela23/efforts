@@ -2879,11 +2879,12 @@ Deno.serve(async (req) => {
         if (rows.length) lower = { dayName: parseISODateOnly(rows[0].date).toLocaleDateString('en-US', { weekday: 'long' }), rpe: rows[0].rpe, w: rows[0].w };
       } catch { lower = null; }
 
-      // Athlete-DECLARED soreness (Q-049, 1–10, higher = sorer): recent (≤2d) + clearly sore (≥7).
+      // Athlete-DECLARED soreness (Q-049 daily check-in, Hooper 1–7 per D-234, higher = sorer): recent (≤2d)
+      // + clearly sore (≥5 = "more than moderate", the linear-rescale equivalent of the old ≥7/10).
       const soreness = (() => {
         const L = arc.readiness?.latest;
         if (!L || L.soreness == null || !L.date) return false;
-        return daysAgo(String(L.date)) <= 2 && Number(L.soreness) >= 7;
+        return daysAgo(String(L.date)) <= 2 && Number(L.soreness) >= 5;
       })();
 
       // Plan-start proximity (cheap): plan not started + starts within the clearing window → "{Day}'s opener".

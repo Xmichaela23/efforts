@@ -209,3 +209,55 @@ export function buildCarryoverClause(r: CarryoverResult | null, discipline: Carr
   }
   return `Your legs may still be carrying ${day}'s lower-body session — this ${activity}'s effort ran a bit above your usual.`;
 }
+
+// ── Soreness scale (D-234): Hooper 1–7 app-wide. 1 = none, 4 = moderate, 7 = extremely sore. ──────────
+export const SORENESS_SCALE_MIN = 1;
+export const SORENESS_SCALE_MAX = 7;
+/** Linear rescale a legacy 1–10 soreness value to the 1–7 Hooper scale: round(1 + (v−1)·6/9). 7→5 exactly. */
+export function rescaleSoreness10to7(v10: number): number {
+  return Math.round(1 + (v10 - 1) * (6 / 9));
+}
+
+export interface SorenessEntry {
+  workoutId: string;   // the workout whose post-completion popup wrote this soreness
+  startTime: string;   // that workout's START timestamp (ISO) — used for the before-session provenance guard
+  soreness: number;    // on the 1–7 Hooper scale (post-migration)
+}
+
+/**
+ * Resolve "soreness CARRIED INTO the target session" from per-workout post-completion soreness entries
+ * (`workout_metadata.readiness.soreness`), as a deviation from the athlete's OWN baseline (Z-score).
+ *
+ * PROVENANCE GUARD (D-234): the claimed sensation must be one the athlete carried IN, not reported AFTER —
+ * so this EXCLUDES the target workout's own entry AND any entry from a session that did not START before the
+ * target session started. A soreness value written by the target's own popup can never trigger its own card.
+ * SCALE GUARD: only 1–7 values are eligible; any out-of-range value (an un-migrated 1–10 leak) is dropped,
+ * never blended into the baseline — mixed scales cannot corrupt one Z-score.
+ */
+export function resolveCarriedInSoreness(
+  entries: SorenessEntry[],
+  target: { workoutId: string; startTime: string },
+  opts?: { windowDays?: number; minBaseline?: number },
+): { elevated: boolean; recent: number | null; mean: number | null; z: number | null; baselineOk: boolean; diag: string } {
+  const windowDays = opts?.windowDays ?? 2;
+  const minBaseline = opts?.minBaseline ?? 5;
+  const tStart = new Date(target.startTime).getTime();
+  const eligible = entries
+    .filter((e) => e.workoutId !== target.workoutId)                         // never the target's own entry
+    .filter((e) => e.soreness >= SORENESS_SCALE_MIN && e.soreness <= SORENESS_SCALE_MAX) // 1–7 only; drop 1–10 leaks
+    .map((e) => ({ e, t: new Date(e.startTime).getTime() }))
+    .filter((x) => Number.isFinite(x.t) && x.t < tStart)                     // started BEFORE the target started
+    .sort((a, b) => b.t - a.t);                                              // most recent first
+  if (eligible.length === 0) return { elevated: false, recent: null, mean: null, z: null, baselineOk: false, diag: 'no carried-in soreness' };
+  const recentX = eligible.find((x) => (tStart - x.t) <= windowDays * 86400000);
+  const recent = recentX ? recentX.e.soreness : null;
+  const baseRows = eligible.filter((x) => x !== recentX).map((x) => x.e.soreness);
+  const baselineOk = baseRows.length >= minBaseline;
+  if (recent == null) return { elevated: false, recent: null, mean: null, z: null, baselineOk, diag: `no recent soreness (≤${windowDays}d)` };
+  if (!baselineOk) return { elevated: false, recent, mean: null, z: null, baselineOk: false, diag: `soreness baseline thin (${baseRows.length})` };
+  const mean = baseRows.reduce((a, b) => a + b, 0) / baseRows.length;
+  const sd = Math.sqrt(baseRows.reduce((a, b) => a + (b - mean) ** 2, 0) / baseRows.length) || 1;
+  const z = (recent - mean) / sd;
+  const elevated = z >= 1.0 && recent >= mean + 1; // above own norm (z≥1) AND a real absolute step
+  return { elevated, recent, mean, z, baselineOk: true, diag: `soreness ${recent} vs norm ${mean.toFixed(1)} (z ${z.toFixed(1)})` };
+}

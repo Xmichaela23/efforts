@@ -1418,7 +1418,7 @@ function analyzeReadinessCheck(readiness: any): any {
     soreness: soreness || null,
     sleep: sleep || null,
     energy_level: energy ? (energy >= 8 ? 'High' : energy >= 6 ? 'Moderate' : 'Low') : null,
-    soreness_level: soreness ? (soreness <= 2 ? 'Low' : soreness <= 5 ? 'Moderate' : 'High') : null,
+    soreness_level: soreness ? (soreness <= 2 ? 'Low' : soreness <= 4 ? 'Moderate' : 'High') : null,
     sleep_quality: sleep ? (sleep >= 8 ? 'Excellent' : sleep >= 7 ? 'Good' : sleep >= 6 ? 'Fair' : 'Poor') : null,
     overall_readiness: calculateOverallReadiness(energy, soreness, sleep)
   };
@@ -2064,7 +2064,7 @@ Pre-workout status:`;
     
     if (readinessData.soreness !== null) {
       context += `
-- Muscle soreness: ${readinessData.soreness}/10 (${readinessData.soreness_level})`;
+- Muscle soreness: ${readinessData.soreness}/7 (${readinessData.soreness_level})`;
     }
     
     if (readinessData.sleep !== null) {
@@ -2079,7 +2079,7 @@ Pre-workout status:`;
     
     // Add assessment based on readiness
     const energyGood = readinessData.energy !== null && readinessData.energy >= 7;
-    const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 3;
+    const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 2;
     const sleepAdequate = readinessData.sleep !== null && readinessData.sleep >= 7;
     
     if (energyGood && sorenessLow && sleepAdequate) {
@@ -2090,7 +2090,7 @@ Assessment: Strong readiness indicators support progressive training loads.`;
       context += `
 
 Assessment: Lower energy levels may impact performance. Consider maintaining current loads.`;
-    } else if (readinessData.soreness !== null && readinessData.soreness > 5) {
+    } else if (readinessData.soreness !== null && readinessData.soreness > 4) {
       context += `
 
 Assessment: Elevated soreness suggests incomplete recovery. Monitor performance closely.`;
@@ -2121,7 +2121,7 @@ PRE-WORKOUT READINESS:`;
     }
     if (readinessData.soreness !== null) {
       context += `
-• Muscle soreness: ${readinessData.soreness}/10 (${readinessData.soreness_level})`;
+• Muscle soreness: ${readinessData.soreness}/7 (${readinessData.soreness_level})`;
     }
     if (readinessData.sleep !== null) {
       context += `
@@ -2133,7 +2133,7 @@ PRE-WORKOUT READINESS:`;
     }
     
     const energyGood = readinessData.energy !== null && readinessData.energy >= 7;
-    const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 3;
+    const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 2;
     const sleepAdequate = readinessData.sleep !== null && readinessData.sleep >= 7;
     
     if (energyGood && sorenessLow && sleepAdequate) {
@@ -2144,7 +2144,7 @@ Assessment: Strong readiness indicators support progressive training loads.`;
       context += `
 
 Assessment: Lower energy levels may impact performance. Consider maintaining current loads.`;
-    } else if (readinessData.soreness !== null && readinessData.soreness > 5) {
+    } else if (readinessData.soreness !== null && readinessData.soreness > 4) {
       context += `
 
 Assessment: Elevated soreness suggests incomplete recovery. Monitor performance closely.`;
@@ -2278,7 +2278,7 @@ Pre-workout recovery status:`;
       }
       if (readinessData.soreness !== null) {
         context += `
-• Soreness: ${readinessData.soreness}/10 (${readinessData.soreness_level})`;
+• Soreness: ${readinessData.soreness}/7 (${readinessData.soreness_level})`;
       }
       if (readinessData.sleep !== null) {
         context += `
@@ -2312,11 +2312,11 @@ ${pattern.exercise_name}:`;
       // Add readiness-aware assessment
       if (readinessData) {
         const energyGood = readinessData.energy !== null && readinessData.energy >= 7;
-        const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 3;
+        const sorenessLow = readinessData.soreness !== null && readinessData.soreness <= 2;
         
         if (energyGood && sorenessLow && !allZero) {
           context += `
-  • Readiness context: Given strong pre-workout readiness (Energy ${readinessData.energy}/10, minimal soreness ${readinessData.soreness}/10), this RIR pattern indicates capacity for load progression.`;
+  • Readiness context: Given strong pre-workout readiness (Energy ${readinessData.energy}/10, minimal soreness ${readinessData.soreness}/7), this RIR pattern indicates capacity for load progression.`;
         } else if (readinessData.energy !== null && readinessData.energy < 6 && !allZero) {
           context += `
   • Readiness context: Lower energy (${readinessData.energy}/10) may have impacted performance. Maintain current loads until recovery improves.`;

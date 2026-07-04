@@ -4713,6 +4713,25 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-234 — Soreness standardized on the Hooper 1–7 scale, two-field topology, before-session provenance guard
+
+- **Date:** 2026-07-03
+- **Context:** soreness became a first-class Axis-1 (cross-domain carryover) trigger, but the app had soreness on a **1–10** scale in two places while a new post-completion popup proposed **0–3** — a scale collision (coach LEGS SORE `≥7`, snapshot averages, analyze-strength `/10`, and the carryover Z-score baseline would all silently break or corrupt).
+- **Decision:**
+  1. **Scale = Hooper 1–7, app-wide** (industry-standard athlete-wellness scale). Anchors: **1 = none · 4 = moderate · 7 = extremely sore**; UI shows anchor labels at 1/4/7 only.
+  2. **Two soreness fields, distinct meanings, NOT duplicates** — no new column:
+     - `readiness_checkins.soreness` = **DAILY** whole-body readiness check-in → coach LEGS SORE, compute-snapshot.
+     - `workouts.workout_metadata.readiness.soreness` = **PER-WORKOUT** post-completion soreness → the popup (generalized from strength-only to all disciplines) + the cards' carryover.
+  3. **Migration = linear rescale** of history, `round(1 + (v−1)·6/9)` (7→5 exact), NOT versioning — chosen because soreness history is sparse, so rescaling gives one coherent scale immediately vs. a baseline kept thin for weeks. `supabase/migrations/20260703120000_soreness_hooper_1to7_rescale.sql`.
+  4. **Consumer retune (one pass):** coach LEGS SORE `≥7 → ≥5` (Hooper "more than moderate" = clearly sore, the exact rescale of ≥7/10); analyze-strength `/10 → /7` with internal cuts rescaled (`≤3→≤2`, `>5→>4`, Moderate band `≤5→≤4`); carryover reads the per-workout field.
+  5. **BEFORE-SESSION PROVENANCE GUARD** (`resolveCarriedInSoreness`): the carryover soreness must be one the athlete **carried INTO** the session — excludes the target workout's OWN entry AND any entry from a session that didn't START before the target started. A soreness value reported *after* a session can never trigger *that* session's card. Pairs with D-233's declared-vs-inferred split: only a logged slider earns "you reported sore legs"; inferred paths stay LOAD language.
+  6. **Scale guard:** the resolver drops any out-of-range (>7) value so an un-migrated 1–10 leak can never blend into a Z-score baseline.
+- **Coordination note:** the client scale-switch (strength-logger dropdown + the new all-discipline popup) must ship to 1–7 with the migration; until then a legacy client could write a 1–10 value (the >7 guard catches 8–10; the 1–7-range ambiguity is low-impact given sparse logging). UI spec: `docs/DESIGN-soreness-input.md` (spec only, held for review).
+- **Fixtures:** `cross-domain-carryover.test.ts` — rescale 7→5; 1–7 fires at Z≥1 & ≥mean+1; mixed-scale (9) never blends; baseline-thin silence; the provenance guard (target's own entry ignored). Coach ≥5 covered by the coach path.
+- **Cross-ref:** D-233 (voice/provenance), Axis 1 (`SELF-AWARENESS-MAP.md`), `DESIGN-cross-domain-carryover.md`, Q-049 (readiness check-ins), Q-115 (recovery-positive).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:

@@ -7,7 +7,7 @@
  */
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, type CarryoverInput } from './cross-domain-carryover.ts';
+import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, resolveCarriedInSoreness, rescaleSoreness10to7, type CarryoverInput } from './cross-domain-carryover.ts';
 
 // A lower-body lift Tue 06-23, target ride Thu 06-25 (2 days out — in the ≤3d window). RPE signal, bar 1.0.
 function base(over: Partial<CarryoverInput> = {}): CarryoverInput {
@@ -182,6 +182,50 @@ Deno.test('soreness is one-way: NOT elevated (un-sore) + objective quiet → sil
   }));
   assertEquals(r?.claimable, false);
   assertEquals(r?.suppressedBy, 'no_elevation');
+});
+
+// ── Soreness scale (Hooper 1–7) + provenance/scale guards (D-234) ────────────────────────────────────
+Deno.test('rescale 1–10 → 1–7: 7→5 (the coach-threshold equivalence), endpoints preserved', () => {
+  assertEquals(rescaleSoreness10to7(7), 5);
+  assertEquals(rescaleSoreness10to7(1), 1);
+  assertEquals(rescaleSoreness10to7(10), 7);
+});
+Deno.test("soreness PROVENANCE GUARD: the target workout's OWN entry never triggers its own carryover", () => {
+  const entries = [
+    { workoutId: 'TARGET', startTime: '2026-06-25T17:00:00Z', soreness: 7 }, // reported AFTER the ride — must be ignored
+    { workoutId: 'mon-lift', startTime: '2026-06-23T18:00:00Z', soreness: 6 },
+    ...Array.from({ length: 5 }, (_, i) => ({ workoutId: `b${i}`, startTime: `2026-06-1${i}T12:00:00Z`, soreness: 1 })),
+  ];
+  const r = resolveCarriedInSoreness(entries, { workoutId: 'TARGET', startTime: '2026-06-25T16:00:00Z' });
+  assertEquals(r.recent, 6);      // Monday's carried-in 6, NOT the target's own post-ride 7
+  assertEquals(r.elevated, true);
+});
+Deno.test('soreness 1–7 FIRES: recent ≥ mean+1 and Z ≥ 1 with a solid baseline', () => {
+  const entries = [
+    { workoutId: 'mon', startTime: '2026-06-23T18:00:00Z', soreness: 5 },
+    ...Array.from({ length: 5 }, (_, i) => ({ workoutId: `b${i}`, startTime: `2026-06-1${i}T12:00:00Z`, soreness: 2 })),
+  ];
+  const r = resolveCarriedInSoreness(entries, { workoutId: 'TARGET', startTime: '2026-06-25T16:00:00Z' });
+  assertEquals(r.elevated, true);
+  assertEquals(r.baselineOk, true);
+});
+Deno.test('soreness MIXED-SCALE never blends: an un-migrated 1–10 value (9) is dropped from the baseline', () => {
+  const entries = [
+    { workoutId: 'mon', startTime: '2026-06-23T18:00:00Z', soreness: 5 },
+    { workoutId: 'leak', startTime: '2026-06-05T12:00:00Z', soreness: 9 }, // 1–10 leak — out of range, must be excluded
+    ...Array.from({ length: 5 }, (_, i) => ({ workoutId: `b${i}`, startTime: `2026-06-1${i}T12:00:00Z`, soreness: 2 })),
+  ];
+  const r = resolveCarriedInSoreness(entries, { workoutId: 'TARGET', startTime: '2026-06-25T16:00:00Z' });
+  assertEquals(r.mean != null && r.mean < 3, true, `mean must exclude the 9: ${r.mean}`);
+});
+Deno.test('soreness baseline thin: fewer than 5 comparable entries → not elevated (silence-on-uncertain)', () => {
+  const entries = [
+    { workoutId: 'mon', startTime: '2026-06-23T18:00:00Z', soreness: 6 },
+    { workoutId: 'b0', startTime: '2026-06-20T12:00:00Z', soreness: 2 },
+  ];
+  const r = resolveCarriedInSoreness(entries, { workoutId: 'TARGET', startTime: '2026-06-25T16:00:00Z' });
+  assertEquals(r.elevated, false);
+  assertEquals(r.baselineOk, false);
 });
 
 // ── the pins ──────────────────────────────────────────────────────────────────────────────────────

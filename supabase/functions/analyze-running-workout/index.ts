@@ -16,7 +16,7 @@ import { fetchGoalRaceCompletionForWorkout, type GoalRaceCompletionMatch } from 
 import { buildMarathonGoalRaceAdherenceSummary } from './lib/analysis/marathon-race-narrative.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
-import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, CARRYOVER_WINDOW_DAYS } from '../_shared/cross-domain-carryover.ts';
+import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, resolveCarriedInSoreness, CARRYOVER_WINDOW_DAYS, type SorenessEntry } from '../_shared/cross-domain-carryover.ts';
 // D-036: GAP enrichment lifted to top-level so both pace-adherence and the
 // HR analyzer consume the same grade-adjusted sample series.
 import { enrichSamplesWithGAP } from '../_shared/gap.ts';
@@ -2256,22 +2256,19 @@ Deno.serve(async (req) => {
                 declaredBaselineOk = true;
               }
             }
-            // Declared soreness (Q-049, LOGGED slider only — provenance-safe) — the strongest leg-feel
-            // signal, Z-score vs the athlete's own baseline. Elevated → first-class carryover trigger.
+            // Declared soreness (D-234) — the strongest leg-feel signal. PER-WORKOUT post-completion soreness
+            // (workout_metadata.readiness.soreness, Hooper 1–7), Z-score vs the athlete's own baseline, with
+            // the before-session provenance guard (the run's own entry can't trigger its own card).
             let declaredSorenessElevated = false;
             {
-              const { data: checkins } = await supabase.from('readiness_checkins')
-                .select('date, soreness').eq('user_id', uid)
-                .gte('date', new Date(new Date(wDate + 'T12:00:00Z').getTime() - 60 * 86400000).toISOString().slice(0, 10)).lte('date', wDate)
-                .order('date', { ascending: false });
-              const rows = ((checkins ?? []) as any[]).map((c) => ({ date: String(c.date), s: Number(c.soreness) })).filter((c) => Number.isFinite(c.s));
-              const recent = rows.find((c) => Math.abs((new Date(wDate + 'T12:00:00Z').getTime() - new Date(c.date + 'T12:00:00Z').getTime()) / 86400000) <= 2);
-              const baseRows = rows.filter((c) => c !== recent);
-              if (recent && baseRows.length >= 5) {
-                const mean = baseRows.reduce((a, b) => a + b.s, 0) / baseRows.length;
-                const sd = Math.sqrt(baseRows.reduce((a, b) => a + (b.s - mean) ** 2, 0) / baseRows.length) || 1;
-                declaredSorenessElevated = (recent.s - mean) / sd >= 1.0 && recent.s >= mean + 1;
-              }
+              const { data: soreWk } = await supabase.from('workouts')
+                .select('id, date, start_date, workout_metadata').eq('user_id', uid).eq('workout_status', 'completed')
+                .gte('date', new Date(new Date(wDate + 'T12:00:00Z').getTime() - 60 * 86400000).toISOString().slice(0, 10)).lte('date', wDate);
+              const entries: SorenessEntry[] = ((soreWk ?? []) as any[])
+                .map((w) => ({ workoutId: String(w?.id ?? ''), startTime: String(w?.start_date || (w?.date + 'T12:00:00Z')), soreness: Number(w?.workout_metadata?.readiness?.soreness) }))
+                .filter((e) => e.workoutId && Number.isFinite(e.soreness));
+              const targetStart = String((workout as any)?.start_date || (wDate + 'T12:00:00Z'));
+              declaredSorenessElevated = resolveCarriedInSoreness(entries, { workoutId: String((workout as any)?.id ?? ''), startTime: targetStart }).elevated;
             }
             const carry = detectCrossDomainCarryover({
               targetDate: wDate, targetDiscipline: 'run',
