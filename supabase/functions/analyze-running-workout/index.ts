@@ -1117,13 +1117,17 @@ Deno.serve(async (req) => {
         const wd = workout?.weather_data;
         if (avgC == null && !wd) return undefined;
         const deviceF = avgC != null && avgC !== 0 ? Math.round(avgC * 9/5 + 32) : null;
-        const apiF = wd?.temperature ?? null;
-        const tempF = deviceF ?? apiF ?? (avgC === 0 ? 32 : null);
+        // Single-source temperature (2026-07-03): the API ambient is AUTHORITATIVE. The Garmin wrist
+        // sensor (avg_temperature → deviceF) reads ~2–5°F high from body heat, and was the source of the
+        // header-76 vs terrain-78 disagreement. API-first, matching the session-detail header
+        // (temperature_start_f ?? temperature); device is a last resort only when no API weather exists.
+        const apiF = (wd?.temperature_start_f ?? wd?.temperature) ?? null;
+        const tempF = apiF ?? deviceF ?? (avgC === 0 ? 32 : null);
         return {
           temperatureF: tempF,
           feelsLikeF: wd?.feels_like,
           humidity: wd?.humidity,
-          source: deviceF != null ? 'device' as const : 'openmeteo' as const,
+          source: apiF != null ? 'openmeteo' as const : (deviceF != null ? 'device' as const : 'openmeteo' as const),
         };
       })(),
       plannedWorkout: plannedWorkout ? {
