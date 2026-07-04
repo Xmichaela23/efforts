@@ -134,6 +134,12 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
   if (workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim') {
     const inferred = inferIntensityFromPerformance(workout);
     if (inferred > 0) return inferred;
+    // sRPE (D-237): no HR/power/pace, but a logged RPE → RPE-derived intensity (session-RPE
+    // is a field-standard load proxy, r≈0.68–0.74) instead of the flat default. Kept on the
+    // same intensity² scale via mapRPEToIntensity so ACWR stays comparable. The flat default
+    // is reserved for the double-missing (no HR AND no RPE) case.
+    const rpe = sessionRPE ?? (workout.workout_metadata || {}).session_rpe;
+    if (typeof rpe === 'number' && rpe >= 1 && rpe <= 10) return mapRPEToIntensity(rpe);
   }
   return getDefaultIntensityForType(workout.type);
 }
@@ -483,7 +489,9 @@ serve(async (req) => {
     // still lacks resting_heart_rate after the baseline injection above).
     const _wt = String(finalWorkoutData.type || '').toLowerCase()
     const _isCardio = _wt === 'run' || _wt === 'ride' || _wt === 'bike' || _wt === 'swim'
-    const intensityDefaulted = _isCardio && inferIntensityFromPerformance(finalWorkoutData) === 0
+    const _rpeVal = sessionRPE ?? (finalWorkoutData.workout_metadata || {}).session_rpe
+    const noPerformanceInference = _isCardio && inferIntensityFromPerformance(finalWorkoutData) === 0
+    const rpeAvailable = typeof _rpeVal === 'number' && _rpeVal >= 1 && _rpeVal <= 10
     const restingAssumed = Boolean(_isCardio && finalWorkoutData.avg_heart_rate && finalWorkoutData.max_heart_rate && !finalWorkoutData.resting_heart_rate)
     const { method: workloadMethodClassified, estimated: workloadEstimated } = classifyWorkloadMethod({
       type: _wt,
@@ -493,7 +501,8 @@ serve(async (req) => {
       hasFtp: Boolean(finalWorkoutData.functional_threshold_power),
       hasAvgPower: Boolean(finalWorkoutData.avg_power),
       hasStepsPreset: Boolean(finalWorkoutData.steps_preset?.length),
-      intensityDefaulted,
+      noPerformanceInference,
+      rpeAvailable,
       restingAssumed,
     })
     

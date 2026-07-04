@@ -205,3 +205,79 @@ export function computeAcwr(rows: LoadRow[], opts: AcwrOptions): AcwrResult {
 
   return { ratio, ratioRaw, acuteLoad, chronicLoad, acuteAvgDaily, chronicAvgDaily, status, thinBase };
 }
+
+// ---------------------------------------------------------------------------
+// Estimated-load disclosure (D-237 Stage 2): the ACWR ratio is honest math, but
+// its load substrate can be a LOW-TRUST estimate (flat-default intensity /
+// assumed resting HR — see _shared/workload.ts LOW_TRUST_WORKLOAD_METHODS). When
+// a meaningful fraction of the WINDOW LOAD (not workout count — one long estimated
+// ride can dominate a week) is low-trust, the load receipt must say so. Thresholds
+// ratified 2026-07-03: chronic-28 low-trust load ≥ 30%, OR a single low-trust
+// workout > 40% of the acute-7 load. srpe_estimated is field-standard and does NOT
+// count as low-trust (that's the sRPE tier's whole point).
+// ---------------------------------------------------------------------------
+
+export interface DisclosureRow {
+  date: string;
+  workload: number | null | undefined;
+  /** true when this workout's stored load is a LOW-TRUST estimate (isLowTrustWorkload(method)). */
+  lowTrust: boolean;
+}
+
+export interface DisclosureResult {
+  disclose: boolean;
+  reason: 'chronic_fraction' | 'dominant_acute' | null;
+  /** low-trust fraction of the chronic-28 window load, rounded to a whole percent. */
+  chronicPct: number;
+  /** count of low-trust workouts in the chronic-28 window. */
+  estimatedCount: number;
+}
+
+export function computeEstimatedLoadDisclosure(
+  rows: DisclosureRow[],
+  opts: {
+    asOfDate: string;
+    chronicDays?: number;
+    acuteDays?: number;
+    chronicFractionThreshold?: number; // default 0.30
+    dominantAcuteThreshold?: number;   // default 0.40
+  },
+): DisclosureResult {
+  const empty: DisclosureResult = { disclose: false, reason: null, chronicPct: 0, estimatedCount: 0 };
+  const asOf = toDateOnly(opts.asOfDate);
+  if (!asOf || !Array.isArray(rows)) return empty;
+  const chronicDays = opts.chronicDays ?? 28;
+  const acuteDays = opts.acuteDays ?? 7;
+  const chronicThresh = opts.chronicFractionThreshold ?? 0.30;
+  const acuteThresh = opts.dominantAcuteThreshold ?? 0.40;
+
+  const chronicStart = addDays(asOf, -(chronicDays - 1));
+  const acuteStart = addDays(asOf, -(acuteDays - 1));
+
+  let chronicTotal = 0, chronicLowTrust = 0, estimatedCount = 0;
+  let acuteTotal = 0, acuteMaxLowTrust = 0;
+  for (const r of rows) {
+    const d = toDateOnly(r.date);
+    const w = Number(r.workload);
+    if (!d || !Number.isFinite(w) || w <= 0) continue;
+    if (d < chronicStart || d > asOf) continue;
+    chronicTotal += w;
+    if (r.lowTrust) { chronicLowTrust += w; estimatedCount += 1; }
+    if (d >= acuteStart) {
+      acuteTotal += w;
+      if (r.lowTrust && w > acuteMaxLowTrust) acuteMaxLowTrust = w;
+    }
+  }
+
+  const chronicFraction = chronicTotal > 0 ? chronicLowTrust / chronicTotal : 0;
+  const dominantAcute = acuteTotal > 0 ? acuteMaxLowTrust / acuteTotal : 0;
+  const chronicPct = Math.round(chronicFraction * 100);
+
+  if (chronicFraction >= chronicThresh) {
+    return { disclose: true, reason: 'chronic_fraction', chronicPct, estimatedCount };
+  }
+  if (dominantAcute > acuteThresh) {
+    return { disclose: true, reason: 'dominant_acute', chronicPct, estimatedCount };
+  }
+  return { disclose: false, reason: null, chronicPct, estimatedCount };
+}

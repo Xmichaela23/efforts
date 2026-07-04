@@ -297,13 +297,31 @@ export function calculateDurationWorkload(
 
 export type WorkloadMethod =
   | 'trimp_hr_based'         // measured: HR + max HR (+ real resting HR)
-  | 'trimp_resting_assumed'  // ESTIMATED: TRIMP but no stored resting HR → assumed (W2)
+  | 'trimp_resting_assumed'  // ESTIMATED (low trust): TRIMP but no stored resting HR → assumed (W2)
   | 'power_intensity'        // measured: power vs FTP
   | 'hr_intensity'           // measured: HR vs threshold
   | 'steps_preset'           // structured prescription
   | 'volume_based'           // strength (sets × reps × load)
   | 'duration_intensity'     // duration × inferred intensity
-  | 'duration_default';      // ESTIMATED: duration × a DEFAULT intensity, no effort signal (W1)
+  | 'srpe_estimated'         // ESTIMATED (field-standard, r≈0.68–0.74): no HR/power/pace but a logged RPE
+  | 'duration_default'       // ESTIMATED (lowest trust): duration × a DEFAULT intensity, no effort signal AND no RPE (W1)
+  | 'hr_rejected_corrupt';   // ESTIMATED: HR present but rejected as corrupt (flaky strap) → fell to RPE/default (reserved; HR-plausibility filter)
+
+/**
+ * LOW-TRUST estimated methods — a flat constant or a skewed physiological input, NOT a validated
+ * proxy. These are what the Stage-2 ACWR disclosure counts (D-237). `srpe_estimated` is field-
+ * standard and deliberately EXCLUDED — it's an estimate that declares itself but doesn't make the
+ * ratio "soft". `trimp_resting_assumed` and `hr_rejected_corrupt` are included.
+ */
+export const LOW_TRUST_WORKLOAD_METHODS: ReadonlySet<WorkloadMethod> = new Set<WorkloadMethod>([
+  'duration_default',
+  'trimp_resting_assumed',
+  'hr_rejected_corrupt',
+]);
+
+export function isLowTrustWorkload(method: string | null | undefined): boolean {
+  return !!method && LOW_TRUST_WORKLOAD_METHODS.has(method as WorkloadMethod);
+}
 
 export function classifyWorkloadMethod(args: {
   type: string;
@@ -313,8 +331,10 @@ export function classifyWorkloadMethod(args: {
   hasFtp: boolean;
   hasAvgPower: boolean;
   hasStepsPreset: boolean;
-  /** cardio fell through to getDefaultIntensityForType (inferIntensityFromPerformance returned 0). */
-  intensityDefaulted: boolean;
+  /** cardio had no HR/power/pace performance inference (inferIntensityFromPerformance returned 0). */
+  noPerformanceInference: boolean;
+  /** a valid logged session RPE (1–10) is available → RPE-derived intensity instead of the flat default. */
+  rpeAvailable: boolean;
   /** TRIMP path but no stored resting HR → workload.ts assumes one. */
   restingAssumed: boolean;
 }): { method: WorkloadMethod; estimated: boolean } {
@@ -328,8 +348,12 @@ export function classifyWorkloadMethod(args: {
       ? { method: 'trimp_resting_assumed', estimated: true }
       : { method: 'trimp_hr_based', estimated: false };
   }
-  // No TRIMP: a defaulted intensity is the W1 silent stand-in.
-  if (isCardio && args.intensityDefaulted) return { method: 'duration_default', estimated: true };
+  // No performance signal: RPE-derived (field-standard) beats the flat default (double-missing).
+  if (isCardio && args.noPerformanceInference) {
+    return args.rpeAvailable
+      ? { method: 'srpe_estimated', estimated: true }
+      : { method: 'duration_default', estimated: true };
+  }
   if (t === 'run' && args.hasAvgHr && args.hasThresholdHr) return { method: 'hr_intensity', estimated: false };
   if ((t === 'ride' || t === 'bike') && args.hasFtp && args.hasAvgPower) return { method: 'power_intensity', estimated: false };
   if (args.hasStepsPreset) return { method: 'steps_preset', estimated: false };

@@ -8,26 +8,41 @@
  *   deno test supabase/functions/_shared/workload-method.test.ts --no-check
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { classifyWorkloadMethod } from './workload.ts';
+import { classifyWorkloadMethod, isLowTrustWorkload } from './workload.ts';
 
 const base = {
   type: 'run', hasAvgHr: false, hasMaxHr: false, hasThresholdHr: false,
   hasFtp: false, hasAvgPower: false, hasStepsPreset: false,
-  intensityDefaulted: false, restingAssumed: false,
+  noPerformanceInference: false, rpeAvailable: false, restingAssumed: false,
 };
 
-// ── the two ESTIMATED cases (W1, W2) ────────────────────────────────────────
+// ── the estimated cases (W1, W2, sRPE tier) ─────────────────────────────────
 
-Deno.test('W1: cardio with no effort signal → duration_default, ESTIMATED', () => {
+Deno.test('W1: cardio, no effort signal AND no RPE → duration_default, ESTIMATED (lowest trust)', () => {
   assertEquals(
-    classifyWorkloadMethod({ ...base, type: 'run', intensityDefaulted: true }),
+    classifyWorkloadMethod({ ...base, type: 'run', noPerformanceInference: true }),
     { method: 'duration_default', estimated: true },
   );
   // ride too (0.70 default) — the unrecoverable-tell case
   assertEquals(
-    classifyWorkloadMethod({ ...base, type: 'ride', intensityDefaulted: true }),
+    classifyWorkloadMethod({ ...base, type: 'ride', noPerformanceInference: true }),
     { method: 'duration_default', estimated: true },
   );
+});
+
+Deno.test('sRPE: no HR/power/pace but a logged RPE → srpe_estimated (field-standard, NOT low-trust)', () => {
+  const r = classifyWorkloadMethod({ ...base, type: 'run', noPerformanceInference: true, rpeAvailable: true });
+  assertEquals(r, { method: 'srpe_estimated', estimated: true });
+  assertEquals(isLowTrustWorkload(r.method), false); // does NOT count toward Stage-2 disclosure
+});
+
+Deno.test('trust tiers: duration_default + trimp_resting_assumed are low-trust; srpe + measured are not', () => {
+  assertEquals(isLowTrustWorkload('duration_default'), true);
+  assertEquals(isLowTrustWorkload('trimp_resting_assumed'), true);
+  assertEquals(isLowTrustWorkload('hr_rejected_corrupt'), true);
+  assertEquals(isLowTrustWorkload('srpe_estimated'), false);
+  assertEquals(isLowTrustWorkload('trimp_hr_based'), false);
+  assertEquals(isLowTrustWorkload('power_intensity'), false);
 });
 
 Deno.test('W2: TRIMP but no stored resting HR → trimp_resting_assumed, ESTIMATED', () => {
