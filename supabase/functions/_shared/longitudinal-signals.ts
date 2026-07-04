@@ -637,7 +637,8 @@ async function detectReadinessSignals(
 
     // ── Soreness → possible overreaching ──────────────────────────────────────
     // v1 detection: absolute floor. (v2: replace this predicate with baseline-relative — see header.)
-    const SORE_HIGH = 6;   // 0–10 scale, higher = worse
+    const SORE_HIGH = 4;   // Hooper 1–7 (D-234/D-235; rescaled from 6/10 → 4/7 — preserves the fire-set,
+                           // and stays intentionally BELOW LEGS SORE's ≥5 since this is a softer multi-session signal)
     const WINDOW = 6;      // last N check-ins
     const NEED = 4;        // ≥N of them high
     const soreRecent = series.slice(0, WINDOW).filter((r) => Number.isFinite(r.soreness));
@@ -649,7 +650,7 @@ async function detectReadinessSignals(
         severity: highCount >= 5 ? 'concern' : 'warning',
         headline: 'High muscle soreness across several sessions — possible overreaching',
         detail:
-          `You've flagged high soreness (≥${SORE_HIGH}/10) on ${highCount} of your last ${soreRecent.length} check-ins. ` +
+          `You've flagged high soreness (≥${SORE_HIGH}/7) on ${highCount} of your last ${soreRecent.length} check-ins. ` +
           `Persistent soreness is one of the strongest early signals of accumulated fatigue — consider a lighter week ` +
           `or a short deload, protect sleep and protein, and don't stack more hard sessions until it settles.`,
         evidence: `soreness ≥${SORE_HIGH} on ${highCount}/${soreRecent.length} recent check-ins`,
