@@ -287,3 +287,51 @@ export function calculateDurationWorkload(
   const durationHours = durationMinutes / 60;
   return Math.round(durationHours * Math.pow(intensity, 2) * 100);
 }
+
+// ---------------------------------------------------------------------------
+// Workload provenance (D-237): declare HOW a stored workload was derived, so an
+// ESTIMATED load (default intensity / assumed resting HR) is distinguishable from
+// a MEASURED one and consumers (ACWR receipt) can disclose it. Persist the result
+// so future rows self-declare — the fix for the W1/W2 silent-impersonation class.
+// ---------------------------------------------------------------------------
+
+export type WorkloadMethod =
+  | 'trimp_hr_based'         // measured: HR + max HR (+ real resting HR)
+  | 'trimp_resting_assumed'  // ESTIMATED: TRIMP but no stored resting HR → assumed (W2)
+  | 'power_intensity'        // measured: power vs FTP
+  | 'hr_intensity'           // measured: HR vs threshold
+  | 'steps_preset'           // structured prescription
+  | 'volume_based'           // strength (sets × reps × load)
+  | 'duration_intensity'     // duration × inferred intensity
+  | 'duration_default';      // ESTIMATED: duration × a DEFAULT intensity, no effort signal (W1)
+
+export function classifyWorkloadMethod(args: {
+  type: string;
+  hasAvgHr: boolean;
+  hasMaxHr: boolean;
+  hasThresholdHr: boolean;
+  hasFtp: boolean;
+  hasAvgPower: boolean;
+  hasStepsPreset: boolean;
+  /** cardio fell through to getDefaultIntensityForType (inferIntensityFromPerformance returned 0). */
+  intensityDefaulted: boolean;
+  /** TRIMP path but no stored resting HR → workload.ts assumes one. */
+  restingAssumed: boolean;
+}): { method: WorkloadMethod; estimated: boolean } {
+  const t = (args.type || '').toLowerCase();
+  const isCardio = t === 'run' || t === 'ride' || t === 'bike' || t === 'swim';
+
+  if (t === 'strength') return { method: 'volume_based', estimated: false };
+  // TRIMP takes precedence for cardio with HR + max HR.
+  if (isCardio && args.hasAvgHr && args.hasMaxHr) {
+    return args.restingAssumed
+      ? { method: 'trimp_resting_assumed', estimated: true }
+      : { method: 'trimp_hr_based', estimated: false };
+  }
+  // No TRIMP: a defaulted intensity is the W1 silent stand-in.
+  if (isCardio && args.intensityDefaulted) return { method: 'duration_default', estimated: true };
+  if (t === 'run' && args.hasAvgHr && args.hasThresholdHr) return { method: 'hr_intensity', estimated: false };
+  if ((t === 'ride' || t === 'bike') && args.hasFtp && args.hasAvgPower) return { method: 'power_intensity', estimated: false };
+  if (args.hasStepsPreset) return { method: 'steps_preset', estimated: false };
+  return { method: 'duration_intensity', estimated: false };
+}

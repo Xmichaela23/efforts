@@ -34,6 +34,7 @@ import {
   calculatePilatesYogaWorkload,
   calculateTRIMPWorkload,
   calculateDurationWorkload,
+  classifyWorkloadMethod,
 } from '../_shared/workload.ts'
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts'
 
@@ -473,6 +474,28 @@ serve(async (req) => {
     // Calculate workload (all math happens server-side)
     const workload = calculateWorkload(finalWorkoutData, sessionRPE)
     const intensity = getSessionIntensity(finalWorkoutData, sessionRPE)
+
+    // D-237: classify HOW this workload was derived so an ESTIMATED load (default
+    // intensity / assumed resting HR) is distinguishable from a MEASURED one. Persisted
+    // below into workout_metadata; the ACWR receipt discloses when a window is meaningfully
+    // estimated. intensityDefaulted = cardio fell through to the default-intensity path;
+    // restingAssumed = TRIMP ran but no real resting HR was available (finalWorkoutData
+    // still lacks resting_heart_rate after the baseline injection above).
+    const _wt = String(finalWorkoutData.type || '').toLowerCase()
+    const _isCardio = _wt === 'run' || _wt === 'ride' || _wt === 'bike' || _wt === 'swim'
+    const intensityDefaulted = _isCardio && inferIntensityFromPerformance(finalWorkoutData) === 0
+    const restingAssumed = Boolean(_isCardio && finalWorkoutData.avg_heart_rate && finalWorkoutData.max_heart_rate && !finalWorkoutData.resting_heart_rate)
+    const { method: workloadMethodClassified, estimated: workloadEstimated } = classifyWorkloadMethod({
+      type: _wt,
+      hasAvgHr: Boolean(finalWorkoutData.avg_heart_rate),
+      hasMaxHr: Boolean(finalWorkoutData.max_heart_rate),
+      hasThresholdHr: Boolean(finalWorkoutData.threshold_heart_rate),
+      hasFtp: Boolean(finalWorkoutData.functional_threshold_power),
+      hasAvgPower: Boolean(finalWorkoutData.avg_power),
+      hasStepsPreset: Boolean(finalWorkoutData.steps_preset?.length),
+      intensityDefaulted,
+      restingAssumed,
+    })
     
     // If workout is attached to a planned workout, fetch planned workload for comparison
     let plannedWorkload = null;
@@ -499,14 +522,25 @@ serve(async (req) => {
     // Determine which table to update based on workout status
     const tableName = workoutStatus === 'planned' ? 'planned_workouts' : 'workouts'
     
-    // Update the workout in the database
+    // Update the workout in the database. For completed workouts, co-locate the load
+    // provenance in workout_metadata (D-237) — merged, never clobbering existing keys —
+    // so the value that feeds ACWR (workload_actual) carries whether it was estimated.
+    const updatePayload: Record<string, any> = {
+      workload_planned: workoutStatus === 'planned' ? workload : null,
+      workload_actual: workoutStatus === 'completed' ? workload : null,
+      intensity_factor: intensity,
+    }
+    if (workoutStatus === 'completed') {
+      // Merge into the SAFELY-PARSED metadata (workoutMetadata may be a raw JSON string).
+      updatePayload.workout_metadata = {
+        ...parsedMetadata,
+        workload_method: workloadMethodClassified,
+        workload_estimated: workloadEstimated,
+      }
+    }
     const { error } = await supabaseClient
       .from(tableName)
-      .update({
-        workload_planned: workoutStatus === 'planned' ? workload : null,
-        workload_actual: workoutStatus === 'completed' ? workload : null,
-        intensity_factor: intensity
-      })
+      .update(updatePayload)
       .eq('id', workout_id)
 
     if (error) {
@@ -516,24 +550,8 @@ serve(async (req) => {
       )
     }
 
-    // Determine which workload method was used for debug info
-    let workloadMethod = 'duration_intensity';
-    const wType = finalWorkoutData?.type?.toLowerCase() || '';
-    const isCardio = wType === 'run' || wType === 'ride' || wType === 'bike' || wType === 'swim';
-    
-    // Check if TRIMP was used (cardio with HR + max HR)
-    if (isCardio && finalWorkoutData?.avg_heart_rate && finalWorkoutData?.max_heart_rate) {
-      workloadMethod = 'trimp_hr_based';
-    } else if (wType === 'strength') {
-      workloadMethod = 'volume_based';
-    } else if ((wType === 'run') && finalWorkoutData?.avg_heart_rate && finalWorkoutData?.threshold_heart_rate) {
-      workloadMethod = 'hr_intensity';
-    } else if ((wType === 'ride' || wType === 'bike') && userFtp && finalWorkoutData?.avg_power) {
-      workloadMethod = 'power_intensity';
-    } else if (finalWorkoutData?.steps_preset?.length > 0) {
-      workloadMethod = 'steps_preset';
-    }
-    
+    // (Old inline debug workload-method block removed — superseded by the persisted
+    //  classifyWorkloadMethod result above, which also distinguishes estimated cases.)
     return new Response(
       JSON.stringify({
         success: true,
@@ -554,7 +572,8 @@ serve(async (req) => {
         avg_heart_rate: finalWorkoutData?.avg_heart_rate,
         threshold_heart_rate: finalWorkoutData?.threshold_heart_rate,
         max_heart_rate: finalWorkoutData?.max_heart_rate,
-        workload_method: workloadMethod
+        workload_method: workloadMethodClassified,
+        workload_estimated: workloadEstimated
       }),
       { 
         status: 200, 
