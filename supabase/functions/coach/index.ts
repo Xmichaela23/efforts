@@ -26,8 +26,9 @@ import {
   isAcwrDetrainedSignal,
   isAcwrFatiguedSignal,
 } from '../_shared/acwr-state.ts';
-import { computeAcwr, type LoadRow } from '../_shared/acwr.ts';
+import { computeAcwr, computeEstimatedLoadDisclosure, type LoadRow, type DisclosureRow } from '../_shared/acwr.ts';
 import { getRunningFatigueWeight, getCyclingFatigueWeight } from '../_shared/fatigue-weights.ts';
+import { isLowTrustWorkload } from '../_shared/workload.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
 import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey } from '../_shared/state-trend/index.ts';
@@ -2064,7 +2065,7 @@ Deno.serve(async (req) => {
 
     const { data: rolling, error: rErr } = await supabase
       .from('workouts')
-      .select('id,workload_actual,date,workout_status,type,name,planned_id')
+      .select('id,workload_actual,date,workout_status,type,name,planned_id,workout_metadata')
       .eq('user_id', userId)
       .gte('date', chronicStart)
       .lte('date', asOfDate);
@@ -2074,6 +2075,20 @@ Deno.serve(async (req) => {
     const acute7Rows = completedRolling.filter((r: any) => String(r?.date) >= acuteStart);
     const acute7Load = acute7Rows.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
     const chronic28Load = completedRolling.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
+
+    // D-237 Stage 2: does a meaningful fraction of the window LOAD rest on a low-trust
+    // estimate (default intensity / assumed resting HR)? If so the load receipt discloses it.
+    // Rows without a workload_method (pre-Stage-1 history) read as measured — the disclosure
+    // is forward-looking and fills in as flagged rows accumulate / are backfilled.
+    const loadDisclosureRows: DisclosureRow[] = completedRolling.map((r: any) => ({
+      date: String(r?.date),
+      workload: safeNum(r?.workload_actual),
+      lowTrust: isLowTrustWorkload(r?.workout_metadata?.workload_method),
+    }));
+    const loadEstimatedDisclosure = computeEstimatedLoadDisclosure(loadDisclosureRows, { asOfDate });
+    const loadEstimatedText = loadEstimatedDisclosure.disclose
+      ? `Load ~${loadEstimatedDisclosure.chronicPct}% estimated — ${loadEstimatedDisclosure.estimatedCount} recent workout${loadEstimatedDisclosure.estimatedCount === 1 ? '' : 's'} without HR/power.`
+      : null;
 
     // Daily load for sparkline — sum workload_actual per day over the last 7 days
     // dominant_type = whichever discipline contributed most load points that day
@@ -3491,6 +3506,19 @@ Deno.serve(async (req) => {
         );
         snapshotBody.load_status.status = reconciled.status;
         snapshotBody.load_status.interpretation = reconciled.interpretation;
+      }
+      // D-237 Stage 2: append the estimated-load disclosure to the load receipt when a
+      // meaningful fraction of the window load is a low-trust estimate. A declared estimate,
+      // not a correction — the ratio math is honest; the substrate is flagged as soft.
+      if (loadEstimatedText) {
+        snapshotBody.load_status.interpretation =
+          `${snapshotBody.load_status.interpretation} ${loadEstimatedText}`.trim();
+        (snapshotBody.load_status as any).load_estimated = {
+          disclose: true,
+          chronic_pct: loadEstimatedDisclosure.chronicPct,
+          estimated_count: loadEstimatedDisclosure.estimatedCount,
+          text: loadEstimatedText,
+        };
       }
 
       // Upcoming sessions with full prescription
