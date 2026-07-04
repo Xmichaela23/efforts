@@ -1427,6 +1427,15 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-117 — bike efficiency = HR-at-power (intensity-controlled); raw EF investigated + REJECTED; decoupling not stored
+
+- **Status:** RESOLVED / do-not-reopen (investigated on real data 2026-07-04). The STATE bike row's "Efficiency" trend uses **HR-at-power** (`bike_fitness_v1.hr_at_band`: mean HR while power is in the FTP-anchored reference band, `analyze-cycling-workout/index.ts:2517-2536`), lower-HR-at-same-power = improving. **This is the CORRECT metric. A proposed switch to the "true EF" (NP/HR, `ride_facts.efficiency_factor`) was built, then REVERTED after a real-data check.**
+- **Why EF is wrong here (the finding):** EF = power ÷ HR conflates *how hard you rode* with *how efficient you are*. Michael's real data: HR-at-power dropped ~145→137 bpm at a FIXED band [99–132W] across all rides (real ~5.5% aerobic gain), while raw EF on endurance rides "declined" 0.84→0.73 — but only because his endurance-ride NP fell (109→97W, i.e. he rode EASIER) at similar HR. His HARD rides went the other way (tempo power up 145→164W). So EF misreads easier riding as declining efficiency; HR-at-power controls for intensity (fixed band) and is honest. **The lesson also caught a process gap: verify the DATA is populated, not just that the code path exists** — `workout_analysis.efficiency` (EF + decoupling) is EMPTY on his rides (a different analyzer path); EF lives in `ride_facts.efficiency_factor`; **decoupling (`aerobic_decoupling_pct`) is NOT stored anywhere for his rides** → adding it is a real compute+backfill build, not a display change.
+- **If reopened:** any bike-efficiency metric must be intensity-controlled (fixed power band or effort-gated), never raw EF across mixed ride types. Decoupling needs the value actually computed+stored first (compute-workout-analysis doesn't run on his rides). Minor: his estimated FTP (~145–150W) sets the low band — internally consistent + like-for-like, but worth confirming FTP someday.
+- **Cross-ref:** `_shared/state-trend/bike-fitness.ts`, `analyze-cycling-workout` (bike_fitness_v1), `compute-facts:1203` (ride_facts EF), the reverted commit (bike EF+decoupling rework).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
