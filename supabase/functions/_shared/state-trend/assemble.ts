@@ -113,8 +113,16 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     ? { verdict: bikeLead.verdict, pctChange: bikeLead.pctChange, sampleCount: bikeLead.sampleCount, newestAgeDays: bikeLead.newestAgeDays, windowDays: bikeLead.windowDays }
     : null;
 
-  // run
-  const runState = computeRunState(routeMetricsToSeries(inp.runJoined), asOf, spw.run);
+  // run — the GAP-pace trend only counts COMPARABLE-EASY runs (run.ts COMPARABLE_RUN_EFFORT),
+  // so the min-session floor must scale off the athlete's EASY-run cadence, not total-run cadence
+  // (D-237 / the 2026-07-03 run-row bug: 24 total runs → floor 4, but only 3 easy-GAP points →
+  // permanent "needs data"). `inp.runJoined` spans the 90d cadence window; routeMetricsToSeries
+  // filters to comparable-easy + valid-GAP, so its length IS the 90d comparable-run count. classifyTrend
+  // still windows the trend itself to runDays (42d) internally, so widening the fetch changes only the
+  // cadence denominator, not the trend.
+  const runSeries = routeMetricsToSeries(inp.runJoined);
+  const runComparableCadence = runSeries.length / WEEKS_90D;
+  const runState = computeRunState(runSeries, asOf, runComparableCadence);
   const run = perfFromTrend(runState.trend);
 
   // swim

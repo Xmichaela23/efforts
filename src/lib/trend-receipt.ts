@@ -68,7 +68,13 @@ export function trendReceipt(args: {
         ? `Last ${unitNoun(discipline)} ${newestAgeDays}d ago — too old to trend (${sampleCount} in ${win})`
         : `No recent ${unitNoun(discipline)}s to trend (${sampleCount} in ${win})`;
     }
-    return `Not enough data yet — ${unitLabel(discipline, sampleCount)} in ${win} (need ${floor})`;
+    // D-237: run's trend counts only comparable-EASY runs — declare that, so "N runs" doesn't read as
+    // total-run scarcity (the athlete may run often but rarely easy). The floor is now scaled off
+    // easy-run cadence too (assemble.ts), so this fires only when easy runs are genuinely too few.
+    const tooFewLabel = discipline === 'run'
+      ? `${sampleCount} easy-pace run${sampleCount === 1 ? '' : 's'}`
+      : unitLabel(discipline, sampleCount);
+    return `Not enough data yet — ${tooFewLabel} in ${win} (need ${floor})`;
   }
   const evidence = trendEvidence(args);
   const pct = pctChange == null ? null : Math.abs(pctChange);

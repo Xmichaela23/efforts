@@ -641,8 +641,10 @@ serve(async (req: Request) => {
           supabase.from("workouts").select("date,workout_analysis")
             .eq("user_id", userId).in("type", ["ride", "bike"]).not("workout_analysis", "is", null)
             .order("date", { ascending: false }).limit(STATE_TREND_WINDOWS.bikeLimit),
+          // 90d cadence window (not 42d trend window): assemble derives the comparable-easy-run cadence
+          // for the min-session floor; classifyTrend windows the trend to runDays internally (D-237 run fix).
           supabase.from("route_progress_metrics").select("metric_date,effort_adjusted_pace_sec_per_km,workout_id")
-            .eq("user_id", userId).gte("metric_date", isoMinus(STATE_TREND_WINDOWS.runDays)).order("metric_date"),
+            .eq("user_id", userId).gte("metric_date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).order("metric_date"),
           supabase.from("workout_facts").select("date,swim_facts")
             .eq("user_id", userId).eq("discipline", "swim").gte("date", isoMinus(STATE_TREND_WINDOWS.swimDays)).order("date"),
           supabase.from("planned_workouts").select("type,date").eq("user_id", userId).gte("date", adhStart).lte("date", asOf),

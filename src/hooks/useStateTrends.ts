@@ -61,13 +61,15 @@ export function useStateTrends(): StateTrends {
         .order('date', { ascending: false })
         .limit(STATE_TREND_WINDOWS.bikeLimit);
 
-      // run — GAP pace at comparable (easy) effort over 6wk. Intent gate reads classified_type
-      // (joined below), NOT RPM.workout_intent (null at source).
+      // run — GAP pace at comparable (easy) effort. Intent gate reads classified_type (joined below),
+      // NOT RPM.workout_intent (null at source). Fetch the 90d CADENCE window (not the 42d trend window):
+      // assemble derives the comparable-easy-run cadence from these rows for the min-session floor, and
+      // classifyTrend windows the trend itself to runDays (42d) internally (D-237 run-row floor fix).
       const runP = supabase
         .from('route_progress_metrics')
         .select('metric_date,effort_adjusted_pace_sec_per_km,workout_id')
         .eq('user_id', userId)
-        .gte('metric_date', isoMinus(STATE_TREND_WINDOWS.runDays))
+        .gte('metric_date', isoMinus(STATE_TREND_WINDOWS.cadenceDays))
         .order('metric_date', { ascending: true });
 
       // swim — pace per 100 over 8wk (Q-038-guarded inside the adapter)

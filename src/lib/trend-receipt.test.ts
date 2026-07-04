@@ -52,26 +52,26 @@ Deno.test('run holding', () => {
     'Holding over 6wk · 6 runs · 2d ago',
   );
 });
-Deno.test('run needs_data (TOO FEW) — says how many / how many needed', () => {
+Deno.test('run needs_data (TOO FEW) — declares "easy-pace runs" (D-237), not bare "runs"', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'needs_data', pctChange: null, sampleCount: 2, newestAgeDays: 5 }),
-    'Not enough data yet — 2 runs in 6wk (need 3)',
+    'Not enough data yet — 2 easy-pace runs in 6wk (need 3)',
   );
 });
 
 // ── BUG FIX (Michael 2026-07-03): the receipt must cite the REAL cadence-scaled floor, not a
 //    hardcoded 3. A ~2.6 runs/wk athlete has minSessions=4, so 3 runs is genuinely too-few —
 //    but the copy said "(need 3)", claiming 3 was enough while the gate held out for 4. ────────
-Deno.test('run needs_data cites the REAL floor: 3 runs, minSessions 4 → "(need 4)" not "(need 3)"', () => {
+Deno.test('run needs_data cites the REAL floor + easy-pace label: 3 easy runs, floor 4', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'needs_data', pctChange: null, sampleCount: 3, newestAgeDays: 4, floor: 4 }),
-    'Not enough data yet — 3 runs in 6wk (need 4)',
+    'Not enough data yet — 3 easy-pace runs in 6wk (need 4)',
   );
 });
-Deno.test('floor omitted → back-compat default 3 (old cache rows / strength with no series)', () => {
+Deno.test('floor omitted → back-compat default 3; singular "run" pluralization', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'needs_data', pctChange: null, sampleCount: 1, newestAgeDays: 2 }),
-    'Not enough data yet — 1 run in 6wk (need 3)',
+    'Not enough data yet — 1 easy-pace run in 6wk (need 3)',
   );
 });
 
