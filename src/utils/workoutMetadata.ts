@@ -37,10 +37,10 @@ export type FocusArea =
 export interface WorkoutMetadata {
   session_rpe?: number;  // Session RPE (1-10) - REQUIRED for pilates_yoga
   notes?: string;         // User notes about the workout
-  readiness?: {           // Pre-workout readiness check-in
-    energy: number;       // Energy level (1-10)
-    soreness: number;     // Muscle soreness (1-10)
-    sleep: number;        // Sleep hours (0-12)
+  readiness?: {           // Readiness — daily check-in (strength logger) OR per-workout post-completion.
+    energy?: number;      // Energy — Hooper 1–7 (D-235)
+    soreness?: number;    // Muscle soreness — Hooper 1–7 (D-234)
+    sleep?: number;       // Sleep HOURS 0–12 (objective, NOT rescaled — D-235)
   };
   // Pilates/Yoga specific fields
   session_type?: PilatesYogaSessionType;  // REQUIRED for pilates_yoga
@@ -87,7 +87,7 @@ export function getWorkoutNotes(workout: any): string | undefined {
 /**
  * Get readiness data from workout (with backward compatibility)
  */
-export function getWorkoutReadiness(workout: any): { energy: number; soreness: number; sleep: number } | undefined {
+export function getWorkoutReadiness(workout: any): { energy?: number; soreness?: number; sleep?: number } | undefined {
   const meta = getWorkoutMetadata(workout);
   return meta.readiness;
 }
@@ -98,7 +98,7 @@ export function getWorkoutReadiness(workout: any): { energy: number; soreness: n
 export function createWorkoutMetadata(params: {
   session_rpe?: number;
   notes?: string;
-  readiness?: { energy: number; soreness: number; sleep: number };
+  readiness?: { energy?: number; soreness?: number; sleep?: number };
   session_type?: PilatesYogaSessionType;
   session_feeling?: SessionFeeling;
   environment?: Environment;
@@ -157,3 +157,19 @@ export function createWorkoutMetadata(params: {
   return metadata;
 }
 
+
+/**
+ * Post-completion soreness → workout_metadata patch (D-234/D-235, Hooper 1–7).
+ *
+ * NO DEFAULT, EVER: returns null when `selectedSoreness` is null (popup unanswered / skipped / dismissed) so
+ * NOTHING is written — no default, no zero. Only an explicit 1–7 tap produces a patch. Merges into existing
+ * metadata (session_rpe, notes, other readiness keys) without clobbering.
+ */
+export function readinessSorenessPatch(
+  existingMeta: WorkoutMetadata | null | undefined,
+  selectedSoreness: number | null,
+): WorkoutMetadata | null {
+  if (selectedSoreness == null) return null; // unanswered → no write, ever
+  const base = existingMeta || {};
+  return { ...base, readiness: { ...(base.readiness || {}), soreness: selectedSoreness } };
+}

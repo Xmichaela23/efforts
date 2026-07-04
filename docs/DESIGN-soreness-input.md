@@ -8,19 +8,21 @@
 ## What it is
 A one-tap **muscle-soreness** capture shown when a workout is marked complete, on the **Hooper 1–7** scale (D-234). It writes the **per-workout** soreness that feeds the cards' cross-domain carryover — distinct from the daily readiness check-in.
 
-## The control — a 7-chip row
-A single horizontal row of 7 tappable chips, `1 … 7`, one tap to select (no confirm step — the tap *is* the log). Anchored labels under **1, 4, 7 only** to keep the row clean:
+## The control — a segmented 1–7 bar (PRIMARY, amended 2026-07-03)
+A single full-width **segmented bar** of 7 equal hit-zones, `1 … 7`, one tap to select (no confirm — the tap *is* the log). Seven ≥44px zones + hairline gaps ≈ the full Capacitor viewport width, so the chip variant is dropped. Anchor labels under **1, 4, 7 only**:
 
 ```
-   ○   ○   ○   ○   ○   ○   ○
-   1               4               7
- none          moderate      extremely sore
+ ┌────┬────┬────┬────┬────┬────┬────┐
+ │ 1  │ 2  │ 3  │ 4  │ 5  │ 6  │ 7  │
+ └────┴────┴────┴────┴────┴────┴────┘
+   none          moderate    extremely sore
 ```
 
-- Chips 2, 3, 5, 6 show the number only (no label) — the anchors imply the gradient.
-- Selected chip fills; the row stays visible so it can be changed before dismiss.
-- **Optional / skippable** — soreness is not required to save the workout (compliance > completeness; a forced field kills the popup). No default selection (an unset value writes null, not a 1).
-- One line of helper text above: *"How sore are your muscles right now?"*
+- Zones 2, 3, 5, 6 show the number only — anchors imply the gradient.
+- Selected zone fills (sport-accent); re-tapping the same zone clears back to unset.
+- **Optional / skippable** — not required to save (compliance > completeness).
+- **NO DEFAULT, EVER** — starts unset (value shows "–"); dismiss/skip writes nothing (`readinessSorenessPatch` returns null on null). Only an explicit tap writes `workout_metadata.readiness.soreness`. Guarded by a deno-tested pure helper (`workoutMetadata.test.ts`).
+- Component: `src/components/SorenessScale.tsx` (reusable — energy uses the same control).
 
 ## Where it writes
 - **Field:** `workouts.workout_metadata.readiness.soreness` (integer 1–7), on the just-completed workout. **No new column** — this generalizes the existing strength per-workout readiness field to all disciplines.
@@ -57,11 +59,8 @@ The same 7-chip component is reused for the **subjective** wellness items; **sle
 ## Mobile ergonomics (verify at Capacitor viewport before build)
 - **Tap targets ≥44px** (Apple HIG minimum). Seven chips across the smallest supported width (~320–360px CSS px inside the WKWebView) leaves ~40–46px per chip after gaps — **borderline**. Verify on-device/simulator at the Capacitor width before committing to a single row.
 - **One-thumb reachable** — the row sits in the lower half of the completion sheet, within thumb arc; no reach to the top edge.
-- **Fallback layouts if seven chips are cramped** (propose in spec, do NOT build until Michael picks):
-  - **(A) Segmented bar** — a single 1–7 track split into 7 equal hit-zones (full-width tap targets, no inter-chip gaps) with anchor labels under 1/4/7. Recommended fallback — maximizes target size.
-  - **(B) 4+3 two-row wrap** — chips 1–4 then 5–7; keeps circular chips but doubles height.
-  - **(C) Stepper** — `−  [n]  +` with the anchor scale shown; smallest footprint, but two taps to reach extremes (worse compliance).
-- Selected state must be legible in both themes; the numeric value echoes above the control (as the current sliders do).
+- **Built as the segmented bar** (Michael's amendment — it IS the primary, not a fallback): `flex-1 min-h-[44px]` zones fill the width, maximizing target size and eliminating inter-chip dead space. If even the segmented bar tests cramped on the narrowest device, the remaining fallbacks are (B) 4+3 two-row wrap or (C) stepper `− [n] +` — but verify the segmented bar first; it should fit.
+- Selected state legible in both themes; the numeric value echoes above the control ("–" when unset).
 
 ## Open for Michael
 - Confirm the anchor wording (`none / moderate / extremely sore`) and the helper prompt.
