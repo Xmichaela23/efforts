@@ -41,4 +41,7 @@ export interface TrendResult {
   newestAgeDays: number | null;
   /** True when an otherwise-real verdict was decayed to needs_data by the staleness gate. */
   stale: boolean;
+  /** The cadence-scaled min-session floor used for the needs_data gate — carried so the
+   *  glass-box receipt cites the REAL threshold ("need 4"), not a hardcoded default. */
+  minSessions: number;
 }

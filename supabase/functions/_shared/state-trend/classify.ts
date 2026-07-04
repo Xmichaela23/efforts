@@ -60,6 +60,7 @@ export function classifyTrend(
     sampleCount: inWindow.length,
     points: inWindow,
     newestAgeDays,
+    minSessions, // carried so the receipt cites the REAL floor, not a default 3
   };
 
   if (inWindow.length < minSessions) {

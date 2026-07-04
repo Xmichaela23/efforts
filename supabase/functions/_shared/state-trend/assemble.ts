@@ -180,6 +180,8 @@ export interface DisciplineTrendCache {
   windowDays?: number;
   /** true = needs_data is a staleness decay (enough samples, too old), not too-few. */
   stale?: boolean;
+  /** cadence-scaled too-few floor, so the receipt cites "need N" honestly (not a default 3). */
+  minSessions?: number;
 }
 export interface StateTrendsV1 {
   as_of: string;
@@ -228,6 +230,7 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       newestAgeDays: p?.newestAgeDays,
       windowDays: p?.windowDays,
       stale: p?.stale,
+      minSessions: p?.minSessions,
     };
   };
   return {

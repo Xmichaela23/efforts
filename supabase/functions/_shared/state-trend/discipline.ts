@@ -24,6 +24,8 @@ export interface PerfSummary {
   /** true when needs_data is a STALENESS decay (enough samples, newest too old) — NOT too-few. Distinguishes
    *  the two needs_data causes so the receipt cites recency ("last swim Nd ago") vs count ("need 3"). */
   stale?: boolean;
+  /** The cadence-scaled min-session floor (needs_data too-few threshold) — so the receipt cites "need N" honestly. */
+  minSessions?: number;
 }
 
 export interface DisciplineCard {
@@ -77,5 +79,6 @@ export function perfFromTrend(t: TrendResult | null): PerfSummary | null {
     newestAgeDays: t.newestAgeDays,
     windowDays: t.window?.days,
     stale: t.stale,
+    minSessions: t.minSessions,
   } : null;
 }
