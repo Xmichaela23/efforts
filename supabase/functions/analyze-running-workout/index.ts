@@ -2256,12 +2256,29 @@ Deno.serve(async (req) => {
                 declaredBaselineOk = true;
               }
             }
+            // Declared soreness (Q-049, LOGGED slider only — provenance-safe) — the strongest leg-feel
+            // signal, Z-score vs the athlete's own baseline. Elevated → first-class carryover trigger.
+            let declaredSorenessElevated = false;
+            {
+              const { data: checkins } = await supabase.from('readiness_checkins')
+                .select('date, soreness').eq('user_id', uid)
+                .gte('date', new Date(new Date(wDate + 'T12:00:00Z').getTime() - 60 * 86400000).toISOString().slice(0, 10)).lte('date', wDate)
+                .order('date', { ascending: false });
+              const rows = ((checkins ?? []) as any[]).map((c) => ({ date: String(c.date), s: Number(c.soreness) })).filter((c) => Number.isFinite(c.s));
+              const recent = rows.find((c) => Math.abs((new Date(wDate + 'T12:00:00Z').getTime() - new Date(c.date + 'T12:00:00Z').getTime()) / 86400000) <= 2);
+              const baseRows = rows.filter((c) => c !== recent);
+              if (recent && baseRows.length >= 5) {
+                const mean = baseRows.reduce((a, b) => a + b.s, 0) / baseRows.length;
+                const sd = Math.sqrt(baseRows.reduce((a, b) => a + (b.s - mean) ** 2, 0) / baseRows.length) || 1;
+                declaredSorenessElevated = (recent.s - mean) / sd >= 1.0 && recent.s >= mean + 1;
+              }
+            }
             const carry = detectCrossDomainCarryover({
               targetDate: wDate, targetDiscipline: 'run',
               effortSignal: haveCadence ? 'cadence' : null, // primary = cadence (heat-immune → no confound subtraction)
               rawElevation: cadenceDrop, adjustedElevation: cadenceDrop, threshold: 3, // ~3 spm drop = notable
               confounds: { grade: false, heat: false, prescribedHard: false },
-              recentSessions, nonLegElevated: null, declaredRpeGap, declaredBaselineOk, corroborated: decoupElevated,
+              recentSessions, nonLegElevated: null, declaredRpeGap, declaredBaselineOk, declaredSorenessElevated, corroborated: decoupElevated,
             });
             const clause = buildCarryoverClause(carry, 'run');
             if (clause) { ai_summary = ai_summary ? `${ai_summary} ${clause}` : clause; if (!ai_summary_generated_at) ai_summary_generated_at = new Date().toISOString(); }

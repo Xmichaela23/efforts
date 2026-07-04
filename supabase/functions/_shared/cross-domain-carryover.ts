@@ -67,6 +67,12 @@ export interface CarryoverInput {
   declaredBaselineOk?: boolean;          // the comparable-effort RPE baseline is ESTABLISHED. Required for the
                                          // gauge to fire — a thin baseline makes the gap noise → stay silent.
   rpeThreshold?: number;                 // gap magnitude to act on (default 1.0 RPE point)
+  // ── Declared soreness (Q-049) — the STRONGEST leg-feel signal (Michael 2026-07-03). Computed by the
+  //    caller as a deviation from the athlete's OWN soreness baseline (Z-score, same baseline-quality gate),
+  //    passed as a boolean: elevated → a first-class carryover TRIGGER + strong confidence. It catches
+  //    sub-resolution carryover on easy sessions that neither the objective signal nor a within-normal RPE
+  //    can see. One-directional (low soreness doesn't veto — you can be un-sore yet objectively fatigued).
+  declaredSorenessElevated?: boolean;
 }
 
 export interface CarryoverResult {
@@ -78,6 +84,11 @@ export interface CarryoverResult {
   recoveryPositive?: boolean;                        // RPE-above-output fired but the session was objectively
                                                      // fine (easy) → sore-but-managed-well framing (Q-115),
                                                      // NOT fatigue-cost ("your legs cost you" would be false)
+  declaredSoreness?: boolean;                        // PROVENANCE: the athlete's LOGGED soreness slider (Q-049)
+                                                     // drove/contributed → the clause MAY state the sensation
+                                                     // ("you reported sore legs"). When false, the claim is
+                                                     // INFERRED (objective/RPE) → LOAD language only, never
+                                                     // "sore" (D-233 — an unreported sensation can't be asserted).
 }
 
 function daysBetween(fromYmd: string, toYmd: string): number | null {
@@ -124,20 +135,21 @@ export function detectCrossDomainCarryover(input: CarryoverInput): CarryoverResu
   const rpeGap = (input.declaredBaselineOk && input.declaredRpeGap != null) ? input.declaredRpeGap : null;
   const rpeVeto = (rpeGap != null && rpeGap <= -rpeThreshold) || input.declaredEasy === true; // felt EASIER than output
   const rpeTrigger = rpeGap != null && rpeGap >= rpeThreshold;                                 // felt HARDER than output
+  const soreTrigger = input.declaredSorenessElevated === true;   // Q-049 soreness above the athlete's own baseline
+  const declaredTrigger = rpeTrigger || soreTrigger;             // any declared leg-feel signal opens the candidate
 
   // ── Objective signal (cadence/decoupling/power-at-HR), confound-subtracted per Gate 3. ──
   const haveObjective = !!input.effortSignal && input.rawElevation != null && input.adjustedElevation != null;
   const objRawElevated = haveObjective && (input.rawElevation as number) >= input.threshold;
   const objResidualSurvives = haveObjective && (input.adjustedElevation as number) >= input.threshold;
 
-  // Data availability: need at least ONE usable signal (objective or a solid RPE gauge).
-  if (!haveObjective && rpeGap == null) return suppress('no_data');
+  // Data availability: need at least ONE usable signal (objective, RPE gauge, or declared soreness).
+  if (!haveObjective && rpeGap == null && !soreTrigger) return suppress('no_data');
 
-  // ── ELEVATION FIRST — a claim needs a source: the objective residual survives, OR RPE ran above output.
-  //    (Confound-subtraction stays the primary silencer: a confound-explained session reports no_elevation,
-  //    never a declared reason.) ──
-  if (!objResidualSurvives && !rpeTrigger) {
-    if (objRawElevated) { // raw-elevated but confound-explained (and no RPE trigger) → name the confound
+  // ── ELEVATION FIRST — a claim needs a source: objective residual survives, OR a declared trigger (RPE
+  //    above output / soreness above baseline). Confound-subtraction stays the primary silencer. ──
+  if (!objResidualSurvives && !declaredTrigger) {
+    if (objRawElevated) { // raw-elevated but confound-explained (no declared trigger) → name the confound
       if (input.confounds?.grade) return suppress('terrain');
       if (input.confounds?.heat) return suppress('heat');
       if (input.confounds?.prescribedHard) return suppress('prescribed');
@@ -145,23 +157,22 @@ export function detectCrossDomainCarryover(input: CarryoverInput): CarryoverResu
     return suppress('no_elevation');
   }
 
-  // ── DECLARED VETO (gauge, low side / D-231) — only reached once an elevation source exists: perceived
-  //    effort BELOW what the output warrants → the athlete's own perception overrides a surviving objective
-  //    residual → no carryover. (rpeVeto and rpeTrigger are mutually exclusive, so this only vetoes the
-  //    objective-driven case, never contradicts an RPE trigger.) ──
-  if (rpeVeto) return suppress('declared_easy');
+  // ── DECLARED VETO (gauge, low side / D-231) — perceived effort BELOW the output overrides a surviving
+  //    OBJECTIVE residual → no carryover. But soreness OVERRIDES the veto: sore legs on an easy-feeling ride
+  //    is the recovery-positive case (managed well), not a silence. So veto only when NO declared trigger. ──
+  if (rpeVeto && !declaredTrigger) return suppress('declared_easy');
 
-  // ── Gate 4 — concentration, not systemic (§9). RPE-above-output opens the candidate; the gates still gate.
+  // ── Gate 4 — concentration, not systemic (§9). A declared trigger opens the candidate; the gates still gate.
   if (input.nonLegElevated === true) return suppress('systemic');
 
-  // ── CLAIM. Source + recovery-positive framing: RPE fired but the objective residual did NOT survive →
-  //    the session was objectively fine (easy) and the athlete just felt the legs → managed-well framing
-  //    (Q-115), not fatigue-cost. Strong when both signals agree, corroborated, novel, or a large residual.
-  const source: 'objective' | 'declared' | 'both' = objResidualSurvives && rpeTrigger ? 'both' : objResidualSurvives ? 'objective' : 'declared';
-  const recoveryPositive = rpeTrigger && !objResidualSurvives;
+  // ── CLAIM. Recovery-positive framing when a declared trigger fired but the objective residual did NOT
+  //    survive — objectively fine, athlete just felt the legs (Q-115), not fatigue-cost. Soreness is the
+  //    strongest confirmer → strong confidence.
+  const source: 'objective' | 'declared' | 'both' = objResidualSurvives && declaredTrigger ? 'both' : objResidualSurvives ? 'objective' : 'declared';
+  const recoveryPositive = declaredTrigger && !objResidualSurvives;
   const bigResidual = haveObjective && (input.adjustedElevation as number) >= input.threshold * 2;
-  const strong = !!input.corroborated || (objResidualSurvives && rpeTrigger) || antecedent.isNovel || bigResidual;
-  return { antecedent, claimable: true, confidence: strong ? 'strong' : 'moderate', suppressedBy: null, source, recoveryPositive };
+  const strong = soreTrigger || !!input.corroborated || (objResidualSurvives && rpeTrigger) || antecedent.isNovel || bigResidual;
+  return { antecedent, claimable: true, confidence: strong ? 'strong' : 'moderate', suppressedBy: null, source, recoveryPositive, declaredSoreness: soreTrigger };
 }
 
 /**
@@ -177,8 +188,18 @@ export function buildCarryoverClause(r: CarryoverResult | null, discipline: Carr
   if (discipline === 'swim') {
     return `${day}'s upper-body work may still be in your arms here — the effort sat a touch above your usual.`;
   }
-  // RECOVERY-POSITIVE (Q-115): RPE ran above the easy output but the session was objectively fine — the
-  // legs are sore but you managed it well. Honest framing is "smart call", NOT "your legs cost you" (false).
+  // PROVENANCE SPLIT (D-233) — ONLY a LOGGED soreness slider (Q-049) earns a sensation claim. Declared →
+  // may state "you reported sore legs". All inferred paths below (objective/RPE) use LOAD language only and
+  // NEVER assert soreness — the athlete didn't report it, so the app can't claim the sensation.
+  if (r.declaredSoreness) {
+    if (r.recoveryPositive) {
+      const easyHelp = discipline === 'ride' ? 'low-impact spinning like this aids their recovery' : 'keeping it easy like this aids their recovery';
+      return `You reported sore legs after ${day}'s lower-body session — keeping this ${activity} easy was the right call; ${easyHelp}.`;
+    }
+    return `You reported sore legs after ${day}'s lower-body session, and this ${activity}'s effort ran a bit above your usual — worth easing off if it lingers.`;
+  }
+  // RECOVERY-POSITIVE (Q-115), INFERRED: a declared-effort/objective trigger fired but the session was
+  // objectively fine. LOAD language ("carrying"), not a sensation claim.
   if (r.recoveryPositive) {
     const easyHelp = discipline === 'ride' ? 'low-impact spinning like this aids their recovery' : 'keeping it easy like this aids their recovery';
     return `Your legs are likely still carrying ${day}'s lower-body session — this felt a bit harder than the easy output suggests, but keeping it easy was the right call; ${easyHelp}.`;

@@ -153,6 +153,37 @@ Deno.test('objective survives AND RPE above → source both, strong, NOT recover
   assertEquals(r?.recoveryPositive, false);
 });
 
+// ── Declared soreness (Q-049) — the strongest leg-feel trigger; the sore-legs-easy-ride fix ──────────
+Deno.test('SORE-LEGS-EASY-RIDE: objective quiet + RPE gauge dormant (0 baseline) + soreness elevated → CLAIM, strong, recovery-positive', () => {
+  const r = detectCrossDomainCarryover(base({
+    targetDiscipline: 'ride',
+    effortSignal: 'hr_at_pace', rawElevation: -9, adjustedElevation: -9, threshold: 3, // objective quiet
+    declaredRpeGap: null, declaredBaselineOk: false, // RPE gauge dormant (the 0-comparable-rides case)
+    declaredSorenessElevated: true,
+  }));
+  assertEquals(r?.claimable, true);
+  assertEquals(r?.source, 'declared');
+  assertEquals(r?.recoveryPositive, true);
+  assertEquals(r?.confidence, 'strong');
+});
+Deno.test('soreness OVERRIDES the easy-RPE veto: sore + rated the ride easy → CLAIM, not declared_easy', () => {
+  const r = detectCrossDomainCarryover(base({
+    effortSignal: 'hr_at_pace', rawElevation: 5, adjustedElevation: 5, threshold: 3, // objective elevated
+    declaredRpeGap: -1.5, declaredBaselineOk: true, // felt easier than output
+    declaredSorenessElevated: true, // but the legs are sore
+  }));
+  assertEquals(r?.claimable, true);
+  assertEquals(r?.source, 'both');
+});
+Deno.test('soreness is one-way: NOT elevated (un-sore) + objective quiet → silent', () => {
+  const r = detectCrossDomainCarryover(base({
+    effortSignal: 'hr_at_pace', rawElevation: -9, adjustedElevation: -9, threshold: 3,
+    declaredSorenessElevated: false,
+  }));
+  assertEquals(r?.claimable, false);
+  assertEquals(r?.suppressedBy, 'no_elevation');
+});
+
 // ── the pins ──────────────────────────────────────────────────────────────────────────────────────
 Deno.test('novelty does NOT widen the window: a novel lift 4 days out is still out of window', () => {
   const r = detectCrossDomainCarryover(base({
@@ -218,6 +249,17 @@ Deno.test('clause: novel antecedent → stronger "paying it off" framing', () =>
 Deno.test('clause: swim → upper-body framing', () => {
   const r = detectCrossDomainCarryover(base({ targetDiscipline: 'swim', recentSessions: [{ date: '2026-06-23', type: 'strength', strengthFocus: 'upper', workload: 100, isNovel: false }] }));
   assertEquals(buildCarryoverClause(r, 'swim'), "Tuesday's upper-body work may still be in your arms here — the effort sat a touch above your usual.");
+});
+Deno.test('clause PROVENANCE: LOGGED soreness → may state the sensation ("you reported sore legs")', () => {
+  const r = detectCrossDomainCarryover(base({ targetDiscipline: 'ride', effortSignal: 'hr_at_pace', rawElevation: -9, adjustedElevation: -9, threshold: 3, declaredSorenessElevated: true }));
+  const c = buildCarryoverClause(r, 'ride') || '';
+  assertEquals(c.includes('You reported sore legs') && c.includes('right call'), true, c);
+});
+Deno.test('clause PROVENANCE: INFERRED (RPE, no logged soreness) → LOAD language, NEVER asserts "sore"', () => {
+  const r = detectCrossDomainCarryover(base({ targetDiscipline: 'ride', effortSignal: 'hr_at_pace', rawElevation: -9, adjustedElevation: -9, threshold: 3, declaredRpeGap: 1.5, declaredBaselineOk: true }));
+  const c = buildCarryoverClause(r, 'ride') || '';
+  assertEquals(/sore/i.test(c), false, `inferred path must never claim the sensation: ${c}`);
+  assertEquals(c.includes('carrying'), true, c);
 });
 Deno.test('clause: recovery-positive (ride) → managed-well framing (Q-115), not fatigue-cost', () => {
   const r = detectCrossDomainCarryover(base({ targetDiscipline: 'ride', effortSignal: 'hr_at_pace', rawElevation: -9, adjustedElevation: -9, threshold: 3, declaredRpeGap: 1.5, declaredBaselineOk: true }));

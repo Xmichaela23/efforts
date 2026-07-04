@@ -2619,12 +2619,37 @@ Deno.serve(async (req) => {
               declaredBaselineOk = true;
             }
           }
+          // Declared soreness (Q-049) — the STRONGEST leg-feel signal. Z-score vs the athlete's OWN baseline
+          // (same gauge architecture + baseline-quality gate as RPE); elevated → first-class carryover trigger
+          // that catches the sore-legs-easy-ride the objective + RPE gauges miss.
+          let declaredSorenessElevated = false;
+          let soreDiag = 'no soreness data';
+          {
+            const { data: checkins } = await supabase.from('readiness_checkins')
+              .select('date, soreness').eq('user_id', uid)
+              .gte('date', new Date(new Date(wDate + 'T12:00:00Z').getTime() - 60 * 86400000).toISOString().slice(0, 10)).lte('date', wDate)
+              .order('date', { ascending: false });
+            const rows = ((checkins ?? []) as any[]).map((c) => ({ date: String(c.date), s: Number(c.soreness) })).filter((c) => Number.isFinite(c.s));
+            const recent = rows.find((c) => Math.abs((new Date(wDate + 'T12:00:00Z').getTime() - new Date(c.date + 'T12:00:00Z').getTime()) / 86400000) <= 2);
+            const baseRows = rows.filter((c) => c !== recent);
+            if (recent && baseRows.length >= 5) {
+              const mean = baseRows.reduce((a, b) => a + b.s, 0) / baseRows.length;
+              const sd = Math.sqrt(baseRows.reduce((a, b) => a + (b.s - mean) ** 2, 0) / baseRows.length) || 1;
+              const z = (recent.s - mean) / sd;
+              declaredSorenessElevated = z >= 1.0 && recent.s >= mean + 1; // above own norm (z≥1) AND a real absolute step
+              soreDiag = `soreness ${recent.s} vs norm ${mean.toFixed(1)} (z ${z.toFixed(1)})`;
+            } else if (recent) {
+              soreDiag = `soreness baseline thin (${baseRows.length} check-ins)`;
+            } else {
+              soreDiag = rows.length ? 'no recent soreness check-in' : 'no soreness data';
+            }
+          }
           const carry = detectCrossDomainCarryover({
             targetDate: wDate, targetDiscipline: 'ride',
             effortSignal: 'hr_at_pace',
             rawElevation, adjustedElevation: confounded ? 0 : rawElevation, threshold: 3,
             confounds: { grade: false, heat: heatConfound, prescribedHard },
-            recentSessions, nonLegElevated: null, declaredRpeGap, declaredBaselineOk,
+            recentSessions, nonLegElevated: null, declaredRpeGap, declaredBaselineOk, declaredSorenessElevated,
           });
           const clause = buildCarryoverClause(carry, 'ride');
           if (clause) { ai_summary = ai_summary ? `${ai_summary} ${clause}` : clause; if (!ai_summary_generated_at) ai_summary_generated_at = new Date().toISOString(); }
@@ -2638,7 +2663,7 @@ Deno.serve(async (req) => {
             else if (!declaredBaselineOk) why = `baseline thin (${compCount} comparable RPE ride${compCount === 1 ? '' : 's'})`;
             else if (expectedRpe != null) why = `RPE ${thisRpe} ≈ your norm ${expectedRpe.toFixed(1)} (not elevated), objective quiet (decoup ${decoupPct.toFixed(1)}%)`;
             else why = `${carry?.suppressedBy ?? 'no signal'}`;
-            ai_summary = `${ai_summary ?? ''}\n\n⟨diag⟩ carryover silent — ${why}`;
+            ai_summary = `${ai_summary ?? ''}\n\n⟨diag⟩ carryover silent — ${why} · ${soreDiag}`;
           }
           console.log(`[analyze-cycling-workout] carryover ${carry?.claimable ? `CLAIMED (${carry.confidence})` : `silent (${carry?.suppressedBy})`} [decoup=${decoupPct} rpe=${thisRpe} if=${thisIF} comps=${compCount} liftAge=${nearestLift?.age ?? 'none'}]`);
         }
