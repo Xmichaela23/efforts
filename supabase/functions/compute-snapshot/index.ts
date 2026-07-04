@@ -663,6 +663,8 @@ serve(async (req: Request) => {
           hr_at_band: r.workout_analysis?.bike_fitness_v1?.hr_at_band ?? null,
           band_source: r.workout_analysis?.bike_fitness_v1?.band_source ?? null,
           hr_corrupt: !!r.workout_metadata?.hr_corrupt,
+          efficiency_factor: r.workout_analysis?.efficiency?.efficiency_factor ?? null,
+          aerobic_decoupling_pct: r.workout_analysis?.efficiency?.aerobic_decoupling_pct ?? null,
         }));
 
         const runRows = (runR.data ?? []) as any[];

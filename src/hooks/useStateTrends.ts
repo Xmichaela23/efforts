@@ -109,6 +109,8 @@ export function useStateTrends(): StateTrends {
         hr_at_band: r.workout_analysis?.bike_fitness_v1?.hr_at_band ?? null,
         band_source: r.workout_analysis?.bike_fitness_v1?.band_source ?? null,
         hr_corrupt: !!r.workout_metadata?.hr_corrupt,
+        efficiency_factor: r.workout_analysis?.efficiency?.efficiency_factor ?? null,
+        aerobic_decoupling_pct: r.workout_analysis?.efficiency?.aerobic_decoupling_pct ?? null,
       }));
 
       // run — join classified_type from workouts (RPM source field workout_intent is null)
