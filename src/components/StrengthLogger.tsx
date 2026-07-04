@@ -217,9 +217,10 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
   onSubmit, 
   data 
 }) => {
-  const [energy, setEnergy] = useState(data?.energy || 7);
-  const [soreness, setSoreness] = useState(data?.soreness || 3);
-  const [sleep, setSleep] = useState(data?.sleep || 7);
+  // Hooper 1–7 (D-234/D-235): defaults are the rescaled equivalents of the old 1–10 defaults (7→5, 3→2).
+  const [energy, setEnergy] = useState(data?.energy || 5);
+  const [soreness, setSoreness] = useState(data?.soreness || 2);
+  const [sleep, setSleep] = useState(data?.sleep || 7); // sleep is HOURS — unchanged
 
   const handleSubmit = () => {
     onSubmit({ energy, soreness, sleep });
@@ -263,7 +264,7 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
               <input
                 type="range"
                 min="1"
-                max="10"
+                max="7"
                 value={energy}
                 onChange={(e) => setEnergy(Number(e.target.value))}
                 className="flex-1 h-2 bg-white/[0.15] rounded-lg"
@@ -282,8 +283,8 @@ const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({
               <span className="text-sm text-white/60">None</span>
               <input
                 type="range"
-                min="0"
-                max="10"
+                min="1"
+                max="7"
                 value={soreness}
                 onChange={(e) => setSoreness(Number(e.target.value))}
                 className="flex-1 h-2 bg-white/[0.15] rounded-lg"

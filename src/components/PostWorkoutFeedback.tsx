@@ -7,6 +7,8 @@ import { useToast } from './ui/use-toast';
 import { useAppContext } from '@/contexts/AppContext';
 import { parseLocalDate } from '@/lib/dateUtils';
 import MapEffort from './MapEffort';
+import SorenessScale from './SorenessScale';
+import { readinessSorenessPatch } from '@/utils/workoutMetadata';
 import {
   Select,
   SelectContent,
@@ -110,6 +112,9 @@ export default function PostWorkoutFeedback({
   const [selectedGearId, setSelectedGearId] = useState<string | null>(existingGearId || null);
   const [selectedRpe, setSelectedRpe] = useState<number | null>(existingRpe || null);
   const [selectedFeeling, setSelectedFeeling] = useState<string | null>(existingFeeling || null);
+  // Post-completion soreness (D-234/D-235, Hooper 1–7). NO DEFAULT — null until an explicit tap; a skipped
+  // control writes nothing (readinessSorenessPatch returns null on null).
+  const [selectedSoreness, setSelectedSoreness] = useState<number | null>(null);
 
   // Swim-only state (D-162)
   const isSwim = workoutType === 'swim';
@@ -355,6 +360,17 @@ export default function PostWorkoutFeedback({
         }
       }
 
+      // Post-completion soreness (D-234/D-235) — ALL disciplines. Merges into workout_metadata (reusing the
+      // swim block's meta if it built one). readinessSorenessPatch returns null when unanswered → no write.
+      {
+        const existingMeta = updateData.workout_metadata
+          ?? (typeof workoutData?.workout_metadata === 'string'
+            ? (() => { try { return JSON.parse(workoutData.workout_metadata); } catch { return {}; } })()
+            : (workoutData?.workout_metadata || {}));
+        const patched = readinessSorenessPatch(existingMeta, selectedSoreness);
+        if (patched) updateData.workout_metadata = patched;
+      }
+
       // Only update if something was selected
       if (Object.keys(updateData).length > 0) {
         const { error } = await supabase
@@ -568,6 +584,19 @@ export default function PostWorkoutFeedback({
           <span>Easy</span>
           <span>Max</span>
         </div>
+      </div>
+
+      {/* Muscle soreness (D-234/D-235) — optional, no default, all disciplines */}
+      <div>
+        <label className="text-sm font-light text-white/70 mb-2 block">
+          Muscle Soreness <span className="text-xs text-white/40 font-light">(optional)</span>
+        </label>
+        <SorenessScale
+          value={selectedSoreness}
+          onChange={setSelectedSoreness}
+          colorRgb={getRgbFromColor(sportColor)}
+          label=""
+        />
       </div>
 
       {/* Feeling Selection */}
