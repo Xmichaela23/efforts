@@ -18,6 +18,25 @@ Deno.test('ceiling: observed-max path (≥5 clean sessions) = max + 15', () => {
   assertEquals(r.ceiling, 197); // 182 + 15
 });
 
+Deno.test('ceiling ROBUSTNESS: an isolated 194 outlier does NOT inflate the ceiling (anchors on the 182 cluster)', () => {
+  // Michael's real shape: cluster 178–182, one lone 194 ride (+12 over the cluster). The 194 must
+  // be trimmed so the ceiling is 182+15=197, not 194+15=209 — else an existing artifact widens the guard.
+  const r = resolveMaxHrCeiling({
+    observedMaxima: [194, 182, 180, 179, 179, 179, 178, 178, 178, 177, 177, 177],
+    age: 57,
+  });
+  assertEquals(r.basis, 'observed');
+  assertEquals(r.observedMax, 182); // 194 trimmed as an isolated outlier
+  assertEquals(r.ceiling, 197);
+});
+
+Deno.test('ceiling robustness: a CLUSTERED high max is kept (193,192 near-together → not trimmed)', () => {
+  // Two close high values are a real cluster, not an isolated artifact → keep them.
+  const r = resolveMaxHrCeiling({ observedMaxima: [193, 192, 185, 184, 183, 182], age: 57 });
+  assertEquals(r.observedMax, 193); // 193−192=1 ≤ gap → kept
+  assertEquals(r.ceiling, 208);
+});
+
 Deno.test('ceiling: Michael (age 57) formula fallback (thin history) = Tanaka 168 + 30 = 198', () => {
   const r = resolveMaxHrCeiling({ observedMaxima: [180], age: 57 }); // 1 clean < 5 → fallback
   assertEquals(r.basis, 'formula');

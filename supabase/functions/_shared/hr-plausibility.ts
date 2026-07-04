@@ -30,8 +30,23 @@ export interface CeilingResult {
   tanaka: number | null;
 }
 
+/**
+ * Distribution-robust observed max: an isolated high outlier (an existing cadence-lock/spike
+ * in history, not yet flagged) must NOT anchor the ceiling. Sort desc; drop the top value while
+ * it sits > `gapBpm` above the next (an isolated outlier), capped at ~10% of sessions so we only
+ * shave isolated spikes, never the real cluster. Returns the first clustered value.
+ */
+export function robustObservedMax(maxima: number[], gapBpm = 10): number | null {
+  const sorted = (maxima || []).filter((v) => Number.isFinite(v) && v > 0).sort((a, b) => b - a);
+  if (!sorted.length) return null;
+  const dropLimit = Math.max(1, Math.floor(sorted.length * 0.1));
+  let i = 0;
+  while (i < sorted.length - 1 && i < dropLimit && (sorted[i] - sorted[i + 1]) > gapBpm) i += 1;
+  return sorted[i];
+}
+
 export function resolveMaxHrCeiling(args: {
-  /** max HR from CLEAN (non-rejected) sessions that had HR — already vetted by the other filters. */
+  /** max HR per session that had HR. An isolated artifact here is trimmed by robustObservedMax. */
   observedMaxima: number[];
   age?: number | null;
   /** clean-session count below which we fall back to the formula. Default 5. */
@@ -39,17 +54,18 @@ export function resolveMaxHrCeiling(args: {
   observedHeadroom?: number; // default +15
   formulaHeadroom?: number;  // default +30
   fallbackAge?: number;      // used only when age is missing. Default 40.
+  outlierGapBpm?: number;    // isolated-outlier gap for robustObservedMax. Default 10.
 }): CeilingResult {
   const clean = (args.observedMaxima || []).filter((v) => Number.isFinite(v) && v > 0);
   const minN = args.minCleanSessions ?? 5;
   const obsHead = args.observedHeadroom ?? 15;
   const formHead = args.formulaHeadroom ?? 30;
-  const observedMax = clean.length ? Math.max(...clean) : null;
+  const observedMax = robustObservedMax(clean, args.outlierGapBpm ?? 10);
 
   const age = (typeof args.age === 'number' && args.age > 0) ? args.age : (args.fallbackAge ?? 40);
   const tanaka = Math.round(208 - 0.7 * age);
 
-  // Primary: observed max + headroom, once we trust enough clean sessions.
+  // Primary: robust observed max + headroom, once we trust enough clean sessions.
   if (clean.length >= minN && observedMax != null) {
     return { ceiling: observedMax + obsHead, basis: 'observed', observedMax, tanaka };
   }
