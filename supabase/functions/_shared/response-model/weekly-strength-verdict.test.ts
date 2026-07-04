@@ -40,7 +40,7 @@ Deno.test('REPRO[125→115]: RIR-only back-off, suggested = best×0.9, no anchor
   assertEquals(bench.verdict_label, 'back off weight');
   assertEquals(bench.verdict_tone, 'caution');
   assertEquals(bench.best_weight, 125);
-  assertEquals(bench.suggested_weight, 115); // 125 * 0.9 = 112.5 → /5 round → 115
+  assertEquals(bench.suggested_weight, null); // Q-111 fact-only: back-off no longer prescribes lighter
   assertEquals(bench.anchor_1rm ?? null, null); // baseline-blind: the typed 150 never entered
 });
 
@@ -56,21 +56,34 @@ Deno.test('accessory (no anchor): behavior unchanged — still RIR back-off to 1
   const l = res.per_lift[0];
   assertEquals(l.verdict_label, 'back off weight');
   assertEquals(l.verdict_tone, 'caution');
-  assertEquals(l.suggested_weight, 205); // 225*0.9=202.5 → /5 round → 205
+  assertEquals(l.suggested_weight, null); // Q-111 fact-only: back-off drops the lighter prescription
   assertEquals(l.anchor_1rm ?? null, null);
 });
 
-// ── FIXED — typed anchor 150 present: the repro FLIPPED to expected output ─────────────────────────
-Deno.test('FLIPPED[anchor 150]: working 125 vs 150 baseline → de-alarmed, anchor carried, still suggests 115', () => {
+// ── FIXED — typed anchor 150 present: de-alarmed tone + anchor carried; NO lighter prescription ────
+Deno.test('FLIPPED[anchor 150]: working 125 vs 150 baseline → de-alarmed, anchor carried, NO suggestion (fact-only)', () => {
   const res = computeStrength([benchBackOff(150)], 'build');
   const bench = res.per_lift[0];
-  // The typed anchor is now CARRIED on the row so the client can render a self-explanatory string.
+  // The typed anchor is CARRIED on the row so the client renders "Working ~125 vs your 150 baseline".
   assertEquals(bench.anchor_1rm, 150);
   // Working 125 is ≤90% of the 150 anchor → clear headroom → the RIR back-off is NOT an alarm.
   assertEquals(bench.verdict_tone, 'neutral');
-  // The suggested working weight is still a sane target (unchanged number), bounded below the anchor.
-  assertEquals(bench.suggested_weight, 115);
-  assert(bench.suggested_weight! < bench.anchor_1rm!, 'suggestion must stay below the tested 1RM');
+  // Q-111 fact-only: a decline/back-off no longer prescribes a lighter weight — state the fact only.
+  assertEquals(bench.suggested_weight, null);
+});
+
+// ── Q-111: PROGRESSION ("add weight") suggestions are KEPT — only the "go lighter" is dropped ───────
+Deno.test('add-weight KEPT: headroom on RIR → "add weight" verdict still carries a suggestion', () => {
+  const readyToProgress: StrengthLiftSnapshot = {
+    canonical_name: 'squat', display_name: 'Squat',
+    current_e1rm: 200, previous_e1rm: null,
+    current_avg_rir: 4, baseline_avg_rir: 2, target_rir: 2, // well above target → room to add
+    sessions_in_window: 4, best_weight: 180, anchor_1rm: null,
+  } as StrengthLiftSnapshot;
+  const res = computeStrength([readyToProgress], 'build');
+  const l = res.per_lift[0];
+  assertEquals(l.verdict_label, 'add weight');
+  assert(l.suggested_weight != null, 'progression suggestion must be kept');
 });
 
 // ── FIXED — near-max working weight vs anchor keeps the alarm (headroom guard is not a blanket mute) ─

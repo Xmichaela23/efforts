@@ -1188,6 +1188,93 @@ export default function StateTab({
   const aimlessCtaAction = serverEmptyState?.cta_action ?? 'create_goal';
   const aimlessCtaTarget = aimlessCtaAction === 'plan_season' ? '/goals' : '/goals';
 
+  // Q-107 H3 nest: the per-lift rows render NESTED under the STRENGTH trend row inside
+  // StatePerformanceSection (below), framed "from your logged sets" as provisional detail — so a
+  // confident per-lift line can't read as a second, competing "STRENGTH" top-line when the spine
+  // trend says needs-data. All state/handlers stay here; only the rendered node is passed down.
+  const strengthPerLiftDetail: React.ReactNode = perLift.length > 0 ? (
+    <div className="mt-1.5 ml-[84px] pl-3 border-l border-white/[0.07] space-y-2">
+      <div className="text-[10px] uppercase tracking-wider text-white/35">from your logged sets</div>
+      {perLift.map((lt: any) => {
+        const verdictLabel: string = lt.verdict_label ?? '—';
+        const verdictColor = verdictToneToColor(lt.verdict_tone ?? 'neutral');
+        const suggestedWeight: number | null = lt.suggested_weight ?? null;
+        const bestWeight: number | null = lt.best_weight ?? liftWeightMap.get(lt.canonical_name) ?? null;
+        const hasWeightSuggestion = suggestedWeight != null && bestWeight != null && bestWeight > 0;
+        const e1rmPct = lt.e1rm_current != null && lt.peak1RM > 0
+          ? Math.min(100, Math.round((lt.e1rm_current / lt.peak1RM) * 100))
+          : lt.e1rm_current != null && lt.e1rm_previous != null && lt.e1rm_previous > 0
+          ? Math.min(100, Math.round((lt.e1rm_current / (lt.e1rm_previous * 1.1)) * 100))
+          : null;
+        // D-231 / Q-107 H1: self-explanatory row (My Record pattern) — what we measured, versus the
+        // typed baseline anchor, and the action. Only when a typed anchor (anchor_1rm) exists;
+        // accessories / gap-fill lifts (no anchor) keep the legacy "best → suggested" pair.
+        const anchor1rm: number | null = lt.anchor_1rm ?? null;
+        const tone: string = lt.verdict_tone ?? 'neutral';
+        const actionText: string = hasWeightSuggestion
+          ? (verdictLabel === 'add weight' ? `add to ${suggestedWeight} next session`
+             : verdictLabel === 'back off weight' ? (tone === 'caution' ? `ease to ${suggestedWeight} this week` : `suggest ${suggestedWeight} this week`)
+             : `to ${suggestedWeight}`)
+          : verdictLabel;
+        const rowText: string = (anchor1rm != null && bestWeight != null && bestWeight > 0)
+          // Q-111 (fact-only): with a typed anchor, state the fact; append an action ONLY when there's
+          // a suggestion (progression). A decline drops the suggestion server-side, so this renders
+          // "Working ~125 vs your 150 baseline." — no prescription.
+          ? (hasWeightSuggestion
+              ? `Working ~${bestWeight} vs your ${anchor1rm} baseline — ${actionText}`
+              : `Working ~${bestWeight} vs your ${anchor1rm} baseline`)
+          : hasWeightSuggestion
+            ? `${bestWeight} → ${suggestedWeight} lbs`
+            : verdictLabel;
+        return (
+          <div key={lt.canonical_name} className="space-y-1">
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-[12px] text-white/80 shrink-0">{lt.display_name}</span>
+              <span className="relative max-w-[68%]">
+                {hasWeightSuggestion ? (
+                  <button
+                    onClick={() => setAdjustingLift(adjustingLift === lt.canonical_name ? null : lt.canonical_name)}
+                    className={`text-[12px] ${verdictColor} underline decoration-dotted underline-offset-2 hover:opacity-80 text-right`}
+                  >{rowText}</button>
+                ) : (
+                  <span className={`text-[12px] ${verdictColor} text-right`}>{rowText}</span>
+                )}
+                {adjustingLift === lt.canonical_name && (
+                  <StrengthAdjustmentModal
+                    exerciseName={lt.display_name}
+                    currentWeight={bestWeight ?? 0}
+                    nextPlannedWeight={suggestedWeight ?? bestWeight ?? 0}
+                    targetRir={(lt as any).rir_target ?? undefined}
+                    actualRir={lt.rir_current ?? undefined}
+                    planId={wsv.plan.plan_id ?? undefined}
+                    isBodyweight={false}
+                    hasPlannedWeight={(bestWeight ?? 0) > 0}
+                    onClose={() => setAdjustingLift(null)}
+                    onSaved={() => { setAdjustingLift(null); refresh(); }}
+                  />
+                )}
+              </span>
+            </div>
+            {e1rmPct != null && (
+              <div className="h-[3px] w-full rounded-full bg-white/[0.06]">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${e1rmPct}%`,
+                    backgroundColor: verdictLabel === 'add weight' ? 'rgba(251,191,36,0.5)' :
+                      verdictLabel === 'back off weight' ? 'rgba(248,113,113,0.4)' :
+                      verdictLabel === 'getting stronger' ? 'rgba(52,211,153,0.4)' :
+                      'rgba(255,255,255,0.15)',
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  ) : null;
+
   return (
     <div className="pt-1 pb-4">
       {/* ── Header ── */}
@@ -1440,7 +1527,7 @@ export default function StateTab({
         )}
 
         {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
-        <StatePerformanceSection />
+        <StatePerformanceSection strengthDetail={strengthPerLiftDetail} />
 
         {/* SWIM re-test nudge (D-200) — fires after ≥4 weeks + ≥4 honored swims; auto-clears when the
             threshold is updated/tested (lastUpdatedAt moves). Dismiss = 7-day snooze (shared pattern). */}
@@ -1503,87 +1590,8 @@ export default function StateTab({
           </div>
         )}
 
-        {/* STRENGTH */}
-        <div className="px-3 py-3">
-          <div className="flex items-start gap-3">
-            <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">STRENGTH</span>
-            <div className="flex-1 space-y-2">
-              {perLift.length === 0 && <Chip value="no data" valueClass="text-white/55" />}
-              {perLift.map((lt: any) => {
-                const verdictLabel: string = lt.verdict_label ?? '—';
-                const verdictColor = verdictToneToColor(lt.verdict_tone ?? 'neutral');
-                const suggestedWeight: number | null = lt.suggested_weight ?? null;
-                const bestWeight: number | null = lt.best_weight ?? liftWeightMap.get(lt.canonical_name) ?? null;
-                const hasWeightSuggestion = suggestedWeight != null && bestWeight != null && bestWeight > 0;
-                const e1rmPct = lt.e1rm_current != null && lt.peak1RM > 0
-                  ? Math.min(100, Math.round((lt.e1rm_current / lt.peak1RM) * 100))
-                  : lt.e1rm_current != null && lt.e1rm_previous != null && lt.e1rm_previous > 0
-                  ? Math.min(100, Math.round((lt.e1rm_current / (lt.e1rm_previous * 1.1)) * 100))
-                  : null;
-                // D-231 / Q-107 H1: self-explanatory row (My Record pattern) — what we measured, versus
-                // the typed baseline anchor, and the action. Only when a typed anchor (anchor_1rm) exists;
-                // accessories / gap-fill lifts (no anchor) keep the legacy "best → suggested" pair.
-                const anchor1rm: number | null = lt.anchor_1rm ?? null;
-                const tone: string = lt.verdict_tone ?? 'neutral';
-                const actionText: string = hasWeightSuggestion
-                  ? (verdictLabel === 'add weight' ? `add to ${suggestedWeight} next session`
-                     : verdictLabel === 'back off weight' ? (tone === 'caution' ? `ease to ${suggestedWeight} this week` : `suggest ${suggestedWeight} this week`)
-                     : `to ${suggestedWeight}`)
-                  : verdictLabel;
-                const rowText: string = (anchor1rm != null && bestWeight != null && bestWeight > 0)
-                  ? `Working ~${bestWeight} vs your ${anchor1rm} baseline — ${actionText}`
-                  : hasWeightSuggestion
-                    ? `${bestWeight} → ${suggestedWeight} lbs`
-                    : verdictLabel;
-                return (
-                  <div key={lt.canonical_name} className="space-y-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="text-[12px] text-white/80 shrink-0">{lt.display_name}</span>
-                      <span className="relative max-w-[68%]">
-                        {hasWeightSuggestion ? (
-                          <button
-                            onClick={() => setAdjustingLift(adjustingLift === lt.canonical_name ? null : lt.canonical_name)}
-                            className={`text-[12px] ${verdictColor} underline decoration-dotted underline-offset-2 hover:opacity-80 text-right`}
-                          >{rowText}</button>
-                        ) : (
-                          <span className={`text-[12px] ${verdictColor} text-right`}>{rowText}</span>
-                        )}
-                        {adjustingLift === lt.canonical_name && (
-                          <StrengthAdjustmentModal
-                            exerciseName={lt.display_name}
-                            currentWeight={bestWeight ?? 0}
-                            nextPlannedWeight={suggestedWeight ?? bestWeight ?? 0}
-                            targetRir={(lt as any).rir_target ?? undefined}
-                            actualRir={lt.rir_current ?? undefined}
-                            planId={wsv.plan.plan_id ?? undefined}
-                            isBodyweight={false}
-                            hasPlannedWeight={(bestWeight ?? 0) > 0}
-                            onClose={() => setAdjustingLift(null)}
-                            onSaved={() => { setAdjustingLift(null); refresh(); }}
-                          />
-                        )}
-                      </span>
-                    </div>
-                    {e1rmPct != null && (
-                      <div className="h-[3px] w-full rounded-full bg-white/[0.06]">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${e1rmPct}%`,
-                            backgroundColor: verdictLabel === 'add weight' ? 'rgba(251,191,36,0.5)' :
-                              verdictLabel === 'back off weight' ? 'rgba(248,113,113,0.4)' :
-                              verdictLabel === 'getting stronger' ? 'rgba(52,211,153,0.4)' :
-                              'rgba(255,255,255,0.15)',
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        {/* STRENGTH per-lift detail moved (Q-107 H3) — now nested under the STRENGTH trend row inside
+            <StatePerformanceSection> above (passed as strengthDetail). No second "STRENGTH" header. */}
 
         {/* RACE — visible during the build and through race week; disappears 7 days after the race. */}
         {(() => {

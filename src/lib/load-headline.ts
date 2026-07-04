@@ -78,13 +78,17 @@ export function buildLoadHeadline(opts: {
   isTaperOrPeak?: boolean;
 }): string | null {
   const { loadLabel, readinessState, readinessLabel, fitnessDirection, isTaperOrPeak } = opts;
-  if (loadLabel === '—') return null;
   // In taper/peak, a "build more" reading is by-design low volume — don't lead the glance with it.
   const effLoad = isTaperOrPeak && loadLabel === 'build more' ? 'balanced' : loadLabel;
   const state = stateSlot(effLoad, readinessState, readinessLabel);
-  if (!state) return null;
   const fit = fitnessSlot(fitnessDirection);
-  const obs = observationSlot(effLoad, readinessState, readinessLabel);
-  const lead = [state, fit].filter(Boolean).join(' · ');
-  return obs ? `${lead} — ${obs}.` : `${lead}.`;
+  const obs = state ? observationSlot(effLoad, readinessState, readinessLabel) : null;
+
+  // Q-111 §5 (mixed-clocks): declare each verdict's time-scope so a THIS-WEEK read (load +
+  // readiness + observation) and the ~6-WEEK fitness trend can never fuse into one claim. The
+  // "6 weeks" window is the representative fitness-trend window (run-primary 42d); tunable.
+  const clauses: string[] = [];
+  if (state) clauses.push(`This week: ${obs ? `${state} — ${obs}` : state}.`);
+  if (fit) clauses.push(`Over 6 weeks: ${fit}.`);
+  return clauses.length ? clauses.join(' ') : null;
 }

@@ -246,7 +246,12 @@ export function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: strin
       verdict_label: verdict.label,
       verdict_tone: verdict.tone,
       best_weight,
-      suggested_weight: computeSuggestedWeight(verdict.label, best_weight, l.canonical_name, anchor_1rm),
+      // Q-111 (fact-only): DROP the "go lighter" prescription on a decline — no established app
+      // prescribes backing off a working weight off one reading. State the fact, don't prescribe.
+      // Progression ("add weight") suggestions are kept — those are helpful, not the objection.
+      suggested_weight: verdict.label === 'back off weight'
+        ? null
+        : computeSuggestedWeight(verdict.label, best_weight, l.canonical_name, anchor_1rm),
       anchor_1rm,
     };
   });

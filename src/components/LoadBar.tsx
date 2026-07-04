@@ -125,7 +125,17 @@ export default function LoadBar({ load, loadStatus, readinessState, weekIntent, 
           {(() => {
             const vl = acwrLabel(load.acwr);
             if (vl === '—' || (isTaperOrPeak && vl === 'build more')) return null;
-            return <><Dot /><span className={`text-[14px] font-semibold tracking-tight ${loadVolumeColor(vl)}`}>{vl}</span></>;
+            return (
+              <>
+                <Dot /><span className={`text-[14px] font-semibold tracking-tight ${loadVolumeColor(vl)}`}>{vl}</span>
+                {/* Approach-C bridge: our plain-language verdict LEADS; the standard term (ACWR — the
+                    D-236 canonical acute:chronic ratio this label already reads) rides alongside, dimmer,
+                    for TrainingPeaks/Garmin users. Only ACWR is bridged; WTD stays "pts" (our unit, not TSS). */}
+                {load.acwr != null && (
+                  <><Dot /><span className="text-[11px] tabular-nums text-white/45">ACWR {load.acwr.toFixed(1)}</span></>
+                )}
+              </>
+            );
           })()}
         </div>
       </div>

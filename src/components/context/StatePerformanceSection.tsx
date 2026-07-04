@@ -165,7 +165,7 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
   );
 }
 
-export default function StatePerformanceSection() {
+export default function StatePerformanceSection({ strengthDetail }: { strengthDetail?: React.ReactNode }) {
   const { cards, headline, bikeFitness, swimRest, loading } = useStateTrends();
   if (loading || cards.length === 0) return null;
 
@@ -177,11 +177,17 @@ export default function StatePerformanceSection() {
     <div className="px-3 py-3">
       <div className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase mb-1.5">Performance</div>
       {headline && <div className="text-[14px] font-medium text-white/90 leading-snug mb-2.5">{headline.line}</div>}
-      {cards.map((card) =>
-        card.discipline === 'bike' && bikeHasSubstance
-          ? <BikeFitnessRow key="bike" fitness={bikeFitness!} />
-          : <DisciplineRow key={card.discipline} card={card} restTrend={card.discipline === 'swim' ? swimRest : null} />,
-      )}
+      {cards.map((card) => {
+        if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow key="bike" fitness={bikeFitness!} />;
+        const row = <DisciplineRow key={card.discipline} card={card} restTrend={card.discipline === 'swim' ? swimRest : null} />;
+        // Q-107 H3: nest the per-lift detail directly under the STRENGTH trend row — one STRENGTH header,
+        // the lifts as provisional "from your logged sets" detail (no competing second top-line).
+        return (card.discipline === 'strength' && strengthDetail)
+          ? <React.Fragment key="strength">{row}{strengthDetail}</React.Fragment>
+          : row;
+      })}
+      {/* defensive: if there's no strength trend card at all, still surface the per-lift detail */}
+      {strengthDetail && !cards.some((c) => c.discipline === 'strength') && strengthDetail}
     </div>
   );
 }
