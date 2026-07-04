@@ -697,9 +697,17 @@ Write 3-4 plain-prose observations addressed to the swimmer as "you" (one or two
                 recentSessions: recentSessions2, nonLegElevated: null,
                 declaredEasy: Number.isFinite(rpe2) && rpe2 > 0 && rpe2 <= 4,
               });
-              const clauseS = buildCarryoverClause(carryS, 'swim');
+              // Research (2026-07-03): legs are only ~10-15% of swim propulsion, so leg-DOMS barely moves
+              // swim pace — a pace change is more likely stroke/conditions/arms than sore quads. So for
+              // swim specifically, pace ALONE cannot fire a leg-carryover claim; it requires a declared
+              // leg-feel confirmer (Axis 4), which isn't wired for swim yet → swim leg-carryover stays
+              // silent. The physiologically stronger swim story is UPPER-body (heavy press → swim, §6) — the
+              // priority axis for swim, sequenced ahead of this weak leg axis. Detector still runs (for the
+              // suppressedBy log + future declared/upper wiring); the clause is gated off pace-alone.
+              const swimDeclaredLegFeel = false; // Axis 4 declared arm/leg-feel for swim — not wired yet
+              const clauseS = swimDeclaredLegFeel ? buildCarryoverClause(carryS, 'swim') : null;
               if (clauseS) narrativeInsights = [...narrativeInsights, clauseS].slice(0, 5);
-              console.log(`[analyze-swim] carryover ${carryS?.claimable ? 'CLAIMED' : `silent (${carryS?.suppressedBy})`} [pace ${avgPacePer100}/${baseP} stroke=${stroke}]`);
+              console.log(`[analyze-swim] carryover ${carryS?.claimable ? `pace-claimable(gated, no declared) ` : `silent (${carryS?.suppressedBy})`}[pace ${avgPacePer100}/${baseP} stroke=${stroke}]`);
             }
           } catch (carryErr) {
             console.warn('[analyze-swim] carryover skipped:', carryErr);

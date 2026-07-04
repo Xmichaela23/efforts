@@ -75,7 +75,9 @@ If effort is elevated in the leg-driven session but ALSO elevated across non-leg
 ## 3. Directionality & pairs (reconcile — mostly settled)
 
 - **lower / full strength → run, ride** (leg-driven) — the proven, high-signal case (`crossDomainPairs` today).
-- **upper / full strength → swim** (and upper-driven efforts) — Q-111 §6 generalization; same detector, `strengthFocus==='upper'`.
+  - **BIKE is the cleanest carryover discipline (research-confirmed 2026-07-03):** power directly measures leg force with no bodyweight-masking. Precise mechanism — cycling is *concentric-dominant* so it doesn't itself cause much DOMS, but it cleanly *reveals* pre-existing leg DOMS from a lift (the target case). "Lowers power + raises HR" compounds (no self-cancel). Signal = power-at-HR decoupling. Built as-is; keep.
+- **upper / full strength → swim** (and upper-driven efforts) — Q-111 §6 generalization; `strengthFocus==='upper'`.
+  - **SWIM: upper is the PRIORITY axis, not legs (research-confirmed 2026-07-03).** Legs are only ~10-15% of swim propulsion, so leg-DOMS barely registers in swim pace — a swim pace change is more likely stroke/conditions/arms than sore quads. So: (1) swim's weak leg axis must NOT fire on pace alone — it requires a declared leg-feel confirmer (Axis 4, not yet wired); (2) the physiologically stronger swim-carryover story is **upper-body (heavy press → swim)** — sequence §6 to build swim's upper axis ahead of its weak leg axis. Swim card stays courtesy-tier / silence-default regardless.
 - **full-body → both.**
 - **DEFER: endurance → strength.** A hard ride before a lift does cause fatigue, but strength here is RIR-regulated (the athlete auto-adjusts load), so the signal is weak and self-correcting. Out of scope for v1; revisit if a real signal appears. Keeping v1 to strength→endurance + upper→swim keeps the attribution tractable.
 

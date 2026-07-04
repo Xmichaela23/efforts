@@ -1407,6 +1407,15 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-115 — Holistic model must allow RECOVERY-POSITIVE cross-domain interactions, not only fatigue-additive
+
+- **Status:** filed 2026-07-03 (Michael, holistic-state design input). The cross-domain carryover model (Axis 1) and the load/interference model currently assume every discipline interaction ADDS fatigue. That's incomplete: **some cross-domain interactions RESTORE rather than cost.** Canonical example: an easy **swim after a heavy leg day** is recovery-adjacent — low-impact, non-eccentric, promotes DOMS blood flow / active recovery. Treating it as pure additive load (or worse, as a fatigue signal) overstates strain and misreads the athlete's actual state.
+- **The design principle:** cross-domain interactions have a SIGN. Fatigue-additive (heavy lift → hard run = compounding) is one case; recovery-positive (hard session → easy low-impact cross-training = restorative) is another. The holistic model — load, readiness, strain, and the carryover narrative — should recognize restorative interactions, not only costs.
+- **Where it lands:** (a) the readiness/strain model shouldn't count a recovery-adjacent easy swim as strain "across disciplines"; (b) the carryover narrative could eventually say the *helpful* version ("yesterday's easy swim likely helped the legs recover from the lift"), not just the cost version. Neither built — logged as the design input.
+- **Cross-ref:** Axis 1 (`SELF-AWARENESS-MAP.md`), `DESIGN-cross-domain-carryover.md`, Axis 5 (load↔readiness↔plan), D-233.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
