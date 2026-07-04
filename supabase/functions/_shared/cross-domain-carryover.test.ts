@@ -147,6 +147,11 @@ Deno.test('classifyStrengthFocus: bench + row → upper; mixed → full; nothing
   assertEquals(classifyStrengthFocus(['Back Squat', 'Bench Press']), 'full');
   assertEquals(classifyStrengthFocus(['Plank', 'Farmer Carry']), 'unknown');
 });
+Deno.test('coexist hardening: mostly-upper + ONE leg movement → full (presence, not ratio — the fork we closed)', () => {
+  // The coach's old ratio rule (1/3 lower < 0.5) called this "upper"; presence-based says "full" because
+  // a heavy squat DID load the legs. One shared derivation → State + cards can't disagree.
+  assertEquals(classifyStrengthFocus(['Bench Press', 'Bicep Curl', 'Back Squat']), 'full');
+});
 
 // ── narration: the ONE clause both surfaces speak (possibility, load language, cite the antecedent) ──
 Deno.test('clause: claimable non-novel ride → possibility + load language + the day', () => {

@@ -41,6 +41,7 @@ import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
 import { buildReadinessWhy, buildCrossTrainingReceipt } from '../_shared/response-model/readiness-receipts.ts';
 import { buildLoadedLegsDiagnosis, classifyFatigueLabel, type LoadedLegsDiagnosis } from '../_shared/response-model/loaded-legs.ts';
 import { detectNovelMovements, novelMovementsNames, type SessionMovement } from '../_shared/novel-movements.ts';
+import { classifyStrengthFocus } from '../_shared/cross-domain-carryover.ts';
 import { runGuardedNarrative, type NarrativeContext, type DisciplineVerdict } from '../_shared/narrative-core/index.ts';
 import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext, type GoalLite } from '../_shared/goal-context.ts';
 import { coachLegacyPriorRaceLine, coachPromptPriorRaceBlock } from '../_shared/prior-similar-race-coach.ts';
@@ -113,7 +114,8 @@ const corsHeaders: Record<string, string> = {
 /** v57: honesty (D-233) — the novel phrase cites the WINDOW actually checked ("in 8 weeks"), not "in months" (a duration the 56-day read can't establish). Bump so cached "in months" rows recompute. */
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
-const COACH_PAYLOAD_VERSION = 59; // 59: plan-week END-gated. // 58: novelty = "not in your recent training". // 57: "in 8 weeks". // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+/** v60: coexist hardening — coach strengthFocusFromWorkout now derives via the SHARED classifyStrengthFocus (presence-based) the carryover cards use, retiring the private ratio heuristic. State + cards derive "which focus" from ONE fact. Behavior: mixed sessions with any leg work now read 'lower'/'full' (was ratio-gated), so LEGS LOADED antecedent detection is slightly more inclusive (physiologically correct — a squat loads the legs). Bump so cached rows recompute. */
+const COACH_PAYLOAD_VERSION = 60; // 60: shared classifyStrengthFocus (one fact). // 59: plan-week END-gated. // 58: novelty = "not in your recent training". // 57: "in 8 weeks". // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -1458,14 +1460,10 @@ Deno.serve(async (req) => {
           if (/full|total/i.test(name)) return 'full';
           return 'unknown';
         }
-        const LOWER = /squat|deadlift|lunge|leg\s*press|leg\s*curl|leg\s*ext|hip\s*thrust|calf|glute|rdl|romanian|step.?up|hack\s*squat|good\s*morning|hamstring/i;
-        const names = exercises.map((e: any) => String(e?.name || '').toLowerCase());
-        let lower = 0, total = names.length;
-        for (const n of names) { if (LOWER.test(n)) lower++; }
-        if (total === 0) return 'unknown';
-        const ratio = lower / total;
-        if (ratio >= 0.5) return ratio >= 0.8 ? 'lower' : 'full';
-        return 'upper';
+        // ONE FACT (coexist hardening 2026-07-03): State + the cards derive "which focus" from the SAME
+        // shared classifyStrengthFocus the per-workout carryover cards use — not a private ratio heuristic
+        // that agrees by luck. Presence-based (any lower + any upper → full) replaces the old ratio rule.
+        return classifyStrengthFocus(exercises.map((e: any) => String(e?.name || '')));
       } catch { return 'unknown'; }
     };
 
