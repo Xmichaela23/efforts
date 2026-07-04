@@ -48,18 +48,25 @@ function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
 function BikeFitnessRow({ fitness }: { fitness: BikeFitness }) {
   const src = fitness.efficiency.basis === 'personal' ? 'personal'
     : fitness.efficiency.basis === 'coggan_ftp' ? 'est (FTP)' : null;
-  // D-232 glass-box: one shared evidence tail (window · rides · recency) from the LEAD sub-trend
-  // (power leads; efficiency when power has no verdict). Both sub-trends share the same ride set.
+  // D-232 glass-box: the shared evidence tail (window · rides · recency) is the LEAD sub-trend's
+  // (power leads; efficiency when power has no verdict). Power and efficiency do NOT always rest on
+  // the same rides — power counts w20>0, efficiency counts clean HR-at-band (D-237: corrupt-HR rides
+  // are excluded from efficiency, not power). So when efficiency's own sample count differs, surface it.
   const lead = fitness.power.verdict !== 'needs_data' ? fitness.power : fitness.efficiency;
   const tail = (lead.sampleCount != null && lead.windowDays != null)
     ? trendEvidence({ windowDays: lead.windowDays, sampleCount: lead.sampleCount, newestAgeDays: lead.newestAgeDays, discipline: 'bike' })
     : null;
+  const effN = fitness.efficiency.verdict !== 'needs_data' ? fitness.efficiency.sampleCount ?? null : null;
+  const showEffN = effN != null && lead.sampleCount != null && effN !== lead.sampleCount;
   return (
     <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
       <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">bike</span>
       <div className="flex-1 text-[12px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
         <Signal label="Power" sig={fitness.power} />
-        <Signal label="Efficiency" sig={fitness.efficiency} />
+        <span className="inline-flex items-baseline gap-1">
+          <Signal label="Efficiency" sig={fitness.efficiency} />
+          {showEffN && <span className="text-white/30 text-[10px]">· {effN} ride{effN === 1 ? '' : 's'}</span>}
+        </span>
         {tail && <span className="text-white/35 text-[10px]">{tail}</span>}
         {src && <span className="text-white/25 text-[10px]">{src}</span>}
       </div>

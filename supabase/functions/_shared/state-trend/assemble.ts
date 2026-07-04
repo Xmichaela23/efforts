@@ -72,7 +72,7 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[]): LiftSeries[]
 export interface StateTrendInputs {
   asOf: string;
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
-  bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; band_source: string | null }>;
+  bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; band_source: string | null; hr_corrupt?: boolean }>;
   runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; classified_type: string | null }>;
   swimRows: Array<{ date: string; pace_per_100m: number; rest_fraction?: number | null; distance_m?: number | null }>;
   plannedBy: Record<string, number>; // this-week planned counts per discipline
@@ -102,9 +102,12 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   for (const k of ORDER) spw[k] = (inp.cadenceCounts[k] || 0) / WEEKS_90D;
 
   // bike — terrain-binned power + HR-at-power efficiency (Step 3 engine)
+  // Power keeps every ride (w20 is HR-independent). Efficiency (HR-at-power) EXCLUDES rides whose
+  // HR was rejected as corrupt (D-237 — flaky strap / cadence-lock would poison the reference-band
+  // mean HR). The flag is set on the workout by compute-facts's HR-plausibility filter.
   const binRides = inp.bikeRows.map((r) => ({ date: r.date, classified_type: r.classified_type, w20: r.w20 }));
   const hrPts = inp.bikeRows
-    .filter((r) => Number(r.hr_at_band) > 0)
+    .filter((r) => Number(r.hr_at_band) > 0 && !r.hr_corrupt)
     .map((r) => ({ date: r.date, value: Number(r.hr_at_band) }));
   const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike);
   bikeFitness.efficiency.basis = inp.bikeRows.map((r) => r.band_source).find((s) => s) ?? null;

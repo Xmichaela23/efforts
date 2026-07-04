@@ -54,7 +54,7 @@ export function useStateTrends(): StateTrends {
       // bike — latest rides carrying workout_analysis (bike_fitness_v1)
       const bikeP = supabase
         .from('workouts')
-        .select('date,workout_analysis')
+        .select('date,workout_analysis,workout_metadata')
         .eq('user_id', userId)
         .in('type', ['ride', 'bike'])
         .not('workout_analysis', 'is', null)
@@ -108,6 +108,7 @@ export function useStateTrends(): StateTrends {
         w20: r.workout_analysis?.bike_fitness_v1?.w20 ?? null,
         hr_at_band: r.workout_analysis?.bike_fitness_v1?.hr_at_band ?? null,
         band_source: r.workout_analysis?.bike_fitness_v1?.band_source ?? null,
+        hr_corrupt: !!r.workout_metadata?.hr_corrupt,
       }));
 
       // run — join classified_type from workouts (RPM source field workout_intent is null)

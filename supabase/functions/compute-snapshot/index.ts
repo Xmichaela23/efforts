@@ -638,7 +638,7 @@ serve(async (req: Request) => {
         const [exR, bikeR, runR, swimR, plannedR, doneR, cadenceR] = await Promise.all([
           supabase.from("exercise_log").select("date,canonical_name,exercise_name,estimated_1rm")
             .eq("user_id", userId).gte("date", isoMinus(STATE_TREND_WINDOWS.liftWeeks * 7)).order("date"),
-          supabase.from("workouts").select("date,workout_analysis")
+          supabase.from("workouts").select("date,workout_analysis,workout_metadata")
             .eq("user_id", userId).in("type", ["ride", "bike"]).not("workout_analysis", "is", null)
             .order("date", { ascending: false }).limit(STATE_TREND_WINDOWS.bikeLimit),
           // 90d cadence window (not 42d trend window): assemble derives the comparable-easy-run cadence
@@ -662,6 +662,7 @@ serve(async (req: Request) => {
           w20: r.workout_analysis?.bike_fitness_v1?.w20 ?? null,
           hr_at_band: r.workout_analysis?.bike_fitness_v1?.hr_at_band ?? null,
           band_source: r.workout_analysis?.bike_fitness_v1?.band_source ?? null,
+          hr_corrupt: !!r.workout_metadata?.hr_corrupt,
         }));
 
         const runRows = (runR.data ?? []) as any[];
