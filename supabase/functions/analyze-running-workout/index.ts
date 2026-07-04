@@ -2214,29 +2214,39 @@ Deno.serve(async (req) => {
             // Feed THAT as the confound-adjusted residual, not raw drift: 'normal/good/excellent' = the
             // conditions explain it → residual at baseline → no_elevation (the honest reason for a warm,
             // hilly run). Only 'elevated'/'high' (beyond what conditions explain) leaves a real residual.
-            const thisDrift = Number((hrAnalysisResult as any)?.drift?.driftBpm);
-            const typicalDrift = Number((historicalDriftData as any)?.avgDriftBpm);
-            const driftAssess = String((hrAnalysisResult as any)?.drift?.assessment || '');
-            const assessKnown = /^(excellent|good|normal|elevated|high)$/.test(driftAssess);
-            const haveDrift = Number.isFinite(thisDrift) && Number.isFinite(typicalDrift) && assessKnown;
-            const controlledForConditions = /^(excellent|good|normal)$/.test(driftAssess);
-            const rawElevation = haveDrift ? thisDrift - typicalDrift : null;
-            // conditions explain it → 0 (→ no_elevation); genuinely elevated beyond conditions → survives.
-            const adjustedElevation = haveDrift ? (controlledForConditions ? 0 : rawElevation) : null;
-            // Axis 4 backstop (D-231): a declared easy RPE vetoes even a surviving residual. SECONDARY —
-            // confound-subtraction above is primary, so a warm/hilly run silences by no_elevation first.
+            // Signal restructure (research-grounded, Michael 2026-07-03): DOMS from eccentric lifting
+            // degrades running ECONOMY + alters stride mechanics (PubMed 12783232). Because DOMS also
+            // RAISES HR, pace-at-HR self-cancels → so CADENCE is primary (most direct stride signature,
+            // heat-IMMUNE), pace-at-HR decoupling supporting (capped), declared RPE the confirmer/veto.
+            // PRIMARY — cadence drop vs the athlete's own recent baseline (legs sluggish, won't turn over).
+            const thisCadence = Number((workout as any)?.computed?.overall?.avg_cadence_spm ?? (workout as any)?.avg_cadence);
+            const cadStart = new Date(new Date(wDate + 'T12:00:00Z').getTime() - 42 * 86400000).toISOString().slice(0, 10);
+            const { data: recentRunCad } = await supabase.from('workouts')
+              .select('avg_cadence, computed').eq('user_id', uid).eq('type', 'run').eq('workout_status', 'completed')
+              .gte('date', cadStart).lt('date', wDate);
+            const cads = ((recentRunCad ?? []) as any[])
+              .map((w) => Number(w?.computed?.overall?.avg_cadence_spm ?? w?.avg_cadence))
+              .filter((n) => Number.isFinite(n) && n > 120 && n < 220);
+            const baselineCadence = cads.length >= 3 ? cads.reduce((a, b) => a + b, 0) / cads.length : null;
+            const haveCadence = Number.isFinite(thisCadence) && thisCadence > 120 && thisCadence < 220 && baselineCadence != null;
+            const cadenceDrop = haveCadence ? (baselineCadence! - thisCadence) : null; // + = cadence dropped
+            // SUPPORTING — pace-at-HR decoupling beyond conditions (capped weight; HR-rises-with-DOMS caveat).
+            const decoupAssess = String((hrAnalysisResult as any)?.summary?.decouplingAssessment || '');
+            const decoupElevated = /elevated|high|poor/i.test(decoupAssess);
+            // CONFIRMER / VETO (Axis 4, D-231): declared RPE. Low → veto. (Leg-specific Q-049 soreness is the
+            // stronger confirmer; not yet wired into the run analyzer — noted as the next Axis-4 upgrade.)
             const thisRpe = Number((workout as any)?.rpe);
             const declaredEasy = Number.isFinite(thisRpe) && thisRpe > 0 && thisRpe <= 4;
             const carry = detectCrossDomainCarryover({
               targetDate: wDate, targetDiscipline: 'run',
-              effortSignal: haveDrift ? 'hr_at_pace' : null,
-              rawElevation, adjustedElevation, threshold: 3, // ~noise band (bpm)
-              confounds: { grade: false, heat: false, prescribedHard: false }, // subtraction is via drift.assessment
-              recentSessions, nonLegElevated: null, declaredEasy,
+              effortSignal: haveCadence ? 'cadence' : null, // primary = cadence (heat-immune → no confound subtraction)
+              rawElevation: cadenceDrop, adjustedElevation: cadenceDrop, threshold: 3, // ~3 spm drop = notable
+              confounds: { grade: false, heat: false, prescribedHard: false },
+              recentSessions, nonLegElevated: null, declaredEasy, corroborated: decoupElevated,
             });
             const clause = buildCarryoverClause(carry, 'run');
             if (clause) { ai_summary = ai_summary ? `${ai_summary} ${clause}` : clause; if (!ai_summary_generated_at) ai_summary_generated_at = new Date().toISOString(); }
-            console.log(`[analyze-running-workout] carryover ${carry?.claimable ? `CLAIMED (${carry.confidence}, ${carry.antecedent?.dayName})` : `silent (${carry?.suppressedBy})`} [drift ${thisDrift}/${typicalDrift} assess=${driftAssess} rpe=${thisRpe}]`);
+            console.log(`[analyze-running-workout] carryover ${carry?.claimable ? `CLAIMED (${carry.confidence}, ${carry.antecedent?.dayName})` : `silent (${carry?.suppressedBy})`} [cad ${thisCadence}/${baselineCadence} drop=${cadenceDrop} decoup=${decoupAssess} rpe=${thisRpe}]`);
           }
         } catch (carryErr) {
           console.warn('[analyze-running-workout] carryover skipped:', carryErr);

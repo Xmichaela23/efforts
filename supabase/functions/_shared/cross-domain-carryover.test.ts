@@ -69,7 +69,23 @@ Deno.test('no data: no usable effort signal → silent (no_data)', () => {
   assertEquals(r?.suppressedBy, 'no_data');
 });
 
-// ── Michael's June 14: confound-subtraction PRIMARY, declared-RPE veto SECONDARY (order matters) ──────
+// ── cadence-primary (research-grounded leg-mechanical signal — heat-immune, the DOMS stride signature) ─
+Deno.test('cadence-primary: cadence dropped ≥ bar after a lower lift, not declared easy → claim', () => {
+  const r = detectCrossDomainCarryover(base({ effortSignal: 'cadence', rawElevation: 4, adjustedElevation: 4, threshold: 3, declaredEasy: false }));
+  assertEquals(r?.claimable, true);
+});
+Deno.test('cadence corroborated by decoupling/declared-leg-feel → strong confidence', () => {
+  const r = detectCrossDomainCarryover(base({ effortSignal: 'cadence', rawElevation: 4, adjustedElevation: 4, threshold: 3, corroborated: true }));
+  assertEquals(r?.claimable, true);
+  assertEquals(r?.confidence, 'strong');
+});
+Deno.test('June 14 restructured: cadence NORMAL on a warm run (legs were fine) → no_elevation', () => {
+  // Cadence is heat-immune — a warm day doesn't drop it; June 14 legs turned over normally → silent.
+  const r = detectCrossDomainCarryover(base({ effortSignal: 'cadence', rawElevation: 0.5, adjustedElevation: 0.5, threshold: 3, declaredEasy: true }));
+  assertEquals(r?.suppressedBy, 'no_elevation'); // primary reason: cadence didn't drop, not the RPE veto
+});
+
+// ── generic confound-subtraction PRIMARY, declared-RPE veto SECONDARY (order matters) ─────────────────
 Deno.test('June 14 (warm+hilly, raw drift +5, conditions explain → adjusted 0, RPE 3) → no_elevation, NOT declared_easy', () => {
   const r = detectCrossDomainCarryover(base({ rawElevation: 5, adjustedElevation: 0, declaredEasy: true }));
   assertEquals(r?.claimable, false);

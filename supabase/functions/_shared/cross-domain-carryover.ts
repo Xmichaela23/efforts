@@ -34,7 +34,7 @@ export function classifyStrengthFocus(exerciseNames: string[]): StrengthFocus {
   if (upper) return 'upper';
   return 'unknown';
 }
-export type EffortSignal = 'rpe' | 'hr_at_pace' | 'execution' | null;
+export type EffortSignal = 'cadence' | 'hr_at_pace' | 'rpe' | 'execution' | null;
 export type SuppressReason =
   | 'no_antecedent' | 'no_data' | 'no_elevation' | 'terrain' | 'heat' | 'prescribed' | 'systemic' | 'declared_easy' | null;
 
@@ -58,6 +58,8 @@ export interface CarryoverInput {
   nonLegElevated?: boolean | null;       // Gate 4 systemic check; null/undefined = unknown → skip (graceful)
   declaredEasy?: boolean;                // Axis 1 → Axis 4 (D-231): athlete declared this session EASY
                                          // (low RPE) → his perception vetoes an inferred "effort up" claim
+  corroborated?: boolean;                // a SUPPORTING signal agrees (pace-at-HR decoupling elevated, or
+                                         // declared leg-feel) → upgrades a claim's confidence to strong
 }
 
 export interface CarryoverResult {
@@ -128,8 +130,9 @@ export function detectCrossDomainCarryover(input: CarryoverInput): CarryoverResu
   //    is SECONDARY: confound-subtraction above is the primary silencer (its reason is the honest one).
   if (input.declaredEasy) return suppress('declared_easy');
 
-  // All four gates pass → claimable. Novelty OR a large residual (≥2× the bar) → strong confidence.
-  const strong = antecedent.isNovel || input.adjustedElevation >= input.threshold * 2;
+  // All gates pass → claimable. Strong when a SUPPORTING signal corroborates (decoupling / declared
+  // leg-feel), or the movement was novel, or the residual is large (≥2× the bar). Else moderate.
+  const strong = !!input.corroborated || antecedent.isNovel || input.adjustedElevation >= input.threshold * 2;
   return { antecedent, claimable: true, confidence: strong ? 'strong' : 'moderate', suppressedBy: null };
 }
 
