@@ -45,67 +45,31 @@ function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
 
 // Bike row — Power leads, Efficiency alongside (disagreement surfaced, never collapsed). The
 // efficiency basis carries the zone-band source (coggan_ftp = estimated; personal = from test).
-// Glance metric: VALUE + improving-arrow only (no raw %). The arrow reflects the classifyTrend
-// verdict (improving/holding/sliding) — so for decoupling (lower=better) a falling number reads as
-// ↑ improving. needs_data shows honestly, never a placeholder value.
-function GlanceMetric({ label, sig, unit = '' }: { label: string; sig: BikeSignal; unit?: string }) {
-  const v = VERDICT[sig.verdict];
-  if (sig.verdict === 'needs_data' || sig.value == null) {
-    return (
-      <span className="inline-flex items-baseline gap-1">
-        <span className="text-white/50">{label}</span><span className="text-white/40">needs data</span>
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-baseline gap-1">
-      <span className="text-white/50">{label}</span>
-      <span className="text-white/85 tabular-nums">{sig.value}{unit}</span>
-      {v.arr && <span className={v.cls}>{v.arr}</span>}
-    </span>
-  );
-}
-
-// Tap receipt: % change + evidence tail + qualifier. Honest needs-data string when no verdict.
-function bikeReceipt(sig: BikeSignal, label: string, qualifier: string): string {
-  if (sig.verdict === 'needs_data' || sig.pctChange == null || sig.windowDays == null) {
-    return `${label} — not enough qualifying rides yet`;
-  }
-  const pct = verdictSignedPct(sig.verdict, sig.pctChange);
-  const wk = `${Math.max(1, Math.round(sig.windowDays / 7))}wk`;
-  const rides = `${sig.sampleCount} ride${sig.sampleCount === 1 ? '' : 's'}`;
-  const recency = sig.newestAgeDays == null ? '' : sig.newestAgeDays <= 0 ? 'today' : `${sig.newestAgeDays}d ago`;
-  return `${label} ${pct} · over ${wk} · ${rides}${recency ? ' · ' + recency : ''} · ${qualifier}`;
-}
-
 function BikeFitnessRow({ fitness }: { fitness: BikeFitness }) {
-  const [open, setOpen] = React.useState(false);
   const src = fitness.efficiency.basis === 'personal' ? 'personal'
     : fitness.efficiency.basis === 'coggan_ftp' ? 'est (FTP)' : null;
-  // Power keeps its verdict+% display (already solid). Efficiency (EF) + Decoupling move to
-  // value+arrow at glance, % + receipt on tap (progressive disclosure, like the BODY row).
-  const powerTail = (fitness.power.sampleCount != null && fitness.power.windowDays != null)
-    ? trendEvidence({ windowDays: fitness.power.windowDays, sampleCount: fitness.power.sampleCount, newestAgeDays: fitness.power.newestAgeDays, discipline: 'bike' })
+  // D-232 glass-box: the shared evidence tail (window · rides · recency) is the LEAD sub-trend's
+  // (power leads; efficiency when power has no verdict). Power and efficiency do NOT always rest on
+  // the same rides — power counts w20>0, efficiency counts clean HR-at-band (D-237: corrupt-HR rides
+  // are excluded from efficiency, not power). So when efficiency's own sample count differs, surface it.
+  const lead = fitness.power.verdict !== 'needs_data' ? fitness.power : fitness.efficiency;
+  const tail = (lead.sampleCount != null && lead.windowDays != null)
+    ? trendEvidence({ windowDays: lead.windowDays, sampleCount: lead.sampleCount, newestAgeDays: lead.newestAgeDays, discipline: 'bike' })
     : null;
+  const effN = fitness.efficiency.verdict !== 'needs_data' ? fitness.efficiency.sampleCount ?? null : null;
+  const showEffN = effN != null && lead.sampleCount != null && effN !== lead.sampleCount;
   return (
-    <div className="border-b border-white/[0.055] last:border-0">
-      <div className="flex items-baseline gap-3 py-2.5 cursor-pointer select-none" onClick={() => setOpen((o) => !o)}>
-        <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">bike</span>
-        <div className="flex-1 text-[12px] text-white/80 flex flex-wrap items-baseline gap-x-3 gap-y-1 leading-none">
-          <Signal label="Power" sig={fitness.power} />
-          <GlanceMetric label="Efficiency" sig={fitness.efficiency} />
-          <GlanceMetric label="Decoupling" sig={fitness.decoupling} unit="%" />
-          {src && <span className="text-white/25 text-[10px]">{src}</span>}
-          <span className="text-white/30 text-[10px] ml-auto">{open ? '▲' : '▼'}</span>
-        </div>
+    <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
+      <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">bike</span>
+      <div className="flex-1 text-[12px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
+        <Signal label="Power" sig={fitness.power} />
+        <span className="inline-flex items-baseline gap-1">
+          <Signal label="Efficiency" sig={fitness.efficiency} />
+          {showEffN && <span className="text-white/30 text-[10px]">· {effN} ride{effN === 1 ? '' : 's'}</span>}
+        </span>
+        {tail && <span className="text-white/35 text-[10px]">{tail}</span>}
+        {src && <span className="text-white/25 text-[10px]">{src}</span>}
       </div>
-      {open && (
-        <div className="pl-[84px] pb-2.5 flex flex-col gap-1 text-[11px] text-white/45 leading-snug">
-          <span>{bikeReceipt(fitness.efficiency, 'Efficiency', 'clean HR only')}</span>
-          <span>{bikeReceipt(fitness.decoupling, 'Decoupling', 'steady rides ≥20min')}</span>
-          {powerTail && <span>Power · {powerTail}</span>}
-        </div>
-      )}
     </div>
   );
 }

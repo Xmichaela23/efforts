@@ -22,12 +22,6 @@ export const POWER_BINS: Record<string, Set<string>> = {
   flat_sustained: new Set(['threshold', 'sweet_spot', 'tempo']),
 };
 
-// Decoupling (Pw:HR drift) is an AEROBIC-DURABILITY read — valid only on STEADY, sub-threshold
-// efforts (the same comparable-effort discipline the run trend uses for easy pace). Intervals/
-// threshold/climbing/recovery are excluded: variable power or at-limit drift isn't durability.
-// This is the INTENT gate on top of the ≥20-min duration gate already applied at computation.
-export const COMPARABLE_DECOUPLING_EFFORT = new Set(['endurance', 'tempo', 'sweet_spot']);
-
 const PROVISIONAL_MAX_N = 4; // n ∈ {minSessions..4} → provisional (near the floor)
 const PROVISIONAL_MIN_SPAN_DAYS = 21; // qualifying points clustered in <3wk → provisional
 
@@ -55,25 +49,13 @@ export function isProvisionalTrend(t: TrendResult): boolean {
   return false;
 }
 
-export interface BikeEffortRide {
-  date: string;
-  classified_type: string | null;
-  w20: number | null;
-  /** EF = normalized power / avg HR (higher = better). */
-  efficiency_factor?: number | null;
-  /** Friel aerobic decoupling % (lower = better). Present only for steady ≥20-min efforts. */
-  aerobic_decoupling_pct?: number | null;
-  /** HR rejected as corrupt (flaky strap / cadence-lock) → excluded from HR-derived reads (EF, decoupling). */
-  hr_corrupt?: boolean;
-}
+export interface BikeEffortRide { date: string; classified_type: string | null; w20: number | null }
 
 export interface BikeSignal {
   verdict: TrendVerdict;
   pctChange: number | null;
   provisional: boolean;
-  basis: string | null; // e.g. the bin name (power) or null
-  /** The current level for the GLANCE display (recent-avg): EF ~1.85, decoupling ~4.1%. Null when needs_data. */
-  value?: number | null;
+  basis: string | null; // e.g. the bin name (power) or null (efficiency)
   /** D-232 glass-box receipt evidence — rides in the trend, newest ride age (days), window length (days). */
   sampleCount?: number;
   newestAgeDays?: number | null;
@@ -81,9 +63,8 @@ export interface BikeSignal {
 }
 
 export interface BikeFitness {
-  power: BikeSignal;      // LEADS the bike verdict (direct output — w20)
-  efficiency: BikeSignal; // EF (NP/HR), higher = better
-  decoupling: BikeSignal; // Pw:HR aerobic decoupling, lower = better (steady efforts only)
+  power: BikeSignal; // LEADS the bike verdict
+  efficiency: BikeSignal; // secondary read (HR-at-power)
 }
 
 /** A — terrain-binned 20-min power. Trend each bin like-for-like; surface the FRESHEST bin that
@@ -100,39 +81,25 @@ export function computeTerrainBinnedPower(rides: BikeEffortRide[], asOf: string,
     const newest = t.points.length ? t.points.map((p) => p.date).sort().pop()! : '';
     if (!best || newest > (best.t.points.map((p) => p.date).sort().pop() || '')) best = { verdict: t.verdict, t, bin };
   }
-  if (!best) return { verdict: 'needs_data', pctChange: null, provisional: false, basis: null, value: null, sampleCount: 0, newestAgeDays: null, windowDays: thresholds.windowDays };
-  return { verdict: best.verdict, pctChange: best.t.pctChange, provisional: isProvisionalTrend(best.t), basis: best.bin, value: best.t.recentAvg != null ? Math.round(best.t.recentAvg) : null, sampleCount: best.t.sampleCount, newestAgeDays: best.t.newestAgeDays, windowDays: best.t.window?.days };
+  if (!best) return { verdict: 'needs_data', pctChange: null, provisional: false, basis: null, sampleCount: 0, newestAgeDays: null, windowDays: thresholds.windowDays };
+  return { verdict: best.verdict, pctChange: best.t.pctChange, provisional: isProvisionalTrend(best.t), basis: best.bin, sampleCount: best.t.sampleCount, newestAgeDays: best.t.newestAgeDays, windowDays: best.t.window?.days };
 }
 
-/** B — Efficiency Factor (NP/HR) trend, HIGHER = better. Excludes rides whose HR was rejected
- *  as corrupt (D-237 — EF uses HR, so a flaky-strap ride would poison it). value = current EF level. */
-export function computeEfficiencyFactorTrend(rides: BikeEffortRide[], asOf: string, spw: number): BikeSignal {
-  const pts: TrendPoint[] = rides
-    .filter((r) => !r.hr_corrupt && Number(r.efficiency_factor) > 0)
-    .map((r) => ({ date: r.date, value: Number(r.efficiency_factor) }));
-  const t = classifyTrend(pts, resolveThresholds('bike', spw), asOf); // bike default = higher-better
-  return { verdict: t.verdict, pctChange: t.pctChange, provisional: isProvisionalTrend(t), basis: null, value: t.recentAvg != null ? Math.round(t.recentAvg * 100) / 100 : null, sampleCount: t.sampleCount, newestAgeDays: t.newestAgeDays, windowDays: t.window?.days };
+/** B — HR-at-power efficiency. `hrAtBand` = per-ride mean HR in the reference band ({date,value}). */
+export function computeEfficiencyTrend(hrAtBand: TrendPoint[], asOf: string, spw: number): BikeSignal {
+  const t = classifyTrend(hrAtBand, efficiencyThresholds(spw), asOf);
+  return { verdict: t.verdict, pctChange: t.pctChange, provisional: isProvisionalTrend(t), basis: null, sampleCount: t.sampleCount, newestAgeDays: t.newestAgeDays, windowDays: t.window?.days };
 }
 
-/** C — Pw:HR aerobic decoupling trend, LOWER = better (tightening). Gated to STEADY aerobic efforts
- *  (COMPARABLE_DECOUPLING_EFFORT) on top of the ≥20-min computation gate, and excludes corrupt HR.
- *  needs_data when too few qualifying rides — never a placeholder. value = current decoupling %. */
-export function computeDecouplingTrend(rides: BikeEffortRide[], asOf: string, spw: number): BikeSignal {
-  const pts: TrendPoint[] = rides
-    .filter((r) => !r.hr_corrupt
-      && r.classified_type != null && COMPARABLE_DECOUPLING_EFFORT.has(String(r.classified_type))
-      && r.aerobic_decoupling_pct != null && Number.isFinite(Number(r.aerobic_decoupling_pct)))
-    .map((r) => ({ date: r.date, value: Number(r.aerobic_decoupling_pct) }));
-  const thresholds = { ...resolveThresholds('bike', spw), lowerIsBetter: true, improvePct: 5, slidePct: -5 };
-  const t = classifyTrend(pts, thresholds, asOf);
-  return { verdict: t.verdict, pctChange: t.pctChange, provisional: isProvisionalTrend(t), basis: null, value: t.recentAvg != null ? Math.round(t.recentAvg * 10) / 10 : null, sampleCount: t.sampleCount, newestAgeDays: t.newestAgeDays, windowDays: t.window?.days };
-}
-
-/** Combine into the bike fitness read. Power leads; EF + decoupling are secondary, alongside. */
-export function computeBikeFitness(rides: BikeEffortRide[], asOf: string, spw: number): BikeFitness {
+/** Combine into the bike fitness read. Power leads; efficiency is the secondary, alongside. */
+export function computeBikeFitness(
+  rides: BikeEffortRide[],
+  hrAtBand: TrendPoint[],
+  asOf: string,
+  spw: number,
+): BikeFitness {
   return {
     power: computeTerrainBinnedPower(rides, asOf, spw),
-    efficiency: computeEfficiencyFactorTrend(rides, asOf, spw),
-    decoupling: computeDecouplingTrend(rides, asOf, spw),
+    efficiency: computeEfficiencyTrend(hrAtBand, asOf, spw),
   };
 }

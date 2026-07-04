@@ -72,7 +72,7 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[]): LiftSeries[]
 export interface StateTrendInputs {
   asOf: string;
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
-  bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; band_source: string | null; hr_corrupt?: boolean; efficiency_factor?: number | null; aerobic_decoupling_pct?: number | null }>;
+  bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; band_source: string | null; hr_corrupt?: boolean }>;
   runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; classified_type: string | null }>;
   swimRows: Array<{ date: string; pace_per_100m: number; rest_fraction?: number | null; distance_m?: number | null }>;
   plannedBy: Record<string, number>; // this-week planned counts per discipline
@@ -102,18 +102,14 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   for (const k of ORDER) spw[k] = (inp.cadenceCounts[k] || 0) / WEEKS_90D;
 
   // bike — terrain-binned power + HR-at-power efficiency (Step 3 engine)
-  // Power keeps every ride (w20 is HR-independent). Efficiency (EF = NP/HR) and decoupling (Pw:HR)
-  // are HR-derived → the ride-level filters inside computeBikeFitness exclude corrupt-HR rides (D-237)
-  // and gate decoupling to steady aerobic efforts. Rides carry the raw values; the trends select.
-  const bikeEffortRides = inp.bikeRows.map((r) => ({
-    date: r.date,
-    classified_type: r.classified_type,
-    w20: r.w20,
-    efficiency_factor: r.efficiency_factor,
-    aerobic_decoupling_pct: r.aerobic_decoupling_pct,
-    hr_corrupt: r.hr_corrupt,
-  }));
-  const bikeFitness = computeBikeFitness(bikeEffortRides, asOf, spw.bike);
+  // Power keeps every ride (w20 is HR-independent). Efficiency (HR-at-power) EXCLUDES rides whose
+  // HR was rejected as corrupt (D-237 — flaky strap / cadence-lock would poison the reference-band
+  // mean HR). The flag is set on the workout by compute-facts's HR-plausibility filter.
+  const binRides = inp.bikeRows.map((r) => ({ date: r.date, classified_type: r.classified_type, w20: r.w20 }));
+  const hrPts = inp.bikeRows
+    .filter((r) => Number(r.hr_at_band) > 0 && !r.hr_corrupt)
+    .map((r) => ({ date: r.date, value: Number(r.hr_at_band) }));
+  const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike);
   bikeFitness.efficiency.basis = inp.bikeRows.map((r) => r.band_source).find((s) => s) ?? null;
   const bikeLead = bikeFitness.power.verdict !== 'needs_data' ? bikeFitness.power : bikeFitness.efficiency;
   const bike: PerfSummary | null = bikeLead.verdict !== 'needs_data'
@@ -206,9 +202,8 @@ export interface StateTrendsV1 {
   /** D-194: `rest` = the rest-fraction (work:rest) trend, nested like bike's power/efficiency. */
   swim: DisciplineTrendCache & { rest: DisciplineTrendCache };
   bike: DisciplineTrendCache & {
-    power: { verdict: string; pctChange: number | null; provisional: boolean; basis: string | null; value?: number | null; sampleCount?: number; newestAgeDays?: number | null; windowDays?: number };
-    efficiency: { verdict: string; pctChange: number | null; provisional: boolean; basis: string | null; value?: number | null; sampleCount?: number; newestAgeDays?: number | null; windowDays?: number };
-    decoupling: { verdict: string; pctChange: number | null; provisional: boolean; basis: string | null; value?: number | null; sampleCount?: number; newestAgeDays?: number | null; windowDays?: number };
+    power: { verdict: string; pctChange: number | null; provisional: boolean; basis: string | null };
+    efficiency: { verdict: string; pctChange: number | null; provisional: boolean; basis: string | null };
     basis: string | null;
   };
 }
@@ -266,7 +261,6 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       ...disc('bike'),
       power: { ...r.bikeFitness.power },
       efficiency: { ...r.bikeFitness.efficiency },
-      decoupling: { ...r.bikeFitness.decoupling },
       basis: r.bikeFitness.efficiency.basis,
     },
   };
