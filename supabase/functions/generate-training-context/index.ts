@@ -2736,7 +2736,15 @@ function acwrFromSnapshot(
 // =============================================================================
 // ACWR CALCULATION (from workouts when mid-week or no snapshot)
 // =============================================================================
-
+//
+// D-236 note: this path DELIBERATELY diverges from the shared coupled-rolling
+// authority (_shared/acwr.ts) on the acute denominator — it divides by days
+// ELAPSED in the current plan week (not a fixed 7), so a mid-week read reflects
+// the honest daily-average over the days actually trained so far. That is the
+// documented "variable acute window" case (divergence (iv)); the shared helper
+// supports it via window.acuteDays but the default is fixed 7. Status is already
+// classified through the shared getAcwrStatus (the sole classifier). This is a
+// flagged, intentional keep — NOT an un-migrated straggler. See D-236.
 function calculateACWR(
   workouts: WorkoutRecord[],
   focusDate: Date,

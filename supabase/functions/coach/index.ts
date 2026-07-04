@@ -26,6 +26,7 @@ import {
   isAcwrDetrainedSignal,
   isAcwrFatiguedSignal,
 } from '../_shared/acwr-state.ts';
+import { computeAcwr, type LoadRow } from '../_shared/acwr.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
 import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey } from '../_shared/state-trend/index.ts';
@@ -2208,31 +2209,35 @@ Deno.serve(async (req) => {
       });
     })();
 
-    // Running-weighted ACWR: discount non-running modalities by their fatigue contribution
-    const weightedLoad = (rows: any[]) => rows.reduce((sum: number, r: any) => {
-      const w = getRunningFatigueWeight({ type: String(r?.type || ''), name: String(r?.name || '') });
-      return sum + (safeNum(r?.workload_actual) || 0) * w;
-    }, 0);
-    const acute7RunLoad = weightedLoad(acute7Rows);
-    const chronic28RunLoad = weightedLoad(completedRolling);
-    const runningAcwr = chronic28RunLoad > 0
-      ? (acute7RunLoad / 7) / (chronic28RunLoad / 28)
-      : null;
-
-    // Cycling-weighted ACWR — Tier 4 item 11 of running→cycling delta map. Mirror of the
-    // running-weighted block above; uses `getCyclingFatigueWeight` to discount non-cycling
-    // modalities by their cycling-fatigue contribution (run 0.4 / lower-strength 0.7 /
-    // upper-strength 0.2 / swim 0.1 / mobility 0). Surfaced symmetrically with running_acwr
-    // in the coach response payload + body_response.load_status.cycling_acwr.
-    const weightedCyclingLoad = (rows: any[]) => rows.reduce((sum: number, r: any) => {
-      const w = getCyclingFatigueWeight({ type: String(r?.type || ''), name: String(r?.name || '') });
-      return sum + (safeNum(r?.workload_actual) || 0) * w;
-    }, 0);
-    const acute7CyclingLoad = weightedCyclingLoad(acute7Rows);
-    const chronic28CyclingLoad = weightedCyclingLoad(completedRolling);
-    const cyclingAcwr = chronic28CyclingLoad > 0
-      ? (acute7CyclingLoad / 7) / (chronic28CyclingLoad / 28)
-      : null;
+    // Running- and cycling-weighted ACWR via the shared authority (D-236).
+    // Same coupled 7/28 window and workout_actual source as the total ACWR
+    // above — the ONLY difference is the discipline weight hook, so both are one
+    // computeAcwr call with a weightFn instead of two hand-rolled formulas.
+    //
+    // chronicLoadFloor: 0 preserves the pre-D-236 `weightedChronic > 0` gate.
+    // The CHRONIC_LOAD_FLOOR (500) is calibrated for RAW total load and is
+    // applied to the total ACWR below; it would over-null on discounted
+    // (weighted) load, so the weighted variants intentionally keep the >0 gate.
+    const acwrRollingRows: LoadRow[] = completedRolling.map((r: any) => ({
+      date: String(r?.date),
+      workload: safeNum(r?.workload_actual),
+      type: r?.type,
+      name: r?.name,
+    }));
+    // .ratioRaw (unrounded) preserves the old float exactly — runningAcwr feeds
+    // a `< 0.85` taper gate where 2-decimal rounding could flip the boundary.
+    const runningAcwr = computeAcwr(acwrRollingRows, {
+      asOfDate,
+      window: { includeAsOfDate: true },
+      chronicLoadFloor: 0,
+      weightFn: (t, n) => getRunningFatigueWeight({ type: String(t || ''), name: String(n || '') }),
+    }).ratioRaw;
+    const cyclingAcwr = computeAcwr(acwrRollingRows, {
+      asOfDate,
+      window: { includeAsOfDate: true },
+      chronicLoadFloor: 0,
+      weightFn: (t, n) => getCyclingFatigueWeight({ type: String(t || ''), name: String(n || '') }),
+    }).ratioRaw;
 
     // =========================================================================
     // Unified Response Model (new: shared with block view)

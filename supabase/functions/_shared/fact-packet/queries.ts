@@ -12,8 +12,9 @@ import {
   resolveOverallDistanceMi,
   resolveOverallPaceSecPerMi,
 } from './pace-resolution.ts';
-import { ACWR_RATIO_THRESHOLDS } from '../acwr-state.ts';
+import { ACWR_RATIO_THRESHOLDS, getAcwrStatus } from '../acwr-state.ts';
 import type { AcwrWeekIntent } from '../acwr-state.ts';
+import { computeAcwr, type LoadRow } from '../acwr.ts';
 
 type SupabaseLike = any;
 
@@ -1075,30 +1076,29 @@ export async function getTrainingLoadContext(
       ? Math.round((week_workload_actual / week_workload_planned) * 100)
       : null;
 
-    // ACWR from 7d vs 28d workloads (completed workouts only); use date-only keys
-    const dateToWorkload = new Map<string, number>();
-    for (const r of completed) {
-      const d = toDateOnly(r.date);
-      const wl = coerceNumber(r.workload_actual);
-      if (!d) continue;
-      if (wl != null) dateToWorkload.set(d, (dateToWorkload.get(d) || 0) + wl);
-    }
-    const sumDays = (days: number): number => {
-      let sum = 0;
-      for (let i = 1; i <= days; i += 1) {
-        const d = isoDateAddDays(workoutDate, -i);
-        sum += dateToWorkload.get(d) || 0;
-      }
-      return sum;
-    };
-    const acute7 = sumDays(7);
-    const chronic28 = sumDays(28);
-    const acwr_ratio = (chronic28 > 0 && acute7 >= 0) ? (acute7 * 28) / (chronic28 * 7) : null;
-    const acwr_status = acwr_ratio == null ? null
-      : acwr_ratio < 0.9 ? 'undertrained'
-      : acwr_ratio <= 1.15 ? 'optimal'
-      : acwr_ratio <= 1.3 ? 'elevated'
-      : 'high_risk';
+    // ACWR via the shared authority (D-236). "Load carried INTO this workout":
+    // both windows END THE DAY BEFORE workoutDate (includeAsOfDate: false) — the
+    // workout's own load isn't yet "carried in". Completed workouts only; raw
+    // (unweighted) total; no thin-base floor (chronicLoadFloor: 0) to preserve
+    // the prior chronic28 > 0 gate and the exact acwr_ratio number.
+    //
+    // acwr_status now routes through getAcwrStatus (the SOLE classifier) instead
+    // of this path's old inline thresholds (optimal ≤ 1.15). That reconciles the
+    // 1.15-vs-1.3 split (divergence (v)): a 1.2 week reads 'optimal' here now,
+    // matching coach and the response model. plan-agnostic (planContext: null),
+    // matching the prior flat mapping — only the boundaries moved.
+    const acwrLoadRows: LoadRow[] = completed.map((r: any) => ({
+      date: String(r.date),
+      workload: coerceNumber(r.workload_actual),
+    }));
+    const acwrRes = computeAcwr(acwrLoadRows, {
+      asOfDate: workoutDate,
+      window: { includeAsOfDate: false },
+      chronicLoadFloor: 0,
+      planContext: null,
+    });
+    const acwr_ratio = acwrRes.ratioRaw;
+    const acwr_status = acwrRes.status;
 
     // Fatigue classification (deterministic)
     const fatigue_evidence: string[] = [];

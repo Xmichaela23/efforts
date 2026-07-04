@@ -30,6 +30,7 @@ import {
   STATE_TREND_WINDOWS,
   type StateTrendsV1,
 } from "../_shared/state-trend/index.ts";
+import { computeAcwr, type LoadRow } from "../_shared/acwr.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -334,6 +335,31 @@ serve(async (req: Request) => {
     const exercises = (allExercises ?? []) as ExerciseRow[];
 
     // -----------------------------------------------------------------------
+    // 2b. Fetch completed workouts for the same window — the CANONICAL load
+    //     source for ACWR (D-236). `workouts.workload_actual` is authoritative;
+    //     workout_facts.workload is only a deferential mirror of it
+    //     (compute-facts returns workload_actual verbatim when present). Reading
+    //     it here makes the PERSISTED acwr identical to what coach computes live
+    //     off the same column (persisted == live).
+    // -----------------------------------------------------------------------
+    const { data: allWorkoutRows, error: wlErr } = await supabase
+      .from("workouts")
+      .select("date, type, name, workload_actual, workout_status")
+      .eq("user_id", userId)
+      .gte("date", rangeStart)
+      .lte("date", rangeEnd)
+      .order("date");
+    if (wlErr) throw wlErr;
+    const acwrLoadRows: LoadRow[] = (allWorkoutRows ?? [])
+      .filter((r: any) => String(r?.workout_status ?? "").toLowerCase() === "completed")
+      .map((r: any) => ({
+        date: String(r.date),
+        workload: r.workload_actual,
+        type: r.type,
+        name: r.name,
+      }));
+
+    // -----------------------------------------------------------------------
     // 3. Split facts into target week vs prior 4 weeks
     // -----------------------------------------------------------------------
     const targetFacts = facts.filter((f) => f.date >= targetWeek && f.date <= rangeEnd);
@@ -357,14 +383,29 @@ serve(async (req: Request) => {
     const current = aggregateWeek(targetFacts);
 
     // -----------------------------------------------------------------------
-    // 5. Compute chronic load (4-week rolling avg) and ACWR
+    // 5. ACWR — coupled-rolling model via the shared authority (D-236).
+    //
+    // Retired: the calendar-DECOUPLED Formula A (weekTotal / mean of the 4
+    // prior weeks, chronic EXCLUDING the current week). It disagreed with every
+    // other surface. The shared helper is coupled-rolling (chronic CONTAINS
+    // acute), same source/window/floor as coach → persisted == live.
+    //
+    // "As of" day: today for the in-progress current week; the target week's
+    // Sunday (rangeEnd) for a completed/backfilled week — whichever is earlier.
     // -----------------------------------------------------------------------
+    const nowYmd = todayISO();
+    const acwrAsOf = nowYmd < rangeEnd ? nowYmd : rangeEnd;
+    const acwrResult = computeAcwr(acwrLoadRows, { asOfDate: acwrAsOf });
+    const acwr = acwrResult.ratio;
+
+    // One-time before/after readout for the acceptance eyeball (D-236): the
+    // retired decoupled value alongside the new coupled one, on real data.
     const priorWorkloads = priorWeeks.map((wk) =>
       wk.reduce((sum, f) => sum + (f.workload ?? 0), 0)
     );
-    const chronicLoad = avg(priorWorkloads);
-    const acwr = chronicLoad && chronicLoad > 0
-      ? Math.round((current.workloadTotal / chronicLoad) * 100) / 100
+    const legacyChronicLoad = avg(priorWorkloads);
+    const acwrDecoupledLegacy = legacyChronicLoad && legacyChronicLoad > 0
+      ? Math.round((current.workloadTotal / legacyChronicLoad) * 100) / 100
       : null;
 
     // -----------------------------------------------------------------------
@@ -762,7 +803,21 @@ serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, week_start: targetWeek, snapshot }),
+      JSON.stringify({
+        success: true,
+        week_start: targetWeek,
+        snapshot,
+        // D-236 acceptance readout: old (decoupled Formula A) vs new (coupled
+        // helper) ACWR for this week, side by side, on real data.
+        acwr_convergence: {
+          as_of: acwrAsOf,
+          new_coupled: acwr,
+          old_decoupled: acwrDecoupledLegacy,
+          thin_base: acwrResult.thinBase,
+          acute_load: Math.round(acwrResult.acuteLoad),
+          chronic_load: Math.round(acwrResult.chronicLoad),
+        },
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: any) {
