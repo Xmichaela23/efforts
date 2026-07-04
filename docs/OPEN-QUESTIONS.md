@@ -1451,6 +1451,15 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-119 — corrupt-duration workout row (2025-09-01 run, workload ~3200) — data cleanup, not a load bug
+
+- **Status:** deferred data cleanup (surfaced 2026-07-04 by the D-238 before/after run). One run (2025-09-01, avg_power 304, avgHR 154) has a stored `workload_actual` of **~3200** — ~30× a normal run. Back-solving the load formula, its `moving_time`/`duration` is ~**2350 min (~39 h)** — a corrupt duration at ingest.
+- **Why not a D-238 issue:** the value is already wrong in the CURRENT data (stored 3200 under the old TRIMP path); the new ladder merely carries the bad duration forward (3200 → ~3918). It's ~10 months old, outside the 28-day ACWR window, so it did not affect the deploy's before/after numbers.
+- **Fix when picked up:** find the row (`workouts` where `moving_time`/`duration` is implausibly large for the discipline), correct or null the duration, recompute. Consider a general ingest-time duration plausibility clamp (a run > ~6 h, a ride > ~12 h → suspect) so future corrupt durations don't reach load. Not urgent; single known row.
+- **Cross-ref:** D-238, `verify-load-ladder-impact.mjs` (the readout that surfaced it).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

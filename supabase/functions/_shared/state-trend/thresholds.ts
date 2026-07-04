@@ -45,6 +45,9 @@ export function windowDaysFor(discipline: Discipline): number {
  */
 export function resolveThresholds(discipline: Discipline, sessionsPerWeek: number): TrendThresholds {
   const u = UNIVERSAL[discipline];
+  // estimate-ok: unknown per-discipline cadence (no history) → cohort REF only sets the trend
+  // floor, and with no history the trend is ALREADY in the "not enough data" state, so REF never
+  // reaches a rendered verdict as if it were the athlete's own cadence.
   const spw = Number.isFinite(sessionsPerWeek) && sessionsPerWeek > 0 ? sessionsPerWeek : REF_SPW[discipline];
   const freshnessDays = clamp(Math.round((BASE_FRESH[discipline] * REF_SPW[discipline]) / spw), FRESH_FLOOR, FRESH_CEIL);
   const avail = spw * (u.windowDays / 7); // sessions that fit in the window at this cadence

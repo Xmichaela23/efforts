@@ -55,6 +55,9 @@ function rirToIntensityContext(avgRir: number | null): string {
 }
 
 function effortFraction(avgRir: number | null): number {
+  // estimate-ok: RIR is optional; absent → a moderate-effort PRIOR (0.7) for the internal
+  // session_load recovery model. A model coefficient for a missing signal, not an impersonated
+  // measurement in a rendered verdict; keeps a logged set as real load rather than blanking it.
   if (avgRir == null) return 0.7;
   return Math.max(0, Math.min(1, (10 - avgRir) / 10));
 }
@@ -70,6 +73,8 @@ function enduranceIntensityFromZones(timeInZone: Record<string, number> | null |
   z4z5Minutes: number;
   totalZoneMinutes: number;
 } {
+  // estimate-ok: no zone data → a moderate-intensity PRIOR (0.8) for the session_load recovery
+  // model (a coefficient for a missing signal, not an impersonated metric in a rendered verdict).
   if (!timeInZone || typeof timeInZone !== "object") {
     return { modifier: 0.8, context: "moderate", z4z5Minutes: 0, totalZoneMinutes: 0 };
   }
@@ -86,6 +91,7 @@ function enduranceIntensityFromZones(timeInZone: Record<string, number> | null |
   }
   const total = z1 + z2 + z3 + z4 + z5;
   const z4z5 = z4 + z5;
+  // estimate-ok: zero total zone minutes → same moderate PRIOR (0.8) as the no-zone-data case.
   if (total <= 0) return { modifier: 0.8, context: "moderate", z4z5Minutes: 0, totalZoneMinutes: 0 };
   const pHard = (z4 + z5) / total;
   const pEasy = (z1 + z2) / total;
@@ -111,10 +117,12 @@ function buildStrengthSessionLoad(
     if (!ex?.muscle_attribution?.primary) continue;
 
     const loadRatio = Number(ex.load_ratio);
+    // estimate-ok: missing per-exercise load_ratio → 1 (neutral identity multiplier, no effect).
     const lr = Number.isFinite(loadRatio) && loadRatio > 0 ? loadRatio : 1;
     const eff = effortFraction(row.avg_rir);
     const volumeLoad = vol * eff * lr;
     const decay = Number(ex.recovery_hours_typical);
+    // estimate-ok: missing per-exercise recovery window → a 48 h PRIOR for the recovery model.
     const decayHours = Number.isFinite(decay) && decay > 0 ? Math.round(decay) : 48;
     const intensity = rirToIntensityContext(row.avg_rir);
     const detail = { exercise_id: row.exercise_id, exercise_slug: ex.slug };

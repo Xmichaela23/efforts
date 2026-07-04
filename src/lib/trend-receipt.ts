@@ -58,6 +58,8 @@ export function trendReceipt(args: {
   stale?: boolean; // needs_data is a staleness decay (enough samples, too old) — cite recency, not count
   floor?: number; // minSessions floor for the needs_data message
 }): string {
+  // estimate-ok: `floor` is the real minSessions from the trend cache; the `= 3` covers only
+  // old cache / strength no-series rows (documented default, cf. the run-cadence fix).
   const { verdict, pctChange, windowDays, sampleCount, newestAgeDays, discipline, stale, floor = 3 } = args;
   const win = windowLabel(windowDays);
   if (verdict === 'needs_data') {

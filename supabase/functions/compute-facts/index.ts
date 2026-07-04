@@ -682,6 +682,7 @@ async function upsertTerrainIntelligence(
     const gradeAdjusted = segPaceSecPerKm != null ? Number((segPaceSecPerKm * (1 - Math.min(0.2, seg.avg_grade_pct / 1000))).toFixed(1)) : null;
     const vam = seg.elev_gain_m > 0 ? Math.round((seg.elev_gain_m / Math.max(1, estMovingTimeS)) * 3600) : null;
     const effortScore = (() => {
+      // estimate-ok: segment effort-score heuristic (0–100 display sort key), not a load/verdict
       const hrScore = avgHr != null ? Math.min(100, Math.max(0, (avgHr - 90) * 0.9)) : 45;
       const gradeScore = Math.min(30, seg.avg_grade_pct * 8);
       return Math.round(Math.min(100, hrScore + gradeScore));
@@ -801,10 +802,10 @@ async function upsertRouteIntelligence(
 
       const startScore = (features.start_lat != null && features.start_lng != null && cStartLat != null && cStartLng != null)
         ? Math.max(0, 1 - (haversineKm(features.start_lat, features.start_lng, cStartLat, cStartLng) / 2.0))
-        : 0.4;
+        : 0.4; // estimate-ok: geo course-match score (heuristic, not a rendered athlete metric)
       const endScore = (features.end_lat != null && features.end_lng != null && cEndLat != null && cEndLng != null)
         ? Math.max(0, 1 - (haversineKm(features.end_lat, features.end_lng, cEndLat, cEndLng) / 2.0))
-        : 0.4;
+        : 0.4; // estimate-ok: geo course-match score (heuristic, not a rendered athlete metric)
 
       const score = (0.5 * distScore) + (0.3 * startScore) + (0.2 * endScore);
       return { c, score };
@@ -875,13 +876,16 @@ async function upsertRouteIntelligence(
   const clusterMeta = parseJsonSafe(cluster.metadata) || {};
   const cStartLat = toNum(clusterMeta.start_lat);
   const cStartLng = toNum(clusterMeta.start_lng);
-  const startKm = (features.start_lat != null && features.start_lng != null && cStartLat != null && cStartLng != null)
-    ? haversineKm(features.start_lat, features.start_lng, cStartLat, cStartLng)
-    : 1.5;
+  // D-237 declare: when start coords are absent, DON'T fabricate a 1.5 km gap — score the route
+  // match on DISTANCE alone (confidence then reflects only the signal we actually have).
+  const haveStart = features.start_lat != null && features.start_lng != null && cStartLat != null && cStartLng != null;
+  const startKm = haveStart ? haversineKm(features.start_lat, features.start_lng, cStartLat, cStartLng) : null;
   const cDist = toNum(cluster.distance_m) ?? features.distance_m;
   const distScore = Math.max(0, 1 - Math.abs(features.distance_m - cDist) / Math.max(800, cDist * 0.2));
-  const startScore = Math.max(0, 1 - (startKm / 2));
-  const matchConfidence = Math.max(0, Math.min(1, (0.65 * distScore) + (0.35 * startScore)));
+  const startScore = startKm != null ? Math.max(0, 1 - (startKm / 2)) : null;
+  const matchConfidence = startScore != null
+    ? Math.max(0, Math.min(1, (0.65 * distScore) + (0.35 * startScore)))
+    : Math.max(0, Math.min(1, distScore));
 
   await supabase
     .from("workout_route_match")
