@@ -3,6 +3,7 @@ import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
 import { spineVerdictFor } from '../_shared/narrative-core/index.ts';
+import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, CARRYOVER_WINDOW_DAYS } from '../_shared/cross-domain-carryover.ts';
 // Step 2 (spine): first server consumer of the relocated deterministic core. The narrative
 // DESCRIBES the spine's bike verdict (terrain-matched + staleness-gated), never infers direction.
 import { computeBikeState, pwr20ToSeries, resolveZoneBand } from '../_shared/state-trend/index.ts';
@@ -2561,6 +2562,48 @@ Deno.serve(async (req) => {
       { isUnplanned: !plannedWorkout },
       aiSummaryDebug);
       if (ai_summary) ai_summary_generated_at = new Date().toISOString();
+
+      // Axis 1 — cross-domain carryover (BIKE card). Discipline-correct signal: power-at-HR decoupling
+      // (cyclingHrDriftPct — HR rising relative to power = engine straining to hold watts). For cycling,
+      // DOMS lowers power AND raises HR, so this COMPOUNDS (no self-cancel, no cadence-DOMS analog).
+      // Conservative + silence-default; heat / hard-prescription confounds → suppress; declared-easy vetoes.
+      try {
+        const uid = (workout as any)?.user_id;
+        const wDate = String((workout as any)?.date || '').slice(0, 10);
+        if (uid && /^\d{4}-\d{2}-\d{2}$/.test(wDate) && Number.isFinite(Number(cyclingHrDriftPct))) {
+          const winStart = new Date(new Date(wDate + 'T12:00:00Z').getTime() - CARRYOVER_WINDOW_DAYS * 86400000).toISOString().slice(0, 10);
+          const { data: recentStr } = await supabase.from('workouts')
+            .select('date, strength_exercises, workload_actual')
+            .eq('user_id', uid).eq('type', 'strength').eq('workout_status', 'completed')
+            .gte('date', winStart).lt('date', wDate);
+          const recentSessions = ((recentStr ?? []) as any[]).map((w) => {
+            const exRaw = w?.strength_exercises;
+            const ex = Array.isArray(exRaw) ? exRaw : (typeof exRaw === 'string' ? (JSON.parse(exRaw || '[]')) : []);
+            const names = (Array.isArray(ex) ? ex : []).map((e: any) => String(e?.name || ''));
+            return { date: String(w?.date || ''), type: 'strength', strengthFocus: classifyStrengthFocus(names), workload: Number(w?.workload_actual || 0), isNovel: false };
+          });
+          const decoupPct = Number(cyclingHrDriftPct);
+          const tempF = Number((workout as any)?.avg_temperature);
+          const heatConfound = Number.isFinite(tempF) && tempF >= 82;
+          const prescribedHard = /interval|threshold|vo2|race|sweet.?spot|\bftp\b|hard/i.test(String((plannedWorkout as any)?.type || '') + ' ' + String((plannedWorkout as any)?.name || ''));
+          const confounded = heatConfound || prescribedHard;
+          const rawElevation = decoupPct - 5; // >5% aerobic (power-at-HR) decoupling = notable; ≥3 over base to fire
+          const thisRpe = Number((workout as any)?.rpe);
+          const declaredEasy = Number.isFinite(thisRpe) && thisRpe > 0 && thisRpe <= 4;
+          const carry = detectCrossDomainCarryover({
+            targetDate: wDate, targetDiscipline: 'ride',
+            effortSignal: 'hr_at_pace',
+            rawElevation, adjustedElevation: confounded ? 0 : rawElevation, threshold: 3,
+            confounds: { grade: false, heat: heatConfound, prescribedHard },
+            recentSessions, nonLegElevated: null, declaredEasy,
+          });
+          const clause = buildCarryoverClause(carry, 'ride');
+          if (clause) { ai_summary = ai_summary ? `${ai_summary} ${clause}` : clause; if (!ai_summary_generated_at) ai_summary_generated_at = new Date().toISOString(); }
+          console.log(`[analyze-cycling-workout] carryover ${carry?.claimable ? `CLAIMED (${carry.confidence})` : `silent (${carry?.suppressedBy})`} [decoup=${decoupPct} rpe=${thisRpe}]`);
+        }
+      } catch (carryErr) {
+        console.warn('[analyze-cycling-workout] carryover skipped:', carryErr);
+      }
     } catch (e: any) {
       console.log('⚠️ Cycling ai_summary generation failed:', e);
       aiSummaryDebug.exception = e?.message || String(e);
