@@ -1,0 +1,24 @@
+name: estimate-provenance
+
+# D-237 "clean = enforced, not asserted" — fail the build when a numeric fallback
+# reaches a load-bearing module without declaring itself as an estimate.
+# See docs/DESIGN-D237-lint-guard.md. To make this a REQUIRED gate, add it as a
+# required status check in the repo's branch-protection rules for `main`.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      # --ignore-scripts skips native/capacitor postinstall — the guard only needs `typescript`.
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run lint:provenance

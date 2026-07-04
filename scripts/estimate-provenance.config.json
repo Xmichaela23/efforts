@@ -1,0 +1,39 @@
+{
+  "_doc": "D-237 estimate-provenance guard config. See docs/DESIGN-D237-lint-guard.md. Curated + grow: add files as the silent-fallback sweep expands the audited surface.",
+
+  "files": [
+    "supabase/functions/_shared/workload.ts",
+    "supabase/functions/calculate-workload/index.ts",
+    "supabase/functions/compute-facts/index.ts",
+    "supabase/functions/_shared/state-trend/thresholds.ts",
+    "supabase/functions/_shared/marathon-readiness/index.ts",
+    "supabase/functions/_shared/session-load.ts",
+    "src/lib/trend-receipt.ts"
+  ],
+
+  "_declaredDefaultProviders_doc": "Functions whose SOLE job is to supply a default. Their internal literal fallback is the sanctioned source; the obligation to DECLARE falls on callers that persist/render the value. Keep this list SHORT and auditable.",
+  "declaredDefaultProviders": [
+    "getDefaultIntensityForType",
+    "calculateTRIMPWorkload",
+    "getStrengthIntensity"
+  ],
+
+  "_provenanceTokens_doc": "If a fallback's NEAREST enclosing function references any of these, the estimate is DECLARED and passes. Must be a SPECIFIC estimate-provenance vocabulary — NOT generic `_method`/`confidence`, which collide with unrelated fields (match_method, match_confidence) and mask real silent fallbacks. Extend deliberately as new declaration markers land.",
+  "provenanceTokens": [
+    "workload_method",
+    "workload_estimated",
+    "_estimated",
+    "classifyWorkloadMethod",
+    "WorkloadMethod",
+    "LOW_TRUST",
+    "isLowTrustWorkload",
+    "hr_rejected_corrupt",
+    "hr_corrupt"
+  ],
+
+  "_defaultNamePattern_doc": "A fallback VALUE that is an identifier/property whose name matches this is a 'named default' (REF_SPW, defaults.mpw, DISTANCE_DEFAULTS.marathon) and is in scope just like a numeric literal.",
+  "defaultNamePattern": "REF_|_DEFAULT|DEFAULT_|_FALLBACK|FALLBACK_|(^|\\.)defaults?($|\\.|\\[)",
+
+  "_ignoreValues_doc": "Numeric fallbacks equal to these are treated as 'empty/none' sentinels, not fabricated estimates (e.g. `x ?? 0`, `Number(v) || 0`). 0 only by default.",
+  "ignoreValues": [0]
+}
