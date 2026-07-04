@@ -2571,7 +2571,9 @@ Deno.serve(async (req) => {
         const uid = (workout as any)?.user_id;
         const wDate = String((workout as any)?.date || '').slice(0, 10);
         if (uid && /^\d{4}-\d{2}-\d{2}$/.test(wDate) && Number.isFinite(Number(cyclingHrDriftPct))) {
-          const winStart = new Date(new Date(wDate + 'T12:00:00Z').getTime() - CARRYOVER_WINDOW_DAYS * 86400000).toISOString().slice(0, 10);
+          // Read a WIDER 7d window (detector still filters to ≤3d) so the diagnostic can say "no lift in
+          // window" when a leg session exists but is too old.
+          const winStart = new Date(new Date(wDate + 'T12:00:00Z').getTime() - 7 * 86400000).toISOString().slice(0, 10);
           const { data: recentStr } = await supabase.from('workouts')
             .select('date, strength_exercises, workload_actual')
             .eq('user_id', uid).eq('type', 'strength').eq('workout_status', 'completed')
@@ -2582,6 +2584,12 @@ Deno.serve(async (req) => {
             const names = (Array.isArray(ex) ? ex : []).map((e: any) => String(e?.name || ''));
             return { date: String(w?.date || ''), type: 'strength', strengthFocus: classifyStrengthFocus(names), workload: Number(w?.workload_actual || 0), isNovel: false };
           });
+          // Diagnostic: nearest leg (lower/full) session in the 7d window + its age (for "no lift in window").
+          const legLifts = recentSessions
+            .filter((s) => (s.strengthFocus === 'lower' || s.strengthFocus === 'full') && s.workload > 0)
+            .map((s) => ({ s, age: Math.round((new Date(wDate + 'T12:00:00Z').getTime() - new Date(s.date + 'T12:00:00Z').getTime()) / 86400000) }))
+            .sort((a, b) => a.age - b.age);
+          const nearestLift = legLifts[0] || null;
           const decoupPct = Number(cyclingHrDriftPct);
           const tempF = Number((workout as any)?.avg_temperature);
           const heatConfound = Number.isFinite(tempF) && tempF >= 82;
@@ -2595,6 +2603,8 @@ Deno.serve(async (req) => {
           const thisIF = Number((cyclingFactPacketV1 as any)?.facts?.intensity_factor);
           let declaredRpeGap: number | null = null;
           let declaredBaselineOk = false;
+          let compCount = 0;       // diagnostic: comparable-IF rides WITH RPE found
+          let expectedRpe: number | null = null;
           if (Number.isFinite(thisRpe) && thisRpe > 0 && Number.isFinite(thisIF) && thisIF > 0) {
             const { data: recRides } = await supabase.from('workouts')
               .select('rpe, computed, workout_analysis').eq('user_id', uid).eq('type', 'ride').eq('workout_status', 'completed')
@@ -2602,9 +2612,10 @@ Deno.serve(async (req) => {
             const comps = ((recRides ?? []) as any[])
               .map((w) => ({ rpe: Number(w?.rpe), iff: Number(w?.computed?.analysis?.power?.intensity_factor ?? w?.workout_analysis?.fact_packet_v1?.facts?.intensity_factor) }))
               .filter((x) => Number.isFinite(x.rpe) && x.rpe > 0 && Number.isFinite(x.iff) && Math.abs(x.iff - thisIF) <= 0.1);
+            compCount = comps.length;
             if (comps.length >= 3) {
-              const expected = comps.reduce((a, b) => a + b.rpe, 0) / comps.length;
-              declaredRpeGap = thisRpe - expected;
+              expectedRpe = comps.reduce((a, b) => a + b.rpe, 0) / comps.length;
+              declaredRpeGap = thisRpe - expectedRpe;
               declaredBaselineOk = true;
             }
           }
@@ -2617,7 +2628,19 @@ Deno.serve(async (req) => {
           });
           const clause = buildCarryoverClause(carry, 'ride');
           if (clause) { ai_summary = ai_summary ? `${ai_summary} ${clause}` : clause; if (!ai_summary_generated_at) ai_summary_generated_at = new Date().toISOString(); }
-          console.log(`[analyze-cycling-workout] carryover ${carry?.claimable ? `CLAIMED (${carry.confidence})` : `silent (${carry?.suppressedBy})`} [decoup=${decoupPct} rpe=${thisRpe}]`);
+          // GLASS-BOX DIAGNOSTIC (TESTING-ONLY — strip once tuned): when a recent leg lift was in play but
+          // carryover stayed silent, show WHY so the eyeball is read-the-reason not guess-the-reason.
+          if (!carry?.claimable && nearestLift) {
+            let why = '';
+            if (nearestLift.age > CARRYOVER_WINDOW_DAYS) why = `no lift in window (last leg session ${nearestLift.age}d ago)`;
+            else if (carry?.suppressedBy === 'systemic') why = 'systemic (elevated across disciplines)';
+            else if (carry?.suppressedBy === 'declared_easy') why = `you rated it easier than the output (RPE ${thisRpe})`;
+            else if (!declaredBaselineOk) why = `baseline thin (${compCount} comparable RPE ride${compCount === 1 ? '' : 's'})`;
+            else if (expectedRpe != null) why = `RPE ${thisRpe} ≈ your norm ${expectedRpe.toFixed(1)} (not elevated), objective quiet (decoup ${decoupPct.toFixed(1)}%)`;
+            else why = `${carry?.suppressedBy ?? 'no signal'}`;
+            ai_summary = `${ai_summary ?? ''}\n\n⟨diag⟩ carryover silent — ${why}`;
+          }
+          console.log(`[analyze-cycling-workout] carryover ${carry?.claimable ? `CLAIMED (${carry.confidence})` : `silent (${carry?.suppressedBy})`} [decoup=${decoupPct} rpe=${thisRpe} if=${thisIF} comps=${compCount} liftAge=${nearestLift?.age ?? 'none'}]`);
         }
       } catch (carryErr) {
         console.warn('[analyze-cycling-workout] carryover skipped:', carryErr);
