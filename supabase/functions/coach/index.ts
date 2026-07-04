@@ -27,6 +27,7 @@ import {
   isAcwrFatiguedSignal,
 } from '../_shared/acwr-state.ts';
 import { computeAcwr, type LoadRow } from '../_shared/acwr.ts';
+import { getRunningFatigueWeight, getCyclingFatigueWeight } from '../_shared/fatigue-weights.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
 import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey } from '../_shared/state-trend/index.ts';
@@ -63,8 +64,6 @@ import {
   buildBodyResponse,
   generateCoaching,
   snapshotToPrompt,
-  getRunningFatigueWeight,
-  getCyclingFatigueWeight,
   assessAdaptation,
   adaptationSignalsToPrompt,
   type AthleteSnapshot,
