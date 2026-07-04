@@ -28,6 +28,7 @@ import {
   mapRPEToIntensity,
   type TRIMPInput,
 } from "../_shared/workload.ts";
+import { assessHrPlausibility, resolveMaxHrCeiling } from "../_shared/hr-plausibility.ts";
 import { canonicalize, muscleGroup, bigFourLift } from "../_shared/canonicalize.ts";
 import {
   buildRegistryLookup,
@@ -1485,8 +1486,10 @@ function computeAdherence(w: WorkoutRow, planned: PlannedRow | null): Record<str
 // Workload computation (uses shared formulas)
 // ---------------------------------------------------------------------------
 
-function computeWorkload(w: WorkoutRow, baselines: Baselines | null): number {
-  if (w.workload_actual && w.workload_actual > 0) return w.workload_actual;
+function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt = false): number {
+  // When HR is rejected as corrupt (D-237), do NOT reuse a workload_actual that was computed
+  // from that bad HR (calculate-workload's TRIMP) — recompute on the estimate path instead.
+  if (!hrCorrupt && w.workload_actual && w.workload_actual > 0) return w.workload_actual;
 
   const dur = durationMinutes(w);
   const type = w.type ?? "run";
@@ -1503,8 +1506,8 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null): number {
     return calculatePilatesYogaWorkload(dur, sessionRPE);
   }
 
-  // Cardio: try TRIMP first
-  if (w.avg_heart_rate && w.max_heart_rate && dur > 0) {
+  // Cardio: TRIMP first — but ONLY when the HR is trusted (not corrupt).
+  if (!hrCorrupt && w.avg_heart_rate && w.max_heart_rate && dur > 0) {
     const restHR = baselines?.performance_numbers?.resting_heart_rate
       ?? baselines?.learned_fitness?.[type]?.resting_hr ?? 60;
     const trimp = calculateTRIMPWorkload({
@@ -1516,7 +1519,10 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null): number {
     if (trimp !== null) return trimp;
   }
 
-  // Fallback: duration-based
+  // Estimate path (no trusted HR): sRPE if a logged RPE exists, else the flat default.
+  if (typeof sessionRPE === "number" && sessionRPE >= 1 && sessionRPE <= 10) {
+    return calculateDurationWorkload(dur, mapRPEToIntensity(sessionRPE));
+  }
   const intensity = getDefaultIntensityForType(type);
   return calculateDurationWorkload(dur, intensity);
 }
@@ -1601,11 +1607,56 @@ serve(async (req: Request) => {
     const discipline = (w.type ?? "run").toLowerCase();
 
     // -----------------------------------------------------------------------
-    // 5. Compute universal metrics
+    // 5. HR plausibility (D-237): reject present-but-corrupt HR (flaky strap /
+    //    optical cadence-lock) so it never feeds TRIMP or the load substrate.
+    //    Scalar ceiling from the athlete's OWN robust observed max (Tanaka fallback
+    //    when thin); cadence-lock (HR×cadence correlation) + slew from the sample
+    //    series. A trip → estimate path + hr_rejected_corrupt, raw HR preserved.
     // -----------------------------------------------------------------------
-    const workload = computeWorkload(w, baselines);
+    const isCardio = discipline === "run" || discipline === "ride" || discipline === "bike" || discipline === "swim";
+    let hrVerdict: { corrupt: boolean; reasons: string[]; correlation: number | null } = { corrupt: false, reasons: [], correlation: null };
+    let hrCeilingUsed: number | null = null;
+    if (isCardio && (w.avg_heart_rate || w.max_heart_rate)) {
+      const { data: hrMaxRows } = await supabase
+        .from("workouts").select("max_heart_rate")
+        .eq("user_id", w.user_id).gt("max_heart_rate", 100);
+      const observedMaxima = (hrMaxRows ?? []).map((r: any) => Number(r.max_heart_rate)).filter((v: number) => Number.isFinite(v));
+      const ceiling = resolveMaxHrCeiling({ observedMaxima, age: baselines?.age ?? null });
+      hrCeilingUsed = ceiling.ceiling;
+      const sd: any = parseJsonSafe(w.sensor_data);
+      const samples: any[] = Array.isArray(sd?.samples) ? sd.samples : Array.isArray(sd) ? sd : [];
+      const hrSeries = samples.map((s: any) => s?.heart_rate).filter((v: any) => typeof v === "number");
+      const cadenceSeries = samples.map((s: any) => s?.cadence).filter((v: any) => typeof v === "number");
+      hrVerdict = assessHrPlausibility({ maxHr: w.max_heart_rate ?? null, ceiling: ceiling.ceiling, hrSeries, cadenceSeries });
+    }
+    const hrCorrupt = hrVerdict.corrupt;
+
+    // -----------------------------------------------------------------------
+    // 6. Compute universal metrics
+    // -----------------------------------------------------------------------
+    const workload = computeWorkload(w, baselines, hrCorrupt);
     const sessionRPE = w.workout_metadata?.session_rpe ?? null;
     const readiness = w.workout_metadata?.readiness ?? null;
+
+    // When HR was rejected, correct the ACWR substrate (workouts.workload_actual) + declare the
+    // method, so both the trend layer (workout_facts.workload below) and ACWR stop eating the bad
+    // TRIMP. Non-destructive: raw avg/max HR are left untouched. Logs WHICH mechanism caught it.
+    if (hrCorrupt) {
+      console.log(`[compute-facts] HR rejected corrupt for ${w.id} (${discipline}): reasons=[${hrVerdict.reasons.join(",")}] r=${hrVerdict.correlation} ceiling=${hrCeilingUsed} → hr_rejected_corrupt, workload ${workload}`);
+      try {
+        await supabase.from("workouts").update({
+          workload_actual: workload,
+          workout_metadata: {
+            ...(w.workout_metadata ?? {}),
+            workload_method: "hr_rejected_corrupt",
+            workload_estimated: true,
+            hr_corrupt: { reasons: hrVerdict.reasons, correlation: hrVerdict.correlation, ceiling: hrCeilingUsed },
+          },
+        }).eq("id", w.id);
+      } catch (e) {
+        console.warn(`[compute-facts] hr_rejected_corrupt write-back failed for ${w.id}:`, (e as any)?.message ?? e);
+      }
+    }
 
     // -----------------------------------------------------------------------
     // 6. Compute discipline-specific facts
