@@ -38,6 +38,17 @@ Deno.test('no output signal → 0 (caller falls through to sRPE / default)', () 
   assertEquals(inferIntensityFromPerformance({ type: 'ride', avgHr: 150 }), 0); // no ftp, no LTHR
 });
 
+Deno.test('CROSS-DISCIPLINE TRAP: a run with Stryd power is NOT scored against cycling FTP', () => {
+  // Michael's real shape: run avg_power 254 (running watts), cycling FTP 176, avgHr 135, LTHR 151.
+  // The BUG would be 254/176 = 1.44 → 1.15 intensity (massive over-score). The power branch is
+  // ride-only, so the run must fall to HR%LTHR: 135/151 = 0.894 → 0.88 (NOT 1.15).
+  const run = inferIntensityFromPerformance({ type: 'run', avgPower: 254, ftp: 176, avgHr: 135, thresholdHr: 151 });
+  assertEquals(run, 0.88);
+  assert(run < 1.0, 'run-power must never produce a power-based over-score');
+  // and a run with power but NO HR/LTHR → 0 (run-power ignored, falls to sRPE/default), never 254/ftp.
+  assertEquals(inferIntensityFromPerformance({ type: 'run', avgPower: 254, ftp: 176 }), 0);
+});
+
 // --- method classification mirrors the ladder; TRIMP is never emitted ---
 
 Deno.test('classifyWorkloadMethod is output-first, never TRIMP', () => {

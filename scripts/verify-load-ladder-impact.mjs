@@ -97,4 +97,26 @@ for (const e of examples) console.log(`  ${e.date} ${e.type.padEnd(4)} ${String(
 console.log(`\nDRAMATIC MOVERS (|Δ| ≥ 25 load pts — worth your eye): ${movers.length}`);
 for (const m of movers.slice(0, 15))
   console.log(`  ${m.date} ${m.type.padEnd(4)} ${String(m.before).padStart(4)} → ${String(m.after).padStart(4)}  Δ ${m.delta>=0?'+':''}${m.delta}  (power ${m.power ?? '—'}, avgHR ${m.hr ?? '—'})`);
-console.log(`\n${movers.length===0?'→ near-no-op on magnitude; the correction removes the fabrication without swinging load.':'→ the movers above are where TRIMP-on-60 over/under-scored vs real output. Review before deploy.'}`);
+console.log(`${movers.length===0?'→ near-no-op on magnitude; the correction removes the fabrication without swinging load.':'→ the movers above are where TRIMP-on-60 over/under-scored vs real output. Review before deploy.'}`);
+
+// --- RUN SAFETY CANARY: runs must score on HR%LTHR, NEVER run-power ÷ cycling-FTP ---
+// The power tier is ride-only (isRide gate). This proves it on every run with Stryd power:
+// shows the ACTUAL new load (HR%LTHR) vs the BUG value (run-power / cycling FTP), and flags
+// any run whose new load implies IF > 1.05 (which only a power misfire could cause).
+const runs = w.filter((r) => r.type === 'run');
+const strydRuns = runs.filter((r) => r.avg_power);
+let runSpikes = 0;
+console.log(`\nRUN SAFETY — ${runs.length} runs, ${strydRuns.length} with Stryd power (run-power is IGNORED; HR%LTHR used):`);
+for (const r of strydRuns.slice(0, 12)) {
+  const dur = (r.moving_time && r.moving_time > 0) ? r.moving_time / 60 : (r.duration || 0);
+  if (!dur) continue;
+  const actual = newLoad(r, dur);                                   // HR%LTHR (or sRPE if no LTHR)
+  const bug = durLoad(dur, ridePowerIF(r.avg_power, ftp));          // what run-power÷FTP WOULD give
+  const impliedIF = Math.sqrt(actual / Math.max(1, durLoad(dur, 1)));
+  const spiked = impliedIF > 1.05;
+  if (spiked) runSpikes++;
+  console.log(`  ${r.date}  new ${String(actual).padStart(4)} (IF~${impliedIF.toFixed(2)}, avgHR ${r.avg_heart_rate})  |  BUG(${r.avg_power}W÷${ftp}) would be ${bug}  ${spiked ? '  ⚠ SPIKE' : '✓ avoided'}`);
+}
+console.log(runSpikes === 0
+  ? `  ✓ 0/${strydRuns.length} runs spiked — no cross-discipline power error. Run-power ÷ cycling-FTP never fires.`
+  : `  ✗ ${runSpikes} run(s) spiked — INVESTIGATE: a run took the power path against cycling FTP.`);
