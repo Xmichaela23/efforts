@@ -12,22 +12,15 @@ All of this is one idea: **a verdict must know (a) what the plan is trying to do
 
 ---
 
-## 1. Plan/history-aware verdict tone
+## 1. Plan/history-aware verdict tone — ❌ DESCOPED 2026-07-04 (principle kept, no build)
 
-**Problem.** A strength decline during/after an endurance-dominant block, when an active rebuild plan exists, reads as alarm ("back off") instead of expected-and-addressed.
+**Decision (Michael, 2026-07-04):** do NOT build §1. Two design passes — first the "expected, rebuilding after the marathon block" tone, then a "state-the-fact vs flag-only-if-consistent" reframe — both converged on solving a **rare edge case**: declining strength + light/inconsistent training + no plan + unplanned sessions. That scenario is largely an artifact of the current **no-plan account state** (real users generally have a plan), not a product priority. Low value vs. the detection effort (endurance-block / training-consistency detection + a verdict-path rewire). **Descoped; revisit only if it stops being an edge case** (e.g. many real users hit declining-while-no-plan).
 
-**Deterministic inputs (all present):** `planConfig` (plan name, `phase_by_week`, `week_intent_by_week`, `planStarted`, `planWeek1StartIso`); logged training history (an endurance-dominant block = ≥N weeks where endurance load ≫ strength load, from `workout_facts`/`session_load`); the Race record (a completed marathon in the last ~8–12 wk).
+**The PRINCIPLE that survives (bake into any future strength-verdict work):** a strength verdict **must not infer a flattering cause it can't verify** — no "down because you raced," no rebuild-week narrative. **When the app can't distinguish detraining from block-recovery, state the fact, don't editorialize.** Silent on the redundant case (the athlete already lived the cause); it speaks only when it has something **non-obvious AND verifiable**. Corollary: **no fabricated "back off / suggest X" prescription on a decline the app can't explain.**
 
-**Detection.**
-- `enduranceBlockRecentlyEnded` = a completed endurance goal (Race record) within ~8 wk **OR** a trailing block where endurance load share ≥ ~70%.
-- `activeRebuild` = `planStarted` (or starts ≤7d) AND the plan is strength-primary ("Get Stronger" / strength_protocol present).
-- If a strength decline verdict fires AND (`enduranceBlockRecentlyEnded` AND `activeRebuild`) → **expected-and-addressed** tone. Else → the existing verdict (alarm reserved for **unaddressed** declines).
+**Explicitly rejected (not being built):** the causal-story logic (`enduranceBlockRecentlyEnded` / `activeRebuild` / "rebuild Week N") AND the consistency-gated two-state flag. The current baseline-aware row (D-231 — "Working ~125 vs your 150 baseline", H1 fixed, verified end-to-end 2026-07-04) stands as-is; §1 adds nothing on top of it now.
 
-**Strings.**
-- Expected-and-addressed: `Bench down ~10% over the marathon block — expected. Rebuild started, Week N of 12.`
-- Unaddressed decline (no rebuild plan): the current back-off verdict stands.
-
-**Fixtures.** decline + endurance-block + active-rebuild → expected string · decline + no rebuild → alarm unchanged · no decline → unchanged.
+**Reliability finding banked (2026-07-04, in case §1 ever revives):** the app *is* the source of truth for strength logs (in-app, not device-synced), so a completed-strength-session frequency read (data already fetched at `coach:2809`, `-56d…-5d`) can distinguish "trained consistently" from "been light" — and the one failure mode (trained-but-didn't-log) reads as "light" → fact-only, structurally **never a false flag**. So the descope is a value/priority call, not a feasibility one.
 
 ---
 
