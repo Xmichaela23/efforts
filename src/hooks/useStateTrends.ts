@@ -16,6 +16,7 @@ import {
   isoMinus,
   STATE_TREND_WINDOWS,
   type BikeFitness,
+  type RunFitness,
   type DisciplineCard,
   type Headline,
   type StateTrendInputs,
@@ -36,6 +37,7 @@ export interface StateTrends {
   cards: DisciplineCard[];
   headline: Headline | null;
   bikeFitness: BikeFitness | null; // the bike row's "Power · Efficiency" dual read
+  runFitness: RunFitness | null;   // Tier 1: run row's "Decoupling · Efficiency" dual read
   swimRest: PerfSummary | null;    // D-194: swim rest-fraction (work:rest) trend
   loading: boolean;
 }
@@ -124,22 +126,33 @@ export function useStateTrends(): StateTrends {
       const runRows = (runR.data || []) as any[];
       const runWids = [...new Set(runRows.map((r) => r.workout_id).filter(Boolean))];
       const runCtById = new Map<string, string | null>();
+      const runHrsByWid = new Map<string, any>(); // Tier 1: heart_rate_summary → decoupling join
       if (runWids.length) {
         const { data: rw } = await supabase.from('workouts').select('id,workout_analysis').in('id', runWids);
-        for (const w of (rw || []) as any[]) runCtById.set(w.id, w.workout_analysis?.classified_type ?? null);
+        for (const w of (rw || []) as any[]) {
+          runCtById.set(w.id, w.workout_analysis?.classified_type ?? null);
+          runHrsByWid.set(w.id, w.workout_analysis?.heart_rate_summary ?? null);
+        }
       }
-      // Q-110: join pace-at-HR efficiency (run_facts) by date onto the run series.
-      const runPaceAtHrByDate = new Map<string, number>();
+      // Q-110: join run efficiency (run_facts.efficiency_index) by date onto the run series.
+      const runEffIndexByDate = new Map<string, number>();
       for (const f of (runFactsR.data || []) as any[]) {
-        const v = f.run_facts?.pace_at_easy_hr;
-        if (typeof v === 'number') runPaceAtHrByDate.set(f.date, v);
+        const v = f.run_facts?.efficiency_index;
+        if (typeof v === 'number') runEffIndexByDate.set(f.date, v);
       }
-      const runJoined = runRows.map((r) => ({
-        metric_date: r.metric_date,
-        effort_adjusted_pace_sec_per_km: r.effort_adjusted_pace_sec_per_km,
-        pace_at_easy_hr: runPaceAtHrByDate.get(r.metric_date) ?? null,
-        classified_type: runCtById.get(r.workout_id) ?? null,
-      }));
+      const runJoined = runRows.map((r) => {
+        const hrs = runHrsByWid.get(r.workout_id) || null;
+        return {
+          metric_date: r.metric_date,
+          effort_adjusted_pace_sec_per_km: r.effort_adjusted_pace_sec_per_km,
+          efficiency_index: runEffIndexByDate.get(r.metric_date) ?? null,
+          decoupling_pct: hrs?.decouplingPct ?? null,
+          decoupling_basis: hrs?.decouplingBasis ?? null,
+          workout_type: hrs?.workoutType ?? null,
+          duration_minutes: hrs?.durationMinutes ?? null,
+          classified_type: runCtById.get(r.workout_id) ?? null,
+        };
+      });
 
       // Q-061 parity: exclude equipment/drill-contaminated swims — MUST match compute-snapshot's
       // filter (the structural-equality guarantee), else the live STATE card and the cached spine drift.
@@ -167,7 +180,7 @@ export function useStateTrends(): StateTrends {
   }, []);
 
   const loading = liftsLoading || raw == null;
-  if (loading) return { cards: [], headline: null, bikeFitness: null, swimRest: null, loading: true };
+  if (loading) return { cards: [], headline: null, bikeFitness: null, runFitness: null, swimRest: null, loading: true };
 
   const exerciseRows: ExerciseLogLite[] = (exercises || []).map((e) => ({
     date: e.date,
@@ -177,7 +190,7 @@ export function useStateTrends(): StateTrends {
   }));
 
   const result = assembleStateTrends({ asOf: todayISO(), exerciseRows, ...raw! });
-  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, swimRest: result.swimRest, loading: false };
+  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, runFitness: result.runFitness, swimRest: result.swimRest, loading: false };
 }
 
 // SCALABILITY NOTE (now realized): the assembly is `assembleStateTrends` in @shared/state-trend,

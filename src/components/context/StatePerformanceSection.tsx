@@ -6,7 +6,7 @@
 // tagged as such; swim is additionally Q-038-clouded.
 
 import React from 'react';
-import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary } from '@shared/state-trend';
+import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand } from '@shared/state-trend';
 import { useStateTrends } from '@/hooks/useStateTrends';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
 
@@ -91,6 +91,55 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
         {children}
       </div>
     </div>
+  );
+}
+
+// Tier 1 — RUN row: DECOUPLING (aerobic durability) LEADS. The Friel band is the plain-language
+// VERDICT (band = state), the trend arrow is the direction, the % is the receipt; efficiency_index is
+// the quiet SECONDARY. Bands are a Friel/TrainingPeaks COACHING STANDARD, not a lab cutoff.
+// Honesty gates: stale → carry-forward "last steady run Nd ago" (never a current verdict); sparse →
+// "needs 20+ min steady effort" (what the metric needs, not what the user did wrong); the label
+// SCOPES the claim to steady runs (it did not measure intervals/short runs).
+const DECOUPLING_BAND: Record<DecouplingBand, { word: string; cls: string }> = {
+  excellent: { word: 'excellent aerobic fitness', cls: 'text-emerald-300' },
+  strong: { word: 'strong aerobic base', cls: 'text-emerald-400/90' },
+  base: { word: 'building aerobic base', cls: 'text-sky-400/85' },
+  durability_gap: { word: 'durability gap', cls: 'text-amber-400/90' },
+};
+
+function RunFitnessRow({ fitness }: { fitness: RunFitness }) {
+  const d = fitness.decoupling;
+  const e = fitness.efficiency;
+  const v = VERDICT[d.verdict];
+  return (
+    <Row label="run">
+      {d.verdict !== 'needs_data' && d.band ? (
+        // confident: band = state, arrow = trend, % = receipt
+        <span className="inline-flex items-baseline gap-1.5">
+          <span className={DECOUPLING_BAND[d.band].cls}>{DECOUPLING_BAND[d.band].word}</span>
+          <span className={`inline-flex items-baseline gap-0.5 ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span></span>
+          {d.recentPct != null && <span className="text-white/35 text-[11px]">{d.recentPct}%</span>}
+          {d.provisional && <span className="text-white/30 text-[10px]">prov</span>}
+        </span>
+      ) : d.stale && d.recentPct != null && d.band ? (
+        // stale → carry-forward the REAL value + its age, dimmed; never a current verdict off old data
+        <span className="inline-flex items-baseline gap-1.5 text-white/40">
+          <span>{DECOUPLING_BAND[d.band].word}</span>
+          <span className="text-white/30 text-[11px]">last steady run {d.newestAgeDays}d ago · {d.recentPct}%</span>
+          <span className="text-white/30 text-[10px]">limited data</span>
+        </span>
+      ) : (
+        // sparse → frame as what the metric needs, not a user failing
+        <span className="text-white/40">needs 20+ min steady effort</span>
+      )}
+      <span className="text-white/25 text-[10px]">aerobic durability · steady runs</span>
+      {e.verdict !== 'needs_data' && (
+        <span className="inline-flex items-baseline gap-1">
+          <span className="text-white/40">Efficiency</span>
+          <span className={`inline-flex items-baseline gap-0.5 ${VERDICT[e.verdict].cls}`}>{VERDICT[e.verdict].arr && <span>{VERDICT[e.verdict].arr}</span>}<span>{VERDICT[e.verdict].word}</span></span>
+        </span>
+      )}
+    </Row>
   );
 }
 
@@ -179,12 +228,16 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
 }
 
 export default function StatePerformanceSection({ strengthDetail }: { strengthDetail?: React.ReactNode }) {
-  const { cards, headline, bikeFitness, swimRest, loading } = useStateTrends();
+  const { cards, headline, bikeFitness, runFitness, swimRest, loading } = useStateTrends();
   if (loading || cards.length === 0) return null;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
   // falls through to the standard card (adherence).
   const bikeHasSubstance = !!bikeFitness && (bikeFitness.power.verdict !== 'needs_data' || bikeFitness.efficiency.verdict !== 'needs_data');
+  // The run row shows the dual Decoupling · Efficiency read when there's decoupling substance
+  // (a verdict, OR a stale-but-real value to carry forward) or an efficiency verdict; else it
+  // falls through to the standard card (adherence). Mirrors bike.
+  const runHasSubstance = !!runFitness && (runFitness.decoupling.verdict !== 'needs_data' || runFitness.decoupling.stale || runFitness.efficiency.verdict !== 'needs_data');
 
   return (
     <div className="px-3 py-3">
@@ -192,6 +245,7 @@ export default function StatePerformanceSection({ strengthDetail }: { strengthDe
       {headline && <div className="text-[14px] font-medium text-white/90 leading-snug mb-2.5">{headline.line}</div>}
       {cards.map((card) => {
         if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow key="bike" fitness={bikeFitness!} />;
+        if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow key="run" fitness={runFitness!} />;
         const row = <DisciplineRow key={card.discipline} card={card} restTrend={card.discipline === 'swim' ? swimRest : null} />;
         // Q-107 H3: nest the per-lift detail directly under the STRENGTH trend row — one STRENGTH header,
         // the lifts as provisional "from your logged sets" detail (no competing second top-line).

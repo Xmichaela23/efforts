@@ -11,7 +11,7 @@
 // barrel here would create a load-order cycle.
 import { computeStrengthState, type LiftSeries } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, type BikeFitness } from './bike-fitness.ts';
-import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, paceAtHrToSeries } from './run.ts';
+import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
 import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSummary } from './discipline.ts';
@@ -73,7 +73,7 @@ export interface StateTrendInputs {
   asOf: string;
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
   bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; band_source: string | null; hr_corrupt?: boolean }>;
-  runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; pace_at_easy_hr?: number | null; classified_type: string | null }>;
+  runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; efficiency_index?: number | null; decoupling_pct?: number | null; decoupling_basis?: string | null; workout_type?: string | null; duration_minutes?: number | null; classified_type: string | null }>;
   swimRows: Array<{ date: string; pace_per_100m: number; rest_fraction?: number | null; distance_m?: number | null }>;
   plannedBy: Record<string, number>; // this-week planned counts per discipline
   doneBy: Record<string, number>; // this-week completed counts per discipline
@@ -84,6 +84,8 @@ export interface StateTrendResult {
   cards: DisciplineCard[];
   headline: Headline | null;
   bikeFitness: BikeFitness;
+  /** Tier 1: RUN dual read — decoupling (aerobic durability) LEAD + efficiency_index SECONDARY. */
+  runFitness: RunFitness;
   perfByDisc: Record<string, PerfSummary | null>;
   provisionalByDisc: Record<string, boolean>;
   spw: Record<string, number>;
@@ -123,14 +125,38 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // filters to comparable-easy + valid-GAP, so its length IS the 90d comparable-run count. classifyTrend
   // still windows the trend itself to runDays (42d) internally, so widening the fetch changes only the
   // cadence denominator, not the trend.
-  // Q-110: the run card's fitness verdict is now pace-at-HR EFFICIENCY (same-HR-faster pace = fitter)
-  // — the honest fitness signal, run analog of bike's HR-at-power. Raw GAP pace ("slower" ≠ "less
-  // fit") is DROPPED from the card. Cadence floor still scales off the comparable-easy run count
-  // (D-237). Decoupling (durability) is Phase 2.
-  const runEffSeries = paceAtHrToSeries(inp.runJoined);
-  const runComparableCadence = runEffSeries.length / WEEKS_90D;
-  const runState = computeRunEfficiencyState(runEffSeries, asOf, runComparableCadence);
-  const run = perfFromTrend(runState.trend);
+  // Tier 1: the RUN card is a DUAL read (mirrors BikeFitness power+efficiency) — DECOUPLING (aerobic
+  // durability, zone-free, no distance confound) LEADS and drives the card verdict; efficiency_index
+  // is the SECONDARY output-per-heartbeat read. GAP pace was dropped in Q-110. Cadence floor scales
+  // off the steady-run (decoupling) pool.
+  const runDecoupSeries = decouplingToSeries(inp.runJoined);
+  const runSteadyCadence = runDecoupSeries.length / WEEKS_90D;
+  const runDecoupling = computeRunDecouplingState(runDecoupSeries, asOf, runSteadyCadence);
+  const runEffSeries = efficiencyIndexToSeries(inp.runJoined);
+  const runEfficiency = computeRunEfficiencyState(runEffSeries, asOf, runEffSeries.length / WEEKS_90D);
+  const runState = runDecoupling; // decoupling drives the provisional flag below
+  // Card verdict = decoupling (the lead). pctChange is NULLED: decoupling's trend runs on offset
+  // values, so its pctChange isn't a meaningful run % — the real band/pct live in runFitness. This
+  // keeps the offset number out of the cached state_trends_v1 (coach never sees a bogus run %).
+  const run = perfFromTrend(runDecoupling.trend)!; // trend is always present; card verdict = decoupling (lead)
+  run.pctChange = null; // null the offset % (decoupling's trend runs on offset values); verdict stays honest
+  const runFitness: RunFitness = {
+    decoupling: {
+      verdict: runDecoupling.trend.verdict,
+      band: runDecoupling.band,
+      recentPct: runDecoupling.recentPct,
+      sampleCount: runDecoupling.trend.sampleCount,
+      newestAgeDays: runDecoupling.trend.newestAgeDays,
+      stale: runDecoupling.trend.stale,
+      provisional: isProvisionalTrend(runDecoupling.trend),
+    },
+    efficiency: {
+      verdict: runEfficiency.trend.verdict,
+      pctChange: runEfficiency.trend.pctChange,
+      sampleCount: runEfficiency.trend.sampleCount,
+      newestAgeDays: runEfficiency.trend.newestAgeDays,
+    },
+  };
 
   // swim
   const { series: swimSeries, dropped } = swimPaceToSeries(inp.swimRows);
@@ -179,7 +205,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   );
 
   return {
-    cards, headline: synthesizeHeadline(cards), bikeFitness, perfByDisc, provisionalByDisc, spw,
+    cards, headline: synthesizeHeadline(cards), bikeFitness, runFitness, perfByDisc, provisionalByDisc, spw,
     swimRest, swimRestProvisional: isProvisionalTrend(swimRestState.trend),
   };
 }
@@ -202,7 +228,13 @@ export interface StateTrendsV1 {
   as_of: string;
   version: 1;
   strength: DisciplineTrendCache;
-  run: DisciplineTrendCache;
+  /** Tier 1: run's dual read cached on the spine like bike's — decoupling (aerobic durability) LEAD
+   *  with its Friel band + recent %, efficiency_index SECONDARY. Lets coach/Arc/LLM narrate the band
+   *  ("building aerobic base"), not just the improving/sliding direction the base verdict carries. */
+  run: DisciplineTrendCache & {
+    decoupling: { verdict: string; band: string | null; recentPct: number | null; provisional: boolean; stale: boolean; newestAgeDays: number | null; sampleCount: number };
+    efficiency: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null };
+  };
   /** D-194: `rest` = the rest-fraction (work:rest) trend, nested like bike's power/efficiency. */
   swim: DisciplineTrendCache & { rest: DisciplineTrendCache };
   bike: DisciplineTrendCache & {
@@ -252,7 +284,13 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
     as_of: asOf,
     version: 1,
     strength: disc('strength'),
-    run: disc('run'),
+    // Tier 1: run's dual read on the spine — decoupling LEAD (band + recent %) + efficiency SECONDARY,
+    // mirroring bike's power/efficiency below, so the app KNOWS the durability band, not just direction.
+    run: {
+      ...disc('run'),
+      decoupling: { ...r.runFitness.decoupling },
+      efficiency: { ...r.runFitness.efficiency },
+    },
     swim: {
       ...disc('swim'),
       rest: {

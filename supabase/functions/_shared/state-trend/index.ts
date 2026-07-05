@@ -27,7 +27,12 @@ export {
   type BikeSignal,
   type BikeFitness,
 } from './bike-fitness.ts';
-export { computeRunState, routeMetricsToSeries, isComparableRunEffort, COMPARABLE_RUN_EFFORT, type RunState } from './run.ts';
+export {
+  computeRunState, routeMetricsToSeries, isComparableRunEffort, COMPARABLE_RUN_EFFORT,
+  efficiencyIndexToSeries, computeRunEfficiencyState,
+  decouplingToSeries, computeRunDecouplingState, frielBand, isSteadyAerobic,
+  type RunState, type RunFitness, type DecouplingBand, type DecouplingState,
+} from './run.ts';
 export { computeSwimState, swimPaceToSeries, type SwimState } from './swim.ts';
 export { synthesizeHeadline, type Headline } from './headline.ts';
 export {

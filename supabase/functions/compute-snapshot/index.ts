@@ -671,21 +671,32 @@ serve(async (req: Request) => {
         const runRows = (runR.data ?? []) as any[];
         const runWids = [...new Set(runRows.map((r) => r.workout_id).filter(Boolean))];
         const runCtById = new Map<string, string | null>();
+        const runHrsByWid = new Map<string, any>(); // Tier 1: heart_rate_summary → decoupling join
         if (runWids.length) {
           const { data: rw } = await supabase.from("workouts").select("id,workout_analysis").in("id", runWids);
-          for (const w of (rw ?? []) as any[]) runCtById.set(w.id, w.workout_analysis?.classified_type ?? null);
+          for (const w of (rw ?? []) as any[]) {
+            runCtById.set(w.id, w.workout_analysis?.classified_type ?? null);
+            runHrsByWid.set(w.id, w.workout_analysis?.heart_rate_summary ?? null);
+          }
         }
-        const runPaceAtHrByDate = new Map<string, number>();
+        const runEffIndexByDate = new Map<string, number>();
         for (const f of (runFactsR.data ?? []) as any[]) {
-          const v = f.run_facts?.pace_at_easy_hr;
-          if (typeof v === "number") runPaceAtHrByDate.set(f.date, v);
+          const v = f.run_facts?.efficiency_index;
+          if (typeof v === "number") runEffIndexByDate.set(f.date, v);
         }
-        const runJoined = runRows.map((r) => ({
-          metric_date: r.metric_date,
-          effort_adjusted_pace_sec_per_km: r.effort_adjusted_pace_sec_per_km,
-          pace_at_easy_hr: runPaceAtHrByDate.get(r.metric_date) ?? null,
-          classified_type: runCtById.get(r.workout_id) ?? null,
-        }));
+        const runJoined = runRows.map((r) => {
+          const hrs = runHrsByWid.get(r.workout_id) || null;
+          return {
+            metric_date: r.metric_date,
+            effort_adjusted_pace_sec_per_km: r.effort_adjusted_pace_sec_per_km,
+            efficiency_index: runEffIndexByDate.get(r.metric_date) ?? null,
+            decoupling_pct: hrs?.decouplingPct ?? null,
+            decoupling_basis: hrs?.decouplingBasis ?? null,
+            workout_type: hrs?.workoutType ?? null,
+            duration_minutes: hrs?.durationMinutes ?? null,
+            classified_type: runCtById.get(r.workout_id) ?? null,
+          };
+        });
 
         // Q-061 / D-193: the swim pace trend must reflect UNAIDED swimming only. Exclude sessions
         // flagged equipment/drill-contaminated by compute-facts (fins/buoy/paddles → faster; kick/drill

@@ -4,11 +4,10 @@
 //
 // ⚠️ Thresholds are PROVISIONAL (not signed off) — see thresholds.ts.
 
-import type { TrendPoint, TrendResult } from './types.ts';
+import type { TrendPoint, TrendResult, TrendVerdict } from './types.ts';
 import { classifyTrend } from './classify.ts';
 import { resolveThresholds } from './thresholds.ts';
 import { isDeloadWeek } from './deload.ts';
-import { efficiencyThresholds } from './bike-fitness.ts';
 
 export interface RunState {
   trend: TrendResult;
@@ -58,25 +57,143 @@ export function computeRunState(series: TrendPoint[], asOf: string, sessionsPerW
   };
 }
 
-// Q-110 — RUN EFFICIENCY (pace-at-HR): the honest fitness signal (same-HR-faster pace = fitter),
-// the run analog of bike's HR-at-power efficiency. Value is `run_facts.pace_at_easy_hr` (sec/km at
-// the easy-HR reference; lower = improving). This is the run card's fitness verdict now — raw GAP
-// pace ("slower" ≠ "less fit") is dropped. Same shape as computeRunState; efficiency thresholds.
+// Q-110 — RUN EFFICIENCY: the honest fitness signal (HR-controlled), the run analog of bike's
+// HR-at-power. Value is `run_facts.efficiency_index` = (pace-speed / hr_avg), a pace-per-HR ratio
+// where HIGHER = fitter (more speed per heartbeat). ⚠️ Opposite direction to pace_at_easy_hr:
+// lowerIsBetter is FALSE here. This is the run card's fitness verdict now; raw GAP pace is dropped.
+// (pace_at_easy_hr — the stricter easy-HR-band version — is Path B, blocked only on a threshold_hr
+// baseline; the sensor samples exist. When that baseline lands, we can upgrade to it.)
 
-/** SOURCE ADAPTER: run rows (joined with pace_at_easy_hr + classified_type) → {date,value}[]. */
-export function paceAtHrToSeries(
-  rows: Array<{ date?: string; metric_date?: string; pace_at_easy_hr?: number | null; classified_type?: string | null }> | null | undefined,
+// efficiency_index sits ~1.5–1.9 for real runs; this band drops corrupt/zero-HR rows without
+// clipping legitimate variation.
+const MIN_EFF_INDEX = 0.5;
+const MAX_EFF_INDEX = 5;
+
+/** SOURCE ADAPTER (SECONDARY signal): efficiency_index on steady aerobic runs in a comparable-DURATION
+ * band (30–70 min). The duration band blunts efficiency_index's whole-run distance confound (longer
+ * runs drift lower) — decoupling is the confound-free LEAD, so it's acceptable to thin this secondary. */
+export function efficiencyIndexToSeries(
+  rows: Array<{ date?: string; metric_date?: string; efficiency_index?: number | null; workout_type?: string | null; duration_minutes?: number | null }> | null | undefined,
 ): TrendPoint[] {
   if (!Array.isArray(rows)) return [];
   return rows
-    .filter((r) => isComparableRunEffort(r.classified_type))
-    .map((r) => ({ date: r.date ?? r.metric_date ?? '', value: Number(r.pace_at_easy_hr) }))
-    .filter((p) => p.date && Number.isFinite(p.value) && p.value >= MIN_RUN_PACE_S && p.value <= MAX_RUN_PACE_S);
+    .filter((r) => isSteadyAerobic(r.workout_type))
+    .filter((r) => typeof r.duration_minutes === 'number' && r.duration_minutes >= 30 && r.duration_minutes <= 70)
+    .map((r) => ({ date: r.date ?? r.metric_date ?? '', value: Number(r.efficiency_index) }))
+    .filter((p) => p.date && Number.isFinite(p.value) && p.value >= MIN_EFF_INDEX && p.value <= MAX_EFF_INDEX);
 }
 
 export function computeRunEfficiencyState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): RunState {
   return {
-    trend: classifyTrend(series, efficiencyThresholds('run', sessionsPerWeek), asOf, { exclude: isDeloadWeek }),
-    metricLabel: 'pace at HR (efficiency)',
+    // efficiency_index is HIGHER-is-better → lowerIsBetter: false (a RISING index = improving fitness).
+    trend: classifyTrend(
+      series,
+      { ...resolveThresholds('run', sessionsPerWeek), improvePct: 3, slidePct: -3, lowerIsBetter: false },
+      asOf,
+      { exclude: isDeloadWeek },
+    ),
+    metricLabel: 'efficiency (pace per HR)',
+  };
+}
+
+// ── Tier 1: RUN AEROBIC DURABILITY (decoupling) — the RUN row's LEAD signal ──────────────────────
+// Within-session pace:HR drift (D-036, GAP-corrected in the analyzer). Zone-free, no baseline, no
+// distance confound (it measures within-run drift, not a whole-run average). Source:
+// workout_analysis.heart_rate_summary.decouplingPct.
+//
+// BANDS are a COACHING STANDARD (Joe Friel / TrainingPeaks), NOT a lab-validated physiological
+// cutoff — cite them as such, never as peer-reviewed thresholds:
+//   negative = excellent · <5% strong aerobic coupling · 5–10% base-building · >10% durability gap.
+// ⚠️ DIRECTION IS INVERTED vs efficiency: LOWER decoupling = better → a FALLING pct reads improving,
+// a RISING pct reads sliding (durability declining). This is the opposite of efficiency_index.
+export type DecouplingBand = 'excellent' | 'strong' | 'base' | 'durability_gap';
+export function frielBand(pct: number): DecouplingBand {
+  if (pct < 0) return 'excellent';       // HR fell relative to pace across the run = excellent
+  if (pct < 5) return 'strong';          // <5% strong aerobic coupling
+  if (pct <= 10) return 'base';          // 5–10% base-building
+  return 'durability_gap';               // >10% durability gap
+}
+
+// Gate (the honest one, resolved from Michael's data): steady/aerobic only, ≥20 min, terrain-neutral.
+// The persisted `decouplingBasis` label is unreliable (gap on 4/145), so we do NOT gate on 'gap' — we
+// trust the GAP-based pct and only DROP a confirmed 'raw' (terrain-confounded). workoutType, not the
+// plan-link classifier, decides steady-vs-interval.
+const DECOUPLING_NONSTEADY = ['interval', 'tempo', 'fartlek', 'threshold', 'vo2', 'speed', 'track', 'race', 'surge'];
+export function isSteadyAerobic(workoutType?: string | null): boolean {
+  const wt = String(workoutType || '').toLowerCase();
+  return wt.length > 0 && !DECOUPLING_NONSTEADY.some((k) => wt.includes(k));
+}
+
+export interface DecouplingRow {
+  date?: string; metric_date?: string;
+  decoupling_pct?: number | null;
+  decoupling_basis?: string | null;   // 'gap' | 'raw' | null — only used to drop confirmed 'raw'
+  workout_type?: string | null;       // heart_rate_summary.workoutType
+  duration_minutes?: number | null;
+}
+export function decouplingToSeries(rows: DecouplingRow[] | null | undefined): TrendPoint[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .filter((r) => typeof r.decoupling_pct === 'number' && Number.isFinite(Number(r.decoupling_pct)))
+    .filter((r) => r.decoupling_basis !== 'raw')                                  // drop confirmed terrain-confounded
+    .filter((r) => isSteadyAerobic(r.workout_type))                              // steady aerobic only
+    .filter((r) => r.duration_minutes == null || Number(r.duration_minutes) >= 20) // ≥20 min (null = don't drop)
+    .map((r) => ({ date: r.date ?? r.metric_date ?? '', value: Number(r.decoupling_pct) }))
+    .filter((p) => p.date && p.value >= -30 && p.value <= 50);                    // plausible decoupling band
+}
+
+// classifyTrend drops values ≤ 0 (its noise filter) and divides by earlyAvg for %-change — both break
+// on decoupling, which crosses zero. Offsetting the series positive lets us REUSE classifyTrend's
+// tested window / min-session floor / endpoint-smoothing / STALENESS gate (the "never extrapolate from
+// stale" honesty requirement) unchanged; the band is read from the RAW (un-offset) values.
+const DECOUPLING_OFFSET = 30;
+
+export interface DecouplingState {
+  trend: TrendResult;          // DIRECTION (lowerIsBetter) + sampleCount + newestAgeDays + stale
+  band: DecouplingBand | null; // Friel band of the recent representative pct (the plain-language state)
+  recentPct: number | null;    // raw recent decoupling — shown with its date for carry-forward when stale
+  metricLabel: string;
+}
+export function computeRunDecouplingState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): DecouplingState {
+  const offset = series.map((p) => ({ date: p.date, value: p.value + DECOUPLING_OFFSET }));
+  const trend = classifyTrend(
+    offset,
+    // lowerIsBetter: a FALLING decoupling = improving durability. improve/slide tuned for the offset scale.
+    { ...resolveThresholds('run', sessionsPerWeek), improvePct: 5, slidePct: -5, lowerIsBetter: true },
+    asOf,
+    { exclude: isDeloadWeek },
+  );
+  // Recent representative pct (un-offset): the smoothed recent end when there's a verdict, else the
+  // newest in-window point so a stale/thin row can still carry-forward "last steady run Nd ago: X%".
+  const rawPts = trend.points.map((p) => p.value - DECOUPLING_OFFSET);
+  const recentPct = trend.recentAvg != null
+    ? Math.round((trend.recentAvg - DECOUPLING_OFFSET) * 10) / 10
+    : rawPts.length ? rawPts[rawPts.length - 1] : null;
+  return {
+    trend,
+    band: recentPct != null ? frielBand(recentPct) : null,
+    recentPct,
+    metricLabel: 'aerobic durability',
+  };
+}
+
+// The RUN row's dual read (mirrors BikeFitness power+efficiency): decoupling LEADS (aerobic
+// durability, band-as-verdict), efficiency_index is the SECONDARY output-per-heartbeat read.
+// Serializable snapshot for the client — no methods, safe to cache in state_trends_v1.
+export interface RunFitness {
+  decoupling: {
+    verdict: TrendVerdict;         // improving = durability building; sliding = declining
+    band: DecouplingBand | null;   // the plain-language state (strong/base/durability_gap/excellent)
+    recentPct: number | null;      // shown with its date for carry-forward when stale
+    sampleCount: number;
+    newestAgeDays: number | null;
+    stale: boolean;                // true → carry-forward "last steady run Nd ago", never a current verdict
+    provisional: boolean;
+  };
+  efficiency: {
+    verdict: TrendVerdict;
+    pctChange: number | null;
+    sampleCount: number;
+    newestAgeDays: number | null;
   };
 }
