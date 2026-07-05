@@ -31,7 +31,7 @@ import { getRunningFatigueWeight, getCyclingFatigueWeight } from '../_shared/fat
 import { isLowTrustWorkload } from '../_shared/workload.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
-import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey } from '../_shared/state-trend/index.ts';
+import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel } from '../_shared/state-trend/index.ts';
 import {
   computeWeeklyResponse,
   type WeeklyResponseState,
@@ -1691,12 +1691,11 @@ Deno.serve(async (req) => {
       easy: 'Easy', z2: 'Zone 2', long: 'Long Run', tempo: 'Tempo',
       progressive: 'Progressive', fartlek: 'Fartlek', intervals: 'Intervals', hills: 'Hills', unknown: 'Other',
     };
+    // D-239 reconcile: ONE threshold set — the shared frielBand-backed decouplingLabel, not a local
+    // ≤3/≤5/≤8 cutoff that disagreed with the RUN row's spine band. runAgg stays the 7d per-type receipt.
     const runEfficiency = (decouple: number | null): { label: string | null; tone: 'positive' | 'warning' | 'danger' | 'neutral' } => {
-      if (decouple == null) return { label: null, tone: 'neutral' };
-      if (decouple <= 3) return { label: 'Ran efficiently', tone: 'positive' };
-      if (decouple <= 5) return { label: 'Solid effort', tone: 'positive' };
-      if (decouple <= 8) return { label: 'HR climbed more than usual', tone: 'warning' };
-      return { label: 'HR was elevated — possible fatigue', tone: 'danger' };
+      const { label, tone } = decouplingLabel(decouple);
+      return { label, tone };
     };
 
     /**

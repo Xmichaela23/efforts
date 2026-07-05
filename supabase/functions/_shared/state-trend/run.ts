@@ -114,6 +114,20 @@ export function frielBand(pct: number): DecouplingBand {
   return 'durability_gap';               // >10% durability gap
 }
 
+// D-239 reconcile: the coaching label for a decoupling %, derived from the SAME frielBand the RUN
+// row uses — so coach and the State screen can't disagree (coach previously had its own ≤3 cutoff).
+// label/tone are the band's plain-language coaching interpretation; band is the single threshold set.
+export function decouplingLabel(pct: number | null): { band: DecouplingBand | null; label: string | null; tone: 'positive' | 'warning' | 'danger' | 'neutral' } {
+  if (pct == null || !Number.isFinite(pct)) return { band: null, label: null, tone: 'neutral' };
+  const band = frielBand(pct);
+  switch (band) {
+    case 'excellent': return { band, label: 'Excellent aerobic control', tone: 'positive' };
+    case 'strong': return { band, label: 'Ran efficiently', tone: 'positive' };
+    case 'base': return { band, label: 'HR climbed more than usual', tone: 'warning' };
+    case 'durability_gap': return { band, label: 'HR elevated — durability gap', tone: 'danger' };
+  }
+}
+
 // Gate (the honest one, resolved from Michael's data): steady/aerobic only, ≥20 min, terrain-neutral.
 // The persisted `decouplingBasis` label is unreliable (gap on 4/145), so we do NOT gate on 'gap' — we
 // trust the GAP-based pct and only DROP a confirmed 'raw' (terrain-confounded). workoutType, not the

@@ -1470,6 +1470,12 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ---
 
+## Q-121 — Tier 2: learn the athlete's aerobic threshold from data (parked); + readiness-RPE freshness guard
+
+A per-athlete aerobic threshold would let us upgrade the RUN row to the strict `pace_at_easy_hr` signal AND fix the run classifier's easy-detection (it defaults unplanned runs to `steady_state`; there's no HR-based easy path without a threshold). **DFA a1** is the peer-reviewed method (aerobic threshold from HRV, ~within a few % of lab CPET) but is **OUT for this athlete — sensor samples carry 1 Hz averaged HR only, no beat-to-beat RR intervals.** Near-term fallback: HR/pace-inflection estimation. Parked, not scoped.
+
+Also filed here: **readiness RPE needs a freshness guard.** The BODY row showed a present-tense "avg 4.8 vs 4.3 · harder than usual" while the live windows are `avg_session_rpe_7d`=3.33 / `norms_28d.session_rpe_avg`=3.56 (honest read: slightly *easier*). The 4.8 matches no current window — a **stale cached coach payload** that also *inverts* the truth. Windows (7d current / 28d typical) are sound; the gap is a stale-cache guard (there's a sample-size stability guard at `coach:4479`, but nothing rejects a stale present-tense claim). Fix deferred; if it persists after a v62 recompute it's a separate `coach_cache`-invalidation live bug.
+
 ## When to add an entry
 
 Add a new Q-NNN when:

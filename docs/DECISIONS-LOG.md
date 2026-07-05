@@ -4821,6 +4821,17 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
+## D-239 — RUN State lead = aerobic decoupling (zone-free); Friel bands are a coaching standard, not lab-validated
+
+The RUN State row leads with within-session **pace:HR decoupling** (`heart_rate_summary.decouplingPct`, D-036 GAP-corrected), NOT `efficiency_index` (whole-run → distance-confounded) and NOT `pace_at_easy_hr` (null on real data — see the dead-code list in ENGINE-STATE). Chosen because decoupling needs **no HR baseline** (this athlete has no reliable `threshold_hr`) and has **no distance confound** (within-run drift, not a whole-run average).
+
+- **Bands** (`frielBand`, `run.ts`): `<0 excellent · <5 strong · 5–10 base · >10 durability_gap`. A **Joe Friel / TrainingPeaks coaching convention — NOT a peer-reviewed cutoff.** Cite as coaching-standard (`docs/SCIENCE-run-decoupling-durability.md`); never as lab-validated. Band = verdict, % = receipt.
+- **Gate:** steady/aerobic `workoutType` + `durationMinutes ≥ 20` + drop confirmed-`raw`. The persisted `decouplingBasis` label is unreliable (gap on 4/145) — so trust the GAP-based pct, only drop confirmed 'raw'. ~79–87 qualifying runs on real data (vs 3 for the easy-only path — that thinness was a *classification* artifact, not scarcity).
+- **Direction INVERTED vs efficiency:** LOWER decoupling = better → falling = improving. Fixtures pin it (`run-decoupling.test.ts`); classifyTrend reused via +30 offset (it drops ≤0 and %-breaks near zero) so its window/floor/staleness gate carry over.
+- **efficiency_index** demoted to secondary, gated to a 30–70min steady duration band.
+- **Spine:** cached into `state_trends_v1.run.decoupling` (band/recentPct) + `.efficiency`, mirroring bike — so coach/Arc/LLM narrate the band, not just direction.
+- **Reconcile (same arc):** coach's `runEfficiency` (`:1694`) used its own ≤3 cutoff → replaced with `frielBand` (one threshold set); the dead `run_easy_pace_at_hr_trend` longitudinal signal + its compute-snapshot aggregation retired. One run-fitness source, not three.
+
 ## When to add an entry
 
 Add a new D-NNN when:

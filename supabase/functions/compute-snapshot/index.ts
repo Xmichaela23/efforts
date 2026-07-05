@@ -751,9 +751,13 @@ serve(async (req: Request) => {
       session_count_planned: sessionCountPlanned,
       adherence_pct: adherencePct,
 
-      run_easy_pace_at_hr: round(current.runEasyPaceAtHR),
-      // D-060 (2026-05-25): DB column renamed to match variable semantic.
-      run_easy_pace_at_hr_trend: runEasyPaceAtHrTrend,
+      // D-239 reconcile: RETIRED — run_easy_pace_at_hr(_trend) is fed by the null `pace_at_easy_hr`
+      // (dead read-path; see ENGINE-STATE dead-code list). Persist null so no garbage aerobic-efficiency
+      // value reaches the Arc/longitudinal. The RUN aerobic read is now `state_trends_v1.run.decoupling`.
+      // (Upstream easyPaces/runEasyPaceAtHrTrend are already always-null; left to avoid touching the
+      // separate per-session `aerobic_direction` consumers — full removal is on the cleanup list.)
+      run_easy_pace_at_hr: null,
+      run_easy_pace_at_hr_trend: null,
       run_long_run_duration: current.runLongRunDuration,
       run_interval_adherence: current.runIntervalAdherence,
 

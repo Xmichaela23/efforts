@@ -13,7 +13,7 @@
  *   deno test supabase/functions/_shared/state-trend/run-decoupling.test.ts --no-check
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { frielBand, isSteadyAerobic, decouplingToSeries, computeRunDecouplingState } from './run.ts';
+import { frielBand, decouplingLabel, isSteadyAerobic, decouplingToSeries, computeRunDecouplingState } from './run.ts';
 
 const AS_OF = '2026-07-03';
 const WEEKS_90D = 90 / 7;
@@ -27,6 +27,21 @@ Deno.test('frielBand: negative=excellent, <5 strong, 5–10 base, >10 durability
   assertEquals(frielBand(10), 'base');      // 10 is base
   assertEquals(frielBand(10.1), 'durability_gap');
   assertEquals(frielBand(12), 'durability_gap');
+});
+
+// ── D-239 reconcile: coach + State share ONE frielBand-backed label. The old coach ≤3-vs-≤5 split
+//    ('Ran efficiently' ≤3 vs 'Solid effort' ≤5) is GONE — 3% and 4% now read the SAME band/label. ──
+Deno.test('decouplingLabel: frielBand-backed — coach ≤3 cutoff removed, one threshold set', () => {
+  assertEquals(decouplingLabel(3).band, 'strong');
+  assertEquals(decouplingLabel(4).band, 'strong');
+  assertEquals(decouplingLabel(3).label, decouplingLabel(4).label); // the ≤3 split is gone
+  assertEquals(decouplingLabel(3).tone, 'positive');
+  assertEquals(decouplingLabel(-1), { band: 'excellent', label: 'Excellent aerobic control', tone: 'positive' });
+  assertEquals(decouplingLabel(7).tone, 'warning');   // 5–10 base
+  assertEquals(decouplingLabel(9).tone, 'warning');   // old coach: >8 = danger; frielBand keeps 5–10 = warning
+  assertEquals(decouplingLabel(12).band, 'durability_gap');
+  assertEquals(decouplingLabel(12).tone, 'danger');
+  assertEquals(decouplingLabel(null).tone, 'neutral');
 });
 
 // ── Gate: steady/aerobic + ≥20min + not-'raw' + pct present ──

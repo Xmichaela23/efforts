@@ -1008,6 +1008,15 @@ Autonomous batch from POLISH-PUNCH-LIST. Five items: two clean (no code), three 
 
 Behaviors that are demonstrably wrong but intentionally deferred. Don't propose fixes unless you have new information — the deferral was a scoping call, and the list below documents the cost so the next implementer can pick up cleanly.
 
+### Dead code — retire on next touch (do NOT build on these) — filed 2026-07-04 (D-239 arc)
+
+The threshold_hr / easy-HR thread turned out to be a tower of dead reads + formula fallbacks. RUN durability was moved to decoupling (D-239) instead. These are provably dead on real data; retire when a change next touches the file, don't wire anything new to them:
+- **`learned_fitness.running.threshold_hr` nested read-path** (`compute-facts:1144`) — dead. The learner writes flat `run_threshold_hr.value` (= 151 for the real user); `calculate-workload:229` reads the correct key. Only the `pace_at_easy_hr` guard used the dead nested path.
+- **compute-facts easy-HR block (`:1143–1158`) → `pace_at_easy_hr`** — never populates (needs the threshold the read-path can't see; and `easyMax = threshold×0.78 = 118` excludes the athlete's real easy runs at HR 133–141 anyway). Null on all 145 runs.
+- **`run_easy_pace_at_hr` aggregate (compute-snapshot) + `run_easy_pace_at_hr_trend` (longitudinal-signals `:52,85,144–163`)** — fed by the null field; the longitudinal signal emits a run-fitness claim off garbage. **Retired in the D-239 reconcile.**
+- **`run_easy_hr` 123 fallback** ("70% of observed max, 0 samples") — a formula, not learned; it undershoots the athlete's real easy HR by ~15 bpm.
+- **daily-ledger `session_rpe` first-preference (`:267`)** — null on all 40; harmlessly falls through to `rpe`. Dead preference, remove.
+
 ### "Spine is truth" is ~6% enforced on the coach; capacity truth is forked (audited 2026-07-02, Q-106)
 - **Symptom (as audited 2026-07-02):** the coach engine reads the cached spine (`state_trends_v1`) for only `fitness_direction` (1 of ~17 verdict families) and recomputes the rest in parallel — even shadowing snapshot columns it fetches (`acwr`, `strength_volume_trend`, `body_response`, `strength_top_lifts`). And there was no canonical capacity truth: `materialize` prescribes load off the typed `performance_numbers` (150) while the coach judged off `learned_fitness.strength_1rms` (125). The athlete-visible face: the State screen's "Bench 125→115 · back off" (baseline-blind — **SINCE FIXED, D-231**), two contradictory strength rows (H3 — resolved cosmetic), FATIGUED triple-echo.
 - **Not blocking:** the *voice* contracts (Arc, `session_detail_v1`) read the spine faithfully; endurance micro→macro continuity is finished (the proof the bet works). This is the strength/coach axis of the migration D-151 started and stopped.

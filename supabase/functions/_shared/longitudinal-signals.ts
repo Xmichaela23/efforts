@@ -45,11 +45,8 @@ type PlannedRow = {
 
 type AthleteSnapshotRow = {
   week_start: string;
-  // D-060 (2026-05-25): renamed from run_easy_hr_trend to match what the
-  // value actually represents (pace-at-easy-HR delta vs chronic, not an
-  // HR-over-time delta). DB column renamed via migration
-  // 20260525_rename_run_easy_hr_trend.sql.
-  run_easy_pace_at_hr_trend: number | null;
+  // run_easy_pace_at_hr_trend: RETIRED (D-239) — fed by the null pace_at_easy_hr; no longer read or
+  // emitted. DB column left in place (harmless); the RUN aerobic read lives on state_trends_v1.run.
   strength_volume_trend: number | null;
   ride_efficiency_factor: number | null;
 };
@@ -82,7 +79,7 @@ export async function computeLongitudinalSignals(
       .order('date', { ascending: true }),
     supabase
       .from('athlete_snapshot')
-      .select('week_start, run_easy_pace_at_hr_trend, strength_volume_trend, ride_efficiency_factor')
+      .select('week_start, strength_volume_trend, ride_efficiency_factor')
       .eq('user_id', userId)
       .gte('week_start', cutoffIso)
       .lte('week_start', asOfDate)
@@ -141,29 +138,10 @@ function detectSnapshotChronicSignals(
 ): void {
   if (!latest) return;
 
-  const tRun = latest.run_easy_pace_at_hr_trend;
-  if (tRun != null && !Number.isNaN(tRun)) {
-    if (tRun > 2) {
-      out.push({
-        id: 'snapshot_run_easy_pace_trend',
-        category: 'is_it_working',
-        severity: 'warning',
-        headline: `Easy aerobic efficiency slipping (pace-at-HR ${tRun > 0 ? '+' : ''}${Math.round(tRun * 10) / 10}% vs chronic)`,
-        detail:
-          `Athlete snapshot shows easy-run pace at target HR trending slower versus your recent baseline. Often fatigue, lost fitness, or easy days drifting harder.`,
-        evidence: `athlete_snapshot week ${latest.week_start} run_easy_pace_at_hr_trend=${tRun}`,
-      });
-    } else if (tRun < -2) {
-      out.push({
-        id: 'snapshot_run_easy_pace_improving',
-        category: 'is_it_working',
-        severity: 'info',
-        headline: `Easy aerobic efficiency improving (${Math.round(tRun * 10) / 10}% vs chronic)`,
-        detail: `Athlete snapshot shows you're moving faster at easy HR versus recent baseline — a good endurance adaptation signal.`,
-        evidence: `athlete_snapshot week ${latest.week_start} run_easy_pace_at_hr_trend=${tRun}`,
-      });
-    }
-  }
+  // D-239 reconcile: RETIRED the run_easy_pace_at_hr_trend signal — it was fed by the null
+  // `pace_at_easy_hr` (dead read-path; see ENGINE-STATE dead-code list), so it emitted an
+  // aerobic-efficiency claim off garbage. The RUN aerobic-efficiency read now lives on the spine
+  // (`state_trends_v1.run.decoupling`) as the single source. No longitudinal run-easy-pace signal.
 
   const tStr = latest.strength_volume_trend;
   if (tStr != null && !Number.isNaN(tStr)) {
