@@ -6,7 +6,7 @@
 // tagged as such; swim is additionally Q-038-clouded.
 
 import React from 'react';
-import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand } from '@shared/state-trend';
+import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand, StrengthFitness } from '@shared/state-trend';
 import { useStateTrends } from '@/hooks/useStateTrends';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
 
@@ -85,6 +85,48 @@ function BikeFitnessRow({ fitness }: { fitness: BikeFitness }) {
         {asOf(lead.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(lead.newestAgeDays)}</span>}
       </div>
     </div>
+  );
+}
+
+// STRENGTH row — VOLUME direction LEADS (activity/load fact: up/steady/down), e1RM is the secondary
+// fitness read (rendered ONLY when there's a trend to hold — thin → clause dropped, no "holding"
+// claim), session count is the receipt, "unplanned" a dim receipt. Volume DOWN is neutral-colored,
+// not red (a deload/taper isn't a fitness loss). Industry-standard (Strong/Hevy/JEFIT).
+const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
+  improving: { word: 'up', cls: 'text-emerald-400', arr: '↑' },
+  holding: { word: 'steady', cls: 'text-amber-300', arr: '→' },
+  sliding: { word: 'down', cls: 'text-white/50', arr: '↓' },
+  needs_data: { word: 'needs data', cls: 'text-white/40', arr: '' },
+};
+
+function StrengthFitnessRow({ fitness }: { fitness: StrengthFitness }) {
+  const vol = fitness.volume;
+  const e = fitness.e1rm;
+  const vv = VOLUME_WORD[vol.verdict];
+  return (
+    <Row label="strength">
+      {vol.verdict !== 'needs_data' ? (
+        <span className="inline-flex items-baseline gap-1">
+          <span className="text-white/50">Volume</span>
+          <span className={`inline-flex items-baseline gap-0.5 ${vv.cls}`}>{vv.arr && <span>{vv.arr}</span>}<span>{vv.word}</span></span>
+        </span>
+      ) : (
+        <span className="text-white/40">volume needs 2+ sessions to trend</span>
+      )}
+      {fitness.sessionsThisWeek > 0 && (
+        <span className="text-white/35 text-[11px]">{fitness.sessionsThisWeek} session{fitness.sessionsThisWeek === 1 ? '' : 's'} this week</span>
+      )}
+      {/* e1RM SECONDARY — only when there IS a trend to hold; thin → drop the clause (no "holding" claim) */}
+      {e && (
+        <span className="inline-flex items-baseline gap-1">
+          <span className="text-white/40">e1RM</span>
+          <span className={`inline-flex items-baseline gap-0.5 ${VERDICT[e.verdict].cls}`}>{VERDICT[e.verdict].arr && <span>{VERDICT[e.verdict].arr}</span>}<span>{VERDICT[e.verdict].word}</span></span>
+        </span>
+      )}
+      {fitness.unplanned > 0 && <span className="text-white/25 text-[10px]">· {fitness.unplanned} unplanned</span>}
+      {vol.provisional && <span className="text-white/30 text-[10px]">prov</span>}
+      {asOf(vol.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(vol.newestAgeDays)}</span>}
+    </Row>
   );
 }
 
@@ -241,7 +283,7 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
 }
 
 export default function StatePerformanceSection({ strengthDetail }: { strengthDetail?: React.ReactNode }) {
-  const { cards, headline, bikeFitness, runFitness, swimRest, loading } = useStateTrends();
+  const { cards, headline, bikeFitness, runFitness, strengthFitness, swimRest, cadenceCounts, loading } = useStateTrends();
   if (loading || cards.length === 0) return null;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
@@ -251,14 +293,27 @@ export default function StatePerformanceSection({ strengthDetail }: { strengthDe
   // (a verdict, OR a stale-but-real value to carry forward) or an efficiency verdict; else it
   // falls through to the standard card (adherence). Mirrors bike.
   const runHasSubstance = !!runFitness && (runFitness.decoupling.verdict !== 'needs_data' || runFitness.decoupling.stale || runFitness.efficiency.verdict !== 'needs_data');
+  // Strength shows the Volume · e1RM · sessions composite when volume trends or e1RM has a verdict;
+  // else the adherence card. Volume gives the row a real verdict so it stops falling to the shrug.
+  const strengthHasSubstance = !!strengthFitness && (strengthFitness.volume.verdict !== 'needs_data' || strengthFitness.e1rm != null || strengthFitness.sessionsThisWeek > 0);
+
+  // Dynamic ordering: most-trained discipline first, by STABLE 90d session count (cadenceCounts) so
+  // rows don't jump per-load; ties keep the canonical ORDER. Activity facts only — no inferred importance.
+  const ORDER_IDX: Record<string, number> = { strength: 0, bike: 1, run: 2, swim: 3 };
+  const sortedCards = [...cards].sort((a, b) => {
+    const ca = cadenceCounts[a.discipline] ?? 0, cb = cadenceCounts[b.discipline] ?? 0;
+    if (cb !== ca) return cb - ca;
+    return (ORDER_IDX[a.discipline] ?? 9) - (ORDER_IDX[b.discipline] ?? 9);
+  });
 
   return (
     <div className="px-3 py-3">
       <div className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase mb-1.5">Performance</div>
       {headline && <div className="text-[14px] font-medium text-white/90 leading-snug mb-2.5">{headline.line}</div>}
-      {cards.map((card) => {
+      {sortedCards.map((card) => {
         if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow key="bike" fitness={bikeFitness!} />;
         if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow key="run" fitness={runFitness!} />;
+        if (card.discipline === 'strength' && strengthHasSubstance) return <React.Fragment key="strength"><StrengthFitnessRow fitness={strengthFitness!} />{strengthDetail}</React.Fragment>;
         const row = <DisciplineRow key={card.discipline} card={card} restTrend={card.discipline === 'swim' ? swimRest : null} />;
         // Q-107 H3: nest the per-lift detail directly under the STRENGTH trend row — one STRENGTH header,
         // the lifts as provisional "from your logged sets" detail (no competing second top-line).

@@ -9,7 +9,7 @@
 
 // Import from source modules (NOT ./index.ts) — index.ts re-exports this file, so importing the
 // barrel here would create a load-order cycle.
-import { computeStrengthState, type LiftSeries } from './strength.ts';
+import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, type LiftSeries, type StrengthFitness, type StrengthVolumeRow } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
@@ -72,6 +72,7 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[]): LiftSeries[]
 export interface StateTrendInputs {
   asOf: string;
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
+  strengthVolumeRows?: StrengthVolumeRow[]; // per-strength-workout total_volume_lbs (the volume trend)
   bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; band_source: string | null; hr_corrupt?: boolean }>;
   runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; efficiency_index?: number | null; decoupling_pct?: number | null; decoupling_basis?: string | null; workout_type?: string | null; duration_minutes?: number | null; classified_type: string | null }>;
   swimRows: Array<{ date: string; pace_per_100m: number; rest_fraction?: number | null; distance_m?: number | null }>;
@@ -86,6 +87,8 @@ export interface StateTrendResult {
   bikeFitness: BikeFitness;
   /** Tier 1: RUN dual read — decoupling (aerobic durability) LEAD + efficiency_index SECONDARY. */
   runFitness: RunFitness;
+  /** STRENGTH dual read — volume direction LEAD + e1RM direction SECONDARY (null when thin) + sessions. */
+  strengthFitness: StrengthFitness;
   perfByDisc: Record<string, PerfSummary | null>;
   provisionalByDisc: Record<string, boolean>;
   spw: Record<string, number>;
@@ -168,9 +171,23 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const swimRestState = computeSwimRestState(swimRestSeries, asOf, spw.swim, restOob);
   const swimRest = perfFromTrend(swimRestState.trend);
 
-  // strength
+  // strength — DUAL read: VOLUME direction (activity/load fact) leads, e1RM direction is the secondary
+  // fitness read, session count is the receipt. e1RM is NULL when there's no trend to hold (drop the
+  // clause, don't assert "holding"). Volume gives the row a real verdict so it no longer falls to the
+  // adherence "needs data · N unplanned" shrug — unplanned demotes to a dim receipt.
   const liftSeries = liftSeriesFromExerciseLog(inp.exerciseRows);
   const strength = computeStrengthState(liftSeries, asOf, spw.strength);
+  const strengthVolTrend = computeStrengthVolumeState(strengthVolumeToSeries(inp.strengthVolumeRows), asOf, spw.strength);
+  const strengthFitness: StrengthFitness = {
+    volume: {
+      verdict: strengthVolTrend.verdict, pctChange: strengthVolTrend.pctChange,
+      sampleCount: strengthVolTrend.sampleCount, newestAgeDays: strengthVolTrend.newestAgeDays,
+      provisional: isProvisionalTrend(strengthVolTrend),
+    },
+    e1rm: strength.overall !== 'needs_data' ? { verdict: strength.overall, pctChange: strength.overallPctChange } : null,
+    sessionsThisWeek: inp.doneBy['strength'] || 0,
+    unplanned: Math.max(0, (inp.doneBy['strength'] || 0) - (inp.plannedBy['strength'] || 0)),
+  };
 
   const perfByDisc: Record<string, PerfSummary | null> = {
     strength: { verdict: strength.overall, pctChange: strength.overallPctChange },
@@ -205,7 +222,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   );
 
   return {
-    cards, headline: synthesizeHeadline(cards), bikeFitness, runFitness, perfByDisc, provisionalByDisc, spw,
+    cards, headline: synthesizeHeadline(cards), bikeFitness, runFitness, strengthFitness, perfByDisc, provisionalByDisc, spw,
     swimRest, swimRestProvisional: isProvisionalTrend(swimRestState.trend),
   };
 }
@@ -227,7 +244,13 @@ export interface DisciplineTrendCache {
 export interface StateTrendsV1 {
   as_of: string;
   version: 1;
-  strength: DisciplineTrendCache;
+  /** STRENGTH dual on the spine — volume direction LEAD + e1RM SECONDARY (null when thin) + sessions,
+   *  so coach/Arc/LLM read the composite, not just the e1RM verdict. */
+  strength: DisciplineTrendCache & {
+    volume: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; provisional: boolean };
+    e1rm: { verdict: string; pctChange: number | null } | null;
+    sessions_this_week: number;
+  };
   /** Tier 1: run's dual read cached on the spine like bike's — decoupling (aerobic durability) LEAD
    *  with its Friel band + recent %, efficiency_index SECONDARY. Lets coach/Arc/LLM narrate the band
    *  ("building aerobic base"), not just the improving/sliding direction the base verdict carries. */
@@ -283,7 +306,12 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
   return {
     as_of: asOf,
     version: 1,
-    strength: disc('strength'),
+    strength: {
+      ...disc('strength'),
+      volume: { ...r.strengthFitness.volume },
+      e1rm: r.strengthFitness.e1rm,
+      sessions_this_week: r.strengthFitness.sessionsThisWeek,
+    },
     // Tier 1: run's dual read on the spine — decoupling LEAD (band + recent %) + efficiency SECONDARY,
     // mirroring bike's power/efficiency below, so the app KNOWS the durability band, not just direction.
     run: {

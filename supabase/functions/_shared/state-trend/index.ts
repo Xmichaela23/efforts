@@ -10,10 +10,14 @@ export type { ClassifyOpts } from './classify.ts';
 export { isDeloadWeek } from './deload.ts';
 export {
   computeStrengthState,
+  strengthVolumeToSeries,
+  computeStrengthVolumeState,
   PRIMARY_LIFTS,
   type LiftSeries,
   type LiftVerdict,
   type StrengthState,
+  type StrengthFitness,
+  type StrengthVolumeRow,
 } from './strength.ts';
 export { computeBikeState, pwr20ToSeries, pickBestPwr20, type BikeState, type Pwr20Series } from './bike.ts';
 export { resolveZoneBand, type AthleteZoneInputs, type ZoneBand } from './zones.ts';

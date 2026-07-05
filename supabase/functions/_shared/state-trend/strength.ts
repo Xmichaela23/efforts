@@ -43,6 +43,39 @@ export const PRIMARY_LIFTS = new Set([
   'overhead_press',
 ]);
 
+// ── Strength row as a DUAL read: VOLUME direction (activity/load fact) LEADS, e1RM direction is the
+// secondary fitness read. Session count is the receipt. Industry-standard (Strong/Hevy/JEFIT). ──
+
+/** Per-workout strength volume (total_volume_lbs) → {date,value}[] for the volume trend. */
+export interface StrengthVolumeRow { date: string; total_volume_lbs: number | null }
+export function strengthVolumeToSeries(rows: StrengthVolumeRow[] | null | undefined): TrendPoint[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((r) => ({ date: r.date, value: Number(r.total_volume_lbs) }))
+    .filter((p) => p.date && Number.isFinite(p.value) && p.value > 0);
+}
+
+/** Volume trend. HIGHER = more training (a load fact, NOT fitness) → lowerIsBetter false; wider
+ *  bands (±8%) than e1RM because session-to-session volume swings (upper vs lower day). */
+export function computeStrengthVolumeState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): TrendResult {
+  return classifyTrend(
+    series,
+    { ...resolveThresholds('strength', sessionsPerWeek), improvePct: 8, slidePct: -8, lowerIsBetter: false },
+    asOf,
+    { exclude: isDeloadWeek },
+  );
+}
+
+// The strength row's serializable dual read. e1rm is NULL when there's no e1RM trend to hold — the
+// render DROPS the clause rather than assert "holding" (holding is a claim; same honesty gate as
+// every other row). "unplanned" is a dim receipt, never the verdict.
+export interface StrengthFitness {
+  volume: { verdict: TrendVerdict; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; provisional: boolean };
+  e1rm: { verdict: TrendVerdict; pctChange: number | null } | null;
+  sessionsThisWeek: number;
+  unplanned: number;
+}
+
 export function computeStrengthState(series: LiftSeries[], asOf: string, sessionsPerWeek: number): StrengthState {
   const thresholds = resolveThresholds('strength', sessionsPerWeek); // per-lift cadence (Q-052)
   const lifts: LiftVerdict[] = series.map((s) => ({

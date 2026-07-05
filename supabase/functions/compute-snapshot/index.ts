@@ -635,7 +635,7 @@ serve(async (req: Request) => {
         const asOf = todayISO();
         const adhStart = isoMinus(STATE_TREND_WINDOWS.adherenceDays - 1);
 
-        const [exR, bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR] = await Promise.all([
+        const [exR, bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR] = await Promise.all([
           supabase.from("exercise_log").select("date,canonical_name,exercise_name,estimated_1rm")
             .eq("user_id", userId).gte("date", isoMinus(STATE_TREND_WINDOWS.liftWeeks * 7)).order("date"),
           supabase.from("workouts").select("date,workout_analysis,workout_metadata")
@@ -654,6 +654,9 @@ serve(async (req: Request) => {
           // Q-110: run pace-at-HR efficiency (run_facts) — joined by date onto the run series below.
           supabase.from("workout_facts").select("date,run_facts").eq("user_id", userId)
             .eq("discipline", "run").gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)),
+          // STRENGTH volume trend — per-workout total_volume_lbs over the lift window.
+          supabase.from("workout_facts").select("date,strength_facts").eq("user_id", userId)
+            .eq("discipline", "strength").gte("date", isoMinus(STATE_TREND_WINDOWS.liftWeeks * 7)),
         ]);
 
         const cadenceCounts: Record<string, number> = {};
@@ -730,7 +733,8 @@ serve(async (req: Request) => {
           date: e.date, canonical_name: e.canonical_name, exercise_name: e.exercise_name, estimated_1rm: e.estimated_1rm,
         }));
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, plannedBy, doneBy, cadenceCounts });
+        const strengthVolumeRows = (strengthVolR.data ?? []).map((f: any) => ({ date: f.date, total_volume_lbs: f.strength_facts?.total_volume_lbs ?? null }));
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts });
         stateTrendsV1 = toStateTrendsV1(result, asOf);
       } catch (e: any) {
         console.log("⚠️ state_trends_v1 (spine) failed (non-fatal):", e?.message || e);

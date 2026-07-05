@@ -17,6 +17,7 @@ import {
   STATE_TREND_WINDOWS,
   type BikeFitness,
   type RunFitness,
+  type StrengthFitness,
   type DisciplineCard,
   type Headline,
   type StateTrendInputs,
@@ -28,6 +29,7 @@ interface RawInputs {
   bikeRows: StateTrendInputs['bikeRows'];
   runJoined: StateTrendInputs['runJoined'];
   swimRows: StateTrendInputs['swimRows'];
+  strengthVolumeRows: StateTrendInputs['strengthVolumeRows'];
   plannedBy: Record<string, number>;
   doneBy: Record<string, number>;
   cadenceCounts: Record<string, number>;
@@ -38,7 +40,9 @@ export interface StateTrends {
   headline: Headline | null;
   bikeFitness: BikeFitness | null; // the bike row's "Power · Efficiency" dual read
   runFitness: RunFitness | null;   // Tier 1: run row's "Decoupling · Efficiency" dual read
+  strengthFitness: StrengthFitness | null; // strength row's "Volume · e1RM · sessions" composite
   swimRest: PerfSummary | null;    // D-194: swim rest-fraction (work:rest) trend
+  cadenceCounts: Record<string, number>; // per-discipline 90d session count — the stable sort key
   loading: boolean;
 }
 
@@ -83,6 +87,14 @@ export function useStateTrends(): StateTrends {
         .eq('discipline', 'run')
         .gte('date', isoMinus(STATE_TREND_WINDOWS.cadenceDays));
 
+      // STRENGTH volume trend — per-workout total_volume_lbs over the lift window.
+      const strengthVolP = supabase
+        .from('workout_facts')
+        .select('date,strength_facts')
+        .eq('user_id', userId)
+        .eq('discipline', 'strength')
+        .gte('date', isoMinus(STATE_TREND_WINDOWS.liftWeeks * 7));
+
       // swim — pace per 100 over 8wk (Q-038-guarded inside the adapter)
       const swimP = supabase
         .from('workout_facts')
@@ -105,7 +117,7 @@ export function useStateTrends(): StateTrends {
         .eq('workout_status', 'completed')
         .gte('date', isoMinus(STATE_TREND_WINDOWS.cadenceDays));
 
-      const [bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR] = await Promise.all([bikeP, runP, swimP, plannedP, doneP, cadenceP, runFactsP]);
+      const [bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR] = await Promise.all([bikeP, runP, swimP, plannedP, doneP, cadenceP, runFactsP, strengthVolP]);
       if (cancelled) return;
 
       // cadence counts
@@ -174,13 +186,14 @@ export function useStateTrends(): StateTrends {
         const k = disciplineOf(w.type); if (k) doneBy[k] = (doneBy[k] || 0) + 1;
       }
 
-      setRaw({ bikeRows, runJoined, swimRows, plannedBy, doneBy, cadenceCounts });
+      const strengthVolumeRows = (strengthVolR.data || []).map((f: any) => ({ date: f.date, total_volume_lbs: f.strength_facts?.total_volume_lbs ?? null }));
+      setRaw({ bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts });
     })();
     return () => { cancelled = true; };
   }, []);
 
   const loading = liftsLoading || raw == null;
-  if (loading) return { cards: [], headline: null, bikeFitness: null, runFitness: null, swimRest: null, loading: true };
+  if (loading) return { cards: [], headline: null, bikeFitness: null, runFitness: null, strengthFitness: null, swimRest: null, cadenceCounts: {}, loading: true };
 
   const exerciseRows: ExerciseLogLite[] = (exercises || []).map((e) => ({
     date: e.date,
@@ -190,7 +203,7 @@ export function useStateTrends(): StateTrends {
   }));
 
   const result = assembleStateTrends({ asOf: todayISO(), exerciseRows, ...raw! });
-  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, runFitness: result.runFitness, swimRest: result.swimRest, loading: false };
+  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, runFitness: result.runFitness, strengthFitness: result.strengthFitness, swimRest: result.swimRest, cadenceCounts: raw!.cadenceCounts, loading: false };
 }
 
 // SCALABILITY NOTE (now realized): the assembly is `assembleStateTrends` in @shared/state-trend,
