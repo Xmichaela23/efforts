@@ -55,6 +55,7 @@ type PlanSession = {
   description: string;
   duration: number;
   strength_exercises?: StrengthExercise[];
+  steps_preset?: string[];
   tags: string[];
 };
 
@@ -280,10 +281,20 @@ function retestAmrapSessions(grid: { strength: string[] }): PlanSession[] {
   }) : null).filter(Boolean) as PlanSession[];
 }
 
-function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean, overrideMins?: number, extraNote?: string, nameOverride?: string): PlanSession {
+// Q-126 (Gap A): a duration-native intensity token for a maintenance run, so its
+// workload_planned reflects the easy/long prescription (0.65 via the Gap-B matcher)
+// instead of the 0.75 per-type default. Vocabulary matches the race path + the
+// materialize-plan token-parser at the substring level (`run_easy` / `easypace`).
+function runIntensityToken(kind: 'easy' | 'long', durationMin: number): string {
+  return kind === 'long'
+    ? `longrun_${durationMin}min_easypace`
+    : `run_easy_${durationMin}min`;
+}
+
+function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: boolean, overrideMins?: number, extraNote?: string, nameOverride?: string, kind: 'easy' | 'long' = 'easy'): PlanSession {
   const mins = overrideMins ?? (sport === 'bike' ? (isRetestWeek ? 35 : 45) : (isRetestWeek ? 25 : 35));
   const label = sport === 'bike' ? 'Easy Ride' : 'Easy Run';
-  return {
+  const base: PlanSession = {
     day,
     type: sport === 'bike' ? 'ride' : 'run',
     name: nameOverride ?? label,
@@ -291,6 +302,12 @@ function enduranceSession(sport: 'run' | 'bike', day: string, isRetestWeek: bool
     duration: mins,
     tags: ['easy', 'maintenance', 'aerobic'],
   };
+  // Q-126: RUN-only token injection. Bike/ride is fenced to its own pass (Gap A-bike) —
+  // it stays byte-identical (no steps_preset), same as before.
+  if (sport === 'run') {
+    return { ...base, steps_preset: [runIntensityToken(kind, mins)] };
+  }
+  return base;
 }
 
 /** Week-1 baseline test (NO-1RMs path): two NAMED "Baseline Test: Lower/Upper" sessions the logger
@@ -473,7 +490,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // as one session in two parts; the grouped-card UI is phase 2 (client bundle, post-Q-097).
         const fatNote = isFatigued ? ' This run loads your legs for part 2 — start the station within ~10 min of finishing.' : '';
         weekSessions.push(enduranceSession('run', day, false, runMinutesByDay[day], (`${note ?? ''}${fatNote}`) || undefined,
-          isFatigued ? 'Combo 1 of 2 — Long run' : undefined));
+          isFatigued ? 'Combo 1 of 2 — Long run' : undefined,
+          day === longRunDay ? 'long' : 'easy'));
         if (isFatigued) {
           const st = fatiguedLegsStation(week);
           weekSessions.push({
