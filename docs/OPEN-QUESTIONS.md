@@ -1546,6 +1546,35 @@ A per-athlete aerobic threshold would let us upgrade the RUN row to the strict `
 
 **Interaction with Q-122:** until Q-126 ships, Q-122's plan-overshoot denominator for the live plan is duration-weighted for BOTH disciplines. Q-122 still holds (per-session, not a constant) but its intensity-awareness is dormant for this plan shape.
 
+### Q-127 — Peripheral leg-fatigue read: two-witness (cause × effect), detect-don't-collect (design, filed 2026-07-05)
+
+**POV (settled with Michael):** "heavy legs" is NOT a feeling to collect (no slider — that's the rejected Option B). It's a cross-signal INFERENCE the app makes when a measured *cause* and a measured *effect* corroborate, surfaced as a confidence-weighted **load line** (D-232 language: load, never state).
+
+**Two witnesses:**
+- **Witness 1 — CAUSE (carries the attribution):** a recent big lower-body session, weight = volume × intensity × novelty, decaying over its echo window. This is the magnitude-decay work from the earlier loaded-legs discussion (`coach/index.ts:2890` flat 4-day window → per-session `echoDays`; loaded-legs stand-alone path). Folded in here as Witness 1.
+- **Witness 2 — EFFECT (corroborates only):** the run signature — pace below the athlete's OWN route norm, at normal-or-below HR, positive split. Substrate already exists + is already ON-SCREEN: GAP/route baseline (D-105, "3 comparable runs"), pace-at-HR (`PACE-AT-HR-TREND-SPEC`), positive-split (the PACING row). The solve is the SYNTHESIS rule, not new data.
+
+**Confidence scales with how many fire:**
+| Cause | Effect | Output |
+|---|---|---|
+| ✓ | ✓ | strong, named: "legs carrying Monday's session — pace down at normal HR" |
+| ✓ | ✗ | soft/predictive: "legs may still be loaded from Monday" |
+| ✗ | ✓ | **NOT legs** — slow-at-normal-HR with no leg day → general fatigue / fueling / illness; never claim legs without the cause |
+
+**CRITICAL CORRECTION (Michael 2026-07-05) — Witness 2 must NOT over-claim.** Do NOT say "normal HR rules out heat, therefore legs." Two confounds wear the SAME fingerprint: (a) a positive split at flat HR is also consistent with pacing error, under-fueling, or **heat-driven central/thermal limiting** (you slowed to hold HR; heat suppresses performance without spiking HR); (b) HR/pace decoupling is *consistent with* peripheral fatigue, not *diagnostic of* it. So Witness 2 is "a signature COMPATIBLE WITH peripheral fatigue," and **the CAUSE earns the attribution while the EFFECT only corroborates.** This is exactly why the ✗-cause/✓-effect row is "not legs" — the effect alone is genuinely ambiguous.
+
+**The real design surface (D-NNN, needs Michael sign-off):** the confidence function `f(session_magnitude, pace_deviation, baseline_depth)` plus the constants — Witness 1's echo/decay coefficients and Witness 2's thresholds (`pace_z`, split magnitude, HR-band width). Too hot → every slow run blamed on legs; too cold → never fires. Calibrate against Michael's own route history (usable-but-thin: 3 comparable runs). Z-score-vs-own-norm gate, same discipline as `resolveCarriedInSoreness`.
+
+**Worked example (this filing's motivating case):** Sun 2026-07-05 Lunch Run — 12:34/mi vs 10:54 route norm, HR 135 in-band, +75s/mi positive split, day 6 after the 2026-06-29 leg day (Back Squat + Bulgarian Split Squats + Reverse Lunge + DB Thrust — big + novel). Both witnesses present → the strong named read; today the app said nothing (window aged out + no synthesis).
+
+**Build order:** (1) ship Q-128 first (the narrative bug, independent). (2) Witness-2 detector in the run analyzer (deterministic flag). (3) the cause×effect join in coach/loaded-legs. (4) Michael-driven coefficient calibration. Deploy-gated; deterministic receipt, LLM narrates inside it.
+
+### Q-128 — ACTIVE BUG (fix now, NOT deferred): a below-baseline positive-split run is narrated as "clean/steady execution"
+
+**Live D-242 violation, shipping right now.** On the 2026-07-05 Lunch Run, INSIGHTS reads *"Your HR stayed right in line… the pace held steady despite the heat and fatigue you reported — a clean execution…"* while the SAME screen's TREND row says **51s/mi slower over 4 workouts** and the PACING row says **positive split, slowed 75s/mi**. The narrative asserts "held steady / clean" against its own deterministic rows — the exact "label what's computed, never compute to match the label" law (D-242), inverted.
+
+**Scope — narrow, ships ALONE, no coefficient sign-off, NOT gated behind Q-127.** The rule: a run that is BELOW the athlete's route/effort baseline AND positive-split cannot be narrated as "clean execution" / "pace held steady." A guard on the narrative generator (the run analyzer's INSIGHTS prompt + a deterministic pre-check/regenerate, same shape as the D-093 clean-execution cap) — **no new detector required**, the baseline-deviation + positive-split facts already exist. Fix immediately; don't let the Q-127 feature gate this embarrassing bug.
+
 ## When to add an entry
 
 Add a new Q-NNN when:
