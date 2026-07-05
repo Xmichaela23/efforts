@@ -464,12 +464,23 @@ export function rpeFeelVerdict(
   delta: number | null,
 ): string {
   if (delta == null || currentAvg == null || baselineAvg == null) return 'steady';
-  const receipt = `avg ${currentAvg.toFixed(1)} vs your typical ${baselineAvg.toFixed(1)}`;
+  // Provenance-in-the-glance: make it visibly the athlete's OWN logged effort ("you rated"), not an
+  // app-computed score. "avg" once. Em-dash form; harness-checked to fit ≤2 lines at 380px (incl. the
+  // worst-case "Noticeably"). The cross-discipline + window detail lives in the tap-expand (rpeProvenance).
+  const receipt = `you rated ${currentAvg.toFixed(1)} avg vs ${baselineAvg.toFixed(1)} typical`;
   const abs = Math.abs(delta);
-  if (abs < 0.5) return `About as hard as usual (${receipt})`;
+  if (abs < 0.5) return `About as hard as usual — ${receipt}`;
   const mag = abs >= 1.0 ? 'Noticeably' : 'A bit';
   const dir = delta > 0 ? 'harder' : 'easier';
-  return `${mag} ${dir} than usual (${receipt})`;
+  return `${mag} ${dir} than usual — ${receipt}`;
+}
+
+// D-232 tap/expand provenance for the "How hard it feels" row — one line naming the SOURCE (your own
+// ratings), the CROSS-DISCIPLINE scope (why a hard lift moves it), and the 7d-vs-28d windows. NOT a
+// new metric — disclosure of the same one fact (logged RPE, recent vs typical).
+export function rpeProvenance(currentAvg: number | null, baselineAvg: number | null): string | null {
+  if (currentAvg == null || baselineAvg == null) return null;
+  return `Last 7 days you've rated effort ${currentAvg.toFixed(1)} on average, vs your 28-day typical of ${baselineAvg.toFixed(1)} — across all disciplines (a hard lift moves this number too).`;
 }
 
 // D-232 color escalation for the "How hard it feels" row (Michael 2026-07-02): magnitude drives tone,
@@ -724,6 +735,7 @@ function computeVisibleSignals(endurance: EnduranceResponse, strength: StrengthR
       // magnitude-driven tone (harder escalates neutral→default→amber; easier never alarms).
       trend: endurance.rpe.trend, trend_icon: trendIcon(endurance.rpe.trend), trend_tone: rpeFeelTone(endurance.rpe.delta),
       detail: rpeFeelVerdict(endurance.rpe.current_avg, endurance.rpe.baseline_avg, endurance.rpe.delta),
+      provenance: rpeProvenance(endurance.rpe.current_avg, endurance.rpe.baseline_avg),
       samples: endurance.rpe.samples,
       samples_label: samplesLabel(endurance.rpe.samples, 'endurance'),
     });

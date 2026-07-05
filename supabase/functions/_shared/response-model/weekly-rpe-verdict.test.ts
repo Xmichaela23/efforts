@@ -11,27 +11,36 @@
  */
 
 import { assertEquals, assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { rpeFeelVerdict, rpeFeelTone } from './weekly.ts';
+import { rpeFeelVerdict, rpeFeelTone, rpeProvenance } from './weekly.ts';
 
-// ── strings ─────────────────────────────────────────────────────────────────────────────────────
-Deno.test('harder 0.5–1.0 → "A bit harder than usual" + receipt', () => {
-  assertEquals(rpeFeelVerdict(6.4, 5.5, 0.9), 'A bit harder than usual (avg 6.4 vs your typical 5.5)');
+// ── strings — glance receipt is now provenance-forward ("you rated"), em-dash form, "avg" once ──────
+Deno.test('harder 0.5–1.0 → "A bit harder than usual" + you-rated receipt', () => {
+  assertEquals(rpeFeelVerdict(6.4, 5.5, 0.9), 'A bit harder than usual — you rated 6.4 avg vs 5.5 typical');
 });
 
 Deno.test('harder ≥1.0 → "Noticeably harder than usual"', () => {
-  assertEquals(rpeFeelVerdict(6.8, 5.5, 1.3), 'Noticeably harder than usual (avg 6.8 vs your typical 5.5)');
+  assertEquals(rpeFeelVerdict(6.8, 5.5, 1.3), 'Noticeably harder than usual — you rated 6.8 avg vs 5.5 typical');
 });
 
 Deno.test('neutral |Δ|<0.5 → "About as hard as usual"', () => {
-  assertEquals(rpeFeelVerdict(5.7, 5.5, 0.2), 'About as hard as usual (avg 5.7 vs your typical 5.5)');
+  assertEquals(rpeFeelVerdict(5.7, 5.5, 0.2), 'About as hard as usual — you rated 5.7 avg vs 5.5 typical');
 });
 
 Deno.test('easier 0.5–1.0 → "A bit easier than usual"', () => {
-  assertEquals(rpeFeelVerdict(4.8, 5.5, -0.7), 'A bit easier than usual (avg 4.8 vs your typical 5.5)');
+  assertEquals(rpeFeelVerdict(4.8, 5.5, -0.7), 'A bit easier than usual — you rated 4.8 avg vs 5.5 typical');
 });
 
 Deno.test('easier ≥1.0 → "Noticeably easier than usual"', () => {
-  assertEquals(rpeFeelVerdict(4.3, 5.5, -1.2), 'Noticeably easier than usual (avg 4.3 vs your typical 5.5)');
+  assertEquals(rpeFeelVerdict(4.3, 5.5, -1.2), 'Noticeably easier than usual — you rated 4.3 avg vs 5.5 typical');
+});
+
+// ── tap/expand provenance: source + cross-discipline + windows; "average" once; null when no data ──
+Deno.test('rpeProvenance: names your own ratings, cross-discipline, 7d vs 28d', () => {
+  assertEquals(
+    rpeProvenance(4.8, 4.3),
+    "Last 7 days you've rated effort 4.8 on average, vs your 28-day typical of 4.3 — across all disciplines (a hard lift moves this number too).",
+  );
+  assertEquals(rpeProvenance(null, 4.3), null);
 });
 
 // ── string boundaries ─────────────────────────────────────────────────────────────────────────────

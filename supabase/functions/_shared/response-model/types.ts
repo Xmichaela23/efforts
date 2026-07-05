@@ -154,6 +154,8 @@ export type VisibleSignal = {
   trend_icon: '↑' | '↓' | '—';
   trend_tone: 'positive' | 'warning' | 'danger' | 'neutral';
   detail: string;
+  /** D-232 tap/expand provenance — one line: source (your own ratings) + cross-discipline + 7d/28d windows. */
+  provenance?: string | null;
   samples: number;
   samples_label: string; // "3 runs", "4 sessions", "2 weeks"
   value_display?: string;

@@ -656,6 +656,7 @@ export default function StateTab({
   const coachBusy = loading || Boolean(revalidating);
   const { liftTrends } = useExerciseLog(8);
   const [narrativeOpen, setNarrativeOpen] = useState(false);
+  const [expandedSignal, setExpandedSignal] = useState<string | null>(null); // D-232 BODY-row provenance tap
   const [adjustingLift, setAdjustingLift] = useState<string | null>(null);
   const [resolvedGoalId, setResolvedGoalId] = useState<string | null>(null);
   const [stateCourseRow, setStateCourseRow] = useState<{ id: string; name: string } | null>(null);
@@ -942,7 +943,7 @@ export default function StateTab({
   const week = wsv.week;
   const load = wsv.load;
   const rm = ((data as any)?.response_model ?? (wsv as any)?.response_model) as {
-    visible_signals: Array<{ label: string; category?: string; trend: string; trend_tone: string; detail: string; samples: number }>;
+    visible_signals: Array<{ label: string; category?: string; trend: string; trend_tone: string; detail: string; samples: number; provenance?: string | null }>;
     overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
     strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean; last_session_date?: string | null }> };
     endurance: unknown;
@@ -1455,11 +1456,24 @@ export default function StateTab({
                 <Chip value="not enough data" valueClass="text-white/55" />
               )}
               {visibleSignals.map((s) => (
-                <div key={s.label} className="flex items-center justify-between">
-                  <span className="text-[12px] text-white/70">{s.label}</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[12px] ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
-                  </div>
+                <div key={s.label}>
+                  {/* D-232 progressive disclosure: tap the row to reveal one line of provenance
+                      (source = your own ratings · cross-discipline · 7d vs 28d). Only when provenance exists. */}
+                  <button
+                    type="button"
+                    disabled={!s.provenance}
+                    onClick={() => s.provenance && setExpandedSignal(expandedSignal === s.label ? null : s.label)}
+                    className="w-full flex items-center justify-between text-left"
+                  >
+                    <span className="text-[12px] text-white/70">{s.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[12px] ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
+                      {s.provenance && <span className="text-white/30 text-[9px] shrink-0">{expandedSignal === s.label ? '▾' : '▸'}</span>}
+                    </div>
+                  </button>
+                  {expandedSignal === s.label && s.provenance && (
+                    <p className="text-[10px] text-white/40 leading-snug mt-1 max-w-[min(100%,320px)]">{s.provenance}</p>
+                  )}
                 </div>
               ))}
               {crossTrainingSignal && (
