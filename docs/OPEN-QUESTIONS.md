@@ -1548,6 +1548,12 @@ A per-athlete aerobic threshold would let us upgrade the RUN row to the strict `
 
 ### Q-127 — Peripheral leg-fatigue read: two-witness (cause × effect), detect-don't-collect (design, filed 2026-07-05)
 
+**STATUS — SPEC LOCKED, NOT BUILT (2026-07-05).** Fully specced with TWO independent acceptance gates, both enforced by build-time fixtures, both distinct from the confidence coefficients (Michael's sign-off surface, not pre-baked).
+- **GATE 1 — CONTINUITY (guards under-reach):** the run's peripheral-fatigue signature must reach State's loaded-legs read as Witness 2 (via `LoadedLegsInput` + `fatigueRefinement`). A run-detail-only render FAILS acceptance — same island class as Q-128. Fixture: signature lands on State as a corroborating loaded-legs input.
+- **GATE 2 — GATE STRUCTURE (guards over-reach):** Witness 2 (pace-fade / slow-at-normal-HR) may influence loaded-legs ONLY when Witness 1 (qualifying recent lower-body session) is present. Cause gates effect. Fixture: fade + NO qualifying leg day → SILENCE (no signal, no attribution).
+- **BOUNDARY (do not cross):** both gates are CORRECTNESS (provable cold, no judgment). The confidence-scaling coefficients are TUNING (Michael's, vs his own route history). Do NOT pre-bake coefficients; do NOT soften gates into tunable thresholds.
+- **NET:** cannot ship as a run-detail-only island (Gate 1); cannot claim legs without a cause (Gate 2). Two-witness discipline is a code contract enforced by fixtures, not a description. **Correctness half locked; tuning half open, awaiting Michael. Build only when he's ready to calibrate.**
+
 **POV (settled with Michael):** "heavy legs" is NOT a feeling to collect (no slider — that's the rejected Option B). It's a cross-signal INFERENCE the app makes when a measured *cause* and a measured *effect* corroborate, surfaced as a confidence-weighted **load line** (D-232 language: load, never state).
 
 **Two witnesses:**
