@@ -1153,8 +1153,9 @@ export default function StateTab({
   const trends = wsv.trends;
   const readinessLabel = trends.readiness_label;
   const readiness = trends.readiness_state;
-  const readinessWhy = trends.readiness_why ?? null; // D-232: FATIGUED "Why:" factor breakdown
+  const readinessWhy = trends.readiness_why ?? null; // D-232: FATIGUED "Why:" — now NON-RPE factors only
   const readinessSuggestion = trends.readiness_suggestion ?? null; // D-232: loaded-legs one-line suggestion
+  const readinessRpeDriver = trends.readiness_rpe_driver ?? null; // BODY-row driver (RPE clause only, Whoop pattern)
   const readinessColor =
     readiness === 'fresh' ? 'text-emerald-400/90' :
     readiness === 'adapting' ? 'text-sky-400/85' :
@@ -1286,9 +1287,8 @@ export default function StateTab({
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="text-[11px] font-semibold tracking-widest text-white/65 uppercase">{weekLabel}</span>
-            {readinessLabel && (
-              <span className={`text-[11px] uppercase tracking-wider font-semibold ${readinessColor}`}>· {readinessLabel}</span>
-            )}
+            {/* Chip Option A / research (Whoop): readiness is STRAIN-class — never headline/crown material.
+                It moved to BODY as the row's driver. "WEEK" stays as the plain section header. */}
           </div>
           {isAimless ? (
             <>
@@ -1475,6 +1475,12 @@ export default function StateTab({
                       {s.provenance && <span className="text-white/30 text-[9px] shrink-0">{expandedSignal === s.label ? '▾' : '▸'}</span>}
                     </div>
                   </button>
+                  {/* Whoop pairing (verdict + its driver, together): the RPE driver — which session
+                      moved the week — sits WITH the "how hard it feels" verdict, dim + always-visible.
+                      RPE-clause only (server guarantees no non-RPE factor reaches this row). */}
+                  {s.label === 'How hard it feels' && readinessRpeDriver && (
+                    <p className="text-[11px] text-white/45 leading-snug mt-0.5">{readinessRpeDriver}</p>
+                  )}
                   {expandedSignal === s.label && s.provenance && (
                     <p className="text-[10px] text-white/40 leading-snug mt-1 max-w-[min(100%,320px)]">{s.provenance}</p>
                   )}

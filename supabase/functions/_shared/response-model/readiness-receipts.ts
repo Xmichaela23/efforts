@@ -63,20 +63,38 @@ export function rpeWhyClause(args: {
   return `effort ${currentAvg.toFixed(1)} vs your typical ${baseline.toFixed(1)}, across ${sessions.length} sessions`;
 }
 
+/**
+ * The BODY-row driver: the RPE CLAUSE ONLY of the Why (it sits under "how hard it feels" = RPE, so
+ * a non-RPE factor there would be a mislabel). Rules:
+ *   • rpe NOT declining → null (BODY shows no driver; never borrows a non-RPE factor like "execution down")
+ *   • rpe declining     → the session driver / receipt, NEVER the bare "perceived effort up" (that just
+ *     restates the verdict the row already shows)
+ */
+export function bodyRpeDriver(args: {
+  rpeDeclining: boolean; sessions: RpeSessionLite[]; currentAvg: number | null; baseline: number | null;
+}): string | null {
+  if (!args.rpeDeclining) return null;
+  const clause = rpeWhyClause({ sessions: args.sessions, currentAvg: args.currentAvg, baseline: args.baseline, elevated: true });
+  return clause === 'perceived effort up' ? null : clause; // a real driver/receipt, never the bare verdict
+}
+
 /** FATIGUED "Why:" breakdown for the open-for-more expansion. Null when there's nothing to explain. */
 export function buildReadinessWhy(args: {
   signals: ReadinessSignalInput;
   loadLabel: string;        // "load balanced" | "load elevated (ACWR 1.3)"
   concerningCount: number;  // assessment.signals_concerning
   rpeClause?: string;       // the driver-named (or receipt) RPE clause — replaces the bare verdict
+  rpeUnderBody?: boolean;   // RPE driver is shown under BODY (readiness_rpe_driver) → drop it here (no dup)
 }): string | null {
   const s = args.signals;
   // NAME the marker(s) that tripped — the driver IS the concerning signal, so no redundant
   // "N body signals declining" count alongside it (Michael 2026-07-03).
   const drivers: string[] = [];
-  if (s.rpe?.declining) {
+  if (s.rpe?.declining && !args.rpeUnderBody) {
     // The Why NAMES THE DRIVER (which session moved the week), not the bare verdict — a restated
     // verdict is nothing. Numeric receipt still lives on the BODY row; the driver sentence is new info.
+    // When rpeUnderBody, the RPE driver renders under BODY instead (paired with its verdict) — the Why
+    // then carries only the NON-RPE factors, so nothing double-shows.
     drivers.push(args.rpeClause ?? 'perceived effort up');
   }
   if (s.execution?.declining) drivers.push('run execution down');

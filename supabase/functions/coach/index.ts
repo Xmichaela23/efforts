@@ -41,7 +41,7 @@ import {
   type CrossDomainPair,
 } from '../_shared/response-model/index.ts';
 import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
-import { buildReadinessWhy, buildCrossTrainingReceipt, crossTrainingStressReceipt, rpeWhyClause } from '../_shared/response-model/readiness-receipts.ts';
+import { buildReadinessWhy, buildCrossTrainingReceipt, crossTrainingStressReceipt, bodyRpeDriver } from '../_shared/response-model/readiness-receipts.ts';
 import { buildLoadedLegsDiagnosis, classifyFatigueLabel, type LoadedLegsDiagnosis } from '../_shared/response-model/loaded-legs.ts';
 import { detectNovelMovements, novelMovementsNames, type SessionMovement } from '../_shared/novel-movements.ts';
 import { classifyStrengthFocus } from '../_shared/cross-domain-carryover.ts';
@@ -116,7 +116,8 @@ const corsHeaders: Record<string, string> = {
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
 /** v61: Q-111 fact-only — a strength DECLINE ("back off weight") no longer emits a `suggested_weight` (the "go lighter" prescription is dropped; the client then renders "Working ~125 vs your 150 baseline" with no action). Progression ("add weight") suggestions unchanged. Bump so cached "suggest 115 / back off" per-lift rows recompute to the fact-only row. */
-const COACH_PAYLOAD_VERSION = 65; // 65: Why names the driver session (constant-free) + chip/headline dedup (readiness in chip only).
+const COACH_PAYLOAD_VERSION = 66; // 66: readiness restructure — RPE driver under BODY (readiness_rpe_driver), chip dropped, Why = non-RPE only.
+// 65 was: // 65: Why names the driver session (constant-free) + chip/headline dedup (readiness in chip only).
 // 64 was: // 64: BODY row provenance — receipt "you rated X avg vs Y typical" + tap-expand cross-discipline line. // 63: per_lift.last_session_date (as-of date on the strength row). // 62: item 3 — headline "Why" RPE driver is bare-verdict (numeric receipt lives on the BODY row only, rule 7). // 61: Q-111 fact-only — no "go lighter" prescription on strength decline. // 60: shared classifyStrengthFocus (one fact). // 59: plan-week END-gated. // 58: novelty = "not in your recent training". // 57: "in 8 weeks". // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
@@ -5311,15 +5312,11 @@ ${narrativeFacts.join('\n')}`;
           const e = weeklyResponseModel.endurance;
           const acwr = metrics.acwr;
           const loadLabel = (acwr != null && acwr >= 1.2) ? `load elevated (ACWR ${acwr.toFixed(2)})` : 'load balanced';
-          // The Why NAMES the driver session (which one moved the week) — constant-free, from per-session RPE.
-          const rpeClause = rpeWhyClause({
-            sessions: rpeSessions,
-            currentAvg: e.rpe.current_avg,
-            baseline: e.rpe.baseline_avg,
-            elevated: e.rpe.sufficient && e.rpe.trend === 'declining',
-          });
+          // The RPE driver now renders under BODY (readiness_rpe_driver, Whoop verdict+driver pairing).
+          // rpeUnderBody drops it here so it never double-shows; the Why keeps only the NON-RPE factors.
+          // For Michael (RPE-only) this returns null → the "open for more" expand disappears.
           return buildReadinessWhy({
-            rpeClause,
+            rpeUnderBody: true,
             signals: {
               rpe: { declining: e.rpe.sufficient && e.rpe.trend === 'declining', current: e.rpe.current_avg, baseline: e.rpe.baseline_avg },
               execution: { declining: e.execution.sufficient && e.execution.trend === 'declining' },
@@ -5329,6 +5326,18 @@ ${narrativeFacts.join('\n')}`;
             },
             loadLabel,
             concerningCount: weeklyResponseModel.assessment.signals_concerning,
+          });
+        })(),
+        // BODY-row driver (Whoop pattern: verdict + its driver, paired): the RPE CLAUSE ONLY of the
+        // Why — the session that moved the week — rendered under BODY's "how hard it feels". RPE-only
+        // (bodyRpeDriver drops non-RPE factors); null when effort isn't up.
+        readiness_rpe_driver: (() => {
+          const e = weeklyResponseModel.endurance;
+          return bodyRpeDriver({
+            rpeDeclining: e.rpe.sufficient && e.rpe.trend === 'declining',
+            sessions: rpeSessions,
+            currentAvg: e.rpe.current_avg,
+            baseline: e.rpe.baseline_avg,
           });
         })(),
         // D-232: the loaded-legs suggestion line (rendered under the Why). Null for systemic/EFFORT-UP.

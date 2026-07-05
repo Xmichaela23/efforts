@@ -6,7 +6,7 @@
  */
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { buildReadinessWhy, buildCrossTrainingReceipt, rpeWhyClause } from './readiness-receipts.ts';
+import { buildReadinessWhy, buildCrossTrainingReceipt, rpeWhyClause, bodyRpeDriver } from './readiness-receipts.ts';
 
 const RPE = (declining: boolean, current: number | null, baseline: number | null) => ({ rpe: { declining, current, baseline } });
 
@@ -62,6 +62,20 @@ Deno.test('rpeWhyClause: a lone modest session above baseline (ride +0.7) still 
   assertEquals(
     rpeWhyClause({ sessions: [{ date: '2026-07-02', type: 'ride', rpe: 5 }, { date: '2026-07-01', type: 'run', rpe: 3 }, { date: '2026-06-30', type: 'run', rpe: 3 }], currentAvg: 4.5, baseline: 4.3, elevated: true }),
     "Thursday's ride (you rated it 5) pushed the week's effort up",
+  );
+});
+
+// ── BODY driver = RPE clause ONLY — "label what fits the row" (BODY is RPE; non-RPE factors don't belong) ──
+Deno.test('bodyRpeDriver: Why has execution-down + effort-up → BODY gets ONLY the effort clause', () => {
+  assertEquals(
+    bodyRpeDriver({ rpeDeclining: true, sessions: [{ date: '2026-06-29', type: 'strength', rpe: 9 }, { date: '2026-07-02', type: 'run', rpe: 3 }, { date: '2026-07-03', type: 'run', rpe: 3 }], currentAvg: 5.0, baseline: 4.3 }),
+    "Monday's strength session (you rated it 9) pushed the week's effort up",
+  );
+});
+Deno.test('bodyRpeDriver: purely non-RPE Why (rpe steady) → null (never borrows execution/HR-drift under BODY)', () => {
+  assertEquals(
+    bodyRpeDriver({ rpeDeclining: false, sessions: [{ date: '2026-06-29', type: 'run', rpe: 3 }], currentAvg: 4.0, baseline: 4.3 }),
+    null,
   );
 });
 Deno.test('why: ACWR-elevated + effort', () => {
