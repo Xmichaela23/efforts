@@ -16,6 +16,7 @@ import { fetchGoalRaceCompletionForWorkout, type GoalRaceCompletionMatch } from 
 import { buildMarathonGoalRaceAdherenceSummary } from './lib/analysis/marathon-race-narrative.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
+import { computePositiveSplitSec } from '../_shared/fact-packet/execution-honesty.ts';
 import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, resolveCarriedInSoreness, CARRYOVER_WINDOW_DAYS, type SorenessEntry } from '../_shared/cross-domain-carryover.ts';
 // D-036: GAP enrichment lifted to top-level so both pace-adherence and the
 // HR analyzer consume the same grade-adjusted sample series.
@@ -2180,6 +2181,19 @@ Deno.serve(async (req) => {
       if (fact_packet_v1 && flags_v1) {
         // Q-112 step 2: run_spine_verdict (state_trends_v1) was captured above where getArcContext ran →
         // rules 6/7 on the per-workout INSIGHTS (no trend claim contradicting the spine; no receipt recap).
+        // Q-128 (D-242): a run that FADED within itself did not "hold steady" — provable from its OWN mile
+        // splits, no route history needed. Keyed on the within-run positive split ALONE (dropped the
+        // fact-packet vs_similar dependency: "held steady" is a within-run claim, and the cross-run input
+        // populated late/null at this point). CRITICAL source: use `workoutToUse` (the line-1850 RE-READ),
+        // NOT the original `workout` — `computed.analysis.events.splits` is written by compute-workout-
+        // analysis and is absent from the original line-162 read (the runtime-null that misfired before).
+        const _ehComp = typeof (workoutToUse as any)?.computed === 'string'
+          ? (() => { try { return JSON.parse((workoutToUse as any).computed); } catch { return null; } })()
+          : (workoutToUse as any)?.computed;
+        const _ehSplitsMi = _ehComp?.analysis?.events?.splits?.mi;
+        const _ehPosSplitSec = computePositiveSplitSec(_ehSplitsMi, true);
+        const _executionHonesty = _ehPosSplitSec != null ? { positiveSplitSec: _ehPosSplitSec } : null;
+
         ai_summary = await generateAISummaryV1(
           fact_packet_v1, flags_v1, null, null, arc_narrative_for_summary,
           { isMixedEffort: _varGate.is_mixed_effort, intervalBreakdown: detailedAnalysis?.interval_breakdown ?? null },
@@ -2191,6 +2205,7 @@ Deno.serve(async (req) => {
           // what the value actually is (pace-at-HR delta, not HR-over-time).
           { runEasyPaceAtHrTrendPct: arc_run_easy_pace_at_hr_trend },
           run_spine_verdict,
+          _executionHonesty,
         );
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
 

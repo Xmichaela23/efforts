@@ -1,5 +1,6 @@
 import type { FactPacketV1, FlagV1 } from './types.ts';
 import { coerceNumber, secondsToPaceString } from './utils.ts';
+import { tripsHonestyGuard, guardNarrativeHonesty, narrativeHasUnearnedCleanClaim, executionHonestyPromptRule, type ExecutionHonestyInput } from './execution-honesty.ts';
 import { callLLM } from '../llm.ts';
 // Shared narrative-reasoning core (continuity leg #3 — D-187). The 7-rule scaffold + the shared
 // validator suite, single-sourced; run plugs in via the run adapter. See docs/WORK-ORDER-narrative-core.md.
@@ -1162,18 +1163,29 @@ export async function generateAISummaryV1(
   unplannedGate?: UnplannedGateOptions | null,
   aerobicTrend?: AerobicTrendOptions | null,
   spineVerdict?: DisciplineVerdict | null, // Q-112 step 2: the run's state_trends_v1 verdict (rules 6/7)
+  executionHonesty?: ExecutionHonestyInput | null, // Q-128: below-baseline positive-split → forbid "clean/steady"
 ): Promise<string | null> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     console.warn('[ai-summary] ANTHROPIC_API_KEY not set — skipping narrative generation');
     return null;
   }
+  // Q-128 (D-242): a faded, below-own-norm run must never be narrated as clean/steady.
+  const _ehTrips = tripsHonestyGuard(executionHonesty ?? null);
+  const _ehSec = executionHonesty?.positiveSplitSec ?? 0;
+  const _finalizeHonesty = (s: string): string =>
+    _ehTrips ? (guardNarrativeHonesty(s, executionHonesty as ExecutionHonestyInput).text ?? s) : s;
+  const _ehValidate = (s: string) =>
+    _ehTrips && narrativeHasUnearnedCleanClaim(s)
+      ? { ok: false, why: 'EXECUTION HONESTY: this run faded (positive split) and was below the athlete\'s norm — do NOT call it clean/steady/held-steady; name the slowdown.' }
+      : { ok: true, why: null as string | null };
 
   const displayPacket = toDisplayFormatV1(factPacket, flags, varianceGate ?? null, unplannedGate ?? null, arcNarrative ?? null, aerobicTrend ?? null);
 
   const arcFacts = arcNarrative ? arcNarrativeFactBlock(arcNarrative) : '';
   const userMessage =
     `${arcFacts ? `\nTEMPORAL ARC CONTEXT (do not contradict; paraphrase for athlete):\n${arcFacts}\n` : ''}` +
-    buildUserMessage(displayPacket);
+    buildUserMessage(displayPacket) +
+    (_ehTrips ? executionHonestyPromptRule(_ehSec) : '');
   // arcPostRaceComparisonAddon emits empty string when is_first_post_race_run
   // is false; safe to always append. arcUnplannedBackwardAnchorAddon (D-046 /
   // Q-026) emits empty when not unplanned or when mode override applies.
@@ -1207,12 +1219,13 @@ export async function generateAISummaryV1(
     const ac1 = validateNoAthleteContradiction(s1, displayPacket);
     const rp1 = validateNoRpeClaimsWithoutAthleteReport(s1, displayPacket);
     const nc1 = validateNarrative(s1, ncCtx); // D-187 shared core: rules 1/2/4/5 (heat-silo, contradiction, cause, single-session)
-    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && hr1.ok && pd1.ok && ac1.ok && rp1.ok && nc1.ok) return s1;
-    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, hr: hr1.why, pd: pd1.why, ac: ac1.why, rp: rp1.why, core: nc1.failures.map(f => f.code) }));
+    const eh1 = _ehValidate(s1); // Q-128: faded run must not be narrated as clean/steady
+    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && hr1.ok && pd1.ok && ac1.ok && rp1.ok && nc1.ok && eh1.ok) return _finalizeHonesty(s1);
+    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, hr: hr1.why, pd: pd1.why, ac: ac1.why, rp: rp1.why, core: nc1.failures.map(f => f.code), eh: eh1.ok }));
 
     const corrections = [
       v1.bad.length ? 'Bad numeric tokens: ' + v1.bad.join(', ') : null,
-      z1.why, len1.why, td1.why, g1.why, hr1.why, pd1.why, ac1.why, rp1.why,
+      z1.why, len1.why, td1.why, g1.why, hr1.why, pd1.why, ac1.why, rp1.why, eh1.why,
       ...nc1.failures.map(f => f.why),
     ].filter(Boolean);
     const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
@@ -1228,10 +1241,12 @@ export async function generateAISummaryV1(
     const ac2 = validateNoAthleteContradiction(s2, displayPacket);
     const rp2 = validateNoRpeClaimsWithoutAthleteReport(s2, displayPacket);
     const nc2 = validateNarrative(s2, ncCtx);
-    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && hr2.ok && pd2.ok && ac2.ok && rp2.ok && nc2.ok) return s2;
-    console.warn('[ai-summary] attempt 2 also rejected:', JSON.stringify({ num: v2.ok, zone: z2.why, len: len2.why, td: td2.why, filler: g2.why, hr: hr2.why, pd: pd2.why, ac: ac2.why, rp: rp2.why, core: nc2.failures.map(f => f.code) }));
+    const eh2 = _ehValidate(s2); // Q-128
+    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && hr2.ok && pd2.ok && ac2.ok && rp2.ok && nc2.ok && eh2.ok) return _finalizeHonesty(s2);
+    console.warn('[ai-summary] attempt 2 also rejected:', JSON.stringify({ num: v2.ok, zone: z2.why, len: len2.why, td: td2.why, filler: g2.why, hr: hr2.why, pd: pd2.why, ac: ac2.why, rp: rp2.why, core: nc2.failures.map(f => f.code), eh: eh2.ok }));
     if (!hr2.ok || !ac2.ok || !rp2.ok) return null;
-    return s2;
+    // Q-128 hard seatbelt: even if attempt 2 still slipped, the exact banned claim cannot reach the screen.
+    return _finalizeHonesty(s2);
   } catch (e) {
     console.warn('[fact-packet] ai_summary generation failed:', e);
     return null;
