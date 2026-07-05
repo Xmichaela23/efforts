@@ -109,6 +109,9 @@ function StrengthFitnessRow({ fitness }: { fitness: StrengthFitness }) {
         <span className="inline-flex items-baseline gap-1">
           <span className="text-white/50">Volume</span>
           <span className={`inline-flex items-baseline gap-0.5 ${vv.cls}`}>{vv.arr && <span>{vv.arr}</span>}<span>{vv.word}</span></span>
+          {/* volume is a 6wk trend (slow clock) — label its window so the fast "this week" receipt
+              beside it isn't mistaken for the trend's clock. */}
+          <span className="text-white/30 text-[10px]">over 6wk</span>
         </span>
       ) : (
         <span className="text-white/40">volume needs 2+ sessions to trend</span>
@@ -308,7 +311,12 @@ export default function StatePerformanceSection({ strengthDetail }: { strengthDe
 
   return (
     <div className="px-3 py-3">
-      <div className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase mb-1.5">Performance</div>
+      {/* Section clock label: PERFORMANCE is the SLOW clock. Per-row windows (8wk, steady runs,
+          over 6wk, as-of dates) are receipts that inherit this and add specifics. */}
+      <div className="mb-1.5 flex items-baseline gap-2">
+        <span className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Performance</span>
+        <span className="text-[10px] text-white/30 lowercase">trends over recent weeks</span>
+      </div>
       {headline && <div className="text-[14px] font-medium text-white/90 leading-snug mb-2.5">{headline.line}</div>}
       {sortedCards.map((card) => {
         if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow key="bike" fitness={bikeFitness!} />;

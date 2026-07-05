@@ -19,30 +19,77 @@ export interface ReadinessSignalInput {
 
 const cap = (x: string) => (x ? x.charAt(0).toUpperCase() + x.slice(1) : x);
 
+// ── The Why NAMES THE DRIVER, not the verdict (the honest "which session moved the week most"). ──
+const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function dayName(iso: string): string {
+  const t = Date.parse(iso + 'T12:00:00Z');
+  return Number.isNaN(t) ? 'A recent' : `${DOW[new Date(t).getUTCDay()]}'s`;
+}
+function sessionKind(type: string): string {
+  const t = (type || '').toLowerCase();
+  if (t.includes('strength')) return 'strength session';
+  if (t.includes('run')) return 'run';
+  if (t.includes('ride') || t.includes('bike') || t.includes('cycl')) return 'ride';
+  if (t.includes('swim')) return 'swim';
+  return 'session';
+}
+
+export interface RpeSessionLite { date: string; type: string; rpe: number }
+
+/**
+ * The RPE clause for the Why. CONSTANT-FREE (Michael 2026-07-04): the driver = the single session
+ * whose excess over the 28d baseline exceeds ALL other positive contributors' excess COMBINED — i.e.
+ * it moved the week more than everyone else put together. Rules:
+ *   • not elevated  → 'perceived effort up' (the caller only calls this when rpe is declining anyway)
+ *   • dominant top  → name it ("Monday's strength session (you rated it 9) pushed the week's effort up")
+ *   • near-tie / no dominant → the plain receipt (adds the spread; a receipt beats a restated verdict)
+ */
+export function rpeWhyClause(args: {
+  sessions: RpeSessionLite[]; currentAvg: number | null; baseline: number | null; elevated: boolean;
+}): string {
+  const { sessions, currentAvg, baseline, elevated } = args;
+  if (!elevated || baseline == null || currentAvg == null || sessions.length === 0) return 'perceived effort up';
+  const contribs = sessions
+    .map((x) => ({ ...x, excess: x.rpe - baseline }))
+    .filter((x) => x.excess > 0)
+    .sort((a, b) => b.excess - a.excess);
+  if (contribs.length) {
+    const top = contribs[0];
+    const othersCombined = contribs.slice(1).reduce((sum, x) => sum + x.excess, 0);
+    if (top.excess > othersCombined) {
+      return `${dayName(top.date)} ${sessionKind(top.type)} (you rated it ${top.rpe}) pushed the week's effort up`;
+    }
+  }
+  return `effort ${currentAvg.toFixed(1)} vs your typical ${baseline.toFixed(1)}, across ${sessions.length} sessions`;
+}
+
 /** FATIGUED "Why:" breakdown for the open-for-more expansion. Null when there's nothing to explain. */
 export function buildReadinessWhy(args: {
   signals: ReadinessSignalInput;
   loadLabel: string;        // "load balanced" | "load elevated (ACWR 1.3)"
   concerningCount: number;  // assessment.signals_concerning
+  rpeClause?: string;       // the driver-named (or receipt) RPE clause — replaces the bare verdict
 }): string | null {
   const s = args.signals;
   // NAME the marker(s) that tripped — the driver IS the concerning signal, so no redundant
   // "N body signals declining" count alongside it (Michael 2026-07-03).
   const drivers: string[] = [];
   if (s.rpe?.declining) {
-    // item 3 (rule 7, no receipt recap): the headline Why names the BARE verdict only. The numeric
-    // receipt (e.g. "4.8 vs 4.3 typical") lives on the BODY "how hard it feels" row — its labeled
-    // home — so the same figures don't render twice, ~6 lines apart, on one screen.
-    drivers.push('perceived effort up');
+    // The Why NAMES THE DRIVER (which session moved the week), not the bare verdict — a restated
+    // verdict is nothing. Numeric receipt still lives on the BODY row; the driver sentence is new info.
+    drivers.push(args.rpeClause ?? 'perceived effort up');
   }
   if (s.execution?.declining) drivers.push('run execution down');
   if (s.hrDrift?.declining) drivers.push('HR drift rising');
   if (s.cardiacEff?.declining) drivers.push('aerobic efficiency down');
   if (s.strength?.declining) drivers.push('strength fading');
-  if (drivers.length) return `Why: ${[...drivers, args.loadLabel].join(' · ')}`;
+  // Load ONLY when it's a real driver (elevated) — a "balanced" load is the headline's fact, not a
+  // Why (one fact, one place; drop the "· load balanced" restatement).
+  const loadTail = args.loadLabel.includes('balanced') ? [] : [args.loadLabel];
+  if (drivers.length) return `Why: ${[...drivers, ...loadTail].join(' · ')}`;
   // No nameable driver but something tripped → say how many (fallback only).
   if (args.concerningCount > 0) {
-    return `Why: ${args.concerningCount} concerning signal${args.concerningCount === 1 ? '' : 's'} · ${args.loadLabel}`;
+    return `Why: ${args.concerningCount} concerning signal${args.concerningCount === 1 ? '' : 's'}${loadTail.length ? ` · ${loadTail[0]}` : ''}`;
   }
   return null;
 }

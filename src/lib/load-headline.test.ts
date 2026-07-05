@@ -26,48 +26,46 @@ Deno.test('acwrZone: standard-app band names match the verdict boundaries', () =
 
 // ── D-232/D-233: refined chip label wins; no false systemic fatigue (now in §5 split format) ──
 
-Deno.test('EFFORT UP: says "effort up", NOT "fatigued"/"carrying fatigue"', () => {
+// ── Chip Option A: readiness lives in the WEEK chip; the headline leads with LOAD only ──
+Deno.test('EFFORT UP: headline drops the readiness clause (chip carries it) — load only', () => {
   const h = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fatigued', readinessLabel: 'EFFORT UP', fitnessDirection: 'improving' })!;
-  assertEquals(h, 'This week: Balanced load, effort up. Over 6 weeks: fitness climbing.');
-  assert(!h.includes('fatigue'), 'must not claim systemic fatigue');
+  assertEquals(h, 'This week: Balanced load. Over 6 weeks: fitness climbing.');
+  assert(!h.includes('effort up') && !h.includes('fatigue'), 'no readiness in the headline');
 });
 
-Deno.test('LEGS LOADED: says "legs loaded", no systemic-fatigue claim', () => {
+Deno.test('LEGS LOADED: headline drops the readiness clause', () => {
   const h = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fatigued', readinessLabel: 'LEGS LOADED', fitnessDirection: 'improving' })!;
-  assertEquals(h, 'This week: Balanced load, legs loaded. Over 6 weeks: fitness climbing.');
-  assert(!h.includes('carrying fatigue'));
+  assertEquals(h, 'This week: Balanced load. Over 6 weeks: fitness climbing.');
 });
 
-Deno.test('LEGS SORE: says "legs sore", no systemic-fatigue claim', () => {
+Deno.test('LEGS SORE: headline drops the readiness clause', () => {
   const h = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fatigued', readinessLabel: 'LEGS SORE', fitnessDirection: 'stable' })!;
-  assert(h.includes('legs sore'));
-  assert(!h.includes('carrying fatigue'));
+  assertEquals(h, 'This week: Balanced load. Over 6 weeks: fitness steady.');
+  assert(!h.includes('legs sore'));
 });
 
-Deno.test('FATIGUED (systemic): keeps "you\'re carrying fatigue" on the this-week clause', () => {
+Deno.test('FATIGUED: headline drops it too (the chip is the notable state; no "carrying fatigue" restatement)', () => {
   const h = buildLoadHeadline({ loadLabel: 'back off', readinessState: 'fatigued', readinessLabel: 'FATIGUED', fitnessDirection: 'declining' })!;
-  assert(h.includes('fatigued'));
-  assert(h.includes("you're carrying fatigue"));
-  // scope-correct: the systemic read sits in "This week:", not the "Over 6 weeks:" clause
-  assert(h.startsWith('This week:'));
+  assertEquals(h, 'This week: Load running high. Over 6 weeks: fitness slipping.');
+  assert(!h.includes('fatigue') && !h.includes('carrying'), 'readiness state lives in the chip, not the headline');
 });
 
-Deno.test('no refined label (e.g. fresh) falls back to the readinessState mapping', () => {
+Deno.test('fresh keeps the "headroom" observation (no chip of its own — unique info)', () => {
   const h = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fresh', readinessLabel: null, fitnessDirection: 'improving' })!;
-  assertEquals(h, 'This week: Balanced load, fresh — you have headroom. Over 6 weeks: fitness climbing.');
+  assertEquals(h, 'This week: Balanced load — you have headroom. Over 6 weeks: fitness climbing.');
 });
 
 // ── Q-111 §5: mixed-clocks structural cases ──
 
 Deno.test('§5 two-clock → two scoped clauses, never fused with a middot', () => {
   const h = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'normal', readinessLabel: 'EFFORT UP', fitnessDirection: 'mixed' });
-  assertEquals(h, 'This week: Balanced load, effort up. Over 6 weeks: fitness mixed.');
+  assertEquals(h, 'This week: Balanced load. Over 6 weeks: fitness mixed.');
   assertEquals(h?.includes(' · '), false);
 });
 
 Deno.test('§5 this-week-only (no fitness) → single clause, no empty "Over N weeks" scaffold', () => {
   const h = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fresh', readinessLabel: null, fitnessDirection: null });
-  assertEquals(h, 'This week: Balanced load, fresh — you have headroom.');
+  assertEquals(h, 'This week: Balanced load — you have headroom.');
   assertEquals(h?.includes('Over 6 weeks'), false);
 });
 

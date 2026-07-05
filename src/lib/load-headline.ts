@@ -54,7 +54,9 @@ function stateSlot(loadLabel: string, readiness: string | null | undefined, read
     readiness === 'overreached' ? 'overreached' :
     readiness === 'detrained'   ? 'detrained' :
     readiness === 'normal'      ? 'steady' : null);
-  if (l && r) return `${l}, ${r}`;
+  // Chip Option A (Michael 2026-07-04): the readiness STATE lives in the WEEK chip (one fact, one
+  // place). The headline leads with LOAD only, so "Balanced load, effort up" (a 2nd copy of the chip)
+  // becomes just "Balanced load." Readiness stands alone ONLY when there's no load reading.
   if (l) return l;
   if (r) return r.charAt(0).toUpperCase() + r.slice(1);
   return null;
@@ -72,12 +74,10 @@ function fitnessSlot(fd: string | null | undefined): string | null {
 // Slot 3 — OBSERVATION: a state-implied direction only. Pure physiological reads off the spine.
 // Deliberately sparse: fires only where the state clearly implies one, omits otherwise (the state
 // slot already carries "Load running high" etc., so we don't double it).
-function observationSlot(loadLabel: string, readiness: string | null | undefined, readinessLabel?: string | null): string | null {
-  // "carrying fatigue" is a SYSTEMIC read — only for overreached or the systemic FATIGUED label.
-  // A localized LEGS LOADED / LEGS SORE / EFFORT UP must NOT claim systemic fatigue (the Why carries it).
-  const u = String(readinessLabel || '').toUpperCase();
-  if (readiness === 'overreached' || u === 'FATIGUED') return "you're carrying fatigue";
-  // headroom only on balanced+fresh — "Room to build" (build-more state) already conveys headroom.
+function observationSlot(loadLabel: string, readiness: string | null | undefined, _readinessLabel?: string | null): string | null {
+  // Chip Option A: "you're carrying fatigue" for overreached/FATIGUED is DROPPED — that IS the chip's
+  // state (FATIGUED), so restating it in the headline is the duplicate we're removing. Keep only the
+  // "headroom" read on balanced+fresh, which has no chip of its own (unique information).
   if (loadLabel === 'balanced' && readiness === 'fresh') return 'you have headroom';
   return null;
 }

@@ -1363,6 +1363,10 @@ export default function StateTab({
         </button>
       </div>
 
+      {/* Section clock label: LOAD + BODY are the FAST clock (how the last 7 days feel vs typical).
+          Named once here; per-row specifics (WTD pts, RPE receipt) inherit it. */}
+      <div className="px-1 mb-1 text-[10px] text-white/30 lowercase">last 7 days vs your typical</div>
+
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] divide-y divide-white/[0.055]">
 
         {/* LOAD — full-width gauge + sparkline */}
