@@ -4832,6 +4832,28 @@ The RUN State row leads with within-session **pace:HR decoupling** (`heart_rate_
 - **Spine:** cached into `state_trends_v1.run.decoupling` (band/recentPct) + `.efficiency`, mirroring bike — so coach/Arc/LLM narrate the band, not just direction.
 - **Reconcile (same arc):** coach's `runEfficiency` (`:1694`) used its own ≤3 cutoff → replaced with `frielBand` (one threshold set); the dead `run_easy_pace_at_hr_trend` longitudinal signal + its compute-snapshot aggregation retired. One run-fitness source, not three.
 
+### D-240 — State screen "one clock, one place" cohesion restructure (2026-07-05, DEPLOYED coach v64→67 + client `52cd8eeb`→`2116e9f2`)
+
+The top of State had grown three overlapping ways to say the same thing: a `WEEK · EFFORT UP` chip, a headline fusing two clocks (`This week: Balanced load. Over 6 weeks: fitness mixed`), and a "Why:" accordion. Whoop/Garmin UX research ([925studios WHOOP breakdown], the5krunner, Wareable) prescribes the opposite: ONE headline verdict, each score paired with its own driver, no nested accordions, strain is a supporting score never the crown. Restructured to match — **all subtractive**:
+
+- **Chip removed.** Readiness ("effort up") is strain-class — never headline/crown material. The `readinessLabel` span in `StateTab` deleted; "WEEK" stays a plain section header.
+- **Headline = THE WEEK only.** `buildLoadHeadline` drops the "Over 6 weeks: fitness" clause (removed `fitnessSlot`). One clock — the week's load verdict. Fitness is a *different* clock, handed to the PERFORMANCE discipline rows.
+- **PERFORMANCE roll-up removed.** The synthesized `Building — bike up, run up` header (`synthesizeHeadline`) committed all three roll-up sins on real data: (1) **lossy** — collapses to one word; (2) **cherry-picking** — gates out "provisional" disciplines (`HEADLINE_GATED_DISCIPLINES`), so a declining-but-provisional swim (−3.6%) vanished from the headline; (3) **clock-mismatch** — averaged run's 42d/6wk window with bike's 56d/8wk. Rows now speak per-discipline, each owning its window; swim's decline is visible.
+- **Why → BODY driver (Whoop pairing).** The RPE driver ("Monday's strength session (you rated it 9) pushed the week's effort up") moved from the headline accordion to a dim always-visible sub-line under BODY's "how hard it feels" verdict. New `readiness_rpe_driver` field (`bodyRpeDriver`), RPE-clause-ONLY (D-241). `buildReadinessWhy(rpeUnderBody:true)` drops the RPE clause from the Why so it never double-shows.
+- **"N concerning signals" count fallback DELETED.** It generated the confusing amber "Why: 1 concerning signal" — a WHOOP-class non-answer (alarms without informing; contradicts a "Balanced load" headline). `buildReadinessWhy` now returns null when no NAMED driver. The `week_narrative` expand survives only when there IS narrative (traced LIVE: 10/11 coach_cache rows non-empty → gate, not delete). Section clock labels added: LOAD/BODY "last 7 days vs your typical"; PERFORMANCE "trends over recent weeks".
+
+Files: `src/lib/load-headline.ts`, `StateTab.tsx`, `StatePerformanceSection.tsx`, `readiness-receipts.ts`, `coach/index.ts`. Fixtures: `load-headline.test.ts`, `readiness-receipts.test.ts`.
+
+### D-241 — Constant-free RPE driver rule + RPE-clause-only under BODY (2026-07-05)
+
+The Why NAMES the session that moved the week, not a restated verdict. Rule (`rpeWhyClause`/`bodyRpeDriver`, `readiness-receipts.ts`): the driver = the session whose excess over the athlete's own 28-day RPE baseline **exceeds all other positive contributors' excess COMBINED** — only when the verdict is elevated. Near-tie → receipt; not elevated → silent. **Rejected** the "≥2 points above typical" (and lowered "≥0.5") absolute thresholds: RPE is a 1–10 cross-discipline average, so a swim-3 next to a lift-9 is normal spread, not an anomaly — an absolute Δ gate is the wrong model. Validated on the real distribution: 7d `[9,5,4,3,3]` vs baseline 4.31 → the 9's +4.69 > the rest's +0.69 → names Monday.
+
+**BODY driver = the RPE CLAUSE ONLY** (`bodyRpeDriver`): it sits under BODY's "how hard it feels" (RPE) row, so it must never borrow a non-RPE factor (execution, HR-drift) — that would be a mislabel (D-242). Returns null when rpe isn't declining. Pinned both directions (`readiness-receipts.test.ts`): execution-down + effort-up → only the effort clause; purely non-RPE → null.
+
+### D-242 — The law: "label what's computed, never compute to match the label" (2026-07-05)
+
+First-class principle, earned three times this arc: (1) the RUN decoupling lead (D-239 — led with the metric actually calculated, not the `pace_at_easy_hr` we wished we had); (2) **STRENGTH-B** — the State strength volume is genuinely a 42-day/6-week `classifyTrend`; when asked to label it "vs 28-day typical," we KEPT the 42d computation and labeled it honestly "over 6wk" rather than fabricate a 7d read to match an improvised label; (3) the fitness-verdict cohesion (D-240 — deleted the roll-up rather than compute a cross-discipline aggregate to justify a single-verdict headline). **The code is the source of truth; the label describes it, never the reverse.** This is the "no unexamined constants" law stated for computations. Corollary: if a label needs a computation that doesn't exist, that's NEW scope (its own decision), not a label fix.
+
 ## When to add an entry
 
 Add a new D-NNN when:

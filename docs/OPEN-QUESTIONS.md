@@ -1476,6 +1476,28 @@ A per-athlete aerobic threshold would let us upgrade the RUN row to the strict `
 
 **CORRECTED 2026-07-04 — there is NO readiness-RPE bug; a prior "stale 4.8" concern was a query-side MISDIAGNOSIS.** The BODY row's "avg 4.8 vs 4.3 · harder than usual" is **correct**. The coach reads RPE as `workout_metadata.session_rpe` first — an audit query dropped that field (read it through a `?.` chain that returned null on those selects) and so undercounted to 3.33. Reading it correctly, the live 7d is `(3 swim + 4 ride + 5 strength + 9 strength + 3 run) / 5 = 4.80` — a genuinely harder week, incl. a logged **RPE-9 Monday strength**. The readiness RPE is honest and cross-discipline; **no freshness guard needed.** Lesson: a correct number was nearly condemned as stale because its *as-of freshness wasn't legible on screen* — which is exactly the motivation for stamping State numbers with an as-of date (in progress). Verify-before-cite applies to bug claims too.
 
+### Q-122 — Plan-phase-aware load verdict (deferred; buildable spec traced 2026-07-05)
+
+`acwrVolumeLabel` is ACWR-only, so a high-but-on-plan **build** week false-alarms as "back off" (`load-headline.ts:12`; the only plan hook is `isTaperOrPeak`, and there's no `build` branch in `weekly.ts`'s prose either). Goal: `high ACWR + on-plan + build → building`, not back off. Trace findings so the next session builds without re-combing:
+- **Phase signal is FREE.** `week.intent === 'build'` is already at the call site — `week_intent` type (`coach/types.ts:147`) is `'build'|'recovery'|'taper'|'peak'|'baseline'|'unknown'`; `weekly_state_v1.week.intent` carries it. (A prior claim that "build isn't in week.intent" was a trace ERROR — conflated with `swim_intent`'s focus/race.) Use `week.intent`, NOT `arc.current_phase` (macro block, unplumbed to the client).
+- **`week_vs_plan_pct` is the WRONG field** — `Math.min(1, actual/planned)` **clamped to [0,100%]** (`adherence-plan.ts:84`), a completion ratio, cannot represent overshoot. Use the deviation `(load.wtd_actual_load − load.wtd_planned_load)/load.wtd_planned_load` — both raw loads ARE on the client `load` object.
+- **Denominator is small early-week.** `plannedWtdLoad` = strict session-sum of `workload_planned` for sessions dated ≤ today (NOT a calendar slice). Real week (Michael, wk of 2026-07-06): Mon 103 → Tue 159 → Wed 215 → Thu 271 → Fri 327 → full 439. A single extra ~56 session reads +54% Mon … +17% Fri → the overshoot % is only reliable ~Thu/Fri. Floor: `if (wtd_planned_load < 150) → skip overshoot, use raw ACWR` (gates Monday). ACWR-primary, plan-overshoot secondary.
+- **Gauge coherence (agreed): Option (b)** — the plan-aware WORD applies to headline+gauge label, while the gauge MARKER + `acwrZone` stay raw ACWR (honest dual read: "ACWR 1.35 · pushing — building on plan"). Do NOT hack `acwrVolumeLabel` in place (`LoadBar.tsx:3` shares it → marker/word desync).
+- **Constants:** keep the codebase's existing 120% not the spec's 115% (avoid two thresholds); ≥1.5 stays the hard "rest now" redline.
+- **Live-testable** once the plan has current-week materialized sessions (Michael's start Mon 2026-07-06 — so testable this week; at ACWR 1.10 the build-pass won't engage until he's actually near 1.3).
+
+### Q-123 — `weekly.ts:594` "above planned" prose is DEAD (clamped field) — cleanup deferred
+
+`if (wv > 120) planFrag = ' Total workload is above planned.'` — `wv = load.week_vs_plan_pct`, clamped to [0,100] (Q-122), so `wv > 120` has never fired. The `wv < 70` "below plan" branch is live. Retire the dead branch on next touch of `weekly.ts`.
+
+### Q-124 — `avgReadiness.soreness` snapshot aggregate is unconsumed — verify + wire-or-retire
+
+`compute-snapshot:211` aggregates post-workout popup soreness (`workout_metadata.readiness.soreness`, copied by compute-facts) into `avgReadiness.soreness`, but nothing reads that aggregate — readiness surfaces use the SEPARATE daily-check-in track (`readiness_checkins` → `arc.readiness` → coach loaded-legs). The popup soreness IS live via Axis-1 (`resolveCarriedInSoreness`, synthetic-tested); this specific snapshot aggregate is the dead-end. Confirm nothing consumes it, then wire or retire.
+
+### Q-125 — Is `workload_planned` a real per-session computation or a template constant? (unverified)
+
+Michael's July plan shows a flat ~56/session `workload_planned` (strength 56, run 56, Monday double 103). If that's a templated default rather than a per-session load computation, the plan-overshoot comparison (Q-122) measures actual against a constant — weakening the signal. Verify where `workload_planned` is written (materialize-plan / activate-plan) and whether it varies by session prescription. (Was next on the comb when the session ended.)
+
 ## When to add an entry
 
 Add a new Q-NNN when:
