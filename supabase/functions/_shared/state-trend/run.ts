@@ -8,6 +8,7 @@ import type { TrendPoint, TrendResult } from './types.ts';
 import { classifyTrend } from './classify.ts';
 import { resolveThresholds } from './thresholds.ts';
 import { isDeloadWeek } from './deload.ts';
+import { efficiencyThresholds } from './bike-fitness.ts';
 
 export interface RunState {
   trend: TrendResult;
@@ -54,5 +55,28 @@ export function computeRunState(series: TrendPoint[], asOf: string, sessionsPerW
   return {
     trend: classifyTrend(series, resolveThresholds('run', sessionsPerWeek), asOf, { exclude: isDeloadWeek }),
     metricLabel: 'GAP pace at comparable effort',
+  };
+}
+
+// Q-110 — RUN EFFICIENCY (pace-at-HR): the honest fitness signal (same-HR-faster pace = fitter),
+// the run analog of bike's HR-at-power efficiency. Value is `run_facts.pace_at_easy_hr` (sec/km at
+// the easy-HR reference; lower = improving). This is the run card's fitness verdict now — raw GAP
+// pace ("slower" ≠ "less fit") is dropped. Same shape as computeRunState; efficiency thresholds.
+
+/** SOURCE ADAPTER: run rows (joined with pace_at_easy_hr + classified_type) → {date,value}[]. */
+export function paceAtHrToSeries(
+  rows: Array<{ date?: string; metric_date?: string; pace_at_easy_hr?: number | null; classified_type?: string | null }> | null | undefined,
+): TrendPoint[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .filter((r) => isComparableRunEffort(r.classified_type))
+    .map((r) => ({ date: r.date ?? r.metric_date ?? '', value: Number(r.pace_at_easy_hr) }))
+    .filter((p) => p.date && Number.isFinite(p.value) && p.value >= MIN_RUN_PACE_S && p.value <= MAX_RUN_PACE_S);
+}
+
+export function computeRunEfficiencyState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): RunState {
+  return {
+    trend: classifyTrend(series, efficiencyThresholds('run', sessionsPerWeek), asOf, { exclude: isDeloadWeek }),
+    metricLabel: 'pace at HR (efficiency)',
   };
 }

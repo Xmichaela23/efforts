@@ -635,7 +635,7 @@ serve(async (req: Request) => {
         const asOf = todayISO();
         const adhStart = isoMinus(STATE_TREND_WINDOWS.adherenceDays - 1);
 
-        const [exR, bikeR, runR, swimR, plannedR, doneR, cadenceR] = await Promise.all([
+        const [exR, bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR] = await Promise.all([
           supabase.from("exercise_log").select("date,canonical_name,exercise_name,estimated_1rm")
             .eq("user_id", userId).gte("date", isoMinus(STATE_TREND_WINDOWS.liftWeeks * 7)).order("date"),
           supabase.from("workouts").select("date,workout_analysis,workout_metadata")
@@ -651,6 +651,9 @@ serve(async (req: Request) => {
           supabase.from("workouts").select("type,date,workout_status").eq("user_id", userId).gte("date", adhStart).lte("date", asOf),
           supabase.from("workouts").select("type,date,workout_status").eq("user_id", userId)
             .eq("workout_status", "completed").gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)),
+          // Q-110: run pace-at-HR efficiency (run_facts) — joined by date onto the run series below.
+          supabase.from("workout_facts").select("date,run_facts").eq("user_id", userId)
+            .eq("discipline", "run").gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)),
         ]);
 
         const cadenceCounts: Record<string, number> = {};
@@ -672,9 +675,15 @@ serve(async (req: Request) => {
           const { data: rw } = await supabase.from("workouts").select("id,workout_analysis").in("id", runWids);
           for (const w of (rw ?? []) as any[]) runCtById.set(w.id, w.workout_analysis?.classified_type ?? null);
         }
+        const runPaceAtHrByDate = new Map<string, number>();
+        for (const f of (runFactsR.data ?? []) as any[]) {
+          const v = f.run_facts?.pace_at_easy_hr;
+          if (typeof v === "number") runPaceAtHrByDate.set(f.date, v);
+        }
         const runJoined = runRows.map((r) => ({
           metric_date: r.metric_date,
           effort_adjusted_pace_sec_per_km: r.effort_adjusted_pace_sec_per_km,
+          pace_at_easy_hr: runPaceAtHrByDate.get(r.metric_date) ?? null,
           classified_type: runCtById.get(r.workout_id) ?? null,
         }));
 

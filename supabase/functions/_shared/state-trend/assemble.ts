@@ -11,7 +11,7 @@
 // barrel here would create a load-order cycle.
 import { computeStrengthState, type LiftSeries } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, type BikeFitness } from './bike-fitness.ts';
-import { computeRunState, routeMetricsToSeries } from './run.ts';
+import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, paceAtHrToSeries } from './run.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
 import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSummary } from './discipline.ts';
@@ -73,7 +73,7 @@ export interface StateTrendInputs {
   asOf: string;
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
   bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; band_source: string | null; hr_corrupt?: boolean }>;
-  runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; classified_type: string | null }>;
+  runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; pace_at_easy_hr?: number | null; classified_type: string | null }>;
   swimRows: Array<{ date: string; pace_per_100m: number; rest_fraction?: number | null; distance_m?: number | null }>;
   plannedBy: Record<string, number>; // this-week planned counts per discipline
   doneBy: Record<string, number>; // this-week completed counts per discipline
@@ -123,9 +123,13 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // filters to comparable-easy + valid-GAP, so its length IS the 90d comparable-run count. classifyTrend
   // still windows the trend itself to runDays (42d) internally, so widening the fetch changes only the
   // cadence denominator, not the trend.
-  const runSeries = routeMetricsToSeries(inp.runJoined);
-  const runComparableCadence = runSeries.length / WEEKS_90D;
-  const runState = computeRunState(runSeries, asOf, runComparableCadence);
+  // Q-110: the run card's fitness verdict is now pace-at-HR EFFICIENCY (same-HR-faster pace = fitter)
+  // — the honest fitness signal, run analog of bike's HR-at-power. Raw GAP pace ("slower" ≠ "less
+  // fit") is DROPPED from the card. Cadence floor still scales off the comparable-easy run count
+  // (D-237). Decoupling (durability) is Phase 2.
+  const runEffSeries = paceAtHrToSeries(inp.runJoined);
+  const runComparableCadence = runEffSeries.length / WEEKS_90D;
+  const runState = computeRunEfficiencyState(runEffSeries, asOf, runComparableCadence);
   const run = perfFromTrend(runState.trend);
 
   // swim

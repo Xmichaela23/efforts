@@ -114,9 +114,10 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
   if (card.primaryAxis === 'performance' && card.headlineVerdict) {
     const v = VERDICT[card.headlineVerdict];
     const perf = card.performance;
-    // item 1: name the metric the way bike names Power/Efficiency — run/swim both read PACE
-    // (run = GAP pace at comparable easy effort; swim = pace per 100). Static label per discipline.
-    const metricLabel = (card.discipline === 'run' || card.discipline === 'swim') ? 'Pace'
+    // name the metric like bike does. Q-110: RUN now reads pace-at-HR EFFICIENCY (same-HR-faster =
+    // fitter), so it's labelled "Efficiency" to match bike. Swim stays "Pace" (pace per 100).
+    const metricLabel = card.discipline === 'run' ? 'Efficiency'
+      : card.discipline === 'swim' ? 'Pace'
       : card.discipline === 'bike' ? 'Power' : null;
     // item 4: a THIN + STALE trend must not render at full confidence. De-weight (dim + "limited
     // data") when < 5 samples AND newest point > 21d old — the counts are already at the render.

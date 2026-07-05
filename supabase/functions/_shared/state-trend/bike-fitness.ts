@@ -33,8 +33,11 @@ function daysBetween(a: string, b: string): number | null {
 
 /** Efficiency uses the bike cadence-scaled window/min/freshness, but HR%-noise bands (±3%) and
  *  lower-is-better (lower HR at the reference power = improving aerobic efficiency). */
-function efficiencyThresholds(spw: number) {
-  return { ...resolveThresholds('bike', spw), improvePct: 3, slidePct: -3, lowerIsBetter: true };
+// Q-110: discipline-aware so RUN reuses this engine — HR-at-pace efficiency (lower pace at the same
+// HR = improving) is the run analog of bike's HR-at-power. Exported so assemble.ts builds the run
+// efficiency trend from the same primitive.
+export function efficiencyThresholds(discipline: 'bike' | 'run', spw: number) {
+  return { ...resolveThresholds(discipline, spw), improvePct: 3, slidePct: -3, lowerIsBetter: true };
 }
 
 /** Provisional when the trend rests on near-floor n (3–4) or a clustered <21d span. */
@@ -86,8 +89,8 @@ export function computeTerrainBinnedPower(rides: BikeEffortRide[], asOf: string,
 }
 
 /** B — HR-at-power efficiency. `hrAtBand` = per-ride mean HR in the reference band ({date,value}). */
-export function computeEfficiencyTrend(hrAtBand: TrendPoint[], asOf: string, spw: number): BikeSignal {
-  const t = classifyTrend(hrAtBand, efficiencyThresholds(spw), asOf);
+export function computeEfficiencyTrend(hrAtBand: TrendPoint[], asOf: string, spw: number, discipline: 'bike' | 'run' = 'bike'): BikeSignal {
+  const t = classifyTrend(hrAtBand, efficiencyThresholds(discipline, spw), asOf);
   return { verdict: t.verdict, pctChange: t.pctChange, provisional: isProvisionalTrend(t), basis: null, sampleCount: t.sampleCount, newestAgeDays: t.newestAgeDays, windowDays: t.window?.days };
 }
 
