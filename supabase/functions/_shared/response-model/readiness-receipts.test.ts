@@ -96,11 +96,10 @@ Deno.test('why: elevated load IS kept (real driver, not restatement)', () => {
     'Why: run execution down · load elevated (ACWR 1.4)',
   );
 });
-Deno.test('why: no nameable driver but something tripped → fallback count (balanced dropped)', () => {
-  assertEquals(
-    buildReadinessWhy({ signals: {}, loadLabel: 'load balanced', concerningCount: 1 }),
-    'Why: 1 concerning signal',
-  );
+Deno.test('why: no NAMED driver → null (the vague "N concerning signals" count fallback is deleted)', () => {
+  assertEquals(buildReadinessWhy({ signals: {}, loadLabel: 'load balanced', concerningCount: 1 }), null);
+  // even with elevated load and a count, no named driver → still null (BODY does the talking)
+  assertEquals(buildReadinessWhy({ signals: {}, loadLabel: 'load elevated (ACWR 1.4)', concerningCount: 3 }), null);
 });
 Deno.test('why: nothing to explain → null', () => {
   assertEquals(buildReadinessWhy({ signals: {}, loadLabel: 'load balanced', concerningCount: 0 }), null);

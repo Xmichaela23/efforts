@@ -62,15 +62,6 @@ function stateSlot(loadLabel: string, readiness: string | null | undefined, read
   return null;
 }
 
-// Slot 2 — FITNESS shape (aggregate direction; per-discipline detail lives in the narrative).
-function fitnessSlot(fd: string | null | undefined): string | null {
-  return fd === 'improving' ? 'fitness climbing'
-    : fd === 'mixed'      ? 'fitness mixed'
-    : fd === 'declining'  ? 'fitness slipping'
-    : fd === 'stable'     ? 'fitness steady'
-    : null;
-}
-
 // Slot 3 — OBSERVATION: a state-implied direction only. Pure physiological reads off the spine.
 // Deliberately sparse: fires only where the state clearly implies one, omits otherwise (the state
 // slot already carries "Load running high" etc., so we don't double it).
@@ -89,18 +80,14 @@ export function buildLoadHeadline(opts: {
   fitnessDirection?: string | null;
   isTaperOrPeak?: boolean;
 }): string | null {
-  const { loadLabel, readinessState, readinessLabel, fitnessDirection, isTaperOrPeak } = opts;
+  const { loadLabel, readinessState, readinessLabel, isTaperOrPeak } = opts;
   // In taper/peak, a "build more" reading is by-design low volume — don't lead the glance with it.
   const effLoad = isTaperOrPeak && loadLabel === 'build more' ? 'balanced' : loadLabel;
   const state = stateSlot(effLoad, readinessState, readinessLabel);
-  const fit = fitnessSlot(fitnessDirection);
   const obs = state ? observationSlot(effLoad, readinessState, readinessLabel) : null;
 
-  // Q-111 §5 (mixed-clocks): declare each verdict's time-scope so a THIS-WEEK read (load +
-  // readiness + observation) and the ~6-WEEK fitness trend can never fuse into one claim. The
-  // "6 weeks" window is the representative fitness-trend window (run-primary 42d); tunable.
-  const clauses: string[] = [];
-  if (state) clauses.push(`This week: ${obs ? `${state} — ${obs}` : state}.`);
-  if (fit) clauses.push(`Over 6 weeks: ${fit}.`);
-  return clauses.length ? clauses.join(' ') : null;
+  // The headline reflects THE WEEK only (Michael 2026-07-04) — one clock. Fitness is a different clock
+  // and is NOT rolled up here: it's handed to the individual discipline rows under PERFORMANCE, each
+  // on its own 6–8wk window. No aggregate fitness verdict anywhere (it would have to lie about the clock).
+  return state ? `This week: ${obs ? `${state} — ${obs}` : state}.` : null;
 }

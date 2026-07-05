@@ -105,10 +105,9 @@ export function buildReadinessWhy(args: {
   // Why (one fact, one place; drop the "· load balanced" restatement).
   const loadTail = args.loadLabel.includes('balanced') ? [] : [args.loadLabel];
   if (drivers.length) return `Why: ${[...drivers, ...loadTail].join(' · ')}`;
-  // No nameable driver but something tripped → say how many (fallback only).
-  if (args.concerningCount > 0) {
-    return `Why: ${args.concerningCount} concerning signal${args.concerningCount === 1 ? '' : 's'}${loadTail.length ? ` · ${loadTail[0]}` : ''}`;
-  }
+  // No NAMED driver → null. The old "N concerning signals" count fallback was a WHOOP-class non-answer
+  // (it alarmed — amber — without informing, and under a "Balanced load" headline it flat contradicted
+  // itself). Deleted 2026-07-04: if we can't name what tripped, we say nothing; BODY's driver talks.
   return null;
 }
 

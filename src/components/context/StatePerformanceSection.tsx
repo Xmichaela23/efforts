@@ -286,7 +286,7 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
 }
 
 export default function StatePerformanceSection({ strengthDetail }: { strengthDetail?: React.ReactNode }) {
-  const { cards, headline, bikeFitness, runFitness, strengthFitness, swimRest, cadenceCounts, loading } = useStateTrends();
+  const { cards, bikeFitness, runFitness, strengthFitness, swimRest, cadenceCounts, loading } = useStateTrends();
   if (loading || cards.length === 0) return null;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
@@ -313,11 +313,13 @@ export default function StatePerformanceSection({ strengthDetail }: { strengthDe
     <div className="px-3 py-3">
       {/* Section clock label: PERFORMANCE is the SLOW clock. Per-row windows (8wk, steady runs,
           over 6wk, as-of dates) are receipts that inherit this and add specifics. */}
-      <div className="mb-1.5 flex items-baseline gap-2">
+      <div className="mb-2.5 flex items-baseline gap-2">
         <span className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Performance</span>
         <span className="text-[10px] text-white/30 lowercase">trends over recent weeks</span>
       </div>
-      {headline && <div className="text-[14px] font-medium text-white/90 leading-snug mb-2.5">{headline.line}</div>}
+      {/* NO aggregate roll-up (Michael 2026-07-04): a cross-discipline headline ("Building — bike up,
+          run up") is a lossy, cherry-picking, clock-mismatched summary (run 6wk vs bike 8wk). Fitness
+          is handed to the individual sport rows below — each owns its own verdict AND its own window. */}
       {sortedCards.map((card) => {
         if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow key="bike" fitness={bikeFitness!} />;
         if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow key="run" fitness={runFitness!} />;
