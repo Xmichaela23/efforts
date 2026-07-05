@@ -1511,7 +1511,9 @@ A per-athlete aerobic threshold would let us upgrade the RUN row to the strict `
 
 **Adjacent, un-filed:** the per-type run *default* (0.75) is HIGHER than every easy/long run token (0.65/0.70), so any run that falls through to the default reads *hotter* than a tokenized easy run of equal duration — the default over-weights an unstructured run. Only bites when runs land on the default (the sub-thread above).
 
-### Q-126 — Non-race (Get Strong combined) generator emits no run `steps_preset` → run load is duration-only (filed 2026-07-05; Gap A of Q-125)
+### Q-126 — Non-race (Get Strong combined) generator emits no run `steps_preset` → run load is duration-only (BUILT 2026-07-05, deploy-owed; Gap A of Q-125)
+
+**STATUS — BUILT + committed (`d8d8e1b7`), NOT deployed.** `enduranceSession()` (`strength-primary-plan.ts:291`) now emits a duration-native token via `runIntensityToken(kind, mins)`, gated to `sport==='run'`, `kind` keyed on `day === longRunDay`. Run rows now carry `run_easy_${mins}min` / `longrun_${mins}min_easypace` → 0.65 via the Gap-B matcher (was the 0.75 default). Spine-safety gate PASSED: strength subset byte-identical to the pre-change golden (55 sessions / 30,697 bytes), verified pre/post + locked as `strength-primary-plan.q126.test.ts` (5/5). Bike FENCED (rides stay token-free — the Gap A-bike sibling is its own pass). Go-forward only. **Deploy-owed:** redeploy the functions that bundle `strength-primary-plan.ts` (the non-race materialization path via `create-goal-and-materialize-plan`) when the window is picked; existing rows unchanged by design. Original entry preserved below.
 
 **Symptom (data-verified, user 45d122e7):** all 25 run rows of the current live non-race plan have `steps_preset = null`, so `estimatePlannedWorkload` falls to the 0.75 per-type default and `workload_planned = duration × 0.75² × 100` — pure minutes, no prescribed-intensity texture. Combined with strength (structurally always default), the entire plan-vs-actual load comparison for this plan tracks minutes moved. This is the sibling of Q-125 Gap B (which fixed the *matcher*); Gap A is that the *generator never emits the tokens to match*.
 
