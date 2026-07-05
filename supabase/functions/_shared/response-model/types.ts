@@ -68,6 +68,8 @@ export type LiftTrend = {
   rir_target: number | null;
   samples: number;
   sufficient: boolean;
+  /** as-of: date (YYYY-MM-DD) of this lift's newest logged session. */
+  last_session_date: string | null;
   /** Server-computed plan-intent-aware action label. Client renders verbatim. */
   verdict_label: string;
   verdict_tone: LiftVerdictTone;
@@ -340,6 +342,8 @@ export type StrengthLiftSnapshot = {
   best_weight: number | null;       // most recent top working weight logged
   /** D-231 typed-anchored 1RM (canonical lifts only; null for accessories / gap-fill). Judge + suggest consult this. */
   anchor_1rm?: number | null;
+  /** as-of: date (YYYY-MM-DD) of this lift's newest logged session. */
+  last_session_date?: string | null;
 };
 
 export type CrossDomainPair = {

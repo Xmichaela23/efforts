@@ -116,7 +116,7 @@ const corsHeaders: Record<string, string> = {
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
 /** v61: Q-111 fact-only — a strength DECLINE ("back off weight") no longer emits a `suggested_weight` (the "go lighter" prescription is dropped; the client then renders "Working ~125 vs your 150 baseline" with no action). Progression ("add weight") suggestions unchanged. Bump so cached "suggest 115 / back off" per-lift rows recompute to the fact-only row. */
-const COACH_PAYLOAD_VERSION = 62; // 62: item 3 — headline "Why" RPE driver is bare-verdict (numeric receipt lives on the BODY row only, rule 7). // 61: Q-111 fact-only — no "go lighter" prescription on strength decline. // 60: shared classifyStrengthFocus (one fact). // 59: plan-week END-gated. // 58: novelty = "not in your recent training". // 57: "in 8 weeks". // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
+const COACH_PAYLOAD_VERSION = 63; // 63: per_lift.last_session_date (as-of date on the strength row). // 62: item 3 — headline "Why" RPE driver is bare-verdict (numeric receipt lives on the BODY row only, rule 7). // 61: Q-111 fact-only — no "go lighter" prescription on strength decline. // 60: shared classifyStrengthFocus (one fact). // 59: plan-week END-gated. // 58: novelty = "not in your recent training". // 57: "in 8 weeks". // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2286,6 +2286,7 @@ Deno.serve(async (req) => {
       const rirByLift7d = new Map<string, number[]>();
       const rirByLift28d = new Map<string, number[]>();
       const bestWeightByLift = new Map<string, number>();
+      const lastDateByLift = new Map<string, string>(); // as-of: newest session date per lift
 
       const extractLiftRir = (workouts: any[], target: Map<string, number[]>) => {
         for (const w of workouts) {
@@ -2297,6 +2298,8 @@ Deno.serve(async (req) => {
           for (const ex of exArr) {
             const canon = canonicalize(String(ex?.name || ''));
             if (!canon || canon === 'unknown') continue;
+            const wDate = String((w as any)?.date || '');
+            if (wDate && wDate > (lastDateByLift.get(canon) ?? '')) lastDateByLift.set(canon, wDate);
             const sets = Array.isArray(ex?.sets) ? ex.sets : [];
             for (const s of sets) {
               if (s.completed === false) continue;
@@ -2319,7 +2322,7 @@ Deno.serve(async (req) => {
 
       const avgArr = (arr: number[]) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
 
-      return { rirByLift7d, rirByLift28d, bestWeightByLift, avgArr };
+      return { rirByLift7d, rirByLift28d, bestWeightByLift, lastDateByLift, avgArr };
     })();
 
     const strengthProfile = resolveProfile(planConfig?.strength_protocol);
@@ -2355,6 +2358,7 @@ Deno.serve(async (req) => {
             sessions_in_window: Number(v.sample_count ?? 0),
             best_weight: perLiftRir.bestWeightByLift.get(key) ?? null,
             anchor_1rm: anchor1rm,
+            last_session_date: perLiftRir.lastDateByLift.get(key) ?? null,
             };
           });
       } catch { return []; }

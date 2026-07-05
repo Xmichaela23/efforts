@@ -243,6 +243,7 @@ export function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: strin
       rir_target: l.target_rir,
       samples: l.sessions_in_window,
       sufficient,
+      last_session_date: l.last_session_date ?? null,
       verdict_label: verdict.label,
       verdict_tone: verdict.tone,
       best_weight,

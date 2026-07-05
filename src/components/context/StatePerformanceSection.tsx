@@ -43,6 +43,16 @@ function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
   );
 }
 
+// "as of {date}" — the date of the newest data point behind a row's number, from the spine's
+// newestAgeDays. Makes freshness LEGIBLE per metric so a current number isn't mistaken for stale
+// (the BODY-4.8 lesson). Null when there's no dated data (needs_data rows).
+function asOf(ageDays: number | null | undefined): string | null {
+  if (ageDays == null || ageDays < 0) return null;
+  const d = new Date();
+  d.setDate(d.getDate() - Math.round(ageDays));
+  return `as of ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+}
+
 // Bike row — Power leads, Efficiency alongside (disagreement surfaced, never collapsed). The
 // efficiency basis carries the zone-band source (coggan_ftp = estimated; personal = from test).
 function BikeFitnessRow({ fitness }: { fitness: BikeFitness }) {
@@ -72,6 +82,7 @@ function BikeFitnessRow({ fitness }: { fitness: BikeFitness }) {
         </span>
         {tail && <span className="text-white/35 text-[10px]">{tail}</span>}
         {src && <span className="text-white/25 text-[10px]">{src}</span>}
+        {asOf(lead.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(lead.newestAgeDays)}</span>}
       </div>
     </div>
   );
@@ -133,6 +144,7 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness }) {
         <span className="text-white/40">needs 20+ min steady effort</span>
       )}
       <span className="text-white/25 text-[10px]">aerobic durability · steady runs</span>
+      {asOf(d.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(d.newestAgeDays)}</span>}
       {e.verdict !== 'needs_data' && (
         <span className="inline-flex items-baseline gap-1">
           <span className="text-white/40">Efficiency</span>
@@ -195,6 +207,7 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
           </>
         )}
         {thinStale && <span className="text-white/30 text-[10px]">limited data</span>}
+        {asOf(perf?.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(perf?.newestAgeDays)}</span>}
         {PROVISIONAL_PERF.has(card.discipline) && <span className="text-white/30 text-[11px]">provisional</span>}
         {card.discipline === 'swim' && <RestTag rest={restTrend} />}
       </Row>

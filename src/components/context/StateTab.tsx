@@ -944,7 +944,7 @@ export default function StateTab({
   const rm = ((data as any)?.response_model ?? (wsv as any)?.response_model) as {
     visible_signals: Array<{ label: string; category?: string; trend: string; trend_tone: string; detail: string; samples: number }>;
     overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
-    strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean }> };
+    strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean; last_session_date?: string | null }> };
     endurance: unknown;
     assessment: { label: string; signals_concerning: number };
   } | undefined;
@@ -1255,6 +1255,9 @@ export default function StateTab({
                 )}
               </span>
             </div>
+            {lt.last_session_date && (
+              <div className="text-[10px] text-white/25">as of {new Date(lt.last_session_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+            )}
             {e1rmPct != null && (
               <div className="h-[3px] w-full rounded-full bg-white/[0.06]">
                 <div
