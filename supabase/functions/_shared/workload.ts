@@ -20,6 +20,12 @@ export const INTENSITY_FACTORS: Record<string, Record<string, number>> = {
     '5kpace_plus0:45': 0.88, '5kpace_plus0:35': 0.90,
     '5kpace': 0.95, '10kpace': 0.90, marathon_pace: 0.82,
     speed: 1.10, strides: 1.05, interval: 0.95, tempo: 0.88, cruise: 0.88,
+    // Gap B (2026-07-05): the generator's actual easy/warmup/MP token families
+    // (run_easy_50min, warmup_run_quality_12min, run_mp_4mi) were not substrings of any
+    // key above, so they silently fell to the 0.75 per-type default — reading HOTTER than
+    // a prescribed easy run (0.65). Added as substring keys; checked AFTER the specific
+    // keys above so quality/long-run tokens still win the max. run_easy→easypace parity.
+    run_easy: 0.65, warmup_run_quality: 0.65, run_mp: 0.82,
   },
   ride: {
     Z1: 0.55, recovery: 0.55, Z2: 0.70, endurance: 0.70,
