@@ -39,6 +39,7 @@ import { resolveRunScalars } from "../_shared/run/run-scalars.ts";
 import { detectSwimEquipment } from "../_shared/swim/swim-equipment.ts";
 import { resolveSwimScalars } from "../_shared/swim/swim-scalars.ts";
 import { resolveRouteCluster } from "../_shared/route-intelligence.ts";
+import { dewPointF } from "../_shared/heat-adjust.ts";
 import { resolveCurrentFtp } from "../../../src/lib/resolve-current-ftp.ts";
 
 // ---------------------------------------------------------------------------
@@ -74,6 +75,7 @@ interface WorkoutRow {
   gps_track: any[] | null;
   start_position_lat: number | null;
   start_position_long: number | null;
+  weather_data: Record<string, any> | null;
 }
 
 interface PlannedRow {
@@ -805,6 +807,14 @@ async function upsertRouteIntelligence(
     return Math.max(0, Math.min(100, Math.round(100 - Math.abs(drift) * 8)));
   })();
 
+  // Conditions for the heat de-confound (Familiar Routes, docs/DESIGN-familiar-routes.md §4).
+  // Read temp/humidity off the workout's weather_data; derive dew point (the heat-stress variable)
+  // at write time so downstream never re-derives it. Absent/unknown → null, never a fabricated 0.
+  const wd = (w.weather_data ?? {}) as Record<string, any>;
+  const tempF = toNum(wd.temperature);
+  const humidityPct = toNum(wd.humidity);
+  const dewF = dewPointF(tempF, humidityPct);
+
   const { data: prevRows } = await supabase
     .from("route_progress_metrics")
     .select("effort_adjusted_pace_sec_per_km")
@@ -837,6 +847,9 @@ async function upsertRouteIntelligence(
       avg_pace_sec_per_km: paceSecPerKm,
       effort_adjusted_pace_sec_per_km: effortAdjusted,
       decoupling_pct: toNum(runFacts?.hr_drift_pct),
+      temp_f: tempF,
+      humidity_pct: humidityPct,
+      dew_point_f: dewF,
       consistency_score: consistency,
       improvement_score: improvement,
       confidence_score: Number(matchConfidence.toFixed(4)),
@@ -1467,7 +1480,7 @@ serve(async (req: Request) => {
         "id, user_id, type, date, timestamp, duration, moving_time, elapsed_time, distance, " +
         "avg_heart_rate, max_heart_rate, avg_pace, avg_power, max_power, normalized_power, " +
         "avg_cadence, elevation_gain, strength_exercises, mobility_exercises, " +
-        "workout_metadata, computed, planned_id, workout_status, workload_actual, sensor_data, gps_track, start_position_lat, start_position_long",
+        "workout_metadata, computed, planned_id, workout_status, workload_actual, sensor_data, gps_track, start_position_lat, start_position_long, weather_data",
       )
       .eq("id", workout_id)
       .maybeSingle();
