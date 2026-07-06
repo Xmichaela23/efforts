@@ -24,12 +24,19 @@ import {
   type RouteEfficiency,
 } from "./efficiency-index.ts";
 
-// Neutral reference: at/below this dew point, evaporative cooling works and no adjustment is applied.
-// Conservative end of the 55–60°F industry consensus band (Vermeer's knee is 60°F).
+// ACTIVE heat variable = AIR TEMPERATURE (°F). Validated on real data (2026-07-06): in a dry climate
+// dew point barely clears its reference (SD < 1.4°F) while air temperature swings 30–40°F — temperature
+// is the heat the body actually feels. Neutral reference: endurance optima sit ~50–55°F; we hinge at
+// 60°F so genuinely pleasant days aren't "corrected". One-sided, tunable/calibratable like DEFAULT_HEAT_K.
+export const TEMP_REF_F = 60;
+
+// Dew point is CAPTURED (compute-facts) but DORMANT in the model — the humid-climate refinement,
+// deferred until a humid-climate user exists (docs/DESIGN-familiar-routes.md §4.2). Its neutral ref,
+// kept for dewPointF's documentation and the future humid path:
 export const DEW_REF_F = 55;
 
 // UNVALIDATED POPULATION PLACEHOLDER, declared as such (D-237 / Law 2). 0.005 = a 0.5% HR rise per °F
-// of dew point above neutral. It exists only so the pipeline has a documented default before
+// of air temperature above neutral. It exists only so the linear-k path has a documented default before
 // calibration; it MUST be replaced by a value fit from the athlete's own hot-vs-cool same-route runs
 // (see PROHIBITION). Do NOT treat this number as validated, and do NOT derive it from a pace coefficient.
 export const DEFAULT_HEAT_K = 0.005;
@@ -59,41 +66,42 @@ export function dewPointF(
 }
 
 /**
- * Heat-adjust a run's efficiency index back to the neutral reference condition.
- *   heat_penalty     = k * max(0, dew_point_f - DEW_REF_F)   // one-sided: heat only ever inflates HR
- *   adj_efficiency   = efficiency_index * (1 + heat_penalty) // undo the HR drag → neutral-day value
+ * One-sided heat load above the neutral AIR-TEMPERATURE reference: max(0, tempF − TEMP_REF_F). The
+ * hinged predictor used EVERYWHERE heat enters — both the linear-k correction and the regression's
+ * heat covariate — so cool runs (temp ≤ ref) contribute exactly 0 and are never scaled. null when
+ * temperature is unknown (missing ≠ 0).
+ */
+export function heatTerm(tempF: number | null | undefined): number | null {
+  if (tempF == null) return null;
+  const t = Number(tempF);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, t - TEMP_REF_F);
+}
+
+/**
+ * Heat-adjust a run's efficiency index back to the neutral (cool-day) condition.
+ *   heat_penalty   = k * max(0, tempF - TEMP_REF_F)       // one-sided: heat only ever inflates HR
+ *   adj_efficiency = efficiency_index * (1 + heat_penalty) // undo the HR drag → neutral-day value
  *
- * ONE-SIDED by design: below the reference dew point the penalty is 0, so a cool run is returned
+ * ONE-SIDED by design: at/below the reference temperature the penalty is 0, so a cool run is returned
  * UNCHANGED — we never scale a cool run down to look artificially fast (matches Garmin's gate).
  *
  * `efficiencyIndex` MUST be the raw speed/HR index (computeEfficiencyIndex). Do NOT pass an
  * already-HR-normalized quantity (e.g. `effort_adjusted_pace_sec_per_km`) — that double-counts HR.
  *
- * When conditions are unknown (dewPointF null) the value is returned UNCHANGED: we cannot correct
- * for weather we didn't measure, and inventing a correction would be the exact lie this prevents.
+ * When conditions are unknown (tempF null) the value is returned UNCHANGED: we cannot correct for
+ * weather we didn't measure, and inventing a correction would be the exact lie this prevents.
  * Result is unrounded for clean composition; callers round for display/storage.
  */
-/**
- * One-sided heat load above the neutral reference: max(0, dew − DEW_REF_F). The hinged predictor
- * used EVERYWHERE heat enters — both the linear-k correction and the regression's heat covariate —
- * so cool runs (dew ≤ ref) contribute exactly 0 and are never scaled. null when dew is unknown.
- */
-export function heatTerm(dew: number | null | undefined): number | null {
-  if (dew == null) return null;
-  const d = Number(dew);
-  if (!Number.isFinite(d)) return null;
-  return Math.max(0, d - DEW_REF_F);
-}
-
 export function adjEfficiency(
   efficiencyIndex: number | null | undefined,
-  dew: number | null | undefined,
+  tempF: number | null | undefined,
   k: number = DEFAULT_HEAT_K,
 ): number | null {
   if (efficiencyIndex == null) return null; // missing efficiency ≠ 0 (Number(null) === 0)
   const e = Number(efficiencyIndex);
   if (!Number.isFinite(e)) return null;
-  const ht = heatTerm(dew);                  // unknown conditions → null → no correction, never invented
+  const ht = heatTerm(tempF);                // unknown conditions → null → no correction, never invented
   const kk = Number(k);
   if (ht == null || !Number.isFinite(kk)) return e;
   return e * (1 + kk * ht);
@@ -125,7 +133,7 @@ export interface RouteHeatRow {
   date?: string;
   pace_s_per_km?: number | null;
   hr?: number | null;
-  dew_point_f?: number | null;
+  temp_f?: number | null;
   intent?: string | null;
 }
 
@@ -147,7 +155,7 @@ export function routeEfficiencyDirectionHeatAdjusted(
     .filter((r) => isComparableIntent(r?.intent))
     .map((r) => ({
       date: String(r?.date ?? ""),
-      v: adjEfficiency(computeEfficiencyIndex(r?.pace_s_per_km, r?.hr), r?.dew_point_f, k),
+      v: adjEfficiency(computeEfficiencyIndex(r?.pace_s_per_km, r?.hr), r?.temp_f, k),
     }))
     .filter((r): r is { date: string; v: number } => r.v != null);
   if (idx.length < ROUTE_EFF_MIN_POINTS) return null;
@@ -169,8 +177,8 @@ export function routeEfficiencyDirectionHeatAdjusted(
 // fit by Huber IRLS so a single GPS-glitch / sick-day run can't swing the line. We read β_time (the
 // fitness trend with heat partialled out) WITH a confidence interval and gate the verdict on the CI.
 //
-// Why joint and not "residualize efficiency on dew, then trend residuals over time": for a seasonal
-// runner dew point and time are correlated, so the naive two-step biases β_time (Frisch–Waugh–Lovell).
+// Why joint and not "residualize efficiency on temp, then trend residuals over time": for a seasonal
+// runner temperature and time are correlated, so the naive two-step biases β_time (Frisch–Waugh–Lovell).
 // One joint fit partials both out simultaneously. This is the load-bearing correction.
 //
 // Heat inclusion is decided by the heat term's SPREAD, not just N:
@@ -183,7 +191,7 @@ export function routeEfficiencyDirectionHeatAdjusted(
 
 export const MIN_REGRESSION_N = 8;   // below this → linear-k half-vs-half fallback (data-poor)
 const HEAT_CONSTANT_EPS = 1e-9;      // heatTerm SD below this → heat is constant/absent → drop the term
-const HEAT_SPREAD_MIN = 4;           // °F SD of heatTerm needed to identify β_heat; between → fallback
+const HEAT_SPREAD_MIN = 4;           // °F SD of heatTerm (air temp) needed to identify β_heat; between → fallback
 
 export type TrendDirection = "improving" | "holding" | "declining" | "still_learning";
 
@@ -369,7 +377,7 @@ export function routeTrend(
     .map((r) => ({
       day: ymdToDays(r?.date),
       eff: computeEfficiencyIndex(r?.pace_s_per_km, r?.hr),
-      ht: heatTerm(r?.dew_point_f),
+      ht: heatTerm(r?.temp_f),
     }))
     .filter((p): p is { day: number; eff: number; ht: number } =>
       p.day != null && p.eff != null && p.ht != null
