@@ -4,20 +4,20 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (roadmap as of 2026-07-05, honest-run-load arc — Q-125 Gap B + Q-126, D-243)
+## 🧭 NEXT SESSION — START HERE (roadmap as of 2026-07-05 — big day: honest-run-load + narrative-honesty + GAP + the Q-122 payoff)
 
-**What THIS session shipped:**
-- **Q-125 RESOLVED** — `workload_planned` is a real per-session computation, not a template constant (`estimatePlannedWorkload` = `round((dur/60)×intensity²×100)`). The "flat ~56" was two intensity holes, both closed.
-- **Gap B DEPLOYED (`f9ea9a0d`)** — `INTENSITY_FACTORS.run` gained the generator's real token families (`run_easy:0.65, warmup_run_quality:0.65, run_mp:0.82`); tokenized easy runs were silently defaulting to 0.75 (HOTTER than prescribed). Fixture `workload-run-tokens.test.ts` (9). Deployed calculate-workload/compute-facts/activate-plan/backfill/coach.
-- **Q-126 DEPLOYED, PENDING DEVICE (`d8d8e1b7`)** — the non-race `enduranceSession()` now emits run tokens (`run_easy_${mins}min` / `longrun_*` on the long-run day), gated `sport==='run'`. Byte-identical strength-subset golden proves zero spine perturbation (`strength-primary-plan.q126.test.ts`, 5). Deployed `generate-strength-plan`.
-- **Full detail in the "Honest run load" Solid entry + D-243.** Process lesson banked: the Q-126 site was mis-attributed twice by elimination — pin an attribution only by READING the emitting function.
+**What THIS session shipped (all DEPLOYED/live unless noted):**
+- **Q-125 RESOLVED + Gap B (`f9ea9a0d`) + Q-126 (`d8d8e1b7`)** — honest run load: `workload_planned` is per-session; the run token families now match; the non-race generator emits run tokens. See the "Honest run load" Solid entry + D-243.
+- **Q-128 (`53948e6e`, D-244)** — run `ai_summary` no longer narrates a faded run as "clean execution"; guarded at `generateAISummaryV1` (prompt + validator + seatbelt), verified 3/3 recomputes.
+- **Q-130 (`291a7228`, D-245)** — GAP was arithmetic-mean-of-pace (~15s/mi inflated → false "downhill" on flat routes); now distance-weighted (`aggregateGapPace`). Cleaned load + pace-vs-norm math broadly.
+- **Q-122 (`665e2472`, D-246) — THE ORIGINAL GOAL, SHIPPED** — high-but-on-plan build week reads "building on plan" not "back off" (`planAwareVolumeLabel`, Option b). Client change: web live via Netlify, iOS synced (Xcode run to install). Fixture-proven; engages once ACWR is in the 1.3–1.5 band during a build week.
+- **Standing rule banked:** LLM-generator acceptance = ≥3 back-to-back clean recomputes, never one. Eyes-open reproduction stopped THREE wrong fixes this session.
 
-**TOP OF QUEUE (this arc's follow-ups — pick up here):**
-1. **Q-122 — plan-phase-aware load verdict (THE PAYOFF, now unblocked).** Full buildable spec is in the Q-122 entry (`week.intent==='build'` free at the call site; use raw `wtd_actual/planned_load` not the clamped `week_vs_plan_pct`; floor ~150 gates Monday; gauge Option b). Run intensity is now honest for the live plan, so its build-pass reads real per-discipline load.
-2. **Gap A-bike (small near-copy pass).** `enduranceSession` also builds rides with no `steps_preset` → 0.70 default; add ride tokens (`Z2`/`endurance`) on the `sport==='bike'` branch, same one-function shape as Q-126. Its own entry when picked up.
-3. **Q-123 (tag-along, not a dedicated pass).** Retire the dead `wv > 120` branch in `weekly.ts` next time that file is touched.
-
-*(Q-126 RESOLVED 2026-07-05 via Level B synthetic-account end-to-end — see the Honest run load Solid entry; no device check owed.)*
+**TOP OF QUEUE (pick up here):**
+1. **Q-127 — heavy-legs two-witness read (THE PAYOFF, now fully unblocked).** Q-130 cleared its GAP dependency. Spec is LOCKED (two correctness gates + threshold sources + artifact→tell pairing + continuity acceptance). **Gated on Michael's DOMS decay coefficients** (Witness 1 — the one bespoke tuning surface); build the correctness scaffold first, plug coefficients in last. A real analyzer+coach/State build — fresh session.
+2. **Q-129 — shared narrative-honesty spine.** THREE unguarded surfaces now: `hr_drift_interpretation` ("solid aerobic work"), the deterministic **SUMMARY fallback** (leads with "Typical", never names the fade — observed 2026-07-05), the coach. Spec needs Michael sign-off on shape. Point-fix the live liars OR build the spine.
+3. **Gap A-bike (small).** Ride tokens on `enduranceSession`'s `sport==='bike'` branch, same shape as Q-126.
+4. **Q-123 (tag-along).** Retire the dead `wv > 120` branch in `weekly.ts` next time that file is touched.
 
 **STANDING QUEUE (prior arcs, still open):**
 1. **D-238 historical backfill** — separate gated decision. Deploy-forward is live; recomputing history rewrites ACWR/CTL (62 movers). Michael watches a few real ingests first, THEN decides. Tool: `verify-load-ladder-impact.mjs`.
@@ -49,6 +49,13 @@ Previous: 2026-06-11 (Q-048 follow-up fixes. D-127: unplanned-only last-actual f
 ## Solid (don't re-litigate)
 
 Verified-working architecture and fixes. If you think one of these is broken, the bug is probably elsewhere — read the verification method before changing anything.
+
+### Narrative honesty + GAP integrity + plan-aware load (Q-128 / Q-130 / Q-122, D-244/245/246, 2026-07-05, DEPLOYED/SHIPPED)
+Three fixes from the "the app must not lie" arc (all D-242 — label what's computed, never compute to match the label):
+- **Q-128 (D-244, DEPLOYED `analyze-running-workout`):** the run `ai_summary` narrated a faded run as "clean execution / pace held steady." Guarded at `generateAISummaryV1` — prompt rule + validator-regen + deterministic seatbelt (`execution-honesty.ts`), keyed on the within-run positive split alone (20s/mi). Verified 3/3 recomputes on the 7/5 run. **Standing rule banked:** LLM-generator acceptance = ≥3 clean recomputes, never one (fooled by variance twice). Split source was the runtime bug — use the post-analysis re-read (`workoutToUse`), not the stale line-162 read.
+- **Q-130 (D-245, DEPLOYED `compute-workout-analysis`):** GAP was an arithmetic mean of per-sample pace (`gapSum/gapCount`) while raw pace is time/dist — `AM ≥ HM` inflated GAP ~15s/mi on ANY pace-varying run, false "downhill" on flat routes. Fixed with distance-weighted `aggregateGapPace()`. Reproduced cold (arithmetic-mean-of-RAW = 769 vs 754). **Feeds `workload` + pace-vs-norm baseline**, so this cleaned load math broadly, not one narrative. Verified 7/5: avg_gap 772→757, bias downhill→flat, narrative clean 3/3.
+- **Q-122 (D-246, SHIPPED client `665e2472`, web auto-deploy; iOS synced):** the ORIGINAL goal — high-but-on-plan build week reads "building on plan" not "back off". `planAwareVolumeLabel()`, Option (b) (word plan-aware, marker/zone raw). Fixture-proven; live-engages once ACWR is in the 1.3–1.5 band during a build week.
+- **Process wins banked:** eyes-open reproduction (real data before deploying) stopped THREE wrong fixes this session — the null-split source guess, the "invented terrain" narrative guard (the "downhill" was derived, not invented — it was the GAP bug), and elevation-smoothing (only 3s/mi of the 15). **The whole arc validated `verify-before-asserting` as the load-bearing discipline.** Q-129 filed (shared honesty spine — the SUMMARY fallback + `hr_drift_interpretation` are still unguarded surfaces).
 
 ### Honest run load — easy-run planned workload reads its prescription, not the flat default (Q-125 Gap B + Q-126, D-243, 2026-07-05, DEPLOYED)
 Started as Q-125 (verify Q-122's denominator: is `workload_planned` per-session or a template constant?). Answer: **per-session** — `activate-plan`'s `estimatePlannedWorkload` = `round((dur/60)×intensity²×100)`, intensity from `getStepsIntensity(steps_preset)` else the per-type default. The "flat ~56" was a symptom of two intensity holes, both now closed:
