@@ -1647,6 +1647,16 @@ A per-athlete aerobic threshold would let us upgrade the RUN row to the strict `
 
 **DELIVERABLE:** GAP should net ≈ raw on a flat loop (`|GAP − raw|` within noise, not 18s/mi). Fixture: a known flat loop → `|GAP − raw| < threshold`.
 
+### Q-131 — Familiar Routes: honest, heat-adjusted per-route performance-over-time (design filed 2026-07-06, NOT built — fresh-session build)
+
+**Strava-adjacent, the honest version.** An athlete has ~5 routes they run/ride a lot (user 45d122e7: 17–40× each); they want "am I getting faster on my usual loop." Strava shows raw clock times (condition-blind — a cool-day PR vs a hot slog aren't comparable). Efforts' edge: **same-route removes hills** (constant), **heat/humidity adjustment removes the rest**, read as **pace-per-HR not raw time** → true fitness with the weather taken out. **Foundation BUILT** (D-248 path identity + backfill; per-run metrics; temp/humidity in `weather_data`; `efficiency_index`). **Feature scoped, NOT built** — full design: `docs/DESIGN-familiar-routes.md`.
+
+**Core engineering (from the design):** heat-adjust pace-per-HR via **dew point** (temp+humidity, better than temp alone) with a bespoke coefficient `k` (same class as Q-127 DOMS coeffs — population default, tune against own hot/cool same-route runs), OR a per-route **regression-residual** for high-N routes. One schema add: `temp_f`/`humidity_pct`/`dew_point_f` on `route_progress_metrics` (written in compute-facts from `weather_data`). Surfaces: a **Routes list + route detail** (a route TREND is macro → its own view, per the CONSTITUTION; the session line stays familiarity-only = the doorway, D-249). Honesty gates tied to the CONSTITUTION/CANON: glass-box the adjustment, hedge (directional not precise), confidence-gated, one-source-of-truth with State.
+
+**5 forks need Michael's ruling** (see §7 of the design): heat model (linear-now vs regression), reference condition (dew point ≤55°F?), `k` default + tuning, where the Routes view lives, rides (power-per-HR) now or phase 2. **Build order** in §8 (schema + heat primitive first — reusable regardless of UI).
+
+*(The OTHER fresh-session build is the fatigue / `training_reaction` NUMBER — Q-127 heavy-legs two-witness + `CANON-arc-inference-model.md`. Both are separate fresh sessions.)*
+
 ## When to add an entry
 
 Add a new Q-NNN when:

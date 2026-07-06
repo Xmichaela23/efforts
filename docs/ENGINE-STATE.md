@@ -4,20 +4,22 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (roadmap as of 2026-07-05 — big day: honest-run-load + narrative-honesty + GAP + the Q-122 payoff)
+## 🧭 NEXT SESSION — START HERE (roadmap as of 2026-07-06 — the "app must not lie" arc + the ROUTE FOUNDATION rebuild)
 
-**What THIS session shipped (all DEPLOYED/live unless noted):**
-- **Q-125 RESOLVED + Gap B (`f9ea9a0d`) + Q-126 (`d8d8e1b7`)** — honest run load: `workload_planned` is per-session; the run token families now match; the non-race generator emits run tokens. See the "Honest run load" Solid entry + D-243.
-- **Q-128 (`53948e6e`, D-244)** — run `ai_summary` no longer narrates a faded run as "clean execution"; guarded at `generateAISummaryV1` (prompt + validator + seatbelt), verified 3/3 recomputes.
-- **Q-130 (`291a7228`, D-245)** — GAP was arithmetic-mean-of-pace (~15s/mi inflated → false "downhill" on flat routes); now distance-weighted (`aggregateGapPace`). Cleaned load + pace-vs-norm math broadly.
-- **Q-122 (`665e2472`, D-246) — THE ORIGINAL GOAL, SHIPPED** — high-but-on-plan build week reads "building on plan" not "back off" (`planAwareVolumeLabel`, Option b). Client change: web live via Netlify, iOS synced (Xcode run to install). Fixture-proven; engages once ACWR is in the 1.3–1.5 band during a build week.
-- **Standing rule banked:** LLM-generator acceptance = ≥3 back-to-back clean recomputes, never one. Eyes-open reproduction stopped THREE wrong fixes this session.
+**What 2026-07-06 shipped (all DEPLOYED unless noted):**
+- **Q-129 point-fixes (D-247)** — the two remaining 7/5 liars are guarded: `hr_drift_interpretation` ("Solid aerobic work") + the SUMMARY fallback ("Typical vs similar") now NAME the fade; a **STEADY-EFFORT gate** in the shared `execution-honesty` primitive suppresses on structured runs (tempo/interval/cooldown), covering all 3 surfaces + Q-128's `ai_summary`. Deployed `analyze-running-workout`. NOT the full spine (still Q-129).
+- **ROUTE FOUNDATION rebuilt (D-248)** — "same route" was distance-buckets (4.0 vs 4.9mi split into "120×"/"19×"; counts inflated on every recompute). Now **PATH-based** (geohash overlap), idempotent true-recount, out-and-back-build-aware, **runs + rides**. Extracted to `_shared/route-intelligence.ts` (`resolveRouteCluster`). **Backfilled user 45d122e7** via `backfill-routes` (batched, non-destructive): 225 workouts → before 55 fake clusters (impossible counts) → **after 59 real path-routes** (top 40×/29×/21×, sum=225). Deployed `compute-facts` + `backfill-routes`. Old runs update on recompute (stored fact packet); new runs immediately.
+- **Efficiency removed from the Performance route line (D-249)** — heat-confounded ("declining" = summer heat) + contradicted State's decoupling-led "holding"; now **familiarity-only** ("Same route · run 40× since 2025"). State owns efficiency trends.
+- **Institutional-memory framework written** (docs, committed): `CANON-arc-inference-model.md` (how Arc infers without lying — the `training_reaction` verdict + confidence ladder + one-government continuity), `CONSTITUTION.md` (the 6 laws that make Efforts a system), SELF-AWARENESS-MAP **rule 11** (intra-surface consistency), `DESIGN-familiar-routes.md`.
 
-**TOP OF QUEUE (pick up here):**
-1. **Q-127 — heavy-legs two-witness read (THE PAYOFF, now fully unblocked).** Q-130 cleared its GAP dependency. Spec is LOCKED (two correctness gates + threshold sources + artifact→tell pairing + continuity acceptance). **Gated on Michael's DOMS decay coefficients** (Witness 1 — the one bespoke tuning surface); build the correctness scaffold first, plug coefficients in last. A real analyzer+coach/State build — fresh session.
-2. **Q-129 — shared narrative-honesty spine.** THREE unguarded surfaces now: `hr_drift_interpretation` ("solid aerobic work"), the deterministic **SUMMARY fallback** (leads with "Typical", never names the fade — observed 2026-07-05), the coach. Spec needs Michael sign-off on shape. Point-fix the live liars OR build the spine.
-3. **Gap A-bike (small).** Ride tokens on `enduranceSession`'s `sport==='bike'` branch, same shape as Q-126.
-4. **Q-123 (tag-along).** Retire the dead `wv > 120` branch in `weekly.ts` next time that file is touched.
+**TOP OF QUEUE — TWO FRESH-SESSION BUILDS (do each in its OWN clean session; both fully specced):**
+1. **Familiar Routes (Q-131 / `DESIGN-familiar-routes.md`)** — the honest, heat-adjusted per-route performance feature (Strava-adjacent, the *honest* version). Foundation is BUILT (D-248 path identity + backfill). Scoped, not built: the **dew-point heat-adjust** (bespoke `k`, like the DOMS coeffs) + the **Routes list/detail surface** (macro → its own view; session line = doorway, D-249). **5 forks need Michael's ruling** (design §7). Start: schema (`temp_f`/`humidity_pct` on `route_progress_metrics`) + the heat-adjust primitive (both reusable).
+2. **Fatigue / `training_reaction` NUMBER (Q-127 + `CANON-arc-inference-model.md`)** — the computed fatigue value so the LLM RENDERS it, never interprets (the "app must not lie" endgame — the bad "fatigue can accumulate" line happened because there's no number yet). Q-127 heavy-legs two-witness is the leg instance; CANON is the general model. **Gated on Michael's DOMS decay coefficients** (Witness 1). Build the correctness scaffold first, coefficients last.
+
+**ALSO OPEN (smaller / prior arcs):**
+- **Q-129 — full shared narrative-honesty spine.** The point-fixes (D-247) were the "each fix teaches the spine" step; the **coach** is still an unguarded 4th surface. Spec needs Michael sign-off on shape.
+- **Gap A-bike** — ride tokens on `enduranceSession`'s `sport==='bike'` branch (Q-126 shape). **Q-123** — dead `wv > 120` branch in `weekly.ts`.
+- **Q-132 (implicit)** — ride efficiency (power-per-HR) route trend, once Familiar Routes lands (design §7 fork 5).
 
 **STANDING QUEUE (prior arcs, still open):**
 1. **D-238 historical backfill** — separate gated decision. Deploy-forward is live; recomputing history rewrites ACWR/CTL (62 movers). Michael watches a few real ingests first, THEN decides. Tool: `verify-load-ladder-impact.mjs`.
