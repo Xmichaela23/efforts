@@ -731,24 +731,17 @@ export default function SessionNarrative({
           context is a same-route EFFICIENCY read (State's pace-per-HR metric, this route only) — one
           clean line, no raw-pace chart, no dashed HR overlay. TrendSparkline/RouteSparkline are no
           longer rendered here. */}
-      {sd?.terrain?.route && sd.terrain.route.history.length >= 2 && (() => {
+      {sd?.terrain?.route && (() => {
+        // Route FAMILIARITY only — "you've run this a lot." The efficiency DIRECTION was removed: it's
+        // heat-confounded (summer heat reads as "declining" with no real fitness loss) and it contradicts
+        // State's careful, decoupling-led efficiency read. State owns efficiency trends; Performance shows
+        // this-session facts + how familiar the route is. Not gated on recent data — familiarity is the
+        // cluster total, so a route run a lot but not lately still shows.
         const route = sd.terrain!.route as any;
-        const eff = route.efficiency as { direction: 'improving' | 'holding' | 'declining'; points: number } | null | undefined;
-        // "You've run this a lot" = times_run (total cluster count), NOT the ≤10 metrics pool. Anchor a
-        // time window from first_seen so 3-runs-of-metrics never reads as "you've only run this 3 times".
-        const times = Math.max(Number(route.times_run) || 0, route.history?.length ?? 0);
+        const times = Math.max(Number(route.times_run) || 0, route.comparable_runs ?? 0, route.history?.length ?? 0);
+        if (times < 2) return null;
         const yr = typeof route.first_seen === 'string' && route.first_seen.length >= 4 ? route.first_seen.slice(0, 4) : null;
-        const familiarity = `${times}×${yr ? ` since ${yr}` : ''}`;
-        if (eff) {
-          const color = eff.direction === 'improving' ? '#34d399' : eff.direction === 'declining' ? '#f87171' : '#9ca3af';
-          return (
-            <div className="text-xs text-gray-500">
-              Same route · run {familiarity} — <span style={{ color }}>efficiency {eff.direction}</span> · last 90d
-            </div>
-          );
-        }
-        // Too few recent runs to trend honestly → familiarity only, no faked/"building" trend.
-        return <div className="text-xs text-gray-500">Same route · run {familiarity}.</div>;
+        return <div className="text-xs text-gray-500">Same route · run {times}×{yr ? ` since ${yr}` : ''}.</div>;
       })()}
       {hasAnalysisDetails && (
         <div className="space-y-1.5">

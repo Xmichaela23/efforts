@@ -11,7 +11,6 @@ import { packageSessionDetailReadiness } from './readiness-load-context.ts';
 import { swimPacePer100Seconds } from '../swim/swim-pace.ts';
 import type { SwimScalars } from '../swim/swim-scalars.ts';
 import { resolveRunGap, type RunScalars } from '../run/run-scalars.ts';
-import { routeEfficiencyDirection } from '../efficiency-index.ts';
 
 /** Match fact-packet ai-summary: session HR drift is not meaningful for structured interval sessions. */
 function shouldSuppressSessionHrDrift(factPacket: any, intervals?: IntervalRow[]): boolean {
@@ -780,35 +779,19 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       const tc = factPacket?.derived?.terrain_context;
       if (!tc?.route_runs) return null;
       const r = tc.route_runs as any;
-      if (!Array.isArray(r.history) || r.history.length < 2) return null;
-      // D-039 Fix 2: `name` dropped — see types.ts terrain.route doc comment.
-      // D-039 Fix 6 + 6.1 + D-040 Fix E: chart_eligible AND visible count
-      // both key off history.length (post-intent-filter), not r.times_run
-      // (cluster total). The two can diverge — 6 cluster samples but only 4
-      // same-intent in history. Both reflect what's actually charted.
-      //
-      // D-040 Fix E: threshold bumped 6 → 8. The 15% pace-proximity pool
-      // filter (D-038 Piece 2) already makes "comparable runs" a stricter
-      // bar; 8 is the right minimum for a meaningful visual trend. A 4- or
-      // 6-point chart against an intensity-matched pool is still too thin
-      // to support direction claims.
-      const ROUTE_CHART_MIN_HISTORY = 8;
-      const comparableRuns = r.history.length;
-      // Same-route EFFICIENCY (the per-session macro context, replacing the removed raw-pace trend).
-      // Uses State's canonical efficiency index (pace-per-HR) over this route's runs — one metric, two
-      // views. Null when too few usable runs → client shows "building history", never a faked direction.
-      const routeEfficiency = type === 'run' ? routeEfficiencyDirection(r.history) : null;
+      const history = Array.isArray(r.history) ? r.history : [];
+      const timesRun = Number(r.times_run || 0);
+      // Gate on FAMILIARITY (cluster total), not on recent history — a route run a lot but not lately
+      // should still show "run Nx". The efficiency DIRECTION is intentionally NOT surfaced here (heat-
+      // confounded + contradicts State's decoupling-led read); State owns efficiency trends.
+      if (timesRun < 2 && history.length < 2) return null;
       return {
         route: {
-          // times_run = the cluster's total sample_count (every run matched to this route, going back
-          // to first_seen) — the honest "you've run this a lot" number, distinct from the ≤10 metrics
-          // history the efficiency read is computed over. first_seen anchors the time window.
-          times_run: Number(r.times_run || 0),
+          times_run: timesRun,
           first_seen: r.first_seen ? String(r.first_seen).slice(0, 10) : null,
-          comparable_runs: comparableRuns,
-          chart_eligible: comparableRuns >= ROUTE_CHART_MIN_HISTORY,
-          history: r.history,
-          efficiency: routeEfficiency,
+          comparable_runs: history.length,
+          chart_eligible: history.length >= 8,
+          history,
         },
       };
     })(),
