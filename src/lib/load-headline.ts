@@ -17,6 +17,32 @@ export function acwrVolumeLabel(v: number | null | undefined): string {
   return 'rest now';
 }
 
+// Q-122: the plan-phase-aware VOLUME word. A high-but-ON-PLAN build week should read
+// "building on plan", not "back off" — the athlete is executing an intended build, not
+// overreaching. Adjusts only the WORD (headline + gauge label); the gauge MARKER + acwrZone
+// stay RAW ACWR (Option b — honest dual read: "ACWR 1.35 · pushing — building on plan").
+// `acwrVolumeLabel` itself is UNTOUCHED (the marker shares it, so this can't desync them).
+export function planAwareVolumeLabel(opts: {
+  acwr: number | null | undefined;
+  weekIntent?: string | null;
+  wtdActualLoad?: number | null;
+  wtdPlannedLoad?: number | null;
+}): string {
+  const raw = acwrVolumeLabel(opts.acwr);
+  // ONLY the 'back off' band (1.3 < ACWR ≤ 1.5) is eligible. 'rest now' (≥1.5) is the hard
+  // redline the plan never overrides; the lower bands aren't alarms to soften.
+  if (raw !== 'back off' || opts.weekIntent !== 'build') return raw;
+  const planned = opts.wtdPlannedLoad;
+  const actual = opts.wtdActualLoad;
+  // Denominator gate: week-to-date planned load must be meaningful. Early-week the planned sum
+  // is tiny, so one extra session reads as a huge % overshoot (unreliable). Floor 150 → gates
+  // Monday/Tuesday; the overshoot read is only trustworthy ~Thu/Fri (Q-122 trace).
+  if (planned == null || planned < 150 || actual == null) return raw;
+  // On-plan = not overshooting beyond 120% (the codebase's existing overshoot threshold, not 115%).
+  const overshoot = (actual - planned) / planned;
+  return overshoot <= 0.20 ? 'building on plan' : raw; // over the plan → "back off" stands
+}
+
 // The ACWR standard-app ZONE name (item 0) — the TrainingPeaks/Garmin vocabulary for the same
 // bands `acwrVolumeLabel` reads, so the naked number gets a scale word ("ACWR 1.1 · optimal").
 // Boundaries MUST match acwrVolumeLabel (0.8 / 1.3 / 1.5) and the LoadBar gauge bands — else the
@@ -43,10 +69,11 @@ function refinedReadinessPhrase(label: string | null | undefined): string | null
 // Slot 1 — STATE: load verdict + readiness, the honest lead (never the deficit).
 function stateSlot(loadLabel: string, readiness: string | null | undefined, readinessLabel?: string | null): string | null {
   const l =
-    loadLabel === 'balanced'   ? 'Balanced load' :
-    loadLabel === 'build more' ? 'Room to build' :
-    loadLabel === 'back off'   ? 'Load running high' :
-    loadLabel === 'rest now'   ? 'Load very high' : null;
+    loadLabel === 'balanced'         ? 'Balanced load' :
+    loadLabel === 'build more'       ? 'Room to build' :
+    loadLabel === 'building on plan' ? 'Building on plan' : // Q-122: high ACWR but on-plan in a build week
+    loadLabel === 'back off'         ? 'Load running high' :
+    loadLabel === 'rest now'         ? 'Load very high' : null;
   const r = refinedReadinessPhrase(readinessLabel) ?? (
     readiness === 'fresh'       ? 'fresh' :
     readiness === 'adapting'    ? 'adapting' :
