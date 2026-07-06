@@ -800,7 +800,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       const routeEfficiency = type === 'run' ? routeEfficiencyDirection(r.history) : null;
       return {
         route: {
+          // times_run = the cluster's total sample_count (every run matched to this route, going back
+          // to first_seen) — the honest "you've run this a lot" number, distinct from the ≤10 metrics
+          // history the efficiency read is computed over. first_seen anchors the time window.
           times_run: Number(r.times_run || 0),
+          first_seen: r.first_seen ? String(r.first_seen).slice(0, 10) : null,
           comparable_runs: comparableRuns,
           chart_eligible: comparableRuns >= ROUTE_CHART_MIN_HISTORY,
           history: r.history,

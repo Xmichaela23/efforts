@@ -160,7 +160,8 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
             Loading performance analysis…
           </div>
         )}
-        <DisciplineTrendLine sd={sd} />
+        {/* Macro discipline trend removed from Performance — a macro verdict lives on State (single
+            source of truth). Per-session context is the same-route efficiency line in SessionNarrative. */}
         {/* D-104: render INSIGHTS narrative ABOVE the exercise table for strength
             sessions. The strength branch was missing SessionNarrative entirely —
             D-102 (lift to ai_summary) + D-103 (remove silent 401 gate) made the
@@ -252,9 +253,8 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         hideTopAdherence={hideTopAdherence || !!sd?.race?.is_goal_race || type === 'swim'}
       />
 
-      {/* Swims render the discipline trend INSIDE the card (PoolSwimOverall) so it isn't orphaned
-          between the header and the card. */}
-      {type !== 'swim' && <DisciplineTrendLine sd={sd} />}
+      {/* Macro discipline trend removed from Performance (lives on State). Swim's in-card trend is a
+          separate placement, deferred. */}
 
       {/* Bike session-detail ← spine. The per-ride HR-at-power datapoint (bike_fitness_v1.hr_at_band)
           is the EXACT value the STATE efficiency trend is built from — surfacing it here connects the

@@ -734,16 +734,20 @@ export default function SessionNarrative({
       {sd?.terrain?.route && sd.terrain.route.history.length >= 2 && (() => {
         const route = sd.terrain!.route as any;
         const eff = route.efficiency as { direction: 'improving' | 'holding' | 'declining'; points: number } | null | undefined;
+        // "You've run this a lot" = times_run (total cluster count), NOT the ≤10 metrics pool. Anchor a
+        // time window from first_seen so 3-runs-of-metrics never reads as "you've only run this 3 times".
+        const times = Math.max(Number(route.times_run) || 0, route.history?.length ?? 0);
+        const yr = typeof route.first_seen === 'string' && route.first_seen.length >= 4 ? route.first_seen.slice(0, 4) : null;
+        const familiarity = `${times}×${yr ? ` since ${yr}` : ''}`;
         if (eff) {
           const color = eff.direction === 'improving' ? '#34d399' : eff.direction === 'declining' ? '#f87171' : '#9ca3af';
           return (
             <div className="text-xs text-gray-500">
-              On this route ({eff.points} runs): <span style={{ color }}>efficiency {eff.direction}</span>
+              Same route · run {familiarity} — <span style={{ color }}>efficiency {eff.direction}</span>
             </div>
           );
         }
-        const n = route.comparable_runs ?? route.history?.length ?? 0;
-        return <div className="text-xs text-gray-500">Same route · {n} runs — building history.</div>;
+        return <div className="text-xs text-gray-500">Same route · run {familiarity} — building efficiency history.</div>;
       })()}
       {hasAnalysisDetails && (
         <div className="space-y-1.5">

@@ -424,7 +424,11 @@ export type SessionDetailV1 = {
    * chart insists there's not enough history. */
   terrain?: {
     route: {
+      /** Total times this route has been run (cluster sample_count) — the honest "a lot over years"
+       *  count, distinct from `comparable_runs` (the ≤10 metrics pool the efficiency read uses). */
       times_run: number;
+      /** Earliest run on this route (YYYY-MM-DD) — anchors the "since …" time window. Null if unknown. */
+      first_seen?: string | null;
       comparable_runs: number;
       chart_eligible: boolean;
       /** D-105: `gap_pace_s_per_km` is the grade-adjusted pace from
