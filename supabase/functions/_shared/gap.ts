@@ -120,6 +120,39 @@ export function computeSampleGrades(
 }
 
 /**
+ * Q-130: Aggregate per-sample GAP pace the SAME way raw avg pace is computed —
+ * total flat-equivalent TIME / total DISTANCE (distance-weighted), NOT an arithmetic mean
+ * of per-sample pace. Arithmetic-mean-of-pace over-weights slow samples (AM ≥ HM by the
+ * variance of pace), inflating GAP ~15s/mi vs raw on ANY pace-varying run and producing a
+ * false "net downhill bias" on flat routes. On a flat run (grades ≈ 0) this returns ≈ raw
+ * avg pace exactly. Returns null if fewer than `minSamples` usable samples.
+ *
+ * Each in-range sample is treated as one time-step; the distance it covers ∝ 1/pace, so
+ * weighting each GAP pace by 1/pace and dividing by Σ(1/pace) reconstructs total_time/total_dist.
+ */
+export function aggregateGapPace(
+  paceSecPerMi: Array<number | null | undefined>,
+  grades: number[],
+  minSamples = 60,
+): number | null {
+  let flatEquivTime = 0; // seconds
+  let distMi = 0;        // miles
+  let count = 0;
+  for (let i = 0; i < paceSecPerMi.length; i++) {
+    const p = paceSecPerMi[i];
+    if (p != null && Number.isFinite(p) && p > 180 && p < 2400) {
+      const g = paceToGAP(p, Number.isFinite(grades[i]) ? grades[i] : 0);
+      const dmi = 1 / p; // mi covered in this 1-second sample
+      flatEquivTime += g * dmi; // (s/mi)·mi = flat-equivalent seconds
+      distMi += dmi;
+      count++;
+    }
+  }
+  if (count <= minSamples || distMi <= 0) return null;
+  return Math.round(flatEquivTime / distMi);
+}
+
+/**
  * Check if elevation data is sufficient for GAP computation.
  * Requires >50% of samples to have elevation_m and meaningful variation.
  */

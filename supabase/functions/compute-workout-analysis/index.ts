@@ -1823,7 +1823,7 @@ Deno.serve(async (req) => {
     // Compute overall GAP from per-sample GAP (more accurate on rolling terrain than per-mile-split)
     if (sport.includes('run') || sport.includes('walk')) {
       try {
-        const { computeSampleGrades, paceToGAP, hasUsableElevation } = await import('../_shared/gap.ts');
+        const { computeSampleGrades, paceToGAP, hasUsableElevation, aggregateGapPace } = await import('../_shared/gap.ts');
         // Rows from normalizeSamples use v_mps (not speed_mps). GAP does not need HR — filtering
         // by HR breaks the 1 Hz assumption in computeSampleGrades unless distance_m is supplied.
         const gapSamples = rows.map((r: any) => {
@@ -1858,20 +1858,13 @@ Deno.serve(async (req) => {
             ],
             firstFewElev: gapSamples.slice(0, 10).map((s) => +(s.elevation_m ?? 0).toFixed(1)),
           }));
-          let gapSum = 0;
-          let gapCount = 0;
-          for (let i = 0; i < gapSamples.length; i++) {
-            const p = gapSamples[i].pace_s_per_mi;
-            if (p != null && p > 180 && p < 2400) {
-              const g = paceToGAP(p, grades[i]);
-              gapSum += g;
-              gapCount++;
-            }
-          }
-          if (gapCount > 60) {
-            const avgGapPerMi = Math.round(gapSum / gapCount);
+          // Q-130: distance-weighted (total_time/total_dist), NOT an arithmetic mean of per-sample
+          // pace. The old `gapSum/gapCount` over-weighted slow samples (AM ≥ HM), inflating GAP
+          // ~15s/mi vs raw on any pace-varying run → false "net downhill" on flat routes.
+          const avgGapPerMi = aggregateGapPace(gapSamples.map((s: any) => s.pace_s_per_mi), grades, 60);
+          if (avgGapPerMi != null) {
             const avgActualPerMi = overall?.avg_pace_s_per_mi != null ? Math.round(Number(overall.avg_pace_s_per_mi)) : null;
-            console.log(`[GAP] per-sample: avgGAP=${avgGapPerMi}s/mi (${Math.floor(avgGapPerMi/60)}:${String(avgGapPerMi%60).padStart(2,'0')}), actual=${avgActualPerMi}s/mi, samples=${gapCount}`);
+            console.log(`[GAP] per-sample (distance-weighted): avgGAP=${avgGapPerMi}s/mi (${Math.floor(avgGapPerMi/60)}:${String(avgGapPerMi%60).padStart(2,'0')}), actual=${avgActualPerMi}s/mi`);
             (overall as any).avg_gap_s_per_mi = avgGapPerMi;
             (overall as any).has_gap = true;
           }
