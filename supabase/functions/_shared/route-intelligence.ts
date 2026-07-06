@@ -14,6 +14,15 @@ function toNum(v: any): number | null {
 function parseJsonSafe(v: any): any {
   try { return typeof v === "string" ? JSON.parse(v) : v; } catch { return null; }
 }
+// Stable hash of a path (sorted geohash set) → a per-route fingerprint. Path IS the identity now, so a
+// path-created cluster's fingerprint is derived from the path — unique per route, and it won't collide
+// with the old distance-bucket fingerprints (which linger, deactivated, under a unique constraint).
+function hashGeohashes(cells: string[]): string {
+  const s = [...cells].sort().join(",");
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
 function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const R = 6371;
   const dLat = (bLat - aLat) * Math.PI / 180;
@@ -176,10 +185,13 @@ export async function resolveRouteCluster(supabase: any, w: RouteWorkout): Promi
     const { count: clusterCount } = await supabase
       .from("route_clusters").select("id", { count: "exact", head: true }).eq("user_id", w.user_id);
     const routeNumber = (clusterCount ?? 0) + 1;
+    // Path-created clusters carry a PATH fingerprint (unique per route); no-GPS ones keep the distance
+    // fingerprint. Prevents collisions with the deactivated old distance-fingerprint clusters.
+    const createFingerprint = runGeohashes.length >= 8 ? `p-${hashGeohashes(runGeohashes)}` : fingerprint;
     const { data: created, error: createErr } = await supabase
       .from("route_clusters")
       .insert({
-        user_id: w.user_id, name: `Route ${routeNumber}`, fingerprint,
+        user_id: w.user_id, name: `Route ${routeNumber}`, fingerprint: createFingerprint,
         distance_m: features.distance_m, elevation_gain_m: features.elevation_gain_m,
         sample_count: 1, is_active: true,
         first_seen_at: workoutDate, last_seen_at: new Date().toISOString(),
