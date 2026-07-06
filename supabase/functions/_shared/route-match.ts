@@ -9,9 +9,13 @@ export interface RouteClusterLite {
   distance_m?: number | null;
 }
 
-// Same roads but wildly different length isn't the same route. Two runs must be within this distance
-// ratio to merge — 4.0mi vs 4.9mi (1.2x) is fine; a 2mi piece of a 6mi route (3x) is NOT, even though
-// the short one's roads are fully contained. Loose enough to allow "same roads, a bit longer/shorter".
+// When one run's roads are almost fully inside the other's (this overlap or higher), it's the SAME
+// route at ANY length — an out-and-back run further/shorter on the same roads, the core Michael builds
+// on. Length is NOT checked in that case. The length guard below only kicks in for PARTIAL overlaps.
+export const CONTAINMENT_FULL = 0.9;
+
+// For PARTIAL overlaps only: a run sharing some-but-not-most roads with a route must also be a
+// comparable length to merge — otherwise it's a different route that just clips a few shared roads.
 export const ROUTE_LENGTH_MAX_RATIO = 2.5;
 
 /** Are two runs close enough in distance to be the same route? (null distances → not a blocker.) */
@@ -54,8 +58,12 @@ export function bestRouteMatch(
   let best: RouteClusterLite | null = null;
   let bestScore = 0;
   for (const c of (Array.isArray(clusters) ? clusters : [])) {
-    if (!lengthCompatible(runDistanceM, c?.distance_m)) continue;
     const score = pathOverlap(runGeohashes, c?.geohashes);
+    if (score < minOverlap) continue;
+    // Full containment (an out-and-back further/shorter on the same roads) = same route at ANY length.
+    // Only PARTIAL overlaps get the length guard, so a genuinely different route that merely clips some
+    // shared roads isn't merged just because the lengths line up.
+    if (score < CONTAINMENT_FULL && !lengthCompatible(runDistanceM, c?.distance_m)) continue;
     if (score > bestScore) { bestScore = score; best = c; }
   }
   return best && bestScore >= minOverlap ? { cluster: best, overlap: bestScore } : null;

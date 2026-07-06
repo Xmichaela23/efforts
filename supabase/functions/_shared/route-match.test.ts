@@ -65,13 +65,21 @@ Deno.test('lengthCompatible: same-ish length ok, wildly different not (nulls nev
   assertEquals(lengthCompatible(6437, 0), true);
 });
 
-Deno.test('length guard: a short run whose roads are a SUBSET of a long route is NOT absorbed', () => {
-  // The 2-mile run's cells are fully inside the 6-mile cluster (overlap 1.0) — but 3x the distance.
-  const twoMile = ['a1', 'a2', 'a3'];
-  const sixMileCluster = { id: 'six', geohashes: ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9'], distance_m: 9600 };
-  assertEquals(pathOverlap(twoMile, sixMileCluster.geohashes), 1); // roads contained...
-  assertEquals(bestRouteMatch(twoMile, [sixMileCluster], ROUTE_MATCH_MIN_OVERLAP, 3200), null); // ...but length guard blocks it
-  // same roads, comparable length still matches:
+Deno.test('out-and-back build: a fully-contained run merges at ANY length (same roads = same route)', () => {
+  // The short core is entirely inside the long build (overlap 1.0). Even at ~3x distance it's ONE route —
+  // this is Michael's "further and further out on builds" case; length must NOT split it.
+  const shortCore = ['a1', 'a2', 'a3'];
+  const longBuild = { id: 'build', geohashes: ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9'], distance_m: 19000 };
+  assertEquals(pathOverlap(shortCore, longBuild.geohashes), 1);
+  assertEquals(bestRouteMatch(shortCore, [longBuild], ROUTE_MATCH_MIN_OVERLAP, 6000)?.cluster.id, 'build');
+});
+
+Deno.test('partial overlap + very different length → blocked (a different route clipping shared roads)', () => {
+  const run = ['a1', 'a2', 'a3', 'a4', 'x5']; // 5 cells; 4 shared, 1 its own
+  const other = { id: 'other', geohashes: ['a1', 'a2', 'a3', 'a4', 'b1', 'b2', 'b3'], distance_m: 16000 };
+  assertEquals(pathOverlap(run, other.geohashes), 0.8); // partial (< CONTAINMENT_FULL) → length guard applies
+  assertEquals(bestRouteMatch(run, [other], ROUTE_MATCH_MIN_OVERLAP, 6000), null); // ~2.7x length → blocked
+  // same roads at comparable length still merges:
   assertEquals(bestRouteMatch(fourNineMi, [{ id: 'A', geohashes: fourMi, distance_m: 6437 }], ROUTE_MATCH_MIN_OVERLAP, 7886)?.cluster.id, 'A');
 });
 

@@ -822,9 +822,9 @@ async function upsertRouteIntelligence(
         const cStartLat = toNum(cMeta.start_lat), cStartLng = toNum(cMeta.start_lng);
         const cEndLat = toNum(cMeta.end_lat), cEndLng = toNum(cMeta.end_lng);
         const startScore = (features.start_lat != null && features.start_lng != null && cStartLat != null && cStartLng != null)
-          ? Math.max(0, 1 - (haversineKm(features.start_lat, features.start_lng, cStartLat, cStartLng) / 2.0)) : 0.4;
+          ? Math.max(0, 1 - (haversineKm(features.start_lat, features.start_lng, cStartLat, cStartLng) / 2.0)) : 0.4; // estimate-ok: geo course-match score (heuristic, not a rendered athlete metric)
         const endScore = (features.end_lat != null && features.end_lng != null && cEndLat != null && cEndLng != null)
-          ? Math.max(0, 1 - (haversineKm(features.end_lat, features.end_lng, cEndLat, cEndLng) / 2.0)) : 0.4;
+          ? Math.max(0, 1 - (haversineKm(features.end_lat, features.end_lng, cEndLat, cEndLng) / 2.0)) : 0.4; // estimate-ok: geo course-match score (heuristic, not a rendered athlete metric)
         return { c, score: (0.5 * distScore) + (0.3 * startScore) + (0.2 * endScore) };
       }).sort((a, b) => b.score - a.score);
       if (scored.length && scored[0].score >= 0.62) { cluster = scored[0].c; matchConfidence = scored[0].score; }
