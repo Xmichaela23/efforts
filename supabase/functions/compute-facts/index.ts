@@ -766,7 +766,11 @@ async function upsertRouteIntelligence(
   w: WorkoutRow,
   runFacts: Record<string, any> | null,
 ): Promise<void> {
-  if (!isRunDiscipline(w.type)) return;
+  // Route IDENTITY now covers runs AND rides (Michael) — "same route Nx" works for both. The run-only
+  // efficiency metrics (route_progress_metrics) below stay gated to runs via `isRun`.
+  const isRun = isRunDiscipline(w.type);
+  const rideType = String(w.type || "").toLowerCase();
+  if (!isRun && !(rideType === "ride" || rideType === "bike" || rideType === "cycling" || rideType === "virtualride")) return;
   if (String(w.workout_status || "").toLowerCase() !== "completed") return;
 
   const features = deriveRouteFeatures(w);
@@ -913,6 +917,9 @@ async function upsertRouteIntelligence(
   await recountCluster(cluster.id);
   if (priorClusterId && priorClusterId !== cluster.id) await recountCluster(priorClusterId);
 
+  // Run-only efficiency metrics (route_progress_metrics). Rides get cluster identity above but not this
+  // (ride "efficiency" is power-based — a separate follow-on).
+  if (isRun) {
   const metricDate = String(w.date || "").slice(0, 10);
   // Q-054 Fix 2 — plausibility clamp at the WRITE site (mirrors the spine read-guard, 150–750
   // s/km). A garbage provider pace (path A: overall.avg_pace_s_per_mi × 0.621) or any OOB value
@@ -977,6 +984,7 @@ async function upsertRouteIntelligence(
         fingerprint,
       },
     }, { onConflict: "route_cluster_id,workout_id" });
+  }
 }
 
 // Seven anchor lifts tracked for 1RM progression.
