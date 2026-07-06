@@ -16,7 +16,7 @@ import { fetchGoalRaceCompletionForWorkout, type GoalRaceCompletionMatch } from 
 import { buildMarathonGoalRaceAdherenceSummary } from './lib/analysis/marathon-race-narrative.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
-import { computePositiveSplitSec } from '../_shared/fact-packet/execution-honesty.ts';
+import { computePositiveSplitSec, guardNarrativeHonesty, fadeLeadBullets } from '../_shared/fact-packet/execution-honesty.ts';
 import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, resolveCarriedInSoreness, CARRYOVER_WINDOW_DAYS, type SorenessEntry } from '../_shared/cross-domain-carryover.ts';
 // D-036: GAP enrichment lifted to top-level so both pace-adherence and the
 // HR analyzer consume the same grade-adjusted sample series.
@@ -1848,7 +1848,18 @@ Deno.serve(async (req) => {
     
     // Use latest workout data if available, otherwise fall back to original
     const workoutToUse = latestWorkout || workout;
-    
+
+    // Q-128/Q-129 (D-242/D-244): the within-run positive split is the ONE honesty key. Computed
+    // ONCE here off the `workoutToUse` RE-READ — `computed.analysis.events.splits` is written by
+    // compute-workout-analysis and is absent from the original line-162 read (the runtime-null that
+    // misfired before D-244). The steady-effort gate (is_mixed_effort) is folded in AFTER the variance
+    // gate below; `_executionHonesty` is assembled there and reused by all three narrative surfaces.
+    const _ehComp = typeof (workoutToUse as any)?.computed === 'string'
+      ? (() => { try { return JSON.parse((workoutToUse as any).computed); } catch { return null; } })()
+      : (workoutToUse as any)?.computed;
+    const _ehSplitsMi = _ehComp?.analysis?.events?.splits?.mi;
+    const _ehPosSplitSec = computePositiveSplitSec(_ehSplitsMi, true);
+
     // Build minimal computed object - DON'T spread (avoids sending thousands of sensor samples)
     // CRITICAL: Preserve analysis.series and overall from compute-workout-analysis (contains chart data and metrics)
     const minimalComputed: any = {
@@ -2169,6 +2180,28 @@ Deno.serve(async (req) => {
       detectWorkoutTypeFromIntervals,
     });
 
+    // Q-128/Q-129 (D-242/D-244) — assemble the honesty key now that the variance gate is known.
+    // STEADY-EFFORT GATE: "faded / didn't hold steady" only means something on a steady run. On a
+    // structured/mixed-effort session (tempo, intervals, fartlek, or warmup→work→easy-cooldown) a
+    // slower second half is expected, not a fade — so `is_mixed_effort` suppresses the guard on ALL
+    // three surfaces at once (the primitive gates on it), closing the false-positive hole.
+    const _executionHonesty = _ehPosSplitSec != null
+      ? { positiveSplitSec: _ehPosSplitSec, isMixedEffort: _varGate.is_mixed_effort === true }
+      : null;
+
+    // Q-129: hr_drift_interpretation is a SECOND narrative surface (deterministic HR module). On a
+    // faded STEADY run its bottom line ("Solid aerobic work.") is a TRUE HR-domain statement but omits
+    // the pace collapse. Keep the true HR read; NAME the fade (D-246 honest dual read). guardNarrative-
+    // Honesty no-ops on a structured run (isMixedEffort) and does NOT strip "Solid aerobic work"
+    // (that phrase isn't a banned clean/steady EXECUTION claim) — it only appends the computed slowdown.
+    if (_executionHonesty && analysis.heart_rate_analysis?.hr_drift_interpretation) {
+      const g = guardNarrativeHonesty(analysis.heart_rate_analysis.hr_drift_interpretation, _executionHonesty);
+      if (g.neutralized) {
+        console.log(`🔧 [HR NARRATIVE HONESTY] named the fade on hr_drift_interpretation (positive split ${_executionHonesty.positiveSplitSec}s/mi)`);
+        analysis.heart_rate_analysis.hr_drift_interpretation = g.text;
+      }
+    }
+
     // =========================================================================
     // AI coaching paragraph (v1)
     // Fact packet + flags + holistic training context (deterministic layer).
@@ -2181,19 +2214,9 @@ Deno.serve(async (req) => {
       if (fact_packet_v1 && flags_v1) {
         // Q-112 step 2: run_spine_verdict (state_trends_v1) was captured above where getArcContext ran →
         // rules 6/7 on the per-workout INSIGHTS (no trend claim contradicting the spine; no receipt recap).
-        // Q-128 (D-242): a run that FADED within itself did not "hold steady" — provable from its OWN mile
-        // splits, no route history needed. Keyed on the within-run positive split ALONE (dropped the
-        // fact-packet vs_similar dependency: "held steady" is a within-run claim, and the cross-run input
-        // populated late/null at this point). CRITICAL source: use `workoutToUse` (the line-1850 RE-READ),
-        // NOT the original `workout` — `computed.analysis.events.splits` is written by compute-workout-
-        // analysis and is absent from the original line-162 read (the runtime-null that misfired before).
-        const _ehComp = typeof (workoutToUse as any)?.computed === 'string'
-          ? (() => { try { return JSON.parse((workoutToUse as any).computed); } catch { return null; } })()
-          : (workoutToUse as any)?.computed;
-        const _ehSplitsMi = _ehComp?.analysis?.events?.splits?.mi;
-        const _ehPosSplitSec = computePositiveSplitSec(_ehSplitsMi, true);
-        const _executionHonesty = _ehPosSplitSec != null ? { positiveSplitSec: _ehPosSplitSec } : null;
-
+        // Q-128 (D-242): a run that FADED within itself did not "hold steady" — the within-run
+        // positive split (`_executionHonesty`, computed once at the workoutToUse re-read above) is
+        // the honesty key fed to the summary generator's PRIMARY prompt rule + validator backstop.
         ai_summary = await generateAISummaryV1(
           fact_packet_v1, flags_v1, null, null, arc_narrative_for_summary,
           { isMixedEffort: _varGate.is_mixed_effort, intervalBreakdown: detailedAnalysis?.interval_breakdown ?? null },
@@ -2426,7 +2449,9 @@ Deno.serve(async (req) => {
       const usedFlagBullets = !!(fact_packet_v1 && Array.isArray(flags_v1) && flags_v1.length);
       if (usedFlagBullets) {
         const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
-        const cleanedBullets = bullets.map((b) => b.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 4);
+        // Q-129: on a faded run, lead with the named fade and drop the "vs similar workouts"
+        // laundering bullet before capping to 4 (no-op when the run didn't trip the honesty guard).
+        const cleanedBullets = fadeLeadBullets(bullets.map((b) => b.replace(/\s+/g, ' ').trim()).filter(Boolean), _executionHonesty).slice(0, 4);
         const tags: string[] = [];
         const confLbl = String((hrAnalysisResult as any)?.confidence || '').toLowerCase();
         const confidence = confLbl === 'high' ? 0.85 : confLbl === 'medium' ? 0.65 : 0.45;
@@ -2595,7 +2620,9 @@ Deno.serve(async (req) => {
       const confidence = confLbl === 'high' ? 0.85 : confLbl === 'medium' ? 0.65 : 0.45;
 
       const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
-      const cleanedBullets = bullets.map((b) => b.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 4);
+      // Q-129: on a faded run, lead with the named fade and drop the "vs similar workouts"
+      // laundering bullet before capping to 4 (no-op when the run didn't trip the honesty guard).
+      const cleanedBullets = fadeLeadBullets(bullets.map((b) => b.replace(/\s+/g, ' ').trim()).filter(Boolean), _executionHonesty).slice(0, 4);
 
       const out: SummaryV1 = {
         version: 1,

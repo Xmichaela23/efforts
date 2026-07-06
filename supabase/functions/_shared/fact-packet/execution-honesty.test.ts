@@ -1,7 +1,7 @@
 // Q-128 acceptance: below-baseline positive-split → the banned clean/steady claim must NOT
 // survive (backstop), and a clean run must be untouched. The 7/5 run is the worked example.
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { guardNarrativeHonesty, narrativeHasUnearnedCleanClaim, computePositiveSplitSec, tripsHonestyGuard } from './execution-honesty.ts';
+import { guardNarrativeHonesty, narrativeHasUnearnedCleanClaim, computePositiveSplitSec, tripsHonestyGuard, fadeLeadBullets } from './execution-honesty.ts';
 
 const SEVEN_FIVE = // the exact narrative from the 2026-07-05 Lunch Run screenshot
   "Your HR stayed right in line with your recent efforts on this route, and the pace held steady despite the heat and fatigue you reported—a clean execution on a day when your body was asking for less.";
@@ -58,10 +58,64 @@ Deno.test('computePositiveSplitSec: second half slower → positive s/mi; even �
   assertEquals(computePositiveSplitSec([], false), null);
 });
 
+// --- Q-129: the deterministic SUMMARY fallback (summaryV1 bullets) ------------------------------
+// The 7/5 faded run, when ai_summary was null, fell back to fact-bullets that LED with
+// "Typical vs similar workouts." and never named the 75s/mi fade. fadeLeadBullets fixes that
+// surface with the SAME positive-split key — no new threshold.
+
+Deno.test('7/5 fallback: leads with the fade, drops the "vs similar workouts" laundering bullet', () => {
+  const bullets = [
+    'Typical vs similar workouts.',
+    'HR drift 4 bpm vs your typical ~5 bpm for similar runs.',
+  ];
+  const out = fadeLeadBullets(bullets, flag);
+  assertEquals(/faded 75s\/mi/.test(out[0]), true);                 // fade leads
+  assertEquals(out.some((b) => /vs similar workouts/i.test(b)), false); // launderer dropped
+  assertEquals(out.some((b) => /HR drift 4 bpm/.test(b)), true);    // real HR fact kept
+});
+
+Deno.test('fallback: reuses an existing fade bullet as the lead instead of duplicating it', () => {
+  const bullets = [
+    'Typical vs similar workouts.',
+    'Pace faded 60s/mi through the second half.',
+  ];
+  const out = fadeLeadBullets(bullets, flag);
+  assertEquals(/faded 60s\/mi/.test(out[0]), true);                 // existing fade moved to front
+  assertEquals(out.filter((b) => /faded/i.test(b)).length, 1);      // not duplicated
+  assertEquals(out.some((b) => /vs similar workouts/i.test(b)), false);
+});
+
+Deno.test('fallback no-op on an even-paced run (guard not tripped → bullets untouched, order preserved)', () => {
+  const bullets = ['Typical vs similar workouts.', 'HR drift 3 bpm vs your typical ~4 bpm.'];
+  assertEquals(fadeLeadBullets(bullets, { positiveSplitSec: 8 }), bullets);
+  assertEquals(fadeLeadBullets(bullets, { positiveSplitSec: null }), bullets);
+  assertEquals(fadeLeadBullets(bullets, null), bullets);
+});
+
 Deno.test('tripsHonestyGuard: within-run positive split alone (no cross-run dependency)', () => {
   assertEquals(tripsHonestyGuard({ positiveSplitSec: 75 }), true);
   assertEquals(tripsHonestyGuard({ positiveSplitSec: 20 }), true);  // at the bar
   assertEquals(tripsHonestyGuard({ positiveSplitSec: 10 }), false); // even pacing / noise
   assertEquals(tripsHonestyGuard({ positiveSplitSec: null }), false);
   assertEquals(tripsHonestyGuard(null), false);
+});
+
+// --- Steady-effort gate: a structured run's slow second half is NOT a fade -----------------------
+// Guards against the false-positive Michael flagged: a tempo / interval / fartlek / warmup→work→
+// easy-cooldown produces a tripping split by design; naming a "fade" there would be its own lie.
+
+Deno.test('steady-effort gate: a structured run (isMixedEffort) never trips, even with a big split', () => {
+  assertEquals(tripsHonestyGuard({ positiveSplitSec: 75, isMixedEffort: true }), false);
+  // and it propagates to every surface built on tripsHonestyGuard:
+  const mixed = { positiveSplitSec: 75, isMixedEffort: true };
+  assertEquals(guardNarrativeHonesty('Solid aerobic work.', mixed).neutralized, false); // hr_drift no-op
+  assertEquals(
+    fadeLeadBullets(['Typical vs similar workouts.', 'HR drift 4 bpm.'], mixed),
+    ['Typical vs similar workouts.', 'HR drift 4 bpm.'],                                 // fallback untouched
+  );
+});
+
+Deno.test('steady-effort gate: a STEADY faded run (isMixedEffort false/absent) still trips', () => {
+  assertEquals(tripsHonestyGuard({ positiveSplitSec: 75, isMixedEffort: false }), true);
+  assertEquals(tripsHonestyGuard({ positiveSplitSec: 75 }), true); // absent → steady (back-compat)
 });

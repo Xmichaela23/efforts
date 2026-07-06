@@ -33,6 +33,8 @@ function fmtSlowdown(positiveSplitSec: number): string {
 
 export interface ExecutionHonestyInput {
   positiveSplitSec: number | null; // second-half slowdown in s/mi (null = unknown / not a positive split)
+  isMixedEffort?: boolean;         // structured run (tempo/interval/fartlek/warmup→work→cooldown) →
+                                   // "held steady" was never the intent, so the guard is suppressed.
 }
 
 // A run that faded ≥ this within itself did NOT "hold steady" — provable from its OWN splits, no route
@@ -40,8 +42,13 @@ export interface ExecutionHonestyInput {
 // GENERAL "this is a real positive split" bar — NOT tuned to any one athlete or run.
 const POSITIVE_SPLIT_FADE_SEC = 20;
 
-/** Does this run trip the honesty guard? A within-run positive split alone — no cross-run dependency. */
+/**
+ * Does this run trip the honesty guard? A within-run positive split alone (no cross-run dependency) —
+ * AND only on a steady-effort run. On a structured/mixed-effort session a slower second half is
+ * expected (cooldown, back-loaded easy), not a fade, so naming a "fade" there would be its own lie.
+ */
 export function tripsHonestyGuard(input: ExecutionHonestyInput | null | undefined): boolean {
+  if (input?.isMixedEffort) return false; // structured run — nothing "held steady" to guard
   return !!(input && input.positiveSplitSec != null && input.positiveSplitSec >= POSITIVE_SPLIT_FADE_SEC);
 }
 
@@ -97,6 +104,29 @@ export function guardNarrativeHonesty(
     neutralized = true;
   }
   return { text: text || null, neutralized };
+}
+
+/**
+ * Q-129 (fallback-surface guard): the deterministic SUMMARY bullets shown when `ai_summary` is
+ * null must not LEAD with — or substitute — a laundering "… vs similar workouts" read on a faded
+ * run, and must NAME the fade. Same within-run positive-split key as the ai_summary guard (no new
+ * threshold, no cross-run dependency). Pure: reorders + drops membership only, invents no claim.
+ * Note: this asserts the INTRA-SURFACE consistency class (a card's bullets can't omit their own
+ * fade), distinct from the card-vs-spine class — see Q-129 scope + SELF-AWARENESS-MAP rule 11.
+ */
+export function fadeLeadBullets(
+  bullets: string[],
+  input: ExecutionHonestyInput | null | undefined,
+): string[] {
+  const arr = Array.isArray(bullets) ? bullets.filter(Boolean) : [];
+  if (!tripsHonestyGuard(input)) return arr;
+  // Drop the vs-similar comparison — it's HR-aware and launders a pace collapse into "typical"
+  // (same confound family as the GAP terrain bug, Q-130). It must not lead, or stand in for, the fade.
+  const kept = arr.filter((b) => !/\bvs\s+similar\s+workouts\b/i.test(b));
+  const fadeLine = fmtSlowdown((input as ExecutionHonestyInput).positiveSplitSec as number);
+  const existing = kept.find((b) => FADE_MENTION.test(b));
+  // Lead with the fade: reuse an existing fade bullet if present, else prepend the computed line.
+  return existing ? [existing, ...kept.filter((b) => b !== existing)] : [fadeLine, ...kept];
 }
 
 /** The hard rule injected into the LLM prompt (PRIMARY fix) when the guard is tripped. */
