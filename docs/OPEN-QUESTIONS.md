@@ -1576,6 +1576,8 @@ A per-athlete aerobic threshold would let us upgrade the RUN row to the strict `
 
 **NET on tuning:** 2 of 3 threshold surfaces are literature constants (cite Friel Pa:Hr; cite Hopkins/Buchheit SWC 0.3×SD). Only **Witness 1's decay day-coefficients** need Michael — and only as a curve fit, not an invented number. His runs VALIDATE the literature defaults; they never SET them. (Supersedes the vague `pace_z` / HR-band-width framing above.)
 
+**DEPENDENCY — Q-130 (GAP artifact on flat routes) is a prerequisite for accuracy.** Witness 2 (decoupling / pace-vs-norm) and the SWC baseline consume GAP-adjusted pace. Q-130 found GAP running ~18s/mi off on a flat loop (false `downhill` bias). Until GAP is fixed, Witness 2 on flat routes is computed on a corrupted input — build/calibrate Q-127 AFTER Q-130, or scope Witness 2 to raw pace on flat routes as an interim.
+
 **Worked example (this filing's motivating case):** Sun 2026-07-05 Lunch Run — 12:34/mi vs 10:54 route norm, HR 135 in-band, +75s/mi positive split, day 6 after the 2026-06-29 leg day (Back Squat + Bulgarian Split Squats + Reverse Lunge + DB Thrust — big + novel). Both witnesses present → the strong named read; today the app said nothing (window aged out + no synthesis).
 
 **Build order:** (1) ship Q-128 first (the narrative bug, independent). (2) Witness-2 detector in the run analyzer (deterministic flag). (3) the cause×effect join in coach/loaded-legs. (4) Michael-driven coefficient calibration. Deploy-gated; deterministic receipt, LLM narrates inside it.
@@ -1618,6 +1620,24 @@ A per-athlete aerobic threshold would let us upgrade the RUN row to the strict `
 **The architectural gap Q-128 exposed.** Narrative honesty is enforced LOCALLY, per-generator — so each one can lie on its own. Proven by TWO independent liars on the same 7/5 faded run: `ai_summary` ("clean execution" — now guarded by Q-128) and `granular_analysis.heart_rate_analysis.hr_drift_interpretation` ("solid aerobic work" — unguarded). A third surface, the **coach**, is a separate generator too. The DATA/spine has continuity; the NARRATIVE layer has no common chokepoint asserting honesty. Chasing generators one at a time is the anti-pattern.
 
 **Spec direction (needs Michael sign-off on SHAPE, not built reactively):** a shared honesty pass every narrative generator routes through — define (a) the deterministic facts each generator MUST receive (e.g. positive-split, below-route-baseline, negative HR-drift), (b) what the guard ASSERTS (no clean/steady on a faded run; no "solid/strong" verdict contradicting the computed rows), (c) WHERE it lives (a `_shared` guard the analyzers + coach all call, generalizing `execution-honesty.ts` from one rule to the family). Worked examples: the two known liars above. Sign-off surface: the fact contract + the assertion set. Parked as a design item — do NOT build in the same motion as point fixes; each point fix (Q-128 was the first) teaches what the shared interface must assert.
+
+### Q-130 — GAP artifact on flat routes: ~18s/mi GAP-vs-raw on a flat loop → false `gap_terrain_bias='downhill'` (upstream data bug, filed 2026-07-05)
+
+**SYMPTOM:** 7/5 Silver Lake Reservoir LOOP (flat, 43ft gain, returns to start) produces `gap_terrain_bias='downhill'`. GAP pace `772 s/mi` vs raw `754 s/mi` = **18s/mi slower**, which `computeGapTerrainBias` (`ai-summary.ts:738`) reads as net-downhill (GAP slower than raw → grade assisted raw pace). The narrative then faithfully says "the route's net downhill bias" (prompt injects it at `ai-summary.ts:543` when `gap_terrain_bias='downhill'`).
+
+**WHY IT'S A BUG (not a true claim):** the route is a LOOP → ends at start → NO net elevation drop; `terrain_type='flat'`, 43ft gain → no net grade to assist pace. So the 18s/mi GAP-vs-raw delta has no elevation justification — **GAP is producing a ~18s/mi artifact on a flat loop.** The number is wrong, not the sentence.
+
+**NOT A NARRATIVE FIX (record so nobody re-adds it):** a Q-128-style terrain "fabrication" guard was built AND REVERTED this session — there is no fabrication; the narrative correctly reports a bad GAP number. The lesson banked: `terrain_type='flat'` (low grade *variance*, "not rolling") ≠ no net grade; and GAP-vs-raw is real signal — verify GAP before calling terrain "invented." Fix is UPSTREAM in GAP, not the narrative honesty layer.
+
+**SCOPE / WHY IT MATTERS (Q-127 dependency):** GAP pace feeds load (`workload`) AND the pace-vs-norm baseline math — the **SWC baseline + Witness 2** of Q-127's two-witness fatigue read. A systematic GAP error on flat routes corrupts the exact inputs the peripheral-fatigue read depends on. **Q-130 is effectively a prerequisite for Q-127's accuracy on flat routes** — build note added there.
+
+**INVESTIGATE:**
+- Why is GAP 18s/mi slower than raw on a flat loop? (per-sample grade-stream noise? GPS elevation jitter that doesn't net to zero on a loop? GAP mis-integrating small grades?)
+- **Wrinkle found:** the per-split `avgGapPace_s_per_km` is NULL for all 3 miles, yet the AGGREGATE `avg_gap_sec_per_mi=772` is present. Why does the aggregate GAP compute but the per-split doesn't — and is the aggregate integrating noise the per-split path rejects?
+- Flat-route-specific or broader? Pull 2–3 other flat runs, check GAP-vs-raw delta. Consistently non-zero on flat → systematic.
+- Confirm the `gap_adjusted=true` path — is `avg_gap` computed off a noisy per-sample grade that doesn't net to zero on a loop?
+
+**DELIVERABLE:** GAP should net ≈ raw on a flat loop (`|GAP − raw|` within noise, not 18s/mi). Fixture: a known flat loop → `|GAP − raw| < threshold`.
 
 ## When to add an entry
 
