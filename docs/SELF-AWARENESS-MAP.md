@@ -2,7 +2,7 @@
 
 **What this is.** The authoritative definition of "self-aware app" for Efforts — deliberately finite. A self-aware app is **a bounded, gated set of reasoning axes on one shared substrate**, not a vibe and not an open-ended aspiration. This doc is the parent map; each axis has (or will have) its own detailed design doc that descends from here. **Keep it current as axes land** — update an axis's status the same session it changes.
 
-Read order: this map → the axis's design doc → the code. Cross-refs: `DECISIONS-LOG.md` (D-231/232/233), `OPEN-QUESTIONS.md` (Q-111/112/113/114), `docs/DESIGN-cross-domain-carryover.md`.
+Read order: this map → the axis's design doc → the code. Cross-refs: `DECISIONS-LOG.md` (D-231/232/233), `OPEN-QUESTIONS.md` (Q-111/112/113/114), `docs/DESIGN-cross-domain-carryover.md`, `docs/CANON-arc-inference-model.md` (how Axis 1 turns antecedent + session into a labeled, confidence-stamped inference — the `training_reaction` verdict, its render seam, and the one-government continuity invariant).
 
 ---
 
