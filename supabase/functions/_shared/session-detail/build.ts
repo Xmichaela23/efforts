@@ -11,6 +11,41 @@ import { packageSessionDetailReadiness } from './readiness-load-context.ts';
 import { swimPacePer100Seconds } from '../swim/swim-pace.ts';
 import type { SwimScalars } from '../swim/swim-scalars.ts';
 import { resolveRunGap, type RunScalars } from '../run/run-scalars.ts';
+import { routeHeadline } from '../heat-adjust.ts';
+
+// Server-authored Tier-1 route readout (Familiar Routes, "arm of State"). The honest, effort-aware
+// headline the client renders VERBATIM — no client-side re-derivation. Heat is parked; this is the
+// efficiency-over-time read on the SAME metric State uses. null (< 4 comparable runs) → familiarity only.
+type RouteReadout = {
+  badge: string;
+  headline: string;
+  why: string;
+  direction: 'improving' | 'holding' | 'declining' | 'still_learning';
+  points: number;
+};
+function buildRouteReadout(history: unknown): RouteReadout | null {
+  const h = routeHeadline(history as any);
+  if (!h) return null;
+  const n = h.points;
+  switch (h.direction) {
+    case 'improving':
+      return { badge: 'Improving', headline: 'You’re getting faster on this loop.',
+        why: 'At the same heart rate, across your runs here — real fitness, not just a day you pushed.',
+        direction: 'improving', points: n };
+    case 'declining':
+      return { badge: 'Slower at effort', headline: 'Slipping a little on this loop.',
+        why: 'Lately you’re running it slower at the same heart rate. Worth a look — not a verdict.',
+        direction: 'declining', points: n };
+    case 'holding':
+      return { badge: 'Holding', headline: 'Holding steady here.',
+        why: 'Same speed for the same effort across your runs — you’re maintaining on this loop.',
+        direction: 'holding', points: n };
+    default:
+      return { badge: 'Still reading', headline: `${n} runs in — the trend isn’t clear yet.`,
+        why: 'Your easy runs here vary a lot day to day. Keep logging this loop and the read sharpens.',
+        direction: 'still_learning', points: n };
+  }
+}
 
 /** Match fact-packet ai-summary: session HR drift is not meaningful for structured interval sessions. */
 function shouldSuppressSessionHrDrift(factPacket: any, intervals?: IntervalRow[]): boolean {
@@ -792,6 +827,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           comparable_runs: history.length,
           chart_eligible: history.length >= 8,
           history,
+          readout: buildRouteReadout(history),
         },
       };
     })(),

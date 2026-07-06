@@ -22,6 +22,7 @@ import {
   computeEfficiencyIndex,
   ROUTE_EFF_MIN_POINTS,
   type RouteEfficiency,
+  routeEfficiencyDirection,
 } from "./efficiency-index.ts";
 
 // ACTIVE heat variable = AIR TEMPERATURE (°F). Validated on real data (2026-07-06): in a dry climate
@@ -196,7 +197,7 @@ const HEAT_SPREAD_MIN = 4;           // °F SD of heatTerm (air temp) needed to 
 export type TrendDirection = "improving" | "holding" | "declining" | "still_learning";
 
 export interface RouteTrend {
-  method: "regression" | "regression_time_only" | "linear_k";
+  method: "regression" | "regression_time_only" | "linear_k" | "half_vs_half";
   direction: TrendDirection;
   pct: number;                    // % efficiency change over the route's observed span (point estimate)
   ci: [number, number] | null;   // 95% CI of pct (regression paths); null on the linear_k fallback
@@ -394,6 +395,42 @@ export function routeTrend(
   if (!hv) return null;
   return {
     method: "linear_k",
+    direction: hv.direction,
+    pct: hv.pct,
+    ci: null,
+    points: hv.points,
+    heatCoefPctPerF: null,
+    spanDays: null,
+  };
+}
+
+/**
+ * The honest HEADLINE read for a route (Familiar Routes, "arm of State"). Heat is PARKED, so this is
+ * the effort-aware fitness read ONLY: efficiency_index (speed/HR — the SAME metric State uses, Law 1)
+ * trended over time. N ≥ MIN_REGRESSION_N → time-only robust regression (Huber, CI-gated four-state
+ * verdict); 4 ≤ N < 8 → half-vs-half; N < 4 → null (caller shows familiarity only, never a faked read).
+ * Returns a RouteTrend. This is what the Tier-1 headline copy is authored from, server-side.
+ */
+export function routeHeadline(history: RouteHeatRow[] | null | undefined): RouteTrend | null {
+  const reg = (Array.isArray(history) ? history : [])
+    .filter((r) => isComparableIntent(r?.intent))
+    .map((r) => ({
+      day: ymdToDays(r?.date),
+      eff: computeEfficiencyIndex(r?.pace_s_per_km, r?.hr),
+      ht: 0, // heat parked — time-only
+    }))
+    .filter((p): p is { day: number; eff: number; ht: number } => p.day != null && p.eff != null);
+
+  if (reg.length >= MIN_REGRESSION_N) return regressionTrend(reg, false); // efficiency ~ time (robust, CI-gated)
+
+  const hv = routeEfficiencyDirection(
+    (Array.isArray(history) ? history : [])
+      .filter((r) => isComparableIntent(r?.intent))
+      .map((r) => ({ date: String(r?.date ?? ""), pace_s_per_km: r?.pace_s_per_km, hr: r?.hr })),
+  );
+  if (!hv) return null;
+  return {
+    method: "half_vs_half",
     direction: hv.direction,
     pct: hv.pct,
     ci: null,

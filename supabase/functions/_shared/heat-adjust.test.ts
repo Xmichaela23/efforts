@@ -177,3 +177,37 @@ Deno.test("honesty: noisy flat data with a wide CI reads 'still_learning', never
   assertEquals(t.method, "regression");
   assertEquals(t.direction, "still_learning");
 });
+
+// ── routeHeadline: the heat-free honest read the Tier-1 card renders ─────────────────────────────────
+import { routeHeadline } from "./heat-adjust.ts";
+
+Deno.test("routeHeadline: N≥8 genuine improvement → time-only regression, 'improving'", () => {
+  const rows: RouteHeatRow[] = MONTHS.map((d, i) => ({
+    date: d, pace_s_per_km: 300, hr: Math.round(160 - i * (14 / 11)), intent: "easy_run", // HR 160→146 at same pace
+  }));
+  const h = routeHeadline(rows)!;
+  assertEquals(h.method, "regression_time_only");
+  assertEquals(h.direction, "improving");
+  assertEquals(h.heatCoefPctPerF, null); // heat parked — never in the headline
+});
+
+Deno.test("routeHeadline: N≥8 noisy/flat → 'still_learning', never a faked direction", () => {
+  const rows: RouteHeatRow[] = MONTHS.map((d, i) => ({
+    date: d, pace_s_per_km: 300, hr: 150 + (i % 2 ? 20 : -20), intent: "easy_run",
+  }));
+  assertEquals(routeHeadline(rows)!.direction, "still_learning");
+});
+
+Deno.test("routeHeadline: 4 ≤ N < 8 → half-vs-half fallback", () => {
+  const rows: RouteHeatRow[] = MONTHS.slice(0, 5).map((d) => ({
+    date: d, pace_s_per_km: 300, hr: 150, intent: "easy_run",
+  }));
+  assertEquals(routeHeadline(rows)!.method, "half_vs_half");
+});
+
+Deno.test("routeHeadline: N < 4 → null (familiarity only)", () => {
+  const rows: RouteHeatRow[] = MONTHS.slice(0, 3).map((d) => ({
+    date: d, pace_s_per_km: 300, hr: 150, intent: "easy_run",
+  }));
+  assertEquals(routeHeadline(rows), null);
+});
