@@ -405,19 +405,21 @@ export function routeTrend(
 }
 
 /**
- * The honest HEADLINE read for a route (Familiar Routes, "arm of State"). Heat is PARKED, so this is
- * the effort-aware fitness read ONLY: efficiency_index (speed/HR — the SAME metric State uses, Law 1)
+ * The honest HEADLINE read for a route (Familiar Routes, "arm of State"). Effort-aware AND
+ * temperature-corrected: each run's efficiency_index (speed/HR — the SAME metric State uses, Law 1) is
+ * heat-adjusted (adjEfficiency, population k) so a dry-climate summer doesn't read as a slump, then
  * trended over time. N ≥ MIN_REGRESSION_N → time-only robust regression (Huber, CI-gated four-state
  * verdict); 4 ≤ N < 8 → half-vs-half; N < 4 → null (caller shows familiarity only, never a faked read).
- * Returns a RouteTrend. This is what the Tier-1 headline copy is authored from, server-side.
+ * Returns a RouteTrend. This is what the Tier-1 headline copy is authored from, server-side, and it
+ * matches the chart's temp-corrected same-effort pace so the two can't contradict.
  */
 export function routeHeadline(history: RouteHeatRow[] | null | undefined): RouteTrend | null {
   const reg = (Array.isArray(history) ? history : [])
     .filter((r) => isComparableIntent(r?.intent))
     .map((r) => ({
       day: ymdToDays(r?.date),
-      eff: computeEfficiencyIndex(r?.pace_s_per_km, r?.hr),
-      ht: 0, // heat parked — time-only
+      eff: adjEfficiency(computeEfficiencyIndex(r?.pace_s_per_km, r?.hr), r?.temp_f, DEFAULT_HEAT_K), // temp-corrected
+      ht: 0, // time-only trend; heat already removed per-run above
     }))
     .filter((p): p is { day: number; eff: number; ht: number } => p.day != null && p.eff != null);
 

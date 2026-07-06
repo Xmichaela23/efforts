@@ -5,14 +5,24 @@ import { useState } from 'react';
  *
  * Progressive disclosure (WHOOP/Strava research): the session shows one plain, tappable familiarity
  * line ("Same route · run 34×"); tapping opens the detail — a glanceable headline (server-authored,
- * rendered verbatim — "arm of State"), then one chart with a Pace/Efficiency toggle and the personal
- * best marked. Heat is parked; the honest read is effort-aware efficiency (speed ÷ HR, State's metric).
+ * rendered verbatim — "arm of State") + one chart with a two-pace toggle and the personal best marked.
+ *
+ * The honest metric is SAME-EFFORT PACE: each run's pace normalized to the athlete's typical heart
+ * rate on this loop (pace × hr / refHR), then TEMPERATURE-CORRECTED so a dry-climate summer doesn't
+ * read as a slump. This is the human form of Efficiency Factor (pace÷HR, TrainingPeaks) and the passive
+ * version of the MAF test (Maffetone) — "how fast at the same effort, weather out," in min/mi.
  */
+
+const HEAT_K = 0.005;    // population placeholder (HR-side; see heat-adjust.ts PROHIBITION)
+const TEMP_REF_F = 60;   // neutral air temp; heat only corrects ABOVE this (one-sided)
+const heatDivisor = (tempF: number | null | undefined) =>
+  tempF == null ? 1 : 1 + HEAT_K * Math.max(0, tempF - TEMP_REF_F);
 
 type RouteHistoryPoint = {
   date: string;
   pace_s_per_km: number | null;
   hr: number | null;
+  temp_f?: number | null;
   is_current?: boolean;
 };
 type RouteReadout = {
@@ -39,8 +49,13 @@ const paceLabel = (sPerKm: number) => {
 };
 const monthLabel = (x: number) =>
   new Date(x * 864e5).toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+const median = (a: number[]) => {
+  const s = [...a].sort((x, y) => x - y);
+  const n = s.length;
+  return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+};
 
-type Run = { x: number; pace: number; hr: number; eff: number; date: string };
+type Run = { x: number; date: string; hr: number; pace: number; adj: number };
 
 function ols(xs: number[], ys: number[]) {
   const n = xs.length;
@@ -59,9 +74,9 @@ const BADGE_TONE: Record<string, string> = {
   still_learning: 'text-gray-300 bg-gray-500/15',
 };
 
-function RouteChart({ runs, metric }: { runs: Run[]; metric: 'eff' | 'pace' }) {
-  const W = 340, H = 176, mL = 40, mR = 10, mT = 10, mB = 22;
-  const invert = metric === 'pace'; // faster (lower time) plotted higher
+// Both metrics are PACE (min/mi) — lower time = faster = plotted higher.
+function RouteChart({ runs, metric, confident }: { runs: Run[]; metric: 'adj' | 'pace'; confident: boolean }) {
+  const W = 340, H = 176, mL = 44, mR = 12, mT = 10, mB = 22;
   const key = metric;
   const x0 = Math.min(...runs.map((r) => r.x));
   const x1 = Math.max(...runs.map((r) => r.x));
@@ -69,36 +84,42 @@ function RouteChart({ runs, metric }: { runs: Run[]; metric: 'eff' | 'pace' }) {
   let lo = Math.min(...ys), hi = Math.max(...ys);
   const pad = (hi - lo) * 0.14 || 1; lo -= pad; hi += pad;
   const px = (x: number) => mL + (x1 === x0 ? 0 : (x - x0) / (x1 - x0)) * (W - mL - mR);
-  const val = (v: number) => invert ? mT + (v - lo) / (hi - lo) * (H - mT - mB) : mT + (hi - v) / (hi - lo) * (H - mT - mB);
-  const fmt = (v: number) => (metric === 'pace' ? paceLabel(v) : v.toFixed(1));
+  const val = (v: number) => mT + (v - lo) / (hi - lo) * (H - mT - mB); // inverted: faster (lower s/km) higher
   const f = ols(runs.map((r) => r.x), ys);
-  const best = runs.reduce((a, b) => (metric === 'pace' ? b.pace < a.pace : b.eff > a.eff) ? b : a);
+  const best = runs.reduce((a, b) => (b[key] < a[key] ? b : a)); // fastest
 
   const gridY = [0, 1, 2, 3].map((i) => lo + (hi - lo) * i / 3);
-  const monthTicks: { x: number; label: string }[] = [];
-  const seen = new Set<string>();
-  runs.forEach((r) => { const mo = r.date.slice(0, 7); if (!seen.has(mo) && seen.size % 3 === 0) monthTicks.push({ x: r.x, label: monthLabel(r.x) }); seen.add(mo); });
+  // ~4 evenly-spread month labels across the full window (clamped so edges don't clip).
+  const monthsOrder = [...new Set(runs.map((r) => r.date.slice(0, 7)))];
+  const step = Math.max(1, Math.ceil(monthsOrder.length / 4));
+  const monthTicks = monthsOrder
+    .filter((_, i) => i % step === 0)
+    .map((mo) => {
+      const r = runs.find((rr) => rr.date.slice(0, 7) === mo)!;
+      return { x: Math.min(Math.max(px(r.x), mL + 6), W - mR - 6), label: monthLabel(r.x) };
+    });
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" role="img" aria-label="Route trend over time">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" role="img" aria-label="Route pace over time">
       {gridY.map((v, i) => (
         <g key={i}>
           <line x1={mL} y1={val(v)} x2={W - mR} y2={val(v)} stroke="currentColor" className="text-gray-700/50" strokeWidth={1} />
-          <text x={mL - 6} y={val(v) + 3} textAnchor="end" className="fill-gray-500" fontSize={9.5}>{fmt(v)}</text>
+          <text x={mL - 6} y={val(v) + 3} textAnchor="end" className="fill-gray-500" fontSize={9.5}>{paceLabel(v)}</text>
         </g>
       ))}
       {monthTicks.map((t, i) => (
-        <text key={i} x={px(t.x)} y={H - 6} textAnchor="middle" className="fill-gray-500" fontSize={9}>{t.label}</text>
+        <text key={i} x={t.x} y={H - 6} textAnchor="middle" className="fill-gray-500" fontSize={9}>{t.label}</text>
       ))}
-      <line x1={px(x0)} y1={val(f.a + f.b * x0)} x2={px(x1)} y2={val(f.a + f.b * x1)} className="text-emerald-400" stroke="currentColor" strokeWidth={2} strokeLinecap="round" opacity={0.85} />
+      {/* Trend line reflects the honest verdict: solid when confident, faded+dashed when "still reading"
+          (or no verdict yet) — so the line never overstates certainty. */}
+      <line x1={px(x0)} y1={val(f.a + f.b * x0)} x2={px(x1)} y2={val(f.a + f.b * x1)} className="text-emerald-400" stroke="currentColor" strokeWidth={2} strokeLinecap="round" opacity={confident ? 0.85 : 0.35} strokeDasharray={confident ? undefined : '5 5'} />
       {runs.map((r, i) => {
         const isBest = r === best;
         return (
           <circle key={i} cx={px(r.x)} cy={val(r[key])} r={isBest ? 5.5 : 4}
             className={isBest ? 'fill-amber-300' : 'fill-emerald-400'}
-            stroke="currentColor" strokeWidth={1.4}
-            style={{ color: 'rgb(17 24 39)' }}>
-            <title>{new Date(r.x * 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })} · {paceLabel(r.pace)}/mi · HR {r.hr} · eff {r.eff.toFixed(2)}{isBest ? ' · best' : ''}</title>
+            stroke="currentColor" strokeWidth={1.4} style={{ color: 'rgb(17 24 39)' }}>
+            <title>{new Date(r.x * 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })} · {paceLabel(r.pace)}/mi · HR {r.hr} · same-effort {paceLabel(r.adj)}/mi{isBest ? ' · best' : ''}</title>
           </circle>
         );
       })}
@@ -108,18 +129,27 @@ function RouteChart({ runs, metric }: { runs: Run[]; metric: 'eff' | 'pace' }) {
 
 export function RouteDoorway({ route }: { route: RouteDoorwayData }) {
   const [open, setOpen] = useState(false);
-  const [metric, setMetric] = useState<'eff' | 'pace'>('eff');
+  const [metric, setMetric] = useState<'adj' | 'pace'>('adj');
 
   const times = Math.max(Number(route?.times_run) || 0, route?.comparable_runs ?? 0, route?.history?.length ?? 0);
   if (times < 2) return null;
   const yr = typeof route?.first_seen === 'string' && route.first_seen.length >= 4 ? route.first_seen.slice(0, 4) : null;
 
-  const runs: Run[] = (route?.history ?? [])
-    .filter((p) => p.pace_s_per_km != null && p.pace_s_per_km! > 0 && p.hr != null && p.hr! > 0)
-    .map((p) => ({ x: dayNum(p.date), date: p.date, pace: p.pace_s_per_km as number, hr: p.hr as number, eff: (1000 / (p.pace_s_per_km as number)) / (p.hr as number) * 100 }))
+  const usable = (route?.history ?? []).filter(
+    (p) => p.pace_s_per_km != null && p.pace_s_per_km! > 0 && p.hr != null && p.hr! > 0,
+  );
+  const refHR = usable.length ? Math.round(median(usable.map((p) => p.hr as number))) : 0;
+  const runs: Run[] = usable
+    .map((p) => {
+      const pace = p.pace_s_per_km as number;
+      const hr = p.hr as number;
+      const sameEffort = refHR ? pace * (hr / refHR) : pace;     // normalize to typical effort
+      return { x: dayNum(p.date), date: p.date, hr, pace, adj: sameEffort / heatDivisor(p.temp_f) }; // - summer heat
+    })
     .sort((a, b) => a.x - b.x);
 
   const readout = route?.readout ?? null;
+  const confident = !!readout && readout.direction !== 'still_learning';
   const bestPace = runs.length ? paceLabel(runs.reduce((a, b) => (b.pace < a.pace ? b : a)).pace) : '—';
   const thisYear = runs.filter((r) => r.date >= '2026-01-01').length;
 
@@ -132,7 +162,7 @@ export function RouteDoorway({ route }: { route: RouteDoorwayData }) {
         className="text-xs text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1"
       >
         <span>Same route · run {times}×{yr ? ` since ${yr}` : ''}</span>
-        <span className="text-gray-500">{open ? '›' : '›'}</span>
+        <span className="text-gray-500">›</span>
       </button>
 
       {open && (
@@ -162,27 +192,29 @@ export function RouteDoorway({ route }: { route: RouteDoorwayData }) {
             </div>
           )}
 
-          {/* Tier 2 — one chart, one metric, toggle */}
+          {/* Tier 2 — one chart, two paces (both min/mi) */}
           {runs.length >= 2 && (
             <div className="rounded-2xl border border-gray-700/60 bg-gray-800/40 p-3">
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1 gap-2">
                 <div className="inline-flex bg-gray-900/60 rounded-lg p-0.5 gap-0.5">
-                  {(['eff', 'pace'] as const).map((m) => (
+                  {(['adj', 'pace'] as const).map((m) => (
                     <button key={m} type="button" onClick={() => setMetric(m)} aria-pressed={metric === m}
                       className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${metric === m ? 'bg-gray-700 text-gray-100' : 'text-gray-400 hover:text-gray-200'}`}>
-                      {m === 'eff' ? 'Efficiency' : 'Pace'}
+                      {m === 'adj' ? 'Same-effort pace' : 'Pace'}
                     </button>
                   ))}
                 </div>
-                <span className="text-[11px] text-gray-500">{metric === 'eff' ? 'speed ÷ HR · up = fitter' : 'min/mi · up = faster'}</span>
+                <span className="text-[10.5px] text-gray-500 text-right">
+                  {metric === 'adj' ? `min/mi at ~${refHR} bpm, temp-adj · up = faster` : 'min/mi · up = faster'}
+                </span>
               </div>
-              <RouteChart runs={runs} metric={metric} />
+              <RouteChart runs={runs} metric={metric} confident={confident} />
               <p className="text-[11.5px] text-gray-500 mt-1.5 px-0.5 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-2 rounded-full border-2 border-amber-300" /> your best on this loop · tap a dot for its detail
               </p>
               <p className="text-[12px] text-gray-500 mt-1.5 leading-relaxed px-0.5">
-                {metric === 'eff'
-                  ? 'The honest one — speed for the heart rate it cost you. Rising means faster at the same effort.'
+                {metric === 'adj'
+                  ? `What you'd run at your usual effort here (~${refHR} bpm), with summer heat taken out. Faster over time = real fitness — the passive version of a MAF test.`
                   : 'Every easy run on this loop. The spread is real — some days you push, some you cruise.'}
               </p>
             </div>

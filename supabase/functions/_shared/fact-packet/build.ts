@@ -713,7 +713,7 @@ export async function buildWorkoutFactPacketV1(args: {
       // look like fitness variation. Column is on route_progress_metrics
       // (verified populated on every recent row for the test user); previously
       // dropped from the SELECT.
-      let routeRuns: { times_run: number; first_seen: string; last_seen: string; history: Array<{ date: string; pace_s_per_km: number | null; gap_pace_s_per_km: number | null; hr: number | null; is_current: boolean }> } | null = null;
+      let routeRuns: { times_run: number; first_seen: string; last_seen: string; history: Array<{ date: string; pace_s_per_km: number | null; gap_pace_s_per_km: number | null; hr: number | null; temp_f: number | null; is_current: boolean }> } | null = null;
       if (matchedClusterId) {
         const [{ data: clusterRow }, { data: histRows }] = await Promise.all([
           supabase
@@ -723,16 +723,17 @@ export async function buildWorkoutFactPacketV1(args: {
             .maybeSingle(),
           supabase
             .from('route_progress_metrics')
-            .select('metric_date, avg_pace_sec_per_km, effort_adjusted_pace_sec_per_km, avg_hr_bpm, workout_id')
+            .select('metric_date, avg_pace_sec_per_km, effort_adjusted_pace_sec_per_km, avg_hr_bpm, temp_f, workout_id')
             .eq('user_id', userId)
             .eq('route_cluster_id', matchedClusterId)
-            // 90-day window (Michael): the efficiency read reflects CURRENT form, not lifetime — an
-            // athlete returning from a detrain reads "improving", not "declining vs peak". Also fixes the
-            // prior oldest-10 bug (ascending + limit(10) returned the EARLIEST runs, ignoring recent ones).
-            // times_run / first_seen come from the cluster row above, so lifetime familiarity is unaffected.
-            .gte('metric_date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
+            // 365-day window (Familiar Routes): the ROUTE chart is a season-over-season "am I getting
+            // faster on this loop" read, so it needs a FULL year — cool winter runs to anchor the trend and
+            // to give the temperature heat-correction cool-vs-hot runs to correct against. (The old 90-day
+            // window was for the removed same-route efficiency DIRECTION; it left the chart all-summer and
+            // heat-confounded.) times_run / first_seen come from the cluster row, so familiarity is unaffected.
+            .gte('metric_date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
             .order('metric_date', { ascending: true })
-            .limit(30),
+            .limit(200),
         ]);
         if (clusterRow && Number((clusterRow as any).sample_count || 0) >= 2) {
           let history = Array.isArray(histRows)
@@ -743,6 +744,7 @@ export async function buildWorkoutFactPacketV1(args: {
                 // when present (per-row availability gates the client fallback).
                 gap_pace_s_per_km: r.effort_adjusted_pace_sec_per_km != null ? Number(r.effort_adjusted_pace_sec_per_km) : null,
                 hr: r.avg_hr_bpm != null ? Number(r.avg_hr_bpm) : null,
+                temp_f: r.temp_f != null ? Number(r.temp_f) : null, // Familiar Routes: for the temp heat-correction
                 is_current: String(r.workout_id) === workoutId,
                 _workout_id: String(r.workout_id || ''),
               }))
