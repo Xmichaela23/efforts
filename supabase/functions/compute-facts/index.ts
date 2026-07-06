@@ -38,8 +38,7 @@ import { rewriteSessionLoad, type ExerciseLogRowForLoad } from "../_shared/sessi
 import { resolveRunScalars } from "../_shared/run/run-scalars.ts";
 import { detectSwimEquipment } from "../_shared/swim/swim-equipment.ts";
 import { resolveSwimScalars } from "../_shared/swim/swim-scalars.ts";
-import { trackToGeohashSet } from "../_shared/geohash.ts";
-import { bestRouteMatch, mergeGeohashes, ROUTE_MATCH_MIN_OVERLAP } from "../_shared/route-match.ts";
+import { resolveRouteCluster } from "../_shared/route-intelligence.ts";
 import { resolveCurrentFtp } from "../../../src/lib/resolve-current-ftp.ts";
 
 // ---------------------------------------------------------------------------
@@ -773,149 +772,10 @@ async function upsertRouteIntelligence(
   if (!isRun && !(rideType === "ride" || rideType === "bike" || rideType === "cycling" || rideType === "virtualride")) return;
   if (String(w.workout_status || "").toLowerCase() !== "completed") return;
 
-  const features = deriveRouteFeatures(w);
-  if (!features.distance_m || features.distance_m < 1000) return; // ignore very short segments
-
-  const fingerprint = buildRouteFingerprint(features);
-  const workoutDate = String(w.date || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
-  // PATH IS THE IDENTITY: turn the GPS track into the set of ~150m cells it covers, and match on the
-  // ROADS actually run — tolerant of length. This replaces the distance-bucket fingerprint that split
-  // 4.0mi and 4.9mi on the same roads into separate "routes" ("120x" / "19x").
-  const runGeohashes = trackToGeohashSet(parseJsonSafe(w.gps_track), 7);
-  const CLUSTER_COLS = "id,name,fingerprint,distance_m,elevation_gain_m,sample_count,metadata,first_seen_at";
-
-  let cluster: any = null;
-  let matchConfidence = 0;
-
-  if (runGeohashes.length >= 8) {
-    // PRIMARY: path-overlap match against this athlete's active routes (length-guarded).
-    const { data: activeClusters } = await supabase
-      .from("route_clusters")
-      .select(CLUSTER_COLS)
-      .eq("user_id", w.user_id)
-      .eq("is_active", true)
-      .limit(300);
-    const lite = (Array.isArray(activeClusters) ? activeClusters : []).map((c: any) => ({
-      id: c.id,
-      geohashes: (parseJsonSafe(c.metadata) || {}).geohashes || [],
-      distance_m: toNum(c.distance_m),
-      _row: c,
-    }));
-    const m = bestRouteMatch(runGeohashes, lite, ROUTE_MATCH_MIN_OVERLAP, features.distance_m);
-    if (m) { cluster = (m.cluster as any)._row; matchConfidence = m.overlap; }
-  } else {
-    // FALLBACK (no usable GPS path): legacy exact-fingerprint + distance-fuzzy match — only when we
-    // genuinely can't see the roads. No worse than before.
-    const { data: existingExact } = await supabase
-      .from("route_clusters").select(CLUSTER_COLS)
-      .eq("user_id", w.user_id).eq("fingerprint", fingerprint).maybeSingle();
-    cluster = existingExact ?? null;
-    if (cluster) {
-      matchConfidence = 1;
-    } else {
-      const { data: candidates } = await supabase
-        .from("route_clusters").select(CLUSTER_COLS)
-        .eq("user_id", w.user_id).eq("is_active", true)
-        .gte("distance_m", Math.max(1000, features.distance_m - Math.max(600, features.distance_m * 0.2)))
-        .lte("distance_m", features.distance_m + Math.max(600, features.distance_m * 0.2))
-        .limit(30);
-      const scored = (Array.isArray(candidates) ? candidates : []).map((c: any) => {
-        const cMeta = parseJsonSafe(c.metadata) || {};
-        const cDist = toNum(c.distance_m) ?? 0;
-        const distScore = Math.max(0, 1 - Math.abs(features.distance_m - cDist) / Math.max(800, cDist * 0.2));
-        const cStartLat = toNum(cMeta.start_lat), cStartLng = toNum(cMeta.start_lng);
-        const cEndLat = toNum(cMeta.end_lat), cEndLng = toNum(cMeta.end_lng);
-        const startScore = (features.start_lat != null && features.start_lng != null && cStartLat != null && cStartLng != null)
-          ? Math.max(0, 1 - (haversineKm(features.start_lat, features.start_lng, cStartLat, cStartLng) / 2.0)) : 0.4; // estimate-ok: geo course-match score (heuristic, not a rendered athlete metric)
-        const endScore = (features.end_lat != null && features.end_lng != null && cEndLat != null && cEndLng != null)
-          ? Math.max(0, 1 - (haversineKm(features.end_lat, features.end_lng, cEndLat, cEndLng) / 2.0)) : 0.4; // estimate-ok: geo course-match score (heuristic, not a rendered athlete metric)
-        return { c, score: (0.5 * distScore) + (0.3 * startScore) + (0.2 * endScore) };
-      }).sort((a, b) => b.score - a.score);
-      if (scored.length && scored[0].score >= 0.62) { cluster = scored[0].c; matchConfidence = scored[0].score; }
-    }
-  }
-
-  if (!cluster) {
-    const { count: clusterCount } = await supabase
-      .from("route_clusters").select("id", { count: "exact", head: true }).eq("user_id", w.user_id);
-    const routeNumber = (clusterCount ?? 0) + 1;
-    const { data: created, error: createErr } = await supabase
-      .from("route_clusters")
-      .insert({
-        user_id: w.user_id,
-        name: `Route ${routeNumber}`,
-        fingerprint,
-        distance_m: features.distance_m,
-        elevation_gain_m: features.elevation_gain_m,
-        sample_count: 1,
-        is_active: true,
-        first_seen_at: workoutDate, // honest: the earliest RUN date, not "when clustering started"
-        last_seen_at: new Date().toISOString(),
-        metadata: {
-          start_lat: features.start_lat, start_lng: features.start_lng,
-          end_lat: features.end_lat, end_lng: features.end_lng,
-          shape_hint: features.shape_hint || null,
-          geohashes: runGeohashes,
-        },
-      })
-      .select(CLUSTER_COLS)
-      .single();
-    if (createErr) throw createErr;
-    cluster = created;
-    console.warn(`[compute-facts] route: created cluster id=${cluster?.id} name="${cluster?.name}" cells=${runGeohashes.length}`);
-  } else {
-    // Existing route: merge this run's roads into the signature; keep first_seen the EARLIEST run.
-    // NO sample_count change here — recounted below so recompute can't inflate it.
-    const meta = parseJsonSafe(cluster.metadata) || {};
-    const mergedGeohashes = runGeohashes.length ? mergeGeohashes(meta.geohashes, runGeohashes) : (meta.geohashes || []);
-    const prevFirst = cluster.first_seen_at ? String(cluster.first_seen_at).slice(0, 10) : workoutDate;
-    const firstSeen = workoutDate < prevFirst ? workoutDate : prevFirst;
-    await supabase
-      .from("route_clusters")
-      .update({
-        is_active: true,
-        last_seen_at: new Date().toISOString(),
-        first_seen_at: firstSeen,
-        metadata: {
-          ...meta,
-          start_lat: meta.start_lat ?? features.start_lat,
-          start_lng: meta.start_lng ?? features.start_lng,
-          end_lat: meta.end_lat ?? features.end_lat,
-          end_lng: meta.end_lng ?? features.end_lng,
-          shape_hint: meta.shape_hint ?? (features.shape_hint || null),
-          geohashes: mergedGeohashes,
-        },
-      })
-      .eq("id", cluster.id);
-  }
-
-  // Idempotent membership + count. Record THIS workout's route (upsert by workout_id), then set
-  // sample_count to the TRUE distinct-workout count for the cluster — immune to recompute (the old
-  // code did +1 every run, inflating the count on every recompute). Recount the prior cluster too if
-  // this workout moved.
-  const { data: priorMatch } = await supabase
-    .from("workout_route_match").select("route_cluster_id").eq("workout_id", w.id).maybeSingle();
-  const priorClusterId = (priorMatch as any)?.route_cluster_id ?? null;
-
-  await supabase
-    .from("workout_route_match")
-    .upsert({
-      user_id: w.user_id,
-      workout_id: w.id,
-      route_cluster_id: cluster.id,
-      match_confidence: Number(matchConfidence.toFixed(4)),
-      match_method: runGeohashes.length >= 8 ? "path_overlap_v1" : "distance_start_shape_v1",
-      condition_bucket: "unknown",
-      weather: {},
-    }, { onConflict: "workout_id" });
-
-  const recountCluster = async (cid: string) => {
-    const { count } = await supabase
-      .from("workout_route_match").select("workout_id", { count: "exact", head: true }).eq("route_cluster_id", cid);
-    await supabase.from("route_clusters").update({ sample_count: count ?? 0 }).eq("id", cid);
-  };
-  await recountCluster(cluster.id);
-  if (priorClusterId && priorClusterId !== cluster.id) await recountCluster(priorClusterId);
+  // Route identity + idempotent count via the ONE shared implementation (also used by backfill-routes).
+  const resolved = await resolveRouteCluster(supabase, w as any);
+  if (!resolved) return;
+  const { cluster, matchConfidence, fingerprint, features } = resolved;
 
   // Run-only efficiency metrics (route_progress_metrics). Rides get cluster identity above but not this
   // (ride "efficiency" is power-based — a separate follow-on).
