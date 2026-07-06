@@ -727,21 +727,24 @@ export default function SessionNarrative({
           </div>
         </div>
       )}
-      {trend && <TrendSparkline trend={trend} />}
-      {sd?.terrain?.route && sd.terrain.route.history.length >= 2 && (
-        // D-039 Fix 6: chart_eligible gates the sparkline at ≥6 history
-        // points (server-side threshold). Below that, render text only —
-        // "Same route · N runs" with a thin trend is noise, not signal.
-        // Fix 6.1: visible count uses comparable_runs (post-intent-filter)
-        // so the user never sees "6 runs" alongside "not enough history".
-        (sd.terrain.route as any).chart_eligible !== false ? (
-          <RouteSparkline route={sd.terrain.route} />
-        ) : (
-          <div className="text-xs text-gray-500">
-            Same route · {(sd.terrain.route as any).comparable_runs ?? sd.terrain.route.history.length} comparable runs — not enough history to trend.
-          </div>
-        )
-      )}
+      {/* Macro trends live on the State screen now (single source of truth). The per-session route
+          context is a same-route EFFICIENCY read (State's pace-per-HR metric, this route only) — one
+          clean line, no raw-pace chart, no dashed HR overlay. TrendSparkline/RouteSparkline are no
+          longer rendered here. */}
+      {sd?.terrain?.route && sd.terrain.route.history.length >= 2 && (() => {
+        const route = sd.terrain!.route as any;
+        const eff = route.efficiency as { direction: 'improving' | 'holding' | 'declining'; points: number } | null | undefined;
+        if (eff) {
+          const color = eff.direction === 'improving' ? '#34d399' : eff.direction === 'declining' ? '#f87171' : '#9ca3af';
+          return (
+            <div className="text-xs text-gray-500">
+              On this route ({eff.points} runs): <span style={{ color }}>efficiency {eff.direction}</span>
+            </div>
+          );
+        }
+        const n = route.comparable_runs ?? route.history?.length ?? 0;
+        return <div className="text-xs text-gray-500">Same route · {n} runs — building history.</div>;
+      })()}
       {hasAnalysisDetails && (
         <div className="space-y-1.5">
           {analysisRows.slice(0, 8).map((r, i) => {

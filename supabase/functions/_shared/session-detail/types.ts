@@ -434,6 +434,15 @@ export type SessionDetailV1 = {
        *  GAP couldn't be computed. Additive — old clients reading only
        *  `pace_s_per_km` keep working. */
       history: Array<{ date: string; pace_s_per_km: number | null; gap_pace_s_per_km: number | null; hr: number | null; is_current: boolean }>;
+      /** Same-route EFFICIENCY direction (pace-per-HR, State's canonical `efficiency_index` metric,
+       *  restricted to this route). Replaces the removed raw-pace/power trend. `null` when there are
+       *  too few usable same-route runs to honestly claim a direction (client shows "building history").
+       *  This is a per-session ZOOM-IN on State's efficiency number, never a competing verdict. */
+      efficiency?: {
+        direction: 'improving' | 'holding' | 'declining';
+        pct: number;    // signed % change in efficiency index, first half → second half
+        points: number; // # of same-route runs with usable pace + HR
+      } | null;
     } | null;
   } | null;
 }

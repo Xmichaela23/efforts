@@ -11,6 +11,7 @@ import { packageSessionDetailReadiness } from './readiness-load-context.ts';
 import { swimPacePer100Seconds } from '../swim/swim-pace.ts';
 import type { SwimScalars } from '../swim/swim-scalars.ts';
 import { resolveRunGap, type RunScalars } from '../run/run-scalars.ts';
+import { routeEfficiencyDirection } from '../efficiency-index.ts';
 
 /** Match fact-packet ai-summary: session HR drift is not meaningful for structured interval sessions. */
 function shouldSuppressSessionHrDrift(factPacket: any, intervals?: IntervalRow[]): boolean {
@@ -764,158 +765,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       power_cv_pct: ((sessionState as any)?.glance?.power_cv_pct as number | null) ?? null,
     },
 
-    trend: (() => {
-      // Cycling: mode-aware TREND (design Build Order #1). The doc's resolved
-      // table maps "unplanned, no segments" (the dominant case) → 20-min power
-      // best over 90 days. So prefer pwr20_trend_v1 (Item D) as the primary
-      // series; fall back to np_trend_v1 so an already-populated NP sparkline
-      // never regresses.
-      //
-      // Autonomous-tier scope (conservative, documented): the other rows of the
-      // doc's TREND table are NOT separately selectable here —
-      //  - Mode 1 "power adherence trend across same session type this block":
-      //    that per-block series is not persisted (needs infra outside the
-      //    autonomous tier).
-      //  - Mode 3/4 segment/race-course series: Build Order #6/#8, skipped;
-      //    segment presence is also invisible at the display layer (build.ts
-      //    has no `achievements`).
-      //  - "No power data → HR-decoupling trend": the per-ride decoupling metric
-      //    now exists (Item B) but a cross-ride decoupling *series* would need
-      //    the same analyzer persistence as np_trend (not in scope).
-      // Mode classification itself shipped as the standalone primitive in
-      // _shared/cycling-v1/analysis-mode.ts (Build Order #2) for when those
-      // series land. Run logic below is untouched.
-      if (type === 'ride') {
-        try {
-          const picked = pickCyclingTrendSeries(wa);
-          if (!picked) return null;
-          const { points: series, metricLabel, noun, rideType } = picked;
-          const sorted = [...series].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
-          const points = sorted
-            .map((p: any) => ({
-              date: String(p.date),
-              value: Number(p.value),
-              // Dual-line TREND (design #1b) — mirrors running build.ts run
-              // branch (`avg_hr: p.avg_hr != null ? Number(p.avg_hr) : null`).
-              // Cycling series now carry avg_hr per ride; the client draws the
-              // dashed HR overlay alongside power.
-              avg_hr: p.avg_hr != null && Number.isFinite(Number(p.avg_hr)) ? Number(p.avg_hr) : null,
-              is_current: !!p.is_current,
-              label: `${Math.round(Number(p.value))}W`,
-            }))
-            .filter((p) => Number.isFinite(p.value) && p.value > 0 && p.value < 1000);
-          if (points.length < 3) return null;
-          const mid = Math.ceil(points.length / 2);
-          const avgArr = (arr: typeof points) => arr.reduce((s, p) => s + p.value, 0) / arr.length;
-          const firstHalfAvg = avgArr(points.slice(0, mid));
-          const secondHalfAvg = avgArr(points.slice(mid));
-          const delta = Math.round(secondHalfAvg - firstHalfAvg); // higher later = improving
-          const direction = delta > 3 ? 'improving' as const : delta < -3 ? 'declining' as const : 'stable' as const;
-          const absDelta = Math.abs(delta);
-          const typeWord = rideType ? `${rideType} ` : '';
-          const summary = direction === 'stable'
-            ? `Consistent ${noun} across ${points.length} ${typeWord}rides`
-            : `${absDelta}W ${direction === 'improving' ? 'higher' : 'lower'} over ${points.length} ${typeWord}rides`;
-          // ride_type: discrete type word for the client's text-only TREND
-          // fallback (3–4 same-type rides → text, ≥5 → chart). null on the
-          // np_trend fallback (not type-filtered). Floor stays <3 so 3–4-point
-          // trends still reach the client for the text path.
-          return { metric_label: metricLabel, unit: 'W', points, direction, summary, lower_is_better: false, ride_type: rideType };
-        } catch { return null; }
-      }
-      try {
-        const pts = factPacket?.derived?.comparisons?.vs_similar?.trend_points;
-        if (!Array.isArray(pts) || pts.length < 3) return null;
-        const fmtPace = (s: number) => { const m = Math.floor(s / 60); const sec = Math.round(s % 60); return `${m}:${String(sec).padStart(2, '0')}/mi`; };
-        const sorted = [...pts].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
-        const rawPoints = sorted.map((p: any) => ({
-          date: String(p.date),
-          value: Number(p.pace_sec_per_mi),
-          avg_hr: p.avg_hr != null ? Number(p.avg_hr) : null,
-          // D-050 / Q-025 — pace_at_hr per point. Null when avg_hr missing.
-          pace_at_hr: p.pace_at_hr != null && Number.isFinite(Number(p.pace_at_hr)) ? Number(p.pace_at_hr) : null,
-          is_current: !!p.is_current,
-          label: fmtPace(Number(p.pace_sec_per_mi)),
-        }));
-        // Drop corrupt pace scalars (bad duration_s_moving / avg_pace) so one point cannot skew the sparkline.
-        const points = rawPoints.filter(
-          (p) => Number.isFinite(p.value) && p.value >= 240 && p.value <= 3600,
-        );
-        if (points.length < 3) return null;
-        const mid = Math.ceil(points.length / 2);
-        const avgArr = (arr: Array<{ value: number }>) => arr.reduce((s, p) => s + p.value, 0) / arr.length;
-        const firstHalfAvg = avgArr(points.slice(0, mid));
-        const secondHalfAvg = avgArr(points.slice(mid));
-        const delta = Math.round(firstHalfAvg - secondHalfAvg);
-        const rawDirection: 'improving' | 'declining' | 'stable' =
-          delta > 10 ? 'improving' : delta < -10 ? 'declining' : 'stable';
-
-        // D-039 Fix 5 + D-040 Fix D: HR-aware direction. Raw pace delta alone
-        // is misleading when HR also shifted. "32s/mi slower over 5 workouts"
-        // in red is wrong when HR dropped too — that's a wash on pace-at-HR
-        // efficiency, not regression.
-        //
-        // Fix D relaxes the gate from ≥2 HR points per half to ≥3 HR points
-        // total with ≥1 per half. With sparse HR data (one null per half,
-        // common when older device sessions lack stored avg_hr) the original
-        // gate failed and the raw pace-only fallback fired even on sessions
-        // with strong HR signal across the trend. The new gate engages on the
-        // 8cbfa389 long-run trend (7 HR points across 8, one null in first
-        // half) where the pre-fix gate happened to clear but produced
-        // direction='improving' that the user reported as "32s/mi slower" —
-        // meaning the displayed trend was the wrong direction. Investigation
-        // showed the actual pool for 8cbfa389 in the user's UI is a subset
-        // (5 points, only some with HR), and that subset failed the per-half
-        // gate. Relaxed gate fires there.
-        const allHrPts = points.filter((p) => p.avg_hr != null);
-        const firstHrPts = points.slice(0, mid).filter((p) => p.avg_hr != null);
-        const secondHrPts = points.slice(mid).filter((p) => p.avg_hr != null);
-        let hrDelta: number | null = null;
-        let direction = rawDirection;
-        let efficiencyNote = '';
-        if (allHrPts.length >= 3 && firstHrPts.length >= 1 && secondHrPts.length >= 1) {
-          const firstHrAvg = firstHrPts.reduce((s, p) => s + (p.avg_hr as number), 0) / firstHrPts.length;
-          const secondHrAvg = secondHrPts.reduce((s, p) => s + (p.avg_hr as number), 0) / secondHrPts.length;
-          hrDelta = Math.round(firstHrAvg - secondHrAvg);
-          // Pace got slower (declining) BUT HR also dropped meaningfully (>3 bpm) → wash
-          if (rawDirection === 'declining' && hrDelta > 3) {
-            direction = 'stable';
-            efficiencyNote = ' — at lower HR, so effort is consistent';
-          }
-          // Pace got faster (improving) BUT HR also rose meaningfully (>3 bpm) → wash
-          else if (rawDirection === 'improving' && hrDelta < -3) {
-            direction = 'stable';
-            efficiencyNote = ' — at higher HR, so effort is consistent';
-          }
-        }
-
-        const absDelta = Math.abs(delta);
-        const summary = (isEasyLike && direction !== 'stable')
-          ? ''
-          : direction === 'stable'
-            ? (efficiencyNote
-                ? `${absDelta}s/mi ${delta > 0 ? 'faster' : 'slower'}${efficiencyNote} (${points.length} workouts)`
-                : `Consistent across ${points.length} workouts`)
-            : `${absDelta}s/mi ${direction === 'improving' ? 'faster' : 'slower'} over ${points.length} workouts`;
-        // D-050 / Q-025 — surface the pace-at-HR percentile classifier
-        // output. Client uses it as the primary direction signal when
-        // non-null and not 'insufficient_data'; falls back to the raw-pace
-        // `direction` above otherwise.
-        const vsSim = factPacket?.derived?.comparisons?.vs_similar as any;
-        const paceAtHrDirection = vsSim?.pace_at_hr_direction ?? null;
-        const paceAtHrBasis = vsSim?.pace_at_hr_basis ?? null;
-        return {
-          metric_label: 'Pace',
-          unit: '/mi',
-          points,
-          direction,
-          summary,
-          lower_is_better: true,
-          pace_at_hr_direction: paceAtHrDirection,
-          pace_at_hr_basis: paceAtHrBasis,
-        };
-      } catch { return null; }
-    })(),
+    // TREND removed (2026-07-05): this block computed its OWN raw-pace / raw-power trend — a fork vs the
+    // State screen (see the State-vs-Performance audit). Macro trends now live ONLY on State; the
+    // per-session route context is the same-route EFFICIENCY read on `terrain.route.efficiency` below
+    // (State's efficiency metric, restricted to this route). `pickCyclingTrendSeries` stays exported
+    // but is no longer called here.
+    trend: null,
 
     discipline_trend: input.disciplineTrend ?? null,
 
@@ -939,12 +794,17 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       // to support direction claims.
       const ROUTE_CHART_MIN_HISTORY = 8;
       const comparableRuns = r.history.length;
+      // Same-route EFFICIENCY (the per-session macro context, replacing the removed raw-pace trend).
+      // Uses State's canonical efficiency index (pace-per-HR) over this route's runs — one metric, two
+      // views. Null when too few usable runs → client shows "building history", never a faked direction.
+      const routeEfficiency = type === 'run' ? routeEfficiencyDirection(r.history) : null;
       return {
         route: {
           times_run: Number(r.times_run || 0),
           comparable_runs: comparableRuns,
           chart_eligible: comparableRuns >= ROUTE_CHART_MIN_HISTORY,
           history: r.history,
+          efficiency: routeEfficiency,
         },
       };
     })(),
