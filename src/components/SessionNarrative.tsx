@@ -1,4 +1,5 @@
 import React from 'react';
+import { RouteDoorway } from './RouteDoorway';
 
 type TrendPoint = {
   date: string;
@@ -320,140 +321,6 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
   );
 }
 
-function RouteSparkline({ route }: { route: RouteData }) {
-  // D-105: prefer grade-adjusted pace per point; fall back to raw when GAP
-  // isn't available (flat-route rows, pre-D-105 backfill rows, or any row
-  // where the GAP computation didn't land). The per-row gate keeps the chart
-  // honest — a mixed series shows GAP where computed, raw where not, and
-  // the "GAP" label below tells the athlete the chart is grade-calibrated.
-  const ptsWithEffective = route.history
-    .map((p) => ({ ...p, effective_pace: p.gap_pace_s_per_km ?? p.pace_s_per_km }))
-    .filter((p) => p.effective_pace != null);
-  if (ptsWithEffective.length < 2) return null;
-  const pts = ptsWithEffective;
-  const usingGap = pts.some((p) => p.gap_pace_s_per_km != null);
-
-  const paceValues = pts.map((p) => p.effective_pace as number);
-  const maxV = Math.max(...paceValues);
-  const minV = Math.min(...paceValues);
-  const range = maxV - minV || 1;
-
-  const W = 200;
-  const H = 48;
-  const PAD = 4;
-  const plotW = W - PAD * 2;
-  const plotH = H - PAD * 2;
-
-  const coords = pts.map((p, i) => ({
-    x: PAD + (i / (pts.length - 1)) * plotW,
-    // lower pace = faster = better = higher on chart (invert)
-    y: PAD + ((maxV - (p.effective_pace as number)) / range) * plotH,
-    ...p,
-  }));
-
-  const pathD = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x},${c.y}`).join(' ');
-
-  const hrPts = pts.filter((p) => p.hr != null);
-  const hasHr = hrPts.length >= 2;
-  const hrPathD = hasHr ? (() => {
-    const hrVals = pts.map((p) => p.hr as number | null);
-    const validHr = hrVals.filter((v): v is number => v != null);
-    const maxHr = Math.max(...validHr);
-    const minHr = Math.min(...validHr);
-    const hrRange = maxHr - minHr || 1;
-    return pts.map((p, i) => {
-      if (p.hr == null) return null;
-      const x = PAD + (i / (pts.length - 1)) * plotW;
-      const y = PAD + ((p.hr - minHr) / hrRange) * plotH;
-      return { x, y, is_current: p.is_current };
-    });
-  })() : [];
-
-  const hrLineParts: string[] = [];
-  if (hasHr) {
-    let seg = '';
-    for (const c of hrPathD) {
-      if (!c) { seg = ''; continue; }
-      seg += seg === '' ? `M${c.x},${c.y}` : `L${c.x},${c.y}`;
-    }
-    if (seg) hrLineParts.push(seg);
-  }
-
-  const formatPace = (s: number) => {
-    const perMi = Math.round(s * 1.60934);
-    return `${Math.floor(perMi / 60)}:${String(perMi % 60).padStart(2, '0')}/mi`;
-  };
-
-  const currentPt = pts[pts.length - 1];
-  const color = '#9ca3af';
-
-  return (
-    <div>
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Route</span>
-        {/* D-107: display cluster total (times_run) in the chart-header label
-            instead of comparable_runs. Post-D-107 the ROUTE intent filter is
-            removed and comparable_runs is just history.length (≤10 due to the
-            route_progress_metrics SELECT cap), so a label saying "8×" reads
-            as the chart's data-point count rather than the athlete's actual
-            cumulative experience with the route. times_run is the cluster
-            sample_count — the honest "how many times have I run this route"
-            answer (43 for today's test-user easy run). iOS has been using
-            times_run all along; this restores parity. */}
-        <span className="text-xs text-gray-500">Same route · {route.times_run ?? (route as any).comparable_runs}×</span>
-        {/* D-105: tell the athlete the chart is grade-adjusted when any
-            plotted point uses GAP. Otherwise the chart is raw pace and the
-            label is silent (no badge = the default, no surprise). */}
-        {usingGap && (
-          <span
-            className="text-[10px] uppercase tracking-wider text-gray-500/80 border border-gray-600/40 rounded px-1.5 py-0.5"
-            title="Pace adjusted for elevation grade where available"
-          >
-            GAP
-          </span>
-        )}
-      </div>
-      <div className="mt-1 relative">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 280, height: 52 }}>
-          <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
-          {coords.map((c, i) => (
-            <circle key={i} cx={c.x} cy={c.y} r={c.is_current ? 3.5 : 2}
-              fill={c.is_current ? '#FFD700' : 'rgba(156,163,175,0.5)'}
-              stroke={c.is_current ? '#FFD700' : 'none'} strokeWidth={c.is_current ? 1 : 0} />
-          ))}
-          {hrLineParts.map((d, i) => (
-            <path key={i} d={d} fill="none" stroke="#fb923c" strokeWidth="1" strokeDasharray="3 2"
-              strokeLinecap="round" strokeLinejoin="round" opacity={0.4} />
-          ))}
-          {hasHr && hrPathD.filter((c): c is NonNullable<typeof c> => !!c && c.is_current).map((c, i) => (
-            <circle key={i} cx={c.x} cy={c.y} r={2.5} fill="#fb923c" opacity={0.6} />
-          ))}
-        </svg>
-        <div className="flex justify-between text-[10px] text-gray-500 mt-0.5" style={{ maxWidth: 280 }}>
-          <span>{pts[0].date.slice(5)}</span>
-          <span className="font-medium text-yellow-400/80">
-            {/* D-105: show GAP value when present for today's run; otherwise raw. */}
-            {currentPt.effective_pace != null ? formatPace(currentPt.effective_pace) : ''}
-            {currentPt.hr != null && <span className="text-orange-400/60 ml-1">· {currentPt.hr} bpm</span>}
-            {' '}← today
-          </span>
-        </div>
-        {hasHr && (
-          <div className="flex items-center gap-3 mt-1" style={{ maxWidth: 280 }}>
-            <span className="flex items-center gap-1 text-[10px] text-gray-400">
-              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={color} strokeWidth="1.5" opacity="0.8" /></svg>
-              pace
-            </span>
-            <span className="flex items-center gap-1 text-[10px] text-orange-400">
-              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#fb923c" strokeWidth="1" strokeDasharray="3 2" opacity="0.8" /></svg>
-              hr
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 export function NextUp({ session }: { session: NextSession }) {
   const dayName = session.date ? (() => {
@@ -731,18 +598,10 @@ export default function SessionNarrative({
           context is a same-route EFFICIENCY read (State's pace-per-HR metric, this route only) — one
           clean line, no raw-pace chart, no dashed HR overlay. TrendSparkline/RouteSparkline are no
           longer rendered here. */}
-      {sd?.terrain?.route && (() => {
-        // Route FAMILIARITY only — "you've run this a lot." The efficiency DIRECTION was removed: it's
-        // heat-confounded (summer heat reads as "declining" with no real fitness loss) and it contradicts
-        // State's careful, decoupling-led efficiency read. State owns efficiency trends; Performance shows
-        // this-session facts + how familiar the route is. Not gated on recent data — familiarity is the
-        // cluster total, so a route run a lot but not lately still shows.
-        const route = sd.terrain!.route as any;
-        const times = Math.max(Number(route.times_run) || 0, route.comparable_runs ?? 0, route.history?.length ?? 0);
-        if (times < 2) return null;
-        const yr = typeof route.first_seen === 'string' && route.first_seen.length >= 4 ? route.first_seen.slice(0, 4) : null;
-        return <div className="text-xs text-gray-500">Same route · run {times}×{yr ? ` since ${yr}` : ''}.</div>;
-      })()}
+      {/* Familiar Routes: the familiarity line is the DOORWAY — tap to open the honest, effort-aware
+          route detail (server-authored headline + Pace/Efficiency chart). Heat parked; State still owns
+          the aggregate — this is the same efficiency metric zoomed to one loop (arm of State). */}
+      {sd?.terrain?.route && <RouteDoorway route={sd.terrain.route as any} />}
       {hasAnalysisDetails && (
         <div className="space-y-1.5">
           {analysisRows.slice(0, 8).map((r, i) => {
