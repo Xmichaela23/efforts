@@ -726,8 +726,13 @@ export async function buildWorkoutFactPacketV1(args: {
             .select('metric_date, avg_pace_sec_per_km, effort_adjusted_pace_sec_per_km, avg_hr_bpm, workout_id')
             .eq('user_id', userId)
             .eq('route_cluster_id', matchedClusterId)
+            // 90-day window (Michael): the efficiency read reflects CURRENT form, not lifetime — an
+            // athlete returning from a detrain reads "improving", not "declining vs peak". Also fixes the
+            // prior oldest-10 bug (ascending + limit(10) returned the EARLIEST runs, ignoring recent ones).
+            // times_run / first_seen come from the cluster row above, so lifetime familiarity is unaffected.
+            .gte('metric_date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
             .order('metric_date', { ascending: true })
-            .limit(10),
+            .limit(30),
         ]);
         if (clusterRow && Number((clusterRow as any).sample_count || 0) >= 2) {
           let history = Array.isArray(histRows)

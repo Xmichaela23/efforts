@@ -743,11 +743,12 @@ export default function SessionNarrative({
           const color = eff.direction === 'improving' ? '#34d399' : eff.direction === 'declining' ? '#f87171' : '#9ca3af';
           return (
             <div className="text-xs text-gray-500">
-              Same route · run {familiarity} — <span style={{ color }}>efficiency {eff.direction}</span>
+              Same route · run {familiarity} — <span style={{ color }}>efficiency {eff.direction}</span> · last 90d
             </div>
           );
         }
-        return <div className="text-xs text-gray-500">Same route · run {familiarity} — building efficiency history.</div>;
+        // Too few recent runs to trend honestly → familiarity only, no faked/"building" trend.
+        return <div className="text-xs text-gray-500">Same route · run {familiarity}.</div>;
       })()}
       {hasAnalysisDetails && (
         <div className="space-y-1.5">

@@ -31,10 +31,10 @@ export interface RouteEfficiency {
   points: number; // # of same-route runs with usable pace + HR
 }
 
-// Need at least this many same-route runs WITH usable pace+HR before honestly claiming a direction.
-// Below it the honest read is "building history" — the existing route code already treats 4–6 points as
-// too thin for a direction claim, so we hold the bar there.
-export const ROUTE_EFF_MIN_POINTS = 5;
+// Need at least this many same-route runs (within the caller's 90-day window) WITH usable pace+HR
+// before claiming a direction. 4 is the floor where a half-vs-half split (2 vs 2) means anything;
+// below it the caller shows NOTHING (route familiarity only) — per Michael, no trend beats a thin one.
+export const ROUTE_EFF_MIN_POINTS = 4;
 // Efficiency-index change inside this band reads as "holding", not a real move.
 const ROUTE_EFF_HOLDING_PCT = 2;
 
