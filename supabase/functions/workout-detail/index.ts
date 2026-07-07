@@ -622,7 +622,25 @@ async function runSessionDetailPipelineAndPersist(
       /* non-fatal logging */
     }
 
+    // Segment verdict(s) for the core(s) this run traversed — the ONLY DB reader of core_verdicts.
+    // build.ts renders these (Law 4); it does not fetch or recompute. Plural: a run can traverse >1
+    // core. Non-fatal: a read failure yields [] (no segment_verdicts), never breaks session-detail.
+    let coreVerdicts: any[] = [];
+    try {
+      const { data: effRows } = await supabase
+        .from('core_efforts').select('core_id').eq('workout_id', id);
+      const coreIds = Array.from(new Set((effRows ?? []).map((e: any) => e.core_id).filter(Boolean)));
+      if (coreIds.length > 0) {
+        const { data: vRows } = await supabase
+          .from('core_verdicts').select('*').in('core_id', coreIds);
+        coreVerdicts = Array.isArray(vRows) ? vRows : [];
+      }
+    } catch (cvErr) {
+      console.warn('[workout-detail] core_verdicts read failed (non-fatal):', cvErr instanceof Error ? cvErr.message : cvErr);
+    }
+
     sessionDetailV1 = buildSessionDetailV1({
+      coreVerdicts,
       workoutId: id,
       workoutDate,
       workoutType: row?.type ?? 'other',

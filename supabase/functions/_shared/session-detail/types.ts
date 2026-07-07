@@ -449,6 +449,34 @@ export type SessionDetailV1 = {
       } | null;
     } | null;
   } | null;
+
+  /** Per-core segment fitness verdict(s) — "am I faster on this stretch." Read from core_verdicts
+   *  (spine-authored, Law 5), rendered here (Law 4). PLURAL: a run can traverse >1 core; [] = none.
+   *  Distinct from the SUPERSEDED terrain.route block above (Q-133). */
+  segment_verdicts?: SegmentVerdictV1[];
+}
+
+/** One core's segment verdict — the render contract for "am I faster on this stretch," server-authored
+ *  for verbatim display (Law 4). The verdict is born on the spine (core_verdicts / Law 5); this is NOT a
+ *  recomputation. */
+export interface SegmentVerdictV1 {
+  /** Tier-1 copy, rendered verbatim. */
+  copy: string;
+  render_flags: { show_arrow: boolean; show_slope: boolean; show_pct: boolean };
+  provenance: 'hr_aligned' | 'raw_pace_only';
+  /** Raw verdict passthrough for the Step-6 chart. pct/ci present ONLY when show_pct — no hidden
+   *  number reaches the client (rule D). */
+  verdict: {
+    direction: 'improving' | 'holding' | 'declining' | 'still_learning' | 'still_building';
+    metric: 'same_effort_pace' | 'raw_pace' | null;
+    n: number;
+    n_hr_aligned: number;
+    window_days: number;
+    method: string | null;
+    span_days: number | null;
+    pct?: number;
+    ci?: [number, number];
+  };
 }
 
 // ── Forward context: "what this means for future races" ──────────────────

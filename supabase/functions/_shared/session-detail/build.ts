@@ -2,7 +2,8 @@
 // SESSION_DETAIL_V1 — Build from snapshot slice + workout_analysis
 // =============================================================================
 
-import type { SessionDetailV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
+import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
+import type { VerdictDirection } from '../core-verdict.ts';
 import type { ArcPerformanceBridgeV1 } from './arc-performance-bridge.ts';
 import { mergeArcPerformanceNarrative } from './arc-performance-bridge.ts';
 import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../athlete-snapshot/types.ts';
@@ -183,7 +184,81 @@ export type SessionDetailInput = {
    *  athlete_snapshot.state_trends_v1 in workout-detail. The builder only passes it through
    *  (no re-derivation); null when no cache is available. */
   disciplineTrend?: SessionDetailV1['discipline_trend'];
+  /** core_verdicts rows for the core(s) this run traversed — loaded by workout-detail (the ONLY DB
+   *  reader). build.ts renders them (Law 4); it does not fetch or recompute. */
+  coreVerdicts?: CoreVerdictRow[] | null;
 };
+
+/** Shape of a core_verdicts row as consumed here. `direction` is typed to the SOURCE union so the
+ *  mapper's never-guard fails to compile if a new VerdictDirection variant is added upstream. */
+type CoreVerdictRow = {
+  direction: VerdictDirection;
+  metric: 'same_effort_pace' | 'raw_pace' | null;
+  pct: number | null;
+  ci_low: number | null;
+  ci_high: number | null;
+  n: number;
+  n_hr_aligned: number;
+  window_days: number;
+  method: string | null;
+  span_days: number | null;
+};
+
+/** Map spine-authored core verdict rows → the render contract. NO recomputation (Law 4). Exhaustive
+ *  direction switch behind a never-guard: a new VerdictDirection variant fails compilation here. */
+function buildSegmentVerdicts(rows: CoreVerdictRow[] | null | undefined): SegmentVerdictV1[] {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((r): SegmentVerdictV1 => {
+    let copy: string;
+    let flags: { show_arrow: boolean; show_slope: boolean; show_pct: boolean };
+    switch (r.direction) {
+      case 'still_learning': // below-confidence: has data, CI won't commit
+        copy = 'Still building a read on this stretch.';
+        flags = { show_arrow: false, show_slope: false, show_pct: false };
+        break;
+      case 'still_building': // below-floor: not enough runs yet (DISTINCT copy — PIN 2)
+        copy = 'Not enough runs on this stretch yet.';
+        flags = { show_arrow: false, show_slope: false, show_pct: false };
+        break;
+      case 'holding': // confidently flat — the ~0 pct + CI band IS the finding (PIN 3 → show_pct true)
+        copy = 'Holding steady on this stretch — same pace for the same effort.';
+        flags = { show_arrow: false, show_slope: false, show_pct: true };
+        break;
+      case 'improving':
+        copy = 'You’re getting faster on this stretch.';
+        flags = { show_arrow: true, show_slope: true, show_pct: true };
+        break;
+      case 'declining':
+        copy = 'Slipping a little on this stretch.';
+        flags = { show_arrow: true, show_slope: true, show_pct: true };
+        break;
+      default: {
+        const _exhaustive: never = r.direction; // new VerdictDirection variant → compile error here
+        throw new Error(`unhandled segment verdict direction: ${_exhaustive}`);
+      }
+    }
+    const verdict: SegmentVerdictV1['verdict'] = {
+      direction: r.direction,
+      metric: r.metric,
+      n: r.n,
+      n_hr_aligned: r.n_hr_aligned,
+      window_days: r.window_days,
+      method: r.method,
+      span_days: r.span_days,
+    };
+    // Suppress pct AND ci entirely unless show_pct — no hidden number reaches the client (rule D).
+    if (flags.show_pct) {
+      if (r.pct != null) verdict.pct = r.pct;
+      if (r.ci_low != null && r.ci_high != null) verdict.ci = [r.ci_low, r.ci_high];
+    }
+    return {
+      copy,
+      render_flags: flags,
+      provenance: r.n_hr_aligned === r.n ? 'hr_aligned' : 'raw_pace_only',
+      verdict,
+    };
+  });
+}
 
 export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1 {
   const {
@@ -831,6 +906,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         },
       };
     })(),
+
+    // Per-core segment verdict(s) — rendered from core_verdicts (spine-authored, Law 5); build.ts
+    // maps, never recomputes (Law 4). [] when this run traversed no core.
+    segment_verdicts: buildSegmentVerdicts(input.coreVerdicts),
 
     display: {
       show_adherence_chips: isTest ? false : showAdherenceChips,
