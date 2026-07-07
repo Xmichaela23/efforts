@@ -29,20 +29,20 @@ function buildRouteReadout(history: unknown): RouteReadout | null {
   const n = h.points;
   switch (h.direction) {
     case 'improving':
-      return { badge: 'Improving', headline: 'You’re getting faster on this loop.',
+      return { badge: 'Improving', headline: 'You’re getting faster on this route.',
         why: 'At the same heart rate, across your runs here — real fitness, not just a day you pushed.',
         direction: 'improving', points: n };
     case 'declining':
-      return { badge: 'Slower at effort', headline: 'Slipping a little on this loop.',
+      return { badge: 'Slower at effort', headline: 'Slipping a little on this route.',
         why: 'Lately you’re running it slower at the same heart rate. Worth a look — not a verdict.',
         direction: 'declining', points: n };
     case 'holding':
       return { badge: 'Holding', headline: 'Holding steady here.',
-        why: 'Same speed for the same effort across your runs — you’re maintaining on this loop.',
+        why: 'Same speed for the same effort across your runs — you’re maintaining on this route.',
         direction: 'holding', points: n };
     default:
       return { badge: 'Still reading', headline: `${n} runs in — the trend isn’t clear yet.`,
-        why: 'Your easy runs here vary a lot day to day. Keep logging this loop and the read sharpens.',
+        why: 'Your easy runs here vary a lot day to day. Keep logging this route and the read sharpens.',
         direction: 'still_learning', points: n };
   }
 }

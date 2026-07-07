@@ -75,7 +75,7 @@ const BADGE_TONE: Record<string, string> = {
 };
 
 // Both metrics are PACE (min/mi) — lower time = faster = plotted higher.
-function RouteChart({ runs, metric, confident }: { runs: Run[]; metric: 'adj' | 'pace'; confident: boolean }) {
+function RouteChart({ runs, metric, direction }: { runs: Run[]; metric: 'adj' | 'pace'; direction?: string }) {
   const W = 340, H = 176, mL = 44, mR = 12, mT = 10, mB = 22;
   const key = metric;
   const x0 = Math.min(...runs.map((r) => r.x));
@@ -110,9 +110,12 @@ function RouteChart({ runs, metric, confident }: { runs: Run[]; metric: 'adj' | 
       {monthTicks.map((t, i) => (
         <text key={i} x={t.x} y={H - 6} textAnchor="middle" className="fill-gray-500" fontSize={9}>{t.label}</text>
       ))}
-      {/* Trend line reflects the honest verdict: solid when confident, faded+dashed when "still reading"
-          (or no verdict yet) — so the line never overstates certainty. */}
-      <line x1={px(x0)} y1={val(f.a + f.b * x0)} x2={px(x1)} y2={val(f.a + f.b * x1)} className="text-emerald-400" stroke="currentColor" strokeWidth={2} strokeLinecap="round" opacity={confident ? 0.85 : 0.35} strokeDasharray={confident ? undefined : '5 5'} />
+      {/* Trend line ONLY when the engine reports a confident DIRECTION (improving/declining). For
+          "holding" / "still reading" / no-verdict we draw NO line — the dots + headline carry it, and a
+          sloped line under a "Holding" verdict is exactly the contradiction we must never ship. */}
+      {(direction === 'improving' || direction === 'declining') && (
+        <line x1={px(x0)} y1={val(f.a + f.b * x0)} x2={px(x1)} y2={val(f.a + f.b * x1)} className="text-emerald-400" stroke="currentColor" strokeWidth={2} strokeLinecap="round" opacity={0.85} />
+      )}
       {runs.map((r, i) => {
         const isBest = r === best;
         return (
@@ -149,7 +152,6 @@ export function RouteDoorway({ route }: { route: RouteDoorwayData }) {
     .sort((a, b) => a.x - b.x);
 
   const readout = route?.readout ?? null;
-  const confident = !!readout && readout.direction !== 'still_learning';
   const bestPace = runs.length ? paceLabel(runs.reduce((a, b) => (b.pace < a.pace ? b : a)).pace) : '—';
   const thisYear = runs.filter((r) => r.date >= '2026-01-01').length;
 
@@ -159,10 +161,18 @@ export function RouteDoorway({ route }: { route: RouteDoorwayData }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="text-xs text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1"
+        className="w-full -mx-2 px-2 py-2 rounded-lg flex items-center justify-between gap-2 text-left hover:bg-gray-800/40 transition-colors group"
       >
-        <span>Same route · run {times}×{yr ? ` since ${yr}` : ''}</span>
-        <span className="text-gray-500">›</span>
+        <span className="text-xs text-gray-300">
+          Same route · run {times}×{yr ? ` since ${yr}` : ''}
+          <span className="text-emerald-400 ml-2 font-medium">{open ? 'Hide' : 'View trend'}</span>
+        </span>
+        <svg
+          viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"
+          className={`shrink-0 text-emerald-400 transition-transform ${open ? 'rotate-90' : ''}`}
+        >
+          <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
 
       {open && (
@@ -208,14 +218,14 @@ export function RouteDoorway({ route }: { route: RouteDoorwayData }) {
                   {metric === 'adj' ? `min/mi at ~${refHR} bpm, temp-adj · up = faster` : 'min/mi · up = faster'}
                 </span>
               </div>
-              <RouteChart runs={runs} metric={metric} confident={confident} />
+              <RouteChart runs={runs} metric={metric} direction={readout?.direction} />
               <p className="text-[11.5px] text-gray-500 mt-1.5 px-0.5 flex items-center gap-1.5">
-                <span className="inline-block w-2 h-2 rounded-full border-2 border-amber-300" /> your best on this loop · tap a dot for its detail
+                <span className="inline-block w-2 h-2 rounded-full border-2 border-amber-300" /> your best on this route · tap a dot for its detail
               </p>
               <p className="text-[12px] text-gray-500 mt-1.5 leading-relaxed px-0.5">
                 {metric === 'adj'
                   ? `What you'd run at your usual effort here (~${refHR} bpm), with summer heat taken out. Faster over time = real fitness — the passive version of a MAF test.`
-                  : 'Every easy run on this loop. The spread is real — some days you push, some you cruise.'}
+                  : 'Every easy run on this route. The spread is real — some days you push, some you cruise.'}
               </p>
             </div>
           )}
