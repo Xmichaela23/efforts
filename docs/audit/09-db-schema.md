@@ -6,6 +6,8 @@ Queries run by: Michael (dashboard SQL editor, read-only).
 Doc written by: Claude, from pasted results.
 User audited: `45d122e7-a950-4d50-858c-380b492061aa`
 
+> **FLAG 2026-07-06 (route/segment audit, D-250 / Q-132):** (a) The route tables `route_clusters`, `route_progress_metrics`, `workout_route_match` exist in the live DB but have **NO migrations in `supabase/migrations/`** — schema is out-of-band; every `onConflict` key is a code-only assertion (unverifiable from source). The `route_progress_metrics` conflict key is `(route_cluster_id, workout_id)` and nothing deletes rows → orphaned duplicate rows on re-match (the June-14 dupe). Before trusting idempotency, introspect live constraints + add tracked migrations. (b) **Segment tables ALREADY EXIST** in the inventory below — `segment_progress_metrics`, `workout_segment_match`, `terrain_segments`, `course_segments`, `cycling_segment_history`. The segment-model build (`DESIGN-segments.md`) MUST inspect these first (columns, who writes them, whether they're live or vestigial) before creating new tables — there may be a usable substrate.
+
 ---
 
 ## 1. TABLE INVENTORY (ground truth)

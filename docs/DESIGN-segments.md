@@ -36,6 +36,8 @@ The client shell for all of this already exists — `src/components/RouteDoorway
 
 ## 3. Data model (needs a real migration — none exist for the current route tables!)
 > ⚠ There are **no migrations** in `supabase/migrations/` for `route_clusters`/`route_progress_metrics`/`workout_route_match` — they live only in prod. Step 0 of the build is to (a) introspect + backfill DDL for whatever we keep, and (b) add the new tables as tracked migrations. Do not add more untracked tables.
+>
+> ⚠⚠ **SEGMENT TABLES MAY ALREADY EXIST — inspect FIRST.** The 2026-06-17 DB inventory (`docs/audit/09-db-schema.md`) lists `segment_progress_metrics`, `workout_segment_match`, `terrain_segments`, `course_segments`, `cycling_segment_history` already in prod. Before creating anything below, introspect these (columns, who writes them, live vs vestigial) — there may be a usable or partially-built substrate to adopt/finish rather than a greenfield build. This changes the sizing of step 0/1.
 
 - **`segments`** — identity of a fixed sub-path: `id`, `user_id`, `polyline`/`geohash_seq` (ORDERED cell sequence, not a set), `start_cell`, `end_cell`, `distance_m`, `direction_bearing`, `first_seen_at`, `effort_count`, `metadata`.
 - **`segment_efforts`** — one row per (segment, workout): `segment_id`, `workout_id`, `user_id`, `effort_date`, `duration_s`, `distance_m`, `avg_pace_sec_per_km`, `avg_hr_bpm`, `temp_f`, `decoupling_pct`, `metadata`. **Unique on `workout_id, segment_id`; DELETE stale rows on re-derive (fixes the orphan bug).** A workout may legitimately have efforts on several segments.
@@ -51,6 +53,13 @@ Fixtures: 5 variable-length out-and-backs on one road → one spine segment cove
 
 **4.3 Segment-effort extraction** (`_shared/segment-effort.ts` + wire into `compute-facts` ingest fan-out). For each segment an activity matches, slice the GPS+time series between entry/exit indices and compute duration, distance, avg pace, avg HR, temp (from `weather_data`), decoupling — over just the segment. Write `segment_efforts` (delete-then-write per workout to avoid orphans). Register in `ingest-activity` fan-out (`~1430-1580`) AND `recompute-workout`/`bulk-reanalyze` so it can't go stale.
 
+## 4b. CONSTITUTION conformance (read `CONSTITUTION.md` — this is load-bearing)
+Checked against the six laws 2026-07-06. The segment feature must be a genuine **arm of State**, not a new government in State's colors:
+- **Law 5 (born on the spine) — the one the first draft got wrong.** The segment fitness VERDICT must be computed **on the spine** (in `compute-snapshot` / where `athlete_snapshot` + `arc-context.ts` already compute State's efficiency verdict), NOT freshly minted in `session-detail/build.ts` at display time. `session-detail/build.ts` may only READ the spine's segment verdict and author copy around it. Minting the verdict in the build layer = a new breakaway state (the Q-106/107/108 debt) — explicitly forbidden. **Segment EFFORTS (per-run pace/HR/temp facts) are fine to compute in `compute-facts`** (Law 2 scope: facts, not verdicts). The VERDICT (improving/holding/…) is the spine citizen.
+- **Law 4 (surfaces render, never re-decide).** The client (`RouteDoorway`) must NOT compute the same-effort pace or the trend-line slope — today it does both. Move per-effort same-effort pace + the trend direction/CI server/spine-side; the client only plots numbers handed to it. The trend LINE geometry is data, not a client OLS.
+- **Law 1 (one government).** The segment read derives from the SAME `efficiency_index` State uses, and is presented as a **scoped zoom** of State's efficiency ("on this segment…"), never a competing global verdict. It must never contradict State's aggregate on the base metric.
+- **Laws 2/3/6** already satisfied by §2/§5/§9 (glass-box, confidence-gated, fixtures + real-data + ≥3 recomputes).
+
 ## 5. The read (mostly REUSE — this session already built it)
 - **Metric:** same-effort pace / pace over the segment, per effort. Efficiency = `computeEfficiencyIndex` (`_shared/efficiency-index.ts`) — the SAME metric State uses (Law 1). Reuse `routeHeadline`/`routeTrend` (`_shared/heat-adjust.ts`) verbatim, fed `segment_efforts` instead of `route_progress_metrics`.
 - **Confidence floor (fixes the flip-flop):** **no directional verdict (improving/declining) under N≥8 comparable efforts.** Below that → "still building history." This is the single most important gate — the whole flip-flop was 4-effort verdicts. (Today's `routeHeadline` fires a half-vs-half direction at N≥4; raise it.)
@@ -63,8 +72,8 @@ Fixtures: 5 variable-length out-and-backs on one road → one spine segment cove
 1. **4.1 ordered path-match** primitive + fixtures. *(hard)*
 2. **4.2 segment detection** (auto-spine) + fixtures. *(hardest — pick the fork first)*
 3. **4.3 segment-effort extraction** in compute-facts + fan-out registration. *(hard)*
-4. **Read:** feed `segment_efforts` into `routeHeadline`/`routeTrend`; raise the floor to N≥8 for a direction.
-5. **Server surface:** `build.ts` serves segment list + per-segment readout (reuse `buildRouteReadout`).
+4. **Read ON THE SPINE (Law 5):** compute the per-segment same-effort pace + the trend verdict where State's efficiency verdict is already computed (`compute-snapshot` / `arc-context.ts`), feeding `segment_efforts` into `routeHeadline`/`routeTrend`; raise the floor to N≥8 for a direction. NOT in `build.ts`.
+5. **Server surface (Law 4):** `session-detail/build.ts` READS the spine's segment verdict + numbers and authors copy (the `buildRouteReadout` pattern) — it does not compute the verdict. The client renders; it computes nothing.
 6. **Client:** point `RouteDoorway` (or a `SegmentDetail`) at segment efforts. Mostly reuse.
 7. **Backfill:** detect segments + extract efforts across history; **then recompute + verify the verdict is STABLE on his real data** (the acceptance bar, §1).
 
