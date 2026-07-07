@@ -856,7 +856,9 @@ serve(async (req: Request) => {
           "Authorization": `Bearer ${svcKey}`,
           "apikey": svcKey,
         },
-        body: JSON.stringify({ user_id: userId }),
+        // dry_run threads to the leaf: a dry-run trigger keeps compute-core-verdict write-free
+        // (it returns would_persist, writes nothing) so core_verdicts stays empty during verification.
+        body: JSON.stringify({ user_id: userId, dry_run: body?.dry_run === true }),
       }).catch(() => {});
     } catch {}
 

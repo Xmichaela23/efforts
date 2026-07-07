@@ -1458,7 +1458,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { workout_id } = await req.json();
+    const { workout_id, dry_run: reqDryRun } = await req.json();
     if (!workout_id) {
       return new Response(JSON.stringify({ error: "workout_id required" }), {
         status: 400,
@@ -1798,7 +1798,8 @@ serve(async (req: Request) => {
             "Authorization": `Bearer ${svcKey}`,
             "apikey": svcKey,
           },
-          body: JSON.stringify({ user_id: w.user_id, workout_id: w.id }),
+          // dry_run threads through: a dry-run trigger keeps match-cores write-free (leaf honors it).
+          body: JSON.stringify({ user_id: w.user_id, workout_id: w.id, dry_run: reqDryRun === true }),
         }).catch(() => {});
       } catch {}
     }
@@ -1814,7 +1815,9 @@ serve(async (req: Request) => {
           "Authorization": `Bearer ${svcKey}`,
           "apikey": svcKey,
         },
-        body: JSON.stringify({ user_id: w.user_id }),
+        // dry_run threads through to compute-snapshot → compute-core-verdict, keeping the VERDICT
+        // write-free on a dry-run trigger (else a dry compute-facts would trigger a REAL verdict write).
+        body: JSON.stringify({ user_id: w.user_id, dry_run: reqDryRun === true }),
       }).catch(() => {});
     } catch {}
 
