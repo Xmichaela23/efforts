@@ -1781,6 +1781,28 @@ serve(async (req: Request) => {
       console.error("[compute-facts] session_load failed:", slErr?.message ?? slErr);
     }
 
+    // Fire-and-forget: refresh segment core EFFORTS for this run.
+    // ── SEGMENT INVARIANT: efforts refresh rides HERE — every reprocess path funnels through this
+    //    chokepoint (compute-facts), so a new reprocess path inherits it for free; do NOT scatter it
+    //    to leaf callers. Run workouts only (rides/swims have no run cores). The VERDICT then refreshes
+    //    on compute-snapshot's tail. Guarded/fire-and-forget: a failure leaves stale efforts, never
+    //    breaks compute-facts (identical posture to the compute-snapshot invoke below).
+    if (isRunDiscipline(w.type)) {
+      try {
+        const matchUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/match-cores`;
+        const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        fetch(matchUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${svcKey}`,
+            "apikey": svcKey,
+          },
+          body: JSON.stringify({ user_id: w.user_id, workout_id: w.id }),
+        }).catch(() => {});
+      } catch {}
+    }
+
     // Fire-and-forget: recompute weekly snapshot for this user
     try {
       const snapshotUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/compute-snapshot`;

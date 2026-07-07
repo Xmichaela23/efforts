@@ -841,6 +841,25 @@ serve(async (req: Request) => {
       );
     }
 
+    // Fire-and-forget: refresh the segment VERDICT for this user.
+    // ── SEGMENT INVARIANT: the verdict is BORN HERE, co-located with State's efficiency verdict
+    //    (Law 5). Riding compute-snapshot also advances the 6-month recency window even with no new
+    //    runs — a staleness case leaf-enumeration misses. Guarded/fire-and-forget: a failure leaves a
+    //    stale verdict, never breaks compute-snapshot (identical posture to the compute-facts invokes).
+    try {
+      const verdictUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/compute-core-verdict`;
+      const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      fetch(verdictUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${svcKey}`,
+          "apikey": svcKey,
+        },
+        body: JSON.stringify({ user_id: userId }),
+      }).catch(() => {});
+    } catch {}
+
     return new Response(
       JSON.stringify({
         success: true,

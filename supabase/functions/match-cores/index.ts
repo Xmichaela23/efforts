@@ -91,10 +91,15 @@ Deno.serve(async (req) => {
     .eq('user_id', userId).not('gps_track', 'is', null)
     .order('date', { ascending: true }).limit(5000);
   if (idErr) return json({ ok: false, error: `id load: ${idErr.message}` }, 500);
-  const eligible = (idRows ?? []).filter((w) => {
+  const eligibleAll = (idRows ?? []).filter((w) => {
     const t = String((w as any).type ?? '').toLowerCase();
     return (t === 'run' || t === 'running') && String((w as any).workout_status ?? '').toLowerCase() === 'completed';
   });
+  // Per-ingest scoping: when a workout_id is given (compute-facts chokepoint), match ONLY that run;
+  // otherwise match all (backfill). Efforts are upserted per (workout,core), so a single-run pass
+  // refreshes just that run's effort.
+  const scopeWorkoutId = typeof body?.workout_id === 'string' ? body.workout_id : null;
+  const eligible = scopeWorkoutId ? eligibleAll.filter((w) => (w as any).id === scopeWorkoutId) : eligibleAll;
 
   // Per-core accumulators.
   const acc = new Map<string, {
