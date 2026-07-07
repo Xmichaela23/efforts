@@ -23,6 +23,34 @@ function num(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Build a timestamp(ms) → HR map from `sensor_data.samples`. Same clock as `gps_track` (confirmed on
+ * real data: both arrays share per-point `timestamp`), so the map joins HR onto gps points by time —
+ * robust even if the two arrays differ in length. Only samples with a real HR reading are included,
+ * so a run whose HR drops out leaves those timestamps ABSENT (→ that stretch reads as no-HR, which is
+ * exactly what drives per-slice metric_source in core-effort.ts).
+ */
+export function parseHrByTime(raw: unknown): Map<number, number> {
+  let data: any = raw;
+  if (typeof raw === 'string') {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return new Map();
+    }
+  }
+  const samples: any[] = Array.isArray(data?.samples) ? data.samples : Array.isArray(data) ? data : [];
+  const m = new Map<number, number>();
+  for (const s of samples) {
+    const tms = num(s?.timestamp);
+    const tsec = num(s?.startTimeInSeconds ?? s?.t ?? s?.time);
+    const t = tms != null ? tms : tsec != null ? tsec * 1000 : null;
+    const hr = num(s?.heartRate ?? s?.heart_rate);
+    if (t != null && hr != null && hr > 0) m.set(t, hr);
+  }
+  return m;
+}
+
 export function parseGpsPoints(raw: unknown): GpsPt[] {
   let data: any = raw;
   if (typeof raw === 'string') {

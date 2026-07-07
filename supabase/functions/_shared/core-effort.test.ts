@@ -72,3 +72,19 @@ Deno.test('no per-point time → null (cannot compute a duration)', () => {
   const noTime = CORE.map((p) => ({ lat: p.lat, lng: p.lng }));
   assertEquals(computeCoreEffort({ gps: noTime, hrByT: hrFull, corePolyline: CORE }), null);
 });
+
+Deno.test('mid-core PAUSE → moving time excludes the stop; pace not inflated (real-data 14:26/mi bug)', () => {
+  const pts: EffortPoint[] = [];
+  let t = 0;
+  for (let i = 0; i < 51; i++) {
+    pts.push({ lat: CORE[i].lat, lng: CORE[i].lng, t });
+    t += 2000;
+    // 60s stop mid-core, watch logging ~2s while stationary
+    if (i === 25) for (let k = 0; k < 30; k++) { pts.push({ lat: CORE[25].lat, lng: CORE[25].lng, t }); t += 2000; }
+  }
+  const hr = new Map(pts.map((p) => [p.t!, 150]));
+  const e = computeCoreEffort({ gps: pts, hrByT: hr, corePolyline: CORE })!;
+  assert(e !== null);
+  assert(Math.abs(e.durationS - 100) < 8, `moving duration ${e.durationS} (elapsed would be ~160)`);
+  assertEquals(e.avgHrBpm, 150);
+});

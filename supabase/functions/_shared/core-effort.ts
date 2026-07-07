@@ -53,11 +53,35 @@ export interface CoreEffort {
 export interface CoreEffortOpts extends CoreMatchOpts {
   /** min fraction of sliced points that must carry HR to call the effort hr_aligned. Default 0.5. */
   hrCoverageThreshold?: number;
+  /**
+   * CALIBRATION PARAM (like coverage_frac / min_core_distance — flag as tunable, not a universal
+   * constant): the minimum speed (m/s) below which an interval counts as STOPPED and is excluded from
+   * moving time. Pace/decoupling use moving time, not elapsed, so a mid-run pause (lights, a stop)
+   * doesn't inflate the read. Default 0.5 m/s (walking is ~1.4 m/s; below 0.5 is effectively stopped).
+   */
+  movingSpeedMinMps?: number;
 }
 
 function round(n: number, dp: number): number {
   const f = 10 ** dp;
   return Math.round(n * f) / f;
+}
+
+/**
+ * Moving time (s) over ordered points: sum only the intervals where the athlete was actually covering
+ * ground (speed ≥ minSpeedMps). Excludes stopped time so a mid-run pause doesn't inflate pace.
+ */
+function movingTimeS(pts: EffortPoint[], minSpeedMps: number): number {
+  let s = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    if (a.t == null || b.t == null) continue;
+    const dt = (b.t - a.t) / 1000;
+    if (dt <= 0) continue;
+    if (haversineM(a, b) / dt >= minSpeedMps) s += dt;
+  }
+  return s;
 }
 
 /** Mean HR over a set of points, using the timestamp→HR map. Returns {mean, coverage, n}. */
@@ -83,6 +107,7 @@ function hrOver(points: EffortPoint[], hrByT: Map<number, number> | null | undef
 export function computeCoreEffort(input: CoreEffortInput, opts: CoreEffortOpts = {}): CoreEffort | null {
   const { gps, hrByT, corePolyline, tempF } = input;
   const hrCoverageThreshold = opts.hrCoverageThreshold ?? 0.5;
+  const movingSpeedMinMps = opts.movingSpeedMinMps ?? 0.5;
   if (!gps || gps.length < 2 || !corePolyline || corePolyline.length < 2) return null;
 
   const match = matchCore(gps as LatLng[], corePolyline, opts);
@@ -91,11 +116,12 @@ export function computeCoreEffort(input: CoreEffortInput, opts: CoreEffortOpts =
   const slice = gps.slice(match.entryIdx, match.exitIdx + 1);
   const tEntry = gps[match.entryIdx].t;
   const tExit = gps[match.exitIdx].t;
-  if (tEntry == null || tExit == null || tExit <= tEntry) return null; // no duration → no effort
+  if (tEntry == null || tExit == null || tExit <= tEntry) return null; // no time → no effort
 
-  const durationS = (tExit - tEntry) / 1000;
+  // MOVING time, not elapsed — a mid-core pause (lights, a stop) must not inflate the pace.
+  const durationS = movingTimeS(slice, movingSpeedMinMps);
   const distanceM = pathLengthM(slice as LatLng[]);
-  if (distanceM <= 0) return null;
+  if (durationS <= 0 || distanceM <= 0) return null;
   const avgPaceSPerKm = durationS / (distanceM / 1000);
 
   // HR + provenance, decided over THE SLICE (not the run).
@@ -110,11 +136,8 @@ export function computeCoreEffort(input: CoreEffortInput, opts: CoreEffortOpts =
     const h1 = slice.slice(0, mid + 1);
     const h2 = slice.slice(mid);
     const eff = (pts: EffortPoint[]) => {
-      const t0 = pts[0]?.t;
-      const t1 = pts[pts.length - 1]?.t;
-      if (t0 == null || t1 == null || t1 <= t0) return null;
       const dist = pathLengthM(pts as LatLng[]);
-      const dur = (t1 - t0) / 1000;
+      const dur = movingTimeS(pts, movingSpeedMinMps); // moving, not elapsed
       const hr = hrOver(pts, hrByT);
       if (dist <= 0 || dur <= 0 || hr.mean == null || hr.n < 2) return null;
       return (dist / dur) / hr.mean; // speed per bpm
