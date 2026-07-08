@@ -55,6 +55,10 @@ Deno.serve(async (req) => {
   const effortOpts = {
     movingSpeedMinMps: numOpt(body?.moving_speed_min_mps),
     hrCoverageThreshold: numOpt(body?.hr_coverage_threshold),
+    // GPS corridor for the ordered match. CALIBRATION (tunable, non-universal): 50m fit to real data
+    // 2026-07-07 — 30m dropped genuine same-stretch runs (June-28 ran 46–50m off the core line; normal
+    // run-to-run GPS spread). 50m catches them without grabbing a different road. Verify per-user.
+    bufferM: numOpt(body?.buffer_m) ?? 50,
   };
 
   const authHeader = req.headers.get('Authorization') ?? '';
