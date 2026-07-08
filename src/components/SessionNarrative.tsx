@@ -598,10 +598,14 @@ export default function SessionNarrative({
           context is a same-route EFFICIENCY read (State's pace-per-HR metric, this route only) — one
           clean line, no raw-pace chart, no dashed HR overlay. TrendSparkline/RouteSparkline are no
           longer rendered here. */}
-      {/* Familiar Routes: the familiarity line is the DOORWAY — tap to open the honest, effort-aware
-          route detail (server-authored headline + Pace/Efficiency chart). Heat parked; State still owns
-          the aggregate — this is the same efficiency metric zoomed to one loop (arm of State). */}
-      {sd?.terrain?.route && <RouteDoorway route={sd.terrain.route as any} />}
+      {/* Segment verdict: the familiarity line is the DOORWAY — tap to open the server-authored verdict
+          card + a quiet flag-driven chart. Reads segment_verdicts (spine-authored, Law 5); the client
+          only renders (Law 4). PLURAL — one doorway per core this run traversed. Supersedes the old
+          terrain.route doorway (Q-133 peel-back of that read-path still owed). */}
+      {Array.isArray((sd as any)?.segment_verdicts) &&
+        (sd as any).segment_verdicts.map((sv: any, i: number) => (
+          <RouteDoorway key={i} verdict={sv} />
+        ))}
       {hasAnalysisDetails && (
         <div className="space-y-1.5">
           {analysisRows.slice(0, 8).map((r, i) => {

@@ -622,9 +622,10 @@ async function runSessionDetailPipelineAndPersist(
       /* non-fatal logging */
     }
 
-    // Segment verdict(s) for the core(s) this run traversed — the ONLY DB reader of core_verdicts.
-    // build.ts renders these (Law 4); it does not fetch or recompute. Plural: a run can traverse >1
-    // core. Non-fatal: a read failure yields [] (no segment_verdicts), never breaks session-detail.
+    // Segment verdict(s) + windowed chart points for the core(s) this run traversed — the ONLY DB
+    // reader of core_verdicts / core_efforts. build.ts renders (Law 4); it does not fetch/recompute.
+    // Plural (a run can traverse >1 core). SERVER-WINDOWED: points come from the SAME window the verdict
+    // used (its as_of + window_days) so chart and verdict can never disagree. Non-fatal → [] on failure.
     let coreVerdicts: any[] = [];
     try {
       const { data: effRows } = await supabase
@@ -633,7 +634,50 @@ async function runSessionDetailPipelineAndPersist(
       if (coreIds.length > 0) {
         const { data: vRows } = await supabase
           .from('core_verdicts').select('*').in('core_id', coreIds);
-        coreVerdicts = Array.isArray(vRows) ? vRows : [];
+        const verdicts = Array.isArray(vRows) ? vRows : [];
+        for (const v of verdicts) {
+          const asOf = String((v as any)?.metadata?.as_of || workoutDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
+          const windowDays = Number((v as any).window_days) || 183;
+          const start = new Date(Date.parse(asOf + 'T00:00:00Z') - windowDays * 86400000).toISOString().slice(0, 10);
+          const { data: effs } = await supabase
+            .from('core_efforts')
+            .select('effort_date, avg_pace_s_per_km, avg_hr_bpm, metric_source')
+            .eq('core_id', (v as any).core_id)
+            .gte('effort_date', start).lte('effort_date', asOf)
+            .order('effort_date', { ascending: true });
+          const rows = (effs ?? []).filter((e: any) => e.avg_pace_s_per_km != null);
+          // same-effort pace = pace normalized to typical HR (mean HR over the window)
+          const hrs = rows.map((e: any) => Number(e.avg_hr_bpm)).filter((h: number) => h > 0);
+          const refHr = hrs.length ? hrs.reduce((a: number, b: number) => a + b, 0) / hrs.length : null;
+          const pts = rows.map((e: any) => {
+            const pace = Number(e.avg_pace_s_per_km);
+            const hr = Number(e.avg_hr_bpm);
+            const sameEff = refHr && hr > 0 ? Math.round(pace * hr / refHr) : Math.round(pace);
+            return {
+              date: String(e.effort_date).slice(0, 10),
+              pace_s_per_km: Math.round(pace),
+              same_effort_pace_s_per_km: sameEff,
+              provenance: e.metric_source === 'hr_aligned' ? 'hr_aligned' : 'raw_pace_only',
+              is_best_same: false,
+              is_best_pace: false,
+            };
+          });
+          if (pts.length > 0) {
+            let bs = 0, bp = 0; // per-lens PR (fastest = min)
+            pts.forEach((p: any, i: number) => {
+              if (p.same_effort_pace_s_per_km < pts[bs].same_effort_pace_s_per_km) bs = i;
+              if (p.pace_s_per_km < pts[bp].pace_s_per_km) bp = i;
+            });
+            pts[bs].is_best_same = true;
+            pts[bp].is_best_pace = true;
+          }
+          (v as any).chart_points = pts;
+          // all-time efforts on this core (NOT windowed) — the familiarity count for "n of N runs"
+          const { count: allTime } = await supabase
+            .from('core_efforts').select('id', { count: 'exact', head: true }).eq('core_id', (v as any).core_id);
+          (v as any).runs_all_time = allTime ?? pts.length;
+        }
+        coreVerdicts = verdicts;
       }
     } catch (cvErr) {
       console.warn('[workout-detail] core_verdicts read failed (non-fatal):', cvErr instanceof Error ? cvErr.message : cvErr);

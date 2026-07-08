@@ -477,6 +477,20 @@ export interface SegmentVerdictV1 {
     pct?: number;
     ci?: [number, number];
   };
+  /** The per-effort chart points — SERVER-WINDOWED to the exact set the verdict used (never all-time;
+   *  the client draws these verbatim, no filtering/windowing/query). `same_effort_pace` = pace
+   *  normalized to typical HR over the window. PR flags are per-lens (gold dot). */
+  chart_points: Array<{
+    date: string; // YYYY-MM-DD
+    pace_s_per_km: number;
+    same_effort_pace_s_per_km: number;
+    provenance: 'hr_aligned' | 'raw_pace_only';
+    is_best_same: boolean; // fastest same-effort pace → PR on the Same-effort lens
+    is_best_pace: boolean; // fastest raw pace → PR on the Pace lens
+  }>;
+  /** All-time efforts on this core (NOT windowed) — the familiarity count. verdict.n is the in-window
+   *  subset; the card shows "n of runs_all_time" so the anchor-drop never reads as a miscount. */
+  runs_all_time: number;
 }
 
 // ── Forward context: "what this means for future races" ──────────────────

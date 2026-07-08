@@ -202,6 +202,10 @@ type CoreVerdictRow = {
   window_days: number;
   method: string | null;
   span_days: number | null;
+  /** Windowed per-effort chart points, prepared by workout-detail (the data-loading layer); build.ts
+   *  passes them through untouched — no windowing/recompute here (Law 4). */
+  chart_points?: SegmentVerdictV1['chart_points'];
+  runs_all_time?: number;
 };
 
 /** Map spine-authored core verdict rows → the render contract. NO recomputation (Law 4). Exhaustive
@@ -256,6 +260,8 @@ function buildSegmentVerdicts(rows: CoreVerdictRow[] | null | undefined): Segmen
       render_flags: flags,
       provenance: r.n_hr_aligned === r.n ? 'hr_aligned' : 'raw_pace_only',
       verdict,
+      chart_points: Array.isArray(r.chart_points) ? r.chart_points : [], // server-windowed; passthrough
+      runs_all_time: typeof r.runs_all_time === 'number' ? r.runs_all_time : r.n,
     };
   });
 }
