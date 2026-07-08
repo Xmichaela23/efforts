@@ -512,6 +512,19 @@ Pattern-matched the swim surfaces to the existing design system (Details READOUT
 
 ---
 
+## Segments → Best Efforts (2026-07-07)
+
+**Done (this session):**
+- [x] **Segment card polish (2026-07-07)** — HR added to the tap detail (`date · pace · HR`); dots brighter (gray-300 @0.7, tapped→gray-100, gold PR intact); tap now works on touch (was desktop-hover only) via an invisible larger hit target + `useState`; legibility (headline 19→17px, y-axis/month labels + readout larger & brighter). Verified live on real data.
+- [x] **Match corridor 30→50m (D-257)** — real GPS ran 46–50m off the frozen line; 30m dropped genuine runs. Re-matched → 23 efforts (was 20).
+
+**Open (carried forward):**
+- [ ] **iOS bundle rebuild (`npm run ios`)** — the segment card is web-only; iOS still runs the pre-deploy bundle. Do before relying on the card on a phone.
+- [ ] **Q-133 peel-back** — delete the now-dead `buildRouteReadout` + `terrain.route` emission in `session-detail/build.ts` (client switched to `segment_verdicts`, D-256; nothing reads it). Low-risk cleanup.
+- [ ] **`calculateBestRunEfforts` ±2% window edge** — the best-effort finder only considers windows within ±2% of the exact distance, so choppy GPS can miss the true best. Tighten during the Best Efforts backfill (`DESIGN-best-efforts.md` §1/§3).
+
+---
+
 ## Done = launchable
 
 When items 1-7 are all 100% and background items are closed, the app ships every flow clean. No new features past this point. Polish only.
