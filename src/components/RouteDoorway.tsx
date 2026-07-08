@@ -102,12 +102,12 @@ function SegmentChart({ pts, metric, showSlope }: { pts: ChartPoint[]; metric: '
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" role="img" aria-label="Your efforts on this stretch">
         {gridY.map((v, i) => (
           <g key={i}>
-            <line x1={mL} y1={py(v)} x2={W - mR} y2={py(v)} stroke="currentColor" className="text-gray-700/50" strokeWidth={1} />
-            <text x={mL - 6} y={py(v) + 3} textAnchor="end" className="fill-gray-500 tabular-nums" fontSize={9.5}>{paceLabel(v)}</text>
+            <line x1={mL} y1={py(v)} x2={W - mR} y2={py(v)} stroke="currentColor" className="text-gray-700/60" strokeWidth={1} />
+            <text x={mL - 7} y={py(v) + 3.5} textAnchor="end" className="fill-gray-300 tabular-nums" fontSize={11}>{paceLabel(v)}</text>
           </g>
         ))}
         {monthTicks.map((t, i) => (
-          <text key={i} x={t.x} y={H - 6} textAnchor="middle" className="fill-gray-500" fontSize={9}>{t.label}</text>
+          <text key={i} x={t.x} y={H - 5} textAnchor="middle" className="fill-gray-300" fontSize={10.5}>{t.label}</text>
         ))}
         {fit && (
           <line
@@ -135,10 +135,10 @@ function SegmentChart({ pts, metric, showSlope }: { pts: ChartPoint[]; metric: '
           );
         })}
       </svg>
-      <p className="text-[11.5px] mt-1.5 px-0.5 flex items-center gap-1.5 tabular-nums">
+      <p className="text-[13px] mt-2 px-0.5 flex items-center gap-2 tabular-nums">
         {tp ? (
           <>
-            <span className={`inline-block w-2 h-2 rounded-full ${isBestOf(tp) ? 'bg-amber-300' : 'bg-gray-200'}`} />
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${isBestOf(tp) ? 'bg-amber-300' : 'bg-gray-200'}`} />
             <span className="text-gray-300">
               <b className="text-gray-100 font-semibold">{paceLabel(valOf(tp))}/mi</b> · {dateLabel(dayNum(tp.date))}
               {tp.hr > 0 ? ` · HR ${tp.hr}` : ''}{isBestOf(tp) ? ' · your best' : ''}
@@ -146,8 +146,8 @@ function SegmentChart({ pts, metric, showSlope }: { pts: ChartPoint[]; metric: '
           </>
         ) : (
           <>
-            <span className="inline-block w-2 h-2 rounded-full bg-amber-300" />
-            <span className="text-gray-500">your best · tap a dot for its detail</span>
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-300" />
+            <span className="text-gray-400">your best · tap a dot for its detail</span>
           </>
         )}
       </p>
@@ -190,7 +190,7 @@ export function RouteDoorway({ verdict }: { verdict: SegmentVerdict | null | und
           {/* CARD carries the claim — the server-authored verdict copy is the headline. */}
           <div className="rounded-2xl border border-gray-700/60 bg-gray-800/40 p-4">
             <span className={`inline-block text-[11px] font-semibold px-2.5 py-1 rounded-full ${pill.tone}`}>{pill.label}</span>
-            <p className="text-[19px] font-semibold text-gray-100 mt-2.5 leading-snug">{verdict.copy}</p>
+            <p className="text-[17px] font-semibold text-gray-100 mt-2.5 leading-snug">{verdict.copy}</p>
             <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-3 text-[12.5px] text-gray-400 tabular-nums">
               <span><b className="text-gray-200 font-semibold">{v.n}</b> of {allTime} runs</span>
               <span className="text-gray-600">·</span>
