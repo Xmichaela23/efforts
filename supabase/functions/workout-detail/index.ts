@@ -657,6 +657,7 @@ async function runSessionDetailPipelineAndPersist(
               date: String(e.effort_date).slice(0, 10),
               pace_s_per_km: Math.round(pace),
               same_effort_pace_s_per_km: sameEff,
+              hr: hr > 0 ? Math.round(hr) : 0,
               provenance: e.metric_source === 'hr_aligned' ? 'hr_aligned' : 'raw_pace_only',
               is_best_same: false,
               is_best_pace: false,

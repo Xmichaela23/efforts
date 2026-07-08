@@ -484,6 +484,7 @@ export interface SegmentVerdictV1 {
     date: string; // YYYY-MM-DD
     pace_s_per_km: number;
     same_effort_pace_s_per_km: number;
+    hr: number; // avg HR on the core for this effort (0 when unavailable) — shown in the tap detail
     provenance: 'hr_aligned' | 'raw_pace_only';
     is_best_same: boolean; // fastest same-effort pace → PR on the Same-effort lens
     is_best_pace: boolean; // fastest raw pace → PR on the Pace lens

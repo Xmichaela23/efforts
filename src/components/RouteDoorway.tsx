@@ -2,20 +2,21 @@ import { useState } from 'react';
 
 /**
  * Segment doorway — "am I getting faster on this stretch." The session card shows a familiarity line
- * ("Same stretch · ran N×"); tapping opens the verdict CARD (server-authored copy, rendered verbatim)
- * + a quiet supporting chart. The CARD carries the claim; the chart is quiet evidence.
+ * ("Same stretch · ran N×"); tapping opens the server-authored verdict CARD (rendered verbatim) + a
+ * quiet supporting chart. The CARD carries the claim; the chart is quiet evidence.
  *
  * FLAG-DRIVEN (Law 4 — render, don't re-decide). The server sends render_flags {show_arrow, show_slope,
  * show_pct}. Honesty is the DEFAULT: flags switch features ON (a trend line, an arrow, a %); their
- * absence (still_learning / still_building) means a quiet faded scatter with NO slope. The client draws
- * ONLY the server-windowed chart_points — no windowing, no same-effort recompute, no core_efforts query.
- * The verdict is born on the spine (core_verdicts / Law 5); this component only presents it.
+ * absence (still_learning / still_building) means a quiet scatter with NO slope. The client draws ONLY
+ * the server-windowed chart_points — no windowing, no same-effort recompute, no core_efforts query. The
+ * verdict is born on the spine (core_verdicts / Law 5); this component only presents it.
  */
 
 type ChartPoint = {
   date: string;
   pace_s_per_km: number;
   same_effort_pace_s_per_km: number;
+  hr: number;
   provenance: 'hr_aligned' | 'raw_pace_only';
   is_best_same: boolean;
   is_best_pace: boolean;
@@ -47,6 +48,7 @@ const paceLabel = (sPerKm: number) => {
 };
 const dayNum = (s: string) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 864e5;
 const monthLabel = (x: number) => new Date(x * 864e5).toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+const dateLabel = (x: number) => new Date(x * 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 function ols(xs: number[], ys: number[]) {
   const n = xs.length;
@@ -70,8 +72,10 @@ const PILL: Record<string, { label: string; tone: string }> = {
 };
 
 function SegmentChart({ pts, metric, showSlope }: { pts: ChartPoint[]; metric: 'same' | 'pace'; showSlope: boolean }) {
+  const [tap, setTap] = useState<number | null>(null);
   const W = 340, H = 176, mL = 44, mR = 12, mT = 12, mB = 22;
   const valOf = (p: ChartPoint) => (metric === 'same' ? p.same_effort_pace_s_per_km : p.pace_s_per_km);
+  const isBestOf = (p: ChartPoint) => (metric === 'same' ? p.is_best_same : p.is_best_pace);
   const xs = pts.map((p) => dayNum(p.date));
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
   // LOCKED y-range across BOTH lenses — flipping Same-effort/Pace must not rescale the axis.
@@ -88,44 +92,66 @@ function SegmentChart({ pts, metric, showSlope }: { pts: ChartPoint[]; metric: '
     const p = pts.find((pp) => pp.date.slice(0, 7) === mo)!;
     return { x: Math.min(Math.max(px(dayNum(p.date)), mL + 6), W - mR - 6), label: monthLabel(dayNum(p.date)) };
   });
-  // Trend line geometry ONLY when the server says show_slope (a confident direction). It fits over the
-  // server-sent points — it never windows or re-decides the verdict.
+  // Trend line geometry ONLY when the server says show_slope. It fits over the server-sent points — it
+  // never windows or re-decides the verdict.
   const fit = showSlope ? ols(xs, pts.map(valOf)) : null;
+  const tp = tap != null ? pts[tap] : null;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" role="img" aria-label="Your efforts on this stretch">
-      {gridY.map((v, i) => (
-        <g key={i}>
-          <line x1={mL} y1={py(v)} x2={W - mR} y2={py(v)} stroke="currentColor" className="text-gray-700/50" strokeWidth={1} />
-          <text x={mL - 6} y={py(v) + 3} textAnchor="end" className="fill-gray-500 tabular-nums" fontSize={9.5}>{paceLabel(v)}</text>
-        </g>
-      ))}
-      {monthTicks.map((t, i) => (
-        <text key={i} x={t.x} y={H - 6} textAnchor="middle" className="fill-gray-500" fontSize={9}>{t.label}</text>
-      ))}
-      {fit && (
-        <line
-          x1={px(x0)} y1={py(fit.a + fit.b * x0)} x2={px(x1)} y2={py(fit.a + fit.b * x1)}
-          className="text-emerald-400" stroke="currentColor" strokeWidth={2} strokeLinecap="round" opacity={0.85}
-        />
-      )}
-      {pts.map((p, i) => {
-        const isBest = metric === 'same' ? p.is_best_same : p.is_best_pace;
-        const cx = px(dayNum(p.date)), cy = py(valOf(p));
-        return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" role="img" aria-label="Your efforts on this stretch">
+        {gridY.map((v, i) => (
           <g key={i}>
-            {isBest && <circle cx={cx} cy={cy} r={9} className="fill-amber-300/15" />}
-            <circle
-              cx={cx} cy={cy} r={isBest ? 5.5 : 4}
-              className={isBest ? 'fill-amber-300' : 'fill-gray-400'} fillOpacity={isBest ? 1 : 0.42}
-              stroke="currentColor" strokeWidth={1.4} style={{ color: 'rgb(17 24 39)' }}
-            >
-              <title>{new Date(dayNum(p.date) * 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })} · {paceLabel(valOf(p))}/mi{isBest ? ' · your best' : ''}</title>
-            </circle>
+            <line x1={mL} y1={py(v)} x2={W - mR} y2={py(v)} stroke="currentColor" className="text-gray-700/50" strokeWidth={1} />
+            <text x={mL - 6} y={py(v) + 3} textAnchor="end" className="fill-gray-500 tabular-nums" fontSize={9.5}>{paceLabel(v)}</text>
           </g>
-        );
-      })}
-    </svg>
+        ))}
+        {monthTicks.map((t, i) => (
+          <text key={i} x={t.x} y={H - 6} textAnchor="middle" className="fill-gray-500" fontSize={9}>{t.label}</text>
+        ))}
+        {fit && (
+          <line
+            x1={px(x0)} y1={py(fit.a + fit.b * x0)} x2={px(x1)} y2={py(fit.a + fit.b * x1)}
+            className="text-emerald-400" stroke="currentColor" strokeWidth={2} strokeLinecap="round" opacity={0.85}
+          />
+        )}
+        {pts.map((p, i) => {
+          const isBest = isBestOf(p), isTap = tap === i;
+          const cx = px(dayNum(p.date)), cy = py(valOf(p));
+          const fill = isBest ? 'fill-amber-300' : isTap ? 'fill-gray-100' : 'fill-gray-300';
+          return (
+            <g key={i}>
+              {isBest && <circle cx={cx} cy={cy} r={9} className="fill-amber-300/20" />}
+              {isTap && !isBest && <circle cx={cx} cy={cy} r={9} className="fill-gray-100/15" />}
+              <circle
+                cx={cx} cy={cy} r={isBest || isTap ? 5.5 : 4}
+                className={fill} fillOpacity={isBest || isTap ? 1 : 0.7}
+                stroke="currentColor" strokeWidth={1.4} style={{ color: 'rgb(17 24 39)', cursor: 'pointer' }}
+                onClick={() => setTap(i)}
+              />
+              {/* larger invisible touch target */}
+              <circle cx={cx} cy={cy} r={12} fill="transparent" style={{ cursor: 'pointer' }} onClick={() => setTap(i)} />
+            </g>
+          );
+        })}
+      </svg>
+      <p className="text-[11.5px] mt-1.5 px-0.5 flex items-center gap-1.5 tabular-nums">
+        {tp ? (
+          <>
+            <span className={`inline-block w-2 h-2 rounded-full ${isBestOf(tp) ? 'bg-amber-300' : 'bg-gray-200'}`} />
+            <span className="text-gray-300">
+              <b className="text-gray-100 font-semibold">{paceLabel(valOf(tp))}/mi</b> · {dateLabel(dayNum(tp.date))}
+              {tp.hr > 0 ? ` · HR ${tp.hr}` : ''}{isBestOf(tp) ? ' · your best' : ''}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="inline-block w-2 h-2 rounded-full bg-amber-300" />
+            <span className="text-gray-500">your best · tap a dot for its detail</span>
+          </>
+        )}
+      </p>
+    </div>
   );
 }
 
@@ -196,9 +222,6 @@ export function RouteDoorway({ verdict }: { verdict: SegmentVerdict | null | und
               </div>
             </div>
             <SegmentChart pts={pts} metric={metric} showSlope={flags.show_slope} />
-            <p className="text-[11.5px] text-gray-500 mt-1.5 px-0.5 flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-amber-300" /> your best · tap a dot for its detail
-            </p>
           </div>
 
           {/* Honesty line — kept verbatim. */}
