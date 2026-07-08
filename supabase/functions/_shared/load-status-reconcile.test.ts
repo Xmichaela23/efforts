@@ -83,6 +83,14 @@ Deno.test('build + cross-training swap @ ACWR 1.4 → on_target (Gate 2)', () =>
   assertStringIncludes(r.interpretation, 'within build tolerance');
 });
 
+// ── baseline week (strength 'Base' phase → 'baseline' intent) fires Gate 2 ──
+// Locks the base → baseline → Gate 2 chain end-to-end (the D-261 near-miss:
+// resolver emits phase 'Base', map → 'baseline', Gate 2 must treat it like build).
+Deno.test('baseline week @ ACWR 1.4 → on_target (Gate 2 fires for baseline, not just build)', () => {
+  const r = run({ planPosition: { weekIntent: 'baseline' } });
+  assertEquals(r.status, 'on_target');
+});
+
 // ── unknown × cross-training-swap → Gate 1 alone (Gate 2 inert) ───────────
 Deno.test('unknown + cross-training swap @ ACWR 1.4 + readiness ok → elevated (Gate 1 only)', () => {
   const r = run({ planPosition: { weekIntent: 'unknown' } });

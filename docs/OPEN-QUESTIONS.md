@@ -1705,6 +1705,16 @@ Observed live on user 45d122e7 (WK1, 2026-07-08): the raw gauge showed `ACWR 1.6
 
 Drop B from the Q-136 trace, logged separately because it's a distinct cleanup with its own lifecycle. `compute-snapshot/index.ts:539` declares `let planPhase: string | null = null` and persists it at `:783` (`plan_phase: planPhase`), but **it is never reassigned** — so `athlete_snapshot.plan_phase` is `null` on every row (matches the `09-db-schema.md` §4 audit finding). Critically, this is **NOT** the cause of Gate 2 being inert: coach does not read this column — it re-derives `weekIntent` live from the plan config (see [[Q-136]] Drop A). So Drop B has no current functional impact on the load-status path; it's a latent trap only for any future consumer that trusts the column. **Decision owed (later, low priority):** either populate it in `compute-snapshot` (mirror the arc-context `config.phases` resolution so the persisted column matches coach's live `weekIntent`) OR drop the column to remove the trap. No urgency; revisit alongside the Q-136 read-time fix so both phase-resolution paths use one shared resolver rather than diverging again.
 
+### Q-139 — Strength-led blocks resolve a phase but route lossily through an endurance intent model; strength progression may need its own load tolerance (2026-07-08, FILED — two-problem seam, partially touched by Item 2)
+
+Surfaced wiring D-261: the primary user's `Get stronger` (`strength_primary_v1`) plan resolves its phase correctly now (`Base`/`Power`/`Deload`/`Peak`/`Retest` via `config.phase_structure.phases`), but those names route through `phaseNameToWeekIntent`, which is endurance-shaped. **This is really TWO problems — flagging the seam so later work doesn't conflate them:**
+
+1. **Phase NAME mapping (lossy).** `Base → baseline` and `Deload → recovery` are honest; but `Power`/`Peak`/`Retest` have no clean endurance analog. D-261 routes them to the `'unknown'` fail-safe default (strict bands) rather than inventing a mapping — safe, but it means a strength Power/Retest week gets no plan-phase leniency at all. Nothing yet addresses this beyond the fail-safe.
+
+2. **Load TOLERANCE (borrowed, not modelled).** Even where the name maps (`Base → baseline`), Gate 2 hands strength blocks the **endurance build-band** tolerance (`build_optimal_max 1.5`). A heavy strength block should tolerate higher acute load without reading as overload, but there's no reason its tolerance curve equals endurance's — it's borrowed, not derived. This is the D-259 theme again (endurance-shaped reasoning applied to a non-endurance athlete). **Item 2 (intensity-binned per-domain load) touches this** — per-domain strength ratios become reconciler inputs — but does not fully close it: the *band* a strength block earns is still an open modelling question.
+
+**Log only for now** — informs the load-system extension doc. Don't engineer a fake phase or a bespoke strength band before Item 2's per-domain inputs exist; revisit tolerance (problem 2) once they do, and problem 1 (naming) separately if strength plans grow phase names worth mapping.
+
 ## When to add an entry
 
 Add a new Q-NNN when:

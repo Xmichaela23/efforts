@@ -357,6 +357,8 @@ export type CoachWeekContextResponseV1 = {
       intent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
       focus_label: string | null;
       intent_summary: string | null;
+      /** D-261: where `intent`'s phase was resolved from (glass-box receipt). */
+      phase_source: 'phase_by_week' | 'config_phases_fallback' | 'phase_structure' | 'unknown';
     };
     plan: {
       has_active_plan: boolean;

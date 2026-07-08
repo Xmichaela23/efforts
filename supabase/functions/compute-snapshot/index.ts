@@ -31,6 +31,7 @@ import {
   type StateTrendsV1,
 } from "../_shared/state-trend/index.ts";
 import { computeAcwr, type LoadRow } from "../_shared/acwr.ts";
+import { resolvePlanPhase } from "../_shared/plan-phase.ts";
 import { localDateInTz } from "../_shared/local-date.ts";
 
 // ---------------------------------------------------------------------------
@@ -552,6 +553,13 @@ serve(async (req: Request) => {
         if (pws && pws[0]) {
           planWeekNumber = pws[0].week_number;
         }
+      }
+      // D-261 / Q-138: populate plan_phase from the single resolver (was a dead
+      // null stub — declared, persisted, never assigned). Phase NAME goes in the
+      // column; coach maps its own week_intent off the same resolver.
+      if (planWeekNumber != null) {
+        const { data: planRow } = await supabase.from("plans").select("config").eq("id", planId).maybeSingle();
+        planPhase = resolvePlanPhase(planRow?.config ?? null, planWeekNumber);
       }
     }
 

@@ -30,6 +30,7 @@ import { computeAcwr, computeEstimatedLoadDisclosure, type LoadRow, type Disclos
 import { getRunningFatigueWeight, getCyclingFatigueWeight } from '../_shared/fatigue-weights.ts';
 import { isLowTrustWorkload } from '../_shared/workload.ts';
 import { reconcileLoadStatus } from '../_shared/load-status-reconcile.ts';
+import { resolvePlanPhaseDetailed, phaseNameToWeekIntent, type PhaseSource } from '../_shared/plan-phase.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
 import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel } from '../_shared/state-trend/index.ts';
@@ -640,22 +641,19 @@ function computeWeekIndex(planConfig: any, focusIso: string, weekStartDow: WeekS
   return resolvePlanWeekIndex(planConfig, focusIso, durationWeeks);
 }
 
-function weekIntentFromContract(planConfig: any, weekIndex: number | null): { intent: CoachWeekContextResponseV1['plan']['week_intent']; focus_label: string | null } {
-  if (!weekIndex) return { intent: 'unknown', focus_label: null };
+function weekIntentFromContract(planConfig: any, weekIndex: number | null): { intent: CoachWeekContextResponseV1['plan']['week_intent']; focus_label: string | null; phase_source: PhaseSource } {
+  if (!weekIndex) return { intent: 'unknown', focus_label: null, phase_source: 'unknown' };
+  // D-261: single plan-phase resolver — phase_by_week (standalone run/tri) →
+  // config.phases (combined) → config.phase_structure.phases (strength_primary).
+  // Was phase_by_week-only → 'unknown' for every multi-sport / strength plan
+  // (Q-136 Drop A). `phaseNameToWeekIntent` maps the raw name (deload→recovery,
+  // unknown phase → 'unknown' fail-safe). `phase_source` is the glass-box receipt.
+  const resolved = resolvePlanPhaseDetailed(planConfig, weekIndex);
+  const intent = phaseNameToWeekIntent(resolved.phase) as CoachWeekContextResponseV1['plan']['week_intent'];
   const c = planConfig?.plan_contract_v1;
-  const phases: string[] | null = Array.isArray(c?.phase_by_week) ? c.phase_by_week : null;
   const intents: any[] | null = Array.isArray(c?.week_intent_by_week) ? c.week_intent_by_week : null;
-  let intent: CoachWeekContextResponseV1['plan']['week_intent'] = 'unknown';
-  if (phases && weekIndex >= 1 && weekIndex <= phases.length) {
-    const p = String(phases[weekIndex - 1] || '').toLowerCase();
-    if (p === 'recovery') intent = 'recovery';
-    else if (p === 'taper') intent = 'taper';
-    else if (p === 'peak') intent = 'peak';
-    else if (p === 'base') intent = 'baseline';
-    else if (p) intent = 'build';
-  }
   const focus_label = intents ? String((intents.find((x: any) => Number(x?.week_index) === weekIndex)?.focus_label) || '') || null : null;
-  return { intent, focus_label };
+  return { intent, focus_label, phase_source: resolved.phase_source };
 }
 
 // ---------------------------------------------------------------------------
@@ -1027,9 +1025,10 @@ Deno.serve(async (req) => {
     // During this window, load-ratio comparisons are often contaminated by the prior cycle.
     const isPlanTransitionPeriod = isPlanTransitionWindowByWeekIndex(weekIndex);
 
-    const weekIntentInfo = activePlan ? weekIntentFromContract(planConfig, weekIndex) : { intent: 'unknown', focus_label: null };
+    const weekIntentInfo = activePlan ? weekIntentFromContract(planConfig, weekIndex) : { intent: 'unknown', focus_label: null, phase_source: 'unknown' as PhaseSource };
     const weekIntent = weekIntentInfo.intent as CoachWeekContextResponseV1['plan']['week_intent'];
     const weekFocusLabel = weekIntentInfo.focus_label as string | null;
+    const weekPhaseSource = weekIntentInfo.phase_source as PhaseSource;
     const methodologyCtx: MethodologyContext = { week_intent: weekIntent as any, week_start_dow: weekStartDow };
 
     // Planned rows within the week window — scoped to all active plans so
@@ -4788,6 +4787,7 @@ ${narrativeFacts.join('\n')}`;
         index: planActiveNow ? weekIndex : null,
         intent: weekIntent,
         focus_label: weekFocusLabel,
+        phase_source: weekPhaseSource, // D-261: glass-box receipt for how `intent` resolved
         intent_summary: (() => {
           const rs = readinessState;
           const intent = weekIntent;
