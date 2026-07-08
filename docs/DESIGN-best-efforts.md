@@ -12,13 +12,13 @@ The primary user (Michael) doesn't run routes — he runs an **area**: a familia
 
 **Incumbent research (2026-07-07):** Strava/Garmin solve variable-length running with **Best Efforts**, not tighter route-matching. Best Efforts finds your **fastest time at benchmark distances (1mi, 5K, 10K…) within ANY run**, regardless of route/length, and trends them. It's the standard, it generalizes, it needs no route. Strava/Garmin run **both** (Segments + Best Efforts) — so do we. **Decision: Best Efforts is the PRIMARY lens; segments stay as the secondary lens for true repeats.** (Sources: Strava Best Efforts / Matched Activities / GAP help; Garmin Segments.)
 
-The distance-only objection is real — *distance ignores terrain* (a hilly 5K ≠ a flat 5K). The answer (both already in our engine): **GAP** (grade-adjusted pace, Minetti) removes hills; **same-effort pace** (HR-normalized) removes total effort. So the metric is **"fastest GAP-adjusted 5K at your typical effort,"** not raw pace. Residual (surface/trail/wind that GAP misses) is accepted noise — a mostly-terrain-proof read on *all* runs beats a perfect read on the ~20% that repeat a route.
+**Metric = PACE / SPEED, hills out — NOT efficiency (ruled 2026-07-07).** Best Efforts trends your **best GAP-adjusted pace at distance** (grade-adjusted so a hilly 5K and a flat 5K compare — the terrain objection stands and GAP answers it). It does **NOT** HR-normalize (the "same-effort" layer the segment uses). Reason: a best effort is by definition a *peak* — HR-normalizing a max effort to "typical HR" is conceptually backwards (adjusting an all-out effort as if it were submaximal) and muddies a clean speed number. Effort is controlled a cleaner way — by reading the **PR frontier** (your *fastest* efforts), which self-selects for hard days; an easy-run week just doesn't produce a PR (exactly how Strava Best Efforts works), it sits low on the chart and the fast frontier carries the trend. **Two clean lenses, both speed:** raw **Pace** (what you ran) and **GAP pace** (hills out). This also keeps the three fitness dimensions cleanly separated: Best Efforts = **peak output (speed)**; economy (efficiency) and durability (decoupling) stay in State + the segment card, where effort-normalization belongs. Residual terrain GAP misses (surface/trail/wind) is accepted noise.
 
 **Cross-sport — this is ONE idea, one metric per sport.** "Best output over time" generalizes across the triathlete's disciplines; only the per-workout metric changes. Build the verdict/trend engine ONCE and feed it each sport's metric:
 
 | sport | metric | terrain adjustment | already computed? | on the spine? |
 |---|---|---|---|---|
-| **Run** | best pace at distance (1mi / 5K / 10K) | **GAP** (hills) + same-effort (HR) | finder yes (raw pace); GAP not wired in | no |
+| **Run** | best pace at distance (1mi / 5K / 10K) | **GAP** (hills) — NO HR/efficiency | finder yes (raw pace); GAP not wired in | no |
 | **Bike** | best power at duration (5s / 1min / 5min / 20min / 60min) | **NONE** — power is inherently terrain-proof (watts is watts uphill) | `calculatePowerCurve` yes | **partly** — `w20`, CTL/ATL/TSB already in `athlete_snapshot` |
 | **Swim** | best pace at distance (pool) | none (no terrain) | — | no |
 
@@ -43,7 +43,7 @@ This is NOT a from-scratch build. Verify each before building:
 ## 2. What the user sees (mirror the segment card)
 Best Efforts becomes the **primary** fitness lens (segments demoted to secondary/"when you repeat a route"):
 - **Tier 1 — headline verdict per distance**, server-authored, rendered verbatim: "Your 5K's getting faster" / "Holding" / "Still building a read." CI-gated, N≥8 floor, **no directional verdict under the floor** (reuse `core-verdict.ts` gate). Same "stay quiet until it's real" honesty.
-- **Tier 2 — one chart per distance, two-metric toggle** (both min/mi): **GAP pace** (hills out) and **Same-effort pace** (hills + effort out). Gold PR dot; trend line ONLY when `show_slope` (a confident direction) — never a slope under "holding." Y-axis locked across the toggle.
+- **Tier 2 — one chart per distance, two-lens toggle** (both min/mi, both SPEED): **Pace** (what you ran) and **GAP pace** (hills out). NO same-effort/efficiency lens (ruled out — §0). Read the **PR frontier** (fastest efforts carry the trend; easy-day best-efforts sit low and are ignored). Gold PR dot; trend line ONLY when `show_slope` (a confident direction) — never a slope under "holding." Y-axis locked across the toggle.
 - **Metric selector (per sport)** — Run/Swim: distance (1mi / 5K / 10K). Bike: duration (5s / 1min / 5min / 20min / 60min). The finder/curve already produces these.
 - **Works on every workout** including travel/variable ones (no route/detection needed) — the whole point.
 
@@ -61,7 +61,7 @@ Reuse `RouteDoorway.tsx`'s flag-driven render (copy headline + demoted quiet cha
 ---
 
 ## 4. Open forks — DECIDE FIRST (Michael's rulings, before building)
-1. **Metric: GAP-only vs GAP + same-effort(HR) vs same-effort-only.** Rec **both** (GAP toggle + Same-effort toggle), leading with Same-effort — matches segments; GAP for hills, HR for total effort. The residual (surface/trail GAP misses) is accepted.
+1. **Metric — RULED (2026-07-07): PACE / SPEED, hills out, NO efficiency.** Two lenses: raw **Pace** + **GAP pace**. Same-effort/HR normalization is OUT (murky on a peak effort — §0); effort is controlled by reading the PR frontier, not by HR-normalizing. Bike = power at duration (already no efficiency, no GAP). This fork is closed — the rest of §4 is still open.
 2. **Metrics per sport.** Run/Swim: the finder's existing **1mi / 5K / 10K** (his "~4 miles always the same" ≈ the 5K–10K band — confirm his real benchmark). Bike: the curve's **5s / 1min / 5min / 20min / 60min** (20-min = threshold proxy, the key one). Add distances/durations later.
 3. **Window.** Reuse segments' **6-month recency** + N≥8 floor + CI gate (calibration params, non-universal). Confirm.
 4. **Source of truth.** Aggregate from the per-workout `computed.best_efforts` (already written every run) vs a dedicated store. Rec: read `computed.best_efforts`, aggregate on the spine (like `core_efforts`). Improve the finder's ±2% edge during backfill.
@@ -81,3 +81,4 @@ Reuse `RouteDoorway.tsx`'s flag-driven render (copy headline + demoted quiet cha
 ## Changelog
 - **2026-07-07** — Created. Best Efforts decided as the PRIMARY lens (matches Strava/Garmin; fits area-based/variable running; doesn't tune to the user); segments demoted to secondary. Two of three hard bricks already in the repo (the window finder + GAP physics); the missing brick is the spine aggregation, which mirrors the just-built `compute-core-verdict`. Written as a hand-off for a fresh build session.
 - **2026-07-07 (later)** — Made CROSS-SPORT. One idea, one metric per sport: run/swim = best pace at distance (run GAP-adjusted), bike = best power at duration (no GAP — power is terrain-proof). Bike is the cleanest/most-built case (`calculatePowerCurve` exists; `w20`/CTL/ATL/TSB already on the spine) → recommended first. The verdict/trend engine is built once and fed each sport's metric.
+- **2026-07-07 (metric ruled)** — Best Efforts is **PACE / SPEED only** (raw Pace + GAP pace), NOT efficiency. Same-effort/HR normalization dropped — it's murky on a peak effort (adjusting a max as if submaximal); effort is controlled by reading the PR frontier instead. Keeps the three fitness dimensions clean: Best Efforts = peak output; efficiency + decoupling stay in State/segment. §4 fork 1 closed.
