@@ -414,6 +414,8 @@ export type CoachWeekContextResponseV1 = {
       running_acwr: number | null;
       /** Tier 4 item 11 — cycling-weighted ACWR (mirror of running_acwr). */
       cycling_acwr: number | null;
+      /** D-263: per-domain load slices (strength / hard_cardio / easy_cardio). */
+      per_domain?: import('../_shared/per-domain-load.ts').PerDomainLoad | null;
       run_only_week_load: number | null;
       run_only_week_load_pct: number | null;
       running_weighted_week_load: number | null;

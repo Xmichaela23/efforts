@@ -32,6 +32,7 @@ import { isLowTrustWorkload } from '../_shared/workload.ts';
 import { reconcileLoadStatus } from '../_shared/load-status-reconcile.ts';
 import { resolvePlanPhaseDetailed, phaseNameToWeekIntent, type PhaseSource } from '../_shared/plan-phase.ts';
 import { offPlanAdherenceBanner } from '../_shared/off-plan-banner.ts';
+import { computePerDomainLoad, type SliceSession } from '../_shared/per-domain-load.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
 import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel } from '../_shared/state-trend/index.ts';
@@ -1854,7 +1855,7 @@ Deno.serve(async (req) => {
 
     const { data: rolling, error: rErr } = await supabase
       .from('workouts')
-      .select('id,workload_actual,date,workout_status,type,name,planned_id,workout_metadata')
+      .select('id,workload_actual,date,workout_status,type,name,planned_id,workout_metadata,avg_power,avg_heart_rate,avg_pace,sensor_data')
       .eq('user_id', userId)
       .gte('date', chronicStart)
       .lte('date', asOfDate);
@@ -2041,6 +2042,29 @@ Deno.serve(async (req) => {
       chronicLoadFloor: 0,
       weightFn: (t, n) => getCyclingFatigueWeight({ type: String(t || ''), name: String(n || '') }),
     }).ratioRaw;
+
+    // D-263 build-step 3: per-domain load (strength / hard_cardio / easy_cardio),
+    // an INPUT to the Q-140 coherence path (off-plan banner). EVERY completed row
+    // maps to a SliceSession — a missing power/HR/pace signal leaves those fields
+    // null so classifySession cascades to sRPE (bin_signal 'srpe'), the row is NEVER
+    // dropped (pin 3). FTP/LTHR from baselines; absent → HR/power bins fall to sRPE too.
+    const ftpForBins = Number.isFinite(Number((arc.performance_numbers as any)?.ftp))
+      ? Number((arc.performance_numbers as any).ftp)
+      : (Number.isFinite(Number((learnedFitness as any)?.ride_ftp_estimated?.value)) ? Number((learnedFitness as any).ride_ftp_estimated.value) : null);
+    const lthrForBins = Number.isFinite(Number((learnedFitness as any)?.run_threshold_hr?.value))
+      ? Number((learnedFitness as any).run_threshold_hr.value) : null;
+    const perDomainSessions: SliceSession[] = completedRolling.map((r: any) => ({
+      date: String(r?.date),
+      type: String(r?.type || ''),
+      workload: safeNum(r?.workload_actual),
+      avgPower: r?.avg_power ?? null,   // null when the row lacks the signal → sRPE cascade, not a drop
+      avgHr: r?.avg_heart_rate ?? null,
+      avgPace: r?.avg_pace ?? null,
+      ftp: ftpForBins,
+      thresholdHr: lthrForBins,
+      samples: Array.isArray(r?.sensor_data?.samples) ? r.sensor_data.samples : null,
+    }));
+    const perDomain = computePerDomainLoad(perDomainSessions, { asOfDate });
 
     // =========================================================================
     // Unified Response Model (new: shared with block view)
@@ -4846,7 +4870,9 @@ ${narrativeFacts.join('\n')}`;
           // D-262: extracted for testability + coherence guard (no "add more"
           // prescription while total load reads high — can't say add-more + rest-now).
           const offPlanLine = offPlanAdherenceBanner({
-            loadStatus: ls, runLoadPct, weekIntent: intent, totalAcwr: lsData?.acwr,
+            loadStatus: ls, runLoadPct, weekIntent: intent,
+            totalAcwr: lsData?.acwr,
+            easyCardioAcwr: perDomain?.easy_cardio?.acwr ?? null, // D-263 bs3: Q-140 coherence input
           });
           if (offPlanLine) return offPlanLine;
 
@@ -4959,6 +4985,7 @@ ${narrativeFacts.join('\n')}`;
         })(),
         running_acwr: runningAcwr,
         cycling_acwr: cyclingAcwr,
+        per_domain: perDomain, // D-263 bs3: strength/hard_cardio/easy_cardio slices (Q-140 input + Item-4 provenance)
         run_only_week_load: athleteSnapshot?.body_response?.load_status?.run_only_week_load ?? null,
         run_only_week_load_pct: athleteSnapshot?.body_response?.load_status?.run_only_week_load_pct ?? null,
         running_weighted_week_load: athleteSnapshot?.body_response?.load_status?.running_weighted_week_load ?? null,

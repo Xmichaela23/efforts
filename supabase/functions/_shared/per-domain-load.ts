@@ -20,6 +20,13 @@ import { assessHrQuality, type HrQuality, type HrSample } from './hr-quality.ts'
 export type SliceKey = 'strength' | 'hard_cardio' | 'easy_cardio';
 export type BinSignal = 'hr' | 'power' | 'pace_unanchored' | 'srpe' | 'mixed';
 
+/** D-263: a slice's ACWR at or above this means it's being loaded at
+ *  maintenance-or-above (acute avg ≥ chronic avg) — i.e. genuinely carried, not
+ *  detraining. Used by the Q-140 coherence path to recognise "run under, load
+ *  carried by another slice." Canonical home (D-264: one place); the off-plan
+ *  banner imports it. */
+export const SLICE_LOADED_ACWR_MIN = 1.0;
+
 /** D-263: easy/hard IF boundary per discipline, anchored to D-238's 'tempo' band
  *  (IF 0.80 = the aerobic|threshold seam). Per-discipline so each can diverge; today
  *  all anchor to the same D-238 line. `hard` iff IF ≥ value. Swim never consults this
