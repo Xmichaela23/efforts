@@ -106,10 +106,15 @@ is NOT a new invention:
 | swim | **pace** | **provisional cross-check only — never drives a bin or a flag** |
 | strength | sRPE | none (0% HR — manual entry) |
 
-- **Swim HR: provisional ALWAYS** (pending the device-metadata peek). His swim HR is wrist-optical
-  (106 / 130 / 113 bpm — suppressed and erratic, with `heartRate: 0` dropouts mid-series), and the
-  schema cannot distinguish optical from strap (Finding A: no sensor provenance stored; `source` is
-  the provider, not the device). Swim HR corroborates only — it never drives a bin or an Item-1 flag.
+- **Swim HR: device-aware (device peek 2026-07-08 OVERTURNED the "always provisional" expectation).**
+  `device_name` IS in the raw Strava blob (`strava_activities.activity_data`) — his swims are **FORM
+  goggles** (13 of 14; a dedicated temple-optical swim-HR device), NOT wrist-optical; only 1 swim is
+  on a Garmin watch (wrist-optical). So swim HR is more trustworthy than assumed: **FORM → usable
+  cross-check** (with dropout filtering); **Garmin-watch swim → wrist-optical, provisional, never a
+  flag.** Pace remains the bin driver either way; HR corroborates. **Finding A partially REVERSED:**
+  HR-source provenance IS recoverable — extract `device_name → hr_source` (a small ingest/compute
+  addition, prerequisite for Item 1's optical-vs-strap gating). Same for power: the `device_watts`
+  key distinguishes a real power meter from Strava-estimated watts (bike-binning trust signal).
 - **`heartRate: 0` dropout filtering — SPECIFIED preprocessing, not a footnote.** HR series carry
   `heartRate: 0` points (dropouts / activity start). Naive TRIMP/decoupling over zeros silently
   **DEFLATES** the metric — a D-242-class "absence rendered as a real low value." Item 1/2/3 MUST
