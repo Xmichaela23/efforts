@@ -159,10 +159,16 @@ export function assessAbsorption(inp: AbsorptionInput): Absorption {
     response_copy = mode === 'partial' ? 'Responding — effort + muscular within normal (no steady aerobic effort this week).' : 'Responding well.';
   }
 
-  // ── ESCALATE (corroborated strain ONLY — the false-positive defense) ──
-  const elevatedCount = [inp.effort.elevated, inp.ledger.elevated, drift.elevated].filter(Boolean).length;
-  const soloStrong = inp.effort.strong || inp.ledger.strong || (drift.strong && drift.canSoloEscalate); // thin-anchor drift can't solo (refinement 1)
-  const corroborated_strain = inp.safetyFloor || soloStrong || elevatedCount >= 2;
+  // ── ESCALATE (D-266 WEIGHTED corroboration — supersedes D-265 co-equal quorum) ──
+  // The strong-evidence leg (effort) is NECESSARY: it may solo only when `strong`; otherwise it
+  // needs ≥1 corroborator. Removes three D-265 back doors — ledger.strong solo, drift.strong solo,
+  // and two-corroborators-alone (elevatedCount>=2) — each of which escalated with effort flat.
+  // The research graded effort strong, ledger + drift unvalidated; corroborators may CONFIRM, never
+  // DRIVE. safetyFloor is cleaned in parallel at computeSafetyFloor (D-266 surface 2). `drift.strong`
+  // and `drift.canSoloEscalate` remain on the object for describe/provenance but no longer escalate.
+  const corroboration = inp.ledger.elevated || drift.elevated;
+  const bodyEscalate = inp.effort.strong || (inp.effort.elevated && corroboration);
+  const corroborated_strain = inp.safetyFloor || bodyEscalate;
 
   return {
     response, response_copy, corroborated_strain,

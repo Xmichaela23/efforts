@@ -27,7 +27,17 @@ const QUIET_TRENDS = {
   run_quality: trend('insufficient', 1), // <2 sessions → runBodyOk unsatisfiable (the swap case)
   strength: trend('stable', 3),
 };
+// D-266: "genuine overload" now requires the PRIMARY leg (effort_perception) among the
+// declining signals — two demoted signals alone (see DECLINING_DEMOTED_ONLY below) no
+// longer count as corroborated strain.
 const DECLINING_TRENDS = {
+  cardiac: trend('declining', 3),
+  effort_perception: trend('declining', 3),
+  run_quality: trend('declining', 3),
+  strength: trend('stable', 3),
+};
+// Two DEMOTED trends declining, effort FLAT — the back door D-266 closes at the floor.
+const DECLINING_DEMOTED_ONLY: BodyTrends = {
   cardiac: trend('declining', 3),
   effort_perception: trend('stable', 3),
   run_quality: trend('declining', 3),
@@ -138,13 +148,19 @@ Deno.test('recovery week + swap @ ACWR 1.1 + fresh → unchanged on_target', () 
   assertEquals(r.status, 'on_target');
 });
 
-// ── fatigued readiness bypasses BOTH gates (Michael's explicit carve-out) ─
-Deno.test('build + swap @ ACWR 1.4 but readiness fatigued → stays high (bypass)', () => {
+// ── D-266: fatigued readiness ALONE (effort flat) no longer bypasses to high ─
+// Pre-D-266 this asserted fatigued → stays high, forcing corroboratedStrain=true — a combo that
+// can't occur post-D-266 (the cleaned floor returns false for fatigued-with-effort-flat). With the
+// honest corroboratedStrain, the raw 'high' is capped to 'elevated' — the readiness leak, closed.
+Deno.test('D-266: build + swap, readiness fatigued but effort flat → capped to elevated (readiness leak closed)', () => {
+  const corroboratedStrain = computeSafetyFloor(QUIET, 'fatigued'); // false under D-266
+  assertEquals(corroboratedStrain, false);
   const r = run({
     planPosition: { weekIntent: 'build' },
-    readiness: 'fatigued', // bodyDrivenHigh → Gate 2 skipped; Gate 1 de-escalation needs fresh/adapting/normal
+    readiness: 'fatigued',
+    corroboratedStrain,
   });
-  assertEquals(r.status, 'high');
+  assertEquals(r.status, 'elevated');
 });
 
 // ── Real regression: Michael WK1, 2026-07-07 (build phase, recovered) ─────
@@ -204,15 +220,33 @@ const decl = (n: number): BodyTrends => ({
   strength: { trend: 'stable', based_on_sessions: 3 },
 });
 
-Deno.test('safety floor: readiness=fatigued (no other strain) → true → load-high stays high (readiness arm)', () => {
-  assertEquals(computeSafetyFloor(QUIET, 'fatigued'), true);
-  assertEquals(computeSafetyFloor(QUIET, 'overreached'), true);
-  // fed to absorption → corroboratedStrain true → reconciler does NOT cap
-  assertEquals(run({ ...LOAD_HIGH, readiness: 'fatigued', corroboratedStrain: true }).status, 'high');
+// ═══ D-266: safety floor requires the PRIMARY leg (effort_perception) ═══════
+// REG-5/REG-6 (readiness arm): a readiness state fabricated upstream by ACWR-alone or a
+// single demoted signal can NO LONGER escalate through the floor — the primary must also be
+// declining. 'fatigued' dropped entirely; only genuine 'overreached' + primary survives.
+Deno.test('D-266 REG: readiness fatigued/overreached with effort FLAT → floor false (ACWR/single-demoted leak closed)', () => {
+  assertEquals(computeSafetyFloor(QUIET, 'fatigued'), false);      // was true (leak)
+  assertEquals(computeSafetyFloor(QUIET, 'overreached'), false);   // was true — needs primary declining
 });
-Deno.test('safety floor: nDeclining≥2 arm → true; <2 or calm → false', () => {
-  assertEquals(computeSafetyFloor(decl(2), 'adapting'), true);   // 2 declining
-  assertEquals(computeSafetyFloor(decl(1), 'adapting'), false);  // 1 declining, calm readiness
+Deno.test('D-266 POS: readiness overreached WITH primary declining → floor true (genuine threshold)', () => {
+  assertEquals(computeSafetyFloor(decl(2), 'overreached'), true);  // decl(2): effort_perception declining
+});
+Deno.test('D-266: nDeclining arm requires primary — decl(2) has effort declining → true; demoted-only → false', () => {
+  assertEquals(computeSafetyFloor(decl(2), 'adapting'), true);                  // effort + cardiac declining (primary present)
+  assertEquals(computeSafetyFloor(DECLINING_DEMOTED_ONLY, 'adapting'), false);  // REG-4: cardiac + execution, effort FLAT → no floor
+  assertEquals(computeSafetyFloor(decl(1), 'adapting'), false);                 // 1 declining (cardiac only), calm
   assertEquals(computeSafetyFloor(QUIET, 'adapting'), false);
-  assertEquals(computeDecliningSignals(decl(2)).length, 2);
+  assertEquals(computeDecliningSignals(DECLINING_DEMOTED_ONLY).length, 2);      // still DESCRIBES both (glass-box intact)
+});
+
+// ═══ D-266 END-TO-END: the prescriptive ('high') leak is closed by the cap ══
+// Load-high inputs + two demoted signals declining (effort flat) + honest corroboratedStrain
+// from the cleaned floor → reconcile's internal ladder raises to 'high', but the two-key cap
+// (line 325) pulls it back to 'elevated'. Nothing reaches the prescriptive band uncorroborated.
+Deno.test('D-266 END-TO-END: load-high + ledger/drift-alone (effort flat) → capped to elevated, never high', () => {
+  const corroboratedStrain = computeSafetyFloor(DECLINING_DEMOTED_ONLY, 'adapting'); // false under D-266
+  assertEquals(corroboratedStrain, false);
+  const r = run({ ...LOAD_HIGH, bodyTrends: DECLINING_DEMOTED_ONLY, readiness: 'adapting', corroboratedStrain });
+  assertEquals(r.status, 'elevated');
+  assertStringIncludes(r.interpretation, 'no corroborated strain');
 });

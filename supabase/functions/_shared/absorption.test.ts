@@ -49,13 +49,32 @@ Deno.test('two elevated (effort + muscular) → corroborated strain', () => {
   assertEquals(assessAbsorption({ effort: elevated, ledger: elevated, driftSession: null, typicalSteadyDriftBpm: null, safetyFloor: false }).corroborated_strain, true);
 });
 
-// ── Fixture 5: single STRONG drift on NON-thin anchor → solo-escalate ──
-Deno.test('single strong drift, non-thin anchor → solo corroborated', () => {
+// ── Fixture 5 (D-266): single STRONG drift, effort FLAT → describes, does NOT escalate ──
+// Was a D-265 solo-escalate; D-266 closed it — a corroborator (even strong) cannot drive.
+Deno.test('D-266: strong drift alone (effort flat) → still flags strong for describe, but does NOT escalate', () => {
   const a = assessAbsorption({ effort: fine, ledger: fine, driftSession: steady(15), typicalSteadyDriftBpm: 6, safetyFloor: false });
-  assertEquals(a.signals.drift.strong, true);          // 15 ≥ 6+8
-  assertEquals(a.signals.drift.canSoloEscalate, true);
-  assertEquals(a.corroborated_strain, true);
+  assertEquals(a.signals.drift.strong, true);          // 15 ≥ 6+8 — describe layer unchanged
+  assertEquals(a.signals.drift.canSoloEscalate, true); // gate still says "not thin"
+  assertEquals(a.corroborated_strain, false);          // D-266: drift may CONFIRM, never DRIVE
 });
+
+// ═══ D-266: WEIGHTED corroboration — effort NECESSARY, corroborators cannot drive ═══
+// REG-1 (the named back door): ledger + drift BOTH elevated with effort FLAT → describes, no escalation.
+Deno.test('D-266 REG: ledger + drift elevated, effort flat → describes (worst-signal-wins) but does NOT escalate', () => {
+  const a = assessAbsorption({ effort: fine, ledger: elevated, driftSession: steady(11), typicalSteadyDriftBpm: 6, safetyFloor: false });
+  assertEquals(a.signals.drift.elevated, true);        // both corroborators lit
+  assertEquals(a.response, 'responding_strained');     // still DESCRIBES honestly
+  assertEquals(a.corroborated_strain, false);          // effort flat → two corroborators can't escalate
+});
+// REG-2: strong ledger alone, effort flat → no escalation.
+Deno.test('D-266 REG: strong ledger alone (effort flat) → does NOT escalate', () => {
+  assertEquals(assessAbsorption({ effort: fine, ledger: strongSig, driftSession: null, typicalSteadyDriftBpm: null, safetyFloor: false }).corroborated_strain, false);
+});
+// POS-2: strong effort alone → escalates (the primary leg may drive on its own when strong).
+Deno.test('D-266 POS: strong effort alone → escalates', () => {
+  assertEquals(assessAbsorption({ effort: strongSig, ledger: fine, driftSession: null, typicalSteadyDriftBpm: null, safetyFloor: false }).corroborated_strain, true);
+});
+// POS-1 (primary + one corroborator) is covered by Fixtures 2 & 4 above — effort elevated + drift/ledger → escalate.
 
 // ── Fixture 6: THIN-ANCHOR STRONG GUARD (refinement 1) — describes, never solo-escalates ──
 Deno.test('strong drift on THIN anchor → describes (elevated) but does NOT solo-escalate', () => {

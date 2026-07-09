@@ -77,7 +77,22 @@ export function computeDecliningSignals(bodyTrends: BodyTrends): string[] {
  * reconciler two-key cap lets it through. One shared computation (D-264).
  */
 export function computeSafetyFloor(bodyTrends: BodyTrends, readiness: string): boolean {
-  return computeDecliningSignals(bodyTrends).length >= 2 || readiness === 'fatigued' || readiness === 'overreached';
+  // D-266: the strong-evidence leg (effort_perception / RPE) is NECESSARY for the floor to fire.
+  // Closes two leaks the safety floor was carrying: (1) two DEMOTED trends (HR drift + RIR) tripping
+  // nDeclining≥2 with RPE flat; (2) readiness 'fatigued'/'overreached' fabricated upstream by
+  // ACWR-alone (coach:2691) or a single demoted signal (coach:2700) — ACWR can't make RPE decline,
+  // so requiring `primaryDeclining` neutralizes both WITHOUT editing the readiness tree (that rework
+  // is Q-148). readiness may still DESCRIBE those states; it can no longer ESCALATE load here.
+  // 'fatigued' dropped entirely (its productions were the leaks); only a genuine 'overreached'
+  // threshold corroborated by the primary survives. THE LAW (D-260) restored on the readiness path.
+  // PARKED (revisit post universal-RPE, Q-148): a lone declining RPE trend currently DESCRIBES but
+  // does not floor-escalate — conservative "one witness isn't agreement". Relax to solo if warranted.
+  const primaryDeclining =
+    bodyTrends.effort_perception.based_on_sessions >= 2 &&
+    bodyTrends.effort_perception.trend === 'declining';
+  const corroboratedDecline = primaryDeclining && computeDecliningSignals(bodyTrends).length >= 2; // primary + ≥1 other
+  const readinessHardFloor = readiness === 'overreached' && primaryDeclining;
+  return corroboratedDecline || readinessHardFloor;
 }
 
 export function reconcileLoadStatus(
