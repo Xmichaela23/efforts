@@ -1,6 +1,6 @@
 import React from 'react';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
-import { acwrVolumeLabel, acwrZone, planAwareVolumeLabel } from '@/lib/load-headline';
+import { acwrVolumeLabel, acwrZone, statusVolumeLabel } from '@/lib/load-headline';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,18 +30,16 @@ interface LoadBarProps {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-// The VOLUME verdict band mapping is the shared acwrVolumeLabel (single source — imported above so
-// the gauge label and the STATE glance headline can never disagree on the bands).
+// acwrVolumeLabel survives ONLY as the gauge dot-color fallback (AcwrGauge, below) — ACWR is the
+// descriptor, never the verdict. The verdict WORD reads the reconciled load_status (statusVolumeLabel).
 const acwrLabel = acwrVolumeLabel;
 
-// Color for the VOLUME verdict (the load label now reads this — matches the gauge). Distinct from
-// loadStatusColor (the retired body-response label, which conflated readiness into LOAD).
+// Color for the reconciled VERDICT word (the only labels statusVolumeLabel emits).
 function loadVolumeColor(label: string): string {
   if (label === 'balanced') return 'text-emerald-400/85';
-  if (label === 'building on plan') return 'text-emerald-400/85'; // Q-122: on-plan build → positive read
   if (label === 'build more') return 'text-sky-400/85';
-  if (label === 'back off') return 'text-amber-400/85';
-  if (label === 'rest now') return 'text-red-400/85';
+  if (label === 'a bit high') return 'text-amber-400/85'; // reconciled 'elevated' (descriptive)
+  if (label === 'pull back') return 'text-red-400/85';    // reconciled 'high' (corroborated)
   return 'text-white/45';
 }
 
@@ -49,23 +47,6 @@ function acwrToGaugePct(v: number): number {
   const min = 0.6;
   const max = 1.7;
   return Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100));
-}
-
-function loadStatusColor(status: string | undefined): string {
-  if (!status) return 'text-white/45';
-  if (status === 'on_target') return 'text-emerald-400/85';
-  if (status === 'elevated') return 'text-amber-400/85';
-  if (status === 'high') return 'text-red-400/85';
-  if (status === 'under') return 'text-sky-400/85';
-  return 'text-white/65';
-}
-
-function loadStatusLabel(status: string): string {
-  if (status === 'on_target') return 'on track';
-  if (status === 'elevated') return 'a bit high';
-  if (status === 'high') return 'pull back';
-  if (status === 'under') return 'build more';
-  return status;
 }
 
 // ── AcwrGauge ────────────────────────────────────────────────────────────────
@@ -136,14 +117,11 @@ export default function LoadBar({ load, loadStatus, readinessState, weekIntent, 
               verdict, so gauge + label can never disagree. Body-response/overreaching is NOT load; it
               lives on the readiness axis (the gauge color + the readiness row), never the LOAD label. */}
           {(() => {
-            // Q-122: the WORD is plan-aware ("building on plan"); the gauge MARKER + acwrZone above stay
-            // RAW ACWR (Option b) — so at ACWR 1.35 you see "· pushing" (marker) + "building on plan" (word).
-            const vl = planAwareVolumeLabel({
-              acwr: load.acwr,
-              weekIntent,
-              wtdActualLoad: load.wtd_actual_load,
-              wtdPlannedLoad: load.wtd_planned_load,
-            });
+            // D-260/D-266: the verdict WORD reads the RECONCILED loadStatus (two-key engine, sole
+            // authority). The gauge MARKER + acwrZone above stay RAW ACWR — the honest descriptor
+            // ("ACWR 1.35 · pushing" alongside a "balanced" verdict when the body is absorbing). No
+            // ACWR-word fallback: if the reconciled verdict is absent, the gauge shows, the word doesn't.
+            const vl = statusVolumeLabel(loadStatus?.status);
             if (vl === '—' || (isTaperOrPeak && vl === 'build more')) return null;
             return <><Dot /><span className={`text-[14px] font-semibold tracking-tight ${loadVolumeColor(vl)}`}>{vl}</span></>;
           })()}

@@ -17,31 +17,23 @@ export function acwrVolumeLabel(v: number | null | undefined): string {
   return 'rest now';
 }
 
-// Q-122: the plan-phase-aware VOLUME word. A high-but-ON-PLAN build week should read
-// "building on plan", not "back off" — the athlete is executing an intended build, not
-// overreaching. Adjusts only the WORD (headline + gauge label); the gauge MARKER + acwrZone
-// stay RAW ACWR (Option b — honest dual read: "ACWR 1.35 · pushing — building on plan").
-// `acwrVolumeLabel` itself is UNTOUCHED (the marker shares it, so this can't desync them).
-export function planAwareVolumeLabel(opts: {
-  acwr: number | null | undefined;
-  weekIntent?: string | null;
-  wtdActualLoad?: number | null;
-  wtdPlannedLoad?: number | null;
-}): string {
-  const raw = acwrVolumeLabel(opts.acwr);
-  // ONLY the 'back off' band (1.3 < ACWR ≤ 1.5) is eligible. 'rest now' (≥1.5) is the hard
-  // redline the plan never overrides; the lower bands aren't alarms to soften.
-  if (raw !== 'back off' || opts.weekIntent !== 'build') return raw;
-  const planned = opts.wtdPlannedLoad;
-  const actual = opts.wtdActualLoad;
-  // Denominator gate: week-to-date planned load must be meaningful. Early-week the planned sum
-  // is tiny, so one extra session reads as a huge % overshoot (unreliable). Floor 150 → gates
-  // Monday/Tuesday; the overshoot read is only trustworthy ~Thu/Fri (Q-122 trace).
-  if (planned == null || planned < 150 || actual == null) return raw;
-  // On-plan = not overshooting beyond 120% (the codebase's existing overshoot threshold, not 115%).
-  const overshoot = (actual - planned) / planned;
-  return overshoot <= 0.20 ? 'building on plan' : raw; // over the plan → "back off" stands
+// The LOAD verdict word reads the RECONCILED load_status (the two-key engine — D-260 sole verdict
+// authority, D-266 weighted), NOT acwrVolumeLabel. ACWR survives only as the gauge number. Descriptive,
+// not prescriptive — and deliberately: reconciled 'elevated' is where the two-key cap parks UNcorroborated
+// highs, so it reads "a bit high", NEVER "back off" (mapping it to a prescription would re-alarm the exact
+// weeks the cap protects). Only a corroborated 'high' earns the pull-back word.
+export function statusVolumeLabel(status: string | null | undefined): string {
+  if (status === 'under') return 'build more';
+  if (status === 'on_target') return 'balanced';
+  if (status === 'elevated') return 'a bit high';
+  if (status === 'high') return 'pull back';
+  return '—';
 }
+
+// NOTE (D-266 cleanup): the client-side plan-phase softening (`planAwareVolumeLabel`, Q-122) was
+// REMOVED — its logic is now owned server-side by the reconciler's Gate 2 build-band (single source,
+// D-264). The client reads the reconciled verdict via statusVolumeLabel; it never re-derives plan
+// awareness. If the "building on plan" phrasing is wanted, expose it from the reconciler, not here.
 
 // The ACWR standard-app ZONE name (item 0) — the TrainingPeaks/Garmin vocabulary for the same
 // bands `acwrVolumeLabel` reads, so the naked number gets a scale word ("ACWR 1.1 · optimal").
@@ -72,6 +64,8 @@ function stateSlot(loadLabel: string, readiness: string | null | undefined, read
     loadLabel === 'balanced'         ? 'Balanced load' :
     loadLabel === 'build more'       ? 'Room to build' :
     loadLabel === 'building on plan' ? 'Building on plan' : // Q-122: high ACWR but on-plan in a build week
+    loadLabel === 'a bit high'       ? 'Load a bit high' :  // reconciled 'elevated' (two-key descriptive band)
+    loadLabel === 'pull back'        ? 'Load high' :        // reconciled 'high' (corroborated)
     loadLabel === 'back off'         ? 'Load running high' :
     loadLabel === 'rest now'         ? 'Load very high' : null;
   const r = refinedReadinessPhrase(readinessLabel) ?? (

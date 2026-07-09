@@ -9,8 +9,27 @@
  * Run from repo root:  deno test src/lib/load-headline.test.ts --no-check
  */
 
-import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { buildLoadHeadline, acwrZone } from './load-headline.ts';
+import { assert, assertEquals, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { buildLoadHeadline, acwrZone, statusVolumeLabel } from './load-headline.ts';
+
+// ── D-260/D-266: the verdict word reads the RECONCILED status, not ACWR ──────
+Deno.test('statusVolumeLabel: reconciled status → descriptive verdict; elevated is NOT "back off"', () => {
+  assertEquals(statusVolumeLabel('under'), 'build more');
+  assertEquals(statusVolumeLabel('on_target'), 'balanced');
+  assertEquals(statusVolumeLabel('elevated'), 'a bit high'); // where the two-key cap parks uncorroborated highs
+  assertEquals(statusVolumeLabel('high'), 'pull back');      // only a corroborated high earns the pull-back word
+  assertEquals(statusVolumeLabel(null), '—');
+  // The whole point of the fix: a reconciled 'elevated' must never render the prescriptive "back off".
+  if (statusVolumeLabel('elevated') === 'back off') throw new Error('elevated must not say back off');
+});
+Deno.test('buildLoadHeadline: reconciled elevated → "Load a bit high" (descriptive, not a prescription)', () => {
+  const h = buildLoadHeadline({ loadLabel: statusVolumeLabel('elevated'), readinessState: 'adapting', readinessLabel: null })!;
+  assertStringIncludes(h, 'Load a bit high');
+});
+Deno.test('buildLoadHeadline: reconciled high → "Load high"', () => {
+  const h = buildLoadHeadline({ loadLabel: statusVolumeLabel('high'), readinessState: 'fatigued', readinessLabel: null })!;
+  assertStringIncludes(h, 'Load high');
+});
 
 // ── Item 0: ACWR zone names align with the verdict bands (0.8 / 1.3 / 1.5) ──
 Deno.test('acwrZone: standard-app band names match the verdict boundaries', () => {

@@ -23,7 +23,7 @@ import { fetchArcContext } from '@/lib/fetch-arc-context';
 import type { ArcReadiness } from '@/lib/arc-types';
 import { shouldShowNudge } from '@/lib/nudge-policy';
 import StatePerformanceSection from '@/components/context/StatePerformanceSection';
-import { buildLoadHeadline, acwrVolumeLabel, planAwareVolumeLabel } from '@/lib/load-headline';
+import { buildLoadHeadline, statusVolumeLabel } from '@/lib/load-headline';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 
 const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
@@ -1165,14 +1165,11 @@ export default function StateTab({
 
   // #4 — deterministic glance headline (load + readiness + fitness, observation never a prescription).
   // The full LLM narrative goes behind an "open for more" expand (collapsed by default).
+  // D-260/D-266: the LOAD verdict reads the RECONCILED load_status (the two-key engine, sole verdict
+  // authority) — not raw ACWR. ACWR stays the gauge number only. If the server verdict is absent, the
+  // headline omits the load slot (no ACWR-word fallback — ACWR never mints a verdict).
   const loadHeadline = buildLoadHeadline({
-    // Q-122: plan-phase-aware — a high-but-on-plan build week reads "building on plan", not "back off".
-    loadLabel: planAwareVolumeLabel({
-      acwr: load.acwr,
-      weekIntent: week.intent,
-      wtdActualLoad: load.wtd_actual_load,
-      wtdPlannedLoad: load.wtd_planned_load,
-    }),
+    loadLabel: statusVolumeLabel(loadStatus?.status),
     readinessState: readiness,
     readinessLabel, // D-232: refined chip label wins so the headline can't contradict the chip
     fitnessDirection: (trends as any).fitness_direction,
