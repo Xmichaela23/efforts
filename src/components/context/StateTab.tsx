@@ -1373,7 +1373,7 @@ export default function StateTab({
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] divide-y divide-white/[0.055]">
 
         {/* LOAD — full-width gauge + sparkline */}
-        <LoadBar load={load} loadStatus={loadStatus} readinessState={readiness} weekIntent={week.intent} />
+        <LoadBar load={load} loadStatus={loadStatus} weekIntent={week.intent} />
 
         {showTopLastRaceCard && lastCompletedRace && (
           <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-1">

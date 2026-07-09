@@ -1,13 +1,13 @@
 import React from 'react';
-import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
-import { acwrVolumeLabel, acwrZone, statusVolumeLabel } from '@/lib/load-headline';
+import { getDisciplineColor } from '@/lib/context-utils';
+import { acwrZone, statusVolumeLabel } from '@/lib/load-headline';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface LoadBarData {
   acwr: number | null;
   wtd_actual_load: number | null;
-  wtd_planned_load?: number | null; // Q-122: plan-phase-aware "building on plan" word
+  wtd_planned_load?: number | null;
   daily_load_7d: Array<{
     date: string;
     load: number;
@@ -23,18 +23,14 @@ export interface LoadBarStatus {
 interface LoadBarProps {
   load: LoadBarData;
   loadStatus: LoadBarStatus | null;
-  readinessState: string | null;
   weekIntent?: string | null;
-  hideDailyBars?: boolean;
+  /** compact variant (calendar) — verdict + ACWR only, no composition strip. */
+  compact?: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-// acwrVolumeLabel survives ONLY as the gauge dot-color fallback (AcwrGauge, below) — ACWR is the
-// descriptor, never the verdict. The verdict WORD reads the reconciled load_status (statusVolumeLabel).
-const acwrLabel = acwrVolumeLabel;
-
-// Color for the reconciled VERDICT word (the only labels statusVolumeLabel emits).
+// Color for the reconciled VERDICT word (D-260/D-266 — statusVolumeLabel's outputs only).
 function loadVolumeColor(label: string): string {
   if (label === 'balanced') return 'text-emerald-400/85';
   if (label === 'build more') return 'text-sky-400/85';
@@ -43,127 +39,110 @@ function loadVolumeColor(label: string): string {
   return 'text-white/45';
 }
 
-function acwrToGaugePct(v: number): number {
-  const min = 0.6;
-  const max = 1.7;
-  return Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100));
+const DISPLAY_NAME: Record<string, string> = {
+  run: 'Run', running: 'Run', bike: 'Ride', ride: 'Ride', cycling: 'Ride',
+  swim: 'Swim', swimming: 'Swim', strength: 'Strength', strength_training: 'Strength',
+  weight: 'Strength', weights: 'Strength', mobility: 'Mobility', pilates_yoga: 'Mobility',
+};
+function disciplineName(type: string): string {
+  const t = (type || '').toLowerCase();
+  return DISPLAY_NAME[t] ?? (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Other');
 }
-
-// ── AcwrGauge ────────────────────────────────────────────────────────────────
-
-function AcwrGauge({ value, readinessState }: { value: number | null; readinessState: string | null }) {
-  if (value == null) return <span className="text-white/55 text-[11px]">—</span>;
-  const pos = acwrToGaugePct(value);
-  const dotColor =
-    readinessState === 'fresh'       ? '#34d399' :
-    readinessState === 'adapting'    ? '#38bdf8' :
-    readinessState === 'normal'      ? '#34d399' :
-    readinessState === 'fatigued'    ? '#fbbf24' :
-    readinessState === 'overreached' ? '#f87171' :
-    readinessState === 'detrained'   ? '#38bdf8' :
-    acwrLabel(value) === 'build more' ? '#38bdf8' :
-    acwrLabel(value) === 'balanced'   ? '#34d399' :
-    acwrLabel(value) === 'back off'   ? '#fbbf24' : '#f87171';
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span className="relative inline-flex items-center w-24 h-1.5 rounded-full overflow-visible">
-        {/* item 0: band boundaries ALIGNED to acwrVolumeLabel / acwrZone (0.8 / 1.3 / 1.5) over the
-            gauge range 0.6–1.7, so the marker's zone color matches the verdict word + the zone label.
-            widths = (0.8-0.6)/1.1, (1.3-0.8)/1.1, (1.5-1.3)/1.1, (1.7-1.5)/1.1. */}
-        <span className="absolute inset-0 flex rounded-full overflow-hidden">
-          <span className="h-full bg-sky-400/25"     style={{ width: '18.2%' }} />
-          <span className="h-full bg-emerald-400/30"  style={{ width: '45.5%' }} />
-          <span className="h-full bg-amber-400/25"   style={{ width: '18.2%' }} />
-          <span className="h-full bg-red-400/20"     style={{ width: '18.1%' }} />
-        </span>
-        <span
-          className="absolute w-2.5 h-2.5 rounded-full -translate-x-1/2 shadow-md"
-          style={{ left: `${pos}%`, backgroundColor: dotColor, boxShadow: `0 0 6px ${dotColor}` }}
-        />
-      </span>
-    </span>
-  );
-}
-
-// ── Dot separator ────────────────────────────────────────────────────────────
 
 function Dot() {
   return <span className="text-white/30 select-none">·</span>;
 }
 
 // ── LoadBar ──────────────────────────────────────────────────────────────────
+// The load section, composition-forward (2026-07-09). Research verdict: a glance surface leads with
+// a VERDICT + an aggregate BREAKDOWN, never a per-day bar chart — every major app (TrainingPeaks,
+// WHOOP, Garmin, Intervals.icu) keeps per-day granularity one tap deeper. So: the reconciled verdict
+// leads, the weekly composition (which discipline carried the load — our differentiator) is the primary
+// visual, ACWR is demoted to a reference number, and per-day detail lives in the calendar drill-down.
 
-export default function LoadBar({ load, loadStatus, readinessState, weekIntent, hideDailyBars }: LoadBarProps) {
+export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadBarProps) {
   const isTaperOrPeak = weekIntent === 'taper' || weekIntent === 'peak';
+
+  // Verdict = the reconciled two-key read (D-260 sole authority). ACWR shows only as a reference.
+  const verdict = statusVolumeLabel(loadStatus?.status);
+  const showVerdict = verdict !== '—' && !(isTaperOrPeak && verdict === 'build more');
+
+  // Weekly COMPOSITION — aggregate the 7-day load by discipline (from by_type; fall back to the
+  // day's dominant_type). This is the primary load visual; the per-day rhythm lives in the calendar.
   const dailyLoad = load.daily_load_7d ?? [];
-  const maxLoad = Math.max(...dailyLoad.map(d => d.load), 1);
+  const byDiscipline = new Map<string, number>();
+  for (const d of dailyLoad) {
+    const segs = d.by_type && d.by_type.length > 0
+      ? d.by_type
+      : (d.load > 0 ? [{ type: d.dominant_type, load: d.load }] : []);
+    for (const s of segs) {
+      const t = (s.type || '').toLowerCase();
+      if (!t || t === 'none' || !(s.load > 0)) continue;
+      byDiscipline.set(t, (byDiscipline.get(t) ?? 0) + s.load);
+    }
+  }
+  const total = [...byDiscipline.values()].reduce((a, b) => a + b, 0);
+  const comp = [...byDiscipline.entries()]
+    .map(([type, l]) => ({ type, load: l, pct: total > 0 ? (l / total) * 100 : 0 }))
+    .sort((a, b) => b.load - a.load);
+  const dominant = comp[0]?.type ?? null;
 
   return (
     <div className="px-3 py-3">
+      {/* Verdict leads; ACWR is the demoted reference number (D-260: ACWR describes, never decides). */}
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">LOAD</span>
         <div className="flex items-center gap-2">
-          {/* item 0 (Option 2): the ACWR number rides WITH the gauge as one unit — number + zone word
-              directly under the marker, so it reads against its scale (TP/Garmin style) instead of as a
-              naked figure. Our plain-language verdict ("balanced") still leads to its right. ACWR is the
-              D-236 canonical acute:chronic ratio the verdict already reads; WTD stays "pts" (not TSS). */}
-          <div className="flex flex-col items-end gap-0.5">
-            <AcwrGauge value={load.acwr} readinessState={readinessState} />
-            {load.acwr != null && acwrZone(load.acwr) && (
+          {showVerdict && (
+            <span className={`text-[14px] font-semibold tracking-tight ${loadVolumeColor(verdict)}`}>{verdict}</span>
+          )}
+          {load.acwr != null && acwrZone(load.acwr) && (
+            <>
+              {showVerdict && <Dot />}
               <span className="text-[10px] tabular-nums text-white/40 leading-none">ACWR {load.acwr.toFixed(1)} · {acwrZone(load.acwr)}</span>
-            )}
-          </div>
-          {/* The LOAD label reads the VOLUME verdict (the same ACWR band the gauge shows) — one load
-              verdict, so gauge + label can never disagree. Body-response/overreaching is NOT load; it
-              lives on the readiness axis (the gauge color + the readiness row), never the LOAD label. */}
-          {(() => {
-            // D-260/D-266: the verdict WORD reads the RECONCILED loadStatus (two-key engine, sole
-            // authority). The gauge MARKER + acwrZone above stay RAW ACWR — the honest descriptor
-            // ("ACWR 1.35 · pushing" alongside a "balanced" verdict when the body is absorbing). No
-            // ACWR-word fallback: if the reconciled verdict is absent, the gauge shows, the word doesn't.
-            const vl = statusVolumeLabel(loadStatus?.status);
-            if (vl === '—' || (isTaperOrPeak && vl === 'build more')) return null;
-            return <><Dot /><span className={`text-[14px] font-semibold tracking-tight ${loadVolumeColor(vl)}`}>{vl}</span></>;
-          })()}
+            </>
+          )}
         </div>
       </div>
-      {!hideDailyBars && dailyLoad.length > 0 && (
-        <div className="mt-2">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-white/65 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
-            <span className="text-[10px] tabular-nums text-white/60">{Math.round(load.wtd_actual_load ?? 0)} pts WTD</span>
+
+      {/* Composition strip — the primary load visual (full surface only). */}
+      {!compact && comp.length > 0 && total > 0 && (
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] text-white/65 uppercase tracking-[0.08em]">Where your load is going</span>
+            <span className="text-[10px] tabular-nums text-white/55">{Math.round(load.wtd_actual_load ?? total)} pts WTD</span>
           </div>
-          <div className="flex items-end h-10 gap-[3px]">
-            {dailyLoad.map((d) => {
-              const isToday = d.date === dailyLoad[dailyLoad.length - 1]?.date;
-              const barPct = d.load > 0 ? Math.max(0.08, d.load / maxLoad) : 0;
-              const segments = (d as any).by_type as Array<{ type: string; load: number }> | undefined;
-              const alpha = isToday ? 0.92 : 0.7;
+          <div className="flex h-6 rounded-md overflow-hidden gap-[2px]">
+            {comp.map((c) => {
+              const isDom = c.type === dominant;
               return (
-                <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-[2px]">
-                  {d.load === 0 ? (
-                    <div className="rounded-[2px]" style={{ width: 8, height: 1, backgroundColor: 'rgba(255,255,255,0.06)' }} />
-                  ) : (
-                    <div
-                      className="flex flex-col-reverse rounded-[2px] overflow-hidden transition-all"
-                      style={{ width: 8, height: `${Math.round(barPct * 100)}%`, minHeight: 4 }}
-                    >
-                      {(segments && segments.length > 0 ? segments : [{ type: d.dominant_type, load: d.load }]).map((seg, i) => {
-                        const segPct = d.load > 0 ? (seg.load / d.load) * 100 : 0;
-                        const hex = seg.type !== 'none' && seg.type !== 'other' ? getDisciplineColor(seg.type) : null;
-                        const color = hex
-                          ? `rgba(${hexToRgb(hex)}, ${alpha})`
-                          : `rgba(255,255,255, ${isToday ? 0.55 : 0.25})`;
-                        return <div key={`${seg.type}-${i}`} style={{ height: `${segPct}%`, minHeight: 1, backgroundColor: color }} />;
-                      })}
-                    </div>
+                <div
+                  key={c.type}
+                  className="flex items-center justify-center min-w-[6px]"
+                  style={{
+                    flexGrow: c.pct, flexBasis: 0,
+                    backgroundColor: getDisciplineColor(c.type),
+                    boxShadow: isDom ? 'inset 0 0 0 1.5px rgba(255,255,255,0.42)' : undefined,
+                  }}
+                  title={`${disciplineName(c.type)} ${Math.round(c.pct)}%`}
+                >
+                  {c.pct >= 26 && (
+                    <span className="text-[10px] font-semibold" style={{ color: 'rgba(0,0,0,0.62)' }}>
+                      {isDom ? `${disciplineName(c.type)} ${Math.round(c.pct)}%` : `${Math.round(c.pct)}%`}
+                    </span>
                   )}
-                  <span className={`text-[9px] tabular-nums leading-none ${isToday ? 'text-white/70' : 'text-white/40'}`}>
-                    {new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'narrow' })}
-                  </span>
                 </div>
               );
             })}
+          </div>
+          <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-2">
+            {comp.map((c) => (
+              <span key={c.type} className="inline-flex items-center gap-1.5 text-[11.5px] text-white/70">
+                <span className="inline-block w-2 h-2 rounded-[2px]" style={{ backgroundColor: getDisciplineColor(c.type) }} />
+                <span className={c.type === dominant ? 'text-white font-semibold' : ''}>{disciplineName(c.type)}</span>
+                <span className="text-[10px] tabular-nums text-white/40">{Math.round(c.pct)}%</span>
+              </span>
+            ))}
           </div>
         </div>
       )}
