@@ -33,6 +33,7 @@ import { reconcileLoadStatus } from '../_shared/load-status-reconcile.ts';
 import { resolvePlanPhaseDetailed, phaseNameToWeekIntent, type PhaseSource } from '../_shared/plan-phase.ts';
 import { offPlanAdherenceBanner } from '../_shared/off-plan-banner.ts';
 import { computePerDomainLoad, type SliceSession } from '../_shared/per-domain-load.ts';
+import { computeFitnessFatigue } from '../_shared/fitness-fatigue.ts';
 import { assessAbsorption } from '../_shared/absorption.ts';
 import { computeSafetyFloor } from '../_shared/load-status-reconcile.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
@@ -2067,6 +2068,23 @@ Deno.serve(async (req) => {
       samples: Array.isArray(r?.sensor_data?.samples) ? r.sensor_data.samples : null,
     }));
     const perDomain = computePerDomainLoad(perDomainSessions, { asOfDate });
+
+    // ── Banister fitness/fatigue/form — SIBLING signal, EVALUATION-ONLY (drives nothing) ──
+    // Separate 84-day fetch of the SAME workload_actual column (D-264 single source; the 28d
+    // `rolling` window is too short for a 42-day fitness constant). Emitted for observation;
+    // never fed to the reconciler verdict. THE LAW holds. (Later: persist a running total
+    // instead of re-fetching, IF this signal earns a real role — not now.)
+    const ffStart = addDaysISO(asOfDate, -83);
+    const { data: ffRows } = await supabase
+      .from('workouts')
+      .select('date, workload_actual, workout_status')
+      .eq('user_id', userId)
+      .gte('date', ffStart)
+      .lte('date', asOfDate);
+    const ffLoadRows: LoadRow[] = (ffRows || [])
+      .filter((r: any) => String(r?.workout_status || '').toLowerCase() === 'completed')
+      .map((r: any) => ({ date: String(r?.date), workload: r?.workload_actual }));
+    const fitnessFatigue = computeFitnessFatigue(ffLoadRows, { asOfDate });
 
     // =========================================================================
     // Unified Response Model (new: shared with block view)
@@ -5019,6 +5037,7 @@ ${narrativeFacts.join('\n')}`;
         running_acwr: runningAcwr,
         cycling_acwr: cyclingAcwr,
         per_domain: perDomain, // D-263 bs3: strength/hard_cardio/easy_cardio slices (Q-140 input + Item-4 provenance)
+        fitness_fatigue: fitnessFatigue, // Banister sibling signal — EVALUATION-ONLY, drives no verdict (2026-07-09)
         run_only_week_load: athleteSnapshot?.body_response?.load_status?.run_only_week_load ?? null,
         run_only_week_load_pct: athleteSnapshot?.body_response?.load_status?.run_only_week_load_pct ?? null,
         running_weighted_week_load: athleteSnapshot?.body_response?.load_status?.running_weighted_week_load ?? null,

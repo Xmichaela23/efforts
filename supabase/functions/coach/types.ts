@@ -416,6 +416,8 @@ export type CoachWeekContextResponseV1 = {
       cycling_acwr: number | null;
       /** D-263: per-domain load slices (strength / hard_cardio / easy_cardio). */
       per_domain?: import('../_shared/per-domain-load.ts').PerDomainLoad | null;
+      /** Banister fitness/fatigue/form — SIBLING signal, evaluation-only, drives no verdict (2026-07-09). */
+      fitness_fatigue?: import('../_shared/fitness-fatigue.ts').FitnessFatigue | null;
       run_only_week_load: number | null;
       run_only_week_load_pct: number | null;
       running_weighted_week_load: number | null;
