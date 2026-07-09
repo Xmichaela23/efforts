@@ -106,15 +106,20 @@ is NOT a new invention:
 | swim | **pace** | **provisional cross-check only — never drives a bin or a flag** |
 | strength | sRPE | none (0% HR — manual entry) |
 
-- **Swim HR: device-aware (device peek 2026-07-08 OVERTURNED the "always provisional" expectation).**
-  `device_name` IS in the raw Strava blob (`strava_activities.activity_data`) — his swims are **FORM
-  goggles** (13 of 14; a dedicated temple-optical swim-HR device), NOT wrist-optical; only 1 swim is
-  on a Garmin watch (wrist-optical). So swim HR is more trustworthy than assumed: **FORM → usable
-  cross-check** (with dropout filtering); **Garmin-watch swim → wrist-optical, provisional, never a
-  flag.** Pace remains the bin driver either way; HR corroborates. **Finding A partially REVERSED:**
-  HR-source provenance IS recoverable — extract `device_name → hr_source` (a small ingest/compute
-  addition, prerequisite for Item 1's optical-vs-strap gating). Same for power: the `device_watts`
-  key distinguishes a real power meter from Strava-estimated watts (bike-binning trust signal).
+- **HR trust is MEASURED, not device-inferred (device mapping abandoned 2026-07-08).** The device
+  peek first *looked* like it recovered HR source (`device_name` in the Strava blob — FORM goggles on
+  swims, Garmin on land). It's a mirage: `device_name` is the **RECORDER, not the SENSOR**. The primary
+  user records **chest-strap** HR on a Garmin watch (wrist tattoos → no optical), so a `device_name →
+  hr_source` map would have tagged his strap-quality HR as `wrist_optical`/low — structurally wrong for
+  *everyone* (a watch records strap or optical indistinguishably). **Replaced by `hr_quality`** —
+  measured per session from **dropout % + physiological range** (`_shared/hr-quality.ts`, D-263):
+  `ok`/`low`/`none`, fail-safe (`low`/`none` → drop the session's HR, fall back to sRPE/duration).
+  Universal, not tuned to anyone's kit. The measured numbers ratify it: every device is clean
+  (dropout ≤ 5.2%, 0 implausible, **including FORM**) — the "swim HR trap" was one start-of-activity
+  zero-sample, not the aggregate. **No `hr_source` enum, no `device_name` extraction, no backfill.**
+- **Swim stays PACE-binned; FORM HR is cross-check-only** — measured-clean but held to corroboration
+  by swimming physiology (dive reflex, water HR suppression) + market reality (swim training is
+  pace-based). Promotable to a bin/flag driver only by a documented decision, never by drift.
 - **`heartRate: 0` dropout filtering — SPECIFIED preprocessing, not a footnote.** HR series carry
   `heartRate: 0` points (dropouts / activity start). Naive TRIMP/decoupling over zeros silently
   **DEFLATES** the metric — a D-242-class "absence rendered as a real low value." Item 1/2/3 MUST
