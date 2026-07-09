@@ -1723,6 +1723,10 @@ Surfaced wiring D-261: the primary user's `Get stronger` (`strength_primary_v1`)
 
 **Interim:** D-262 coherence guard stops the contradictory "add more" prescription (no add-more while ACWR high) — but that's a guard against the *symptom*, not the cause. **Root fix: Item 2 (intensity-binned per-domain load)** — when the reconciler sees "running behind plan BUT total/cross-training load carried," it produces ONE coherent verdict ("you swapped running for cross-training — running's behind, but you're carrying the load") instead of two opposite ones, and `load_status` stops being run-myopic. Closes when Item 2's per-domain ratios feed the reconciler.
 
+### Q-141 — Entire cardio pipeline routes through Strava despite live Garmin OAuth: single-vendor dependency on the load system's input layer (2026-07-08, FILED — assess Garmin as primary/redundant)
+
+The Item 2 HR audit (user 45d122e7) found ALL cardio — run/ride/swim, 35 sessions over 8 weeks — ingests via `source = 'strava'`, even though the app runs a live **Garmin OAuth** proxy (`npm run dev` port 8080). So the load system's entire input layer (HR, power, pace, time-series) depends on a **single vendor**. Risk: Strava API approval is still **pending** (applied Apr 2026), and Strava's ToS **constrains raw-data flow** (retention / redistribution limits). If Strava access lapses or tightens, the load system loses its substrate — right as Items 1–3 make that substrate load-bearing. **Assess Garmin as a primary or redundant source:** the OAuth already exists and `ingest-activity` already handles `provider = 'garmin'` (separate write path, lines ~810–1040), so the plumbing is partly there. Log only — not Item 2's scope, but it's the input layer every load-system item builds on, so it's a standing risk to the whole arc, not a feature gap.
+
 ## When to add an entry
 
 Add a new Q-NNN when:

@@ -86,6 +86,40 @@ the reconciler — "total 1.6 but the spike is low-intensity swim on thin chroni
 representable inside the one authority. Closes Q-137's substance. No new gauge, no parallel
 verdict. **Emits the LOAD READING.**
 
+**Data reality (audited 2026-07-08, user 45d122e7 — real 8-week coverage):**
+
+| Discipline | Sessions | avg_hr | HR series | power | pace | Source |
+|---|---|---|---|---|---|---|
+| ride | 14 | 100% | 100% | 100% | 100% | strava |
+| run | 12 | 100% | 100% | 100% | 100% | strava |
+| swim | 9 | 100% | 100% | 0% | 100% | strava |
+| strength | 9 | **0%** | 0% | 0% | 0% | manual |
+
+The audit **replaces** the "intensity from HR where available" framing with a **discipline-specific
+primary signal** — this GENERALIZES the existing `inferIntensityFromPerformance` ladder (D-238), it
+is NOT a new invention:
+
+| Discipline | Bin on | HR role |
+|---|---|---|
+| run | HR/LTHR (running power also present) | primary |
+| ride | power/FTP | primary; HR backup |
+| swim | **pace** | **provisional cross-check only — never drives a bin or a flag** |
+| strength | sRPE | none (0% HR — manual entry) |
+
+- **Swim HR: provisional ALWAYS** (pending the device-metadata peek). His swim HR is wrist-optical
+  (106 / 130 / 113 bpm — suppressed and erratic, with `heartRate: 0` dropouts mid-series), and the
+  schema cannot distinguish optical from strap (Finding A: no sensor provenance stored; `source` is
+  the provider, not the device). Swim HR corroborates only — it never drives a bin or an Item-1 flag.
+- **`heartRate: 0` dropout filtering — SPECIFIED preprocessing, not a footnote.** HR series carry
+  `heartRate: 0` points (dropouts / activity start). Naive TRIMP/decoupling over zeros silently
+  **DEFLATES** the metric — a D-242-class "absence rendered as a real low value." Item 1/2/3 MUST
+  drop `heartRate <= 0` points before any HR aggregation; a fixture pins this when Item 2 builds.
+- **Run + ride: 100% HR series → TRIMP (Item 1) and decoupling (Item 3) fully computable** on the
+  valid (post-dropout-filter) series. Strength: sRPE only (no series). Swim: series exists, HR provisional.
+- **Coverage is total for cardio** → the "sRPE where HR isn't available" fallback barely applies to
+  cardio; it's essentially the **strength** path (0% HR, manual → sRPE, correct per Item 1).
+- **Single-vendor substrate:** all cardio routes through Strava despite live Garmin OAuth (Q-141).
+
 ### Item 3 — Two-key absorption rule [lit-adjusted]
 - **Key 1:** load math (total + per-domain ACWR, plan-phase aware post-Q-136).
 - **Key 2 (the RESPONSE):** HR/pace decoupling (steady-state aerobic efforts only —
