@@ -142,11 +142,16 @@ is NOT a new invention:
 - **Single-vendor substrate:** all cardio routes through Strava despite live Garmin OAuth (Q-141).
 
 ### Item 3 — Two-key absorption rule [lit-adjusted]
-- **Key 1:** load math (total + per-domain ACWR, plan-phase aware post-Q-136).
-- **Key 2 (the RESPONSE):** HR/pace decoupling (steady-state aerobic efforts only —
-  TrainingPeaks Pa:Hr, <5% good / >10% concerning) + effort-vs-typical + muscular ledger.
-  HRV/RHR join as additive corroborators IF the Garmin tier returns them (check first); never
-  required.
+- **Key 1:** load math (per-domain COMPOSITION always + ratios when earned, plan-phase aware post-Q-136).
+- **Key 2 (the RESPONSE) — signals we actually control (no HRV/RHR):** HR/pace decoupling
+  (steady-state aerobic efforts only — TrainingPeaks Pa:Hr, <5% good / >10% concerning) +
+  effort-vs-typical + muscular ledger. **HRV/RHR are OUT of the design entirely** (2026-07-09,
+  Michael) — the Garmin tier doesn't return them; don't build on a signal we don't control.
+  Anchors (all live on Training Baselines): run decoupling → **LTHR 151 / threshold pace 10:05**;
+  bike → **FTP 176**; swim → **CSS 2:30/100** (exists — Q-147; corrects Item 2's "unanchored").
+  effort-vs-typical already collected; muscular ledger = 1RMs on file. **Anchor-confidence
+  provenance (Q-146):** each Key-2 verdict carries the confidence of the anchor(s) it used — a
+  thin anchor (threshold pace "3 runs," manual swim CSS) caps/softens the verdict. Ship-low-earn-up.
 - **Rule:** the reconciler escalates to a cautionary/prescriptive verdict **only when both
   keys agree.** Load-high + body-fine → `elevated` max, descriptive copy only.
 - **Missing-data (designed, not edge case):** decoupling is valid only on steady-state aerobic
