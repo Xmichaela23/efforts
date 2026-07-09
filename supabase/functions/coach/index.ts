@@ -31,6 +31,7 @@ import { getRunningFatigueWeight, getCyclingFatigueWeight } from '../_shared/fat
 import { isLowTrustWorkload } from '../_shared/workload.ts';
 import { reconcileLoadStatus } from '../_shared/load-status-reconcile.ts';
 import { resolvePlanPhaseDetailed, phaseNameToWeekIntent, type PhaseSource } from '../_shared/plan-phase.ts';
+import { offPlanAdherenceBanner } from '../_shared/off-plan-banner.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
 import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel } from '../_shared/state-trend/index.ts';
@@ -4842,13 +4843,12 @@ ${narrativeFacts.join('\n')}`;
           // i.e. did ≤ half the planned running) and excluded on intents MEANT to
           // be light (recovery/taper/deload/peak). Only for low/normal
           // load_status; 'high'/'elevated' (real overload) are handled above.
-          if (
-            (ls === 'under' || ls === 'on_target') &&
-            runLoadPct != null && runLoadPct <= -50 &&
-            !['recovery', 'taper', 'deload', 'peak'].includes(intent)
-          ) {
-            return 'Off plan this week — planned sessions skipped. Get back on schedule before adding extra.';
-          }
+          // D-262: extracted for testability + coherence guard (no "add more"
+          // prescription while total load reads high — can't say add-more + rest-now).
+          const offPlanLine = offPlanAdherenceBanner({
+            loadStatus: ls, runLoadPct, weekIntent: intent, totalAcwr: lsData?.acwr,
+          });
+          if (offPlanLine) return offPlanLine;
 
           // ── Race-aware overrides (≤21 days out) ─────────────────────────
           const raceNameForSummary = goalContext?.primary_event?.name ?? activePlan?.name ?? null;

@@ -1715,6 +1715,12 @@ Surfaced wiring D-261: the primary user's `Get stronger` (`strength_primary_v1`)
 
 **Log only for now** — informs the load-system extension doc. Don't engineer a fake phase or a bespoke strength band before Item 2's per-domain inputs exist; revisit tolerance (problem 2) once they do, and problem 1 (naming) separately if strength plans grow phase names worth mapping.
 
+### Q-140 — `load_status` is run-centric: a deliberate discipline substitution reads as BOTH overload and deficit — the false-*under* mirror of D-259's false-*over* (2026-07-08, FILED — interim guard D-262, root fix Item 2)
+
+`load_status` is computed primarily from `run_only_week_load_pct` (running actual vs planned running). So when a hybrid/strength athlete deliberately swaps planned runs for cross-training (bike/swim), the SAME week reads as: (1) **overload** — the all-discipline gauge spikes (ACWR 1.58 · "rest now") because the cross-training load is real; and (2) **deficit** — `load_status = under` → "off plan, add more" because running is −100% vs plan. Two opposite verdicts from one week. This is the **exact mirror of D-259**: Gate 1 killed the false-*over* ("you're overloaded" from a swap); this is the false-*under* ("you're under-training" from the same swap). **Same root, opposite sign** — endurance/run-shaped reasoning applied to an athlete who substituted disciplines.
+
+**Interim:** D-262 coherence guard stops the contradictory "add more" prescription (no add-more while ACWR high) — but that's a guard against the *symptom*, not the cause. **Root fix: Item 2 (intensity-binned per-domain load)** — when the reconciler sees "running behind plan BUT total/cross-training load carried," it produces ONE coherent verdict ("you swapped running for cross-training — running's behind, but you're carrying the load") instead of two opposite ones, and `load_status` stops being run-myopic. Closes when Item 2's per-domain ratios feed the reconciler.
+
 ## When to add an entry
 
 Add a new Q-NNN when:
