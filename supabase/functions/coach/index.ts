@@ -33,6 +33,8 @@ import { reconcileLoadStatus } from '../_shared/load-status-reconcile.ts';
 import { resolvePlanPhaseDetailed, phaseNameToWeekIntent, type PhaseSource } from '../_shared/plan-phase.ts';
 import { offPlanAdherenceBanner } from '../_shared/off-plan-banner.ts';
 import { computePerDomainLoad, type SliceSession } from '../_shared/per-domain-load.ts';
+import { assessAbsorption } from '../_shared/absorption.ts';
+import { computeSafetyFloor } from '../_shared/load-status-reconcile.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
 import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel } from '../_shared/state-trend/index.ts';
@@ -3294,6 +3296,34 @@ Deno.serve(async (req) => {
         const unplannedTotalLoad = unplannedWorkouts.reduce(
           (sum: number, w: any) => sum + (Number(w?.workload_actual) || 0), 0
         );
+        // ── Item 3 (D-265): Key-2 absorption → two-key cap + BODY-row RESPONSE ──
+        const trendSig = (t: { trend: string; based_on_sessions: number }) => ({
+          available: t.based_on_sessions >= 2,
+          elevated: t.based_on_sessions >= 2 && t.trend === 'declining',
+          strong: false, // v1: effort/ledger are direction-only (no magnitude tier) → cannot solo-escalate
+        });
+        // anchorThin from LTHR confidence (Q-146): low/absent → thin (describes, never solo-escalates / no baseline).
+        const _lthrConf = String((learnedFitness as any)?.run_threshold_hr?.confidence || '');
+        const anchorThin = _lthrConf !== 'medium' && _lthrConf !== 'high';
+        // This week's easy runs → mean HR drift, gate-filtered per-session (intent-easy proxy =
+        // below-threshold HR; non-negative drift) BEFORE the mean, so it inherits the gate's honesty.
+        const _easyRunDrifts = dailyLedger
+          .flatMap((d: any) => d.actual || [])
+          .filter((a: any) => String(a?.type || '').toLowerCase().startsWith('run')
+            && a?.hr_drift_bpm != null && Number(a.hr_drift_bpm) >= 0
+            && a?.avg_hr != null && lthrForBins != null && Number(a.avg_hr) < lthrForBins)
+          .map((a: any) => Number(a.hr_drift_bpm));
+        const _meanDrift = _easyRunDrifts.length
+          ? Math.round((_easyRunDrifts.reduce((x: number, y: number) => x + y, 0) / _easyRunDrifts.length) * 10) / 10
+          : null;
+        const absorption = assessAbsorption({
+          effort: trendSig(snapshotBody.weekly_trends.effort_perception),
+          ledger: trendSig(snapshotBody.weekly_trends.strength),
+          driftSession: _meanDrift != null ? { intentEasy: true, hrDriftBpm: _meanDrift, anchorThin } : null,
+          typicalSteadyDriftBpm: null, // v1 cold-start: historical gate-passing baseline deferred (correct for a thin anchor anyway)
+          safetyFloor: computeSafetyFloor(snapshotBody.weekly_trends, readinessState),
+        });
+
         const reconciled = reconcileLoadStatus(
           {
             status: snapshotBody.load_status.status,
@@ -3320,9 +3350,12 @@ Deno.serve(async (req) => {
           snapshotBody.load_status.run_only_week_load_pct ?? null,
           disciplineProfiles.map(p => ({ discipline: p.discipline, maturity: p.maturity, acwr: p.acwr })),
           isSpikeOnEmptyBase,
+          absorption.corroborated_strain, // Item 3 (D-265): the two-key cap — ESCALATION path (separate from the BODY row)
         );
         snapshotBody.load_status.status = reconciled.status;
         snapshotBody.load_status.interpretation = reconciled.interpretation;
+        // Path 2 (separate, per the pin): the RESPONSE describes the BODY row INDEPENDENT of status.
+        (snapshotBody.load_status as any).absorption = absorption;
       }
       // D-237 Stage 2: append the estimated-load disclosure to the load receipt when a
       // meaningful fraction of the window load is a low-trust estimate. A declared estimate,
