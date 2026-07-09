@@ -17,7 +17,7 @@
  *   deno test supabase/functions/_shared/load-status-reconcile.test.ts --no-check
  */
 import { assertEquals, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { reconcileLoadStatus, type ReconcileLoadInput, type TrendInfo } from './load-status-reconcile.ts';
+import { reconcileLoadStatus, computeSafetyFloor, computeDecliningSignals, type ReconcileLoadInput, type TrendInfo, type BodyTrends } from './load-status-reconcile.ts';
 
 // ── Fixture builders (defaults = quiet body, no decline) ──────────────────
 const trend = (t: string, n: number): TrendInfo => ({ trend: t, based_on_sessions: n });
@@ -46,6 +46,7 @@ function run(overrides: {
   runLoadPct?: number | null;
   discProfiles?: Args[8];
   spikeOnEmptyBase?: boolean;
+  corroboratedStrain?: boolean;
 }) {
   const raw: ReconcileLoadInput = {
     status: 'high',
@@ -73,6 +74,7 @@ function run(overrides: {
     overrides.runLoadPct ?? null,
     overrides.discProfiles,
     overrides.spikeOnEmptyBase ?? false,
+    overrides.corroboratedStrain ?? true, // default true = no cap (preserves pre-Item-3 tests)
   );
 }
 
@@ -171,4 +173,46 @@ Deno.test('regression: Michael WK1 as unknown phase → elevated (Gate 1 clears 
     runLoadPct: null,
   });
   assertEquals(r.status, 'elevated');
+});
+
+// ═══ Item 3 (D-265): two-key cap + safety floor ═══════════════════════════
+// A LOAD-driven 'high' scenario: over-running (runLoadPct 60 → excess IS running) +
+// unplanned load 200% of plan → reconciler reaches 'high' from load alone.
+const LOAD_HIGH = { runLoadPct: 60, unplannedLoad: { count: 5, totalLoad: 200, plannedWeekLoad: 100 } } as const;
+
+Deno.test('two-key cap: load-high + NOT corroborated → capped to elevated (the false-back-off defense)', () => {
+  const r = run({ ...LOAD_HIGH, corroboratedStrain: false });
+  assertEquals(r.status, 'elevated');
+  assertStringIncludes(r.interpretation, 'no corroborated strain');
+});
+Deno.test('two-key cap: load-high + corroborated → stays high (body agrees)', () => {
+  assertEquals(run({ ...LOAD_HIGH, corroboratedStrain: true }).status, 'high');
+});
+
+// Safety floor (nDeclining≥2 / readiness) → corroborated → passes the cap. The
+// readiness/nDeclining → corroboratedStrain mapping is computeSafetyFloor (below).
+const QUIET: BodyTrends = {
+  cardiac: { trend: 'insufficient', based_on_sessions: 0 },
+  effort_perception: { trend: 'stable', based_on_sessions: 3 },
+  run_quality: { trend: 'insufficient', based_on_sessions: 1 },
+  strength: { trend: 'stable', based_on_sessions: 3 },
+};
+const decl = (n: number): BodyTrends => ({
+  cardiac: { trend: n >= 1 ? 'declining' : 'stable', based_on_sessions: 3 },
+  effort_perception: { trend: n >= 2 ? 'declining' : 'stable', based_on_sessions: 3 },
+  run_quality: { trend: 'stable', based_on_sessions: 3 },
+  strength: { trend: 'stable', based_on_sessions: 3 },
+});
+
+Deno.test('safety floor: readiness=fatigued (no other strain) → true → load-high stays high (readiness arm)', () => {
+  assertEquals(computeSafetyFloor(QUIET, 'fatigued'), true);
+  assertEquals(computeSafetyFloor(QUIET, 'overreached'), true);
+  // fed to absorption → corroboratedStrain true → reconciler does NOT cap
+  assertEquals(run({ ...LOAD_HIGH, readiness: 'fatigued', corroboratedStrain: true }).status, 'high');
+});
+Deno.test('safety floor: nDeclining≥2 arm → true; <2 or calm → false', () => {
+  assertEquals(computeSafetyFloor(decl(2), 'adapting'), true);   // 2 declining
+  assertEquals(computeSafetyFloor(decl(1), 'adapting'), false);  // 1 declining, calm readiness
+  assertEquals(computeSafetyFloor(QUIET, 'adapting'), false);
+  assertEquals(computeDecliningSignals(decl(2)).length, 2);
 });

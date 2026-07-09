@@ -49,6 +49,37 @@ export type TrendInfo = { trend: string; based_on_sessions: number };
 
 export const LOAD_RANK: Record<string, number> = { under: 0, on_target: 1, elevated: 2, high: 3 };
 
+export interface BodyTrends {
+  cardiac: TrendInfo;
+  effort_perception: TrendInfo;
+  run_quality: TrendInfo;
+  strength: TrendInfo;
+}
+
+/**
+ * The declining body-signal names (≥2 sessions + declining trend). ONE canonical
+ * computation (D-264) — the reconciler's `nDeclining` and Item 3's absorption
+ * safety-floor (`nDeclining ≥ 2`) both read this, so they can never disagree.
+ */
+export function computeDecliningSignals(bodyTrends: BodyTrends): string[] {
+  const s: string[] = [];
+  if (bodyTrends.cardiac.based_on_sessions >= 2 && bodyTrends.cardiac.trend === 'declining') s.push('HR drift');
+  if (bodyTrends.effort_perception.based_on_sessions >= 2 && bodyTrends.effort_perception.trend === 'declining') s.push('RPE');
+  if (bodyTrends.run_quality.based_on_sessions >= 2 && bodyTrends.run_quality.trend === 'declining') s.push('execution');
+  if (bodyTrends.strength.based_on_sessions >= 2 && bodyTrends.strength.trend === 'declining') s.push('RIR');
+  return s;
+}
+
+/**
+ * The absorption SAFETY FLOOR (Item 3): genuine overreaching that escalates regardless of
+ * the two-key rule — ≥2 declining body signals OR fatigued/overreached readiness. Fed into
+ * `assessAbsorption` as `safetyFloor`, which makes `corroborated_strain` true, so the
+ * reconciler two-key cap lets it through. One shared computation (D-264).
+ */
+export function computeSafetyFloor(bodyTrends: BodyTrends, readiness: string): boolean {
+  return computeDecliningSignals(bodyTrends).length >= 2 || readiness === 'fatigued' || readiness === 'overreached';
+}
+
 export function reconcileLoadStatus(
   raw: ReconcileLoadInput,
   bodyTrends: {
@@ -71,20 +102,17 @@ export function reconcileLoadStatus(
   runLoadPct: number | null,
   discProfiles?: Array<{ discipline: string; maturity: string; acwr: number | null }>,
   spikeOnEmptyBase: boolean = false,
+  /** Item 3 (D-265): Key-2 agreement from absorption. The two-key cap — a LOAD-driven
+   *  'high' without corroborated body strain is capped to 'elevated' (descriptive). Because
+   *  `corroborated_strain` already folds in the safety floor (nDeclining≥2 / fatigued /
+   *  overreached), body/safety-driven highs pass; only load-only highs cap. Default true =
+   *  no cap (backward-compat for callers that don't pass it). */
+  corroboratedStrain: boolean = true,
 ): { status: LoadStatusLevel; interpretation: string } {
   const reasons: string[] = [];
 
-  // ── 0. Assess body response quality ────────────────────────────────────
-  const decliningSignals: string[] = [];
-  if (bodyTrends.cardiac.based_on_sessions >= 2 && bodyTrends.cardiac.trend === 'declining')
-    decliningSignals.push('HR drift');
-  if (bodyTrends.effort_perception.based_on_sessions >= 2 && bodyTrends.effort_perception.trend === 'declining')
-    decliningSignals.push('RPE');
-  if (bodyTrends.run_quality.based_on_sessions >= 2 && bodyTrends.run_quality.trend === 'declining')
-    decliningSignals.push('execution');
-  if (bodyTrends.strength.based_on_sessions >= 2 && bodyTrends.strength.trend === 'declining')
-    decliningSignals.push('RIR');
-
+  // ── 0. Assess body response quality (shared computation — D-264) ───────
+  const decliningSignals = computeDecliningSignals(bodyTrends);
   const nDeclining = decliningSignals.length;
 
   const runBodyOk =
@@ -272,6 +300,16 @@ export function reconcileLoadStatus(
   ) {
     status = 'under';
     reasons.push('one big session on a thin base — build consistency, not recovery');
+  }
+
+  // ── Two-key cap (Item 3, D-265): THE LAW needs AGREEMENT ───────────────
+  // A LOAD-driven 'high' (Key 1) without corroborated body strain (Key 2) is capped to
+  // 'elevated' — descriptive, not prescriptive. `corroboratedStrain` already includes the
+  // safety floor (nDeclining≥2 / fatigued / overreached), so body/safety highs pass and
+  // only load-only highs cap. This is the structural defense against the false "back off".
+  if (status === 'high' && !corroboratedStrain) {
+    status = 'elevated';
+    reasons.push('load high but body absorbing — no corroborated strain (two-key)');
   }
 
   // ── Build interpretation ───────────────────────────────────────────────
