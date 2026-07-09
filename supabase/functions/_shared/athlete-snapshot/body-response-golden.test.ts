@@ -22,7 +22,7 @@ function run(id: string, date: string, day: string, hr: number, exec: number, rp
     actual: [{
       workout_id: id, type: 'run', name: 'Easy Run', source: 'garmin' as const,
       duration_seconds: 3000, distance_meters: 8000, pace: '9:00/mi', avg_hr: hr,
-      load_actual: load, rpe, feeling: null, execution_score: exec, decoupling_pct: dec,
+      load_actual: load, rpe, feeling: null, execution_score: exec, decoupling_pct: dec, hr_drift_bpm: dec, // D-264: cardiac trend now reads hr_drift_bpm (real signal); decoupling_pct retained for the % observation
       strength_actual: null,
     }],
   };
@@ -33,7 +33,7 @@ function strength(id: string, date: string, day: string, rir: number, target: nu
     actual: [{
       workout_id: id, type: 'strength', name: 'Lower Body Strength', source: 'manual' as const,
       duration_seconds: 3600, distance_meters: null, pace: null, avg_hr: null,
-      load_actual: load, rpe: 7, feeling: null, execution_score: null, decoupling_pct: null,
+      load_actual: load, rpe: 7, feeling: null, execution_score: null, decoupling_pct: null, hr_drift_bpm: null,
       strength_actual: [
         { name: 'Back Squat', sets: 3, best_weight: 225, best_reps: 5, avg_rir: rir, target_rir: target, rir_delta: rir - target, unit: 'lbs' as const },
         { name: 'Romanian Deadlift', sets: 3, best_weight: 185, best_reps: 8, avg_rir: rir, target_rir: target, rir_delta: rir - target, unit: 'lbs' as const },
@@ -113,5 +113,6 @@ Deno.test('golden: load_status strings (status, interpretation, load receipts, u
     cross_training_load_summary: '2 strength (185 pts, moderate running impact, learning — 6 sessions)',
     status: 'on_target',
     interpretation: 'running load on target. Cross-training: 2 strength (185 pts, moderate running impact, learning — 6 sessions). 5 unplanned: 3 runs, 2 strengths',
+    avg_run_hr_drift_bpm: 5.4, // D-264 step 0 receipt: mean of the 3 runs' drift (4.2/5.1/6.8)
   });
 });

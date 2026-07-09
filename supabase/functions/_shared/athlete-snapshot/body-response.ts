@@ -367,7 +367,15 @@ export function buildBodyResponse(
 
   const runQuality = makeTrend(runs, s => s.execution_score, 'higher');
   const effortPerception = makeTrend(allActual, s => s.rpe, 'lower');
-  const cardiac = makeTrend(runs, s => s.decoupling_pct, 'lower');
+  // D-264 step 0: cardiac trend reads the REAL signal (HR drift bpm), not the phantom
+  // decoupling_pct that was never populated. Runs + rides carry drift (swims don't).
+  // Lower drift = better. NOTE (Item 3): drift is NOT pace-corrected, so it's only VALID
+  // on steady-state efforts — the steady gate that Item 3 adds does double duty (relevance
+  // AND validity). This step 0 only plumbs the number; the verdict logic is Item 3.
+  const cardiac = makeTrend(runs, s => s.hr_drift_bpm, 'lower');
+  // Receipt surface: week's mean run HR drift (bpm), so the fix is verifiable end-to-end.
+  const runDrifts = runs.map(s => s.hr_drift_bpm).filter((v): v is number => v != null);
+  const avgRunHrDriftBpm = runDrifts.length > 0 ? Math.round((runDrifts.reduce((a, b) => a + b, 0) / runDrifts.length) * 10) / 10 : null;
 
   const strengthRirs = strengthSessions
     .flatMap(s => (s.strength_actual || []).map(e => e.avg_rir))
@@ -515,6 +523,7 @@ export function buildBodyResponse(
       cross_training_load_summary: crossTrainingLoadSummary,
       status: loadStatusLabel,
       interpretation: loadInterp,
+      avg_run_hr_drift_bpm: avgRunHrDriftBpm, // D-264 step 0: receipt surface for the cardiac read-path fix
     },
   };
 }

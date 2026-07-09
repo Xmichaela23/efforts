@@ -267,7 +267,14 @@ export function buildActualSession(row: any, imperial: boolean): ActualSession {
     rpe: Number(row?.session_rpe) || Number(row?.rpe) || null,
     feeling: row?.feeling ? String(row.feeling) : null,
     execution_score: pickExecutionScoreFromWorkoutRow(analysis as Record<string, unknown>, computed as Record<string, unknown>),
-    decoupling_pct: Number(analysis?.decoupling_pct) || Number(computed?.decoupling_pct) || null,
+    // D-264 read-path fix (Item 3 step 0): the phantom top-level `decoupling_pct` is
+    // NEVER written by the analyzer (decoupling % isn't computed at all). The real cardiac
+    // signal is HR DRIFT (bpm), stored nested. Read it from where it actually lives.
+    decoupling_pct: Number(analysis?.decoupling_pct) || Number(computed?.decoupling_pct) || null, // decoupling % — absent today (Fork B later)
+    hr_drift_bpm: Number(analysis?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm)
+      || Number(analysis?.detailed_analysis?.workout_summary?.hr_drift)
+      || Number(analysis?.heart_rate_summary?.drift_bpm)
+      || null,
     strength_actual: strengthActual,
   };
 }

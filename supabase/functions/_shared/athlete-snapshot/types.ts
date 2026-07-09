@@ -137,7 +137,8 @@ export type ActualSession = {
   rpe: number | null;
   feeling: string | null;
   execution_score: number | null;
-  decoupling_pct: number | null;
+  decoupling_pct: number | null; // decoupling % (Pa:Hr) — not computed today; null
+  hr_drift_bpm: number | null;   // D-264 step 0: the real cardiac-drift signal (bpm), was misread
   strength_actual: StrengthExerciseActual[] | null;
 };
 
@@ -204,6 +205,8 @@ export type BodyResponse = {
     cross_training_load_summary: string | null;
     status: 'under' | 'on_target' | 'elevated' | 'high';
     interpretation: string;
+    /** D-264 step 0: mean run HR drift (bpm) this week — receipt for the cardiac read-path fix. */
+    avg_run_hr_drift_bpm?: number | null;
   };
 };
 
