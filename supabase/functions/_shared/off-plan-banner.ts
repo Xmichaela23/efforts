@@ -19,12 +19,12 @@
  * run-centric); Item 2's per-domain view is what makes this coherent.
  */
 
-import { SLICE_LOADED_ACWR_MIN } from './per-domain-load.ts';
+import { SLICE_LOADED_ACWR_MIN, dominantAcuteSlice, type PerDomainLoad } from './per-domain-load.ts';
 
 const FACT = 'Off plan this week — planned sessions skipped.';
 const FACT_PLUS_PRESCRIPTION = `${FACT} Get back on schedule before adding extra.`;
-// Pin 1: attribute by the arm that fired — only claim "easy cross-training" when
-// the easy_cardio slice is what's loaded; the total-only arm stays generic.
+// Attribution names the carrier when one slice holds the acute-load majority, else
+// stays generic (no dominant carrier — a CORRECT read, not a fallback).
 const CARRIED_EASY = 'Running behind plan — total load carried via easy cross-training.';
 const CARRIED_GENERIC = 'Running behind plan — total load carried across your training.';
 
@@ -35,12 +35,13 @@ export function offPlanAdherenceBanner(opts: {
   runLoadPct: number | null | undefined;
   /** resolved week_intent */
   weekIntent: string;
-  /** all-discipline ACWR (load_status.acwr) — the "loaded overall" signal */
+  /** all-discipline ACWR (load_status.acwr) — the "loaded overall" gate */
   totalAcwr: number | null | undefined;
-  /** easy_cardio slice ACWR (per-domain) — the "carried via easy cross-training" signal */
-  easyCardioAcwr: number | null | undefined;
+  /** per-domain slices — attribution keys on COMPOSITION (acute-load share), not
+   *  per-slice ACWR (null-by-floor in prod; D-263 bs3 fix). */
+  perDomain: PerDomainLoad | null | undefined;
 }): string | null {
-  const { loadStatus, runLoadPct, weekIntent, totalAcwr, easyCardioAcwr } = opts;
+  const { loadStatus, runLoadPct, weekIntent, totalAcwr, perDomain } = opts;
 
   // D-147 firing conditions (unchanged): a real run shortfall on a normal training
   // week; excluded on intents meant to be light.
@@ -48,12 +49,12 @@ export function offPlanAdherenceBanner(opts: {
   if (runLoadPct == null || runLoadPct > -50) return null;
   if (['recovery', 'taper', 'deload', 'peak'].includes(weekIntent)) return null;
 
-  // Q-140 kill: is the load carried by another slice? Attribute by the arm that fired (pin 1).
-  const easyLoaded = easyCardioAcwr != null && easyCardioAcwr >= SLICE_LOADED_ACWR_MIN;
+  // Loaded overall? Total ACWR is the always-available gate (per-slice ratios are
+  // null-by-floor). Not loaded → genuinely under-training; the prescription is correct.
   const totalLoaded = totalAcwr != null && totalAcwr >= SLICE_LOADED_ACWR_MIN;
-  if (easyLoaded) return CARRIED_EASY;       // easy_cardio is the carrier — name it
-  if (totalLoaded) return CARRIED_GENERIC;   // loaded overall but not via easy_cardio — stay generic
+  if (!totalLoaded) return FACT_PLUS_PRESCRIPTION;
 
-  // Nothing loaded → genuinely under-training; the prescription is correct here.
-  return FACT_PLUS_PRESCRIPTION;
+  // Q-140 kill: loaded overall → attribute by acute-load COMPOSITION. Name the
+  // carrier only when a slice holds the majority; else the generic line is correct.
+  return dominantAcuteSlice(perDomain) === 'easy_cardio' ? CARRIED_EASY : CARRIED_GENERIC;
 }

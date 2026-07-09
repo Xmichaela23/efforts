@@ -22,10 +22,35 @@ export type BinSignal = 'hr' | 'power' | 'pace_unanchored' | 'srpe' | 'mixed';
 
 /** D-263: a slice's ACWR at or above this means it's being loaded at
  *  maintenance-or-above (acute avg ≥ chronic avg) — i.e. genuinely carried, not
- *  detraining. Used by the Q-140 coherence path to recognise "run under, load
- *  carried by another slice." Canonical home (D-264: one place); the off-plan
- *  banner imports it. */
+ *  detraining. The "loaded overall" gate reads TOTAL ACWR against this. Per-slice
+ *  ACWR is a BONUS that only exists when a slice's chronic base earns the 500
+ *  floor (usually it doesn't — see PERMISE reframe: composition is primary, ratios
+ *  mature in). Canonical home (D-264: one place). */
 export const SLICE_LOADED_ACWR_MIN = 1.0;
+
+/** D-263 bs3: a slice carries the acute load when its share of the total acute
+ *  load is at or above this (0.5 = a majority). Attribution keys on COMPOSITION,
+ *  not per-slice ACWR (which is null-by-floor in prod). Below it there is no
+ *  dominant carrier and the generic "across your training" line is CORRECT — not
+ *  a fallback failure. */
+export const ATTRIBUTION_DOMINANT_SHARE = 0.5;
+
+/** Which slice (if any) carries a majority of the acute load. Returns null when
+ *  no slice reaches ATTRIBUTION_DOMINANT_SHARE (genuinely spread → generic copy). */
+export function dominantAcuteSlice(pd: PerDomainLoad | null | undefined): SliceKey | null {
+  if (!pd) return null;
+  const loads: Array<[SliceKey, number]> = [
+    ['easy_cardio', pd.easy_cardio?.acute_load || 0],
+    ['hard_cardio', pd.hard_cardio?.acute_load || 0],
+    ['strength', pd.strength?.acute_load || 0],
+  ];
+  const total = loads.reduce((s, [, v]) => s + v, 0);
+  if (total <= 0) return null;
+  for (const [key, v] of loads) {
+    if (v / total >= ATTRIBUTION_DOMINANT_SHARE) return key;
+  }
+  return null;
+}
 
 /** D-263: easy/hard IF boundary per discipline, anchored to D-238's 'tempo' band
  *  (IF 0.80 = the aerobic|threshold seam). Per-discipline so each can diverge; today

@@ -4872,7 +4872,7 @@ ${narrativeFacts.join('\n')}`;
           const offPlanLine = offPlanAdherenceBanner({
             loadStatus: ls, runLoadPct, weekIntent: intent,
             totalAcwr: lsData?.acwr,
-            easyCardioAcwr: perDomain?.easy_cardio?.acwr ?? null, // D-263 bs3: Q-140 coherence input
+            perDomain: perDomain ?? null, // D-263 bs3: attribution by acute-load composition
           });
           if (offPlanLine) return offPlanLine;
 

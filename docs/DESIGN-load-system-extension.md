@@ -86,6 +86,17 @@ the reconciler — "total 1.6 but the spike is low-intensity swim on thin chroni
 representable inside the one authority. Closes Q-137's substance. No new gauge, no parallel
 verdict. **Emits the LOAD READING.**
 
+**PREMISE reframe (2026-07-08, from the live receipt).** Per-domain **ratios** are NOT the
+primary reconciler input — a single slice's chronic base almost never clears the shared 500
+floor (live: easy 468 / hard 269 / strength 221, all `null`/`insufficient_base`). Lowering the
+floor was rejected (thin-base ratios are the manufactured confidence fork 2(b) refused).
+**So the primary, always-available per-domain signal is COMPOSITION — the acute-load SHARE per
+slice** (which slice carries the work). Per-slice ACWR is a **bonus** that appears only when a
+slice's chronic base earns the floor; slices mature into ratios naturally as history accrues.
+Reconciler inputs = **composition always + ratios when earned.** The Q-140 attribution keys on
+composition: the carrier is the slice with acute-load share ≥ `ATTRIBUTION_DOMINANT_SHARE` (0.5);
+below that there is no dominant carrier and the generic line is correct.
+
 **Data reality (audited 2026-07-08, user 45d122e7 — real 8-week coverage):**
 
 | Discipline | Sessions | avg_hr | HR series | power | pace | Source |
