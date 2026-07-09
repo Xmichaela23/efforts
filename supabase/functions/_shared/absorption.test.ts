@@ -81,10 +81,14 @@ Deno.test('no effort/ledger/cardiac → load_only, unavailable, no escalation', 
   assertEquals(a.corroborated_strain, false);
 });
 
-// ── Cold-start fallback: no baseline → universal bpm bar (PENDING 6/14 calibration) ──
-Deno.test('cold-start (no typical baseline) uses universal fallback bpm', () => {
-  assertEquals(assessAbsorption({ effort: fine, ledger: fine, driftSession: steady(6), typicalSteadyDriftBpm: null, safetyFloor: false }).signals.drift.elevated, true); // 6 ≥ 5 coldstart-elevated
-  assertEquals(assessAbsorption({ effort: fine, ledger: fine, driftSession: steady(11), typicalSteadyDriftBpm: null, safetyFloor: false }).signals.drift.strong, true); // 11 ≥ 10 coldstart-strong
+// ── Cold-start fallback: calibrated conservative (6/14) — his benign-high 11 does NOT solo-escalate ──
+Deno.test('cold-start bars calibrated: 11 (his benign-high max) is NOT strong; strain (≥14) is', () => {
+  const at11 = assessAbsorption({ effort: fine, ledger: fine, driftSession: steady(11), typicalSteadyDriftBpm: null, safetyFloor: false });
+  assertEquals(at11.signals.drift.elevated, true);   // 11 ≥ 8 → describes
+  assertEquals(at11.signals.drift.strong, false);    // 11 < 14 → does NOT solo-escalate (refinement #2)
+  assertEquals(at11.corroborated_strain, false);     // his normal-high drift alone never prescribes at cold-start
+  assertEquals(assessAbsorption({ effort: fine, ledger: fine, driftSession: steady(7), typicalSteadyDriftBpm: null, safetyFloor: false }).signals.drift.elevated, false); // 7 < 8 typical
+  assertEquals(assessAbsorption({ effort: fine, ledger: fine, driftSession: steady(14), typicalSteadyDriftBpm: null, safetyFloor: false }).signals.drift.strong, true);   // 14 ≥ 14 → real strain
 });
 
 // ── steadyGate exclusions ──

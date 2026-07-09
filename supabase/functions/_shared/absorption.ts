@@ -33,9 +33,14 @@ export const DRIFT_ELEVATED_MARGIN_BPM = 4;
 /** Drift is `strong` (solo-escalation-level) at typical + this many bpm. */
 export const DRIFT_STRONG_MARGIN_BPM = 8;
 /** COLD-START fallback (no personal baseline yet). STEADY-STATE ONLY — never apply to
- *  variable efforts. PENDING calibration against a known-benign high-drift run (6/14). */
-export const HR_DRIFT_ELEVATED_BPM_STEADY_COLDSTART = 5;
-export const HR_DRIFT_STRONG_BPM_STEADY_COLDSTART = 10;
+ *  variable efforts. Calibrated 2026-07-09 against the primary user's high-drift history:
+ *  his steady drifts run 1/3/6/11 bpm — 11 (6/14, avgHR 135 = 89% LTHR, no RPE/temp to
+ *  confirm strain) is a plausibly-benign MAX. So `strong` sits ABOVE his observed max (14),
+ *  so cold-start never solo-escalates a normal-high drift; `elevated` (8) is above his
+ *  typical (1–6). Deliberately blunt — drift-vs-typical replaces this the moment the
+ *  personal baseline matures (and self-corrects for a high-drift-baseline athlete). */
+export const HR_DRIFT_ELEVATED_BPM_STEADY_COLDSTART = 8;
+export const HR_DRIFT_STRONG_BPM_STEADY_COLDSTART = 14;
 
 export type ResponseState = 'responding_well' | 'responding_strained' | 'partial' | 'unavailable';
 export type DriftExcludedReason = 'negative' | 'non_steady' | 'thin_anchor' | 'no_data' | null;
