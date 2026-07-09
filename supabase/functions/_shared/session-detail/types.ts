@@ -269,6 +269,9 @@ export type SessionDetailV1 = {
       basis: 'gap' | 'raw' | null;
       assessment: 'excellent' | 'good' | 'moderate' | 'high' | null;
     } | null;
+    /** D-264 step-0 receipt: HR drift (bpm) as it flows through the fixed pipeline
+     *  (buildActualSession → session), proving the nested key reaches session_detail. */
+    hr_drift_bpm: number | null;
   };
 
   // ── Splits (SessionNarrative Speed insight) ───────────────────────────────

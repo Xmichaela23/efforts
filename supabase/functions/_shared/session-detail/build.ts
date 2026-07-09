@@ -867,6 +867,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           assessment: (['excellent','good','moderate','high'] as const).includes(assessment as any) ? assessment : null,
         };
       })(),
+      // D-264 step-0 receipt: HR drift (bpm) sourced from the FIXED pipeline
+      // (buildActualSession → session.hr_drift_bpm), NOT a re-read of workout_analysis —
+      // proves the real nested row flows through deployed code end-to-end.
+      hr_drift_bpm: (actualSession as any)?.hr_drift_bpm ?? null,
     },
 
     splits_mi: splitsMi,
