@@ -11,6 +11,7 @@ import { rideComputedNp } from '../_shared/cycling-v1/np-trend.ts';
 import { detectClimbSegments, parseStravaSegmentEfforts } from '../_shared/cycling-v1/segments.ts';
 import { computeCtlAtl } from '../_shared/cycling-v1/ride-physiology.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { getTrainingLoadContext } from '../_shared/fact-packet/queries.ts';
 import { fetchPlanContextForWorkout } from '../_shared/plan-context.ts';
@@ -1530,12 +1531,13 @@ Deno.serve(async (req) => {
     // Get user baselines (for FTP). Tier 3 item 10 also pulls `weight` for the W/kg
     // limiter signal; without it we fall back to the NP-trend path in the limiter.
     let baselines = {};
+    let fullBaselines: any = null; // full row (performance_numbers + learned_fitness) for resolveCurrentFtp
     let userUnits = 'imperial';
     let userWeight: number | null = null;
     try {
       const { data: userBaselines } = await supabase
         .from('user_baselines')
-        .select('performance_numbers, units, weight')
+        .select('performance_numbers, learned_fitness, units, weight')
         .eq('user_id', workout.user_id)
         .single();
 
@@ -1543,14 +1545,20 @@ Deno.serve(async (req) => {
         userUnits = userBaselines.units;
       }
       baselines = userBaselines?.performance_numbers || {};
+      fullBaselines = userBaselines ?? null;
       userWeight = typeof userBaselines?.weight === 'number' ? userBaselines.weight : null;
     } catch (error) {
       console.log('⚠️ No user baselines found');
     }
 
+    // FTP fracture #2 fix: route through the SINGLE resolver (learned-first, ≥medium confidence) instead of
+    // reading performance_numbers.ftp raw. Now matches compute-facts (:1089/:1426) + the frozen snapshot
+    // bike.ftp_w, so the efficiency BAND the spine trend is built from stops being anchored to a possibly-
+    // stale typed value — and a power-meter (learned-only) rider gets a real band instead of null → no verdict.
+    // Falls back to typed when learned is absent/low-confidence, so a no-power-meter athlete is unchanged.
     const ftpW = (() => {
       try {
-        const v = Number((baselines as any)?.ftp ?? (baselines as any)?.functional_threshold_power);
+        const v = Number(resolveCurrentFtp(fullBaselines || {})?.value);
         return Number.isFinite(v) && v > 0 ? v : null;
       } catch {
         return null;
