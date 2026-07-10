@@ -2,6 +2,8 @@
 
 Companion to `SCREEN-INVENTORY.md` (which says *what each screen is*). This says **what each screen is wired to** — the data it reads, the data it writes, the edge function behind it, and whether it rides the smart-server path or touches tables directly. Code-derived 2026-07-02; update when wiring changes.
 
+> **Third companion — `TRUTH-MAP.md`:** for *which layer OWNS each fact (spine / Arc / coach / baselines), whether every screen that shows it agrees, and the verified fractures where they don't*, see **`docs/TRUTH-MAP.md`**. Read it before building anything that touches fitness/load/RPE/FTP/strength — it's the anti-drift map.
+
 **Legend, per screen:** **reads ←** source · **writes →** target · **edge:** invoked function(s) · **dep:** the load-bearing server contract · **notes.** `file:line` anchors are under `src/`.
 
 ---
