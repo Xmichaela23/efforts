@@ -1142,6 +1142,81 @@ export default function StateTab({
     avg_hr_drift_bpm: number | null;
   }> ?? [];
 
+  // ── BIKE row — from ride_session_types_7d (b2 scale-up: bike-forward leads with this) ──
+  const rideTypes = wsv.ride_session_types_7d ?? [];
+
+  // ── STRENGTH row — from strength_session_types_7d (b2/Q-149) ─────────────
+  const strengthTypes = wsv.strength_session_types_7d ?? [];
+  // Plan-primary is server single-source (Law-4 — the client renders it, never re-derives it). When the
+  // plan's primary discipline is strength, the STRENGTH execution row LEADS the surface: this athlete's
+  // key sessions are lifts, graded by the strength verdict, not run pace.
+  const primaryDiscipline = wsv.plan.primary_discipline ?? 'unknown';
+  const strengthLeads = primaryDiscipline === 'strength';
+  const strengthExecRow = (() => {
+    const graded = strengthTypes.filter(st => st.avg_execution_score != null);
+    const hasTests = strengthTypes.some(st => st.test_count > 0);
+    // Endurance athlete with no strength execution data → render nothing (don't clutter). A strength-primary
+    // athlete with no graded lift yet → honest-abstain line, NOT silence and NOT run pace masquerading as the verdict.
+    if (graded.length === 0 && !(strengthLeads && (strengthTypes.length > 0 || hasTests))) return null;
+    return (
+      <div className="px-3 py-3">
+        <Row label="STRENGTH">
+          {graded.length > 0 ? graded.map((st, i) => {
+            const effColor = st.efficiency_tone === 'positive' ? 'text-emerald-400/85'
+              : st.efficiency_tone === 'warning' ? 'text-amber-400/85'
+              : st.efficiency_tone === 'danger' ? 'text-rose-400/85'
+              : 'text-white/70';
+            return (
+              <React.Fragment key={st.type}>
+                {i > 0 && <Dot />}
+                <Chip label={st.type_label} value={`${Math.round(st.avg_execution_score!)}% exec`} valueClass={effColor} />
+              </React.Fragment>
+            );
+          }) : (
+            <span className="text-[12px] text-white/50">
+              {hasTests ? 'Strength tested this week — not graded' : 'No strength sessions logged yet this week'}
+            </span>
+          )}
+        </Row>
+      </div>
+    );
+  })();
+
+  // ── AERO (run) + BIKE rows — mirror shape; only graded (execution-scored) types show ──
+  const execScoreColor = (s: number) => s >= 80 ? 'text-emerald-400/85' : s >= 60 ? 'text-white/70' : 'text-amber-400/85';
+  const runExecRow = runTypes.some(rt => rt.avg_execution_score != null) ? (
+    <div className="px-3 py-3">
+      <Row label="AERO">
+        {runTypes.filter(rt => rt.avg_execution_score != null).map((rt, i) => (
+          <React.Fragment key={rt.type}>
+            {i > 0 && <Dot />}
+            <Chip label={rt.type} value={`${Math.round(rt.avg_execution_score!)}% eff`} valueClass={execScoreColor(rt.avg_execution_score!)} />
+          </React.Fragment>
+        ))}
+      </Row>
+    </div>
+  ) : null;
+  const rideExecRow = rideTypes.some(rt => rt.avg_execution_score != null) ? (
+    <div className="px-3 py-3">
+      <Row label="BIKE">
+        {rideTypes.filter(rt => rt.avg_execution_score != null).map((rt, i) => (
+          <React.Fragment key={rt.type}>
+            {i > 0 && <Dot />}
+            <Chip label={rt.type_label ?? rt.type} value={`${Math.round(rt.avg_execution_score!)}% eff`} valueClass={execScoreColor(rt.avg_execution_score!)} />
+          </React.Fragment>
+        ))}
+      </Row>
+    </div>
+  ) : null;
+
+  // Order the execution rows so the plan's PRIMARY discipline leads (server single-source). Single-sport
+  // (strength/run/ride) hoists its row; triathlon/duathlon/hybrid/unknown keep the default order — no forced
+  // lead (a tri isn't one discipline). Swim never has an execution row here — shown honestly elsewhere, never faked.
+  const execRowsByKey: Record<string, React.ReactNode> = { strength: strengthExecRow, run: runExecRow, ride: rideExecRow };
+  const defaultExecOrder = ['run', 'ride', 'strength'];
+  const leadKey = (['strength', 'run', 'ride'] as string[]).includes(primaryDiscipline) ? primaryDiscipline : null;
+  const orderedExecKeys = leadKey ? [leadKey, ...defaultExecOrder.filter(k => k !== leadKey)] : defaultExecOrder;
+
   // ── NEXT row ─────────────────────────────────────────────────────────────
   const sessionsRemaining = data.week?.key_sessions_remaining ?? [];
   const nextSessions = sessionsRemaining.slice(0, 3);
@@ -1538,24 +1613,9 @@ export default function StateTab({
           );
         })()}
 
-        {/* AERO */}
-        {runTypes.some(rt => rt.avg_execution_score != null) && (
-          <div className="px-3 py-3">
-            <Row label="AERO">
-              {runTypes.filter(rt => rt.avg_execution_score != null).map((rt, i) => {
-                const effColor = rt.avg_execution_score! >= 80 ? 'text-emerald-400/85'
-                  : rt.avg_execution_score! >= 60 ? 'text-white/70'
-                  : 'text-amber-400/85';
-                return (
-                  <React.Fragment key={rt.type}>
-                    {i > 0 && <Dot />}
-                    <Chip label={rt.type} value={`${Math.round(rt.avg_execution_score!)}% eff`} valueClass={effColor} />
-                  </React.Fragment>
-                );
-              })}
-            </Row>
-          </div>
-        )}
+        {/* Execution surface (b2/Q-149 + scale-up) — STRENGTH / AERO / BIKE rows, ordered so the plan's
+            primary discipline leads. Bike-forward leads with BIKE, strength-forward with STRENGTH, etc. */}
+        {orderedExecKeys.map((k) => execRowsByKey[k] ? <React.Fragment key={k}>{execRowsByKey[k]}</React.Fragment> : null)}
 
         {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
         <StatePerformanceSection strengthDetail={strengthPerLiftDetail} />

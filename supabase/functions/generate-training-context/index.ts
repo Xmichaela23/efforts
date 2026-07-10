@@ -1,10 +1,22 @@
 /**
  * =============================================================================
+ * ORPHANED — NOT INVOKED BY ANYTHING (verified by trace 2026-07-09, Q-149).
+ * =============================================================================
+ * No `invoke('generate-training-context')` exists in src/ or supabase/ — the only
+ * references left are stale comments. The LIVE weekly-context path is the `coach`
+ * function → `weekly_state_v1` (consumed by the State screen via useCoachWeekContext).
+ * Its `week_review` / `key_session_audits` / `execution_quality` engine feeds NOBODY.
+ *
+ * Do NOT extend this file believing it ships (the D-268 Phase-4 handoff mis-targeted it here).
+ * b2 (Q-149) — the plan-primary strength key-session read — was built on the live coach path
+ * instead (_shared/strength-session-types.ts + coach strength_session_types_7d). Deleting this
+ * 3.4k-line file is a separate, gated call; flagged here so nobody rebuilds into dead code.
+ * =============================================================================
  * EDGE FUNCTION: generate-training-context
  * =============================================================================
- * 
- * PURPOSE: Calculate training context for Context screen
- * 
+ *
+ * PURPOSE: (legacy) Calculate training context for Context screen — see orphan note above.
+ *
  * WHAT IT DOES:
  * - Calculates ACWR (Acute:Chronic Workload Ratio) using plan-aligned week windows
  * - Aggregates sport breakdown (run/bike/swim/strength/mobility)

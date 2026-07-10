@@ -121,6 +121,29 @@ export function resolvePlanPrimary(planConfig: any): PlanPrimary {
   return 'unknown';
 }
 
+// b2 scale-up (Q-149): the SPECIFIC lead discipline for the execution surface — strength/run/ride/swim,
+// or a multi-sport bucket (triathlon/duathlon/hybrid) that must NOT force a single lead. This is a display
+// concern distinct from resolvePlanPrimary's load-verdict bucket, but it DELEGATES to it so "is this
+// strength-primary" stays one decision (Law-1). Reads the plan's own sport field (config.discipline ||
+// config.sport || config.source || plan_type) — the same signal arc-context.ts:684 uses.
+export type PrimarySport = 'strength' | 'run' | 'ride' | 'swim' | 'triathlon' | 'duathlon' | 'hybrid' | 'unknown';
+
+export function resolvePrimarySport(planConfig: any, planType?: string | null): PrimarySport {
+  // Strength is decided in exactly one place.
+  if (resolvePlanPrimary(planConfig) === 'strength') return 'strength';
+  const raw = String(
+    planConfig?.discipline ?? planConfig?.sport ?? planConfig?.source ?? planType ?? ''
+  ).toLowerCase().trim();
+  if (/triathlon|(^|[^a-z])tri([^a-z]|$)/.test(raw)) return 'triathlon';
+  if (/duathlon|duath/.test(raw)) return 'duathlon';
+  if (/cycl|bike|ride/.test(raw)) return 'ride';
+  if (/swim/.test(raw)) return 'swim';
+  if (/run/.test(raw)) return 'run';
+  if (resolvePlanPrimary(planConfig) === 'hybrid') return 'hybrid';
+  // Can't tell → no forced single lead (honest: never hoist a discipline we can't confirm is primary).
+  return 'unknown';
+}
+
 /**
  * (§4) WTD-prorated primary-discipline adherence. Strength-primary v1 only (returns null otherwise).
  * Mid-week the target is prorated by the fraction of the week ELAPSED, so strength done later in the

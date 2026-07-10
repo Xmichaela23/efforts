@@ -12,7 +12,13 @@ Efforts is a hybrid endurance + strength training app for intermediate athletes 
 
 ## Context-priming for new sessions
 
-Before doing any non-trivial work, read these in order — they prevent re-litigating settled choices and re-discovering already-filed bugs:
+**The thesis first (read before the state docs — this is the frame everything else sits inside).** Efforts' product *is* coherent reasoning about an athlete: nothing happens in a vacuum — every surface is plan-aware, performance-aware, and reads one shared truth instead of minting its own. "Completely self-aware" is the north star, defined finitely (not a vibe), and it is a target being migrated toward surface by surface — not an achieved state. Hold it before you touch any feature:
+
+- **`docs/CONSTITUTION.md`** — the six laws that make Efforts *a system* not a pile of features (one source of truth per claim; surfaces render, never re-decide; new reasoning born on the spine; each law has a violation-tell).
+- **`docs/SELF-AWARENESS-MAP.md`** — what "self-aware" means, made finite: five reasoning axes on one shared substrate. Substrate built; most axes **partial** with named gaps. The app is "self-aware" when all five are built and gated.
+- **`docs/CANON-arc-inference-model.md`** — how it infers without becoming "the score that lies": one confidence-stamped `training_reaction` fact, born on the spine, every surface an arm that renders it. §12 = the continuity invariant (one government, states as arms; divergence is the lie).
+
+Then the state docs (in order) — they prevent re-litigating settled choices and re-discovering already-filed bugs:
 
 1. **`docs/ENGINE-STATE.md`** — current state. Three sections: Solid (don't re-litigate), Known broken (filed, not blocking), Questioned (worth verifying). If you think one of the Solid items is broken, the bug is probably elsewhere — read the verification method before changing anything.
 2. **`docs/DECISIONS-LOG.md`** — why things are the way they are. Numbered D-NNN. Records non-obvious design choices, coefficients picked deliberately, architectural patterns rejected. If you're about to reverse one of these, find the entry first and either supersede it explicitly (new D-NNN) or talk to the human.

@@ -1,6 +1,17 @@
 // Coach Engine Contracts (Deterministic)
 // V1 is intentionally small and stable so multiple screens can share it.
 
+// b2 (Q-149): strength 7-day session-type breakdown, the plan-primary mirror of run/ride.
+// The type + builder live in _shared (Law-5: a renderer of the strength analyzer's verdict).
+export type { StrengthSessionType7d } from '../_shared/strength-session-types.ts';
+import type { StrengthSessionType7d } from '../_shared/strength-session-types.ts';
+
+// b2 scale-up (Q-149): the specific lead discipline for the execution surface (single source:
+// resolvePrimarySport). strength/run/ride/swim → that discipline leads; triathlon/duathlon/hybrid/unknown
+// → no forced single lead. Distinct from resolvePlanPrimary's coarse load-verdict bucket.
+export type { PrimarySport } from '../_shared/load-status-reconcile.ts';
+import type { PrimarySport } from '../_shared/load-status-reconcile.ts';
+
 export type MethodologyId =
   | 'run:sustainable'
   | 'run:performance_build'
@@ -231,6 +242,9 @@ export type CoachWeekContextResponseV1 = {
   run_session_types_7d?: RunSessionType7d[];
   /** Tier 4 item 12 of running→cycling delta map. Mirror of run_session_types_7d for rides. */
   ride_session_types_7d?: RideSessionType7d[];
+  /** b2 (Q-149): strength 7-day session-type breakdown — the plan-primary key-session read for
+   * strength-primary athletes (their lifts graded by the analyzer's verdict, not run pace). */
+  strength_session_types_7d?: StrengthSessionType7d[];
   /** Tier 4 item 15 of running→cycling delta map. Mirror of running's planCtx fields
    * (peakLongRunMi / nextLongRunMi / etc.) for cycling. Long rides are >= 3 hr.
    * Cycling race-readiness (Tier 4 item 16) will read from this when it lands. */
@@ -365,6 +379,10 @@ export type CoachWeekContextResponseV1 = {
       plan_id: string | null;
       plan_name: string | null;
       athlete_context_for_week: string | null;
+      /** b2 (Q-149) + scale-up: the SPECIFIC lead discipline (single source: resolvePrimarySport).
+       * The client reads THIS to decide which session-type breakdown leads the execution surface —
+       * it does not re-derive it (Law-4). strength/run/ride/swim → that row leads; tri/duathlon/hybrid → no lead. */
+      primary_discipline: PrimarySport;
     };
     guards: {
       is_transition_window: boolean;
@@ -463,6 +481,9 @@ export type CoachWeekContextResponseV1 = {
     run_session_types_7d?: RunSessionType7d[];
   /** Tier 4 item 12 of running→cycling delta map. Mirror of run_session_types_7d for rides. */
   ride_session_types_7d?: RideSessionType7d[];
+  /** b2 (Q-149): strength 7-day session-type breakdown — the plan-primary key-session read for
+   * strength-primary athletes (their lifts graded by the analyzer's verdict, not run pace). */
+  strength_session_types_7d?: StrengthSessionType7d[];
   /** Tier 4 item 15 of running→cycling delta map. Mirror of running's planCtx fields
    * (peakLongRunMi / nextLongRunMi / etc.) for cycling. Long rides are >= 3 hr.
    * Cycling race-readiness (Tier 4 item 16) will read from this when it lands. */

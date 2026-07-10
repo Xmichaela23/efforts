@@ -35,7 +35,7 @@ import { offPlanAdherenceBanner } from '../_shared/off-plan-banner.ts';
 import { computePerDomainLoad, type SliceSession } from '../_shared/per-domain-load.ts';
 import { computeFitnessFatigue } from '../_shared/fitness-fatigue.ts';
 import { assessAbsorption } from '../_shared/absorption.ts';
-import { computeSafetyFloor, resolvePlanPrimary, computePrimaryAdherence } from '../_shared/load-status-reconcile.ts';
+import { computeSafetyFloor, resolvePlanPrimary, computePrimaryAdherence, resolvePrimarySport } from '../_shared/load-status-reconcile.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
 import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel } from '../_shared/state-trend/index.ts';
@@ -52,6 +52,7 @@ import { buildReadinessWhy, buildCrossTrainingReceipt, crossTrainingStressReceip
 import { buildLoadedLegsDiagnosis, classifyFatigueLabel, type LoadedLegsDiagnosis } from '../_shared/response-model/loaded-legs.ts';
 import { detectNovelMovements, novelMovementsNames, type SessionMovement } from '../_shared/novel-movements.ts';
 import { classifyStrengthFocus } from '../_shared/cross-domain-carryover.ts';
+import { buildStrengthSessionTypes7d } from '../_shared/strength-session-types.ts';
 import { runGuardedNarrative, type NarrativeContext, type DisciplineVerdict } from '../_shared/narrative-core/index.ts';
 import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext, type GoalLite } from '../_shared/goal-context.ts';
 import { coachLegacyPriorRaceLine, coachPromptPriorRaceBlock } from '../_shared/prior-similar-race-coach.ts';
@@ -123,7 +124,7 @@ const corsHeaders: Record<string, string> = {
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
 /** v61: Q-111 fact-only — a strength DECLINE ("back off weight") no longer emits a `suggested_weight` (the "go lighter" prescription is dropped; the client then renders "Working ~125 vs your 150 baseline" with no action). Progression ("add weight") suggestions unchanged. Bump so cached "suggest 115 / back off" per-lift rows recompute to the fact-only row. */
-const COACH_PAYLOAD_VERSION = 71; // 71: D-268 Phase 3 — the LLM narrative + intent_summary are told the plan's PRIMARY discipline (strength-primary → prose frames around strength, not running). Bump so cached rows recompute. // 70: D-268 Phase 2 — off-plan banner plan-aware; planPrimary hoisted. // 69: D-268 Phase 1 — strength-primary interpretation de-run-framed. // 68: D-267 Fix 1. // 67: N-concerning fallback.
+const COACH_PAYLOAD_VERSION = 73; // 73: b2 scale-up (Q-149) — primary_discipline now the SPECIFIC lead sport (strength/run/ride/swim/tri/duathlon/hybrid) so bike-forward leads with bike, not run; swim never faked. // 72: b2 — strength_session_types_7d + weekly_state_v1.plan.primary_discipline. // 71: D-268 Phase 3 — the LLM narrative + intent_summary are told the plan's PRIMARY discipline (strength-primary → prose frames around strength, not running). Bump so cached rows recompute. // 70: D-268 Phase 2 — off-plan banner plan-aware; planPrimary hoisted. // 69: D-268 Phase 1 — strength-primary interpretation de-run-framed. // 68: D-267 Fix 1. // 67: N-concerning fallback.
 // 66 was: // 66: readiness restructure — RPE driver under BODY (readiness_rpe_driver), chip dropped, Why = non-RPE only.
 // 65 was: // 65: Why names the driver session (constant-free) + chip/headline dedup (readiness in chip only).
 // 64 was: // 64: BODY row provenance — receipt "you rated X avg vs Y typical" + tap-expand cross-discipline line. // 63: per_lift.last_session_date (as-of date on the strength row). // 62: item 3 — headline "Why" RPE driver is bare-verdict (numeric receipt lives on the BODY row only, rule 7). // 61: Q-111 fact-only — no "go lighter" prescription on strength decline. // 60: shared classifyStrengthFocus (one fact). // 59: plan-week END-gated. // 58: novelty = "not in your recent training". // 57: "in 8 weeks". // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
@@ -1650,6 +1651,11 @@ Deno.serve(async (req) => {
       })
       .sort((a, b) => b.sample_size - a.sample_size);
 
+    // b2 (Q-149): strength session-type breakdown — the plan-primary key-session read. Renderer of the
+    // strength analyzer's per-session verdict (session_state_v1.glance.execution_score; null for 1RM tests
+    // at the source). Same recentWorkouts 7d window as run/ride above. No parallel grading (Law-5).
+    const strengthSessionTypes7d = buildStrengthSessionTypes7d(Array.isArray(recentWorkouts) ? recentWorkouts : []);
+
     const linkingConfidence: CoachWeekContextResponseV1['reaction']['linking_confidence'] = (() => {
       const base =
         0.25 +
@@ -2342,6 +2348,9 @@ Deno.serve(async (req) => {
     // source, D-264) and read by every consumer below: the load reconciler, the off-plan banner, and
     // (later phases) the coach copy. Absent/unknown → current behavior everywhere. ─────────────────
     const planPrimary = resolvePlanPrimary(planConfig);
+    // b2 scale-up (Q-149): the specific lead discipline for the execution surface (strength/run/ride/swim/
+    // triathlon/duathlon/hybrid/unknown). Single source; the client leads with this, never re-derives it.
+    const primarySport = resolvePrimarySport(planConfig, (activePlan as any)?.plan_type ?? null);
     const planPrimaryStrengthSessions = (Array.isArray(weekWorkouts) ? weekWorkouts : []).filter(
       (w: any) => String(w?.type || '').toLowerCase() === 'strength'
         && String(w?.workout_status || '').toLowerCase() === 'completed',
@@ -5028,6 +5037,10 @@ ${narrativeFacts.join('\n')}`;
         plan_id: activePlan?.id || null,
         plan_name: activePlan?.name || null,
         athlete_context_for_week: athleteContextStr || null,
+        // b2 (Q-149) + scale-up: the specific lead discipline (resolvePrimarySport). Client reads this to
+        // decide which session-type breakdown leads the execution surface — never re-derives it (Law-4).
+        // strength/run/ride/swim → that row leads; triathlon/duathlon/hybrid/unknown → no forced single lead.
+        primary_discipline: primarySport,
       },
       guards: {
         is_transition_window: isPlanTransitionPeriod,
@@ -5262,6 +5275,7 @@ ${narrativeFacts.join('\n')}`;
         : undefined,
       run_session_types_7d: runSessionTypes7d,
       ride_session_types_7d: rideSessionTypes7d,
+      strength_session_types_7d: strengthSessionTypes7d,
       cycling_long_ride_context: cyclingLongRideContext,
       response_model: weeklyResponseModel,
       race_finish_projection_v1: raceFinishProjectionV1,
@@ -5308,6 +5322,7 @@ ${narrativeFacts.join('\n')}`;
       baseline_drift_suggestions: baseline_drift_suggestions.length ? baseline_drift_suggestions : undefined,
       run_session_types_7d: runSessionTypes7d,
       ride_session_types_7d: rideSessionTypes7d,
+      strength_session_types_7d: strengthSessionTypes7d,
       cycling_long_ride_context: cyclingLongRideContext,
       training_state,
       verdict: {

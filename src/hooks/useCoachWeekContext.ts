@@ -232,6 +232,17 @@ export type CoachWeekContextV1 = {
       avg_interval_hr_creep_bpm: number | null;
       avg_decoupling_pct: number | null;
     }>;
+    /** b2 (Q-149): strength 7-day session-type breakdown (plan-primary key-session read). */
+    strength_session_types_7d?: Array<{
+      type: string;
+      type_label: string;
+      sample_size: number;
+      avg_execution_score: number | null;
+      efficiency_label: string | null;
+      efficiency_tone: 'positive' | 'warning' | 'danger' | 'neutral';
+      primary_mover: string | null;
+      test_count: number;
+    }>;
   };
   training_state: {
     code: string;
@@ -364,6 +375,9 @@ export type CoachWeekContextV1 = {
       plan_id: string | null;
       plan_name: string | null;
       athlete_context_for_week: string | null;
+      /** b2 (Q-149): plan primary discipline (server single-source). Client reads this to decide which
+       * session-type breakdown leads the execution surface — never re-derives it (Law-4). */
+      primary_discipline?: 'strength' | 'run' | 'ride' | 'swim' | 'triathlon' | 'duathlon' | 'hybrid' | 'unknown';
     };
     guards: {
       is_transition_window: boolean;
@@ -401,6 +415,26 @@ export type CoachWeekContextV1 = {
       cta_label: string;
       cta_action: 'create_goal' | 'plan_season' | 'none';
     } | null;
+    /** b2 (Q-149): strength 7-day session-type breakdown, emitted onto weekly_state_v1 by coach. */
+    strength_session_types_7d?: Array<{
+      type: string;
+      type_label: string;
+      sample_size: number;
+      avg_execution_score: number | null;
+      efficiency_label: string | null;
+      efficiency_tone: 'positive' | 'warning' | 'danger' | 'neutral';
+      primary_mover: string | null;
+      test_count: number;
+    }>;
+    /** b2 scale-up: ride 7-day session-type breakdown (bike-forward athletes lead with this). */
+    ride_session_types_7d?: Array<{
+      type: string;
+      type_label: string;
+      sample_size: number;
+      avg_execution_score: number | null;
+      efficiency_label: string | null;
+      efficiency_tone: 'positive' | 'warning' | 'danger' | 'neutral';
+    }>;
     load: {
       wtd_planned_load: number | null;
       wtd_actual_load: number | null;
