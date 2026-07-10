@@ -2,6 +2,7 @@
 // Function: sweep-week
 // Behavior: Pre-materialize planned rows, auto-attach completed workouts, and compute summaries for a week window
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireUser } from '../_shared/require-user.ts';
 
 function toISO(d: Date) {
   const y = d.getFullYear();
@@ -35,6 +36,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Provide week_start as YYYY-MM-DD' }), { status: 400, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
     }
 
+    // B1: verify the caller and SCOPE the sweep to them. This function had NO user filter — it swept
+    // EVERY user's workouts in the window (latent over-reach + anonymously triggerable). Now caller-scoped.
+    const { userId } = await requireUser(req);
+
     const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
     // Compute window
@@ -46,6 +51,7 @@ Deno.serve(async (req) => {
     const { data: rows, error } = await supabase
       .from('workouts')
       .select('id,type,date,planned_id')
+      .eq('user_id', userId)
       .gte('date', fromISO)
       .lte('date', toISOEnd)
       .in('type', ['run','ride','swim','walk'])
@@ -58,6 +64,7 @@ Deno.serve(async (req) => {
     const { data: plannedRows } = await supabase
       .from('planned_workouts')
       .select('completed_workout_id,date')
+      .eq('user_id', userId)
       .gte('date', fromISO)
       .lte('date', toISOEnd)
       .not('completed_workout_id', 'is', null)
@@ -80,6 +87,7 @@ Deno.serve(async (req) => {
       const { data: plannedWin } = await supabase
         .from('planned_workouts')
         .select('id,computed,total_duration_seconds')
+        .eq('user_id', userId)
         .gte('date', fromISO)
         .lte('date', toISOEnd)
         .limit(2000);
@@ -116,7 +124,8 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ success:true, attached, computed, from: fromISO, to: toISOEnd }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
+    const status = (e as any)?.status ?? 500;
+    return new Response(JSON.stringify({ error: String(e) }), { status, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
   }
 });
 
