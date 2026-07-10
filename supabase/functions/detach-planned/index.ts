@@ -2,6 +2,7 @@
 // Function: detach-planned
 // Behavior: deterministically detach a completed workout from a planned workout (both sides).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireUser } from '../_shared/require-user.ts';
 
 Deno.serve(async (req) => {
   const cors = {
@@ -14,6 +15,8 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
 
   try {
+    // B1: identify the caller from the VERIFIED JWT so we can enforce ownership on the entity ids below.
+    const { userId: callerUserId } = await requireUser(req);
     const payload = await req.json();
     const workout_id = payload?.workout_id;
     const planned_id = payload?.planned_id || payload?.plannedId || null;
@@ -39,6 +42,14 @@ Deno.serve(async (req) => {
 
     if (!w) {
       return new Response(JSON.stringify({ success: false, detached: false, reason: 'workout_not_found', details: wErr }), {
+        status: 404,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // B1 ownership guard: you can only detach YOUR OWN workout (was missing → any caller could detach any id).
+    if (String(w.user_id) !== String(callerUserId)) {
+      return new Response(JSON.stringify({ success: false, detached: false, reason: 'not_owner' }), {
         status: 404,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -91,8 +102,9 @@ Deno.serve(async (req) => {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
   } catch (e: any) {
-    return new Response(JSON.stringify({ success: false, detached: false, reason: 'internal_error', error: String(e) }), {
-      status: 500,
+    const status = (e as any)?.status ?? 500;
+    return new Response(JSON.stringify({ success: false, detached: false, reason: status === 401 ? 'unauthorized' : 'internal_error', error: String(e) }), {
+      status,
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
   }

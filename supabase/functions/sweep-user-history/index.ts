@@ -11,6 +11,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { requireUser } from '../_shared/require-user.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,20 +25,12 @@ serve(async (req) => {
       return new Response('ok', { headers: corsHeaders })
     }
 
-    const { user_id, batch_size = 50, dry_run = false } = await req.json()
-    
-    if (!user_id) {
-      return new Response(
-        JSON.stringify({ error: 'user_id is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
+    // B1: identity from the VERIFIED JWT, never the body (was `user_id` under service-role).
+    const { userId: user_id, supabase: supabaseClient } = await requireUser(req)
+    const { batch_size = 50, dry_run = false } = await req.json()
+    // Still needed for the edge-to-edge fetch to calculate-workload below.
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-
-    // Initialize Supabase client with service role key for database operations
-    const supabaseClient = createClient(supabaseUrl, serviceRoleKey)
 
     const startTime = Date.now()
     let processed = 0
@@ -174,10 +167,11 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('[sweep] Function error:', error)
+    const status = (error as any)?.status ?? 500
+    if (status !== 401) console.error('[sweep] Function error:', error)
     return new Response(
       JSON.stringify({ error: error.message || 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })

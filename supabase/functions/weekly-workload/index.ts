@@ -11,6 +11,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { requireUser } from '../_shared/require-user.ts'
 
 serve(async (req) => {
   try {
@@ -24,32 +25,9 @@ serve(async (req) => {
       })
     }
 
-    const { user_id, week_start_date } = await req.json()
-    
-    if (!user_id) {
-      return new Response(
-        JSON.stringify({ error: 'user_id is required' }),
-        { 
-          status: 400, 
-          headers: { 
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-          } 
-        }
-      )
-    }
-
-    // Initialize Supabase client with service role key for database operations
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    )
+    // B1: identity from the VERIFIED JWT, never the body (was `user_id` under service-role).
+    const { userId: user_id, supabase: supabaseClient } = await requireUser(req)
+    const { week_start_date } = await req.json()
 
     // Calculate week start if not provided
     let weekStart: string;
@@ -223,16 +201,17 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Function error:', error)
+    const status = (error as any)?.status ?? 500
+    if (status !== 401) console.error('Function error:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { 
+      JSON.stringify({ error: status === 401 ? 'unauthorized' : 'Internal server error' }),
+      {
+        status,
+        headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        } 
+        }
       }
     )
   }
