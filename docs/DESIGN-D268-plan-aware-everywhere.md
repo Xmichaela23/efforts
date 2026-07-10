@@ -1,6 +1,6 @@
 # DESIGN — D-268: Plan-primary is a SYSTEM invariant (every surface reads the plan-aware read; nothing re-derives from running)
 
-**Status:** DECISION (approved to write 2026-07-09; engine changes gated on review + a per-phase go).
+**Status:** SHIPPED Phases 1-3 + 5 (2026-07-09, coach v291/v293 + client — the whole visible State card is plan-aware). **Phase 4 REMAINING** (deferred to a fresh session — Q-149; handoff: `docs/HANDOFF-2026-07-09-load-plan-awareness.md`).
 **Extends:** the Constitution (Law 1 one-source, Law 4 render-don't-decide, Law 5 born-on-the-spine), D-260 (THE LAW), D-264 (single source), D-267 (the load verdict reads plan-primary). **Does not supersede.**
 
 > **Michael, 2026-07-09:** *"everything in the app must be like this."* Plan-awareness is not a load-only fix — it is a **system invariant.**

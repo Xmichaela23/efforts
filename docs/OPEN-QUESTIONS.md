@@ -1757,6 +1757,14 @@ D-266 closed the **prescriptive** ('high' / "back off") leak completely — the 
 
 **Also folds in the D-266 parked tuning call:** a lone declining RPE trend currently DESCRIBES but does not floor-escalate (conservative "one witness isn't agreement"); revisit whether it should solo-escalate once **universal per-session RPE** lands (the #1 sRPE-capture dependency) — with RPE captured on every session the primary leg is always available, which also removes the "goes quiet on strength-only weeks" cost D-266 accepts. **Big blast radius** (the readiness tree is inside the 5k-line `@ts-nocheck` coach file); deferred deliberately, not urgent.
 
+### Q-149 — D-268 Phase 4: `generate-training-context` is still plan-blind (run-only), + the `arc-context` `discipline` re-derivation — deferred to a fresh session (2026-07-09, FILED — the remaining plan-awareness surface)
+
+D-268 (plan-primary is a system invariant) shipped Phases 1-3 + 5 — the entire **visible State card** now reads the plan, not running. **Phase 4 is the one remaining surface and is deferred to a fresh session** (this one was long; Phase 4 is a big separate function and rushing it risks the race/goal logic). It is fully specified in `docs/DESIGN-D268-plan-aware-everywhere.md` §3 (surface #5) + §5 (Phase 4) + the handoff doc `docs/HANDOFF-2026-07-09-load-plan-awareness.md`.
+
+**What's still run-blind (`generate-training-context/index.ts`):** recent-form + key-session-audit queries filter `type in (run,running)` (`:728`, `:830`, `:1438`); `next_key_session.sport` defaults `'run'` (`:1863`/`:1865`); gap-scan copy hardcodes "Add N more run session(s)" (`:1131`). NOT on the State card — it feeds the AI narrative, the arc, and goal-prediction. **Mitigated:** D-268 Phase 3 already pushes the plan-primary fact into the LLM narrative, so the biggest prose risk is covered; Phase 4 closes the next-action defaults + the run-only inputs. **Fix pattern:** import the shared `resolvePlanPrimary` (single source), default the next-action off `planPrimary` not `'run'`, make the recent-form inputs discipline-aware. Endurance/tri: zero regression.
+
+**Also in scope (D-268 §7 cleanup):** `arc-context.ts:683` re-derives its own `discipline` (`config.discipline || config.sport || plan_type`) independently of `resolvePlanPrimary` — a second, divergent notion of "what discipline is this plan" (D-264 single-source concern). Collapse to one.
+
 ## When to add an entry
 
 Add a new Q-NNN when:
