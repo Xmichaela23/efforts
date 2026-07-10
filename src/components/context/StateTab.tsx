@@ -1174,6 +1174,7 @@ export default function StateTab({
     readinessLabel, // D-232: refined chip label wins so the headline can't contradict the chip
     fitnessDirection: (trends as any).fitness_direction,
     isTaperOrPeak: week.intent === 'taper' || week.intent === 'peak',
+    acwr: load.acwr, // D-268 Phase 5: "headroom" only when load is genuinely light (server-computed acwr)
   });
 
 

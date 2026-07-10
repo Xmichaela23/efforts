@@ -70,10 +70,18 @@ Deno.test('FATIGUED: week only (readiness → chip, no "carrying fatigue")', () 
   assert(!h.includes('fatigue') && !h.includes('carrying') && !h.includes('fitness'));
 });
 
-Deno.test('fresh keeps the "headroom" observation (no chip of its own — unique info)', () => {
-  const h = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fresh', readinessLabel: null, fitnessDirection: 'improving' })!;
-  assertEquals(h, 'This week: Balanced load — you have headroom.');
-  assert(!h.includes('fitness') && !h.includes('6 weeks'));
+Deno.test('D-268 P5: headroom only when load genuinely light (acwr < 1.0)', () => {
+  // Light load + fresh → headroom shows.
+  const light = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fresh', readinessLabel: null, fitnessDirection: 'improving', acwr: 0.9 })!;
+  assertEquals(light, 'This week: Balanced load — you have headroom.');
+  assert(!light.includes('fitness') && !light.includes('6 weeks'));
+  // Above-chronic load (acwr 1.3) + fresh → NO headroom (the old bug).
+  const loaded = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fresh', readinessLabel: null, fitnessDirection: 'improving', acwr: 1.3 })!;
+  assertEquals(loaded, 'This week: Balanced load.');
+  if (loaded.includes('headroom')) throw new Error('must not claim headroom at acwr 1.3: ' + loaded);
+  // acwr absent → no headroom (conservative).
+  const noAcwr = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fresh', readinessLabel: null })!;
+  if (noAcwr.includes('headroom')) throw new Error('no acwr → no headroom claim');
 });
 
 // ── one-clock: fitness NEVER appears in the headline (it lives on the discipline rows) ──────────────

@@ -86,26 +86,27 @@ function stateSlot(loadLabel: string, readiness: string | null | undefined, read
 // Slot 3 — OBSERVATION: a state-implied direction only. Pure physiological reads off the spine.
 // Deliberately sparse: fires only where the state clearly implies one, omits otherwise (the state
 // slot already carries "Load running high" etc., so we don't double it).
-function observationSlot(loadLabel: string, readiness: string | null | undefined, _readinessLabel?: string | null): string | null {
-  // Chip Option A: "you're carrying fatigue" for overreached/FATIGUED is DROPPED — that IS the chip's
-  // state (FATIGUED), so restating it in the headline is the duplicate we're removing. Keep only the
-  // "headroom" read on balanced+fresh, which has no chip of its own (unique information).
-  if (loadLabel === 'balanced' && readiness === 'fresh') return 'you have headroom';
+function observationSlot(loadLabel: string, readiness: string | null | undefined, acwr?: number | null): string | null {
+  // "headroom" read on balanced+fresh. D-268 Phase 5: only when load is GENUINELY light — acute below
+  // chronic (acwr < 1.0). Reads the server-computed acwr; never claims "headroom" while load is AT or
+  // ABOVE the athlete's own norm (the old bug: "headroom" at ACWR 1.3, above chronic).
+  if (loadLabel === 'balanced' && readiness === 'fresh' && acwr != null && acwr < 1.0) return 'you have headroom';
   return null;
 }
 
 export function buildLoadHeadline(opts: {
-  loadLabel: string;                 // from acwrVolumeLabel(load.acwr)
+  loadLabel: string;                 // reconciled load_status verdict word
   readinessState?: string | null;
   readinessLabel?: string | null;    // the refined chip label (LEGS LOADED / EFFORT UP / FATIGUED / …)
   fitnessDirection?: string | null;
   isTaperOrPeak?: boolean;
+  acwr?: number | null;              // D-268 Phase 5: gate the "headroom" observation on load being genuinely light
 }): string | null {
-  const { loadLabel, readinessState, readinessLabel, isTaperOrPeak } = opts;
+  const { loadLabel, readinessState, readinessLabel, isTaperOrPeak, acwr } = opts;
   // In taper/peak, a "build more" reading is by-design low volume — don't lead the glance with it.
   const effLoad = isTaperOrPeak && loadLabel === 'build more' ? 'balanced' : loadLabel;
   const state = stateSlot(effLoad, readinessState, readinessLabel);
-  const obs = state ? observationSlot(effLoad, readinessState, readinessLabel) : null;
+  const obs = state ? observationSlot(effLoad, readinessState, acwr) : null;
 
   // The headline reflects THE WEEK only (Michael 2026-07-04) — one clock. Fitness is a different clock
   // and is NOT rolled up here: it's handed to the individual discipline rows under PERFORMANCE, each
