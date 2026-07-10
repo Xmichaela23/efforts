@@ -56,6 +56,12 @@ Previous: 2026-06-11 (Q-048 follow-up fixes. D-127: unplanned-only last-actual f
 
 ## Solid (don't re-litigate)
 
+### Architecture north star + doc framework — the anti-drift map (2026-07-10, D-269 / Q-150)
+Destination written down + in CLAUDE.md priming: `TARGET-ARCHITECTURE.md` (deterministic · smart-server/dumb-client · single source of truth; yardstick "make X look like run"), `TRUTH-MAP.md` (per-fact authority + verified fractures: strength contradicts itself, bike FTP, swim broken), `FOUNDATION-READINESS.md` (scale/security/ops; blockers B1 cross-user exposure + B4 no monitoring). Companion to SCREEN-INVENTORY/CONNECTIVITY. Verified by 3 adversarial audits. **Per-discipline cohesion: RUN = clean (the model); strength = contradicting; bike = mixed; swim = broken.**
+
+### b2 — plan-primary execution surface (State screen) — SHIPPED LIVE (Q-149, 2026-07-10, coach v73)
+State execution rows (STRENGTH/AERO/BIKE) lead by the plan's primary discipline: `resolvePrimarySport` (single source) → coach `weekly_state_v1.primary_discipline`; `_shared/strength-session-types.ts` renders the strength analyzer's per-session verdict (Law-5, no new grading); cardio rows render the efficiency verdict (BIKE "0% eff" lie fixed). Fixtures green (strength-session-types + primary-sport). Deployed coach + client (Netlify). Next handoff: `HANDOFF-2026-07-10-architecture-north-star.md`.
+
 Verified-working architecture and fixes. If you think one of these is broken, the bug is probably elsewhere — read the verification method before changing anything.
 
 ### Segment / route-core feature — BUILT + LIVE on real data (Q-132, D-250→D-258, 2026-07-07, DEPLOYED web + edge fns)

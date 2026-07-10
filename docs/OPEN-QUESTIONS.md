@@ -1765,6 +1765,14 @@ D-268 (plan-primary is a system invariant) shipped Phases 1-3 + 5 — the entire
 
 **Also in scope (D-268 §7 cleanup):** `arc-context.ts:683` re-derives its own `discipline` (`config.discipline || config.sport || plan_type`) independently of `resolvePlanPrimary` — a second, divergent notion of "what discipline is this plan" (D-264 single-source concern). Collapse to one.
 
+### Q-150 — Foundation-readiness: scale + security + ops hardening backlog (2026-07-10, FILED — umbrella; blockers B1/B4 gate a 2nd paying user)
+
+A 3-way architecture audit found the domain logic + target pattern (run + `session_detail_v1`) solid, but the layer around them not commercial-ready. Full severity-ranked list + evidence: **`docs/FOUNDATION-READINESS.md`**. Pre-launch / one user → nothing on fire today; do NOT over-alarm. Tracked items:
+- **BLOCKERS (before a 2nd paying account):** B1 — ~47 edge fns take `user_id` from the request body under service-role (~24 `verify_jwt=false`) → cross-user data exposure; the JWT-derived pattern exists (`save-location`) in only ~26 of ~90 fns. B4 — no error sink/monitoring; a broken user compute is invisible.
+- **Scale (~1k users):** S1 coach_cache invalidation race (stale State ≤24h); S2 `useStateTrends` recomputes ~10 queries client-side (== the dumb-client cohesion fix, first mission); S3 ingest fan-out no queue/retry/DLQ; S4 getArcContext re-invoked 2–3×/workout; S5 `route_progress_metrics` index (verify).
+- **Serious/cleanup:** B2 hardcoded anon key; B3 silent sync death + Strava token-rotation bug; B6 workload `??0` score-that-lies; B7 failure illegible to user; B8–B13 (rate-limit, Garmin token-in-URL, `weekly_workload` RLS, migrations dir, `backfill-facts` unguarded).
+Cross-ref (already tracked): Q-105/Q-106 (strength fork), Q-141 (single-vendor), D-186/D-194 (dumb-client), D-140–143 (readiness dual-write), Q-054/Q-057 (route_progress data).
+
 ## When to add an entry
 
 Add a new Q-NNN when:
