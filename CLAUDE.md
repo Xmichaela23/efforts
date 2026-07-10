@@ -14,6 +14,9 @@ Efforts is a hybrid endurance + strength training app for intermediate athletes 
 
 **The thesis first (read before the state docs — this is the frame everything else sits inside).** Efforts' product *is* coherent reasoning about an athlete: nothing happens in a vacuum — every surface is plan-aware, performance-aware, and reads one shared truth instead of minting its own. "Completely self-aware" is the north star, defined finitely (not a vibe), and it is a target being migrated toward surface by surface — not an achieved state. Hold it before you touch any feature:
 
+- **`docs/TARGET-ARCHITECTURE.md`** — THE north star: a living, coherent, steerable system that is **deterministic, smart-server / dumb-client, single source of truth**. The destination every change is aimed at; the yardstick is "does this move a discipline toward the run model." Read FIRST.
+- **`docs/TRUTH-MAP.md`** — where the app is vs that target: per-fact authority (who owns each fact) + the verified fractures (strength contradicts itself; bike FTP; swim broken). Read before touching fitness/load/RPE/FTP/strength or wiring a screen.
+
 - **`docs/CONSTITUTION.md`** — the six laws that make Efforts *a system* not a pile of features (one source of truth per claim; surfaces render, never re-decide; new reasoning born on the spine; each law has a violation-tell).
 - **`docs/SELF-AWARENESS-MAP.md`** — what "self-aware" means, made finite: five reasoning axes on one shared substrate. Substrate built; most axes **partial** with named gaps. The app is "self-aware" when all five are built and gated.
 - **`docs/CANON-arc-inference-model.md`** — how it infers without becoming "the score that lies": one confidence-stamped `training_reaction` fact, born on the spine, every surface an arm that renders it. §12 = the continuity invariant (one government, states as arms; divergence is the lie).
