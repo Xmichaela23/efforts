@@ -74,6 +74,7 @@ export {
   type StateTrendInputs,
   type StateTrendResult,
   type StateTrendsV1,
+  type StateDisplayV1,
   type DisciplineTrendCache,
   type ExerciseLogLite,
 } from './assemble.ts';

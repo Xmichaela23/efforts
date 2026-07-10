@@ -1625,7 +1625,7 @@ export default function StateTab({
         {orderedExecKeys.map((k) => execRowsByKey[k] ? <React.Fragment key={k}>{execRowsByKey[k]}</React.Fragment> : null)}
 
         {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
-        <StatePerformanceSection strengthDetail={strengthPerLiftDetail} />
+        <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} />
 
         {/* SWIM re-test nudge (D-200) — fires after ≥4 weeks + ≥4 honored swims; auto-clears when the
             threshold is updated/tested (lastUpdatedAt moves). Dismiss = 7-day snooze (shared pattern). */}

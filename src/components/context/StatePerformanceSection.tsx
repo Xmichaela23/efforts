@@ -6,7 +6,7 @@
 // tagged as such; swim is additionally Q-038-clouded.
 
 import React from 'react';
-import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand, StrengthFitness } from '@shared/state-trend';
+import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand, StrengthFitness, StateDisplayV1 } from '@shared/state-trend';
 import { useStateTrends } from '@/hooks/useStateTrends';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
 
@@ -285,8 +285,10 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
   );
 }
 
-export default function StatePerformanceSection({ strengthDetail }: { strengthDetail?: React.ReactNode }) {
-  const { cards, bikeFitness, runFitness, strengthFitness, swimRest, cadenceCounts, loading } = useStateTrends();
+export default function StatePerformanceSection({ strengthDetail, stateDisplay }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null }) {
+  // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
+  // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
+  const { cards, bikeFitness, runFitness, strengthFitness, swimRest, cadenceCounts, loading } = useStateTrends(stateDisplay);
   if (loading || cards.length === 0) return null;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it

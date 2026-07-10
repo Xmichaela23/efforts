@@ -34,12 +34,15 @@ export interface LiftTrend {
   latestRir: number | null;
 }
 
-export function useExerciseLog(weeksBack: number = 12) {
+export function useExerciseLog(weeksBack: number = 12, enabled: boolean = true) {
   const [exercises, setExercises] = useState<ExerciseLogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
+    // S2: skip the query entirely when the caller doesn't need it (e.g. useStateTrends has the
+    // server-assembled display contract). Additive — default enabled=true keeps every other caller.
+    if (!enabled) { setLoading(false); return; }
     try {
       setLoading(true);
       setError(null);
@@ -64,7 +67,7 @@ export function useExerciseLog(weeksBack: number = 12) {
     } finally {
       setLoading(false);
     }
-  }, [weeksBack]);
+  }, [weeksBack, enabled]);
 
   useEffect(() => { fetch(); }, [fetch]);
 

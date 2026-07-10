@@ -95,6 +95,9 @@ export interface StateTrendResult {
   /** D-194: swim rest-fraction trend (secondary swim signal, nested under swim in the cache). */
   swimRest: PerfSummary | null;
   swimRestProvisional: boolean;
+  /** S2: per-discipline 90d session counts (the card sort key) — carried so the cached DISPLAY contract
+   *  is self-contained and the client no longer needs the raw cadence rows to render. */
+  cadenceCounts: Record<string, number>;
 }
 
 /** The assembly. Mirrors useStateTrends' body — one code path for client + server. */
@@ -239,6 +242,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   return {
     cards, headline: synthesizeHeadline(cards), bikeFitness, runFitness, strengthFitness, perfByDisc, provisionalByDisc, spw,
     swimRest, swimRestProvisional: isProvisionalTrend(swimRestState.trend),
+    cadenceCounts: inp.cadenceCounts,
   };
 }
 
@@ -256,9 +260,25 @@ export interface DisciplineTrendCache {
   /** cadence-scaled too-few floor, so the receipt cites "need N" honestly (not a default 3). */
   minSessions?: number;
 }
+/** S2: the full server-computed State DISPLAY contract — everything `useStateTrends` used to assemble
+ *  in the browser, cached so the client RENDERS it and computes nothing (retires the ~9 in-browser
+ *  queries + live assembleStateTrends). Mirrors the hook's return minus `headline` (no consumer). The
+ *  coach forwards this on `weekly_state_v1`; the client reads it. Optional for back-compat (a snapshot
+ *  written before this deploy has no `display` → the client falls back to the legacy live path). */
+export interface StateDisplayV1 {
+  cards: DisciplineCard[];
+  bikeFitness: BikeFitness;
+  runFitness: RunFitness;
+  strengthFitness: StrengthFitness;
+  swimRest: PerfSummary | null;
+  cadenceCounts: Record<string, number>;
+}
+
 export interface StateTrendsV1 {
   as_of: string;
   version: 1;
+  /** S2: the pre-assembled display contract (see StateDisplayV1). Server-authored, client-rendered. */
+  display?: StateDisplayV1;
   /** STRENGTH dual on the spine — volume direction LEAD + e1RM SECONDARY (null when thin) + sessions,
    *  so coach/Arc/LLM read the composite, not just the e1RM verdict. */
   strength: DisciplineTrendCache & {
@@ -324,6 +344,16 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
   return {
     as_of: asOf,
     version: 1,
+    // S2: the client-ready display contract, built once here on the server (compute-snapshot) and
+    // cached, so the State screen renders it verbatim instead of re-running this assembly in the browser.
+    display: {
+      cards: r.cards,
+      bikeFitness: r.bikeFitness,
+      runFitness: r.runFitness,
+      strengthFitness: r.strengthFitness,
+      swimRest: r.swimRest,
+      cadenceCounts: r.cadenceCounts,
+    },
     strength: {
       ...disc('strength'),
       volume: { ...r.strengthFitness.volume },

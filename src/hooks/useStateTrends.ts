@@ -23,6 +23,7 @@ import {
   type StateTrendInputs,
   type ExerciseLogLite,
   type PerfSummary,
+  type StateDisplayV1,
 } from '@shared/state-trend';
 
 interface RawInputs {
@@ -46,11 +47,17 @@ export interface StateTrends {
   loading: boolean;
 }
 
-export function useStateTrends(): StateTrends {
-  const { exercises, loading: liftsLoading } = useExerciseLog(STATE_TREND_WINDOWS.liftWeeks);
+// S2: `displayContract` is the server-assembled State display block (coach weekly_state_v1.trends.display).
+// When present the hook RENDERS it and computes nothing — the ~9 in-browser queries + live assembly are
+// skipped. When absent (a snapshot written before S2, or the coach payload not yet loaded) the hook falls
+// back to the legacy live path below, so the screen never breaks during rollout.
+export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTrends {
+  const hasContract = !!displayContract;
+  const { exercises, loading: liftsLoading } = useExerciseLog(STATE_TREND_WINDOWS.liftWeeks, !hasContract);
   const [raw, setRaw] = useState<RawInputs | null>(null);
 
   useEffect(() => {
+    if (hasContract) return; // server contract present → no client fetch/assembly
     let cancelled = false;
     (async () => {
       const userId = getStoredUserId();
@@ -190,7 +197,23 @@ export function useStateTrends(): StateTrends {
       setRaw({ bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts });
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [hasContract]);
+
+  // S2: the server already assembled this exact contract (compute-snapshot ran the SAME assembleStateTrends
+  // and cached it; the coach forwards it). Render it verbatim — one truth, zero client math, no live-vs-cached
+  // freshness fork. `headline` is dropped (StatePerformanceSection never consumed it).
+  if (displayContract) {
+    return {
+      cards: displayContract.cards,
+      headline: null,
+      bikeFitness: displayContract.bikeFitness,
+      runFitness: displayContract.runFitness,
+      strengthFitness: displayContract.strengthFitness,
+      swimRest: displayContract.swimRest,
+      cadenceCounts: displayContract.cadenceCounts,
+      loading: false,
+    };
+  }
 
   const loading = liftsLoading || raw == null;
   if (loading) return { cards: [], headline: null, bikeFitness: null, runFitness: null, strengthFitness: null, swimRest: null, cadenceCounts: {}, loading: true };

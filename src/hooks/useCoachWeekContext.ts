@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { COACH_CLIENT_MIN_PAYLOAD_VERSION } from '@/lib/coach-contract';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import type { GoalPredictionResult } from '@/lib/analysis/goal-predictor';
+import type { StateDisplayV1 } from '@shared/state-trend';
 
 /** Same Monday boundary logic as the coach's week (local calendar date, en-CA). */
 function weekStartMondayEnCA(ymd: string): string {
@@ -463,6 +464,10 @@ export type CoachWeekContextV1 = {
     };
     trends: {
       fitness_direction: string;
+      /** S2: the pre-assembled State display contract (cards + per-discipline fitness reads), built on
+       *  the server and rendered verbatim by StatePerformanceSection. null when the snapshot predates S2
+       *  → the client falls back to the legacy in-browser assembly (useStateTrends). */
+      display?: StateDisplayV1 | null;
       readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
       readiness_label: string | null;
       readiness_why?: string | null;
