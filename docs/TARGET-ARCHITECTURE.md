@@ -67,5 +67,8 @@ Every discipline looks like **run does today**: one server authority, every scre
 
 Every change moves a discipline (or the client) toward this picture. Nothing that doesn't. Each fix is **"make X look like run."**
 
+## The other half — the foundation must carry it
+This doc is the *destination*. `FOUNDATION-READINESS.md` is whether the *foundation* can carry paying users — the scale (orchestration/cache) + security/ops hardening backlog. The two tracks run together: **cohesion** ("make X look like run") + **hardening** (close the trust boundary, fix the cache race, move compute to the server). Two blockers gate a second paying account: **B1** cross-user data exposure, **B4** no error monitoring.
+
 ## Cross-refs
-`CONSTITUTION.md` (the laws this serves) · `TRUTH-MAP.md` (where we are vs here) · `SELF-AWARENESS-MAP.md` (the reasoning axes) · `SCREEN-CONNECTIVITY.md` (wiring)
+`FOUNDATION-READINESS.md` (the hardening backlog) · `CONSTITUTION.md` (the laws this serves) · `TRUTH-MAP.md` (where we are vs here) · `SELF-AWARENESS-MAP.md` (the reasoning axes) · `SCREEN-CONNECTIVITY.md` (wiring)
