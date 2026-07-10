@@ -415,9 +415,18 @@ export function reconcileLoadStatus(
   }
 
   // ── Build interpretation ───────────────────────────────────────────────
-  let interpretation = raw.interpretation;
-  if (reasons.length > 0) {
-    interpretation = `${raw.interpretation}. ${reasons.join('; ')}`;
+  // D-268 Phase 1: for a strength-primary plan, running is NOT the framing. Strip body-response's
+  // run-only lead ("Running load X% below plan") and lead with the plan-aware reasons; keep the
+  // cross-training breakdown. The reconciler owns the final interpretation (THE LAW); body-response
+  // supplies the raw breakdown only. Endurance / hybrid / unknown: unchanged (run/endurance framing kept).
+  let interpretation: string;
+  if (planPrimary === 'strength') {
+    const breakdown = raw.interpretation.replace(/^\s*Running load\b[^.]*(?:\.\s*|$)/i, '').trim();
+    interpretation = reasons.length > 0
+      ? (breakdown ? `${reasons.join('; ')}. ${breakdown}` : reasons.join('; '))
+      : (breakdown || raw.interpretation);
+  } else {
+    interpretation = reasons.length > 0 ? `${raw.interpretation}. ${reasons.join('; ')}` : raw.interpretation;
   }
 
   return { status, interpretation };

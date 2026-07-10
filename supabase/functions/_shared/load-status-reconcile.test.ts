@@ -336,3 +336,29 @@ Deno.test('D-267 NEG-3: planPrimary absent → inert; CORE inputs stay under (by
   const r = run({ ...D267_BASE, unweightedAcwr: 1.3, planPosition: { weekIntent: 'baseline' } });
   assertEquals(r.status, 'under');   // without the plan-primary signal, the run-only under is unchanged
 });
+
+// ═══ D-268 Phase 1: the RECEIPT (interpretation) is de-run-framed for a strength-primary plan ═══
+// The reconciler (sole authority) strips body-response's "Running load X% below plan" lead and leads
+// plan-aware; the cross-training breakdown is kept. Endurance-primary keeps the run framing.
+Deno.test('D-268 P1: strength-primary → interpretation drops the "Running load" lead, leads plan-aware', () => {
+  const adh = computePrimaryAdherence({ planPrimary: 'strength', strengthSessionsCompleted: 3, strengthFrequency: 4, e1rmDirection: 'gaining', dayIndex: 3 });
+  const r = run({
+    raw: { status: 'under', interpretation: 'Running load 100% below plan. Cross-training: 3 strength (64 pts), 2 ride (141 pts). 5 unplanned: 2 rides, 3 swims.', running_acwr: 1.2 },
+    readiness: 'adapting', runLoadPct: -100, unweightedAcwr: 1.27,
+    unplannedLoad: { count: 0, totalLoad: 0, plannedWeekLoad: 100 },
+    planPosition: { weekIntent: 'baseline', planPrimary: 'strength', primaryAdherence: adh },
+  });
+  assertEquals(r.status, 'on_target');
+  if (r.interpretation.includes('Running load')) throw new Error('strength-primary must not lead with "Running load": ' + r.interpretation);
+  assertStringIncludes(r.interpretation, 'strength');
+  assertStringIncludes(r.interpretation, 'Cross-training');   // breakdown detail kept
+});
+Deno.test('D-268 P1 NEG: endurance-primary keeps the "Running load" lead (unchanged framing)', () => {
+  const r = run({
+    raw: { status: 'under', interpretation: 'Running load 100% below plan. Cross-training: 2 ride.', running_acwr: 0.6 },
+    readiness: 'normal', runLoadPct: -100, unweightedAcwr: 0.7,
+    unplannedLoad: { count: 0, totalLoad: 0, plannedWeekLoad: 100 },
+    planPosition: { weekIntent: 'baseline', planPrimary: 'endurance', primaryAdherence: null },
+  });
+  assertStringIncludes(r.interpretation, 'Running load');   // endurance-primary: run framing preserved
+});
