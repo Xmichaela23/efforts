@@ -130,17 +130,22 @@ export function computePrimaryAdherence(args: {
   planPrimary: PlanPrimary;
   strengthSessionsCompleted: number;
   strengthFrequency: number;
-  strengthTrend: string;
+  /** Fix 1: e1RM-derived strength-progression direction (weeklyResponseModel.strength.overall.trend),
+   *  NOT the RIR-direction trend. Only 'declining' vetoes; null/'insufficient_data'/'gaining'/'maintaining' → no veto. */
+  e1rmDirection: string | null;
   dayIndex: number;
 }): PrimaryAdherence | null {
   if (args.planPrimary !== 'strength') return null;
   const elapsedFrac = Math.min(1, (args.dayIndex + 1) / 7);
   const expectedByNow = args.strengthFrequency * elapsedFrac;
-  const met = (args.strengthSessionsCompleted >= expectedByNow - STRENGTH_ADHERENCE_TOLERANCE)
-            && args.strengthTrend !== 'declining';
+  const sessionsMet = args.strengthSessionsCompleted >= expectedByNow - STRENGTH_ADHERENCE_TOLERANCE;
+  // Fix 1: veto ONLY on a GENUINE strength decline (e1RM direction) — never the RIR-direction trend,
+  // which reads 'declining' when RIR drops (pushing harder in a Base/Power phase) and wrongly vetoed.
+  const met = sessionsMet && args.e1rmDirection !== 'declining';
   const note = `strength ${args.strengthSessionsCompleted}/${args.strengthFrequency} sessions`
-             + (args.strengthTrend === 'improving' ? ' · e1RM improving'
-                : args.strengthTrend === 'declining' ? ' · trend declining' : ' · trend steady');
+             + (args.e1rmDirection === 'gaining' ? ' · e1RM improving'
+                : args.e1rmDirection === 'declining' ? ' · e1RM declining'
+                : args.e1rmDirection === 'maintaining' ? ' · e1RM steady' : '');
   return { discipline: 'strength', met, note };
 }
 
@@ -389,9 +394,10 @@ export function reconcileLoadStatus(
         ? `${adh}; endurance load carried by cross-training (total ACWR ${acwrTxt})`
         : `${adh}; you have headroom to add endurance`);
     } else if (!totalGenuinelyLow) {
-      // strength behind plan BUT total load maintained → attention, not a deficit; never 'under'.
+      // strength behind plan OR e1RM declining, BUT total load maintained → attention, not a deficit;
+      // never 'under'. The note carries the reason (sessions shortfall or 'e1RM declining').
       status = 'on_target';
-      reasons.push('strength behind plan, but total load is maintained — attention, not under-training');
+      reasons.push(`${adh} — attention, not under-training (total load maintained)`);
     } else {
       // strength behind plan AND total load genuinely low → 'under' stands (genuine build-more); name it.
       reasons.push(`${adh}; total load low (ACWR ${acwrTxt}) — build more`);

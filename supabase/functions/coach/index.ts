@@ -3355,7 +3355,9 @@ Deno.serve(async (req) => {
           planPrimary: d267PlanPrimary,
           strengthSessionsCompleted: d267StrengthSessions,
           strengthFrequency: Number(planConfig?.strength_frequency) || 0,
-          strengthTrend: snapshotBody.weekly_trends.strength.trend,
+          // Fix 1: the GENUINE strength-progression (e1RM) direction — NOT weekly_trends.strength (RIR),
+          // which reads 'declining' when RIR drops (pushing harder) and wrongly vetoed a met athlete.
+          e1rmDirection: weeklyResponseModel?.strength?.overall?.trend ?? null,
           dayIndex: d267DayIndex,
         });
 

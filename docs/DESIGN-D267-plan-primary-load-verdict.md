@@ -89,7 +89,12 @@ planPosition: {
 }
 ```
 
-**`primaryAdherence.met` — WTD-prorated, in a pure testable helper** (Amendment 2). Computed by `computePrimaryAdherence(...)` in `_shared/load-status-reconcile.ts` (co-located with the verdict authority so it is **unit-testable**; coach imports it — single source, D-264). Mid-week, adherence is judged against the **fraction of the week ELAPSED**, so an athlete who does strength later in the week is not falsely flagged "not met" on a Tuesday:
+**`primaryAdherence.met` — session-based, WTD-prorated, in a pure testable helper** (Amendment 2 + **Amendment 3 / Fix 1**). Computed by `computePrimaryAdherence(...)` in `_shared/load-status-reconcile.ts` (unit-testable; coach imports it — single source, D-264). `met` is **session-based** — did you do the planned strength sessions — prorated by the fraction of the week ELAPSED, so strength done later in the week is not falsely flagged "not met" mid-week.
+
+**Amendment 3 / Fix 1 — the veto source (the live-verified bug).** The original draft vetoed `met` on `bodyTrends.strength.trend !== 'declining'`. That trend is **RIR-direction** — "declining" means reps-in-reserve dropping (pushing *harder*, expected in a Base/Power phase), NOT strength slipping. On the primary user's live data it read `declining` while e1RM was *improving*, wrongly flipping `met` to false. **The veto is now a genuine performance-decline signal: e1RM direction declining.**
+
+- **Exact field sourced:** `weeklyResponseModel.strength.overall.trend` (`_shared/response-model/types.ts` `StrengthResponse.overall.trend` ∈ `'gaining' | 'maintaining' | 'declining' | 'insufficient_data'`). It is **e1RM-derived** — aggregated from per-lift `LiftTrend.e1rm_trend` (`weekly.ts:261-263`), NOT RIR.
+- **Null behavior:** only the exact value `'declining'` vetoes. `'gaining'`, `'maintaining'`, `'insufficient_data'`, `null`, or `undefined` → **no veto; sessions decide.** A missing e1RM signal never blocks adherence.
 
 ```ts
 // WTD proration. dayIndex = 0-based position of asOf within the plan week (0 = week start day),
@@ -98,24 +103,27 @@ export function computePrimaryAdherence(args: {
   planPrimary: PlanPrimary;
   strengthSessionsCompleted: number;   // WTD count this plan-week
   strengthFrequency: number;           // config.strength_frequency (planned per week)
-  strengthTrend: string;               // bodyTrends.strength.trend
+  e1rmDirection: string | null;        // weeklyResponseModel.strength.overall.trend (e1RM-derived)
   dayIndex: number;                    // 0..6 within the plan week (0 = week start)
 }): { discipline: string; met: boolean; note: string } | null {
   if (args.planPrimary !== 'strength') return null;              // only strength-primary defines it (v1)
   const elapsedFrac = Math.min(1, (args.dayIndex + 1) / 7);      // fraction elapsed, incl. today
   const expectedByNow = args.strengthFrequency * elapsedFrac;    // prorated target so far
-  const met = (args.strengthSessionsCompleted >= expectedByNow - STRENGTH_ADHERENCE_TOLERANCE)
-            && args.strengthTrend !== 'declining';
+  const sessionsMet = args.strengthSessionsCompleted >= expectedByNow - STRENGTH_ADHERENCE_TOLERANCE;
+  const e1rmVeto = args.e1rmDirection === 'declining';           // GENUINE strength decline only (not RIR)
+  const met = sessionsMet && !e1rmVeto;
   const note = `strength ${args.strengthSessionsCompleted}/${args.strengthFrequency} sessions`
-             + (args.strengthTrend === 'improving' ? ' · e1RM improving'
-                : args.strengthTrend === 'declining' ? ' · trend declining' : ' · trend steady');
+             + (args.e1rmDirection === 'gaining' ? ' · e1RM improving'
+                : args.e1rmDirection === 'declining' ? ' · e1RM declining'
+                : args.e1rmDirection === 'maintaining' ? ' · e1RM steady' : '');
   return { discipline: 'strength', met, note };
 }
 ```
 
-`STRENGTH_ADHERENCE_TOLERANCE = 1` (named dial). Judged against **expected-by-now**, not the full-week target: forgiving early/mid-week (strength isn't evenly distributed), tightening to the true target by week's end.
-- **Worked (the mid-week fixture, §8):** Tuesday (`dayIndex 1`) → `expectedByNow = 4 × 2/7 = 1.14`; completed `1 ≥ 1.14 − 1 = 0.14` → **met = true**.
-- End of week (`dayIndex 6`) with 1/4 → expected `4`; `1 ≥ 3` is false → **met = false** (genuine end-of-week shortfall).
+`STRENGTH_ADHERENCE_TOLERANCE = 1` (named dial). Judged against **expected-by-now**, not the full-week target: forgiving early/mid-week, tightening to the true target by week's end.
+- **Worked (mid-week fixture, §8):** Tuesday (`dayIndex 1`) → `expectedByNow = 4 × 2/7 = 1.14`; `1 ≥ 0.14` → sessions met; e1RM not declining → **met = true**.
+- **Worked (the live case, §8):** `sessions 3/4`, `dayIndex 3` → `expectedByNow = 4 × 4/7 = 2.29`; `3 ≥ 1.29` → sessions met; e1RM `gaining` → **met = true → case (a)** (the RIR-trend no longer vetoes).
+- **Veto (§8):** sessions met but `e1rmDirection === 'declining'` → **met = false** (genuine strength decline; the note names it, evidence carries it into the attention branch).
 
 Defaults (`planPrimary='unknown'`, `primaryAdherence=null`) make D-267 **inert until coach wires it** — same pattern as `corroboratedStrain` (D-265).
 

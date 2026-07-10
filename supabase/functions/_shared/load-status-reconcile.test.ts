@@ -263,10 +263,13 @@ const D267_BASE = {
 } as const;
 const strengthMet = { discipline: 'strength', met: true, note: 'strength 4/4 sessions · e1RM improving' };
 
-// CORE — the live "Get stronger" Wk1 Base case: strength on plan, endurance covered (ACWR 1.3) → on_target.
-Deno.test('D-267 CORE: strength-primary, strength met, ACWR 1.3 → on_target; evidence names strength + cross-training', () => {
+// CORE — the "Get stronger" Wk1 Base case via the helper (real production semantics): strength on plan
+// (4/4, e1RM gaining), endurance covered (ACWR 1.3) → on_target, evidence names strength + cross-training.
+Deno.test('D-267 CORE: strength-primary, strength met (helper), ACWR 1.3 → on_target; evidence names strength + cross-training', () => {
+  const adh = computePrimaryAdherence({ planPrimary: 'strength', strengthSessionsCompleted: 4, strengthFrequency: 4, e1rmDirection: 'gaining', dayIndex: 3 });
+  assertEquals(adh?.met, true);
   const r = run({ ...D267_BASE, unweightedAcwr: 1.3,
-    planPosition: { weekIntent: 'baseline', planPrimary: 'strength', primaryAdherence: strengthMet } });
+    planPosition: { weekIntent: 'baseline', planPrimary: 'strength', primaryAdherence: adh } });
   assertEquals(r.status, 'on_target');            // NOT 'under'
   assertStringIncludes(r.interpretation, 'strength');
   assertStringIncludes(r.interpretation, 'cross-training');
@@ -280,13 +283,36 @@ Deno.test('D-267 CASE-B: strength met, ACWR 0.9 (uncovered) → on_target + head
   assertStringIncludes(r.interpretation, 'headroom');
 });
 
-// MID-WEEK (Amendment 2) — WTD proration: Tuesday, 1/4 done, stable → met=true; reconciler → on_target.
-Deno.test('D-267 MID-WEEK: helper Tue 1/4 stable → met=true; reconciler → on_target', () => {
-  const adh = computePrimaryAdherence({ planPrimary: 'strength', strengthSessionsCompleted: 1, strengthFrequency: 4, strengthTrend: 'stable', dayIndex: 1 });
-  assertEquals(adh?.met, true);   // 1 >= 4*(2/7) - 1 = 0.14
+// MID-WEEK (Amendment 2) — WTD proration: Tuesday, 1/4 done, e1RM maintaining → met=true; reconciler → on_target.
+Deno.test('D-267 MID-WEEK: helper Tue 1/4, e1RM maintaining → met=true; reconciler → on_target', () => {
+  const adh = computePrimaryAdherence({ planPrimary: 'strength', strengthSessionsCompleted: 1, strengthFrequency: 4, e1rmDirection: 'maintaining', dayIndex: 1 });
+  assertEquals(adh?.met, true);   // 1 >= 4*(2/7) - 1 = 0.14; e1RM not declining
   const r = run({ ...D267_BASE, unweightedAcwr: 1.1,
     planPosition: { weekIntent: 'baseline', planPrimary: 'strength', primaryAdherence: adh } });
   assertEquals(r.status, 'on_target');
+});
+
+// LIVE-CASE (Fix 1) — production exactly as it hit: 3/4 sessions, dayIndex 3, e1RM improving. The RIR
+// weekly-trend was 'declining' and is NO LONGER an input (that was the bug). met=true → case (a).
+Deno.test('D-267 LIVE-CASE: 3/4 sessions, dayIndex 3, e1RM gaining (RIR-declining now moot) → met=true → case (a)', () => {
+  const adh = computePrimaryAdherence({ planPrimary: 'strength', strengthSessionsCompleted: 3, strengthFrequency: 4, e1rmDirection: 'gaining', dayIndex: 3 });
+  assertEquals(adh?.met, true);   // 3 >= 4*(4/7) - 1 = 1.29; e1RM gaining → no veto (RIR trend not consulted)
+  const r = run({ ...D267_BASE, unweightedAcwr: 1.27,
+    planPosition: { weekIntent: 'baseline', planPrimary: 'strength', primaryAdherence: adh } });
+  assertEquals(r.status, 'on_target');
+  assertStringIncludes(r.interpretation, 'strength');       // strength-on-plan named
+  assertStringIncludes(r.interpretation, 'cross-training'); // endurance-carried named (case a)
+});
+
+// VETO (Fix 1) — sessions met but e1RM GENUINELY declining → met=false → attention branch (total load
+// fine → on_target, never under), evidence names the strength decline.
+Deno.test('D-267 VETO: sessions met but e1RM declining → met=false; attention branch names the decline', () => {
+  const adh = computePrimaryAdherence({ planPrimary: 'strength', strengthSessionsCompleted: 4, strengthFrequency: 4, e1rmDirection: 'declining', dayIndex: 6 });
+  assertEquals(adh?.met, false);   // sessions met, but e1RM declining → veto
+  const r = run({ ...D267_BASE, unweightedAcwr: 1.2,
+    planPosition: { weekIntent: 'baseline', planPrimary: 'strength', primaryAdherence: adh } });
+  assertEquals(r.status, 'on_target');                       // total load fine → not under, attention only
+  assertStringIncludes(r.interpretation, 'e1RM declining');  // evidence names the strength decline
 });
 
 // NEG-1 — genuine under still fires: strength NOT met AND total load genuinely low (ACWR 0.6) → under.
