@@ -95,6 +95,55 @@ export function computeSafetyFloor(bodyTrends: BodyTrends, readiness: string): b
   return corroboratedDecline || readinessHardFloor;
 }
 
+// ── D-267: plan-primary discipline + primary-discipline adherence ────────────
+// The load verdict must read the plan's PRIMARY discipline, not hardcoded running. For a
+// strength-primary plan a run-only 'under' is NOT under-training when strength is on plan. Pure
+// exported helpers — coach resolves + computes, the reconciler applies (§5). Sole authority stays
+// the reconciler (D-260). See docs/DESIGN-D267-plan-primary-load-verdict.md.
+
+export type PlanPrimary = 'strength' | 'endurance' | 'hybrid' | 'unknown';
+export interface PrimaryAdherence { discipline: string; met: boolean; note: string }
+
+/** Strength sessions may fall short of the (prorated) weekly target by this much and still count on-plan. */
+export const STRENGTH_ADHERENCE_TOLERANCE = 1;
+/** total acute:chronic ≥ this ⇒ a skipped endurance shortfall was redistributed into cross-training, not lost. */
+export const ENDURANCE_COVERED_ACWR_MIN = 1.0;
+/** strength-primary 'under' requires total acute:chronic below this (genuinely low total load). */
+export const UNDER_TOTAL_ACWR_MAX = 0.8;
+
+/** (§3) Source the plan's PRIMARY discipline from plan config. Unknown/unrecognized → current behavior. */
+export function resolvePlanPrimary(planConfig: any): PlanPrimary {
+  const source = String(planConfig?.source ?? '').toLowerCase();
+  const version = String(planConfig?.plan_version ?? '').toLowerCase();
+  if (source === 'strength_primary' || version.startsWith('strength_primary')) return 'strength';
+  if (source.startsWith('endurance') || source === 'run' || source === 'triathlon' || source === 'duathlon') return 'endurance';
+  if (source.startsWith('hybrid') || source.startsWith('combined')) return 'hybrid';
+  return 'unknown';
+}
+
+/**
+ * (§4) WTD-prorated primary-discipline adherence. Strength-primary v1 only (returns null otherwise).
+ * Mid-week the target is prorated by the fraction of the week ELAPSED, so strength done later in the
+ * week is not falsely flagged "not met" early. dayIndex = 0..6 within the plan week (0 = week start).
+ */
+export function computePrimaryAdherence(args: {
+  planPrimary: PlanPrimary;
+  strengthSessionsCompleted: number;
+  strengthFrequency: number;
+  strengthTrend: string;
+  dayIndex: number;
+}): PrimaryAdherence | null {
+  if (args.planPrimary !== 'strength') return null;
+  const elapsedFrac = Math.min(1, (args.dayIndex + 1) / 7);
+  const expectedByNow = args.strengthFrequency * elapsedFrac;
+  const met = (args.strengthSessionsCompleted >= expectedByNow - STRENGTH_ADHERENCE_TOLERANCE)
+            && args.strengthTrend !== 'declining';
+  const note = `strength ${args.strengthSessionsCompleted}/${args.strengthFrequency} sessions`
+             + (args.strengthTrend === 'improving' ? ' · e1RM improving'
+                : args.strengthTrend === 'declining' ? ' · trend declining' : ' · trend steady');
+  return { discipline: 'strength', met, note };
+}
+
 export function reconcileLoadStatus(
   raw: ReconcileLoadInput,
   bodyTrends: {
@@ -110,6 +159,10 @@ export function reconcileLoadStatus(
     totalWeeks: number | null;
     weeksOut: number | null;
     isPlanTransition: boolean;
+    /** D-267: the plan's primary discipline (resolvePlanPrimary). Absent/'unknown' → current behavior. */
+    planPrimary?: PlanPrimary;
+    /** D-267: primary-discipline adherence (computePrimaryAdherence). Null/absent → current behavior. */
+    primaryAdherence?: PrimaryAdherence | null;
   },
   unweightedAcwr: number | null,
   keySessionsNext48h: Array<{ date: string; type: string; category: string }>,
@@ -146,7 +199,7 @@ export function reconcileLoadStatus(
   const excessNotFromRunning = runNotOverPlan || (runBodyOk && excessIsCrossTraining);
 
   // ── 1. Plan-position context ───────────────────────────────────────────
-  const { weekIntent, weeksOut, isPlanTransition } = planPosition;
+  const { weekIntent, weeksOut, isPlanTransition, planPrimary = 'unknown', primaryAdherence = null } = planPosition;
   const isEasyWeek = ['recovery', 'taper', 'deload'].includes(weekIntent);
   const isBuildWeek = weekIntent === 'build';
   const isRaceProximity = weeksOut != null && weeksOut <= 3;
@@ -315,6 +368,34 @@ export function reconcileLoadStatus(
   ) {
     status = 'under';
     reasons.push('one big session on a thin base — build consistency, not recovery');
+  }
+
+  // ── D-267: plan-primary re-classification (UNDER-direction only) ───────────
+  // The verdict reads the plan's PRIMARY discipline. For a strength-primary plan a run-only 'under'
+  // is NOT under-training when strength is on plan (INVARIANT §5: primaryAdherence.met===true ⟹ a raw
+  // 'under' NEVER survives) or when total load is maintained. Endurance-primary / hybrid / unknown:
+  // byte-identical current behavior — this block only runs for planPrimary==='strength' AND a still-
+  // 'under' status. Only ever corrects the under-direction; escalation is untouched (§9).
+  if (status === 'under' && planPrimary === 'strength') {
+    const met = primaryAdherence?.met === true;
+    const adh = primaryAdherence?.note ?? 'strength on plan';
+    const acwrTxt = unweightedAcwr != null ? unweightedAcwr.toFixed(2) : 'n/a';
+    const covered = unweightedAcwr != null && unweightedAcwr >= ENDURANCE_COVERED_ACWR_MIN;
+    const totalGenuinelyLow = unweightedAcwr == null || unweightedAcwr < UNDER_TOTAL_ACWR_MAX;
+    if (met) {
+      // INVARIANT: strength on plan ⇒ never under. (a) covered → cross-training evidence; (b) uncovered → headroom.
+      status = 'on_target';
+      reasons.push(covered
+        ? `${adh}; endurance load carried by cross-training (total ACWR ${acwrTxt})`
+        : `${adh}; you have headroom to add endurance`);
+    } else if (!totalGenuinelyLow) {
+      // strength behind plan BUT total load maintained → attention, not a deficit; never 'under'.
+      status = 'on_target';
+      reasons.push('strength behind plan, but total load is maintained — attention, not under-training');
+    } else {
+      // strength behind plan AND total load genuinely low → 'under' stands (genuine build-more); name it.
+      reasons.push(`${adh}; total load low (ACWR ${acwrTxt}) — build more`);
+    }
   }
 
   // ── Two-key cap (Item 3, D-265): THE LAW needs AGREEMENT ───────────────

@@ -17,7 +17,7 @@
  *   deno test supabase/functions/_shared/load-status-reconcile.test.ts --no-check
  */
 import { assertEquals, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { reconcileLoadStatus, computeSafetyFloor, computeDecliningSignals, type ReconcileLoadInput, type TrendInfo, type BodyTrends } from './load-status-reconcile.ts';
+import { reconcileLoadStatus, computeSafetyFloor, computeDecliningSignals, computePrimaryAdherence, type ReconcileLoadInput, type TrendInfo, type BodyTrends } from './load-status-reconcile.ts';
 
 // ── Fixture builders (defaults = quiet body, no decline) ──────────────────
 const trend = (t: string, n: number): TrendInfo => ({ trend: t, based_on_sessions: n });
@@ -249,4 +249,64 @@ Deno.test('D-266 END-TO-END: load-high + ledger/drift-alone (effort flat) → ca
   const r = run({ ...LOAD_HIGH, bodyTrends: DECLINING_DEMOTED_ONLY, readiness: 'adapting', corroboratedStrain });
   assertEquals(r.status, 'elevated');
   assertStringIncludes(r.interpretation, 'no corroborated strain');
+});
+
+// ═══ D-267: plan-primary load verdict — the verdict reads the plan's PRIMARY discipline ═══
+// A strength-primary athlete maintaining strength + swapping runs for cross-training must NOT read
+// 'under'/"build more". reconcileLoadStatus is the sole authority; planPrimary + primaryAdherence
+// are threaded into planPosition. See docs/DESIGN-D267-plan-primary-load-verdict.md.
+const D267_BASE = {
+  raw: { status: 'under' as const, interpretation: 'Running load 40% below plan', running_acwr: 0.9 },
+  readiness: 'adapting',
+  runLoadPct: -40,
+  unplannedLoad: { count: 0, totalLoad: 0, plannedWeekLoad: 100 },
+} as const;
+const strengthMet = { discipline: 'strength', met: true, note: 'strength 4/4 sessions · e1RM improving' };
+
+// CORE — the live "Get stronger" Wk1 Base case: strength on plan, endurance covered (ACWR 1.3) → on_target.
+Deno.test('D-267 CORE: strength-primary, strength met, ACWR 1.3 → on_target; evidence names strength + cross-training', () => {
+  const r = run({ ...D267_BASE, unweightedAcwr: 1.3,
+    planPosition: { weekIntent: 'baseline', planPrimary: 'strength', primaryAdherence: strengthMet } });
+  assertEquals(r.status, 'on_target');            // NOT 'under'
+  assertStringIncludes(r.interpretation, 'strength');
+  assertStringIncludes(r.interpretation, 'cross-training');
+});
+
+// CASE-B (Amendment 1b) — strength met but total load low (ACWR 0.9) → on_target + headroom, never under.
+Deno.test('D-267 CASE-B: strength met, ACWR 0.9 (uncovered) → on_target + headroom, never under', () => {
+  const r = run({ ...D267_BASE, unweightedAcwr: 0.9,
+    planPosition: { weekIntent: 'baseline', planPrimary: 'strength', primaryAdherence: { ...strengthMet, note: 'strength 3/4 sessions · trend steady' } } });
+  assertEquals(r.status, 'on_target');
+  assertStringIncludes(r.interpretation, 'headroom');
+});
+
+// MID-WEEK (Amendment 2) — WTD proration: Tuesday, 1/4 done, stable → met=true; reconciler → on_target.
+Deno.test('D-267 MID-WEEK: helper Tue 1/4 stable → met=true; reconciler → on_target', () => {
+  const adh = computePrimaryAdherence({ planPrimary: 'strength', strengthSessionsCompleted: 1, strengthFrequency: 4, strengthTrend: 'stable', dayIndex: 1 });
+  assertEquals(adh?.met, true);   // 1 >= 4*(2/7) - 1 = 0.14
+  const r = run({ ...D267_BASE, unweightedAcwr: 1.1,
+    planPosition: { weekIntent: 'baseline', planPrimary: 'strength', primaryAdherence: adh } });
+  assertEquals(r.status, 'on_target');
+});
+
+// NEG-1 — genuine under still fires: strength NOT met AND total load genuinely low (ACWR 0.6) → under.
+Deno.test('D-267 NEG-1: strength NOT met + ACWR 0.6 → under (genuine build-more preserved)', () => {
+  const r = run({ ...D267_BASE, readiness: 'normal', unweightedAcwr: 0.6, runLoadPct: -50,
+    raw: { status: 'under', interpretation: 'Running load 50% below plan', running_acwr: 0.5 },
+    planPosition: { weekIntent: 'baseline', planPrimary: 'strength', primaryAdherence: { discipline: 'strength', met: false, note: 'strength 0/4 sessions · trend steady' } } });
+  assertEquals(r.status, 'under');
+});
+
+// NEG-2 — endurance-primary unchanged: a raw under stands (run IS the primary; no re-classification).
+Deno.test('D-267 NEG-2: endurance-primary, raw under, ACWR 0.7 → under unchanged', () => {
+  const r = run({ ...D267_BASE, readiness: 'normal', unweightedAcwr: 0.7,
+    raw: { status: 'under', interpretation: 'Running load below plan', running_acwr: 0.6 },
+    planPosition: { weekIntent: 'baseline', planPrimary: 'endurance', primaryAdherence: null } });
+  assertEquals(r.status, 'under');
+});
+
+// NEG-3 — planPrimary absent → D-267 inert: CORE inputs minus the plan-primary signal stay 'under'.
+Deno.test('D-267 NEG-3: planPrimary absent → inert; CORE inputs stay under (byte-identical old behavior)', () => {
+  const r = run({ ...D267_BASE, unweightedAcwr: 1.3, planPosition: { weekIntent: 'baseline' } });
+  assertEquals(r.status, 'under');   // without the plan-primary signal, the run-only under is unchanged
 });

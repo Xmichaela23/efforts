@@ -35,7 +35,7 @@ import { offPlanAdherenceBanner } from '../_shared/off-plan-banner.ts';
 import { computePerDomainLoad, type SliceSession } from '../_shared/per-domain-load.ts';
 import { computeFitnessFatigue } from '../_shared/fitness-fatigue.ts';
 import { assessAbsorption } from '../_shared/absorption.ts';
-import { computeSafetyFloor } from '../_shared/load-status-reconcile.ts';
+import { computeSafetyFloor, resolvePlanPrimary, computePrimaryAdherence } from '../_shared/load-status-reconcile.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
 import { rollupFitnessDirection, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel } from '../_shared/state-trend/index.ts';
@@ -3342,6 +3342,23 @@ Deno.serve(async (req) => {
           safetyFloor: computeSafetyFloor(snapshotBody.weekly_trends, readinessState),
         });
 
+        // ── D-267: plan-primary discipline + WTD strength adherence (fed INTO the reconciler, the
+        // sole verdict authority — D-260). Absent/unknown → byte-identical current behavior. ────────
+        const d267PlanPrimary = resolvePlanPrimary(planConfig);
+        const d267StrengthSessions = (Array.isArray(weekWorkouts) ? weekWorkouts : []).filter(
+          (w: any) => String(w?.type || '').toLowerCase() === 'strength'
+            && String(w?.workout_status || '').toLowerCase() === 'completed',
+        ).length;
+        const d267DayIndex = Math.max(0, Math.min(6, Math.round(
+          (new Date(asOfDate).getTime() - new Date(weekStartDate).getTime()) / 86_400_000)));
+        const d267PrimaryAdherence = computePrimaryAdherence({
+          planPrimary: d267PlanPrimary,
+          strengthSessionsCompleted: d267StrengthSessions,
+          strengthFrequency: Number(planConfig?.strength_frequency) || 0,
+          strengthTrend: snapshotBody.weekly_trends.strength.trend,
+          dayIndex: d267DayIndex,
+        });
+
         const reconciled = reconcileLoadStatus(
           {
             status: snapshotBody.load_status.status,
@@ -3357,6 +3374,8 @@ Deno.serve(async (req) => {
             totalWeeks: activePlan?.duration_weeks ?? null,
             weeksOut,
             isPlanTransition: isPlanTransitionPeriod,
+            planPrimary: d267PlanPrimary,
+            primaryAdherence: d267PrimaryAdherence,
           },
           acwr ?? null,
           keysNext48h,
