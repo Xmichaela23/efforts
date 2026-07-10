@@ -1137,9 +1137,12 @@ export default function StateTab({
   // ── RUN row — from run_session_types_7d ──────────────────────────────────
   const runTypes = (wsv as any).run_session_types_7d as Array<{
     type: string;
+    type_label?: string;
     sample_size: number;
     avg_execution_score: number | null;
     avg_hr_drift_bpm: number | null;
+    efficiency_label: string | null;
+    efficiency_tone: 'positive' | 'warning' | 'danger' | 'neutral';
   }> ?? [];
 
   // ── BIKE row — from ride_session_types_7d (b2 scale-up: bike-forward leads with this) ──
@@ -1182,32 +1185,32 @@ export default function StateTab({
     );
   })();
 
-  // ── AERO (run) + BIKE rows — mirror shape; only graded (execution-scored) types show ──
-  const execScoreColor = (s: number) => s >= 80 ? 'text-emerald-400/85' : s >= 60 ? 'text-white/70' : 'text-amber-400/85';
-  const runExecRow = runTypes.some(rt => rt.avg_execution_score != null) ? (
-    <div className="px-3 py-3">
-      <Row label="AERO">
-        {runTypes.filter(rt => rt.avg_execution_score != null).map((rt, i) => (
-          <React.Fragment key={rt.type}>
-            {i > 0 && <Dot />}
-            <Chip label={rt.type} value={`${Math.round(rt.avg_execution_score!)}% eff`} valueClass={execScoreColor(rt.avg_execution_score!)} />
-          </React.Fragment>
-        ))}
-      </Row>
-    </div>
-  ) : null;
-  const rideExecRow = rideTypes.some(rt => rt.avg_execution_score != null) ? (
-    <div className="px-3 py-3">
-      <Row label="BIKE">
-        {rideTypes.filter(rt => rt.avg_execution_score != null).map((rt, i) => (
-          <React.Fragment key={rt.type}>
-            {i > 0 && <Dot />}
-            <Chip label={rt.type_label ?? rt.type} value={`${Math.round(rt.avg_execution_score!)}% eff`} valueClass={execScoreColor(rt.avg_execution_score!)} />
-          </React.Fragment>
-        ))}
-      </Row>
-    </div>
-  ) : null;
+  // ── AERO (run) + BIKE rows — show the coach-computed EFFICIENCY VERDICT per type (execution % for
+  // targeted sessions, HR/power-drift label for steady/endurance). NEVER a raw execution score: it's
+  // meaningless for an endurance ride and was rendering "0% eff" — a score that lies, contradicting the
+  // BIKE trend row below. efficiency_label is already discipline- and type-correct (coach:runEfficiency/rideEfficiency).
+  const toneColor = (t: string) => t === 'positive' ? 'text-emerald-400/85' : t === 'warning' ? 'text-amber-400/85' : t === 'danger' ? 'text-rose-400/85' : 'text-white/70';
+  const cardioExecRow = (
+    label: string,
+    types: Array<{ type: string; type_label?: string; efficiency_label: string | null; efficiency_tone: 'positive' | 'warning' | 'danger' | 'neutral' }>,
+  ) => {
+    const shown = types.filter(t => t.efficiency_label != null);
+    if (shown.length === 0) return null;
+    return (
+      <div className="px-3 py-3">
+        <Row label={label}>
+          {shown.map((t, i) => (
+            <React.Fragment key={t.type}>
+              {i > 0 && <Dot />}
+              <Chip label={t.type_label ?? t.type} value={t.efficiency_label!} valueClass={toneColor(t.efficiency_tone)} />
+            </React.Fragment>
+          ))}
+        </Row>
+      </div>
+    );
+  };
+  const runExecRow = cardioExecRow('AERO', runTypes);
+  const rideExecRow = cardioExecRow('BIKE', rideTypes);
 
   // Order the execution rows so the plan's PRIMARY discipline leads (server single-source). Single-sport
   // (strength/run/ride) hoists its row; triathlon/duathlon/hybrid/unknown keep the default order — no forced
@@ -1614,7 +1617,11 @@ export default function StateTab({
         })()}
 
         {/* Execution surface (b2/Q-149 + scale-up) — STRENGTH / AERO / BIKE rows, ordered so the plan's
-            primary discipline leads. Bike-forward leads with BIKE, strength-forward with STRENGTH, etc. */}
+            primary discipline leads. Bike-forward leads with BIKE, strength-forward with STRENGTH, etc.
+            Scope-labeled "last 7 days" so it's not misread against the 8-week PERFORMANCE trends below (mixed-clocks, Q-111 §5). */}
+        {orderedExecKeys.some((k) => execRowsByKey[k]) && (
+          <div className="px-4 pt-3 text-[10px] text-white/30 lowercase">how your sessions went · last 7 days</div>
+        )}
         {orderedExecKeys.map((k) => execRowsByKey[k] ? <React.Fragment key={k}>{execRowsByKey[k]}</React.Fragment> : null)}
 
         {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
