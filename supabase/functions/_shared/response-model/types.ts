@@ -346,6 +346,10 @@ export type StrengthLiftSnapshot = {
   anchor_1rm?: number | null;
   /** as-of: date (YYYY-MM-DD) of this lift's newest logged session. */
   last_session_date?: string | null;
+  /** D-270: the SPINE's owned e1RM direction for this lift (state_trends_v1.strength.per_lift), mapped to
+   *  the coach's vocab. When present it WINS as `e1rm_trend` — the per-lift verdict reads it instead of
+   *  re-deriving one from `previous_e1rm` (which was always null → dead, Q-107 H2). Null → fall back. */
+  spine_e1rm_direction?: 'improving' | 'declining' | 'stable' | null;
 };
 
 export type CrossDomainPair = {

@@ -215,10 +215,17 @@ export function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: strin
       ? Math.round((l.current_avg_rir - l.baseline_avg_rir) * 10) / 10
       : null;
 
-    const e1rm_trend: TrendDirection = !sufficient ? 'stable'
-      : e1rmDelta != null && e1rmDelta >= 3 ? 'improving'
-      : e1rmDelta != null && e1rmDelta <= -3 ? 'declining'
-      : 'stable';
+    // D-270: e1RM DIRECTION is the SPINE's owned fact — read it, don't re-derive. `spine_e1rm_direction`
+    // is the discipline spine's per-lift verdict (state_trends_v1.strength.per_lift), the same logged-set
+    // e1RM series the State trend row reads → one direction, one substrate, no divergence. The old
+    // `previous_e1rm` delta was structurally dead (previous_e1rm always null → always 'stable', so the
+    // "getting stronger/slipping" verdict never fired, Q-107 H2); it's kept only for the delta_pct receipt.
+    // Fallback (spine null: needs_data, or a snapshot written before this deploy) → the old behavior.
+    const e1rm_trend: TrendDirection = l.spine_e1rm_direction
+      ?? (!sufficient ? 'stable'
+        : e1rmDelta != null && e1rmDelta >= 3 ? 'improving'
+        : e1rmDelta != null && e1rmDelta <= -3 ? 'declining'
+        : 'stable');
 
     const rir_trend: TrendDirection = !sufficient ? 'stable'
       : rirDelta != null && rirDelta >= 0.5 ? 'improving'

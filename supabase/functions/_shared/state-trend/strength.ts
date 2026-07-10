@@ -66,12 +66,30 @@ export function computeStrengthVolumeState(series: TrendPoint[], asOf: string, s
   );
 }
 
+// Per-lift e1RM DIRECTION, serialized onto the spine (D-270). computeStrengthState already produces
+// this list; before, rollUp collapsed it to the aggregate and it was discarded. Persisting it makes the
+// spine the SINGLE authority for "is <lift> improving" — the coach per-lift row READS this instead of
+// re-deriving a parallel (dead-fielded) direction from a different table. One direction, one substrate.
+export interface StrengthPerLift {
+  canonical: string;
+  displayName: string;
+  isPrimary: boolean;
+  direction: TrendVerdict;     // the lift's e1RM trend — the spine's owned fact
+  pctChange: number | null;
+  latestE1rm: number | null;   // most-recent estimated_1rm point (the number the direction is OF)
+  sampleCount: number;
+  newestAgeDays: number | null;
+  provisional: boolean;
+}
+
 // The strength row's serializable dual read. e1rm is NULL when there's no e1RM trend to hold — the
 // render DROPS the clause rather than assert "holding" (holding is a claim; same honesty gate as
-// every other row). "unplanned" is a dim receipt, never the verdict.
+// every other row). "unplanned" is a dim receipt, never the verdict. perLift is the per-lift breakdown
+// the aggregate rolls up FROM — persisted so surfaces read one direction (D-270), not re-derive it.
 export interface StrengthFitness {
   volume: { verdict: TrendVerdict; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; provisional: boolean };
   e1rm: { verdict: TrendVerdict; pctChange: number | null } | null;
+  perLift: StrengthPerLift[];
   sessionsThisWeek: number;
   unplanned: number;
 }

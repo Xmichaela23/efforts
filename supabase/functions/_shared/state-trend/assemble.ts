@@ -9,7 +9,7 @@
 
 // Import from source modules (NOT ./index.ts) — index.ts re-exports this file, so importing the
 // barrel here would create a load-order cycle.
-import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, type LiftSeries, type StrengthFitness, type StrengthVolumeRow } from './strength.ts';
+import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, type LiftSeries, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
@@ -178,6 +178,20 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const liftSeries = liftSeriesFromExerciseLog(inp.exerciseRows);
   const strength = computeStrengthState(liftSeries, asOf, spw.strength);
   const strengthVolTrend = computeStrengthVolumeState(strengthVolumeToSeries(inp.strengthVolumeRows), asOf, spw.strength);
+  // Per-lift direction the aggregate rolls up FROM — persisted so the coach reads one direction (D-270).
+  // points are sorted ascending by date (liftSeriesFromExerciseLog), so the last point is the latest e1RM.
+  const liftLatest = new Map(liftSeries.map((s) => [s.canonical, s.points.length ? s.points[s.points.length - 1].value : null]));
+  const strengthPerLift: StrengthPerLift[] = strength.lifts.map((l) => ({
+    canonical: l.canonical,
+    displayName: l.displayName,
+    isPrimary: l.isPrimary,
+    direction: l.trend.verdict,
+    pctChange: l.trend.pctChange,
+    latestE1rm: liftLatest.get(l.canonical) ?? null,
+    sampleCount: l.trend.sampleCount,
+    newestAgeDays: l.trend.newestAgeDays,
+    provisional: isProvisionalTrend(l.trend),
+  }));
   const strengthFitness: StrengthFitness = {
     volume: {
       verdict: strengthVolTrend.verdict, pctChange: strengthVolTrend.pctChange,
@@ -185,6 +199,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       provisional: isProvisionalTrend(strengthVolTrend),
     },
     e1rm: strength.overall !== 'needs_data' ? { verdict: strength.overall, pctChange: strength.overallPctChange } : null,
+    perLift: strengthPerLift,
     sessionsThisWeek: inp.doneBy['strength'] || 0,
     unplanned: Math.max(0, (inp.doneBy['strength'] || 0) - (inp.plannedBy['strength'] || 0)),
   };
@@ -249,6 +264,9 @@ export interface StateTrendsV1 {
   strength: DisciplineTrendCache & {
     volume: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; provisional: boolean };
     e1rm: { verdict: string; pctChange: number | null } | null;
+    /** D-270: per-lift e1RM direction — the single authority the coach per-lift row reads (kills the
+     *  dead `previous_e1rm` re-derivation, Q-107 H2). Empty when no lift has ≥2 logged sessions. */
+    per_lift: StrengthPerLift[];
     sessions_this_week: number;
   };
   /** Tier 1: run's dual read cached on the spine like bike's — decoupling (aerobic durability) LEAD
@@ -310,6 +328,7 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       ...disc('strength'),
       volume: { ...r.strengthFitness.volume },
       e1rm: r.strengthFitness.e1rm,
+      per_lift: r.strengthFitness.perLift,
       sessions_this_week: r.strengthFitness.sessionsThisWeek,
     },
     // Tier 1: run's dual read on the spine — decoupling LEAD (band + recent %) + efficiency SECONDARY,
