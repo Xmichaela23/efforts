@@ -90,3 +90,35 @@ Deno.test('e2e: real rows → per-domain → banner → easy cross-training (com
   const banner = offPlanAdherenceBanner({ loadStatus: 'under', runLoadPct: -100, weekIntent: 'baseline', totalAcwr: 1.58, perDomain });
   assertEquals(banner, CARRIED_EASY);
 });
+
+// ═══ D-268 Phase 2: strength-primary → banner keys on STRENGTH, never "Running behind plan" ═══
+const S_CARRIED = 'On plan — strength on track; endurance via cross-training.';
+const S_LIGHT = 'Strength on track — room to add endurance.';
+const S_BEHIND = 'Behind on strength this week — your priority sessions.';
+const adhMet = { discipline: 'strength', met: true, note: 'strength 3/4 sessions · e1RM steady' };
+const adhNot = { discipline: 'strength', met: false, note: 'strength 1/4 sessions' };
+
+Deno.test('D-268 P2: strength-primary, strength met + loaded (his live case, ACWR 1.27) → "On plan", NOT "Running behind plan"', () => {
+  assertEquals(
+    offPlanAdherenceBanner({ loadStatus: 'under', runLoadPct: -100, weekIntent: 'baseline', totalAcwr: 1.27, perDomain: pd(252, 58, 68), planPrimary: 'strength', primaryAdherence: adhMet }),
+    S_CARRIED,
+  );
+});
+Deno.test('D-268 P2: strength-primary, strength met + light (ACWR 0.9) → headroom, not behind', () => {
+  assertEquals(
+    offPlanAdherenceBanner({ loadStatus: 'under', runLoadPct: -100, weekIntent: 'baseline', totalAcwr: 0.9, perDomain: pd(20, 0, 40), planPrimary: 'strength', primaryAdherence: adhMet }),
+    S_LIGHT,
+  );
+});
+Deno.test('D-268 P2: strength-primary, strength NOT met → "Behind on strength" (the genuine miss)', () => {
+  assertEquals(
+    offPlanAdherenceBanner({ loadStatus: 'under', runLoadPct: -100, weekIntent: 'baseline', totalAcwr: 1.2, perDomain: pd(200, 0, 20), planPrimary: 'strength', primaryAdherence: adhNot }),
+    S_BEHIND,
+  );
+});
+Deno.test('D-268 P2 NEG: endurance-primary → original run-centric banner unchanged', () => {
+  assertEquals(
+    offPlanAdherenceBanner({ loadStatus: 'under', runLoadPct: -100, weekIntent: 'baseline', totalAcwr: 1.58, perDomain: pd(252, 58, 68), planPrimary: 'endurance', primaryAdherence: null }),
+    CARRIED_EASY,
+  );
+});

@@ -123,7 +123,7 @@ const corsHeaders: Record<string, string> = {
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
 /** v61: Q-111 fact-only — a strength DECLINE ("back off weight") no longer emits a `suggested_weight` (the "go lighter" prescription is dropped; the client then renders "Working ~125 vs your 150 baseline" with no action). Progression ("add weight") suggestions unchanged. Bump so cached "suggest 115 / back off" per-lift rows recompute to the fact-only row. */
-const COACH_PAYLOAD_VERSION = 69; // 69: D-268 Phase 1 — strength-primary interpretation de-run-framed (reconciler strips "Running load X% below plan" lead, leads plan-aware). Bump so cached rows recompute. // 68: D-267 Fix 1 — load_status.interpretation VALUES changed (plan-primary re-classification). // 67: delete vague "N concerning signals" count fallback (readiness_why null when no named driver).
+const COACH_PAYLOAD_VERSION = 70; // 70: D-268 Phase 2 — off-plan banner is plan-aware (strength-primary reads "On plan — strength on track" not "Running behind plan"); planPrimary hoisted to single source. Bump so cached rows recompute. // 69: D-268 Phase 1 — strength-primary interpretation de-run-framed. // 68: D-267 Fix 1 — load_status.interpretation VALUES changed. // 67: delete vague "N concerning signals" count fallback.
 // 66 was: // 66: readiness restructure — RPE driver under BODY (readiness_rpe_driver), chip dropped, Why = non-RPE only.
 // 65 was: // 65: Why names the driver session (constant-free) + chip/headline dedup (readiness in chip only).
 // 64 was: // 64: BODY row provenance — receipt "you rated X avg vs Y typical" + tap-expand cross-discipline line. // 63: per_lift.last_session_date (as-of date on the strength row). // 62: item 3 — headline "Why" RPE driver is bare-verdict (numeric receipt lives on the BODY row only, rule 7). // 61: Q-111 fact-only — no "go lighter" prescription on strength decline. // 60: shared classifyStrengthFocus (one fact). // 59: plan-week END-gated. // 58: novelty = "not in your recent training". // 57: "in 8 weeks". // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
@@ -2338,6 +2338,24 @@ Deno.serve(async (req) => {
       },
     });
 
+    // ── D-267/D-268: plan-primary discipline + WTD strength adherence — resolved ONCE here (single
+    // source, D-264) and read by every consumer below: the load reconciler, the off-plan banner, and
+    // (later phases) the coach copy. Absent/unknown → current behavior everywhere. ─────────────────
+    const planPrimary = resolvePlanPrimary(planConfig);
+    const planPrimaryStrengthSessions = (Array.isArray(weekWorkouts) ? weekWorkouts : []).filter(
+      (w: any) => String(w?.type || '').toLowerCase() === 'strength'
+        && String(w?.workout_status || '').toLowerCase() === 'completed',
+    ).length;
+    const planPrimaryDayIndex = Math.max(0, Math.min(6, Math.round(
+      (new Date(asOfDate).getTime() - new Date(weekStartDate).getTime()) / 86_400_000)));
+    const primaryAdherence = computePrimaryAdherence({
+      planPrimary,
+      strengthSessionsCompleted: planPrimaryStrengthSessions,
+      strengthFrequency: Number(planConfig?.strength_frequency) || 0,
+      e1rmDirection: weeklyResponseModel?.strength?.overall?.trend ?? null,
+      dayIndex: planPrimaryDayIndex,
+    });
+
     // D-212 Piece 4 (wire-now) — feed the block-adaptation substrate so goal_prediction.block_verdict
     // is non-null and sits adjacent to fitness_direction + race_readiness in the payload. The THIRD
     // axis is block_verdict specifically — NEVER weekly_verdict (that's the readiness clone). No focus:
@@ -3342,25 +3360,8 @@ Deno.serve(async (req) => {
           safetyFloor: computeSafetyFloor(snapshotBody.weekly_trends, readinessState),
         });
 
-        // ── D-267: plan-primary discipline + WTD strength adherence (fed INTO the reconciler, the
-        // sole verdict authority — D-260). Absent/unknown → byte-identical current behavior. ────────
-        const d267PlanPrimary = resolvePlanPrimary(planConfig);
-        const d267StrengthSessions = (Array.isArray(weekWorkouts) ? weekWorkouts : []).filter(
-          (w: any) => String(w?.type || '').toLowerCase() === 'strength'
-            && String(w?.workout_status || '').toLowerCase() === 'completed',
-        ).length;
-        const d267DayIndex = Math.max(0, Math.min(6, Math.round(
-          (new Date(asOfDate).getTime() - new Date(weekStartDate).getTime()) / 86_400_000)));
-        const d267PrimaryAdherence = computePrimaryAdherence({
-          planPrimary: d267PlanPrimary,
-          strengthSessionsCompleted: d267StrengthSessions,
-          strengthFrequency: Number(planConfig?.strength_frequency) || 0,
-          // Fix 1: the GENUINE strength-progression (e1RM) direction — NOT weekly_trends.strength (RIR),
-          // which reads 'declining' when RIR drops (pushing harder) and wrongly vetoed a met athlete.
-          e1rmDirection: weeklyResponseModel?.strength?.overall?.trend ?? null,
-          dayIndex: d267DayIndex,
-        });
-
+        // D-267/D-268: plan-primary + adherence resolved ONCE above (single source, D-264). Fed into
+        // the reconciler here (sole verdict authority — D-260).
         const reconciled = reconcileLoadStatus(
           {
             status: snapshotBody.load_status.status,
@@ -3376,8 +3377,8 @@ Deno.serve(async (req) => {
             totalWeeks: activePlan?.duration_weeks ?? null,
             weeksOut,
             isPlanTransition: isPlanTransitionPeriod,
-            planPrimary: d267PlanPrimary,
-            primaryAdherence: d267PrimaryAdherence,
+            planPrimary,
+            primaryAdherence,
           },
           acwr ?? null,
           keysNext48h,
@@ -4945,6 +4946,7 @@ ${narrativeFacts.join('\n')}`;
             loadStatus: ls, runLoadPct, weekIntent: intent,
             totalAcwr: lsData?.acwr,
             perDomain: perDomain ?? null, // D-263 bs3: attribution by acute-load composition
+            planPrimary, primaryAdherence, // D-268 Phase 2: strength-primary → key on strength, not a run shortfall
           });
           if (offPlanLine) return offPlanLine;
 

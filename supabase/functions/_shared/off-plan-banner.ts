@@ -28,6 +28,12 @@ const FACT_PLUS_PRESCRIPTION = `${FACT} Get back on schedule before adding extra
 const CARRIED_EASY = 'Running behind plan — total load carried via easy cross-training.';
 const CARRIED_GENERIC = 'Running behind plan — total load carried across your training.';
 
+// D-268 Phase 2: strength-primary copy — running is NOT the plan's primary, so a run shortfall is
+// not "behind plan". The banner keys on STRENGTH adherence instead.
+const STRENGTH_ON_PLAN_CARRIED = 'On plan — strength on track; endurance via cross-training.';
+const STRENGTH_ON_PLAN_LIGHT = 'Strength on track — room to add endurance.';
+const STRENGTH_BEHIND = 'Behind on strength this week — your priority sessions.';
+
 export function offPlanAdherenceBanner(opts: {
   /** reconciled load_status.status */
   loadStatus: string | null | undefined;
@@ -40,8 +46,13 @@ export function offPlanAdherenceBanner(opts: {
   /** per-domain slices — attribution keys on COMPOSITION (acute-load share), not
    *  per-slice ACWR (null-by-floor in prod; D-263 bs3 fix). */
   perDomain: PerDomainLoad | null | undefined;
+  /** D-268 Phase 2: the plan's primary discipline. Absent/'endurance'/'hybrid'/'unknown' →
+   *  the original run-centric banner (unchanged). */
+  planPrimary?: string | null;
+  /** D-268 Phase 2: primary-discipline (strength) adherence from computePrimaryAdherence. */
+  primaryAdherence?: { discipline: string; met: boolean; note: string } | null;
 }): string | null {
-  const { loadStatus, runLoadPct, weekIntent, totalAcwr, perDomain } = opts;
+  const { loadStatus, runLoadPct, weekIntent, totalAcwr, perDomain, planPrimary, primaryAdherence } = opts;
 
   // D-147 firing conditions (unchanged): a real run shortfall on a normal training
   // week; excluded on intents meant to be light.
@@ -49,12 +60,21 @@ export function offPlanAdherenceBanner(opts: {
   if (runLoadPct == null || runLoadPct > -50) return null;
   if (['recovery', 'taper', 'deload', 'peak'].includes(weekIntent)) return null;
 
-  // Loaded overall? Total ACWR is the always-available gate (per-slice ratios are
-  // null-by-floor). Not loaded → genuinely under-training; the prescription is correct.
   const totalLoaded = totalAcwr != null && totalAcwr >= SLICE_LOADED_ACWR_MIN;
-  if (!totalLoaded) return FACT_PLUS_PRESCRIPTION;
 
-  // Q-140 kill: loaded overall → attribute by acute-load COMPOSITION. Name the
-  // carrier only when a slice holds the majority; else the generic line is correct.
+  // ── D-268 Phase 2: strength-primary — a run shortfall is NOT "behind plan". Key on strength.
+  if (planPrimary === 'strength') {
+    if (primaryAdherence?.met === true) {
+      return totalLoaded ? STRENGTH_ON_PLAN_CARRIED : STRENGTH_ON_PLAN_LIGHT;
+    }
+    return STRENGTH_BEHIND; // the genuine miss — strength is the priority, not running
+  }
+
+  // ── Endurance / hybrid / unknown: the original run-centric banner (unchanged) ──────────────────
+  // Loaded overall? Total ACWR is the always-available gate (per-slice ratios are null-by-floor).
+  // Not loaded → genuinely under-training; the prescription is correct.
+  if (!totalLoaded) return FACT_PLUS_PRESCRIPTION;
+  // Q-140 kill: loaded overall → attribute by acute-load COMPOSITION. Name the carrier only when a
+  // slice holds the majority; else the generic line is correct.
   return dominantAcuteSlice(perDomain) === 'easy_cardio' ? CARRIED_EASY : CARRIED_GENERIC;
 }
