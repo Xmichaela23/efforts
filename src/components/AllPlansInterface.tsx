@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { normalizePlannedSession, normalizeStructuredSession } from '@/services/plans/normalizer';
 import { supabase } from '@/lib/supabase';
+import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -661,7 +662,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           const candidate5k = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
           const fiveK: string | null = (candidate5k ? String(candidate5k) : null) as any;
           const easyPace: string | null = (pn.easyPace ? String(pn.easyPace) : null) as any;
-          const ftp: number | null = (bl?.performanceNumbers?.ftp || null) as any;
+          // FTP fracture #2: resolver-first (learned when confident) so displayed watts match the baked watts.
+          const ftp: number | null = (resolveCurrentFtp({ learned_fitness: (bl as any)?.learned_fitness, performance_numbers: bl?.performanceNumbers } as any).value ?? null) as any;
           const hints = (pd?.export_hints || {}) as any;
           const paceTolQuality = typeof hints.pace_tolerance_quality === 'number' ? hints.pace_tolerance_quality : 0.04;
           const paceTolEasy = typeof hints.pace_tolerance_easy === 'number' ? hints.pace_tolerance_easy : 0.06;
@@ -787,7 +789,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const candidate5k2 = pn2.fiveK_pace || pn2.fiveKPace || pn2.fiveK || null;
               const fiveK: string | null = (candidate5k2 ? String(candidate5k2) : null) as any;
               const easyPace: string | null = (pn2.easyPace ? String(pn2.easyPace) : null) as any;
-              const ftp: number | null = (bl?.performanceNumbers?.ftp || null) as any;
+              // FTP fracture #2: resolver-first (learned when confident) so displayed watts match the baked watts.
+          const ftp: number | null = (resolveCurrentFtp({ learned_fitness: (bl as any)?.learned_fitness, performance_numbers: bl?.performanceNumbers } as any).value ?? null) as any;
               const resolvePaces = (text: string) => {
                 let out = text || '';
                 if (fiveK) out = out.split('{5k_pace}').join(String(fiveK));
