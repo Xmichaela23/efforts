@@ -54,6 +54,13 @@ For any fact, this says who owns it and whether the screens agree. **Before buil
 
 ## 4. The verified fractures (recorded so they're never rediscovered)
 
+**Per-discipline cohesion verdict (traced + verified 2026-07-10):**
+- **RUN — CLEAN.** One rendered authority (spine `run.decoupling`); the old duplicate was retired (D-239). This is the model the others should copy.
+- **STRENGTH — CONTRADICTING (worst).** Three visible engines; the e1RM fact is computed from two different data trails (fracture #1).
+- **BIKE — MIXED.** Fitness *direction* is clean — one rendered authority; the CTL/ATL/TSB "form" second engine (Arc `cycling_fitness`) is **internal-only, never rendered** (and there's even a *third* CTL/ATL/TSB in `analyze-cycling-workout.fitness_v1`, prose-only). But (a) **efficiency has two visible engines** on State — spine 56-day HR-at-power vs coach 7-day HR-drift — only saved from a naked clash by the scope labels ("last 7 days" vs "trends over recent weeks"); and (b) the **FTP fracture is visible across two client screens** (fracture #2, now with detail below).
+- **SWIM — BROKEN, not contradicting.** No two-engines-one-fact clash (rendered pace reads are single-sourced, D-182). The problems are: a single **provisional/`needs_data`** engine, **no swim-native display template** (falls through the endurance/run layout — Q-038 Layer 2, still open; the June duration-unit "2263% adherence" bug is FIXED), and the **CSS anchor is orphaned** — shown on Baselines but read by *nothing* in the swim session verdict, and even its plan-gen use is staged off (`planning-context.ts:237 SWIM_CSS_LIVE = false`). More disconnected than FTP.
+
+
 **🔴 #1 — Strength contradicts itself on the State screen (LIVE, worst).** Three engines, three windows, one screen:
 - b2 7-day execution row ← coach `weekly_state_v1.strength_session_types_7d` (`StateTab.tsx:1152`)
 - volume / e1RM trend ← **client-live** `assembleStateTrends.strengthFitness` from `workout_facts.strength_facts` + `exercise_log.estimated_1rm` (`StatePerformanceSection.tsx:326`)
@@ -61,12 +68,12 @@ For any fact, this says who owns it and whether the screens agree. **Before buil
 
 Nothing forces them to agree → "e1RM improving" can sit above a lift verdict that says decline. **Fix = converge on one strength authority** (the D-231 `resolveStrengthCapacity` pattern is the template).
 
-**🔴 #2 — Baselines FTP ≠ what the engine uses (LIVE).** Same anchor, three answers:
-- Baselines UI shows **manual-first** (`TrainingBaselines.tsx:1268`)
-- plan / workload / facts read **learned-first** via `resolveCurrentFtp` (`resolve-current-ftp.ts:71`) — a good learned value **overrides** your typed one
-- `analyze-cycling-workout` reads `performance_numbers.ftp` **only, ignoring learned** (`index.ts:1553`) → a learned-only rider sees FTP + zones on Baselines but gets **no power verdict** on rides
+**🔴 #2 — FTP: same anchor, three answers, TWO on visible client screens (LIVE).**
+- **Baselines** screen shows **manual-first** (`TrainingBaselines.tsx:1269`)
+- **Athletic Record** screen shows **learned-first** via `resolveCurrentFtp` (`AthleticRecordPage.tsx:141`, `resolve-current-ftp.ts:71`) → **two client screens can display different FTP numbers for the same athlete**
+- `analyze-cycling-workout` reads `performance_numbers.ftp` **only, ignoring learned** (`index.ts:1551`) → it also **sets the power band the spine efficiency trend is built from** (`resolveZoneBand`, `:2517`), so if learned FTP moved but the typed value is stale, the rendered efficiency trend is anchored to an FTP **neither screen may be showing**; and a learned-only rider gets **no power verdict** on rides.
 
-**Fix = route every FTP read through `resolveCurrentFtp`** (Baselines UI + cycling analyzer both bypass it).
+**Fix = route every FTP read through `resolveCurrentFtp`** (Baselines UI, Athletic Record, and the cycling analyzer all bypass it — 1RMs already do this right via `resolveStrengthCapacity`).
 
 **⚠️ #3 — Metric easy-pace unit mislabel (latent).** Baselines hardcodes `/mi` (`TrainingBaselines.tsx:1233`); AppContext stores `/km` for metric users (`AppContext.tsx:359`). Masked today only because the run analyzer is suffix-blind.
 
