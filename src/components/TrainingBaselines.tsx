@@ -12,6 +12,7 @@ import { refreshGroupRideRouteSnapshotsForUser } from '@/lib/refresh-group-ride-
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-types';
+import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
@@ -1265,8 +1266,13 @@ return (
                             {(() => {
                               const manualFtp = data.performanceNumbers?.ftp;
                               const learnedFtp = learnedFitness?.ride_ftp_estimated?.value;
-                              const effectiveFtp = manualFtp || learnedFtp;
-                              const learnedImproved = manualFtp && learnedFtp && learnedFtp > manualFtp;
+                              // FTP fracture #2: the FTP the app USES is the single resolver's answer (learned-first when
+                              // confident) — so Baselines agrees with Athletic Record / the cycling analyzer / the coach.
+                              // The input still edits the TYPED anchor; `effectiveFtp` (zones + status) is what the app uses.
+                              const resolved = resolveCurrentFtp({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any);
+                              const effectiveFtp = resolved.value ?? manualFtp ?? learnedFtp;
+                              const learnedLeading = resolved.source === 'learned' || resolved.source === 'learned-low';
+                              const learnedImproved = !!manualFtp && learnedLeading; // resolver chose confident learned over the typed value
                               
                               return (
                                 <div className="space-y-1">
@@ -1325,16 +1331,16 @@ return (
                                       </span>
                                     )}
                                     {manualFtp && learnedImproved && (
-                                      <span className="text-amber-400/70 flex items-center gap-1">
-                                        <span>Manual (auto-learned improved to {learnedFtp}W)</span>
+                                      <span className="text-teal-400/70 flex items-center gap-1">
+                                        <span>Using learned {learnedFtp}W from your rides · your entry {manualFtp}W is the anchor</span>
                                         <button
                                           onClick={() => setData(prev => {
                                             const { ftp, ...rest } = prev.performanceNumbers as any;
                                             return { ...prev, performanceNumbers: rest };
                                           })}
-                                          className="underline hover:text-amber-300"
+                                          className="underline hover:text-teal-300"
                                         >
-                                          • Use learned
+                                          • Clear entry
                                         </button>
                                       </span>
                                     )}
@@ -1343,12 +1349,13 @@ return (
                               );
                             })()}
                             
-                            {/* Power Zones from FTP - always visible */}
-                            {(data.performanceNumbers?.ftp || learnedFitness?.ride_ftp_estimated?.value) && (
+                            {/* Power Zones from the RESOLVED FTP (learned-first) — the same source the app uses, so the
+                                zones on Baselines match the analyzer/coach instead of being manual-first (FTP fracture #2). */}
+                            {resolveCurrentFtp({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any).value && (
                               <div className="space-y-1.5">
                                 <div className="text-xs text-white/50 font-medium">Power Zones</div>
                                 <div className="space-y-1">
-                                  {getPowerZones(data.performanceNumbers?.ftp || learnedFitness?.ride_ftp_estimated?.value).map((zone) => (
+                                  {getPowerZones(resolveCurrentFtp({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any).value).map((zone) => (
                                     <div 
                                       key={zone.name}
                                       className="flex items-center justify-between px-2 py-1 rounded text-xs"
