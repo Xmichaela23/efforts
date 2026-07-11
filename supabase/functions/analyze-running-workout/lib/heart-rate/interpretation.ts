@@ -120,61 +120,17 @@ function calculateConditionsSeverity(
 }
 
 // =============================================================================
-// EXPECTED DRIFT MODEL
+// DRIFT CLASSIFICATION (single source: drift.ts)
 // =============================================================================
 
-interface DriftBand {
-  lowerBpm: number;
-  upperBpm: number;
-  category: 'short' | 'moderate' | 'long' | 'extended';
-}
-
+// The narrative reads drift.ts's ONE terrain-adjusted, phase/weather-aware verdict
+// (DriftAnalysis.assessment) and maps it onto this enum — see buildSteadyStateNarrative.
+// The old getExpectedDrift/assessDriftBand pair (a SECOND band on RAW drift) was retired:
+// judging drift naked, against a duplicate phase-blind band, is the scientifically weaker
+// read and could disagree with the durability verdict the rest of the app shows. drift.ts
+// separates terrain from the drift value and widens the band for plan phase + weather — the
+// correct single source (TrainingPeaks Pa:Hr / Garmin both keep ONE decoupling read).
 type DriftClassification = 'below_expected' | 'normal' | 'elevated' | 'high';
-
-/**
- * Get expected drift band based on duration and conditions.
- */
-function getExpectedDrift(
-  durationMinutes: number,
-  conditionsSeverity: ConditionsSeverity
-): DriftBand {
-  // Base drift bands by duration
-  let lower: number;
-  let upper: number;
-  let category: DriftBand['category'];
-  
-  if (durationMinutes < 45) {
-    lower = 0; upper = 8; category = 'short';
-  } else if (durationMinutes < 90) {
-    lower = 4; upper = 12; category = 'moderate';
-  } else if (durationMinutes < 150) {
-    lower = 6; upper = 16; category = 'long';
-  } else {
-    lower = 8; upper = 20; category = 'extended';
-  }
-  
-  // Severity modifier
-  if (conditionsSeverity === 'high') {
-    lower += 2;
-    upper += 6;
-  } else if (conditionsSeverity === 'moderate') {
-    lower += 1;
-    upper += 3;
-  }
-  // 'unknown' and 'low' get no modifier
-  
-  return { lowerBpm: lower, upperBpm: upper, category };
-}
-
-/**
- * Classify actual drift against expected band.
- */
-function assessDriftBand(driftBpm: number, expected: DriftBand): DriftClassification {
-  if (driftBpm < expected.lowerBpm) return 'below_expected';
-  if (driftBpm <= expected.upperBpm) return 'normal';
-  if (driftBpm <= expected.upperBpm + 5) return 'elevated';
-  return 'high';
-}
 
 // =============================================================================
 // STEADY-STATE NARRATIVE BUILDER
@@ -203,6 +159,12 @@ interface SteadyStateNarrativeInput {
   earlyAvgHr?: number;
   lateAvgHr?: number;
   historicalAvgDriftBpm?: number; // user's typical drift for similar runs (bpm)
+  // The SINGLE drift verdict, computed once in drift.ts (analyzeSteadyStateDrift → assessDrift) on
+  // the TERRAIN-ADJUSTED drift against a duration + plan-phase + weather-aware band. This narrative
+  // reads it instead of recomputing a second band on raw drift (the retired duplicate). Science:
+  // drift must be judged against conditions, not naked — and as ONE number, not two (TrainingPeaks
+  // Pa:Hr, Garmin). null when drift wasn't computed (short/interval run).
+  driftAssessment?: 'excellent' | 'good' | 'normal' | 'elevated' | 'high' | null;
   
   // Conditions
   temperatureF?: number | null;
@@ -223,7 +185,7 @@ interface SteadyStateNarrativeInput {
  * - HR drift as tie-breaker (if drift is normal, stimulus was achieved)
  * - Separate base vs finish assessment for long runs with fast finish
  */
-function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
+export function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
   const {
     intent,
     durationMinutes,
@@ -262,13 +224,17 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
     terrainProfile ?? null
   );
   
-  // Compute drift band (if we have drift)
-  let driftBand: DriftClassification | null = null;
-  let expectedDrift: DriftBand | null = null;
-  if (hrDriftBpm !== undefined && hrDriftBpm !== null) {
-    expectedDrift = getExpectedDrift(durationMinutes, conditionsSeverity);
-    driftBand = assessDriftBand(hrDriftBpm, expectedDrift);
-  }
+  // Drift band = the ONE verdict drift.ts already computed (terrain-adjusted drift vs the
+  // phase+weather band), mapped onto this decision tree's enum. NO second band recomputed here
+  // (getExpectedDrift/assessDriftBand retired — they judged RAW drift against a duplicate,
+  // phase-blind band, a scientifically weaker read that could disagree with the durability verdict
+  // the rest of the app shows). 'excellent'/'good' (drift below the normal floor) → below_expected.
+  const driftBand: DriftClassification | null =
+    input.driftAssessment == null
+      ? null
+      : (input.driftAssessment === 'excellent' || input.driftAssessment === 'good')
+        ? 'below_expected'
+        : input.driftAssessment; // 'normal' | 'elevated' | 'high' pass through 1:1
   
   // -------------------------------------------------------------------------
   // HEAT-ADJUSTED TOLERANCE + HR TIE-BREAKER
@@ -560,6 +526,9 @@ function buildDriftInterpretation(
     finishDeltaSecPerMi: context.segmentData?.finishDeltaSecPerMi,
     hasFinishSegment: context.segmentData?.hasFinishSegment,
     hrDriftBpm,
+    // The single drift verdict (drift.ts, terrain-adjusted + phase/weather-aware). The narrative
+    // reads THIS instead of recomputing its own band on raw drift.
+    driftAssessment: drift.assessment,
     earlyAvgHr: drift.earlyAvgHr,
     lateAvgHr: drift.lateAvgHr,
     historicalAvgDriftBpm: context.historicalDrift?.avgDriftBpm,
