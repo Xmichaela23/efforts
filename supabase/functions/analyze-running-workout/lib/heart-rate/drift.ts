@@ -89,6 +89,16 @@ export function analyzeSteadyStateDrift(
   // Calculate HR averages
   const earlyAvgHr = calculateAvgHR(earlyWindow);
   const lateAvgHr = calculateAvgHR(lateWindow);
+
+  // Empty-window guard (D-242 anti-silent-fail): calculateAvgHR returns 0 when a
+  // window has no valid HR (sensor dropout for an entire half). Averaging that as
+  // a real value would emit an absurd drift (e.g. lateAvg 0 → "-140 bpm"). Bail to
+  // an invalid read so NO drift line renders, rather than printing garbage.
+  if (earlyAvgHr <= 0 || lateAvgHr <= 0) {
+    console.log('📊 [DRIFT] Empty HR window (dropout) — cannot compute drift honestly');
+    return createInvalidDrift('Insufficient valid HR samples in a drift window', workoutType);
+  }
+
   const rawDriftBpm = lateAvgHr - earlyAvgHr;
   
   console.log('📊 [DRIFT] Early avg HR:', earlyAvgHr);

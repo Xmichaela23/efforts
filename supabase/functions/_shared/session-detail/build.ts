@@ -633,6 +633,23 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     return buildWeekLabel(factPacket);
   })();
 
+  // D-036 aerobic decoupling, resolved ONCE (single source): the classification
+  // block below and the Performance "Aerobic decoupling" row both read this — they
+  // cannot diverge. { pct, basis, assessment } from the analyzer's heart_rate_summary.
+  const decouplingV1 = (() => {
+    const hrs = (wa as any)?.heart_rate_summary;
+    if (!hrs || typeof hrs !== 'object') return null;
+    const pct = (hrs as any)?.decouplingPct;
+    const basis = (hrs as any)?.decouplingBasis ?? null;
+    const assessment = (hrs as any)?.decouplingAssessment ?? null;
+    if (pct == null && basis == null && assessment == null) return null;
+    return {
+      pct: typeof pct === 'number' && Number.isFinite(pct) ? Math.round(pct * 10) / 10 : null,
+      basis: (basis === 'gap' || basis === 'raw') ? basis : null,
+      assessment: (['excellent','good','moderate','high'] as const).includes(assessment as any) ? assessment : null,
+    };
+  })();
+
   // ── Analysis detail rows ───────────────────────────────────────────────────
   // Goal races use structured technical_insights only — suppress fact-packet rows to avoid duplication
   const analysisDetailRows = isGoalRaceSession
@@ -647,6 +664,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         type,
         (wa as any)?.vs_similar_v1 ?? null,
         (typeof weatherTempF === 'number' && Number.isFinite(weatherTempF)) ? Math.round(weatherTempF) : null,
+        decouplingV1,
       );
 
   // ── Adherence narrative ────────────────────────────────────────────────────
@@ -854,19 +872,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       // workout_analysis.heart_rate_summary (sample-level, warmup-skipped).
       // Null when not computed (interval workout, < 20 min of paced-HR data,
       // cycling/swim) — older rows without the fields render decoupling: null.
-      decoupling: (() => {
-        const hrs = (wa as any)?.heart_rate_summary;
-        if (!hrs || typeof hrs !== 'object') return null;
-        const pct = (hrs as any)?.decouplingPct;
-        const basis = (hrs as any)?.decouplingBasis ?? null;
-        const assessment = (hrs as any)?.decouplingAssessment ?? null;
-        if (pct == null && basis == null && assessment == null) return null;
-        return {
-          pct: typeof pct === 'number' && Number.isFinite(pct) ? Math.round(pct * 10) / 10 : null,
-          basis: (basis === 'gap' || basis === 'raw') ? basis : null,
-          assessment: (['excellent','good','moderate','high'] as const).includes(assessment as any) ? assessment : null,
-        };
-      })(),
+      decoupling: decouplingV1,
       // D-264 step-0 receipt: HR drift (bpm) sourced from the FIXED pipeline
       // (buildActualSession → session.hr_drift_bpm), NOT a re-read of workout_analysis —
       // proves the real nested row flows through deployed code end-to-end.
@@ -1248,10 +1254,11 @@ export function formatCyclingClimbingRow(
   return { label: 'CLIMBING', value: `VAM ${Math.round(vam)} m/h${ascentStr}` };
 }
 
-function buildAnalysisDetailRows(
+export function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
   intervals: IntervalRow[] = [], sport: string = '', vsSimilar: any = null,
   weatherTempF: number | null = null,
+  decoupling: { pct: number | null; basis: 'gap' | 'raw' | null; assessment: 'excellent' | 'good' | 'moderate' | 'high' | null } | null = null,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
@@ -1523,17 +1530,29 @@ function buildAnalysisDetailRows(
       ? (derived as any).pace_normalized_drift_bpm : null;
     const driftExplanation = (derived as any)?.drift_explanation as string | null;
     const driftTypical = typeof derived?.hr_drift_typical === 'number' ? derived.hr_drift_typical : null;
-    const durMinHr = typeof factPacket?.facts?.total_duration_min === 'number' ? factPacket.facts.total_duration_min : null;
 
     const signal = paceNormDrift ?? rawAbsDrift;
 
-    const durationExpectedMax =
-      durMinHr != null
-        ? (durMinHr >= 150 ? 20 : durMinHr >= 90 ? 15 : durMinHr >= 60 ? 12 : 8)
-        : null;
+    // Aerobic decoupling — the SINGLE durability verdict for this run (D-036 %, the
+    // TrainingPeaks/intervals.icu Pa:Hr standard; <5% = solid base). Renders ONLY on a
+    // GAP-basis (terrain-neutral) graded read. When shown, it OWNS "how did the aerobic
+    // system hold up" — the descriptive bpm line below is suppressed so there is exactly
+    // one HR-behaviour read, never two that can disagree. Raw/confounded/short/interval
+    // runs have no % → fall through to the measured (verdict-free) bpm description.
+    const decouplingShown = !!(decoupling && decoupling.basis === 'gap'
+      && typeof decoupling.pct === 'number' && decoupling.assessment);
+    if (decouplingShown) {
+      const a = decoupling!.assessment;
+      const word = a === 'excellent' ? 'excellent — HR stayed locked to pace'
+        : a === 'good' ? 'good — strong aerobic base'
+        : a === 'moderate' ? 'moderate — some drift over the run'
+        : 'high — HR climbed well above pace';
+      rows.push({ label: 'Aerobic decoupling', value: `${decoupling!.pct}% — ${word}` });
+    }
 
-    if (sport === 'swim' || shouldSuppressSessionHrDrift(factPacket, intervals)) {
-      // Layer 2: swims get NO land HR-drift row (terrain/grade/pace-drift framing is land-only).
+    if (decouplingShown || sport === 'swim' || shouldSuppressSessionHrDrift(factPacket, intervals)) {
+      // Decoupling % owns it (above), OR swims get no land HR-drift row (terrain/grade/pace
+      // framing is land-only), OR interval/variable-pace runs where "HR rose" is meaningless.
     } else if (driftExplanation === 'pace_driven' && rawAbsDrift != null && Math.abs(rawAbsDrift) >= 5) {
       rows.push({
         label: 'Heart rate',
@@ -1553,18 +1572,15 @@ function buildAnalysisDetailRows(
         value += ` (pace-normalized from ${rawAbsDrift > 0 ? '+' : ''}${Math.round(rawAbsDrift)} raw)`;
       }
 
-      // Duration context first, then typical comparison
-      if (durationExpectedMax != null && absSig <= durationExpectedMax) {
-        value += ` — normal for ${Math.round(durMinHr!)} min`;
-      }
-
+      // Own-baseline comparison only (no phase-blind duration band — Q-158). Compares
+      // this run's drift to the athlete's OWN typical drift; the durationExpectedMax
+      // "normal for X min" verdict was removed — it ignored heat + plan phase and could
+      // contradict the analyzer's own conditions-aware read.
       if (driftTypical != null && Math.abs(driftTypical) >= 1) {
         const typSign = driftTypical > 0 ? '+' : '';
         const delta = absSig - Math.abs(driftTypical);
         if (Math.abs(delta) <= 3) {
-          value += durationExpectedMax != null && absSig <= durationExpectedMax
-            ? ` (typical ${typSign}${Math.round(driftTypical)})`
-            : ` — within your normal range (typical ${typSign}${Math.round(driftTypical)})`;
+          value += ` — within your normal range (typical ${typSign}${Math.round(driftTypical)})`;
         } else if (delta > 0) {
           value += ` — higher than your typical ${typSign}${Math.round(driftTypical)} bpm`;
         } else {
