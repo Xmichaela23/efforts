@@ -53,6 +53,21 @@ export function tripsHonestyGuard(input: ExecutionHonestyInput | null | undefine
 }
 
 /**
+ * Q-129 mixed-effort hole: the variance gate's `is_mixed_effort` conflates "structured BY DESIGN"
+ * with "high variance for ANY reason." A monotonic FADE trips it via `pace_cv` (a big slowdown is a
+ * big pace swing) or via a mislabelled unplanned `detected_intervals` (the detector called an easy
+ * run "Interval 1") — and those are exactly the runs whose fade must still be named. Only a run
+ * PRESCRIBED as structured (a linked plan with interval/tempo intent) has a legitimately-expected
+ * slower second half (cooldown), so ONLY those two signals may suppress the fade-honesty guard.
+ * This is what feeds ExecutionHonestyInput.isMixedEffort — NOT the raw gate boolean.
+ */
+export function structuredBySignalSuppressesFade(
+  varianceSignal: string | null | undefined,
+): boolean {
+  return varianceSignal === 'interval_execution' || varianceSignal === 'plan_intent_intervals';
+}
+
+/**
  * Compute the second-half slowdown (s/mi) from mile splits. Mirrors build.ts' PACING row.
  * Positive return = positive split (faded); ≤0 = even/negative split; null = not computable.
  * Prefers grade-adjusted pace when every split has it (`gapAdjusted`).

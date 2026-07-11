@@ -16,7 +16,7 @@ import { fetchGoalRaceCompletionForWorkout, type GoalRaceCompletionMatch } from 
 import { buildMarathonGoalRaceAdherenceSummary } from './lib/analysis/marathon-race-narrative.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
-import { computePositiveSplitSec, guardNarrativeHonesty, fadeLeadBullets } from '../_shared/fact-packet/execution-honesty.ts';
+import { computePositiveSplitSec, guardNarrativeHonesty, fadeLeadBullets, structuredBySignalSuppressesFade } from '../_shared/fact-packet/execution-honesty.ts';
 import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, resolveCarriedInSoreness, CARRYOVER_WINDOW_DAYS, type SorenessEntry } from '../_shared/cross-domain-carryover.ts';
 // D-036: GAP enrichment lifted to top-level so both pace-adherence and the
 // HR analyzer consume the same grade-adjusted sample series.
@@ -2182,11 +2182,14 @@ Deno.serve(async (req) => {
 
     // Q-128/Q-129 (D-242/D-244) — assemble the honesty key now that the variance gate is known.
     // STEADY-EFFORT GATE: "faded / didn't hold steady" only means something on a steady run. On a
-    // structured/mixed-effort session (tempo, intervals, fartlek, or warmup→work→easy-cooldown) a
-    // slower second half is expected, not a fade — so `is_mixed_effort` suppresses the guard on ALL
-    // three surfaces at once (the primitive gates on it), closing the false-positive hole.
+    // run PRESCRIBED as structured (a linked plan with interval/tempo intent) a slower second half is
+    // an expected cooldown, not a fade — so those suppress the guard. But the raw `is_mixed_effort`
+    // ALSO trips on `pace_cv` (a fade IS a big pace swing) and on a mislabelled unplanned
+    // `detected_intervals` (the detector called an easy run "Interval 1") — using it here suppressed
+    // the guard on exactly the faded runs it must catch (Q-129 hole). So gate on the SIGNAL: only real
+    // plan structure suppresses; a monotonic fade on an unplanned run still gets named.
     const _executionHonesty = _ehPosSplitSec != null
-      ? { positiveSplitSec: _ehPosSplitSec, isMixedEffort: _varGate.is_mixed_effort === true }
+      ? { positiveSplitSec: _ehPosSplitSec, isMixedEffort: structuredBySignalSuppressesFade(_varGate.variance_signal) }
       : null;
 
     // Q-129: hr_drift_interpretation is a SECOND narrative surface (deterministic HR module). On a

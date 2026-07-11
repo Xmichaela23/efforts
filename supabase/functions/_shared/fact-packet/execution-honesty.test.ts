@@ -1,7 +1,7 @@
 // Q-128 acceptance: below-baseline positive-split → the banned clean/steady claim must NOT
 // survive (backstop), and a clean run must be untouched. The 7/5 run is the worked example.
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { guardNarrativeHonesty, narrativeHasUnearnedCleanClaim, computePositiveSplitSec, tripsHonestyGuard, fadeLeadBullets } from './execution-honesty.ts';
+import { guardNarrativeHonesty, narrativeHasUnearnedCleanClaim, computePositiveSplitSec, tripsHonestyGuard, fadeLeadBullets, structuredBySignalSuppressesFade } from './execution-honesty.ts';
 
 const SEVEN_FIVE = // the exact narrative from the 2026-07-05 Lunch Run screenshot
   "Your HR stayed right in line with your recent efforts on this route, and the pace held steady despite the heat and fatigue you reported—a clean execution on a day when your body was asking for less.";
@@ -118,4 +118,38 @@ Deno.test('steady-effort gate: a structured run (isMixedEffort) never trips, eve
 Deno.test('steady-effort gate: a STEADY faded run (isMixedEffort false/absent) still trips', () => {
   assertEquals(tripsHonestyGuard({ positiveSplitSec: 75, isMixedEffort: false }), true);
   assertEquals(tripsHonestyGuard({ positiveSplitSec: 75 }), true); // absent → steady (back-compat)
+});
+
+// ── Q-129 mixed-effort HOLE (the 7/5 laundering) ─────────────────────────────
+// The variance gate flagged the 7/5 faded easy run is_mixed_effort=true (via pace_cv or a
+// mislabelled "Interval 1" detected_intervals), which SUPPRESSED the fade guard → "Typical vs
+// similar workouts" led and the fade was papered over with heat. Only real PLAN structure may
+// suppress; a monotonic fade on an unplanned run must still be named.
+
+Deno.test('structuredBySignalSuppressesFade: only real plan structure suppresses', () => {
+  assertEquals(structuredBySignalSuppressesFade('interval_execution'), true);   // linked plan, ≥2 work steps
+  assertEquals(structuredBySignalSuppressesFade('plan_intent_intervals'), true); // linked plan, interval intent
+  assertEquals(structuredBySignalSuppressesFade('pace_cv'), false);              // a fade IS a big pace swing
+  assertEquals(structuredBySignalSuppressesFade('detected_intervals'), false);   // "Interval 1" mislabel — untrusted
+  assertEquals(structuredBySignalSuppressesFade(null), false);
+  assertEquals(structuredBySignalSuppressesFade(undefined), false);
+});
+
+Deno.test('Q-129 hole closed: the 7/5 fade (flagged via pace_cv) now TRIPS the guard', () => {
+  // this is what the construction site now feeds: isMixedEffort = structuredBySignalSuppressesFade(signal)
+  const honesty = { positiveSplitSec: 75, isMixedEffort: structuredBySignalSuppressesFade('pace_cv') };
+  assertEquals(tripsHonestyGuard(honesty), true);
+  // and the SUMMARY fallback now leads with the fade + drops the laundering bullet:
+  const led = fadeLeadBullets(['Typical vs similar workouts.', 'HR drift 1 bpm.'], honesty);
+  assertEquals(/vs similar workouts/i.test(led.join(' ')), false); // laundering bullet dropped
+  assertEquals(/positive split|faded/i.test(led[0]), true);        // fade leads
+});
+
+Deno.test('a genuine PLANNED interval session (interval_execution) still suppresses — cooldown ≠ fade', () => {
+  const honesty = { positiveSplitSec: 75, isMixedEffort: structuredBySignalSuppressesFade('interval_execution') };
+  assertEquals(tripsHonestyGuard(honesty), false);
+  assertEquals(
+    fadeLeadBullets(['Typical vs similar workouts.', 'HR drift 4 bpm.'], honesty),
+    ['Typical vs similar workouts.', 'HR drift 4 bpm.'], // untouched — a prescribed cooldown is not a fade
+  );
 });
