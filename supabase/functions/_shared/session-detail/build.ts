@@ -1576,11 +1576,26 @@ export function buildAnalysisDetailRows(
       // this run's drift to the athlete's OWN typical drift; the durationExpectedMax
       // "normal for X min" verdict was removed — it ignored heat + plan phase and could
       // contradict the analyzer's own conditions-aware read.
+      // CONFOUND GUARD (unconditioned-comparison Q): heat and terrain INFLATE drift, so they can
+      // falsely trip "higher than your typical" — asserting a fitness decline that conditions
+      // explain (the "score that lies" class, D-242). They can't make drift LOWER, so only the
+      // "higher" branch is confoundable. When the run was hot/hilly, name the confound instead of
+      // implying a fitness change; the neutral + low branches are unchanged.
       if (driftTypical != null && Math.abs(driftTypical) >= 1) {
         const typSign = driftTypical > 0 ? '+' : '';
         const delta = absSig - Math.abs(driftTypical);
+        const wxD = factPacket?.facts?.weather;
+        const heatConfound = (typeof wxD?.temperature_f === 'number' && wxD.temperature_f > 75)
+          || (typeof wxD?.heat_stress_level === 'string' && wxD.heat_stress_level !== 'none' && wxD.heat_stress_level !== '');
+        const terrainConfound = driftExplanation === 'terrain_driven'
+          || (typeof derived?.terrain_contribution_bpm === 'number' && Math.abs(derived.terrain_contribution_bpm) >= 3);
+        const confoundWord = heatConfound && terrainConfound ? 'heat and terrain'
+          : heatConfound ? 'the heat'
+          : terrainConfound ? 'the terrain' : null;
         if (Math.abs(delta) <= 3) {
           value += ` — within your normal range (typical ${typSign}${Math.round(driftTypical)})`;
+        } else if (delta > 0 && confoundWord) {
+          value += ` — above your typical ${typSign}${Math.round(driftTypical)}, but ${confoundWord} drove it (not a fitness change)`;
         } else if (delta > 0) {
           value += ` — higher than your typical ${typSign}${Math.round(driftTypical)} bpm`;
         } else {
