@@ -5061,6 +5061,28 @@ The north star, made explicit and written to `docs/TARGET-ARCHITECTURE.md` (+ CL
 
 **Verification:** deterministic fixtures green across all pieces (basis, rows, band mapping, confound guard, fade-guard hole); bike/run type errors touched are pre-existing `strict:false` noise. The LLM prose pieces (fade opener) await ≥3 Michael recomputes. Q-158 RESOLVED; Q-157 MOOT (sparkline dead); Q-055 existing-line closed (Read-3 build still open); Q-129 3-of-4 surfaces guarded (coach remains).
 
+**Post-D-273 cleanup (same session, `c6bac6e3`):** deleted the dead client `TrendSparkline` (the retired raw-pace / pace-at-HR-direction chart, D-050/Q-025) + its `TrendData`/`TrendPoint` types + the `trend` prop field from `SessionNarrative.tsx`. Already switched off (server emits `trend:null`, component never mounted after macro trends moved to State) but a latent re-wire hazard — a future session could have re-mounted a workout-screen chart stamping a direction that contradicts State. Client build green; no behavior change. Q-157 fully cleaned (moot + code gone). Server-side `pace_at_hr_direction` plumbing left inert (emits null, read by nobody) — a separate optional cleanup.
+
+## D-274 — Coach week-headline honesty net: guard the ONE AI sentence against its own on-screen rows (2026-07-11)
+
+**Context.** The State screen is the Whoop-sweet-spot pattern (verified vs incumbents): ONE AI-written sentence — the WK headline — sitting on a stack of deterministic, glass-box rows (LOAD + composition, BODY/RPE, STRENGTH exec %, AERO/BIKE verdicts). Everything but the headline is computed and can't lie. So "coach honesty" = guarding one sentence, not a narrative surface.
+
+**Finding (code-traced, corrected a stale premise).** Q-129 called the coach "a 4th unguarded generator" — STALE. The headline already ran through the shared `runGuardedNarrative` (narrative-core rules 6/7 spine-contradiction/recap, 5 grounding, 8/10 plan/phase). But two real holes:
+1. **`atypicalSignals: []` hardcoded** (`coach/index.ts:~4682`) → rule 2 (don't call the week "comfortable / steady / cruising / in control" while a signal is atypical, unacknowledged) could **never fire on the coach**. So the exact intra-surface class Q-129 flagged (a headline contradicting the concerning ROW right below it — e.g. "you're cruising" over an AERO "durability gap") was unguarded.
+2. **Cold-start bypass** — `spineVerdicts.length ? guarded : generate(null)` emitted a **fully unguarded** narrative for a data-less athlete (LLM free to invent readiness/fitness/phase).
+
+**Decision + fix.**
+- Feed the CONCERNING spine verdicts (any discipline `sliding`) into `atypicalSignals`, **derived from the same verdicts the rows render** (one source — the headline can't diverge from its own screen). `holding`/`improving`/`needs_data` are not atypical.
+- **Always** run guarded (empty verdicts → rules 6/7/2 no-op; 5/8/10 still hold) — no more cold-start hole.
+- Extended the shared `ACK_ATYPICAL` lexicon (`narrative-core/validate.ts`) with weekly-decline acknowledgment words (`slid*`/`slipp*`/`declin*`/`fad*`/`worth watching`) so an honest "run is slipping" headline that also uses "easy/comfortable" isn't falsely flagged — the old list only knew per-session drift language (drift/elevated/climbed). Deliberately excluded `slow*` (a pace word, over-broad for a fitness-decline ack) — keeps the workout surface unweakened.
+- COACH_PAYLOAD_VERSION 76→77.
+
+**Rejected:** the full "formal `_shared` honesty pass every generator subscribes to" (Q-129's grand version) — over-scoped for the actual gap. Wiring the coach into the existing guard + populating its signals achieves the honesty outcome (the one sentence is now guarded against its rows) without a shared-interface refactor. The formal version stays a future consolidation, not a blocker.
+
+**Sequencing intent met (Michael):** honesty FOUNDATION first — the headline is now provably honest, so building the State coaching OUT later is safe. (Corrected a mid-session mis-read where this was recorded as "don't build, wait for a caught lie" — the actual call was build-the-net-now.)
+
+**Verification.** 2 new fixtures (`validate-guard.test.ts`): cruising-while-sliding fails rule 2; a plain plan-state headline + an acknowledged-slide headline don't over-fire. 29/29 narrative-core green (workout rule 2 unaffected). Deployed coach + the 3 analyzers bundling narrative-core (`analyze-cycling/strength/swim`). LLM-stochastic → the headline itself needs Michael's ≥3 recomputes; 1 done live (recomputed clean, reads human, with a durability-gap row on screen — the no-over-fire case). Q-129: coach surface now guarded (3 workout surfaces closed earlier this session; the formal shared-pass is the only remainder, non-blocking).
+
 ## When to add an entry
 
 Add a new D-NNN when:
