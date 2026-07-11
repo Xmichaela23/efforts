@@ -82,6 +82,14 @@ export interface StrengthPerLift {
   provisional: boolean;
 }
 
+/** Bridge the spine's per-lift e1RM `direction` (TrendVerdict) to the per-workout narrative's
+ *  up/flat/down vocabulary, so the workout "trending" claim reads the SAME direction State renders
+ *  (D-270 continuity) instead of getE1rmTrend's this-vs-last-session delta. needs_data / absent →
+ *  null = no trend claim (honest). The e1RM numbers stay the receipt; only the DIRECTION is spine-owned. */
+export function spineDirectionToTrend(v: TrendVerdict | null | undefined): 'up' | 'down' | 'flat' | null {
+  return v === 'improving' ? 'up' : v === 'sliding' ? 'down' : v === 'holding' ? 'flat' : null;
+}
+
 // The strength row's serializable dual read. e1rm is NULL when there's no e1RM trend to hold — the
 // render DROPS the clause rather than assert "holding" (holding is a claim; same honesty gate as
 // every other row). "unplanned" is a dim receipt, never the verdict. perLift is the per-lift breakdown

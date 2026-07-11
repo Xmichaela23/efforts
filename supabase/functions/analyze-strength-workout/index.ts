@@ -11,6 +11,7 @@ import { detectNovelMovements, novelMovementsNames, novelMovementNames } from '.
 // D-208: role classifier — execution scoring weights a skipped accessory less than a main lift.
 import { roleForExercise, ROLE_WEIGHT } from '../_shared/strength/exercise-role.ts';
 import { rirVerdictFromDelta } from '../_shared/strength-profiles.ts';
+import { spineDirectionToTrend } from '../_shared/state-trend/strength.ts';
 
 /**
  * =============================================================================
@@ -1698,6 +1699,24 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
       const arc = await getArcContext(supabase, workout.user_id as string, `${wdSlice}T12:00:00.000Z`);
       arc_narrative_for_summary = arc.arc_narrative_context ?? null;
       strength_spine_verdict = spineVerdictFor((arc.latest_snapshot as any)?.state_trends_v1, 'strength');
+
+      // D-270 continuity (e1RM DIRECTION): the narrative's "trending" claim must read the SPINE per-lift
+      // direction — the SAME state_trends_v1.strength.per_lift State renders — not getE1rmTrend's
+      // this-vs-last-session delta (which can say "down" on one soft day while State's multi-week trend
+      // says "improving"). Tag each e1RM row with the spine direction here (the numbers stay the receipt;
+      // buildStrengthTestResult already ran above with the session-local this-vs-last PR — a receipt,
+      // not a trend, so it's untouched). Spine unavailable / needs_data → null = no trend claim (honest).
+      try {
+        const perLift = (arc?.latest_snapshot as any)?.state_trends_v1?.strength?.per_lift;
+        if (Array.isArray(perLift)) {
+          const dirByCanonical = new Map<string, any>(
+            perLift.filter((l: any) => l?.canonical).map((l: any) => [String(l.canonical), l.direction]),
+          );
+          for (const e of e1rmTrend) {
+            (e as any).spine_direction = spineDirectionToTrend(dirByCanonical.get(String(e.canonical)));
+          }
+        }
+      } catch (_) { /* spine unavailable → rows carry no spine_direction → narrative claims no trend */ }
       console.log(`[analyze-strength-workout] arc_narrative mode=${arc_narrative_for_summary?.mode ?? 'n/a'} days_since_last_race=${arc_narrative_for_summary?.days_since_last_goal_race ?? 'n/a'}`);
     }
   } catch (arcSummErr) {
@@ -2430,11 +2449,20 @@ COACHING INSIGHT
     // client to render verbatim; the narrative is supposed to *interpret*, not
     // re-list. Mode rule structure mirrors cycling STRUCTURED PLANNED MODE /
     // CLEAN-EXECUTION CAP from D-092 / D-093.
-    // D-189: canonical e1RM block — real values from exercise_log, NEVER invented. When a lift has no
-    // prior session, say so explicitly so the model can't claim a trend (rule 5 / rule 6 guard).
+    // D-189 / D-270: canonical e1RM block — real values from exercise_log, NEVER invented. The current
+    // and prev-session numbers are the RECEIPT; the DIRECTION ("getting stronger") comes from the SPINE
+    // per-lift trend (spine_direction, tagged from state_trends_v1.strength.per_lift — the same fact State
+    // renders), NOT the prev-session delta. Spine says needs_data / no history → no trend claim.
     const e1rmBlock = e1rmTrend.length
       ? '\n\nESTIMATED 1RM (canonical, from exercise_log — authoritative; use ONLY these numbers, never invent an e1RM):\n' +
-        e1rmTrend.map((e) => `- ${e.exercise}: ${e.current_e1rm} lb${e.prior_e1rm != null ? ` (prev ${e.prior_e1rm} lb → ${e.trend})` : ' — NO prior session, so NO trend exists; do not claim one'}`).join('\n')
+        e1rmTrend.map((e) => {
+          const dir = (e as any).spine_direction as 'up' | 'down' | 'flat' | null;
+          const receipt = e.prior_e1rm != null ? ` (prev session ${e.prior_e1rm} lb — a receipt for this lift, not a trend)` : '';
+          const trendClause = dir
+            ? ` · e1RM trend over recent weeks (STATE spine — authoritative): ${dir === 'up' ? 'improving' : dir === 'down' ? 'sliding' : 'holding'}. Use THIS for any getting-stronger/-weaker claim; NEVER infer a direction from the prev-session delta.`
+            : ' — not enough history for an e1RM trend; do NOT claim a direction.';
+          return `- ${e.exercise}: ${e.current_e1rm} lb${receipt}${trendClause}`;
+        }).join('\n')
       : '\n\nESTIMATED 1RM: not available this session — do NOT mention or invent an estimated 1RM.';
     const ncCtx = strengthAdapter.buildContext({ e1rm_by_exercise: e1rmTrend });
     // App-wide grounding (shared helper): rule 8 (unplanned → no target/adherence), rule 9 (name the novel

@@ -20,8 +20,15 @@ export const strengthAdapter: DisciplineAdapter = {
   addendum: STRENGTH_ADDENDUM,
   buildContext(packet: any): NarrativeContext {
     const e1rm = Array.isArray(packet?.e1rm_by_exercise) ? packet.e1rm_by_exercise : [];
-    // a per-exercise e1RM trend exists when at least one lift has a prior session to compare against.
-    const hasTrend = e1rm.some((e: any) => e?.prior_e1rm != null && Number(e.prior_e1rm) > 0);
+    // D-270 continuity: a DIRECTION claim ("getting stronger") is grounded only when the SPINE has a
+    // per-lift trend (spine_direction present) — NOT merely because a prior session exists (a prior
+    // session is a receipt, not a trend; that was the fork that let the narrative say "down" while State
+    // said "improving"). Fall back to prior-session presence only for callers that don't thread
+    // spine_direction, so their prior behavior is preserved.
+    const spineThreaded = e1rm.some((e: any) => e != null && 'spine_direction' in e);
+    const hasTrend = spineThreaded
+      ? e1rm.some((e: any) => e?.spine_direction != null)
+      : e1rm.some((e: any) => e?.prior_e1rm != null && Number(e.prior_e1rm) > 0);
     return {
       notableLeadSignals: [], // no captured-but-dropped lead signal (unlike run's heat)
       atypicalSignals: [],    // strength's single paragraph + RIR discipline rarely contradicts; keep empty (no-regression)
