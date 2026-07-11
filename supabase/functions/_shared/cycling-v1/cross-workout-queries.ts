@@ -458,34 +458,22 @@ export function assessCyclingLimiter(params: {
     };
   }
 
-  // §2 NP-trend fallback — works for non-tri or when bodyweight is missing.
-  const recent = params.recentNpSamples ?? [];
-  const ninety = params.ninetyDayNpSamples ?? [];
-  if (recent.length >= 3 && ninety.length >= 5) {
-    const recentMean = avg(recent)!;
-    const ninetyMean = avg(ninety)!;
-    if (ninetyMean > 0) {
-      const deltaPct = Math.round(((recentMean - ninetyMean) / ninetyMean) * 1000) / 10;
-      const flag: CyclingLimiterV1['flag'] =
-        deltaPct <= -5 ? 'trending_down' :
-        deltaPct >= 5 ? 'trending_up' :
-        'stable';
-      const detail =
-        flag === 'trending_down'
-          ? `Recent NP averaging ${Math.round(recentMean)}W vs 90-day mean ${Math.round(ninetyMean)}W (${deltaPct}%). Power trending down — review recovery and fueling before adding intensity.`
-          : flag === 'trending_up'
-          ? `Recent NP averaging ${Math.round(recentMean)}W vs 90-day mean ${Math.round(ninetyMean)}W (+${deltaPct}%). Power trending up — fitness is responding to recent training.`
-          : `Recent NP holding steady against 90-day mean (${Math.round(recentMean)}W vs ${Math.round(ninetyMean)}W).`;
-      return { flag, source: 'np_trend', detail, np_trend_pct: deltaPct };
-    }
-  }
-
+  // §2 REMOVED — bike-power TREND is the SPINE's job, not a "limiter". This used to average recent NP
+  // vs a 90-day ALL-ride NP mean (±5%, no terrain match, no staleness gate) and emit "Power trending
+  // up/down — fitness responding / review recovery". That was a baseline-blind duplicate of the spine
+  // power trend (state_trends_v1.bike.power — terrain-binned, staleness-gated, easy-ride-safe): an easy
+  // block dragged the mean and manufactured a false "trending down", contradicting State — for tri AND
+  // non-tri athletes alike. The spine now owns bike-power direction for EVERY athlete; the real W/kg
+  // limiter (§1) still runs for triathletes with baselines + a race. Neither applies → honest 'none'
+  // (no fabricated limiter). `recentNpSamples`/`ninetyDayNpSamples` are now unused (kept on the signature
+  // so callers don't change). Follow-up (filed): for a tri athlete missing bodyweight, prompt "add your
+  // weight for a bike-limiter read" instead of silence.
   return {
     flag: 'none',
     source: 'insufficient_data',
     detail: params.isTriAthlete
-      ? 'Insufficient data for limiter assessment (need bodyweight + FTP for W/kg, or 5+ rides in last 90d for NP trend).'
-      : 'Insufficient ride history for power-trend assessment (need 5+ rides in last 90d).',
+      ? 'No W/kg limiter read — needs bodyweight + FTP + a target race distance. Bike power trend is on the State screen.'
+      : 'No bike limiter for a non-race plan. Bike power trend is on the State screen.',
   };
 }
 
