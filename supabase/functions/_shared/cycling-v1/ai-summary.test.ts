@@ -221,6 +221,36 @@ Deno.test('trend: type-filtered pwr20 preferred over np_trend (the 11-vs-3 bug)'
   assertEquals(out.trend.ride_type, 'climbing'); // matches the TREND row
 });
 
+// Easy-ride false-dip regression: an EASY / endurance ride must NEVER produce a fitness-decline
+// claim. Its 20-min power isn't a fitness max (shared POWER_BINS rule with the STATE bike row), so
+// trending it reads a "decline" off an intentionally-soft effort — the exact bug on the real
+// unplanned easy ride (NP 106W, spine slid -21W). Gate: hard-effort types only feed out.trend.
+Deno.test('trend: easy/endurance ride claims NO fitness dip; hard effort still does', () => {
+  const points = [
+    { date: '2026-06-24', value: 118 },
+    { date: '2026-07-02', value: 110 },
+    { date: '2026-07-10', value: 106, is_current: true },
+  ];
+  const sliding = { verdict: 'sliding', earlyAvg: 127, recentAvg: 106, sampleCount: 5 };
+
+  // Easy endurance ride → gated out: no fitness-direction claim reaches the narrative.
+  const easy = cyclingCrossWorkoutDisplay({
+    pwr20Trend: { classified_type: 'endurance', points },
+    spineBikeTrend: sliding,
+  });
+  assertEquals(easy?.trend, undefined);
+
+  // Same sliding spine verdict, but a hard-effort (threshold) ride → the trend IS honest, so it surfaces.
+  const hard = cyclingCrossWorkoutDisplay({
+    pwr20Trend: { classified_type: 'threshold', points },
+    spineBikeTrend: sliding,
+  });
+  assert(hard?.trend);
+  assertEquals(hard.trend.direction, 'declining');
+  assertEquals(hard.trend.ride_type, 'threshold');
+  assertEquals(hard.trend.delta_w, -21);
+});
+
 Deno.test('achievements → PRs split by attribution; Efforts-scoped language', () => {
   const out = cyclingCrossWorkoutDisplay({
     achievements: {

@@ -5,6 +5,19 @@ import { callLLM } from '../llm.ts';
 import { buildReasoningScaffold, validateNarrative, rideAdapter, applyGroundingContext } from '../narrative-core/index.ts';
 import type { ArcNarrativeContextV1 } from '../arc-narrative-state.ts';
 import { arcModeSystemAddon, arcNarrativeFactBlock, arcUnplannedBackwardAnchorAddon } from '../arc-narrative-ai-appendix.ts';
+import { POWER_BINS } from '../state-trend/bike-fitness.ts';
+
+/**
+ * A 20-min-power fitness TREND is only meaningful for hard-effort ride types — the SAME like-for-like
+ * rule the STATE bike row uses (`POWER_BINS`: climbing / threshold / sweet_spot / tempo). Easy /
+ * endurance / recovery / vo2 / anaerobic rides have no 20-min fitness MAX (an easy ride's best 20 min
+ * isn't a ceiling), so trending their power reads a "decline" from an intentionally-soft effort — the
+ * easy-ride false-dip. Gating on the shared rule means an easy ride never manufactures a fitness-
+ * direction claim, and this narrative can't disagree with STATE on what counts as fitness.
+ */
+function isFitnessPowerType(t: unknown): boolean {
+  return typeof t === 'string' && Object.values(POWER_BINS).some((set) => set.has(t));
+}
 
 /**
  * Numbers the LLM may legitimately cite from the temporal Arc frame (days
@@ -204,6 +217,9 @@ export function cyclingCrossWorkoutDisplay(cw: {
   const sv = cw.spineBikeTrend; // spine TrendResult: { verdict, pctChange, earlyAvg, recentAvg, sampleCount }
   if (
     pwr20 && Array.isArray(pwr20.points) && pwr20.points.length >= 3 &&
+    // Only hard-effort ride types feed the fitness-direction claim (shared POWER_BINS rule) — an
+    // easy/endurance ride's 20-min power isn't a fitness max, so it must not drive a "declining" verdict.
+    isFitnessPowerType(pwr20.classified_type) &&
     sv && typeof sv.verdict === 'string' && sv.verdict !== 'needs_data'
   ) {
     const delta = (Number.isFinite(Number(sv.recentAvg)) && Number.isFinite(Number(sv.earlyAvg)))
