@@ -1,38 +1,11 @@
 import React from 'react';
 import { RouteDoorway } from './RouteDoorway';
 
-type TrendPoint = {
-  date: string;
-  value: number;
-  avg_hr: number | null;
-  /**
-   * D-050 / Q-025 — pace-at-HR (sec/mi per 100bpm). Server-emitted on each
-   * point; null when avg_hr was missing. Drives the primary sparkline line
-   * when `pace_at_hr_direction` is active (see TrendData below).
-   */
-  pace_at_hr?: number | null;
-  is_current: boolean;
-  label: string;
-};
-
-type TrendData = {
-  metric_label: string;
-  unit: string;
-  points: TrendPoint[];
-  direction: 'improving' | 'declining' | 'stable';
-  summary: string;
-  lower_is_better?: boolean;
-  ride_type?: string | null; // cycling: classified-type word for the text-only TREND fallback
-  /**
-   * D-050 / Q-025 — per-athlete percentile-classifier output. PRIMARY
-   * direction signal for the running TREND when non-null and not
-   * 'insufficient_data'. Falls back to `direction` (raw-pace classifier)
-   * otherwise. `pace_at_hr_basis` reports which pace basis the classifier
-   * used ('gap' = grade-adjusted; 'raw' = device pace).
-   */
-  pace_at_hr_direction?: 'improving' | 'stable' | 'declining' | 'insufficient_data' | null;
-  pace_at_hr_basis?: 'gap' | 'raw' | null;
-};
+// NOTE: the per-session TrendSparkline (raw-pace / pace-at-HR direction, D-050/Q-025) was RETIRED —
+// macro trends live on State (single source), and the workout screen renders `discipline_trend`
+// (read from the cached spine, never a competing verdict). The dead sparkline component + its
+// TrendData/TrendPoint types + the `trend` prop field were removed 2026-07-11 so the competing-
+// verdict chart can't be accidentally re-wired (Q-157 cleanup). Server still emits `trend: null`.
 
 export type NextSession = {
   name: string;
@@ -115,7 +88,6 @@ interface SessionNarrativeProps {
       planned?: unknown | null;
       match?: { summary?: string } | null;
     };
-    trend?: TrendData | null;
     next_session?: NextSession | null;
     terrain?: {
       route?: RouteData | null;
@@ -141,186 +113,6 @@ interface SessionNarrativeProps {
    *  (strength Performance tab moves it to the bottom, below the compare table). */
   hideNextUp?: boolean;
 }
-
-function TrendSparkline({ trend }: { trend: TrendData }) {
-  const pts = trend.points;
-  if (pts.length < 3) return null;
-
-  // Cycling TREND: require ≥5 same-type rides for the sparkline. With 3–4
-  // points the data is too thin for a chart, so show a one-line text summary
-  // instead — this gate covers BOTH the power and HR lines (no chart at all
-  // under 5). Running (unit '/mi') keeps its existing ≥3 chart behavior.
-  const isCyclingTrend = trend.unit === 'W';
-  if (isCyclingTrend && pts.length < 5) {
-    const typeWord = trend.ride_type ? `${trend.ride_type} ` : '';
-    const firstV = Math.round(pts[0].value);
-    const lastV = Math.round(pts[pts.length - 1].value);
-    const hrVals = pts
-      .map((p) => (p as any).avg_hr)
-      .filter((v: any): v is number => typeof v === 'number' && Number.isFinite(v));
-    let hrClause = '';
-    if (hrVals.length >= 2) {
-      const mid = Math.ceil(hrVals.length / 2);
-      const avg = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length;
-      // Lower HR later = improving (same direction as the chart's HR scaling).
-      const d = avg(hrVals.slice(mid)) - avg(hrVals.slice(0, mid));
-      const dir = d <= -2 ? 'improving' : d >= 2 ? 'declining' : 'consistent';
-      hrClause = ` · HR ${dir}`;
-    }
-    const line = `${pts.length} ${typeWord}rides · ${firstV}W → ${lastV}W${hrClause}`;
-    return (
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Trend</span>
-        </div>
-        <div className="mt-1 text-xs text-gray-400">{line}</div>
-      </div>
-    );
-  }
-
-  // D-050 / Q-025 — pace-at-HR mode. When the server's percentile classifier
-  // returned a usable direction (not null / insufficient_data) AND ≥6 points
-  // carry pace_at_hr values, plot pace_at_hr as the primary line and label
-  // direction via pace_at_hr_direction. Otherwise fall back to raw-pace
-  // values + direction (current behavior). Athlete-facing labels: "getting
-  // more efficient" / "holding steady" / "worth watching". Never red on
-  // stable / improving — only `declining` produces the red color.
-  const paceAtHrCount = pts.filter((p) => p.pace_at_hr != null && Number.isFinite(p.pace_at_hr)).length;
-  const usePaceAtHr =
-    trend.pace_at_hr_direction != null &&
-    trend.pace_at_hr_direction !== 'insufficient_data' &&
-    paceAtHrCount >= 6 &&
-    trend.unit === '/mi'; // running-only — cycling TREND already exits above
-
-  const plotValueOf = (p: TrendPoint): number => (usePaceAtHr && p.pace_at_hr != null ? p.pace_at_hr : p.value);
-  const values = pts.map(plotValueOf);
-  const maxV = Math.max(...values);
-  const minV = Math.min(...values);
-  const range = maxV - minV || 1;
-
-  const W = 200;
-  const H = 48;
-  const PAD = 4;
-  const plotW = W - PAD * 2;
-  const plotH = H - PAD * 2;
-
-  const coords = pts.map((p, i) => ({
-    x: PAD + (i / (pts.length - 1)) * plotW,
-    y: PAD + ((plotValueOf(p) - minV) / range) * plotH,
-    ...p,
-  }));
-
-  const pathD = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x},${c.y}`).join(' ');
-  // D-050 / Q-025 — direction + color override when pace-at-HR mode active.
-  const effectiveDirection: 'improving' | 'declining' | 'stable' =
-    usePaceAtHr && trend.pace_at_hr_direction != null && trend.pace_at_hr_direction !== 'insufficient_data'
-      ? trend.pace_at_hr_direction
-      : trend.direction;
-  const arrow = effectiveDirection === 'improving' ? '↗' : effectiveDirection === 'declining' ? '↘' : '→';
-  const color = effectiveDirection === 'improving' ? '#34d399' : effectiveDirection === 'declining' ? '#f87171' : '#9ca3af';
-
-  // HR line — normalize independently, lower HR = higher on chart (same direction as pace improvement)
-  // D-107: threshold lowered from >=3 to >=2. D-106's strict-intent TREND
-  // pool narrows the data; on thin pools (e.g. an athlete's first few easy
-  // runs after a build block) only 2 of 3 trend points carry HR. >=3 hid
-  // the HR dashed line entirely in that case. >=2 renders a single segment
-  // — sparse but honest. Backfills naturally as more same-intent runs land.
-  const hrPts = pts.filter((p) => (p as any).avg_hr != null);
-  const hasHr = hrPts.length >= 2;
-  const hrCoords = hasHr ? (() => {
-    const hrVals = pts.map((p) => (p as any).avg_hr as number | null);
-    const validHr = hrVals.filter((v): v is number => v != null);
-    const maxHr = Math.max(...validHr);
-    const minHr = Math.min(...validHr);
-    const hrRange = maxHr - minHr || 1;
-    return pts.map((p, i) => {
-      const hr = (p as any).avg_hr as number | null;
-      return {
-        x: PAD + (i / (pts.length - 1)) * plotW,
-        y: hr != null ? PAD + ((hr - minHr) / hrRange) * plotH : null,
-        hr,
-        is_current: (p as any).is_current,
-      };
-    });
-  })() : [];
-  const hrPathSegments: string[] = [];
-  if (hasHr) {
-    let seg = '';
-    for (const c of hrCoords) {
-      if (c.y == null) { seg = ''; continue; }
-      seg += seg === '' ? `M${c.x},${c.y}` : `L${c.x},${c.y}`;
-    }
-    if (seg) hrPathSegments.push(seg);
-  }
-
-  // HR label for today
-  const todayHr = (pts[pts.length - 1] as any).avg_hr as number | null;
-
-  // Sport-aware legend: the cycling TREND plots power (trend.unit === 'W',
-  // built in _shared/session-detail/build.ts:635); running plots pace
-  // (unit '/mi', build.ts:669). "pace" was hardcoded — wrong for rides.
-  const seriesLabel = trend.unit === 'W' ? 'power' : 'pace';
-
-  // D-050 / Q-025 — athlete-facing label when pace-at-HR mode active.
-  // "getting more efficient" / "holding steady" / "worth watching" map from
-  // pace_at_hr_direction; otherwise keep server-built `summary` (raw-pace).
-  const effectiveSummary = usePaceAtHr
-    ? (effectiveDirection === 'improving'
-        ? `getting more efficient (${pts.length} workouts)`
-        : effectiveDirection === 'declining'
-          ? `worth watching (${pts.length} workouts)`
-          : `holding steady (${pts.length} workouts)`)
-    : trend.summary;
-
-  return (
-    <div>
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Trend</span>
-        {effectiveSummary && <span className="text-xs" style={{ color }}>{arrow} {effectiveSummary}</span>}
-      </div>
-      <div className="mt-1 relative">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 280, height: 52 }}>
-          {/* Pace line */}
-          <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
-          {coords.map((c, i) => (
-            <circle key={i} cx={c.x} cy={c.y} r={c.is_current ? 3.5 : 2}
-              fill={c.is_current ? color : 'rgba(156,163,175,0.5)'}
-              stroke={c.is_current ? color : 'none'} strokeWidth={c.is_current ? 1 : 0} />
-          ))}
-          {/* HR line — dashed, muted red, independently scaled */}
-          {hrPathSegments.map((d, i) => (
-            <path key={i} d={d} fill="none" stroke="#fb923c" strokeWidth="1" strokeDasharray="3 2"
-              strokeLinecap="round" strokeLinejoin="round" opacity={0.4} />
-          ))}
-          {hasHr && hrCoords.filter((c) => c.y != null && c.is_current).map((c, i) => (
-            <circle key={i} cx={c.x} cy={c.y!} r={2.5} fill="#fb923c" opacity={0.6} />
-          ))}
-        </svg>
-        <div className="flex justify-between text-[10px] text-gray-500 mt-0.5" style={{ maxWidth: 280 }}>
-          <span>{pts[0].label}</span>
-          <span className="font-medium" style={{ color }}>
-            {pts[pts.length - 1].label}
-            {todayHr != null && <span className="text-orange-400/60 ml-1">· {todayHr} bpm</span>}
-            {' '}← today
-          </span>
-        </div>
-        {hasHr && (
-          <div className="flex items-center gap-3 mt-1" style={{ maxWidth: 280 }}>
-            <span className="flex items-center gap-1 text-[10px]" style={{ color }}>
-              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={color} strokeWidth="1.5" opacity="0.8" /></svg>
-              {seriesLabel}
-            </span>
-            <span className="flex items-center gap-1 text-[10px] text-orange-400">
-              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#fb923c" strokeWidth="1" strokeDasharray="3 2" opacity="0.8" /></svg>
-              hr
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 
 export function NextUp({ session }: { session: NextSession }) {
   const dayName = session.date ? (() => {
@@ -420,7 +212,6 @@ export default function SessionNarrative({
   })();
   const hasSummaryBullets = summaryBullets.length > 0;
 
-  const trend = sd?.trend ?? null;
   const nextSession = sd?.next_session ?? null;
 
   const analysisRows = sd?.analysis_details?.rows ?? [];
@@ -594,10 +385,10 @@ export default function SessionNarrative({
           </div>
         </div>
       )}
-      {/* Macro trends live on the State screen now (single source of truth). The per-session route
-          context is a same-route EFFICIENCY read (State's pace-per-HR metric, this route only) — one
-          clean line, no raw-pace chart, no dashed HR overlay. TrendSparkline/RouteSparkline are no
-          longer rendered here. */}
+      {/* Macro trends live on the State screen now (single source of truth). The per-session
+          discipline context is `discipline_trend` (read from the cached spine, never a competing
+          verdict). The old raw-pace/pace-at-HR TrendSparkline was DELETED 2026-07-11 (Q-157) — no
+          raw-pace chart, no dashed HR overlay, nothing here can stamp a rival direction. */}
       {/* Segment verdict: the familiarity line is the DOORWAY — tap to open the server-authored verdict
           card + a quiet flag-driven chart. Reads segment_verdicts (spine-authored, Law 5); the client
           only renders (Law 4). PLURAL — one doorway per core this run traversed. Supersedes the old
