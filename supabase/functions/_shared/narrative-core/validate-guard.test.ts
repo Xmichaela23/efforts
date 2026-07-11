@@ -36,6 +36,38 @@ Deno.test('rule 7 recap: restating +3.6% (a rendered receipt) → fails', () => 
   assert(r.failures.some((f) => f.rule === 7));
 });
 
+// Q-129 coach net: the coach now feeds CONCERNING spine verdicts (sliding) as atypicalSignals, so a
+// "you're cruising / comfortable" headline that ignores a discipline sliding on-screen trips rule 2.
+// (Was dead on the coach — atypicalSignals hardcoded []. These prove the wiring + no over-fire.)
+function ctxWithAtypical(atypical: { signal: string; state: string; detail?: string }[]): NarrativeContext {
+  return { notableLeadSignals: [], atypicalSignals: atypical, anchors: {},
+    hasTrendField: true, hasFitnessTrend: true, establishedCauses: [], disciplineVerdicts: [] };
+}
+
+Deno.test('coach net: "you\'re cruising" headline while run fitness is sliding → fails rule 2', () => {
+  const r = validateNarrative(
+    "On plan and cruising — everything feels comfortable this week.",
+    ctxWithAtypical([{ signal: 'run fitness', state: 'sliding', detail: '-4%' }]),
+  );
+  assert(!r.ok);
+  assert(r.failures.some((f) => f.rule === 2), JSON.stringify(r.failures));
+});
+
+Deno.test('coach net: a headline that ACKNOWLEDGES the slide (or avoids "cruising") does not over-fire', () => {
+  // acknowledges via a decline/drift token → rule 2's ACK clears it
+  const ack = validateNarrative(
+    "Strength is on track, though run durability has been slipping — keep the easy runs honest.",
+    ctxWithAtypical([{ signal: 'run fitness', state: 'sliding', detail: '-4%' }]),
+  );
+  assert(!ack.failures.some((f) => f.rule === 2), JSON.stringify(ack.failures));
+  // a plain plan-state headline with no "cruising/steady/easy" language → rule 2 never triggers
+  const plain = validateNarrative(
+    "On plan — strength on track; endurance via cross-training. Balanced load.",
+    ctxWithAtypical([{ signal: 'run fitness', state: 'sliding', detail: '-4%' }]),
+  );
+  assert(!plain.failures.some((f) => f.rule === 2), JSON.stringify(plain.failures));
+});
+
 Deno.test('clean: agrees with the spine, no receipt numbers → passes', () => {
   const r = validateNarrative(
     'Your plan starts Monday. Bike and run are both improving, while strength needs more sessions to call. Head in fresh and let the plan load you.',

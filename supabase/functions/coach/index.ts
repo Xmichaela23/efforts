@@ -125,7 +125,7 @@ const corsHeaders: Record<string, string> = {
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
 /** v61: Q-111 fact-only — a strength DECLINE ("back off weight") no longer emits a `suggested_weight` (the "go lighter" prescription is dropped; the client then renders "Working ~125 vs your 150 baseline" with no action). Progression ("add weight") suggestions unchanged. Bump so cached "suggest 115 / back off" per-lift rows recompute to the fact-only row. */
-const COACH_PAYLOAD_VERSION = 76; // 76: FTP fracture #2 — coach FTP reads (per-domain load bins + prose baseline line) route through resolveCurrentFtp (learned-first) instead of a local manual-first fork; bike FTP now agrees across coach/analyzer/compute-facts. Bump so per-domain bins recompute. // 75: S2 — weekly_state_v1.trends.display carries the pre-assembled State display contract (cards + per-discipline fitness reads) from the cached spine, so the client renders it instead of recomputing in-browser. Bump so payloads gain the field. // 74: D-270 strength convergence — per-lift e1rm_trend now READS the spine's per-lift direction (state_trends_v1.strength.per_lift) instead of the dead previous_e1rm delta; the "getting stronger/slipping" verdict fires again (Q-107 H2). Bump so cached always-'stable' rows recompute. // 73: b2 scale-up (Q-149) — primary_discipline now the SPECIFIC lead sport (strength/run/ride/swim/tri/duathlon/hybrid) so bike-forward leads with bike, not run; swim never faked. // 72: b2 — strength_session_types_7d + weekly_state_v1.plan.primary_discipline. // 71: D-268 Phase 3 — the LLM narrative + intent_summary are told the plan's PRIMARY discipline (strength-primary → prose frames around strength, not running). Bump so cached rows recompute. // 70: D-268 Phase 2 — off-plan banner plan-aware; planPrimary hoisted. // 69: D-268 Phase 1 — strength-primary interpretation de-run-framed. // 68: D-267 Fix 1. // 67: N-concerning fallback.
+const COACH_PAYLOAD_VERSION = 77; // 77: Q-129 coach honesty net — the week headline now feeds CONCERNING spine verdicts (sliding) as atypicalSignals so rule 2 catches a "you're cruising / comfortable" headline that contradicts a discipline sliding on-screen (was hardcoded [] → rule 2 dead); AND the guard always runs (cold-start no longer bypasses it → no unguarded narrative for a data-less athlete). Bump so cached headlines re-validate. // 76: FTP fracture #2 — coach FTP reads (per-domain load bins + prose baseline line) route through resolveCurrentFtp (learned-first) instead of a local manual-first fork; bike FTP now agrees across coach/analyzer/compute-facts. Bump so per-domain bins recompute. // 75: S2 — weekly_state_v1.trends.display carries the pre-assembled State display contract (cards + per-discipline fitness reads) from the cached spine, so the client renders it instead of recomputing in-browser. Bump so payloads gain the field. // 74: D-270 strength convergence — per-lift e1rm_trend now READS the spine's per-lift direction (state_trends_v1.strength.per_lift) instead of the dead previous_e1rm delta; the "getting stronger/slipping" verdict fires again (Q-107 H2). Bump so cached always-'stable' rows recompute. // 73: b2 scale-up (Q-149) — primary_discipline now the SPECIFIC lead sport (strength/run/ride/swim/tri/duathlon/hybrid) so bike-forward leads with bike, not run; swim never faked. // 72: b2 — strength_session_types_7d + weekly_state_v1.plan.primary_discipline. // 71: D-268 Phase 3 — the LLM narrative + intent_summary are told the plan's PRIMARY discipline (strength-primary → prose frames around strength, not running). Bump so cached rows recompute. // 70: D-268 Phase 2 — off-plan banner plan-aware; planPrimary hoisted. // 69: D-268 Phase 1 — strength-primary interpretation de-run-framed. // 68: D-267 Fix 1. // 67: N-concerning fallback.
 // 66 was: // 66: readiness restructure — RPE driver under BODY (readiness_rpe_driver), chip dropped, Why = non-RPE only.
 // 65 was: // 65: Why names the driver session (constant-free) + chip/headline dedup (readiness in chip only).
 // 64 was: // 64: BODY row provenance — receipt "you rated X avg vs Y typical" + tap-expand cross-discipline line. // 63: per_lift.last_session_date (as-of date on the strength row). // 62: item 3 — headline "Why" RPE driver is bare-verdict (numeric receipt lives on the BODY row only, rule 7). // 61: Q-111 fact-only — no "go lighter" prescription on strength decline. // 60: shared classifyStrengthFocus (one fact). // 59: plan-week END-gated. // 58: novelty = "not in your recent training". // 57: "in 8 weeks". // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
@@ -4678,8 +4678,20 @@ ${narrativeFacts.join('\n')}`;
             }
             return out;
           })();
+          // Q-129 coach net: feed the CONCERNING per-discipline verdicts as atypical signals so rule 2
+          // catches a headline that calls the week "comfortable / steady / cruising / in control"
+          // while a discipline is sliding (e.g. the AERO "durability gap" row the athlete sees right
+          // below the headline). Derived from the SAME spine verdicts the rows render → one source,
+          // the headline can't contradict its own screen. Was hardcoded [] → rule 2 could never fire.
+          const atypicalFromSpine = spineVerdicts
+            .filter((v) => v.verdict === 'sliding')
+            .map((v) => ({
+              signal: `${v.discipline} fitness`,
+              state: 'sliding',
+              detail: v.pctChange != null ? `${v.pctChange > 0 ? '+' : ''}${v.pctChange}%` : undefined,
+            }));
           const coachCtx: NarrativeContext = {
-            notableLeadSignals: [], atypicalSignals: [], anchors: {},
+            notableLeadSignals: [], atypicalSignals: atypicalFromSpine, anchors: {},
             hasTrendField: true, hasFitnessTrend: true, establishedCauses: [],
             disciplineVerdicts: spineVerdicts,
             // App-wide grounding: no active plan → no target/adherence claim (rule 8) and no grounded phase
@@ -4706,9 +4718,11 @@ ${narrativeFacts.join('\n')}`;
             return null;
           };
 
-          const result = spineVerdicts.length
-            ? await runGuardedNarrative({ surface: 'coach', ctx: coachCtx, generate })
-            : { narrative: await generate(null), dropped: false };
+          // Cold-start hole closed (Q-129): ALWAYS run guarded — previously an athlete with no spine
+          // verdicts got a fully UNGUARDED narrative (the LLM could invent readiness/fitness/phase for
+          // someone with no data). With empty verdicts, rules 6/7/2 simply don't fire (nothing to
+          // contradict) while rules 5/8/10 still hold — so cold-start prose is grounded, not blind.
+          const result = await runGuardedNarrative({ surface: 'coach', ctx: coachCtx, generate });
           week_narrative = result.narrative;
         }
       }

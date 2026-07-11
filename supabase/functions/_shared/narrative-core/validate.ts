@@ -52,8 +52,12 @@ const firstSentence = (s: string): string => {
 // is a violation wherever it appears. Gated on atypicalSignals so a genuinely-easy session (no atypical
 // signal — e.g. a compliant swim) never trips it.
 const EASY_ANYWHERE = /\b(steady|controlled|comfortable|relaxed|in control|well within|cruis\w+|easy)\b/i;
-// tokens that COUNT as acknowledging an atypical signal (so the lead isn't a contradiction).
-const ACK_ATYPICAL = /\b(drift|decoupl\w+|elevated|higher than (typical|usual|normal)|climbed|crept up|rose (over|through)|ran high)\b/i;
+// tokens that COUNT as acknowledging an atypical signal (so the lead isn't a contradiction). Covers
+// both per-session drift language (drift/elevated/climbed — the workout surface) AND weekly-direction
+// decline language (sliding/slipping/declining/fading — the coach surface, whose atypical signals are
+// `sliding` fitness verdicts, Q-129). Without the decline words an honest "run is slipping" headline
+// would falsely trip rule 2 while also saying "easy/comfortable" elsewhere.
+const ACK_ATYPICAL = /\b(drift|decoupl\w+|elevated|higher than (typical|usual|normal)|climbed|crept up|rose (over|through)|ran high|slid\w*|slipp\w*|declin\w*|fad\w*|worth (watching|monitoring))\b/i;
 // READINESS verdicts (Rule 5) — race-readiness is NEVER grounded by one session OR a trend; always fire.
 const READINESS_VERDICT = /\b(signal(s|ing)?\s+(you'?re|you are)\s+ready|you'?re\s+ready\b|ready\s+(to\s+race|for\s+(race|your|the)\b)|peaking|dialed\s+in|primed)\b/i;
 // FITNESS-STATE verdicts (Rule 5) — "X is holding/building" needs a FITNESS-grade trend (ctx.hasFitnessTrend:
