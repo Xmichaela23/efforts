@@ -12,6 +12,8 @@ Efforts is a hybrid endurance + strength training app for intermediate athletes 
 
 ## Context-priming for new sessions
 
+**Read `docs/START-HERE.md` FIRST — the one-page map.** What the app is (all major pieces exist), the current mission (total continuity: one workout in, every screen reads the same source), the ingest→screens pipeline, what's clean vs in-progress, and pointers into the deep docs below. It orients you in one screen; everything below is the depth behind it.
+
 **The thesis first (read before the state docs — this is the frame everything else sits inside).** Efforts' product *is* coherent reasoning about an athlete: nothing happens in a vacuum — every surface is plan-aware, performance-aware, and reads one shared truth instead of minting its own. "Completely self-aware" is the north star, defined finitely (not a vibe), and it is a target being migrated toward surface by surface — not an achieved state. Hold it before you touch any feature:
 
 - **`docs/TARGET-ARCHITECTURE.md`** — THE north star: a living, coherent, steerable system that is **deterministic, smart-server / dumb-client, single source of truth**. The destination every change is aimed at; the yardstick is "does this move a discipline toward the run model." Read FIRST.
