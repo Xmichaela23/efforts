@@ -45,7 +45,7 @@ For any fact, this says who owns it and whether the screens agree. **Before buil
 | **RPE / "how it feels"** | one object `response-model/weekly.ts` `endurance.rpe` | State header, BODY row, readiness — all deref the same object | ✅ cannot diverge within a payload |
 | **Run durability** (decoupling, Friel band) | SPINE `state_trends_v1.run.decoupling` | State (live), Performance tab (cached, but not currently rendered) | ✅ one authority (freshness only) |
 | **1RM anchor** (per-lift) | `resolveStrengthCapacity` — **typed wins** (D-231) | coach, materialize, per-lift verdict | ✅ **the model the others should copy** |
-| **FTP** | *supposed* to be `resolveCurrentFtp` (learned-first) | see fracture #2 | 🔴 **FRACTURE** — three different answers |
+| **FTP** | `resolveCurrentFtp` (learned-first, ≥medium conf) | Baselines, Athletic Record, cycling analyzer — ALL through the resolver now | ✅ **CLOSED 2026-07-10/11** (was fracture #2 — see below) |
 | **Strength trend** (volume / e1RM) | — | see fracture #1 | 🔴 **FRACTURE** — three engines on one screen |
 | **Per-session execution** (exec % / analysis) | `session_detail_v1.execution` (`build.ts:782`) | Workout Performance/Details tabs | ✅ single-source (workout-only) |
 | **Bike "how's the bike"** | split: spine `bike.power` trend vs Arc `cycling_fitness` {ctl,atl,tsb} | State / narrative | ⚠️ two adjacent reads, unreconciled (fracture #7) |
@@ -57,7 +57,7 @@ For any fact, this says who owns it and whether the screens agree. **Before buil
 **Per-discipline cohesion verdict (traced + verified 2026-07-10):**
 - **RUN — CLEAN.** One rendered authority (spine `run.decoupling`); the old duplicate was retired (D-239). This is the model the others should copy.
 - **STRENGTH — CONTRADICTING (worst).** Three visible engines; the e1RM fact is computed from two different data trails (fracture #1).
-- **BIKE — MIXED.** Fitness *direction* is clean — one rendered authority; the CTL/ATL/TSB "form" second engine (Arc `cycling_fitness`) is **internal-only, never rendered** (and there's even a *third* CTL/ATL/TSB in `analyze-cycling-workout.fitness_v1`, prose-only). But (a) **efficiency has two visible engines** on State — spine 56-day HR-at-power vs coach 7-day HR-drift — only saved from a naked clash by the scope labels ("last 7 days" vs "trends over recent weeks"); and (b) the **FTP fracture is visible across two client screens** (fracture #2, now with detail below).
+- **BIKE — MIXED.** Fitness *direction* is clean — one rendered authority; the CTL/ATL/TSB "form" second engine (Arc `cycling_fitness`) is **internal-only, never rendered** (and there's even a *third* CTL/ATL/TSB in `analyze-cycling-workout.fitness_v1`, prose-only). But **efficiency has two visible engines** on State — spine 56-day HR-at-power vs coach 7-day HR-drift — only saved from a naked clash by the scope labels ("last 7 days" vs "trends over recent weeks"). (The **FTP fracture #2 is now CLOSED** — all reads route through `resolveCurrentFtp`, fixed 2026-07-10/11; see below.)
 - **SWIM — BROKEN, not contradicting.** No two-engines-one-fact clash (rendered pace reads are single-sourced, D-182). The problems are: a single **provisional/`needs_data`** engine, **no swim-native display template** (falls through the endurance/run layout — Q-038 Layer 2, still open; the June duration-unit "2263% adherence" bug is FIXED), and the **CSS anchor is orphaned** — shown on Baselines but read by *nothing* in the swim session verdict, and even its plan-gen use is staged off (`planning-context.ts:237 SWIM_CSS_LIVE = false`). More disconnected than FTP.
 
 
@@ -68,12 +68,12 @@ For any fact, this says who owns it and whether the screens agree. **Before buil
 
 Nothing forces them to agree → "e1RM improving" can sit above a lift verdict that says decline. **Fix = converge on one strength authority** (the D-231 `resolveStrengthCapacity` pattern is the template).
 
-**🔴 #2 — FTP: same anchor, three answers, TWO on visible client screens (LIVE).**
-- **Baselines** screen shows **manual-first** (`TrainingBaselines.tsx:1269`)
-- **Athletic Record** screen shows **learned-first** via `resolveCurrentFtp` (`AthleticRecordPage.tsx:141`, `resolve-current-ftp.ts:71`) → **two client screens can display different FTP numbers for the same athlete**
-- `analyze-cycling-workout` reads `performance_numbers.ftp` **only, ignoring learned** (`index.ts:1551`) → it also **sets the power band the spine efficiency trend is built from** (`resolveZoneBand`, `:2517`), so if learned FTP moved but the typed value is stale, the rendered efficiency trend is anchored to an FTP **neither screen may be showing**; and a learned-only rider gets **no power verdict** on rides.
+**✅ #2 — FTP: CLOSED 2026-07-10/11 (was: same anchor, three answers).** All FTP reads now route through the single `resolveCurrentFtp` resolver (learned-first at ≥medium confidence, else manual, else learned-low fallback). Fixed in a prior session (commits `d278cadd` cycling analyzer · `eae2d9aa` Baselines · `00dbc9f2` Plans-tab watts; Athletic Record already used it). Verified by code trace 2026-07-11 (reconciling prior-session work — this map was written before the fix and lagged). The former fracture:
+- ~~Baselines showed manual-first~~ → now `resolveCurrentFtp` (`eae2d9aa`).
+- Athletic Record showed learned-first via `resolveCurrentFtp` (was already correct).
+- ~~`analyze-cycling-workout` read `performance_numbers.ftp` only, ignoring learned~~ → now routes through the resolver (`d278cadd`), so the power band the spine efficiency trend is built from matches what the screens show, and a learned-only rider gets a real band (no more null → no verdict).
 
-**Fix = route every FTP read through `resolveCurrentFtp`** (Baselines UI, Athletic Record, and the cycling analyzer all bypass it — 1RMs already do this right via `resolveStrengthCapacity`).
+**Still open (bike, separate):** efficiency has two *visible* engines on State (spine 56-day HR-at-power vs coach 7-day HR-drift) — contained by scope labels, lower priority. CTL/ATL/TSB triplication is latent (internal-only, never rendered). 1RMs use the same resolver pattern via `resolveStrengthCapacity`.
 
 **⚠️ #3 — Metric easy-pace unit mislabel (latent).** Baselines hardcodes `/mi` (`TrainingBaselines.tsx:1233`); AppContext stores `/km` for metric users (`AppContext.tsx:359`). Masked today only because the run analyzer is suffix-blind.
 
