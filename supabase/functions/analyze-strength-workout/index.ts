@@ -10,6 +10,7 @@ import { buildReasoningScaffold, validateNarrative, strengthAdapter, applyGround
 import { detectNovelMovements, novelMovementsNames, novelMovementNames } from '../_shared/novel-movements.ts';
 // D-208: role classifier — execution scoring weights a skipped accessory less than a main lift.
 import { roleForExercise, ROLE_WEIGHT } from '../_shared/strength/exercise-role.ts';
+import { rirVerdictFromDelta } from '../_shared/strength-profiles.ts';
 
 /**
  * =============================================================================
@@ -678,15 +679,10 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
     }
   }
 
-  // RIR verdict — directional signal, not a score
-  // Positive rirAdherence = more reps in reserve than target = too easy (underloaded)
-  // Negative rirAdherence = fewer reps in reserve than target = too hard (overloaded)
-  let rirVerdict: 'too_easy' | 'on_target' | 'too_hard' | null = null;
-  if (rirAdherence !== null) {
-    if (rirAdherence > 1.5) rirVerdict = 'too_easy';
-    else if (rirAdherence < -1.5) rirVerdict = 'too_hard';
-    else rirVerdict = 'on_target';
-  }
+  // RIR verdict — directional signal, not a score. Shared ±1.0 band (VERDICT_DEVIATION via
+  // rirVerdictFromDelta) so the Details table, the AI prose, and the State row can't land in
+  // different tiers for the same set (this table previously used a ±1.5 outlier).
+  const rirVerdict = rirVerdictFromDelta(rirAdherence);
 
   // Calculate volume completion
   const plannedVolume = plannedSets.reduce((sum: number, set: any) =>
@@ -2842,11 +2838,9 @@ Deno.serve(async (req) => {
       const rirDelta = (avgActualRir != null && avgTargetRir != null)
         ? Math.round((avgActualRir - avgTargetRir) * 10) / 10
         : null;
-      const rirVerdict: 'too_easy' | 'on_target' | 'too_hard' | null =
-        rirDelta == null ? null
-          : rirDelta <= -1 ? 'too_hard'
-          : rirDelta >= 1 ? 'too_easy'
-          : 'on_target';
+      // Same shared ±1.0 band as the Details table + State (VERDICT_DEVIATION). Was ±1.0 already, so
+      // behavior is unchanged here — routed through the one helper for single-source.
+      const rirVerdict = rirVerdictFromDelta(rirDelta);
       const phaseFacts = (() => {
         const pm = (analysis as any).plan_metadata as EnhancedPlanContext | null;
         if (!pm) return { phase: null, week_in_phase: null, plan_intent: null, plan_type: null };

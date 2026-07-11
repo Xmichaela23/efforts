@@ -128,6 +128,25 @@ export const VERDICT_DEVIATION = {
   BACK_OFF:  -1.0,    // deviation <= -1.0 → "back off weight"
 } as const;
 
+export type StrengthRirVerdict = 'too_easy' | 'on_target' | 'too_hard';
+
+/**
+ * Descriptive RIR receipt verdict from (actual RIR − target RIR), on the shared VERDICT_DEVIATION
+ * band (±1.0) — the SAME band State's prescriptive `computeLiftVerdict` uses. Both the workout
+ * Details table and the workout AI prose call this, so a set can't land in different tiers across the
+ * table, the prose, and the State row (the table previously used a ±1.5 cutoff — an undocumented
+ * outlier that let the table read "on target" while the prose on the same screen read "too easy").
+ * Positive delta = more reps in reserve than target = the set was too easy (underloaded). These
+ * DESCRIPTIVE words are the receipt register; State renders the PRESCRIPTIVE words (add weight / back
+ * off) from the same band — two standard registers, one threshold.
+ */
+export function rirVerdictFromDelta(delta: number | null | undefined): StrengthRirVerdict | null {
+  if (delta == null || !Number.isFinite(delta)) return null;
+  if (delta >= VERDICT_DEVIATION.ADD_WEIGHT) return 'too_easy';
+  if (delta <= VERDICT_DEVIATION.BACK_OFF) return 'too_hard';
+  return 'on_target';
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
