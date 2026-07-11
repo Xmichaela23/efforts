@@ -11,9 +11,26 @@ import {
   WorkoutType,
   EfficiencyMetrics
 } from './types.ts';
+import { frielBand } from '../../../_shared/state-trend/run.ts';
 
 // Skip first 10 minutes (warmup/ramp-up)
 const WARMUP_SKIP_SECONDS = 600;
+
+/**
+ * Map a decoupling % to this pipeline's 4 display words using the SINGLE shared band the STATE run
+ * row + coach use (frielBand) — one threshold set, so a given % lands in the same tier on every
+ * screen (finishes the D-239 reconcile on the run side). Signed, not abs(): a negative decoupling
+ * (HR fell relative to pace) is genuinely excellent, which the old abs()+<3/<5/<8 scale erased and
+ * which also disagreed with State at 5–10% (old 'high' ≥8 vs State 'base' ≤10). The 4 words are this
+ * pipeline's vocabulary, mapped 1:1 onto frielBand's tiers.
+ */
+export function decouplingAssessmentFromPct(pct: number): 'excellent' | 'good' | 'moderate' | 'high' {
+  const band = frielBand(pct);
+  return band === 'excellent' ? 'excellent'
+    : band === 'strong' ? 'good'
+    : band === 'base' ? 'moderate'
+    : 'high'; // durability_gap
+}
 
 /**
  * Calculate efficiency metrics for steady-state workouts.
@@ -80,19 +97,8 @@ export function calculateEfficiency(
   
   console.log('📈 [EFFICIENCY] Decoupling:', decouplingPercent, '%');
   
-  // Assess decoupling
-  let assessment: 'excellent' | 'good' | 'moderate' | 'high';
-  const absDecoupling = Math.abs(decouplingPercent);
-  
-  if (absDecoupling < 3) {
-    assessment = 'excellent';
-  } else if (absDecoupling < 5) {
-    assessment = 'good';
-  } else if (absDecoupling < 8) {
-    assessment = 'moderate';
-  } else {
-    assessment = 'high';
-  }
+  // Assess decoupling on the SAME shared band State + coach use (see decouplingAssessmentFromPct).
+  const assessment = decouplingAssessmentFromPct(decouplingPercent);
   
   // Overall average efficiency
   const avgRatio = calculateEfficiencyRatio(samplesAfterWarmup);
