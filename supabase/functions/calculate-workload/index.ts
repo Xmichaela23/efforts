@@ -23,6 +23,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { resolveUser } from '../_shared/require-user.ts'
 import {
   getDefaultIntensityForType,
   getStepsIntensity,
@@ -163,6 +164,11 @@ serve(async (req) => {
       )
     }
 
+    // B1: caller identity — a human's JWT or an internal caller's service key (ingest/sweep). Identity only;
+    // the DB client below stays pure service-role, so the internal (robot) path is unchanged. The human path
+    // gains an ownership check after the workout is loaded.
+    const { userId: callerUserId, isService } = await resolveUser(req)
+
     // Initialize Supabase client with service role (bypasses RLS)
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -204,6 +210,12 @@ serve(async (req) => {
       }
     }
     
+    // B1 ownership guard: a human caller may only compute their OWN workout (internal service callers are
+    // trusted — they legitimately act on any user during ingest/sweep). userId here is the workout's owner.
+    if (!isService && userId && String(userId) !== String(callerUserId)) {
+      return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+    }
+
     // Fetch user's FTP, threshold HR, max HR, resting HR from user_baselines (including learned_fitness)
     let userFtp: number | null = null;
     let userThresholdHr: number | null = null;
@@ -530,9 +542,10 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    const status = (error as any)?.status ?? 500
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: status === 401 ? 'unauthorized' : 'Internal server error' }),
+      { status, headers: { 'Content-Type': 'application/json' } }
     )
   }
 })

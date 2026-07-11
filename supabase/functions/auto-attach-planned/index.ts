@@ -2,6 +2,7 @@
 // Function: auto-attach-planned
 // Behavior: Attach completed workouts to planned by exact YYYY-MM-DD date + type
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { resolveUser } from '../_shared/require-user.ts';
 
 function pctDiff(a: number, b: number): number { if (!(a>0) || !(b>0)) return Infinity; return Math.abs(a-b)/a; }
 
@@ -65,6 +66,10 @@ Deno.serve(async (req) => {
     console.log('[auto-attach-planned] Type of explicitPlannedId:', typeof explicitPlannedId, 'Truthy?', !!explicitPlannedId);
     if (!workout_id) return new Response(JSON.stringify({ error: 'workout_id required' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
 
+    // B1: caller identity — human JWT or internal service key (ingest/sweep/activate-plan). Identity only;
+    // the DB client below stays pure service-role, so the internal (robot) path is byte-identical.
+    const { userId: callerUserId, isService } = await resolveUser(req);
+
     console.log('[auto-attach-planned] Creating Supabase client...');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -96,6 +101,11 @@ Deno.serve(async (req) => {
     if (!w) {
       console.error('[auto-attach-planned] Failed to load workout. Error:', wErr);
       return new Response(JSON.stringify({ error: 'workout not found', details: wErr }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
+    // B1 ownership guard: a human may only attach their OWN workout; internal service callers are trusted.
+    if (!isService && String(w.user_id) !== String(callerUserId)) {
+      return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
     console.log('[auto-attach-planned] About to call sportSubtype with:', w.provider_sport, w.type);
@@ -713,8 +723,9 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
-    console.error('[auto-attach-planned] Error:', e);
-    return new Response(JSON.stringify({ error: String(e), stack: e?.stack }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+    const status = (e as any)?.status ?? 500;
+    if (status !== 401) console.error('[auto-attach-planned] Error:', e);
+    return new Response(JSON.stringify({ error: String(e), stack: e?.stack }), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 });
 

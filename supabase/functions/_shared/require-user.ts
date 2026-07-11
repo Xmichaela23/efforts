@@ -17,16 +17,42 @@ export class AuthError extends Error {
   constructor(message = 'unauthorized') { super(message); this.name = 'AuthError'; }
 }
 
-/** Verify the caller's JWT and return their user id + a service-role client. Throws AuthError (401) if unauthenticated. */
-export async function requireUser(req: Request): Promise<{ userId: string; supabase: any }> {
-  const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-  const supabase = createClient(
+function svcClient(jwt: string) {
+  return createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY')!,
     { global: { headers: { Authorization: jwt ? `Bearer ${jwt}` : '' } } },
   );
+}
+
+/** Verify the caller's JWT and return their user id + a service-role client. Throws AuthError (401) if unauthenticated. */
+export async function requireUser(req: Request): Promise<{ userId: string; supabase: any }> {
+  const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  const supabase = svcClient(jwt);
   const { data } = await supabase.auth.getUser(jwt);
   const userId = data?.user?.id;
   if (!userId) throw new AuthError();
   return { userId, supabase };
+}
+
+/**
+ * For functions used by BOTH the client (human) AND internal callers (edge-to-edge / cron, which present
+ * the SERVICE-ROLE key — a server-only secret, never in the client bundle). Returns { userId, isService }:
+ *   - service-role key  → isService=true, userId=null (the internal caller supplies the target id in the
+ *     body; trusted because only server code holds this key). Callers: use body user_id / entity as given.
+ *   - human user JWT    → isService=false, userId=verified user id. Callers: use userId, IGNORE body id,
+ *     and ownership-check any entity id against userId.
+ *   - anything else (missing/forged token, or the PUBLIC anon key which has no `sub`) → AuthError (401).
+ */
+export async function resolveUser(req: Request): Promise<{ userId: string | null; isService: boolean; supabase: any }> {
+  const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  const supabase = svcClient(jwt);
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (jwt && serviceKey && jwt === serviceKey) {
+    return { userId: null, isService: true, supabase };
+  }
+  const { data } = await supabase.auth.getUser(jwt);
+  const userId = data?.user?.id;
+  if (!userId) throw new AuthError();
+  return { userId, isService: false, supabase };
 }

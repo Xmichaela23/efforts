@@ -21,6 +21,7 @@
 // =============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { resolveUser } from '../_shared/require-user.ts';
 import type { Phase, PhaseStructure } from '../generate-run-plan/types.ts';
 import {
   buildStrengthSessionsForPlanWeek,
@@ -96,7 +97,7 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const { user_id, action = 'suggest', suggestion_id, cron_secret } = payload;
+    const { user_id: bodyUserId, action = 'suggest', suggestion_id, cron_secret } = payload;
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -124,6 +125,12 @@ Deno.serve(async (req) => {
       });
     }
 
+    // B1: resolve the ACTING user. Human actions (accept / dismiss / default suggest) take identity from the
+    // VERIFIED JWT — body user_id is ignored. The internal service caller (ingest action=auto, service key)
+    // supplies it in the body. auto_batch above is cron-secret-guarded and returned before this point.
+    // `user_id` below is the effective acting user, so every downstream branch is correctly scoped.
+    const { userId: jwtUserId, isService } = await resolveUser(req);
+    const user_id = isService ? bodyUserId : jwtUserId;
     if (!user_id) {
       return new Response(JSON.stringify({ error: 'user_id is required' }), {
         status: 400,
@@ -439,9 +446,10 @@ Deno.serve(async (req) => {
       },
     );
   } catch (e: any) {
-    console.error('[adapt-plan] error:', e);
+    const status = (e as any)?.status ?? 500;
+    if (status !== 401) console.error('[adapt-plan] error:', e);
     return new Response(JSON.stringify({ error: String(e?.message || e) }), {
-      status: 500,
+      status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
