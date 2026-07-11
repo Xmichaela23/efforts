@@ -150,7 +150,8 @@ export function executionHonestyPromptRule(positiveSplitSec: number): string {
     `\n\nEXECUTION HONESTY (mandatory): this run FADED — it slowed ~${Math.round(positiveSplitSec)}s/mi in the second half`,
     `(a positive split, measured from its own mile splits).`,
     `You MUST NOT describe it as "clean execution", "steady", "held steady", or "even effort".`,
-    `Name the slowdown plainly; if HR stayed in the normal band while pace dropped, note pace fell at normal effort.`,
-    `Do not paper the fade over with heat or the athlete's self-report as "a clean day."`,
+    `OPEN by describing what happened as a plain observation — the pace slowed in the second half — introducing it fresh, as new information to the reader. Do NOT open with the phrase "the fade" or otherwise refer to the slowdown as something already established; name it, then interpret why.`,
+    `If HR stayed in the normal band while pace dropped, note pace fell at normal effort.`,
+    `Do not paper the slowdown over with heat or the athlete's self-report as "a clean day."`,
   ].join(' ');
 }
