@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { runPostImportAthletePipeline } from '../_shared/post-import-athlete-pipeline.ts';
+import { localDayOf, localDayInRange, paddedEpochBounds } from './date-window.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_KEY =
@@ -680,18 +681,10 @@ Deno.serve(async (req) => {
     const perPage = 200;
     let updatedTokens: any = null;
 
-    // Normalize date boundaries to UTC day start/end to avoid TZ drift
-    const toUnix = (d: string, endOfDay = false) => {
-      try {
-        const iso = `${d}T${endOfDay ? '23:59:59' : '00:00:00'}Z`;
-        return Math.floor(new Date(iso).getTime() / 1000);
-      } catch (_) {
-        return undefined as unknown as number;
-      }
-    };
-
-    const afterEpoch = startDate ? toUnix(startDate, false) : undefined;
-    const beforeEpoch = endDate ? toUnix(endDate, true) : undefined;
+    // The user picks days in THEIR local calendar; Strava's `after`/`before` are UTC epoch bounds.
+    // Widen the fetch window by a day each side so an evening (local) activity near the UTC
+    // boundary is never dropped, then narrow precisely by local day in the loop below (Q-154).
+    const { afterEpoch, beforeEpoch } = paddedEpochBounds(startDate, endDate);
 
     while (true) {
       let url = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`;
@@ -751,11 +744,12 @@ Deno.serve(async (req) => {
       if (!activities.length) break;
 
       for (const a of activities) {
-        // Defensive filter in case API returns out-of-range items
+        // Narrow to the user's LOCAL calendar day(s) — the padded UTC window above over-fetches
+        // by a day each side on purpose; this is the precise selection (Q-154). Same
+        // `start_date_local`-first derivation the stored row uses at the mapping below.
         try {
-          const startTs = Math.floor(new Date(a.start_date).getTime() / 1000);
-          if (afterEpoch && startTs < afterEpoch) { skipped++; continue; }
-          if (beforeEpoch && startTs > beforeEpoch) { skipped++; continue; }
+          const localDay = localDayOf(a);
+          if (!localDayInRange(localDay, startDate, endDate)) { skipped++; continue; }
         } catch (_) {}
 
         if (existing.has(a.id)) { skipped++; continue; }
