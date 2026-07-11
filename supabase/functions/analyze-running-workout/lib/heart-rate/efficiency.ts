@@ -99,12 +99,22 @@ export function calculateEfficiency(
   
   // Assess decoupling on the SAME shared band State + coach use (see decouplingAssessmentFromPct).
   const assessment = decouplingAssessmentFromPct(decouplingPercent);
-  
+
+  // Basis of this decoupling: 'gap' when the pace series was grade-adjusted (enrichSamplesWithGAP
+  // stamps raw_pace_s_per_mi on every sample when the run had usable elevation), else 'raw' (device
+  // pace, terrain-confounded). Only a 'gap' read is a trustworthy fitness signal — the Performance
+  // "Aerobic decoupling" row gates on it (Q-158 follow-on). Detected the same way gap.ts:200 does.
+  const basis: 'gap' | 'raw' =
+    samplesAfterWarmup[0] && typeof (samplesAfterWarmup[0] as any).raw_pace_s_per_mi !== 'undefined'
+      ? 'gap'
+      : 'raw';
+
   // Overall average efficiency
   const avgRatio = calculateEfficiencyRatio(samplesAfterWarmup);
-  
+
   return {
     decoupling: {
+      basis,
       percent: Math.round(decouplingPercent * 10) / 10,
       earlyRatio: Math.round(earlyRatio * 1000) / 1000,
       lateRatio: Math.round(lateRatio * 1000) / 1000,

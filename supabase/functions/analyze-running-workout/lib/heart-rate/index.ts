@@ -200,6 +200,8 @@ function analyzeSteadyStateWorkout(
         minHr: hrValues.length > 0 ? Math.min(...hrValues) : 0,
         driftBpm: null,
         decouplingPct: null,
+        decouplingBasis: null,
+        decouplingAssessment: null,
         efficiencyRatio: null,
         timeInZones: { z1Seconds: 0, z2Seconds: 0, z3Seconds: 0, z4Seconds: 0, z5Seconds: 0 },
         intervalHrCreepBpm: null,
@@ -333,6 +335,8 @@ function createInsufficientDataResult(
       minHr,
       driftBpm: null,
       decouplingPct: null,
+      decouplingBasis: null,
+      decouplingAssessment: null,
       efficiencyRatio: null,
       timeInZones: { z1Seconds: 0, z2Seconds: 0, z3Seconds: 0, z4Seconds: 0, z5Seconds: 0 },
       intervalHrCreepBpm: null,
@@ -503,13 +507,20 @@ function buildSummary(
   confidence: 'high' | 'medium' | 'low'
 ): HRSummaryMetrics {
   const hrValues = validHRSamples.map(s => s.heart_rate!);
-  
+
+  // Carry decoupling's basis + assessment straight from calculateEfficiency (the single source —
+  // it owns the GAP-vs-raw determination). These were dropped here before, so the Performance
+  // "Aerobic decoupling" row (which gates on basis === 'gap') was dormant. Q-158 follow-on.
+  const decouplingPct = efficiency?.decoupling?.percent ?? null;
+
   return {
     avgHr: Math.round(hrValues.reduce((a, b) => a + b, 0) / hrValues.length),
     maxHr: Math.max(...hrValues),
     minHr: Math.min(...hrValues),
     driftBpm: drift?.driftBpm ?? null,
-    decouplingPct: efficiency?.decoupling?.percent ?? null,
+    decouplingPct,
+    decouplingBasis: decouplingPct == null ? null : (efficiency?.decoupling?.basis ?? null),
+    decouplingAssessment: decouplingPct == null ? null : (efficiency?.decoupling?.assessment ?? null),
     efficiencyRatio: efficiency?.avgEfficiencyRatio ?? null,
     timeInZones: zonesToTimeInZones(zones),
     intervalHrCreepBpm: null,
@@ -536,6 +547,8 @@ function buildIntervalSummary(
     minHr: Math.min(...hrValues),
     driftBpm: null,
     decouplingPct: null,
+    decouplingBasis: null,
+    decouplingAssessment: null,
     efficiencyRatio: null,
     timeInZones: zonesToTimeInZones(zones),
     intervalHrCreepBpm: intervals?.hrCreep?.creepBpm ?? null,
@@ -561,6 +574,8 @@ function buildMixedSummary(
     minHr: Math.min(...hrValues),
     driftBpm: null,
     decouplingPct: null,
+    decouplingBasis: null,
+    decouplingAssessment: null,
     efficiencyRatio: null,
     timeInZones: zonesToTimeInZones(zones),
     intervalHrCreepBpm: null,
