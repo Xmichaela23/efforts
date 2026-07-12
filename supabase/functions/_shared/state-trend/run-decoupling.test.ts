@@ -13,7 +13,7 @@
  *   deno test supabase/functions/_shared/state-trend/run-decoupling.test.ts --no-check
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { frielBand, decouplingLabel, isSteadyAerobic, decouplingToSeries, computeRunDecouplingState } from './run.ts';
+import { frielBand, decouplingLabel, decouplingBandDisplay, isSteadyAerobic, decouplingToSeries, computeRunDecouplingState } from './run.ts';
 
 const AS_OF = '2026-07-03';
 const WEEKS_90D = 90 / 7;
@@ -42,6 +42,17 @@ Deno.test('decouplingLabel: frielBand-backed — coach ≤3 cutoff removed, one 
   assertEquals(decouplingLabel(12).band, 'durability_gap');
   assertEquals(decouplingLabel(12).tone, 'danger');
   assertEquals(decouplingLabel(null).tone, 'neutral');
+});
+
+// ── ONE band vocabulary (D-275 close): the AERO card (coach) and the PERFORMANCE trend row (client) both
+//    render the durability band through decouplingBandDisplay, so they can't diverge in words. These words
+//    MUST match the client's DECOUPLING_BAND map (StatePerformanceSection.tsx) — the whole point of the close. ──
+Deno.test('decouplingBandDisplay: canonical band → word/tone (must match the client PERFORMANCE vocabulary)', () => {
+  assertEquals(decouplingBandDisplay('excellent'), { word: 'excellent aerobic fitness', tone: 'positive' });
+  assertEquals(decouplingBandDisplay('strong'), { word: 'strong aerobic base', tone: 'positive' });
+  assertEquals(decouplingBandDisplay('base'), { word: 'building aerobic base', tone: 'neutral' });   // informational, NOT an alarm
+  assertEquals(decouplingBandDisplay('durability_gap'), { word: 'durability gap', tone: 'danger' });  // the only red band
+  assertEquals(decouplingBandDisplay(null), { word: null, tone: 'neutral' });                          // stale/needs_data → no verdict
 });
 
 // ── Gate: steady/aerobic + ≥20min + not-'raw' + pct present ──

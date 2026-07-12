@@ -128,6 +128,22 @@ export function decouplingLabel(pct: number | null): { band: DecouplingBand | nu
   }
 }
 
+// Canonical band → State-row display (word + tone). ONE vocabulary for every surface that renders the
+// durability band — the PERFORMANCE trend row AND the AERO session row read this, so they can't diverge in
+// words (base = "building aerobic base" everywhere, not "HR climbed more than usual" one place and
+// "building aerobic base" another). `base` is neutral-toned (an informational building state, not an
+// alarm); only `durability_gap` is danger. This is the display twin of `decouplingLabel` (which is the
+// per-workout receipt phrasing); State rows use THIS so AERO ≡ PERFORMANCE.
+export function decouplingBandDisplay(band: DecouplingBand | null): { word: string | null; tone: 'positive' | 'warning' | 'danger' | 'neutral' } {
+  switch (band) {
+    case 'excellent': return { word: 'excellent aerobic fitness', tone: 'positive' };
+    case 'strong': return { word: 'strong aerobic base', tone: 'positive' };
+    case 'base': return { word: 'building aerobic base', tone: 'neutral' };
+    case 'durability_gap': return { word: 'durability gap', tone: 'danger' };
+    default: return { word: null, tone: 'neutral' };
+  }
+}
+
 // Gate (the honest one, resolved from Michael's data): steady/aerobic only, ≥20 min, terrain-neutral.
 // The persisted `decouplingBasis` label is unreliable (gap on 4/145), so we do NOT gate on 'gap' — we
 // trust the GAP-based pct and only DROP a confirmed 'raw' (terrain-confounded). workoutType, not the

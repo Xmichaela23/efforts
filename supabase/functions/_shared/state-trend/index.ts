@@ -34,7 +34,7 @@ export {
 export {
   computeRunState, routeMetricsToSeries, isComparableRunEffort, COMPARABLE_RUN_EFFORT,
   efficiencyIndexToSeries, computeRunEfficiencyState,
-  decouplingToSeries, computeRunDecouplingState, frielBand, decouplingLabel, isSteadyAerobic,
+  decouplingToSeries, computeRunDecouplingState, frielBand, decouplingLabel, decouplingBandDisplay, isSteadyAerobic,
   type RunState, type RunFitness, type DecouplingBand, type DecouplingState,
 } from './run.ts';
 export { computeSwimState, swimPaceToSeries, type SwimState } from './swim.ts';
