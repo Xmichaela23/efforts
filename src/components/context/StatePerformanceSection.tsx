@@ -165,23 +165,28 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness }) {
   const d = fitness.decoupling;
   const e = fitness.efficiency;
   const v = VERDICT[d.verdict];
+  // Migration-safe band lookup: a cached snapshot may still carry a pre-Q-161 band string
+  // (strong/base/excellent/durability_gap) until it's recomputed. Index the map defensively — an
+  // unknown band resolves to undefined and falls through to the "needs data" copy, instead of reading
+  // DECOUPLING_BAND[undefined].cls and blanking the whole screen.
+  const bandInfo = d.band ? DECOUPLING_BAND[d.band as DecouplingBand] : undefined;
   // Q-161: an "i" that explains the metric AND its honest catch — a run can read >5% because it was
   // hot/hilly/short, not because fitness slipped. Mirrors StateTab's tap-expand affordance.
   const [explainOpen, setExplainOpen] = React.useState(false);
   return (
     <Row label="run">
-      {d.verdict !== 'needs_data' && d.band ? (
+      {d.verdict !== 'needs_data' && bandInfo ? (
         // confident: band = state, arrow = trend, % = receipt
         <span className="inline-flex items-baseline gap-1.5">
-          <span className={DECOUPLING_BAND[d.band].cls}>{DECOUPLING_BAND[d.band].word}</span>
+          <span className={bandInfo.cls}>{bandInfo.word}</span>
           <span className={`inline-flex items-baseline gap-0.5 ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span></span>
           {d.recentPct != null && <span className="text-white/35 text-[11px]">{d.recentPct}%</span>}
           {d.provisional && <span className="text-white/30 text-[10px]">prov</span>}
         </span>
-      ) : d.stale && d.recentPct != null && d.band ? (
+      ) : d.stale && d.recentPct != null && bandInfo ? (
         // stale → carry-forward the REAL value + its age, dimmed; never a current verdict off old data
         <span className="inline-flex items-baseline gap-1.5 text-white/40">
-          <span>{DECOUPLING_BAND[d.band].word}</span>
+          <span>{bandInfo.word}</span>
           <span className="text-white/30 text-[11px]">last steady run {d.newestAgeDays}d ago · {d.recentPct}%</span>
           <span className="text-white/30 text-[10px]">limited data</span>
         </span>
