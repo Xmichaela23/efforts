@@ -717,15 +717,12 @@ function computeEmptyState(args: {
 function computeVisibleSignals(endurance: EnduranceResponse, strength: StrengthResponse): VisibleSignal[] {
   const out: VisibleSignal[] = [];
 
-  if (endurance.execution.sufficient) {
-    out.push({
-      label: 'Run quality', category: 'endurance',
-      trend: endurance.execution.trend, trend_icon: trendIcon(endurance.execution.trend), trend_tone: trendTone(endurance.execution.trend),
-      detail: humanDetail(endurance.execution.delta, '%', 'sharper', 'slipping', 'on track'),
-      samples: endurance.execution.samples,
-      samples_label: samplesLabel(endurance.execution.samples, 'endurance'),
-    });
-  }
+  // "Run quality" (execution-score vs baseline) intentionally NOT surfaced as a BODY signal — it's
+  // plan-adherence, not body response, and the field (Garmin/Whoop/COROS/TrainingPeaks) keeps adherence
+  // in a separate execution lane, never in body/readiness. It also collides in name with the real
+  // pace-at-HR "run quality" already shown in PERFORMANCE. Per-run execution is covered by the "how your
+  // sessions went" RUN row; run physiology by the PERFORMANCE decoupling/efficiency reads. (endurance.
+  // execution stays computed for load-status reconcile; it is just no longer a BODY row.)
   if (endurance.hr_drift.sufficient) {
     out.push({
       label: 'Heart rate drift', category: 'endurance',
