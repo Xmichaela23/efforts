@@ -25,6 +25,7 @@ import { shouldShowNudge } from '@/lib/nudge-policy';
 import StatePerformanceSection from '@/components/context/StatePerformanceSection';
 import { buildLoadHeadline, statusVolumeLabel } from '@/lib/load-headline';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
+import { useAppContext } from '@/contexts/AppContext';
 
 const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
 
@@ -679,6 +680,7 @@ export default function StateTab({
   const [checkinReadiness, setCheckinReadiness] = useState<ArcReadiness | null>(null);
   const [nudgeDismissNonce, setNudgeDismissNonce] = useState(0);
   const swimNudge = useSwimBaselineNudge(); // D-200: honored-swim-gated swim re-test nudge (State only)
+  const { useImperial } = useAppContext(); // imperial → yards, metric → meters — for the SWIM sessions row distance
 
   useEffect(() => {
     fetchArcContext().then((arc) => {
@@ -1212,11 +1214,43 @@ export default function StateTab({
   const runExecRow = cardioExecRow('RUN', runTypes); // was 'AERO' — discipline label so run is findable, consistent with BIKE/STRENGTH/SWIM
   const rideExecRow = cardioExecRow('BIKE', rideTypes);
 
+  // SWIM row — Q-038-safe: planned swim → % achieved, unplanned → distance covered (NEVER pace). Was hidden
+  // entirely; now visible when you actually swam. Reads coach swim_sessions_7d (planned/execution_pct/distance_m).
+  const swimExecRow = (() => {
+    const swims = wsv.swim_sessions_7d ?? [];
+    const fmtDist = (m: number) => useImperial
+      ? `${Math.round((m * 1.09361) / 25) * 25}yd`
+      : `${Math.round(m / 25) * 25}m`;
+    const chips = swims.map((s) => {
+      if (s.planned && s.execution_pct != null) {
+        const tone = s.execution_pct >= 85 ? 'positive' : s.execution_pct >= 70 ? 'warning' : 'danger';
+        return { label: 'Planned', value: `${Math.round(s.execution_pct)}%`, tone };
+      }
+      if (s.distance_m != null && s.distance_m > 0) {
+        return { label: s.planned ? 'Planned' : 'Free', value: fmtDist(s.distance_m), tone: 'neutral' as const };
+      }
+      return null; // no completion % and no distance → nothing honest to show for this swim
+    }).filter(Boolean) as Array<{ label: string; value: string; tone: string }>;
+    if (chips.length === 0) return null;
+    return (
+      <div className="px-3 py-3">
+        <Row label="SWIM">
+          {chips.map((c, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && <Dot />}
+              <Chip label={c.label} value={c.value} valueClass={toneColor(c.tone)} />
+            </React.Fragment>
+          ))}
+        </Row>
+      </div>
+    );
+  })();
+
   // Order the execution rows so the plan's PRIMARY discipline leads (server single-source). Single-sport
   // (strength/run/ride) hoists its row; triathlon/duathlon/hybrid/unknown keep the default order — no forced
-  // lead (a tri isn't one discipline). Swim never has an execution row here — shown honestly elsewhere, never faked.
-  const execRowsByKey: Record<string, React.ReactNode> = { strength: strengthExecRow, run: runExecRow, ride: rideExecRow };
-  const defaultExecOrder = ['run', 'ride', 'strength'];
+  // lead (a tri isn't one discipline). SWIM shows completion/distance (Q-038-safe, never pace) when you swam.
+  const execRowsByKey: Record<string, React.ReactNode> = { strength: strengthExecRow, run: runExecRow, ride: rideExecRow, swim: swimExecRow };
+  const defaultExecOrder = ['run', 'ride', 'strength', 'swim'];
   const leadKey = (['strength', 'run', 'ride'] as string[]).includes(primaryDiscipline) ? primaryDiscipline : null;
   const orderedExecKeys = leadKey ? [leadKey, ...defaultExecOrder.filter(k => k !== leadKey)] : defaultExecOrder;
 

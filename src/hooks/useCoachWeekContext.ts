@@ -244,6 +244,8 @@ export type CoachWeekContextV1 = {
       primary_mover: string | null;
       test_count: number;
     }>;
+    /** SWIM 7d — planned → % achieved, unplanned → distance covered (never pace, Q-038-safe). */
+    swim_sessions_7d?: Array<{ date?: string; planned: boolean; execution_pct: number | null; distance_m: number | null }>;
   };
   training_state: {
     code: string;
@@ -427,6 +429,8 @@ export type CoachWeekContextV1 = {
       primary_mover: string | null;
       test_count: number;
     }>;
+    /** SWIM 7d — planned → % achieved, unplanned → distance covered (never pace, Q-038-safe). */
+    swim_sessions_7d?: Array<{ date?: string; planned: boolean; execution_pct: number | null; distance_m: number | null }>;
     /** b2 scale-up: ride 7-day session-type breakdown (bike-forward athletes lead with this). */
     ride_session_types_7d?: Array<{
       type: string;

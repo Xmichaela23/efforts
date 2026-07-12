@@ -5,6 +5,8 @@
 // The type + builder live in _shared (Law-5: a renderer of the strength analyzer's verdict).
 export type { StrengthSessionType7d } from '../_shared/strength-session-types.ts';
 import type { StrengthSessionType7d } from '../_shared/strength-session-types.ts';
+export type { SwimSession7d } from '../_shared/swim-sessions.ts';
+import type { SwimSession7d } from '../_shared/swim-sessions.ts';
 
 // b2 scale-up (Q-149): the specific lead discipline for the execution surface (single source:
 // resolvePrimarySport). strength/run/ride/swim → that discipline leads; triathlon/duathlon/hybrid/unknown
@@ -245,6 +247,8 @@ export type CoachWeekContextResponseV1 = {
   /** b2 (Q-149): strength 7-day session-type breakdown — the plan-primary key-session read for
    * strength-primary athletes (their lifts graded by the analyzer's verdict, not run pace). */
   strength_session_types_7d?: StrengthSessionType7d[];
+  /** SWIM 7d — planned → % achieved, unplanned → distance covered (never pace, Q-038-safe). State swim row. */
+  swim_sessions_7d?: SwimSession7d[];
   /** Tier 4 item 15 of running→cycling delta map. Mirror of running's planCtx fields
    * (peakLongRunMi / nextLongRunMi / etc.) for cycling. Long rides are >= 3 hr.
    * Cycling race-readiness (Tier 4 item 16) will read from this when it lands. */
@@ -484,6 +488,8 @@ export type CoachWeekContextResponseV1 = {
   /** b2 (Q-149): strength 7-day session-type breakdown — the plan-primary key-session read for
    * strength-primary athletes (their lifts graded by the analyzer's verdict, not run pace). */
   strength_session_types_7d?: StrengthSessionType7d[];
+  /** SWIM 7d — planned → % achieved, unplanned → distance covered (never pace, Q-038-safe). State swim row. */
+  swim_sessions_7d?: SwimSession7d[];
   /** Tier 4 item 15 of running→cycling delta map. Mirror of running's planCtx fields
    * (peakLongRunMi / nextLongRunMi / etc.) for cycling. Long rides are >= 3 hr.
    * Cycling race-readiness (Tier 4 item 16) will read from this when it lands. */
