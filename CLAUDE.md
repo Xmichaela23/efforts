@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## STOP — this app is BUILT. The job is wiring, not features.
+
+Efforts is a mature, largely-complete app. The near-term mission is **continuity**: verify every capability is wired together and reads one truth — NOT building new features. Before you propose to build ANYTHING, obey this:
+
+1. **Trace-before-build (hard rule).** No build proposal until you have traced and *stated in writing* what already exists for that capability. Start at `docs/CAPABILITY-MAP.md` (the "does X exist and where" index), then grep the entry point, then read it. "I think we should build X" without a preceding "here's what's already wired for X" finding is a process failure — it wastes hours re-inventing shipped infrastructure (this has happened repeatedly).
+2. **Default posture: find where it lives, don't design a solution.** When something seems missing or wrong, the first move is a code trace to locate the existing implementation — assume it exists until the trace proves it doesn't. Most "we should add X" instincts are already built in a form you haven't found yet (e.g. FTP-learned-from-riding + user-adopt: fully built via `learn-fitness-profile` → `ride_ftp_estimated` → `TrainingBaselines` adopt UI).
+3. **Ground design calls in commercial-app practice + training science, verified — never hand-picked** (see the metric/threshold decisions in DECISIONS-LOG). But do #1 FIRST — check what's built before researching what's ideal.
+4. **Update `docs/CAPABILITY-MAP.md`** when you discover a capability's status/entry-point, or ship something that changes it. Keep it terse (one line per capability) so it stays alive and trusted.
+
 ## Product Identity
 
 Efforts is a hybrid endurance + strength training app for intermediate athletes (runners, cyclists, triathletes) who want to integrate strength training into their endurance training. It is **not** a triathlon-only app. Strength is always present — core to every athlete profile, not an add-on. Race goal is optional. The engine manages interference between endurance and strength automatically. See `docs/PRODUCT-POSITIONING.md` for the full product identity.
@@ -62,7 +71,9 @@ Before any session ends — when the human says "we're done," "closing the lapto
 3. Wait for human approval.
 4. Commit + push as `docs: end-of-session context update for YYYY-MM-DD`.
 
-Also update `docs/POLISH-PUNCH-LIST.md` if items closed (mark `[x]` with date) or new items were added during the session.
+Also update `docs/POLISH-PUNCH-LIST.md` if items closed (mark `[x]` with date) or new items were added during the session, and `docs/CAPABILITY-MAP.md` if a capability's status/entry-point changed or you discovered its real status (keep rows terse — one line each).
+
+**The 5 living docs** (updated ~every session; everything else in `docs/` is reference, often stale — verify before trusting): `DECISIONS-LOG.md`, `OPEN-QUESTIONS.md`, `ENGINE-STATE.md`, `POLISH-PUNCH-LIST.md`, `CAPABILITY-MAP.md`.
 
 If the human ends the session without triggering this, prompt before stopping:
 
