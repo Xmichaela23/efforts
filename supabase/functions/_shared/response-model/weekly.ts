@@ -99,6 +99,7 @@ function computeEndurance(signals: WeeklySignalInputs, norms: BaselineNorms): En
       delta_display: hrDriftSufficient ? formatDelta(driftDelta, ' bpm') : 'Not enough data',
       samples: signals.hr_drift_sample_size,
       sufficient: hrDriftSufficient,
+      newest_session_date: signals.hr_drift_newest_date ?? null,
       current_avg_bpm: signals.hr_drift_avg_bpm,
       baseline_avg_bpm: norms.hr_drift_avg_bpm,
     },
@@ -119,6 +120,7 @@ function computeEndurance(signals: WeeklySignalInputs, norms: BaselineNorms): En
       delta_display: rpeSufficient ? formatDelta(rpeDelta, ' RPE') : 'Not enough data',
       samples: signals.rpe_sample_size_7d,
       sufficient: rpeSufficient,
+      newest_session_date: signals.rpe_newest_date ?? null,
       current_avg: signals.avg_session_rpe_7d,
       baseline_avg: norms.session_rpe_avg,
     },
@@ -730,6 +732,7 @@ function computeVisibleSignals(endurance: EnduranceResponse, strength: StrengthR
       detail: humanDetail(endurance.hr_drift.delta, 'bpm', 'less drift', 'more drift', 'normal'),
       samples: endurance.hr_drift.samples,
       samples_label: samplesLabel(endurance.hr_drift.samples, 'endurance'),
+      as_of_date: endurance.hr_drift.newest_session_date ?? null,
     });
   }
   if (endurance.rpe.sufficient) {
@@ -742,6 +745,7 @@ function computeVisibleSignals(endurance: EnduranceResponse, strength: StrengthR
       provenance: rpeProvenance(endurance.rpe.current_avg, endurance.rpe.baseline_avg),
       samples: endurance.rpe.samples,
       samples_label: samplesLabel(endurance.rpe.samples, 'endurance'),
+      as_of_date: endurance.rpe.newest_session_date ?? null,
     });
   }
   if (endurance.cardiac_efficiency.sufficient) {

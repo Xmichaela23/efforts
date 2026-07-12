@@ -146,6 +146,15 @@ function fmtSignedDeltaVsProjection(actualSec: number, projSec: number): string 
   return `${sign}${body} vs projection`;
 }
 
+// "as of {Mon D}" for a BODY row's newest session date — so a rolling 7d/week read isn't mistaken for
+// today's data (BODY-4.8 freshness-legibility). Null-safe: no date → no stamp.
+function fmtBodyAsOf(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (isNaN(d.getTime())) return null;
+  return `as of ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+}
+
 function isRunPrimary(pe: { sport?: string | null } | null | undefined): boolean {
   if (!pe) return false;
   const s = String(pe.sport || '').toLowerCase();
@@ -1596,6 +1605,9 @@ export default function StateTab({
                       RPE-clause only (server guarantees no non-RPE factor reaches this row). */}
                   {s.label === 'How hard it feels' && readinessRpeDriver && (
                     <p className="text-[11px] text-white/45 leading-snug mt-0.5">{readinessRpeDriver}</p>
+                  )}
+                  {fmtBodyAsOf(s.as_of_date) && (
+                    <p className="text-[10px] text-white/25 leading-snug mt-0.5">{fmtBodyAsOf(s.as_of_date)}</p>
                   )}
                   {expandedSignal === s.label && s.provenance && (
                     <p className="text-[10px] text-white/40 leading-snug mt-1 max-w-[min(100%,320px)]">{s.provenance}</p>

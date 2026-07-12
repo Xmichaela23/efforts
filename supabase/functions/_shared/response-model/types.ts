@@ -22,6 +22,8 @@ export type SignalTrend = {
   delta_display: string;
   samples: number;
   sufficient: boolean; // true when samples >= MIN_SAMPLES_FOR_SIGNAL
+  /** Date (YYYY-MM-DD) of the newest session behind this rolling read, for an "as of" freshness stamp. */
+  newest_session_date?: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -159,6 +161,9 @@ export type VisibleSignal = {
   samples: number;
   samples_label: string; // "3 runs", "4 sessions", "2 weeks"
   value_display?: string;
+  /** Date (YYYY-MM-DD) of the newest session behind this row → rendered as "as of {date}" so a rolling
+   *  7d/week read isn't mistaken for today's data (the BODY-4.8 freshness-legibility rule). */
+  as_of_date?: string | null;
 };
 
 export type ContextPrompt = {
@@ -316,6 +321,10 @@ export type WeeklySignalInputs = {
   rir_sample_size_7d: number;
   cardiac_efficiency_current: number | null;
   cardiac_efficiency_sample_size: number;
+  /** as-of: date (YYYY-MM-DD) of the newest session behind each rolling read, so a BODY row that
+   *  looks current can be stamped with how fresh it actually is (a 7d/week window can be 6 days old). */
+  rpe_newest_date?: string | null;
+  hr_drift_newest_date?: string | null;
 };
 
 export type BaselineNorms = {
