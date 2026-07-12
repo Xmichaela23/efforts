@@ -370,6 +370,46 @@ export function rollupFitnessDirection(v1: StateTrendsV1 | null | undefined): Fi
   return rollupFitness(v1).direction;
 }
 
+export interface HrResponseRollup {
+  /** Combined heart-rate-response verdict across the reliable-HR endurance disciplines. 'sliding' =
+   *  HR drifting up / working harder for the same output; 'improving' = HR settling. */
+  verdict: 'improving' | 'holding' | 'sliding' | 'needs_data';
+  contributors: Array<{ discipline: 'run' | 'bike'; verdict: string; provisional: boolean; newestAgeDays: number | null }>;
+  /** Freshest contributing session age in days (min across contributors), for the "as of" stamp. */
+  newestAgeDays: number | null;
+}
+
+/** Holistic heart-rate response across endurance, read from the SPINE (not re-derived): run = aerobic
+ *  decoupling (HR drift vs pace), bike = HR-at-power efficiency — each discipline's CORRECT instrument.
+ *  Swim is intentionally excluded (in-water HR is unreliable). Combines the per-discipline verdicts the
+ *  same way fitnessDirection does — SOLID verdicts decide, a provisional/thin read can't assert (Q-162).
+ *  This replaces the coach's run-only re-derived HR-drift with a single-source read that covers every
+ *  discipline whose HR is trustworthy. */
+export function rollupHrResponse(v1: StateTrendsV1 | null | undefined): HrResponseRollup {
+  if (!v1) return { verdict: 'needs_data', contributors: [], newestAgeDays: null };
+  const runD = v1.run?.decoupling;
+  const bikeE = v1.bike?.efficiency as (StateTrendsV1['bike']['efficiency'] & { newestAgeDays?: number | null }) | undefined;
+  const all: Array<{ discipline: 'run' | 'bike'; verdict?: string; provisional: boolean; newestAgeDays: number | null }> = [];
+  if (runD) all.push({ discipline: 'run', verdict: runD.verdict, provisional: !!runD.provisional, newestAgeDays: runD.newestAgeDays ?? null });
+  if (bikeE) all.push({ discipline: 'bike', verdict: bikeE.verdict, provisional: !!bikeE.provisional, newestAgeDays: bikeE.newestAgeDays ?? null });
+  const contributors = all.filter((c) => c.verdict && c.verdict !== 'needs_data') as HrResponseRollup['contributors'];
+  if (contributors.length === 0) return { verdict: 'needs_data', contributors: [], newestAgeDays: null };
+
+  const solid = contributors.filter((c) => !c.provisional);
+  const dirOf = (set: HrResponseRollup['contributors']): HrResponseRollup['verdict'] => {
+    const vs = set.map((c) => c.verdict);
+    const imp = vs.includes('improving'), sld = vs.includes('sliding');
+    if (imp && sld) return 'holding'; // genuinely both ways → net holding (contributors name the split)
+    if (sld) return 'sliding';
+    if (imp) return 'improving';
+    return 'holding';
+  };
+  const verdict = solid.length > 0 ? dirOf(solid) : 'holding';
+  const ages = contributors.map((c) => c.newestAgeDays).filter((a): a is number => a != null);
+  const newestAgeDays = ages.length ? Math.min(...ages) : null;
+  return { verdict, contributors, newestAgeDays };
+}
+
 /** Shape the assembled result into the cached contract. Per-discipline = the model's performance
  *  verdict (needs_data when no real trend), independent of the card's display axis. */
 export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV1 {

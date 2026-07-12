@@ -725,16 +725,9 @@ function computeVisibleSignals(endurance: EnduranceResponse, strength: StrengthR
   // pace-at-HR "run quality" already shown in PERFORMANCE. Per-run execution is covered by the "how your
   // sessions went" RUN row; run physiology by the PERFORMANCE decoupling/efficiency reads. (endurance.
   // execution stays computed for load-status reconcile; it is just no longer a BODY row.)
-  if (endurance.hr_drift.sufficient) {
-    out.push({
-      label: 'Heart rate drift', category: 'endurance',
-      trend: endurance.hr_drift.trend, trend_icon: trendIcon(endurance.hr_drift.trend), trend_tone: trendTone(endurance.hr_drift.trend),
-      detail: humanDetail(endurance.hr_drift.delta, 'bpm', 'less drift', 'more drift', 'normal'),
-      samples: endurance.hr_drift.samples,
-      samples_label: samplesLabel(endurance.hr_drift.samples, 'endurance'),
-      as_of_date: endurance.hr_drift.newest_session_date ?? null,
-    });
-  }
+  // "Heart rate drift" (run-only, re-derived here) intentionally NOT surfaced — it's replaced by the
+  // holistic, spine-sourced "Heart-rate response" signal the coach injects (run decoupling + bike
+  // HR-at-power, swim excluded). One source, all reliable-HR endurance, not a run-only re-derivation.
   if (endurance.rpe.sufficient) {
     out.push({
       label: 'How hard it feels', category: 'endurance',
