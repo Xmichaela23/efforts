@@ -136,6 +136,7 @@ These 5 docs are ALIVE — updated basically every working session. If you touch
 | STRENGTH row + per-lift | `StateTab.tsx:1151` | BUILT | spine strength.per_lift (D-270) |
 | AERO (run) + BIKE exec rows (7d) | `StateTab.tsx:1188/1212` | BUILT | coach run/ride_session_types_7d |
 | AERO durability verdict | `coach:2209` (v78) | BUILT | now SPINE decoupling band via decouplingBandDisplay (was coach 7d avg) |
+| BIKE efficiency verdict | `coach` (v80) `bikeEfficiencyDisplay` | BUILT | steady-aerobic types now render SPINE bike.efficiency (was coach's own HR-drift bands) → BIKE row ≡ PERFORMANCE; last run↔bike continuity gap closed |
 | PERFORMANCE section | `StatePerformanceSection.tsx:288` | PARTIAL | stateDisplay contract; "under review, not yet shipped" per StateTab:1627 |
 | LLM week narrative | `coach/index.ts:3319` | BUILT | coachAdapter + spine fitness_direction |
 | Honesty guard (narrative-core) | `_shared/narrative-core/validate.ts:82` | BUILT | validates narrative vs spine; 1 retry then drop |

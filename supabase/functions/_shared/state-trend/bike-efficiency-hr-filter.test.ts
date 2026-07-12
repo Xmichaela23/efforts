@@ -18,7 +18,17 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { assembleStateTrends } from './assemble.ts';
-import { bikeEfficiencyRideEligible, bikeRideIntensityAerobic } from './bike-fitness.ts';
+import { bikeEfficiencyRideEligible, bikeRideIntensityAerobic, bikeEfficiencyDisplay } from './bike-fitness.ts';
+
+// ── the BIKE "sessions went" row now renders the SPINE efficiency verdict via this shared vocab (D-275-bike
+//    follow-on) — so it matches the PERFORMANCE bike Efficiency row instead of a rival HR-drift verdict. ──
+Deno.test('bikeEfficiencyDisplay: spine efficiency verdict → word/tone (matches PERFORMANCE)', () => {
+  assertEquals(bikeEfficiencyDisplay('improving'), { word: 'improving', tone: 'positive' });
+  assertEquals(bikeEfficiencyDisplay('holding'), { word: 'holding', tone: 'warning' });
+  assertEquals(bikeEfficiencyDisplay('sliding'), { word: 'sliding', tone: 'danger' });
+  assertEquals(bikeEfficiencyDisplay('needs_data'), { word: null, tone: 'neutral' }); // no verdict
+  assertEquals(bikeEfficiencyDisplay(null), { word: null, tone: 'neutral' });
+});
 
 // ── the SHARED intensity gate (both bike engines: spine HR-at-power + coach HR-drift use this ONE line) ──
 Deno.test('bikeRideIntensityAerobic: best-20 below Z4 floor (90% FTP) = aerobic; threshold effort = not', () => {

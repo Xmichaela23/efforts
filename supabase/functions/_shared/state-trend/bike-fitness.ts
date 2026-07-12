@@ -90,6 +90,22 @@ export function isProvisionalTrend(t: TrendResult): boolean {
 
 export interface BikeEffortRide { date: string; classified_type: string | null; w20: number | null }
 
+// Canonical bike-EFFICIENCY verdict → State-row display (word + tone). ONE vocabulary so the coach's
+// BIKE "sessions went" row renders the SAME verdict as the PERFORMANCE bike Efficiency row (which reads
+// this spine signal directly) — they can't diverge. The BIKE row previously computed its own within-ride
+// HR-drift bands (≤3/5/8%), a different metric that could contradict the spine HR-at-power trend (the one
+// remaining run↔bike continuity gap; D-275-bike follow-on). `needs_data`/stale → no verdict. Mirrors run's
+// `decouplingBandDisplay`. tone matches the PERFORMANCE VERDICT coloring (improving=positive, holding=warning,
+// sliding=danger). The raw per-type HR-drift stays an LLM/detail receipt, not the rendered verdict.
+export function bikeEfficiencyDisplay(verdict: string | null | undefined): { word: string | null; tone: 'positive' | 'warning' | 'danger' | 'neutral' } {
+  switch (verdict) {
+    case 'improving': return { word: 'improving', tone: 'positive' };
+    case 'holding':   return { word: 'holding', tone: 'warning' };
+    case 'sliding':   return { word: 'sliding', tone: 'danger' };
+    default:          return { word: null, tone: 'neutral' }; // needs_data / unknown → no verdict
+  }
+}
+
 export interface BikeSignal {
   verdict: TrendVerdict;
   pctChange: number | null;
