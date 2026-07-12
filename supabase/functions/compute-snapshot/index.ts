@@ -703,6 +703,7 @@ serve(async (req: Request) => {
             efficiency_index: runEffIndexByDate.get(r.metric_date) ?? null,
             decoupling_pct: hrs?.decouplingPct ?? null,
             decoupling_basis: hrs?.decouplingBasis ?? null,
+            decoupling_confounded: hrs?.decouplingConfounded ?? null, // heat/RPE-confounded → excluded from the durability substrate
             workout_type: hrs?.workoutType ?? null,
             duration_minutes: hrs?.durationMinutes ?? null,
             classified_type: runCtById.get(r.workout_id) ?? null,

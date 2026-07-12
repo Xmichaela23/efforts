@@ -74,7 +74,7 @@ export interface StateTrendInputs {
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
   strengthVolumeRows?: StrengthVolumeRow[]; // per-strength-workout total_volume_lbs (the volume trend)
   bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; band_source: string | null; hr_corrupt?: boolean }>;
-  runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; efficiency_index?: number | null; decoupling_pct?: number | null; decoupling_basis?: string | null; workout_type?: string | null; duration_minutes?: number | null; classified_type: string | null }>;
+  runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; efficiency_index?: number | null; decoupling_pct?: number | null; decoupling_basis?: string | null; decoupling_confounded?: boolean | null; workout_type?: string | null; duration_minutes?: number | null; classified_type: string | null }>;
   swimRows: Array<{ date: string; pace_per_100m: number; rest_fraction?: number | null; distance_m?: number | null }>;
   plannedBy: Record<string, number>; // this-week planned counts per discipline
   doneBy: Record<string, number>; // this-week completed counts per discipline

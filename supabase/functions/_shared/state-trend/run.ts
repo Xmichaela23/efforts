@@ -142,6 +142,7 @@ export interface DecouplingRow {
   date?: string; metric_date?: string;
   decoupling_pct?: number | null;
   decoupling_basis?: string | null;   // 'gap' | 'raw' | null — only used to drop confirmed 'raw'
+  decoupling_confounded?: boolean | null; // heat/RPE-confounded → not a clean durability read (analyzer-set)
   workout_type?: string | null;       // heart_rate_summary.workoutType
   duration_minutes?: number | null;
 }
@@ -150,6 +151,12 @@ export function decouplingToSeries(rows: DecouplingRow[] | null | undefined): Tr
   return rows
     .filter((r) => typeof r.decoupling_pct === 'number' && Number.isFinite(Number(r.decoupling_pct)))
     .filter((r) => r.decoupling_basis !== 'raw')                                  // drop confirmed terrain-confounded
+    // Decoupling is only a valid DURABILITY read in controlled conditions (Friel/TrainingPeaks: don't test
+    // in heat; Garmin normalizes heat rather than reading a false fitness decline). A run the analyzer flagged
+    // heat- or RPE-confounded isn't a clean measurement, so it can't stand up the "durability gap" band — same
+    // exclusion the terrain-confounded ('raw') runs already get. The workout screen already explained these as
+    // conditions, not fitness; State must not re-derive a contradicting verdict from the raw %.
+    .filter((r) => r.decoupling_confounded !== true)
     .filter((r) => isSteadyAerobic(r.workout_type))                              // steady aerobic only
     .filter((r) => r.duration_minutes == null || Number(r.duration_minutes) >= 20) // ≥20 min (null = don't drop)
     .map((r) => ({ date: r.date ?? r.metric_date ?? '', value: Number(r.decoupling_pct) }))

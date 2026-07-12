@@ -167,6 +167,7 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
           efficiency_index: runEffIndexByDate.get(r.metric_date) ?? null,
           decoupling_pct: hrs?.decouplingPct ?? null,
           decoupling_basis: hrs?.decouplingBasis ?? null,
+          decoupling_confounded: hrs?.decouplingConfounded ?? null, // heat-confounded → excluded from the durability substrate (single-source w/ compute-snapshot)
           workout_type: hrs?.workoutType ?? null,
           duration_minutes: hrs?.durationMinutes ?? null,
           classified_type: runCtById.get(r.workout_id) ?? null,

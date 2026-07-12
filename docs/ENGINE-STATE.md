@@ -10,6 +10,8 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 >
 > **2026-07-11 (later) — COACH HONESTY NET SHIPPED (D-274, coach v77) + Q-157 dead code deleted.** The State-screen headline is now guarded against its own rows (was a hardcoded-`[]` hole + a cold-start bypass; both closed). The dead client `TrendSparkline` was deleted (Q-157 fully cleaned). Coach headline recomputed clean live (2 more ≥3 recomputes owed to fully close). See D-274.
 >
+> **2026-07-11 (later still) — RUN DURABILITY HEAT-CONFOUND FIX SHIPPED (D-275).** Caught a real run-continuity seam: State's AERO row banded a lone 80°F run's raw 10.7% decoupling as a red "durability gap" while that run's own workout screen said "heat + fatigue, not fitness." Heat-confound awareness lived on the workout side only; now propagated — State drops heat-confounded runs from the durability substrate (like it already drops terrain/short/non-steady), so one hot run reads `needs data`, not a red flag. Aligned to industry+science (heat/terrain/effort/duration are the validity gates; RPE deliberately NOT one). Deployed + pushed + fixtured. **Owed (Michael):** recompute the July-5 run → confirm AERO flips red→`needs data`. See D-275.
+>
 > **NEXT (genuinely a fresh session — this one is long + run/honesty-weighted):**
 > - **Q-117 bike decoupling** — the clear fresh-session build: different subsystem (cycling analyzer), real compute + backfill, and a SEQUENCING catch — first VERIFY the existing State bike-efficiency reading (the unvalidated ~5.5% HR-at-power gain, Q-117 status #2) before adding a second bike metric next to it. Don't add decoupling on top of an unverified read.
 > - **Q-127 Witness-2** decoupling-tier reconcile (Friel <5/5-10/>10 vs our <3/<5/<8) — wiring now well-understood; full build gated on Michael's DOMS coefficients.
@@ -68,6 +70,10 @@ Previous: 2026-06-11 (Q-048 follow-up fixes. D-127: unplanned-only last-actual f
 ---
 
 ## Solid (don't re-litigate)
+
+### Run durability (decoupling) is heat-confound-aware on State (2026-07-11, D-275, DEPLOYED + PUSHED)
+
+State's AERO durability band no longer stands up a red "durability gap" off a heat-confounded run. `analyze-running-workout` stamps `decouplingConfounded` on `heart_rate_summary` from its own weather read (`drift.weather.factor==='hot'`, >75°F); `state-trend/run.ts` `decouplingToSeries` drops confounded runs from the substrate — same exclusion terrain-confounded (`raw`), non-steady, and <20-min runs already get. Threaded through `compute-snapshot` (server spine) + `useStateTrends.ts` (client fallback) so both read identically. When no clean run remains → `needs_data`, never a red band off one hot run. Validity gates match industry+science (Friel/TrainingPeaks, Intervals.icu, Garmin): heat/terrain/effort/duration — **RPE is NOT a gate** (removed after research; its home is the workout narrative). Fixtures: `run-decoupling.test.ts` incl. the July-5 regression, 37/37 green. **Don't re-litigate** "add RPE to the durability gate" — the field doesn't, and it was tried and removed. Acceptance recompute of the July-5 run owed from Michael. See D-275.
 
 ### Coach week-headline honesty net (2026-07-11, D-274, coach v77, DEPLOYED + PUSHED)
 

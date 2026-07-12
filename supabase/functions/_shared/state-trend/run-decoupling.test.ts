@@ -67,6 +67,35 @@ Deno.test('decouplingToSeries: drops raw-basis, intervals, <20min; keeps steady 
   assertEquals(series.map((p) => p.value), [6.2, 4.1]);
 });
 
+// ── CONFOUND EXCLUSION (continuity fix): a heat-confounded run is not a clean durability read
+//    (Friel/TrainingPeaks: don't test decoupling in heat; Garmin normalizes heat). It's dropped from
+//    the substrate exactly like a terrain-confounded 'raw' run — so it can't stand up the danger band.
+//    (Validity gates, per the field, are OBJECTIVE conditions — heat/terrain/effort/duration — not RPE.) ──
+Deno.test('decouplingToSeries: drops heat-confounded runs, keeps clean ones', () => {
+  const series = decouplingToSeries([
+    { date: '2026-06-10', decoupling_pct: 4.0, decoupling_basis: 'gap', decoupling_confounded: false, workout_type: 'easy', duration_minutes: 40 }, // keep (clean)
+    { date: '2026-06-14', decoupling_pct: 11.5, decoupling_basis: 'gap', decoupling_confounded: true, workout_type: 'easy', duration_minutes: 45 }, // drop (confounded)
+    { date: '2026-06-18', decoupling_pct: 6.0, decoupling_basis: 'gap', workout_type: 'easy', duration_minutes: 50 },                               // keep (flag absent = not confounded)
+  ]);
+  assertEquals(series.map((p) => p.value), [4.0, 6.0]);
+});
+
+// ══ THE REGRESSION — the July-5 case: one hot (confounded) 10.7% run is the ONLY recent steady run.
+//    Before: State banded the raw 10.7% → 'durability_gap' (red home-screen flag) while the workout screen
+//    said "heat + fatigue, not fitness". After: the confounded run is excluded → no clean data → needs_data,
+//    NOT a durability-gap verdict. State stops contradicting the workout screen about the same run. ══
+Deno.test('confound: a lone hot 10.7% run does NOT stand up a durability_gap band (reads needs_data)', () => {
+  const rows = [
+    { date: '2026-07-05', decoupling_pct: 10.7, decoupling_basis: 'gap', decoupling_confounded: true, workout_type: 'easy', duration_minutes: 45 },
+  ];
+  const series = decouplingToSeries(rows);
+  assertEquals(series.length, 0);                                  // the hot run is excluded from the substrate
+  const { trend, band, recentPct } = computeRunDecouplingState(series, '2026-07-11', 1);
+  assertEquals(trend.verdict, 'needs_data');                       // no clean data → honest "needs data", not red
+  assertEquals(band, null);                                        // no 'durability_gap' band to render
+  assertEquals(recentPct, null);
+});
+
 // ══ DIRECTION PIN #1 — FALLING decoupling = IMPROVING (durability building), lands in a better band ══
 Deno.test('computeRunDecouplingState: FALLING pct → improving (LOWER decoupling = better)', () => {
   const series = [

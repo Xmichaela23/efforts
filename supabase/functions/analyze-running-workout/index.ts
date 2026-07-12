@@ -2958,6 +2958,24 @@ Deno.serve(async (req) => {
       } : {}),
     };
 
+    // Decoupling-confound flag (continuity fix): a decoupling % is only a valid DURABILITY read in
+    // controlled conditions. The validity gates are the OBJECTIVE conditions the field uses — Friel/
+    // TrainingPeaks, Intervals.icu (Seiler), and the research all agree: heat, terrain, effort-type, and
+    // duration invalidate the measurement; RPE is NOT a decoupling-validity gate (it's a load/narrative
+    // metric, not a conditions gate). Terrain (GAP-corrected + 'raw'-drop), effort-type (isSteadyAerobic),
+    // and duration (≥20 min) are already gated in state-trend/run.ts. HEAT is the missing one — flagged
+    // here from the analyzer's own weather read (drift.weather.factor === 'hot', >75°F; Garmin's heat line
+    // is ~72°F). Fueling/hydration also invalidate but are unmeasurable → honest-blank. State drops
+    // confounded runs from the durability substrate; the workout screen already explains a hot run as
+    // conditions, not fitness — this stops State minting a contradicting "durability gap" verdict.
+    const _heatConfound = (hrAnalysisResult as any)?.drift?.weather?.factor === 'hot';
+    const _hasDecoupling = (hrAnalysisResult as any)?.summary?.decouplingPct != null;
+    const decouplingConfounded = _hasDecoupling && _heatConfound;
+    const decouplingConfoundReason = decouplingConfounded ? 'heat' : null;
+    const heartRateSummaryOut = (hrAnalysisResult as any)?.summary
+      ? { ...(hrAnalysisResult as any).summary, decouplingConfounded, decouplingConfoundReason }
+      : (hrAnalysisResult as any)?.summary;
+
     // Full replacement — every field is computed fresh in this run.
     const updatePayload = {
       workout_analysis: {
@@ -2976,7 +2994,7 @@ Deno.serve(async (req) => {
         ai_summary_generated_at: ai_summary_generated_at,
         session_state_v1: sessionStateV1,
         mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null,  // Include terrain breakdown
-        heart_rate_summary: hrAnalysisResult.summary,
+        heart_rate_summary: heartRateSummaryOut,
         is_goal_race: goalRaceCompletionMatch.matched === true,
         race_debrief_text: race_debrief_text ?? null,
         // Snapshot the course strategy zones used for this debrief so the
