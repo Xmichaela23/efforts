@@ -80,16 +80,14 @@ export function analyzeHeartRate(
   }
   
   // Detect/confirm workout type
-  let workoutType = context.workoutType || detectWorkoutType(context.intervals, context.plannedWorkout);
-  // D-038 Piece 1B: the variance gate (CV-on-GAP, computed upstream) is authoritative — a run that
-  // resolved to 'steady_state' but whose efforts vary too much routes to the mixed path, so its
-  // decoupling is read as inconclusive (forMixedEffort → basis 'raw'), not a clean steady verdict.
-  // Overrides ONLY exactly 'steady_state'; more specific verdicts win on their own merits. (Restored
-  // 2026-07-12 — this override was accidentally reverted by a8bf025b, an unrelated State-headline commit.)
-  if (workoutType === 'steady_state' && context.varianceGate?.isMixedEffort === true) {
-    console.log('💓 [HR ANALYSIS] varianceGate override: steady_state → fartlek');
-    workoutType = 'fartlek';
-  }
+  const workoutType = context.workoutType || detectWorkoutType(context.intervals, context.plannedWorkout);
+  // Pace VARIANCE must NOT re-label the run type (research-backed, 2026-07-12): a fartlek is DELIBERATE
+  // speed play; an easy run that wobbles (hills / lights / GPS noise) is not one, and no commercial app
+  // (Garmin, TrainingPeaks, Stryd, COROS, Runna, Strava, Polar) names a run "fartlek" from variance.
+  // So the variance gate (context.varianceGate.isMixedEffort) keeps the honest type and instead only
+  // marks the DECOUPLING low-confidence — the steady-state path forces basis='raw' below so the metric
+  // carries the uncertainty, not the label (the Garmin/TrainingPeaks/Stryd/Whoop pattern). This
+  // SUPERSEDES the D-038 Piece 1B steady→fartlek override (which produced false "Fartlek" tags).
   console.log('💓 [HR ANALYSIS] Workout type (final):', workoutType);
   
   // Calculate zone distribution (always done)
@@ -147,9 +145,11 @@ function analyzeSteadyStateWorkout(
     const drift = analyzeSteadyStateDrift(sensorData, validHRSamples, context, workoutType);
     console.log('💓 [HR ANALYSIS] Drift calculated:', drift?.driftBpm);
     
-    // Calculate efficiency (pace:HR decoupling)
+    // Calculate efficiency (pace:HR decoupling). When the variance gate flags the effort as not steady
+    // enough, force basis='raw' so the decoupling reads as low-confidence — the metric carries the
+    // uncertainty while the run keeps its honest type label (no false "fartlek").
     console.log('💓 [HR ANALYSIS] Calculating efficiency...');
-    const efficiency = calculateEfficiency(sensorData, validHRSamples, context, workoutType);
+    const efficiency = calculateEfficiency(sensorData, validHRSamples, context, workoutType, { forMixedEffort: context.varianceGate?.isMixedEffort === true });
     
     // Build trends if historical data available
     const trends = buildTrends(drift, efficiency, context);

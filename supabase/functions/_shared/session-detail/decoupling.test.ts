@@ -234,11 +234,12 @@ function makeHRSamples(n: number, opts?: { gapMarker?: boolean; baseHr?: number;
   });
 }
 
-Deno.test('D-038 Piece 1B: varianceGate=true + workoutType=steady_state → override to fartlek (decoupling.basis=raw)', () => {
-  // Mirrors b70658b0: caller-set workoutType is 'steady_state' (classified from
-  // detectWorkoutTypeFromIntervals empty fallback), but variance gate signals
-  // mixed-effort. Override routes to analyzeMixedWorkout which now calls
-  // calculateEfficiency with forMixedEffort:true → basis='raw'.
+Deno.test('D-038 Piece 1B: varianceGate=true keeps the HONEST type, only flags decoupling low-confidence (basis=raw)', () => {
+  // Research-corrected 2026-07-12: pace variance must NEVER re-label a run "fartlek" (fartlek is
+  // deliberate speed play; no commercial app names one from variance). A steady_state run whose pace is
+  // too variable KEEPS its type — the variance gate instead forces the decoupling to basis='raw' (low
+  // confidence) via the steady path, so the METRIC carries the uncertainty, not the label. Supersedes
+  // the old steady→fartlek override.
   const samples = makeHRSamples(1400, { gapMarker: true });
   const context = {
     workoutType: 'steady_state' as const,
@@ -247,11 +248,9 @@ Deno.test('D-038 Piece 1B: varianceGate=true + workoutType=steady_state → over
     varianceGate: { isMixedEffort: true },
   };
   const result = analyzeHeartRate(samples, context as any);
-  // Override fires: workoutType becomes 'fartlek' which routes to analyzeMixedWorkout
-  assertEquals(result.workoutType, 'fartlek');
-  // analyzeMixedWorkout now calls calculateEfficiency with forMixedEffort:true
+  assertEquals(result.workoutType, 'steady_state');        // NOT relabeled to fartlek
   assertNotEquals(result.efficiency, undefined);
-  assertEquals(result.efficiency!.decoupling.basis, 'raw');
+  assertEquals(result.efficiency!.decoupling.basis, 'raw'); // drift flagged inconclusive instead
 });
 
 Deno.test('D-038 Piece 1B: varianceGate=true + workoutType=intervals → no override (more specific verdict wins)', () => {

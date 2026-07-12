@@ -1036,16 +1036,20 @@ Deno.serve(async (req) => {
     // fact_packet_v1 (terrain_type, interval_execution) which isn't built yet,
     // so reproduce the subset of predicates whose inputs are available now:
     // pace CV at GAP basis, detected intervals on unplanned sessions, plan
-    // intent intervals on linked sessions. Threaded into hrAnalysisContext so
-    // analyzeHeartRate can override a steady_state verdict to 'fartlek' and
-    // engage D-037's forMixedEffort decoupling path. ie-total-steps and
-    // raw-CV-on-flat signals are deferred to the full _varGate downstream
-    // (they don't matter for HR-analyzer routing).
+    // intent intervals on linked sessions. Threaded into hrAnalysisContext so analyzeHeartRate marks the
+    // DECOUPLING low-confidence (basis='raw') on a not-steady-enough effort — it NO LONGER re-labels the
+    // run "fartlek" (that was scientifically wrong + out of step with every commercial app; the label
+    // stays honest, the metric carries the uncertainty). ie-total-steps and raw-CV-on-flat signals are
+    // deferred to the full _varGate downstream.
     const preHRMixedEffortHint: boolean = (() => {
-      // (1) pace CV at GAP basis ≥ 8%
+      // (1) pace CV at GAP basis ≥ 13%. Was 8% — research-corrected 2026-07-12: normal easy runs run
+      // 5–10% CV on raw/GAP pace (GPS noise + hills + lights) and 7% CV is metabolically costless, so 8%
+      // fired on ordinary easy runs. ~13% (low-mid teens) separates genuinely-variable efforts (marathons
+      // ~16%, fartlek/intervals higher) from steady easy running. (Ideal = a Variability-Index / NGP÷avg
+      // gate ~1.05, jitter-resistant — not computed here yet.)
       const cvPct = Number((analysis as any)?.pacing_variability?.coefficient_of_variation);
       const gapAdj = Boolean((analysis as any)?.gap_adjusted);
-      if (Number.isFinite(cvPct) && cvPct >= 8 && gapAdj) return true;
+      if (Number.isFinite(cvPct) && cvPct >= 13 && gapAdj) return true;
       // (2) detected intervals on unplanned session (non-easy/steady/long/recovery)
       if (!isLinkedPlanSession) {
         const detected = String(detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout) || '').toLowerCase().trim();
