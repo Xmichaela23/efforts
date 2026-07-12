@@ -1209,7 +1209,7 @@ export default function StateTab({
       </div>
     );
   };
-  const runExecRow = cardioExecRow('AERO', runTypes);
+  const runExecRow = cardioExecRow('RUN', runTypes); // was 'AERO' — discipline label so run is findable, consistent with BIKE/STRENGTH/SWIM
   const rideExecRow = cardioExecRow('BIKE', rideTypes);
 
   // Order the execution rows so the plan's PRIMARY discipline leads (server single-source). Single-sport
