@@ -17,34 +17,38 @@ import { frielBand } from '../../../_shared/state-trend/run.ts';
 const WARMUP_SKIP_SECONDS = 600;
 
 /**
- * Map a decoupling % to this pipeline's 4 display words using the SINGLE shared band the STATE run
- * row + coach use (frielBand) — one threshold set, so a given % lands in the same tier on every
- * screen (finishes the D-239 reconcile on the run side). Signed, not abs(): a negative decoupling
- * (HR fell relative to pace) is genuinely excellent, which the old abs()+<3/<5/<8 scale erased and
- * which also disagreed with State at 5–10% (old 'high' ≥8 vs State 'base' ≤10). The 4 words are this
- * pipeline's vocabulary, mapped 1:1 onto frielBand's tiers.
+ * Map a decoupling % to this pipeline's display words using the SINGLE shared band the STATE run row +
+ * coach use (frielBand). Q-161: frielBand is now the two science-defensible states at the 5% line
+ * (≤5% sound / >5% needs work) — the old 4-word convention (excellent/good/moderate/high off a
+ * <3/<5/<8 scale) collapsed with it, so the workout card can't grade finer than the science supports
+ * or diverge from State. `good` = base sound, `needs_work` = build more base (or a residual confound).
  */
-export function decouplingAssessmentFromPct(pct: number): 'excellent' | 'good' | 'moderate' | 'high' {
-  const band = frielBand(pct);
-  return band === 'excellent' ? 'excellent'
-    : band === 'strong' ? 'good'
-    : band === 'base' ? 'moderate'
-    : 'high'; // durability_gap
+export function decouplingAssessmentFromPct(pct: number): 'good' | 'needs_work' {
+  return frielBand(pct) === 'sound' ? 'good' : 'needs_work';
 }
 
 /**
  * Calculate efficiency metrics for steady-state workouts.
+ *
+ * D-037: `options.forMixedEffort=true` bypasses the intervals/hill_repeats steady-state guard so a
+ * mixed-effort run (fartlek, or a steady run the variance gate flagged as mixed) still gets a
+ * whole-session decoupling read — but a split-half ratio across heterogeneous efforts is NOT a clean
+ * steady-state signal, so `basis` is forced to 'raw' regardless of GAP enrichment (the prompt's
+ * raw-basis rule then treats the number as inconclusive, not a fitness verdict). Restored 2026-07-12:
+ * the option was accidentally reverted by a8bf025b (an unrelated State-headline commit, 2026-06-14).
  */
 export function calculateEfficiency(
   sensorData: SensorSample[],
   validHRSamples: SensorSample[],
   context: HRAnalysisContext,
-  workoutType: WorkoutType
+  workoutType: WorkoutType,
+  options?: { forMixedEffort?: boolean }
 ): EfficiencyMetrics | undefined {
   console.log('📈 [EFFICIENCY] Calculating pace:HR efficiency...');
-  
-  // Only calculate for steady-state-ish workouts
-  if (workoutType === 'intervals' || workoutType === 'hill_repeats') {
+
+  // Only calculate for steady-state-ish workouts — unless forMixedEffort explicitly opts a mixed run
+  // in (basis is forced to 'raw' below so the number reads as inconclusive, not a clean verdict).
+  if (!options?.forMixedEffort && (workoutType === 'intervals' || workoutType === 'hill_repeats')) {
     console.log('📈 [EFFICIENCY] Skipping for interval workout');
     return undefined;
   }
@@ -104,10 +108,13 @@ export function calculateEfficiency(
   // stamps raw_pace_s_per_mi on every sample when the run had usable elevation), else 'raw' (device
   // pace, terrain-confounded). Only a 'gap' read is a trustworthy fitness signal — the Performance
   // "Aerobic decoupling" row gates on it (Q-158 follow-on). Detected the same way gap.ts:200 does.
-  const basis: 'gap' | 'raw' =
+  const detectedBasis: 'gap' | 'raw' =
     samplesAfterWarmup[0] && typeof (samplesAfterWarmup[0] as any).raw_pace_s_per_mi !== 'undefined'
       ? 'gap'
       : 'raw';
+  // D-037: a whole-session ratio across mixed efforts is inconclusive → force 'raw' so the prompt's
+  // raw-basis rule fires (never a clean fitness read), regardless of GAP enrichment.
+  const basis: 'gap' | 'raw' = options?.forMixedEffort ? 'raw' : detectedBasis;
 
   // Overall average efficiency
   const avgRatio = calculateEfficiencyRatio(samplesAfterWarmup);

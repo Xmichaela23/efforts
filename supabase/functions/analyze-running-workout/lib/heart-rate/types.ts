@@ -348,7 +348,7 @@ export interface EfficiencyMetrics {
     percent: number;            // Decoupling %
     earlyRatio: number;         // Early pace/HR ratio
     lateRatio: number;          // Late pace/HR ratio
-    assessment: 'excellent' | 'good' | 'moderate' | 'high';
+    assessment: 'good' | 'needs_work'; // Q-161: 5% line — 'good' ≤5% / 'needs_work' >5%
     /**
      * D-036: which pace series fed the ratio.
      * 'gap' when the input samples carried the raw_pace_s_per_mi marker (i.e.
@@ -412,8 +412,8 @@ export interface HRSummaryMetrics {
    * null = decoupling not computed (interval workout, < 20 min, etc.).
    */
   decouplingBasis: 'gap' | 'raw' | null;
-  /** D-036: excellent/good/moderate/high band from efficiency.ts:84-95. */
-  decouplingAssessment: 'excellent' | 'good' | 'moderate' | 'high' | null;
+  /** Q-161: the shared frielBand state at the 5% science line, from decouplingAssessmentFromPct. */
+  decouplingAssessment: 'good' | 'needs_work' | null; // 'good' ≤5% / 'needs_work' >5%
   efficiencyRatio: number | null;
   
   // For weekly zone aggregation

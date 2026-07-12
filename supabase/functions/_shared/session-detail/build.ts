@@ -646,7 +646,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     return {
       pct: typeof pct === 'number' && Number.isFinite(pct) ? Math.round(pct * 10) / 10 : null,
       basis: (basis === 'gap' || basis === 'raw') ? basis : null,
-      assessment: (['excellent','good','moderate','high'] as const).includes(assessment as any) ? assessment : null,
+      assessment: (['good','needs_work'] as const).includes(assessment as any) ? assessment : null,
     };
   })();
 

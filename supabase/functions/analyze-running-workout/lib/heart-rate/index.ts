@@ -24,7 +24,8 @@ import {
   SensorSample,
   HRSummaryMetrics,
   ZoneDistribution,
-  ZoneTime
+  ZoneTime,
+  EfficiencyMetrics
 } from './types.ts';
 
 import { detectWorkoutType } from './detect-workout-type.ts';
@@ -79,7 +80,16 @@ export function analyzeHeartRate(
   }
   
   // Detect/confirm workout type
-  const workoutType = context.workoutType || detectWorkoutType(context.intervals, context.plannedWorkout);
+  let workoutType = context.workoutType || detectWorkoutType(context.intervals, context.plannedWorkout);
+  // D-038 Piece 1B: the variance gate (CV-on-GAP, computed upstream) is authoritative — a run that
+  // resolved to 'steady_state' but whose efforts vary too much routes to the mixed path, so its
+  // decoupling is read as inconclusive (forMixedEffort → basis 'raw'), not a clean steady verdict.
+  // Overrides ONLY exactly 'steady_state'; more specific verdicts win on their own merits. (Restored
+  // 2026-07-12 — this override was accidentally reverted by a8bf025b, an unrelated State-headline commit.)
+  if (workoutType === 'steady_state' && context.varianceGate?.isMixedEffort === true) {
+    console.log('💓 [HR ANALYSIS] varianceGate override: steady_state → fartlek');
+    workoutType = 'fartlek';
+  }
   console.log('💓 [HR ANALYSIS] Workout type (final):', workoutType);
   
   // Calculate zone distribution (always done)
@@ -277,10 +287,16 @@ function analyzeMixedWorkout(
   durationMinutes: number
 ): HRAnalysisResult {
   console.log('💓 [HR ANALYSIS] Analyzing as mixed/fartlek workout');
-  
+
   // For mixed workouts, zone distribution is the main insight
   const { confidence, reasons } = determineMixedConfidence(validHRSamples.length);
-  
+
+  // D-037: whole-session decoupling for fartlek / mixed sessions (planned or not). forMixedEffort
+  // bypasses the steady-state guard AND forces basis='raw' so the prompt's raw-branch rule treats the
+  // number as inconclusive — HR behavior is described in plain language, fitness is not claimed.
+  // (Restored 2026-07-12; the call was dropped when a8bf025b reverted this path.)
+  const efficiency = calculateEfficiency(sensorData, validHRSamples, context, workoutType, { forMixedEffort: true });
+
   // Build interpretation narrative
   const interpretation = buildInterpretation({
     workoutType,
@@ -288,14 +304,15 @@ function analyzeMixedWorkout(
     zones,
     context
   });
-  
+
   // Build summary for aggregation
-  const summary = buildMixedSummary(validHRSamples, zones, workoutType, durationMinutes, confidence);
-  
+  const summary = buildMixedSummary(validHRSamples, efficiency, zones, workoutType, durationMinutes, confidence);
+
   return {
     workoutType,
     analysisType: 'zones',
     zones,
+    efficiency,
     interpretation,
     summaryLabel: 'Zone Summary',
     confidence,
@@ -561,22 +578,24 @@ function buildIntervalSummary(
 
 function buildMixedSummary(
   validHRSamples: SensorSample[],
+  efficiency: EfficiencyMetrics | undefined,
   zones: ZoneDistribution,
   workoutType: WorkoutType,
   durationMinutes: number,
   confidence: 'high' | 'medium' | 'low'
 ): HRSummaryMetrics {
   const hrValues = validHRSamples.map(s => s.heart_rate!);
-  
+
   return {
     avgHr: Math.round(hrValues.reduce((a, b) => a + b, 0) / hrValues.length),
     maxHr: Math.max(...hrValues),
     minHr: Math.min(...hrValues),
     driftBpm: null,
-    decouplingPct: null,
-    decouplingBasis: null,
-    decouplingAssessment: null,
-    efficiencyRatio: null,
+    // D-037: decoupling populated via the forMixedEffort path; basis is always 'raw' here (inconclusive).
+    decouplingPct: efficiency?.decoupling?.percent ?? null,
+    decouplingBasis: efficiency?.decoupling?.basis ?? null,
+    decouplingAssessment: efficiency?.decoupling?.assessment ?? null,
+    efficiencyRatio: efficiency?.avgEfficiencyRatio ?? null,
     timeInZones: zonesToTimeInZones(zones),
     intervalHrCreepBpm: null,
     intervalRecoveryRate: null,

@@ -2654,8 +2654,9 @@ Deno.serve(async (req) => {
           });
           const clause = buildCarryoverClause(carry, 'ride');
           if (clause) { ai_summary = ai_summary ? `${ai_summary} ${clause}` : clause; if (!ai_summary_generated_at) ai_summary_generated_at = new Date().toISOString(); }
-          // GLASS-BOX DIAGNOSTIC (TESTING-ONLY — strip once tuned): when a recent leg lift was in play but
-          // carryover stayed silent, show WHY so the eyeball is read-the-reason not guess-the-reason.
+          // GLASS-BOX DIAGNOSTIC (Q-163): when a recent leg lift was in play but carryover stayed silent,
+          // log WHY so the eyeball is read-the-reason not guess-the-reason. Logged only — this must NEVER
+          // reach the user-facing ai_summary (the ⟨diag⟩ string was leaking into the workout INSIGHTS prose).
           if (!carry?.claimable && nearestLift) {
             let why = '';
             if (nearestLift.age > CARRYOVER_WINDOW_DAYS) why = `no lift in window (last leg session ${nearestLift.age}d ago)`;
@@ -2664,7 +2665,7 @@ Deno.serve(async (req) => {
             else if (!declaredBaselineOk) why = `baseline thin (${compCount} comparable RPE ride${compCount === 1 ? '' : 's'})`;
             else if (expectedRpe != null) why = `RPE ${thisRpe} ≈ your norm ${expectedRpe.toFixed(1)} (not elevated), objective quiet (decoup ${decoupPct.toFixed(1)}%)`;
             else why = `${carry?.suppressedBy ?? 'no signal'}`;
-            ai_summary = `${ai_summary ?? ''}\n\n⟨diag⟩ carryover silent — ${why} · ${soreDiag}`;
+            console.log(`[analyze-cycling-workout] ⟨diag⟩ carryover silent — ${why} · ${soreDiag}`);
           }
           console.log(`[analyze-cycling-workout] carryover ${carry?.claimable ? `CLAIMED (${carry.confidence})` : `silent (${carry?.suppressedBy})`} [decoup=${decoupPct} rpe=${thisRpe} if=${thisIF} comps=${compCount} liftAge=${nearestLift?.age ?? 'none'}]`);
         }

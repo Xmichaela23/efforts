@@ -463,11 +463,9 @@ POOL INTENSITY CONTEXT — when signals.comparisons.vs_similar is present AND vs
 
 AEROBIC DECOUPLING (RUN) — when signals.cardiac_decoupling is present AND signals.decoupling_basis === 'gap':
 - This is grade-adjusted: the pace input feeding the decoupling ratio used GAP, not raw pace. Terrain confound is removed. The number reflects real cardiovascular efficiency drift across the workout, not how the route happened to slope.
-- Translate the value to plain language; NEVER print the percentage:
-  • signals.decoupling_assessment === 'excellent' (<0% — HR held or fell) → "heart rate stayed controlled as effort held — strong aerobic efficiency."
-  • 'good' (0–5%) → "modest efficiency drift over the second half — typical for the duration."
-  • 'moderate' (5–10%) → "noticeable efficiency drop — your body worked harder to maintain effort late."
-  • 'high' (>10%) → "significant decoupling — this effort pushed your aerobic limits, or fatigue accumulated."
+- Translate the value to plain language; NEVER print the percentage. There are two states (Q-161, the one science-backed 5% line — do NOT invent finer gradations):
+  • signals.decoupling_assessment === 'good' (≤5% — HR held relative to pace) → "heart rate stayed controlled as effort held — aerobic base looks sound for this duration."
+  • 'needs_work' (>5%) → "heart rate drifted up over the run — the aerobic base has room to build (or heat/hills/a short effort nudged it)."
 - Decoupling and HR drift are distinct. Drift answers "did HR climb?" (can be terrain-driven; use the existing drift_explanation field). Decoupling at gap basis answers "did efficiency drop?" — fitness, not geography.
 - Treat the decoupling read as one observation among others; do not lead with it unless it's the most striking signal in the data.
 
@@ -476,11 +474,9 @@ AEROBIC DECOUPLING (RUN) — when signals.decoupling_basis === 'raw' AND signals
 
 AEROBIC DECOUPLING (RUN) — when signals.decoupling_basis === 'raw' AND signals.is_mixed_effort !== true (steady-state session, no usable GPS elevation but the effort was genuinely steady):
 - The decoupling number is meaningful here even at raw basis. The session was steady-effort (low CV passed the variance gate), so the pace:HR ratio split first/second half reflects real cardiovascular efficiency. The only caveat vs gap basis: terrain influence on raw pace isn't removed, but on a flat or treadmill session (the typical raw-basis case) terrain wasn't a factor anyway.
-- DO surface the assessment as you would for gap basis — translate, never print the percentage:
-  • signals.decoupling_assessment === 'excellent' (<0% — HR held or fell) → "HR stayed controlled as effort held — strong aerobic efficiency for this duration."
-  • 'good' (0–5%) → "modest HR drift over the second half — typical for the duration."
-  • 'moderate' (5–10%) → "noticeable HR drift — your body worked harder to maintain pace late."
-  • 'high' (>10%) → "significant drift — this effort pushed your aerobic limits, or fatigue accumulated."
+- DO surface the assessment as you would for gap basis — translate, never print the percentage. Two states only (Q-161, the 5% line — do NOT invent finer gradations):
+  • signals.decoupling_assessment === 'good' (≤5% — HR held relative to pace) → "HR stayed controlled as effort held — aerobic base looks sound for this duration."
+  • 'needs_work' (>5%) → "HR drifted up over the run — the aerobic base has room to build (or heat/hills/a short effort nudged it)."
 - Where possible, pair the assessment with the bpm drift number from drift_explanation / hr_drift for concreteness ("HR drifted +X bpm over the run — excellent for this duration").
 
 UNPLANNED MODE — when the user message opens with "UNPLANNED SESSION" and there is NO "EXECUTION vs PLAN" block:
@@ -932,7 +928,7 @@ export function toDisplayFormatV1(
       decoupling_basis: (coerceNumber(derived?.cardiac_decoupling_pct) != null)
         ? ((derived?.decoupling_basis as 'gap' | 'raw' | null) ?? null) : null,
       decoupling_assessment: (coerceNumber(derived?.cardiac_decoupling_pct) != null)
-        ? ((derived?.decoupling_assessment as 'excellent' | 'good' | 'moderate' | 'high' | null) ?? null) : null,
+        ? ((derived?.decoupling_assessment as 'good' | 'needs_work' | null) ?? null) : null,
       pace_fade: (coerceNumber(derived?.pace_fade_pct) != null) ? `${Math.round(Number(derived.pace_fade_pct))}%` : null,
       training_load: derived?.training_load
         ? (() => {

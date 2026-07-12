@@ -2277,7 +2277,7 @@ Deno.serve(async (req) => {
             const cadenceDrop = haveCadence ? (baselineCadence! - thisCadence) : null; // + = cadence dropped
             // SUPPORTING — pace-at-HR decoupling beyond conditions (capped weight; HR-rises-with-DOMS caveat).
             const decoupAssess = String((hrAnalysisResult as any)?.summary?.decouplingAssessment || '');
-            const decoupElevated = /elevated|high|poor/i.test(decoupAssess);
+            const decoupElevated = decoupAssess === 'needs_work'; // Q-161: was /elevated|high|poor/ over the old 4-word vocab
             // Two-way RPE gauge (Axis 4): this run's RPE vs the athlete's OWN baseline RPE for comparable-
             // INTENSITY runs (avg HR ±8 bpm — same effort band). Above expected → carryover trigger (catches
             // easy runs the cadence signal misses); below → veto. ≥3 comparables required, else gauge off.

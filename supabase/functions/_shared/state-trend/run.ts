@@ -101,45 +101,42 @@ export function computeRunEfficiencyState(series: TrendPoint[], asOf: string, se
 // distance confound (it measures within-run drift, not a whole-run average). Source:
 // workout_analysis.heart_rate_summary.decouplingPct.
 //
-// BANDS are a COACHING STANDARD (Joe Friel / TrainingPeaks), NOT a lab-validated physiological
-// cutoff — cite them as such, never as peer-reviewed thresholds:
-//   negative = excellent · <5% strong aerobic coupling · 5–10% base-building · >10% durability gap.
+// Q-161 (2026-07-12): banded to the ONE science-defensible line. Friel/TrainingPeaks publish a single
+// ~5% cutoff (≤5% = aerobic base is sound; >5% = needs base work, after ruling out heat/hills/short
+// efforts) — there is NO published second threshold, and a separate "excellent" tier for negative drift
+// is not defensible (a negative usually reflects a soft start, not superior durability). So the old
+// 4-tier convention (<0 excellent / <5 strong / 5–10 base / >10 gap) collapses to two honest states.
+// Sources: TrainingPeaks (Friel), Intervals.icu, Uphill Athlete AeT drift test, Muniz-Pumares durability
+// literature — the 5% line is the only one with authorship + platform + literature backing. A read >10%
+// is NOT a separate user grade (it reads 'needs_work'); it more often means a confound slipped the
+// upstream gate — which is already filtered on the inputs (steady/aerobic, ≥20min, terrain-neutral).
 // ⚠️ DIRECTION IS INVERTED vs efficiency: LOWER decoupling = better → a FALLING pct reads improving,
 // a RISING pct reads sliding (durability declining). This is the opposite of efficiency_index.
-export type DecouplingBand = 'excellent' | 'strong' | 'base' | 'durability_gap';
+export type DecouplingBand = 'sound' | 'needs_work';
 export function frielBand(pct: number): DecouplingBand {
-  if (pct < 0) return 'excellent';       // HR fell relative to pace across the run = excellent
-  if (pct < 5) return 'strong';          // <5% strong aerobic coupling
-  if (pct <= 10) return 'base';          // 5–10% base-building
-  return 'durability_gap';               // >10% durability gap
+  return pct < 5 ? 'sound' : 'needs_work'; // ≤5% (incl. negatives) = base sound; >5% = build more base
 }
 
-// D-239 reconcile: the coaching label for a decoupling %, derived from the SAME frielBand the RUN
-// row uses — so coach and the State screen can't disagree (coach previously had its own ≤3 cutoff).
-// label/tone are the band's plain-language coaching interpretation; band is the single threshold set.
+// D-239 reconcile: the coaching label for a decoupling %, derived from the SAME frielBand the RUN row
+// uses — so coach and the State screen can't disagree. label/tone are the band's plain-language coaching
+// interpretation; band is the single threshold set.
 export function decouplingLabel(pct: number | null): { band: DecouplingBand | null; label: string | null; tone: 'positive' | 'warning' | 'danger' | 'neutral' } {
   if (pct == null || !Number.isFinite(pct)) return { band: null, label: null, tone: 'neutral' };
   const band = frielBand(pct);
-  switch (band) {
-    case 'excellent': return { band, label: 'Excellent aerobic control', tone: 'positive' };
-    case 'strong': return { band, label: 'Ran efficiently', tone: 'positive' };
-    case 'base': return { band, label: 'HR climbed more than usual', tone: 'warning' };
-    case 'durability_gap': return { band, label: 'HR elevated — durability gap', tone: 'danger' };
-  }
+  // >5% is a "build more base" cue (or a residual confound), NOT an alarm → warning, never danger.
+  return band === 'sound'
+    ? { band, label: 'Aerobic base held', tone: 'positive' }
+    : { band, label: 'HR drifted — build aerobic base', tone: 'warning' };
 }
 
 // Canonical band → State-row display (word + tone). ONE vocabulary for every surface that renders the
-// durability band — the PERFORMANCE trend row AND the AERO session row read this, so they can't diverge in
-// words (base = "building aerobic base" everywhere, not "HR climbed more than usual" one place and
-// "building aerobic base" another). `base` is neutral-toned (an informational building state, not an
-// alarm); only `durability_gap` is danger. This is the display twin of `decouplingLabel` (which is the
-// per-workout receipt phrasing); State rows use THIS so AERO ≡ PERFORMANCE.
+// durability band — the PERFORMANCE trend row AND the AERO session row read this, so they can't diverge
+// in words. This is the display twin of `decouplingLabel` (the per-workout receipt phrasing); State rows
+// use THIS so AERO ≡ PERFORMANCE.
 export function decouplingBandDisplay(band: DecouplingBand | null): { word: string | null; tone: 'positive' | 'warning' | 'danger' | 'neutral' } {
   switch (band) {
-    case 'excellent': return { word: 'excellent aerobic fitness', tone: 'positive' };
-    case 'strong': return { word: 'strong aerobic base', tone: 'positive' };
-    case 'base': return { word: 'building aerobic base', tone: 'neutral' };
-    case 'durability_gap': return { word: 'durability gap', tone: 'danger' };
+    case 'sound': return { word: 'aerobic base is sound', tone: 'positive' };
+    case 'needs_work': return { word: 'aerobic base needs work', tone: 'warning' };
     default: return { word: null, tone: 'neutral' };
   }
 }

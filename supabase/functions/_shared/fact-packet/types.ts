@@ -222,8 +222,10 @@ export type FactPacketV1 = {
      * null = decoupling not computed (interval workout, < 20 min, cycling).
      */
     decoupling_basis?: 'gap' | 'raw' | null;
-    /** D-036: 'excellent' (<3%) | 'good' (<5%) | 'moderate' (<8%) | 'high' (≥8%) | null. */
-    decoupling_assessment?: 'excellent' | 'good' | 'moderate' | 'high' | null;
+    /** The shared frielBand states (Q-161 — banded to the one science line at 5%): 'good' (≤5% —
+     *  aerobic base sound) | 'needs_work' (>5% — build base, or a residual confound) | null. Same
+     *  threshold as the State run row + coach, so a given % lands in the same state on every surface. */
+    decoupling_assessment?: 'good' | 'needs_work' | null;
     pace_fade_pct: number | null;
     pacing_pattern?: {
       speedups_note: string | null;

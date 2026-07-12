@@ -262,7 +262,8 @@ export type SessionDetailV1 = {
      *  • basis: 'gap' = terrain-neutral, treat as fitness signal;
      *           'raw' = terrain-confounded, inconclusive;
      *           null  = not computed (interval workout, < 20 min, etc.).
-     *  • assessment: 'excellent' (<3%) / 'good' (<5%) / 'moderate' (<8%) / 'high' (≥8%).
+     *  • assessment: the shared frielBand states (Q-161 — one science line at 5%) — 'good' (≤5%,
+     *    aerobic base sound) / 'needs_work' (>5%, build base). Same band as State run row + coach.
      */
     decoupling: {
       pct: number | null;

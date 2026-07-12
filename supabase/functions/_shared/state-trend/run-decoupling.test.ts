@@ -18,41 +18,36 @@ import { frielBand, decouplingLabel, decouplingBandDisplay, isSteadyAerobic, dec
 const AS_OF = '2026-07-03';
 const WEEKS_90D = 90 / 7;
 
-// ── Friel bands map pct → plain-language state (rendered as the verdict, NOT a naked %) ──
-Deno.test('frielBand: negative=excellent, <5 strong, 5–10 base, >10 durability_gap', () => {
-  assertEquals(frielBand(-1.0), 'excellent');
-  assertEquals(frielBand(0), 'strong');
-  assertEquals(frielBand(4.9), 'strong');
-  assertEquals(frielBand(5), 'base');       // 5 is base (5–10)
-  assertEquals(frielBand(10), 'base');      // 10 is base
-  assertEquals(frielBand(10.1), 'durability_gap');
-  assertEquals(frielBand(12), 'durability_gap');
+// ── Q-161: frielBand is the ONE science-defensible line (Friel/TrainingPeaks ~5%) — two states, not
+//    the old 4-tier convention. Negatives fold into 'sound' (no separate "excellent"); >10 is NOT a
+//    separate grade (still 'needs_work'). ──
+Deno.test('frielBand (Q-161): two states at the 5% line — <5% sound, ≥5% needs_work', () => {
+  assertEquals(frielBand(-1.0), 'sound');   // negative folds into sound (no superior "excellent" tier)
+  assertEquals(frielBand(0), 'sound');
+  assertEquals(frielBand(4.9), 'sound');
+  assertEquals(frielBand(5), 'needs_work');
+  assertEquals(frielBand(10), 'needs_work');
+  assertEquals(frielBand(12), 'needs_work'); // >10 is still needs_work, not a separate durability grade
 });
 
-// ── D-239 reconcile: coach + State share ONE frielBand-backed label. The old coach ≤3-vs-≤5 split
-//    ('Ran efficiently' ≤3 vs 'Solid effort' ≤5) is GONE — 3% and 4% now read the SAME band/label. ──
-Deno.test('decouplingLabel: frielBand-backed — coach ≤3 cutoff removed, one threshold set', () => {
-  assertEquals(decouplingLabel(3).band, 'strong');
-  assertEquals(decouplingLabel(4).band, 'strong');
-  assertEquals(decouplingLabel(3).label, decouplingLabel(4).label); // the ≤3 split is gone
-  assertEquals(decouplingLabel(3).tone, 'positive');
-  assertEquals(decouplingLabel(-1), { band: 'excellent', label: 'Excellent aerobic control', tone: 'positive' });
-  assertEquals(decouplingLabel(7).tone, 'warning');   // 5–10 base
-  assertEquals(decouplingLabel(9).tone, 'warning');   // old coach: >8 = danger; frielBand keeps 5–10 = warning
-  assertEquals(decouplingLabel(12).band, 'durability_gap');
-  assertEquals(decouplingLabel(12).tone, 'danger');
+// ── decouplingLabel (the per-workout receipt phrasing): sound=positive, needs_work=warning. >5% is a
+//    "build more base" cue (or a residual confound), NOT a red alarm — so needs_work is warning, never danger. ──
+Deno.test('decouplingLabel (Q-161): sound=positive, needs_work=warning (never danger)', () => {
+  assertEquals(decouplingLabel(3), { band: 'sound', label: 'Aerobic base held', tone: 'positive' });
+  assertEquals(decouplingLabel(4).band, 'sound');
+  assertEquals(decouplingLabel(-1).band, 'sound');   // negative folds into sound, not a superior tier
+  assertEquals(decouplingLabel(7), { band: 'needs_work', label: 'HR drifted — build aerobic base', tone: 'warning' });
+  assertEquals(decouplingLabel(12).tone, 'warning'); // >10 still warning, not danger
   assertEquals(decouplingLabel(null).tone, 'neutral');
 });
 
-// ── ONE band vocabulary (D-275 close): the AERO card (coach) and the PERFORMANCE trend row (client) both
-//    render the durability band through decouplingBandDisplay, so they can't diverge in words. These words
-//    MUST match the client's DECOUPLING_BAND map (StatePerformanceSection.tsx) — the whole point of the close. ──
-Deno.test('decouplingBandDisplay: canonical band → word/tone (must match the client PERFORMANCE vocabulary)', () => {
-  assertEquals(decouplingBandDisplay('excellent'), { word: 'excellent aerobic fitness', tone: 'positive' });
-  assertEquals(decouplingBandDisplay('strong'), { word: 'strong aerobic base', tone: 'positive' });
-  assertEquals(decouplingBandDisplay('base'), { word: 'building aerobic base', tone: 'neutral' });   // informational, NOT an alarm
-  assertEquals(decouplingBandDisplay('durability_gap'), { word: 'durability gap', tone: 'danger' });  // the only red band
-  assertEquals(decouplingBandDisplay(null), { word: null, tone: 'neutral' });                          // stale/needs_data → no verdict
+// ── ONE band vocabulary: the AERO card (coach) and the PERFORMANCE trend row (client) both render the
+//    durability band through decouplingBandDisplay, so they can't diverge in words. These words MUST
+//    match the client's DECOUPLING_BAND map (StatePerformanceSection.tsx). ──
+Deno.test('decouplingBandDisplay (Q-161): band → word/tone (must match the client DECOUPLING_BAND map)', () => {
+  assertEquals(decouplingBandDisplay('sound'), { word: 'aerobic base is sound', tone: 'positive' });
+  assertEquals(decouplingBandDisplay('needs_work'), { word: 'aerobic base needs work', tone: 'warning' });
+  assertEquals(decouplingBandDisplay(null), { word: null, tone: 'neutral' });   // stale/needs_data → no verdict
 });
 
 // ── Gate: steady/aerobic + ≥20min + not-'raw' + pct present ──
@@ -118,7 +113,7 @@ Deno.test('computeRunDecouplingState: FALLING pct → improving (LOWER decouplin
   ];
   const { trend, band, recentPct } = computeRunDecouplingState(series, AS_OF, series.length / WEEKS_90D);
   assertEquals(trend.verdict, 'improving');     // falling decoupling reads IMPROVING
-  assertEquals(band, 'strong');                 // recent ~3% → strong aerobic coupling
+  assertEquals(band, 'sound');                  // recent ~3% (<5%) → aerobic base sound
   assert(recentPct != null && recentPct < 5);
 });
 
@@ -133,7 +128,7 @@ Deno.test('computeRunDecouplingState: RISING pct → sliding (durability declini
   ];
   const { trend, band } = computeRunDecouplingState(series, AS_OF, series.length / WEEKS_90D);
   assertEquals(trend.verdict, 'sliding');       // rising decoupling reads SLIDING, never improving
-  assertEquals(band, 'durability_gap');         // recent ~11% → durability gap
+  assertEquals(band, 'needs_work');             // recent ~11% (>5%) → aerobic base needs work
 });
 
 // ── Honesty gate: STALE input → needs_data (never a confident current verdict), but the real value
@@ -150,7 +145,7 @@ Deno.test('computeRunDecouplingState: stale (newest > freshness) → needs_data 
   assertEquals(trend.stale, true);
   assert(trend.newestAgeDays != null && trend.newestAgeDays >= 35);
   assertEquals(recentPct, 6);                   // real last value survives for carry-forward…
-  assertEquals(band, 'base');                   // …with its band, shown dimmed + "limited data"
+  assertEquals(band, 'needs_work');             // …with its band (6% > 5%), shown dimmed + "limited data"
 });
 
 // ── Sparse (below the min-session floor) → needs_data, NOT stale → render shows "needs 20+ min steady effort". ──

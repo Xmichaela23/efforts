@@ -2,29 +2,24 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { decouplingAssessmentFromPct } from './efficiency.ts';
 import { frielBand } from '../../../_shared/state-trend/run.ts';
 
-// D-239 (run side): the workout decoupling word must land in the SAME tier as the STATE run row for
-// the same %, so a user never sees "mild" on State and "alarm" in the workout prose (or vice versa).
-// The 4 display words map 1:1 onto the shared frielBand tiers.
-Deno.test('run decoupling assessment shares State frielBand tiers', () => {
-  // Negative decoupling = HR fell relative to pace = genuinely excellent. The OLD abs() scale
-  // flattened this to 'good' (bug); State always called it 'excellent'.
-  assertEquals(decouplingAssessmentFromPct(-4), 'excellent');
-  assertEquals(frielBand(-4), 'excellent');
+// Q-161: the workout decoupling word must land in the SAME state as the STATE run row for the same %,
+// so a user never sees a different read on State vs the workout prose. Both map off the one shared
+// frielBand — now two science-defensible states at the 5% line ('good' ≤5% / 'needs_work' >5%).
+Deno.test('run decoupling assessment shares State frielBand states (Q-161)', () => {
+  // Negative decoupling folds into 'good'/'sound' — no separate "excellent" grade (a negative usually
+  // reflects a soft start, not superior durability).
+  assertEquals(decouplingAssessmentFromPct(-4), 'good');
+  assertEquals(frielBand(-4), 'sound');
 
-  // 0–5% strong coupling → 'good'.
+  // <5% → base sound → 'good'.
   assertEquals(decouplingAssessmentFromPct(3), 'good');
-  assertEquals(frielBand(3), 'strong');
+  assertEquals(frielBand(3), 'sound');
+  assertEquals(decouplingAssessmentFromPct(4.9), 'good');
 
-  // 5–10% base-building. OLD abs scale called ≥8% 'high' (alarm) — State calls it 'base' (mild).
-  // This is the exact contradiction the reconcile closes.
-  assertEquals(decouplingAssessmentFromPct(9), 'moderate');
-  assertEquals(frielBand(9), 'base');
-
-  // >10% durability gap → 'high'.
-  assertEquals(decouplingAssessmentFromPct(12), 'high');
-  assertEquals(frielBand(12), 'durability_gap');
-
-  // Boundary: 10% is still 'base'/moderate (≤10), 10.1% tips to durability_gap/high.
-  assertEquals(decouplingAssessmentFromPct(10), 'moderate');
-  assertEquals(decouplingAssessmentFromPct(10.1), 'high');
+  // ≥5% → needs work. No finer gradation (the 5–10 / >10 split was convention, not science).
+  assertEquals(decouplingAssessmentFromPct(5), 'needs_work');
+  assertEquals(frielBand(5), 'needs_work');
+  assertEquals(decouplingAssessmentFromPct(9), 'needs_work');
+  assertEquals(decouplingAssessmentFromPct(12), 'needs_work'); // >10 is not a separate grade
+  assertEquals(frielBand(12), 'needs_work');
 });

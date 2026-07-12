@@ -311,22 +311,63 @@ export interface StateTrendsV1 {
 
 export type FitnessDirection = 'improving' | 'stable' | 'declining' | 'mixed';
 
+export interface FitnessRollup {
+  direction: FitnessDirection;
+  /** Q-162: disciplines that HAD an improving/sliding verdict but were held OUT of the confident
+   *  direction because their trend is provisional (near-floor n or clustered in <21d — see
+   *  isProvisionalTrend) AND whose exclusion actually changed the headline. Surfaced so the read is
+   *  HONEST about the gap ("holding on what we can measure — not enough swim data yet") instead of
+   *  asserting a confident direction off thin data. Empty when thin data didn't change the read. */
+  thinHeldOut: string[];
+}
+
 /** Roll the per-discipline spine verdicts up to the coach's single fitness_direction. The coach
  *  DESCRIBES this; it no longer re-derives fitness its own way (the Step-2 narrative→spine lesson,
  *  one level up). Only disciplines with a real verdict count (needs_data is ignored, not asserted
- *  as a direction). Mixed = genuinely both ways; stable = no detected change OR no signal at all
- *  (matches the prior derivation's catch-all default, so the cold-start contract is unchanged). */
+ *  as a direction).
+ *
+ *  Q-162 — the composite must be only as confident as its inputs: a PROVISIONAL verdict (thin or
+ *  clustered data) cannot ASSERT a confident direction. The headline is decided by SOLID verdicts
+ *  only, so thin data can't make the composite read "improving" while the per-discipline breakdown
+ *  right below it hedges the same trend as "[provisional — sparse/limited data]". Mixed = solid
+ *  verdicts genuinely both ways; stable = no solid change OR no signal at all (matches the prior
+ *  catch-all default, so the cold-start contract is unchanged). */
+export function rollupFitness(v1: StateTrendsV1 | null | undefined): FitnessRollup {
+  if (!v1) return { direction: 'stable', thinHeldOut: [] };
+  const discs = ([
+    ['strength', v1.strength],
+    ['bike', v1.bike],
+    ['run', v1.run],
+    ['swim', v1.swim],
+  ] as const)
+    .map(([key, d]) => ({ key, verdict: d?.verdict, provisional: !!d?.provisional }))
+    .filter((d) => d.verdict && d.verdict !== 'needs_data');
+
+  const dirOf = (set: Array<{ verdict?: string }>): FitnessDirection => {
+    const vs = set.map((d) => d.verdict);
+    const hasImp = vs.includes('improving');
+    const hasSld = vs.includes('sliding');
+    if (hasImp && hasSld) return 'mixed';
+    if (hasImp) return 'improving';
+    if (hasSld) return 'declining';
+    return 'stable';
+  };
+
+  const solid = discs.filter((d) => !d.provisional);
+  // Confident direction from solid verdicts only — thin trends never assert it.
+  const direction = solid.length > 0 ? dirOf(solid) : 'stable';
+  // Name the gap ONLY when holding thin data out actually changed the headline (otherwise it's
+  // noise): the provisional movers that would have driven a different composite.
+  const directionAll = discs.length > 0 ? dirOf(discs) : 'stable';
+  const thinHeldOut = direction !== directionAll
+    ? discs.filter((d) => d.provisional && (d.verdict === 'improving' || d.verdict === 'sliding')).map((d) => d.key)
+    : [];
+  return { direction, thinHeldOut };
+}
+
+/** Back-compat single-enum view (callers that only want the direction). */
 export function rollupFitnessDirection(v1: StateTrendsV1 | null | undefined): FitnessDirection {
-  if (!v1) return 'stable';
-  const verdicts = [v1.strength?.verdict, v1.bike?.verdict, v1.run?.verdict, v1.swim?.verdict]
-    .filter((x) => x && x !== 'needs_data');
-  if (verdicts.length === 0) return 'stable';
-  const hasImp = verdicts.includes('improving');
-  const hasSld = verdicts.includes('sliding');
-  if (hasImp && hasSld) return 'mixed';
-  if (hasImp) return 'improving';
-  if (hasSld) return 'declining';
-  return 'stable'; // only holding
+  return rollupFitness(v1).direction;
 }
 
 /** Shape the assembled result into the cached contract. Per-discipline = the model's performance

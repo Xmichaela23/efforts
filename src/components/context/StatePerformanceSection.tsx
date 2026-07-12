@@ -150,23 +150,24 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-// Tier 1 — RUN row: DECOUPLING (aerobic durability) LEADS. The Friel band is the plain-language
-// VERDICT (band = state), the trend arrow is the direction, the % is the receipt; efficiency_index is
-// the quiet SECONDARY. Bands are a Friel/TrainingPeaks COACHING STANDARD, not a lab cutoff.
-// Honesty gates: stale → carry-forward "last steady run Nd ago" (never a current verdict); sparse →
-// "needs 20+ min steady effort" (what the metric needs, not what the user did wrong); the label
-// SCOPES the claim to steady runs (it did not measure intervals/short runs).
+// Tier 1 — RUN row: DECOUPLING (aerobic durability) LEADS. The band is the plain-language VERDICT
+// (band = state), the trend arrow is the direction, the % is the receipt; efficiency_index is the
+// quiet SECONDARY. Q-161: banded to the one science-backed line (Friel/TrainingPeaks ~5%) — ≤5% =
+// base sound, >5% = build more base. Honesty gates: stale → carry-forward "last steady run Nd ago"
+// (never a current verdict); sparse → "needs 20+ min steady effort" (what the metric needs, not what
+// the user did wrong); the label SCOPES the claim to steady runs (not intervals/short runs).
 const DECOUPLING_BAND: Record<DecouplingBand, { word: string; cls: string }> = {
-  excellent: { word: 'excellent aerobic fitness', cls: 'text-emerald-300' },
-  strong: { word: 'strong aerobic base', cls: 'text-emerald-400/90' },
-  base: { word: 'building aerobic base', cls: 'text-sky-400/85' },
-  durability_gap: { word: 'durability gap', cls: 'text-amber-400/90' },
+  sound: { word: 'aerobic base is sound', cls: 'text-emerald-300' },
+  needs_work: { word: 'aerobic base needs work', cls: 'text-amber-400/90' },
 };
 
 function RunFitnessRow({ fitness }: { fitness: RunFitness }) {
   const d = fitness.decoupling;
   const e = fitness.efficiency;
   const v = VERDICT[d.verdict];
+  // Q-161: an "i" that explains the metric AND its honest catch — a run can read >5% because it was
+  // hot/hilly/short, not because fitness slipped. Mirrors StateTab's tap-expand affordance.
+  const [explainOpen, setExplainOpen] = React.useState(false);
   return (
     <Row label="run">
       {d.verdict !== 'needs_data' && d.band ? (
@@ -188,8 +189,21 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness }) {
         // sparse → frame as what the metric needs, not a user failing
         <span className="text-white/40">needs 20+ min steady effort</span>
       )}
-      <span className="text-white/25 text-[10px]">aerobic durability · steady runs</span>
+      <button
+        type="button"
+        onClick={() => setExplainOpen((o) => !o)}
+        className="inline-flex items-baseline gap-1 text-white/25 text-[10px]"
+        aria-label="What aerobic decoupling means"
+      >
+        <span>aerobic durability · steady runs</span>
+        <span className="text-white/35 text-[9px]">{explainOpen ? '▾' : 'ⓘ'}</span>
+      </button>
       {asOf(d.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(d.newestAgeDays)}</span>}
+      {explainOpen && (
+        <p className="basis-full text-[10px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">
+          Aerobic decoupling — how much your heart rate drifted up while your pace held steady on a long, steady run. Under 5% means your aerobic base is holding. A higher number can also just mean heat, hills, or a short effort.
+        </p>
+      )}
       {e.verdict !== 'needs_data' && (
         <span className="inline-flex items-baseline gap-1">
           <span className="text-white/40">Efficiency</span>

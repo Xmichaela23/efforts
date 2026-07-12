@@ -11,15 +11,17 @@ import { formatCyclingClimbingRow, formatCyclingEfficiencyRow } from './build.ts
 
 // ── EFFICIENCY ──────────────────────────────────────────────────────────────
 
-Deno.test('efficiency: both values finite → "EF {ef} · {dec}% HR decoupling"', () => {
+// D-062 / Q-010: the EFFICIENCY row is plain-language ("Watts per heartbeat … · HR drift …%"), NOT the
+// old jargon ("EF … · …% HR decoupling"). This test drifted from that shipped change; realigned 2026-07-12.
+Deno.test('efficiency: both values finite → "Watts per heartbeat {ef} · HR drift {dec}%"', () => {
   assertEquals(
     formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: 4.3 }),
-    { label: 'EFFICIENCY', value: 'EF 1.62 · 4.3% HR decoupling' },
+    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.62 · HR drift 4.3%' },
   );
   // 0% decoupling is finite → still renders
   assertEquals(
     formatCyclingEfficiencyRow({ efficiency_factor: 1.7, aerobic_decoupling_pct: 0 }),
-    { label: 'EFFICIENCY', value: 'EF 1.7 · 0% HR decoupling' },
+    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.7 · HR drift 0%' },
   );
 });
 

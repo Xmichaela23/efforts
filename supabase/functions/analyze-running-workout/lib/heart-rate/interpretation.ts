@@ -636,15 +636,12 @@ function buildTempoSegmentStatement(tempo: NonNullable<DriftAnalysis['tempoSegme
 function buildEfficiencyStatement(efficiency: EfficiencyMetrics): string {
   const { percent, assessment } = efficiency.decoupling;
   
+  // Q-161: two states at the 5% science line (was excellent/good/moderate/high).
   switch (assessment) {
-    case 'excellent':
-      return `Pace:HR decoupling was ${percent}% — excellent efficiency throughout.`;
     case 'good':
-      return `Pace:HR decoupling was ${percent}% — good aerobic control.`;
-    case 'moderate':
-      return `Pace:HR decoupling was ${percent}% — your body worked harder to maintain pace in the second half.`;
-    case 'high':
-      return `Pace:HR decoupling was ${percent}% — significant drop in efficiency, suggesting this effort pushed your aerobic limits.`;
+      return `Pace:HR decoupling was ${percent}% — aerobic base looks sound for this duration.`;
+    case 'needs_work':
+      return `Pace:HR decoupling was ${percent}% — HR drifted up relative to pace, so the aerobic base has room to build (or heat/hills/a short effort nudged it).`;
     default:
       return '';
   }

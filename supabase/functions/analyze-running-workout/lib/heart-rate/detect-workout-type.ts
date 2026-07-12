@@ -130,19 +130,22 @@ function isFartlek(description: string, token: string): boolean {
  */
 function hasAlternatingPattern(intervals: IntervalData[]): boolean {
   if (intervals.length < 4) return false;
-  
+
+  // D-038 1A: prefer planned paceRange, but fall back to executed.avgPaceSPerMi for unplanned interval
+  // sessions logged as plain role:'lap' with no planned target — without this fallback those runs read
+  // all-zero pace here, miss the alternation, and default to steady_state/tempo (missing the mixed-effort
+  // decoupling path). Restored 2026-07-12 — the fallback was reverted by a8bf025b.
+  const pickPace = (iv: IntervalData): number => {
+    if (iv.paceRange) return (iv.paceRange.lower + iv.paceRange.upper) / 2;
+    const ex = iv.executed?.avgPaceSPerMi;
+    return typeof ex === 'number' && ex > 0 ? ex : 0;
+  };
+
   let alternations = 0;
   for (let i = 1; i < intervals.length; i++) {
-    const prev = intervals[i - 1];
-    const curr = intervals[i];
-    
-    const prevPace = prev.paceRange 
-      ? (prev.paceRange.lower + prev.paceRange.upper) / 2 
-      : 0;
-    const currPace = curr.paceRange 
-      ? (curr.paceRange.lower + curr.paceRange.upper) / 2 
-      : 0;
-    
+    const prevPace = pickPace(intervals[i - 1]);
+    const currPace = pickPace(intervals[i]);
+
     if (prevPace > 0 && currPace > 0) {
       // Significant pace difference (>15%) suggests alternation
       const diff = Math.abs(currPace - prevPace) / Math.min(currPace, prevPace);
