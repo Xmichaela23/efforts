@@ -26,6 +26,8 @@ export {
   computeTerrainBinnedPower,
   computeEfficiencyTrend,
   isProvisionalTrend,
+  bikeEfficiencyRideEligible,
+  bikeRideIntensityAerobic,
   POWER_BINS,
   type BikeEffortRide,
   type BikeSignal,

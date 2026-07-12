@@ -675,6 +675,8 @@ serve(async (req: Request) => {
           classified_type: r.workout_analysis?.classified_type ?? null,
           w20: r.workout_analysis?.bike_fitness_v1?.w20 ?? null,
           hr_at_band: r.workout_analysis?.bike_fitness_v1?.hr_at_band ?? null,
+          in_band_s: r.workout_analysis?.bike_fitness_v1?.in_band_s ?? null, // aerobic-band dwell → efficiency substrate gate
+          band_hi: r.workout_analysis?.bike_fitness_v1?.band_hi ?? null, // aerobic band ceiling (75% FTP) → efficiency intensity gate
           band_source: r.workout_analysis?.bike_fitness_v1?.band_source ?? null,
           hr_corrupt: !!r.workout_metadata?.hr_corrupt,
         }));

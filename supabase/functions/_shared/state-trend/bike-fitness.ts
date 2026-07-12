@@ -22,6 +22,42 @@ export const POWER_BINS: Record<string, Set<string>> = {
   flat_sustained: new Set(['threshold', 'sweet_spot', 'tempo']),
 };
 
+// HR-at-power efficiency is a STEADY-AEROBIC read (TrainingPeaks/Friel: EF & HR-at-power are computed on
+// aerobic endurance efforts only, never mixed ride types). The reference band [~56–75% FTP] captures
+// INCIDENTAL in-band time on hard rides too (a climb's warmup/descents), where HR is dragged up by the
+// overall effort — so feeding climbing/threshold/sweet-spot/tempo rides into the "aerobic efficiency"
+// trend fabricates a false direction (verified on Michael's data 2026-07-11: the mid-series HR spike was
+// a May CLIMBING block, not declining fitness; aerobic-only, HR-at-band is flat/slightly-up, NOT -5.5%
+// improving). Gate the efficiency substrate to steady-aerobic types + a minimum in-band dwell so a
+// few-second in-band sample can't count. Q-117 status #2 closed. Mirrors run's isSteadyAerobic.
+export const BIKE_EFFICIENCY_AEROBIC_TYPES = new Set(['endurance', 'endurance_long', 'recovery']);
+export const MIN_EFFICIENCY_IN_BAND_S = 600; // ≥10 min of aerobic-band dwell for a trustworthy per-ride HR-at-power
+// A ride labeled "endurance" but RIDDEN hard still contaminates the HR-at-power read: a threshold-level
+// segment jacks in-band HR via cardiac lag (verified on Michael's data — a 165W/94%-FTP "endurance" ride
+// read 145bpm and single-handedly faked a -4.7% "improving"). So also require NO threshold-or-harder
+// effort: best-20-min power below the Coggan Z4 floor (~90% FTP). FTP is derived from the aerobic band
+// ceiling (band_hi = 75% FTP → FTP = band_hi / 0.75), so the gate is per-ride and FTP-change-safe.
+const THRESHOLD_FTP_FRACTION = 0.90; // Coggan Z4 (threshold) floor — at/above = a hard effort, not steady aerobic
+/** Was the ride ridden as a steady aerobic effort (no threshold-level work)? SHARED by both bike engines
+ *  — the spine HR-at-power efficiency AND the coach's within-ride HR-drift row — so "how hard is too hard
+ *  to count as an aerobic read" has ONE definition. Best-20-min < 90% FTP (FTP = band_hi / 0.75). Absent
+ *  w20/band_hi → true (can't assess intensity; don't over-drop). */
+export function bikeRideIntensityAerobic(w20?: number | null, bandHi?: number | null): boolean {
+  if (!(Number(w20) > 0) || !(Number(bandHi) > 0)) return true;
+  const ftp = Number(bandHi) / 0.75;
+  return Number(w20) < ftp * THRESHOLD_FTP_FRACTION;
+}
+export function bikeEfficiencyRideEligible(
+  classifiedType: string | null | undefined,
+  inBandS: number | null | undefined,
+  w20?: number | null,
+  bandHi?: number | null,
+): boolean {
+  if (!classifiedType || !BIKE_EFFICIENCY_AEROBIC_TYPES.has(String(classifiedType))) return false;
+  if (!(Number(inBandS) >= MIN_EFFICIENCY_IN_BAND_S)) return false;
+  return bikeRideIntensityAerobic(w20, bandHi);
+}
+
 const PROVISIONAL_MAX_N = 4; // n ∈ {minSessions..4} → provisional (near the floor)
 const PROVISIONAL_MIN_SPAN_DAYS = 21; // qualifying points clustered in <3wk → provisional
 

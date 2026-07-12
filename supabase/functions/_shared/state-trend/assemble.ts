@@ -10,7 +10,7 @@
 // Import from source modules (NOT ./index.ts) — index.ts re-exports this file, so importing the
 // barrel here would create a load-order cycle.
 import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, type LiftSeries, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
-import { computeBikeFitness, isProvisionalTrend, type BikeFitness } from './bike-fitness.ts';
+import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
@@ -73,7 +73,7 @@ export interface StateTrendInputs {
   asOf: string;
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
   strengthVolumeRows?: StrengthVolumeRow[]; // per-strength-workout total_volume_lbs (the volume trend)
-  bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; band_source: string | null; hr_corrupt?: boolean }>;
+  bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; in_band_s?: number | null; band_hi?: number | null; band_source: string | null; hr_corrupt?: boolean }>;
   runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; efficiency_index?: number | null; decoupling_pct?: number | null; decoupling_basis?: string | null; decoupling_confounded?: boolean | null; workout_type?: string | null; duration_minutes?: number | null; classified_type: string | null }>;
   swimRows: Array<{ date: string; pace_per_100m: number; rest_fraction?: number | null; distance_m?: number | null }>;
   plannedBy: Record<string, number>; // this-week planned counts per discipline
@@ -116,6 +116,10 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const binRides = inp.bikeRows.map((r) => ({ date: r.date, classified_type: r.classified_type, w20: r.w20 }));
   const hrPts = inp.bikeRows
     .filter((r) => Number(r.hr_at_band) > 0 && !r.hr_corrupt)
+    // STEADY-AEROBIC ONLY: exclude climbing/threshold/sweet-spot/tempo (their in-band time is incidental,
+    // HR dragged up by the overall effort) + require ≥10min in-band dwell. Without this the "aerobic
+    // efficiency" trend reads ride-type MIX as fitness (the fabricated -5.5% "improving" — Q-117 #2).
+    .filter((r) => bikeEfficiencyRideEligible(r.classified_type, r.in_band_s, r.w20, r.band_hi))
     .map((r) => ({ date: r.date, value: Number(r.hr_at_band) }));
   const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike);
   bikeFitness.efficiency.basis = inp.bikeRows.map((r) => r.band_source).find((s) => s) ?? null;
