@@ -375,8 +375,10 @@ export interface HrResponseRollup {
    *  HR drifting up / working harder for the same output; 'improving' = HR settling. */
   verdict: 'improving' | 'holding' | 'sliding' | 'needs_data';
   contributors: Array<{ discipline: 'run' | 'bike'; verdict: string; provisional: boolean; newestAgeDays: number | null }>;
-  /** Freshest contributing session age in days (min across contributors), for the "as of" stamp. */
-  newestAgeDays: number | null;
+  /** Age (days) of the OLDEST contributing session — the "as of" stamp uses this so a combined read is
+   *  never shown fresher than its stalest half (a 5-day bike + 14-day run stamps "as of {14d ago}", not
+   *  the fresh bike date). Honesty > recency: don't let a current-looking date mask a 2-week-old input. */
+  asOfAgeDays: number | null;
 }
 
 /** Holistic heart-rate response across endurance, read from the SPINE (not re-derived): run = aerobic
@@ -386,14 +388,14 @@ export interface HrResponseRollup {
  *  This replaces the coach's run-only re-derived HR-drift with a single-source read that covers every
  *  discipline whose HR is trustworthy. */
 export function rollupHrResponse(v1: StateTrendsV1 | null | undefined): HrResponseRollup {
-  if (!v1) return { verdict: 'needs_data', contributors: [], newestAgeDays: null };
+  if (!v1) return { verdict: 'needs_data', contributors: [], asOfAgeDays: null };
   const runD = v1.run?.decoupling;
   const bikeE = v1.bike?.efficiency as (StateTrendsV1['bike']['efficiency'] & { newestAgeDays?: number | null }) | undefined;
   const all: Array<{ discipline: 'run' | 'bike'; verdict?: string; provisional: boolean; newestAgeDays: number | null }> = [];
   if (runD) all.push({ discipline: 'run', verdict: runD.verdict, provisional: !!runD.provisional, newestAgeDays: runD.newestAgeDays ?? null });
   if (bikeE) all.push({ discipline: 'bike', verdict: bikeE.verdict, provisional: !!bikeE.provisional, newestAgeDays: bikeE.newestAgeDays ?? null });
   const contributors = all.filter((c) => c.verdict && c.verdict !== 'needs_data') as HrResponseRollup['contributors'];
-  if (contributors.length === 0) return { verdict: 'needs_data', contributors: [], newestAgeDays: null };
+  if (contributors.length === 0) return { verdict: 'needs_data', contributors: [], asOfAgeDays: null };
 
   const solid = contributors.filter((c) => !c.provisional);
   const dirOf = (set: HrResponseRollup['contributors']): HrResponseRollup['verdict'] => {
@@ -406,8 +408,8 @@ export function rollupHrResponse(v1: StateTrendsV1 | null | undefined): HrRespon
   };
   const verdict = solid.length > 0 ? dirOf(solid) : 'holding';
   const ages = contributors.map((c) => c.newestAgeDays).filter((a): a is number => a != null);
-  const newestAgeDays = ages.length ? Math.min(...ages) : null;
-  return { verdict, contributors, newestAgeDays };
+  const asOfAgeDays = ages.length ? Math.max(...ages) : null; // OLDEST input → stamp can't overstate freshness
+  return { verdict, contributors, asOfAgeDays };
 }
 
 /** Shape the assembled result into the cached contract. Per-discipline = the model's performance
