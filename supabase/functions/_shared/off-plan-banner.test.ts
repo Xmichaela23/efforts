@@ -122,23 +122,3 @@ Deno.test('D-268 P2 NEG: endurance-primary → original run-centric banner uncha
     CARRIED_EASY,
   );
 });
-
-// ── D-281 / Q-166: the banner must survive the new 'productive' state ─────────
-// The cross-training-carried athlete is EXACTLY who this banner exists to explain — and D-281 is what
-// moves that athlete from 'on_target' to 'productive'. A hardcoded ['under','on_target'] gate would
-// have silently dropped the banner for them at the very moment the verdict started naming their load.
-Deno.test("D-281: loadStatus 'productive' (rank 1, non-alarming) still shows the carried-load banner", () => {
-  assertEquals(
-    offPlanAdherenceBanner({ loadStatus: 'productive', runLoadPct: -100, weekIntent: 'baseline', totalAcwr: 1.45, perDomain: pd(252, 58, 68) }),
-    CARRIED_EASY,
-  );
-});
-
-// The other side of the gate: a genuinely elevated week is NOT explained away by this banner — the load
-// verdict itself is the message, and the banner would talk over it.
-Deno.test("D-281: loadStatus 'elevated' still suppresses the banner (the verdict speaks, not the banner)", () => {
-  assertEquals(
-    offPlanAdherenceBanner({ loadStatus: 'elevated', runLoadPct: -100, weekIntent: 'baseline', totalAcwr: 1.64, perDomain: pd(252, 58, 68) }),
-    null,
-  );
-});

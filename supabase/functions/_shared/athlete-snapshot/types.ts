@@ -5,8 +5,6 @@
 // Sections 1-4 are deterministic. Section 5 (coaching) is the only LLM layer.
 // =============================================================================
 
-import type { LoadStatusLevel } from '../load-status-reconcile.ts';
-
 // ---------------------------------------------------------------------------
 // 1. Identity (slow-changing — weekly rebuild cadence)
 // ---------------------------------------------------------------------------
@@ -205,13 +203,7 @@ export type BodyResponse = {
     running_weighted_week_load_pct: number | null;
     unplanned_summary: string | null;
     cross_training_load_summary: string | null;
-    /**
-     * The reconciled load verdict. The union is IMPORTED from the reconciler (D-260, sole authority)
-     * rather than re-spelled here — when it was re-spelled, D-280's new 'productive' state was added
-     * to the reconciler and NOT to this type, so the snapshot has been carrying a value its own
-     * contract forbade. A duplicated enum is a fork waiting to happen; there is now one definition.
-     */
-    status: LoadStatusLevel;
+    status: 'under' | 'on_target' | 'elevated' | 'high';
     interpretation: string;
     /** D-264 step 0: mean run HR drift (bpm) this week — receipt for the cardiac read-path fix. */
     avg_run_hr_drift_bpm?: number | null;

@@ -583,6 +583,8 @@ export type SessionInterpretation = {
     actual_stimulus: string;
     alignment: 'on_target' | 'partial' | 'missed' | 'exceeded';
   };
-  // D-281: `weekly_impact` REMOVED — a week-load verdict minted by a second engine, from all-null
-  // inputs, and rendered by nothing. The week is State's fact, from the reconciler (D-260).
+  weekly_impact: {
+    load_status: 'under' | 'on_track' | 'over';
+    note: string;
+  };
 }

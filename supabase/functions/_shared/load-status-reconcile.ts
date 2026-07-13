@@ -52,14 +52,6 @@ export type TrendInfo = { trend: string; based_on_sessions: number };
 
 export const LOAD_RANK: Record<string, number> = { under: 0, on_target: 1, productive: 1, elevated: 2, high: 3 };
 
-// ── Total-load ACWR bands (D-281 / Q-166) ────────────────────────────────────
-// The field's two lines on a TOTAL acute:chronic ratio, on a real chronic base:
-//   >1.3  a real ramp — name it (absorbed → 'productive'; Garmin "Productive" / COROS "Optimized")
-//   >1.5  a STEEP ramp — COROS calls this "excessive". Even absorbed it is NOT painted green:
-//         it reads 'elevated' ("a bit high · handling it"), never 'productive'.
-export const TOTAL_ELEVATED_MIN = ACWR_RATIO_THRESHOLDS.ramp_fast;    // 1.3
-export const TOTAL_STEEP_RAMP_MIN = ACWR_RATIO_THRESHOLDS.overreaching; // 1.5
-
 export interface BodyTrends {
   cardiac: TrendInfo;
   effort_perception: TrendInfo;
@@ -291,39 +283,16 @@ export function reconcileLoadStatus(
     raise('elevated', `key session upcoming with ${decliningSignals[0]} declining`);
   }
 
-  // ── Total-load band (D-281 / Q-166) ────────────────────────────────────
-  // `unweightedAcwr` is the TOTAL 7d:28d ratio across every discipline, and the caller
-  // already nulls it on a thin chronic base (coach: chronic28Load < CHRONIC_LOAD_FLOOR),
-  // so a non-null value IS a real base. A real elevation on a real base is real regardless
-  // of WHICH disciplines produced it — attribution decides the WORDS, never whether the
-  // elevation is SEEN.
-  //
-  // This REPLACES the old cross-training escalation, which could only fire when running
-  // ACWR was quiet AND some single non-run discipline was itself mature and above 1.3.
-  // An athlete whose spike is spread across several cross-training disciplines (none of
-  // them individually over 1.3) satisfied neither gate, so a genuine total-load elevation
-  // stayed at 'on_target' and rendered "balanced" — the Q-166 bug. Bands are Gabbett /
-  // COROS: >1.3 a real ramp, >1.5 a steep one. Escalating here is safe because it is
-  // DESCRIPTIVE: the two-key cap below caps any load-only 'high' to 'elevated', and an
-  // absorbed elevation is relabeled 'productive' — so seeing the elevation can never
-  // manufacture a false "back off".
-  //
-  // GUARDED on !isPlanTransition, like every other escalation path here (body signals :259, key
-  // sessions :290). In the first two plan weeks the 7d window is the NEW plan while the 28d baseline is
-  // still half the OLD cycle — the ratio is an artifact, and the app already says so out loud (the coach
-  // tells the LLM "do NOT flag load as elevated or suggest recovery based on the load ratio" in this
-  // window). Escalating off a number we elsewhere declare contaminated is how a real athlete on WK1 got
-  // told to "pull back" while every body signal on the same card said he was handling it fine.
-  if (unweightedAcwr != null && !spikeOnEmptyBase && !isPlanTransition) {
-    const a = unweightedAcwr.toFixed(2);
-    const runIsQuiet = raw.running_acwr == null || raw.running_acwr < 1.1;
-    const crossTrainingLed = runIsQuiet
-      && (discProfiles?.some(p => p.discipline !== 'run' && p.acwr != null && p.acwr > 1.1) ?? false);
-    const who = crossTrainingLed ? 'cross-training pushing total load to' : 'total load at';
-    if (unweightedAcwr > TOTAL_STEEP_RAMP_MIN) {
-      raise('high', `${who} ACWR ${a}`);
-    } else if (unweightedAcwr > TOTAL_ELEVATED_MIN) {
-      raise('elevated', `${who} ACWR ${a}`);
+  // Cross-training ACWR gap — skip escalation when cross-training disciplines
+  // are still "building" (near-zero chronic baseline makes ACWR meaningless)
+  const crossTrainingEstablished = discProfiles
+    ? discProfiles.some(p => p.discipline !== 'run' && p.maturity !== 'building' && p.acwr != null && p.acwr > 1.3)
+    : true;
+  if (unweightedAcwr != null && (raw.running_acwr == null || raw.running_acwr < 1.1) && crossTrainingEstablished) {
+    if (unweightedAcwr > 1.5) {
+      raise('high', `cross-training spiking total ACWR to ${unweightedAcwr.toFixed(2)}`);
+    } else if (unweightedAcwr > 1.3) {
+      raise('elevated', `cross-training pushing total ACWR to ${unweightedAcwr.toFixed(2)}`);
     }
   }
 
@@ -468,40 +437,14 @@ export function reconcileLoadStatus(
   // only load-only highs cap. This is the structural defense against the false "back off".
   // A REAL load elevation the body is ABSORBING (no corroborated strain) is PRODUCTIVE — surface the
   // elevation as a positive, not "balanced" (hides it) and not "back off" (a false alarm). A corroborated
-  // -strain high stays 'high' ("pull back"). It also requires good readiness (fresh/adapting/normal): a
-  // fatigued athlete on a flat-effort week is NOT "productive", so that path caps to 'elevated' below.
+  // -strain high stays 'high' ("pull back"). Only genuine elevations reach here: a thin/empty-base spike
+  // was already downgraded to 'under' above, so 'productive' can't fire off an unreliable ratio.
+  // …AND requires good readiness (fresh/adapting/normal): a fatigued athlete on a flat-effort week is NOT
+  // "productive", so that path still caps to 'elevated' via the else-if.
   const bodyGenuinelyFine = (readiness === 'fresh' || readiness === 'adapting' || readiness === 'normal') && nDeclining < 2;
-  const absorbing = !corroboratedStrain && bodyGenuinelyFine;
-
-  // ── D-281 / Q-166: name the elevation, at the ONE place every path converges ──
-  // Two claims, and 'productive' makes BOTH: "the load is genuinely elevated" AND "the body is
-  // absorbing it". So it needs a ratio it can trust for the first claim — a non-null TOTAL ACWR
-  // (the caller nulls it on a thin chronic base) above the ramp line, and not a spike on an empty
-  // base. Without that, only the second claim holds, which is just the two-key cap (below).
-  //
-  // This closes two holes the earlier wording asserted but did not enforce:
-  //   · "a thin-base spike was already downgraded to 'under'" — it isn't on easy/recovery/deload
-  //     weeks (the downgrade skips them), so such a week could reach 'productive' off a ratio we
-  //     don't trust;
-  //   · a null ACWR could still print "load elevated (ACWR n/a) … productive" — an athlete escalated
-  //     by ONE declining body signal, with no ratio at all, being told they're absorbing an elevation.
-  // You cannot absorb an elevation you have no base for.
-  // Same plan-transition guard as the band above: a contaminated ratio cannot support the claim
-  // "your load is genuinely elevated", so it cannot mint 'productive' either.
-  const realElevation = unweightedAcwr != null && unweightedAcwr > TOTAL_ELEVATED_MIN
-    && !spikeOnEmptyBase && !isPlanTransition;
-  const steepRamp = unweightedAcwr != null && unweightedAcwr > TOTAL_STEEP_RAMP_MIN;
-  // 'on_target' is included deliberately: the escalation math can still park a real elevation there
-  // (Gate 2's build-band tolerance, the plan-primary reclass) — that is the "balanced" lie of Q-166.
-  const namableStatus = status === 'high' || status === 'elevated' || status === 'on_target';
-
-  if (realElevation && absorbing && namableStatus) {
-    // In-band (≤1.5) → 'productive'. A STEEP ramp (>1.5) → 'elevated': honest about the ramp, without
-    // a false alarm, and without painting it green (COROS calls >1.5 excessive even when absorbed).
-    status = steepRamp ? 'elevated' : 'productive';
-    reasons.push(steepRamp
-      ? `total load ACWR ${unweightedAcwr!.toFixed(2)} — a steep ramp; the body's handling it so far`
-      : `load elevated (ACWR ${unweightedAcwr!.toFixed(2)}) and the body's absorbing it — productive`);
+  if ((status === 'high' || status === 'elevated') && !corroboratedStrain && bodyGenuinelyFine) {
+    status = 'productive';
+    reasons.push(`load elevated (ACWR ${unweightedAcwr != null ? unweightedAcwr.toFixed(2) : 'n/a'}) and the body's absorbing it — productive`);
   } else if (status === 'high' && !corroboratedStrain) {
     status = 'elevated';
     reasons.push('load high but body absorbing — no corroborated strain (two-key)');
