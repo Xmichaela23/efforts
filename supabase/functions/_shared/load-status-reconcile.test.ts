@@ -196,10 +196,13 @@ Deno.test('regression: Michael WK1 as unknown phase → elevated (Gate 1 clears 
 // unplanned load 200% of plan → reconciler reaches 'high' from load alone.
 const LOAD_HIGH = { runLoadPct: 60, unplannedLoad: { count: 5, totalLoad: 200, plannedWeekLoad: 100 } } as const;
 
-Deno.test('two-key cap: load-high + NOT corroborated → capped to elevated (the false-back-off defense)', () => {
+Deno.test('two-key cap: load-high + NOT corroborated + body fine → PRODUCTIVE (elevation surfaced, no false back-off)', () => {
+  // Field-standard (Garmin "Productive" / COROS "Optimized"): a real load-high the body is absorbing
+  // reads PRODUCTIVE — still not "high"/"pull back" (the two-key false-back-off defense holds), but it
+  // names the elevation instead of the softer "elevated"/"a bit high".
   const r = run({ ...LOAD_HIGH, corroboratedStrain: false });
-  assertEquals(r.status, 'elevated');
-  assertStringIncludes(r.interpretation, 'no corroborated strain');
+  assertEquals(r.status, 'productive');
+  assertStringIncludes(r.interpretation, 'absorbing');
 });
 Deno.test('two-key cap: load-high + corroborated → stays high (body agrees)', () => {
   assertEquals(run({ ...LOAD_HIGH, corroboratedStrain: true }).status, 'high');

@@ -1,11 +1,14 @@
 import React from 'react';
 import { getDisciplineColor } from '@/lib/context-utils';
-import { acwrZone, statusVolumeLabel } from '@/lib/load-headline';
+import { statusVolumeLabel } from '@/lib/load-headline';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface LoadBarData {
   acwr: number | null;
+  /** The ACWR ratio rests on a chronic base too short to trust (Gabbett ~4wk; Garmin/COROS/Intervals
+   *  gate on an established base). Rendered "· provisional" so a bare high number isn't read as a real spike. */
+  acwr_provisional?: boolean;
   wtd_actual_load: number | null;
   wtd_planned_load?: number | null;
   daily_load_7d: Array<{
@@ -17,7 +20,7 @@ export interface LoadBarData {
 }
 
 export interface LoadBarStatus {
-  status: 'under' | 'on_target' | 'elevated' | 'high';
+  status: 'under' | 'on_target' | 'productive' | 'elevated' | 'high';
 }
 
 interface LoadBarProps {
@@ -33,6 +36,7 @@ interface LoadBarProps {
 // Color for the reconciled VERDICT word (D-260/D-266 — statusVolumeLabel's outputs only).
 function loadVolumeColor(label: string): string {
   if (label === 'balanced') return 'text-emerald-400/85';
+  if (label === 'productive') return 'text-emerald-400/85'; // real elevation, absorbing it — positive
   if (label === 'build more') return 'text-sky-400/85';
   if (label === 'a bit high') return 'text-amber-400/85'; // reconciled 'elevated' (descriptive)
   if (label === 'pull back') return 'text-red-400/85';    // reconciled 'high' (corroborated)
@@ -96,10 +100,17 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
           {showVerdict && (
             <span className={`text-[14px] font-semibold tracking-tight ${loadVolumeColor(verdict)}`}>{verdict}</span>
           )}
-          {load.acwr != null && acwrZone(load.acwr) && (
+          {load.acwr != null && (
             <>
               {showVerdict && <Dot />}
-              <span className="text-[10px] tabular-nums text-white/40 leading-none">ACWR {load.acwr.toFixed(1)} · {acwrZone(load.acwr)}</span>
+              {/* ACWR is a BARE reference number — no zone word ("optimal"/"pushing"). The zone label
+                  editorializes and competes with the engine's verdict (a 1.2 "optimal" next to a
+                  "build more" verdict reads as a contradiction). One voice: the verdict judges, ACWR
+                  is just the datapoint (D-260). */}
+              <span className="text-[10px] tabular-nums text-white/40 leading-none">ACWR {load.acwr.toFixed(1)}</span>
+              {load.acwr_provisional && (
+                <span className="text-[9px] text-white/30 leading-none">· provisional</span>
+              )}
             </>
           )}
         </div>

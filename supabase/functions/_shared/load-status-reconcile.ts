@@ -36,7 +36,10 @@
 
 import { ACWR_RATIO_THRESHOLDS, isAcwrDetrainedSignal } from './acwr-state.ts';
 
-export type LoadStatusLevel = 'under' | 'on_target' | 'elevated' | 'high';
+// 'productive' = a REAL load elevation the body is absorbing (Garmin "Productive" / COROS "Optimized" /
+// Intervals "Optimal"): non-alarming like on_target, but names the elevation instead of hiding it as
+// "balanced". Applied as the final relabel, so it never participates in the rank-based escalation math.
+export type LoadStatusLevel = 'under' | 'on_target' | 'productive' | 'elevated' | 'high';
 
 export type ReconcileLoadInput = {
   status: LoadStatusLevel;
@@ -47,7 +50,7 @@ export type ReconcileLoadInput = {
 
 export type TrendInfo = { trend: string; based_on_sessions: number };
 
-export const LOAD_RANK: Record<string, number> = { under: 0, on_target: 1, elevated: 2, high: 3 };
+export const LOAD_RANK: Record<string, number> = { under: 0, on_target: 1, productive: 1, elevated: 2, high: 3 };
 
 export interface BodyTrends {
   cardiac: TrendInfo;
@@ -204,7 +207,7 @@ export function reconcileLoadStatus(
    *  overreached), body/safety-driven highs pass; only load-only highs cap. Default true =
    *  no cap (backward-compat for callers that don't pass it). */
   corroboratedStrain: boolean = true,
-): { status: LoadStatusLevel; interpretation: string } {
+): { status: LoadStatusLevel; interpretation: string; acwrProvisional: boolean } {
   const reasons: string[] = [];
 
   // ── 0. Assess body response quality (shared computation — D-264) ───────
@@ -432,7 +435,17 @@ export function reconcileLoadStatus(
   // 'elevated' — descriptive, not prescriptive. `corroboratedStrain` already includes the
   // safety floor (nDeclining≥2 / fatigued / overreached), so body/safety highs pass and
   // only load-only highs cap. This is the structural defense against the false "back off".
-  if (status === 'high' && !corroboratedStrain) {
+  // A REAL load elevation the body is ABSORBING (no corroborated strain) is PRODUCTIVE — surface the
+  // elevation as a positive, not "balanced" (hides it) and not "back off" (a false alarm). A corroborated
+  // -strain high stays 'high' ("pull back"). Only genuine elevations reach here: a thin/empty-base spike
+  // was already downgraded to 'under' above, so 'productive' can't fire off an unreliable ratio.
+  // …AND requires good readiness (fresh/adapting/normal): a fatigued athlete on a flat-effort week is NOT
+  // "productive", so that path still caps to 'elevated' via the else-if.
+  const bodyGenuinelyFine = (readiness === 'fresh' || readiness === 'adapting' || readiness === 'normal') && nDeclining < 2;
+  if ((status === 'high' || status === 'elevated') && !corroboratedStrain && bodyGenuinelyFine) {
+    status = 'productive';
+    reasons.push(`load elevated (ACWR ${unweightedAcwr != null ? unweightedAcwr.toFixed(2) : 'n/a'}) and the body's absorbing it — productive`);
+  } else if (status === 'high' && !corroboratedStrain) {
     status = 'elevated';
     reasons.push('load high but body absorbing — no corroborated strain (two-key)');
   }
@@ -452,5 +465,10 @@ export function reconcileLoadStatus(
     interpretation = reasons.length > 0 ? `${raw.interpretation}. ${reasons.join('; ')}` : raw.interpretation;
   }
 
-  return { status, interpretation };
+  // Provisional-ACWR flag (field-standard): an elevated ratio that did NOT drive the verdict (status
+  // stayed on_target/under) was discounted as thin/empty-base — the chronic base is too short for the
+  // ratio to be trustworthy (Gabbett: ~4wk chronic needed; Garmin/COROS/Intervals gate on an established
+  // base before the ratio counts). Flag it so the bare number isn't read as a real spike.
+  const acwrProvisional = unweightedAcwr != null && unweightedAcwr >= 1.3 && (status === 'on_target' || status === 'under');
+  return { status, interpretation, acwrProvisional };
 }

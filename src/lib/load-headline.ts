@@ -25,6 +25,7 @@ export function acwrVolumeLabel(v: number | null | undefined): string {
 export function statusVolumeLabel(status: string | null | undefined): string {
   if (status === 'under') return 'build more';
   if (status === 'on_target') return 'balanced';
+  if (status === 'productive') return 'productive'; // real elevation, body absorbing it (Garmin/COROS/Intervals)
   if (status === 'elevated') return 'a bit high';
   if (status === 'high') return 'pull back';
   return '—';
