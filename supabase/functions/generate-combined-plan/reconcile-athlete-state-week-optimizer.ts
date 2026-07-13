@@ -113,21 +113,6 @@ function resolveSessionFrequencyDefaults(state: AthleteState): SessionFrequencyD
   const inputs: SessionFrequencyInputs = {
     weekly_hours_available: state.weekly_hours_available,
     days_per_week,
-    // PROVISIONAL (F-9): thread sport from per_discipline_posture so a single-sport non-race goal
-    // (run-only / bike-only) gets a single-sport frequency instead of the triathlon split. Absent
-    // posture (events / legacy) → undefined → computeSessionFrequencyDefaults defaults to 'triathlon'
-    // → byte-identical. Multi-discipline / swim-present → 'triathlon' (unchanged).
-    ...((): { sport?: 'triathlon' | 'running' | 'cycling' } => {
-      const p = (state as { per_discipline_posture?: Record<string, string> }).per_discipline_posture;
-      if (!p || typeof p !== 'object') return {};
-      const on = (d: string) => p[d] === 'develop' || p[d] === 'maintain';
-      const swim = on('swim'), bike = on('bike'), run = on('run');
-      const n = [swim, bike, run].filter(Boolean).length;
-      if (n === 1 && run) return { sport: 'running' };
-      if (n === 1 && bike) return { sport: 'cycling' };
-      if (n === 0) return {}; // strength-only — no endurance; default path (F-10 gate handles upstream)
-      return { sport: 'triathlon' };
-    })(),
     ...(state.limiter_sport === 'swim' || state.limiter_sport === 'bike' || state.limiter_sport === 'run'
       ? { limiter_sport: state.limiter_sport }
       : {}),

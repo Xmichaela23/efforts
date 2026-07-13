@@ -92,8 +92,8 @@ export type FrequencyPhase = 'base' | 'build' | 'race_specific' | 'taper' | 'rec
 /** Output: per-discipline session counts plus telemetry. */
 export interface SessionFrequencyDefaults {
   swims_per_week: 0 | 1 | 2 | 3;
-  bikes_per_week: 0 | 1 | 2 | 3; // PROVISIONAL (F-9): 0 added so single-sport non-race shapes (run-only) carry no bikes
-  runs_per_week: 0 | 1 | 2 | 3 | 4 | 5; // PROVISIONAL (F-9): 0/1 added for bike-only / low-volume non-race shapes
+  bikes_per_week: 1 | 2 | 3;
+  runs_per_week: 2 | 3 | 4 | 5;
   strength_per_week: 0 | 1 | 2 | 3;
   /**
    * Brick sessions per week, keyed by phase. The TYPICAL mid-build cap from
@@ -129,9 +129,9 @@ type TierLabel = SessionFrequencyDefaults['tier_label'];
 
 /** Cell of the (hours_tier × days_per_week) matrix. */
 interface MatrixCell {
-  swims: 0 | 1 | 2 | 3;
-  bikes: 0 | 1 | 2 | 3;
-  runs: 0 | 1 | 2 | 3 | 4 | 5;
+  swims: 1 | 2 | 3;
+  bikes: 1 | 2 | 3;
+  runs: 2 | 3 | 4 | 5;
 }
 
 /**
@@ -177,32 +177,11 @@ const TRIATHLON_MATRIX: SportMatrix = {
   },
 };
 
-// ⚠️ PROVISIONAL — NOT SCIENCE-FINAL (F-9 plumbing proof, 2026-06-28). These run/bike-focused cells
-// exist only to prove the non-race pipeline schedules a real single-sport week instead of a stripped
-// triathlon week. Numbers are placeholders pending the SPEC-non-race-goal-plan-contract.md sourcing
-// pass (sign-off gate #2). Swims=0 (swim is tri-only per the spec). Do NOT treat as final frequency.
-const RUNNING_MATRIX_PROVISIONAL: SportMatrix = {
-  '5-7':   { 5: { swims: 0, bikes: 0, runs: 3 }, 6: { swims: 0, bikes: 0, runs: 3 }, 7: { swims: 0, bikes: 0, runs: 4 } },
-  '8-10':  { 5: { swims: 0, bikes: 0, runs: 4 }, 6: { swims: 0, bikes: 0, runs: 4 }, 7: { swims: 0, bikes: 0, runs: 5 } },
-  '10-12': { 5: { swims: 0, bikes: 0, runs: 4 }, 6: { swims: 0, bikes: 0, runs: 5 }, 7: { swims: 0, bikes: 0, runs: 5 } },
-  '12-14': { 5: { swims: 0, bikes: 0, runs: 5 }, 6: { swims: 0, bikes: 0, runs: 5 }, 7: { swims: 0, bikes: 0, runs: 5 } },
-  '14+':   { 5: { swims: 0, bikes: 0, runs: 5 }, 6: { swims: 0, bikes: 0, runs: 5 }, 7: { swims: 0, bikes: 0, runs: 5 } },
-};
-// ⚠️ PROVISIONAL — NOT SCIENCE-FINAL. Bikes capped at 3 by the current type; a real cycling matrix
-// needs higher bike frequency (gate #2). Runs=0, swims=0.
-const CYCLING_MATRIX_PROVISIONAL: SportMatrix = {
-  '5-7':   { 5: { swims: 0, bikes: 3, runs: 0 }, 6: { swims: 0, bikes: 3, runs: 0 }, 7: { swims: 0, bikes: 3, runs: 0 } },
-  '8-10':  { 5: { swims: 0, bikes: 3, runs: 0 }, 6: { swims: 0, bikes: 3, runs: 0 }, 7: { swims: 0, bikes: 3, runs: 0 } },
-  '10-12': { 5: { swims: 0, bikes: 3, runs: 0 }, 6: { swims: 0, bikes: 3, runs: 0 }, 7: { swims: 0, bikes: 3, runs: 0 } },
-  '12-14': { 5: { swims: 0, bikes: 3, runs: 0 }, 6: { swims: 0, bikes: 3, runs: 0 }, 7: { swims: 0, bikes: 3, runs: 0 } },
-  '14+':   { 5: { swims: 0, bikes: 3, runs: 0 }, 6: { swims: 0, bikes: 3, runs: 0 }, 7: { swims: 0, bikes: 3, runs: 0 } },
-};
-
 const SPORT_MATRIX: Partial<Record<Sport, SportMatrix>> = {
   triathlon: TRIATHLON_MATRIX,
-  running: RUNNING_MATRIX_PROVISIONAL,   // PROVISIONAL (F-9) — see note above
-  cycling: CYCLING_MATRIX_PROVISIONAL,   // PROVISIONAL (F-9) — see note above
-  // hybrid:   TBD — multi-endurance-no-tri; sport-derivation maps it to 'triathlon' for now
+  // running:  TBD — distinct matrix when run-only plans gain matrix-aware frequency
+  // cycling:  TBD — distinct matrix when cycling-only plans gain matrix-aware frequency
+  // hybrid:   TBD — no-event athletes (Crawley/Bare hybrid framework) need their own cells
 };
 
 /** Tier-only fields preserved from the original hours-only design. */
@@ -232,20 +211,8 @@ const TRIATHLON_TIER_EXTRAS: SportTierExtras = {
   '14+':   { strengthBaseline: 2, bricksByPhase: { ...ZERO_BRICKS, build: 1, race_specific: 2 } },
 };
 
-// PROVISIONAL (F-9): single-sport extras — no bricks (bricks are a tri concept); strength baseline
-// mirrors the tri tiers (intent still overrides via §7). Pending gate #2 sourcing.
-const SINGLE_SPORT_TIER_EXTRAS_PROVISIONAL: SportTierExtras = {
-  '5-7':   { strengthBaseline: 0, bricksByPhase: { ...ZERO_BRICKS } },
-  '8-10':  { strengthBaseline: 1, bricksByPhase: { ...ZERO_BRICKS } },
-  '10-12': { strengthBaseline: 1, bricksByPhase: { ...ZERO_BRICKS } },
-  '12-14': { strengthBaseline: 1, bricksByPhase: { ...ZERO_BRICKS } },
-  '14+':   { strengthBaseline: 2, bricksByPhase: { ...ZERO_BRICKS } },
-};
-
 const SPORT_TIER_EXTRAS: Partial<Record<Sport, SportTierExtras>> = {
   triathlon: TRIATHLON_TIER_EXTRAS,
-  running: SINGLE_SPORT_TIER_EXTRAS_PROVISIONAL,
-  cycling: SINGLE_SPORT_TIER_EXTRAS_PROVISIONAL,
 };
 
 function tierLabelFor(hours: number): TierLabel {
@@ -348,8 +315,8 @@ export function computeSessionFrequencyDefaults(
   }
 
   let swims: 0 | 1 | 2 | 3 = cell.swims;
-  let bikes: 0 | 1 | 2 | 3 = cell.bikes;
-  let runs: 0 | 1 | 2 | 3 | 4 | 5 = cell.runs;
+  let bikes: 1 | 2 | 3 = cell.bikes;
+  let runs: 2 | 3 | 4 | 5 = cell.runs;
   let strength: 0 | 1 | 2 | 3 = extras.strengthBaseline;
 
   // §5 — swim_intent='focus' floors swims at 3, even at <12hr. Apply BEFORE limiter so

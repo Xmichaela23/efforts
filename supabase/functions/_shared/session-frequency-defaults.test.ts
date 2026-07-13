@@ -256,18 +256,28 @@ Deno.test('sport=triathlon explicit is identical to omitted', () => {
   assertEquals(omitted.runs_per_week, explicit.runs_per_week);
 });
 
-Deno.test('sport=running → PROVISIONAL run-only frequency (F-9): runs-only, no swim/bike', () => {
-  const r = compute({ weekly_hours_available: 10, days_per_week: 6, sport: 'running' });
-  assertEquals(r.swims_per_week, 0);
-  assertEquals(r.bikes_per_week, 0);
-  assert(r.runs_per_week >= 3, `run-only should run ≥3×; got ${r.runs_per_week}`);
+Deno.test('sport=running throws — matrix not yet populated (forward-compat stub)', () => {
+  let caught: Error | undefined;
+  try {
+    compute({ weekly_hours_available: 10, days_per_week: 6, sport: 'running' });
+  } catch (err) {
+    caught = err as Error;
+  }
+  assert(caught, 'expected throw for unsupported sport');
+  assert(
+    /running/.test(String(caught?.message)) && /not yet populated/.test(String(caught?.message)),
+    `expected error to name the unsupported sport + roadmap note; got: ${caught?.message}`,
+  );
 });
 
-Deno.test('sport=cycling → PROVISIONAL bike-only frequency (F-9): bikes-only, no swim/run', () => {
-  const r = compute({ weekly_hours_available: 10, days_per_week: 6, sport: 'cycling' });
-  assertEquals(r.swims_per_week, 0);
-  assertEquals(r.runs_per_week, 0);
-  assert(r.bikes_per_week >= 1, `bike-only should bike ≥1×; got ${r.bikes_per_week}`);
+Deno.test('sport=cycling throws (forward-compat stub)', () => {
+  let caught: Error | undefined;
+  try {
+    compute({ weekly_hours_available: 10, days_per_week: 6, sport: 'cycling' });
+  } catch (err) {
+    caught = err as Error;
+  }
+  assert(caught, 'expected throw for sport=cycling');
 });
 
 Deno.test('sport=hybrid throws (forward-compat stub for no-event athletes)', () => {

@@ -164,13 +164,13 @@ export interface WeekOptimizerInputs {
      * Optional — when undefined, defaults to 3 (existing behavior preserved for callers
      * that don't yet supply this).
      */
-    bikes_per_week?: 0 | 1 | 2 | 3; // PROVISIONAL (F-9): 0 for run-only single-sport non-race shapes
+    bikes_per_week?: 1 | 2 | 3;
     /**
      * Per `docs/SESSION-FREQUENCY-DEFAULTS.md`: total run sessions per week (long_run +
      * quality_run + optional easy_run). When &lt; 3, easy_run is skipped entirely.
      * Optional — when undefined, defaults to 3.
      */
-    runs_per_week?: 0 | 1 | 2 | 3 | 4 | 5; // PROVISIONAL (F-9): 0 for bike-only; up to 5 for run-focused
+    runs_per_week?: 2 | 3 | 4;
     /** Optional explicit rest days (Sun-first day names). Server fills the rest. */
     rest_days?: DayName[];
     /**
