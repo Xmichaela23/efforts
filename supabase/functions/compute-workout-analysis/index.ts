@@ -916,6 +916,8 @@ Deno.serve(async (req) => {
     // Fetch user FTP, learned fitness, and configured HR zones from user_baselines
     let userFtp: number | null = null;
     let userMaxHR: number | null = null;
+    // Q-169: the learned LTHR (Friel anchor). Null -> the %HRmax fallback below.
+    let learnedLthr: number | null = null;
     let configuredHrZones: any = null;
     try {
       if (w.user_id) {
@@ -957,12 +959,34 @@ Deno.serve(async (req) => {
           }
         }
         if (lf) {
-          const sportMaxHr = (sport.includes('ride') || sport.includes('bike') || sport.includes('cycling'))
-            ? lf?.ride_max_hr_observed
-            : lf?.run_max_hr_observed;
+          const isRideSport = sport.includes('ride') || sport.includes('bike') || sport.includes('cycling');
+          const sportMaxHr = isRideSport ? lf?.ride_max_hr_observed : lf?.run_max_hr_observed;
           if (sportMaxHr?.value && Number.isFinite(Number(sportMaxHr.value))) {
             userMaxHR = Number(sportMaxHr.value);
             console.log('[HR ZONES] Max HR from learned_fitness:', userMaxHR);
+          }
+          // Q-169 — THE LEARNED LTHR WAS NEVER READ HERE. This block already pulled learned MAX HR out
+          // of `learned_fitness`, but the zone-schema chain below only looked for threshold HR in
+          // `configured_hr_zones` and the workout's own `threshold_heart_rate` column. Both are null for
+          // a Strava/Garmin-imported athlete, so every workout silently fell through to the %HRmax
+          // fallback — even for an athlete whose LTHR the app had ALREADY LEARNED and was ALREADY
+          // RENDERING on the Baselines screen as "Friel %LTHR".
+          //
+          // Measured consequence (user 45d122e7, LTHR 151 / max 174): zones bound at 60/70/80/90% of max
+          // -> Z3 = 122-139, Z4 = 139-157. His easy RPE-3 runs at 133-141 bpm were binned as TEMPO and
+          // THRESHOLD. A 1-hour easy run read as "54% Z3 / 44% Z4". Downstream: intensity_distribution
+          // reported 7-20% easy and labelled him "high-intensity dominant" (he is well-polarized), and
+          // session-load's `enduranceIntensityFromZones` scored the run pHard=0.44 -> the "hard" 1.2x
+          // modifier instead of the 0.5x recovery one. Under the correct Friel zones (Z2 128-136,
+          // Z3 136-143) the same run is aerobic.
+          //
+          // `calculate-workload:378` ALREADY does this correctly (it hydrates threshold_heart_rate from
+          // learned_fitness before inferring intensity), which is why the ACWR/load ladder was never
+          // poisoned. This is the same read, forty lines away, in the file that forgot it.
+          const sportLthr = isRideSport ? lf?.ride_threshold_hr : lf?.run_threshold_hr;
+          if (sportLthr?.value && Number.isFinite(Number(sportLthr.value)) && Number(sportLthr.value) > 100) {
+            learnedLthr = Number(sportLthr.value);
+            console.log('[HR ZONES] LTHR from learned_fitness:', learnedLthr, '(confidence:', sportLthr.confidence, ')');
           }
         }
         if (baseline?.configured_hr_zones) {
@@ -1546,8 +1570,13 @@ Deno.serve(async (req) => {
 
     // Priority 2: LTHR from configured_hr_zones or workout (Friel 5-zone model)
     if (!hrZoneBoundaries) {
+      // Q-169: `learnedLthr` added as the THIRD source. It is last so an athlete's explicitly
+      // configured zones and a device-supplied threshold still win — but it means an athlete whose LTHR
+      // the app LEARNED no longer silently falls through to %HRmax zones that contradict the Friel
+      // zones their own Baselines screen displays.
       const lthr = configuredHrZones?.threshold_heart_rate
-        || (Number.isFinite((w as any)?.threshold_heart_rate) ? Number((w as any).threshold_heart_rate) : null);
+        || (Number.isFinite((w as any)?.threshold_heart_rate) ? Number((w as any).threshold_heart_rate) : null)
+        || learnedLthr;
       if (lthr && lthr > 100) {
         hrZoneBoundaries = [
           0,
