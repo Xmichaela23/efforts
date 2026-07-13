@@ -34,6 +34,7 @@ import { runPostRaceFeedbackChain } from '../_shared/race-feedback.ts';
 import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
+import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -334,9 +335,19 @@ Deno.serve(async (req) => {
       }
     })();
 
+    // D-287 — the EASY pace this card GRADES the athlete against now comes from the ONE resolver.
+    // It used to run its own chain: effort_paces -> manual -> learned. That is the OPPOSITE precedence to
+    // the snapshot pin (learned only) and to resolveCurrentRunEasyPace (choice -> learned -> manual ->
+    // effort_paces). So the screen that JUDGED the run and the plan that PRESCRIBED it could disagree about
+    // what "easy" even was — and the athlete's own Q-174 choice was ignored here entirely.
+    // Only `base` is routed: steady/power/speed/race have no resolver yet and keep their effort_paces read.
+    const resolvedEasy = resolveCurrentRunEasyPace({
+      learned_fitness: learnedFitness,
+      performance_numbers: baselines,
+      effort_paces: effortPaces,
+    } as any);
     const baselinePacesSecPerMi = {
-      base: Number.isFinite(Number(effortPaces?.base)) ? Number(effortPaces.base)
-        : (parsePaceSecPerMi(baselines?.easyPace) ?? parsePaceSecPerMi(baselines?.easy_pace) ?? (learnedEasySecPerMi ?? null)),
+      base: resolvedEasy.sec_per_mi,
       steady: Number.isFinite(Number(effortPaces?.steady)) ? Number(effortPaces.steady) : null,
       power: Number.isFinite(Number(effortPaces?.power)) ? Number(effortPaces.power) : null,
       speed: Number.isFinite(Number(effortPaces?.speed)) ? Number(effortPaces.speed) : null,

@@ -511,7 +511,12 @@ export async function getBlockAdaptation(
     const learnedEasyConf = confidenceToNumber(learnedEasyPace?.confidence);
     const manualEasy = parseMmSsPerMiToSeconds(perf?.easyPace);
     const learnedEasySecPerKm = Number(learnedEasyPace?.value);
-    if (manualEasy != null && Number.isFinite(learnedEasySecPerKm) && learnedEasyConf >= 0.7) {
+    // D-287 / Q-174 — do NOT recommend replacing a number the athlete EXPLICITLY CHOSE. This is a
+    // divergence detector (learned vs manual), which is correct and stays — but once the athlete has said
+    // "use my number", repeating the suggestion every block is nagging them to reverse a decision they made.
+    // (It deliberately does NOT use resolveCurrentRunEasyPace: that returns ONE value, and this needs BOTH.)
+    const athleteChoseManual = (perf as any)?.easy_pace_source === 'manual';
+    if (!athleteChoseManual && manualEasy != null && Number.isFinite(learnedEasySecPerKm) && learnedEasyConf >= 0.7) {
       const learnedSecPerMi = learnedEasySecPerKm * 1.60934;
       const deltaPct = Math.abs(learnedSecPerMi - manualEasy) / manualEasy;
       if (deltaPct >= 0.05) {
@@ -520,7 +525,10 @@ export async function getBlockAdaptation(
           current_value: manualEasy,
           recommended_value: Math.round(learnedSecPerMi),
           confidence: learnedEasyConf,
-          evidence: `Learned from recent easy runs (confidence ${(learnedEasyConf * 100).toFixed(0)}%).`,
+          // D-287 / Law 2 — name the ACTUAL basis + sample size + age. This used to hardcode "Learned from
+          // recent easy runs" regardless of what the value really was or how old it was.
+          evidence: `${String(learnedEasyPace?.source ?? 'learned from your easy runs')}`
+            + (learnedEasyPace?.as_of ? ` (as of ${String(learnedEasyPace.as_of).slice(0, 10)})` : ''),
           impact: 'Improves pace targets and workload estimates for easy runs.',
         });
       }

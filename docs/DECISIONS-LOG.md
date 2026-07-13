@@ -5325,3 +5325,35 @@ D-033's reconciler, the easy band (`easy-hr.ts`), the VDOT tables, and **no numb
 - **Shared-code direction (load-bearing):** the client **never** imports from `supabase/functions/_shared`; shared code lives in **`src/lib/`** and edge functions import *from* it (the `resolve-current-ftp.ts` / `session-frequency-defaults.ts` precedent). That is why the model landed in `src/lib/`, not `_shared/`.
 - **No number was hand-picked and NOTHING is tuned to the primary user.** All three copies were defensible Friel (Z2 = 85-89% of LTHR; Z3 begins at 90%). **The bug was never the number — it was that there were three numbers.** Z4/Z5 boundaries (0.95 / 1.05) are carried over untouched; only the fractured Z2/Z3 seam is consolidated.
 - **Verified:** a sweep across LTHR 140-180 asserts, at every value, that `Z2.max === band.ceiling`, that the last beat of Z2 **is** easy, and that the first beat of Z3 **is not**. 24/24 `easy-hr` fixtures green (incl. the D-284 boundary pin, which now passes against the shared model); 1056 shared tests; client `vite build` green.
+
+---
+
+## D-287 — The run-pace resolver is now UNIVERSAL on the server. One truth, every surface. (2026-07-13, completes D-285)
+
+- **Date:** 2026-07-13. **Completes D-285**, which created `resolveCurrentRunEasyPace` and wired only **3** consumers. **D-285 stopped the app LYING (killed 7 fabricated paces). It did not stop the app DISAGREEING WITH ITSELF.** This closes that.
+- **The disease, measured.** Three *different* precedences were live simultaneously:
+
+| surface | its own precedence | consequence |
+|---|---|---|
+| `analyze-running-workout:337` (**GRADES the workout card**) | `effort_paces` → manual → learned | the card judged the run against one pace… |
+| `_shared/athlete-snapshot.ts:258,404` (**writes the PLAN PIN**) | **learned ONLY** — ignored manual AND the Q-174 choice entirely | …while the plan prescribed off another. A plan could be pinned to a pace the athlete had **expressly rejected**. |
+| `resolveCurrentRunEasyPace` | choice → learned → manual → effort_paces | the agreed one |
+
+  This is exactly the disease `resolveCurrentFtp` was written to cure — *"8 different ad-hoc `||`/`??` fallback chains that previously chose differently per consumer"* — reproduced on the run side, and D-285 only cured a third of it.
+
+- **Routed through the ONE resolver (3 callers → 9):**
+  - `analyze-running-workout` — the pace the workout card **grades** against. (`base` only; steady/power/speed/race have no resolver yet.)
+  - `_shared/athlete-snapshot.ts` — **both** the pin writer (`extractRun`) and the live read (`resolveLiveRun`). **Pin semantics are unchanged** (a plan freezes its pace for its lifetime — correct, D-033); only *which value* gets frozen is corrected.
+  - `materialize-plan` — a `_resolvedEasySecPerMi` stamp mirroring the existing `resolveCurrentFtp` precedent, read at **§1b**: below the snapshot pin (a pinned plan still wins) and **above** the old `effort_paces → manual` chain. So an **unpinned** plan now agrees with every other surface.
+  - `generate-strength-plan` — **DELETED a whole private ad-hoc resolver** (Q-105) with its own sec/km→min/mi conversion and its own unit-sniffing regex.
+  - `course-detail` — restructured so the athlete's **explicit choice outranks the learned value** (previously learned always won and a chosen manual number was silently ignored).
+  - `_shared/block-adaptation` — **deliberately NOT routed** (it is a *divergence detector*: it needs BOTH learned and manual; the resolver returns one). But: it no longer **nags an athlete to reverse a choice they made** (Q-174 guard), and its `evidence` string no longer **hardcodes** *"Learned from recent easy runs"* regardless of the value's actual provenance or age (Law 2).
+  - (Already wired in D-285: `create-goal-and-materialize-plan`, `planning-context`, `end-plan-core`.)
+
+- **⚠ BEHAVIOR CHANGES, named honestly.** No number was invented, but two real behaviors moved:
+  1. The **workout card's easy-pace verdict** now grades against the resolved pace, not `effort_paces`-first. A run previously called "faster than your baseline base pace" may now read differently — because it is now being compared to the pace the *plan* actually used.
+  2. An **unpinned plan's** easy targets now resolve learned-first (or athlete-chosen-first) instead of `effort_paces`-first. **Pinned plans are untouched.**
+
+- **⚠ STILL OPEN — the CLIENT re-derives (Law 4).** `src/services/plans/normalizer.ts:54`, `StructuredPlannedView.tsx:352`, `PlanSelect.tsx:585`, `PlanWizard.tsx:470`, `AllPlansInterface.tsx` all still read `performance_numbers.easyPace` directly to expand `{easy_pace}` tokens. They **cannot** call the resolver — the client is only handed `performanceNumbers`, never `learned_fitness`. **The right fix is not to ship the resolver to the client; it is for the SERVER to send the already-resolved pace** (Law 4: surfaces render, they never re-decide). Filed as **Q-175**. Deliberately not half-done here.
+
+- **Verified:** 1056 shared tests pass (same 5 pre-existing cycling-v1 failures); client `vite build` green; **zero new type errors** — `analyze-running-workout` 62→62, `materialize-plan` 0→0, `athlete-snapshot` 0→0, `block-adaptation` 0→0, `generate-strength-plan` 0→0, `course-detail` 2→2 (both pre-existing).

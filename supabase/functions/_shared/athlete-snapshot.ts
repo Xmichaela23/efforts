@@ -1,4 +1,5 @@
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 
 /**
  * AthleteSnapshot — single source of truth for the athlete-input values used to build a plan.
@@ -255,8 +256,13 @@ function extractRun(state: Record<string, unknown>): AthleteSnapshotV1['run'] {
   const thr = readLearnedSecPerKm(lfRec.run_threshold_pace_sec_per_km);
   if (thr != null) out.threshold_pace_sec_per_mi = Math.round(thr * KM_TO_MI);
 
-  const easy = readLearnedSecPerKm(lfRec.run_easy_pace_sec_per_km);
-  if (easy != null) out.easy_pace_sec_per_mi = Math.round(easy * KM_TO_MI);
+  // D-287 — the PIN now captures what the ONE resolver says the athlete's easy pace IS, not learned-only.
+  // It used to read `run_easy_pace_sec_per_km` and NOTHING else, so it silently ignored the athlete's typed
+  // value AND their explicit Q-174 choice ("use my number") — a plan could be pinned to a pace the athlete
+  // had expressly rejected. The pin semantics are unchanged (a plan freezes its pace at materialization,
+  // D-033/§6); only WHICH value gets frozen is corrected.
+  const resolvedEasy = resolveCurrentRunEasyPace(state as any);   // state carries lf + pn + effort_paces
+  if (resolvedEasy.sec_per_mi != null) out.easy_pace_sec_per_mi = resolvedEasy.sec_per_mi;
 
   return Object.keys(out).length > 0 ? out : null;
 }
@@ -401,10 +407,12 @@ function resolveLiveRun(live: LiveBaselinesFallback): AthleteResolved['run'] {
     ? live.learned_fitness
     : {}) as Record<string, unknown>;
   const thr = readLearnedSecPerKm(lf.run_threshold_pace_sec_per_km);
-  const easy = readLearnedSecPerKm(lf.run_easy_pace_sec_per_km);
+  // D-287 — same correction as the pin writer: the LIVE read routes through the one resolver, so a plan
+  // without a pin resolves easy pace identically to every other surface (and honours the Q-174 choice).
+  const resolvedEasy = resolveCurrentRunEasyPace(live as any);
   return {
     threshold_pace_sec_per_mi: thr != null ? Math.round(thr * KM_TO_MI) : null,
-    easy_pace_sec_per_mi: easy != null ? Math.round(easy * KM_TO_MI) : null,
+    easy_pace_sec_per_mi: resolvedEasy.sec_per_mi,
     fiveK_pace_sec_per_mi: null,
   };
 }

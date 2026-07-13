@@ -21,6 +21,7 @@ import {
   pickRaceFinishProjectionV1ForCourseGoal,
 } from '../_shared/resolve-server-predicted-finish.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
+import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -268,10 +269,18 @@ Deno.serve(async (req) => {
   const pn = (arc.performance_numbers || {}) as Record<string, unknown>;
 
   const KM_TO_MI = 1.609344;
+  // D-287 / Q-174 — the athlete's EXPLICIT choice outranks the learned value, here as everywhere. `pfc.easy`
+  // is the arc's LEARNED pace; the raw `pn` fallback is their typed one. Before this, learned always won and
+  // a chosen manual number was silently ignored on this surface. Units owned by the resolver (pn is sec/mi
+  // or an "11:30/mi" string; pfc is sec/KM — the classic footgun).
+  const pnEasy = resolveCurrentRunEasyPace({ performance_numbers: pn } as any).sec_per_mi;
+  const choseManual = (pn as any)?.easy_pace_source === 'manual' && pnEasy != null;
   const easySec: number | null =
-    pfc?.easy?.sec_per_km != null
-      ? Math.round(pfc.easy.sec_per_km * KM_TO_MI)
-      : parsePaceToSecPerMi(pn.easy_pace ?? pn.easyPace ?? pn.easy_pace_sec_per_mi);
+    choseManual
+      ? pnEasy
+      : pfc?.easy?.sec_per_km != null
+        ? Math.round(pfc.easy.sec_per_km * KM_TO_MI)
+        : pnEasy;
   const threshSec: number | null =
     pfc?.threshold?.sec_per_km != null
       ? Math.round(pfc.threshold.sec_per_km * KM_TO_MI)

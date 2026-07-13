@@ -2038,6 +2038,19 @@ Low-severity, noticed-and-deferred: **(1)** tri athlete missing bodyweight → n
 - **⚠ Blast radius if flipped:** `resolveCurrentFtp` shares the ranking, so a change would want to move BIKE too, or the two disciplines diverge on the same question (a Law 1 fracture). Decide once, for both.
 - **Related:** the manual field has no `as_of`. If the athlete's number is going to win, it should be dated, like the learned one now is (Q-173).
 
+## Q-175 — The CLIENT still re-derives the easy pace (Law 4: surfaces render, they never re-decide) (ENGINE, 2026-07-13)
+
+- **Status:** OPEN. Filed by D-287, which made the resolver universal on the SERVER and deliberately stopped there rather than half-doing this.
+- **The gap.** These client surfaces expand `{easy_pace}` / pace tokens by reading `performance_numbers.easyPace` **directly**, with their own `||` chains:
+  - `src/services/plans/normalizer.ts:54` (`resolvePaceToken`)
+  - `src/components/StructuredPlannedView.tsx:352`
+  - `src/pages/PlanSelect.tsx:585, 609, 652, 722`
+  - `src/components/PlanWizard.tsx:470, 509`
+  - `src/components/AllPlansInterface.tsx:664, 791`
+- **Why they can't just call `resolveCurrentRunEasyPace`.** The client is only handed `performanceNumbers` — it **never receives `learned_fitness`**. So the resolver would be running on a third of its inputs and would silently answer `manual` for everyone, which is worse than the status quo.
+- **⚠ THE FIX IS NOT "ship the resolver to the client."** That would make the client re-decide a verdict the server already owns — a Law 4 violation with a nicer haircut. **The server should send the already-resolved pace** (with its `source` / `confidence` / `as_of`, per Law 3), and the client should render it. The plan contract is the natural home.
+- **Blast radius:** display + token expansion only. It cannot currently *prescribe* a wrong pace (the server materializes the targets); it can *display* a pace that disagrees with the one the plan was built on.
+
 ## When to add an entry
 
 Add a new Q-NNN when:

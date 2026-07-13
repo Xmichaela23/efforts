@@ -25,6 +25,7 @@ import {
   swimGearNormalized,
 } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 
 // Type for plan adjustments
 type PlanAdjustment = {
@@ -505,6 +506,17 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
       return snapPaces.fiveK_pace_sec_per_mi;
     }
   }
+  // §1b D-287 — the ONE resolved easy pace (choice -> learned -> manual -> effort_paces). Sits BELOW the
+  // snapshot pin (a plan freezes its pace for its lifetime) and ABOVE the ad-hoc chain below, so an UNPINNED
+  // plan agrees with the workout card, State, the coach and Baselines about what "easy" is.
+  if (which === 'easy') {
+    const resolvedEasy = (b as any)._resolvedEasySecPerMi;
+    if (typeof resolvedEasy === 'number' && Number.isFinite(resolvedEasy) && resolvedEasy > 0) {
+      console.log(`[Paces] Using RESOLVED easy: ${resolvedEasy}s/mi`);
+      return resolvedEasy;
+    }
+  }
+
   // §2 PREFER effort_paces from PlanWizard (already in seconds per mile)
   if (b.effort_paces) {
     if (which === 'fivek' && b.effort_paces.power) {
@@ -2644,6 +2656,18 @@ Deno.serve(async (req) => {
         effort_paces: effortPaces || undefined,
         isMetric: ub?.units === 'metric',
       } as any;
+
+      // D-287 — EASY PACE via the shared resolver, exactly as FTP does below. Before this, a plan WITHOUT a
+      // snapshot pin resolved easy pace as `effort_paces.base -> performance_numbers.easyPace`, which is a
+      // DIFFERENT precedence from every other surface (and ignored the athlete's Q-174 choice entirely). The
+      // pin still wins for a plan's lifetime (§1 — that is correct and unchanged); this only fixes what an
+      // UNPINNED plan resolves to. The resolver already considers effort_paces as its own third tier, so
+      // nothing is lost — it is simply consulted in the one agreed order.
+      const easyResolved = resolveCurrentRunEasyPace(ub as any);
+      if (easyResolved.sec_per_mi != null) {
+        (baselines as any)._resolvedEasySecPerMi = easyResolved.sec_per_mi;
+        console.log(`[Paces] Resolved easy: ${easyResolved.sec_per_mi}s/mi (source=${easyResolved.source})`);
+      }
 
       // FTP via shared precedence helper. Quality-gated for plan baking — accepts learned
       // (≥medium) > manual but REJECTS 'learned-low' (low-confidence values shouldn't get

@@ -11,6 +11,7 @@
 // ============================================================================
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { composeStrengthPrimaryPlan } from '../shared/strength-system/strength-primary-plan.ts';
+import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,22 +42,17 @@ Deno.serve(async (req: Request) => {
     // generation-time COPY (paceKnown → the note is suppressed). Pace-unit footgun: learned_fitness is
     // sec/km; performance_numbers.easyPace carries a /mi or /km suffix.
     let easyPaceMin: number | undefined = Number(easy_pace_min_per_mile) > 0 ? Number(easy_pace_min_per_mile) : undefined;
+    // D-287 — was a LOCAL ad-hoc easy-pace resolver (Q-105): learned -> manual, with its own sec/km->min/mi
+    // conversion and its own unit-sniffing regex. A private copy of a shared decision is exactly the disease
+    // `resolveCurrentFtp` was written to cure, and it chose a DIFFERENT answer than the plan and the workout
+    // card did. Routed through the ONE resolver, which owns the units and honours the athlete's Q-174 choice.
     if (easyPaceMin === undefined) {
       try {
         const { data: ub } = await supabase
-          .from('user_baselines').select('learned_fitness, performance_numbers').eq('user_id', String(user_id)).maybeSingle();
-        const secPerKm = Number((ub?.learned_fitness as any)?.run_easy_pace_sec_per_km?.value);
-        if (Number.isFinite(secPerKm) && secPerKm > 0) {
-          easyPaceMin = (secPerKm * 1.60934) / 60; // sec/km → min/mi
-        } else {
-          const ep = String((ub?.performance_numbers as any)?.easyPace || '').trim();
-          const m = ep.match(/(\d{1,2}):(\d{2})/);
-          if (m) {
-            const perUnit = parseInt(m[1], 10) + parseInt(m[2], 10) / 60;
-            easyPaceMin = /km/i.test(ep) ? perUnit * 1.60934 : perUnit; // min/km → min/mi, else already min/mi
-          }
-        }
-      } catch { /* no baselines → the 10:00/mi fallback note is honest */ }
+          .from('user_baselines').select('learned_fitness, performance_numbers, effort_paces').eq('user_id', String(user_id)).maybeSingle();
+        const resolved = resolveCurrentRunEasyPace(ub as any);
+        if (resolved.sec_per_mi != null) easyPaceMin = resolved.sec_per_mi / 60;   // sec/mi -> min/mi
+      } catch { /* no baselines → the honest "estimated at 10:00/mi until we learn your easy pace" note fires */ }
     }
 
     // Accessory-bias add-on (glute | hyrox); anything else → none (byte-identical plain plan).
