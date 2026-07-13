@@ -1960,7 +1960,15 @@ Low-severity, noticed-and-deferred: **(1)** tri athlete missing bodyweight → n
 
 ## Q-170 — The heat gate: D-275's exclusion is NOT field-standard, and its cost is a blind trend. The fix is an ADJUSTMENT, not a filter. (ENGINE, 2026-07-13)
 
-- **Status:** filed 2026-07-13. **Attempted and REVERTED same night** (`bea95d06` → `c1a96b9c`). D-275's exclusion **still stands in code**. Do not re-attempt without reading this entry AND §"what NOT to build".
+- **Status: RESOLVED 2026-07-13 (D-283) — but NOT the way this entry predicted. Read the resolution before the body below.**
+- **✅ THE EXCLUSION IS DEAD.** Hot runs are KEPT in the durability substrate (and in the coach's 7d receipt). This entry was RIGHT that no shipped app deletes a session for heat.
+- **❌ THE FIX WAS NOT AN ADJUSTMENT.** The "athlete-selectable ADJUST FOR HEAT toggle" ruling below is **WITHDRAWN on the evidence.** We measured it (`scripts/verify-heat-decoupling-*.mjs`): across **81 steady runs**, the heat→decoupling slope's 95% CI **straddles zero under every specification**, r² = 0.014, and the median decoupling by temperature bucket **FALLS** with heat instead of rising (<65°F: 4.90% → >80°F: 1.45%). **His hot runs read BEST.** There is no coefficient to fit — anything fitted would be noise, which is exactly what killed D-250. The exclusion was not shielding him from a hot-run lie; **it was deleting his best data.**
+- **⚠ The "measured cost" claimed below was a FORECAST, not a measurement.** The exclusion was only firing on **1 of 92** runs — history was never re-analyzed after D-275 shipped (2026-07-11), so the flag is almost entirely unset. The thin July substrate was caused by **low run frequency + the fartlek/steady gate**, not by heat. The blindness this entry describes was **latent** (it would have bitten on the next backfill), not realized.
+- **⚠ n=1 — do NOT hardcode "heat doesn't matter."** A heat-**naive** athlete may well show the textbook drift. What generalizes is only "nobody deletes the session". Any future correction must be a **per-athlete fitted coefficient that applies nothing unless that athlete's data earns it** — machinery already exists (`_shared/heat-adjust.ts`). Not built now: the correction branch has no real athlete to validate against. **See D-283 for the full ruling.**
+
+<details><summary>The original entry (retained — its research was right, its prescription was not)</summary>
+
+- **Status:** filed 2026-07-13. **Attempted and REVERTED same night** (`bea95d06` → `c1a96b9c`).
 - **The finding — D-275's justification is false.** `state-trend/run.ts` drops heat-confounded runs from the run durability substrate (`.filter((r) => r.decoupling_confounded !== true)`), and ENGINE-STATE called this "confirmed field-standard (NOT over-correcting)". **It is not.** Research (2026-07-13, adversarially verified) found **NO shipped product discards a session from a decoupling / efficiency / fitness trend because it was hot**:
   - **Garmin ADJUSTS a RETAINED estimate.** Above 22°C/72°F it applies heat corrections to VO2max + Training Status. **Patent US 11,998,802** (Firstbeat Analytics Oy, granted 2024-06-04 — *verified real*): heat dose from live weather + training history → an acclimatization state → a **multiplicative correction** to the retained value. Firstbeat's own stated rationale is the anti-exclusion argument: without correction the number falls in heat and gives the athlete **"false discouraging feedback."**
   - **TrainingPeaks** computes and SHOWS Pa:Hr regardless of conditions (fixed 5% band). It does **NOT** auto-flag heat — the athlete interprets. (⚠ A claim made mid-session that TP "flags conditions" was **WRONG and is retracted**. TP also ships no decoupling *trend* at all.)
@@ -1977,6 +1985,17 @@ Low-severity, noticed-and-deferred: **(1)** tri athlete missing bodyweight → n
   - **Do NOT improvise the adjustment.** `_shared/heat-adjust.ts` already exists (`heatTerm`, `adjEfficiency`, `dewPointF`) — from **D-250**, the route-trend heat adjustment that was built, deployed, and then **FLIP-FLOPPED on real data** and was superseded. There is a corpse behind this. It needs evidence, not enthusiasm.
   - **Do NOT remove the exclusion without an adjustment behind it.** That was tried (`bea95d06`) and pulled: hot runs inflate decoupling, so "needs work" would fire MORE often all summer, carrying only a label. **Labelling a number you could have corrected is not honesty — it is an excuse.**
 - **Also retracted from that attempt:** the "· N of M runs were hot" naming + warning-tone drop was **an invention**, presented as the TrainingPeaks model. No shipped app does it. If it ever returns, it returns as an explicit, owned design decision — not a citation.
+
+</details>
+
+## Q-171 — The observed easy-pace side was contaminated by HARD runs, and an invented number could anchor the band (ENGINE, 2026-07-13)
+
+- **Status: RESOLVED 2026-07-13 (D-284).** Filed and fixed the same session. Kept as the record of what D-282 shipped wrong, because all three defects sat on the path into the engine that sets the plan's easy pace.
+- **The contamination (the one with teeth).** `compute-facts` qualified *samples*, not *runs*: every run, 10-sample floor. So an interval session's warm-up (in-band HR, slow) and the **HR-lag opening of each hard rep** (HR not caught up, pace already fast) both wrote a `pace_at_easy_hr` for a HARD workout — feeding `run_easy_pace_at_hr` → the D-033 reconciler → **the plan's easy pace**. A noisy-slow patch trips `reconciled_worse` and slows the athlete down. **The bike already had this exact fix (D-275-bike, "cardiac lag"); the run never got it.**
+- **The invented anchor.** `learn-fitness-profile` can write `run_threshold_hr` = "88% of observed max (estimated)", `sample_count: 0`. The band accepted it and announced *"Friel Z2 — at or below 89% of your threshold HR"* over a pure formula — and the resulting band (62-78% of max) was **tighter than the honest bootstrap it replaced**, drifting back toward the Q-169 starvation.
+- **The 1 bpm seam.** Easy topped at 134; the analyzer's Zone 3 began at 136. A 135 bpm run was Zone 2 on Details and "not easy" to the learner.
+- **Don't re-litigate:** the easy gate is intensity-based, not label-based (an unlabeled interval session must still be caught, and `compute-facts` can run before the analyzer classifies). The `sample_count` gate is **measured-vs-invented**, not weak-vs-strong — a low-confidence *measured* threshold still anchors.
+- **Still owed:** the recompute/backfill (`pace_at_easy_hr` + LTHR zone bins are stored per workout; history is on the old rules, and the 5-week intensity window currently mixes two zone schemas).
 
 ## When to add an entry
 
