@@ -1273,14 +1273,54 @@ return (
                                 />
                                 <span className="text-sm text-white/50">/mi</span>
                               </div>
+                              {/* Q-174 — THE ATHLETE CHOOSES, and their choice wins.
+                                  Before this, a learned value silently outranked the typed one and the typed
+                                  field was hidden entirely — the app decided, and the athlete had no say and no
+                                  way to see it. Now: when both exist, they pick, and the pick is honoured over
+                                  even a high-confidence learned pace. An assertion beats an inference (Law 2);
+                                  Garmin and TrainingPeaks both respect a value you set.
+                                  Absent a choice, behavior is byte-identical to before (learned-first). */}
                               {hasEasyLearned && (
-                                // Do NOT let the athlete believe this field is steering the plan when it is not.
-                                // Precedence today: a medium/high LEARNED value outranks the typed one
-                                // (`resolveCurrentRunEasyPace`, mirroring `resolveCurrentFtp`). Say so plainly.
-                                <p className="text-[11px] text-white/30 leading-snug">
-                                  Your runs are being used instead ({formatPace(easyLearned.value)}). This value is
-                                  kept, but not applied while a measured pace exists.
-                                </p>
+                                <div className="flex flex-col gap-1.5 mt-0.5">
+                                  <div className="flex items-center gap-1.5">
+                                    {([
+                                      { key: 'learned', label: 'Use my runs', val: formatPace(easyLearned.value) },
+                                      { key: 'manual', label: 'Use my number', val: data.performanceNumbers?.easyPace || '—' },
+                                    ] as const).map(({ key, label, val }) => {
+                                      // Absent choice === 'learned' (the historical default).
+                                      const chosen = (data.performanceNumbers as any)?.easy_pace_source ?? 'learned';
+                                      const active = chosen === key;
+                                      const disabled = key === 'manual' && !data.performanceNumbers?.easyPace;
+                                      return (
+                                        <button
+                                          key={key}
+                                          type="button"
+                                          disabled={disabled}
+                                          onClick={() => setData(prev => ({
+                                            ...prev,
+                                            performanceNumbers: { ...prev.performanceNumbers, easy_pace_source: key },
+                                          }))}
+                                          className={`px-2.5 py-1.5 rounded-lg text-[11px] leading-tight border transition-colors text-left ${
+                                            active
+                                              ? 'bg-teal-500/15 border-teal-500/50 text-white'
+                                              : 'bg-white/[0.04] border-white/10 text-white/45 hover:text-white/70'
+                                          } ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                          title={key === 'manual'
+                                            ? 'Your entered pace is used, even if your runs say otherwise.'
+                                            : 'Tracks what your easy runs actually show, and keeps updating.'}
+                                        >
+                                          <span className="block">{label}</span>
+                                          <span className="block tabular-nums text-white/50">{val}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  {!data.performanceNumbers?.easyPace && (
+                                    <p className="text-[11px] text-white/25 leading-snug">
+                                      Enter a pace above to be able to choose it.
+                                    </p>
+                                  )}
+                                </div>
                               )}
                             </div>
                             {hasThrLearned && (

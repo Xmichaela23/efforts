@@ -34,8 +34,9 @@ const SEC_PER_KM_TO_SEC_PER_MI = 1.609344;
 
 /** Where the number came from. Travels to the surface with it (Law 3). */
 export type RunPaceSource =
+  | 'manual-chosen'  // Q-174 — the athlete EXPLICITLY chose their own number. Outranks everything.
   | 'learned'        // measured from the athlete's own easy runs, confidence medium|high
-  | 'manual'         // the athlete typed it. An assertion, not an inference.
+  | 'manual'         // the athlete typed it, but has not chosen it over the learned value
   | 'effort_paces'   // wizard/VDOT-derived. An INFERENCE — is_estimate: true.
   | 'learned-low';   // measured, but the learner is not confident yet
 
@@ -67,6 +68,18 @@ type PerformanceNumbersLike = {
   /** sec per MILE, or a "9:30" string */
   easyPace?: number | string | null;
   easy_pace?: number | string | null;
+  /**
+   * Q-174 — THE ATHLETE'S EXPLICIT CHOICE, and it outranks everything.
+   *
+   * 'manual'  -> "use MY number." The athlete looked at both and picked their own. An ASSERTION beats an
+   *              inference (Law 2 draws exactly that line), and Garmin/TrainingPeaks both respect a value
+   *              you set. Honored even against a high-confidence learned pace.
+   * 'learned' -> "use what my runs say." Tracks the learner live, and keeps updating.
+   * absent    -> unchosen. Falls through to the default precedence below (learned-first) — so this field
+   *              is purely additive and changes NOTHING for an athlete who has never expressed a
+   *              preference. No migration, no regression.
+   */
+  easy_pace_source?: 'manual' | 'learned' | null;
 } | null | undefined;
 
 type EffortPacesLike = {
@@ -116,12 +129,19 @@ function confOf(raw: LearnedMetricLike): 'low' | 'medium' | 'high' | null {
 /**
  * The athlete's current easy run pace, in sec/MILE, with its provenance attached.
  *
- * Precedence (mirrors the FTP ruling, adapted for the run's extra `effort_paces` tier):
+ * Precedence:
+ *   0. THE ATHLETE'S EXPLICIT CHOICE (`performance_numbers.easy_pace_source`) — Q-174. If they picked
+ *      'manual' and a manual value exists, it WINS, even over a high-confidence learned pace. They looked
+ *      at both and chose. An assertion outranks an inference; Garmin and TrainingPeaks both honour a value
+ *      you set. If they picked 'learned', we skip the manual tier entirely and track the learner live.
  *   1. learned (confidence medium|high)  — MEASURED from their own runs
- *   2. manual                            — the athlete ASSERTED it
+ *   2. manual                            — typed, but not explicitly chosen over the learner
  *   3. effort_paces.base                 — an INFERENCE (wizard/VDOT). is_estimate: true.
  *   4. learned (any confidence)          — measured but thin
- *   5. null                              — we do not know. SAY SO.
+ *   5. null                              — we do not know. SAY SO. (Never 540. Never 600.)
+ *
+ * An ABSENT choice behaves exactly as before, so this is purely additive: no migration, no regression for
+ * an athlete who has never expressed a preference.
  */
 export function resolveCurrentRunEasyPace(baselines: RunBaselinesLike): ResolvedRunPace {
   if (!baselines) return NULL_RESULT;
@@ -142,13 +162,25 @@ export function resolveCurrentRunEasyPace(baselines: RunBaselinesLike): Resolved
   const manual = parsePaceToSecPerMi(pn?.easyPace ?? pn?.easy_pace);
   const wizard = parsePaceToSecPerMi(baselines.effort_paces?.base);
 
+  // ── Tier 0 (Q-174): the athlete's explicit choice outranks everything. ──
+  const chosen = pn?.easy_pace_source;
+  if (chosen === 'manual' && manual != null) {
+    return {
+      sec_per_mi: manual, source: 'manual-chosen', confidence: null,
+      sample_count: null, as_of: null, is_estimate: false,   // an ASSERTION, not an estimate
+    };
+  }
+  // chosen === 'learned' -> fall through, but SKIP the manual tier: they told us to track their runs, so a
+  // stale typed number must not resurface just because the learner momentarily thins out.
+  const manualEligible = chosen !== 'learned';
+
   if (learnedSecPerMi != null && learnedTrusted) {
     return {
       sec_per_mi: learnedSecPerMi, source: 'learned', confidence: learnedConf,
       sample_count: learnedSamples, as_of: learnedAsOf, is_estimate: false,
     };
   }
-  if (manual != null) {
+  if (manual != null && manualEligible) {
     // The athlete asserted this. It is not an estimate — but it carries no date, so it can go stale
     // silently. That is a known gap (the manual field has no `as_of`); do not paper over it here.
     return {

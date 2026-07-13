@@ -114,3 +114,49 @@ Deno.test('LAW 3: a manual value carries no false confidence', () => {
   assertEquals(r.sample_count, null);
   assertEquals(r.is_estimate, false);        // an assertion is not an estimate
 });
+
+// ═══ Q-174 — THE ATHLETE CHOOSES, AND THEIR CHOICE WINS ═══════════════════
+Deno.test('Q-174: "use MY number" beats even a HIGH-confidence learned pace', () => {
+  const r = resolveCurrentRunEasyPace({
+    ...learned(415, 'high'),                                   // the app measured 11:08/mi
+    performance_numbers: { easyPace: '11:30', easy_pace_source: 'manual' },
+  });
+  assertEquals(r.source, 'manual-chosen');
+  assertEquals(r.sec_per_mi, 690);        // 11:30 — the athlete's number, honoured
+  assertEquals(r.is_estimate, false);     // an ASSERTION, not an estimate
+});
+
+Deno.test('Q-174: "use my RUNS" skips the manual tier — a stale typed number cannot resurface', () => {
+  // The athlete chose the learner. If the learner momentarily thins out, we must NOT silently fall back to
+  // a number they explicitly declined — that would resurrect the very value they rejected.
+  const thin = resolveCurrentRunEasyPace({
+    ...learned(415, 'low'),                                    // learner is thin today
+    performance_numbers: { easyPace: '11:30', easy_pace_source: 'learned' },
+  });
+  assertEquals(thin.source, 'learned-low');   // NOT 'manual'
+  assertEquals(thin.sec_per_mi, 668);
+
+  const none = resolveCurrentRunEasyPace({
+    performance_numbers: { easyPace: '11:30', easy_pace_source: 'learned' },
+  });
+  assertEquals(none.sec_per_mi, null);        // nothing learned yet -> honest null, NOT the declined 11:30
+  assertEquals(none.source, null);
+});
+
+Deno.test('Q-174: an ABSENT choice is byte-identical to the old behavior (no migration, no regression)', () => {
+  const withChoice = resolveCurrentRunEasyPace({
+    ...learned(415, 'high'),
+    performance_numbers: { easyPace: '11:30' },                // no easy_pace_source key at all
+  });
+  assertEquals(withChoice.source, 'learned');                  // learned-first, exactly as before
+  assertEquals(withChoice.sec_per_mi, 668);
+});
+
+Deno.test('Q-174: choosing manual with NO manual value set does not invent one', () => {
+  const r = resolveCurrentRunEasyPace({
+    ...learned(415, 'high'),
+    performance_numbers: { easy_pace_source: 'manual' },       // chose manual, but never typed one
+  });
+  assertEquals(r.source, 'learned');       // falls through honestly; does NOT fabricate a manual value
+  assertEquals(r.sec_per_mi, 668);
+});
