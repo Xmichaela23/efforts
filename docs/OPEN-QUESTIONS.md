@@ -2020,6 +2020,16 @@ Low-severity, noticed-and-deferred: **(1)** tri athlete missing bodyweight → n
 - **⚠ What we could NOT measure (be honest about this).** Does heat slow his pace *at a given HR*? Almost certainly yes — physiology says so, and his own run proves the cost (slowed to 12:14, still hit 138). But **it is unmeasurable on his data**, because heat ejects the runs from the band: only **n=2** hot runs qualify as easy. The regression returns +0.53 sec/mi per °F, *not significant*, CI straddling zero — a number with no evidentiary weight. **Do not build a pace-heat correction off it.**
 - **The irony worth remembering:** D-283 removed the heat exclusion that *didn't* matter (decoupling — measured, no effect). The one that *might* matter (pace-at-HR) is still standing, hidden inside the HR ceiling — and it cannot be measured for exactly the reason it exists.
 
+## Q-174 — Should the athlete's TYPED pace beat the app's LEARNED one? (PRODUCT, 2026-07-13)
+
+- **Status:** OPEN — a genuine product decision, deliberately not made in D-285. Michael's call.
+- **The question.** `resolveCurrentRunEasyPace` (and `resolveCurrentFtp` before it) rank a **medium/high learned value ABOVE the athlete's manual entry**. So if the athlete types 11:30 and the app has learned 11:08, **the typed value is kept but never applied.** D-285 made that state *visible* ("Your runs are being used instead") rather than hiding the field — but it did not change the ranking.
+- **The case for flipping it (athlete wins):** a manual entry is an **assertion**, not an inference (Law 2 draws exactly that line). The field standard supports it — Garmin lets you set a manual max HR / FTP and respects it; TrainingPeaks never auto-overrides what you set; Runalyze estimates but lets you choose. An app that keeps a field it will not honour is a subtler kind of lie than one that hides it.
+- **The case for leaving it (learned wins):** the athlete's typed number goes stale silently (it carries **no `as_of`** — a real gap), and a measured value from their own runs is usually truer than a number they entered months ago. This is why `resolveCurrentFtp` was written this way.
+- **The honest middle:** an explicit per-field **override toggle** ("use my number"), which is what the FTP flow's "Clear to use auto-learned" button gropes toward but inverts.
+- **⚠ Blast radius if flipped:** `resolveCurrentFtp` shares the ranking, so a change would want to move BIKE too, or the two disciplines diverge on the same question (a Law 1 fracture). Decide once, for both.
+- **Related:** the manual field has no `as_of`. If the athlete's number is going to win, it should be dated, like the learned one now is (Q-173).
+
 ## When to add an entry
 
 Add a new Q-NNN when:

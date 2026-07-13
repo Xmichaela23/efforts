@@ -413,7 +413,7 @@
     Warm up 300 yd. 5×100 yd at sustainable race-swim rhythm (15 sec rest). Where the lane allows, merge into longer unbroken 200–400 yd pieces. Sight every 6–8 strokes; practice breathing to both sides for chop or sun glare. Swim these repeats hands-only by default; paddles optional for a few repeats only if shoulders feel good—not the entire main set. Cool down 200 yd.
 - **Wednesday**
   - Tri Durability — Taper Light Session (strength · 30min · EASY)
-    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Dumbbells, Bands.
+    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Bands.
   - Easy Ride — 1.0 hr (bike · 60min · EASY)
     Recovery spin at Z1–Z2. No pushing. Legs should feel loose and refreshed by the end.
 - **Thursday**
@@ -439,7 +439,7 @@
     Warm up 300 yd. 5×100 yd at sustainable race-swim rhythm (15 sec rest). Where the lane allows, merge into longer unbroken 200–400 yd pieces. Sight every 6–8 strokes; practice breathing to both sides for chop or sun glare. Swim these repeats hands-only by default; paddles optional for a few repeats only if shoulders feel good—not the entire main set. Cool down 200 yd.
 - **Wednesday**
   - Tri Durability — Taper Light Session (strength · 30min · EASY)
-    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Dumbbells, Bands.
+    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Bands.
 - **Thursday**
   - Easy Run — 4 mi (run · 40min · EASY)
     Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.

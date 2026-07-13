@@ -93,8 +93,26 @@ export interface RunPaceForCoach {
    * `per_mile` = that value × 1.609 (do not re-label per-km mm:ss as /mi).
    */
   _unit_note: 'run threshold/easy paces in JSON are sec/km. Use per_km and per_mile only.';
-  threshold?: { sec_per_km: number; per_km: string; per_mile: string };
-  easy?: { sec_per_km: number; per_km: string; per_mile: string };
+  /** D-285 / Law 3 — the model is told, in-band, that it may not out-assert the confidence it was handed. */
+  _confidence_note?: string;
+  threshold?: RunPaceForCoachEntry;
+  easy?: RunPaceForCoachEntry;
+}
+
+/**
+ * D-285 / Law 3 — `magnitude` never travels without `confidence` + `basis`. These used to be stripped
+ * before the LLM saw them, so a 5-run medium-confidence easy pace and a 20-run high-confidence threshold
+ * pace reached the model looking IDENTICAL. `as_of` is the newest SESSION behind the number (Q-173) —
+ * NOT the last time the profile was rebuilt — so a pace that has not moved since May cannot be spoken
+ * as if it were measured today.
+ */
+export interface RunPaceForCoachEntry {
+  sec_per_km: number;
+  per_km: string;
+  per_mile: string;
+  confidence?: 'low' | 'medium' | 'high' | string;
+  sample_count?: number;
+  as_of?: string;
 }
 
 /**
@@ -530,14 +548,30 @@ function buildRunPaceForCoach(learnedFitness: LearnedFitness | null): RunPaceFor
   const one = (key: 'run_threshold_pace_sec_per_km' | 'run_easy_pace_sec_per_km') => {
     const raw = learnedFitness[key];
     const o =
-      raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as { value?: unknown }) : null;
+      raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? (raw as { value?: unknown; confidence?: unknown; sample_count?: unknown; as_of?: unknown })
+        : null;
     const secKm = o?.value;
     if (typeof secKm !== 'number' || !Number.isFinite(secKm) || secKm <= 0) return null;
     const secMi = secKm * PACE_KM_TO_MI;
+    // D-285 / LAW 3 — confidence, sample size and FRESHNESS travel with the number, all the way to the
+    // model. They used to be stripped here: the LLM received threshold and easy rendered IDENTICALLY and
+    // INDISTINGUISHABLY, with no way to tell a 5-run medium-confidence read from a 20-run high-confidence
+    // one — or a number learned this week from one that has not moved since May. Law 3's failure tell,
+    // verbatim: "a number shown without its confidence". The prompt tells the model to quote these paces,
+    // so a stripped number is an unhedged assertion in the athlete's ear.
+    const conf = typeof o?.confidence === 'string' ? o.confidence : null;
+    const n = typeof o?.sample_count === 'number' && Number.isFinite(o.sample_count)
+      ? o.sample_count
+      : null;
+    const asOf = typeof o?.as_of === 'string' && o.as_of.length >= 10 ? o.as_of.slice(0, 10) : null;
     return {
       sec_per_km: Math.round(secKm * 10) / 10,
       per_km: `${formatMmSsPaceFromSecPerUnit(secKm)}/km`,
       per_mile: `${formatMmSsPaceFromSecPerUnit(secMi)}/mi`,
+      confidence: conf ?? undefined,
+      sample_count: n ?? undefined,
+      as_of: asOf ?? undefined,
     };
   };
   const threshold = one('run_threshold_pace_sec_per_km');
@@ -545,6 +579,11 @@ function buildRunPaceForCoach(learnedFitness: LearnedFitness | null): RunPaceFor
   if (!threshold && !easy) return null;
   return {
     _unit_note: 'run threshold/easy paces in JSON are sec/km. Use per_km and per_mile only.',
+    // Law 3: the model must not assert above the confidence it was handed, and must not present a stale
+    // pace as current. `as_of` is the newest SESSION behind the number, not the last profile rebuild.
+    _confidence_note:
+      'Each pace carries confidence / sample_count / as_of. Do NOT state a pace more confidently than its '
+      + 'confidence allows, and do NOT present a pace as current if as_of is old — say when it was last measured.',
     threshold: threshold ?? undefined,
     easy: easy ?? undefined,
   };

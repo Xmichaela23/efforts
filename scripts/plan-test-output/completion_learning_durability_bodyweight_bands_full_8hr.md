@@ -165,7 +165,7 @@
   - Technique Aerobic Swim — 850 yd (swim · 24min · EASY)
     Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
   - Tri Durability — Maximum Strength B (strength · 45min · MODERATE)
-    Late Base Week 7 (MS phase) — Heavy compounds at 6-8 reps, RIR 2. Same movement patterns you've been training in AA, now at race-meaningful loads. Squat / hinge / push / pull — 3 sets each, full-body. Equipment — Required: Dumbbells, Pull-up Bar, Bands.
+    Late Base Week 7 (MS phase) — Heavy compounds at 6-8 reps, RIR 2. Same movement patterns you've been training in AA, now at race-meaningful loads. Squat / hinge / push / pull — 3 sets each, full-body. Equipment — Required: Dumbbells.
 - **Thursday**
   - Run Intervals — 7×1000m (run · 58min · MODERATE)
     Warm up 10 min easy. 7×1000m at 10K / tempo pace with 90 sec jog recovery between. Cool down 10 min. Focus on consistent splits, not all-out.
@@ -191,7 +191,7 @@
   - Technique Aerobic Swim — 850 yd (swim · 24min · EASY)
     Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
   - Tri Durability — Maximum Strength B (strength · 45min · MODERATE)
-    Late Base Week 8 (MS phase) — Heavy compounds at 6-8 reps, RIR 2. Same movement patterns you've been training in AA, now at race-meaningful loads. Squat / hinge / push / pull — 3 sets each, full-body. Equipment — Required: Dumbbells, Pull-up Bar, Bands.
+    Late Base Week 8 (MS phase) — Heavy compounds at 6-8 reps, RIR 2. Same movement patterns you've been training in AA, now at race-meaningful loads. Squat / hinge / push / pull — 3 sets each, full-body. Equipment — Required: Dumbbells.
 - **Thursday**
   - Run Intervals — 7×1000m (run · 58min · MODERATE)
     Warm up 10 min easy. 7×1000m at 10K / tempo pace with 90 sec jog recovery between. Cool down 10 min. Focus on consistent splits, not all-out.
@@ -469,7 +469,7 @@
   - Technique Aerobic Swim — 700 yd (swim · 20min · EASY)
     Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
   - Tri Durability — Taper Light Session (strength · 30min · EASY)
-    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Dumbbells, Bands.
+    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Bands.
 - **Thursday**
   - Easy Run — 4 mi (run · 40min · EASY)
     Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
@@ -495,7 +495,7 @@
   - Technique Aerobic Swim — 700 yd (swim · 20min · EASY)
     Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
   - Tri Durability — Taper Light Session (strength · 30min · EASY)
-    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Dumbbells, Bands.
+    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Bands.
 - **Thursday**
   - Easy Run — 4 mi (run · 40min · EASY)
     Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.
@@ -519,7 +519,7 @@
   - Technique Aerobic Swim — 700 yd (swim · 20min · EASY)
     Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
   - Tri Durability — Taper Light Session (strength · 30min · EASY)
-    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Dumbbells, Bands.
+    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Bands.
 - **Thursday**
   - Easy Run — 4 mi (run · 40min · EASY)
     Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.

@@ -447,13 +447,19 @@ Deno.serve(async (req) => {
         console.log(`📊 [HISTORICAL] No runs found (30+ min, last 90 days, with analysis)`);
       }
     } catch (error) {
-      console.log('⚠️ Could not fetch historical drift data:', error);
-      baselines = {
-        fiveK_pace: 450, // 7:30/mi
-        easyPace: 540,   // 9:00/mi
-        tenK_pace: 480,  // 8:00/mi
-        marathon_pace: 600 // 10:00/mi
-      };
+      // D-285 / LAW 2 — DO NOT FABRICATE BASELINES HERE.
+      //
+      // This catch guards the HISTORICAL-DRIFT fetch. It used to respond to that failure by REPLACING the
+      // athlete's real `performance_numbers` (loaded at :294) with a hardcoded fictional athlete —
+      // fiveK 7:30/mi, easy 9:00/mi, tenK 8:00/mi, marathon 10:00/mi — and the analyzer then GRADED the
+      // athlete's workout against those numbers ("N/mi faster than your baseline base pace"). So a transient
+      // query error on an UNRELATED lookup silently swapped in a stranger's paces and judged the run by them.
+      // A fabricated anchor reaching a user-facing verdict is the exact failure Law 2 forbids, and it is how
+      // the "short finish relative to the planned ~90 min" bug was manufactured.
+      //
+      // The drift data is optional context. Losing it must cost us the CONTEXT, never the TRUTH. The real
+      // baselines stay; downstream already handles absent paces with `?? null` (:339) and discloses.
+      console.log('⚠️ Could not fetch historical drift data (baselines left intact):', error);
     }
 
     // Get planned workout data with token parsing support

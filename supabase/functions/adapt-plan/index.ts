@@ -1203,57 +1203,28 @@ async function autoAdapt(
     }
   }
 
-  // 3. Endurance auto-updates (only with high confidence)
-  const learnedEasyPace = learned?.run_easy_pace_sec_per_km;
-  if (learnedEasyPace?.confidence === 'high' && learnedEasyPace?.value) {
-    const learnedSecPerKm = Number(learnedEasyPace.value);
-    const learnedSecPerMi = Math.round(learnedSecPerKm * 1.60934);
-    const manualEasyMmSs = perf.easyPace;
-    if (manualEasyMmSs) {
-      const parts = String(manualEasyMmSs).split(':');
-      if (parts.length === 2) {
-        const manualSecPerMi = Number(parts[0]) * 60 + Number(parts[1]);
-        const deltaPct = Math.abs(learnedSecPerMi - manualSecPerMi) / manualSecPerMi;
-        if (deltaPct >= 0.07) {
-          const m = Math.floor(learnedSecPerMi / 60);
-          const s = Math.round(learnedSecPerMi % 60);
-          const newPace = `${m}:${String(s).padStart(2, '0')}`;
-
-          await supabase.from('user_baselines').update({
-            performance_numbers: { ...perf, easyPace: newPace },
-            updated_at: new Date().toISOString(),
-          }).eq('user_id', userId);
-
-          adaptations.push({
-            type: 'endurance_pace_update',
-            detail: `Easy pace auto-updated to ${newPace}/mi (high confidence)`,
-            applied: true,
-          });
-        }
-      }
-    }
-  }
-
-  const learnedFtp = learned?.ride_ftp_estimated;
-  if (learnedFtp?.confidence === 'high' && learnedFtp?.value) {
-    const manualFtp = Number(perf.ftp);
-    const learnedVal = Number(learnedFtp.value);
-    if (Number.isFinite(manualFtp) && manualFtp > 0 && Number.isFinite(learnedVal)) {
-      const deltaPct = Math.abs(learnedVal - manualFtp) / manualFtp;
-      if (deltaPct >= 0.07) {
-        await supabase.from('user_baselines').update({
-          performance_numbers: { ...perf, ftp: Math.round(learnedVal) },
-          updated_at: new Date().toISOString(),
-        }).eq('user_id', userId);
-
-        adaptations.push({
-          type: 'endurance_ftp_update',
-          detail: `FTP auto-updated to ${Math.round(learnedVal)}W (high confidence)`,
-          applied: true,
-        });
-      }
-    }
-  }
+  // ── 3. Endurance baselines: THE APP NO LONGER OVERWRITES THE ATHLETE (D-285, SPEC-run-pace-glass-box) ──
+  //
+  // DELETED: two silent auto-writes that lived here. Each one, on a >=7% divergence with a 'high'-confidence
+  // learned value, UPDATED `user_baselines.performance_numbers` — the athlete's OWN typed number —
+  // with no prompt, no consent, and NO UN-WRITE PATH:
+  //   · easyPace  -> cascaded into token targets, materialize-plan's chain, the client token expansion,
+  //                  and (via materialize-plan:543, `easyPace - 30`) THE MARATHON PACE TARGET.
+  //   · ftp       -> same shape, same silence.
+  // It then re-materialized the plan off the number it had just changed behind the athlete's back.
+  //
+  // WHY DELETING IT COSTS NOTHING: the athlete-gated SUGGESTION path above (`end_easy_pace` / the FTP twin,
+  // ~line 349) already fires on a STRICTLY LOOSER trigger — >=5% divergence at >=medium confidence, versus
+  // this block's >=7% at high. Every case the auto-write caught was already a suggestion. The only thing
+  // the auto-write added was the absence of consent.
+  //
+  // WHY IT IS WRONG: no commercial app rewrites an athlete's entered baseline without asking. Garmin,
+  // TrainingPeaks, Runalyze all SUGGEST and let the athlete adopt. And it is a Law 2 violation in the
+  // literal sense — an inference silently displacing an assertion, then being read back as if the athlete
+  // had said it.
+  //
+  // ⛔ DO NOT RE-ADD AN AUTO-WRITE HERE. If a baseline should change, it goes through the suggestion list
+  // and the athlete accepts it. The apply path (~line 935) already writes it on their confirmation.
 
   // 4. Re-materialize affected workouts if any adaptations were applied
   if (adaptations.some((a) => a.applied) && planId) {

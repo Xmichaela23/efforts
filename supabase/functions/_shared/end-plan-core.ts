@@ -3,6 +3,7 @@
  * Used by end-plan edge and complete-race.
  */
 // @ts-nocheck
+import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 
 export async function executeEndPlan(
   supabase: { from: (t: string) => any },
@@ -65,14 +66,21 @@ export async function executeEndPlan(
     if (snapshots?.length) {
       const { data: bl } = await supabase
         .from('user_baselines')
-        .select('effort_paces, current_volume')
+        // D-285: learned_fitness + performance_numbers added so the ONE run-pace resolver can run here.
+        // (SELECT-projection footgun: this repo has repeatedly read a column the query never fetched.)
+        .select('effort_paces, current_volume, learned_fitness, performance_numbers')
         .eq('user_id', userId)
         .maybeSingle();
 
-      const easyPaceSec: number = bl?.effort_paces?.base ?? 600;
+      // D-285 / LAW 2 — was `effort_paces.base ?? 600`, i.e. an invented 10:00/mi. It converts a long-run
+      // DURATION into MILES (`miles = min * 60 / paceSec`), so a wrong pace silently rewrites the athlete's
+      // recorded peak long run: at the invented 10:00/mi a 90-min run is 9.0 mi; at a real 11:08/mi it is
+      // 8.1 mi. That ~10% fiction then feeds volume/progression reasoning. If we do not know the pace we
+      // CANNOT do this conversion — so we skip it, rather than manufacture a mileage.
+      const easyPaceSec: number | null = resolveCurrentRunEasyPace(bl as any).sec_per_mi;
 
       for (const s of snapshots) {
-        if (s.run_long_run_duration && s.run_long_run_duration > 0) {
+        if (easyPaceSec != null && s.run_long_run_duration && s.run_long_run_duration > 0) {
           const miles = Math.round((s.run_long_run_duration * 60 / easyPaceSec) * 10) / 10;
           if (peakLongRunMiles === null || miles > peakLongRunMiles) peakLongRunMiles = miles;
         }

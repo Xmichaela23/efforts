@@ -16,6 +16,7 @@ import {
   type TrainingTransition,
 } from '../_shared/planning-context.ts';
 import { normalizeGoalDistanceKey, projectRaceSplits } from '../_shared/race-projections.ts';
+import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { buildSwimCutoffPressureV1, type SwimCutoffPressureV1 } from '../_shared/swim-cutoff-pressure.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType } from '../_shared/training-intent.ts';
@@ -2398,8 +2399,13 @@ Deno.serve(async (req: Request) => {
             // Maintenance-endurance band (run only): the athlete's typed weekly miles + their learned easy
             // pace → the composer clamps to the science band. sec/km → min/mi = ×1.609344 ÷ 60. Absent
             // either → the composer falls to its fixed default (no band, no friction).
-            const gsEasyPaceSecPerKm = Number((gsBaseline?.learned_fitness as any)?.run_easy_pace_sec_per_km);
-            const gsEasyPaceMinPerMile = gsEasyPaceSecPerKm > 0 ? (gsEasyPaceSecPerKm * 1.609344) / 60 : undefined;
+            // D-285 — was `Number(learned_fitness.run_easy_pace_sec_per_km)`, which reads the METRIC OBJECT
+            // (`{value, confidence, sample_count}`), not `.value` → `Number({...})` is **NaN** → `NaN > 0` is
+            // false → this band has NEVER once been applied. Silent, latent, and invisible: the composer just
+            // fell to its fixed default forever. Now routed through the ONE run-pace resolver, which also
+            // owns the sec/km → sec/mi conversion (the unit footgun this file was hand-rolling).
+            const gsEasy = resolveCurrentRunEasyPace(gsBaseline as any);
+            const gsEasyPaceMinPerMile = gsEasy.sec_per_mi != null ? gsEasy.sec_per_mi / 60 : undefined;
             const gsTargetWeeklyMiles = Number(gsTp.target_weekly_miles) > 0 ? Number(gsTp.target_weekly_miles) : undefined;
             const gsBody: Record<string, any> = {
               user_id,

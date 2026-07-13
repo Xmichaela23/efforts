@@ -5263,3 +5263,42 @@ So if a heat correction is ever built, it must be a **per-athlete fitted coeffic
 
 - **Fixtures:** 13 new in `easy-hr.test.ts` (24 total, all green) — incl. the interval-session regression, the tempo refusal, the dwell-floor-is-TIME pin, the `sample_count: 0` anchor refusal (which also asserts the fabricated anchor would have been *strictly tighter* than the honest bootstrap), and a **Law-1 pin sweeping runs through both the baseline predicate and the observed predicate and asserting they never diverge.**
 - **Blast radius / backfill:** `pace_at_easy_hr` and the LTHR zone bins are **stored per workout**. History was computed under the old rules, so a recompute is owed — see ENGINE-STATE "owed". Deploy-forward alone leaves the 5-week intensity window mixing two zone schemas.
+
+---
+
+## D-285 — The run-pace stack: ONE resolver, NO silent writes, NOTHING hidden from the athlete (2026-07-13, SPEC-run-pace-glass-box)
+
+- **Date:** 2026-07-13. **Spec:** `docs/SPEC-run-pace-glass-box.md`. **Changes no number's VALUE** — only where it comes from, who may overwrite it, and what travels with it.
+
+### ⛔ FIRST: what this decision REJECTED (read before "improving" it)
+A proposal to **derive easy pace from threshold pace** (Daniels/Friel) instead of learning it. **Traced and killed.** Do not resurrect:
+1. **It already exists.** `create-goal-and-materialize-plan/index.ts:319-325` already does `learned threshold → estimateVdotFromPace → getPacesFromScore → .base`, as the FALLBACK, with learned-easy overriding it at `:340-347`. There are **four** copies of the VDOT model in the repo. The proposal was never "build it" — it was "invert its precedence."
+2. **D-033 already rejected it** (`DECISIONS-LOG.md:691`, verbatim): *"**Threshold pace as the signal, not easy pace. Rejected** — Easy pace at HR is the cleanest read on aerobic fitness; threshold prescriptions inherit via Daniels ratios anyway."*
+3. **It re-breaks Law 1 permanently.** The D-033 reconciler compares BASELINE vs OBSERVED, and D-284 spent real effort forcing both to *measure one population*. A Daniels table value is an inference with a **fixed structural offset** from the measured observed side. The reconciler would stop measuring *fitness change* and start measuring *the athlete's deviation from Daniels* — which never goes away. Dense data → `reconciled_better` fires forever (a lie). Sparse data (the norm) → the derived slow pace goes **straight into the plan**. Same change, opposite failure, decided by how much the athlete happened to run. It also **blunts detraining detection by the full 20-60 s/mi** — the exact thing that machine exists to catch.
+4. **`baselineUsable()` (`science.ts:70-79`) requires `confidence !== 'low'` AND `sample_count >= 2`.** A table lookup has neither. Shipping it would require **fabricating a sample_count** — the precise Law 2 violation deleted in D-284.
+
+**The math was never the problem. The plumbing was.**
+
+### What shipped
+
+**1. `resolveCurrentRunEasyPace` (`src/lib/resolve-current-run-pace.ts`) — the run twin of `resolveCurrentFtp`.** Pure, no I/O, client+edge. Precedence: learned(med/high) → manual → effort_paces(`is_estimate: true`) → learned-low → **null**. Carries `source` / `confidence` / `sample_count` / `as_of` / `is_estimate` to every surface (Law 3). **It owns the sec/km → sec/mi conversion, once** — the unit footgun that has bitten this repo three times (`learned_fitness` is sec/km; `performance_numbers.easyPace` is sec/mi and is sometimes a `"9:30"` string). 11 fixtures, incl. an explicit "a sec/km value must never leak to the surface unconverted" pin.
+
+**2. SEVEN FABRICATED PACES DELETED (Law 2).** A number with no provenance was reaching verdicts the athlete reads:
+- `analyze-running-workout/index.ts:451` — **the worst one.** A `catch` block guarding an *unrelated* historical-drift query responded to failure by **replacing the athlete's real `performance_numbers` with a hardcoded fictional athlete** (5K 7:30/mi, easy 9:00/mi, marathon 10:00/mi) — and the analyzer then **GRADED their workout against it** ("N/mi faster than your baseline base pace"). A transient DB error swapped in a stranger's paces and judged the run by them. Now: the drift context is lost, the truth is not.
+- `_shared/token-parser.ts` ×3 and `lib/analysis/running/token-parser.ts` ×3 — `baselines.easyPace || 540`, an invented 9:00/mi written onto the **planned session** as its pace target. Now the segment ships with **no target** when the pace is unknown (`RunSegment.target_pace` is optional exactly so this is expressible). "10 min warm up", not "10 min warm up @ 9:00/mi". *(Note `getPaceFromReference` in the same files already returned `null` honestly — one file, two philosophies. Now one.)*
+- `_shared/end-plan-core.ts:72` and `_shared/planning-context.ts:380` — `effort_paces.base ?? 600`. These convert a long-run **duration** into **miles** (`miles = min × 60 / paceSec`), so an invented 10:00/mi silently rewrites the athlete's recorded peak long run by ~10% (a 90-min run reads 9.0 mi instead of 8.1 mi at a real 11:08/mi) — and that fiction feeds volume/progression reasoning. Unknown pace → **we do not convert**.
+
+**3. THE APP NO LONGER OVERWRITES THE ATHLETE (`adapt-plan/index.ts`).** Deleted **two** silent auto-writes (easy pace AND FTP). Each one, on a ≥7% divergence with a `high`-confidence learned value, **wrote `user_baselines.performance_numbers`** — the athlete's own typed number — with **no prompt, no consent, and no un-write path**, then re-materialized the plan off the number it had just changed behind their back. The easy-pace one cascaded into token targets, materialize-plan's chain, client token expansion, and (via `materialize-plan:543`, `easyPace - 30`) **the marathon-pace target**.
+**Deleting it costs nothing:** the athlete-gated SUGGESTION path (`end_easy_pace`, `adapt-plan:349` → apply at `:935`) already fires on a **strictly looser** trigger — ≥5% at ≥medium confidence vs this block's ≥7% at high. **Every case the auto-write caught was already a suggestion.** The only thing the auto-write added was the absence of consent. No commercial app does this; Garmin/TrainingPeaks/Runalyze all suggest and let the athlete adopt.
+
+**4. Provenance reaches the LLM (`_shared/arc-context.ts`, Law 3).** `buildRunPaceForCoach` stripped `confidence`/`sample_count`/`as_of`, so the model received threshold and easy **identically and indistinguishably** — a 5-run medium read looked exactly like a 20-run high one, and a pace unmoved since May looked current. The prompt tells the model to *quote* these paces. Now each entry carries its confidence, sample count and `as_of`, plus an in-band `_confidence_note` forbidding the model from asserting above them.
+
+**5. A latent NaN bug (`create-goal-and-materialize-plan:2401`).** `Number(learned_fitness.run_easy_pace_sec_per_km)` read the **metric object**, not `.value` → `NaN` → `NaN > 0` false → the Get Strong maintenance-endurance band **had never once been applied**. Silent and invisible. Now routed through the resolver.
+
+**6. The athlete can see and edit their own number again (`TrainingBaselines.tsx`).** The manual easy-pace input was gated on `!hasEasyLearned` — so the moment the app learned a pace, **the athlete's field vanished**: no accept, no reject, no override. Both are now rendered, and the one actually **in use** is named, because precedence gives a medium/high learned value the win. (Q-174 asks whether that precedence is right — the athlete's explicit assertion arguably *should* beat an inference. Not decided here.)
+
+### What this deliberately does NOT touch
+D-033's reconciler, the easy band (`easy-hr.ts`), the VDOT tables, and **no number's value**. Existing plans are unaffected *except* that (3) removes a silent mutation that was moving them — a fix, not a regression.
+
+### Verification
+1052 shared tests pass (the same 5 pre-existing cycling-v1 failures); 11 new resolver fixtures; client `vite build` green; zero new type errors in `_shared` (50→50), `adapt-plan` (0→0), `arc-context` (0→0), `token-parser` (0→0/4→4), `analyze-running-workout` (62→62), `create-goal` (47→47), `TrainingBaselines` (1→1).

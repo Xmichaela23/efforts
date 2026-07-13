@@ -506,10 +506,40 @@ const formatPace = (secPerKm: number | undefined): string => {
   return `${mins}:${String(secs).padStart(2, '0')}/mi`;
 };
 
-const paceConfidenceLine = (metric: { sample_count?: number } | null | undefined, sport: 'run' | 'ride'): string | null => {
+// GLASS BOX (Law 2 + Law 3). Every learned number shows its work: what it was measured from, the RULE that
+// qualified those sessions, and HOW OLD the newest one is.
+//
+// This used to print the sample count and DROP the `source` string — while the engine was already writing a
+// full plain-English basis ("pace at easy HR (5 runs; Friel Z2 — at or below 89% of your threshold HR
+// (151 bpm))"). A magnitude reaching the surface stripped of its basis is the Law 3 failure tell verbatim
+// ("a number shown without its confidence"). The copy was never missing — the surface was throwing it away.
+//
+// `as_of` (Q-173) is the newest SESSION behind the number, NOT the last time the profile was rebuilt. It
+// matters most in summer: heat lifts run HR ~4-7 bpm, so hot runs sit above the easy ceiling and (correctly)
+// do not qualify — so the learner can go quiet for a whole season while the surface keeps showing a
+// months-old pace that LOOKS current. Now it says how old it is instead of lying by omission.
+const learnedBasisLine = (
+  metric: { sample_count?: number; source?: string } | null | undefined,
+  sport: 'run' | 'ride',
+): string | null => {
   if (!metric?.sample_count || metric.sample_count < 1) return null;
+  // Prefer the engine's own basis — it names the qualifying RULE, which is what answers "why didn't my run
+  // count?". Fall back to the bare count only when the engine did not supply one.
+  if (metric.source && String(metric.source).trim().length > 0) return String(metric.source).trim();
   const u = sport === 'ride' ? 'rides' : 'runs';
   return `Learned from ${metric.sample_count} ${u}`;
+};
+
+/** "as of May 27" — the newest session behind the number. null when the engine didn't stamp one (never faked). */
+const learnedAsOfLine = (metric: { as_of?: string | null } | null | undefined): string | null => {
+  const d = metric?.as_of;
+  if (!d || typeof d !== 'string' || d.length < 10) return null;
+  const dt = new Date(`${d.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(dt.getTime())) return null;
+  const days = Math.floor((Date.now() - dt.getTime()) / 86400000);
+  const pretty = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  // Only shout about age once it's genuinely stale. Under 6 weeks, the date alone is enough.
+  return days >= 42 ? `as of ${pretty} — ${days} days ago` : `as of ${pretty}`;
 };
 
 // Get confidence dots
@@ -1207,15 +1237,25 @@ return (
                                   <span className="text-lg font-medium text-white tabular-nums">{formatPace(easyLearned.value)}</span>
                                   <span className="text-[10px] text-white/35" title="Model confidence">{getConfidenceDots(easyLearned.confidence)}</span>
                                 </div>
-                                {paceConfidenceLine(easyLearned, 'run') && (
-                                  <p className="text-[11px] text-white/40 mt-1 leading-snug">{paceConfidenceLine(easyLearned, 'run')}</p>
+                                {learnedBasisLine(easyLearned, 'run') && (
+                                  <p className="text-[11px] text-white/40 mt-1 leading-snug">{learnedBasisLine(easyLearned, 'run')}</p>
+                                )}
+                                {learnedAsOfLine(easyLearned) && (
+                                  <p className="text-[11px] text-white/30 mt-0.5 leading-snug">{learnedAsOfLine(easyLearned)}</p>
                                 )}
                               </div>
                             </div>
                             )}
-                            {!hasEasyLearned && (
+                            {/* D-285 / GLASS BOX — the manual input is ALWAYS rendered.
+                                It used to be gated on `!hasEasyLearned`, so the moment the app learned an easy
+                                pace the athlete's own field VANISHED: no accept, no reject, no override. The
+                                app's inference won and the athlete had no recourse — the opposite of a glass box,
+                                and the reason a wrong manual value could sit there uncorrectable.
+                                Both values are now visible, and the one actually IN USE is named (Law 3). */}
                             <div className="flex flex-col gap-1.5">
-                              <label className="text-xs text-white/50 font-medium">Easy pace (manual)</label>
+                              <label className="text-xs text-white/50 font-medium">
+                                Easy pace (manual){hasEasyLearned ? '' : ' — in use'}
+                              </label>
                               <div className="flex items-center gap-2">
                                 <input
                                   type="text"
@@ -1233,8 +1273,16 @@ return (
                                 />
                                 <span className="text-sm text-white/50">/mi</span>
                               </div>
+                              {hasEasyLearned && (
+                                // Do NOT let the athlete believe this field is steering the plan when it is not.
+                                // Precedence today: a medium/high LEARNED value outranks the typed one
+                                // (`resolveCurrentRunEasyPace`, mirroring `resolveCurrentFtp`). Say so plainly.
+                                <p className="text-[11px] text-white/30 leading-snug">
+                                  Your runs are being used instead ({formatPace(easyLearned.value)}). This value is
+                                  kept, but not applied while a measured pace exists.
+                                </p>
+                              )}
                             </div>
-                            )}
                             {hasThrLearned && (
                             <div className="flex flex-col gap-1.5 min-w-[10rem]">
                               <label className="text-xs text-white/50 font-medium">Threshold pace</label>
@@ -1243,8 +1291,11 @@ return (
                                   <span className="text-lg font-medium text-white tabular-nums">{formatPace(thrLearned.value)}</span>
                                   <span className="text-[10px] text-white/35" title="Model confidence">{getConfidenceDots(thrLearned.confidence)}</span>
                                 </div>
-                                {paceConfidenceLine(thrLearned, 'run') && (
-                                  <p className="text-[11px] text-white/40 mt-1 leading-snug">{paceConfidenceLine(thrLearned, 'run')}</p>
+                                {learnedBasisLine(thrLearned, 'run') && (
+                                  <p className="text-[11px] text-white/40 mt-1 leading-snug">{learnedBasisLine(thrLearned, 'run')}</p>
+                                )}
+                                {learnedAsOfLine(thrLearned) && (
+                                  <p className="text-[11px] text-white/30 mt-0.5 leading-snug">{learnedAsOfLine(thrLearned)}</p>
                                 )}
                               </div>
                             </div>

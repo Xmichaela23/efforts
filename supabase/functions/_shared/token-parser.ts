@@ -81,29 +81,46 @@ function parseToken(token: string, baselines: UserBaselines): RunSegment[] {
   return segments;
 }
 
+// ── D-285 / LAW 2 — WE DO NOT INVENT A PACE ─────────────────────────────────────────────────────────
+// These three token parsers used to write `baselines.easyPace || 540` — a bare 9:00/mi, invented, with no
+// provenance, straight onto the athlete's PLANNED SESSION as its pace target. The athlete then ran against
+// it and was GRADED against it. A number nobody measured, prescribing and judging real training.
+//
+// Note `getPaceFromReference` (below, in this same file) already did the right thing and returned `null`.
+// One file, two philosophies. Now one: when the easy pace is unknown, the segment ships WITHOUT a pace
+// target — "10 min warm up", not "10 min warm up @ 9:00/mi". `RunSegment.target_pace` is optional exactly
+// so this is expressible. Losing the target costs a hint; inventing one costs the truth.
+//
+// ⛔ DO NOT reintroduce a `|| 540` / `?? 600` here. If we do not know the pace, we say nothing.
+function easyPaceTarget(baselines: UserBaselines): RunSegment['target_pace'] | undefined {
+  const targetPace = parsePaceString(baselines.easyPace) ?? null;
+  if (targetPace == null || !(targetPace > 0)) return undefined;   // unknown -> no target. Never a literal.
+  const tolerance = 0.10;
+  return {
+    target: targetPace,
+    lower: Math.round(targetPace * (1 - tolerance)),
+    upper: Math.round(targetPace * (1 + tolerance)),
+    tolerance,
+  };
+}
+
 function parseWarmupToken(token: string, baselines: UserBaselines): RunSegment | null {
   const durationMatch = token.match(/(\d+)min/);
   if (!durationMatch) return null;
   const duration = parseInt(durationMatch[1]) * 60;
-  const targetPace = baselines.easyPace || 540;
-  const tolerance = 0.10;
-  return {
-    type: 'warmup',
-    duration,
-    target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance }
-  };
+  const target_pace = easyPaceTarget(baselines);
+  return { type: 'warmup', duration, ...(target_pace ? { target_pace } : {}) };
 }
 
 function parseCooldownToken(token: string, baselines: UserBaselines): RunSegment | null {
   const durationMatch = token.match(/(\d+)min/);
   if (!durationMatch) return null;
   const duration = parseInt(durationMatch[1]) * 60;
-  const targetPace = baselines.easyPace || 540;
-  const tolerance = 0.10;
+  const target_pace = easyPaceTarget(baselines);
   return {
     type: 'cooldown',
     duration,
-    target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance }
+    ...(target_pace ? { target_pace } : {})
   };
 }
 
@@ -183,9 +200,8 @@ function parseEasyRunToken(token: string, baselines: UserBaselines): RunSegment 
   const durationMatch = token.match(/run_easy_(\d+)min/);
   if (!durationMatch) return null;
   const duration = parseInt(durationMatch[1]) * 60;
-  const targetPace = baselines.easyPace || 540;
-  const tolerance = 0.10;
-  return { type: 'work', duration, target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance } };
+  const target_pace = easyPaceTarget(baselines);
+  return { type: 'work', duration, ...(target_pace ? { target_pace } : {}) };
 }
 
 function getPaceFromReference(paceRef: string, baselines: UserBaselines): number | null {

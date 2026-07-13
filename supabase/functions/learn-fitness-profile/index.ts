@@ -96,6 +96,27 @@ interface LearnedMetric {
   confidence: 'low' | 'medium' | 'high';
   source: string;
   sample_count: number;
+  /**
+   * Q-173 / Law 3 — the date of the NEWEST session that actually fed this number.
+   *
+   * NOT the same as `learned_fitness.last_updated`, which only says when the profile was last REBUILT.
+   * The distinction is load-bearing: a re-learn that runs today over runs from May stamps `last_updated`
+   * with today's date while the number is three months stale. That is the freshness lie.
+   *
+   * It bites hardest in summer: heat lifts run HR ~4-7 bpm, so hot runs land ABOVE the easy ceiling and are
+   * (correctly) excluded from the easy band — which means through a hot season almost nothing qualifies, the
+   * learner quietly stops updating, and the surface keeps showing a months-old pace that LOOKS current.
+   * Stamping the newest contributor is what lets the surface say "as of {date}" instead of lying by omission.
+   *
+   * Mirrors the coach's BODY "as of" treatment (v85/v87).
+   */
+  as_of?: string | null;
+}
+
+/** Newest session date among the rows that fed a metric. null when unknown — never a fabricated today. */
+function newestDate(rows: Array<{ date?: string | null }>): string | null {
+  const ds = rows.map((r) => r?.date).filter((d): d is string => typeof d === 'string' && d.length >= 10).sort();
+  return ds.length ? ds[ds.length - 1] : null;
 }
 
 interface LearnedFitnessProfile {
@@ -572,7 +593,8 @@ function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
         value: Math.round(thresholdHRValue),
         confidence: thresholdCandidates.length >= 5 ? 'high' : 'medium',
         source: `median of ${thresholdCandidates.length} threshold efforts (85-92% max)`,
-        sample_count: thresholdCandidates.length
+        sample_count: thresholdCandidates.length,
+        as_of: newestDate(thresholdCandidates)
       };
     } else {
       // Fallback: Take 95th percentile of all sustained efforts
@@ -637,7 +659,8 @@ function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
         // The receipt names the ACTUAL band that was applied (Law 3), not a hardcoded "<75% max" that
         // stopped being true.
         source: `median of ${easyEfforts.length} easy runs (${runEasyBand.basis})`,
-        sample_count: easyEfforts.length
+        sample_count: easyEfforts.length,
+        as_of: newestDate(easyEfforts),   // Q-173: how old is the newest run behind this number?
       };
     } else {
       // Q-169 / LAW 2 — THE FABRICATION IS DELETED.
@@ -737,8 +760,9 @@ function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
       easy_pace = {
         value: Math.round(medianPace),
         confidence: easyPaceRuns.length >= 5 ? 'high' : 'medium',
-        source: `pace at easy HR (${easyPaceRuns.length} runs)`,
-        sample_count: easyPaceRuns.length
+        source: `pace at easy HR (${easyPaceRuns.length} runs; ${runEasyBand.basis})`,
+        sample_count: easyPaceRuns.length,
+        as_of: newestDate(easyPaceRuns),  // Q-173: heat can silence this learner for a whole summer
       };
     }
   }

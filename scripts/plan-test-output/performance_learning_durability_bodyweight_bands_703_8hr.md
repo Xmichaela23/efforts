@@ -409,7 +409,7 @@
   - Technique Aerobic Swim — 650 yd (swim · 19min · EASY)
     Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
   - Tri Durability — Taper Light Session (strength · 30min · EASY)
-    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Dumbbells, Bands.
+    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Bands.
 - **Thursday**
   - Easy Run + Strides — 4 mi (run · 45min · EASY)
     Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue. After the cool-down, 4 × 20 sec strides at ~5K pace effort with 30 sec walk recovery. Strides wake up fast-twitch fibers and improve running economy — not speedwork; relaxed and fast.
@@ -435,7 +435,7 @@
   - Technique Aerobic Swim — 650 yd (swim · 19min · EASY)
     Warm up 300 yd easy. 4×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down 200 yd.
   - Tri Durability — Taper Light Session (strength · 30min · EASY)
-    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Dumbbells, Bands.
+    Race week — one light session early in the week (Monday or Tuesday). 30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you feel fresh and want the day for recovery. After this session, no strength until the post-race recovery week. Equipment — Required: Bands.
 - **Thursday**
   - Easy Run — 4 mi (run · 40min · EASY)
     Recovery run. Fully conversational Z1–Z2 pace. These miles build your aerobic base without adding meaningful fatigue.

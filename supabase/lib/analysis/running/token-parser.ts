@@ -126,6 +126,26 @@ function parseToken(token: string, baselines: UserBaselines): RunSegment[] {
 // INDIVIDUAL TOKEN PARSERS
 // =============================================================================
 
+// ── D-285 / LAW 2 — WE DO NOT INVENT A PACE (twin of _shared/token-parser.ts) ───────────────────────
+// Three sites below wrote `baselines.easyPace || 540` — a bare invented 9:00/mi — straight onto the
+// athlete's PLANNED SESSION as its pace target, which they then ran against and were graded against.
+// `getPaceFromReference` in this same file already returned null honestly. One file, two philosophies.
+// Now one: unknown pace -> the segment ships WITHOUT a target ("10 min warm up", not "@ 9:00/mi").
+// `RunSegment.target_pace` is optional precisely so this is expressible.
+// ⛔ DO NOT reintroduce a `|| 540`. If we do not know the pace, we say nothing.
+function easyPaceTarget(baselines: UserBaselines): RunSegment['target_pace'] | undefined {
+  const raw = parsePaceString(baselines.easyPace as any);
+  const targetPace = typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null;
+  if (targetPace == null) return undefined;
+  const tolerance = 0.10;
+  return {
+    target: targetPace,
+    lower: Math.round(targetPace * (1 - tolerance)),
+    upper: Math.round(targetPace * (1 + tolerance)),
+    tolerance,
+  };
+}
+
 function parseWarmupToken(token: string, baselines: UserBaselines): RunSegment | null {
   // Examples: warmup_run_easy_10min, warmup_run_quality_12min
   
@@ -139,18 +159,12 @@ function parseWarmupToken(token: string, baselines: UserBaselines): RunSegment |
   const isQuality = token.includes('quality');
   
   // Use easy pace for warmup (with 10% tolerance)
-  const targetPace = baselines.easyPace || 540; // Default 9:00/mi if no baseline
-  const tolerance = 0.10;
+  const target_pace = easyPaceTarget(baselines);   // D-285: unknown pace -> NO target. Never 540.
   
   return {
     type: 'warmup',
     duration,
-    target_pace: {
-      target: targetPace,
-      lower: Math.round(targetPace * (1 - tolerance)),
-      upper: Math.round(targetPace * (1 + tolerance)),
-      tolerance
-    }
+    ...(target_pace ? { target_pace } : {})
   };
 }
 
@@ -166,18 +180,12 @@ function parseCooldownToken(token: string, baselines: UserBaselines): RunSegment
   const duration = parseInt(durationMatch[1]) * 60; // Convert to seconds
   
   // Use easy pace for cooldown (with 10% tolerance)
-  const targetPace = baselines.easyPace || 540; // Default 9:00/mi if no baseline
-  const tolerance = 0.10;
+  const target_pace = easyPaceTarget(baselines);   // D-285: unknown pace -> NO target. Never 540.
   
   return {
     type: 'cooldown',
     duration,
-    target_pace: {
-      target: targetPace,
-      lower: Math.round(targetPace * (1 - tolerance)),
-      upper: Math.round(targetPace * (1 + tolerance)),
-      tolerance
-    }
+    ...(target_pace ? { target_pace } : {})
   };
 }
 
@@ -358,18 +366,12 @@ function parseEasyRunToken(token: string, baselines: UserBaselines): RunSegment 
   const duration = parseInt(durationMatch[1]) * 60; // Convert to seconds
   
   // Use easy pace (with 10% tolerance)
-  const targetPace = baselines.easyPace || 540; // Default 9:00/mi if no baseline
-  const tolerance = 0.10;
+  const target_pace = easyPaceTarget(baselines);   // D-285: unknown pace -> NO target. Never 540.
   
   return {
     type: 'work',
     duration,
-    target_pace: {
-      target: targetPace,
-      lower: Math.round(targetPace * (1 - tolerance)),
-      upper: Math.round(targetPace * (1 + tolerance)),
-      tolerance
-    }
+    ...(target_pace ? { target_pace } : {})
   };
 }
 
