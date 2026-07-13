@@ -5302,3 +5302,26 @@ D-033's reconciler, the easy band (`easy-hr.ts`), the VDOT tables, and **no numb
 
 ### Verification
 1052 shared tests pass (the same 5 pre-existing cycling-v1 failures); 11 new resolver fixtures; client `vite build` green; zero new type errors in `_shared` (50→50), `adapt-plan` (0→0), `arc-context` (0→0), `token-parser` (0→0/4→4), `analyze-running-workout` (62→62), `create-goal` (47→47), `TrainingBaselines` (1→1).
+
+---
+
+## D-286 — ONE Friel zone model. The zone table the athlete READS and the band the engine APPLIES cannot disagree again. (2026-07-13)
+
+- **Date:** 2026-07-13. **Completes D-284's third fix**, which was only half-done.
+- **The bug (live on the athlete's own screen).** The Friel Z2/Z3 boundary was hardcoded in **three** places that rounded independently:
+
+| file | boundary | @ LTHR 151 |
+|---|---|---|
+| `_shared/easy-hr.ts` | easy ceiling = `round(0.89 × LTHR)` | **134** |
+| `compute-workout-analysis/index.ts` | Z3 floor = `round(0.90 × LTHR)` | **136** |
+| `src/components/TrainingBaselines.tsx` `getFrielZones` | Z2 max = `round(0.90 × LTHR)` | **136** |
+
+  So a **135 bpm run was "Zone 2 Aerobic" on the athlete's Baselines screen and "too hard to be easy" to the learner that sets their plan's pace.** One fact, two screens, opposite answers — the exact failure the shared easy band was written to end.
+- **D-284 claimed to fix this and fixed only ONE of the two divergent copies** (the analyzer). It missed `TrainingBaselines.tsx` — **the copy the athlete actually looks at.** Caught when Michael sent a screenshot of his own Baselines screen showing `Z2 128-136` while the engine was cutting easy at 134.
+- **The fix.** `src/lib/friel-zones.ts` — one model, client + edge. `easy-hr.ts` re-exports from it (so every existing importer is unchanged); `TrainingBaselines.getFrielZones` renders it; the analyzer's `runEasyZone3FloorBpm` delegates to it. **Z2's ceiling IS `easyCeilingBpm`, and Z3 begins one beat above it — derived, never rounded independently.** So:
+
+  > **`easy` ≡ `Zone 1 or Zone 2` ≡ `hr <= easyCeilingBpm(lthr)`** — by construction, at every LTHR, on every surface.
+
+- **Shared-code direction (load-bearing):** the client **never** imports from `supabase/functions/_shared`; shared code lives in **`src/lib/`** and edge functions import *from* it (the `resolve-current-ftp.ts` / `session-frequency-defaults.ts` precedent). That is why the model landed in `src/lib/`, not `_shared/`.
+- **No number was hand-picked and NOTHING is tuned to the primary user.** All three copies were defensible Friel (Z2 = 85-89% of LTHR; Z3 begins at 90%). **The bug was never the number — it was that there were three numbers.** Z4/Z5 boundaries (0.95 / 1.05) are carried over untouched; only the fractured Z2/Z3 seam is consolidated.
+- **Verified:** a sweep across LTHR 140-180 asserts, at every value, that `Z2.max === band.ceiling`, that the last beat of Z2 **is** easy, and that the first beat of Z3 **is not**. 24/24 `easy-hr` fixtures green (incl. the D-284 boundary pin, which now passes against the shared model); 1056 shared tests; client `vite build` green.

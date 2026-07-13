@@ -13,6 +13,7 @@ import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-types';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
+import { frielRunZones } from '@/lib/friel-zones';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
@@ -591,13 +592,13 @@ interface HRZone {
 const ZONE_COLORS = ['#10b981', '#84cc16', '#f59e0b', '#ef4444', '#991b1b'];
 
 // Friel 5-zone model from LTHR (used by Garmin, TrainingPeaks)
-const getFrielZones = (lthr: number): HRZone[] => [
-  { name: 'Z1', label: 'Recovery',  min: 0,                        max: Math.round(lthr * 0.85), color: ZONE_COLORS[0] },
-  { name: 'Z2', label: 'Aerobic',   min: Math.round(lthr * 0.85),  max: Math.round(lthr * 0.90), color: ZONE_COLORS[1] },
-  { name: 'Z3', label: 'Tempo',     min: Math.round(lthr * 0.90),  max: Math.round(lthr * 0.95), color: ZONE_COLORS[2] },
-  { name: 'Z4', label: 'Threshold', min: Math.round(lthr * 0.95),  max: Math.round(lthr * 1.05), color: ZONE_COLORS[3] },
-  { name: 'Z5', label: 'VO2max',    min: Math.round(lthr * 1.05),  max: null,                    color: ZONE_COLORS[4] },
-];
+// D-286 — the zone table the athlete READS now derives from the SAME Friel model the learner applies.
+// It used to top Z2 at `round(0.90 x LTHR)` = 136 while `easy-hr.ts` cut easy at `round(0.89 x LTHR)` = 134,
+// so a 135 bpm run was "Zone 2 Aerobic" ON THIS SCREEN and "too hard to be easy" to the engine that sets
+// the athlete's plan pace. D-284 fixed the analyzer's copy and missed THIS one — the one they look at.
+// Now: easy === Z1 or Z2, by construction, at every LTHR. See src/lib/friel-zones.ts.
+const getFrielZones = (lthr: number): HRZone[] =>
+  frielRunZones(lthr).map((z, i) => ({ name: z.name, label: z.label, min: z.min, max: z.max, color: ZONE_COLORS[i] }));
 
 // Karvonen %HRR model (uses Max HR + Resting HR)
 const getKarvonenZones = (maxHR: number, restingHR: number): HRZone[] => {

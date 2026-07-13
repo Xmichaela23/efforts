@@ -43,24 +43,16 @@
  *     never followed its own zones screen.
  */
 
-/** Friel run Z2 ceiling — the top of easy/aerobic. Z1 <85% LTHR, Z2 85-89%; above 89% is Z3 (not easy). */
-export const EASY_CEILING_PCT_LTHR = 0.89;
-/**
- * Friel Z3 floor — the first heartbeat that is NOT easy. THE ANALYZER'S ZONE BINS MUST USE THIS.
- *
- * Q-171: this band and `compute-workout-analysis`'s Friel zone array shipped 40 minutes apart with two
- * independently-rounded ceilings — easy topped at `round(0.89 x LTHR)` = 134 while Zone 3 began at
- * `round(0.90 x LTHR)` = 136 (LTHR 151). A 135 bpm run was therefore **Zone 2 on the Details screen and
- * NOT easy to the learner**: one fact, two screens, opposite answers — the exact failure the shared band
- * was written to end. Both numbers are defensible Friel (Z2 is 85-89%, Z3 starts at 90%); the bug is that
- * they were TWO numbers. `runEasyZone3FloorBpm` derives the boundary from the easy ceiling, so
- * `isEasyHr(hr) === true` <=> hr bins to Zone 1 or Zone 2, by construction, permanently.
- */
+// D-286 — the Friel boundary now lives in ONE place (`src/lib/friel-zones.ts`) that the CLIENT's zone table
+// reads too. It was hardcoded in three files that rounded independently (0.89 here, 0.90 in the analyzer,
+// 0.90 in TrainingBaselines) — so a 135 bpm run was "Zone 2" on the athlete's screen and "not easy" to this
+// learner. Re-exported here so every existing importer keeps working unchanged.
+export { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, easyCeilingBpm, zone3FloorBpm, frielRunZones } from '../../../src/lib/friel-zones.ts';
+import { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, easyCeilingBpm, zone3FloorBpm } from '../../../src/lib/friel-zones.ts';
+/** Friel Z3 floor — kept as a named export for existing importers; delegates to the ONE model (D-286). */
 export function runEasyZone3FloorBpm(lthr: number): number {
-  return Math.round(lthr * EASY_CEILING_PCT_LTHR) + 1;
+  return zone3FloorBpm(lthr);
 }
-/** Floor: below this is a walk / a stop / a broken strap, not an easy run. */
-export const EASY_FLOOR_PCT_LTHR = 0.70;
 /** Cold-start bootstrap: the field's aerobic ceiling is 80% of max — NOT the 75% that starved this. */
 export const EASY_CEILING_PCT_MAXHR = 0.80;
 /** Cold-start floor: below 65% of max is recovery/commute territory (mirrors the working bike band). */
@@ -128,7 +120,7 @@ export function resolveRunEasyHrBand(
 
   if (lthr) {
     return {
-      ceiling: Math.round(lthr.value * EASY_CEILING_PCT_LTHR),
+      ceiling: easyCeilingBpm(lthr.value),
       floor: Math.round(lthr.value * EASY_FLOOR_PCT_LTHR),
       anchor: 'lthr',
       confidence: lthr.confidence,
