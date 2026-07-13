@@ -64,7 +64,12 @@ export type ResolvedLthr = {
 export function resolveCurrentLthr(b: BaselinesLike): ResolvedLthr;
 ```
 
-### Precedence — ⚠ THE ONE OPEN DESIGN CALL (Michael's)
+### Precedence — ✅ **DECIDED 2026-07-13 (Michael): LET THE ATHLETE CHOOSE. Mirror Q-174.**
+
+**The ruling:** default to **learned** (byte-identical to today — no migration, no regression), and give the athlete an explicit `lthr_source: 'manual' | 'learned'` toggle whose choice is **honoured over even a high-confidence learned value**. Exactly the Q-174 mechanism, reused verbatim.
+
+**Why this and not a fixed order:** a real threshold **test** the athlete performed beats a passive learn off ambient runs (his LTHR is **n=2**) — but the app **cannot distinguish a tested number from a guessed one**, and it never will. So it must not pretend to. **The athlete knows which theirs is. Ask them.** (And, per Q-174: choosing `'learned'` must SKIP the manual tier entirely, so a typed number they declined cannot resurface when the learner thins out.)
+
 
 ```
 0. the athlete's EXPLICIT choice     (`lthr_source: 'manual' | 'learned'` — the Q-174 mechanism, reused)
