@@ -33,6 +33,9 @@ import {
 } from '../_shared/athlete-identity-inference.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import { fitSwimCss } from '../_shared/swim/swim-css-learner.ts';
+// Q-169: the ONE definition of "is this heartbeat easy" — threshold-anchored (Friel Z2), %max-bootstrapped.
+// The RUN sites use it; the BIKE band (65-75% max + power filter) is deliberately NOT routed through it.
+import { resolveRunEasyHrBand, isEasyHr } from '../_shared/easy-hr.ts';
 
 // =============================================================================
 // CORS HEADERS
@@ -606,32 +609,46 @@ function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
   
   let easy_hr: LearnedMetric | null = null;
 
-  if (observedMaxHR) {
-    const easyHRCeiling = observedMaxHR * 0.75;
+  // Q-169: the RUN easy band is threshold-anchored (Friel Z2), NOT a 75%-of-max ceiling. The old gate
+  // (observedMaxHR * 0.75) excluded 100% of a real athlete's easy runs — running HR sits 5-10 bpm above
+  // cycling at the same effort, so the %max band that works for the bike locks the run out. One shared
+  // definition now: `_shared/easy-hr.ts`. (The BIKE band below is untouched — it works.)
+  // Built from what THIS pass just learned (both are in scope: `threshold_hr` at :549-591,
+  // `observedMaxHR` at :524) — so the band upgrades to the threshold anchor the moment a hard effort
+  // is logged, and bootstraps off %max until then. Same shared definition every other surface uses.
+  const runEasyBand = resolveRunEasyHrBand({
+    run_threshold_hr: threshold_hr,
+    run_max_hr_observed: observedMaxHR != null ? { value: observedMaxHR, confidence: 'high' } : null,
+  });
+  if (runEasyBand.ceiling != null) {
     const easyEfforts = runs.filter(r => {
       const duration = r.moving_time || r.duration || 0;
       const hr = r.avg_heart_rate || 0;
-      return duration >= 20 && hr > 100 && hr <= easyHRCeiling;
+      return duration >= 20 && isEasyHr(hr, runEasyBand) === true;
     });
 
     if (easyEfforts.length >= 3) {
       const sortedEasyHRs = easyEfforts.map(r => r.avg_heart_rate).sort((a, b) => a - b);
       const medianEasyHR = sortedEasyHRs[Math.floor(sortedEasyHRs.length / 2)];
-      
+
       easy_hr = {
         value: Math.round(medianEasyHR),
         confidence: easyEfforts.length >= 5 ? 'high' : 'medium',
-        source: `median of ${easyEfforts.length} easy runs (<75% max)`,
+        // The receipt names the ACTUAL band that was applied (Law 3), not a hardcoded "<75% max" that
+        // stopped being true.
+        source: `median of ${easyEfforts.length} easy runs (${runEasyBand.basis})`,
         sample_count: easyEfforts.length
       };
     } else {
-      // Fallback: 70% of max
-      easy_hr = {
-        value: Math.round(observedMaxHR * 0.70),
-        confidence: 'low',
-        source: '70% of observed max (estimated)',
-        sample_count: 0
-      };
+      // Q-169 / LAW 2 — THE FABRICATION IS DELETED.
+      // This used to invent `70% of observed max (estimated)`, sample_count: 0, and ship it as a
+      // confident-looking number. On real data it produced `run_easy_hr = 122 bpm` for an athlete who
+      // actually runs easy at ~135 — a value measured from NOTHING. Worse, it fired precisely BECAUSE
+      // the (broken) gate above found no easy runs: the app failed to observe, then filled the hole it
+      // had just dug with a guess, and labelled the result "confident".
+      //
+      // We do not know it yet. Say so. `null` is honest; it re-learns the moment 3 easy runs land.
+      easy_hr = null;
     }
   }
 
@@ -696,14 +713,21 @@ function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
   }
 
   // Find easy pace (pace when HR is in easy zone)
-  if (easy_hr && observedMaxHR) {
+  // Q-169: THE STARVATION. This gate (`hr <= observedMaxHR * 0.75` = 130.5 bpm for a 174 max) excluded
+  // 0-of-77 of a real athlete's runs — his genuine easy runs (RPE 2-3) sit at 133-141 bpm. It needs 3
+  // to learn. It could never get 3. So `run_easy_pace_sec_per_km` stayed null forever, which starved
+  // the D-033 pace reconciler (`generate-combined-plan/science.ts:110`) — the machine that notices an
+  // athlete has detrained — so the app kept prescribing against a pace he had not run in 77 recorded
+  // runs. Now threshold-anchored via the ONE shared band. NOTE: it no longer requires `easy_hr` to
+  // have been learned first (that coupled two starvations together).
+  if (runEasyBand.ceiling != null) {
     const easyPaceRuns = runs.filter(r => {
       const duration = r.moving_time || r.duration || 0;
       const hr = r.avg_heart_rate || 0;
       const pace = r.avg_pace || 0;
-      return duration >= 20 && 
+      return duration >= 20 &&
              pace > 150 && pace < 900 &&
-             hr <= observedMaxHR * 0.75;
+             isEasyHr(hr, runEasyBand) === true;
     });
 
     if (easyPaceRuns.length >= 3) {

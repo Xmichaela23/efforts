@@ -41,6 +41,8 @@ import { resolveSwimScalars } from "../_shared/swim/swim-scalars.ts";
 import { resolveRouteCluster } from "../_shared/route-intelligence.ts";
 import { dewPointF } from "../_shared/heat-adjust.ts";
 import { resolveCurrentFtp } from "../../../src/lib/resolve-current-ftp.ts";
+// Q-169: the ONE definition of "is this heartbeat easy" (threshold-anchored, %max-bootstrapped).
+import { resolveRunEasyHrBand, isEasyHr } from "../_shared/easy-hr.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1035,19 +1037,38 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null): Record<strin
     }
   }
 
-  // Pace at easy HR (aerobic efficiency proxy)
-  const thresholdHR = baselines?.learned_fitness?.running?.threshold_hr
-    ?? baselines?.performance_numbers?.threshold_heart_rate;
-  if (thresholdHR && w.sensor_data?.samples) {
-    const easyMax = Math.round(thresholdHR * 0.78);
-    const easySamples = w.sensor_data.samples.filter(
-      (s: any) => (s.heartRate ?? s.heart_rate) > 0 && (s.heartRate ?? s.heart_rate) <= easyMax
-        && (s.speedMetersPerSecond ?? 0) > 0.5
-    );
+  // ── Pace at easy HR (aerobic efficiency proxy) — Q-169 ────────────────────────────────────────
+  // THE DEAD LOOKUP THIS FIXES. This block used to read `learned_fitness.running.threshold_hr` — a
+  // NESTED path that has never existed (`learned_fitness` has no `running` object; threshold HR lives
+  // at TOP-LEVEL `run_threshold_hr.value`). Its fallback, `performance_numbers.threshold_heart_rate`,
+  // is also absent. So `thresholdHR` was `undefined`, this block NEVER EXECUTED, and `pace_at_easy_hr`
+  // was null on 147 of 147 runs — while `efficiency_index` (the very next block, same sensor samples)
+  // computed fine on 146. That null starved compute-snapshot -> athlete_snapshot.run_easy_pace_at_hr
+  // (which D-239 then correctly hard-nulled to stop persisting garbage) -> the D-033 pace reconciler's
+  // OBSERVED side, which is the machine that notices an athlete has detrained. One wrong field path.
+  //
+  // The gate is now the ONE shared easy-HR band (`_shared/easy-hr.ts`) — threshold-anchored (Friel Z2,
+  // <=89% LTHR), %max-bootstrapped when no threshold exists, and honestly null when neither is known.
+  // The old sample gate was `thresholdHR * 0.78` (= 118 bpm for a 151 LTHR) — so even with the path
+  // fixed it would have captured only WARM-UP samples and reported a misleadingly slow pace. Replacing
+  // no-data with wrong-data is worse than the bug; the threshold moved with the anchor.
+  const easyBand = resolveRunEasyHrBand(
+    baselines?.learned_fitness,
+    baselines?.performance_numbers?.threshold_heart_rate,
+  );
+  if (easyBand.ceiling != null && w.sensor_data?.samples) {
+    const easySamples = w.sensor_data.samples.filter((s: any) => {
+      const hr = s.heartRate ?? s.heart_rate;
+      return isEasyHr(hr, easyBand) === true && (s.speedMetersPerSecond ?? 0) > 0.5;
+    });
     if (easySamples.length >= 10) {
       const avgSpeed = easySamples.reduce((sum: number, s: any) => sum + (s.speedMetersPerSecond ?? 0), 0) / easySamples.length;
       if (avgSpeed > 0) {
         facts.pace_at_easy_hr = Math.round(1000 / avgSpeed);
+        // Law 3: the anchor's confidence travels with the number, so a %max-bootstrapped read is never
+        // mistaken for a threshold-anchored one downstream.
+        facts.pace_at_easy_hr_anchor = easyBand.anchor;
+        facts.pace_at_easy_hr_confidence = easyBand.confidence;
       }
     }
   }

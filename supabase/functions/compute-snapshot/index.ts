@@ -766,13 +766,25 @@ serve(async (req: Request) => {
       session_count_planned: sessionCountPlanned,
       adherence_pct: adherencePct,
 
-      // D-239 reconcile: RETIRED — run_easy_pace_at_hr(_trend) is fed by the null `pace_at_easy_hr`
-      // (dead read-path; see ENGINE-STATE dead-code list). Persist null so no garbage aerobic-efficiency
-      // value reaches the Arc/longitudinal. The RUN aerobic read is now `state_trends_v1.run.decoupling`.
-      // (Upstream easyPaces/runEasyPaceAtHrTrend are already always-null; left to avoid touching the
-      // separate per-session `aerobic_direction` consumers — full removal is on the cleanup list.)
-      run_easy_pace_at_hr: null,
-      run_easy_pace_at_hr_trend: null,
+      // Q-169 — D-239's null-write is RETIRED, because the null it was defending against is FIXED.
+      //
+      // D-239 hard-nulled these because they were "fed by the null `pace_at_easy_hr` (dead read-path)"
+      // — and it was RIGHT to: persisting a garbage aerobic-efficiency value into the Arc would have
+      // been worse. But it treated the SYMPTOM. The root cause was one dead field lookup in
+      // `compute-facts:1039` (`learned_fitness.running.threshold_hr` — a nested path that has never
+      // existed), which meant `pace_at_easy_hr` was never written on ANY run: 0 of 147, while
+      // `efficiency_index` — the very next block, same sensor samples — computed fine on 146.
+      //
+      // With the lookup fixed and the easy-HR band threshold-anchored (`_shared/easy-hr.ts`),
+      // `pace_at_easy_hr` is real. Persisting it un-starves the OBSERVED side of the D-033 pace
+      // reconciler (`generate-combined-plan/science.ts:110`) — the machine that notices an athlete has
+      // detrained, with its streak gates and its ACWR gate so a fatigued week is not mistaken for
+      // fitness decline. That engine has never once run. This is what feeds it.
+      //
+      // The RUN aerobic READ on State remains `state_trends_v1.run.decoupling` (unchanged — D-239's
+      // other half stands). This field feeds the PLAN reconciler, not the State card.
+      run_easy_pace_at_hr: current.runEasyPaceAtHR,
+      run_easy_pace_at_hr_trend: runEasyPaceAtHrTrend,
       run_long_run_duration: current.runLongRunDuration,
       run_interval_adherence: current.runIntervalAdherence,
 
