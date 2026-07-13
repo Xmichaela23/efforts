@@ -745,7 +745,19 @@ serve(async (req: Request) => {
         }));
 
         const strengthVolumeRows = (strengthVolR.data ?? []).map((f: any) => ({ date: f.date, total_volume_lbs: f.strength_facts?.total_volume_lbs ?? null }));
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts });
+        // Q-170: the athlete's heat-handling preference (Baselines). 'include' (default) keeps hot runs in
+        // the durability substrate and NAMES them; 'exclude' keeps the trend quiet rather than speak off
+        // hot data. Read here so the spine stays a pure function of its inputs.
+        let heatHandling: 'include' | 'exclude' = 'include';
+        try {
+          const { data: prefRow } = await supabase
+            .from('user_baselines').select('analysis_prefs').eq('user_id', userId).maybeSingle();
+          const ap = typeof prefRow?.analysis_prefs === 'string'
+            ? JSON.parse(prefRow.analysis_prefs) : prefRow?.analysis_prefs;
+          if (ap?.run_heat_handling === 'exclude') heatHandling = 'exclude';
+        } catch { /* absent column / bad JSON -> the honest default: include + name */ }
+
+        const result = assembleStateTrends({ asOf, heatHandling, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts });
         stateTrendsV1 = toStateTrendsV1(result, asOf);
       } catch (e: any) {
         console.log("⚠️ state_trends_v1 (spine) failed (non-fatal):", e?.message || e);

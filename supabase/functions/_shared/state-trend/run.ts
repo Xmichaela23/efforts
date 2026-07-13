@@ -164,16 +164,51 @@ export function decouplingToSeries(rows: DecouplingRow[] | null | undefined): Tr
   return rows
     .filter((r) => typeof r.decoupling_pct === 'number' && Number.isFinite(Number(r.decoupling_pct)))
     .filter((r) => r.decoupling_basis !== 'raw')                                  // drop confirmed terrain-confounded
-    // Decoupling is only a valid DURABILITY read in controlled conditions (Friel/TrainingPeaks: don't test
-    // in heat; Garmin normalizes heat rather than reading a false fitness decline). A run the analyzer flagged
-    // heat- or RPE-confounded isn't a clean measurement, so it can't stand up the "durability gap" band — same
-    // exclusion the terrain-confounded ('raw') runs already get. The workout screen already explained these as
-    // conditions, not fitness; State must not re-derive a contradicting verdict from the raw %.
-    .filter((r) => r.decoupling_confounded !== true)
+    // ── D-275's heat EXCLUSION is REMOVED (Q-170). Hot runs are KEPT. ───────────────────────────────
+    // The old line here was `.filter((r) => r.decoupling_confounded !== true)`, and the comment
+    // justifying it cited Garmin — while doing the OPPOSITE of what Garmin does. Research (2026-07-13,
+    // adversarially verified) found NO shipped product discards a session from a decoupling/efficiency/
+    // fitness trend because it was hot:
+    //   · Garmin ADJUSTS: above 22C/72F it applies heat corrections to a RETAINED VO2max/Training Status
+    //     estimate (patent US 11,998,802 — a multiplicative correction, e.g. 50 x 1.082 = 54.1). Firstbeat's
+    //     stated rationale is the anti-exclusion argument itself: without correction the number falls in heat
+    //     and gives the athlete "false discouraging feedback".
+    //   · TrainingPeaks COMPUTES AND SHOWS Pa:Hr regardless of conditions (fixed 5% band) and names heat as
+    //     an EXPLANATION the athlete weighs — not a reason to bin the session.
+    //   · Runalyze INCLUDES every hot run in its rolling 30d shape, acknowledges the ~2-point summer sag, and
+    //     frames it as something to CANCEL OUT. It HAS a per-activity exclusion switch; heat never triggers it.
+    // The science agrees it is a modelable confound, not corrupt data: HR drift ~11% at 35C vs ~2% at 22C in
+    // the same subjects at the same workload, dose-dependent with temperature.
+    //
+    // THE FAILURE MODE THE EXCLUSION CAUSED (real, observed): it is July, every run is hot, so every run was
+    // dropped — the durability read fell to 4 samples with the newest 15 DAYS OLD, and State kept printing
+    // "aerobic base needs work" as flat fact off a stale, self-flagged-provisional trend. Excluding data does
+    // not make a verdict honest; it makes it BLIND. D-275 diagnosed a real bug (one 80F run flashing a red
+    // "durability gap") and picked the wrong remedy: the field's remedy is to KEEP the number and NAME the heat.
+    //
+    // So the confound is no longer a filter — it is CARRIED (see `confoundedCount` on DecouplingState) so the
+    // surface can say "needs work — 2 of 6 runs were hot" instead of silently going stale.
     .filter((r) => isSteadyAerobic(r.workout_type))                              // steady aerobic only
     .filter((r) => r.duration_minutes == null || Number(r.duration_minutes) >= 20) // ≥20 min (null = don't drop)
     .map((r) => ({ date: r.date ?? r.metric_date ?? '', value: Number(r.decoupling_pct) }))
     .filter((p) => p.date && p.value >= -30 && p.value <= 50);                    // plausible decoupling band
+}
+
+/**
+ * Q-170: how many runs IN the durability substrate were flagged heat/condition-confounded by the analyzer.
+ * They are no longer dropped (see above) — so the surface must be able to SAY they are in there. This is the
+ * TrainingPeaks posture: show the number, name the conditions. A verdict that hides its own confounds is the
+ * same lie as a verdict that hides its own staleness.
+ */
+export function countConfoundedInSeries(rows: DecouplingRow[] | null | undefined): number {
+  if (!Array.isArray(rows)) return 0;
+  return rows.filter((r) =>
+    typeof r.decoupling_pct === 'number' && Number.isFinite(Number(r.decoupling_pct))
+    && r.decoupling_basis !== 'raw'
+    && isSteadyAerobic(r.workout_type)
+    && (r.duration_minutes == null || Number(r.duration_minutes) >= 20)
+    && r.decoupling_confounded === true,
+  ).length;
 }
 
 // classifyTrend drops values ≤ 0 (its noise filter) and divides by earlyAvg for %-change — both break
@@ -187,8 +222,11 @@ export interface DecouplingState {
   band: DecouplingBand | null; // Friel band of the recent representative pct (the plain-language state)
   recentPct: number | null;    // raw recent decoupling — shown with its date for carry-forward when stale
   metricLabel: string;
+  /** Q-170: how many runs in this substrate were heat/condition-confounded. The surface NAMES them
+   *  (TrainingPeaks posture) instead of the trend silently going stale (the D-275 exclusion). */
+  confoundedCount: number;
 }
-export function computeRunDecouplingState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): DecouplingState {
+export function computeRunDecouplingState(series: TrendPoint[], asOf: string, sessionsPerWeek: number, confoundedCount = 0): DecouplingState {
   const offset = series.map((p) => ({ date: p.date, value: p.value + DECOUPLING_OFFSET }));
   const trend = classifyTrend(
     offset,
@@ -203,7 +241,7 @@ export function computeRunDecouplingState(series: TrendPoint[], asOf: string, se
   const recentPct = trend.recentAvg != null
     ? Math.round((trend.recentAvg - DECOUPLING_OFFSET) * 10) / 10
     : rawPts.length ? rawPts[rawPts.length - 1] : null;
-  return {
+  return { confoundedCount,
     trend,
     band: recentPct != null ? frielBand(recentPct) : null,
     recentPct,
