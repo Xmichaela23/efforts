@@ -148,3 +148,9 @@ These 5 docs are ALIVE — updated basically every working session. If you touch
 | Goals screen | `src/components/GoalsScreen.tsx:355` | BUILT | coach race_readiness + useGoals |
 | Goal prefill fitness/volume strings | `GoalsScreen.tsx:530-621` | PARTIAL | ⚠ derives labels client-side, not spine |
 | Race-readiness projection | `coach/index.ts:62` computeRaceReadiness | BUILT | _shared/race-readiness + session_detail_v1.race_readiness |
+
+| Run easy-HR band (the ONE definition of "easy") | `_shared/easy-hr.ts` | BUILT (D-282) | Threshold-anchored (Friel Z2 ≤89% LTHR); %max 65-80% bootstrap; null when neither. Bike NOT routed through it (its own band works — running HR sits 5-10 bpm higher at the same effort). |
+| Run easy-pace learner | `learn-fitness-profile:699` | BUILT, was STARVED (D-282) | Old gate `hr <= maxHR*0.75` passed 0-of-22 runs. Now threshold-anchored → fires. |
+| Run pace RECONCILER (notices detraining) | `generate-combined-plan/science.ts:110` (D-033) | BUILT, **HAS NEVER RUN** | Streak + median + ACWR gates. Both inputs were null (Q-169). Baseline side fixed by D-282; observed side needs a recompute to backfill `pace_at_easy_hr`. **Do not rebuild it.** |
+| HR zone schema (per workout) | `compute-workout-analysis:1548` | BUILT (D-282 fix) | Now reads learned LTHR → Friel. Previously fell to %HRmax for every Strava/Garmin athlete. ⚠ bins stored per workout — history needs recompute. |
+| Heat handling (run durability) | `_shared/state-trend/run.ts:172` | **EXCLUSION STANDS (D-275)** | ⚠ Q-170: the exclusion is NOT field-standard (no app drops a session for heat). Right fix = athlete-selectable ADJUST toggle. Attempted + reverted. Read Q-170 first. |

@@ -529,3 +529,14 @@ Pattern-matched the swim surfaces to the existing design system (Details READOUT
 ## Done = launchable
 
 When items 1-7 are all 100% and background items are closed, the app ships every flow clean. No new features past this point. Polish only.
+
+
+## 2026-07-13 — owed from the starved-reads session (D-282 / Q-166 → Q-170)
+
+- [ ] **RECOMPUTE / BACKFILL decision (gated — Michael).** D-282 is **deploy-forward only**. Zone bins and `pace_at_easy_hr` are stored per workout, so the 147 historical runs still carry the old %HRmax bins and a null `pace_at_easy_hr`. Until they are recomputed: `intensity_distribution` stays wrong for past weeks, and the **D-033 pace reconciler** (which needs ≥3 weeks of `run_easy_pace_at_hr`) stays starved for ~a month. **D-238 posture: watch a few live ingests first, confirm the new bins are right, THEN decide.**
+- [ ] **Q-170 — the adjust-for-heat toggle.** Athlete-selectable ADJUST vs RAW (not include/exclude — nobody ships that fork). Needs a real model from published dose-response curves, **NOT Garmin's patented method** (US 11,998,802; we are a Garmin/Strava partner). ⚠ `heat-adjust.ts` exists from D-250, which **flip-flopped on real data**. Evidence first.
+- [ ] **Q-167 — the RPE trend is a within-week ORDERING artifact.** `makeTrend` splits the week first-half vs second-half at a 5% threshold, so hard days landing later read as "declining" = strained. It is the strong-evidence leg D-266 requires for EVERY escalation, and it appears in **zero docs**. Establish the intent before touching it (Q-121 warns an RPE read was already misdiagnosed once).
+- [ ] **Q-168 — load-verdict audit leftovers.** Three hand-rolled total-ACWRs in `coach/index.ts` (one with no thin-base floor); `load_status` mutated a SECOND time after the reconciler (`:3814`, coupled to LLM availability); the State headline has **no `productive` branch** so a productive week silently drops the load slot.
+- [ ] **Q-165 — LLM prose recompute.** Effectively PASSED: two recomputes were consistent, the deterministic spine was byte-identical, and the "the prose contradicts itself" call was **over-stated and is retracted**. A third recompute would close it formally.
+- [ ] **Q-164 — dead "Aerobic fitness" BODY row** (`cardiac_efficiency_current` hardcoded null → can never render).
+- [ ] **"provisional" → "building base"** wording swap.

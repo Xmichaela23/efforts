@@ -16,6 +16,31 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
+## 🧭 NEXT SESSION — START HERE (roadmap as of 2026-07-13 — the app LEARNS numbers and does not READ them back)
+
+> ## 2026-07-13 — FOUR STARVED READS ROOT-CAUSED. ONE PATTERN: the app learns a number, then doesn't read it.
+>
+> **The session's real finding, and it is structural: nothing was MISSING. Everything was BUILT and HUNGRY.** Four reads, four files, one disease.
+>
+> **SHIPPED + DEPLOYED (D-282 — `_shared/easy-hr.ts`, ONE definition of "easy", threshold-anchored):**
+> - **`compute-workout-analysis` never read the learned LTHR** → every workout fell to %HRmax zones → easy RPE-3 runs at 133-141 bpm binned as **TEMPO/THRESHOLD** (a 1-hr easy run read *"54% Z3 / 44% Z4"*). `intensity_distribution` reported **7-20% easy** and called a well-polarized athlete **"high-intensity dominant"** — **the 80/20 check, inverted.** Fixed: Details now agrees with Baselines (both Friel %LTHR). ⚠ **Zone bins are stored per workout — HISTORY NEEDS A RECOMPUTE.** Deploy-forward only.
+> - **`learn-fitness-profile`'s easy gate (`hr <= maxHR * 0.75`) excluded 0-of-22 runs** in its own 90d window → `run_easy_pace_sec_per_km` null forever → **the D-033 pace reconciler had NEVER RUN.** Fixed: threshold-anchored band (Friel Z2 ≤89% LTHR; %max 65-80% bootstrap). Proven: 0/22 → **5/22 qualify, learns 11:08/mi high-confidence, all 5 RPE-3.**
+> - **`compute-facts:1039` read a field path that has never existed** (`learned_fitness.running.threshold_hr`) → `pace_at_easy_hr` null on **0 of 147 runs**. Fixed. **D-239's null-write in compute-snapshot un-nulled** (it was correct — it treated the symptom; nobody went one level up).
+> - **`run_easy_hr = 122 "70% of observed max (estimated)", sample_count 0** — a fabrication shipped as a confident number. **Deleted** (Law 2).
+> - **The ACWR/load ladder was NEVER poisoned** — `calculate-workload:378` already hydrated the learned LTHR. The same read, forty lines away, in the files that forgot it. **The BIKE is untouched and correct** (running HR sits 5-10 bpm above cycling at the same effort — one %max band works for the bike and locks the run out; do NOT unify them).
+>
+> **REVERTED — READ BEFORE RE-ATTEMPTING:**
+> - **D-281 / Q-166 (the load verdict).** Shipped an ACWR-driven escalation → a live WK-1 card read **"pull back"** while every body row said the athlete was fine. **Reverted.** It violated D-266 ("ACWR never escalates"), Item 3's rule ("Load-high + body-fine → elevated max"), Q-137 ("do NOT patch the gauge") and Constitution Law 6. **THE RULE: the ratio DESCRIBES; the body PRESCRIBES.** Q-166 is **unproven** — filed on one WK-1 screen where the app declares its own ratio contaminated.
+> - **Q-170 (the heat gate).** The research is REAL and stands: **no shipped app discards a session for heat** — Garmin ADJUSTS a retained estimate (patent US 11,998,802, verified), TrainingPeaks shows the raw number, Runalyze keeps every hot run. So **D-275's "confirmed field-standard" justification is FALSE**, and the exclusion's cost is measured (July → every run hot → substrate down to **4 samples, newest 15 days old**, while State printed "aerobic base needs work" as flat fact). **But the FIX was pulled**: it shipped include/exclude (**the wrong toggle — nobody ships that fork**) plus an invented heat-naming presented as "the TrainingPeaks model" (**they do no such thing — retracted**). **The right fix is an athlete-selectable ADJUST-FOR-HEAT toggle**, built from published dose-response curves — **NOT Garmin's patented method** (we are a Garmin/Strava partner; the patent number is now on record). ⚠ `heat-adjust.ts` exists from **D-250, which flip-flopped on real data**. There is a corpse behind this.
+>
+> **NEW: Q-167** (the strong-evidence RPE leg is a within-week ORDERING artifact — `makeTrend` splits the week in half at a 5% threshold; it is the signal D-266 requires for EVERY escalation, and it appears in **ZERO docs**). **Q-168** (three hand-rolled total-ACWRs; a post-reconcile override; the headline has no 'productive' branch). **Q-169** (the starved pace engine). **Q-170** (the heat gate).
+>
+> **PROCESS (the expensive lesson):** a Q-entry is a **LEAD, not a verified bug report**. D-281 was built on one screenshot, against the founding law of the subsystem it changed, without reading D-260/D-265/D-266/Q-137 — all of which forbade it. **Read the law before touching the machinery it governs.** And when something looks broken: **ask "is it STARVED or is it ABSENT?"** first.
+>
+> **NEXT (owed, in order):** ① **recompute/backfill decision** for zone bins + `pace_at_easy_hr` (D-238 posture: watch a few live ingests first). ② **Q-170 adjust-for-heat toggle** (needs a model + an FTO read). ③ **Q-165** (LLM prose — basically passed; the two recomputes were consistent and the over-call is retracted). ④ **Q-164** (dead "Aerobic fitness" BODY row). ⑤ the "provisional" → "building base" wording.
+
+---
+
 ## 🧭 NEXT SESSION — START HERE (roadmap as of 2026-07-12 — State honesty batch + BODY rebuild + load-verdict field-standardization)
 
 > ## ⛔ 2026-07-12 (LAST) — Q-166 WAS ATTEMPTED AND REVERTED. READ D-281 BEFORE YOU TOUCH THE LOAD VERDICT.
