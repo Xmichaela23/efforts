@@ -1241,7 +1241,10 @@ return (
                               )}
                             </div>
                             {hasEasyLearned && (
-                            <div className="flex flex-col gap-1.5 min-w-[10rem]">
+                            // Fixed width + a min-height on the card below: the two sources have different
+                            // amounts of provenance (a 3-line receipt vs "you entered this"), so without this
+                            // the card resized and the whole page jumped every time you switched.
+                            <div className="flex flex-col gap-1.5 w-[17rem] max-w-full">
                               <label className="text-xs text-white/50 font-medium">Easy pace</label>
                               {/* THE BOX SHOWS THE NUMBER YOU CHOSE. It used to render the LEARNED value
                                   unconditionally, so picking "use my number" changed what the APP used and not
@@ -1255,7 +1258,7 @@ return (
                                 } as any);
                                 const onManual = resolvedEasy.source === 'manual-chosen' || resolvedEasy.source === 'manual';
                                 return (
-                              <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left">
+                              <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left min-h-[6.5rem]">
                                 <div className="flex items-baseline justify-between gap-2">
                                   <span className="text-lg font-medium text-white tabular-nums">{formatPaceSecPerMi(resolvedEasy.sec_per_mi)}</span>
                                   {!onManual && (
@@ -1315,8 +1318,8 @@ return (
                                   Garmin and TrainingPeaks both respect a value you set.
                                   Absent a choice, behavior is byte-identical to before (learned-first). */}
                               {hasEasyLearned && (
-                                <div className="flex flex-col gap-1.5 mt-0.5">
-                                  <div className="flex items-center gap-1.5">
+                                <div className="flex flex-col gap-1.5 mt-0.5 w-[17rem] max-w-full">
+                                  <div className="flex items-stretch gap-1.5">
                                     {([
                                       { key: 'learned', label: 'Use my runs', val: formatPace(easyLearned.value) },
                                       { key: 'manual', label: 'Use my number', val: data.performanceNumbers?.easyPace || '—' },
@@ -1334,7 +1337,9 @@ return (
                                             ...prev,
                                             performanceNumbers: { ...prev.performanceNumbers, easy_pace_source: key },
                                           }))}
-                                          className={`px-2.5 py-1.5 rounded-lg text-[11px] leading-tight border transition-colors text-left ${
+                                          // flex-1 + a fixed min-height: both pills are the same size in both
+                                          // states, so selecting one does not resize it and shove the other.
+                                          className={`flex-1 min-h-[2.75rem] px-2.5 py-1.5 rounded-lg text-[11px] leading-tight border transition-colors text-left ${
                                             active
                                               ? 'bg-teal-500/15 border-teal-500/50 text-white'
                                               : 'bg-white/[0.04] border-white/10 text-white/45 hover:text-white/70'
