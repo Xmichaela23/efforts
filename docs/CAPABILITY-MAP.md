@@ -87,16 +87,17 @@ These 5 docs are ALIVE — updated basically every working session. If you touch
 | Cadence-scaled thresholds (Q-052) | `_shared/state-trend/thresholds.ts:46` | BUILT | ⚠ run/swim %-thresholds flagged PROVISIONAL |
 | Run decoupling (durability LEAD) | `run.ts:194` `computeRunDecouplingState` | BUILT | Excludes raw-basis, heat/RPE-confounded, non-steady, <20min (D-275) |
 | Run efficiency_index (SECONDARY) | `run.ts:86` | PARTIAL | Secondary only; GAP-pace verdict dropped (Q-110) |
-| frielBand / decouplingBandDisplay (ONE band vocab) | `run.ts:110/137` | BUILT | Shared by PERFORMANCE + AERO + coach so surfaces can't diverge (D-239/D-275) |
+| frielBand / decouplingBandDisplay (ONE band vocab) | `run.ts:110/137` | BUILT | D-276: TWO states at the 5% science line — `sound`(<5%)/`needs_work`(≥5%); dropped the `<0 excellent`+`>10 gap` convention tiers. Shared by PERFORMANCE + AERO + coach + workout card so surfaces can't diverge |
 | Bike terrain-binned power (LEAD) | `bike-fitness.ts:111` | BUILT | climbing vs flat_sustained bins |
 | Bike HR-at-power efficiency (SECONDARY) | `bike-fitness.ts:128` + eligibility `:50` | PARTIAL | ⚠ was artifact-prone (fake −5.5%, Q-117); now gated steady-aerobic + ≥10min dwell + <90% FTP (D-275). Fundamentally window-fragile — fitness truth is FTP, not this |
 | Swim pace/100 + rest-fraction | `swim.ts:42/97` | PARTIAL | ⚠ Q-038 ingest bug → pace unreliable, mostly needs_data |
 | Strength volume (LEAD) + per-lift e1RM (SECONDARY) | `strength.ts:105/60` | BUILT | Per-lift direction serialized to spine (D-270); coach reads, no re-derive |
-| fitnessDirection rollup | `assemble.ts:319` | BUILT | 4 verdicts → improving/stable/declining/mixed; coach describes only |
+| fitnessDirection rollup (`rollupFitness`) | `assemble.ts:319` | BUILT | D-276/Q-162: SOLID verdicts decide the direction; a provisional/thin discipline can't ASSERT it — `thinHeldOut` names the held-out mover so the narrative flags the gap. `rollupFitnessDirection` now a thin wrapper |
+| BODY holistic Heart-rate response (`rollupHrResponse`) | `assemble.ts` (rollupHrResponse) → coach inject | BUILT | D-279: ONE BODY signal from the SPINE — run aerobic decoupling + bike HR-at-power, swim excluded (in-water HR unreliable, named in provenance). Provisional-aware; "as of" = OLDEST contributor. Replaced the coach's run-only re-derived drift |
 | Cardio vs strength load formulas | `_shared/workload.ts:189/324` | BUILT | Output-first ladder power/FTP→HR→sRPE→duration (D-238) |
 | Workload provenance / low-trust methods | `_shared/workload.ts:340` | BUILT | Estimated vs measured; feeds ACWR disclosure |
 | ACWR core + status classifier | `_shared/acwr.ts:155`, `acwr-state.ts:31` | BUILT | Sole authority (D-236); thin-base→null |
-| Two-key load verdict reconcile (sole load verdict) | `_shared/load-status-reconcile.ts:64` | BUILT | ACWR describes, never decides (D-260/264/266) |
+| Two-key load verdict reconcile (sole load verdict) | `_shared/load-status-reconcile.ts:64` | BUILT | ACWR describes, never decides (D-260/264/266). D-280: adds a `productive` state (real elevation absorbed — Garmin/COROS field-std) + `acwrProvisional` flag (thin-base ratio, keyed on `spikeOnEmptyBase`). ⚠ Q-166: a cross-training-heavy real total-load spike still under-reads to on_target/"balanced" |
 | LoadBar composition bar | `src/components/LoadBar.tsx:63` | BUILT | Verdict leads, by-discipline strip, ACWR demoted |
 | Per-domain load slices | `_shared/per-domain-load.ts:137` | PARTIAL | ⚠ cross-sport % uncalibrated; keys on composition share; coach-only (D-263) |
 | Fitness-fatigue (CTL/ATL/TSB) | `_shared/fitness-fatigue.ts:73` | STUB | "uncalibrated — drives no verdict"; per-domain scaffolded not built |
