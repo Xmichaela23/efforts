@@ -1240,113 +1240,123 @@ return (
                                 </div>
                               )}
                             </div>
-                            {/* ONE BOX. The big number is ALWAYS the one actually in use.
-                                It used to render the LEARNED value unconditionally — so choosing "use my
-                                number" changed what the app used and NOT what the screen said. A number on
-                                screen that isn't the number in use is the exact lie D-285 exists to kill, and
-                                it got shipped into the UI four hours after the law was written.
-                                Now: headline = resolved value, subtitle = THAT value's provenance, and the
-                                other source is a quiet link — not a competing card. (Q-174.) */}
-                            {(() => {
-                              const pn: any = data.performanceNumbers || {};
-                              const resolved = resolveCurrentRunEasyPace({
-                                learned_fitness: learnedFitness,
-                                performance_numbers: pn,
-                              } as any);
-                              const usingManual = resolved.source === 'manual-chosen' || resolved.source === 'manual';
-                              const canSwitchToManual = hasEasyLearned && !!pn.easyPace;
-                              const setSource = (key: 'learned' | 'manual') => setData(prev => ({
-                                ...prev,
-                                performanceNumbers: { ...prev.performanceNumbers, easy_pace_source: key },
-                              }));
-                              if (resolved.sec_per_mi == null && !hasEasyLearned) {
-                                // Nothing known and nothing typed — just the input. Never invent a pace.
+                            {hasEasyLearned && (
+                            <div className="flex flex-col gap-1.5 min-w-[10rem]">
+                              <label className="text-xs text-white/50 font-medium">Easy pace</label>
+                              {/* THE BOX SHOWS THE NUMBER YOU CHOSE. It used to render the LEARNED value
+                                  unconditionally, so picking "use my number" changed what the APP used and not
+                                  what the SCREEN said — a number on screen that isn't the number in use, which
+                                  is the exact lie D-285 exists to kill. Resolved through the SAME resolver the
+                                  9 server surfaces use, so the screen and the engine cannot disagree. */}
+                              {(() => {
+                                const resolvedEasy = resolveCurrentRunEasyPace({
+                                  learned_fitness: learnedFitness,
+                                  performance_numbers: data.performanceNumbers,
+                                } as any);
+                                const onManual = resolvedEasy.source === 'manual-chosen' || resolvedEasy.source === 'manual';
                                 return (
-                                  <div className="flex flex-col gap-1.5">
-                                    <label className="text-xs text-white/50 font-medium">Easy pace</label>
-                                    <div className="flex items-center gap-2">
-                                      <input
-                                        type="text"
-                                        value={pn.easyPace || ''}
-                                        onChange={(e) => setData(prev => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, easyPace: e.target.value } }))}
-                                        placeholder="9:30"
-                                        className="w-24 h-12 px-3 text-lg font-medium bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
-                                        style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
-                                      <span className="text-sm text-white/50">/mi</span>
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              return (
-                                <div className="flex flex-col gap-1.5 min-w-[14rem]">
-                                  <label className="text-xs text-white/50 font-medium">Easy pace</label>
-                                  <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left">
-                                    <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-lg font-medium text-white tabular-nums">
-                                        {resolved.sec_per_mi != null ? formatPaceSecPerMi(resolved.sec_per_mi) : '—'}
-                                      </span>
-                                      {!usingManual && (
-                                        <span className="text-[10px] text-white/35" title="Model confidence">{getConfidenceDots(easyLearned?.confidence)}</span>
-                                      )}
-                                    </div>
-                                    {usingManual ? (
-                                      // The athlete's own number has no date, no samples, no basis. Say only what is true.
-                                      <p className="text-[11px] text-white/40 mt-1 leading-snug">you entered this</p>
-                                    ) : (
-                                      <>
-                                        {learnedBasisLine(easyLearned, 'run') && (
-                                          <p className="text-[11px] text-white/40 mt-1 leading-snug">{learnedBasisLine(easyLearned, 'run')}</p>
-                                        )}
-                                        {learnedAsOfLine(easyLearned) && (
-                                          <p className="text-[11px] text-white/30 mt-0.5 leading-snug">{learnedAsOfLine(easyLearned)}</p>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-
-                                  {usingManual && (
-                                    <div className="flex items-center gap-2">
-                                      <input
-                                        type="text"
-                                        value={pn.easyPace || ''}
-                                        onChange={(e) => setData(prev => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, easyPace: e.target.value } }))}
-                                        placeholder="9:30"
-                                        className="w-24 h-11 px-3 text-base font-medium bg-white/[0.06] border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
-                                        style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
-                                      <span className="text-sm text-white/50">/mi</span>
-                                    </div>
-                                  )}
-
-                                  {hasEasyLearned && (
-                                    usingManual ? (
-                                      <button type="button" onClick={() => setSource('learned')}
-                                        className="self-start text-[11px] text-white/40 hover:text-white/70 transition-colors">
-                                        Use my runs ({formatPace(easyLearned.value)}) →
-                                      </button>
-                                    ) : canSwitchToManual ? (
-                                      <button type="button" onClick={() => setSource('manual')}
-                                        className="self-start text-[11px] text-white/40 hover:text-white/70 transition-colors">
-                                        Use my own ({pn.easyPace}) →
-                                      </button>
-                                    ) : (
-                                      <div className="flex items-center gap-2">
-                                        <input
-                                          type="text"
-                                          value={pn.easyPace || ''}
-                                          onChange={(e) => setData(prev => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, easyPace: e.target.value } }))}
-                                          placeholder="Use my own"
-                                          className="w-28 h-9 px-2 text-sm bg-white/[0.04] border border-white/10 rounded-lg text-white placeholder:text-white/25 focus:outline-none focus:border-teal-500/40 text-center"
-                                          style={{ fontFamily: 'Inter, sans-serif' }}
-                                        />
-                                        <span className="text-xs text-white/35">/mi</span>
-                                      </div>
-                                    )
+                              <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left">
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <span className="text-lg font-medium text-white tabular-nums">{formatPaceSecPerMi(resolvedEasy.sec_per_mi)}</span>
+                                  {!onManual && (
+                                    <span className="text-[10px] text-white/35" title="Model confidence">{getConfidenceDots(easyLearned.confidence)}</span>
                                   )}
                                 </div>
-                              );
-                            })()}
+                                {onManual ? (
+                                  // The athlete's own number has no date, no samples, no basis. Say only what is true.
+                                  <p className="text-[11px] text-white/40 mt-1 leading-snug">you entered this</p>
+                                ) : (
+                                  <>
+                                    {learnedBasisLine(easyLearned, 'run') && (
+                                      <p className="text-[11px] text-white/40 mt-1 leading-snug">{learnedBasisLine(easyLearned, 'run')}</p>
+                                    )}
+                                    {learnedAsOfLine(easyLearned) && (
+                                      <p className="text-[11px] text-white/30 mt-0.5 leading-snug">{learnedAsOfLine(easyLearned)}</p>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                                );
+                              })()}
+                            </div>
+                            )}
+                            {/* D-285 / GLASS BOX — the manual input is ALWAYS rendered.
+                                It used to be gated on `!hasEasyLearned`, so the moment the app learned an easy
+                                pace the athlete's own field VANISHED: no accept, no reject, no override. The
+                                app's inference won and the athlete had no recourse — the opposite of a glass box,
+                                and the reason a wrong manual value could sit there uncorrectable.
+                                Both values are now visible, and the one actually IN USE is named (Law 3). */}
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-xs text-white/50 font-medium">
+                                Easy pace (manual){hasEasyLearned ? '' : ' — in use'}
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={data.performanceNumbers?.easyPace || ''}
+                                  onChange={(e) => setData(prev => ({
+                                    ...prev,
+                                    performanceNumbers: {
+                                      ...prev.performanceNumbers,
+                                      easyPace: e.target.value
+                                    }
+                                  }))}
+                                  placeholder="9:30"
+                                  className="w-24 h-12 px-3 text-lg font-medium bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
+                                  style={{ fontFamily: 'Inter, sans-serif' }}
+                                />
+                                <span className="text-sm text-white/50">/mi</span>
+                              </div>
+                              {/* Q-174 — THE ATHLETE CHOOSES, and their choice wins.
+                                  Before this, a learned value silently outranked the typed one and the typed
+                                  field was hidden entirely — the app decided, and the athlete had no say and no
+                                  way to see it. Now: when both exist, they pick, and the pick is honoured over
+                                  even a high-confidence learned pace. An assertion beats an inference (Law 2);
+                                  Garmin and TrainingPeaks both respect a value you set.
+                                  Absent a choice, behavior is byte-identical to before (learned-first). */}
+                              {hasEasyLearned && (
+                                <div className="flex flex-col gap-1.5 mt-0.5">
+                                  <div className="flex items-center gap-1.5">
+                                    {([
+                                      { key: 'learned', label: 'Use my runs', val: formatPace(easyLearned.value) },
+                                      { key: 'manual', label: 'Use my number', val: data.performanceNumbers?.easyPace || '—' },
+                                    ] as const).map(({ key, label, val }) => {
+                                      // Absent choice === 'learned' (the historical default).
+                                      const chosen = (data.performanceNumbers as any)?.easy_pace_source ?? 'learned';
+                                      const active = chosen === key;
+                                      const disabled = key === 'manual' && !data.performanceNumbers?.easyPace;
+                                      return (
+                                        <button
+                                          key={key}
+                                          type="button"
+                                          disabled={disabled}
+                                          onClick={() => setData(prev => ({
+                                            ...prev,
+                                            performanceNumbers: { ...prev.performanceNumbers, easy_pace_source: key },
+                                          }))}
+                                          className={`px-2.5 py-1.5 rounded-lg text-[11px] leading-tight border transition-colors text-left ${
+                                            active
+                                              ? 'bg-teal-500/15 border-teal-500/50 text-white'
+                                              : 'bg-white/[0.04] border-white/10 text-white/45 hover:text-white/70'
+                                          } ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                          title={key === 'manual'
+                                            ? 'Your entered pace is used, even if your runs say otherwise.'
+                                            : 'Tracks what your easy runs actually show, and keeps updating.'}
+                                        >
+                                          <span className="block">{label}</span>
+                                          <span className="block tabular-nums text-white/50">{val}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  {!data.performanceNumbers?.easyPace && (
+                                    <p className="text-[11px] text-white/25 leading-snug">
+                                      Enter a pace above to be able to choose it.
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                             {hasThrLearned && (
                             <div className="flex flex-col gap-1.5 min-w-[10rem]">
                               <label className="text-xs text-white/50 font-medium">Threshold pace</label>
