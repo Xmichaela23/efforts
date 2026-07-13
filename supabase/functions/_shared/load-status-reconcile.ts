@@ -307,7 +307,14 @@ export function reconcileLoadStatus(
   // DESCRIPTIVE: the two-key cap below caps any load-only 'high' to 'elevated', and an
   // absorbed elevation is relabeled 'productive' — so seeing the elevation can never
   // manufacture a false "back off".
-  if (unweightedAcwr != null && !spikeOnEmptyBase) {
+  //
+  // GUARDED on !isPlanTransition, like every other escalation path here (body signals :259, key
+  // sessions :290). In the first two plan weeks the 7d window is the NEW plan while the 28d baseline is
+  // still half the OLD cycle — the ratio is an artifact, and the app already says so out loud (the coach
+  // tells the LLM "do NOT flag load as elevated or suggest recovery based on the load ratio" in this
+  // window). Escalating off a number we elsewhere declare contaminated is how a real athlete on WK1 got
+  // told to "pull back" while every body signal on the same card said he was handling it fine.
+  if (unweightedAcwr != null && !spikeOnEmptyBase && !isPlanTransition) {
     const a = unweightedAcwr.toFixed(2);
     const runIsQuiet = raw.running_acwr == null || raw.running_acwr < 1.1;
     const crossTrainingLed = runIsQuiet
@@ -479,7 +486,10 @@ export function reconcileLoadStatus(
   //   · a null ACWR could still print "load elevated (ACWR n/a) … productive" — an athlete escalated
   //     by ONE declining body signal, with no ratio at all, being told they're absorbing an elevation.
   // You cannot absorb an elevation you have no base for.
-  const realElevation = unweightedAcwr != null && unweightedAcwr > TOTAL_ELEVATED_MIN && !spikeOnEmptyBase;
+  // Same plan-transition guard as the band above: a contaminated ratio cannot support the claim
+  // "your load is genuinely elevated", so it cannot mint 'productive' either.
+  const realElevation = unweightedAcwr != null && unweightedAcwr > TOTAL_ELEVATED_MIN
+    && !spikeOnEmptyBase && !isPlanTransition;
   const steepRamp = unweightedAcwr != null && unweightedAcwr > TOTAL_STEEP_RAMP_MIN;
   // 'on_target' is included deliberately: the escalation math can still park a real elevation there
   // (Gate 2's build-band tolerance, the plan-primary reclass) — that is the "balanced" lie of Q-166.

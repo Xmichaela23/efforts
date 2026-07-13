@@ -515,3 +515,44 @@ Deno.test('Q-166 NEG no ratio: elevated with a NULL ACWR + body fine → never "
   assertEquals(r.status, 'elevated'); // NOT 'productive'
   if (r.interpretation.includes('n/a')) throw new Error('must not print an "ACWR n/a" elevation claim');
 });
+
+// ── D-281 REGRESSION (live, 2026-07-12): WK1 plan transition must NOT escalate off the ratio ──
+// The first shipped version of the total-load band had no plan-transition guard, and a real athlete on
+// WK 1 (ACWR 1.6) was told to "pull back" while every body row on the same card said he was handling
+// the load fine. Root cause: in the first two plan weeks the 7d window is the NEW plan but the 28d
+// baseline is still half the OLD cycle, so the ratio is an artifact — which the app declares elsewhere
+// (body escalation and key-session escalation are both already guarded on isPlanTransition, and the
+// coach tells the LLM to ignore the load ratio in this window). The band escalated off it anyway.
+//
+// `corroboratedStrain: true` here is the OTHER half of what made it bite: the RPE trend compares the
+// first half of the week to the second half (makeTrend, 5% threshold), so hard days landing later in
+// the week read as "declining" — which is what let 'high' survive the two-key cap. Filed separately.
+Deno.test('D-281 REG: WK1 plan transition @ ACWR 1.6 + strain flag → must NOT escalate (no "pull back")', () => {
+  const r = run({
+    ...SPREAD_RAMP,
+    unweightedAcwr: 1.6,
+    corroboratedStrain: true, // the noisy within-week RPE trend
+    raw: { ...SPREAD_RAMP.raw, status: 'on_target' },
+    planPosition: { weekIntent: 'build', weekIndex: 1, isPlanTransition: true },
+  });
+  if (r.status === 'high') throw new Error('plan transition must never reach "pull back" off a contaminated ratio');
+  assertEquals(r.status, 'on_target');
+});
+
+Deno.test('D-281 REG: plan transition cannot mint "productive" either (a contaminated ratio proves nothing)', () => {
+  const r = run({
+    ...SPREAD_RAMP,
+    unweightedAcwr: 1.45,
+    planPosition: { weekIntent: 'build', weekIndex: 1, isPlanTransition: true },
+  });
+  assertEquals(r.status, 'on_target'); // not 'productive' — we cannot claim a real elevation here
+});
+
+Deno.test('D-281 REG: the SAME athlete OUT of transition still gets the Q-166 fix (guard is scoped, not a retreat)', () => {
+  const r = run({
+    ...SPREAD_RAMP,
+    unweightedAcwr: 1.45,
+    planPosition: { weekIntent: 'build', weekIndex: 5, isPlanTransition: false },
+  });
+  assertEquals(r.status, 'productive');
+});
