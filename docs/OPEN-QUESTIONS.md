@@ -2051,6 +2051,17 @@ Low-severity, noticed-and-deferred: **(1)** tri athlete missing bodyweight → n
 - **⚠ THE FIX IS NOT "ship the resolver to the client."** That would make the client re-decide a verdict the server already owns — a Law 4 violation with a nicer haircut. **The server should send the already-resolved pace** (with its `source` / `confidence` / `as_of`, per Law 3), and the client should render it. The plan contract is the natural home.
 - **Blast radius:** display + token expansion only. It cannot currently *prescribe* a wrong pace (the server materializes the targets); it can *display* a pace that disagrees with the one the plan was built on.
 
+## Q-176 — LTHR resolves FOUR different ways, and two are inverted. It is the root of the run stack. (ENGINE, 2026-07-13)
+
+- **Status:** OPEN, **spec'd** (`docs/SPEC-lthr-one-anchor.md`). **The highest-leverage continuity work left.**
+- **The fracture.** `_shared/easy-hr.ts` (the EASY BAND) resolves LTHR **learned → manual**. `compute-workout-analysis:1578` (the ZONE BINS on Details) resolves it **configured/manual → workout → learned**. **Inverted.** Plus `calculate-workload:241` (workout-first) and `coach:2087` (learned-only) — four chains.
+- **The realised bug:** an athlete who **types** an LTHR in Baselines gets their **zone bins** from the typed value and their **easy band** from the learned one. **Two LTHRs, two zone tables, one athlete.** That is D-286's bug at the root, where it propagates into every zone, the 80/20 read, and which runs qualify as "easy".
+- **Latent for the primary user only by accident** — he has typed no LTHR, so both chains fall through to learned (151) and agree.
+- **⚠ A scare that is NOT real — do not "fix" it.** Strava writes `configured_hr_zones` on connect, and the analyzer trusts that object first, so a synced 220-age default *looked* like it could outrank a measured LTHR. **It cannot:** `strava-token-exchange:139` writes `threshold_heart_rate: null`. Strava supplies zone boundaries and a max HR, never an LTHR.
+- **The fix** is the pattern already proven three times (`resolveCurrentFtp`, `resolveCurrentRunEasyPace`, `friel-zones.ts`): one `resolveCurrentLthr()` in `src/lib/`, four call sites routed. **Do `threshold_pace` in the same pass — it has NO resolver at all** (read directly in ~15 files).
+- **The one open design call (Michael's):** should a **typed** LTHR beat a **learned** one? FTP says learned-first. But a *real threshold test* beats a passive learn off ambient runs (his LTHR is **n=2**), and the app cannot tell a tested number from a guessed one. **Q-174 already solved this shape: let the athlete say.** Default learned (byte-identical to today), athlete can override.
+- **⚠ This makes four surfaces AGREE about the number. It does not make the number BETTER.** Only a threshold test does that. **Do not fix his zones by inference.**
+
 ## When to add an entry
 
 Add a new Q-NNN when:
