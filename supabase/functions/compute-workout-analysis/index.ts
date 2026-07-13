@@ -5,6 +5,7 @@ import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
 import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
 
 const ANALYSIS_VERSION = 'v0.1.9'; // NP zero-preserve + 30s Coggan startup trim (D-112)
 
@@ -1578,10 +1579,14 @@ Deno.serve(async (req) => {
         || (Number.isFinite((w as any)?.threshold_heart_rate) ? Number((w as any).threshold_heart_rate) : null)
         || learnedLthr;
       if (lthr && lthr > 100) {
+        // Q-171 — the Z2/Z3 boundary is sourced from the ONE easy band (`_shared/easy-hr.ts`), not a second
+        // hardcoded 0.90. They shipped 40 min apart and rounded independently (134 vs 136 at LTHR 151), so a
+        // 135 bpm run binned Zone 2 here while the easy-pace learner called it hard. Deriving the floor from
+        // the easy ceiling makes "easy" === "Zone 1 or 2" by construction — they can no longer drift.
         hrZoneBoundaries = [
           0,
           Math.round(lthr * 0.85),
-          Math.round(lthr * 0.90),
+          runEasyZone3FloorBpm(lthr),
           Math.round(lthr * 0.95),
           Math.round(lthr * 1.05),
           Math.round(lthr * 1.15),

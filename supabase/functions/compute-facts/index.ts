@@ -42,7 +42,7 @@ import { resolveRouteCluster } from "../_shared/route-intelligence.ts";
 import { dewPointF } from "../_shared/heat-adjust.ts";
 import { resolveCurrentFtp } from "../../../src/lib/resolve-current-ftp.ts";
 // Q-169: the ONE definition of "is this heartbeat easy" (threshold-anchored, %max-bootstrapped).
-import { resolveRunEasyHrBand, isEasyHr } from "../_shared/easy-hr.ts";
+import { resolveRunEasyHrBand, isEasyHr, runEasyPaceEligible } from "../_shared/easy-hr.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1052,16 +1052,30 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null): Record<strin
   // The old sample gate was `thresholdHR * 0.78` (= 118 bpm for a 151 LTHR) — so even with the path
   // fixed it would have captured only WARM-UP samples and reported a misleadingly slow pace. Replacing
   // no-data with wrong-data is worse than the bug; the threshold moved with the anchor.
+  //
+  // Q-171 — THE RUN-LEVEL GATE. The block above used to qualify only SAMPLES, on EVERY run, behind a
+  // 10-SAMPLE floor. So an interval/tempo session's warm-up (in-band HR, slow) and the HR-lag opening of
+  // each hard rep (HR not caught up, pace already fast) both wrote a "pace at easy HR" for a HARD
+  // workout — and that number feeds the D-033 reconciler that sets the plan's easy pace. The run now
+  // qualifies the WHOLE RUN with the SAME predicate the baseline learner uses, so the reconciler's two
+  // sides finally measure one population (`_shared/easy-hr.ts` -> `runEasyPaceEligible`).
   const easyBand = resolveRunEasyHrBand(
     baselines?.learned_fitness,
     baselines?.performance_numbers?.threshold_heart_rate,
   );
-  if (easyBand.ceiling != null && w.sensor_data?.samples) {
-    const easySamples = w.sensor_data.samples.filter((s: any) => {
+  const samples: any[] = Array.isArray(w.sensor_data?.samples) ? w.sensor_data.samples : [];
+  if (easyBand.ceiling != null && samples.length > 0) {
+    const easySamples = samples.filter((s: any) => {
       const hr = s.heartRate ?? s.heart_rate;
       return isEasyHr(hr, easyBand) === true && (s.speedMetersPerSecond ?? 0) > 0.5;
     });
-    if (easySamples.length >= 10) {
+    // Dwell in SECONDS, with the sample cadence derived from THIS run — Garmin smart-recording is not
+    // 1 Hz, so a raw sample count would mean different amounts of time on different files.
+    const sampleIntervalS = dur > 0 ? (dur * 60) / samples.length : 1;
+    const inBandSeconds = easySamples.length * sampleIntervalS;
+
+    // hr_avg is the D-185 resolved scalar (null when HR is corrupt) — never the raw column.
+    if (runEasyPaceEligible(facts.hr_avg, dur, inBandSeconds, easyBand)) {
       const avgSpeed = easySamples.reduce((sum: number, s: any) => sum + (s.speedMetersPerSecond ?? 0), 0) / easySamples.length;
       if (avgSpeed > 0) {
         facts.pace_at_easy_hr = Math.round(1000 / avgSpeed);

@@ -45,6 +45,20 @@
 
 /** Friel run Z2 ceiling — the top of easy/aerobic. Z1 <85% LTHR, Z2 85-89%; above 89% is Z3 (not easy). */
 export const EASY_CEILING_PCT_LTHR = 0.89;
+/**
+ * Friel Z3 floor — the first heartbeat that is NOT easy. THE ANALYZER'S ZONE BINS MUST USE THIS.
+ *
+ * Q-171: this band and `compute-workout-analysis`'s Friel zone array shipped 40 minutes apart with two
+ * independently-rounded ceilings — easy topped at `round(0.89 x LTHR)` = 134 while Zone 3 began at
+ * `round(0.90 x LTHR)` = 136 (LTHR 151). A 135 bpm run was therefore **Zone 2 on the Details screen and
+ * NOT easy to the learner**: one fact, two screens, opposite answers — the exact failure the shared band
+ * was written to end. Both numbers are defensible Friel (Z2 is 85-89%, Z3 starts at 90%); the bug is that
+ * they were TWO numbers. `runEasyZone3FloorBpm` derives the boundary from the easy ceiling, so
+ * `isEasyHr(hr) === true` <=> hr bins to Zone 1 or Zone 2, by construction, permanently.
+ */
+export function runEasyZone3FloorBpm(lthr: number): number {
+  return Math.round(lthr * EASY_CEILING_PCT_LTHR) + 1;
+}
 /** Floor: below this is a walk / a stop / a broken strap, not an easy run. */
 export const EASY_FLOOR_PCT_LTHR = 0.70;
 /** Cold-start bootstrap: the field's aerobic ceiling is 80% of max — NOT the 75% that starved this. */
@@ -76,6 +90,21 @@ function readMetric(lf: Record<string, unknown> | null | undefined, key: string)
   if (raw == null) return null;
   const v = typeof raw === 'object' ? Number((raw as any).value) : Number(raw);
   if (!Number.isFinite(v) || !(v > 0)) return null;
+  // LAW 2 — an INVENTED number may not become an anchor (Q-171). `learn-fitness-profile` has a last-resort
+  // branch that writes `run_threshold_hr` as "88% of observed max (estimated)" with **sample_count: 0** —
+  // a formula applied to another estimate (and observed-max is a one-way ratchet, so a single strap
+  // artefact poisons it permanently). Accepting that as the LTHR anchor makes the band ANNOUNCE
+  // "Friel Z2 — at or below 89% of your threshold HR" over a number nobody measured, and it is not even
+  // conservative: 0.89 x 0.88 = 78% of max ceiling, 0.70 x 0.88 = 62% floor — TIGHTER and LOWER than the
+  // honest %max bootstrap (65-80%), i.e. it drifts straight back toward the Q-169 starvation while
+  // claiming to be the cure for it. So: a metric that explicitly declares ZERO samples is not a
+  // measurement and cannot anchor. We fall through to the bootstrap, which at least says it is one.
+  //
+  // `sample_count: 0` is REJECTED. `sample_count` ABSENT is accepted — absent means "not stated" (the
+  // in-pass synthetic band built inside learn-fitness-profile passes no count), not "measured nothing".
+  // The 95th-percentile fallback (low confidence, sample_count >= 3) SURVIVES: it is a weak measurement,
+  // not an invention, and the distinction this gate draws is measured-vs-invented, not strong-vs-weak.
+  if (typeof raw === 'object' && (raw as any).sample_count === 0) return null;
   const c = typeof raw === 'object' ? String((raw as any).confidence ?? '') : '';
   return { value: v, confidence: (c === 'high' || c === 'medium' || c === 'low') ? c : null };
 }
@@ -129,4 +158,56 @@ export function isEasyHr(hr: number | null | undefined, band: EasyHrBand): boole
   const v = Number(hr);
   if (!Number.isFinite(v) || !(v > 0)) return null;
   return v >= band.floor && v <= band.ceiling;
+}
+
+// ── WHICH RUNS MAY SUPPLY A "PACE AT EASY HR" (Q-171) ────────────────────────────────────────────
+//
+// The band above answers "is this HEARTBEAT easy". It does NOT answer "is this RUN an easy run", and
+// conflating the two was a real bug. `compute-facts` harvested easy-band samples from EVERY run behind
+// a 10-SAMPLE floor (~10 s at 1 Hz). On an interval or tempo session that harvests two lies at once:
+//   · the warm-up / cool-down  — in-band HR, genuinely SLOW pace, and
+//   · the HR-LAG opening of each hard rep — HR has not caught up yet, pace is already FAST.
+// The resulting `pace_at_easy_hr` is noise in an unpredictable direction, and it does not stay put:
+// compute-snapshot -> `athlete_snapshot.run_easy_pace_at_hr` -> the D-033 reconciler -> THE PLAN'S
+// EASY PACE. A noisy-slow patch is exactly what trips `reconciled_worse` and slows the athlete down.
+//
+// This is the SAME disease D-275-bike already cured on the ride side, in almost the same words —
+// "a threshold-level segment jacks in-band HR via cardiac lag" (`state-trend/bike-fitness.ts`). The cure
+// has the same shape: qualify the SESSION, not just the sample — intensity + a real dwell floor.
+//
+// The intensity gate is DELIBERATELY the same predicate the BASELINE learner already applies
+// (`learn-fitness-profile`: `duration >= 20` AND the run's own avg HR inside this band). The D-033
+// reconciler compares baseline against observed, so the two MUST measure one population (Law 1). Before
+// this they did not: baseline qualified whole runs, observed qualified loose samples. That asymmetry —
+// not the band — is what made the observed side untrustworthy.
+//
+// It is intensity-gated, not LABEL-gated, on purpose: an unlabeled interval session is caught just the
+// same, and nothing depends on the analyzer having classified the run before `compute-facts` runs.
+
+/** Whole-run minimum, in MINUTES. Mirrors the baseline learner's `duration >= 20`. */
+export const MIN_EASY_RUN_MINUTES = 20;
+
+/** Minimum in-band DWELL, in SECONDS, before a pace-at-easy-HR is a measurement and not a fragment.
+ *  Mirrors the bike's `MIN_EFFICIENCY_IN_BAND_S = 600` (D-275-bike). The old floor was 10 SAMPLES. */
+export const MIN_EASY_PACE_IN_BAND_S = 600;
+
+/**
+ * Is this RUN a legitimate source of a "pace at easy HR" reading?
+ *
+ * @param avgHr           the run's OWN average HR (use the sanitized/resolved value — a corrupt-HR run
+ *                        must arrive here as null, never as a raw column read).
+ * @param durationMinutes whole-run duration, MINUTES (this codebase stores `moving_time` in minutes).
+ * @param inBandSeconds   dwell inside the easy band, SECONDS — not a sample count.
+ */
+export function runEasyPaceEligible(
+  avgHr: number | null | undefined,
+  durationMinutes: number | null | undefined,
+  inBandSeconds: number | null | undefined,
+  band: EasyHrBand,
+): boolean {
+  if (band.ceiling == null) return false;                                  // cannot judge easy -> abstain
+  if (!(Number(durationMinutes) >= MIN_EASY_RUN_MINUTES)) return false;    // Number(null) === 0 -> false
+  if (isEasyHr(avgHr, band) !== true) return false;                        // the RUN must have been run easy
+  if (!(Number(inBandSeconds) >= MIN_EASY_PACE_IN_BAND_S)) return false;   // a fragment is not a measurement
+  return true;
 }
