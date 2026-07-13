@@ -215,11 +215,6 @@ const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [garminRestingHR, setGarminRestingHR] = useState<number | null>(null);
 
   // Track initial manual HR state for change detection
-  // Q-170: how heat-confounded runs are treated in the RUN durability trend.
-  // 'include' (default) keeps them and NAMES them; 'exclude' keeps the trend quiet rather than speak
-  // off hot data. No shipped app DROPS a session for heat (Garmin adjusts a retained estimate,
-  // US 11,998,802) — but the athlete gets the escape hatch.
-  const [runHeatHandling, setRunHeatHandling] = useState<'include' | 'exclude'>('include');
   const [initialManualHR, setInitialManualHR] = useState('');
   const currentManualHR = JSON.stringify({ manualRunMaxHR, manualRunLTHR, manualRideMaxHR, manualRideLTHR });
   const hasChanges = JSON.stringify(data) !== originalData || currentManualHR !== initialManualHR;
@@ -374,14 +369,9 @@ const loadBaselines = async () => {
       if (userId) {
         const { data: row } = await supabase
           .from('user_baselines')
-          .select('configured_hr_zones, analysis_prefs')
+          .select('configured_hr_zones')
           .eq('user_id', userId)
           .maybeSingle();
-        const rawPrefs: unknown = (row as { analysis_prefs?: unknown } | null)?.analysis_prefs;
-        const ap = (typeof rawPrefs === 'string' ? JSON.parse(rawPrefs) : rawPrefs) as
-          { run_heat_handling?: string } | null | undefined;
-        if (ap?.run_heat_handling === 'exclude') setRunHeatHandling('exclude');
-
         if (row?.configured_hr_zones) {
           const cfg = typeof row.configured_hr_zones === 'string'
             ? JSON.parse(row.configured_hr_zones)
@@ -688,21 +678,6 @@ const handleSave = async () => {
           .update({ configured_hr_zones: configuredZones })
           .eq('user_id', userId);
       }
-    }
-
-    // Q-170: persist the heat-handling preference (independent of the zones block above, which only
-    // runs when manual HR anchors changed). Tolerant by design: until the `analysis_prefs` migration is
-    // applied the column does not exist, and a hard failure here would take the WHOLE baselines save down
-    // with it. The spine already defaults to 'include' when the column/value is absent, so a failed write
-    // costs the athlete a preference, never their baselines.
-    try {
-      const { error: prefErr } = await supabase
-        .from('user_baselines')
-        .update({ analysis_prefs: { run_heat_handling: runHeatHandling } })
-        .eq('user_id', userId);
-      if (prefErr) console.warn('[baselines] analysis_prefs not saved (migration pending?):', prefErr.message);
-    } catch (e) {
-      console.warn('[baselines] analysis_prefs write skipped:', e);
     }
 
     setOriginalData(JSON.stringify(dataToSave)); // match the SAVED copy (incl. swimPace100_updated_at) so the button greys out post-save
@@ -2098,49 +2073,6 @@ return (
                     })()}
                   </div>
                   )}
-
-                  {/* Q-170 — Heat handling. The RUN durability trend (aerobic decoupling) is confounded by
-                      heat: at ~80F the HR-drift effect is roughly the SIZE OF THE THRESHOLD it is tested
-                      against, and slowing down does not escape it (decoupling is a pace-per-heartbeat RATIO
-                      — hold pace and HR climbs; slow down and pace falls; the ratio degrades either way).
-                      Default = include + NAME the heat. No shipped app DROPS a session for heat (Garmin
-                      ADJUSTS a retained estimate, US 11,998,802, explicitly to avoid "false discouraging
-                      feedback"). Exclude is the escape hatch for an athlete who would rather the trend go
-                      quiet than speak off hot data. */}
-                  {activeSport === 'running' && (
-                  <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] mt-5">
-                    <h2 className="text-sm font-semibold text-white/90 tracking-wide">Hot-weather runs</h2>
-                    <p className="text-xs text-white/50 mt-0.5 mb-3">
-                      Heat inflates heart-rate drift, so a hot run can look like a weak aerobic base. Choose how they count.
-                    </p>
-                    <div className="space-y-2">
-                      {([
-                        { v: 'include' as const, t: 'Count them, and say so',
-                          d: 'Your durability read stays current, and tells you when it is standing on hot runs.' },
-                        { v: 'exclude' as const, t: 'Leave them out',
-                          d: 'A cleaner read from cool runs only — but it can go quiet for a whole summer.' },
-                      ]).map((o) => (
-                        <button
-                          key={o.v}
-                          type="button"
-                          onClick={() => setRunHeatHandling(o.v)}
-                          className={`w-full text-left p-3 rounded-xl border transition-all ${
-                            runHeatHandling === o.v
-                              ? 'bg-white/[0.10] border-white/30'
-                              : 'bg-white/[0.02] border-white/10 hover:bg-white/[0.05]'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${runHeatHandling === o.v ? 'bg-emerald-400' : 'bg-white/20'}`} />
-                            <span className="text-sm text-white/90">{o.t}</span>
-                          </div>
-                          <p className="text-xs text-white/45 mt-1 ml-4">{o.d}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  )}
-
                 </div>
               ) : (
                 /* Data Import Tab */

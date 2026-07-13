@@ -11,7 +11,7 @@
 // barrel here would create a load-order cycle.
 import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, type LiftSeries, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, type BikeFitness } from './bike-fitness.ts';
-import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, decouplingToSeries, countConfoundedInSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
+import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
 import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSummary } from './discipline.ts';
@@ -71,14 +71,6 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[]): LiftSeries[]
 // ---- raw inputs (each caller fetches with its own client, then flattens identically) ----
 export interface StateTrendInputs {
   asOf: string;
-  /** Q-170: athlete preference for how heat-confounded runs are treated in the run durability trend.
-   *  'include' (DEFAULT) — keep them, and NAME them. The trend never goes blind; the verdict says what it
-   *    is standing on. No shipped app drops a session for heat (Garmin ADJUSTS a retained estimate,
-   *    US 11,998,802; Runalyze keeps every hot run in its 30d shape).
-   *  'exclude' — the athlete would rather the trend stay quiet than speak off hot data. Fewer samples;
-   *    can go stale through a summer. Runalyze ships an equivalent per-activity opt-out.
-   *  Absent -> 'include'. */
-  heatHandling?: 'include' | 'exclude';
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
   strengthVolumeRows?: StrengthVolumeRow[]; // per-strength-workout total_volume_lbs (the volume trend)
   bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; in_band_s?: number | null; band_hi?: number | null; band_source: string | null; hr_corrupt?: boolean }>;
@@ -147,18 +139,9 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // durability, zone-free, no distance confound) LEADS and drives the card verdict; efficiency_index
   // is the SECONDARY output-per-heartbeat read. GAP pace was dropped in Q-110. Cadence floor scales
   // off the steady-run (decoupling) pool.
-  const excludeHot = inp.heatHandling === 'exclude';
-  const runDecoupRows = excludeHot
-    ? inp.runJoined.filter((r) => r.decoupling_confounded !== true)
-    : inp.runJoined;
-  const runDecoupSeries = decouplingToSeries(runDecoupRows);
+  const runDecoupSeries = decouplingToSeries(inp.runJoined);
   const runSteadyCadence = runDecoupSeries.length / WEEKS_90D;
-  // Q-170: hot runs are KEPT in the substrate now; the count of condition-confounded ones is CARRIED so the
-  // surface can name them (TrainingPeaks posture) instead of the trend silently starving every summer.
-  // When the athlete opts to exclude hot runs there are none left in the substrate to name -> count 0.
-  const runDecoupling = computeRunDecouplingState(
-    runDecoupSeries, asOf, runSteadyCadence, excludeHot ? 0 : countConfoundedInSeries(inp.runJoined),
-  );
+  const runDecoupling = computeRunDecouplingState(runDecoupSeries, asOf, runSteadyCadence);
   const runEffSeries = efficiencyIndexToSeries(inp.runJoined);
   const runEfficiency = computeRunEfficiencyState(runEffSeries, asOf, runEffSeries.length / WEEKS_90D);
   const runState = runDecoupling; // decoupling drives the provisional flag below
