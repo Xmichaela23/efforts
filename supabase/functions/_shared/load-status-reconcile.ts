@@ -465,10 +465,12 @@ export function reconcileLoadStatus(
     interpretation = reasons.length > 0 ? `${raw.interpretation}. ${reasons.join('; ')}` : raw.interpretation;
   }
 
-  // Provisional-ACWR flag (field-standard): an elevated ratio that did NOT drive the verdict (status
-  // stayed on_target/under) was discounted as thin/empty-base — the chronic base is too short for the
-  // ratio to be trustworthy (Gabbett: ~4wk chronic needed; Garmin/COROS/Intervals gate on an established
-  // base before the ratio counts). Flag it so the bare number isn't read as a real spike.
-  const acwrProvisional = unweightedAcwr != null && unweightedAcwr >= 1.3 && (status === 'on_target' || status === 'under');
+  // Provisional-ACWR flag (field-standard): an elevated ratio is only trustworthy on an established
+  // chronic base (Gabbett: ~4wk chronic; Garmin/COROS/Intervals gate on a real base). Key it on the
+  // ACTUAL thin-base signal (`spikeOnEmptyBase` — a big acute load on a near-empty chronic base), NOT on
+  // "the verdict stayed low" (which also happens for real-base athletes whose spike is cross-training-
+  // attributed — flagging THOSE was wrong). So: a genuinely-thin base with a high ratio → provisional;
+  // a real base → never provisional, whatever the composition. Athlete/plan-agnostic.
+  const acwrProvisional = spikeOnEmptyBase && unweightedAcwr != null && unweightedAcwr >= 1.3;
   return { status, interpretation, acwrProvisional };
 }

@@ -208,6 +208,18 @@ Deno.test('two-key cap: load-high + corroborated → stays high (body agrees)', 
   assertEquals(run({ ...LOAD_HIGH, corroboratedStrain: true }).status, 'high');
 });
 
+// ═══ acwrProvisional: keyed on the REAL thin-base signal, athlete/composition-agnostic ═══
+Deno.test('acwrProvisional: high ratio on a THIN base (spikeOnEmptyBase) → provisional', () => {
+  assertEquals(run({ unweightedAcwr: 1.6, spikeOnEmptyBase: true }).acwrProvisional, true);
+});
+Deno.test('acwrProvisional: high ratio on a REAL base → NOT provisional (whatever the composition — the fix)', () => {
+  // The bug was flagging a real-base athlete whose spike is cross-training-attributed. Real base = trust the ratio.
+  assertEquals(run({ unweightedAcwr: 1.6, spikeOnEmptyBase: false }).acwrProvisional, false);
+});
+Deno.test('acwrProvisional: sweet-spot ratio (≤1.3) is never provisional, thin base or not', () => {
+  assertEquals(run({ unweightedAcwr: 1.1, spikeOnEmptyBase: true }).acwrProvisional, false);
+});
+
 // Safety floor (nDeclining≥2 / readiness) → corroborated → passes the cap. The
 // readiness/nDeclining → corroboratedStrain mapping is computeSafetyFloor (below).
 const QUIET: BodyTrends = {
