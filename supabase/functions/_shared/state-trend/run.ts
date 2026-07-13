@@ -155,21 +155,45 @@ export interface DecouplingRow {
   date?: string; metric_date?: string;
   decoupling_pct?: number | null;
   decoupling_basis?: string | null;   // 'gap' | 'raw' | null — only used to drop confirmed 'raw'
-  decoupling_confounded?: boolean | null; // heat/RPE-confounded → not a clean durability read (analyzer-set)
+  /** Analyzer-set heat flag. STILL STAMPED, and the WORKOUT screen still uses it to say "it was 80°F".
+   *  It is deliberately NOT a substrate filter any more — see the block below (D-283). */
+  decoupling_confounded?: boolean | null;
   workout_type?: string | null;       // heart_rate_summary.workoutType
   duration_minutes?: number | null;
 }
+
+// ── D-283 (supersedes D-275's heat gate) — HOT RUNS ARE KEPT. Measured, not assumed. ──────────────
+//
+// D-275 dropped every heat-confounded run from this substrate, justified as "field-standard". Both halves
+// of that were wrong, and the second one was checked against real data (`scripts/verify-heat-decoupling-*.mjs`):
+//
+//  1. NOT FIELD-STANDARD. No shipped product discards a session from a decoupling/efficiency/fitness trend
+//     because it was hot. Garmin ADJUSTS a RETAINED estimate (and only VO2max/Training Status — it ships no
+//     decoupling trend at all, and its correction is ACCLIMATION-scaled, so an acclimated athlete's
+//     correction tends to zero). TrainingPeaks INVENTED Pa:Hr and shows it raw. Runalyze keeps every hot run.
+//     Deleting the session is the one option nobody ships.
+//
+//  2. NO HEAT EFFECT TO CORRECT FOR — on the only real data we have. Regressing decoupling on
+//     heatTerm = max(0, tempF - 60) over 81 steady runs: slope -0.135 %/degF, t = -1.07, r^2 = 0.014, and the
+//     95% CI straddles zero under EVERY specification (raw, trimmed, positive-only). Median decoupling by
+//     temperature bucket does not rise with heat — it FALLS (<65F: 4.9% -> >80F: 1.45%). The textbook effect
+//     (~+0.39 %/degF) sits OUTSIDE the CI. So the exclusion was not protecting the athlete from a hot-run lie;
+//     it was DELETING HIS BEST DATA (his hot runs read strongest).
+//
+// The July-5 bug D-275 was written to fix is ALREADY fixed by other gates, and is pinned as such below: a
+// lone run — hot or not — yields `needs_data` on the min-sessions floor, and BOTH surfaces gate on
+// `verdict !== 'needs_data'` before rendering a band. The heat filter was redundant with the floor.
+//
+// ⚠ DO NOT re-add a heat FILTER, and do not add a heat ADJUSTMENT off a population curve. If a heat
+// correction is ever built it must be a PER-ATHLETE fitted coefficient that applies nothing when the
+// athlete's own data does not earn it (the machinery already exists: `_shared/heat-adjust.ts` fits the
+// coefficient by regression and refuses when heat and fitness are not separable). This athlete exercises
+// the "refuse" branch; correcting him would be multiplying by 1 with extra steps.
 export function decouplingToSeries(rows: DecouplingRow[] | null | undefined): TrendPoint[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .filter((r) => typeof r.decoupling_pct === 'number' && Number.isFinite(Number(r.decoupling_pct)))
     .filter((r) => r.decoupling_basis !== 'raw')                                  // drop confirmed terrain-confounded
-    // Decoupling is only a valid DURABILITY read in controlled conditions (Friel/TrainingPeaks: don't test
-    // in heat; Garmin normalizes heat rather than reading a false fitness decline). A run the analyzer flagged
-    // heat- or RPE-confounded isn't a clean measurement, so it can't stand up the "durability gap" band — same
-    // exclusion the terrain-confounded ('raw') runs already get. The workout screen already explained these as
-    // conditions, not fitness; State must not re-derive a contradicting verdict from the raw %.
-    .filter((r) => r.decoupling_confounded !== true)
     .filter((r) => isSteadyAerobic(r.workout_type))                              // steady aerobic only
     .filter((r) => r.duration_minutes == null || Number(r.duration_minutes) >= 20) // ≥20 min (null = don't drop)
     .map((r) => ({ date: r.date ?? r.metric_date ?? '', value: Number(r.decoupling_pct) }))

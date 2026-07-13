@@ -73,33 +73,76 @@ Deno.test('decouplingToSeries: drops raw-basis, intervals, <20min; keeps steady 
   assertEquals(series.map((p) => p.value), [6.2, 4.1]);
 });
 
-// ── CONFOUND EXCLUSION (continuity fix): a heat-confounded run is not a clean durability read
-//    (Friel/TrainingPeaks: don't test decoupling in heat; Garmin normalizes heat). It's dropped from
-//    the substrate exactly like a terrain-confounded 'raw' run — so it can't stand up the danger band.
-//    (Validity gates, per the field, are OBJECTIVE conditions — heat/terrain/effort/duration — not RPE.) ──
-Deno.test('decouplingToSeries: drops heat-confounded runs, keeps clean ones', () => {
+// ── D-283 (INVERTS the D-275 pin that used to live here): a heat-confounded run STAYS in the substrate.
+//    The old test asserted the hot run was dropped. That behavior is dead: no shipped product discards a
+//    session from a fitness trend for heat (Garmin ADJUSTS a retained VO2max, acclimation-scaled; TrainingPeaks
+//    shows Pa:Hr raw; Runalyze keeps every hot run), and on 81 real steady runs the heat→decoupling slope's
+//    95% CI straddles zero under every specification — the hot runs read BEST. The filter was deleting the
+//    athlete's best data to protect him from a lie his data does not tell. ──
+Deno.test('D-283: decouplingToSeries KEEPS heat-confounded runs (the D-275 exclusion is dead)', () => {
   const series = decouplingToSeries([
-    { date: '2026-06-10', decoupling_pct: 4.0, decoupling_basis: 'gap', decoupling_confounded: false, workout_type: 'easy', duration_minutes: 40 }, // keep (clean)
-    { date: '2026-06-14', decoupling_pct: 11.5, decoupling_basis: 'gap', decoupling_confounded: true, workout_type: 'easy', duration_minutes: 45 }, // drop (confounded)
-    { date: '2026-06-18', decoupling_pct: 6.0, decoupling_basis: 'gap', workout_type: 'easy', duration_minutes: 50 },                               // keep (flag absent = not confounded)
+    { date: '2026-06-10', decoupling_pct: 4.0, decoupling_basis: 'gap', decoupling_confounded: false, workout_type: 'easy', duration_minutes: 40 },
+    { date: '2026-06-14', decoupling_pct: 11.5, decoupling_basis: 'gap', decoupling_confounded: true, workout_type: 'easy', duration_minutes: 45 }, // HOT — kept, and kept RAW
+    { date: '2026-06-18', decoupling_pct: 6.0, decoupling_basis: 'gap', workout_type: 'easy', duration_minutes: 50 },
   ]);
-  assertEquals(series.map((p) => p.value), [4.0, 6.0]);
+  assertEquals(series.map((p) => p.value), [4.0, 11.5, 6.0]);
 });
 
-// ══ THE REGRESSION — the July-5 case: one hot (confounded) 10.7% run is the ONLY recent steady run.
-//    Before: State banded the raw 10.7% → 'durability_gap' (red home-screen flag) while the workout screen
-//    said "heat + fatigue, not fitness". After: the confounded run is excluded → no clean data → needs_data,
-//    NOT a durability-gap verdict. State stops contradicting the workout screen about the same run. ══
-Deno.test('confound: a lone hot 10.7% run does NOT stand up a durability_gap band (reads needs_data)', () => {
+// ══ THE REGRESSION — the July-5 case: one hot 10.7% run is the ONLY recent steady run. State banded the raw
+//    10.7% → red "durability gap" while the workout screen said "heat + fatigue, not fitness".
+//
+//    D-275 fixed it by DELETING hot runs from the substrate. D-283 removed that filter (it is not
+//    field-standard, and on 81 real steady runs the heat→decoupling slope's 95% CI straddles zero — hot runs
+//    actually read BEST, so the filter was deleting the athlete's best data).
+//
+//    This fixture now pins the OUTCOME, not the mechanism — which is the thing that actually protects the
+//    athlete, and which turns out to have been doing the work all along: a LONE run cannot stand up a verdict,
+//    because the min-sessions floor returns `needs_data` and BOTH surfaces gate on `verdict !== 'needs_data'`
+//    before they render a band. The heat filter was redundant with the floor. ══
+Deno.test('REGRESSION (July-5): a lone hot 10.7% run is KEPT, and still cannot stand up a durability verdict', () => {
   const rows = [
     { date: '2026-07-05', decoupling_pct: 10.7, decoupling_basis: 'gap', decoupling_confounded: true, workout_type: 'easy', duration_minutes: 45 },
   ];
   const series = decouplingToSeries(rows);
-  assertEquals(series.length, 0);                                  // the hot run is excluded from the substrate
-  const { trend, band, recentPct } = computeRunDecouplingState(series, '2026-07-11', 1);
-  assertEquals(trend.verdict, 'needs_data');                       // no clean data → honest "needs data", not red
-  assertEquals(band, null);                                        // no 'durability_gap' band to render
-  assertEquals(recentPct, null);
+  assertEquals(series.length, 1);                    // D-283: the hot run is KEPT. We do not delete data.
+  assertEquals(series[0].value, 10.7);               // ...and it is kept RAW. No invented correction.
+
+  const { trend } = computeRunDecouplingState(series, '2026-07-11', 1);
+  assertEquals(trend.verdict, 'needs_data');         // one run is not a trend — the min-sessions floor holds
+  assertEquals(trend.sampleCount, 1);
+
+  // THE INVARIANT THAT MATTERS: neither surface may render a red band off this. Both gate on the verdict.
+  // (Mirrors StatePerformanceSection.tsx and coach/index.ts's AERO gate.)
+  const clientRendersVerdict = trend.verdict !== 'needs_data';
+  const coachRendersVerdict = trend.verdict !== 'needs_data' && !trend.stale;
+  assertEquals(clientRendersVerdict, false, 'the PERFORMANCE row must not speak off one run');
+  assertEquals(coachRendersVerdict, false, 'the AERO card must not speak off one run');
+});
+
+// ══ D-283 — hot runs belong in the substrate. This is the anti-regression for re-adding the filter. ══
+Deno.test('D-283: heat-confounded runs are NOT filtered out of the durability substrate', () => {
+  const rows = [
+    { date: '2026-06-03', decoupling_pct: 8.0, decoupling_basis: 'gap', decoupling_confounded: true, workout_type: 'easy', duration_minutes: 45 },
+    { date: '2026-06-14', decoupling_pct: 10.5, decoupling_basis: 'gap', decoupling_confounded: true, workout_type: 'long', duration_minutes: 70 },
+    { date: '2026-06-28', decoupling_pct: 5.1, decoupling_basis: 'gap', decoupling_confounded: false, workout_type: 'easy', duration_minutes: 40 },
+    { date: '2026-07-12', decoupling_pct: 3.4, decoupling_basis: 'gap', decoupling_confounded: true, workout_type: 'easy', duration_minutes: 45 },
+  ];
+  const series = decouplingToSeries(rows);
+  // All four survive. Under D-275 three of these were deleted and the substrate fell to ONE run.
+  assertEquals(series.length, 4);
+  assertEquals(series.map((p) => p.value), [8.0, 10.5, 5.1, 3.4]);
+});
+
+Deno.test('D-283: the OTHER gates still hold — heat is not a licence to keep junk', () => {
+  const rows = [
+    { date: '2026-07-01', decoupling_pct: 6.0, decoupling_basis: 'raw', decoupling_confounded: true, workout_type: 'easy', duration_minutes: 45 },   // terrain-confounded → still dropped
+    { date: '2026-07-02', decoupling_pct: 6.0, decoupling_basis: 'gap', decoupling_confounded: true, workout_type: 'intervals', duration_minutes: 45 }, // not steady → still dropped
+    { date: '2026-07-03', decoupling_pct: 6.0, decoupling_basis: 'gap', decoupling_confounded: true, workout_type: 'easy', duration_minutes: 12 },    // too short → still dropped
+    { date: '2026-07-04', decoupling_pct: 6.0, decoupling_basis: 'gap', decoupling_confounded: true, workout_type: 'easy', duration_minutes: 45 },    // HOT but otherwise clean → KEPT
+  ];
+  const series = decouplingToSeries(rows);
+  assertEquals(series.length, 1);
+  assertEquals(series[0].date, '2026-07-04');
 });
 
 // ══ DIRECTION PIN #1 — FALLING decoupling = IMPROVING (durability building), lands in a better band ══
