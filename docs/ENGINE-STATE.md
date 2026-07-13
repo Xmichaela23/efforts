@@ -1,5 +1,17 @@
 # Engine State
 
+# ⛔ IT HAS BEEN BUILT. IT MAY NOT WORK — BUT IT HAS PROBABLY BEEN BUILT, MAYBE MORE THAN ONCE.
+
+**"It doesn't work" is NOT evidence that "it doesn't exist."** The dominant failure mode in this codebase is a **well-built system STARVED of its inputs** — it exists, it is spec'd, it is fixtured, and it never fires because something upstream is null. It looks *missing*. **It is not missing. It is hungry.**
+
+**Before writing any new function: grep the name you were about to give it.** It is often already taken — by the thing you were about to rebuild.
+
+*(2026-07-12, one session, both mistakes: a session rebuilt `resolveRunEasyPace()` — **same function name** — while the real one sat in `generate-combined-plan/science.ts:110` with its own spec (`PHASE-1-RUN-PACE-SPEC.md`) and 9 pin tests. That real engine is excellent — streak gates, median gates, an ACWR gate so fatigue isn't misread as fitness decline — and it has **never once run**, because both its inputs (`learned_fitness.run_easy_pace_sec_per_km`, `athlete_snapshot.run_easy_pace_at_hr`) are null. The job was to FEED it. See Q-169.)*
+
+**When something looks broken, ask FIRST: is it starved, or is it absent?** Trace its inputs to the write site. A null input is a plumbing job, not a build job.
+
+---
+
 A current snapshot of what's load-bearing, what's known broken, and what's believed-working but unverified. Read this BEFORE proposing changes — most "obvious" bugs were either already fixed (don't re-litigate), already filed (don't re-discover), or intentionally left in place (don't "fix").
 
 ---

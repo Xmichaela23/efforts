@@ -2,6 +2,27 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+# ⛔ IT HAS BEEN BUILT. IT MAY NOT WORK — BUT IT HAS PROBABLY BEEN BUILT, MAYBE MORE THAN ONCE.
+
+**READ THIS BEFORE YOU WRITE A SINGLE NEW FUNCTION. Every session that skipped it has burned hours and shipped a regression.**
+
+**"It doesn't work" is NOT evidence that "it doesn't exist."** The dominant failure mode in this codebase is a **well-built system STARVED of its inputs** — it exists, it is spec'd, it is fixtured, and it never fires because something upstream is null. It looks *missing*. It is not missing. **It is hungry.**
+
+**The proof, from 2026-07-12 (one session, both mistakes):**
+- Claude decided the app needed a `resolveRunEasyPace()` and built one — **while `resolveRunEasyPace()` already existed** (`generate-combined-plan/science.ts:110`, D-033, its own spec doc `PHASE-1-RUN-PACE-SPEC.md`, **9 pin tests**). Same capability. **Same function name.** It had been warned about false starts one hour earlier.
+- That existing engine is *excellent* — streak gates, median gates, an ACWR gate so fatigue isn't misread as fitness decline. It has **never once run**, because both of its inputs (`learned_fitness.run_easy_pace_sec_per_km` and `athlete_snapshot.run_easy_pace_at_hr`) are null. **The job was to FEED it, not to rebuild it.**
+
+**THE HARD RULE — before writing any new function, helper, or resolver:**
+1. `grep -rn "<theFunctionNameYouAreAboutToWrite>" supabase/functions src` — **the name you would naturally pick is often the name that is already there.**
+2. `grep` the *capability* (2-3 different words for it), and check `docs/CAPABILITY-MAP.md`.
+3. Search `docs/` for a **DESIGN-\*/SPEC-\*** doc on it. If one exists, the thing exists.
+4. If you find something that looks broken: **ask "is it starved or is it absent?"** Trace its inputs to the write site. A null input is a plumbing job, not a build job.
+5. State in writing what you found **before** proposing to build. No exceptions.
+
+If you are about to say "the app needs X" — you are probably about to rebuild X.
+
+---
+
 ## STOP — this app is BUILT. The job is wiring, not features.
 
 Efforts is a mature, largely-complete app. The near-term mission is **continuity**: verify every capability is wired together and reads one truth — NOT building new features. Before you propose to build ANYTHING, obey this:
