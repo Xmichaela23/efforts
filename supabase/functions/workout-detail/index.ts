@@ -699,7 +699,9 @@ async function runSessionDetailPipelineAndPersist(
       observations,
       workoutAnalysis: wa,
       narrativeText,
-      loadStatus: bodyResponse?.load_status ? { status: bodyResponse.load_status.status, interpretation: bodyResponse.load_status.interpretation } : null,
+      // D-281: no loadStatus. bodyResponse here is built with NULL load inputs (acwr/pct below), so its
+      // load_status was a verdict about nothing — and the week verdict is State's fact anyway (D-260).
+      // bodyResponse is kept for `session_signals` only: grading THIS session, which is Performance's job.
       completedComputed: (detail as any).computed ?? null,
       // D-182: for swims, pass the RAW-column scalar (moving/elapsed/distance/HR) so the card reads the
       // SAME authoritative numbers the narrative does — never computed.overall (sample-derived, has been

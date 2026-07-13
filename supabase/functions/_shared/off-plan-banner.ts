@@ -20,6 +20,7 @@
  */
 
 import { SLICE_LOADED_ACWR_MIN, dominantAcuteSlice, type PerDomainLoad } from './per-domain-load.ts';
+import { LOAD_RANK } from './load-status-reconcile.ts';
 
 const FACT = 'Off plan this week — planned sessions skipped.';
 const FACT_PLUS_PRESCRIPTION = `${FACT} Get back on schedule before adding extra.`;
@@ -56,7 +57,12 @@ export function offPlanAdherenceBanner(opts: {
 
   // D-147 firing conditions (unchanged): a real run shortfall on a normal training
   // week; excluded on intents meant to be light.
-  if (!(loadStatus === 'under' || loadStatus === 'on_target')) return null;
+  // The banner explains a run shortfall on a NON-ALARMING week; when load is genuinely elevated/high
+  // the load verdict itself is the message and this banner would talk over it. Gated by RANK, not by
+  // an enumerated list: D-281 added 'productive' (rank 1, same as on_target — a real elevation the body
+  // is absorbing, not an alarm), and a hardcoded ['under','on_target'] list silently dropped the banner
+  // for exactly the cross-training-carried athlete it exists to explain. Rank keeps new states honest.
+  if (!(loadStatus && LOAD_RANK[loadStatus] <= LOAD_RANK['on_target'])) return null;
   if (runLoadPct == null || runLoadPct > -50) return null;
   if (['recovery', 'taper', 'deload', 'peak'].includes(weekIntent)) return null;
 

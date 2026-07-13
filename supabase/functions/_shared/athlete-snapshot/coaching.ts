@@ -483,6 +483,9 @@ function fallbackCoaching(snapshot: Omit<AthleteSnapshot, 'coaching'>): Coaching
   return {
     headline: load.status === 'high' ? 'High load — protect recovery'
       : load.status === 'elevated' ? 'Load is elevated'
+      // D-281: without this arm a real elevation the body is absorbing falls through to "On track",
+      // which hides the load — the same lie "balanced" was telling on the card (Q-166).
+      : load.status === 'productive' ? 'Load is building — you are absorbing it'
       : done === 0 ? 'Week just started'
       : 'On track',
     narrative: `${done} of ${planned} planned sessions completed so far. ${load.interpretation}.`,

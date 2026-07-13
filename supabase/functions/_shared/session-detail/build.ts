@@ -154,8 +154,11 @@ export type SessionDetailInput = {
   observations: string[];
   workoutAnalysis: Record<string, unknown> | null;
   narrativeText: string | null;
-  /** Optional: from body_response.load_status for weekly_impact */
-  loadStatus?: { status: 'on_target' | 'high' | 'elevated' | 'under'; interpretation?: string } | null;
+  // D-281: `loadStatus` REMOVED. Performance grades the SESSION; the week-load verdict belongs to
+  // State, and it has exactly one origin — the reconciler (D-260). This param fed a `weekly_impact`
+  // block that (a) was built by a SECOND engine, (b) was fed all-null load inputs by workout-detail
+  // (`acwr: null, actual_vs_planned_pct: null`) so it was a verdict about nothing, and (c) was read by
+  // nobody. If Performance ever needs the week verdict, it reads the reconciled one — it never mints it.
   /** Completed workout's `computed` field (from compute-workout-analysis). */
   completedComputed?: Record<string, unknown> | null;
   /** D-182: SWIM pace + HR scalars from the RAW workouts columns (the authoritative layer for swims —
@@ -281,7 +284,6 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     observations,
     workoutAnalysis,
     narrativeText,
-    loadStatus,
     completedComputed,
     completedSwimScalars,
     completedRunScalars,
@@ -967,7 +969,6 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       durationAdherence,
       weightDeviation: weightDev,
       volumeDeviation: volumeDev,
-      loadStatus,
       planContextSummary: match?.summary ?? null,
       intervals,
     }),
@@ -1677,7 +1678,6 @@ function buildSessionInterpretation(params: {
   durationAdherence: number | null;
   weightDeviation: SessionDetailV1['strength_weight_deviation'];
   volumeDeviation: SessionDetailV1['strength_volume_deviation'];
-  loadStatus?: { status: string; interpretation?: string } | null;
   planContextSummary: string | null;
   intervals: SessionDetailV1['intervals'];
 }): SessionInterpretation {
@@ -1691,7 +1691,6 @@ function buildSessionInterpretation(params: {
     durationAdherence,
     weightDeviation,
     volumeDeviation,
-    loadStatus,
     planContextSummary,
     intervals,
   } = params;
@@ -1836,21 +1835,12 @@ function buildSessionInterpretation(params: {
     }
   }
 
-  const loadStatusMap = loadStatus?.status === 'high' || loadStatus?.status === 'elevated' ? 'over' as const
-    : loadStatus?.status === 'under' ? 'under' as const
-    : 'on_track' as const;
-  const weeklyNote = loadStatus?.interpretation ?? '';
-
   return {
     plan_adherence: { overall, deviations },
     training_effect: {
       intended_stimulus: intendedStimulus,
       actual_stimulus: actualStimulus,
       alignment,
-    },
-    weekly_impact: {
-      load_status: loadStatusMap,
-      note: weeklyNote,
     },
   };
 }

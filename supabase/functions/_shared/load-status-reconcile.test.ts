@@ -78,7 +78,9 @@ function run(overrides: {
     overrides.bodyTrends ?? QUIET_TRENDS,
     overrides.readiness ?? 'adapting',
     planPosition,
-    overrides.unweightedAcwr ?? 1.4,
+    // `??` would swallow an explicit null — and null is a REAL production state (the caller nulls the
+    // ACWR on a thin chronic base), so the harness has to be able to express it.
+    overrides.unweightedAcwr !== undefined ? overrides.unweightedAcwr : 1.4,
     overrides.keySessionsNext48h ?? [],
     overrides.unplannedLoad ?? { count: 5, totalLoad: 314, plannedWeekLoad: 100 },
     overrides.runLoadPct ?? null,
@@ -376,4 +378,140 @@ Deno.test('D-268 P1 NEG: endurance-primary keeps the "Running load" lead (unchan
     planPosition: { weekIntent: 'baseline', planPrimary: 'endurance', primaryAdherence: null },
   });
   assertStringIncludes(r.interpretation, 'Running load');   // endurance-primary: run framing preserved
+});
+
+// ═══ D-281 / Q-166: a real TOTAL-load elevation is never hidden as "balanced" ═══
+// SYNTHETIC athletes only — the bug was found on one real week, but the fix must hold across
+// compositions, plans and body states, so it is fixtured against a matrix, never one athlete
+// ([[feedback_user_agnostic_design]]). The shape of the bug: the old escalation could only see a
+// total-load spike through two ATTRIBUTION gates (running ACWR quiet AND some single non-run
+// discipline itself mature and >1.3). An athlete whose ramp is spread across several cross-training
+// disciplines — none of them individually over 1.3 — passed neither gate, so a genuine elevation
+// stayed 'on_target' → "balanced".
+
+// A cross-training-led week ON PLAN (no unplanned load — the plan itself ramped), on a real base.
+// discProfiles are all MATURE but each individually below the old 1.3 gate: this is the exact
+// composition the old code could not see.
+const SPREAD_RAMP = {
+  raw: { status: 'on_target' as const, interpretation: 'Cross-training: 3 ride, 2 swim, 2 strength.', running_acwr: 0.9, actual_vs_planned_pct: null },
+  runLoadPct: null,
+  unplannedLoad: { count: 0, totalLoad: 0, plannedWeekLoad: 300 },
+  discProfiles: [
+    { discipline: 'ride', maturity: 'established', acwr: 1.28 },
+    { discipline: 'swim', maturity: 'established', acwr: 1.20 },
+    { discipline: 'strength', maturity: 'established', acwr: 1.12 },
+  ],
+  corroboratedStrain: false, // body absorbing it
+};
+
+Deno.test('Q-166 CORE: spread cross-training ramp @ ACWR 1.45, body absorbing → productive, NOT "balanced"', () => {
+  const r = run({ ...SPREAD_RAMP, unweightedAcwr: 1.45 });
+  assertEquals(r.status, 'productive');
+  assertStringIncludes(r.interpretation, 'absorbing');
+});
+
+Deno.test('Q-166 STEEP: same athlete @ ACWR 1.64 → elevated ("handling it"), never green productive', () => {
+  // COROS calls >1.5 excessive even when absorbed — name the steep ramp, do not paint it green,
+  // and do not cry "pull back" (no corroborated strain).
+  const r = run({ ...SPREAD_RAMP, unweightedAcwr: 1.64 });
+  assertEquals(r.status, 'elevated');
+  assertStringIncludes(r.interpretation, 'steep ramp');
+});
+
+Deno.test('Q-166 STRAIN: same ramp @ ACWR 1.45 but the body IS declining → high (pull back survives)', () => {
+  const r = run({
+    ...SPREAD_RAMP,
+    unweightedAcwr: 1.45,
+    bodyTrends: DECLINING_TRENDS,
+    readiness: 'normal',
+    corroboratedStrain: true,
+  });
+  assertEquals(r.status, 'high');
+});
+
+Deno.test('Q-166 NEG sweet-spot: ACWR 1.25 on a real base, body fine → on_target (no manufactured elevation)', () => {
+  assertEquals(run({ ...SPREAD_RAMP, unweightedAcwr: 1.25 }).status, 'on_target');
+});
+
+Deno.test('Q-166 NEG thin base: spike on an empty base → under (never "productive")', () => {
+  // Production nulls the ACWR on a thin chronic base; belt-and-braces, a non-null ratio carrying
+  // spikeOnEmptyBase must still refuse to read as a real elevation.
+  const r = run({ ...SPREAD_RAMP, unweightedAcwr: 1.9, spikeOnEmptyBase: true, raw: { ...SPREAD_RAMP.raw, status: 'high' } });
+  assertEquals(r.status, 'under');
+});
+
+Deno.test('Q-166 BUILD: build-week ramp @ ACWR 1.45, absorbing → productive (Gate 2 softens, but no longer HIDES)', () => {
+  // Gate 2 pulls a build-week elevation back to the band the ACWR earns — correct, it must not say
+  // "back off" in a build week. But the elevation is still REAL, so it must land 'productive', not
+  // "balanced": softening the alarm is not the same as denying the load.
+  const r = run({ ...SPREAD_RAMP, unweightedAcwr: 1.45, planPosition: { weekIntent: 'build' } });
+  assertEquals(r.status, 'productive');
+});
+
+Deno.test('Q-166 STRENGTH-PRIMARY: strength on plan + cross-training ramp @ 1.45 → productive, not "balanced"', () => {
+  const adh = computePrimaryAdherence({ planPrimary: 'strength', strengthSessionsCompleted: 4, strengthFrequency: 4, e1rmDirection: 'gaining', dayIndex: 6 });
+  const r = run({
+    ...SPREAD_RAMP,
+    raw: { ...SPREAD_RAMP.raw, status: 'under', interpretation: 'Running load 100% below plan. Cross-training: 4 strength, 3 ride.' },
+    unweightedAcwr: 1.45,
+    runLoadPct: -100,
+    planPosition: { weekIntent: 'unknown', planPrimary: 'strength', primaryAdherence: adh },
+  });
+  assertEquals(r.status, 'productive');
+});
+
+Deno.test('Q-166 RUNNER: over-running @ ACWR 1.6 + declining body → high (endurance path unchanged)', () => {
+  const r = run({
+    raw: { status: 'high', interpretation: 'running load ramping quickly', running_acwr: 1.6 },
+    bodyTrends: DECLINING_TRENDS,
+    readiness: 'normal',
+    unweightedAcwr: 1.6,
+    runLoadPct: 60,
+    corroboratedStrain: true,
+  });
+  assertEquals(r.status, 'high');
+});
+
+// The invariant, swept: on a REAL base, with the body absorbing, an ACWR above the ramp line is
+// NEVER reported as "balanced" (on_target) — whatever the composition or plan.
+Deno.test('Q-166 INVARIANT: real base + absorbing + ACWR > 1.3 ⇒ never on_target (matrix sweep)', () => {
+  for (const acwr of [1.31, 1.4, 1.45, 1.5, 1.51, 1.7, 2.0]) {
+    for (const weekIntent of ['unknown', 'build', 'baseline', 'recovery', 'taper']) {
+      for (const planPrimary of ['unknown', 'endurance', 'strength', 'hybrid'] as const) {
+        const r = run({ ...SPREAD_RAMP, unweightedAcwr: acwr, planPosition: { weekIntent, planPrimary } });
+        if (r.status === 'on_target' || r.status === 'under') {
+          throw new Error(`hidden elevation: ACWR ${acwr} / ${weekIntent} / ${planPrimary} → ${r.status}`);
+        }
+      }
+    }
+  }
+});
+
+Deno.test('Q-166 NEG thin base × easy week: the spike-downgrade skips easy weeks — must NOT read "productive"', () => {
+  // The downgrade to 'under' deliberately does not fire on recovery/taper/deload weeks, so this is the
+  // one path where a thin-base spike can still reach the relabel. ACWR 1.4 (inside the band, so the
+  // steep-ramp branch is NOT what saves us) — the relabel must refuse the claim on the base alone.
+  const r = run({
+    ...SPREAD_RAMP,
+    unweightedAcwr: 1.4,
+    spikeOnEmptyBase: true,
+    planPosition: { weekIntent: 'recovery' },
+    raw: { ...SPREAD_RAMP.raw, status: 'elevated' },
+  });
+  if (r.status === 'productive') throw new Error('thin-base spike must never read productive');
+  assertEquals(r.status, 'elevated');
+});
+
+Deno.test('Q-166 NEG no ratio: elevated with a NULL ACWR + body fine → never "productive (ACWR n/a)"', () => {
+  // 'productive' claims BOTH "genuinely elevated" AND "absorbing it". With no trusted ratio (the caller
+  // nulls the ACWR on a thin chronic base) the first claim is unsupported — this athlete would have been
+  // told they were absorbing an elevation nobody could measure. running_acwr 1.2 keeps the detrained
+  // softener off, so the relabel is what has to refuse it. Falls back to the two-key behavior.
+  const r = run({
+    ...SPREAD_RAMP,
+    unweightedAcwr: null,
+    raw: { ...SPREAD_RAMP.raw, status: 'elevated', running_acwr: 1.2 },
+  });
+  assertEquals(r.status, 'elevated'); // NOT 'productive'
+  if (r.interpretation.includes('n/a')) throw new Error('must not print an "ACWR n/a" elevation claim');
 });
