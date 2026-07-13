@@ -35,6 +35,7 @@ import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveRunEasyHrBand, isEasyHr } from '../_shared/easy-hr.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -2544,10 +2545,57 @@ Deno.serve(async (req) => {
           return `${m}:${String(r).padStart(2, '0')}/mi`;
         };
 
-        // Baseline easy/base comparison (what this means *for you*, not just the plan).
+        // ── D-288 — AN EASY RUN IS JUDGED ON HEART RATE, NOT PACE. ─────────────────────────────────────
+        //
+        // This block used to compare the easy portion's PACE to the baseline easy pace with a **±10 sec/mi**
+        // tolerance, and say "Easy portion was 1:06/mi SLOWER than your baseline base pace."
+        //
+        // That is the wrong axis, and the tolerance is not real. On an easy run, pace is the OUTPUT — heat,
+        // hills, wind, traffic, sleep and tired legs all change the cost of the same pace. The athlete who
+        // correctly slows down in 78°F to hold Zone 2 was being told he ran a minute per mile slow. He
+        // executed PERFECTLY. The app had his HR (138), his band (106-134) and the temperature — computed all
+        // three, and then judged him on a fourth.
+        //
+        // THE FIELD (researched 2026-07-13):
+        //  · Coaching standard is unambiguous: easy runs are EFFORT sessions, graded on HR/effort, not pace.
+        //  · GARMIN ships a first-class structured-workout setting: **"Heart rate for slow steps, otherwise
+        //    speed"** — i.e. exactly this split. Its guidance: pace/power for short hard efforts; heart rate
+        //    for recovery control and steady endurance.
+        //  · TRAININGPEAKS does not grade pace at all — compliance is duration / distance / TSS.
+        //  · And the tolerance was absurd: TP's "completed as prescribed" band is **±20%**. ±10 sec/mi on an
+        //    11:08 easy pace is **±1.5%** — 13x stricter, on the metric the field says not to use.
+        //
+        // SO: steady_state (easy / long / recovery) is judged on the HR BAND. Pace becomes a RECEIPT, not a
+        // verdict. Every other type (intervals / tempo / progressive / hills / fartlek) KEEPS the pace verdict
+        // — those sessions were GIVEN a pace target and asked to hit it. Judge what the athlete was trying to do.
+        const isSteadyEasyRun = String(classifiedHrWorkoutType) === 'steady_state';
+        const easyHrBand = resolveRunEasyHrBand(learnedFitness, (baselines as any)?.threshold_heart_rate);
+        const runAvgHr = Number((hrAnalysisResult as any)?.summary?.avgHr);
+        const ranHot = (hrAnalysisResult as any)?.drift?.weather?.factor === 'hot';
+        const hrJudgeable = isSteadyEasyRun
+          && easyHrBand.ceiling != null
+          && Number.isFinite(runAvgHr) && runAvgHr > 0;
+
         const baseActual = Number(seg?.baseActualSecPerMi);
         const baseBaseline = Number(baselinePacesSecPerMi.base);
-        if (seg?.hasFinishSegment && Number.isFinite(baseActual) && baseActual > 0 && Number.isFinite(baseBaseline) && baseBaseline > 0) {
+        const paceReceipt = Number.isFinite(baseActual) && baseActual > 0 ? ` (${fmtPace(baseActual)})` : '';
+
+        if (hrJudgeable) {
+          const ceiling = easyHrBand.ceiling as number;
+          const hr = Math.round(runAvgHr);
+          if (isEasyHr(runAvgHr, easyHrBand) === true) {
+            bullets.push(`Held your easy band — ${hr} bpm, at or under your ${ceiling} bpm ceiling${paceReceipt}.`);
+          } else if (runAvgHr > ceiling) {
+            const over = Math.round(runAvgHr - ceiling);
+            bullets.push(
+              `Ran ${over} bpm over your easy ceiling (${hr} vs ${ceiling} bpm)`
+              + (ranHot ? ' — heat will do that' : '')
+              + `${paceReceipt}.`,
+            );
+          }
+          // Below the FLOOR (a walk / stopped strap) is not a verdict worth speaking. Silence.
+        } else if (seg?.hasFinishSegment && Number.isFinite(baseActual) && baseActual > 0 && Number.isFinite(baseBaseline) && baseBaseline > 0) {
+          // NOT a steady easy run -> it had a PACE target. Judge it on pace, as before.
           const d = baseActual - baseBaseline;
           const abs = Math.abs(d);
           if (abs <= 10) {
