@@ -203,7 +203,14 @@ const GLUTE_ROTATION: StrengthExercise[] = [
 // out of the string and silently became **40 SECONDS**. A unit pun that happened to produce a
 // plausible number. Nobody designed it.
 //
-// It is now `40` — forty seconds, explicitly, on the existing convention. Same behaviour, honest name.
+// It is now `'40s'` — forty SECONDS, with the unit spelled out.
+//
+// ⚠️ WHY `'40s'` AND NOT `40`. The first fix WAS a bare `40`, and the Q-126 golden caught it: the
+// session description renders `${sets}×${reps} @ ${weight}`, so a bare 40 printed as
+// "Farmers Carry 3×40 @ Heavy" — WHICH READS AS FORTY REPS. The old '40 m' was wrong about the unit
+// but at least HAD one; the bare number was wrong AND silent. `'40s'` is right on both: it prints
+// "3×40s @ Heavy", and it still parses to 40 (parseInt) for the logger's duration_seconds, exactly as
+// the '40 m' string did. THE ATHLETE-FACING COPY IS PART OF THE FIX, NOT AN AFTERTHOUGHT.
 //
 // ⚠️ KNOWN GAP (filed, deliberately NOT built): SLED and SANDBAG work is distance-native, and the app
 // still cannot record a distance. Those stations are only reachable with commercial-gym equipment; for
@@ -213,7 +220,7 @@ const GLUTE_ROTATION: StrengthExercise[] = [
 // that is a PROGRAM, not a +1 accessory (Q-103). Do not bolt a half one on here.
 const HYROX_ROTATION: StrengthExercise[] = [
   { name: 'Sled Push', sets: 3, reps: '20 m', weight: 'Heavy' },        // gym-only; substituted otherwise
-  { name: 'Farmers Carry', sets: 3, reps: 40, weight: 'Heavy' },        // 40 SECONDS (duration convention)
+  { name: 'Farmers Carry', sets: 3, reps: '40s', weight: 'Heavy' },     // 40 SECONDS — the unit is EXPLICIT
   { name: 'Sandbag Lunge', sets: 3, reps: '20 m', weight: 'Moderate' }, // gym-only; substituted otherwise
   { name: 'Sled Pull', sets: 3, reps: '20 m', weight: 'Heavy' },        // gym-only; substituted otherwise
   { name: 'Back Extension', sets: 3, reps: '15', weight: 'Bodyweight' },
@@ -238,10 +245,17 @@ function biasMicrocopy(preset: 'glute' | 'hyrox', sport: 'run' | 'bike' | null):
 // single-type per session; a true mixed row needs new code, the flagged balloon). One per work week, on a
 // run-only mid-week day (not heavy-Lower, not the long run). Station is equipment-substituted at materialize
 // via substituteExerciseForEquipment (home gym → DB/barbell). Skipped on deload + retest (kept byte-identical).
+// Q-180 — THE SECOND COPY. The carry is defined HERE as well as in HYROX_ROTATION, and the first pass
+// at this fix only changed the other one. The Q-126 golden caught it: 55 sessions, 3 differed, and two
+// of them were this station still emitting '40 m'. **Two definitions of one exercise is the doubled
+// disease in miniature — if you change one, grep for the other.**
+// Same rule as HYROX_ROTATION: a carry is DURATION work, and `reps` on a duration exercise IS SECONDS.
+// The unit is explicit ('40s') so the session description reads "4×40s @ Heavy" and not "4×40" (which
+// would read as forty REPS). Sled/sandbag stay distance-native and gym-only — see the note above.
 const FATIGUED_LEGS_STATION: StrengthExercise[] = [
-  { name: 'Sled Push', sets: 4, reps: '25 m', weight: 'Heavy' },
-  { name: 'Sandbag Lunge', sets: 4, reps: '20 m', weight: 'Moderate' },
-  { name: 'Farmers Carry', sets: 4, reps: '40 m', weight: 'Heavy' },
+  { name: 'Sled Push', sets: 4, reps: '25 m', weight: 'Heavy' },        // gym-only; substituted otherwise
+  { name: 'Sandbag Lunge', sets: 4, reps: '20 m', weight: 'Moderate' }, // gym-only; substituted otherwise
+  { name: 'Farmers Carry', sets: 4, reps: '40s', weight: 'Heavy' },     // 40 SECONDS — the unit is EXPLICIT
 ];
 function fatiguedLegsStation(week: number): StrengthExercise {
   return { ...FATIGUED_LEGS_STATION[(week - 1) % FATIGUED_LEGS_STATION.length] };

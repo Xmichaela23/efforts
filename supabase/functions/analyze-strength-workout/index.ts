@@ -9,7 +9,7 @@ import { arcModeSystemAddon, arcNarrativeFactBlock } from '../_shared/arc-narrat
 import { buildReasoningScaffold, validateNarrative, strengthAdapter, applyGroundingContext, spineVerdictFor } from '../_shared/narrative-core/index.ts';
 import { detectNovelMovements, novelMovementsNames, novelMovementNames } from '../_shared/novel-movements.ts';
 // D-208: role classifier — execution scoring weights a skipped accessory less than a main lift.
-import { roleForExercise, ROLE_WEIGHT } from '../_shared/strength/exercise-role.ts';
+import { roleForExercise, ROLE_WEIGHT } from '../../../src/lib/exercise-role.ts';
 import { isPerformedStrengthSet } from '../_shared/strength/performed-set.ts';
 import { matchExercises } from '../_shared/strength/match-exercises.ts';
 import { buildSubstitutionNote } from '../_shared/strength/substitution-note.ts';

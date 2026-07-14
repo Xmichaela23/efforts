@@ -16,7 +16,7 @@ import {
   resolveStrengthEquipmentTypeForPlan,
 } from '../_shared/strength-equipment-tier.ts';
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
-import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from '../_shared/strength/exercise-config.ts';
+import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from '../../../src/lib/exercise-config.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
 import {
   swimDrillDisplayName,

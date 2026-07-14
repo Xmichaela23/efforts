@@ -20,7 +20,7 @@
  * "Your quads will suffer" is an invention — the Tier-2 trap SPEC-posture-flag.md §4 documents, and the
  * app has no model for it. Do not extend this sentence into a consequence claim.
  */
-import { getExerciseConfig } from './exercise-config.ts';
+import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 
 /** Plain-English name for a movement-pattern slot. Used only to say WHAT changed, never why it matters. */
 const PATTERN_WORD: Record<string, string> = {

@@ -2,7 +2,7 @@
 // (heavy sub-max triple → estimate e1RM, no solo max-grind). Off the entered 1RM, no inflation.
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { buildArcPhases, composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
-import { roleForExercise } from '../../_shared/strength/exercise-role.ts';
+import { roleForExercise } from '../../../../src/lib/exercise-role.ts';
 
 const PLAN = composeStrengthPrimaryPlan({
   durationWeeks: 12, strengthFrequency: 4, tier: 'barbell', enduranceSport: 'run', enduranceFrequency: 2,

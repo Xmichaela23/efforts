@@ -67,7 +67,7 @@ for (const lane of ['power', 'build'] as const) {
 }
 
 Deno.test('strength-focus-split (build): names all resolve in exercise-role.ts vocabulary', async () => {
-  const { roleForExercise } = await import('../_shared/strength/exercise-role.ts');
+  const { roleForExercise } = await import('../../../src/lib/exercise-role.ts');
   const names = getProtocol('strength_focus_build')
     .createWeekSessions(ctx(4))
     .flatMap(s => s.exercises.map(e => e.name));
