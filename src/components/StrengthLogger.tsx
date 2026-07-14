@@ -3082,6 +3082,48 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
 
+    // Q-180: DURATION-BASED work does NOT use RIR. "Reps in reserve" is meaningless on an exercise
+    // with no reps — you cannot have 3 reps left in the tank on a 40-second carry. Done previously
+    // fell through to the D-203 auto-save below and stamped `rir: 3` onto a timed set, which is where
+    // the "0 reps (RIR 3)" row came from. (Michael, on device: "a 40 second timer and a done button
+    // with triggered RIR, which it shouldn't.")
+    //
+    // Same shape as the two skips above (mobility, AMRAP/rep-max) — a set type whose measurement is
+    // not reps does not get asked for reps-in-reserve. AND we persist the duration on Done, so the
+    // work is actually recorded rather than just flagged.
+    if (isDurationBasedExercise(exercise.name)) {
+      // Persist a duration DEFENSIVELY. Both set-creation paths are supposed to stamp
+      // duration_seconds from the prescription — and yet the live Jul-13 carry saved with NO
+      // duration at all (the row rendered "0 reps (RIR 3)"; the compare table's formatter DOES
+      // print a duration when one is present, so its absence is proof the field was missing).
+      // I could not close that gap from code alone, so Done no longer ASSUMES the set carries a
+      // duration: if it doesn't, we recover the prescribed one. A duration set that completes with
+      // no duration is work the athlete did and the app threw away.
+      // `LoggedExercise` carries the prescription in `target_reps` (a string, display-only) — it has
+      // NO `reps` field. For a duration exercise the app's long-standing convention is that the
+      // prescribed rep number IS SECONDS ("Planks 3×60" → 60s), so target_reps is the duration.
+      const prescribed = (() => {
+        const raw = exercise.target_reps;
+        if (typeof raw === 'string') {
+          const m = raw.match(/^(\d+)/);
+          if (m) {
+            const n = parseInt(m[1], 10);
+            if (n > 0) return n;
+          }
+        }
+        return undefined;
+      })();
+      const durationToRecord = (typeof set.duration_seconds === 'number' && set.duration_seconds > 0)
+        ? set.duration_seconds
+        : prescribed;
+      updateSet(exerciseId, setIndex, {
+        completed: true,
+        ...(durationToRecord ? { duration_seconds: durationToRecord } : {}),
+      });
+      autoStartRestForSet(exerciseId, setIndex);
+      return;
+    }
+
     // Done SAVES immediately with the suggested RIR (default) + starts rest — friction-free, no forced
     // "hit the number" step (supersedes D-134's blocking confirm). For WORKING sets, surface a small
     // NON-BLOCKING adjust strip so the athlete can tap a different number ONLY if it actually felt
