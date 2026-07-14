@@ -89,6 +89,7 @@ Full detail + file:line in **`CAPABILITY-MAP.md`** (FACTS table) and **`LIFECYCL
 | Doc | Trust | |
 |---|---|---|
 | **`START-HERE.md`** (this) | — | the front door |
+| **`GAME-PLAN.md`** | ✅ | **the sequence.** Dependency-ordered. What to actually do, in what order, and why. |
 | **`LIFECYCLE.md`** | ✅ | **the loop.** Frozen vs live. Read before wiring. |
 | **`CAPABILITY-MAP.md`** | ✅ rebuilt 2026-07-13 | **does X exist + where.** The anti-rebuild index. |
 | `ENGINE-STATE.md` | ✅ | current state. The only doc that retracts its own claims in place. |
