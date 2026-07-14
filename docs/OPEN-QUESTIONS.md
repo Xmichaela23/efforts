@@ -592,7 +592,14 @@ per_discipline_posture  in  supabase/functions/coach/index.ts         -> 0 occur
 ### It is worse than posture-blind — the number is also STALE
 The 7.8% decoupling driving "needs work" is **`as of Jun 27`** — **16 days old** on the day it was read. Because the durability substrate only accepts **steady** runs and drops `decoupling_basis === 'raw'` (terrain), and the athlete (a) barely runs during a strength block and (b) runs rolling terrain when he does. **So the app is scolding him about a discipline he deliberately parked, on a two-week-old reading, in the middle of the strength block he planned.**
 
-> ⚠️ **Suspected, NOT verified:** that the terrain/raw-basis filter is what is starving the run durability trend. The Jul 13 run was *"Rolling (167 ft gain)"* and did not refresh the reading. **If most of an athlete's runs are on rolling terrain, their durability trend may almost never update.** Worth a query, not a screenshot. Do not act on this until it is proven.
+> ### ⛔ CORRECTION (same session): my first theory was WRONG, and the real finding is better.
+> **I guessed the terrain/raw-basis filter was starving the trend. It is not — I had it backwards.** `gap.ts:195-204`: `basis = 'raw'` means **NO USABLE ELEVATION** (treadmill, or a device that didn't record it). **Rolling terrain HAS elevation → `basis = 'gap'` → the run is KEPT.** The Jul 13 run passes every gate: `isSteadyAerobic('easy run')` ✅ (`run.ts:148` drops only interval/tempo/fartlek/threshold/vo2/speed/track/race/surge), 48 min ≥ 20 ✅, elevation present ✅.
+>
+> **✅ WHAT IS VERIFIED — A STRUCTURAL ONE-WORKOUT LAG.** The spine reads a run's decoupling from `workouts.workout_analysis` (`compute-snapshot:689`). But `workout_analysis` is written by **`analyze-running-workout`**, which `ingest-activity` fires **fire-and-forget at `:1624`** — *after* it **awaits `compute-facts` at `:1581`*, and `compute-facts:1844` is what **fires `compute-snapshot`**.
+> **So on every ingest, `compute-snapshot` reads the analysis of the run that has just landed — before that analysis has been written.** The newest run's decoupling is silently absent from the series, and only enters on a LATER snapshot pass (the next time any workout is ingested).
+> **The run durability trend is therefore ALWAYS AT LEAST ONE WORKOUT BEHIND, by construction.** This is the SAME disease as the `compute-facts`-reads-`computed` race already filed: **the fan-out awaits the wrong things.**
+>
+> ⚠️ **STILL UNEXPLAINED, and I am not going to guess:** a one-workout lag does not explain **16 days**. Many workouts have been ingested since Jun 27. **Something else is also suppressing his recent runs from the decoupling series. This needs a DB query, not another theory.**
 
 ### This is the SAME shape as Garmin calling him "Unproductive"
 `PRODUCT-POSITIONING-v2-DRAFT.md` opens on exactly this: *"Garmin tells a lifting, swimming athlete running in summer heat that he is Unproductive. It cannot see the lifting, cannot see the swimming... and it never asked what you wanted."*
