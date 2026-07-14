@@ -24,11 +24,15 @@ import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 
 /** Plain-English name for a movement-pattern slot. Used only to say WHAT changed, never why it matters. */
 const PATTERN_WORD: Record<string, string> = {
-  squat: 'knee-dominant',
-  deadlift: 'hip-dominant',
-  hipThrust: 'hip-dominant',
-  bench: 'horizontal push',
-  overhead: 'vertical push',
+  knee_dominant: 'knee-dominant',
+  hip_dominant: 'hip-dominant',
+  horizontal_push: 'horizontal pushing',
+  horizontal_pull: 'horizontal pulling',
+  vertical_push: 'vertical pushing',
+  vertical_pull: 'vertical pulling',
+  core: 'core work',
+  plyometric: 'plyometric work',
+  calf: 'calf work',
 };
 
 export interface SubstitutionNote {
@@ -46,8 +50,11 @@ export function buildSubstitutionNote(plannedName: string, executedName: string)
 
   const pCfg = getExerciseConfig(planned);
   const eCfg = getExerciseConfig(executed);
-  const pRef = pCfg?.primaryRef ?? null;
-  const eRef = eCfg?.primaryRef ?? null;
+  // Q-181: PATTERN, not primaryRef. primaryRef is a LOADING reference — Barbell Row is primaryRef
+  // 'bench', so this used to read a ROW and a BENCH PRESS as the SAME SLOT and stay SILENT on swapping
+  // a pull for a push. See MovementPattern in exercise-config.ts.
+  const pRef = pCfg?.pattern ?? null;
+  const eRef = eCfg?.pattern ?? null;
 
   // ⛔ NEVER GRADE — OR NARRATE — WHAT YOU CANNOT ANCHOR. If either exercise is not in the config, we do
   // not know its pattern. Say nothing rather than guess. (Law 2; the same rule as Q-180.)

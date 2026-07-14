@@ -10,9 +10,23 @@
  * movement". Fitbod auto-substitutes same-muscle at equivalent intensity. RP Hypertrophy swaps
  * mid-cycle from a library. The consensus on a GOOD substitute: MATCH THE MOVEMENT PATTERN.
  *
- * ⛔ NO NEW TAXONOMY. `primaryRef` in `exercise-config.ts` IS the movement-pattern slot — ~135
- * research-cited entries (NSCA, Schoenfeld, Helms, Contreras), already driving every accessory's load.
- * We filter on it. We do not invent a second one.
+ * ⛔ FILTER ON `pattern`, NOT `primaryRef`. I had this WRONG and it shipped: `primaryRef` is a LOADING
+ * reference ("which 1RM do I derive the weight from"), and a Barbell Row is `primaryRef: 'bench'`
+ * because a row loads at ~80% of your bench. The config's own section header says so — "UPPER PULL
+ * (Bench Reference AS PROXY)". Filtering on it OFFERED A BENCH PRESS AS A SUBSTITUTE FOR A ROW: a push
+ * for a pull, the opposite muscle group. And every bodyweight movement (pull-ups — THE most-substituted
+ * exercise in the gym — push-ups, planks) had `primaryRef: null` and so got no options at all.
+ *
+ * `pattern` (MovementPattern in exercise-config.ts) is the real slot. It was NOT invented: it is
+ * transcribed from that file's own section headers, which have carried the taxonomy as comments all
+ * along.
+ *
+ * ⛔ AND WE DO NOT FILTER ON ROLE. Two reasons. (1) THE FIELD DOESN'T: Trainerize's filters are "Same
+ * muscle group / Same Equipment / Same movement"; Fitbod matches "same muscles at equivalent
+ * intensity". Neither filters on load tier — that was MY judgment, not the field's. (2) `roleForExercise`
+ * is too noisy to filter on anyway: `barbell row` is 'primary' while `bent over row` is 'accessory' —
+ * THE SAME MOVEMENT. Filtering on it produced EMPTY lists. (That inconsistency is a real data bug in
+ * exercise-role.ts; it is filed, not papered over here.)
  *
  * ⚠️ THERE IS A DEAD SECOND TAXONOMY IN THE REPO — `src/services/ExerciseLibrary.ts` (primaryMuscles,
  * equipment, categories). Its header claims it is "Used by PlanEngine, ManualPlanBuilder, and Logging
@@ -29,7 +43,6 @@
  * and skip it, but they cannot pick something the app never showed them.
  */
 import { EXERCISE_CONFIG, getExerciseConfig, type ExerciseConfig } from './exercise-config.ts';
-import { roleForExercise } from './exercise-role.ts';
 
 export interface AlternativeOption {
   /** The exercise name, title-cased for display. */
@@ -80,24 +93,22 @@ export function getInSlotAlternatives(
   equipment?: string[] | null,
 ): AlternativeOption[] {
   const cfg = getExerciseConfig(plannedName);
-  if (!cfg || !cfg.primaryRef) return [];
+  // Q-181: filter on PATTERN, not primaryRef. primaryRef is a LOADING reference — a Barbell Row is
+  // primaryRef 'bench' ("a row loads at ~80% of your bench"), so filtering on it offered a BENCH PRESS
+  // as a substitute for a ROW. A push for a pull. See MovementPattern in exercise-config.ts.
+  if (!cfg || !cfg.pattern) return [];
 
   // Normalize with punctuation → SPACE (not deletion), or 'step-ups' becomes 'stepups' and fails to
   // dedupe against 'step ups'.
   const norm = (n: string) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 
-  const plannedRole = roleForExercise(plannedName);
-  const seen = new Set<string>([norm(plannedName)]);
+  const selfNorm = norm(plannedName);
+  const selfTight = selfNorm.replace(/ /g, '');
+  const seen = new Set<string>([selfNorm, selfTight.endsWith('s') ? selfTight.slice(0, -1) : selfTight]);
   const out: AlternativeOption[] = [];
 
   for (const [key, c] of Object.entries(EXERCISE_CONFIG)) {
-    if (c.primaryRef !== cfg.primaryRef) continue;          // different slot → not a substitute
-
-    // SAME ROLE TIER. Without this, an accessory (Bulgarian Split Squat) was offered the PRIMARY
-    // compound (Squat / Back Squat) as a "substitute" — a 3×8 accessory swapped for the main lift is
-    // not a substitution, it is a different session. The field constrains substitutes to the same
-    // slot AND the same job. (roleForExercise / ROLE_WEIGHT, D-208.)
-    if (roleForExercise(key) !== plannedRole) continue;
+    if (c.pattern !== cfg.pattern) continue;                // different movement pattern → not a substitute
 
     // The config carries plural ALIASES as separate keys ('reverse lunge' AND 'reverse lunges',
     // 'step up' / 'step ups' / 'step-ups'). Offering the same movement three times is noise.
@@ -109,11 +120,25 @@ export function getInSlotAlternatives(
     // Dedupe on the SINGULARIZED normalized form too. The exact-alias rule above misses hyphenated
     // plurals: 'step-ups' → slice off the 's' → 'step-up', which is NOT a config key, so it survives —
     // and then normalizes to 'step ups', which does not equal the already-seen 'step up'.
+    // Collapse every alias form to ONE option. The config carries 'pull-up' / 'pull-ups' / 'pullup' /
+    // 'pullups' as four separate keys; offering the same movement four times is noise. Dedupe on the
+    // normalized form with spaces removed AND singularized, so all four collapse to 'pullup'.
     const k = norm(key);
-    const kSingular = k.endsWith('s') ? k.slice(0, -1) : k;
-    if (seen.has(k) || seen.has(kSingular)) continue;
+    const kTight = k.replace(/ /g, '');
+    const kKey = kTight.endsWith('s') ? kTight.slice(0, -1) : kTight;
+    // Plus: two keys with a BYTE-IDENTICAL config are the same exercise ('dumbbell bench press' /
+    // 'db bench press'). Exact, not a guess.
+    const cfgKey = JSON.stringify(c);
+    if (seen.has(k) || seen.has(kKey) || seen.has(cfgKey)) continue;
     seen.add(k);
-    seen.add(kSingular);
+    seen.add(kKey);
+    seen.add(cfgKey);
+
+    // ⚠️ KNOWN COSMETIC GAP: pure SHORTHAND aliases survive ('Bench' next to 'Bench Press', 'Squat'
+    // next to 'Back Squat') because their configs differ only in `notes`. Every option shown is
+    // CORRECT — they resolve to the same exercise — it is just a slightly noisy list. Every cleverer
+    // rule I tried broke something real ('squat' is a substring of 'front squat', which is NOT an
+    // alias of it), so I stopped rather than invent one.
 
     const need = equipmentOf(c);
     if (!canDo(equipment, need)) continue;                   // they cannot load it

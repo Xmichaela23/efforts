@@ -18,23 +18,43 @@ Deno.test('THE MICHAEL CASE: a Bulgarian Split Squat offers KNEE-DOMINANT altern
   assertEquals(alts.includes('hip thrust'), false);
   assertEquals(alts.includes('romanian deadlift'), false);
 
-  // ⛔ SAME SLOT, DIFFERENT ROLE. The main lift is not a substitute for an accessory variant — a 3×8
-  // Bulgarian split squat swapped for a Back Squat is not a substitution, it is a different session.
-  // (Squat / Back Squat / Front Squat / Leg Press / Goblet Squat all classify as 'primary';
-  // Bulgarian Split Squat is 'secondary'.)
-  assertEquals(alts.includes('squat'), false);
-  assertEquals(alts.includes('back squat'), false);
-  assertEquals(alts.includes('front squat'), false);
-  assertEquals(alts.includes('leg press'), false);
-
   // never itself
   assertEquals(alts.includes('bulgarian split squat'), false);
 });
 
-Deno.test('a hip-dominant lift offers hip-dominant alternatives (same slot AND same role)', () => {
-  const alts = names(getInSlotAlternatives('Romanian Deadlift', FULL_GYM)); // 'deadlift' slot, 'primary'
+Deno.test('a hip-dominant lift offers hip-dominant alternatives', () => {
+  const alts = names(getInSlotAlternatives('Romanian Deadlift', FULL_GYM));
   assertEquals(alts.includes('hip thrust'), true);
-  assertEquals(alts.includes('bulgarian split squat'), false); // knee-dominant → different slot
+  assertEquals(alts.includes('bulgarian split squat'), false); // knee-dominant → different pattern
+});
+
+// ═══ THE BUG THAT SHIPPED, AND ITS FIXTURE. `primaryRef` is a LOADING reference, not a pattern —
+// Barbell Row is primaryRef 'bench' ("a row loads at ~80% of your bench"). Filtering on it offered a
+// BENCH PRESS as a substitute for a ROW. A push for a pull. Never again. ═══════════════════════════
+
+Deno.test('⛔ A ROW NEVER OFFERS A BENCH PRESS (the primaryRef bug — a push is not a pull)', () => {
+  const alts = names(getInSlotAlternatives('Barbell Row', FULL_GYM));
+  assertEquals(alts.includes('bench press'), false);
+  assertEquals(alts.includes('dumbbell bench press'), false);
+  assertEquals(alts.includes('chest fly'), false);
+  // it offers actual PULLS:
+  assertEquals(alts.includes('dumbbell row'), true);
+  assertEquals(alts.includes('inverted row'), true);
+});
+
+Deno.test('PULL-UPS get alternatives — the most-substituted exercise in the gym had ZERO before', () => {
+  // primaryRef is null for every bodyweight movement, so pull-ups used to offer nothing at all.
+  const alts = names(getInSlotAlternatives('Pull-up', FULL_GYM));
+  assertEquals(alts.includes('chin-up'), true);
+  assertEquals(alts.includes('lat pulldown'), true);   // the field's #1 pull-up substitute
+  assertEquals(alts.includes('bench press'), false);   // still not a push
+});
+
+Deno.test('a bench press offers horizontal PUSHES, including bodyweight ones', () => {
+  const alts = names(getInSlotAlternatives('Bench Press', FULL_GYM));
+  assertEquals(alts.includes('push-up'), true);        // bodyweight, same pattern
+  assertEquals(alts.includes('barbell row'), false);   // a pull is not a push
+  assertEquals(alts.includes('overhead press'), false); // vertical, not horizontal
 });
 
 Deno.test('EQUIPMENT filters what the athlete cannot load', () => {
@@ -52,13 +72,18 @@ Deno.test('a commercial gym unlocks everything', () => {
   assertEquals(gym.length > home.length, true);
 });
 
-Deno.test('⛔ NEVER GUESS A SLOT WE DO NOT KNOW: an unknown or pattern-less exercise offers NOTHING', () => {
-  // Not in the config at all → we do not know its slot.
+Deno.test('⛔ NEVER GUESS A SLOT WE DO NOT KNOW: an exercise not in the config offers NOTHING', () => {
+  // We do not know its pattern → we do not guess. The athlete can still use the free-library search;
+  // the app simply refuses to pretend it knows what a valid substitute is.
   assertEquals(getInSlotAlternatives('Some Exercise We Invented', FULL_GYM).length, 0);
-  // In the config, but primaryRef: null (bodyweight) → no pattern to match on.
-  assertEquals(getInSlotAlternatives('Plank', FULL_GYM).length, 0);
-  // The athlete can still use the free-library search. The app simply refuses to pretend it knows
-  // what a valid substitute is.
+});
+
+Deno.test('BODYWEIGHT work now has a pattern, and therefore alternatives (primaryRef gave it none)', () => {
+  // A plank is primaryRef:null — under the old filter it offered NOTHING. It has a pattern: core.
+  const core = names(getInSlotAlternatives('Plank', FULL_GYM));
+  assertEquals(core.length > 0, true);
+  assertEquals(core.includes('side plank'), true);
+  assertEquals(core.includes('bench press'), false); // still never crosses patterns
 });
 
 Deno.test('canDo: bodyweight is always available; unknown is OFFERED, not hidden', () => {

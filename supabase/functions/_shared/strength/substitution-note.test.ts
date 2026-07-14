@@ -32,22 +32,37 @@ Deno.test('different refs that MEAN the same thing stay silent (deadlift vs hipT
 });
 
 Deno.test('a REAL pattern change on the upper body fires', () => {
-  // Bench (horizontal push) → Overhead Press (vertical push).
   const n = buildSubstitutionNote('Bench Press', 'Overhead Press');
   assertEquals(n.same_pattern, false);
   assertEquals(
     n.note,
-    'Swapped Bench Press → Overhead Press. Vertical push instead of horizontal push — same session, different stimulus.',
+    'Swapped Bench Press → Overhead Press. Vertical pushing instead of horizontal pushing — same session, different stimulus.',
   );
 });
 
+// ═══ THE BUG THAT SHIPPED. `primaryRef` is a LOADING reference — Barbell Row is primaryRef 'bench'
+// ("a row loads at ~80% of your bench"). So a ROW and a BENCH PRESS read as the SAME SLOT, and the app
+// would have stayed SILENT on swapping a pull for a push. It now speaks. ═══════════════════════════
+
+Deno.test('⛔ ROW → BENCH PRESS is a PUSH FOR A PULL, and the app must SAY SO (the primaryRef bug)', () => {
+  const n = buildSubstitutionNote('Barbell Row', 'Bench Press');
+  assertEquals(n.same_pattern, false);   // was TRUE under primaryRef — both 'bench'
+  assertEquals(
+    n.note,
+    'Swapped Barbell Row → Bench Press. Horizontal pushing instead of horizontal pulling — same session, different stimulus.',
+  );
+});
+
+Deno.test('a pull-for-a-pull swap is SILENT (pull-up → chin-up, both vertical pulling)', () => {
+  const n = buildSubstitutionNote('Pull-up', 'Chin-up');
+  assertEquals(n.same_pattern, true);
+  assertEquals(n.note, null);
+});
+
 Deno.test('⛔ NEVER NARRATE WHAT YOU CANNOT ANCHOR: an exercise not in the config says NOTHING', () => {
-  // A bodyweight/unknown movement has no primaryRef. We do not know its pattern — so we do not guess.
+  // Not in the config → we do not know its pattern → we do not guess.
   const n = buildSubstitutionNote('Bulgarian Split Squat', 'Some Exercise We Have Never Heard Of');
   assertEquals(n.note, null);
-
-  const n2 = buildSubstitutionNote('Plank', 'Hip Thrust'); // plank has primaryRef null
-  assertEquals(n2.note, null);
 });
 
 Deno.test('the sentence NAMES the trade and never predicts its cost', () => {
