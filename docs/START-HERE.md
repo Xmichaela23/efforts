@@ -59,15 +59,23 @@ Every problem in this app is one of these three. **Name which one you're looking
 - **Fitness direction · the ACWR ratio · the 1RM anchor** — single source, all callers routed.
 - **Run easy pace** — one resolver, universal on the server, athlete override honoured.
 
-**Fractured — the live ones:**
-- 🔴 **Three Zone 2 ceilings** (128 / 134 / 136 at LTHR 151). The plan prescribes to 136; the analyzer grades that run out of Z2.
-- 🔴 **LTHR resolves 4 ways, 2 inverted, no resolver.** Type one in and half the app discards it. *It is the root of the run stack.*
-- 🔴 **The RPE trend is a within-week ordering artifact** — and it is the required leg for the safety floor.
+**Fractured — LIVE on the only real account:**
+- 🔴 **The verdict engine is POSTURE-BLIND (Q-179).** `per_discipline_posture` appears **ZERO times** in the spine and **ZERO times** in the coach. The plan copy says *"maintenance only (held so strength leads)"* while State says *"aerobic base needs work"* — same discipline, same week, same athlete. **This is THE continuity fracture, and the posture flag is its fix, not a banner.**
+- 🔴 **A skipped exercise counts as PERFORMED (Q-178).** `completed === true` outranks "zero reps". Live repro: zero Farmers Carries → `98% · Strong` → *"sets landed on target across all three lifts."* ⚠️ **The LLM wasn't lying — the fact packet was.** The guard validates prose against the facts, so **it cannot catch a lie already IN the facts.**
+- 🔴 **The Monday alarm (Q-177).** A partial-week SUM vs complete prior weeks → fires `concern` severity every Monday, forever. It measures *what day you looked*.
+- 🔴 **`adapt-plan` silently re-prices strength on every ingest** — skipping the fatigue gate the *suggest* path applies, while the path that **asks** you sits unmounted.
+- 🔴 **The RPE trend is a within-week ORDERING artifact** — and it is the required leg for the safety floor.
 - 🔴 **The ACWR band is bypassed 6×**; a taper week can read `elevated` and `optimal` in the same payload.
-- 🔴 **`adapt-plan` silently re-prices your strength weights on every ingest** — and skips the fatigue gate the *suggest* path applies. Meanwhile the path that **asks** you is unmounted.
-- 🟡 Two ingest paths never reach the spine · the load substrate is starved · a race in the fan-out drops facts silently.
+- 🟡 **The fan-out awaits the wrong things** — facts are dropped silently, and the run durability trend is **always one workout behind, by construction.**
 
-Full detail + file:line in **`CAPABILITY-MAP.md`** (FACTS table) and **`LIFECYCLE.md`**.
+**Fractured — LATENT. Dormant today, and they ALL fire on the first NEW user:**
+- **LTHR resolves 4 ways, 2 inverted, no resolver.** Bites an athlete who **types** one. *(Michael never has.)*
+- **Two divergent HR zone tables.** ⚠️ **The earlier "the plan says 136, the app grades you at 134, it's happening now" claim was FALSE and is RETRACTED.** Verified on device: the stored bins **match Baselines**. D-286 fixed three copies of the Friel seam — **there were five** — but both survivors are one condition away (a plan that prescribes HR; a user with no `configured_hr_zones`).
+- **The app INVENTS when it doesn't know** — a silent 135 lb squat, a silent 1:30/100 swim. **The frictionless path is the dangerous path.**
+
+Full detail in **`GAME-PLAN.md`** (the sequence), **`CAPABILITY-MAP.md`** (FACTS table), **`LIFECYCLE.md`**.
+
+> ⚠️ **METHOD, and it cost us twice on 2026-07-13:** a four-agent code audit found the architecture and **NONE of the three worst bugs above**. `pctChange(current, chronic)` reads as reasonable — until you notice it's Monday. **A code trace is right about what EXISTS and blind to what is BITING. A plausible mechanism found in code is a HYPOTHESIS, not a finding, until the data agrees.** Do both.
 
 ---
 
