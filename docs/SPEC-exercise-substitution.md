@@ -1,123 +1,160 @@
-# SPEC — Exercise substitution: a swap is not a skip
+# SPEC — Exercise substitution: the SLOT is the unit, not the exercise
 
-**Status:** SPEC (2026-07-13). Not built.
+**Status:** SPEC v2 (2026-07-14). Not built. **v1 (2026-07-13) was WRONG and is superseded — see §0.**
 **Laws:** 1 (one source), **2 (measured ≠ inferred)**, 4 (surfaces render, never re-decide).
-**Voice:** `PRODUCT-POSITIONING-v2-DRAFT.md` — **a trade made visible, not a compliance cop.** Same thesis as `SPEC-posture-flag.md`, applied to a single exercise.
-**Sign-off gated:** this changes prescription-adherence semantics (`POLISH-PUNCH-LIST` §1: *"any change to prescribed load / RIR… held for user sign-off"*).
+**Grounding:** field-standard mechanic (see §2), not invented. **`primaryRef` + `roleForExercise` already exist — this uses them.**
+**Sign-off gated:** changes prescription-adherence semantics (`POLISH-PUNCH-LIST` §1).
 
-> **Michael, 2026-07-13:** *"I'm gonna swap Bulgarian split squats for hip thrust… I don't think the app should dock the user for substitutions if they are actual substitutions. Now it does."*
-
----
-
-## 0. The one-line version
-
-> **You swapped Bulgarian Split Squat for Hip Thrust. That's hip-dominant instead of knee-dominant — same session, different stimulus.**
-
-No dock. No silence either. **The athlete's own swap, named.**
+> **Michael:** *"I'm gonna swap Bulgarian split squats for hip thrust… I don't think the app should dock the user for substitutions if they are actual substitutions. Now it does."*
+> **And:** *"Follow whatever pattern a commercial strength app would follow. Let's not invent anything."*
 
 ---
 
-## 1. THE BUG — it is a DOUBLE penalty, and it is verified
+## 0. ⚠️ v1 WAS WRONG. Read this before anything else.
 
-`analyze-strength-workout:520` `matchExercises` links planned↔executed **BY NAME ONLY** — exact match, then a fuzzy `includes()`. There is **no** substitution concept anywhere in the codebase (`grep substituted_for|swapped_from|original_name` → **zero hits**).
+**v1 designed:** let the athlete swap freely, then have the app *name the trade* on every swap.
 
-So when the athlete does Hip Thrust instead of the planned Bulgarian Split Squat:
+**The field does the opposite: it CONSTRAINS the swap so there is no trade to name.**
+
+> ### THE INSIGHT, AND IT REFRAMES EVERYTHING
+> **No commercial strength app treats the EXERCISE as the unit of adherence. They treat the SLOT** — the movement pattern / muscle group the program actually prescribed. **The exercise is one instantiation of the slot.**
+>
+> **Swap within the slot and NOTHING WAS MISSED.** There is no penalty question, because there is nothing to forgive. The program asked for a knee-dominant lower push; you did one.
+
+That is why the field has no "should a swap be docked?" debate. **The question never arises.** Efforts docks the athlete only because its adherence matches **by exercise NAME**, which is a unit no serious programmed app uses.
+
+---
+
+## 1. THE BUG — a DOUBLE penalty (verified)
+
+`analyze-strength-workout:520` `matchExercises` links planned↔executed **BY NAME ONLY** — exact, then a fuzzy `includes()`. **No substitution concept exists anywhere** (`grep substituted_for|swapped_from|original_name` → **0 hits**).
+
+Do Hip Thrust instead of the planned Bulgarian Split Squat:
 
 | | what happens | consequence |
 |---|---|---|
-| **Bulgarian Split Squat** (planned) | no executed exercise carries that name → `matched: false` (`:554`) | counts as a **SKIP**. Drags down `exerciseCompletion` (`:1337`), which is **30% of the execution score** (D-208, role-weighted: primary/secondary **1.0**, accessory **0.5**). |
-| **Hip Thrust** (executed) | no planned match → `{ planned: null, matched: false }` (`:593`) | excluded from `plannedEntries` (`:1332`, filters on `ex.planned != null`) → **ZERO CREDIT for the work actually done.** |
+| **Bulgarian Split Squat** (planned) | no executed exercise carries the name → `matched: false` (`:554`) | counts as a **SKIP** → drags `exerciseCompletion` (`:1337`) = **30% of the execution score** (D-208) |
+| **Hip Thrust** (executed) | no planned match → `{ planned: null }` (`:593`) → dropped by `plannedEntries` (`:1332`) | **ZERO CREDIT for the work actually done** |
 
-> **Penalised for what he didn't do, and unpaid for what he did.** The app cannot tell a substitution from a skip **because nobody ever told it.**
+**Penalised for what he didn't do, and unpaid for what he did.**
 
 ---
 
-## 2. What already exists (do NOT rebuild)
+## 2. THE FIELD STANDARD (researched 2026-07-14 — this is the pattern to copy)
+
+| app | what it does |
+|---|---|
+| **ABC Trainerize** | substitution filters named, verbatim: **"Same muscle group" · "Same Equipment" · "Same movement"** (plus main-muscle / mechanics / level) |
+| **Fitbod** | **auto-substitutes exercises that target the same muscles at equivalent intensity**; equipment constrains the option set |
+| **RP Hypertrophy** | swap **mid-cycle** from a maintained library of alternatives (missing machine, injury, travel) |
+| **Built with Science** | swap any time **"while keeping the plan structurally sound"** |
+| **consensus on a GOOD substitute** | **match the MOVEMENT PATTERN** — push / pull / hinge / squat |
+
+**Converged pattern, and all four points matter:**
+1. **Substitution is a FIRST-CLASS ACTION** — a "Swap" button on the prescribed exercise. **Not delete-and-re-add.** (Delete-and-re-add is exactly what destroys the link today.)
+2. **The app OFFERS the alternatives**, filtered by movement pattern + the athlete's equipment. The athlete picks from a list; they do not have to know what a valid substitute is.
+3. **A free-library override is still allowed.** Every app lets you search everything and pick anything.
+4. **Adherence is tracked against the SLOT.** A swap is not a deviation. **No app docks you for it.**
+
+---
+
+## 3. What already exists (do NOT rebuild — the slot taxonomy is already here)
 
 | piece | where | status |
 |---|---|---|
-| Per-exercise planned↔executed matching | `analyze-strength-workout:520` `matchExercises` | BUILT — **name-only. This is the seam.** |
-| Role-weighted exercise completion | `analyze-strength-workout:1337` + `_shared/strength/exercise-role.ts` (`ROLE_WEIGHT`: primary/secondary 1.0, accessory 0.5) | BUILT (D-208) |
-| **Movement-pattern reference per exercise** | `materialize-plan/exercise-config.ts` — `primaryRef: 'squat' \| 'deadlift' \| 'bench' \| 'overhead' \| 'hipThrust'`, ~135 entries, research-cited | **BUILT — and this is what makes the honest sentence possible.** |
-| Set-level PROVENANCE flags (the pattern to copy) | `StrengthLogger.tsx` — `prefilled` (D-204), `rir_autofilled` (D-204), `from_previous` (D-097) | BUILT — **provenance is already how this codebase records "how do we know this?"** |
-| **Equipment substitution at PLAN-BUILD time** | `materialize-plan:1006-1032` | BUILT — ⚠️ **A DIFFERENT THING. Do not conflate.** That rewrites the PLAN before the athlete sees it (no sled → a loaded lunge). This spec is about the athlete swapping at LOG time, against a plan that already fits their equipment. |
+| **Movement-pattern slot per exercise** | `materialize-plan/exercise-config.ts` — `primaryRef: 'squat' \| 'deadlift' \| 'bench' \| 'overhead' \| 'hipThrust'`, ~135 entries, research-cited (NSCA, Schoenfeld, Helms, Contreras) | **BUILT. This IS the slot taxonomy.** |
+| Role tier | `_shared/strength/exercise-role.ts` — `roleForExercise` → primary / secondary / accessory; `ROLE_WEIGHT` (D-208) | BUILT |
+| **Slot-preserving substitution, with honest notes** | `materialize-plan:1006-1032` — *"No sled — loaded walking lunge (forward horizontal drive under load)"* | **BUILT — for EQUIPMENT, at PLAN-BUILD time.** ⚠️ A different moment from this spec (athlete swaps at LOG time), but **the same idea, and the notes are the voice to copy.** |
+| Set/exercise PROVENANCE flags (the pattern to mirror) | `StrengthLogger.tsx` — `prefilled`, `rir_autofilled` (D-204), `from_previous` (D-097) | BUILT |
+| Planned↔executed matching | `analyze-strength-workout:520` `matchExercises` | BUILT — **name-only. THIS is the seam.** |
 
-**Every part exists except one field and one branch.**
+**The slot concept exists. Adherence simply doesn't use it.** Same disease as the rest of the app: *built, and not introduced to the thing next to it.*
 
 ---
 
-## 3. The design
+## 4. THE DESIGN
 
-### 3.1 The athlete SAYS it. The app does not guess. (Law 2)
+### 4.1 A "Swap" action on the prescribed exercise (field-standard #1)
 
-**A "Swap" action on a planned exercise in the logger.** It replaces the exercise and stamps provenance on the executed one:
+Replaces delete-and-re-add. Stamps provenance on the executed exercise:
 
 ```ts
 substituted_for?: string;   // the planned exercise name this replaces
 ```
 
-Mirrors `prefilled` / `rir_autofilled` / `from_previous` exactly: **a flag that records how we know, written at the point of truth.**
+Mirrors `prefilled` / `rir_autofilled` / `from_previous` exactly — **a flag recording HOW WE KNOW, written at the point of truth.** Additive; legacy rows behave exactly as today.
 
-> ⛔ **DO NOT INFER EQUIVALENCE FROM THE MOVEMENT PATTERN.** It is tempting — `primaryRef` is right there — and it is wrong. Bulgarian Split Squat is `primaryRef: 'squat'` (knee-dominant, ratio 0.50). Hip Thrust is `primaryRef: 'deadlift'` (hip-dominant, ratio 0.90). **They are genuinely different stimuli.** An app that silently decides they are interchangeable is inventing (Law 2), and it would also let a real deviation — a heavy squat "swapped" for a leg extension — pass as compliance. **Ask. Don't guess.**
+### 4.2 The app OFFERS the alternatives (field-standard #2)
 
-### 3.2 `matchExercises` honours the swap
+The swap sheet lists exercises from `EXERCISE_CONFIG` filtered by:
+- **same `primaryRef`** (same movement-pattern slot), **and**
+- **same `roleForExercise` tier**, **and**
+- **the athlete's equipment** (reuse the `substituteExerciseForEquipment` signals — `hasBarbell` / `hasDumbbells` / …).
 
-One branch, before the fuzzy fallback: an executed exercise whose `substituted_for` normalizes to a planned exercise's name **MATCHES it**.
+For a planned **Bulgarian Split Squat** (`primaryRef: 'squat'`, accessory) that offers: reverse lunge, walking lunge, step-up, goblet squat, front squat — **not** hip thrust.
 
-Result: the planned exercise is **not a skip** (no dock), and the executed work **lands in the denominator** (credit). The double penalty dies.
+> ⛔ **DO NOT invent a new taxonomy.** `primaryRef` is the slot. It is already research-cited and already drives every accessory's load. **Use it.**
 
-### 3.3 The score does not punish the swap — and the session still tells the truth
+### 4.3 A free-library override is allowed (field-standard #3)
 
-**A declared swap counts as COMPLETED for exercise-completion (the 30% term).** The athlete showed up and did the work.
+The athlete can search the whole library and pick anything — **including out-of-slot.** The app does not block. *(`PRODUCT-POSITIONING-v2-DRAFT §7`: not a compliance cop. **"Its job is not to stop you moving; it is to make sure you know you moved."**)*
 
-**Load and RIR adherence are computed against the SUBSTITUTE'S own prescription, not the original's.** A hip thrust is not graded against a Bulgarian split squat's target — that would be nonsense. If the substitute has an `exercise-config` entry (hip thrust does: `deadlift × 0.90`), it gets a real target. If it does not, it is **un-anchored and must NOT be graded** — see §3.5.
+### 4.4 Adherence is measured against the SLOT (field-standard #4) — the fix
 
-### 3.4 The receipt — this is the product part
+`matchExercises` gains one branch, before the fuzzy fallback: **an executed exercise whose `substituted_for` matches a planned exercise's name MATCHES it.**
 
-**The app names the trade. It does not score it.**
+- the planned exercise is **not a skip** → no dock
+- the executed work **lands in the denominator** → credit
+- **load / RIR are graded against the SUBSTITUTE'S OWN prescription**, via its `exercise-config` entry (hip thrust: `deadlift × 0.90`). **Never against the original's** — grading a hip thrust against a split squat's target is nonsense.
 
-Compare `primaryRef` (and `roleForExercise`) of the planned vs the substitute:
+### 4.5 ⛔ Never grade what you cannot anchor (the Q-180 rule)
 
-- **Same reference + same role → say nothing.** A clean like-for-like swap is not news.
-- **Different reference or role → ONE honest sentence:**
-  > *"Swapped Bulgarian Split Squat → Hip Thrust. Hip-dominant instead of knee-dominant — same session, different stimulus."*
+If the substitute has **no `exercise-config` entry**, the app does not know what load was appropriate. **Exclude it from load/RIR adherence and disclose.** Do not invent a target; do not score it as a miss. *(Same law that forbids the silent 135 lb squat.)*
 
-**That is the posture flag, at the scale of one exercise.** Not a nag, not a score, not a block. **The athlete moved, and they know they moved.** They decide whether they care.
+### 4.6 The ONE thing the field does NOT do — and the only place Efforts speaks
 
-> ⚠️ **The sentence is a FACT, not a judgment.** *"Different stimulus"* is true and checkable from `primaryRef`. **Do NOT extend it into a claim about consequence** (*"your quads will suffer"*) — that is exactly the Tier-2 trap `SPEC-posture-flag.md §4` documents, and the app has no model for it.
+**In-slot swap → SILENT.** No dock, no comment. Nothing was missed. **This is 95% of swaps and it is pure field standard.**
 
-### 3.5 ⛔ Never grade what you cannot anchor (the Q-180 rule)
+**Out-of-slot override → no dock, and ONE honest sentence:**
 
-If the substitute has no `exercise-config` entry, the app **does not know** what load was appropriate. It must **exclude that exercise from load/RIR adherence and say so** — not invent a target, and not score it as a miss.
+> *"Swapped Bulgarian Split Squat → Hip Thrust. Hip-dominant instead of knee-dominant — same session, different stimulus."*
 
-**This is the same rule Q-180 established** (*"if the app structurally cannot capture an exercise, it must not grade the athlete on it"*), and the same law that forbids the silent 135 lb squat. **Refuse, disclose, move on.**
+`primaryRef` already knows this: BSS = `squat` (knee-dominant, ratio 0.50) · Hip Thrust = `deadlift` (hip-dominant, ratio 0.90).
+
+**This is the ONLY invented-by-Efforts part of the spec, and it is deliberate.** It is the product thesis (`PRODUCT-POSITIONING-v2-DRAFT §3`): *"Everyone can build you a hybrid plan. Nobody will tell you when you've stopped following your own."* **The mechanic is field standard. The one sentence is the wedge.**
+
+> ⚠️ **It is a FACT, not a judgment.** *"Different stimulus"* is true and checkable from `primaryRef`. **Do NOT extend it into a consequence claim** (*"your quads will suffer"*) — that is the Tier-2 trap `SPEC-posture-flag.md §4` documents, and the app has no model for it.
 
 ---
 
-## 4. ⚠️ What NOT to build
+## 5. ⛔ What NOT to build
 
-- **NOT pattern-inferred equivalence.** See §3.1. Ask the athlete.
-- **NOT a "substitution allowed / not allowed" gate.** The app is not a compliance cop (`PRODUCT-POSITIONING-v2-DRAFT §7`). **Missing your prescription is not a failure — it is a trade. The app's job is not to stop you moving; it is to make sure you know you moved.**
+- **NOT a new movement taxonomy.** `primaryRef` is the slot. It is already there and already research-grounded.
+- **NOT inferred equivalence without a declared swap.** If the athlete simply logs a different exercise with no swap action, that is **not** a substitution — it is an unplanned exercise plus a skip, and it should read that way. **The declaration is what makes it a swap.** (Law 2: ask, don't guess.)
+- **NOT a block.** Out-of-slot is allowed. Not a compliance cop.
 - **NOT a consequence claim.** Naming the stimulus change is a fact. Predicting its cost is an invention.
-- **NOT a second matcher.** `matchExercises` is the one place planned meets executed. Extend it; do not write a parallel path.
-- **NOT free forgiveness.** A swap the athlete *declared* is not a skip. An exercise that simply **didn't happen** still counts as a skip — that is D-208 working correctly, and Q-178 just fixed the hole where a flag could fake it.
+- **NOT a second matcher.** `matchExercises` is the one place planned meets executed. Extend it.
+- **NOT free forgiveness.** A **declared** swap is not a skip. An exercise that simply **didn't happen** still is — D-208 working correctly, and Q-178 just closed the hole where a flag could fake it.
 
 ---
 
-## 5. Verification
+## 6. Verification
 
-- **Fixtures** (`_shared/strength/`, alongside `performed-set.test.ts`):
-  - a declared swap → planned NOT a skip, substitute IS credited, `exerciseCompletion` unchanged vs a clean session
-  - **the Michael case:** BSS → Hip Thrust → no dock, and the honest sentence fires (different `primaryRef`)
-  - a like-for-like swap (same `primaryRef` + role) → no dock, and **no sentence** (not news)
-  - an **undeclared** miss → still a skip (D-208 intact — **the regression that matters most**)
-  - a substitute with **no `exercise-config` entry** → excluded from load/RIR adherence, disclosed, **not scored as a miss**
-- **Then:** one real logged swap on device, and read the Performance screen.
+Fixtures in `_shared/strength/` (alongside `performed-set.test.ts`):
+
+- **THE REGRESSION THAT MATTERS MOST — write it FIRST:** an **undeclared** miss is **still a skip**. D-208 intact.
+- an in-slot declared swap → planned not a skip · substitute credited · `exerciseCompletion` **identical to a clean session** · **NO sentence**
+- **the Michael case:** BSS → Hip Thrust (out-of-slot) → **no dock**, and the honest sentence fires (different `primaryRef`)
+- load/RIR graded against the **substitute's** config, never the original's
+- a substitute with **no config entry** → excluded from load/RIR adherence, disclosed, **not scored as a miss**
+- the swap sheet for a `squat`-slot accessory **does not offer hip thrust**
+
+Then: one real logged swap on device; read the Performance screen.
 
 ---
 
-## 6. Blast radius
+## 7. Blast radius
 
-- `matchExercises` is the core of strength adherence. **Every** strength execution score routes through it. The undeclared-miss fixture is the guard — write it first.
-- The execution score will **RISE** for any athlete who has been swapping exercises and silently eating the dock. That is a **correction**, not a regression. **Name it when it ships.**
-- No migration. `substituted_for` is additive; legacy sets simply don't carry it and behave exactly as today.
+- `matchExercises` is the core of strength adherence — **every** strength execution score routes through it. **The undeclared-miss fixture is the guard. Write it first.**
+- Execution scores will **RISE** for any athlete who has been swapping and silently eating the dock. That is a **correction, not a regression. Name it when it ships.**
+- No migration. `substituted_for` is additive.

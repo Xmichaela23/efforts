@@ -678,7 +678,19 @@ So a declared, honest swap is read as **two separate failures**:
 
 **Penalised for what he didn't do, and unpaid for what he did.** The app cannot tell a substitution from a skip **because nobody ever told it.**
 
-**SPEC: `docs/SPEC-exercise-substitution.md`.** The athlete declares the swap (`substituted_for`, mirroring the `prefilled` / `rir_autofilled` / `from_previous` provenance pattern), `matchExercises` honours it, the score stops docking — and the app **names the trade** instead of scoring it: *"Swapped Bulgarian Split Squat → Hip Thrust. Hip-dominant instead of knee-dominant — same session, different stimulus."* (`primaryRef` in `exercise-config.ts` already knows this: BSS = `squat`, hip thrust = `deadlift`.)
+> ### ⚠️ SPEC v1 WAS WRONG — CORRECTED 2026-07-14 AFTER RESEARCHING THE FIELD (Michael: *"follow whatever pattern a commercial strength app would follow, let's not invent anything"*).
+>
+> **v1 designed:** free swap + the app *names the trade* on every swap. **The field does the OPPOSITE — it CONSTRAINS the swap so there is no trade to name.**
+>
+> **THE INSIGHT: no commercial strength app treats the EXERCISE as the unit of adherence. They treat the SLOT** — the movement pattern the program actually prescribed. The exercise is one instantiation of it. **Swap within the slot and NOTHING WAS MISSED**, so the penalty question never arises. *(ABC Trainerize's filters are literally "Same muscle group / Same Equipment / Same movement". Fitbod auto-substitutes same-muscle at equivalent intensity. RP Hypertrophy swaps mid-cycle from a library. Built with Science: swap "while keeping the plan structurally sound". Consensus on a good substitute: match the MOVEMENT PATTERN.)*
+>
+> **Efforts docks the athlete only because `matchExercises` matches by exercise NAME — a unit no serious programmed app uses.**
+>
+> **AND THE SLOT TAXONOMY ALREADY EXISTS:** `exercise-config.ts` `primaryRef` (`squat | deadlift | bench | overhead | hipThrust`, ~135 research-cited entries) IS the movement-pattern slot, and `materialize-plan:1006` already does slot-preserving equipment swaps with honest notes. **Adherence simply doesn't use it.** Built, and never introduced to the thing next to it.
+
+**SPEC: `docs/SPEC-exercise-substitution.md` (v2).** Field-standard mechanic: a first-class **Swap** action (not delete-and-re-add); the app **OFFERS** in-slot alternatives filtered by `primaryRef` + role + equipment; a free-library override is still allowed; and **adherence is measured against the SLOT**, so a declared swap is not a deviation and is never docked. An **in-slot** swap is **SILENT** — nothing was missed.
+
+**The ONE thing the field does not do, and the only Efforts-invented part:** an **out-of-slot** override gets no dock and **one honest sentence** — *"Swapped Bulgarian Split Squat → Hip Thrust. Hip-dominant instead of knee-dominant — same session, different stimulus."* (`primaryRef` in `exercise-config.ts` already knows this: BSS = `squat`, hip thrust = `deadlift`.)
 
 ⛔ **DO NOT infer equivalence from the movement pattern.** It is tempting — `primaryRef` is right there — and it is wrong: knee-dominant and hip-dominant are genuinely different stimuli, and a "heavy squat swapped for a leg extension" would sail through as compliance. **Ask the athlete. Don't guess.** (Law 2.)
 
