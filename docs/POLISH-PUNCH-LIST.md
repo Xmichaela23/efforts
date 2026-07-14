@@ -31,20 +31,58 @@ The 2026-07-13 audit found the same disease three times, and it is the highest-l
 
 ---
 
-# 1. LIVE FRACTURES — the app is contradicting itself right now
+# 1. FRACTURES — split by whether they are LIVE or LATENT
 
-Ordered worst-first. Detail + file:line in `CAPABILITY-MAP.md` (FACTS table).
+> ## ⚠️ READ THIS BEFORE THE LIST — the 2026-07-13 device session corrected the code audit
+>
+> The audit was run entirely from code. **Then we opened the app**, and it changed the ordering materially. **Most of the "worst" fractures are LATENT for the only user who exists.** Michael has learned baselines, configured HR zones, and a pace-prescribed plan — which is exactly the configuration that dodges them.
+>
+> **They are still real. They fire the day a SECOND user exists** — specifically, a user who has **typed** a number, or who has **no** numbers at all. That is the entire population of the onboarding flow.
+>
+> **The lesson, and it cuts against the standing rule:** *"verify by code trace, not one device session"* is right about **existence** and wrong about **severity**. The trace found the defects. **Only the device session could tell us which ones were biting.** Do both. Neither alone is honest.
 
-- [ ] **🔴 THE ZONES. Three Zone 2 ceilings — 128 / 134 / 136 bpm at LTHR 151.** The plan generator prescribes an easy run with a Z2 ceiling of **136** (`_shared/endurance/hr-zones.ts:18`, 0.90); the analyzer grades that run against **134** (`src/lib/friel-zones.ts:36`, 0.89) — and a third table says **128** (`analyze-running-workout:1031`, 0.85). **The app tells you to run at 136 and then marks you down for doing it.** D-286 landed on the client and never on the server. A test (`endurance-parity.test.ts:20-25`) pins the broken copy against *itself*, so it stays green while disagreeing with the canon. ⚠️ And a **fourth** table gets written by a FIT import (`save-imported-workout:174`) into `configured_hr_zones`, which the analyzer trusts **first**. **START HERE.**
-- [ ] **🔴 ONE LTHR (Q-176).** Four chains, **no resolver**, two inverted. Type an LTHR into Baselines and the coach, the easy-HR band, the run analyzer and the workload calc all **silently discard it**. It is the **root of the run stack** — everything above sits on it. Spec: `docs/SPEC-lthr-one-anchor.md`. ✅ **Michael has ruled: default learned, athlete can override, override wins (mirrors Q-174).** Do `threshold_pace` in the same pass — it has **no resolver at all** and is read raw in ~17 files across 3 units.
-- [ ] **🔴 ONE ACWR BAND (Q-168).** The *ratio* is single-source and clean. The *band* is re-derived in **6 places**, one of them plan-blind and shipping in the same payload as the real one (`_shared/response-model/weekly.ts:313`). **A taper week at 1.15 reads `elevated` and `optimal` simultaneously.** Also: `load_status` is mutated a second time *after* the reconciler (`coach:3814`, coupled to LLM availability), and the State headline has **no `productive` branch** (`src/lib/load-headline.ts:63`) so a productive week silently drops the load slot.
+## LIVE — happening on the only real account, today
+
+- [ ] **🔴 STRENGTH WEIGHTS HAVE TWO WRITERS, AND ONLY ONE ASKS.** `adapt-plan` action=auto silently re-prices the lifts on **every ingest** (`:1161/:1188` → `materialize-plan:1232`), **skipping the Arc fatigue/taper/adherence gate** the `suggest` path applies. Meanwhile the consent path (`StrengthAdjustmentModal`, mounted at `StateTab.tsx:1370`) asks permission for a thing already done. **This silently violates the standing rule that any change to prescribed load or RIR is sign-off-gated**, and it means §8's "GATED — changes prescription" Steps 4/5 describe a door **already ajar**. ✅ **Michael wants the athlete option (mirror the easy-pace chooser).** One writer; default = today's behaviour; visible; overridable. **This is the #1 live item.**
 - [ ] **🔴 THE RPE TREND IS AN ORDERING ARTIFACT (Q-167).** `makeTrend` (`_shared/response-model/body-response.ts:369`) splits **this week's** sessions in half **by the order they happened**. Hard Monday + easy Friday reads *improving*; swap the days and the identical week reads *declining*. **It is the required strong-evidence leg for the safety floor** (`load-status-reconcile.ts:83-95`, D-266). Establish intent before touching (Q-121 precedent).
-- [ ] **🔴 STRENGTH WEIGHTS HAVE TWO WRITERS, AND ONLY ONE ASKS.** `adapt-plan` action=auto silently re-prices your lifts on **every ingest** (`:1161/:1188` → `materialize-plan:1232`), **skipping the Arc fatigue/taper/adherence gate** the `suggest` path applies. Meanwhile the consent path (`StrengthAdjustmentModal`, mounted at `StateTab.tsx:1370`) asks you for permission to do a thing already done. **This also silently violates the standing rule that any change to prescribed load or RIR is sign-off-gated** — and it means §8's "GATED — changes prescription" Steps 4/5 are describing a door **already ajar**. ✅ **Michael wants the athlete option (mirror the easy-pace chooser).** One writer; default = today's behaviour; visible; overridable.
-- [ ] **🟡 FTP bypasses the resolver in 8 places** — incl. `get-week:436` (week-view watts), `src/services/plans/normalizer.ts:308/898/935` (plan watts), and `athlete-snapshot/identity.ts:67` → **the LLM prompt**, so the coach can *speak* a different FTP than the screens show. *(TRUTH-MAP says FTP is "CLOSED". It is not.)*
-- [ ] **🟡 Two ingest paths never reach the spine.** `ingest-phone-workout` and `save-imported-workout` fire only `compute-workout-summary` → no `workout_facts`. They contribute **zero to ACWR** while still counting toward `workload_total`. **The same snapshot row contradicts itself.**
-- [ ] **🟡 A race in the fan-out silently drops facts.** `compute-facts` is awaited but reads `workouts.computed`, written by two fire-and-forget calls it doesn't wait for (`ingest-activity:1508/:1521`). When it loses: no time-in-zone, no interval hits, no HR drift, no execution score. No error.
-- [ ] **🟡 Dead "Aerobic fitness" BODY row (Q-164).** `coach:2131` `cardiac_efficiency_current: null`, `sample_size: 0` — the render gate can never be true, so the row **can never appear**. Feed it or delete it.
-- [ ] **🟡 The app invents undisclosed numbers.** Squat/bench/deadlift **135 lb**, OHP **95 lb** (`materialize-plan:2699-2726`), swim **1:30/100** (`:2352`). Console log only — the athlete is never told. Law 2 says refuse and say so. *(The 10:00/mi run fallback IS disclosed — copy that pattern.)*
+- [ ] **🔴 ONE ACWR BAND (Q-168).** The *ratio* is single-source and clean. The *band* is re-derived in **6 places**, one plan-blind and shipping in the same payload as the real one (`_shared/response-model/weekly.ts:313`). **A taper week at 1.15 reads `elevated` and `optimal` simultaneously.** Also: `load_status` is mutated a second time *after* the reconciler (`coach:3814`, coupled to LLM availability); the State headline has **no `productive` branch** (`load-headline.ts:63`) so a productive week silently drops the load slot.
+- [ ] **🟡 A race in the fan-out silently drops facts.** `compute-facts` is awaited but reads `workouts.computed`, written by two fire-and-forget calls it does not wait for (`ingest-activity:1508/:1521`). When it loses: no time-in-zone, no interval hits, no HR drift, no execution score. **No error anywhere.**
+- [ ] **🟡 Dead "Aerobic fitness" BODY row (Q-164).** `coach:2131` `cardiac_efficiency_current: null`, `sample_size: 0` → the render gate can never be true, so the row **can never appear**. Feed it or delete it.
+
+## LATENT — dormant today, and they ALL fire on the first new user
+
+**These are the onboarding blast radius. See §1b.**
+
+- [ ] **🔴 THE ZONES — two bad tables, both currently dodged.** ⚠️ **CORRECTED 2026-07-13 after looking at the app.** The earlier claim ("the plan says run at 136, the analyzer grades you at 134, it's happening now") **was FALSE** and is retracted. Verified on the live account: the workout's stored bins are **Z2 128-135, Z3 135-143** (half-open), which **match Baselines exactly**. The analyzer's Priority 1 is `configured_hr_zones` — *deliberately*, with a comment saying so — and those zones are the Friel 0.89 canon. **The system is behaving correctly.**
+  **But two divergent tables are real in code, and both are one condition away:**
+  - `_shared/endurance/hr-zones.ts:18` — Z2 ceiling **0.90** (→136 @ LTHR 151) vs the canon's **0.89** (→134). Used by `generate-run-plan`. **Dormant only because the current plan prescribes PACE bands, not HR zones.**
+  - `analyze-running-workout:1030-1033` — a **non-Friel** model (0.75/0.85/0.92/0.98) whose Z2 tops at **128** (the canon's *floor*) and whose **threshold zone caps at 148 — BELOW a real LTHR of 151.** **Fires only when `configured_hr_zones` is missing — i.e. a brand-new user.**
+  - D-286 fixed **three** copies of the Friel seam. **There were five.** Its own header lists the three it knew about; these two are not among them.
+- [ ] **🔴 ONE LTHR (Q-176).** Four chains, **no resolver**, two inverted. **Latent only because Michael's LTHR is `learned` and he has never typed one.** The inversion bites the moment an athlete **types** an LTHR: Baselines and the plan generator honour it; the coach, the easy-HR band, the run analyzer and `calculate-workload` **silently discard it**. It is the **root of the run stack**. Spec: `docs/SPEC-lthr-one-anchor.md`. ✅ **Ruled: default learned, athlete can override, override wins (mirrors Q-174).** Do `threshold_pace` in the same pass — **no resolver at all**, read raw in ~17 files across 3 units.
+- [ ] **🟡 FTP bypasses the resolver in 8 places** — `get-week:436` (week-view watts), `normalizer.ts:308/898/935` (plan watts), `PlanSelect.tsx:587`, `course-strategy:521`, and `athlete-snapshot/identity.ts:67` → **the LLM prompt**, so the coach can *speak* a different FTP than the screens show. *(TRUTH-MAP says FTP is "CLOSED". It is not.)*
+- [ ] **🟡 Two ingest paths never reach the spine.** `ingest-phone-workout` and `save-imported-workout` fire only `compute-workout-summary` → **no `workout_facts`**. Zero contribution to ACWR while still counting toward `workload_total` — **the same snapshot row contradicts itself.** *(Latent for Michael: he ingests via Strava/Garmin, which take the full path. Fires for anyone using phone-recording or FIT import.)*
+
+---
+
+# 1b. THE ONBOARDING GATE — the app must stop inventing BEFORE it invites anyone in
+
+**Michael's intent (2026-07-13):** a new-user flow to enter easy pace, 5K pace, FTP, 100y/m swim pace, and 1RMs for the major compounds — **as frictionless as possible**, with the option to let the app learn from their own testing instead.
+
+> ### ⛔ THE FRICTIONLESS PATH IS THE DANGEROUS PATH. This is the gate, and it is not optional.
+>
+> **Today, when a user gives the app nothing, the app does not refuse. It INVENTS, and says nothing.**
+> - squat / bench / deadlift 1RM = **135 lb**, OHP = **95 lb**, hip thrust = `max(75, deadlift × 0.55)` (`materialize-plan:2699-2726`) — **console log only**
+> - swim pace = **1:30/100** (`materialize-plan:2352`) — drives every swim `duration_s`
+> - HR zones fall through to the **non-Friel** model above, whose threshold zone caps below a real LTHR
+>
+> **Every "LATENT" fracture above fires on exactly this user.** They are not separate work — **they are the onboarding blast radius.**
+>
+> **Law 2 says: measured ≠ inferred. When you don't know, SAY SO.** The pattern already exists and already ships honestly — the run-pace fallback tells the athlete: *"Run durations estimated at 10:00/mi until we learn your easy pace"* (`strength-primary-plan.ts:427` → `GoalsScreen.tsx:1633`). **Copy it. It is the only disclosed fallback in the app.**
+
+- [ ] **Make the app refuse instead of invent** (strength 1RMs, swim pace, HR zones). Disclose, or decline and ask. **Gates everything below.**
+- [ ] **The onboarding flow itself.** ⚠️ **Most of it is BUILT — this is a wiring job, not a build.** `OnboardingProfilePage.tsx` today collects **identity only** (birthday, gender, height, weight) and **never asks for a single performance number**. The performance numbers live on `TrainingBaselines.tsx`, and **nothing walks a new user there.**
+- [ ] **The "let the app learn it" half is SHIPPED and working** — verified live on device: *"11:09/mi — pace at easy HR (5 runs; Friel Z2, at or below 89% of your threshold HR (151 bpm)) — as of Jul 13"*, with **the Q-174 chooser next to it**: `Use my runs 11:09` / `Use my number 11:30`. **That IS the "enter it, or let the app learn it" fork Michael is describing.** Reuse the mechanism; do not design a second one.
+- [ ] **The "learn from their own test" half is BUILT for strength** — a Get Stronger plan drops in a `baselineTestWeek` (`strength-primary-plan.ts:526`) when it doesn't know the lifts. ⚠️ **But it only fires when BOTH bench AND squat are missing** (`create-goal…:2397`). Enter one, get no test week, and the other is invented.
 
 ---
 
