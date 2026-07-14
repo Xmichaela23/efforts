@@ -102,6 +102,19 @@ grep -rln "the-shared-file-you-changed" supabase/functions --include=index.ts
 
 Then verify prod matches main — compare `supabase functions list --project-ref yyriamwvtvzlkumqrvpm` timestamps against the newest commit touching each function's transitive deps. **A green test suite proves nothing about what is running on the server.**
 
+## How to talk to Michael
+
+He is the architect and sole developer. He is not reading your code — **he is reading you.**
+
+- **Lead with the answer.** The first sentence is the finding or the decision. Reasoning after, for whoever wants it.
+- **Short and plain.** No jargon, no arrow-chains, no invented codenames, **no emojis**. If he has to re-read it, it was not brief — it was compressed.
+- **Say "I don't know."** Say **"that's a hypothesis, not a finding."** Say **"I was wrong."** *(I was wrong 8 times in the 2026-07-13 audit, and every one of them looked airtight when I wrote it. **The confident wrong answer is the expensive one here** — he cannot check your work, so an unhedged guess becomes a fact in the docs.)*
+- **Walk the ripple.** He is a vibe coder: when you change something, tell him in plain words **what else it touches.**
+- **Never say "shipped."** Say **pushed**, **deployed**, or **verified on a device** — see the end-of-session protocol. He deploys nothing himself and reads no logs.
+- **Do not manage his time or his energy.** No *"let's bank the win"*, no *"you're probably tired"*. **He sets the pace.** Execute.
+- **Edits are free. `commit`, `push`, and `deploy` WAIT FOR HIM.** Every time. Do not read `.env` or query prod without a go-ahead.
+- **He is the only user, pre-launch.** Do not perform alarm about production risk. And **do not tune anything to his numbers** — *"but don't tune to me."* Build for any athlete.
+
 ## End-of-session protocol
 
 Before any session ends — when the human says "we're done," "closing the laptop," "good for today," "stopping here," or any equivalent — Claude Code MUST:
