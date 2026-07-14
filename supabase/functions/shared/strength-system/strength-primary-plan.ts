@@ -190,11 +190,32 @@ const GLUTE_ROTATION: StrengthExercise[] = [
   { name: 'Single-Leg Squat', sets: 3, reps: '8/leg', weight: 'Add weight if able' }, // DiStefano 2009 (max glute-max recruitment)
   { name: 'Back Extension', sets: 3, reps: '12-15', weight: 'Bodyweight' },
 ];
+// Q-180 — THE UNIT. Read this before changing a `reps` value here.
+//
+// For a DURATION-BASED exercise the app's convention is that `reps` IS SECONDS. That convention is
+// long-standing and load-bearing — materialize-plan states it verbatim: "Convert reps to
+// duration_seconds for duration-based exercises (e.g. 'Planks 3×60' where 60 is seconds)".
+// StrengthLogger.isDurationBasedExercise() decides duration-vs-reps FROM THE NAME (/plank|hold|carry|
+// farmer|.../), and the compare table already computes duration volume as duration_seconds × weight.
+//
+// The carry used to be prescribed as `'40 m'` — FORTY METRES. Nothing in the app can read metres:
+// there is no distance input in the logger, and no distance field on a set. So the "40" was parsed
+// out of the string and silently became **40 SECONDS**. A unit pun that happened to produce a
+// plausible number. Nobody designed it.
+//
+// It is now `40` — forty seconds, explicitly, on the existing convention. Same behaviour, honest name.
+//
+// ⚠️ KNOWN GAP (filed, deliberately NOT built): SLED and SANDBAG work is distance-native, and the app
+// still cannot record a distance. Those stations are only reachable with commercial-gym equipment; for
+// every other athlete `materialize-plan`'s equipment substitution correctly swaps them for a loaded
+// lunge / row (which are REP exercises — and that substitution now rewrites the rep unit too, rather
+// than handing a row a distance). A real Hyrox path needs a distance-capable set shape end to end;
+// that is a PROGRAM, not a +1 accessory (Q-103). Do not bolt a half one on here.
 const HYROX_ROTATION: StrengthExercise[] = [
-  { name: 'Sled Push', sets: 3, reps: '20 m', weight: 'Heavy' },
-  { name: 'Farmers Carry', sets: 3, reps: '40 m', weight: 'Heavy' },
-  { name: 'Sandbag Lunge', sets: 3, reps: '20 m', weight: 'Moderate' },
-  { name: 'Sled Pull', sets: 3, reps: '20 m', weight: 'Heavy' },
+  { name: 'Sled Push', sets: 3, reps: '20 m', weight: 'Heavy' },        // gym-only; substituted otherwise
+  { name: 'Farmers Carry', sets: 3, reps: 40, weight: 'Heavy' },        // 40 SECONDS (duration convention)
+  { name: 'Sandbag Lunge', sets: 3, reps: '20 m', weight: 'Moderate' }, // gym-only; substituted otherwise
+  { name: 'Sled Pull', sets: 3, reps: '20 m', weight: 'Heavy' },        // gym-only; substituted otherwise
   { name: 'Back Extension', sets: 3, reps: '15', weight: 'Bodyweight' },
 ];
 function biasAccessoryFor(preset: 'glute' | 'hyrox', week: number): StrengthExercise {

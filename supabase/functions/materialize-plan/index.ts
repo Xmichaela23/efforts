@@ -923,9 +923,14 @@ function getBandResistanceFromPercentage(originalPercent: number): string {
 }
 
 // Equipment substitution based on user's available equipment
-function substituteExerciseForEquipment(exerciseName: string, userEquipment: string[], percentOf1RM?: number): { name: string; notes?: string } {
+// Q-180: `reps` added to the return. A substitution that swaps a DISTANCE-native station (a 20 m sled
+// push) for a REP exercise (a loaded lunge, a row) must rewrite the UNIT too — otherwise it hands a
+// dumbbell row a prescription of '20 m'. It used to rewrite only the name and the notes.
+function substituteExerciseForEquipment(exerciseName: string, userEquipment: string[], percentOf1RM?: number): { name: string; notes?: string; reps?: number | string } {
   const name = String(exerciseName || '').toLowerCase();
   const equipment = Array.isArray(userEquipment) ? userEquipment : [];
+  // Q-180: set when a substitution changes the exercise's UNIT (distance station -> rep exercise).
+  let repsOverride: number | string | undefined;
   
   // Check for gym access (old and new naming conventions)
   const hasGymAccess = equipment.includes('Full commercial gym access') || equipment.includes('Commercial gym');
@@ -1016,14 +1021,17 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
   if (name.includes('sled push') && !hasGymAccess) {
     resultName = hasDumbbells ? 'Dumbbell Walking Lunge' : hasBarbell ? 'Barbell Walking Lunge' : 'Walking Lunge';
     notes = 'No sled — loaded walking lunge (forward horizontal drive under load)';
+    repsOverride = '10/leg'; // Q-180: a loaded walking lunge is dosed in reps, not metres
   }
   if (name.includes('sandbag lunge') && !hasGymAccess) {
     resultName = hasDumbbells ? 'Dumbbell Walking Lunge' : hasBarbell ? 'Barbell Walking Lunge' : 'Walking Lunge';
     notes = 'No sandbag — loaded walking lunge';
+    repsOverride = '10/leg'; // Q-180: same
   }
   if (name.includes('sled pull') && !hasGymAccess) {
     resultName = hasDumbbells ? 'Dumbbell Row' : hasBarbell ? 'Bent-Over Row' : hasResistanceBands ? 'Band Row' : 'Inverted Row';
     notes = 'No sled — heavy horizontal pull';
+    repsOverride = '8-12'; // Q-180: a row is dosed in reps, not metres
   }
   // Farmers carry works with any load (DB/KB/barbell); only fall back when there is none at all.
   if (name.includes('farmers carry') && !hasDumbbells && !hasKettlebells && !hasBarbell && !hasGymAccess) {
@@ -1052,7 +1060,7 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
     }
   }
   
-  return { name: resultName == null || resultName === '' ? 'exercise' : String(resultName), notes };
+  return { name: resultName == null || resultName === '' ? 'exercise' : String(resultName), notes, reps: repsOverride };
 }
 
 function parseIntSafe(s?: string | number | null): number | null { const n = typeof s === 'number' ? s : parseInt(String(s||''), 10); return Number.isFinite(n) ? n : null; }
@@ -1633,7 +1641,7 @@ function expandTokensForRow(
         
         for (const ex of exs) {
           const originalName = String(ex?.name||'exercise');
-          const reps = (typeof ex?.reps==='number'? ex.reps : (typeof ex?.reps==='string'? ex.reps : undefined));
+          let reps = (typeof ex?.reps==='number'? ex.reps : (typeof ex?.reps==='string'? ex.reps : undefined)); // Q-180: `let` — a substitution may rewrite the rep UNIT below
           const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
           
           // Get percentage for band resistance guidance (from percent_1rm field OR weight string)
@@ -1647,6 +1655,10 @@ function expandTokensForRow(
           const substituted = substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
           const name = substituted.name;
           const equipmentNotes = substituted.notes;
+          // Q-180: a substitution can change the UNIT, not just the name. A 20 m sled push swapped for a
+          // loaded walking lunge (or a sled pull swapped for a dumbbell row) is a REP exercise — it must
+          // not inherit the sled's distance. Previously it did: a dumbbell row prescribed in metres.
+          if (substituted.reps !== undefined) reps = substituted.reps;
           
           // Debug band exercises
           if (String(name ?? '').toLowerCase().includes('band') && originalName.toLowerCase().includes('face pull')) {
@@ -1818,7 +1830,7 @@ function expandTokensForRow(
         
         for (const ex of exs) {
           const originalName = String(ex?.name||'exercise');
-          const reps = (typeof ex?.reps==='number'? ex.reps : (typeof ex?.reps==='string'? ex.reps : undefined));
+          let reps = (typeof ex?.reps==='number'? ex.reps : (typeof ex?.reps==='string'? ex.reps : undefined)); // Q-180: `let` — a substitution may rewrite the rep UNIT below
           const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
           
           // Get percentage for band resistance guidance (from percent_1rm field OR weight string)
@@ -1832,6 +1844,10 @@ function expandTokensForRow(
           const substituted = substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
           const name = substituted.name;
           const equipmentNotes = substituted.notes;
+          // Q-180: a substitution can change the UNIT, not just the name. A 20 m sled push swapped for a
+          // loaded walking lunge (or a sled pull swapped for a dumbbell row) is a REP exercise — it must
+          // not inherit the sled's distance. Previously it did: a dumbbell row prescribed in metres.
+          if (substituted.reps !== undefined) reps = substituted.reps;
           
           // Use research-based exercise config for weight calculation
           const exerciseConfig = getExerciseConfig(name);

@@ -107,7 +107,10 @@ const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' 
     'bicep curl', 'biceps curl', 'hammer curl', 'concentration curl',
     'lateral raise', 'front raise', 'chest fly', 'chest flye',
     'arnold press', 'bulgarian split squat',
-    'farmer walk', 'farmer walks',
+    // Q-180: the plan calls it "Farmers Carry" (strength-primary-plan HYROX_ROTATION), and only
+    // 'farmer walk' was listed — so a Farmers Carry fell through to 'barbell' and would have been
+    // labelled as a single total load instead of per-hand. Carries are two implements, one per hand.
+    'farmer walk', 'farmer walks', 'farmers carry', 'farmer carry', 'farmers walk', 'suitcase carry',
     'walking lunge', 'reverse lunge', 'forward lunge', 'lunge',
     'single leg rdl', 'single-leg rdl',  // Single-leg RDLs are typically dumbbell; regular RDL is barbell
     'step up', 'step-up'
@@ -656,6 +659,28 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   // Helper: detect duration-based exercises by name (planks, holds, carries)
+  // Q-180: a LOADED duration exercise — duration-based, but the LOAD IS THE EXERCISE.
+  //
+  // The old code assumed duration ⇒ bodyweight and hid the weight input for everything
+  // duration-based ("Duration-based exercises don't need weight input (bodyweight)"). That is true
+  // for a plank and FALSE for a farmers carry — and a carry is exactly the exercise where the load
+  // is the whole point.
+  //
+  // The damage: the accessory-bias rotations prescribe loading QUALITATIVELY on purpose
+  // (strength-primary-plan.ts: "Qualitative loading only — the weight is coaching text… these are
+  // NOT %1RM-anchored barbell lifts"), i.e. the plan says "Heavy — you judge it". So the athlete's
+  // own entry is the ONLY record of what they carried. With the box hidden, there was nowhere to
+  // put it: no weight, no volume, nothing to learn from, and therefore no suggestion next time.
+  // (Michael, on his own session: "I DID complete the farmers carry — there was no slot for the
+  // weight." He did the work; the app had no way to hear it.)
+  //
+  // Keep this list to genuinely LOADED carries/holds. A plank, wall sit, dead bug or hollow hold is
+  // duration-based AND bodyweight — those must still hide the weight box.
+  const isLoadedDurationExercise = (name: string): boolean => {
+    const n = String(name || '').toLowerCase();
+    return /carry|carries|farmer|suitcase|sled|sandbag|yoke|rack hold|front rack hold|overhead hold|waiter/.test(n);
+  };
+
   const isDurationBasedExercise = (name: string): boolean => {
     const n = String(name || '').toLowerCase();
     return /plank|hold|carry|farmer|suitcase|wall sit|iso|isometric|time|seconds?|sec|core circuit|core work|circuit/.test(n);
@@ -4080,11 +4105,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       )}
                       
                       {(() => {
-                        // Duration-based exercises don't need weight input (bodyweight)
-                        if (isDurationBased) {
+                        // Duration-based BODYWEIGHT work (plank, wall sit, dead bug, hollow hold) needs no
+                        // weight input. But a LOADED carry is duration-based AND loaded — the load IS the
+                        // exercise, and because the accessory rotations prescribe loading qualitatively on
+                        // purpose ("Heavy — you judge it"), the athlete's entry is the ONLY record of it.
+                        // Hiding the box here meant the work was done and then thrown away. (Q-180.)
+                        if (isDurationBased && !isLoadedDurationExercise(exercise.name)) {
                           return null;
                         }
-                        
+
                         // Bodyweight exercises don't need weight input (e.g., Nordic Curls, pull-ups, push-ups)
                         if (isBodyweightMove(exercise.name)) {
                           return null;
