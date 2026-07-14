@@ -695,3 +695,36 @@ So a declared, honest swap is read as **two separate failures**:
 ⛔ **DO NOT infer equivalence from the movement pattern.** It is tempting — `primaryRef` is right there — and it is wrong: knee-dominant and hip-dominant are genuinely different stimuli, and a "heavy squat swapped for a leg extension" would sail through as compliance. **Ask the athlete. Don't guess.** (Law 2.)
 
 **This is `SPEC-posture-flag.md`'s thesis at the scale of one exercise: a trade made visible, not a compliance cop.** Sign-off gated (it changes prescription-adherence semantics).
+
+---
+
+## Q-182 — A "+1 ACCESSORY" CANNOT BE A FOCUS. Specialization is REDISTRIBUTION, not addition. (PRODUCT + ENGINE, 2026-07-14)
+
+> **Michael:** *"We were gonna add a glute focus, pull-up focus along with hyrox — in Get Stronger."* (Q-100's original three.) *"Follow whatever pattern a commercial strength app would follow. Let's not invent anything."*
+
+**Glute + Hyrox shipped (D-225) as a `+1 accessory` on Upper A, rotating weekly.** Q-103 called it *"a thin delta."* **The field says it is the WRONG PRIMITIVE.**
+
+### The field standard (researched 2026-07-14 — volume landmarks, Israetel/RP, broadly adopted)
+| | weekly sets / muscle group | |
+|---|---|---|
+| **MEV** | ~8–12 | below this you **maintain**, you do not grow |
+| **MAV** | ~12–20 | the growth band |
+| **MRV** | ~18–25+ | the ceiling — past it, regression. Highly individual. |
+
+**Specialization:** push **1–2** targets toward MRV · **hold everything else at MEV** · **rotate every 8–12 weeks** · and, decisively:
+
+> *"If you're training every body part for 20 sets and that's your MRV, and you want to bring biceps to 25 — **you need to take 5 sets out from somewhere else.** Once you're at your system MRV you cannot simply add more."*
+
+**⛔ A FOCUS TAKES SETS FROM SOMEWHERE. If nothing went down, nothing was focused.**
+
+**So `+1 accessory` is not a small focus — it is not a focus at all.** One added set, one week in three, is **below MEV** (grows nothing) and it **ADDS** to systemic volume rather than redistributing. *(Keep `accessory_bias` — as the movement-familiarity add-on it is honestly labelled as. A FOCUS is a different feature.)*
+
+### THE INSIGHT — the right primitive is a vocabulary Efforts ALREADY OWNS
+**MEV = "maintain". MAV/MRV = "develop".** **That is `per_discipline_posture`, one level down** — and `exercise-config.ts` `primaryRef` is already the movement-pattern taxonomy. A strength focus = **develop one pattern toward MAV, hold the rest at MEV, total systemic volume flat.** Nothing new is invented.
+
+**And the receipt falls out for free** — a redistribution has a source: *"Glute focus on. Moved 4 sets from pressing into hip work. Your pressing is at maintenance for this block — it will hold, not grow."* **The trade made visible.**
+
+### ⚠️ AND THE SAME DISEASE AS Q-179 — declared intent is WRITE-ONCE
+`accessory_bias` is written by the wizard (`NonRaceBuilder.tsx:145`), read only at plan-build (`create-goal…:2423` → `generate-strength-plan:59`), and `GoalsScreen:1653` merely **displays** it. **There is NO edit path — changing your focus means rebuilding the whole plan.** `per_discipline_posture` has the identical problem (Q-179). **The app asks the athlete what they want, captures it once, and then neither reads it again nor lets them change their mind. Fix one edit path; serve both.**
+
+**SPEC: `docs/SPEC-strength-focus.md`.** Sign-off gated (changes prescribed volume). **Open before building:** `vertical_pull` is not a `primaryRef` value today (a pull-up focus needs it) · where a per-athlete MRV comes from (do NOT fabricate one) · interference with concurrent endurance.
