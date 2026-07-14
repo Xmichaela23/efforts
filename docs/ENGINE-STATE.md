@@ -24,6 +24,47 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
+## 🧭 NEXT SESSION — START HERE (2026-07-14 — STRENGTH IS DONE. NEXT IS PHASE 2: FIX THE FAN-OUT.)
+
+> ## READ `docs/GAME-PLAN.md`. It is dependency-ordered and it is the whole plan. Then `START-HERE.md` and `LIFECYCLE.md`.
+>
+> ### YOUR JOB: **PHASE 2 — FIX THE FAN-OUT.** This is what Michael calls "the analysis problem", and it is the root of it.
+>
+> **The fan-out awaits the wrong things. Two verified instances of one bug:**
+> 1. `compute-facts` is **awaited** (`ingest-activity:1582`) but reads `workouts.computed`, which is written by two **fire-and-forget** calls (`:1508`, `:1521`). When it loses the race: **no time-in-zone, no interval hits, no HR drift, no execution score. No error anywhere.**
+> 2. `compute-snapshot` (fired *from* `compute-facts:1844`) reads `workouts.workout_analysis` (`:689`) — written by `analyze-{sport}`, which `ingest-activity` fires **after**, fire-and-forget (`:1624`). **So the run durability trend is ALWAYS AT LEAST ONE WORKOUT BEHIND, by construction.**
+>
+> **Also in Phase 2:** two ingest paths never reach the spine (`ingest-phone-workout`, `save-imported-workout` → no `workout_facts`); and `workouts.workload_actual` (the ACWR substrate) is written by ONE job called from TWO places, so anything ingested another way contributes **zero to ACWR while still counting toward `workload_total`** — the same snapshot row contradicts itself.
+>
+> ⚠️ **UNEXPLAINED, AND DO NOT GUESS:** the run durability read is **`as of Jun 27` — 16 days stale**, and the one-workout lag does NOT account for that. **Two theories were already wrong on 2026-07-13. Get a DB query, not another theory.**
+>
+> ### AFTER PHASE 2: **PHASE 3 — MAKE THE VERDICT ENGINE POSTURE-AWARE.** This is "the continuity problem" **AND the product** — they turned out to be the same thing (Q-179). `per_discipline_posture` appears **ZERO times** in `_shared/state-trend/` and **ZERO times** in `coach/index.ts`. **The posture flag IS this fix, not a thing built on top of it. Do not ship the banner first.**
+>
+> ---
+>
+> ### ✅ SHIPPED + DEPLOYED 2026-07-13/14 (strength + the docs). Do NOT re-litigate.
+>
+> - **Q-177** — the "strength volume down" signal was a **partial-week artifact** (a cumulative SUM of the current week vs the average of COMPLETE prior weeks → ~−75% on a Monday) firing at **CONCERN** severity every Monday, forever. Retired — same move D-239 already made one field over. The `structuralDirection` fallback that fed `interferenceScore` off the same artifact is gone too. `COACH_PAYLOAD_VERSION` 95 → 96.
+> - **Q-178** — a set flagged `completed` with **zero reps/weight/duration** counted as PERFORMED. Live repro: zero Farmers Carries → `98% · Strong` → *"sets landed on target across all three lifts."* ⚠️ **The LLM was not lying — THE FACT PACKET WAS.** `narrative-core/validate.ts` validates prose against the FACTS, so **it cannot catch a lie that is already IN the facts.** The containment is sound and **only as honest as the packet.**
+> - **Q-180** — the logger could not record a carry (no weight box, no duration persisted, RIR prompted on a timed set, wrong shape on hand-add, an apostrophe defaulting it to *barbell*, and `'40 m'` being read as 40 **seconds**). Fixed. ⚠️ **The Q-126 golden caught a copy regression AND a second, unfixed copy of the carry** (`FATIGUED_LEGS_STATION`). **Two definitions of one exercise — if you change one, GREP FOR THE OTHER.**
+> - **D-289 / D-290** — **a SWAP IS NOT A SKIP.** The **SLOT** is the unit of strength adherence, not the exercise name (field standard). Swap button, in-slot alternatives, no dock, credit for the work, load/RIR not graded on an un-anchored substitute, and one honest sentence when the athlete goes out-of-slot. ⛔ **The guard matters more than the feature: an UNDECLARED miss is STILL a skip.**
+> - **Q-TIMER** — the rest/duration timer lost the time you were away, then cancelled the notification that would have told you. **Seconds-remaining is a DERIVED value; the authority is `endsAt`.** Reconcile from the wall clock on every foreground, not just on mount.
+> - **THE DOCS.** `CAPABILITY-MAP` rebuilt **from code** (the old one asserted a deleted path was live and cited a decision never written). `LIFECYCLE.md` — **the loop, drawn for the first time.** `GAME-PLAN.md`. Living docs **1.6MB → 420KB** (archive split, nothing lost). Six lying entries back-annotated.
+>
+> ### ⛔ THREE RULES NOW IN `CLAUDE.md`. They are load-bearing.
+> 1. **DEPLOY EVERY IMPORTER.** Supabase bundles `_shared` **at deploy time**. Editing a shared file changes NOTHING until every importer is redeployed. This stranded **17 functions**, one for a month, and made D-287's *"the resolver is UNIVERSAL on every surface"* **false in production**.
+> 2. **BACK-ANNOTATE.** When you supersede an older `D-NNN`/`Q-NNN`, **go back and mark the OLD entry.** Forward pointers were always good here; back-pointers never existed. That is how all five docs rotted.
+> 3. **A SPEC DIES ON SHIP.** Fold it into a `D-NNN` and DELETE the file. `docs/` has ~149 files and most are stale **because specs never die.**
+>
+> ### ⚠️ METHOD — IT COST US REPEATEDLY
+> **Run ALL FOUR suites, every time.** `supabase/functions/_shared` (1090) · `supabase/functions/shared` (106 — **a DIFFERENT directory, and it was a blind spot all day**) · `generate-run-plan` (33) · `src/lib` (198).
+>
+> **A code trace is right about what EXISTS and blind to what is BITING.** The four-agent audit found the architecture and **none of the three worst bugs** — those came from opening the app. **And a plausible mechanism found in code is a HYPOTHESIS, not a finding, until the data agrees.**
+>
+> ### AWAITING MICHAEL (shipped, human-unverified) — see the top of `POLISH-PUNCH-LIST.md`.
+
+---
+
 ## 🧭 NEXT SESSION — START HERE (roadmap as of 2026-07-13 — the app LEARNS numbers and does not READ them back)
 
 > ## 2026-07-13 — FOUR STARVED READS ROOT-CAUSED. ONE PATTERN: the app learns a number, then doesn't read it.
