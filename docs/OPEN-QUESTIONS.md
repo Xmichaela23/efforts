@@ -613,3 +613,50 @@ The 7.8% decoupling driving "needs work" is **`as of Jun 27`** — **16 days old
 
 ### ⚠️ Method note
 Found by **opening a swim session and reading the "Next" card**, then comparing it to State. The code audit had all the pieces (`SPEC-posture-flag` documented the write-only field; the spine trace covered `run.ts`) and **never put them next to each other** — because in code they live in different files, and only on screen do they live in the same eye.
+
+---
+
+## Q-180 — THE LOGGER CANNOT RECORD A CARRY. The Hyrox station is prescribed in METRES; the logger has a timer and a reps box, and nothing else. The athlete's work is silently lost. (ENGINE + PRODUCT, 2026-07-13 — FOUND BY MICHAEL, from his own session)
+
+**This is the disease behind Q-178.** Q-178 fixed the analyzer (it must not fabricate work from a `completed` flag). **This is why the data was missing in the first place.**
+
+> **Michael, on his own Mon 2026-07-13 session: "I DID complete the farmers carry — it felt a little glitchy on the logger."**
+> **He did the work. The app threw it away.**
+
+### The chain
+
+1. **`shared/strength-system/strength-primary-plan.ts:193` — `HYROX_ROTATION` prescribes carries in METRES, in the `reps` field, as a string:**
+   `Sled Push '20 m'` · **`Farmers Carry '40 m'`** · `Sandbag Lunge '20 m'` · `Sled Pull '20 m'` · `Back Extension '15'`
+2. **The equipment substitution WORKS — and it is well built** (`materialize-plan:1006-1032`). Michael has dumbbells and no sled/turf, so sled + sandbag were correctly swapped out and **Farmers Carry correctly survived** (*"works with any load (DB/KB/barbell); only fall back when there is none at all"*), with honest notes. **His session was Bench, BB Row, Farmers Carry. Exactly right.**
+3. 🔴 **THE LOGGER HAS NO DISTANCE INPUT.** `grep -cniE "distance|metres|meters" src/components/StrengthLogger.tsx` → **0**. It has exactly two modes (`:3955`): `isDurationBased` → a **timer**; else → a **numeric reps box**. **A 40-metre carry fits neither.**
+4. → He carried 40 m, had no field to put it in, tapped Done, and D-203's friction-free auto-save wrote `completed: true, rir: 3, reps: 0`.
+5. → The old analyzer predicate read the flag and called it PERFORMED → `98% · Strong` → *"sets landed on target across all three lifts."* **(Q-178.)**
+
+### ⚠️ THIS IS WHY Q-178 CANNOT SHIP ALONE
+
+The Q-178 fix (a 0-rep set is not performed) is **correct** — the app must not claim work it has no record of. **But deployed on its own it now correctly reports that his carries were not recorded, which means it MARKS HIM DOWN FOR WORK HE ACTUALLY DID.**
+
+**The old behaviour lied in his favour. The fixed behaviour lies against him. Neither is true.** The truth is: **the app does not know, because it never gave him a way to tell it.**
+
+> ### THE RULE THIS ESTABLISHES
+> **If the app structurally CANNOT capture an exercise, it must not GRADE the athlete on it.**
+> Exclude it from the denominator and **say so** — *"carry work isn't recorded yet."*
+> Same principle as refusing to invent a 1RM (Law 2). **Do not penalise what you cannot measure.**
+
+### Also found — a LATENT unit bug in the same block
+**The substitution rewrites the exercise NAME and the NOTES. It never rewrites the `reps` UNIT** (`reps rewrites inside the fallback block: 0`).
+- `Sled Pull ('20 m')` → **`Dumbbell Row`** — still prescribed **`20 m`**. **A dumbbell row in metres.**
+- `Sled Push ('20 m')` → `Dumbbell Walking Lunge` — 20 m is arguably fine for a walking lunge, but it is luck, not design.
+- Also: `repScaleFor` (`materialize-plan:834`) does `Number(reps)` → **`Number('40 m')` = NaN** on every distance-prescribed set.
+- The rotation cycles weekly (`rot[(week - 1) % rot.length]`), so **Michael hits the Dumbbell-Row-in-metres in week 4.**
+
+### The fix — three pieces, and (1) must not ship without (3)
+1. ✅ **Analyzer: don't fabricate work from a flag.** *(Q-178 — done, committed, held.)*
+2. 🔴 **Logger: a THIRD input mode — distance.** The real fix. `duration_seconds` already exists as the precedent for a non-rep unit (`StrengthLogger.tsx:21`); this needs `distance_m` alongside it, threaded through the set shape, volume, and the analyzer.
+3. 🔴 **Analyzer: exclude un-capturable exercises from the score, and disclose.** This is what makes (1) safe to ship. Without it, the honesty fix punishes the athlete.
+4. 🟡 **Substitution must rewrite the UNIT, not just the name.** A row is reps; a carry is metres.
+
+### ⚠️ Method note — the third overclaim of the day
+I first wrote this up as *"4 of 5 Hyrox stations are unloggable"*. **Wrong.** The equipment substitution filters them, and it does so correctly — **Michael only ever saw the one station his kit supports.** The real finding is narrower and sharper: **whatever station survives substitution is still prescribed in a unit the logger cannot capture.**
+
+**Michael caught it, from his own session, in one sentence.** The code audit missed it, the device session missed it, and I overstated it twice before he corrected me. **The athlete in the chair is a load-bearing part of this method.**
