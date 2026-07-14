@@ -117,6 +117,24 @@ Also update `docs/POLISH-PUNCH-LIST.md` if items closed (mark `[x]` with date) o
 
 **The 5 living docs** (updated ~every session; everything else in `docs/` is reference, often stale — verify before trusting): `DECISIONS-LOG.md`, `OPEN-QUESTIONS.md`, `ENGINE-STATE.md`, `POLISH-PUNCH-LIST.md`, `CAPABILITY-MAP.md`.
 
+### ⛔ THE SPEC LIFECYCLE — a SPEC is scaffolding, and scaffolding comes down
+
+**`docs/` has ~150 files and most are stale. This is why: SPECS NEVER DIE.** They get written, they get built, and then they sit there forever describing something that now lives in code — where the **code is the truth** and the spec is a second, decaying copy of it. That is the doc-rot engine.
+
+**The lifecycle, and it is not optional:**
+
+| doc | lifespan | purpose |
+|---|---|---|
+| **`Q-NNN`** (OPEN-QUESTIONS) | cheap, permanent | *"we noticed this."* A **LEAD**, not a verified bug. |
+| **`SPEC-*.md`** | **TEMPORARY — it dies on ship** | a **build contract**. Only write one when the thing is genuinely spec-worthy (new semantics, sign-off gated). |
+| **`D-NNN`** (DECISIONS-LOG) | permanent | *"here is what we did and WHY."* **The spec's substance lands here.** |
+
+**WHEN A SPEC SHIPS: fold its substance into a `D-NNN`, then DELETE the spec file.** If only part shipped, write the `D-NNN` for that part and leave the spec holding **only the unbuilt remainder** — then delete it when that lands. *(Worked example: `SPEC-exercise-substitution` → D-289 for slices 1+3; the file now holds only slice 2.)*
+
+**⛔ DO NOT WRITE A NEW DOC WHEN A `Q-NNN` WILL DO.** Most findings are a Q-entry and then code. A new file needs to earn itself.
+
+**And a decision that lives only in a commit message does not exist.** *(D-288 shipped, was cited by `CAPABILITY-MAP`, and was never written to the log — the code was at D-288 while the log ended at D-287. Written a day late.)*
+
 If the human ends the session without triggering this, prompt before stopping:
 
 > "Before you go — should I update the context docs with what we shipped today?"
