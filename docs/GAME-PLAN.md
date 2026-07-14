@@ -22,16 +22,22 @@ That is the whole diagnosis, and it produces exactly three diseases:
 
 ---
 
-## PHASE 1 — STOP THE LIES (days, not weeks)
+## PHASE 1 — STOP THE LIES ✅ **DONE 2026-07-14 — deployed, not yet human-verified**
 
 *The app is actively telling its only user false things. Nothing else matters until it stops.*
 
-- [ ] **Q-178 — a skipped exercise counts as PERFORMED.** `analyze-strength-workout:89` — `completed === true` short-circuits, so a `0 reps / 0 weight / 0 duration` set reads as done. **Live repro: he did ZERO Farmers Carries and the app said `98% · Strong — "sets landed on target across all three lifts"`.**
+> **Closed 2026-07-14.** Three of the four shipped and are live. **Q-164 was deliberately left** — it is a dead row, not a lie, and it belongs with the other DEAD findings in Phase 4.
+>
+> **A whole phase's worth of strength work rode along that was NOT on this plan** — it came from Michael opening the logger, and it is the argument for doing that more often. **Q-180**: the logger could not record a Farmers Carry at all (no weight box, duration never persisted, RIR prompted on timed work, `'40 m'` read as 40 *seconds*). **D-289/D-290**: a **SWAP IS NOT A SKIP** — the SLOT is the unit of strength adherence, not the exercise name. **Q-TIMER**: the rest timer lost the time you were away, then cancelled the notification that would have told you.
+>
+> ⚠️ **The four-agent code audit that produced THIS PLAN found none of those three.** They were found by using the app. **A code trace is right about what EXISTS and blind to what is BITING.**
+
+- [x] **Q-178 — a skipped exercise counts as PERFORMED.** `analyze-strength-workout:89` — `completed === true` short-circuits, so a `0 reps / 0 weight / 0 duration` set reads as done. **Live repro: he did ZERO Farmers Carries and the app said `98% · Strong — "sets landed on target across all three lifts"`.**
   **Fix:** a set with `reps === 0 && !weight && !duration` is not performed, whatever the flag says. Upstream: the logger must not write an RIR onto a zero-rep set. ⚠️ Read D-204 — change the *predicate*, not the 6 call sites.
   ⛔ **This is the one that matters most, and not for the score.** The fact packet said the exercise was performed → the LLM faithfully repeated it. **`narrative-core/validate.ts` validates prose against the FACTS, so it cannot catch a lie already IN the facts.** The containment is sound and **only as honest as the packet**. Corrupt the packet and the guard becomes a laundering step.
-- [ ] **Q-177 — the Monday alarm.** `compute-snapshot:445` compares a **partial-week cumulative SUM** against **complete prior weeks** → ≈ −75% on a Monday → fires `concern` severity every Monday and Tuesday, forever. It measures *what day you looked*. **Fix: delete the signal.** The spine's 6-week per-workout volume trend already exists, is immune, and said `steady`. **Do not widen the threshold — that hides a structural artifact behind a magic number.**
-- [ ] **Q-164 — the dead "Aerobic fitness" BODY row.** `coach:2131` `cardiac_efficiency_current: null, sample_size: 0` → the render gate can never be true. **Feed it or delete it.**
-- [ ] **The 5 red tests** (`_shared/cycling-v1/*`) assert an NP-trend fallback that `cb4eb1d5` deliberately deleted. **Green must mean green.**
+- [x] **Q-177 — the Monday alarm.** `compute-snapshot:445` compares a **partial-week cumulative SUM** against **complete prior weeks** → ≈ −75% on a Monday → fires `concern` severity every Monday and Tuesday, forever. It measures *what day you looked*. **Fix: delete the signal.** The spine's 6-week per-workout volume trend already exists, is immune, and said `steady`. **Do not widen the threshold — that hides a structural artifact behind a magic number.**
+- [ ] **Q-164 — the dead "Aerobic fitness" BODY row.** *(⏭️ DEFERRED to Phase 4 — it is DEAD, not LYING. A row that never renders tells no one anything false.)* `coach:2131` `cardiac_efficiency_current: null, sample_size: 0` → the render gate can never be true. **Feed it or delete it.**
+- [x] **The 5 red tests** (`_shared/cycling-v1/*`) assert an NP-trend fallback that `cb4eb1d5` deliberately deleted. **Green must mean green.**
 
 ---
 
