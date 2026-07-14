@@ -183,6 +183,17 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
   // D-208: dynamic "what moved it" line, read from the shared component_attribution structure the
   // analyzer emits. Null when the session is clean (nothing to explain) — then only the static
   // metric explainer shows.
+  // Q-181: declared substitutions. The server already decided whether each one is worth saying —
+  // an IN-SLOT swap comes back with note:null (nothing was missed; not news). We render only the
+  // sentences it chose to speak, verbatim. The client does not re-decide. (Law 4.)
+  const execSubstitutionNotes: string[] = (() => {
+    const subs = sessionDetail?.execution?.substitutions;
+    if (!Array.isArray(subs)) return [];
+    return subs
+      .map((s: { note?: string | null }) => (typeof s?.note === 'string' ? s.note.trim() : ''))
+      .filter((n: string) => n.length > 0);
+  })();
+
   const execWhatMoved: string | null = (() => {
     const attr: any = (sessionDetail as any)?.execution?.component_attribution;
     if (!attr || !attr.primary_mover) return null;
@@ -240,6 +251,14 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
           {execWhatMoved && (
             <p className="text-xs text-white/55 mt-1 leading-snug">{execWhatMoved}</p>
           )}
+          {/* Q-181 — THE SWAP RECEIPT. A declared swap is never a dock: the slot was filled, and the
+              slot is the unit of adherence. This is not a penalty and not a scolding — it is the trade,
+              named. An IN-SLOT swap carries note:null and renders NOTHING (nothing was missed, so it is
+              not news, and narrating it would make the app a nag). Only an OUT-OF-SLOT swap speaks, and
+              that sentence is DETERMINISTIC — computed server-side from `primaryRef`, never LLM prose. */}
+          {execSubstitutionNotes.map((note, i) => (
+            <p key={i} className="text-xs text-white/55 mt-1 leading-snug">{note}</p>
+          ))}
         </div>
       )}
       <StrengthCompareTable

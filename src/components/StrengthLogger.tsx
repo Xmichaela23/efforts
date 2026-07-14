@@ -58,6 +58,14 @@ interface LoggedExercise {
   notes?: string;
   target_rir?: number; // Target RIR from prescription (1-5)
   target_reps?: string; // Target reps from prescription, e.g. "4-6" or "8" (display only)
+  // Q-181: the PLANNED exercise this row came from. Stamped ONLY when prefilled from the plan.
+  // The name field in the header is an editable search box, so the athlete's natural way to swap an
+  // exercise is to type over the prescribed one. That is a DECLARATION — they took the prescribed row
+  // and said "I'm doing this instead" — and it is meaningfully different from skipping the planned
+  // lift and adding a separate exercise. Without this field the rename was invisible: the analyzer
+  // matched by name, so the planned lift read as a SKIP and the work read as an unplanned EXTRA.
+  // Undefined on hand-added exercises — those were never prescribed, so they can never be a swap.
+  planned_name?: string;
 }
 
 interface StrengthLoggerProps {
@@ -1627,6 +1635,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             rir: null,
             target_rir: targetRir, // Target RIR from prescription
             target_reps: targetReps, // Target reps from prescription (e.g. "4-6")
+            planned_name: name, // Q-181: remember what was PRESCRIBED, so a rename reads as a swap
           } as LoggedExercise;
         }
         const targetSets = Math.max(1, sets);
@@ -3252,6 +3261,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Keep exercises with names and any sets (for manual logging, be permissive)
     const validExercises = exercises
       .filter(ex => ex.name.trim())
+      // Q-181: A DECLARED SWAP. If a PRESCRIBED row's name was changed, the athlete replaced that
+      // exercise — stamp what it replaces so the analyzer stops reading it as a skip PLUS an orphan.
+      // Derived at save time from planned_name, so no new UI is needed: the header name field is
+      // already an editable search box, and typing over a prescribed exercise IS the declaration.
+      // A hand-added exercise has no planned_name and therefore can never become a swap — an
+      // undeclared miss must stay a skip. (Law 2: we record what the athlete told us; we never infer.)
+      .map(ex => {
+        const planned = ex.planned_name;
+        const isSwap = !!planned && planned.trim().toLowerCase() !== ex.name.trim().toLowerCase();
+        return isSwap ? { ...ex, substituted_for: planned } : ex;
+      })
       .map(ex => ({ 
         ...ex, 
         sets: ex.sets.filter(s => {

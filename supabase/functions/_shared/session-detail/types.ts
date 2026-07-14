@@ -127,6 +127,24 @@ export type SessionDetailV1 = {
     status_label: string | null;
     /** True when pace_adherence was scored on Grade-Adjusted Pace (Minetti model). */
     gap_adjusted?: boolean;
+    /**
+     * Q-181 — DECLARED exercise substitutions (strength only; null for endurance).
+     *
+     * A swap is NEVER a dock — the slot was filled, and the slot is the unit of adherence
+     * (docs/SPEC-exercise-substitution.md). This field is the RECEIPT, not the penalty.
+     *
+     * `note` is **null when the swap stayed IN-SLOT** — nothing was missed, so there is nothing to
+     * say, and the client renders nothing. It carries ONE honest sentence only when the athlete
+     * stepped OUT of the movement-pattern slot. That sentence is DETERMINISTIC (computed from
+     * `primaryRef` in the exercise config) — it is not LLM prose, and it names the trade without
+     * ever predicting its cost.
+     */
+    substitutions?: Array<{
+      planned: string;
+      executed: string;
+      same_pattern: boolean;
+      note: string | null;
+    }> | null;
   };
 
   observations: string[];

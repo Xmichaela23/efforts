@@ -811,6 +811,13 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       component_attribution:
         (sessionState?.details?.execution_summary?.component_attribution
           ?? (wa as any)?.detailed_analysis?.execution_summary?.component_attribution) ?? null,
+      // Q-181: DECLARED exercise substitutions. A swap is never a dock (the slot was filled). An
+      // IN-SLOT swap carries note:null and renders nothing — nothing was missed, so it is not news.
+      // An OUT-OF-SLOT swap carries one honest, DETERMINISTIC sentence (computed from `primaryRef`,
+      // not written by the LLM). Null for endurance.
+      substitutions:
+        (sessionState?.details?.execution_summary?.substitutions
+          ?? (wa as any)?.detailed_analysis?.execution_summary?.substitutions) ?? null,
     },
 
     observations,

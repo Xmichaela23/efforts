@@ -11,6 +11,8 @@ import { detectNovelMovements, novelMovementsNames, novelMovementNames } from '.
 // D-208: role classifier — execution scoring weights a skipped accessory less than a main lift.
 import { roleForExercise, ROLE_WEIGHT } from '../_shared/strength/exercise-role.ts';
 import { isPerformedStrengthSet } from '../_shared/strength/performed-set.ts';
+import { matchExercises } from '../_shared/strength/match-exercises.ts';
+import { buildSubstitutionNote } from '../_shared/strength/substitution-note.ts';
 import { rirVerdictFromDelta } from '../_shared/strength-profiles.ts';
 import { spineDirectionToTrend } from '../_shared/state-trend/strength.ts';
 
@@ -472,132 +474,15 @@ async function extractEnhancedPlanMetadata(
 
 // Helper function to normalize planned exercise format
 // Planned format: {name, sets: 4, reps: 5, weight: 85}
-// Executed format: {name, sets: [{reps: 5, weight: 85}, ...]}
-function normalizePlannedExercise(planned: any): any {
-  // If already in executed format (has sets array), return as-is
-  if (Array.isArray(planned.sets)) {
-    return planned;
-  }
-  
-  // Convert flat format to nested format
-  const numSets = typeof planned.sets === 'number' ? planned.sets : 0;
-  const reps = planned.reps || 0;
-  const weight = typeof planned.weight === 'number' ? planned.weight : 0;
-  const durationSeconds = planned.duration_seconds || null;
-  const rir = planned.rir || null;
-  
-  // Create array of sets
-  const sets = [];
-  for (let i = 0; i < numSets; i++) {
-    sets.push({
-      reps: reps,
-      weight: weight,
-      duration_seconds: durationSeconds,
-      rir: rir,
-      completed: false // Planned sets are not completed
-    });
-  }
-  
-  return {
-    ...planned,
-    sets: sets
-  };
-}
-
-// Helper function to normalize exercise names for matching
-function normalizeExerciseName(name: string): string {
-  return name.toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .replace(/[^\w\s]/g, '') // Remove special characters
-    .replace(/\b(curls?|curl)\b/gi, 'curl') // Normalize "curl" variations
-    .replace(/\b(squats?|squat)\b/gi, 'squat')
-    .replace(/\b(deadlifts?|deadlift)\b/gi, 'deadlift')
-    .replace(/\b(nordic\s*curl|nordic)\b/gi, 'nordic curl'); // Normalize Nordic Curls
-}
-
-// Helper function to match exercises between planned and executed
-function matchExercises(plannedExercises: any[], executedExercises: any[]): any[] {
-  const matches: any[] = [];
-  
-  for (const planned of plannedExercises) {
-    // Normalize planned exercise to match executed format
-    const normalizedPlanned = normalizePlannedExercise(planned);
-    const plannedNameNormalized = normalizeExerciseName(planned.name);
-    
-    // Try exact match first
-    let executed = executedExercises.find(exec => 
-      normalizeExerciseName(exec.name) === plannedNameNormalized
-    );
-    
-    // If no exact match, try fuzzy matching (contains)
-    if (!executed) {
-      executed = executedExercises.find(exec => {
-        const execNameNormalized = normalizeExerciseName(exec.name);
-        return execNameNormalized.includes(plannedNameNormalized) || 
-               plannedNameNormalized.includes(execNameNormalized);
-      });
-    }
-    
-    if (executed) {
-      matches.push({
-        name: planned.name,
-        planned: normalizedPlanned, // Use normalized version
-        executed: executed,
-        matched: true
-      });
-    } else {
-      matches.push({
-        name: planned.name,
-        planned: normalizedPlanned, // Use normalized version
-        executed: null,
-        matched: false
-      });
-    }
-  }
-  
-  // Add any executed exercises that weren't planned
-  for (const executed of executedExercises) {
-    const executedNameNormalized = normalizeExerciseName(executed.name);
-    const alreadyMatched = matches.some(match => {
-      if (!match.planned) return false;
-      const matchNameNormalized = normalizeExerciseName(match.name);
-      return matchNameNormalized === executedNameNormalized ||
-             matchNameNormalized.includes(executedNameNormalized) ||
-             executedNameNormalized.includes(matchNameNormalized);
-    });
-    
-    if (!alreadyMatched) {
-      // Check if this executed exercise matches any planned exercise name
-      const matchingPlanned = plannedExercises.find(planned => {
-        const plannedNameNormalized = normalizeExerciseName(planned.name);
-        return plannedNameNormalized === executedNameNormalized ||
-               plannedNameNormalized.includes(executedNameNormalized) ||
-               executedNameNormalized.includes(plannedNameNormalized);
-      });
-      
-      if (matchingPlanned) {
-        // Found a match - update the existing match entry
-        const existingMatch = matches.find(m => 
-          normalizeExerciseName(m.name) === normalizeExerciseName(matchingPlanned.name)
-        );
-        if (existingMatch && !existingMatch.executed) {
-          existingMatch.executed = executed;
-          existingMatch.matched = true;
-        }
-      } else {
-        matches.push({
-          name: executed.name,
-          planned: null,
-          executed: executed,
-          matched: false
-        });
-      }
-    }
-  }
-  
-  return matches;
-}
+// Q-181: normalizePlannedExercise / normalizeExerciseName / matchExercises now live in
+// `_shared/strength/match-exercises.ts` (imported above) so they can be PIN-TESTED. matchExercises is
+// the core of EVERY strength execution score — it had no fixture at all. The inline copies were
+// deleted 2026-07-14. Do not re-inline them, and do not write a second matcher.
+//
+// The behaviour change: A DECLARED SWAP IS NOT A SKIP. An executed exercise carrying
+// `substituted_for` matches the planned exercise it replaces, so the athlete is no longer docked
+// twice for an honest substitution (a skip on the planned lift AND zero credit for the work done).
+// An UNDECLARED miss is still a skip — that guard is the first fixture in the test file.
 
 // Helper function to calculate exercise adherence
 function calculateExerciseAdherence(match: any, userUnits: string, planUnits: string): any {
@@ -1301,19 +1186,37 @@ function calculateExecutionSummary(
   
   // Calculate overall execution score
   const setCompletion = overallAdherence.set_completion_rate || 0;
+
+  // Q-181 — NEVER GRADE WHAT YOU CANNOT ANCHOR (the Q-180 rule).
+  //
+  // A DECLARED swap counts as COMPLETED (the slot was filled — that is the whole point, no dock), but
+  // it must NOT be graded on LOAD or RIR: the substitute carries no prescription of its own, and
+  // comparing a hip thrust's weight to a Bulgarian split squat's target is nonsense. Grading it would
+  // just be inventing a verdict from a number that means nothing.
+  //
+  // So load/RIR average over the ANCHORED matches only. If every matched exercise was swapped, there is
+  // no load signal at all — the term must not PENALISE (the athlete did the work; we simply cannot
+  // grade the load) and must not REWARD. It goes silent at 100, exactly as rirAdherence already does
+  // when there is no RIR data. Exercise-completion still carries the honest verdict.
+  //
+  // ⚠️ The `matchedExercises.length > 0` outer guard STAYS: a session where nothing matched at all is
+  // still a 0, not a free 100.
+  const anchoredExercises = matchedExercises.filter((ex: any) => !ex.substituted);
   const loadAdherence = matchedExercises.length > 0
-    ? matchedExercises.reduce((sum: number, ex: any) => {
-        const weightScore = Math.max(0, 100 - Math.abs(ex.adherence.weight_progression || 0));
-        return sum + weightScore;
-      }, 0) / matchedExercises.length
+    ? (anchoredExercises.length > 0
+        ? anchoredExercises.reduce((sum: number, ex: any) => {
+            const weightScore = Math.max(0, 100 - Math.abs(ex.adherence.weight_progression || 0));
+            return sum + weightScore;
+          }, 0) / anchoredExercises.length
+        : 100) // every match was an un-anchored swap → no load signal, no penalty
     : 0;
-  const rirAdherence = matchedExercises.filter(ex => ex.adherence.rir_adherence != null).length > 0
-    ? matchedExercises
-        .filter(ex => ex.adherence.rir_adherence != null)
-        .reduce((sum: number, ex: any) => {
-          const rirScore = Math.max(0, 100 - (ex.adherence.rir_adherence * 20));
-          return sum + rirScore;
-        }, 0) / matchedExercises.filter(ex => ex.adherence.rir_adherence != null).length
+  // Q-181: swaps are excluded here too — a RIR target belongs to the exercise that was PRESCRIBED.
+  const rirAnchored = anchoredExercises.filter((ex: any) => ex.adherence.rir_adherence != null);
+  const rirAdherence = rirAnchored.length > 0
+    ? rirAnchored.reduce((sum: number, ex: any) => {
+        const rirScore = Math.max(0, 100 - (ex.adherence.rir_adherence * 20));
+        return sum + rirScore;
+      }, 0) / rirAnchored.length
     : 100; // Default to 100% if no RIR data
 
   // D-208: ROLE-WEIGHTED exercise completion. Each planned exercise contributes its role weight
@@ -1372,6 +1275,12 @@ function calculateExecutionSummary(
     rir_adherence: rirAdherence,
     overall_execution: Math.round(overallExecution),
     component_attribution: componentAttribution,
+    // Q-181 — THE SWAP RECEIPT. Deterministic, computed from `primaryRef`; NOT LLM prose. An IN-SLOT
+    // swap is SILENT (nothing was missed — field standard). An OUT-OF-SLOT swap is never docked either,
+    // and gets ONE honest sentence naming what changed. It names the trade; it never predicts its cost.
+    substitutions: matchedExercises
+      .filter((ex: any) => ex.substituted && ex.substituted_with)
+      .map((ex: any) => buildSubstitutionNote(String(ex.name ?? ''), String(ex.substituted_with ?? ''))),
   };
 }
 
@@ -1507,7 +1416,12 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
       planned: match.planned,
       executed: match.executed,
       adherence: adherence,
-      matched: match.matched
+      matched: match.matched,
+      // Q-181: a DECLARED swap. Counts as COMPLETED (the slot was filled — no dock), but it is
+      // UN-ANCHORED for load/RIR: the executed exercise has no prescription of its own, and grading
+      // a hip thrust against a Bulgarian split squat's target is nonsense.
+      substituted: (match as any).substituted === true,
+      substituted_with: (match as any).substituted_with
     };
   });
   
