@@ -87,8 +87,16 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
 };
 
 // Smart exercise type detection from name
+// Q-180: normalize before ANY substring match. The plan writes "Farmers Carry"; the exercise library
+// and the athlete write "Farmer's Carry". `"farmer's carry".includes('farmers carry')` is FALSE, so the
+// apostrophe alone dropped the exercise through every dbPattern and it defaulted to BARBELL — the
+// logger offered a plate calculator and a 45 lb bar for a dumbbell carry. Strip punctuation, collapse
+// whitespace, then match. (Screenshot, 2026-07-14.)
+const normalizeExerciseNameForMatch = (name: string): string =>
+  String(name || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+
 const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' | 'bodyweight' | 'goblet' => {
-  const name = exerciseName.toLowerCase();
+  const name = normalizeExerciseNameForMatch(exerciseName);
   
   // Bodyweight / core exercises (no equipment needed)
   if (name.includes('core circuit') || name.includes('core work') || name.includes('calf raise')) return 'bodyweight';
@@ -2759,16 +2767,41 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     
     if (!nameToAdd) return;
     
+    // Q-180: DERIVE THE SET SHAPE FROM THE EXERCISE, exactly as the prefill path does.
+    //
+    // The render decides duration-vs-reps from `set.duration_seconds !== undefined` (:3935) — NOT from
+    // the exercise name. The materializer's prefill stamps duration_seconds for a duration-based
+    // exercise, so a PLANNED carry or plank gets a timer. `addExercise` hardcoded { reps: 0, weight: 0,
+    // barType: 'standard' }, so a HAND-ADDED carry or plank fell through to the generic barbell shape:
+    // a Reps box, an RIR box, a plate calculator and a 45 lb bar — for a dumbbell carry.
+    //
+    // Michael, from a screenshot (2026-07-14): "when adding an exercise in the logger it defaults to the
+    // regular lifting shape — farmers, plank do not go to their shapes; those seem to only happen when
+    // the materializer prefills them." Exactly right. The shape logic existed and fired on ONE path.
+    //
+    // `addSet` already clones duration_seconds from the previous set, so fixing the FIRST set is enough.
+    const isDurationExercise = isDurationBasedExercise(nameToAdd);
+    const firstSet: LoggedSet = isDurationExercise
+      ? {
+          // The timer's own fallback is 60s (`set.duration_seconds || 60`) — match it, and let the
+          // athlete edit. A duration set must NOT carry `reps`, or the render flips back to the rep box.
+          duration_seconds: 60,
+          weight: 0,
+          rir: undefined,
+          completed: false,
+        }
+      : {
+          reps: 0,
+          weight: 0,
+          barType: 'standard',
+          rir: undefined,
+          completed: false,
+        };
+
     const newExercise: LoggedExercise = {
       id: Date.now().toString(),
       name: nameToAdd,
-      sets: [{
-        reps: 0,
-        weight: 0,
-        barType: 'standard',
-        rir: undefined,
-        completed: false
-      }],
+      sets: [firstSet],
       expanded: true
     };
     
