@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, CheckCircle, Pencil } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, CheckCircle, Pencil, Repeat } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
+import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-alternatives';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
 import CoreTimer from '@/components/CoreTimer';
@@ -438,7 +439,26 @@ const PlateMath: React.FC<{
 };
 
 export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved, targetDate }: StrengthLoggerProps) {
-  const { workouts, addWorkout, updateWorkout } = useAppContext();
+  const { workouts, addWorkout, updateWorkout, loadUserBaselines } = useAppContext();
+
+  // Q-181 (slice 2): the SWAP SHEET. The athlete's strength equipment, so the offered alternatives are
+  // ones they can actually load. Fetched once; absent → we OFFER everything rather than hide it (a false
+  // exclusion is worse than a false offer — they can skip a barbell lift they can't do, but they cannot
+  // pick something the app never showed them).
+  const [strengthEquipment, setStrengthEquipment] = useState<string[]>([]);
+  const [swapFor, setSwapFor] = useState<string | null>(null); // exercise.id whose swap sheet is open
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const b = await loadUserBaselines();
+        const eq = (b as { equipment?: { strength?: string[] } } | null)?.equipment?.strength;
+        if (!cancelled && Array.isArray(eq)) setStrengthEquipment(eq);
+      } catch { /* no equipment → offer everything (see above) */ }
+    })();
+    return () => { cancelled = true; };
+  }, [loadUserBaselines]);
   // Planned feed for reliable prefill
   const { plannedWorkouts = [], refresh: refreshPlanned } = usePlannedWorkouts() as any;
   const [exercises, setExercises] = useState<LoggedExercise[]>([]);
@@ -3961,6 +3981,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     </div>
                   )}
                 </div>
+                {/* Q-181 — SWAP. Only on a PRESCRIBED exercise: a hand-added one was never prescribed,
+                    so there is nothing to substitute FOR, and an undeclared miss must stay a skip.
+                    The field makes Swap a FIRST-CLASS ACTION precisely because delete-and-re-add
+                    destroys the planned↔executed link. Renaming already worked — nobody could find it. */}
+                {exercise.planned_name && (
+                  <button
+                    onClick={() => setSwapFor(swapFor === exercise.id ? null : exercise.id)}
+                    className={`p-2 transition-colors ${swapFor === exercise.id ? 'text-teal-300' : 'text-white/60 hover:text-white/90'}`}
+                    aria-label="Swap this exercise"
+                    title="Swap this exercise"
+                  >
+                    <Repeat className="h-4 w-4" />
+                  </button>
+                )}
                 <button
                   onClick={() => toggleExerciseExpanded(exercise.id)}
                   className="p-2 text-white/60 hover:text-white/90 transition-colors"
@@ -3979,6 +4013,96 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     <X className="h-4 w-4" />
                   </button>
                 )}
+
+              {/* ── Q-181 — THE SWAP SHEET ────────────────────────────────────────────────────────
+                  The app OFFERS the alternatives, filtered by MOVEMENT PATTERN + the athlete's
+                  equipment — the field standard (Trainerize's filters are literally "Same muscle group
+                  / Same Equipment / Same movement"; Fitbod matches same-muscle at equivalent intensity).
+                  The athlete does not have to know what a valid substitute is.
+
+                  Picking one just RENAMES the prescribed exercise — the exact same data path the manual
+                  rename already used. `substituted_for` is derived from `planned_name` at save. ONE data
+                  path, two doors. So a swap is never a dock (the slot was filled), and an OUT-OF-SLOT
+                  choice still gets its honest sentence on Performance.
+
+                  ⚠️ The free-library override stays: the name field above is still an editable search
+                  box, so the athlete can pick ANYTHING, including out of slot. The app does not block —
+                  "its job is not to stop you moving; it is to make sure you know you moved."
+              ─────────────────────────────────────────────────────────────────────────────────────── */}
+              {swapFor === exercise.id && (() => {
+                const alts: AlternativeOption[] = getInSlotAlternatives(
+                  exercise.planned_name || exercise.name,
+                  strengthEquipment,
+                );
+                return (
+                  <div className="mt-2 mb-3 rounded-xl border-2 border-white/15 bg-white/[0.06] backdrop-blur-md p-3">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-[11px] uppercase tracking-wide text-white/45">
+                        Swap {exercise.planned_name}
+                      </span>
+                      <button
+                        onClick={() => setSwapFor(null)}
+                        className="text-white/40 hover:text-white/70"
+                        aria-label="Close swap"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    {alts.length > 0 ? (
+                      <>
+                        <p className="text-[11px] text-white/40 mb-2 leading-snug">
+                          Same movement pattern, with your equipment.
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {alts.map((a) => (
+                            <button
+                              key={a.name}
+                              onClick={() => {
+                                // Q-181: CLEAR THE PRESCRIBED WEIGHT ON A SWAP.
+                                //
+                                // The number on those sets was computed for a DIFFERENT exercise — a
+                                // Bulgarian Split Squat is 50% of your squat; a Hip Thrust is 90% of your
+                                // deadlift. Carrying it across would show the athlete a weight the app
+                                // cannot stand behind, and (worse) one they might actually load. Even an
+                                // in-slot swap shifts the ratio (walking lunge 0.50 vs step-up 0.40).
+                                //
+                                // So we clear it and let them enter what they used. Law 2: we do not
+                                // display a number we cannot anchor. It costs one tap, and the analyzer
+                                // does not grade load on a swap anyway (un-anchored — see D-289).
+                                // Reps/duration are KEPT: the volume prescription (3×8) still stands.
+                                setExercises((prev) => prev.map((ex) =>
+                                  ex.id === exercise.id
+                                    ? {
+                                        ...ex,
+                                        name: a.name,
+                                        sets: ex.sets.map((st) => ({ ...st, weight: 0, completed: false })),
+                                      }
+                                    : ex,
+                                ));
+                                setSwapFor(null);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg text-[12px] border border-white/15 bg-white/[0.05] text-white/80 hover:bg-white/[0.10] hover:text-white transition-colors"
+                            >
+                              {a.name}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      /* We do not know this exercise's movement pattern — so we do not guess at a
+                         substitute. Say so, and let them search. (Law 2.) */
+                      <p className="text-[11px] text-white/40 leading-snug">
+                        No matched alternatives for this movement — type a name above to search.
+                      </p>
+                    )}
+
+                    <p className="text-[11px] text-white/30 mt-2.5 leading-snug">
+                      Swapping is not a miss. Or type any exercise in the name field above.
+                    </p>
+                  </div>
+                );
+              })()}
               </div>
             </div>
 
