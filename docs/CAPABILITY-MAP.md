@@ -1,168 +1,250 @@
 # CAPABILITY MAP — "does X exist, and where?"
 
-## 🔴 THE LIVING DOCS — read these, and UPDATE these every session
+**Rebuilt from code 2026-07-13** (4 parallel readers, every row verified by code-read — not by trusting comments or the previous map). The previous version asserted a deleted code path was live, cited a decision number that was never written, was 16 coach versions stale, and omitted ~13 shipped subsystems. Treat this rebuild as the baseline; append to it, and **when you ship something that changes a row, change the row.**
 
-These 5 docs are ALIVE — updated basically every working session. If you touch the app, you update them (see the end-of-session protocol in `CLAUDE.md`). **Everything else in `docs/` is reference and mostly stale — verify before trusting.**
+**Purpose:** the lookup that stops us re-inventing shipped infrastructure. Before proposing to build ANYTHING, find the capability here, then grep its entry point and read it (`CLAUDE.md` top banner: **trace-before-build**). This app is BUILT — the job is wiring/continuity, not features.
 
-| Doc | What it is | Update when |
+**How to use:** Ctrl-F the capability. `BUILT` → don't rebuild, wire into it. `PARTIAL`/`SEAM`/`STUB` → that's the real edge. `DEAD` → it exists and nothing calls it; decide whether to mount it or delete it, but don't write a second one. Entry points are `file:approx-line` — **lines drift, grep the symbol.**
+
+**Status legend:**
+`BUILT` works end to end · `PARTIAL` works but fragile/incomplete (the note says how) · `SEAM` documented extension point, not built · `STUB` placeholder / invented numbers · `DEAD` exists, zero callers OR output never rendered.
+
+---
+
+## ⚠️ READ FIRST — the "I almost rebuilt this" list
+
+**This section is the whole point of the doc.** Every item is something that exists, is hard to find, and has been (or nearly been) rebuilt.
+
+1. **A run easy-pace resolver.** `src/lib/resolve-current-run-pace.ts:146` is THE one (client + edge import it). A **second function with the same name** exists at `generate-combined-plan/science.ts:110` — different function, currently starved. Don't write a third; don't "fix" the second by deleting it. *(A session rebuilt this once. See CLAUDE.md.)*
+2. **"Is this HR easy?"** → `_shared/easy-hr.ts:112` (`resolveRunEasyHrBand`). Already consolidated out of **five** disagreeing copies. Do not add a sixth.
+3. **"What day does session X go on?"** → `_shared/week-optimizer.ts:1075` (`deriveOptimalWeek`) is the sole authority; the same-day matrix is `_shared/schedule-session-constraints.ts:148`. `generate-run-plan` and `generate-triathlon-plan` **not** routing through it makes the optimizer look absent. It exists; they're unwired.
+4. **A run plan generator.** There are **five DEAD generator classes** in `generate-run-plan/generators/`, and `simple-completion.ts:89` exports a class named `SustainableGenerator` — **identical in name to the live one** in `sustainable.ts:92`. Editing the wrong file is a silent no-op. Only `sustainable` and `performance-build` are switched on (`generate-run-plan/index.ts:232`).
+5. **A weekly training-context engine.** `generate-training-context/` (3.4k lines) is a **DEAD twin** of the live `coach` → `weekly_state_v1` path. It looks canonical and ships nothing.
+6. **A "coach week" screen.** `CoachWeekTab.tsx` (1145 lines) and `BlockSummaryTab.tsx` (1185 lines) are fully built, fully typed, and **unmounted**. The data is already on the wire. Mount them or delete them — don't build a third.
+7. **A daily readiness check-in screen.** `readiness_checkins` is a real table with three server readers, and its **only writer lives inside the strength logger** (`StrengthLogger.tsx:3278`). An endurance-only athlete can never check in. Most likely thing in the app to get rebuilt from scratch.
+8. **The segment / "core" engine.** Three stages exist and are spine-wired (`detect-cores` → `match-cores` → `compute-core-verdict`), but **stage 1 has no caller** — no cron, no button, no script. So `route_cores` is always empty and the whole thing produces nothing. It looks unbuilt. It is **unstarted**.
+9. **The ingest fan-out.** `analyze-workout/` is an **empty directory** with the most guessable name in the repo. The real orchestrator is `ingest-activity/index.ts:1345-1712`. Any new downstream step must register in **three** hand-maintained routing tables: `ingest-activity`, `recompute-workout:27`, `bulk-reanalyze-workouts:36`.
+10. **A shared CORS helper.** There is no `_shared/cors.ts`. All 87 functions hand-roll it. Genuinely missing — but creating it means reconciling 87 copies, at least three of which differ.
+11. **A "verify the caller" helper.** `_shared/require-user.ts` exists and is good. Adoption is **9 of 87**. `_shared/bearer-auth.ts` is a **second, unverified** implementation (decodes the JWT without checking the signature). Don't write a third — adopt the first, delete the second.
+12. **Strava token refresh.** `strava-refresh/` is a complete, **DEAD** standalone function with the obvious name. The live logic is `_shared/strava-access-token.ts`. Someone told "add token refresh" will find the corpse first.
+13. **A plan "baker".** `src/services/plans/tools/plan_bake_and_compute.ts:948` (`augmentPlan`) exists, works offline (`npm run bake`), and is **commented out in the app** (`PlanSelect.tsx:910-930`, "BAKER IS CRASHING SUPABASE"). Disabled, not missing.
+14. **A plan-token expander.** TWO exist: the live one inline in `materialize-plan/index.ts:1123+`, and `_shared/token-parser.ts` (which serves the **analysis** path, not plans). CLAUDE.md points at the wrong one.
+15. **Race finish projection.** `_shared/race-projections.ts` (17 importers) is the answer. Six other modules orbit it (`riegel.ts`, `goal-finish-from-workouts.ts`, `resolve-server-predicted-finish.ts`, `resolve-goal-target-time.ts`, and two `race-finish-seconds.ts`).
+16. **Backfills.** Six DEAD backfill functions already exist plus two empty dirs. Check the DEAD list before writing a seventh.
+
+---
+
+## Cross-cutting risks (read before touching a fact)
+
+- **The plan pin only half-exists.** `_shared/athlete-snapshot.ts:158` (`buildAthleteSnapshot`) freezes targets at generation — but **5 of its 8 categories are hardcoded `null`** (`:178-182`): swim, equipment, intent, capacity, bio. Those re-resolve **live** on every materialize, so a mid-plan baseline edit silently moves them. Its only reader is `materialize-plan:2745`. And **`generate-strength-plan` never calls it** → Get Stronger / Hyrox plans have **no pin at all**.
+- **Two ingest paths never reach the spine.** `ingest-phone-workout` and `save-imported-workout` fire only `compute-workout-summary` → no `workout_facts`, no `session_load`, invisible to snapshot/arc/coach. `ManualSwimEntry.tsx:70` works around it by calling `recompute-workout`; the other two don't.
+- **`workouts.workload_actual` (the ACWR substrate) is written by ONE job** (`calculate-workload`) called from **two places**. Anything ingested another way contributes **zero to ACWR** while still counting toward `workload_total` — the same snapshot row can contradict itself.
+- **A race in the fan-out.** `compute-facts` is awaited (`ingest-activity:1582`) but reads `workouts.computed`, written by two **fire-and-forget** calls (`:1508`, `:1521`). When it loses, `time_in_zone`, `intervals_hit/total`, `hr_drift_pct` and `execution_score` are silently absent.
+- **The client is a second State engine.** `useStateTrends.ts:54-233` re-runs the server's `assembleStateTrends` in-browser (9 direct queries, hand-copied row filters, browser clock) whenever the server display contract is absent.
+- **Three Friel zone tables disagree.** See the FACTS table below — this is the sharpest live fracture in the app.
+
+---
+
+## FACTS — who owns each number
+
+| fact | resolver | routed? | live fracture |
+|---|---|---|---|
+| **HR zones (Friel)** | `src/lib/friel-zones.ts:36` (Z2 ceiling = 0.89 × LTHR) | ❌ **NO** | 🔴 **THREE tables.** Server `_shared/endurance/hr-zones.ts:18` = **0.90** (used by the run plan generator). Analyzer `analyze-running-workout:1031` = **0.85**. At LTHR 151: **136 / 134 / 128**. The plan prescribes Z2 to 136; the analyzer grades that run out of Z2. A FIT import (`save-imported-workout:174`) writes a **fourth** table into `configured_hr_zones`, which the analyzer trusts FIRST. |
+| **LTHR** | ❌ **none** (`docs/SPEC-lthr-one-anchor.md` = unbuilt spec) | — | 🔴 **4 chains, 2 inverted.** Manual-first: `TrainingBaselines.tsx:2032`, `generate-run-plan:185`. Learned-only (your typed number silently discarded): `coach:2087`, `easy-hr.ts:116`, `analyze-running-workout:1028`, `calculate-workload:241`. Plus a 5th **dead** path still read at `compute-facts:1459`. |
+| **threshold_pace** | ❌ **none** | — | 🔴 **4 chains, ~17 files, 3 units.** `coach:4452` reads `effort_paces` only; `race-projections:370` reads learned only — disjoint fields. |
+| **max HR** | ❌ **none** (`resolveMaxHrCeiling` is a plausibility ceiling, not a value resolver) | — | 🟡 same inversion as LTHR, fewer readers |
+| **FTP** | ✅ `src/lib/resolve-current-ftp.ts:62` | **8 bypass it** | 🔴 `get-week:436` (week-view watts), `normalizer.ts:308/898/935` (plan watts), `PlanSelect.tsx:587`, `course-strategy:521`, **`athlete-snapshot/identity.ts:67` → the LLM prompt** (the coach can *speak* a different FTP than the screens show). |
+| **run easy pace** | ✅ `src/lib/resolve-current-run-pace.ts:146` | server ✅ universal (D-287) | 🟡 client stragglers: `AllPlansInterface.tsx:664/791`, `StructuredPlannedView.tsx:352`, `PlanWizard.tsx:470`, `ArcSetupWizard.tsx:1693` |
+| **1RM anchor** | ✅ `_shared/state-trend/capacity-resolver.ts:125` | ✅ | 🟢 **the model to copy.** Explicitly refuses raw `exercise_log.estimated_1rm` as truth. |
+| **e1RM series (trend)** | `exercise_log.estimated_1rm` ← `compute-facts:124` | 3 readers, 2 estimators | 🟡 `state-trend/strength.ts:79`, `adapt-plan:1138`, `analyze-strength-workout:814` |
+| **ACWR ratio** | ✅ `_shared/acwr.ts:155` | ✅ all 4 | 🟢 clean |
+| **ACWR band/status** | ✅ `_shared/acwr-state.ts:31` (plan-aware) | **6 bypass it** | 🔴 `response-model/weekly.ts:313` is **plan-blind** and ships in the same payload. Taper week @ 1.15: canon says `elevated` (cap 1.1), copy says `optimal` (cap 1.3). |
+| **fitness direction** | ✅ `_shared/state-trend/assemble.ts:335` (`rollupFitness`) | ✅ | 🟢 clean |
+| **RPE / effort perception** | `_shared/response-model/body-response.ts:369` | — | 🔴 **`makeTrend` splits THIS WEEK's sessions in half BY ORDER.** Hard Monday + easy Friday = "improving"; swap the days = "declining". It is the **necessary** leg for the safety floor (`load-status-reconcile.ts:83-95`, D-266). Q-167. |
+| **swim CSS** | ❌ none | — | ⚫ **ORPHANED.** Written by two engines (`learn-fitness-profile:355`, `compute-workout-analysis:772`), read by **nothing**. `planning-context.ts:238` `SWIM_CSS_LIVE = false`. The swim verdict is anchorless. |
+
+---
+
+## INVENTED NUMBERS (still live, mostly undisclosed)
+
+Law 2 says measured ≠ inferred. These are inferred and presented as measured.
+
+| number | file:line | athlete told? |
 |---|---|---|
-| `DECISIONS-LOG.md` | WHY things are the way they are (numbered D-NNN) | you make a non-obvious design choice |
-| `OPEN-QUESTIONS.md` | things noticed + left on purpose, or deferred bugs (numbered Q-NNN) | you notice something and choose to leave it, or resolve a Q |
-| `ENGINE-STATE.md` | current state: what's Solid / Known-broken / Questioned right now | anything ships, breaks, or becomes suspect |
-| `POLISH-PUNCH-LIST.md` | the work queue | items close or get added |
-| `CAPABILITY-MAP.md` (this) | what exists + where + built/broken status | you discover a capability's real status, or ship something that changes it |
+| squat / bench / deadlift 1RM = **135 lb** | `materialize-plan/index.ts:2699 / 2704 / 2714` | **NO** — console log only |
+| overhead press 1RM = **95 lb** | `materialize-plan/index.ts:2719` | **NO** |
+| hip thrust = `max(75, deadlift × 0.55)` | `materialize-plan/index.ts:2726` | **NO** (and derived from a possibly-invented 135) |
+| swim pace = **1:30/100** | `materialize-plan/index.ts:2352` | **NO** — drives every swim `duration_s` |
+| easy run pace = **10:00/mi** | `shared/strength-system/strength-primary-plan.ts:370` | ✅ **YES** — `volume_notes` at `:427`, rendered `GoalsScreen.tsx:1633`. **The only disclosed one.** |
+| heat coefficient `DEFAULT_HEAT_K = 0.005` | `_shared/heat-adjust.ts:43` | self-declared "UNVALIDATED POPULATION PLACEHOLDER" |
+| marathon pace = easy − 30 · threshold = 5K + 20 | `materialize-plan/index.ts:555 / 561` | NO |
+
+**Net:** a brand-new athlete's first strength session is prescribed as a % of an invented 135 lb, and their first swim at an invented 1:30/100, with nothing on screen saying so. The run-pace lies were cleaned up by D-285 (`token-parser.ts:94`, `end-plan-core.ts:75`, `planning-context.ts:381` all now return null instead of guessing). Strength and swim were not.
 
 ---
 
+## INGEST → PROCESSING → ANALYSIS
 
-**Purpose:** the lookup that stops us re-inventing shipped infrastructure. Before proposing to build ANYTHING, find the capability here, then grep its entry point and read it (see the `CLAUDE.md` top banner: **trace-before-build**). This app is BUILT — the job is wiring/continuity, not features.
+| capability | entry point | status | note |
+|---|---|---|---|
+| Garmin/Strava ingest + the full fan-out (THE orchestrator) | `ingest-activity/index.ts:1345-1712` | BUILT | the only path that runs the complete pipeline |
+| Phone-recorded workout ingest | `ingest-phone-workout/index.ts:292` | PARTIAL | fires **only** compute-workout-summary → no facts, no spine |
+| FIT-file import | `save-imported-workout/index.ts:195` | PARTIAL | same; client adds attach+workload, still **no compute-facts** |
+| Garmin swim length/lap reconstruction | `swim-activity-details/index.ts:315` | PARTIAL | Garmin-only (hard 400 otherwise) |
+| Executed intervals + overall pace/HR/power | `compute-workout-summary/index.ts` | BUILT | writes `workouts.computed.overall/intervals` |
+| Zones, GAP series, power curve, best efforts, NP | `compute-workout-analysis/index.ts` | BUILT | ⚠️ **does NOT write `workout_analysis`** despite the name (`:2044` says so) |
+| Deterministic per-workout facts | `compute-facts/index.ts:1650` | BUILT | the deterministic layer; also writes `exercise_log`, `session_load`; then calls `match-cores` + `compute-snapshot` |
+| Per-session workload score | `calculate-workload/index.ts`; formulas `_shared/workload.ts:324` | BUILT | writes `workload_actual` — the ACWR substrate |
+| Run / ride / swim / strength analysis | `analyze-{running,cycling,swim,strength}-workout/index.ts` | BUILT | ⚠️ the function is `analyze-swim-workout`, NOT `analyze-swimming-workout` |
+| Aerobic decoupling (HR drift), runs | `compute-facts/index.ts:1022` | BUILT | first vs second half, ≥20 samples |
+| Pace at easy HR | `compute-facts/index.ts:1069` + `_shared/easy-hr.ts:112` | PARTIAL | **starved** when both `learned_fitness.run_threshold_hr` and `run_max_hr_observed` are null |
+| The one definition of "easy HR" | `_shared/easy-hr.ts:112` | BUILT | consolidated from 5 copies. **Do not add a sixth.** |
+| Corrupt-HR / strap-artefact detection | `_shared/hr-plausibility.ts:145` | BUILT | |
+| Grade-adjusted pace | `_shared/gap.ts:36` | BUILT | |
+| Heat-adjusted route/efficiency trend | `_shared/heat-adjust.ts:372` | STUB (coefficient) | + `temp_f` is null on first ingest (weather is fetched by the analyzer, which runs *after* compute-facts) → those runs are dropped from the regression |
+| Weather for a workout | `get-weather/index.ts:179` | PARTIAL | runs only; ordering bug above |
+| Recompute one workout (the compensating path) | `recompute-workout/index.ts` | BUILT | analysis → facts → analyze. Use this, not bulk-reanalyze, for a correct single backfill |
+| Bulk re-analyze | `bulk-reanalyze-workouts/index.ts:36` | BUILT | ⚠️ **only re-runs the analyzer** — facts + snapshot go stale |
 
-**How to use:** Ctrl-F the capability. If it's `BUILT`, don't rebuild it — wire into it. If `PARTIAL`/`SEAM`/`STUB`, that's the real edge. Entry points are `file:approx-line` (lines drift — grep the symbol).
-
-**Status legend:** `BUILT` = works end-to-end · `PARTIAL` = works but fragile/incomplete/known-caveat · `SEAM` = documented extension point, not built · `STUB` = placeholder/provisional numbers · `DEAD` = exists, zero callers.
-
-**Keep it alive:** update a row when you discover its real status or ship something that changes it. One line per capability. First cut swept 2026-07-11 (5 parallel readers, verified by code-read).
+**Segments / "cores":** `detect-cores` **DEAD (zero callers)** → `match-cores` PARTIAL (wired at `compute-facts:1827`, starved) → `compute-core-verdict` PARTIAL (wired at `compute-snapshot:873`, starved). **Built, spine-wired, produces nothing, because stage 1 is never invoked.**
 
 ---
 
-## ⚠️ Read first — the "I almost rebuilt this" list + cross-cutting risks
+## PLANS · GOALS · CALENDAR
 
-- **FTP is learned from riding AND proactively suggested AND user-adoptable — fully wired.** `learn-fitness-profile` → `learned_fitness.ride_ftp_estimated` → proactive suggest in **`adapt-plan:396/966`** (≥5% delta, writes `performance_numbers.ftp`) → adopt UI in `TrainingBaselines.tsx:1268`. (Corrects an earlier mis-trace: the proactive path is NOT strength-only; it lives in `adapt-plan`, not `capacity-resolver`.) **Caveat:** the proactive path sits inside `adapt-plan`, which is flagged "never really worked" (Q-155) — built in code, reliability questioned.
-- **Bike aerobic decoupling IS computed** (`analyze-cycling-workout:2601`) but **NOT stored** as a field → it's a persist job, not a compute build, if ever wanted. (Run stores its decoupling; bike drops it.)
-- **`bulk-reanalyze-workouts` only re-runs the analyzer — NOT compute-facts/compute-snapshot** → workout_facts + athlete_snapshot go **stale** on a bulk backfill. Use `recompute-workout` (full ordered pipeline) for a correct single-workout backfill.
-- **Continuity risks (surfaces that hold/derive their own copy of a spine fact):**
-  - `useStateTrends.ts:231` — client keeps a **full copy** of the spine's State assembly (live-fallback); only inert while the S2 display contract is present.
-  - `GoalsScreen.tsx:530-621` — computes fitness/volume labels **locally**, not from a spine fact.
-  - `per-domain-load.ts` — cross-sport % **uncalibrated** (attribution keys on composition share, not per-slice ACWR).
-  - `fitness-fatigue.ts` — CTL/ATL is a **STUB** ("uncalibrated — drives no verdict").
-- **Single-sport plans:** only **get-stronger** and **run non-race** build real plans; bike-only/swim-only/hybrid + all single-sport frequency numbers are **STUB** below the F-9 seam. Swim-only product deliberately removed.
+| capability | entry point | status | note |
+|---|---|---|---|
+| **THE wrapper** — create a goal, build + activate a plan | `create-goal-and-materialize-plan/index.ts:2077`, routing `:2320` | BUILT | every plan path goes through here except `PlanWizard` |
+| Season / combined (multi-sport) | `generate-combined-plan/index.ts:60` | BUILT | the most active engine; the only one wired to `week-optimizer` |
+| Run race plan | `generate-run-plan/index.ts:232` | BUILT | only `sustainable` + `performance_build` are switched on |
+| Run non-race (capacity, retest head) | `create-goal…:2458` | BUILT | |
+| **Get Stronger (strength-primary)** | `generate-strength-plan/index.ts:25` → `shared/strength-system/strength-primary-plan.ts` | PARTIAL | ⚠️ **only fires for `commercial_gym`** (`create-goal…:2390`). Bodyweight athletes **silently** get the run-durability plan instead, with no message. Also: **no plan pin.** |
+| **Hyrox accessory bias** | UI `NonRaceBuilder.tsx:395`; engine `strength-primary-plan.ts:193/402/485` | **BUILT — SHIPPED** | sled push / farmers carry / sandbag lunge / sled pull + a fatigued-legs combo after the long run. Rides the Get Stronger path (so inherits the commercial-gym gate). *(The old map had no row. Q-100 still says "not built" — it is stale; Q-103 superseded it.)* |
+| Triathlon / 70.3 — via combined | `combine:true` → `generate-combined-plan` | BUILT | the intended tri path. ⚠️ **the swim leg is not anchored to the athlete's swimming** — the generator is handed `swim_pace_per_100_sec` and never reads it |
+| Triathlon — standalone legacy | `generate-triathlon-plan/index.ts` | PARTIAL | **bypasses `week-optimizer`** — its day placement can disagree with combined |
+| Season gate | `non-race-routing.ts:162` | BUILT | **needs ≥2 event goals**; a single-race athlete who ticks "combine" gets the goal rolled back and `combined_plan_unavailable` |
+| Library plans | `src/services/LibraryPlans.ts:17` → `PlanSelect.tsx:1119` → `activate-plan` | PARTIAL | the **baker is disabled** (`PlanSelect.tsx:910`) |
+| Materialize (tokens → steps, durations, weights) | `materialize-plan/index.ts:2536` | BUILT | has its **own inline token expander** at `:1123` — NOT `_shared/token-parser.ts` |
+| Activate a plan (write rows to the calendar) | `activate-plan/index.ts` | BUILT | |
+| **The calendar read (the ONLY path)** | `get-week/index.ts:33` | BUILT | client must never query `planned_workouts`+`workouts` for the calendar |
+| The plan PIN (freeze targets at build) | `_shared/athlete-snapshot.ts:158` | PARTIAL | see cross-cutting risks — 5 of 8 categories null, one reader, absent on strength plans |
+| Week optimizer (sole day-placement authority) | `_shared/week-optimizer.ts:1075` | BUILT | only `generate-combined-plan` routes through it |
+| Same-day compatibility matrix | `_shared/schedule-session-constraints.ts:148` | BUILT | |
+| Pause / resume / end / delete plan | `pause-plan` · `resume-plan` · `end-plan` → `_shared/end-plan-core.ts:8` · `delete-plan` | BUILT | pause and end **delete all future planned rows** |
+| Drag-reschedule | `validate-reschedule/` + `WorkoutCalendar.tsx:397` | PARTIAL | athlete IS asked — but confirm also **silently deletes same-type conflicting planned rows** (`:431`), which the popup never mentions |
+| Auto-attach a completed workout to its planned row | `auto-attach-planned/index.ts` | BUILT | |
+| Sweep a week (materialize missing + attach) | `sweep-week/index.ts:22` | BUILT | fires on calendar load |
+| Extract races from free text | `extract-races/index.ts` | BUILT | Claude + web search |
+
+### What can CHANGE a plan after it's built — and is the athlete asked?
+
+| change | trigger | asked? |
+|---|---|---|
+| **Strength weight auto-progression / deload** | `adapt-plan` action=`auto`, fire-and-forget from **every workout ingest** + cron (`adapt-plan:1161/1188`) → `materialize-plan:1232` rewrites future rows | **NO — silent.** Only trace is `plan_adjustments.reason`. ⚠️ It also **skips the Arc fatigue/taper/adherence gate** that the *suggest* path applies (`buildAdaptSuggestionGates:484` is only called in the suggest branch) — so a bump too risky to **suggest** still gets **written**. |
+| Strength week relayout | `adapt-plan:750` on plan-JSON fingerprint change | NO on auto; YES on suggest→accept |
+| Manual 1RM override | `StrengthAdjustmentModal.tsx:82` → `materialize-plan` | **YES** — athlete initiates. Mounted at `StateTab.tsx:1370`. |
+| Drag-reschedule | `WorkoutCalendar.tsx:397` | PARTLY (see above) |
+| Sweep | on week load | NO (idempotent) |
+| Pause / End | athlete or `GoalsScreen.tsx:911/971` (auto) | YES / **NO on the auto path** |
+
+> **The consent path exists and is well-built — and it is half-unreachable.** `adapt-plan` `suggest`→`accept` includes *"you got fitter, update your easy pace / FTP?"* (`:349-422`, applied `:935-990`). Its **only** Accept button lives in `CoachWeekTab.tsx:914`, which is **unmounted**. Meanwhile `useCoachWeekContext.ts:570` invokes `adapt-plan` on every State mount, merges the suggestions into the payload by hand, and **drops them on the floor.**
 
 ---
 
-## Baselines & fitness-learning
+## STATE · COACH · ARC · LEARNING
 
-| Capability | Entry point | Status | Notes |
+**Only ONE mounted surface consumes the coach: `AppLayout → ContextTabs → StateTab`.**
+
+| capability | entry point | status | note |
 |---|---|---|---|
-| `user_baselines` store (performance_numbers=typed anchor, learned_fitness=auto, athlete_identity, dismissed_suggestions) | migrations `_create_user_baselines` etc. | BUILT | One-row-per-user JSONB |
-| Learn FTP/paces/HR/swim from 90d activity → learned_fitness | `learn-fitness-profile/index.ts:131` | BUILT | Fans out runs/rides/swims + CSS + identity; auto after milestone ingest + post-race; manual button `TrainingBaselines:414` |
-| FTP learned from riding (ride_ftp_estimated, 4-tier, conf+samples) | `learn-fitness-profile/index.ts:743` | BUILT | 20-min×.95 → NP-hard×.95 → avg×1.05×.95 → fallback; ratchet floor guard |
-| resolveCurrentFtp (learned med/high → manual → learned-low → null) | `src/lib/resolve-current-ftp.ts:62` | BUILT | Pure, client+edge; used in Baselines, cycling analyzer, coach, garmin sync |
-| Proactive FTP suggest + apply | `adapt-plan/index.ts:396` (gen), `:966` (apply) | BUILT | ≥5% delta + conf≥med → suggestion; apply writes performance_numbers.ftp; surfaced `useCoachWeekContext:601`. ⚠ inside questioned adapt-plan (Q-155) |
-| Proactive easy-run-pace suggest + apply | `adapt-plan/index.ts:353/935` | BUILT | Same 5% gate; learned sec/km→sec/mi |
-| suggestBaselineUpdate (generic gated suggest engine) | `_shared/state-trend/reconcile.ts:46` | BUILT | ≥3 samples, ≥med conf, ≤42d, ≥5% divergence; used by capacity-resolver (strength) |
-| resolveStrengthCapacity (1RM: typed wins, learned gap-fills+suggests) | `_shared/state-trend/capacity-resolver.ts:125` | BUILT | Owns lift-key canon; coach reads it (prescribe+judge) |
-| Learned-FTP adopt UI ("Clear to use auto-learned {W}") | `src/components/TrainingBaselines.tsx:1268` | BUILT | Zones render off resolveCurrentFtp |
-| Strength/swim adopt-in-UI (confirm→writes performance_numbers) | `src/components/AthleticRecordPage.tsx:397` | BUILT | Confirm-only; acted keys session-local (no cross-session cooldown) |
-| 5K-time adopt nudge (Yes writes fiveK / No → dismissed_suggestions) | `TrainingBaselines.tsx:1176`; `arc-context.ts:579` | BUILT | — |
-| Run pace learning (threshold/easy pace-at-HR, sec/km) | `learn-fitness-profile/index.ts:505` | BUILT | HR-anchored ±5bpm of learned threshold HR |
-| HR-zone learning (easy/threshold/race/max observed) | `learn-fitness-profile/index.ts:536/772` | BUILT | Anchors threshold not max; ride threshold needs power>P75 |
-| Swim pace + CSS learning | `learn-fitness-profile/index.ts:267` | PARTIAL | Median s/100m BUILT; learned CSS staged OFF-precedence (SWIM_CSS_LIVE gate) |
-| athlete_identity inference | `_shared/athlete-identity-inference.ts` | BUILT | Skipped once confirmed_by_user |
-| dismissed_suggestions cooldown persistence | `TrainingBaselines.tsx:486` | PARTIAL | Persisted only for five_k_nudge; strength/swim use in-memory actedKeys |
-| resolvePaceCapacity (unified pace/FTP capacity resolver) | `capacity-resolver.ts:182` | SEAM | Documented D-231 seam; pace suggest currently ad-hoc in adapt-plan/arc-context |
+| Weekly snapshot (`athlete_snapshot`) | `compute-snapshot/index.ts` | BUILT | ⚠️ `state_trends_v1` is written **only for the current week** (`:641`); historical rows get null |
+| The spine (`state_trends_v1` — per-discipline verdicts) | `_shared/state-trend/assemble.ts:104` | BUILT | server AND client both call it — two execution sites, one code path |
+| Weekly coach payload (`weekly_state_v1`) | `coach/index.ts:5051` | BUILT | `COACH_PAYLOAD_VERSION = 95` (`:129`) — **bump it when the payload shape changes or stale caches pass the gate** |
+| Week narrative (LLM prose) | `coach/index.ts:4838` (`runGuardedNarrative`) | BUILT | rendered via `wsv.coach.narrative` (`StateTab.tsx:1272/1456`). The **top-level** `week_narrative` key is a dead duplicate. |
+| Readiness chip + why + suggestion | `coach` → `weekly_state_v1.trends.readiness_*` | BUILT | |
+| Race readiness / finish projection / block verdict | `_shared/race-readiness/` · `_shared/race-projections.ts` · `_shared/goal-predictor/` | BUILT | rendered on StateTab |
+| Off-plan adherence banner | `_shared/off-plan-banner.ts:37` | PARTIAL | ⚠️ returns *"On plan — strength on track"* to a Get-Stronger athlete with **zero runs** (`:66-71`); `computePrimaryAdherence` counts the primary discipline only. The honest sentence exists 3 lines above (`:28`) and is suppressed for exactly the athletes who need it. See `docs/SPEC-posture-flag.md`. |
+| Learn fitness profile (FTP/pace/HR from history) | `learn-fitness-profile/index.ts` | BUILT | ⚠️ on `ingest-activity` it runs for **Garmin only** and is milestone-gated (`:1685-1705`) — a HealthKit athlete never learns from ingest |
+| Athlete memory | `recompute-athlete-memory/index.ts` | BUILT | |
+| The Arc bundle | `_shared/arc-context.ts` (1350 lines) | BUILT | 15+ importers, the widest-read module |
+| `session_detail_v1` — the display contract | builder `_shared/session-detail/build.ts` · server `workout-detail/index.ts` · client `useWorkoutDetail.ts:109` | BUILT | 🟢 **the healthiest contract in the app** — one builder, one fetch, many dumb renderers |
+| Readiness check-in (energy/soreness/sleep) | writer `StrengthLogger.tsx:3278` | PARTIAL | ⚠️ **the only write path**, and it's inside the strength logger. Endurance-only athletes can never check in. 3 server readers, 1 starved producer. |
+| RPE capture | `PostWorkoutFeedback.tsx:322`, `CompletedTab.tsx:288`, `StrengthLogger.tsx:3118` | BUILT | nag: `check-feedback-needed` |
 
-## Ingest → analysis pipeline
+### The LLM — where it enters and what it can do
 
-| Capability | Entry point | Status | Notes |
+Gateway: `_shared/llm.ts:47` (`callLLM` — Anthropic, never throws, returns `null` on failure).
+
+Entries: `coach:3783` (coaching prose) · `coach:4822` (**bypasses `callLLM`** — raw fetch, hardcoded model) · `coach:5004` (marathon readiness — DEAD path) · `_shared/session-detail/race-readiness-llm.ts:709` · `course-strategy/index.ts:559` · `arc-setup-chat` (DEAD).
+
+**It can change: prose. That is all.** Every verdict, number, band, zone, projection and baseline is deterministic *before* the LLM is called and passed in as facts. `_shared/narrative-core/validate.ts` enforces it — on contradiction the prose is **dropped**, not the numbers. 🟢 **This is a genuine strength. Keep it.**
+
+### DEAD — computed, shipped, and no mounted surface renders it
+
+`plan_adaptation_suggestions` (`coach:3329`) · **`reaction`** — the training-reaction axis, the centrepiece of `CANON-arc-inference-model.md` (`coach:1711`; ⚠️ *the field is dead but the object is load-bearing internally — do not delete it*) · `training_state` (`:2683`) · `baseline_drift_suggestions` (`:1851`) · `marathon_readiness` (`:4849`, includes a second LLM call) · `interference` (`:3458`) · `next_action` (`:5499`) · `evidence` (`:5017`) · goal-predictor's `race_day_forecast` / `durability_risk` / `goal_profile` · `generate-overall-context` (the whole 550-line function) · `synthesizeHeadline` (`_shared/state-trend/headline.ts` — runs on **every** snapshot and **every** State render, and both throw it away).
+
+Also dead: the LLM's `headline` and `next_session_guidance` — **parsed, typed, and discarded.** You pay for them.
+
+---
+
+## INTEGRATIONS · AUTH · ADMIN
+
+**Strava tokens live in `device_connections`. Garmin tokens live in `user_connections`.** They do not share a schema, and Garmin leaks across both (`garmin-webhook-activities:51` falls back to `device_connections`).
+
+| capability | entry point | status | note |
 |---|---|---|---|
-| Ingest fan-out (orchestrator) | `ingest-activity/index.ts:1433` | BUILT | Per import: summary, analysis, workload, adaptation-metrics, facts, cache-invalidate, sport analyzer, adapt-plan auto, milestone post-import pipeline |
-| compute-facts (deterministic layer) | `compute-facts/index.ts:1615` | BUILT | workout_facts + exercise_log + session_load; tail invokes match-cores + compute-snapshot |
-| analyze-running-workout (reference analyzer) | `analyze-running-workout/index.ts:2981` | BUILT | Richest; decoupling (GAP), hr_drift, efficiency, heart_rate_summary, ai_summary, fact_packet |
-| analyze-cycling-workout | `analyze-cycling-workout/index.ts:2682` | PARTIAL | bike_fitness_v1 (HR-at-band+w20), fitness_v1 (CTL/ATL). decoupPct computed @2601 but NOT stored; race_debrief always null |
-| analyze-strength-workout | `analyze-strength-workout/index.ts:2922` | BUILT | execution_summary, test_result_v1 (tests suppress framing, D-208) |
-| analyze-swim-workout | `analyze-swim-workout/index.ts:815` | PARTIAL | Thinnest; efficiency signal "rarely fires" (no reliable swim-efficiency yet). NOTE: fn is analyze-swim not analyze-swimming |
-| compute-workout-summary → workouts.computed | `compute-workout-summary/index.ts:2160` | BUILT | intervals/series/overall; preserves analysis.series |
-| compute-workout-analysis (series/charts) | `compute-workout-analysis/index.ts` | BUILT | Separate fan-out target; series preserved into computed |
-| compute-snapshot → athlete_snapshot | `compute-snapshot/index.ts:756` | BUILT | Per user+week: state_trends_v1, workload, acwr, aggregates, interference, intensity_distribution |
-| recompute-workout (user backfill — CORRECT path) | `recompute-workout/index.ts:88` | BUILT | Full ordered: analysis→facts→analyzer→snapshot+cache-invalidate (D-178) |
-| bulk-reanalyze-workouts (bulk backfill) | `bulk-reanalyze-workouts/index.ts:208` | PARTIAL | ⚠ Only re-runs analyzer — NOT facts/snapshot → those go stale |
-| Storage layers (computed / workout_analysis / workout_facts / athlete_snapshot) | (above writers) | BUILT | 4 non-interchangeable layers; cycling key-scrub avoids stale run keys |
+| Strava OAuth exchange | `strava-token-exchange/index.ts:33` | PARTIAL | `userId` from **body**, no JWT verification |
+| Strava push webhook | `strava-webhook/index.ts:19` | BUILT | `verify_jwt=false` (correct); fans out to `ingest-activity` |
+| Strava webhook subscribe/unsubscribe | `strava-webhook-manager/index.ts:16` | PARTIAL | no auth; client calls it with the **anon key** as bearer, so the request carries no identity **by construction** |
+| Strava history import | `import-strava-history/index.ts:653` | PARTIAL | tokens supplied by the client |
+| **Strava token refresh (standalone)** | `strava-refresh/index.ts:17` | 🔴 **DEAD + DEPLOYED + UNAUTHENTICATED** | takes `userId` from the body, **no auth check**, and **returns the access token** (`:93`). The anon key that reaches it is public. **Delete it.** Live refresh is `_shared/strava-access-token.ts`. |
+| Garmin OAuth PKCE | `bright-service/index.ts:46` | BUILT | 🟢 the **only** integration fn that properly verifies the JWT |
+| Garmin push webhook | `garmin-webhook-activities/index.ts:41` | BUILT | |
+| Garmin read proxy | `swift-task/index.ts:58` | PARTIAL | OAuth token in a **query string**; allowlisted paths only |
+| Push a workout TO Garmin | `send-workout-to-garmin/index.ts:71` | PARTIAL | the app's **only** outbound integration |
+| Disconnect a provider | `disconnect-connection/index.ts:28` | BUILT | ✅ uses `requireUser` |
+| **`disconect-connection` (misspelled)** | *no source in repo* — called at `Connections.tsx:495` | 🔴 **SEAM** | a real **deployed** function with **no source**, kept as a permanent fallback branch. Unknown behaviour. |
+| Gear CRUD + mileage | `Gear.tsx:102`; mileage by **DB trigger** (`20260108_fix_gear_distance_trigger.sql`) | BUILT | no edge function |
+| Admin console (backfills) | `WorkloadAdmin.tsx:17` | PARTIAL | 🔴 gate is **client-side only** — the 8 edge functions it invokes have **no server-side admin check** |
 
-## Fitness verdicts (State spine) & load
+### Security posture (the B1 item)
 
-| Capability | Entry point | Status | Notes |
-|---|---|---|---|
-| State spine assembly (ONE code path, client+server) | `_shared/state-trend/assemble.ts:104` | BUILT | Both useStateTrends + compute-snapshot call it → structural single-source; → state_trends_v1 incl. `display` (S2) |
-| Shared trend classifier (window/staleness/provisional/dead-band) | `_shared/state-trend/classify.ts:40` | BUILT | Every discipline routes through it; stale verdict→needs_data |
-| Cadence-scaled thresholds (Q-052) | `_shared/state-trend/thresholds.ts:46` | BUILT | ⚠ run/swim %-thresholds flagged PROVISIONAL |
-| Run decoupling (durability LEAD) | `run.ts:194` `computeRunDecouplingState` | BUILT | Excludes raw-basis, heat/RPE-confounded, non-steady, <20min (D-275) |
-| Run efficiency_index (SECONDARY) | `run.ts:86` | PARTIAL | Secondary only; GAP-pace verdict dropped (Q-110) |
-| frielBand / decouplingBandDisplay (ONE band vocab) | `run.ts:110/137` | BUILT | D-276: TWO states at the 5% science line — `sound`(<5%)/`needs_work`(≥5%); dropped the `<0 excellent`+`>10 gap` convention tiers. Shared by PERFORMANCE + AERO + coach + workout card so surfaces can't diverge |
-| Bike terrain-binned power (LEAD) | `bike-fitness.ts:111` | BUILT | climbing vs flat_sustained bins |
-| Bike HR-at-power efficiency (SECONDARY) | `bike-fitness.ts:128` + eligibility `:50` | PARTIAL | ⚠ was artifact-prone (fake −5.5%, Q-117); now gated steady-aerobic + ≥10min dwell + <90% FTP (D-275). Fundamentally window-fragile — fitness truth is FTP, not this |
-| Swim pace/100 + rest-fraction | `swim.ts:42/97` | PARTIAL | ⚠ Q-038 ingest bug → pace unreliable, mostly needs_data |
-| Strength volume (LEAD) + per-lift e1RM (SECONDARY) | `strength.ts:105/60` | BUILT | Per-lift direction serialized to spine (D-270); coach reads, no re-derive |
-| fitnessDirection rollup (`rollupFitness`) | `assemble.ts:319` | BUILT | D-276/Q-162: SOLID verdicts decide the direction; a provisional/thin discipline can't ASSERT it — `thinHeldOut` names the held-out mover so the narrative flags the gap. `rollupFitnessDirection` now a thin wrapper |
-| BODY holistic Heart-rate response (`rollupHrResponse`) | `assemble.ts` (rollupHrResponse) → coach inject | BUILT | D-279: ONE BODY signal from the SPINE — run aerobic decoupling + bike HR-at-power, swim excluded (in-water HR unreliable, named in provenance). Provisional-aware; "as of" = OLDEST contributor. Replaced the coach's run-only re-derived drift |
-| Cardio vs strength load formulas | `_shared/workload.ts:189/324` | BUILT | Output-first ladder power/FTP→HR→sRPE→duration (D-238) |
-| Workload provenance / low-trust methods | `_shared/workload.ts:340` | BUILT | Estimated vs measured; feeds ACWR disclosure |
-| ACWR core + status classifier | `_shared/acwr.ts:155`, `acwr-state.ts:31` | BUILT | Sole authority (D-236); thin-base→null |
-| Two-key load verdict reconcile (sole load verdict) | `_shared/load-status-reconcile.ts:64` | BUILT | ACWR describes, never decides (D-260/264/266). D-280: adds a `productive` state (real elevation absorbed — Garmin/COROS field-std) + `acwrProvisional` flag (thin-base ratio, keyed on `spikeOnEmptyBase`). ⚠ Q-166 (UNPROVEN — filed on one WK-1 screen, where the ratio is contaminated): a cross-training-heavy real total-load spike may under-read to on_target/"balanced". **The fix it prescribes is UNLAWFUL — attempted as D-281, shipped a false "pull back", REVERTED. The ratio may never `raise()`; only the descriptive `productive` relabel is available. Read D-281 first.** |
-| LoadBar composition bar | `src/components/LoadBar.tsx:63` | BUILT | Verdict leads, by-discipline strip, ACWR demoted |
-| Per-domain load slices | `_shared/per-domain-load.ts:137` | PARTIAL | ⚠ cross-sport % uncalibrated; keys on composition share; coach-only (D-263) |
-| Fitness-fatigue (CTL/ATL/TSB) | `_shared/fitness-fatigue.ts:73` | STUB | "uncalibrated — drives no verdict"; per-domain scaffolded not built |
+- **9 of 87** functions import `_shared/require-user.ts`. **77 of 87** instantiate a service-role (RLS-bypassing) client.
+- **Three competing auth idioms:** `requireUser` (verified) · inline `auth.getUser(jwt)` (verified) · **`_shared/bearer-auth.ts:17` (UNVERIFIED — decodes the JWT with `atob`, never checks the signature, trusts an attacker-supplied `sub`).**
+- **No `_shared/cors.ts`** — all 87 hand-roll it.
+- Sensitive functions taking identity from the **body** rather than a verified JWT: `strava-refresh`, `strava-token-exchange`, `strava-webhook-manager`, `import-strava-history`, `send-workout-to-garmin`, `import-garmin-history`, `swift-task`.
+- No true secrets in the client. The anon key + project ref are hardcoded in **5 files** outside the shared client (`GarminPreview`, `GarminDataService`, `Connections`, `TrainingBaselines`) — rotating the key would silently break those five.
 
-## Plan generation & scheduling
+---
 
-| Capability | Entry point | Status | Notes |
-|---|---|---|---|
-| Goal→engine ROUTER (mode/sport/goal_type dispatch) | `create-goal-and-materialize-plan/index.ts:2180` | BUILT | Non-race short-circuit → event tri/run split |
-| week-optimizer (sole scheduling authority) | `_shared/week-optimizer.ts:1075` | BUILT | Owns every day-assignment; same-day matrix in schedule-session-constraints.ts |
-| reconcile-athlete-state-week-optimizer (plumbing) | `generate-combined-plan/reconcile-...ts:237` | BUILT | Runs unconditionally; self-short-circuits if long_run_day missing |
-| generate-combined-plan (multi-sport, triathlon-shaped) | `generate-combined-plan/index.ts` | BUILT | Only engine reading optimizer; returns NO plan for single-sport (F-9/F-12) |
-| materialize-plan (token expansion → computed.steps) | `materialize-plan/index.ts` | BUILT | Resolves paces/FTP/1RM; applies plan_adjustments |
-| generate-run-plan (single-sport run) | `generate-run-plan/index.ts` | BUILT | Event run + non-race retest head; NOT via optimizer |
-| generate-strength-plan (Get Stronger, strength-primary) | `generate-strength-plan/index.ts` | BUILT | 4-day U/L/U/L + maintenance endurance |
-| generate-triathlon-plan (event tri, standalone) | `generate-triathlon-plan/index.ts` | BUILT | Superseded for multi-goal by combine flag → buildCombinedPlan |
-| Non-race routing: get-stronger → generate-strength-plan | `create-goal.../index.ts:2383` | BUILT | Gate: strength develops, no endurance develops, commercial_gym |
-| Non-race routing: run non-race → generate-run-plan | `create-goal.../index.ts:2452` | BUILT | D-218; combined can't build single-sport run |
-| Non-race routing: tri non-race → buildCombinedPlan | `create-goal.../index.ts:2552` | BUILT | Only non-race shape combined handles |
-| session-frequency-defaults: TRIATHLON matrix | `src/lib/session-frequency-defaults.ts:151` | BUILT | Real hours×days cells |
-| session-frequency-defaults: RUNNING/CYCLING matrix | `session-frequency-defaults.ts:184/193` | STUB | "PROVISIONAL — NOT SCIENCE-FINAL" (F-9 gate #2 pending) |
-| Non-race: bike-only / swim-only / hybrid | (no live branch) | STUB | 0/16 non-race combos materialize on combined; swim-only removed |
-| combine flag (event goals → unified combined) | `create-goal.../index.ts:2639/3095` | BUILT | Multi-goal events → combined engine |
-| generate-plan (legacy) | `generate-plan/index.ts` | DEAD | Validation-only; zero callers |
+## THE DEAD LIST — zero callers
 
-## Coach & display surfaces
+**100 directories under `supabase/functions/` · 11 empty · 87 real functions · 24 dead.**
 
-| Capability | Entry point | Status | Reads-from |
-|---|---|---|---|
-| Coach week payload (weekly_state_v1) + serve | `coach/index.ts:949` | BUILT | spine state_trends_v1, plans, workouts → weekly_state_v1 incl trends.display |
-| coach_cache stale-while-revalidate (version-gated) | `coach/index.ts:977/5443`; VERSION=79 | BUILT | coach_cache |
-| S2 State display contract (trends.display) | `assemble.ts:272`; fwd `coach:5278` | BUILT | server assembleStateTrends → client renders verbatim |
-| State screen (StateTab) | `src/components/context/StateTab.tsx:940` | BUILT | weekly_state_v1 + trends.display |
-| useStateTrends (contract-first, live fallback) | `src/hooks/useStateTrends.ts:54/231` | PARTIAL | ⚠ fallback = full client copy of spine assembly |
-| LOAD row | `StateTab.tsx:1454` | BUILT | coach reconciled load_status (7d, not spine) |
-| BODY row (RPE/readiness) | `StateTab.tsx:1518` | BUILT | coach readiness_* (7d vs 28d) |
-| STRENGTH row + per-lift | `StateTab.tsx:1151` | BUILT | spine strength.per_lift (D-270) |
-| RUN + BIKE exec rows (7d) | `StateTab.tsx:1212/1213` | BUILT | coach run/ride_session_types_7d (run row relabeled AERO→RUN) |
-| SWIM sessions row (7d) | `coach swim_sessions_7d` (v81) + `StateTab.tsx swimExecRow` | BUILT | Q-038-safe: planned → % achieved, unplanned → distance (yd/m by units); NEVER pace. Was hidden; now shows when you swam |
-| AERO durability verdict | `coach:2209` (v78) | BUILT | now SPINE decoupling band via decouplingBandDisplay (was coach 7d avg) |
-| BIKE efficiency verdict | `coach` (v80) `bikeEfficiencyDisplay` | BUILT | steady-aerobic types now render SPINE bike.efficiency (was coach's own HR-drift bands) → BIKE row ≡ PERFORMANCE; last run↔bike continuity gap closed |
-| PERFORMANCE section | `StatePerformanceSection.tsx:288` | PARTIAL | stateDisplay contract; "under review, not yet shipped" per StateTab:1627 |
-| LLM week narrative | `coach/index.ts:3319` | BUILT | coachAdapter + spine fitness_direction |
-| Honesty guard (narrative-core) | `_shared/narrative-core/validate.ts:82` | BUILT | validates narrative vs spine; 1 retry then drop |
-| Coach honesty net (headline vs sliding spine) | `coach/index.ts` (v77) | BUILT | feeds concerning spine verdicts to rule 2 (D-274) |
-| session_detail_v1 builder | `_shared/session-detail/build.ts:269` | BUILT | analyzer computed/raw + spine (single-sourced totals) |
-| Workout Performance/Details (workout-detail) | `workout-detail/index.ts:687` | BUILT | persisted session_detail_v1 or rebuild; maps spine verdict |
-| Goals screen | `src/components/GoalsScreen.tsx:355` | BUILT | coach race_readiness + useGoals |
-| Goal prefill fitness/volume strings | `GoalsScreen.tsx:530-621` | PARTIAL | ⚠ derives labels client-side, not spine |
-| Race-readiness projection | `coach/index.ts:62` computeRaceReadiness | BUILT | _shared/race-readiness + session_detail_v1.race_readiness |
+**Empty directories (11)** — they have no files at all, and some have the most guessable names in the repo:
+`analyze-workout` · `analyze-workout-ai` · `analyze-weekly-ai` · `activity-details` · `batch-recalculate-workloads` · `garmin-webhook-activity-details` · `Garmin-Workout-Export` · `generate-daily-context` · `run-migration` · `sweep-attach-history` · `test-db-connection`
 
-| Run easy-HR band (the ONE definition of "easy") | `_shared/easy-hr.ts` | BUILT (D-282) | Threshold-anchored (Friel Z2 ≤89% LTHR); %max 65-80% bootstrap; null when neither. Bike NOT routed through it (its own band works — running HR sits 5-10 bpm higher at the same effort). |
-| Run easy-pace learner | `learn-fitness-profile:699` | BUILT, was STARVED (D-282) | Old gate `hr <= maxHR*0.75` passed 0-of-22 runs. Now threshold-anchored → fires. |
-| Run pace RECONCILER (notices detraining) | `generate-combined-plan/science.ts:110` (D-033) | BUILT, **HAS NEVER RUN** | Streak + median + ACWR gates. Both inputs were null (Q-169). Baseline side fixed by D-282; observed side needs a recompute to backfill `pace_at_easy_hr`. **Do not rebuild it.** |
-| HR zone schema (per workout) | `compute-workout-analysis:1548` | BUILT (D-282 fix) | Now reads learned LTHR → Friel. Previously fell to %HRmax for every Strava/Garmin athlete. ⚠ bins stored per workout — history needs recompute. |
-| Heat handling (run durability) | `_shared/state-trend/run.ts:172` | **EXCLUSION STANDS (D-275)** | ⚠ Q-170: the exclusion is NOT field-standard (no app drops a session for heat). Right fix = athlete-selectable ADJUST toggle. Attempted + reverted. Read Q-170 first. |
+**Dead functions (zero callers):**
+`analyze-user-profile` · `arc-setup-chat` · `backfill-facts` · `backfill-planned-workload` · `backfill-routes` · `backfill-week-summaries` · `detect-cores` *(⚠️ this one starves the whole segment engine)* · `enrich-history` · `generate-plan` *(a validator that generates nothing)* · `generate-training-context` *(3.4k lines, dead twin of `coach`)* · `import-connect-history` · `process-workouts-batch` · `readiness` *(HTTP wrapper; everyone imports `buildReadiness` directly)* · `reingest-activity` · `restore-gps-track` · `save-location` *(yet `require-user.ts:12` cites it as "the proven pattern")* · `strava-refresh` *(see security note)* · `weekly-workload` *(the `weekly_workload` table is written and read only by itself — real weekly load is `session_load` + ACWR)*
 
-| Run easy-pace RESOLVER (choice → learned → manual → effort_paces → **null**) | `src/lib/resolve-current-run-pace.ts:62` | **BUILT** | D-285/D-287. The run twin of `resolveCurrentFtp`. Owns the sec/km→sec/mi conversion ONCE. **Server-universal (9 callers). CLIENT still re-derives — Q-175.** |
-| Athlete's explicit pace choice (`easy_pace_source`) | `performance_numbers.easy_pace_source`; UI `TrainingBaselines.tsx` | **BUILT** | Q-174. 'manual' outranks even a high-confidence learned pace. Absent = old behavior. **Bike/FTP half NOT done — a naive flip kills bike race projections.** |
-| ONE Friel run HR zone model (client + edge) | `src/lib/friel-zones.ts:60` | **BUILT** | D-286. `easy ≡ Z1 or Z2` by construction. Was THREE hardcoded copies that disagreed by 2 bpm. |
-| Learned-metric FRESHNESS (`as_of` = newest contributing SESSION) | `learn-fitness-profile/index.ts` (`newestDate`); rendered `TrainingBaselines.tsx` | **BUILT** | Q-173. NOT `last_updated` (which is "when the profile was rebuilt"). Exposed that his LTHR is 53 days old, n=2. |
-| Declared per-discipline intent (`develop`/`maintain`/`out`) | `goals.training_prefs.per_discipline_posture`; `non-race-goal-seeds.ts:198` | **WRITE-ONLY** ⚠ | Read once at plan-build. **ZERO runtime surfaces read it.** The app never checks if you did what you said. See ENGINE-STATE §3. |
-| Posture-vs-behavior check ("you said maintain running; you've run once") | — | **MISSING** ⚠ | Every part exists (posture + `adherence.ts:49` counts + the off-plan sentence). Never introduced. **`off-plan-banner.ts:66-71` actively says "On plan" to a Get-Stronger athlete who stopped running.** |
-| Cross-domain **FATIGUE** carryover ("Monday's lift is why Thursday's ride felt hard") | `_shared/cross-domain-carryover.ts:115` | **BUILT** | ⚠ **Name is misleading** — 72h ACUTE fatigue only. It does NOT model whether bike/swim aerobic work preserves RUN fitness. No such model exists anywhere. |
-| Run-SPECIFICITY model (what does NOT carry over from bike/swim to run) | — | **MISSING** | The app's only maintenance theory is *"aerobic detrains slower → low volume holds it"* (`SPEC-getstronger-contract-row.md:49`), which is **discipline-blind**. The engine carries over; the legs don't. |
-| Easy-run VERDICT = the HR band (not pace) | `analyze-running-workout` (D-288) | **BUILT, not deployed** | steady_state → HR band; intervals/tempo → keep pace. Pace becomes a receipt. Garmin ships this split ("HR for slow steps, otherwise speed"). |
-| ONE LTHR resolver | — | **MISSING** ⚠ | **FOUR chains, two inverted** (`easy-hr.ts` learned-first vs `compute-workout-analysis:1578` manual-first). The ROOT of the run stack. Spec: `SPEC-lthr-one-anchor.md`, Q-176. |
-| ONE threshold-PACE resolver | — | **MISSING** | No resolver at all; read directly in ~15 files. Do it in the LTHR pass. |
+**NOT dead despite zero in-repo callers** (external entry points — don't delete): `strava-webhook` (Strava push) · `garmin-webhook-activities` (Garmin push) · `notify-admin-signup` (Supabase Dashboard DB webhook, invisible to grep).
+
+Also: `supabase/functions/garmin-webhook-activities-working.ts` — a stray 390-byte file at the functions root. Not a function, not imported.
+
+**Dead client components:** `CoachWeekTab` · `BlockSummaryTab` · `non-race/non-race-intake-steps.tsx` (no importer at all) · `WorkoutSummary` → `WorkoutDetail` → `StrengthSummaryView` / `WorkoutMetrics` (transitively dead) · `WorkoutExecutionView` · `GarminAutoSync` · `WorkoutSummaryView` · `CleanElevationChart` · the five dropdown components · `plan_bake_and_compute.augmentPlan` (offline only).
+
+---
+
+## The 5 living docs
+
+| Doc | What it is | Trust |
+|---|---|---|
+| `ENGINE-STATE.md` | current state: Solid / Known-broken / Questioned | ✅ **the most trustworthy** — the only doc that retracts its own claims in place |
+| `DECISIONS-LOG.md` | WHY things are the way they are (D-NNN) | ⚠️ trust the entry you're reading; **do not** trust that an older one is still live |
+| `OPEN-QUESTIONS.md` | noticed + left on purpose, or deferred (Q-NNN) | ⚠️ several stale — a Q is a **LEAD, not a verified bug report** |
+| `POLISH-PUNCH-LIST.md` | the work queue | ⚠️ header lags |
+| `CAPABILITY-MAP.md` (this) | does X exist + where | rebuilt 2026-07-13 |
+
+Plus: **`START-HERE.md`** (the one-page onboarding — read it first) and **`LIFECYCLE.md`** (the loop: baselines → plan → pins → performance → state → learned → next plan).
+
+> **The rot pattern, named:** these docs have excellent **forward pointers** and **no back-pointers**. D-283 knows it killed D-275; D-275 has never heard of D-283. The fix that closes a Q never returns to close the Q. **When you supersede an older entry, go back and annotate the older entry** — that one habit is what keeps all five honest.

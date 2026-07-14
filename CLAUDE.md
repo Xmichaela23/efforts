@@ -42,7 +42,9 @@ Efforts is a hybrid endurance + strength training app for intermediate athletes 
 
 ## Context-priming for new sessions
 
-**Read `docs/START-HERE.md` FIRST — the one-page map.** What the app is (all major pieces exist), the current mission (total continuity: one workout in, every screen reads the same source), the ingest→screens pipeline, what's clean vs in-progress, and pointers into the deep docs below. It orients you in one screen; everything below is the depth behind it.
+**Read `docs/START-HERE.md` FIRST — the one page.** What the app is (all major pieces exist), the loop, the three diseases (starved / dead / doubled), what's clean vs fractured, and which docs lie. It orients you in one screen; everything below is the depth behind it.
+
+Then, before wiring anything: **`docs/LIFECYCLE.md`** — the loop (baselines → plan → **frozen** pins → performance → state → learning → next plan), and the FROZEN-vs-LIVE boundary that every fracture found in the 2026-07-13 audit lived on. And **`docs/CAPABILITY-MAP.md`** — "does X exist and where", rebuilt from code 2026-07-13, starting with its **"I almost rebuilt this"** list.
 
 **The thesis first (read before the state docs — this is the frame everything else sits inside).** Efforts' product *is* coherent reasoning about an athlete: nothing happens in a vacuum — every surface is plan-aware, performance-aware, and reads one shared truth instead of minting its own. "Completely self-aware" is the north star, defined finitely (not a vibe), and it is a target being migrated toward surface by surface — not an achieved state. Hold it before you touch any feature:
 
@@ -78,7 +80,21 @@ No `npm test`. Some `*.test.ts` / `*.contract.test.ts` live under `supabase/func
 
 ## Deploy policy (the user does NOT deploy)
 
-After any change that affects production, ship it: deploy every edge function you touched plus its callers, and `git push origin main` (Netlify auto-deploys). Don't end a task with "you should deploy."
+After any change that affects production, ship it, and `git push origin main` (Netlify auto-deploys). Don't end a task with "you should deploy."
+
+### ⛔ The `_shared` deploy trap — read this every time you touch a shared file
+
+**Supabase bundles `_shared/` and `src/lib/` into each edge function AT DEPLOY TIME. Each function carries its own frozen copy.** Editing a shared file changes nothing in production until **every function that imports it** is redeployed. There is no warning, no error, and no test that catches it.
+
+On 2026-07-13 this was found to have silently stranded **17 functions** — including both plan generators (running a month-old copy of the pace resolver, so D-287's "the resolver is UNIVERSAL on every surface" was **false in production**) and `ingest-activity` (last deployed a month earlier).
+
+**So: deploy every function you touched PLUS everything that imports what you touched.** To find them:
+
+```bash
+grep -rln "the-shared-file-you-changed" supabase/functions --include=index.ts
+```
+
+Then verify prod matches main — compare `supabase functions list --project-ref yyriamwvtvzlkumqrvpm` timestamps against the newest commit touching each function's transitive deps. **A green test suite proves nothing about what is running on the server.**
 
 ## End-of-session protocol
 
@@ -88,9 +104,14 @@ Before any session ends — when the human says "we're done," "closing the lapto
    - **ENGINE-STATE.md:** new fixes go to **Solid** (with file paths + verification method); new known-broken bugs go to **Known broken** (with deferred-reason); new unverified claims go to **Questioned** (with verification approach).
    - **DECISIONS-LOG.md:** new D-NNN entry per non-trivial design choice — coefficient picked deliberately, alternative pattern rejected, scoping call made.
    - **OPEN-QUESTIONS.md:** new Q-NNN entry per behavior that was noticed and intentionally left, or per bug deferred with a reason.
-2. Show the proposed diff.
-3. Wait for human approval.
-4. Commit + push as `docs: end-of-session context update for YYYY-MM-DD`.
+2. **⛔ BACK-ANNOTATE. This is the step that keeps the docs honest, and it is the one that has never been done.**
+   If anything you shipped **supersedes, reverses, or closes** an older `D-NNN` / `Q-NNN` — **go back and mark the OLDER entry.** Not just the new one.
+   > *The docs' forward pointers are excellent and their back-pointers do not exist. D-283 knew it killed D-275; D-275 had never heard of D-283, and sat for two days presenting a reversed decision — with its full justification intact — to anyone who searched for "heat". Q-136, Q-138 and Q-169 were all fixed and all still read as open. **A fix that does not return to close the thing it fixed is how every one of these docs rotted.***
+
+   Write the back-annotation as a `>` blockquote at the TOP of the old entry: what changed, where in code, and "everything below is history."
+3. Show the proposed diff.
+4. Wait for human approval.
+5. Commit + push as `docs: end-of-session context update for YYYY-MM-DD`.
 
 Also update `docs/POLISH-PUNCH-LIST.md` if items closed (mark `[x]` with date) or new items were added during the session, and `docs/CAPABILITY-MAP.md` if a capability's status/entry-point changed or you discovered its real status (keep rows terse — one line each).
 
@@ -106,15 +127,25 @@ This is the institutional-memory backbone. The next session reads what this sess
 
 ### Ingest is the orchestrator
 
-`supabase/functions/analyze-workout/` is **empty**. Real fan-out lives in `ingest-activity/index.ts:~1430-1580`. Per ingest, ~8 things happen (mostly fire-and-forget):
+`supabase/functions/analyze-workout/` is **empty** (one of 11 empty dirs — see `docs/CAPABILITY-MAP.md`). Real fan-out lives in **`ingest-activity/index.ts:1345-1712`**. Per ingest, ~8 things happen:
 
-- `compute-facts` (writes `workout_facts`, `exercise_log`, `session_load`)
-- Invalidate `block_adaptation_cache` and `coach_cache` rows for the user
-- Route to `analyze-{running,cycling,strength,swim}-workout` (NOT `analyze-swimming-workout`)
-- `adapt-plan` action=auto (auto strength/endurance progression; safe-as-no-op because activity ingest doesn't mutate plan JSON — break this assumption and adapt-plan starts mis-firing silently)
-- Milestone-gated `post-import-athlete-pipeline` (memory + snapshot warm-up)
+- `auto-attach-planned` (**awaited** — deliberate, for deterministic ordering)
+- `compute-workout-summary` + `compute-workout-analysis` (**fire-and-forget**)
+- `calculate-workload` → `workouts.workload_actual` (**awaited**) — this is the ACWR substrate
+- `compute-adaptation-metrics` (awaited)
+- `compute-facts` (**awaited**; writes `workout_facts`, `exercise_log`, `session_load`) → then fires `compute-snapshot` → the spine
+- Invalidate `block_adaptation_cache` and `coach_cache`
+- Route to `analyze-{running,cycling,strength,swim}-workout` (NOT `analyze-swimming-workout`) — fire-and-forget
+- **`adapt-plan` action=auto** — fire-and-forget
+- `post-import-athlete-pipeline` — awaited, but **Garmin-only and milestone-gated**
 
-Routing also exists in `recompute-workout/index.ts:21-25` and `bulk-reanalyze-workouts/index.ts:40-50`. Any new cache or downstream system MUST register here or it goes stale.
+⚠️ **`adapt-plan` action=auto is NOT a no-op.** (This file claimed it was, and that claim was false.) It auto-progresses/deloads strength loads off the `exercise_log` e1RM trend, writes `plan_adjustments`, and invokes `materialize-plan`, which rewrites `computed.steps` on the plan's future rows. **The athlete is never asked.** The adjustment is stamped `applies_from: today`, so the past is safe — but the auto path **skips the Arc fatigue/taper/adherence gate** that the `suggest` path applies. See `docs/LIFECYCLE.md`.
+
+⚠️ **There is a RACE.** `compute-facts` is *awaited* but reads `workouts.computed`, which is written by the two *fire-and-forget* calls above. When it loses, `time_in_zone`, `intervals_hit/total`, `hr_drift_pct` and `execution_score` are silently absent from that workout.
+
+⚠️ **Two ingest paths bypass all of this.** `ingest-phone-workout` and `save-imported-workout` fire **only** `compute-workout-summary` → no `workout_facts`, invisible to the spine, and **zero contribution to ACWR** while still counting toward `workload_total`.
+
+Routing also exists in `recompute-workout/index.ts:21-25` and `bulk-reanalyze-workouts/index.ts:40-50` — **three hand-maintained routing tables.** Any new cache or downstream system MUST register in all of them or it goes stale.
 
 ### Four storage layers for "what we know about a workout"
 
@@ -178,7 +209,7 @@ Read these before touching the corresponding subsystem:
 - Arc / athlete state → `supabase/functions/_shared/arc-context.ts`, `_shared/athlete-snapshot/`, `compute-snapshot/`, `compute-facts/`
 - Coach (deterministic week-context engine, LLM on top) → `supabase/functions/coach/`, `coach/methodologies/`
 - Plan generation → `generate-combined-plan/`, `generate-run-plan/types.ts` (`PlanContractV1`)
-- Plan token expansion → `materialize-plan/`, `_shared/token-parser.ts`
+- Plan token expansion → **`materialize-plan/index.ts:1123+` (its OWN inline expander)**. ⚠️ `_shared/token-parser.ts` is a *different* thing — it serves the **analysis** path (`compute-workout-analysis`, `analyze-running-workout`), and `materialize-plan` does not import it. This file used to point at the wrong one.
 - Workload → `_shared/workload.ts`, `calculate-workload/`
 - Ingest fan-out → `ingest-activity/index.ts:~1430-1580`
 
