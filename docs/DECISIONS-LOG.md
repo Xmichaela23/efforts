@@ -578,3 +578,58 @@ D-033's reconciler, the easy band (`easy-hr.ts`), the VDOT tables, and **no numb
 - ⛔ **THE GUARD, and it matters more than the feature.** `matchExercises` is the core of **every** strength execution score and had **no fixture at all**. It was extracted to `_shared/strength/match-exercises.ts` and pinned — the **first two tests** are *"an undeclared miss is STILL a skip"* and *"logging a different exercise with no declaration is a skip PLUS an unplanned extra."* **Forgiving a real skip would be a score that lies in the athlete's favour** — the failure mode `CANON-arc-inference-model.md` exists to prevent, and far worse than the bug this fixes. Those guards were written and passing **before** the matcher was changed.
 - **Note for a future session:** an athlete who **adds** an exercise instead of renaming the prescribed one still eats the dock. That is **correct** (the planned lift genuinely went undone) — but the rename gesture is **undiscoverable**, which is exactly what slice 2 exists to fix. **Delete-and-re-add destroys the link; that is precisely why the field makes Swap a first-class action.**
 - **Verified:** 19 new fixtures (12 matcher, 7 note). Suite 1069 → 1088, 0 failed.
+
+---
+
+## D-290 — The SWAP SHEET, and the `primaryRef` bug it exposed: a LOADING reference is not a MOVEMENT PATTERN (2026-07-14, SHIPPED + DEPLOYED)
+
+**Completes D-289. `SPEC-exercise-substitution.md` is now DELETED** — the scaffolding came down (see the SPEC lifecycle in `CLAUDE.md`).
+
+### 🔴 The bug D-289 shipped, and how it was caught
+
+Michael: *"Did we open a can of worms with Bulgarian Split Squat being the only exercise with options?"*
+
+**He was right, and it was worse than thin coverage.** Measured: **54 exercises had alternatives, 38 had ZERO** — and almost every zero was a **bodyweight** movement. Chasing why exposed a real bug in already-deployed code:
+
+```
+Barbell Row  ->  primaryRef: 'bench'          // because a row LOADS at ~80% of your bench
+```
+
+The config's own section header says it in terms: **`// UPPER PULL (Bench Reference AS PROXY)`.**
+
+**`primaryRef` answers "which 1RM do I derive the working weight from." It is a LOADING reference, not a movement pattern.** D-289 built the substitution slot filter on it and called it a pattern taxonomy. So:
+
+- `getInSlotAlternatives('Barbell Row')` → **Bench Press · Dumbbell Bench Press · Incline Bench · Dip · Chest Fly.** **A PUSH FOR A PULL.**
+- **`substitution-note.ts`, already deployed,** read a row and a bench press as the **same slot** and would have stayed **SILENT** on that swap — quietly blessing it. *(Latent only because the swap fires on a rename and nobody had renamed anything.)*
+- And every bodyweight movement had `primaryRef: null` → no pattern → **no options at all — including PULL-UPS, which the research says are the most commonly substituted exercise in the gym.**
+
+### The fix — TRANSCRIPTION, not invention
+
+A real `pattern` field (`MovementPattern`): `knee_dominant | hip_dominant | horizontal_push | horizontal_pull | vertical_push | vertical_pull | core | plyometric | calf`.
+
+**Nothing invented.** The vocabulary is transcribed from `exercise-config.ts`'s **own section headers** — KNEE DOMINANT / HIP DOMINANT / UPPER PUSH / UPPER PULL / SHOULDERS / PULL-UPS / PUSH-UPS / CORE / CALF / PLYOMETRIC. **The taxonomy had been sitting in that file as comments the whole time.** It also matches the field's own rule for a good substitute: *"a horizontal push is replaced by another horizontal push."* 135 entries stamped, with explicit overrides where a section header lies (lat pulldown sits under UPPER PULL but is a **vertical** pull; inverted row sits under PULL-UPS but is **horizontal**; pike push-up is a **vertical** press).
+
+| | before | after |
+|---|---|---|
+| Barbell Row | Bench Press, Dips, Chest Fly | Bent Over Row · Dumbbell Row · Face Pull · Inverted Row |
+| Pull-up | *(nothing)* | Chin-up · **Lat Pulldown** *(the field's #1 pull-up substitute)* |
+| coverage | 54 with / 38 without | **89 with / 1 without** |
+
+### ⛔ And the ROLE filter was REMOVED
+
+1. **The field does not filter on role.** Trainerize's filters are *"Same muscle group / Same Equipment / Same movement."* Fitbod matches *"same muscles at equivalent intensity."* Neither uses load tier. *"An accessory can't be swapped for a main lift"* was **my** judgment, not the field's — and the brief was explicitly *"follow whatever a commercial strength app would do, let's not invent anything."*
+2. **`roleForExercise` is too noisy to filter on anyway:** `barbell row` → **primary**, `bent over row` → **accessory**. *The same movement.* Filtering on it produced **empty lists**. ⚠️ **That inconsistency is a real data bug in `exercise-role.ts` — filed, not papered over.**
+
+### The sheet (slice 2)
+
+A **Swap** action on any **prescribed** exercise (a hand-added one was never prescribed → nothing to substitute for → an undeclared miss stays a skip). It offers in-slot alternatives filtered by pattern + the athlete's equipment. **Picking one just RENAMES the exercise — the exact same data path the manual rename already used.** One data path, two doors. The free-library override stays: the name field is still a search box, so the athlete can pick **anything**, including out-of-slot. **The app does not block.**
+
+**A swap CLEARS the prescribed weight.** That number was computed for a *different* exercise (BSS = 50% of squat; hip thrust = 90% of deadlift) — carrying it across would show a weight the app cannot stand behind, and one the athlete might actually load. Even an in-slot swap shifts the ratio. **Law 2: do not display a number you cannot anchor.** Reps/duration are kept — the volume prescription still stands.
+
+### ⚠️ Stated, not faked
+Pure **shorthand aliases** survive the dedupe ("Bench" next to "Bench Press") because their configs differ only in `notes`. Every option shown is **correct**; the list is just slightly noisy. Every cleverer rule broke something real (`squat` is a substring of `front squat`, which is **not** an alias of it), so I stopped rather than invent one.
+
+### Also still open (from the deleted spec)
+**The schedule-aware contradiction check.** The plan protects the athlete by **PLACEMENT, not by exercise** (`strength-primary-plan.ts:182` — the bias slot lands on Upper A *"maximally removed from the long run… for ANY selection"* [Wilson 2012]), **so an in-slot swap cannot break it — the day did not move.** The real risk is a **cross-region** swap (lower-body work onto an upper day, with heavy Lower tomorrow). ⛔ **And it does NOT belong on Performance** — telling an athlete after they trained that their swap conflicts with tomorrow is useless. **That is a nag, not a coach.** It belongs in the Swap sheet, at the moment of choosing. **BLOCKED ON:** the logger sees `scheduledWorkout` but **not the week**, so it cannot know what is tomorrow.
+
+**Verified:** all four suites green (`_shared` 1090 · `shared` 106 · `generate-run-plan` 33 · `src/lib` 198). Q-126 golden byte-identical.
