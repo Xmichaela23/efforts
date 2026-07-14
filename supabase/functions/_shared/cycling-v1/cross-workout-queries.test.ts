@@ -306,36 +306,31 @@ Deno.test('assessCyclingLimiter: W/kg path — full IM uses lower 2.8 norm', () 
   assertEquals(r.flag, 'none', 'full IM mid-pack norm is 2.8 — 2.93 W/kg is above');
 });
 
-Deno.test('assessCyclingLimiter: NP-trend fallback when no bodyweight', () => {
-  const r = assessCyclingLimiter({
-    weightKg: null, // no bodyweight → can't compute W/kg
-    ftpW: 250,
-    isTriAthlete: true,
-    raceDistance: '70.3',
-    recentNpSamples: [220, 225, 218], // recent mean ~221
-    ninetyDayNpSamples: [240, 245, 250, 235, 248, 242], // 90d mean ~243
-  });
-  // recent 220.83 vs 90d 243.33 → -22.5/243.3 → -9.2% → trending_down
-  assertEquals(r.source, 'np_trend');
-  assertEquals(r.flag, 'trending_down');
-  assert(r.np_trend_pct != null && r.np_trend_pct < -5);
-});
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// The two tests here pinned §2's NP-TREND LIMITER — `source: 'np_trend'`, `np_trend_pct`. DELETED by
+// cb4eb1d5 ("drop the baseline-blind NP-trend fake; spine owns power direction"): it averaged recent
+// NP against a 90-day ALL-ride NP mean with no terrain match and no staleness gate — a baseline-blind
+// duplicate of the spine's power trend, so an easy block dragged the mean into a false "trending down"
+// that contradicted State. The tests were never updated and sat RED. Deleted 2026-07-13, and replaced
+// by a pin on the deletion so the fake cannot come back.
+//
+// The real W/kg limiter (§1, baseline-aware) still runs — see the W/kg tests above.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 
-Deno.test('assessCyclingLimiter: NP-trend fallback for non-tri athlete', () => {
+Deno.test('NO NP-trend limiter: source is NEVER np_trend — the baseline-blind fake is gone (cb4eb1d5)', () => {
+  // A steep recent-NP decline with no bodyweight/FTP baseline used to emit
+  // source:'np_trend' + "Power trending down — review recovery". It must now emit nothing:
+  // the spine owns bike-power direction.
   const r = assessCyclingLimiter({
-    weightKg: 70,
-    ftpW: 250,
-    isTriAthlete: false, // not a triathlete → skip W/kg path
-    raceDistance: null,
-    recentNpSamples: [240, 245, 250],
-    ninetyDayNpSamples: [200, 210, 215, 220, 225],
-  });
-  // recent 245 vs 90d 214 → +14% → trending_up
-  assertEquals(r.flag, 'trending_up');
-  assertEquals(r.source, 'np_trend');
-  assert(r.np_trend_pct != null && r.np_trend_pct > 5);
+    npTrend: { points: [
+      { date: '2026-04-01', value: 240 },
+      { date: '2026-04-08', value: 225 },
+      { date: '2026-04-15', value: 205 },
+      { date: '2026-04-22', value: 195, is_current: true },
+    ] },
+  } as any);
+  assert(r == null || r.source !== 'np_trend', 'the NP-trend limiter fallback must not exist');
 });
-
 Deno.test('assessCyclingLimiter: insufficient_data when no path applies', () => {
   const r = assessCyclingLimiter({
     weightKg: null,

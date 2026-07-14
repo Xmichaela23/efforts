@@ -10,6 +10,7 @@ import { buildReasoningScaffold, validateNarrative, strengthAdapter, applyGround
 import { detectNovelMovements, novelMovementsNames, novelMovementNames } from '../_shared/novel-movements.ts';
 // D-208: role classifier — execution scoring weights a skipped accessory less than a main lift.
 import { roleForExercise, ROLE_WEIGHT } from '../_shared/strength/exercise-role.ts';
+import { isPerformedStrengthSet } from '../_shared/strength/performed-set.ts';
 import { rirVerdictFromDelta } from '../_shared/strength-profiles.ts';
 import { spineDirectionToTrend } from '../_shared/state-trend/strength.ts';
 
@@ -82,17 +83,9 @@ interface EnhancedPlanContext {
 /**
  * Extract enhanced plan context from planned workout and training plan
  */
-// D-204: a strength set counts as PERFORMED if the athlete marked it completed or it
-// carries real data — but NEVER if it is a pure untouched prefill (completed!==true &&
-// prefilled): the prescription the athlete never engaged. Centralizes the predicate that
-// was duplicated 6× across this analyzer (set_completion, volume, breakdown, RIR, totals).
-function isPerformedStrengthSet(s: any): boolean {
-  if (s?.completed !== true && s?.prefilled === true) return false;
-  return s?.completed === true ||
-    (s?.reps != null && s.reps > 0) ||
-    (s?.weight != null && s.weight > 0) ||
-    (s?.duration_seconds != null && s.duration_seconds > 0);
-}
+// D-204 / Q-178: THE definition of a performed set now lives in `_shared/strength/performed-set.ts`
+// (imported above), so it can be pin-tested. The inline copy was deleted 2026-07-13 — do not
+// re-inline it, and do not write a second one. Read that file before changing the rule.
 
 function extractEnhancedPlanContext(
   plannedWorkout: any, 

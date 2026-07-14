@@ -504,9 +504,22 @@ serve(async (req: Request) => {
     if (currentAvg1RM != null && priorAvg1RM != null && priorAvg1RM > 0) {
       const liftDelta = ((currentAvg1RM - priorAvg1RM) / priorAvg1RM) * 100;
       structuralDirection = liftDelta > 2 ? 'improving' : liftDelta < -2 ? 'declining' : 'stable';
-    } else if (strengthVolumeTrend != null) {
-      structuralDirection = strengthVolumeTrend > 5 ? 'improving' : strengthVolumeTrend < -5 ? 'declining' : 'stable';
     }
+    // Q-177 (2026-07-13): the `else if (strengthVolumeTrend != null)` fallback was REMOVED.
+    //
+    // `strengthVolumeTrend` (:445) compares a CUMULATIVE SUM of the CURRENT (partial) week against the
+    // average of COMPLETE prior weeks — so it is systematically negative early in the week (~-75% on a
+    // Monday with 1 of 4 sessions in). This fallback turned that artifact into a VERDICT: on a Monday,
+    // an athlete with no top-lift e1RM history was declared 'declining', which then fed
+    // `interferenceScore` below and let the app assert "endurance is dominating your strength" — off
+    // nothing but the day of the week. It was dodged on the primary account only because he HAS e1RM
+    // data, which wins the branch above.
+    //
+    // No inference without evidence (Law 2): with no e1RM history, structuralDirection stays NULL and
+    // interference simply is not computed. An honest silence beats a confident artifact.
+    //
+    // The correct strength-direction read is the SPINE (`state_trends_v1.strength`, which uses
+    // PER-WORKOUT volume over 6 weeks with ±8% bands and is immune to the partial-week problem).
 
     // Interference: one system improving while the other declines
     let interferenceScore: Record<string, any> | null = null;

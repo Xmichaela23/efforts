@@ -168,8 +168,24 @@ Deno.test('D-073: vs_similar surfaces HR deltas + pool_power_context when popula
   assertEquals(out?.vs_similar?.pool_power_context?.basis, 'if');
 });
 
-Deno.test('trend: np_trend fallback → metric NP, ride_type null, count/direction/delta', () => {
-  const improving = cyclingCrossWorkoutDisplay({
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// The three tests that used to sit here pinned the NP-TREND FALLBACK — a fitness-direction claim
+// trended off `npTrend` (all-effort NP) with no ride-type gate. That path was DELIBERATELY DELETED:
+//
+//   e8b67eaf "bike easy-ride false-dip: fitness-power trend only from hard efforts" — an easy ride's
+//   20-min power is not a fitness max (industry mean-max principle), so trending across whatever
+//   effort you happened to do MANUFACTURED a decline out of a soft block.
+//   cb4eb1d5 "drop the baseline-blind NP-trend fake; spine owns power direction".
+//
+// The tests were never updated, so they sat RED for days, asserting behaviour the code had removed on
+// purpose. Deleted 2026-07-13. They are replaced by pins on the DELETION itself, so nobody re-adds it.
+//
+// `out.trend` now requires ALL of: pwr20Trend (>=3 pts) + isFitnessPowerType(classified_type)
+// (climbing/threshold/sweet_spot/tempo) + a spine verdict that is not `needs_data`.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+Deno.test('NO np_trend fallback: npTrend alone must NOT produce a fitness-direction claim (cb4eb1d5/e8b67eaf)', () => {
+  const out = cyclingCrossWorkoutDisplay({
     npTrend: { points: [
       { date: '2026-04-01', value: 200 },
       { date: '2026-04-08', value: 210 },
@@ -177,35 +193,12 @@ Deno.test('trend: np_trend fallback → metric NP, ride_type null, count/directi
       { date: '2026-04-22', value: 240, is_current: true },
     ] },
   });
-  assert(improving?.trend);
-  assertEquals(improving.trend.metric, 'NP');
-  assertEquals(improving.trend.ride_count, 4);
-  assertEquals(improving.trend.ride_type, null);
-  assertEquals(improving.trend.direction, 'improving');
-  // first half avg (200,210)=205; second half (230,240)=235; delta +30
-  assertEquals(improving.trend.delta_w, 30);
-
-  // <3 np points and no pwr20 → no trend at all
-  assertEquals(cyclingCrossWorkoutDisplay({ npTrend: { points: [{ date: '2026-04-01', value: 200 }, { date: '2026-04-08', value: 210 }] } }), null);
+  // A rising all-effort NP series used to read "improving". It must now claim nothing.
+  assertEquals(out?.trend, undefined);
 });
 
-Deno.test('trend: near-flat series → stable', () => {
+Deno.test('NO np_trend fallback: a hard-type pwr20 series still needs a SPINE verdict — no spine, no claim', () => {
   const out = cyclingCrossWorkoutDisplay({
-    npTrend: { points: [
-      { date: '2026-04-01', value: 220 },
-      { date: '2026-04-08', value: 221 },
-      { date: '2026-04-15', value: 219 },
-      { date: '2026-04-22', value: 222 },
-    ] },
-  });
-  assertEquals(out?.trend?.direction, 'stable');
-});
-
-Deno.test('trend: type-filtered pwr20 preferred over np_trend (the 11-vs-3 bug)', () => {
-  const out = cyclingCrossWorkoutDisplay({
-    // np_trend has 11 rides (old narrative said "11 rides"); pwr20 has 3 climbing
-    // (what the TREND row shows). The narrative must follow pwr20.
-    npTrend: { points: Array.from({ length: 11 }, (_, i) => ({ date: `2026-03-${String(i + 1).padStart(2, '0')}`, value: 200 + i })) },
     pwr20Trend: {
       classified_type: 'climbing',
       points: [
@@ -214,17 +207,11 @@ Deno.test('trend: type-filtered pwr20 preferred over np_trend (the 11-vs-3 bug)'
         { date: '2026-04-15', value: 262, is_current: true },
       ],
     },
+    // no spineBikeTrend → the spine owns power direction, so the narrative stays honestly silent
   });
-  assert(out?.trend);
-  assertEquals(out.trend.metric, '20-min power');
-  assertEquals(out.trend.ride_count, 3); // NOT 11
-  assertEquals(out.trend.ride_type, 'climbing'); // matches the TREND row
+  assertEquals(out?.trend, undefined);
 });
 
-// Easy-ride false-dip regression: an EASY / endurance ride must NEVER produce a fitness-decline
-// claim. Its 20-min power isn't a fitness max (shared POWER_BINS rule with the STATE bike row), so
-// trending it reads a "decline" off an intentionally-soft effort — the exact bug on the real
-// unplanned easy ride (NP 106W, spine slid -21W). Gate: hard-effort types only feed out.trend.
 Deno.test('trend: easy/endurance ride claims NO fitness dip; hard effort still does', () => {
   const points = [
     { date: '2026-06-24', value: 118 },

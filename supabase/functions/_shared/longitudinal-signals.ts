@@ -143,28 +143,32 @@ function detectSnapshotChronicSignals(
   // aerobic-efficiency claim off garbage. The RUN aerobic-efficiency read now lives on the spine
   // (`state_trends_v1.run.decoupling`) as the single source. No longitudinal run-easy-pace signal.
 
-  const tStr = latest.strength_volume_trend;
-  if (tStr != null && !Number.isNaN(tStr)) {
-    if (tStr < -12) {
-      out.push({
-        id: 'snapshot_strength_volume_down',
-        category: 'adherence',
-        severity: tStr < -22 ? 'concern' : 'warning',
-        headline: `Strength volume well below recent baseline (${Math.round(tStr * 10) / 10}% vs chronic)`,
-        detail: `Athlete snapshot shows weekly strength volume down versus your trailing average. Confirm if intentional (deload, travel) or consistency slipped.`,
-        evidence: `athlete_snapshot week ${latest.week_start} strength_volume_trend=${tStr}`,
-      });
-    } else if (tStr > 8) {
-      out.push({
-        id: 'snapshot_strength_volume_up',
-        category: 'is_it_working',
-        severity: 'info',
-        headline: `Strength volume above recent baseline (+${Math.round(tStr * 10) / 10}% vs chronic)`,
-        detail: `Athlete snapshot shows more strength work than your recent rolling average — okay if recovery supports it.`,
-        evidence: `athlete_snapshot week ${latest.week_start} strength_volume_trend=${tStr}`,
-      });
-    }
-  }
+  // Q-178/Q-177 reconcile (2026-07-13): RETIRED the strength_volume_trend signals — EXACTLY the
+  // D-239 move above, one field over, for exactly the same reason: the substrate is garbage, and the
+  // spine already owns the read.
+  //
+  //   `athlete_snapshot.strength_volume_trend` = pctChange(current.strengthVolume, chronicStrVol)
+  //   (compute-snapshot:445). `current.strengthVolume` is a CUMULATIVE SUM of the CURRENT week
+  //   (compute-snapshot:117/:183, targetWeek = mondayOfToday()). `chronicStrVol` is the average of
+  //   COMPLETE PRIOR weeks. A partial-week SUM against full-week SUMS is systematically negative.
+  //
+  //   On a MONDAY, with 1 of 4 sessions logged, that is ~-75%. Observed live: -64.4%, which cleared
+  //   the `< -22` bar and fired at **'concern'** — the top severity — with a "Review with Arc" button
+  //   under it. So the highest-severity strength nudge in the app fired every Monday and Tuesday, for
+  //   every athlete, forever, then decayed to nothing by Sunday and re-armed. It was measuring WHAT
+  //   DAY YOU LOOKED, not what you did. ("The score that lies" — CANON-arc-inference-model.md.)
+  //
+  //   Meanwhile the spine said `steady`, and the spine was RIGHT: `_shared/state-trend/strength.ts`
+  //   reads PER-WORKOUT total_volume_lbs over a 6-week window with ±8% bands — immune to the
+  //   partial-week problem. Two engines, one fact, opposite answers, on the same screen. Law 1.
+  //
+  // THE STRENGTH VOLUME READ NOW LIVES ON THE SPINE (`state_trends_v1.strength.volume`) AS THE
+  // SINGLE SOURCE. No longitudinal strength-volume signal. Do not re-add one, and do NOT "fix" this
+  // by widening the threshold — that hides a structural artifact behind a magic number.
+  //
+  // NOTE: `strength_volume_trend` is still WRITTEN by compute-snapshot and is now read by nothing
+  // live (its only other reader, BlockSummaryTab, is unmounted). It is a DEAD column — see
+  // CAPABILITY-MAP. Its `structuralDirection` fallback (compute-snapshot:507) is fixed separately.
 
   const curEf = latest.ride_efficiency_factor;
   const prevEf = prior?.ride_efficiency_factor;
