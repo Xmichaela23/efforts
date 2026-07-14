@@ -6,6 +6,17 @@
 
 **How to use:** Ctrl-F the capability. `BUILT` → don't rebuild, wire into it. `PARTIAL`/`SEAM`/`STUB` → that's the real edge. `DEAD` → it exists and nothing calls it; decide whether to mount it or delete it, but don't write a second one. Entry points are `file:approx-line` — **lines drift, grep the symbol.**
 
+> **⛔ WHEN YOU ADD A ROW, SAY WHAT IT DOES FOR AN ATHLETE — not just where the code lives.**
+> The 2026-07-13 audit found three fully-built, fully-tested engines that had **never run once**, and the owner could not remember what any of them were *for*, because every doc described them structurally (*"the rule set ships at `week-optimizer.ts:412`"*) and never in a sentence a runner would understand. **A capability nobody can describe is a capability nobody will wire up.** One plain sentence, then the file path.
+
+### The three that are BUILT, TESTED, and have NEVER EXECUTED (2026-07-13)
+
+| what it does for an athlete | where | why it never runs |
+|---|---|---|
+| **"Put my lifting on the same day as a hard leg session, so my other days stay free."** The strength-integration fork: dense days vs light days. | engine `_shared/week-optimizer.ts:412-417` · spec `docs/CONSOLIDATED-MODE.md` | **No wizard writes `integration_mode`** → `create-goal…:1895` hardcodes `'separated'` for everyone |
+| **Stops the wizard accepting an IMPOSSIBLE week.** "4 days, 10 hours, hard, lots of strength" → it does the arithmetic and warns or refuses, showing the math. | `src/lib/day-count-gate.ts:237` · spec `docs/DAY-COUNT-GATES.md` | **Zero importers.** Nothing in the app calls it. ⚠️ Ships *after* consolidated mode — its matrix keys on `integration_mode`. |
+| **"Am I getting faster on this stretch?"** Your own personal segments — the chunks of road you actually repeat. *(Deliberately replaces the per-route approach, which flip-flopped on real data.)* | `detect-cores` → `match-cores` → `compute-core-verdict` · spec `docs/DESIGN-segments.md` | **`detect-cores` has ZERO callers.** No cron, no button, no script → `route_cores` is always empty → all three stages produce nothing. |
+
 **Status legend:**
 `BUILT` works end to end · `PARTIAL` works but fragile/incomplete (the note says how) · `SEAM` documented extension point, not built · `STUB` placeholder / invented numbers · `DEAD` exists, zero callers OR output never rendered.
 
