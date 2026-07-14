@@ -565,3 +565,44 @@ A set is **not performed** if it has `reps === 0 && !weight && !duration`, **reg
 
 ### ⚠️ Method note
 **The code audit did not find this.** `isPerformedStrengthSet` reads as a careful, well-commented, deliberately-centralized predicate — and it is. **It was found by opening a completed workout and reading the table.** Same lesson as Q-177: a code trace is right about EXISTENCE and blind to SEVERITY.
+
+---
+
+## Q-179 — THE CONTINUITY FRACTURE, WATCHED LIVE: the plan knows running is "maintenance only (held so strength leads)". State says "aerobic base needs work". `per_discipline_posture` is read ZERO times at runtime. (ENGINE + PRODUCT, 2026-07-13 — FOUND BY LOOKING AT THE APP)
+
+**This is the single clearest instance of the continuity problem in the app.** One athlete, one week, one question — *how is your running?* — and **three surfaces answer differently**, because the athlete's declared intent is read once at plan-build and then discarded.
+
+### What is on screen, right now, simultaneously
+
+| surface | what it says | does it know the posture? |
+|---|---|---|
+| **The plan's session copy** (swim card → "Next") | *"Easy Run — ~60 min easy aerobic, conversational — **maintenance only (held so strength leads)**."* | ✅ **YES** — generated at plan build, which DID read `per_discipline_posture` |
+| **State → PERFORMANCE → run** | *"Easy — **aerobic base needs work**"* (`_shared/state-trend/run.ts:139`, driven purely by decoupling > 5%; his is **7.8%**) | ❌ **NO** |
+| **`off-plan-banner.ts:66-71`** (strength-primary path) | *"On plan — strength on track; endurance via cross-training"* — while he ran **zero** of his two planned runs in Jul 6-12 | ❌ **NO** (`computePrimaryAdherence` counts the primary discipline only — see `SPEC-posture-flag.md §2`) |
+
+### THE PROOF — one grep
+
+```
+per_discipline_posture  in  supabase/functions/_shared/state-trend/   -> 0 occurrences
+per_discipline_posture  in  supabase/functions/coach/index.ts         -> 0 occurrences
+```
+
+**The entire verdict engine is posture-blind.** It grades a `maintain` discipline exactly as it would grade a `develop` one. `SPEC-posture-flag.md §3` already said this in the abstract — *"BUILT — but WRITE-ONLY. Read once at plan-build; ZERO runtime surfaces read it."* **This entry is the receipt.**
+
+### It is worse than posture-blind — the number is also STALE
+The 7.8% decoupling driving "needs work" is **`as of Jun 27`** — **16 days old** on the day it was read. Because the durability substrate only accepts **steady** runs and drops `decoupling_basis === 'raw'` (terrain), and the athlete (a) barely runs during a strength block and (b) runs rolling terrain when he does. **So the app is scolding him about a discipline he deliberately parked, on a two-week-old reading, in the middle of the strength block he planned.**
+
+> ⚠️ **Suspected, NOT verified:** that the terrain/raw-basis filter is what is starving the run durability trend. The Jul 13 run was *"Rolling (167 ft gain)"* and did not refresh the reading. **If most of an athlete's runs are on rolling terrain, their durability trend may almost never update.** Worth a query, not a screenshot. Do not act on this until it is proven.
+
+### This is the SAME shape as Garmin calling him "Unproductive"
+`PRODUCT-POSITIONING-v2-DRAFT.md` opens on exactly this: *"Garmin tells a lifting, swimming athlete running in summer heat that he is Unproductive. It cannot see the lifting, cannot see the swimming... and it never asked what you wanted."*
+
+**Efforts DID ask. It stored the answer. And then it judged him on the axis he told it to deprioritize anyway.** *(D-288's commit message named this class — "right about the number, wrong about the athlete" — and fixed it for the Performance screen. **It was never fixed on State.**)*
+
+### What this means for the roadmap
+**The posture flag is not a new feature. It is the fix for this.** And it should be understood as **making the verdict engine posture-aware**, not as adding a banner. The banner is the smallest part.
+
+**Do NOT ship the flag before the verdict engine can read posture at runtime** — otherwise the app will flag "you said maintain running and you haven't" on one row while still saying "aerobic base needs work" on the row above it. **Two posture-aware surfaces and one posture-blind one is not continuity; it is a third opinion.**
+
+### ⚠️ Method note
+Found by **opening a swim session and reading the "Next" card**, then comparing it to State. The code audit had all the pieces (`SPEC-posture-flag` documented the write-only field; the spine trace covered `run.ts`) and **never put them next to each other** — because in code they live in different files, and only on screen do they live in the same eye.

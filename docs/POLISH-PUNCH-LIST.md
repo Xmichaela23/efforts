@@ -43,6 +43,14 @@ The 2026-07-13 audit found the same disease three times, and it is the highest-l
 
 ## LIVE — happening on the only real account, today
 
+- [ ] **🔴 Q-179 — THE CONTINUITY FRACTURE, WATCHED LIVE. The verdict engine is POSTURE-BLIND.** *(Found 2026-07-13 by putting two screens next to each other.)*
+  **One athlete, one week, one question — *how is your running?* — three different answers:**
+  - **the plan's own copy:** *"Easy Run — maintenance only (**held so strength leads**)"* ✅ knows
+  - **State:** *"Easy — **aerobic base needs work**"* (`state-trend/run.ts:139`, pure decoupling >5%) ❌ blind
+  - **`off-plan-banner.ts:66-71`:** *"On plan — strength on track"* — while he ran **zero** of two planned runs ❌ blind
+  **The proof is one grep: `per_discipline_posture` appears ZERO times in `_shared/state-trend/` and ZERO times in `coach/index.ts`.** The verdict engine grades a `maintain` discipline exactly as it grades a `develop` one. And the 7.8% decoupling driving the scolding is **`as of Jun 27` — 16 days stale.**
+  **This is the same shape as Garmin calling him "Unproductive"** — and `PRODUCT-POSITIONING-v2-DRAFT` opens on exactly that. **Efforts asked, stored the answer, and judged him on the axis he told it to deprioritize anyway.**
+  ⛔ **THIS REFRAMES THE POSTURE FLAG.** It is not a banner and it is not a new feature — **it is making the verdict engine posture-aware at runtime.** The banner is the smallest part. **Do NOT ship the flag first:** a posture-aware banner sitting above a posture-blind verdict is not continuity, it is a third opinion.
 - [ ] **🔴 Q-177 — THE "STRENGTH VOLUME DOWN" SIGNAL IS A PARTIAL-WEEK ARTIFACT. It fires at CONCERN severity every Monday, for every athlete, by construction.** *(Found 2026-07-13 **by opening the app on a Monday**. The code audit missed it completely.)*
   On screen, simultaneously: **`STRENGTH · Volume · steady`** (the spine, correct) and **`SIGNAL: Strength volume well below recent baseline (-64.4% vs chronic)`** (a top-severity nudge with a "Review with Arc" button). Two engines, one fact, one screen.
   **Why it cannot not fire:** `compute-snapshot:445` compares `current.strengthVolume` — a **cumulative SUM of the CURRENT week** (`:117/:183`, `targetWeek = mondayOfToday()`) — against the **average of COMPLETE prior weeks**. On a Monday with 1 of 4 sessions done that is **≈ −75%**. `longitudinal-signals.ts:148` fires `warning` at `< -12` and **`concern` at `< -22`**. **It measures what day you looked, not what you did**, then decays to nothing by Sunday and re-arms.
