@@ -100,6 +100,13 @@ Then verify prod matches main — compare `supabase functions list --project-ref
 
 Before any session ends — when the human says "we're done," "closing the laptop," "good for today," "stopping here," or any equivalent — Claude Code MUST:
 
+0. **⛔ WRITE THE HANDOFF. This is the deliverable — everything else is bookkeeping.**
+   Replace the **`## 🧭 NEXT SESSION — START HERE`** banner at the TOP of `docs/ENGINE-STATE.md`. One banner, dated; the old one gets deleted, not stacked. It must answer, in this order:
+   - **What is the next session's JOB?** Name it, point at `GAME-PLAN.md`, and give the two or three *specific verified facts* it needs to start — file:line, not vibes.
+   - **What shipped, so they don't re-litigate it?** *(A fresh session with a good map will happily rediscover the Monday alarm and spend a day on it.)*
+   - **What is still UNVERIFIED, and what would settle it?** Especially: *"I have a plausible mechanism"* is a **hypothesis, not a finding.** Say so, and say what query or device test closes it.
+   > *This banner is the whole reason a fresh chat works. A year of this project was built by LLMs with no context, and the cost is visible in every stale doc. **Write the banner as if the next session is a stranger who will believe you.***
+
 1. Propose updates to `docs/ENGINE-STATE.md`, `docs/DECISIONS-LOG.md`, and `docs/OPEN-QUESTIONS.md` based on what shipped this session:
    - **ENGINE-STATE.md:** new fixes go to **Solid** (with file paths + verification method); new known-broken bugs go to **Known broken** (with deferred-reason); new unverified claims go to **Questioned** (with verification approach).
    - **DECISIONS-LOG.md:** new D-NNN entry per non-trivial design choice — coefficient picked deliberately, alternative pattern rejected, scoping call made.
@@ -109,13 +116,27 @@ Before any session ends — when the human says "we're done," "closing the lapto
    > *The docs' forward pointers are excellent and their back-pointers do not exist. D-283 knew it killed D-275; D-275 had never heard of D-283, and sat for two days presenting a reversed decision — with its full justification intact — to anyone who searched for "heat". Q-136, Q-138 and Q-169 were all fixed and all still read as open. **A fix that does not return to close the thing it fixed is how every one of these docs rotted.***
 
    Write the back-annotation as a `>` blockquote at the TOP of the old entry: what changed, where in code, and "everything below is history."
-3. Show the proposed diff.
-4. Wait for human approval.
-5. Commit + push as `docs: end-of-session context update for YYYY-MM-DD`.
+3. **Tick `docs/GAME-PLAN.md`.** If a phase shipped, mark it. If what we learned changed the order, **rewrite the plan** — do not leave a plan standing that we no longer believe. *A stale plan is more dangerous than no plan, because the next session will follow it.*
+
+4. **⛔ REPORT THE THREE STATES SEPARATELY. Never say "shipped."** The word hides exactly the failure that stranded 17 functions for a month:
+
+   | | means | how it's false |
+   |---|---|---|
+   | **PUSHED** | it is on `main` | …and running nowhere |
+   | **DEPLOYED** | the edge functions are live *(and EVERY importer of any touched `_shared` file was redeployed)* | …and the phone still runs the old bundle |
+   | **VERIFIED** | a human saw it do the right thing on a device | …and *nothing else counts.* A green suite proves the code is right, not that it is **running** |
+
+   Anything DEPLOYED-but-not-VERIFIED goes to the **AWAITING MICHAEL** block at the top of `POLISH-PUNCH-LIST.md`, with what to look for. Michael deploys nothing himself and reads no logs — **if the close does not say which of the three is true, he cannot know.**
+
+5. Show the proposed diff.
+6. Wait for human approval.
+7. Commit + push as `docs: end-of-session context update for YYYY-MM-DD`.
 
 Also update `docs/POLISH-PUNCH-LIST.md` if items closed (mark `[x]` with date) or new items were added during the session, and `docs/CAPABILITY-MAP.md` if a capability's status/entry-point changed or you discovered its real status (keep rows terse — one line each).
 
-**The 5 living docs** (updated ~every session; everything else in `docs/` is reference, often stale — verify before trusting): `DECISIONS-LOG.md`, `OPEN-QUESTIONS.md`, `ENGINE-STATE.md`, `POLISH-PUNCH-LIST.md`, `CAPABILITY-MAP.md`.
+**The 6 living docs** (updated ~every session; everything else in `docs/` is reference, often stale — verify before trusting): `ENGINE-STATE.md`, `GAME-PLAN.md`, `DECISIONS-LOG.md`, `OPEN-QUESTIONS.md`, `POLISH-PUNCH-LIST.md`, `CAPABILITY-MAP.md`.
+
+**⛔ AND THEY ARE CAPPED.** `DECISIONS-LOG`, `OPEN-QUESTIONS` and `ENGINE-STATE` are **append-heavy and they WILL rot back.** They hit **812KB / 416KB / 380KB** and had to be split by hand. **When a living doc passes ~150KB, move the closed and superseded entries to its `-ARCHIVE.md` and leave a pointer.** Nothing is deleted; it stops being loaded. *The 2026-07 split was a rescue, not a rule. This is the rule.*
 
 ### ⛔ THE SPEC LIFECYCLE — a SPEC is scaffolding, and scaffolding comes down
 
