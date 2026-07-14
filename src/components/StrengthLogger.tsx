@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -180,13 +180,68 @@ async function scheduleRestNotification(key: string, seconds: number): Promise<v
     await LocalNotifications.schedule({
       notifications: [{
         id: restNotifId(key),
-        title: 'Rest complete',
-        body: 'Time for your next set.',
+        // Q-TIMER: a DURATION timer (a carry, a plank) is not a rest — say the right thing.
+        title: isDurationTimerKey(key) ? 'Set complete' : 'Rest complete',
+        body: isDurationTimerKey(key) ? 'Time is up.' : 'Time for your next set.',
         schedule: { at: new Date(Date.now() + seconds * 1000) },
       }],
     });
   } catch { /* web / plugin absent */ }
 }
+// ── Q-TIMER — WALL-CLOCK TIMER PERSISTENCE ────────────────────────────────────────────────────────
+//
+// THE BUG (Michael, on device): "the timer is shotty — doesn't continue to count down when you leave the
+// app, sends notifications inconsistently."
+//
+// iOS SUSPENDS the JS `setInterval` when the app is backgrounded — but it KEEPS THE WEBVIEW ALIVE, so the
+// component does NOT remount. The old restore ran in a `useEffect(..., [])`, i.e. ONCE at mount, so on a
+// background→foreground round-trip it never re-ran. The tick simply RESUMED FROM THE VALUE IT FROZE AT,
+// losing exactly the time the athlete was away.
+//
+// And the notification handler made it worse: on foreground it CANCELLED the scheduled notification —
+// on the assumption that the resumed in-app tick would buzz instead. But that tick was now stale. So:
+//
+//     background with 60s left  ->  notification armed for +60s
+//     return at +30s            ->  notification CANCELLED, timer still says 60s
+//     -> the athlete waits 60 MORE seconds, and NO ALERT EVER FIRES.
+//
+// The rest was silently wrong AND the buzz never came. That is the "inconsistent".
+//
+// THE FIX: seconds-remaining is a DERIVED value, never an authority. The authority is `endsAt` — an
+// absolute wall-clock deadline. Persist it, and RECONCILE FROM THE CLOCK on every foreground, not just
+// on mount. A suspended interval can then never lose time: it is corrected the moment we come back.
+//
+// This now covers BOTH timer kinds. The DURATION timer (a carry, a plank) previously had NO background
+// handling at all — no persistence, no notification, no reconcile. Which is the worst case of the lot:
+// you start a 40-second carry, the screen locks while you WALK it, and the timer freezes.
+const TIMERS_KEY = 'strength_timers_v2';
+type PersistedTimers = Record<string, number>; // timerKey -> endsAt (epoch ms)
+
+function readPersistedTimers(): PersistedTimers {
+  try {
+    const raw = localStorage.getItem(TIMERS_KEY);
+    const v = raw ? JSON.parse(raw) : null;
+    return v && typeof v === 'object' ? (v as PersistedTimers) : {};
+  } catch { return {}; }
+}
+function persistTimer(key: string, seconds: number): void {
+  if (!key || !(seconds > 0)) return;
+  try {
+    const all = readPersistedTimers();
+    all[key] = Date.now() + seconds * 1000;
+    localStorage.setItem(TIMERS_KEY, JSON.stringify(all));
+  } catch {}
+}
+function clearPersistedTimer(key: string): void {
+  try {
+    const all = readPersistedTimers();
+    delete all[key];
+    localStorage.setItem(TIMERS_KEY, JSON.stringify(all));
+  } catch {}
+}
+/** A duration timer's key carries '-set-'; a rest timer's does not. */
+function isDurationTimerKey(key: string): boolean { return key.includes('-set-'); }
+
 async function cancelRestNotification(key: string): Promise<void> {
   try { await LocalNotifications.cancel({ notifications: [{ id: restNotifId(key) }] }); } catch { /* no-op */ }
 }
@@ -486,18 +541,37 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // `exercises` (which would tear it down + restart on every set edit → the stuttering timer). (Q-timer)
   const exercisesRef = useRef(exercises);
   useEffect(() => { exercisesRef.current = exercises; }, [exercises]);
-  // Restore a running rest timer across resume rebuilds (it lives only in memory otherwise → wiped on
-  // remount). Reads the persisted {key, endsAt}; re-arms with the remaining seconds, or clears if expired.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('strength_rest_timer');
-      if (!raw) return;
-      const { key, endsAt } = JSON.parse(raw);
-      const remaining = Math.ceil((Number(endsAt) - Date.now()) / 1000);
-      if (key && remaining > 0) setTimers((prev) => (prev[key]?.running ? prev : { ...prev, [key]: { seconds: remaining, running: true } }));
-      else localStorage.removeItem('strength_rest_timer');
-    } catch {}
+  // Q-TIMER — RECONCILE EVERY RUNNING TIMER FROM THE WALL CLOCK.
+  //
+  // Seconds-remaining is a DERIVED value, never an authority. The authority is the persisted `endsAt`.
+  // This runs on MOUNT (a genuine rebuild) and on EVERY FOREGROUND (the far more common case on iOS,
+  // where the WebView survives and the component never remounts — which is exactly why the old
+  // mount-only restore never fired and the timer silently lost the time the athlete was away).
+  //
+  // Returns the keys that EXPIRED while away, so the caller can clear them without re-buzzing: the
+  // scheduled notification already fired out there. We must not haptic again on return.
+  const reconcileTimersFromClock = useCallback((): string[] => {
+    const all = readPersistedTimers();
+    const keys = Object.keys(all);
+    if (keys.length === 0) return [];
+    const now = Date.now();
+    const expired: string[] = [];
+    const live: Record<string, number> = {};
+    for (const k of keys) {
+      const remaining = Math.ceil((Number(all[k]) - now) / 1000);
+      if (remaining > 0) live[k] = remaining;
+      else { expired.push(k); clearPersistedTimer(k); }
+    }
+    setTimers((prev) => {
+      const next = { ...prev };
+      for (const k of expired) delete next[k];
+      for (const [k, secs] of Object.entries(live)) next[k] = { seconds: secs, running: true };
+      return next;
+    });
+    return expired;
   }, []);
+
+  useEffect(() => { reconcileTimersFromClock(); }, [reconcileTimersFromClock]);
   // Away-alert: haptic in-app, notification ONLY when away. iOS suspends the JS countdown when the app is
   // backgrounded, so on background we schedule a notification per running rest timer; on foreground we
   // cancel them — the resumed JS tick fires the in-app HAPTIC and no foreground banner ever shows.
@@ -508,17 +582,32 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         handle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
           const cur = timersRef.current || {};
           if (!isActive) {
+            // BACKGROUND: iOS is about to suspend the JS tick. A scheduled local notification is the ONLY
+            // way to reach the athlete out there. Now covers DURATION timers too (a carry / a plank) —
+            // they previously got nothing at all, which is the worst case: you start a 40s carry, the
+            // screen locks while you WALK it, and both the timer and the buzz are lost.
             for (const k of Object.keys(cur)) {
-              if (!k.includes('-set-') && cur[k]?.running && (cur[k]?.seconds ?? 0) > 0) void scheduleRestNotification(k, cur[k].seconds);
+              if (cur[k]?.running && (cur[k]?.seconds ?? 0) > 0) void scheduleRestNotification(k, cur[k].seconds);
             }
           } else {
-            for (const k of Object.keys(cur)) { if (!k.includes('-set-')) void cancelRestNotification(k); }
+            // FOREGROUND: RECONCILE FIRST, THEN CANCEL. Order is load-bearing.
+            //
+            // The old code cancelled the notification and trusted the resumed JS tick to buzz instead —
+            // but that tick had been suspended and was now STALE, so the athlete waited out the whole
+            // rest AGAIN and no alert ever fired. Reconciling from `endsAt` first means the in-app timer
+            // is CORRECT the instant we return, so cancelling the notification is finally safe.
+            const expired = reconcileTimersFromClock();
+
+            // A timer that ran out while away has ALREADY buzzed via its notification. Do not haptic
+            // again on return — that is a double-fire, and it is the other half of "inconsistent".
+            for (const k of expired) void cancelRestNotification(k);
+            for (const k of Object.keys(timersRef.current || {})) void cancelRestNotification(k);
           }
         });
       } catch { /* web / no plugin */ }
     })();
     return () => { try { (handle as any)?.remove?.(); } catch {} };
-  }, []);
+  }, [reconcileTimersFromClock]);
   // D-122: prior-session per-set actuals, keyed by normalized exercise name.
   // Populated by the D-097 autofill fetch; feeds the persistent "last:" anchor line.
   const [previousSessionByName, setPreviousSessionByName] = useState<Record<string, LoggedSet[]>>({});
@@ -2561,6 +2650,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             const ns = t.seconds - 1;
             copy[k] = { ...t, seconds: ns };
             if (ns === 0) {
+              // Q-TIMER: ANY timer that reaches zero drops its wall-clock deadline — rest OR duration.
+              // (This used to sit inside the rest-only branch below, so a finished DURATION timer left a
+              // stale deadline behind and the next foreground reconcile would resurrect it.)
+              clearPersistedTimer(k);
+              void cancelRestNotification(k); // it fired in-app; do not also buzz from the background
+
               // D-100: pair existing haptic with a short audible tone at rest-end.
               if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
                 try { (navigator as any).vibrate?.(50); } catch {}
@@ -2570,7 +2665,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               if (!k.includes('-set-')) {
                 playRestEndTone();
                 hapticSuccess();  // D-139: success haptic at rest-end → "start the next set"
-                try { localStorage.removeItem('strength_rest_timer'); } catch {} // rest done → drop the persisted timer
               }
             }
 
@@ -3091,7 +3185,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       });
       hapticLight();
       // Persist the running timer so it survives a resume rebuild (timers are otherwise in-memory only).
-      try { localStorage.setItem('strength_rest_timer', JSON.stringify({ key: restKey, endsAt: Date.now() + calculatedRest * 1000 })); } catch {}
+      persistTimer(restKey, calculatedRest); // Q-TIMER: the wall-clock deadline IS the authority
     } catch {}
   };
 
@@ -3629,7 +3723,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   setRestDismissed((prev) => new Set(prev).add(activeKey));
                   setTimers((prev) => { const next = { ...prev }; delete next[activeKey]; return next; });
                   cancelRestNotification(activeKey);
-                  try { localStorage.removeItem('strength_rest_timer'); } catch {} // skipped → drop the persisted timer
+                  clearPersistedTimer(activeKey); // Q-TIMER: skipped → drop its wall-clock deadline
                 }}
                 className="ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-amber-100 hover:text-white flex items-center justify-center text-xs font-medium"
                 aria-label="Skip rest"
@@ -4217,8 +4311,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             {!isDurationRunning ? (
                               <button
                                 onClick={() => {
-                                  const currentDuration = set.duration_seconds || 60;
-                                  setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds: currentDuration, running: true } }));
+                                  // Q-TIMER: RESUME from what is left, don't RESET. This read
+                                  // `set.duration_seconds` unconditionally, so pausing a 40s carry at 20s
+                                  // and pressing Start again jumped back to 40 — a reset wearing a resume's
+                                  // clothes. Fall back to the prescribed duration only when there is nothing
+                                  // to resume.
+                                  const remaining = timers[durationTimerKey]?.seconds;
+                                  const seconds = (typeof remaining === 'number' && remaining > 0)
+                                    ? remaining
+                                    : (set.duration_seconds || 60);
+                                  setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds, running: true } }));
+                                  // Arm the wall-clock deadline: this is what survives iOS suspending the
+                                  // JS tick when the screen locks mid-carry.
+                                  persistTimer(durationTimerKey, seconds);
                                 }}
                                 className="h-9 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] transition-all duration-300"
                                 style={{ fontFamily: 'Inter, sans-serif' }}
@@ -4229,6 +4334,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               <button
                                 onClick={() => {
                                   setTimers(prev => ({ ...prev, [durationTimerKey]: { ...prev[durationTimerKey], running: false } }));
+                                  // Q-TIMER: a PAUSED timer has no deadline. Drop it, or the next foreground
+                                  // reconcile would "catch it up" against a clock that never stopped and
+                                  // silently eat the paused time. And cancel its notification — nothing is
+                                  // going to end.
+                                  clearPersistedTimer(durationTimerKey);
+                                  void cancelRestNotification(durationTimerKey);
                                 }}
                                 className="h-9 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] transition-all duration-300"
                                 style={{ fontFamily: 'Inter, sans-serif' }}
