@@ -514,3 +514,54 @@ Either (a) **normalize** — compare per-session or per-day volume, not a week-t
 
 ### ⚠️ How this was found, and why it matters for method
 **The code audit missed it entirely.** Four parallel readers traced the whole spine and never flagged it, because in code `pctChange(current, chronic)` looks completely reasonable. **It was found by opening the app on a Monday.** See the note at the top of `POLISH-PUNCH-LIST.md §1`: a code trace is right about EXISTENCE and blind to SEVERITY. Some bugs are only visible from a chair.
+
+---
+
+## Q-178 — Q-076 ROOT-CAUSED WITH A LIVE REPRO: a skipped exercise counts as PERFORMED, because `completed === true` outranks "zero reps". The score forgives it and the narrative asserts the opposite of what happened. (ENGINE, 2026-07-13 — FOUND BY LOOKING AT THE APP)
+
+**Q-076 ("skipped exercise still shows as done") has sat unverified since 2026-06-21 because the only screenshot was blank.** Here is the repro, live, on the primary account.
+
+### The session — Strength Focus — Upper A, Mon 2026-07-13
+
+| exercise | planned | completed |
+|---|---|---|
+| Bench Press | 5×5 @ 120 lb | **4 sets** (set 5 = `—`). Volume **−600 lb**. |
+| Barbell Row | 3×5 @ 95 lb | 3 sets ✅ |
+| **Farmers Carry** *(the HYROX accessory)* | 3 × 40 reps | set 1 `—` · set 2 **`0 reps (RIR 3)`** · set 3 `—` |
+
+**He did ZERO Farmers Carries.** The app said:
+
+> **EXECUTION 98% · Strong**
+> *"Sets landed on target across all three lifts, with loads held to plan…"*
+
+### ROOT CAUSE — `analyze-strength-workout/index.ts:89` (`isPerformedStrengthSet`, D-204)
+
+```ts
+if (s?.completed !== true && s?.prefilled === true) return false;
+return s?.completed === true ||          // <- SHORT-CIRCUITS. The flag outranks the data.
+  (s?.reps != null && s.reps > 0) ||
+  (s?.weight != null && s.weight > 0) ||
+  (s?.duration_seconds != null && s.duration_seconds > 0);
+```
+
+A set with **0 reps, 0 weight, 0 duration** but `completed: true` returns **PERFORMED**. *(Deductively certain: with `completed !== true` this set could only return false — every data branch is zero. So that row carries `completed: true, reps: 0`.)*
+
+**The tell is `0 reps (RIR 3)` — an RIR value on a set with no reps.** The logger wrote the reps-in-reserve and never wrote the reps.
+
+### Why the SCORE forgives it
+`:1337` — D-208 role-weighted exercise completion: each planned exercise contributes its role weight (primary/secondary **1.0**, accessory **0.5**) to numerator and denominator, and the numerator counts exercises where `ex.matched`. Because the 0-rep set reads as performed, **Farmers Carry MATCHES**, so `exerciseCompletion = 100%` and the 30%-weighted term pays out in full for an exercise that never happened. `overallExecution = exercise×0.3 + sets×0.2 + load×0.3 + rir×0.2` (`:1341`) → **98%** → `>= 85` → **"Strong"** (`:2811`).
+
+*(Even correctly counted, Farmers Carry is an accessory at 0.5 weight → exerciseCompletion 80% → ~92%, still "Strong". **So the score is the smaller problem. The narrative is the bigger one.**)*
+
+### 🔴 Why the NARRATIVE is the real damage — and why the guard cannot catch it
+The prose says *"Sets landed on target across all three lifts."* **The LLM is not hallucinating.** It is being handed a fact packet that already records the exercise as performed. **`_shared/narrative-core/validate.ts` validates prose against the FACTS — so it cannot catch a lie that is already IN the facts.**
+
+> **This is the failure mode the whole LLM containment strategy is built to prevent, arriving through the one door it does not watch: garbage in, confident out.** The containment (LLM writes prose only, validated against the spine, dropped on contradiction) is sound — **and it is only as honest as the packet.** Corrupt the packet and the guard becomes a laundering step.
+
+### The fix (direction, not a decision)
+A set is **not performed** if it has `reps === 0 && !weight && !duration`, **regardless of the `completed` flag**. The flag records that the athlete *touched the row*; it must not outrank the fact that they logged nothing. **Also fix upstream:** the logger should not write an RIR onto a set with zero reps.
+
+⚠️ **Read D-204 before touching `isPerformedStrengthSet` — it was deliberately centralized out of 6 copies.** Change the predicate, not the call sites.
+
+### ⚠️ Method note
+**The code audit did not find this.** `isPerformedStrengthSet` reads as a careful, well-commented, deliberately-centralized predicate — and it is. **It was found by opening a completed workout and reading the table.** Same lesson as Q-177: a code trace is right about EXISTENCE and blind to SEVERITY.
