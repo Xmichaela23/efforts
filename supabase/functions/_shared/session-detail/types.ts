@@ -453,13 +453,23 @@ export type SessionDetailV1 = {
       first_seen?: string | null;
       comparable_runs: number;
       chart_eligible: boolean;
-      /** D-105: `gap_pace_s_per_km` is the grade-adjusted pace from
-       *  `route_progress_metrics.effort_adjusted_pace_sec_per_km`. Client
-       *  prefers it when non-null (per-row fallback gate); raw `pace_s_per_km`
-       *  is preserved for flat routes / pre-D-105 backfill rows / rows where
-       *  GAP couldn't be computed. Additive — old clients reading only
-       *  `pace_s_per_km` keep working. */
-      history: Array<{ date: string; pace_s_per_km: number | null; gap_pace_s_per_km: number | null; hr: number | null; is_current: boolean }>;
+      /** Two ADJUSTED paces. They answer different questions and must not be collapsed.
+       *
+       *  `gap_pace_s_per_km` — GRADE-adjusted (terrain removed). The real thing: `_shared/gap.ts`
+       *    (Minetti metabolic cost — the model behind Strava GAP and TrainingPeaks NGP), read from
+       *    `workouts.computed.overall.gap_pace_s_per_mi`. This is what the ROUTE sparkline plots:
+       *    "same effort, different hills" must not read as fitness variation. Null when the run had
+       *    no usable elevation — the client falls back to raw `pace_s_per_km` per row.
+       *
+       *  `effort_adjusted_pace_s_per_km` — EFFORT-adjusted (pace x avg_hr / threshold_hr), from
+       *    `route_progress_metrics.effort_adjusted_pace_sec_per_km`. Pace at comparable cardiac
+       *    effort. Nothing to do with terrain.
+       *
+       *  ⛔ Until 2026-07-14 `gap_pace_s_per_km` was fed from the EFFORT-adjusted column and
+       *  documented here as grade-adjusted. The route chart claimed the hills were removed while
+       *  actually tracking how hard the athlete's heart was working. Both now ship under true names.
+       */
+      history: Array<{ date: string; pace_s_per_km: number | null; gap_pace_s_per_km: number | null; effort_adjusted_pace_s_per_km?: number | null; hr: number | null; is_current: boolean }>;
       /** Same-route EFFICIENCY direction (pace-per-HR, State's canonical `efficiency_index` metric,
        *  restricted to this route). Replaces the removed raw-pace/power trend. `null` when there are
        *  too few usable same-route runs to honestly claim a direction (client shows "building history").

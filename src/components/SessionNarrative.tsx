@@ -17,9 +17,14 @@ export type NextSession = {
 type RouteHistoryPoint = {
   date: string;
   pace_s_per_km: number | null;
-  /** D-105: grade-adjusted pace from `route_progress_metrics.effort_adjusted_pace_sec_per_km`.
-   *  Preferred when non-null; falls back to `pace_s_per_km` per-row. */
+  /** GRADE-adjusted pace — terrain removed (Minetti/GAP, the Strava-GAP / TP-NGP model).
+   *  Preferred when non-null; falls back to `pace_s_per_km` per-row when the run had no
+   *  usable elevation. (Before 2026-07-14 this field carried the EFFORT-adjusted number and
+   *  the chart claimed to have removed hills it had never looked at.) */
   gap_pace_s_per_km?: number | null;
+  /** EFFORT-adjusted pace — pace at comparable cardiac effort (pace x avg_hr / threshold_hr).
+   *  A different question from GAP. Not plotted by the route sparkline. */
+  effort_adjusted_pace_s_per_km?: number | null;
   hr: number | null;
   is_current: boolean;
 };

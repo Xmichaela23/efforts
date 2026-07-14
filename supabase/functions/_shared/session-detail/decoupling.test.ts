@@ -23,6 +23,7 @@ import { assertEquals, assertNotEquals, assertStringIncludes } from 'https://den
 import { enrichSamplesWithGAP } from '../gap.ts';
 import { toDisplayFormatV1, buildUserMessage } from '../fact-packet/ai-summary.ts';
 import { calculateEfficiency } from '../../analyze-running-workout/lib/heart-rate/efficiency.ts';
+import { decouplingToSeries } from '../state-trend/run.ts';
 import type { HRAnalysisContext, SensorSample } from '../../analyze-running-workout/lib/heart-rate/types.ts';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
@@ -197,14 +198,42 @@ Deno.test('D-037 mixed-effort: forMixedEffort=true bypasses the intervals/hill_r
   assertEquals(typeof out!.decoupling.percent, 'number');
 });
 
-Deno.test('D-037 mixed-effort: forMixedEffort=true forces basis="raw" on GAP-enriched samples (raw branch of prompt fires)', () => {
-  // Whole-session decoupling across heterogeneous efforts is inconclusive even
-  // when the sample series itself was grade-adjusted — force 'raw' so the
-  // AEROBIC DECOUPLING (RUN) raw-branch rule fires.
+// ⛔ REGRESSION (2026-07-14). This test used to assert the OPPOSITE — that forMixedEffort forced
+// basis='raw' on GAP-enriched samples. It passed, and it was pinning a live bug: `state-trend/run.ts`
+// DROPS a 'raw' row from the durability substrate (it reads 'raw' as "terrain-confounded"). The
+// variance gate fires on ~10 of 11 real outdoor runs, so once D-037 was restored on 2026-07-12 every
+// run was binned and the State durability trend silently froze 16 days out of date.
+// `basis` answers ONE question — was the pace grade-adjusted. Confidence rides on `mixedEffort`.
+Deno.test('mixed-effort does NOT corrupt basis: GAP-enriched samples keep basis="gap" and are flagged mixedEffort', () => {
   const samples = makeEffSamples(1400, { gapMarker: true });
   const out = calculateEfficiency(samples, samples, makeBlankContext(), 'fartlek', { forMixedEffort: true });
   assertNotEquals(out, undefined);
+  assertEquals(out!.decoupling.basis, 'gap');        // terrain fact: the pace WAS grade-adjusted
+  assertEquals(out!.decoupling.mixedEffort, true);   // confidence fact: rides on its own channel
+});
+
+Deno.test('mixed-effort on non-GAP samples: basis stays "raw" (genuinely no elevation) and mixedEffort is flagged', () => {
+  const samples = makeEffSamples(1400);
+  const out = calculateEfficiency(samples, samples, makeBlankContext(), 'fartlek', { forMixedEffort: true });
+  assertNotEquals(out, undefined);
   assertEquals(out!.decoupling.basis, 'raw');
+  assertEquals(out!.decoupling.mixedEffort, true);
+});
+
+// The bug in one assertion: a mixed-effort STEADY run with usable elevation must survive the State
+// durability filter. Before the split it was deleted, and nothing said so on the screen.
+Deno.test('REGRESSION: a mixed-effort steady run still reaches the durability substrate', () => {
+  const samples = makeEffSamples(1400, { gapMarker: true });
+  const out = calculateEfficiency(samples, samples, makeBlankContext(), 'steady_state', { forMixedEffort: true });
+  const series = decouplingToSeries([{
+    date: '2026-07-13',
+    decoupling_pct: out!.decoupling.percent,
+    decoupling_basis: out!.decoupling.basis,
+    decoupling_mixed_effort: out!.decoupling.mixedEffort,
+    workout_type: 'steady_state',
+    duration_minutes: 47,
+  }]);
+  assertEquals(series.length, 1);
 });
 
 Deno.test('D-037 mixed-effort: forMixedEffort=false on fartlek with GAP samples returns basis="gap" (steady-state path unchanged)', () => {
@@ -234,12 +263,13 @@ function makeHRSamples(n: number, opts?: { gapMarker?: boolean; baseHr?: number;
   });
 }
 
-Deno.test('D-038 Piece 1B: varianceGate=true keeps the HONEST type, only flags decoupling low-confidence (basis=raw)', () => {
+Deno.test('D-038 Piece 1B: varianceGate=true keeps the HONEST type, and flags the decoupling low-confidence WITHOUT corrupting basis', () => {
   // Research-corrected 2026-07-12: pace variance must NEVER re-label a run "fartlek" (fartlek is
   // deliberate speed play; no commercial app names one from variance). A steady_state run whose pace is
-  // too variable KEEPS its type — the variance gate instead forces the decoupling to basis='raw' (low
-  // confidence) via the steady path, so the METRIC carries the uncertainty, not the label. Supersedes
-  // the old steady→fartlek override.
+  // too variable KEEPS its type — the METRIC carries the uncertainty, not the label.
+  // Corrected again 2026-07-14: that uncertainty rode on basis='raw', which the State durability filter
+  // reads as "terrain-confounded → delete". It now rides on `mixedEffort`, and `basis` keeps telling the
+  // truth about the terrain. The run stays in the trend, hedged rather than erased.
   const samples = makeHRSamples(1400, { gapMarker: true });
   const context = {
     workoutType: 'steady_state' as const,
@@ -248,9 +278,11 @@ Deno.test('D-038 Piece 1B: varianceGate=true keeps the HONEST type, only flags d
     varianceGate: { isMixedEffort: true },
   };
   const result = analyzeHeartRate(samples, context as any);
-  assertEquals(result.workoutType, 'steady_state');        // NOT relabeled to fartlek
+  assertEquals(result.workoutType, 'steady_state');              // NOT relabeled to fartlek
   assertNotEquals(result.efficiency, undefined);
-  assertEquals(result.efficiency!.decoupling.basis, 'raw'); // drift flagged inconclusive instead
+  assertEquals(result.efficiency!.decoupling.basis, 'gap');      // terrain truth preserved
+  assertEquals(result.efficiency!.decoupling.mixedEffort, true); // uncertainty on its own channel
+  assertEquals(result.summary.decouplingMixedEffort, true);      // and it PERSISTS to every consumer
 });
 
 Deno.test('D-038 Piece 1B: varianceGate=true + workoutType=intervals → no override (more specific verdict wins)', () => {

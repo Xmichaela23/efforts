@@ -1393,6 +1393,20 @@ const formatMovingTime = () => {
             </div>
           </div>
 
+          {/* Grade-adjusted pace — what this run would have been on the flat. Server-computed
+              (Minetti/GAP); the client only reads it. Shown for runs when the server has it;
+              absent when there was no usable elevation, and we say nothing rather than guess. */}
+          {String(norm.sport || '').includes('run') && norm.gap_pace_s_per_km ? (
+            <div className="px-0.5 py-1">
+              <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
+                {formatPace(norm.gap_pace_s_per_km, useImperial)}
+              </div>
+              <div className="text-xs text-muted-foreground font-normal">
+                <div className="text-xs font-light" style={metricLabelStyle}>Grade-Adj Pace</div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="px-0.5 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.max_pace_s_per_km ? formatPace(norm.max_pace_s_per_km, useImperial) : 'N/A'}

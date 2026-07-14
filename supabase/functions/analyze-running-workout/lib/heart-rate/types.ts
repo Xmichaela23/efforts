@@ -350,12 +350,19 @@ export interface EfficiencyMetrics {
     lateRatio: number;          // Late pace/HR ratio
     assessment: 'good' | 'needs_work'; // Q-161: 5% line — 'good' ≤5% / 'needs_work' >5%
     /**
-     * D-036: which pace series fed the ratio.
+     * D-036: which pace series fed the ratio. TERRAIN ONLY — it says nothing about effort quality.
      * 'gap' when the input samples carried the raw_pace_s_per_mi marker (i.e.
      * pace_s_per_mi was already grade-adjusted at the analyzer entry).
      * 'raw' otherwise.
      */
     basis: 'gap' | 'raw';
+    /**
+     * Variance gate: the session's efforts were heterogeneous, so a whole-session first/second-half
+     * ratio is dominated by WHERE the hard bits fell, not by efficiency drift. A CONFIDENCE flag —
+     * consumers hedge on it. It is NOT an exclusion order, and it must never be folded back into
+     * `basis` (that collision silently emptied the State durability trend; see efficiency.ts).
+     */
+    mixedEffort?: boolean;
   };
   
   // Overall efficiency
@@ -406,12 +413,20 @@ export interface HRSummaryMetrics {
   driftBpm: number | null;
   decouplingPct: number | null;
   /**
-   * D-036: which pace series fed the decoupling ratio.
+   * D-036: which pace series fed the decoupling ratio. TERRAIN ONLY.
    * 'gap' = grade-adjusted pace (terrain neutralized; honest fitness signal).
-   * 'raw' = raw pace (no usable elevation; treat decoupling as inconclusive).
+   * 'raw' = raw pace (no usable elevation; terrain confound not removed).
    * null = decoupling not computed (interval workout, < 20 min, etc.).
+   * ⛔ Effort quality does NOT live here — see decouplingMixedEffort.
    */
   decouplingBasis: 'gap' | 'raw' | null;
+  /**
+   * Variance gate: the efforts inside this session were heterogeneous, so the first/second-half
+   * ratio is dominated by where the hard bits fell. A CONFIDENCE flag, not an exclusion order —
+   * hedge the prose, keep the number. Persisted on `heart_rate_summary` so every downstream
+   * consumer (State trend, coach, session detail) reads the same fact.
+   */
+  decouplingMixedEffort?: boolean | null;
   /** Q-161: the shared frielBand state at the 5% science line, from decouplingAssessmentFromPct. */
   decouplingAssessment: 'good' | 'needs_work' | null; // 'good' ≤5% / 'needs_work' >5%
   efficiencyRatio: number | null;

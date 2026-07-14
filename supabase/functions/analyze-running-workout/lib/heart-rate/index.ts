@@ -537,6 +537,7 @@ function buildSummary(
     driftBpm: drift?.driftBpm ?? null,
     decouplingPct,
     decouplingBasis: decouplingPct == null ? null : (efficiency?.decoupling?.basis ?? null),
+    decouplingMixedEffort: decouplingPct == null ? null : (efficiency?.decoupling?.mixedEffort ?? false),
     decouplingAssessment: decouplingPct == null ? null : (efficiency?.decoupling?.assessment ?? null),
     efficiencyRatio: efficiency?.avgEfficiencyRatio ?? null,
     timeInZones: zonesToTimeInZones(zones),
@@ -591,9 +592,11 @@ function buildMixedSummary(
     maxHr: Math.max(...hrValues),
     minHr: Math.min(...hrValues),
     driftBpm: null,
-    // D-037: decoupling populated via the forMixedEffort path; basis is always 'raw' here (inconclusive).
+    // D-037: decoupling populated via the forMixedEffort path. `basis` now reports GAP-ness honestly;
+    // the "this ratio is inconclusive" fact rides on decouplingMixedEffort, not on a forced 'raw'.
     decouplingPct: efficiency?.decoupling?.percent ?? null,
     decouplingBasis: efficiency?.decoupling?.basis ?? null,
+    decouplingMixedEffort: efficiency?.decoupling?.mixedEffort ?? null,
     decouplingAssessment: efficiency?.decoupling?.assessment ?? null,
     efficiencyRatio: efficiency?.avgEfficiencyRatio ?? null,
     timeInZones: zonesToTimeInZones(zones),

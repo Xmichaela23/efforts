@@ -461,7 +461,7 @@ POOL INTENSITY CONTEXT — when signals.comparisons.vs_similar is present AND vs
 - "matched": pool intensity comparable to current session. HR delta is a legitimate cross-session comparison; interpret normally (use drift signals, arc context, etc.).
 - This rule takes PRIORITY over generic vs_similar HR interpretation. It composes with POST-RACE COMPARISON and MIXED-EFFORT MODE — if any of them apply, all apply.
 
-AEROBIC DECOUPLING (RUN) — when signals.cardiac_decoupling is present AND signals.decoupling_basis === 'gap':
+AEROBIC DECOUPLING (RUN) — when signals.cardiac_decoupling is present AND signals.decoupling_basis === 'gap' AND signals.is_mixed_effort !== true:
 - This is grade-adjusted: the pace input feeding the decoupling ratio used GAP, not raw pace. Terrain confound is removed. The number reflects real cardiovascular efficiency drift across the workout, not how the route happened to slope.
 - Translate the value to plain language; NEVER print the percentage. There are two states (Q-161, the one science-backed 5% line — do NOT invent finer gradations):
   • signals.decoupling_assessment === 'good' (≤5% — HR held relative to pace) → "heart rate stayed controlled as effort held — aerobic base looks sound for this duration."
@@ -469,8 +469,8 @@ AEROBIC DECOUPLING (RUN) — when signals.cardiac_decoupling is present AND sign
 - Decoupling and HR drift are distinct. Drift answers "did HR climb?" (can be terrain-driven; use the existing drift_explanation field). Decoupling at gap basis answers "did efficiency drop?" — fitness, not geography.
 - Treat the decoupling read as one observation among others; do not lead with it unless it's the most striking signal in the data.
 
-AEROBIC DECOUPLING (RUN) — when signals.decoupling_basis === 'raw' AND signals.is_mixed_effort === true (fartlek / detected interval session with no usable steady block):
-- Treat the decoupling number as inconclusive. The first-half / second-half ratio is dominated by where in the session the hard intervals fell, not by efficiency drift. Do NOT use the number to claim fitness or fatigue. Describe what HR did in plain terms across the variable efforts (drift_explanation, drift bpm vs typical) instead.
+AEROBIC DECOUPLING (RUN) — when signals.is_mixed_effort === true (fartlek / interval session / a steady run whose efforts varied too much for a clean split-half read). This branch wins at ANY basis:
+- Treat the decoupling number as inconclusive. The first-half / second-half ratio is dominated by where in the session the hard efforts fell, not by efficiency drift. Do NOT use the number to claim fitness or fatigue. Describe what HR did in plain terms across the variable efforts (drift_explanation, drift bpm vs typical) instead.
 
 AEROBIC DECOUPLING (RUN) — when signals.decoupling_basis === 'raw' AND signals.is_mixed_effort !== true (steady-state session, no usable GPS elevation but the effort was genuinely steady):
 - The decoupling number is meaningful here even at raw basis. The session was steady-effort (low CV passed the variance gate), so the pace:HR ratio split first/second half reflects real cardiovascular efficiency. The only caveat vs gap basis: terrain influence on raw pace isn't removed, but on a flat or treadmill session (the typical raw-basis case) terrain wasn't a factor anyway.

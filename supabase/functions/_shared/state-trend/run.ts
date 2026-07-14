@@ -145,6 +145,18 @@ export function decouplingBandDisplay(band: DecouplingBand | null): { word: stri
 // The persisted `decouplingBasis` label is unreliable (gap on 4/145), so we do NOT gate on 'gap' — we
 // trust the GAP-based pct and only DROP a confirmed 'raw' (terrain-confounded). workoutType, not the
 // plan-link classifier, decides steady-vs-interval.
+//
+// ⛔ 2026-07-14 — WHY THIS DROP EMPTIED THE TREND, and the rule that comes out of it.
+// 'raw' meant ONE thing here: no usable elevation, so the pace was never grade-adjusted. On 2026-07-12
+// the analyzer started ALSO forcing basis='raw' whenever the variance gate flagged a session as
+// mixed-effort (D-037) — a "this number is low-confidence" stamp. This filter read that stamp as a
+// DELETE order. The variance gate fires on ~10 of 11 real outdoor runs (pace CV 12-29% is just
+// running: hills, lights, corners), so every run after the restore was binned and the durability
+// trend stopped advancing — last counting run 2026-06-28, silently 16 days stale on a live screen.
+// The analyzer now keeps the two facts apart: `basis` = terrain, `decouplingMixedEffort` = confidence.
+// A mixed-effort STEADY run keeps its point here; the confidence caveat is carried in the prose.
+// THE RULE: a confidence flag is not an exclusion order. If a metric should be dropped, drop it on the
+// fact that makes it wrong — never on a label that happens to be spelled the same.
 const DECOUPLING_NONSTEADY = ['interval', 'tempo', 'fartlek', 'threshold', 'vo2', 'speed', 'track', 'race', 'surge'];
 export function isSteadyAerobic(workoutType?: string | null): boolean {
   const wt = String(workoutType || '').toLowerCase();
@@ -154,7 +166,11 @@ export function isSteadyAerobic(workoutType?: string | null): boolean {
 export interface DecouplingRow {
   date?: string; metric_date?: string;
   decoupling_pct?: number | null;
-  decoupling_basis?: string | null;   // 'gap' | 'raw' | null — only used to drop confirmed 'raw'
+  decoupling_basis?: string | null;   // 'gap' | 'raw' | null — TERRAIN only; used to drop confirmed 'raw'
+  /** Variance gate: heterogeneous efforts → the ratio is low-confidence. A HEDGE, never a filter.
+   *  Kept in the substrate so the row can say so; see the block above for what happened when
+   *  this fact was smuggled through `decoupling_basis` instead. */
+  decoupling_mixed_effort?: boolean | null;
   /** Analyzer-set heat flag. STILL STAMPED, and the WORKOUT screen still uses it to say "it was 80°F".
    *  It is deliberately NOT a substrate filter any more — see the block below (D-283). */
   decoupling_confounded?: boolean | null;

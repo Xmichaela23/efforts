@@ -707,13 +707,24 @@ export async function buildWorkoutFactPacketV1(args: {
       // upgrading these labels into asserted identities; the athlete never
       // saw a name field to validate against. Generic "a route you've run N
       // times" framing replaces it across all consumers.
-      // D-105: surface effort-adjusted pace alongside raw so the client ROUTE
-      // sparkline can plot GAP-corrected pace (grade-neutral) on hilly routes
-      // instead of raw pace, which made same-effort runs at different grades
-      // look like fitness variation. Column is on route_progress_metrics
-      // (verified populated on every recent row for the test user); previously
-      // dropped from the SELECT.
-      let routeRuns: { times_run: number; first_seen: string; last_seen: string; history: Array<{ date: string; pace_s_per_km: number | null; gap_pace_s_per_km: number | null; hr: number | null; temp_f: number | null; is_current: boolean }> } | null = null;
+      // D-105: surface an adjusted pace alongside raw so the client ROUTE sparkline plots a
+      // grade-neutral pace on hilly routes instead of raw pace, which made same-effort runs at
+      // different grades look like fitness variation.
+      //
+      // ⛔ 2026-07-14 — D-105's INTENT was grade-neutral; its IMPLEMENTATION was not.
+      // `gap_pace_s_per_km` was fed from `route_progress_metrics.effort_adjusted_pace_sec_per_km`,
+      // which is NOT grade-adjusted at all — compute-facts computes it as
+      //     pace x (avg_hr / threshold_hr)
+      // i.e. HR-NORMALIZED. There is no hill in that formula. So the chart that answers "am I getting
+      // faster on this loop" was moving with how hard the athlete's heart worked, and a hilly route
+      // stayed hilly. The real grade-adjusted pace has existed all along on
+      // `workouts.computed.overall.gap_pace_s_per_mi` (`_shared/gap.ts`, the D-036 engine — Minetti
+      // metabolic cost, the same model Strava GAP / TrainingPeaks NGP use). It was never read here.
+      //
+      // Both facts now ship, each under its true name. The two answer different questions and must
+      // never be collapsed again: GAP removes the TERRAIN; effort-adjusted removes the EFFORT.
+      // ⚠ UNITS (the standing footgun): `gap_pace_s_per_mi` is sec/MILE; this contract is sec/KM.
+      let routeRuns: { times_run: number; first_seen: string; last_seen: string; history: Array<{ date: string; pace_s_per_km: number | null; gap_pace_s_per_km: number | null; effort_adjusted_pace_s_per_km: number | null; hr: number | null; temp_f: number | null; is_current: boolean }> } | null = null;
       if (matchedClusterId) {
         const [{ data: clusterRow }, { data: histRows }] = await Promise.all([
           supabase
@@ -735,16 +746,35 @@ export async function buildWorkoutFactPacketV1(args: {
             .order('metric_date', { ascending: true })
             .limit(200),
         ]);
+        // The REAL grade-adjusted pace lives on the workout, not the route row. Fetch it for the
+        // history's workouts and key it by id. Absent (no usable elevation) -> null, never faked.
+        const histWids = (Array.isArray(histRows) ? histRows : [])
+          .map((r: any) => String(r.workout_id || '')).filter(Boolean);
+        const gapByWid = new Map<string, number>();
+        if (histWids.length) {
+          const { data: gapRows } = await supabase
+            .from('workouts').select('id, computed').in('id', histWids);
+          for (const g of (gapRows ?? []) as any[]) {
+            const secPerMi = Number(g.computed?.overall?.gap_pace_s_per_mi);
+            // sec/MILE -> sec/KM. Plausibility band mirrors the write-site clamp (150-750 s/km).
+            const secPerKm = Number.isFinite(secPerMi) && secPerMi > 0 ? secPerMi / 1.609344 : NaN;
+            if (Number.isFinite(secPerKm) && secPerKm >= 150 && secPerKm <= 750) {
+              gapByWid.set(String(g.id), Math.round(secPerKm * 10) / 10);
+            }
+          }
+        }
+
         if (clusterRow && Number((clusterRow as any).sample_count || 0) >= 2) {
           let history = Array.isArray(histRows)
             ? histRows.map((r: any) => ({
                 date: String(r.metric_date || '').slice(0, 10),
                 pace_s_per_km: r.avg_pace_sec_per_km != null ? Number(r.avg_pace_sec_per_km) : null,
-                // D-105: grade-adjusted pace — preferred by the ROUTE sparkline
-                // when present (per-row availability gates the client fallback).
-                gap_pace_s_per_km: r.effort_adjusted_pace_sec_per_km != null ? Number(r.effort_adjusted_pace_sec_per_km) : null,
+                // TERRAIN removed (Minetti/GAP, _shared/gap.ts) — what the sparkline should plot.
+                gap_pace_s_per_km: gapByWid.get(String(r.workout_id || '')) ?? null,
+                // EFFORT removed (pace x avg_hr / threshold_hr). A different question; kept, named honestly.
+                effort_adjusted_pace_s_per_km: r.effort_adjusted_pace_sec_per_km != null ? Number(r.effort_adjusted_pace_sec_per_km) : null,
                 hr: r.avg_hr_bpm != null ? Number(r.avg_hr_bpm) : null,
-                temp_f: r.temp_f != null ? Number(r.temp_f) : null, // Familiar Routes: for the temp heat-correction
+                temp_f: r.temp_f != null ? Number(r.temp_f) : null, // conditions receipt (D-283: shown, never corrected for)
                 is_current: String(r.workout_id) === workoutId,
                 _workout_id: String(r.workout_id || ''),
               }))

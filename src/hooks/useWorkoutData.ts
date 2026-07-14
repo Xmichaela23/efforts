@@ -17,6 +17,12 @@ export type WorkoutDataNormalized = {
   avg_speed_kmh: number | null;
   avg_speed_mps: number | null;
   avg_pace_s_per_km: number | null;
+  /** GRADE-ADJUSTED pace — the pace this run would have been on the flat. Read STRAIGHT from the
+   *  server's `computed.overall.avg_gap_s_per_mi` (`_shared/gap.ts`, Minetti metabolic cost — the
+   *  model behind Strava GAP / TrainingPeaks NGP). D-186: the client must NEVER re-derive GAP; it
+   *  had two hand-rolled approximations once, and both are deleted. This is a read, not a derive.
+   *  Null when the run had no usable elevation. */
+  gap_pace_s_per_km: number | null;
   avg_running_cadence_spm: number | null;
   avg_cycling_cadence_rpm: number | null;
   avg_swim_pace_per_100m: number | null;
@@ -63,7 +69,17 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     // Calculate avg_pace - MUST use same source as Summary screen for consistency
     // Summary uses computed.overall.avg_pace_s_per_mi, so Details should use the same
     // Convert from per-mile to per-km: divide by 1.60934
-    const avg_pace_s_per_km = Number.isFinite(workoutData?.computed?.overall?.avg_pace_s_per_mi) 
+    // GRADE-ADJUSTED pace, straight from the server (never re-derived here — see the type above).
+    // The analyzer writes it as `avg_gap_s_per_mi`; `gap_pace_s_per_mi` is the older key on the same
+    // number. sec/MILE -> sec/KM, the same conversion avg_pace uses.
+    const _gapSecPerMi = Number(
+      workoutData?.computed?.overall?.avg_gap_s_per_mi
+      ?? workoutData?.computed?.overall?.gap_pace_s_per_mi,
+    );
+    const gap_pace_s_per_km = Number.isFinite(_gapSecPerMi) && _gapSecPerMi > 0
+      ? _gapSecPerMi / 1.60934
+      : null;
+    const avg_pace_s_per_km = Number.isFinite(workoutData?.computed?.overall?.avg_pace_s_per_mi)
       ? Number(workoutData.computed.overall.avg_pace_s_per_mi) / 1.60934  // Convert mi to km
       : (Number.isFinite(workoutData?.avg_pace) ? Number(workoutData.avg_pace) 
       : (Number.isFinite(workoutData?.metrics?.avg_pace) ? Number(workoutData.metrics.avg_pace) 
@@ -110,6 +126,6 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     
     const sport = typeof workoutData?.type === 'string' ? String(workoutData.type).toLowerCase() : null;
     const series = workoutData?.computed?.analysis?.series || null;
-    return { distance_m, distance_km, duration_s, elapsed_s, elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, avg_power_pedaling_w, pct_time_pedaling, sport, series };
+    return { distance_m, distance_km, duration_s, elapsed_s, elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, gap_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, avg_power_pedaling_w, pct_time_pedaling, sport, series };
   }, [workoutData]);
 };

@@ -108,13 +108,22 @@ export function calculateEfficiency(
   // stamps raw_pace_s_per_mi on every sample when the run had usable elevation), else 'raw' (device
   // pace, terrain-confounded). Only a 'gap' read is a trustworthy fitness signal — the Performance
   // "Aerobic decoupling" row gates on it (Q-158 follow-on). Detected the same way gap.ts:200 does.
-  const detectedBasis: 'gap' | 'raw' =
+  const basis: 'gap' | 'raw' =
     samplesAfterWarmup[0] && typeof (samplesAfterWarmup[0] as any).raw_pace_s_per_mi !== 'undefined'
       ? 'gap'
       : 'raw';
-  // D-037: a whole-session ratio across mixed efforts is inconclusive → force 'raw' so the prompt's
-  // raw-basis rule fires (never a clean fitness read), regardless of GAP enrichment.
-  const basis: 'gap' | 'raw' = options?.forMixedEffort ? 'raw' : detectedBasis;
+  // `basis` answers ONE question: was the pace grade-adjusted? Nothing else.
+  //
+  // ⛔ It used to answer two. D-037 forced basis='raw' on a mixed-effort session to mark the number
+  // low-confidence — but 'raw' already meant "terrain-confounded", and `state-trend/run.ts` DROPS a
+  // 'raw' row from the durability substrate on that older meaning. So the low-confidence stamp read
+  // as a delete order: 3 of 3 runs after the 2026-07-12 restore were binned, and the State durability
+  // trend stopped advancing entirely (last counting run 2026-06-28, 16 days stale).
+  //
+  // Mixed-effort now travels on its OWN channel — `mixedEffort` below, from the variance gate — and
+  // every consumer decides for itself what to do with it. Confidence and terrain are different facts.
+  // Field standard (Garmin, TrainingPeaks): hedge the metric, never silently delete the session.
+  const mixedEffort = options?.forMixedEffort === true;
 
   // Overall average efficiency
   const avgRatio = calculateEfficiencyRatio(samplesAfterWarmup);
@@ -122,6 +131,7 @@ export function calculateEfficiency(
   return {
     decoupling: {
       basis,
+      mixedEffort,
       percent: Math.round(decouplingPercent * 10) / 10,
       earlyRatio: Math.round(earlyRatio * 1000) / 1000,
       lateRatio: Math.round(lateRatio * 1000) / 1000,
