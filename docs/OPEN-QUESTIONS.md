@@ -471,3 +471,46 @@ Add a new Q-NNN when:
 - Verification is owed but not yet done — record the verification approach so the next session can pick it up cheaply.
 
 When the answer is established (verified, intentional, or fixed), keep the entry but mark its status. Don't delete entries; they're institutional memory.
+
+---
+
+## Q-177 — The "strength volume down" SIGNAL is a PARTIAL-WEEK ARTIFACT. It fires at CONCERN severity every Monday, for every athlete, by construction. (ENGINE, 2026-07-13 — FOUND BY LOOKING AT THE APP)
+
+**Found on the live account, on a Monday.** State showed, on the same screen, at the same time:
+
+> `STRENGTH · Volume · steady` *(the spine)*
+> `SIGNAL: Strength volume well below recent baseline (-64.4% vs chronic)` *(a nudge, with a "Review with Arc →" button)*
+
+**Two engines, one fact, opposite answers, one screen.** Law 1.
+
+### The arithmetic — it cannot NOT fire
+
+`compute-snapshot/index.ts:445` — `const strengthVolumeTrend = pctChange(current.strengthVolume, chronicStrVol);`
+
+- **`current.strengthVolume` is a CUMULATIVE SUM** of the CURRENT week's sessions (`:117` `let strengthVolume = 0`, `:183` `strengthVolume += f.strength_facts.total_volume_lbs`). `targetWeek = mondayOfToday()` (`:293`), so on a Monday this is **one day of data**.
+- **`chronicStrVol` is the average of COMPLETE prior weeks** (`:443-444`).
+
+**A partial-week sum compared against full-week sums is systematically negative.** Monday, 1 of 4 sessions done → **≈ −75%**. The observed value was **−64.4%**.
+
+`_shared/longitudinal-signals.ts:148-156` fires it at `tStr < -12` (warning) and **`tStr < -22` → `severity: 'concern'`** — the top tier.
+
+> **So the highest-severity strength nudge in the app fires every Monday and Tuesday of every week, for every athlete, forever. It is measuring WHAT DAY YOU LOOKED, not what you did.** It then decays to nothing by Sunday, and re-arms.
+
+**This is "the score that lies" (`CANON-arc-inference-model.md`), live and on screen.**
+
+### Why the spine is right and this is wrong
+`_shared/state-trend/strength.ts` reads **per-workout** `total_volume_lbs` over a **6-week** window with ±8% bands and endpoint smoothing — **immune to the partial-week problem.** It said `steady`. It was correct.
+
+### Blast radius — the nudge is not the only consumer
+- 🔴 **LIVE:** the SIGNAL nudge (`longitudinal-signals.ts:146` → ArcContext → `StateTab.tsx:1700-1735`).
+- 🟡 **LATENT:** `compute-snapshot:507` — `structuralDirection` falls back to `strengthVolumeTrend` (`> 5` improving / `< -5` declining) **when top-lift e1RM data is absent**. `structuralDirection` then feeds **`interferenceScore`** (`:511+`, "one system improving while the other declines"). So for an athlete with no lift history, **a Monday makes the app believe their strength is declining, and it will call that interference.** *(Dodged on the primary account only because he has e1RM data, which wins the branch.)*
+- ⚫ `BlockSummaryTab.tsx:140` — unmounted, dead.
+
+### Scope note — the sibling trends are NOT broken the same way
+`compute-snapshot:428` `rpeTrend` and `:440` `runEasyPaceAtHrTrend` use the same `pctChange(current, chronic)` shape, **but their `current` is an AVERAGE, not a sum** — an average over a partial week is noisy, not systematically biased. **`strengthVolume` is the only cumulative total in the set. That is the whole bug.**
+
+### The fix direction (NOT a decision — needs a call)
+Either (a) **normalize** — compare per-session or per-day volume, not a week-to-date sum; (b) **gate** — don't emit the signal until the week is complete (or until N sessions land); or (c) **delete the signal** and let the spine's 6-week volume trend be the single source, which is what Law 1 actually wants. **(c) is the cheapest and most Law-1 compliant.** Do not just widen the threshold — that hides a structural artifact behind a magic number.
+
+### ⚠️ How this was found, and why it matters for method
+**The code audit missed it entirely.** Four parallel readers traced the whole spine and never flagged it, because in code `pctChange(current, chronic)` looks completely reasonable. **It was found by opening the app on a Monday.** See the note at the top of `POLISH-PUNCH-LIST.md §1`: a code trace is right about EXISTENCE and blind to SEVERITY. Some bugs are only visible from a chair.
