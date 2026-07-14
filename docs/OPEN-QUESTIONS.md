@@ -660,3 +660,26 @@ The Q-178 fix (a 0-rep set is not performed) is **correct** — the app must not
 I first wrote this up as *"4 of 5 Hyrox stations are unloggable"*. **Wrong.** The equipment substitution filters them, and it does so correctly — **Michael only ever saw the one station his kit supports.** The real finding is narrower and sharper: **whatever station survives substitution is still prescribed in a unit the logger cannot capture.**
 
 **Michael caught it, from his own session, in one sentence.** The code audit missed it, the device session missed it, and I overstated it twice before he corrected me. **The athlete in the chair is a load-bearing part of this method.**
+
+---
+
+## Q-181 — A SWAP IS NOT A SKIP: the app docks the athlete TWICE for an honest exercise substitution (PRODUCT + ENGINE, 2026-07-13 — RAISED BY MICHAEL)
+
+> **Michael:** *"I'm gonna swap Bulgarian split squats for hip thrust… I don't think the app should dock the user for substitutions if they are actual substitutions. Now it does."*
+
+**Verified.** `analyze-strength-workout:520` `matchExercises` links planned↔executed **BY NAME ONLY** (exact, then a fuzzy `includes()`), and **no substitution concept exists anywhere in the codebase** (`grep substituted_for|swapped_from|original_name` → **0 hits**).
+
+So a declared, honest swap is read as **two separate failures**:
+
+| | | |
+|---|---|---|
+| **Bulgarian Split Squat** (planned) | `matched: false` (`:554`) | counts as a **SKIP** → drags `exerciseCompletion` (`:1337`), which is **30% of the execution score** (D-208, role-weighted) |
+| **Hip Thrust** (executed) | `{ planned: null }` (`:593`) → excluded from `plannedEntries` (`:1332`) | **ZERO CREDIT for work actually done** |
+
+**Penalised for what he didn't do, and unpaid for what he did.** The app cannot tell a substitution from a skip **because nobody ever told it.**
+
+**SPEC: `docs/SPEC-exercise-substitution.md`.** The athlete declares the swap (`substituted_for`, mirroring the `prefilled` / `rir_autofilled` / `from_previous` provenance pattern), `matchExercises` honours it, the score stops docking — and the app **names the trade** instead of scoring it: *"Swapped Bulgarian Split Squat → Hip Thrust. Hip-dominant instead of knee-dominant — same session, different stimulus."* (`primaryRef` in `exercise-config.ts` already knows this: BSS = `squat`, hip thrust = `deadlift`.)
+
+⛔ **DO NOT infer equivalence from the movement pattern.** It is tempting — `primaryRef` is right there — and it is wrong: knee-dominant and hip-dominant are genuinely different stimuli, and a "heavy squat swapped for a leg extension" would sail through as compliance. **Ask the athlete. Don't guess.** (Law 2.)
+
+**This is `SPEC-posture-flag.md`'s thesis at the scale of one exercise: a trade made visible, not a compliance cop.** Sign-off gated (it changes prescription-adherence semantics).

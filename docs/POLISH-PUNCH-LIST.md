@@ -157,6 +157,9 @@ The 2026-07-13 audit found the same disease three times, and it is the highest-l
 - [ ] **Bike `limiter_sport` intensity dial** — `limiter_sport` shifts **volume** only today; no intensity dial exists for bike *or* run.
 
 ### Strength
+- [ ] **🔴 Q-181 — A SWAP IS NOT A SKIP. The app docks an honest substitution TWICE.** *(Raised by Michael, 2026-07-13, from his own plan: swapping Bulgarian Split Squat → Hip Thrust.)*
+  `matchExercises` (`analyze-strength-workout:520`) links planned↔executed **by NAME only**, and **no substitution concept exists in the codebase** (0 hits for any provenance field). So the planned lift reads as a **SKIP** (dragging the 30%-weighted exercise-completion term) **and** the work he actually did gets **zero credit** (`planned: null` → dropped from the denominator). **Penalised for what he didn't do; unpaid for what he did.**
+  **SPEC: `docs/SPEC-exercise-substitution.md`.** The athlete declares the swap; the app stops docking and **names the trade** instead of scoring it. ⛔ Do NOT infer equivalence from the movement pattern — BSS is knee-dominant (`primaryRef: squat`), hip thrust is hip-dominant (`primaryRef: deadlift`). Ask, don't guess. **Sign-off gated.**
 - [ ] **Strength → endurance interference signals** + **`endurance_load_context` population** (`analyze-strength-workout:2904`, still `null`). ⚠️ **These are ONE job** — the same `athlete_snapshot` fetch serves both. The substrate is already live (`compute-snapshot:512-522`).
 - [ ] **Per-exercise history** — 1RM/volume trend + set records. `ExerciseHistory.tsx` does not exist. *(`StrengthCompareTable.tsx:250` already renders this session + the previous one inline — the gap is the last-6 trend + PR flag, not the expansion.)*
 - [ ] **Refactor strength INSIGHTS → `_shared/strength-v1/ai-summary.ts`** (the directory doesn't exist; `_shared/cycling-v1/` is the pattern to mirror). Prompt + fact packet are still inlined.
