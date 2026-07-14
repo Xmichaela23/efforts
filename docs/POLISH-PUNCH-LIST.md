@@ -8,6 +8,29 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+# ⚡ AWAITING MICHAEL — SHIPPED 2026-07-13/14, NOT YET VERIFIED ON DEVICE
+
+**All deployed and live.** Fixtures are green; **none of this has been driven by a human yet.** Tick these off as you train.
+
+## ⚠️ READ THIS FIRST — do NOT recompute the Mon 2026-07-13 strength session
+
+Q-178 fixed the predicate so a set flagged `completed` with **zero reps, zero weight, zero duration** no longer counts as performed. **That is correct — but that Monday row is genuinely incomplete**, because the logger had no weight box and never persisted the duration (Q-180). So a **recompute of that session will now honestly report the Farmers Carry as unrecorded**, and the score will fall. **The work happened; the record of it does not exist, and no amount of recomputing will conjure it.**
+
+**Don't chase it. Just log the next carry with the fixed logger** — that is the real test.
+
+## The list
+
+- [ ] **The carry (Q-180).** Log a Farmers Carry — planned OR hand-added. Expect: a **countdown timer**, a **weight box labelled `lb/hand`**, **no RIR prompt** on Done, **no plate calculator**, and the duration **actually on the row afterwards** (`0:40`, not `0 reps`). *(Hand-add already confirmed by screenshot 2026-07-14; the PLANNED path is still untested.)*
+- [ ] **The swap (Q-181).** In a prescribed session, **type over an exercise's name** (e.g. Bulgarian Split Squat → Hip Thrust). Expect: **no dock** (the planned lift is not a skip), the substitute **gets credit**, load/RIR **not graded** on it, and on Performance one line — *"Swapped Bulgarian Split Squat → Hip Thrust. Hip-dominant instead of knee-dominant — same session, different stimulus."*
+  Also worth trying: an **in-slot** swap (reverse lunge for the Bulgarian) → **no dock and NO sentence.** Silence is the correct answer there.
+- [ ] **The Monday alarm is gone (Q-177).** Open **State on a Monday or Tuesday**. The *"Strength volume well below recent baseline (−64.4% vs chronic)"* signal — top severity, with a "Review with Arc" button — **should no longer appear at all.** The spine's `STRENGTH · Volume · steady` stands alone.
+- [ ] **A strength session's narrative is honest (Q-178).** Skip a set or an exercise deliberately. The prose must **not** claim you *"landed on target across all three lifts."*
+- [ ] **The 26-function deploy.** D-285/D-287's run-pace resolver was **stranded and never actually running in the plan generators** — it is now. **Build a plan and sanity-check the paces.** Also the B1 identity fix reached its 7 functions.
+
+**If any of these misbehave, the diagnostic is *which one* — each maps to a different fix.**
+
+---
+
 # 0. THE HEADLINE — three finished engines have never run once
 
 The 2026-07-13 audit found the same disease three times, and it is the highest-leverage thing on this page. **In each case the engine is fully built, pin-tested, and spec'd — and nothing calls it.** These are not features. They are **plumbing jobs**, and each is small.
