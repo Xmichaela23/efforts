@@ -42,6 +42,12 @@ Efforts is a hybrid endurance + strength training app for intermediate athletes 
 
 ## Context-priming for new sessions
 
+### ⛔ FIRST, BEFORE ANY OF IT: the **`🧭 NEXT SESSION — START HERE`** banner at the very top of **`docs/ENGINE-STATE.md`**.
+
+**That banner is the previous session talking directly to you.** It names your job, lists what already shipped so you don't spend a day rediscovering it, and flags which of its own claims are still unverified. **It is dated — check the date.** If it is stale or contradicts the code, say so out loud and fix it; a lying banner is worse than none. Everything below is the reference material *behind* that banner.
+
+---
+
 **Read `docs/START-HERE.md` FIRST — the one page.** What the app is (all major pieces exist), the loop, the three diseases (starved / dead / doubled), what's clean vs fractured, and which docs lie. It orients you in one screen; everything below is the depth behind it.
 
 Then, before wiring anything: **`docs/LIFECYCLE.md`** — the loop (baselines → plan → **frozen** pins → performance → state → learning → next plan), and the FROZEN-vs-LIVE boundary that every fracture found in the 2026-07-13 audit lived on. And **`docs/CAPABILITY-MAP.md`** — "does X exist and where", rebuilt from code 2026-07-13, starting with its **"I almost rebuilt this"** list.
