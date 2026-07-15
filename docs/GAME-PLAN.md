@@ -59,7 +59,11 @@ That is the whole diagnosis, and it produces exactly three diseases:
 
 *And this is also the product. They turned out to be the same thing.*
 
-- [ ] **Q-179 — the verdict engine is POSTURE-BLIND.**
+> **✅ TIER 1 SHIPPED 2026-07-14 (D-292).** `per_discipline_posture` is now read at runtime; a `maintain` discipline's decline is framed as a declared TRADE, not "aerobic base needs work". Deployed + pushed + verified in DB. The posture flag (`SPEC-posture-flag.md` Tier 1) is live. **What remains of Phase 3:** Tier 2 (consequence prose) — blocked on `PRODUCT-POSITIONING-v2-DRAFT.md` + `SCIENCE-run-specificity.md` — and the full State v3 redesign that builds on it (`SPEC-state-fitness-band.md`: the fitness band, the prognosis ghost dot, and the "lever" that connects the run slide to the 1.6-vs-3 trade).
+>
+> ⚠️ **Note for whoever picks up Phase 2:** the "run durability is one workout behind / 16 days stale" symptom that motivated Phase 2 was TWO bugs. The 16-day freeze was a SEPARATE cause (D-291, the `basis='raw'` collision) and is FIXED. The structural one-workout-behind fan-out race is still real and still unfixed — Phase 2 stands.
+
+- [x] **Q-179 — the verdict engine is POSTURE-BLIND.** ✅ D-292.
   ```
   per_discipline_posture  in  _shared/state-trend/   -> 0 occurrences
   per_discipline_posture  in  coach/index.ts         -> 0 occurrences

@@ -19,6 +19,25 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
+## Q-183 — a STRAY non-Monday `athlete_snapshot` row silently disables the ENTIRE S2 server-render path for the primary user (ENGINE, 2026-07-14 — found while shipping D-292, deliberately NOT chased)
+
+**Status: unverified root cause, real symptom.** The coach reads the athlete_snapshot with **MAX `week_start`** (`coach/index.ts:2209`, `order('week_start', desc).limit(1)`). But there is a snapshot row keyed to a **non-Monday** date (`2026-07-14`, a Tuesday) that has **no `state_trends_v1`** (the spine block only computes for `week_start === mondayOfToday()`, i.e. the Monday row `2026-07-13`). So the coach grabs the stray row → `state_trends_v1.display` is null → `weekly_state_v1.trends.display` is null → **the client falls back to its LIVE in-browser assembly on EVERY load.** The whole S2 optimization (server-assembled cards, ~9 fewer client queries, D-260-era) has been **silently inactive** for this user.
+
+**Why it wasn't chased:** it predates all of 2026-07-14's work, and the posture render fix (D-292) made the live path read the goal too, so posture is correct on BOTH paths regardless. **Two things to settle in a dedicated pass:** (1) WHERE does the non-Monday row come from — who writes an athlete_snapshot with a non-Monday `week_start`? (2) the coach should select the CURRENT-WEEK snapshot (`mondayOfToday`), not `max(week_start)` — but guard for the case where this week's row doesn't exist yet. **Do NOT confuse this with anything shipped 2026-07-14.**
+
+## Q-184 — four SILENT-DROP / staleness fractures on the State screen, catalogued in `STATE-SOURCE-MAP.md` (ENGINE, 2026-07-14 — code-verified, deferred)
+
+Found while building the State source map. All four verified in code; none blocking; all worth a pass:
+
+1. **The "as of" date drifts OPTIMISTIC.** The server stores an AGE in days (`classify.ts:56`); the client renders it as `today − age` (`StatePerformanceSection.tsx:49`). If the snapshot is N days old, every "as of" reads N days too fresh. Live receipt: "as of Jun 27" when the newest qualifying run was Jun 28. **Fix: ship the DATE, not the age.**
+2. **The deload exclusion has NEVER fired.** `isDeloadWeek` (`deload.ts:15`) reads `point.meta.name`; **no adapter in the trend layer ever sets `meta`** → `/deload/i.test('')` is always false. A deliberately light deload week can therefore read as "sliding" — the exact failure the file's comment claims it prevents.
+3. **The entire RUN column is gated on the ROUTES table.** `compute-snapshot:667` seeds the run substrate from `route_progress_metrics` (a courtesy feature), so a run that fails the route write — no GPS distance, sub-1km, **treadmill** (`route-intelligence.ts:133`) — is invisible to State even though `workout_facts` holds a good decoupling number. A treadmill athlete is 100% invisible. The one column routes owns (`effort_adjusted_pace_sec_per_km`) is fetched and **no longer read by any rendered verdict**.
+4. **Run efficiency excludes the long run by construction** (`run.ts:81`, duration 30–70 min). For a marathon athlete the most informative session is dropped from the efficiency trend every week.
+
+⛔ **NOT a bug (do not "fix"):** the bike power/efficiency split (power = hard rides only, efficiency = easy rides only) is deliberate and correct — every ride feeds exactly one. See `STATE-SOURCE-MAP.md §"Not a bug"`.
+
+---
+
 ### Q-130 — GAP artifact on flat routes: ~18s/mi GAP-vs-raw on a flat loop → false `gap_terrain_bias='downhill'` (RESOLVED 2026-07-05, DEPLOYED)
 
 **ROOT CAUSE + FIX (shipped `291a7228`, deployed `compute-workout-analysis`):** it was NOT a grade/elevation bug — it was an **aggregation-method mismatch**. `overall.avg_gap_s_per_mi` was computed as `gapSum/gapCount` — an **arithmetic mean of per-sample GAP pace** — while raw `avg_pace` is `total_time/total_distance` (harmonic/distance-weighted). `AM ≥ HM` by the variance of pace, so GAP read ~15s/mi slower than raw on ANY pace-varying run **regardless of grade**. Reproduced on the real 2709-sample track: arithmetic-mean-of-RAW-pace alone = 769 vs true 754 (15s/mi from aggregation, zero grade). Fix: pure `aggregateGapPace()` in `gap.ts` (total flat-equivalent time / total distance) → on a flat run GAP ≈ raw exactly; real grades still adjust. Fixture `gap.test.ts` (4). **Verified 7/5:** avg_gap 772→757, `gap_terrain_bias` downhill→flat, narrative drops "net downhill" (3/3 recomputes). **Two smaller siblings deferred:** the per-split GAP fallback (`compute-workout-analysis:1883`) + `compute-workout-summary.gap_pace_s_per_mi` weight differently (time-weighted / separate field) — reconcile later; neither fed the false-downhill symptom. The eyes-open reproduction stopped two wrong fixes (elevation smoothing → only 3s/mi; the terrain narrative guard → papering over a bad number).
@@ -569,6 +588,8 @@ A set is **not performed** if it has `reps === 0 && !weight && !duration`, **reg
 ---
 
 ## Q-179 — THE CONTINUITY FRACTURE, WATCHED LIVE: the plan knows running is "maintenance only (held so strength leads)". State says "aerobic base needs work". `per_discipline_posture` is read ZERO times at runtime. (ENGINE + PRODUCT, 2026-07-13 — FOUND BY LOOKING AT THE APP)
+
+> **✅ TIER 1 CLOSED 2026-07-14 — see D-292.** `per_discipline_posture` is now read at runtime (`_shared/state-trend/posture.ts`) and the State run row frames a maintained discipline's decline as a declared TRADE, not "aerobic base needs work". Shipped + deployed + pushed + verified in DB. **Tier 2 (the "consequence" prose — what we can no longer see when a discipline stops) is STILL OPEN**, blocked on `PRODUCT-POSITIONING-v2-DRAFT.md` + `SCIENCE-run-specificity.md`. The full State v3 vision (band + prognosis + the "lever") is `SPEC-state-fitness-band.md`. Everything below is the original 2026-07-13 finding, still accurate as history.
 
 **This is the single clearest instance of the continuity problem in the app.** One athlete, one week, one question — *how is your running?* — and **three surfaces answer differently**, because the athlete's declared intent is read once at plan-build and then discarded.
 

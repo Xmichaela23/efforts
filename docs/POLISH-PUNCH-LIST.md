@@ -20,6 +20,12 @@ Q-178 fixed the predicate so a set flagged `completed` with **zero reps, zero we
 
 ## The list
 
+### Shipped 2026-07-14 (State) — verify on device
+- [ ] **The run row stops scolding you (D-292 / Q-179).** Open **State → PERFORMANCE**. The run row should carry a **grey** line beneath it — *"You said 3 a week. You've been doing about 1.6 a week. That's a trade, not a mistake — but it's yours to make on purpose."* **Grey, NOT amber.** Your STRENGTH row is the one now allowed to flag a concern (it's the thing you're building). ⚠️ Needs the new **Netlify client bundle** — hard-refresh; if the line is missing after that, the fix is in the live-path render (commit `746c3685`), say so.
+- [ ] **The durability trend is un-frozen (D-291).** The run row should read **"as of Jul 13"**, not late June, and count your Jul 12/13 runs (`newestAgeDays 1`, not 16). Verified in DB; confirm on screen.
+- [ ] **Grade-Adj Pace tile (D-291).** Open a recent outdoor run → **Details**. There should be a **Grade-Adj Pace** tile next to Avg Pace (the hills-removed pace; on a hilly run it reads a few sec/mi slower than raw). And the **route chart** now plots the real grade-adjusted number, not the HR-normalized one.
+
+### Shipped 2026-07-13/14 (strength) — verify on device
 - [ ] **The SWAP (Q-181 / D-289 + D-290).** In a prescribed strength session, hit the **⟳ Swap** icon on an exercise. Expect: a sheet of **same-movement-pattern** alternatives you can actually load (Bulgarian Split Squat → walking lunge, reverse lunge, step-up — **never** hip thrust). Pick one → **no dock**, the weight **clears** (it was computed for the other exercise), reps stay.
   Then try an **out-of-slot** override — type "Hip Thrust" into the name field — and check Performance says: *"Swapped Bulgarian Split Squat → Hip Thrust. Hip-dominant instead of knee-dominant — same session, different stimulus."*
   And the one that matters most: **skip an exercise entirely and confirm it STILL counts as a skip.** Forgiving a real miss would be far worse than the bug we fixed.

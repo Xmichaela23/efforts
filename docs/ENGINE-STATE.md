@@ -24,21 +24,38 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-14 — STRENGTH IS DONE. NEXT IS PHASE 2: FIX THE FAN-OUT.)
+## 🧭 NEXT SESSION — START HERE (2026-07-14 EOD — POSTURE SHIPPED. THE STALE-DURABILITY MYSTERY IS SOLVED. NEXT: PHASE 2 (FAN-OUT) or the STATE v3 REDESIGN.)
 
-> ## READ `docs/GAME-PLAN.md`. It is dependency-ordered and it is the whole plan. Then `START-HERE.md` and `LIFECYCLE.md`.
+> ## READ `docs/GAME-PLAN.md` (dependency-ordered), then `START-HERE.md` + `LIFECYCLE.md`. **New this session: `docs/STATE-SOURCE-MAP.md` and `docs/SPEC-state-fitness-band.md` — read both before touching State.**
 >
-> ### YOUR JOB: **PHASE 2 — FIX THE FAN-OUT.** This is what Michael calls "the analysis problem", and it is the root of it.
+> ### WHAT HAPPENED TODAY — the "as of Jun 27" mystery from the LAST banner is SOLVED, and it opened the whole product.
 >
-> **The fan-out awaits the wrong things. Two verified instances of one bug:**
-> 1. `compute-facts` is **awaited** (`ingest-activity:1582`) but reads `workouts.computed`, which is written by two **fire-and-forget** calls (`:1508`, `:1521`). When it loses the race: **no time-in-zone, no interval hits, no HR drift, no execution score. No error anywhere.**
-> 2. `compute-snapshot` (fired *from* `compute-facts:1844`) reads `workouts.workout_analysis` (`:689`) — written by `analyze-{sport}`, which `ingest-activity` fires **after**, fire-and-forget (`:1624`). **So the run durability trend is ALWAYS AT LEAST ONE WORKOUT BEHIND, by construction.**
+> The last banner said *"the run durability read is 16 days stale, DO NOT GUESS, get a DB query."* We did. **It was not the fan-out.** It was a WORD COLLISION: `decouplingBasis='raw'` meant "no elevation" to `state-trend/run.ts` (which DROPS raw) but the 2026-07-12 D-037 restore ALSO forced `basis='raw'` to mark a mixed-effort run low-confidence. The variance gate fires on **10 of 11 real outdoor runs**, so every run was silently binned and the trend froze. **A confidence flag was read as an exclusion order.** Fixed: the two facts travel apart now (`basis`=terrain, `decouplingMixedEffort`=confidence). Verified: 3 runs recomputed, `newestAgeDays 16→1`, `sampleCount 5→8`. **See D-291.**
 >
-> **Also in Phase 2:** two ingest paths never reach the spine (`ingest-phone-workout`, `save-imported-workout` → no `workout_facts`); and `workouts.workload_actual` (the ACWR substrate) is written by ONE job called from TWO places, so anything ingested another way contributes **zero to ACWR while still counting toward `workload_total`** — the same snapshot row contradicts itself.
+> **Then the run trend showed "sliding" and Michael asked why.** Chasing it root-caused the whole thing: **he ran ~3x/MONTH since June (declared 3x/WEEK), so he's slower at the same HR — he DETRAINED, on purpose, to build strength.** Heat/humidity/dew-point/strength-block all tested and REJECTED as causes (`scripts/`, n=67 steady runs). The app was **grading his running like a marathon PR while his own plan said run=maintain.** That is Q-179, and we shipped its fix. **See D-292.**
 >
-> ⚠️ **UNEXPLAINED, AND DO NOT GUESS:** the run durability read is **`as of Jun 27` — 16 days stale**, and the one-workout lag does NOT account for that. **Two theories were already wrong on 2026-07-13. Get a DB query, not another theory.**
+> ### YOUR JOB — two good options, Michael's call:
 >
-> ### AFTER PHASE 2: **PHASE 3 — MAKE THE VERDICT ENGINE POSTURE-AWARE.** This is "the continuity problem" **AND the product** — they turned out to be the same thing (Q-179). `per_discipline_posture` appears **ZERO times** in `_shared/state-trend/` and **ZERO times** in `coach/index.ts`. **The posture flag IS this fix, not a thing built on top of it. Do not ship the banner first.**
+> **OPTION A — PHASE 2, FIX THE FAN-OUT** (still owed; `GAME-PLAN.md`). The fan-out awaits the wrong things: `compute-facts` (awaited, `ingest-activity:1582`) reads `workouts.computed` written by two fire-and-forget calls (`:1508`,`:1521`); `compute-snapshot` reads `workout_analysis` written fire-and-forget AFTER it → run durability is one workout behind BY CONSTRUCTION. Plus `ingest-phone-workout`/`save-imported-workout` never reach the spine, and `workload_actual` is written by one job from two places (a snapshot row can contradict itself on ACWR). **This is real and still unfixed — the stale-durability bug was a SEPARATE cause, so Phase 2 is not "already done."**
+>
+> **OPTION B — STATE v3, THE FITNESS BAND + PROGNOSIS** (`docs/SPEC-state-fitness-band.md`, written today, sign-off gated). Two sections: Fitness (dot on your 12wk range + trend arrow) and Plan (the posture read, shipped). Tap → prognosis (ghost dot, "if this trend holds", + THE LEVER connecting the slide to the 1.6-vs-3 trade). **The lever is the payoff of today's posture work — it could not exist yesterday.** Biggest new piece: the `positionInRange` band scalar (needs a backfill). **This is the product Michael got excited about.**
+>
+> ### ⚠️ FILED, NOT CHASED — a real pre-existing bug found while shipping posture:
+> The coach reads the athlete_snapshot with **MAX `week_start`** (`coach:2209`), but a **stray non-Monday snapshot row** (e.g. `2026-07-14`) has no `state_trends_v1` → the coach forwards `display: null` → the client falls to its LIVE in-browser path EVERY load. **So the entire S2 server-render optimization has been silently inactive for the primary user.** The posture render fix works regardless (live path now reads the goal too). **This predates all of today's work — file as a Q and fix separately. Do NOT confuse it with anything shipped today.**
+>
+> ---
+>
+> ### ✅ SHIPPED + DEPLOYED + PUSHED 2026-07-14. VERIFIED IN DB (not yet on device by Michael — see `POLISH-PUNCH-LIST.md`). Do NOT re-litigate.
+>
+> - **D-291 — the durability trend was DELETING runs.** `basis='raw'` collision (confidence vs terrain). Now split: `decouplingMixedEffort` carries the hedge, `basis` stays terrain-only. `state-trend/run.ts` drops only true no-elevation runs. Commit `4fece5da`.
+> - **The grade-adjusted pace mislabel.** `gap_pace_s_per_km` was fed from `route_progress_metrics.effort_adjusted_pace_sec_per_km` — which is `pace × (avg_hr/threshold_hr)`, **HR-normalized, NOT grade-adjusted**. Real GAP (`computed.overall.avg_gap_s_per_mi`, Minetti, `_shared/gap.ts`) now feeds the route chart; a **Grade-Adj Pace tile** was added to Details (`CompletedTab`, reads the server number, never re-derives). Effort-adjusted keeps its own honest name. **See D-291.** Commit `4fece5da`.
+> - **D-292 / Q-179 — POSTURE. The app now reads the athlete's DECLARED per-discipline intent** (`goals.training_prefs.per_discipline_posture` — read at RUNTIME for the first time; it was write-once at plan build). `_shared/state-trend/posture.ts` joins declared intent + what they DID + how it went. A `maintain` discipline that slips is a **TRADE, stated not scolded**; a `develop` one that slips is a concern. **Behaviour (sessions/wk vs declared target) outranks the trend** — a false-comfort bug ("you're maintaining" while he'd stopped) was caught in review before ship. No jargon, no cause asserted (verified vs Garmin: consumer apps use NONE of our words). Commits `856b5c1d` (engine+client) + `746c3685` (render fix + coach v97). **SPEC-posture-flag.md Tier 1 is shipped; Tier 2 (consequence prose) still owed.**
+> - **`docs/STATE-SOURCE-MAP.md`** — every State row, its real substrate, every gate that can silently drop a session. **Four verified findings** for later: (1) the "as of" date drifts OPTIMISTIC (server sends an AGE, client renders vs TODAY); (2) the deload exclusion has **NEVER fired** (reads a `meta` field nothing sets → a deload week can read "sliding"); (3) the whole RUN column is gated on `route_progress_metrics` (a treadmill athlete is 100% invisible to State); (4) run efficiency excludes the long run by construction (30–70min gate).
+> - **`docs/SPEC-state-fitness-band.md`** — the State v3 redesign (Option B above).
+>
+> ### ⚠️ METHOD — TWO LESSONS BANKED TODAY
+> 1. **I burned the session budget on THREE unapproved deep-research passes; the third hit the session limit and returned nothing, costing ~4 hours.** Deep research + big Workflows now need Michael's explicit go-ahead (saved to memory). A quick WebSearch for one fact is fine; a fan-out is not.
+> 2. **The deep research WAS worth it where it ran:** consumer apps use zero of our jargon ("decoupling"/"efficiency factor"/"aerobic base"/"durability" = 0 hits on Garmin); Garmin refuses to name a cause even WITH sleep/HRV; and NO app (TrainingPeaks/Garmin/TrainerRoad, firm) grades a discipline against declared intent — **posture is a genuine market gap.** (Hybrid apps + market-pain unconfirmed — the pass that would have closed that is the one that failed.)
 >
 > ---
 >
