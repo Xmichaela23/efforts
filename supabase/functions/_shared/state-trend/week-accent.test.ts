@@ -25,6 +25,7 @@ Deno.test('trade: strength-only carrier → NO "aerobic base covered" claim (hon
   const t = tradeCandidate({ underDone: 'run', carriers: ['strength'], aerobicCarried: false });
   assertEquals(t?.sentence.includes('aerobic base is likely covered'), false);
   assertStringIncludes(t!.sentence, 'running eased off');
+  assertStringIncludes(t!.sentence, 'getting a run back in'); // not "runn" (the /ing$/ strip bug)
 });
 
 Deno.test('trade: RIR under target folds in as ONE tail (not a second accent)', () => {

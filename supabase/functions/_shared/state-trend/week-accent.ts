@@ -167,7 +167,7 @@ export function tradeCandidate(opts: {
   const under = DISC_WORD[underDone] ?? underDone;
   let sentence = aerobicCarried
     ? `${joinWords(carriers)} carried the week while ${under} eased off. Your aerobic base is likely covered — ${under}-specific speed is what the trade costs if it holds.`
-    : `${joinWords(carriers)} carried the load while ${under} eased off — worth getting a ${under.replace(/ing$/, '')} back in before the ${under}-specific side slips.`;
+    : `${joinWords(carriers)} carried the load while ${under} eased off — worth getting a ${underDone} back in before the ${under}-specific side slips.`;
   if (rirUnderTarget) {
     sentence += ` Your lifts also came in a little harder than planned — worth easing the last rep or two next week.`;
   }
