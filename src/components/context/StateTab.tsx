@@ -168,6 +168,44 @@ function WeekAccentLine({ sentence, detail }: { sentence: string; detail: string
   );
 }
 
+// THE WEEK · MIX — planned vs actual by discipline, so a swap is SEEN, not just counted (a run traded
+// for a swim shows the run share shrink and the swim share grow). Bars share one scale, so an over- or
+// under-done week reads as a longer/shorter actual bar. Colors are the app's SPORT_COLORS.
+function WeekMixBar({ counts }: { counts: Array<{ discipline: string; planned: number; done: number }> }) {
+  const ORDER = ['strength', 'run', 'ride', 'swim'];
+  const NAME: Record<string, string> = { run: 'run', ride: 'bike', strength: 'strength', swim: 'swim' };
+  const ordered = ORDER.map((d) => counts.find((c) => c.discipline === d)).filter(Boolean) as typeof counts;
+  const totalPlanned = ordered.reduce((s, c) => s + c.planned, 0);
+  const totalDone = ordered.reduce((s, c) => s + c.done, 0);
+  const scale = Math.max(totalPlanned, totalDone, 1);
+  const Bar = ({ label, pick }: { label: string; pick: (c: { planned: number; done: number }) => number }) => (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] text-white/40 w-12 shrink-0 lowercase">{label}</span>
+      <div className="flex-1 flex h-2 rounded-full overflow-hidden bg-white/[0.05]">
+        {ordered.map((c) => {
+          const v = pick(c);
+          if (v <= 0) return null;
+          return <div key={c.discipline} style={{ width: `${(v / scale) * 100}%`, backgroundColor: getDisciplineColor(c.discipline) }} />;
+        })}
+      </div>
+    </div>
+  );
+  return (
+    <div className="px-4 py-3 space-y-1.5">
+      <Bar label="planned" pick={(c) => c.planned} />
+      <Bar label="actual" pick={(c) => c.done} />
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-14 pt-1">
+        {ordered.filter((c) => c.planned > 0 || c.done > 0).map((c) => (
+          <span key={c.discipline} className="inline-flex items-center gap-1 text-[10px] text-white/45">
+            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: getDisciplineColor(c.discipline) }} />
+            {NAME[c.discipline] ?? c.discipline}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // "as of {Mon D}" for a BODY row's newest session date — so a rolling 7d/week read isn't mistaken for
 // today's data (BODY-4.8 freshness-legibility). Null-safe: no date → no stamp.
 function fmtBodyAsOf(dateStr: string | null | undefined): string | null {
@@ -1585,27 +1623,10 @@ export default function StateTab({
           const counts = Array.isArray(we?.counts) ? we!.counts! : [];
           const accent = we?.accent ?? null;
           if (counts.length === 0 && !accent) return null; // nothing to say → render nothing
-          const DISC_LABEL: Record<string, string> = { run: 'Run', ride: 'Bike', strength: 'Strength', swim: 'Swim' };
           return (
             <>
-              <div className="px-4 pt-3 text-[10px] text-white/30 lowercase">how your sessions went · last 7 days</div>
-              {counts.length > 0 && (
-                <div className="px-3 py-3">
-                  <Row label="week">
-                    {counts.map((c, i) => (
-                      <React.Fragment key={c.discipline}>
-                        {i > 0 && <Dot />}
-                        <span className="inline-flex items-baseline gap-1">
-                          <span className="text-white/50">{DISC_LABEL[c.discipline] ?? c.discipline}</span>
-                          {/* planned-vs-done fact: "1/3" when planned, bare count when it was unplanned
-                              (a swap counts, it is not a miss). No color, no judgment word (§2a). */}
-                          <span className="text-white/80">{c.planned > 0 ? `${c.done}/${c.planned}` : String(c.done)}</span>
-                        </span>
-                      </React.Fragment>
-                    ))}
-                  </Row>
-                </div>
-              )}
+              <div className="px-4 pt-3 text-[10px] text-white/30 lowercase tracking-[0.12em]">the week · mix</div>
+              {counts.length > 0 && <WeekMixBar counts={counts} />}
               {accent?.sentence && <WeekAccentLine sentence={accent.sentence} detail={accent.trace?.detail ?? null} />}
             </>
           );

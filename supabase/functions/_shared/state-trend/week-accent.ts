@@ -134,6 +134,51 @@ export function bannerCandidate(
   return { source, tier: ACCENT_TIER[source], sentence: line, trace: { kind, detail } };
 }
 
+// The athlete's word for a discipline (plain English, never our internal keys).
+const DISC_WORD: Record<string, string> = {
+  run: 'running', ride: 'cycling', bike: 'cycling', swim: 'swimming', strength: 'strength',
+};
+function cap(s: string): string { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+function joinWords(cs: string[]): string {
+  const w = cs.map((c) => DISC_WORD[c] ?? c);
+  if (w.length <= 1) return cap(w[0] ?? '');
+  if (w.length === 2) return `${cap(w[0])} and ${w[1]}`;
+  return `${cap(w[0])}, ${w.slice(1, -1).join(', ')} and ${w[w.length - 1]}`;
+}
+
+/**
+ * (a) THE TRADE — tier 4 (substitution). The warm, human read of a SWAP: names what carried the week,
+ * what eased off, and the trade's UPSIDE and DOWNSIDE in plain words (the athlete's mockup). Unlike the
+ * old load-only banner line, this names the adaptation trade — but honestly:
+ *  - The "aerobic base likely covered" claim fires ONLY when an aerobic cross-training discipline
+ *    (swim/bike) carried the load. Strength alone does not hold an aerobic base, so we don't claim it.
+ *  - The cost is the SPECIFICITY the cross-training can't replace ({discipline}-specific speed), stated
+ *    conditionally ("if it holds") — never as a prophecy.
+ * A RIR shortfall folds in as one tail clause so the week is ONE sentence, not two accents.
+ */
+export function tradeCandidate(opts: {
+  underDone: string | null;        // the discipline that eased off (e.g. 'run')
+  carriers: string[];              // disciplines that carried the load (e.g. ['swim','strength'])
+  aerobicCarried: boolean;         // an aerobic cross-training discipline (swim/bike) carried it
+  rirUnderTarget?: boolean;        // fold in a RIR heads-up tail
+}): WeekAccent | null {
+  const { underDone, carriers, aerobicCarried, rirUnderTarget } = opts;
+  if (!underDone || carriers.length === 0) return null;
+  const under = DISC_WORD[underDone] ?? underDone;
+  let sentence = aerobicCarried
+    ? `${joinWords(carriers)} carried the week while ${under} eased off. Your aerobic base is likely covered — ${under}-specific speed is what the trade costs if it holds.`
+    : `${joinWords(carriers)} carried the load while ${under} eased off — worth getting a ${under.replace(/ing$/, '')} back in before the ${under}-specific side slips.`;
+  if (rirUnderTarget) {
+    sentence += ` Your lifts also came in a little harder than planned — worth easing the last rep or two next week.`;
+  }
+  return {
+    source: 'substitution',
+    tier: ACCENT_TIER.substitution,
+    sentence,
+    trace: { kind: 'load', detail: `${under} under plan; load carried by ${carriers.join(', ')}${rirUnderTarget ? '; avg RIR under target' : ''}` },
+  };
+}
+
 /**
  * (b) THE LEVER — tier 2. DORMANT by construction, and deliberately so.
  *

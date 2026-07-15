@@ -1,13 +1,41 @@
 // Composer unit checks — contract §8b. Run: deno test week-accent.test.ts
-import { assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
+import { assertEquals, assertStringIncludes } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import {
   composeWeekAccent,
   overReachCandidate,
   rirCandidate,
   bannerCandidate,
+  tradeCandidate,
   leverCandidate,
   ACCENT_TIER,
 } from './week-accent.ts';
+
+// ── THE TRADE sentence — names carriers + benefit + cost; RIR folds in; honest about aerobic ──────
+Deno.test('trade: aerobic cross-training carried → names base covered + specificity cost', () => {
+  const t = tradeCandidate({ underDone: 'run', carriers: ['swim', 'strength'], aerobicCarried: true });
+  assertEquals(t?.source, 'substitution');
+  assertStringIncludes(t!.sentence, 'Swimming and strength carried the week');
+  assertStringIncludes(t!.sentence, 'running eased off');
+  assertStringIncludes(t!.sentence, 'aerobic base is likely covered');
+  assertStringIncludes(t!.sentence, 'running-specific speed');
+  assertStringIncludes(t!.sentence, 'if it holds'); // conditional, never a prophecy
+});
+
+Deno.test('trade: strength-only carrier → NO "aerobic base covered" claim (honest)', () => {
+  const t = tradeCandidate({ underDone: 'run', carriers: ['strength'], aerobicCarried: false });
+  assertEquals(t?.sentence.includes('aerobic base is likely covered'), false);
+  assertStringIncludes(t!.sentence, 'running eased off');
+});
+
+Deno.test('trade: RIR under target folds in as ONE tail (not a second accent)', () => {
+  const t = tradeCandidate({ underDone: 'run', carriers: ['swim'], aerobicCarried: true, rirUnderTarget: true });
+  assertStringIncludes(t!.sentence, 'aerobic base is likely covered');
+  assertStringIncludes(t!.sentence, 'harder than planned');
+});
+
+Deno.test('trade: no shortfall (nothing eased off) → null', () => {
+  assertEquals(tradeCandidate({ underDone: null, carriers: [], aerobicCarried: false }), null);
+});
 
 // ── §8b(i) — multiple qualifying candidates → exactly ONE accent, correct priority ──────────────────
 Deno.test('multi-qualify → one accent, highest priority (over-reach beats substitution)', () => {

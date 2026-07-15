@@ -39,7 +39,7 @@ import { assessAbsorption } from '../_shared/absorption.ts';
 import { computeSafetyFloor, resolvePlanPrimary, computePrimaryAdherence, resolvePrimarySport } from '../_shared/load-status-reconcile.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
-import { rollupFitnessDirection, rollupFitness, rollupHrResponse, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel, decouplingBandDisplay, bikeRideIntensityAerobic, bikeEfficiencyDisplay, composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate, leverCandidate, type WeekAccent } from '../_shared/state-trend/index.ts';
+import { rollupFitnessDirection, rollupFitness, rollupHrResponse, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel, decouplingBandDisplay, bikeRideIntensityAerobic, bikeEfficiencyDisplay, composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate, tradeCandidate, leverCandidate, type WeekAccent } from '../_shared/state-trend/index.ts';
 import {
   computeWeeklyResponse,
   type WeeklyResponseState,
@@ -5066,12 +5066,33 @@ ${narrativeFacts.join('\n')}`;
         if (actual == null) continue;
         rirActualSum += actual; rirTargetSum += getTargetRir(strengthProfile, lift); rirN += 1;
       }
+      const rirActual = rirN ? rirActualSum / rirN : null;
+      const rirTarget = rirN ? rirTargetSum / rirN : null;
+      const rirUnderTarget = rirN >= 2 && rirActual != null && rirTarget != null && rirActual <= rirTarget - 1;
+
+      // THE TRADE (a swap): an endurance discipline eased off (done < planned) while others carried the
+      // load. underDone = the endurance discipline with the biggest shortfall; carriers = the disciplines
+      // actually done; aerobicCarried = swim/bike among them (only then is "aerobic base covered" honest).
+      // RIR folds into the trade sentence as one tail so the week stays ONE sentence, not two accents.
+      const ENDURANCE_DISC = new Set(['run', 'ride', 'swim']);
+      const shortfalls = counts
+        .filter((c) => ENDURANCE_DISC.has(c.discipline) && c.planned > 0 && c.done < c.planned)
+        .sort((a, b) => (b.planned - b.done) - (a.planned - a.done));
+      const underDone = shortfalls.length ? shortfalls[0].discipline : null;
+      const carriers = underDone ? counts.filter((c) => c.discipline !== underDone && c.done > 0).map((c) => c.discipline) : [];
+      const aerobicCarried = carriers.some((d) => d === 'swim' || d === 'ride');
+      const trade = tradeCandidate({ underDone, carriers, aerobicCarried, rirUnderTarget });
 
       const accent: WeekAccent | null = composeWeekAccent([
         overReachCandidate({ loadStatus: lsX?.status, readiness: readinessState, runningAcwr: lsX?.acwr }),
-        rirCandidate({ actualRir: rirN ? rirActualSum / rirN : null, targetRir: rirN ? rirTargetSum / rirN : null, sampleSize: rirN }),
-        bannerCandidate(banner?.line, banner?.branch),
         leverCandidate(),
+        // RIR alone only when it is NOT already folded into a trade sentence.
+        trade ? null : rirCandidate({ actualRir: rirActual, targetRir: rirTarget, sampleSize: rirN }),
+        trade,
+        // The banner's positive / behind / under-training reads — but NOT its 'carried' branch when a
+        // trade fired (the warm trade sentence replaces it). Positive stays first-class, just lower tier.
+        trade ? bannerCandidate(banner?.line, banner?.branch === 'carried' ? null : banner?.branch)
+              : bannerCandidate(banner?.line, banner?.branch),
       ]);
       return { counts, accent };
     })();

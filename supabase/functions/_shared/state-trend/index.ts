@@ -68,6 +68,7 @@ export {
   overReachCandidate,
   rirCandidate,
   bannerCandidate,
+  tradeCandidate,
   leverCandidate,
   ACCENT_TIER,
   type WeekAccent,
