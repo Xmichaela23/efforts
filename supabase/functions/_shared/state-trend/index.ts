@@ -94,3 +94,16 @@ export {
   type AxisMode,
   type PerfSummary,
 } from './discipline.ts';
+
+// Q-179: declared intent (posture) — the join between what the athlete SAID and what the numbers DID.
+export {
+  readPosture,
+  postureSentence,
+  sanitizePosture,
+  isConcern,
+  disciplineWord,
+  type Posture,
+  type PostureRead,
+  type PerDisciplinePosture,
+} from './posture.ts';
+export { declaredSessionsPerWeek, MAINTAIN_SHORTFALL_BAND, type PostureBehaviour } from './posture.ts';

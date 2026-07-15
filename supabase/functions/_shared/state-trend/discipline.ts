@@ -8,6 +8,7 @@
 
 import type { TrendVerdict, TrendResult } from './types.ts';
 import type { AdherenceState } from './adherence.ts';
+import type { Posture, PostureRead } from './posture.ts';
 
 export type AxisMode = 'performance' | 'adherence';
 
@@ -38,6 +39,15 @@ export interface DisciplineCard {
   adherence: AdherenceState | null;
   /** Headline verdict when performance leads; null when adherence leads (no trend verdict). */
   headlineVerdict: TrendVerdict | null;
+  /** Q-179 — the athlete's DECLARED intent for this discipline ('develop' | 'maintain' | 'out').
+   *  null when they never declared one, in which case every field below is inert and the row
+   *  renders exactly as it did before posture existed. */
+  posture?: Posture | null;
+  /** What the verdict MEANS given that intent. `unknown` = behave as before. See posture.ts. */
+  postureRead?: PostureRead;
+  /** The server-minted plain-English line. Null when there is no posture claim to make.
+   *  Law 4: the surface renders this. It does not compose its own. */
+  postureSentence?: string | null;
 }
 
 /**

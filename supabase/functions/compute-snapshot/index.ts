@@ -28,7 +28,10 @@ import {
   todayISO,
   isoMinus,
   STATE_TREND_WINDOWS,
+  sanitizePosture,
+  declaredSessionsPerWeek,
   type StateTrendsV1,
+  type PerDisciplinePosture,
 } from "../_shared/state-trend/index.ts";
 import { computeAcwr, type LoadRow } from "../_shared/acwr.ts";
 import { resolvePlanPhase } from "../_shared/plan-phase.ts";
@@ -759,7 +762,30 @@ serve(async (req: Request) => {
         }));
 
         const strengthVolumeRows = (strengthVolR.data ?? []).map((f: any) => ({ date: f.date, total_volume_lbs: f.strength_facts?.total_volume_lbs ?? null }));
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts });
+
+        // Q-179 — READ THE ATHLETE'S DECLARED INTENT. It has been sitting on the goal since plan
+        // build (D-210) and NOTHING at runtime has ever read it: `per_discipline_posture` appeared
+        // zero times in the spine and zero times in the coach. That is why State told an athlete who
+        // declared run='maintain' — and was lifting instead, exactly as planned — that his "aerobic
+        // base needs work". Every number was right. Nobody asked what he was trying to do.
+        // Null-safe by design: no declared posture → readPosture() returns 'unknown' → today's
+        // behaviour, byte for byte.
+        let posture: PerDisciplinePosture | null = null;
+        let declaredSpw: Partial<Record<string, number>> | null = null;
+        try {
+          const { data: activeGoal } = await supabase
+            .from("goals").select("training_prefs")
+            .eq("user_id", userId).eq("status", "active")
+            .order("created_at", { ascending: false }).limit(1).maybeSingle();
+          const tp = (activeGoal as any)?.training_prefs ?? null;
+          posture = sanitizePosture(tp?.per_discipline_posture);
+          declaredSpw = declaredSessionsPerWeek(tp);
+          if (posture) console.log("[compute-snapshot] Q-179 posture:", JSON.stringify(posture), "declared/wk:", JSON.stringify(declaredSpw));
+        } catch (e: any) {
+          console.log("[compute-snapshot] posture read failed (non-fatal):", e?.message || e);
+        }
+
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw });
         stateTrendsV1 = toStateTrendsV1(result, asOf);
       } catch (e: any) {
         console.log("⚠️ state_trends_v1 (spine) failed (non-fatal):", e?.message || e);

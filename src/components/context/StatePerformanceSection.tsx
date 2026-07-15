@@ -304,6 +304,29 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
   );
 }
 
+// Q-179 — WHAT THE ATHLETE SAID, next to what the numbers did.
+//
+// The line is MINTED ON THE SERVER (`_shared/state-trend/posture.ts`). This renders it and decides
+// nothing — Constitution Law 4. If the athlete declared no posture, `postureSentence` is null and
+// this renders nothing at all, so a user without a declared intent sees exactly what they saw before.
+//
+// The bug it closes: the athlete declared run='maintain' while building strength, ran 3x/month
+// instead of 19x, got slower at the same effort — precisely what maintaining implies — and this
+// screen said "aerobic base needs work" in amber. Every number above this line was correct. The app
+// simply never asked what he was trying to do.
+//
+// Deliberately NOT amber, NOT a warning, NOT an icon. A trade is not a failure (SPEC-posture-flag §6).
+function PostureLine({ card }: { card: DisciplineCard }) {
+  const sentence = (card as any).postureSentence as string | null | undefined;
+  if (!sentence) return null;
+  const concern = (card as any).postureRead === 'develop_declining' || (card as any).postureRead === 'develop_stalled';
+  return (
+    <p className={`pl-[62px] pr-1 -mt-0.5 mb-1.5 text-[11px] leading-snug max-w-[min(100%,360px)] ${concern ? 'text-amber-400/80' : 'text-white/45'}`}>
+      {sentence}
+    </p>
+  );
+}
+
 export default function StatePerformanceSection({ strengthDetail, stateDisplay }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
@@ -342,15 +365,21 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay }
           run up") is a lossy, cherry-picking, clock-mismatched summary (run 6wk vs bike 8wk). Fitness
           is handed to the individual sport rows below — each owns its own verdict AND its own window. */}
       {sortedCards.map((card) => {
-        if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow key="bike" fitness={bikeFitness!} />;
-        if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow key="run" fitness={runFitness!} />;
-        if (card.discipline === 'strength' && strengthHasSubstance) return <React.Fragment key="strength"><StrengthFitnessRow fitness={strengthFitness!} />{strengthDetail}</React.Fragment>;
-        const row = <DisciplineRow key={card.discipline} card={card} restTrend={card.discipline === 'swim' ? swimRest : null} />;
-        // Q-107 H3: nest the per-lift detail directly under the STRENGTH trend row — one STRENGTH header,
-        // the lifts as provisional "from your logged sets" detail (no competing second top-line).
-        return (card.discipline === 'strength' && strengthDetail)
-          ? <React.Fragment key="strength">{row}{strengthDetail}</React.Fragment>
-          : row;
+        const inner = (() => {
+          if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} />;
+          if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} />;
+          if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} />{strengthDetail}</>;
+          const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} />;
+          // Q-107 H3: nest the per-lift detail directly under the STRENGTH trend row — one STRENGTH header,
+          // the lifts as provisional "from your logged sets" detail (no competing second top-line).
+          return (card.discipline === 'strength' && strengthDetail) ? <>{row}{strengthDetail}</> : row;
+        })();
+        return (
+          <React.Fragment key={card.discipline}>
+            {inner}
+            <PostureLine card={card} />
+          </React.Fragment>
+        );
       })}
       {/* defensive: if there's no strength trend card at all, still surface the per-lift detail */}
       {strengthDetail && !cards.some((c) => c.discipline === 'strength') && strengthDetail}

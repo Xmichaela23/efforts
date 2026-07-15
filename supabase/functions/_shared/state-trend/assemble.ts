@@ -15,6 +15,7 @@ import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, effic
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
 import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSummary } from './discipline.ts';
+import { readPosture, postureSentence, disciplineWord, type PerDisciplinePosture } from './posture.ts';
 import { synthesizeHeadline, type Headline } from './headline.ts';
 import { ADHERENCE_WINDOW_DAYS } from './thresholds.ts';
 
@@ -79,6 +80,13 @@ export interface StateTrendInputs {
   plannedBy: Record<string, number>; // this-week planned counts per discipline
   doneBy: Record<string, number>; // this-week completed counts per discipline
   cadenceCounts: Record<string, number>; // 90d completed counts per discipline
+  /** Q-179: the athlete's DECLARED intent per discipline (`goals.training_prefs.per_discipline_posture`).
+   *  Optional and null-safe on purpose — an athlete who never declared one must see EXACTLY today's
+   *  behaviour. See posture.ts for why this exists. */
+  posture?: PerDisciplinePosture | null;
+  /** Q-179 Tier 1: the DECLARED sessions/week per discipline (`run_days`, `strength_frequency`).
+   *  The yardstick for "are you maintaining it?" — absent → the row stays silent rather than guess. */
+  declaredSessionsPerWeek?: Partial<Record<string, number>> | null;
 }
 
 export interface StateTrendResult {
@@ -230,8 +238,11 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     swim: isProvisionalTrend(swimState.trend),
   };
 
-  const cards: DisciplineCard[] = ORDER.map((k) =>
-    resolveDisciplineCard({
+  // Q-179 — THE JOIN. The verdict is untouched; what it MEANS is decided here, once, on the server.
+  // A discipline the athlete declared `maintain` must never be graded as one they are trying to
+  // `develop`. No posture declared → `unknown` → every surface behaves exactly as it did before.
+  const cards: DisciplineCard[] = ORDER.map((k) => {
+    const card = resolveDisciplineCard({
       discipline: k,
       performance: perfByDisc[k],
       adherence: computeAdherenceState({
@@ -240,8 +251,22 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
         planned: inp.plannedBy[k] || 0,
         completed: inp.doneBy[k] || 0,
       }),
-    }),
-  );
+    });
+    const declared = inp.posture?.[k] ?? null;
+    // BEHAVIOUR, not the trend verdict, answers "are you maintaining it?" — `spw` is the spine's own
+    // 90d sessions/week, already computed above; the target is what the athlete typed into the wizard.
+    const behaviour = {
+      targetSessionsPerWeek: inp.declaredSessionsPerWeek?.[k] ?? null,
+      actualSessionsPerWeek: spw[k] ?? null,
+    };
+    const read = readPosture(declared, card.headlineVerdict, behaviour);
+    return {
+      ...card,
+      posture: declared,
+      postureRead: read,
+      postureSentence: postureSentence(read, disciplineWord(k), behaviour),
+    };
+  });
 
   return {
     cards, headline: synthesizeHeadline(cards), bikeFitness, runFitness, strengthFitness, perfByDisc, provisionalByDisc, spw,
