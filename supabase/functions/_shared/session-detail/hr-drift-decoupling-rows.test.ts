@@ -47,7 +47,8 @@ Deno.test('Q-158 (1): GAP decoupling renders the % verdict and SUPPRESSES the bp
   const dec = find(rows, 'Aerobic decoupling');
   assertEquals(!!dec, true, 'Aerobic decoupling row must render on a GAP-basis read');
   assertStringIncludes(dec!.value, '4.2%');
-  assertStringIncludes(dec!.value, 'good');
+  // ONE vocabulary with the State "Fitness" card (frielBand): ≤5% → "aerobic base is sound".
+  assertStringIncludes(dec!.value, 'aerobic base is sound');
   // Exactly one HR-behaviour read: the descriptive bpm "Heart rate" line is gone.
   assertEquals(labels(rows).includes('Heart rate'), false, 'bpm line must be suppressed when % shown');
 });

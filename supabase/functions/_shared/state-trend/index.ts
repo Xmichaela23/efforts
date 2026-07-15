@@ -64,6 +64,17 @@ export {
   type SessionContextTag,
 } from './adherence.ts';
 export {
+  composeWeekAccent,
+  overReachCandidate,
+  rirCandidate,
+  bannerCandidate,
+  leverCandidate,
+  ACCENT_TIER,
+  type WeekAccent,
+  type AccentSource,
+  type AccentTrace,
+} from './week-accent.ts';
+export {
   assembleStateTrends,
   liftSeriesFromExerciseLog,
   toStateTrendsV1,

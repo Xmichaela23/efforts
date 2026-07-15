@@ -34,7 +34,7 @@ const STRENGTH_ON_PLAN_CARRIED = 'On plan — strength on track; endurance via c
 const STRENGTH_ON_PLAN_LIGHT = 'Strength on track — room to add endurance.';
 const STRENGTH_BEHIND = 'Behind on strength this week — your priority sessions.';
 
-export function offPlanAdherenceBanner(opts: {
+export interface OffPlanBannerOpts {
   /** reconciled load_status.status */
   loadStatus: string | null | undefined;
   /** run_only_week_load_pct (≤ -50 = did ≤ half the planned running) */
@@ -51,7 +51,16 @@ export function offPlanAdherenceBanner(opts: {
   planPrimary?: string | null;
   /** D-268 Phase 2: primary-discipline (strength) adherence from computePrimaryAdherence. */
   primaryAdherence?: { discipline: string; met: boolean; note: string } | null;
-}): string | null {
+}
+
+/** Which read the banner produced — lets a consumer (e.g. the State week-accent composer) rank it by
+ *  priority without re-parsing the copy. 'carried'/'positive' are non-punitive load reads; 'behind'
+ *  and 'nothing_loaded' are genuine under-execution nudges. */
+export type OffPlanBranch = 'carried' | 'positive' | 'behind' | 'nothing_loaded';
+
+/** The structured banner: the line AND which branch produced it. `offPlanAdherenceBanner` (the string
+ *  form the coach headline consumes) delegates here, so the logic lives in exactly one place. */
+export function offPlanAdherenceResult(opts: OffPlanBannerOpts): { line: string; branch: OffPlanBranch } | null {
   const { loadStatus, runLoadPct, weekIntent, totalAcwr, perDomain, planPrimary, primaryAdherence } = opts;
 
   // D-147 firing conditions (unchanged): a real run shortfall on a normal training
@@ -65,16 +74,20 @@ export function offPlanAdherenceBanner(opts: {
   // ── D-268 Phase 2: strength-primary — a run shortfall is NOT "behind plan". Key on strength.
   if (planPrimary === 'strength') {
     if (primaryAdherence?.met === true) {
-      return totalLoaded ? STRENGTH_ON_PLAN_CARRIED : STRENGTH_ON_PLAN_LIGHT;
+      return { line: totalLoaded ? STRENGTH_ON_PLAN_CARRIED : STRENGTH_ON_PLAN_LIGHT, branch: 'positive' };
     }
-    return STRENGTH_BEHIND; // the genuine miss — strength is the priority, not running
+    return { line: STRENGTH_BEHIND, branch: 'behind' }; // the genuine miss — strength is the priority
   }
 
   // ── Endurance / hybrid / unknown: the original run-centric banner (unchanged) ──────────────────
   // Loaded overall? Total ACWR is the always-available gate (per-slice ratios are null-by-floor).
   // Not loaded → genuinely under-training; the prescription is correct.
-  if (!totalLoaded) return FACT_PLUS_PRESCRIPTION;
+  if (!totalLoaded) return { line: FACT_PLUS_PRESCRIPTION, branch: 'nothing_loaded' };
   // Q-140 kill: loaded overall → attribute by acute-load COMPOSITION. Name the carrier only when a
   // slice holds the majority; else the generic line is correct.
-  return dominantAcuteSlice(perDomain) === 'easy_cardio' ? CARRIED_EASY : CARRIED_GENERIC;
+  return { line: dominantAcuteSlice(perDomain) === 'easy_cardio' ? CARRIED_EASY : CARRIED_GENERIC, branch: 'carried' };
+}
+
+export function offPlanAdherenceBanner(opts: OffPlanBannerOpts): string | null {
+  return offPlanAdherenceResult(opts)?.line ?? null;
 }

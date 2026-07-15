@@ -32,14 +32,14 @@ import { isLowTrustWorkload } from '../_shared/workload.ts';
 import { reconcileLoadStatus } from '../_shared/load-status-reconcile.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolvePlanPhaseDetailed, phaseNameToWeekIntent, type PhaseSource } from '../_shared/plan-phase.ts';
-import { offPlanAdherenceBanner } from '../_shared/off-plan-banner.ts';
+import { offPlanAdherenceBanner, offPlanAdherenceResult } from '../_shared/off-plan-banner.ts';
 import { computePerDomainLoad, type SliceSession } from '../_shared/per-domain-load.ts';
 import { computeFitnessFatigue } from '../_shared/fitness-fatigue.ts';
 import { assessAbsorption } from '../_shared/absorption.ts';
 import { computeSafetyFloor, resolvePlanPrimary, computePrimaryAdherence, resolvePrimarySport } from '../_shared/load-status-reconcile.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
-import { rollupFitnessDirection, rollupFitness, rollupHrResponse, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel, decouplingBandDisplay, bikeRideIntensityAerobic, bikeEfficiencyDisplay } from '../_shared/state-trend/index.ts';
+import { rollupFitnessDirection, rollupFitness, rollupHrResponse, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel, decouplingBandDisplay, bikeRideIntensityAerobic, bikeEfficiencyDisplay, composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate, leverCandidate, type WeekAccent } from '../_shared/state-trend/index.ts';
 import {
   computeWeeklyResponse,
   type WeeklyResponseState,
@@ -126,7 +126,7 @@ const corsHeaders: Record<string, string> = {
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
 /** v61: Q-111 fact-only — a strength DECLINE ("back off weight") no longer emits a `suggested_weight` (the "go lighter" prescription is dropped; the client then renders "Working ~125 vs your 150 baseline" with no action). Progression ("add weight") suggestions unchanged. Bump so cached "suggest 115 / back off" per-lift rows recompute to the fact-only row. */
-const COACH_PAYLOAD_VERSION = 97; // 97: Q-179 — weekly_state_v1.trends.display now carries the per-discipline POSTURE read (posture/postureRead/postureSentence on each card). The coach forwards state_trends_v1.display verbatim (:5359), but coach_cache freezes the whole payload, so a stale cache serves pre-posture cards. Bump so cached rows re-source and the posture line reaches the client. Same move as v75, when display was first added. // 96: Q-177 — compute-snapshot's structuralDirection no longer falls back to strength_volume_trend (a PARTIAL-WEEK artifact: a cumulative SUM of the current week vs the average of COMPLETE prior weeks, so ~-75% on a Monday). That fallback fed interferenceScore, which the coach reads at :2205 — so on a Monday an athlete with no e1RM history was declared 'declining' and the app could assert "endurance is dominating your strength" off nothing but the day of the week. With no e1RM history structuralDirection now stays NULL and interference is simply not computed (Law 2: no inference without evidence). Bump so cached interference/verdict rows re-source instead of passing the `cachedVer >= COACH_PAYLOAD_VERSION` gate with an artifact baked in — the same trap the D-281 and Q-170 reverts both hit. Also retires the strength_volume_trend longitudinal SIGNALS built on the same substrate (the spine's 6-week per-workout volume trend is the single source, and it was RIGHT). // 95: D-283 — hot runs are KEPT in the run durability substrate and in the coach's 7d decoupling receipt (D-275's heat exclusion is dead: not field-standard, and on 81 real steady runs the heat->decoupling slope's 95% CI straddles zero under every specification — hot runs read BEST, so the filter was deleting the athlete's best data). Bump so cached AERO/decoupling rows re-source off the un-filtered substrate. // 94: REVERT of Q-170 (v93) — the heat work is pulled; D-275's exclusion stands. Bumped FORWARD (not back to 92) on purpose: the cache gate is `cachedVer >= COACH_PAYLOAD_VERSION`, so restoring 92 would leave the v93 rows (the '· N of M runs were hot' naming) passing as valid and still being served. Same trap as the D-281 revert. // 92: REVERT of D-281 (v90 + v91) — the total-load ACWR band is removed and the pre-D-281 reconciler restored. Bumped FORWARD (not back to 89) on purpose: the cache gate is `cachedVer >= COACH_PAYLOAD_VERSION`, so reverting the constant to 89 would leave the bad v90/v91 rows (the false "pull back") passing as valid and being served. 92 invalidates them. See the revert commit + Q-166 for why the band was wrong: ACWR alone must never reach the prescriptive band (D-266, Q-137, Item-3 rule "Load-high + body-fine → elevated max"). // 89: acwr_provisional fix — the thin-base flag now keys on the REAL thin-base signal (spikeOnEmptyBase), not "the verdict stayed low" (which wrongly flagged real-base athletes whose spike is cross-training-attributed). Real base → never provisional, any composition. Bump so cached load re-sources. // 88: LOAD verdict — a REAL elevation the body is absorbing (no strain, good readiness, no ≥2 declining signals) now reads 'productive' (Garmin/COROS/Intervals field-standard), not "balanced" (hides it) or "back off" (false alarm); AND an elevated ACWR discounted as thin/empty-base is flagged acwr_provisional so the bare number isn't read as a real spike. Bump so cached load verdicts re-source. // 87: BODY "Heart-rate response" as_of now stamps the OLDEST contributing session (was freshest) so a combined read never looks fresher than its stalest half (a fresh bike + 2-week-old run stamps the run date); provenance also names each discipline's age. Bump so cached BODY rows re-source. // 86: BODY "Heart-rate response" — holistic, SPINE-sourced (run aerobic decoupling + bike HR-at-power, swim excluded), replacing the run-only re-derived HR-drift row. One source across all reliable-HR endurance; provisional-aware; carries as_of + a per-discipline provenance. Bump so cached BODY rows re-source. // 85: BODY endurance signals (How hard it feels / Heart rate drift) carry as_of_date = newest session behind the rolling read, rendered "as of {date}" so a 7d/week window isn't mistaken for today's data. Bump so payloads gain the field. // 84: drop the "Run quality" BODY signal (execution-vs-baseline is plan-adherence, not body response — field keeps adherence in a separate lane; run physiology already in PERFORMANCE). Bump so cached BODY rows re-source. // 83: Q-162 — fitness_direction is now decided by SOLID verdicts only; a provisional (thin/clustered) discipline can no longer ASSERT a confident direction (was un-weighted), and any thin mover held out is named as a data gap in the narrative. Bump so cached fitness_direction recomputes. // 82: SWIM row fix — fetch planned_id in the recentWorkouts query so the "planned → % achieved" branch works (was never selected → every swim read as unplanned); free swims already showed distance. Bump forces a fresh compute so swim_sessions_7d lands. // 81: SWIM sessions row — emit swim_sessions_7d (planned → % achieved, unplanned → distance covered; NEVER pace, Q-038-safe) so the State "how your sessions went" section finally shows swim instead of hiding it. Bump so payloads gain the field. // 80: D-275-bike follow-on — the BIKE "sessions went" row's steady-aerobic efficiency VERDICT now reads the SPINE bike efficiency (HR-at-power) via shared bikeEfficiencyDisplay, not the coach's own HR-drift bands → BIKE row ≡ PERFORMANCE bike Efficiency (the last run↔bike continuity gap closed). Bump so cached BIKE rows re-source. // 79: D-275-bike / Q-117 — the BIKE 7d HR-drift row now excludes hard-RIDDEN rides (best-20 ≥ 90% FTP) from the steady-type drift avg, via the SAME bikeRideIntensityAerobic gate the spine HR-at-power efficiency read uses → both bike engines agree on "too hard to count as aerobic". Bump so cached BIKE rows recompute. // 78: D-275 continuity close — the AERO card's run durability VERDICT (steady types) now reads the SPINE decoupling band (confound-excluded, freshness-gated) via the shared decouplingBandDisplay vocab, instead of the coach's own 7d decoupling average → AERO ≡ PERFORMANCE (no more "durability gap" on AERO while the trend says "holding"). Also skips heat-confounded runs from the 7d decoupling receipt. Bump so cached cards re-source. // 77: Q-129 coach honesty net — the week headline now feeds CONCERNING spine verdicts (sliding) as atypicalSignals so rule 2 catches a "you're cruising / comfortable" headline that contradicts a discipline sliding on-screen (was hardcoded [] → rule 2 dead); AND the guard always runs (cold-start no longer bypasses it → no unguarded narrative for a data-less athlete). Bump so cached headlines re-validate. // 76: FTP fracture #2 — coach FTP reads (per-domain load bins + prose baseline line) route through resolveCurrentFtp (learned-first) instead of a local manual-first fork; bike FTP now agrees across coach/analyzer/compute-facts. Bump so per-domain bins recompute. // 75: S2 — weekly_state_v1.trends.display carries the pre-assembled State display contract (cards + per-discipline fitness reads) from the cached spine, so the client renders it instead of recomputing in-browser. Bump so payloads gain the field. // 74: D-270 strength convergence — per-lift e1rm_trend now READS the spine's per-lift direction (state_trends_v1.strength.per_lift) instead of the dead previous_e1rm delta; the "getting stronger/slipping" verdict fires again (Q-107 H2). Bump so cached always-'stable' rows recompute. // 73: b2 scale-up (Q-149) — primary_discipline now the SPECIFIC lead sport (strength/run/ride/swim/tri/duathlon/hybrid) so bike-forward leads with bike, not run; swim never faked. // 72: b2 — strength_session_types_7d + weekly_state_v1.plan.primary_discipline. // 71: D-268 Phase 3 — the LLM narrative + intent_summary are told the plan's PRIMARY discipline (strength-primary → prose frames around strength, not running). Bump so cached rows recompute. // 70: D-268 Phase 2 — off-plan banner plan-aware; planPrimary hoisted. // 69: D-268 Phase 1 — strength-primary interpretation de-run-framed. // 68: D-267 Fix 1. // 67: N-concerning fallback.
+const COACH_PAYLOAD_VERSION = 98; // 98: STATE "how your sessions went" is rebuilt (docs/STATE-WEEK-EXECUTION.md) — steady run/bike FITNESS verdicts removed from this section (they duplicated PERFORMANCE; the "aerobic base needs work" said-twice bug), and weekly_state_v1.week_execution_v1 now carries neutral planned-vs-done COUNTS + at most ONE composed accent (over-reach > lever(dormant) > RIR-vs-plan-target > substitution/positive/under-training). Bump so cached rows re-source and the new field lands. // 97: Q-179 — weekly_state_v1.trends.display now carries the per-discipline POSTURE read (posture/postureRead/postureSentence on each card). The coach forwards state_trends_v1.display verbatim (:5359), but coach_cache freezes the whole payload, so a stale cache serves pre-posture cards. Bump so cached rows re-source and the posture line reaches the client. Same move as v75, when display was first added. // 96: Q-177 — compute-snapshot's structuralDirection no longer falls back to strength_volume_trend (a PARTIAL-WEEK artifact: a cumulative SUM of the current week vs the average of COMPLETE prior weeks, so ~-75% on a Monday). That fallback fed interferenceScore, which the coach reads at :2205 — so on a Monday an athlete with no e1RM history was declared 'declining' and the app could assert "endurance is dominating your strength" off nothing but the day of the week. With no e1RM history structuralDirection now stays NULL and interference is simply not computed (Law 2: no inference without evidence). Bump so cached interference/verdict rows re-source instead of passing the `cachedVer >= COACH_PAYLOAD_VERSION` gate with an artifact baked in — the same trap the D-281 and Q-170 reverts both hit. Also retires the strength_volume_trend longitudinal SIGNALS built on the same substrate (the spine's 6-week per-workout volume trend is the single source, and it was RIGHT). // 95: D-283 — hot runs are KEPT in the run durability substrate and in the coach's 7d decoupling receipt (D-275's heat exclusion is dead: not field-standard, and on 81 real steady runs the heat->decoupling slope's 95% CI straddles zero under every specification — hot runs read BEST, so the filter was deleting the athlete's best data). Bump so cached AERO/decoupling rows re-source off the un-filtered substrate. // 94: REVERT of Q-170 (v93) — the heat work is pulled; D-275's exclusion stands. Bumped FORWARD (not back to 92) on purpose: the cache gate is `cachedVer >= COACH_PAYLOAD_VERSION`, so restoring 92 would leave the v93 rows (the '· N of M runs were hot' naming) passing as valid and still being served. Same trap as the D-281 revert. // 92: REVERT of D-281 (v90 + v91) — the total-load ACWR band is removed and the pre-D-281 reconciler restored. Bumped FORWARD (not back to 89) on purpose: the cache gate is `cachedVer >= COACH_PAYLOAD_VERSION`, so reverting the constant to 89 would leave the bad v90/v91 rows (the false "pull back") passing as valid and being served. 92 invalidates them. See the revert commit + Q-166 for why the band was wrong: ACWR alone must never reach the prescriptive band (D-266, Q-137, Item-3 rule "Load-high + body-fine → elevated max"). // 89: acwr_provisional fix — the thin-base flag now keys on the REAL thin-base signal (spikeOnEmptyBase), not "the verdict stayed low" (which wrongly flagged real-base athletes whose spike is cross-training-attributed). Real base → never provisional, any composition. Bump so cached load re-sources. // 88: LOAD verdict — a REAL elevation the body is absorbing (no strain, good readiness, no ≥2 declining signals) now reads 'productive' (Garmin/COROS/Intervals field-standard), not "balanced" (hides it) or "back off" (false alarm); AND an elevated ACWR discounted as thin/empty-base is flagged acwr_provisional so the bare number isn't read as a real spike. Bump so cached load verdicts re-source. // 87: BODY "Heart-rate response" as_of now stamps the OLDEST contributing session (was freshest) so a combined read never looks fresher than its stalest half (a fresh bike + 2-week-old run stamps the run date); provenance also names each discipline's age. Bump so cached BODY rows re-source. // 86: BODY "Heart-rate response" — holistic, SPINE-sourced (run aerobic decoupling + bike HR-at-power, swim excluded), replacing the run-only re-derived HR-drift row. One source across all reliable-HR endurance; provisional-aware; carries as_of + a per-discipline provenance. Bump so cached BODY rows re-source. // 85: BODY endurance signals (How hard it feels / Heart rate drift) carry as_of_date = newest session behind the rolling read, rendered "as of {date}" so a 7d/week window isn't mistaken for today's data. Bump so payloads gain the field. // 84: drop the "Run quality" BODY signal (execution-vs-baseline is plan-adherence, not body response — field keeps adherence in a separate lane; run physiology already in PERFORMANCE). Bump so cached BODY rows re-source. // 83: Q-162 — fitness_direction is now decided by SOLID verdicts only; a provisional (thin/clustered) discipline can no longer ASSERT a confident direction (was un-weighted), and any thin mover held out is named as a data gap in the narrative. Bump so cached fitness_direction recomputes. // 82: SWIM row fix — fetch planned_id in the recentWorkouts query so the "planned → % achieved" branch works (was never selected → every swim read as unplanned); free swims already showed distance. Bump forces a fresh compute so swim_sessions_7d lands. // 81: SWIM sessions row — emit swim_sessions_7d (planned → % achieved, unplanned → distance covered; NEVER pace, Q-038-safe) so the State "how your sessions went" section finally shows swim instead of hiding it. Bump so payloads gain the field. // 80: D-275-bike follow-on — the BIKE "sessions went" row's steady-aerobic efficiency VERDICT now reads the SPINE bike efficiency (HR-at-power) via shared bikeEfficiencyDisplay, not the coach's own HR-drift bands → BIKE row ≡ PERFORMANCE bike Efficiency (the last run↔bike continuity gap closed). Bump so cached BIKE rows re-source. // 79: D-275-bike / Q-117 — the BIKE 7d HR-drift row now excludes hard-RIDDEN rides (best-20 ≥ 90% FTP) from the steady-type drift avg, via the SAME bikeRideIntensityAerobic gate the spine HR-at-power efficiency read uses → both bike engines agree on "too hard to count as aerobic". Bump so cached BIKE rows recompute. // 78: D-275 continuity close — the AERO card's run durability VERDICT (steady types) now reads the SPINE decoupling band (confound-excluded, freshness-gated) via the shared decouplingBandDisplay vocab, instead of the coach's own 7d decoupling average → AERO ≡ PERFORMANCE (no more "durability gap" on AERO while the trend says "holding"). Also skips heat-confounded runs from the 7d decoupling receipt. Bump so cached cards re-source. // 77: Q-129 coach honesty net — the week headline now feeds CONCERNING spine verdicts (sliding) as atypicalSignals so rule 2 catches a "you're cruising / comfortable" headline that contradicts a discipline sliding on-screen (was hardcoded [] → rule 2 dead); AND the guard always runs (cold-start no longer bypasses it → no unguarded narrative for a data-less athlete). Bump so cached headlines re-validate. // 76: FTP fracture #2 — coach FTP reads (per-domain load bins + prose baseline line) route through resolveCurrentFtp (learned-first) instead of a local manual-first fork; bike FTP now agrees across coach/analyzer/compute-facts. Bump so per-domain bins recompute. // 75: S2 — weekly_state_v1.trends.display carries the pre-assembled State display contract (cards + per-discipline fitness reads) from the cached spine, so the client renders it instead of recomputing in-browser. Bump so payloads gain the field. // 74: D-270 strength convergence — per-lift e1rm_trend now READS the spine's per-lift direction (state_trends_v1.strength.per_lift) instead of the dead previous_e1rm delta; the "getting stronger/slipping" verdict fires again (Q-107 H2). Bump so cached always-'stable' rows recompute. // 73: b2 scale-up (Q-149) — primary_discipline now the SPECIFIC lead sport (strength/run/ride/swim/tri/duathlon/hybrid) so bike-forward leads with bike, not run; swim never faked. // 72: b2 — strength_session_types_7d + weekly_state_v1.plan.primary_discipline. // 71: D-268 Phase 3 — the LLM narrative + intent_summary are told the plan's PRIMARY discipline (strength-primary → prose frames around strength, not running). Bump so cached rows recompute. // 70: D-268 Phase 2 — off-plan banner plan-aware; planPrimary hoisted. // 69: D-268 Phase 1 — strength-primary interpretation de-run-framed. // 68: D-267 Fix 1. // 67: N-concerning fallback.
 // 66 was: // 66: readiness restructure — RPE driver under BODY (readiness_rpe_driver), chip dropped, Why = non-RPE only.
 // 65 was: // 65: Why names the driver session (constant-free) + chip/headline dedup (readiness in chip only).
 // 64 was: // 64: BODY row provenance — receipt "you rated X avg vs Y typical" + tap-expand cross-discipline line. // 63: per_lift.last_session_date (as-of date on the strength row). // 62: item 3 — headline "Why" RPE driver is bare-verdict (numeric receipt lives on the BODY row only, rule 7). // 61: Q-111 fact-only — no "go lighter" prescription on strength decline. // 60: shared classifyStrengthFocus (one fact). // 59: plan-week END-gated. // 58: novelty = "not in your recent training". // 57: "in 8 weeks". // 53 (D-232): loaded-legs fires on full-body days. // 52 (D-232): surgical loaded-legs readiness. // 51 (D-232): named marker + terse narrative. // 50 (D-232): pre-start claim-grounding. // 49 (D-232): honest strain label + readiness_why. // 48 (D-232): glass-box RPE detail. // 47 (D-231): per_lift.anchor_1rm. // 46 (D-212 Cut 2): emit fitness_verdict_divergence top-level (spine↔projection cross-check). Additive/optional; bump invalidates cache so the field lands in fresh payloads. // 45 (D-191): coach prose migrated onto the shared narrative core (scaffold + validators); fitness claims pinned to the spine verdict (rule 5), no state-diagnosis (rule 4), describe-don't-prescribe folded in (D-154/D-155). Bump invalidates pre-migration cached narratives. // 44: narrative sentence-4 — forbid "add a session" (describe plan, don't prescribe); name only plan-marked key sessions; max_tokens 300->500 (truncation fix)
@@ -1533,9 +1533,14 @@ Deno.serve(async (req) => {
         const decouple = avgArr(runAgg[k].decouple, 1);
         const execScore = avgArr(runAgg[k].exec, 0);
         const isIntervalType = k === 'intervals' || k === 'hills';
+        // "How your sessions went" is the EXECUTION/shape clock, not a fitness verdict. Intervals keep
+        // their execution % (real adherence); steady types no longer emit a decoupling FITNESS verdict
+        // here — it duplicated the PERFORMANCE row ("aerobic base needs work" said twice). Fitness lives
+        // one section down. avg_decoupling_pct stays on the row as an LLM/detail receipt.
+        // See docs/STATE-WEEK-EXECUTION.md.
         const eff = isIntervalType
           ? { label: execScore != null ? `${execScore}% execution` : null, tone: (execScore != null && execScore >= 85 ? 'positive' : execScore != null && execScore >= 70 ? 'warning' : 'neutral') as any }
-          : runEfficiency(decouple);
+          : { label: null as string | null, tone: 'neutral' as const };
         return {
           type: k,
           type_label: RUN_TYPE_LABELS[k] || k,
@@ -1649,12 +1654,16 @@ Deno.serve(async (req) => {
         const isPowerTargetedType =
           k === 'vo2' || k === 'threshold' || k === 'anaerobic' ||
           k === 'neuromuscular' || k === 'sweet_spot' || k === 'race_prep';
+        // Mirror the run cut (docs/STATE-WEEK-EXECUTION.md): steady rides no longer emit an HR-drift
+        // FITNESS verdict in "how your sessions went" — it duplicated the PERFORMANCE bike Efficiency
+        // row. Power-targeted rides keep execution %; steady rides carry no verdict here. avg_hr_drift_pct
+        // stays on the row as an LLM/detail receipt.
         const eff = isPowerTargetedType
           ? {
               label: execScore != null ? `${execScore}% execution` : null,
               tone: (execScore != null && execScore >= 85 ? 'positive' : execScore != null && execScore >= 70 ? 'warning' : 'neutral') as 'positive' | 'warning' | 'danger' | 'neutral',
             }
-          : rideEfficiency(driftPct);
+          : { label: null as string | null, tone: 'neutral' as const };
         return {
           type: k,
           type_label: RIDE_TYPE_LABELS[k] || k,
@@ -2217,43 +2226,13 @@ Deno.serve(async (req) => {
     // AND words. Stale/needs_data → no verdict (honest "no clean recent read"), never a carried-forward gap.
     // Only STEADY-aerobic types map to durability; intervals/hills keep their execution % (spine has no
     // durability read for them). The raw per-type avg_decoupling_pct stays as an LLM/detail receipt. ──
-    {
-      const spineDecoup = latestSnapshot?.state_trends_v1?.run?.decoupling;
-      if (spineDecoup && Array.isArray(runSessionTypes7d)) {
-        const cleanRecent = spineDecoup.verdict !== 'needs_data' && !spineDecoup.stale && !!spineDecoup.band;
-        const disp = cleanRecent
-          ? decouplingBandDisplay(spineDecoup.band as any)
-          : { word: null, tone: 'neutral' as const };
-        const STEADY_DURABILITY_TYPES = new Set(['easy', 'z2', 'long', 'progressive']);
-        for (const rt of runSessionTypes7d) {
-          if (STEADY_DURABILITY_TYPES.has(rt.type)) {
-            rt.efficiency_label = disp.word;
-            rt.efficiency_tone = disp.tone;
-          }
-        }
-      }
-    }
-
-    // ── Continuity close (D-275-bike follow-on): the BIKE "sessions went" row's steady-aerobic efficiency
-    // VERDICT reads the SPINE bike efficiency (HR-at-power trend) — NOT the coach's own within-ride HR-drift
-    // bands (≤3/5/8%) — so the BIKE row and the PERFORMANCE bike Efficiency row can't tell contradicting
-    // stories on the same screen (the run AERO→spine reconciliation, now mirrored onto bike; the one
-    // remaining run↔bike asymmetry). Same shared vocab the PERFORMANCE row renders. needs_data → no verdict.
-    // Only STEADY-AEROBIC types (the substrate the spine efficiency represents) map; power-targeted types
-    // keep execution %; tempo/brick keep their own drift read. Raw avg_hr_drift_pct stays an LLM receipt. ──
-    {
-      const spineBikeEff = latestSnapshot?.state_trends_v1?.bike?.efficiency;
-      if (spineBikeEff && Array.isArray(rideSessionTypes7d)) {
-        const disp = bikeEfficiencyDisplay(spineBikeEff.verdict);
-        const STEADY_AEROBIC_BIKE = new Set(['recovery', 'endurance', 'endurance_long']);
-        for (const rt of rideSessionTypes7d) {
-          if (STEADY_AEROBIC_BIKE.has(rt.type)) {
-            rt.efficiency_label = disp.word;
-            rt.efficiency_tone = disp.tone;
-          }
-        }
-      }
-    }
+    // ── REMOVED 2026-07-14 (docs/STATE-WEEK-EXECUTION.md): two blocks here used to overwrite the
+    // steady run/bike "sessions went" rows with the SPINE fitness verdict (decouplingBandDisplay /
+    // bikeEfficiencyDisplay), to make this section ≡ the PERFORMANCE row. That reconciliation cured
+    // divergence but created DUPLICATION — the same "aerobic base needs work" appeared twice on one
+    // screen and read as nagging. "How your sessions went" is the execution/shape clock; the fitness
+    // verdict belongs to PERFORMANCE only (Law 1: one source per fact). Steady types now carry no
+    // efficiency verdict here (label null, set above); intervals keep their execution %. ──
 
     // Spine verdict vocab → coach TrendDirection, keyed by canonical lift (same scheme both sides:
     // bench_press/squat/…). needs_data → omitted → the per-lift falls back. Absent cache (a snapshot
@@ -5048,11 +5027,61 @@ ${narrativeFacts.join('\n')}`;
       runningAcwr: runningAcwr,
     });
 
+    // ── STATE "how your sessions went" → neutral per-discipline counts + at most ONE accent.
+    //    docs/STATE-WEEK-EXECUTION.md. Counts are planned-vs-done FACTS (no grading). The accent is
+    //    SELECTED by composeWeekAccent from candidates that each cite a real measurement (never invented):
+    //    over-reach (load AND body agree) > lever (dormant, owed by State v3) > RIR vs the PLAN'S target
+    //    (plan-aware continuity) > substitution / positive / under-training (the off-plan banner). No
+    //    qualifier → accent null (silence is valid). Fitness verdicts do NOT live here — that is PERFORMANCE.
+    const weekExecutionV1: NonNullable<CoachWeekContextResponseV1['weekly_state_v1']>['week_execution_v1'] = (() => {
+      const normDisc = (t: unknown): string | null => {
+        const s = String(t || '').toLowerCase();
+        if (s === 'run') return 'run';
+        if (s === 'ride' || s === 'bike' || s === 'cycling') return 'ride';
+        if (s === 'strength') return 'strength';
+        if (s === 'swim') return 'swim';
+        return null;
+      };
+      const isDone = (w: any): boolean => String(w?.workout_status || '').toLowerCase() === 'completed';
+      const plannedArr = Array.isArray(plannedWeek) ? plannedWeek : [];
+      const doneArr = (Array.isArray(weekWorkouts) ? weekWorkouts : []).filter(isDone);
+      const counts = (['run', 'ride', 'strength', 'swim'] as const).map((d) => ({
+        discipline: d,
+        planned: plannedArr.filter((p: any) => normDisc(p?.type) === d).length,
+        done: doneArr.filter((w: any) => normDisc(w?.type) === d).length,
+      })).filter((c) => c.planned > 0 || c.done > 0);
+
+      // substitution / positive / under-training — the off-plan banner (load language only, non-punitive).
+      const lsX = athleteSnapshot?.body_response?.load_status;
+      const banner = offPlanAdherenceResult({
+        loadStatus: lsX?.status, runLoadPct: lsX?.run_only_week_load_pct, weekIntent,
+        totalAcwr: lsX?.acwr, perDomain, planPrimary, primaryAdherence,
+      });
+
+      // RIR vs the PLAN'S target — the plan-aware continuity read. Each lift's 7d avg RIR vs
+      // getTargetRir(profile, lift) (always a number); weekly means. Gate is ≥2 lifts with logged RIR.
+      let rirActualSum = 0, rirTargetSum = 0, rirN = 0;
+      for (const [lift, rirs] of perLiftRir.rirByLift7d) {
+        const actual = perLiftRir.avgArr(rirs as number[]);
+        if (actual == null) continue;
+        rirActualSum += actual; rirTargetSum += getTargetRir(strengthProfile, lift); rirN += 1;
+      }
+
+      const accent: WeekAccent | null = composeWeekAccent([
+        overReachCandidate({ loadStatus: lsX?.status, readiness: readinessState, runningAcwr: lsX?.acwr }),
+        rirCandidate({ actualRir: rirN ? rirActualSum / rirN : null, targetRir: rirN ? rirTargetSum / rirN : null, sampleSize: rirN }),
+        bannerCandidate(banner?.line, banner?.branch),
+        leverCandidate(),
+      ]);
+      return { counts, accent };
+    })();
+
     const weekly_state_v1: NonNullable<CoachWeekContextResponseV1['weekly_state_v1']> = {
       version: 1,
       owner: 'coach',
       generated_at: new Date().toISOString(),
       as_of_date: asOfDate,
+      week_execution_v1: weekExecutionV1,
       week: {
         start_date: weekStartDate,
         end_date: weekEndDate,

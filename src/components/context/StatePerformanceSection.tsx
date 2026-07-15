@@ -358,7 +358,9 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay }
       {/* Section clock label: PERFORMANCE is the SLOW clock. Per-row windows (8wk, steady runs,
           over 6wk, as-of dates) are receipts that inherit this and add specifics. */}
       <div className="mb-2.5 flex items-baseline gap-2">
-        <span className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Performance</span>
+        {/* Named "Fitness" (not "Performance") so it can't be confused with the per-workout Performance
+            tab that grades a single session. This card is the multi-week fitness TREND. */}
+        <span className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Fitness</span>
         <span className="text-[10px] text-white/30 lowercase">trends over recent weeks</span>
       </div>
       {/* NO aggregate roll-up (Michael 2026-07-04): a cross-discipline headline ("Building — bike up,

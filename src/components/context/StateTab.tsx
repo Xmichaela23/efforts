@@ -146,6 +146,28 @@ function fmtSignedDeltaVsProjection(actualSec: number, projSec: number): string 
   return `${sign}${body} vs projection`;
 }
 
+// STATE "how your sessions went" ACCENT — the one composed sentence for the week (server-owned, this
+// only renders it — Law 4). docs/STATE-WEEK-EXECUTION.md. Deliberately neutral (grey, no icon-as-alarm):
+// it is a heads-up, never a scold. Tap reveals the source measurement it was drawn from (traceability §5c).
+function WeekAccentLine({ sentence, detail }: { sentence: string; detail: string | null }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="px-4 pb-1.5 pt-0.5">
+      <button
+        type="button"
+        onClick={() => { if (detail) setOpen((o) => !o); }}
+        className="text-left text-[11px] leading-snug text-white/55 max-w-[min(100%,360px)]"
+      >
+        {sentence}
+        {detail && <span className="text-white/30 text-[9px]"> {open ? '▾' : 'ⓘ'}</span>}
+      </button>
+      {open && detail && (
+        <p className="mt-1 text-[10px] text-white/35 leading-snug max-w-[min(100%,340px)]">Based on: {detail}</p>
+      )}
+    </div>
+  );
+}
+
 // "as of {Mon D}" for a BODY row's newest session date — so a rolling 7d/week read isn't mistaken for
 // today's data (BODY-4.8 freshness-legibility). Null-safe: no date → no stamp.
 function fmtBodyAsOf(dateStr: string | null | undefined): string | null {
@@ -1145,123 +1167,12 @@ export default function StateTab({
   // Still use liftTrends only for pre-filling the adjustment modal (best_weight)
   const liftWeightMap = new Map(liftTrends.map(lt => [lt.canonical, lt.entries[lt.entries.length - 1]?.best_weight ?? 0]));
 
-  // ── RUN row — from run_session_types_7d ──────────────────────────────────
-  const runTypes = (wsv as any).run_session_types_7d as Array<{
-    type: string;
-    type_label?: string;
-    sample_size: number;
-    avg_execution_score: number | null;
-    avg_hr_drift_bpm: number | null;
-    efficiency_label: string | null;
-    efficiency_tone: 'positive' | 'warning' | 'danger' | 'neutral';
-  }> ?? [];
-
-  // ── BIKE row — from ride_session_types_7d (b2 scale-up: bike-forward leads with this) ──
-  const rideTypes = wsv.ride_session_types_7d ?? [];
-
-  // ── STRENGTH row — from strength_session_types_7d (b2/Q-149) ─────────────
-  const strengthTypes = wsv.strength_session_types_7d ?? [];
-  // Plan-primary is server single-source (Law-4 — the client renders it, never re-derives it). When the
-  // plan's primary discipline is strength, the STRENGTH execution row LEADS the surface: this athlete's
-  // key sessions are lifts, graded by the strength verdict, not run pace.
-  const primaryDiscipline = wsv.plan.primary_discipline ?? 'unknown';
-  const strengthLeads = primaryDiscipline === 'strength';
-  const strengthExecRow = (() => {
-    const graded = strengthTypes.filter(st => st.avg_execution_score != null);
-    const hasTests = strengthTypes.some(st => st.test_count > 0);
-    // Endurance athlete with no strength execution data → render nothing (don't clutter). A strength-primary
-    // athlete with no graded lift yet → honest-abstain line, NOT silence and NOT run pace masquerading as the verdict.
-    if (graded.length === 0 && !(strengthLeads && (strengthTypes.length > 0 || hasTests))) return null;
-    return (
-      <div className="px-3 py-3">
-        <Row label="STRENGTH">
-          {graded.length > 0 ? graded.map((st, i) => {
-            const effColor = st.efficiency_tone === 'positive' ? 'text-emerald-400/85'
-              : st.efficiency_tone === 'warning' ? 'text-amber-400/85'
-              : st.efficiency_tone === 'danger' ? 'text-rose-400/85'
-              : 'text-white/70';
-            return (
-              <React.Fragment key={st.type}>
-                {i > 0 && <Dot />}
-                <Chip label={st.type_label} value={`${Math.round(st.avg_execution_score!)}% exec`} valueClass={effColor} />
-              </React.Fragment>
-            );
-          }) : (
-            <span className="text-[12px] text-white/50">
-              {hasTests ? 'Strength tested this week — not graded' : 'No strength sessions logged yet this week'}
-            </span>
-          )}
-        </Row>
-      </div>
-    );
-  })();
-
-  // ── AERO (run) + BIKE rows — show the coach-computed EFFICIENCY VERDICT per type (execution % for
-  // targeted sessions, HR/power-drift label for steady/endurance). NEVER a raw execution score: it's
-  // meaningless for an endurance ride and was rendering "0% eff" — a score that lies, contradicting the
-  // BIKE trend row below. efficiency_label is already discipline- and type-correct (coach:runEfficiency/rideEfficiency).
-  const toneColor = (t: string) => t === 'positive' ? 'text-emerald-400/85' : t === 'warning' ? 'text-amber-400/85' : t === 'danger' ? 'text-rose-400/85' : 'text-white/70';
-  const cardioExecRow = (
-    label: string,
-    types: Array<{ type: string; type_label?: string; efficiency_label: string | null; efficiency_tone: 'positive' | 'warning' | 'danger' | 'neutral' }>,
-  ) => {
-    const shown = types.filter(t => t.efficiency_label != null);
-    if (shown.length === 0) return null;
-    return (
-      <div className="px-3 py-3">
-        <Row label={label}>
-          {shown.map((t, i) => (
-            <React.Fragment key={t.type}>
-              {i > 0 && <Dot />}
-              <Chip label={t.type_label ?? t.type} value={t.efficiency_label!} valueClass={toneColor(t.efficiency_tone)} />
-            </React.Fragment>
-          ))}
-        </Row>
-      </div>
-    );
-  };
-  const runExecRow = cardioExecRow('RUN', runTypes); // was 'AERO' — discipline label so run is findable, consistent with BIKE/STRENGTH/SWIM
-  const rideExecRow = cardioExecRow('BIKE', rideTypes);
-
-  // SWIM row — Q-038-safe: planned swim → % achieved, unplanned → distance covered (NEVER pace). Was hidden
-  // entirely; now visible when you actually swam. Reads coach swim_sessions_7d (planned/execution_pct/distance_m).
-  const swimExecRow = (() => {
-    const swims = wsv.swim_sessions_7d ?? [];
-    const fmtDist = (m: number) => useImperial
-      ? `${Math.round((m * 1.09361) / 25) * 25}yd`
-      : `${Math.round(m / 25) * 25}m`;
-    const chips = swims.map((s) => {
-      if (s.planned && s.execution_pct != null) {
-        const tone = s.execution_pct >= 85 ? 'positive' : s.execution_pct >= 70 ? 'warning' : 'danger';
-        return { label: 'Planned', value: `${Math.round(s.execution_pct)}%`, tone };
-      }
-      if (s.distance_m != null && s.distance_m > 0) {
-        return { label: s.planned ? 'Planned' : 'Free', value: fmtDist(s.distance_m), tone: 'neutral' as const };
-      }
-      return null; // no completion % and no distance → nothing honest to show for this swim
-    }).filter(Boolean) as Array<{ label: string; value: string; tone: string }>;
-    if (chips.length === 0) return null;
-    return (
-      <div className="px-3 py-3">
-        <Row label="SWIM">
-          {chips.map((c, i) => (
-            <React.Fragment key={i}>
-              {i > 0 && <Dot />}
-              <Chip label={c.label} value={c.value} valueClass={toneColor(c.tone)} />
-            </React.Fragment>
-          ))}
-        </Row>
-      </div>
-    );
-  })();
-
-  // Order the execution rows so the plan's PRIMARY discipline leads (server single-source). Single-sport
-  // (strength/run/ride) hoists its row; triathlon/duathlon/hybrid/unknown keep the default order — no forced
-  // lead (a tri isn't one discipline). SWIM shows completion/distance (Q-038-safe, never pace) when you swam.
-  const execRowsByKey: Record<string, React.ReactNode> = { strength: strengthExecRow, run: runExecRow, ride: rideExecRow, swim: swimExecRow };
-  const defaultExecOrder = ['run', 'ride', 'strength', 'swim'];
-  const leadKey = (['strength', 'run', 'ride'] as string[]).includes(primaryDiscipline) ? primaryDiscipline : null;
-  const orderedExecKeys = leadKey ? [leadKey, ...defaultExecOrder.filter(k => k !== leadKey)] : defaultExecOrder;
+  // ── "How your sessions went" — REBUILT (docs/STATE-WEEK-EXECUTION.md). The old per-discipline
+  //    execution-row builders (run/ride/strength/swim `efficiency_label` chips) lived here and were
+  //    DELETED: steady run/bike rows carried a FITNESS verdict that duplicated PERFORMANCE ("aerobic
+  //    base needs work" said twice), and interval/execution % belongs to session detail, not this
+  //    section. The section now renders neutral planned-vs-done COUNTS + one composed accent, off
+  //    `wsv.week_execution_v1` (server-owned), further down in the JSX. ──
 
   // ── NEXT row ─────────────────────────────────────────────────────────────
   const sessionsRemaining = data.week?.key_sessions_remaining ?? [];
@@ -1662,13 +1573,43 @@ export default function StateTab({
           );
         })()}
 
-        {/* Execution surface (b2/Q-149 + scale-up) — STRENGTH / AERO / BIKE rows, ordered so the plan's
-            primary discipline leads. Bike-forward leads with BIKE, strength-forward with STRENGTH, etc.
-            Scope-labeled "last 7 days" so it's not misread against the 8-week PERFORMANCE trends below (mixed-clocks, Q-111 §5). */}
-        {orderedExecKeys.some((k) => execRowsByKey[k]) && (
-          <div className="px-4 pt-3 text-[10px] text-white/30 lowercase">how your sessions went · last 7 days</div>
-        )}
-        {orderedExecKeys.map((k) => execRowsByKey[k] ? <React.Fragment key={k}>{execRowsByKey[k]}</React.Fragment> : null)}
+        {/* "How your sessions went · last 7 days" — REBUILT (docs/STATE-WEEK-EXECUTION.md). Neutral
+            per-discipline planned-vs-done COUNTS + at most ONE composed accent. No fitness verdicts here
+            (that is PERFORMANCE, below); interval/execution % lives in session detail. Server owns the
+            accent; this renders it (Law 4). Three states: counts+accent / counts-only / nothing. */}
+        {(() => {
+          const we = (wsv as any).week_execution_v1 as {
+            counts?: Array<{ discipline: string; planned: number; done: number }>;
+            accent?: { sentence: string; trace?: { detail?: string } } | null;
+          } | null | undefined;
+          const counts = Array.isArray(we?.counts) ? we!.counts! : [];
+          const accent = we?.accent ?? null;
+          if (counts.length === 0 && !accent) return null; // nothing to say → render nothing
+          const DISC_LABEL: Record<string, string> = { run: 'Run', ride: 'Bike', strength: 'Strength', swim: 'Swim' };
+          return (
+            <>
+              <div className="px-4 pt-3 text-[10px] text-white/30 lowercase">how your sessions went · last 7 days</div>
+              {counts.length > 0 && (
+                <div className="px-3 py-3">
+                  <Row label="week">
+                    {counts.map((c, i) => (
+                      <React.Fragment key={c.discipline}>
+                        {i > 0 && <Dot />}
+                        <span className="inline-flex items-baseline gap-1">
+                          <span className="text-white/50">{DISC_LABEL[c.discipline] ?? c.discipline}</span>
+                          {/* planned-vs-done fact: "1/3" when planned, bare count when it was unplanned
+                              (a swap counts, it is not a miss). No color, no judgment word (§2a). */}
+                          <span className="text-white/80">{c.planned > 0 ? `${c.done}/${c.planned}` : String(c.done)}</span>
+                        </span>
+                      </React.Fragment>
+                    ))}
+                  </Row>
+                </div>
+              )}
+              {accent?.sentence && <WeekAccentLine sentence={accent.sentence} detail={accent.trace?.detail ?? null} />}
+            </>
+          );
+        })()}
 
         {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
         <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} />

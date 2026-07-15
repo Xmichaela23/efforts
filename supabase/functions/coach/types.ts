@@ -7,6 +7,13 @@ export type { StrengthSessionType7d } from '../_shared/strength-session-types.ts
 import type { StrengthSessionType7d } from '../_shared/strength-session-types.ts';
 export type { SwimSession7d } from '../_shared/swim-sessions.ts';
 import type { SwimSession7d } from '../_shared/swim-sessions.ts';
+export type { WeekAccent } from '../_shared/state-trend/week-accent.ts';
+import type { WeekAccent } from '../_shared/state-trend/week-accent.ts';
+
+// STATE "how your sessions went" — neutral per-discipline counts + at most ONE selected accent.
+// docs/STATE-WEEK-EXECUTION.md. Counts are planned-vs-done FACTS; the accent is composed on the server.
+export interface WeekExecutionCount { discipline: string; planned: number; done: number; }
+export interface WeekExecutionV1 { counts: WeekExecutionCount[]; accent: WeekAccent | null; }
 
 // b2 scale-up (Q-149): the specific lead discipline for the execution surface (single source:
 // resolvePrimarySport). strength/run/ride/swim → that discipline leads; triathlon/duathlon/hybrid/unknown
@@ -367,6 +374,9 @@ export type CoachWeekContextResponseV1 = {
     owner: 'coach';
     generated_at: string;
     as_of_date: string;
+    /** STATE "how your sessions went" — neutral counts + at most one composed accent. Optional so a
+     *  pre-this-version cached payload (or a cold-start) simply omits it and the client renders nothing. */
+    week_execution_v1?: WeekExecutionV1;
     week: {
       start_date: string;
       end_date: string;

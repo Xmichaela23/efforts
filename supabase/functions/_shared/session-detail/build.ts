@@ -13,6 +13,7 @@ import { swimPacePer100Seconds } from '../swim/swim-pace.ts';
 import type { SwimScalars } from '../swim/swim-scalars.ts';
 import { resolveRunGap, type RunScalars } from '../run/run-scalars.ts';
 import { routeHeadline } from '../heat-adjust.ts';
+import { frielBand, decouplingBandDisplay } from '../state-trend/run.ts';
 
 // Server-authored Tier-1 route readout (Familiar Routes, "arm of State"). The honest, effort-aware
 // headline the client renders VERBATIM — no client-side re-derivation. Heat is parked; this is the
@@ -1549,12 +1550,13 @@ export function buildAnalysisDetailRows(
     const decouplingShown = !!(decoupling && decoupling.basis === 'gap'
       && typeof decoupling.pct === 'number' && decoupling.assessment);
     if (decouplingShown) {
-      const a = decoupling!.assessment;
-      const word = a === 'excellent' ? 'excellent — HR stayed locked to pace'
-        : a === 'good' ? 'good — strong aerobic base'
-        : a === 'moderate' ? 'moderate — some drift over the run'
-        : 'high — HR climbed well above pace';
-      rows.push({ label: 'Aerobic decoupling', value: `${decoupling!.pct}% — ${word}` });
+      // ONE vocabulary with State (docs/STATE-WEEK-EXECUTION.md continuity). The old 4-tier read
+      // (excellent/good/moderate/high) included an "excellent" tier for near-zero/negative drift that
+      // Q-161 killed as indefensible (a negative usually reflects a soft start, not superior durability).
+      // State collapsed to the single Friel ~5% line; this row now reads the SAME shared `decouplingLabel`
+      // (frielBand) so a run's decoupling can never say one thing here and another on State.
+      const { word } = decouplingBandDisplay(frielBand(decoupling!.pct));
+      rows.push({ label: 'Aerobic decoupling', value: `${decoupling!.pct}% — ${word ?? 'measured'}` });
     }
 
     if (decouplingShown || sport === 'swim' || shouldSuppressSessionHrDrift(factPacket, intervals)) {
