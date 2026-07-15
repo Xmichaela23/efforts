@@ -15,6 +15,8 @@ import {
   todayISO,
   isoMinus,
   STATE_TREND_WINDOWS,
+  sanitizePosture,
+  declaredSessionsPerWeek as declaredSessionsPerWeek_,
   type BikeFitness,
   type RunFitness,
   type StrengthFitness,
@@ -34,6 +36,11 @@ interface RawInputs {
   plannedBy: Record<string, number>;
   doneBy: Record<string, number>;
   cadenceCounts: Record<string, number>;
+  // Q-179: declared per-discipline intent + weekly targets, so the FALLBACK path frames posture
+  // identically to the server. Without these the browser assembly would silently drop the posture
+  // line whenever the coach payload is absent — the exact divergence Constitution Law 1 forbids.
+  posture: StateTrendInputs['posture'];
+  declaredSessionsPerWeek: StateTrendInputs['declaredSessionsPerWeek'];
 }
 
 export interface StateTrends {
@@ -124,8 +131,22 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
         .eq('workout_status', 'completed')
         .gte('date', isoMinus(STATE_TREND_WINDOWS.cadenceDays));
 
-      const [bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR] = await Promise.all([bikeP, runP, swimP, plannedP, doneP, cadenceP, runFactsP, strengthVolP]);
+      // Q-179: the active goal's declared intent + weekly targets (the same read compute-snapshot does).
+      const goalP = supabase
+        .from('goals')
+        .select('training_prefs')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const [bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR, goalR] = await Promise.all([bikeP, runP, swimP, plannedP, doneP, cadenceP, runFactsP, strengthVolP, goalP]);
       if (cancelled) return;
+
+      const tp = (goalR as any)?.data?.training_prefs ?? null;
+      const posture = sanitizePosture(tp?.per_discipline_posture);
+      const declaredSessionsPerWeek = declaredSessionsPerWeek_(tp);
 
       // cadence counts
       const cadenceCounts: Record<string, number> = {};
@@ -197,7 +218,7 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
       }
 
       const strengthVolumeRows = (strengthVolR.data || []).map((f: any) => ({ date: f.date, total_volume_lbs: f.strength_facts?.total_volume_lbs ?? null }));
-      setRaw({ bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts });
+      setRaw({ bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek });
     })();
     return () => { cancelled = true; };
   }, [hasContract]);
