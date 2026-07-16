@@ -63,6 +63,7 @@ export {
   type AdherenceState,
   type SessionContextTag,
 } from './adherence.ts';
+export { positionInRange, type RangePosition } from './position-in-range.ts';
 export {
   composeWeekAccent,
   overReachCandidate,

@@ -161,52 +161,69 @@ const DECOUPLING_BAND: Record<DecouplingBand, { word: string; cls: string }> = {
   needs_work: { word: 'aerobic base needs work', cls: 'text-amber-400/90' },
 };
 
+// State v3 fitness DOT — the current value's position in the athlete's OWN 12-week range (left = worst,
+// right = best; the server orients positionPct so 1 = best for any metric). Confident → bright dot; thin
+// or flat data → grey (a positioned dot on thin data is a lie with a coordinate). No number on the dot —
+// the POSITION is the claim; a percent would relocate false precision onto it (SPEC §4).
+function FitnessDot({ pct, confident }: { pct: number; confident: boolean }) {
+  const left = `${Math.round(Math.max(0, Math.min(1, pct)) * 100)}%`;
+  return (
+    <div className="basis-full mt-1.5 mb-0.5">
+      <div className="relative h-1 rounded-full bg-white/[0.08]">
+        <div
+          className="absolute top-1/2 w-2.5 h-2.5 rounded-full"
+          style={{
+            left, transform: 'translate(-50%, -50%)',
+            backgroundColor: confident ? '#d1d5db' : '#6b7280',
+            boxShadow: confident ? '0 0 6px rgba(255,255,255,0.35)' : 'none',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// RUN row — State v3: DECOUPLING as a DOT (where you are in your 12wk range) + an ARROW (which way). The
+// dot answers the LEVEL, the arrow answers the TREND — so "needs work" and "improving" can no longer read
+// as the app arguing with itself. The old clipped verdict ("aerobic base needs work ↑ improving 6%") is
+// gone. efficiency_index stays a quiet secondary arrow.
 function RunFitnessRow({ fitness }: { fitness: RunFitness }) {
   const d = fitness.decoupling;
   const e = fitness.efficiency;
   const v = VERDICT[d.verdict];
-  // Migration-safe band lookup: a cached snapshot may still carry a pre-Q-161 band string
-  // (strong/base/excellent/durability_gap) until it's recomputed. Index the map defensively — an
-  // unknown band resolves to undefined and falls through to the "needs data" copy, instead of reading
-  // DECOUPLING_BAND[undefined].cls and blanking the whole screen.
-  const bandInfo = d.band ? DECOUPLING_BAND[d.band as DecouplingBand] : undefined;
-  // Q-161: an "i" that explains the metric AND its honest catch — a run can read >5% because it was
-  // hot/hilly/short, not because fitness slipped. Mirrors StateTab's tap-expand affordance.
+  const range = (d as any).range as { positionPct: number; confident: boolean } | null | undefined;
   const [explainOpen, setExplainOpen] = React.useState(false);
+  const showDot = d.verdict !== 'needs_data' && range != null;
   return (
     <Row label="run">
-      {d.verdict !== 'needs_data' && bandInfo ? (
-        // confident: band = state, arrow = trend, % = receipt
-        <span className="inline-flex items-baseline gap-1.5">
-          <span className={bandInfo.cls}>{bandInfo.word}</span>
-          <span className={`inline-flex items-baseline gap-0.5 ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span></span>
-          {d.recentPct != null && <span className="text-white/35 text-[11px]">{d.recentPct}%</span>}
-          {d.provisional && <span className="text-white/30 text-[10px]">prov</span>}
-        </span>
-      ) : d.stale && d.recentPct != null && bandInfo ? (
-        // stale → carry-forward the REAL value + its age, dimmed; never a current verdict off old data
+      {showDot ? (
+        <>
+          <span className="basis-full flex items-baseline justify-between gap-2">
+            <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[12px]">
+              aerobic durability <span className="text-white/30 text-[9px]">{explainOpen ? '▾' : 'ⓘ'}</span>
+            </button>
+            <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{d.provisional && <span className="text-white/30 text-[10px] ml-1">prov</span>}</span>
+          </span>
+          <FitnessDot pct={range!.positionPct} confident={range!.confident} />
+          <span className="basis-full flex items-center justify-between text-[9px] text-white/25">
+            <span>weaker</span>
+            <span>{range!.confident ? 'vs your 12-week range' : 'thin data'}</span>
+            <span>stronger</span>
+          </span>
+        </>
+      ) : d.stale ? (
         <span className="inline-flex items-baseline gap-1.5 text-white/40">
-          <span>{bandInfo.word}</span>
-          <span className="text-white/30 text-[11px]">last steady run {d.newestAgeDays}d ago · {d.recentPct}%</span>
+          <span>aerobic durability</span>
+          <span className="text-white/30 text-[11px]">last steady run {d.newestAgeDays}d ago</span>
           <span className="text-white/30 text-[10px]">limited data</span>
         </span>
       ) : (
-        // sparse → frame as what the metric needs, not a user failing
         <span className="text-white/40">needs 20+ min steady effort</span>
       )}
-      <button
-        type="button"
-        onClick={() => setExplainOpen((o) => !o)}
-        className="inline-flex items-baseline gap-1 text-white/25 text-[10px]"
-        aria-label="What aerobic decoupling means"
-      >
-        <span>aerobic durability · steady runs</span>
-        <span className="text-white/35 text-[9px]">{explainOpen ? '▾' : 'ⓘ'}</span>
-      </button>
       {asOf(d.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(d.newestAgeDays)}</span>}
       {explainOpen && (
         <p className="basis-full text-[10px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">
-          Aerobic decoupling — how much your heart rate drifted up while your pace held steady on a long, steady run. Under 5% means your aerobic base is holding. A higher number can also just mean heat, hills, or a short effort.
+          The dot is where your aerobic durability sits versus your own last 12 weeks — how much your heart rate drifts on a long steady run. Left is the weakest it's been, right the strongest. It's a relative frame, not an absolute score.
         </p>
       )}
       {e.verdict !== 'needs_data' && (

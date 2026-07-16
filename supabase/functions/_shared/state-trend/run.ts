@@ -5,6 +5,7 @@
 // ⚠️ Thresholds are PROVISIONAL (not signed off) — see thresholds.ts.
 
 import type { TrendPoint, TrendResult, TrendVerdict } from './types.ts';
+import type { RangePosition } from './position-in-range.ts';
 import { classifyTrend } from './classify.ts';
 import { resolveThresholds } from './thresholds.ts';
 import { isDeloadWeek } from './deload.ts';
@@ -256,8 +257,9 @@ export function computeRunDecouplingState(series: TrendPoint[], asOf: string, se
 // Serializable snapshot for the client — no methods, safe to cache in state_trends_v1.
 export interface RunFitness {
   decoupling: {
-    verdict: TrendVerdict;         // improving = durability building; sliding = declining
+    verdict: TrendVerdict;         // improving = durability building; sliding = declining (the ARROW)
     band: DecouplingBand | null;   // the plain-language state (strong/base/durability_gap/excellent)
+    range: RangePosition | null;   // State v3 DOT: where the current value sits in the 12wk range (best=1)
     recentPct: number | null;      // shown with its date for carry-forward when stale
     sampleCount: number;
     newestAgeDays: number | null;

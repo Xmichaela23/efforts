@@ -12,6 +12,7 @@
 import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, type LiftSeries, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
+import { positionInRange } from './position-in-range.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
 import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSummary } from './discipline.ts';
@@ -158,10 +159,15 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // keeps the offset number out of the cached state_trends_v1 (coach never sees a bogus run %).
   const run = perfFromTrend(runDecoupling.trend)!; // trend is always present; card verdict = decoupling (lead)
   run.pctChange = null; // null the offset % (decoupling's trend runs on offset values); verdict stays honest
+  // State v3 dot-and-arrow: WHERE the current value sits in the athlete's own 12wk range (oriented so
+  // 1 = best). Decoupling is lower-is-better, so a low value lands at the best edge — the dot shows the
+  // LEVEL, the arrow shows the DIRECTION, and "needs work" (level) + "improving" (trend) stop fighting.
+  const runDecoupRange = positionInRange(runDecoupSeries, { higherIsBetter: false });
   const runFitness: RunFitness = {
     decoupling: {
       verdict: runDecoupling.trend.verdict,
       band: runDecoupling.band,
+      range: runDecoupRange,
       recentPct: runDecoupling.recentPct,
       sampleCount: runDecoupling.trend.sampleCount,
       newestAgeDays: runDecoupling.trend.newestAgeDays,
