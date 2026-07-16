@@ -236,7 +236,9 @@ export function computeRunDecouplingState(series: TrendPoint[], asOf: string, se
     // lowerIsBetter: a FALLING decoupling = improving durability. improve/slide tuned for the offset scale.
     { ...resolveThresholds('run', sessionsPerWeek), improvePct: 5, slidePct: -5, lowerIsBetter: true },
     asOf,
-    { exclude: isDeloadWeek },
+    // noiseGuardStdev: decoupling swings run-to-run on confounds we can't see (weather/sleep/fatigue), so
+    // the early→recent shift must beat 1 SD of the series' own scatter — else it's noise and reads holding.
+    { exclude: isDeloadWeek, noiseGuardStdev: 1.0 },
   );
   // Recent representative pct (un-offset): the smoothed recent end when there's a verdict, else the
   // newest in-window point so a stale/thin row can still carry-forward "last steady run Nd ago: X%".

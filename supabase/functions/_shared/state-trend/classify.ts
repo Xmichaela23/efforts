@@ -26,6 +26,12 @@ export interface ClassifyOpts {
   exclude?: (p: TrendPoint) => boolean;
   /** Points averaged at each end for the noise guard (default 2 — see below). */
   endpointWindow?: number;
+  /** SIGNAL-VS-NOISE gate (opt-in). When set, a directional verdict (improving/sliding) must have an
+   *  early→recent shift of at least this many WITHIN-WINDOW standard deviations, else it reads holding.
+   *  For metrics with big per-session scatter (run decoupling swings 3–11% run to run on confounds we
+   *  can't see — weather, sleep, fatigue), a fixed dead-band isn't enough; the shift has to clear the
+   *  data's OWN noise. Uses only the series — no new inputs. ~1.0 = "the shift beats one SD of scatter". */
+  noiseGuardStdev?: number;
 }
 
 /**
@@ -82,6 +88,19 @@ export function classifyTrend(
   else if (effective >= improvePct) verdict = 'improving';
   else if (effective <= slidePct) verdict = 'sliding';
   else verdict = 'holding';
+
+  // SIGNAL-VS-NOISE gate: a directional verdict must clear the series' OWN run-to-run scatter, not just
+  // the fixed dead-band. Otherwise decoupling swinging 3–11% (weather/sleep/fatigue we can't see) reads
+  // as "improving" off a fraction-of-a-point wobble. If the early→recent shift is under noiseGuardStdev
+  // standard deviations, it's noise → hold. Data-only; no new inputs (Michael's rule).
+  if (opts.noiseGuardStdev != null && (verdict === 'improving' || verdict === 'sliding')) {
+    const vals = inWindow.map((p) => p.value);
+    const mean = avg(vals);
+    const sd = Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / vals.length);
+    if (sd > 0 && Math.abs(recentAvg - earlyAvg) < opts.noiseGuardStdev * sd) {
+      verdict = 'holding';
+    }
+  }
 
   // STALENESS GATE: a real verdict whose newest qualifying point is older than freshnessDays
   // is not a CURRENT trend — decay to needs_data (honest) rather than assert a stale direction.
