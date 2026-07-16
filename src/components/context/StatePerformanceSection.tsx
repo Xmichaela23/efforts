@@ -105,7 +105,7 @@ function StrengthFitnessRow({ fitness, showAxis }: { fitness: StrengthFitness; s
   return (
     <Row label="strength">
       {e && range ? (
-        <FitnessDotBlock label="e1RM" range={range} verdict={e.verdict} showAxis={showAxis} />
+        <FitnessDotBlock label="e1RM" range={range} verdict={e.verdict} showAxis={showAxis} frame="vs your baseline" />
       ) : e ? (
         <span className="basis-full flex items-baseline justify-between gap-2">
           <span className="text-white/55 text-[12px]">e1RM</span>
@@ -412,7 +412,10 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay }
           run up") is a lossy, cherry-picking, clock-mismatched summary (run 6wk vs bike 8wk). Fitness
           is handed to the individual sport rows below — each owns its own verdict AND its own window. */}
       {sortedCards.map((card, idx) => {
-        const showAxis = idx === 0; // axis grammar on the first band only (item 7)
+        // Axis grammar once PER FRAME (item 7): strength reads "vs your baseline", the endurance rows
+        // read "vs your 12-week range" — two different frames, so label the first of each. With the fixed
+        // strength→run→swim→bike order that's row 0 (strength) + row 1 (the first endurance row).
+        const showAxis = idx === 0 || (idx === 1 && sortedCards[0]?.discipline === 'strength');
         const inner = (() => {
           if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} />;
           if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} showAxis={showAxis} />;
