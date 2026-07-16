@@ -1,108 +1,79 @@
-// Composer unit checks — contract §8b. Run: deno test week-accent.test.ts
+// Composer + enforced voice. Run: deno test --no-check week-accent.test.ts
 import { assertEquals, assertStringIncludes } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import {
-  composeWeekAccent,
-  overReachCandidate,
-  rirCandidate,
-  bannerCandidate,
-  tradeCandidate,
-  leverCandidate,
-  ACCENT_TIER,
+  composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate,
+  tradeCandidate, leverCandidate, voiceViolation, ACCENT_TIER,
 } from './week-accent.ts';
 
-// ── THE TRADE sentence — names carriers + benefit + cost; RIR folds in; honest about aerobic ──────
-Deno.test('trade: aerobic cross-training carried → names base covered + specificity cost', () => {
-  const t = tradeCandidate({ underDone: 'run', carriers: ['swim', 'strength'], aerobicCarried: true });
-  assertEquals(t?.source, 'substitution');
-  assertStringIncludes(t!.sentence, 'Swimming and strength carried the week');
-  assertStringIncludes(t!.sentence, 'running eased off');
-  assertStringIncludes(t!.sentence, 'aerobic base is likely covered');
-  assertStringIncludes(t!.sentence, 'running-specific speed');
-  assertStringIncludes(t!.sentence, 'if it holds'); // conditional, never a prophecy
+// ── THE VOICE, ENFORCED — banned words + exclamations fail; clean copy passes ───────────────────────
+Deno.test('voiceViolation catches the banned register', () => {
+  for (const bad of ['Great work this week', 'Nice, keep it up', 'You are on track', 'Stay consistent', 'Solid week', 'Do more!']) {
+    assertEquals(voiceViolation(bad) !== null, true, bad);
+  }
+  assertEquals(voiceViolation('Running came in at 1 of 3 this week; swimming carried the endurance load.'), null);
 });
 
-Deno.test('trade: strength-only carrier → NO "aerobic base covered" claim (honest)', () => {
-  const t = tradeCandidate({ underDone: 'run', carriers: ['strength'], aerobicCarried: false });
-  assertEquals(t?.sentence.includes('aerobic base is likely covered'), false);
-  assertStringIncludes(t!.sentence, 'running eased off');
-  assertStringIncludes(t!.sentence, 'getting a run back in'); // not "runn" (the /ing$/ strip bug)
+// EVERY producible accent must pass the check — this is the guard that keeps the voice from rotting.
+Deno.test('every emitted accent passes the voice check', () => {
+  const all = [
+    overReachCandidate({ loadStatus: 'high', readiness: 'overreached', runningAcwr: 1.6 }),
+    overReachCandidate({ loadStatus: 'high', readiness: 'fatigued' }),
+    rirCandidate({ actualRir: 0.5, targetRir: 2, sampleSize: 3 }),
+    bannerCandidate(null, 'behind'),
+    bannerCandidate(null, 'nothing_loaded'),
+    tradeCandidate({ underDone: 'run', underDoneDone: 1, underDonePlanned: 3, aerobicCarriers: ['swim'], rirActual: 0.5, rirTarget: 2 }),
+    tradeCandidate({ underDone: 'run', underDoneDone: 1, underDonePlanned: 3, aerobicCarriers: ['swim', 'ride'] }),
+  ].filter(Boolean);
+  for (const a of all) assertEquals(voiceViolation(a!.sentence), null, a!.sentence);
 });
 
-Deno.test('trade: RIR under target folds in as ONE tail (not a second accent)', () => {
-  const t = tradeCandidate({ underDone: 'run', carriers: ['swim'], aerobicCarried: true, rirUnderTarget: true });
-  assertStringIncludes(t!.sentence, 'aerobic base is likely covered');
-  assertStringIncludes(t!.sentence, 'harder than planned');
+// ── Trade: only AEROBIC (swim/bike) carries endurance — strength is never a carrier ─────────────────
+Deno.test('trade names only aerobic carriers, leads with the count, folds RIR', () => {
+  const t = tradeCandidate({ underDone: 'run', underDoneDone: 1, underDonePlanned: 3, aerobicCarriers: ['swim'], rirActual: 0.5, rirTarget: 2 });
+  assertStringIncludes(t!.sentence, 'Running came in at 1 of 3');
+  assertStringIncludes(t!.sentence, 'swimming carried the endurance load');
+  assertEquals(t!.sentence.includes('strength'), false); // strength is NOT an endurance carrier
+  assertStringIncludes(t!.sentence, 'if this stays here'); // conditional, not a prophecy
+  assertStringIncludes(t!.sentence, 'RIR 0.5');            // folded tail
 });
 
-Deno.test('trade: no shortfall (nothing eased off) → null', () => {
-  assertEquals(tradeCandidate({ underDone: null, carriers: [], aerobicCarried: false }), null);
+Deno.test('no aerobic carrier → NOT a trade → null (under-training is the banner/posture, not a trade)', () => {
+  assertEquals(tradeCandidate({ underDone: 'run', underDoneDone: 1, underDonePlanned: 3, aerobicCarriers: [] }), null);
+  assertEquals(tradeCandidate({ underDone: null, aerobicCarriers: ['swim'] }), null);
 });
 
-// ── §8b(i) — multiple qualifying candidates → exactly ONE accent, correct priority ──────────────────
-Deno.test('multi-qualify → one accent, highest priority (over-reach beats substitution)', () => {
+// ── Composer selection ──────────────────────────────────────────────────────────────────────────────
+Deno.test('over-reach outranks the trade', () => {
   const over = overReachCandidate({ loadStatus: 'high', readiness: 'overreached', runningAcwr: 1.6 });
-  const sub = bannerCandidate('Running behind plan — total load carried via easy cross-training.', 'carried');
-  assertEquals(over?.source, 'overreach');
-  assertEquals(sub?.source, 'substitution');
-  const picked = composeWeekAccent([sub, over]); // submission order deliberately worst-first
-  assertEquals(picked?.source, 'overreach');
-  assertEquals(picked?.tier, ACCENT_TIER.overreach);
+  const trade = tradeCandidate({ underDone: 'run', underDoneDone: 1, underDonePlanned: 3, aerobicCarriers: ['swim'] });
+  assertEquals(composeWeekAccent([trade, over])?.source, 'overreach');
 });
 
-Deno.test('multi-qualify → RIR (tier 3) beats substitution (tier 4) but loses to over-reach (tier 1)', () => {
-  const rir = rirCandidate({ actualRir: 0.5, targetRir: 2, sampleSize: 3 });
-  const sub = bannerCandidate('Running behind plan — total load carried across your training.', 'carried');
-  assertEquals(composeWeekAccent([sub, rir])?.source, 'rir');
-  const over = overReachCandidate({ loadStatus: 'elevated', readiness: 'fatigued' });
-  assertEquals(composeWeekAccent([sub, rir, over])?.source, 'overreach');
+Deno.test('none qualify → null (silence)', () => {
+  assertEquals(composeWeekAccent([
+    overReachCandidate({ loadStatus: 'on_target', readiness: 'fresh' }),
+    bannerCandidate('On plan — strength on track', 'positive'),
+    leverCandidate(),
+  ]), null);
 });
 
-// ── §8b(ii) — no qualifying candidates → EMPTY accent (silence is valid, never backfilled) ──────────
-Deno.test('none qualify → null (counts-only section)', () => {
-  const over = overReachCandidate({ loadStatus: 'on_target', readiness: 'fresh' }); // load fine, body fine
-  const rir = rirCandidate({ actualRir: 2, targetRir: 2, sampleSize: 3 }); // on target
-  const sub = bannerCandidate(null, null); // banner silent
-  assertEquals(over, null);
-  assertEquals(rir, null);
-  assertEquals(sub, null);
-  assertEquals(composeWeekAccent([over, rir, sub, leverCandidate()]), null);
+Deno.test('positive and carried banners → null (boring week is silent; trade owns carried)', () => {
+  assertEquals(bannerCandidate('On plan — strength on track', 'positive'), null);
+  assertEquals(bannerCandidate('Running behind — load carried', 'carried'), null);
 });
 
-// ── §8b(iii) — the positive case selects when it is the sole qualifier (first-class, not a fallback) ─
-Deno.test('positive maintenance selects when sole qualifier', () => {
-  const positive = bannerCandidate('On plan — strength on track; endurance via cross-training.', 'positive');
-  assertEquals(positive?.source, 'positive');
-  const picked = composeWeekAccent([positive, leverCandidate()]);
-  assertEquals(picked?.source, 'positive');
-  assertEquals(picked?.sentence, 'On plan — strength on track; endurance via cross-training.');
-});
-
-// ── Gates: the agreement rule (over-reach needs load AND body), RIR needs a target + a real sample ──
-Deno.test('over-reach does NOT fire on high load with a fine body (ratio describes, body prescribes)', () => {
+// ── Gates unchanged: over-reach needs load AND body; RIR needs a target + a real sample ─────────────
+Deno.test('gates hold', () => {
   assertEquals(overReachCandidate({ loadStatus: 'high', readiness: 'fresh' }), null);
-  assertEquals(overReachCandidate({ loadStatus: 'on_target', readiness: 'overreached' }), null);
-});
-
-Deno.test('RIR does not qualify without a target (§7 — never invent the number)', () => {
   assertEquals(rirCandidate({ actualRir: 0, targetRir: null, sampleSize: 4 }), null);
-  assertEquals(rirCandidate({ actualRir: 0.5, targetRir: 2, sampleSize: 1 }), null); // one session ≠ a week
-});
-
-// ── The lever slot is dormant until State v3 (never duplicates the PERFORMANCE posture line) ─────────
-Deno.test('lever candidate is dormant (owed by State v3)', () => {
+  assertEquals(rirCandidate({ actualRir: 0.5, targetRir: 2, sampleSize: 1 }), null);
   assertEquals(leverCandidate(), null);
 });
 
-// ── Traceability — every emitted accent cites a source measurement (voice §5c) ──────────────────────
-Deno.test('every accent carries a non-empty trace', () => {
-  const accents = [
-    overReachCandidate({ loadStatus: 'high', readiness: 'overreached', runningAcwr: 1.6 }),
-    rirCandidate({ actualRir: 0.5, targetRir: 2, sampleSize: 3 }),
-    bannerCandidate('Running behind plan — total load carried via easy cross-training.', 'carried'),
-    bannerCandidate('On plan — strength on track; endurance via cross-training.', 'positive'),
-  ];
-  for (const a of accents) {
-    assertEquals(typeof a?.trace.detail, 'string');
-    assertEquals((a?.trace.detail.length ?? 0) > 0, true);
-  }
+// ── The composer DROPS a voice-violating candidate rather than ship it ──────────────────────────────
+Deno.test('composer drops a candidate that trips the voice check', () => {
+  const bad = { source: 'substitution' as const, tier: ACCENT_TIER.substitution, sentence: 'Great job — keep it up!', trace: { kind: 'load' as const, detail: 'x' } };
+  const good = tradeCandidate({ underDone: 'run', underDoneDone: 1, underDonePlanned: 3, aerobicCarriers: ['swim'] });
+  assertEquals(composeWeekAccent([bad, good])?.source, 'substitution'); // the good (trade) survives
+  assertEquals(composeWeekAccent([bad]), null);                          // only the bad one → dropped → silence
 });

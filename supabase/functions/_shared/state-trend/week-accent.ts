@@ -42,14 +42,37 @@ export interface WeekAccent {
   trace: AccentTrace;
 }
 
+// ── THE VOICE, ENFORCED ──────────────────────────────────────────────────────────────────────────
+// Register: "a quant who trains, not a coach who encourages." (copy-voice memory; docs/STATE-WEEK-
+// EXECUTION.md). This is a HARD CHECK, not a suggestion — a sentence that trips it is a bug, and the
+// composer DROPS it (silence is legal) rather than ship a fortune cookie. Fixed templates fill number
+// slots; nothing here generates freeform prose.
+const BANNED_WORDS = [
+  // praise / filler — if it works on a motivational poster, it is dead
+  'well', 'great', 'solid', 'nice', 'good job', 'keep it up', 'stay consistent',
+  'crushing it', 'body is ready', 'on track',
+  // imperatives — the app OBSERVES and names trades; it does not instruct. The user drives.
+  'stay', 'keep', 'try', 'consider', 'focus',
+];
+/** First voice violation in a sentence, or null if clean. Exclamation marks and any banned word (whole-
+ *  word, case-insensitive) fail. Used to gate every emitted accent AND asserted over every template. */
+export function voiceViolation(sentence: string): string | null {
+  if (sentence.includes('!')) return 'exclamation mark';
+  const lower = sentence.toLowerCase();
+  for (const w of BANNED_WORDS) {
+    if (new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(lower)) return w;
+  }
+  return null;
+}
+
 /**
- * SELECT one accent or none from the submitted candidates. Null/empty candidates are ignored (a
- * producer that does not qualify submits null). No qualifier → null (silence, never a backfilled
- * positive — contract §4b). Ties keep submission order.
+ * SELECT one accent or none from the submitted candidates. Null/empty candidates are ignored, and any
+ * candidate whose sentence trips the voice check is DROPPED (silence over a fortune cookie — contract
+ * §4b + the voice spec). No qualifier → null. Ties keep submission order.
  */
 export function composeWeekAccent(candidates: Array<WeekAccent | null | undefined>): WeekAccent | null {
   const valid = candidates.filter(
-    (c): c is WeekAccent => !!c && typeof c.sentence === 'string' && c.sentence.length > 0,
+    (c): c is WeekAccent => !!c && typeof c.sentence === 'string' && c.sentence.length > 0 && !voiceViolation(c.sentence),
   );
   if (valid.length === 0) return null;
   return valid.slice().sort((a, b) => a.tier - b.tier)[0];
@@ -71,14 +94,15 @@ export function overReachCandidate(opts: {
   const loadHigh = opts.loadStatus === 'elevated' || opts.loadStatus === 'high';
   const bodyStrained = opts.readiness === 'overreached' || opts.readiness === 'fatigued';
   if (!(loadHigh && bodyStrained)) return null;
-  const acwr = typeof opts.runningAcwr === 'number' && Number.isFinite(opts.runningAcwr)
-    ? `${opts.runningAcwr.toFixed(1)}× load, ` : '';
+  const hasAcwr = typeof opts.runningAcwr === 'number' && Number.isFinite(opts.runningAcwr);
+  const lead = hasAcwr
+    ? `Load is running about ${opts.runningAcwr!.toFixed(1)}× while readiness reads strained`
+    : `Load and readiness both read high this week`;
   return {
     source: 'overreach',
     tier: ACCENT_TIER.overreach,
-    sentence:
-      'Both your training load and how you feel are running high this week — a couple of easier days may help you absorb the work.',
-    trace: { kind: 'load', detail: `${acwr}readiness ${opts.readiness}` },
+    sentence: `${lead} — the pairing that usually needs absorbing before more.`,
+    trace: { kind: 'load', detail: `${hasAcwr ? `${opts.runningAcwr!.toFixed(1)}× load, ` : ''}readiness ${opts.readiness}` },
   };
 }
 
@@ -99,8 +123,7 @@ export function rirCandidate(opts: {
     return {
       source: 'rir',
       tier: ACCENT_TIER.rir,
-      sentence:
-        'Your lifting landed closer to failure than the plan asked for this week — easing the last rep or two keeps the work repeatable.',
+      sentence: `Lifts landed near RIR ${round05(actualRir)} against a ${round05(targetRir)} target this week — closer to failure than planned.`,
       trace: { kind: 'logged_sets', detail: `avg RIR ${actualRir} vs target ${targetRir}, ${sampleSize} sessions` },
     };
   }
@@ -117,21 +140,18 @@ export function rirCandidate(opts: {
  * The coach knows the branch (it picked the banner constant); it is not re-parsed from the string here.
  */
 export function bannerCandidate(
-  line: string | null | undefined,
-  branch: 'carried' | 'positive' | 'behind' | 'nothing_loaded' | null | undefined,
+  _line: string | null | undefined, // the coach-HEADLINE copy is NOT reused — that voice ("on track",
+  branch: 'carried' | 'positive' | 'behind' | 'nothing_loaded' | null | undefined, // "get back on schedule") fails the spec
 ): WeekAccent | null {
-  if (!line || !branch) return null;
-  // 'behind' (under-executed the priority discipline) and 'nothing_loaded' are both under-training
-  // nudges → the lowest priority tier. 'carried' → substitution. 'positive' → first-class positive.
-  const source: AccentSource =
-    branch === 'positive' ? 'positive'
-    : branch === 'carried' ? 'substitution'
-    : 'nothing_loaded'; // 'behind' | 'nothing_loaded'
-  const kind: AccentTrace['kind'] = source === 'nothing_loaded' ? 'adherence' : 'load';
-  const detail = source === 'nothing_loaded'
-    ? 'planned-vs-done counts; total load low'
-    : 'per-domain acute-load composition';
-  return { source, tier: ACCENT_TIER[source], sentence: line, trace: { kind, detail } };
+  if (!branch) return null;
+  // 'positive' = a boring, on-plan week → SILENCE (the voice spec: a boring week gets nothing).
+  // 'carried' = a substitution → the tradeCandidate owns it (fact-first, with numbers). Both → null here.
+  if (branch === 'positive' || branch === 'carried') return null;
+  // 'behind' / 'nothing_loaded' = genuine under-training. Fact, no imperative, no praise.
+  const sentence = branch === 'behind'
+    ? 'Strength came in under plan this week — the priority sessions are the gap.'
+    : "Planned sessions came up short this week and nothing else carried the load — under the week's target.";
+  return { source: 'nothing_loaded', tier: ACCENT_TIER.nothing_loaded, sentence, trace: { kind: 'adherence', detail: 'planned-vs-done counts; total load low' } };
 }
 
 // The athlete's word for a discipline (plain English, never our internal keys).
@@ -139,11 +159,12 @@ const DISC_WORD: Record<string, string> = {
   run: 'running', ride: 'cycling', bike: 'cycling', swim: 'swimming', strength: 'strength',
 };
 function cap(s: string): string { return s ? s[0].toUpperCase() + s.slice(1) : s; }
-function joinWords(cs: string[]): string {
+function round05(n: number): number { return Math.round(n * 2) / 2; } // human units: RIR to the nearest half
+function joinWords(cs: string[]): string { // lowercase — callers cap() when it leads the sentence
   const w = cs.map((c) => DISC_WORD[c] ?? c);
-  if (w.length <= 1) return cap(w[0] ?? '');
-  if (w.length === 2) return `${cap(w[0])} and ${w[1]}`;
-  return `${cap(w[0])}, ${w.slice(1, -1).join(', ')} and ${w[w.length - 1]}`;
+  if (w.length <= 1) return w[0] ?? '';
+  if (w.length === 2) return `${w[0]} and ${w[1]}`;
+  return `${w[0]}, ${w.slice(1, -1).join(', ')} and ${w[w.length - 1]}`;
 }
 
 /**
@@ -157,25 +178,35 @@ function joinWords(cs: string[]): string {
  * A RIR shortfall folds in as one tail clause so the week is ONE sentence, not two accents.
  */
 export function tradeCandidate(opts: {
-  underDone: string | null;        // the discipline that eased off (e.g. 'run')
-  carriers: string[];              // disciplines that carried the load (e.g. ['swim','strength'])
-  aerobicCarried: boolean;         // an aerobic cross-training discipline (swim/bike) carried it
-  rirUnderTarget?: boolean;        // fold in a RIR heads-up tail
+  underDone: string | null;          // the endurance discipline that came in light (e.g. 'run')
+  underDoneDone?: number;            // sessions done this week (for the fact-first lead)
+  underDonePlanned?: number;         // sessions planned this week
+  aerobicCarriers: string[];         // ONLY aerobic cross-training (swim/bike) carries the endurance
+                                     // load. Strength is a different modality — it never appears here.
+  rirActual?: number | null;         // fold a RIR shortfall in as one numbered tail clause
+  rirTarget?: number | null;
 }): WeekAccent | null {
-  const { underDone, carriers, aerobicCarried, rirUnderTarget } = opts;
-  if (!underDone || carriers.length === 0) return null;
+  const { underDone, underDoneDone, underDonePlanned, aerobicCarriers, rirActual, rirTarget } = opts;
+  // A TRADE requires a real aerobic SUBSTITUTION — swim/bike picked up the endurance load. Running
+  // simply coming in light with nothing aerobic underneath is under-training, not a trade (the banner
+  // or the posture line owns that), so we stay silent here rather than invent a carrier.
+  if (!underDone || aerobicCarriers.length === 0) return null;
   const under = DISC_WORD[underDone] ?? underDone;
-  let sentence = aerobicCarried
-    ? `${joinWords(carriers)} carried the week while ${under} eased off. Your aerobic base is likely covered — ${under}-specific speed is what the trade costs if it holds.`
-    : `${joinWords(carriers)} carried the load while ${under} eased off — worth getting a ${underDone} back in before the ${under}-specific side slips.`;
-  if (rirUnderTarget) {
-    sentence += ` Your lifts also came in a little harder than planned — worth easing the last rep or two next week.`;
+  const hasCount = typeof underDoneDone === 'number' && typeof underDonePlanned === 'number' && underDonePlanned > 0;
+  const lead = hasCount
+    ? `${cap(under)} came in at ${underDoneDone} of ${underDonePlanned} this week`
+    : `${cap(under)} came in light this week`;
+  // Fact first, then the trade: aerobic work transfers, specificity does not — conditional, mechanism named.
+  let sentence = `${lead}; ${joinWords(aerobicCarriers)} carried the endurance load. Aerobic fitness holds across sports — ${under}-specific speed is the part that does not, if this stays here.`;
+  const rirUnder = typeof rirActual === 'number' && typeof rirTarget === 'number' && rirActual <= rirTarget - 1;
+  if (rirUnder) {
+    sentence += ` Lifts landed near RIR ${round05(rirActual)} against a ${round05(rirTarget)} target — closer to failure than planned.`;
   }
   return {
     source: 'substitution',
     tier: ACCENT_TIER.substitution,
     sentence,
-    trace: { kind: 'load', detail: `${under} under plan; load carried by ${carriers.join(', ')}${rirUnderTarget ? '; avg RIR under target' : ''}` },
+    trace: { kind: 'load', detail: `${under} ${hasCount ? `${underDoneDone}/${underDonePlanned}` : 'under plan'}; endurance carried by ${aerobicCarriers.join(', ')}${rirUnder ? '; RIR under target' : ''}` },
   };
 }
 
