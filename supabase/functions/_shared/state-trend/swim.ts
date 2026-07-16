@@ -46,7 +46,11 @@ export function computeSwimState(
   droppedImplausible = 0,
 ): SwimState {
   return {
-    trend: classifyTrend(series, resolveThresholds('swim', sessionsPerWeek), asOf, { exclude: isDeloadWeek }),
+    // SIGNAL-VS-NOISE gate (noiseGuardStdev) — swim pace swings hard on fins/paddles/set-type we can't
+    // fully see, so a directional verdict must clear the series' OWN scatter or it reads holding. The
+    // swim ROW no longer shows this verdict (it shows volume facts); the gate keeps the backend/coach
+    // from asserting a false swim direction that would contradict the facts line. Same gate as run.
+    trend: classifyTrend(series, resolveThresholds('swim', sessionsPerWeek), asOf, { exclude: isDeloadWeek, noiseGuardStdev: 1.0 }),
     metricLabel: 'pace per 100',
     droppedImplausible,
   };

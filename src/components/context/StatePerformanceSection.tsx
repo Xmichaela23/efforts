@@ -6,8 +6,9 @@
 // tagged as such; swim is additionally Q-038-clouded.
 
 import React from 'react';
-import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand, StrengthFitness, StateDisplayV1 } from '@shared/state-trend';
+import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand, StrengthFitness, StateDisplayV1, SwimVolume } from '@shared/state-trend';
 import { useStateTrends } from '@/hooks/useStateTrends';
+import { useAppContext } from '@/contexts/AppContext';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
 
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
@@ -273,6 +274,34 @@ function RestTag({ rest }: { rest: PerfSummary | null | undefined }) {
   );
 }
 
+// SWIM row — DESCRIBED, not graded. Swim fitness has no honest dot for this app: pace is corrupted by
+// fins/paddles/set-type and equipment capture is spotty, and the field (TrainingPeaks/Swim Smooth/Garmin)
+// benchmarks swim off a clean CSS test we don't force. So the swim row shows the facts fins CAN'T corrupt
+// — swim count, total distance, longest swim — over the 8wk window. Garmin/Strava fallback: volume, not
+// a fitness score. No dot, no arrow, no verdict. useImperial → yards (imperial) or meters (metric).
+function SwimVolumeRow({ vol }: { vol: SwimVolume }) {
+  const { useImperial } = useAppContext();
+  const toDisp = (m: number) => (useImperial ? Math.round(m * 1.09361) : m);
+  const unit = useImperial ? 'yd' : 'm';
+  const weeks = Math.round((vol.windowDays || 56) / 7);
+  if (!vol.swims) {
+    return (
+      <Row label="swim">
+        <span className="text-white/40 text-[12px]">no swims logged</span>
+        <span className="text-white/25 text-[10px]">· last {weeks}wk</span>
+      </Row>
+    );
+  }
+  return (
+    <Row label="swim">
+      <span className="text-white/80 text-[12px]">{vol.swims} {vol.swims === 1 ? 'swim' : 'swims'}</span>
+      <span className="text-white/60 text-[12px]">{toDisp(vol.totalDistanceM).toLocaleString()} {unit}</span>
+      <span className="text-white/60 text-[12px]">longest {toDisp(vol.longestM).toLocaleString()} {unit}</span>
+      <span className="text-white/25 text-[10px] basis-full">last {weeks}wk</span>
+    </Row>
+  );
+}
+
 function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; restTrend?: PerfSummary | null; showAxis?: boolean }) {
   if (card.primaryAxis === 'performance' && card.headlineVerdict) {
     const v = VERDICT[card.headlineVerdict];
@@ -379,7 +408,7 @@ function PostureLine({ card }: { card: DisciplineCard }) {
 export default function StatePerformanceSection({ strengthDetail, stateDisplay }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
-  const { cards, bikeFitness, runFitness, strengthFitness, swimRest, cadenceCounts, loading } = useStateTrends(stateDisplay);
+  const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, cadenceCounts, loading } = useStateTrends(stateDisplay);
   if (loading || cards.length === 0) return null;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
@@ -419,6 +448,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay }
         const inner = (() => {
           if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} />;
           if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} showAxis={showAxis} />;
+          // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
+          if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
           if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} showAxis={showAxis} />{strengthDetail}</>;
           const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
           // Q-107 H3: nest the per-lift detail directly under the STRENGTH trend row — one STRENGTH header,

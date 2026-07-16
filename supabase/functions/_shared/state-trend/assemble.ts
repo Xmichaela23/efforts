@@ -37,6 +37,38 @@ export const STATE_TREND_WINDOWS = {
   adherenceDays: ADHERENCE_WINDOW_DAYS,
 };
 
+// Pure asOf-relative window boundary (mirrors classify.ts's isoMinusDays; kept local to avoid a cycle).
+function isoMinusDaysPure(iso: string, days: number): string {
+  return new Date(Date.parse(iso + 'T12:00:00Z') - days * DAY).toISOString().slice(0, 10);
+}
+
+// ── SWIM VOLUME FACTS (Garmin/Strava parity) ────────────────────────────────────────────────
+// Swim is the one discipline we DESCRIBE, not grade. A pace-based swim fitness dot is dishonest for
+// this athlete — fins/paddles/set-type corrupt pace and equipment capture is spotty — and the field
+// (TrainingPeaks/Swim Smooth/Garmin) benchmarks swim off a clean CSS test, not a rolling daily-pace
+// trend. So the swim row shows what fins CANNOT corrupt: how many swims, total distance, longest swim.
+// Distance is honest regardless of equipment. No dot, no arrow, no verdict — facts only.
+export interface SwimVolume { swims: number; totalDistanceM: number; longestM: number; windowDays: number; }
+export function swimVolumeFacts(
+  rows: Array<{ date?: string; distance_m?: number | null }> | null | undefined,
+  asOf: string,
+  windowDays: number,
+): SwimVolume {
+  const start = isoMinusDaysPure(asOf, windowDays);
+  const dists: number[] = [];
+  for (const r of rows || []) {
+    const d = Number(r?.distance_m);
+    if (!r?.date || !(d > 0)) continue;
+    if (r.date > start && r.date <= asOf) dists.push(d);
+  }
+  return {
+    swims: dists.length,
+    totalDistanceM: Math.round(dists.reduce((a, b) => a + b, 0)),
+    longestM: dists.length ? Math.round(Math.max(...dists)) : 0,
+    windowDays,
+  };
+}
+
 export const disciplineOf = (t: unknown): string | null => {
   const s = String(t || '').toLowerCase();
   if (s.includes('run')) return 'run';
@@ -107,6 +139,8 @@ export interface StateTrendResult {
   /** D-194: swim rest-fraction trend (secondary swim signal, nested under swim in the cache). */
   swimRest: PerfSummary | null;
   swimRestProvisional: boolean;
+  /** Swim VOLUME facts (count / total distance / longest) — the described-not-graded swim row. */
+  swimVolume: SwimVolume;
   /** S2: per-discipline 90d session counts (the card sort key) — carried so the cached DISPLAY contract
    *  is self-contained and the client no longer needs the raw cadence rows to render. */
   cadenceCounts: Record<string, number>;
@@ -196,8 +230,11 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const { series: swimSeries, dropped } = swimPaceToSeries(inp.swimRows);
   const swimState = computeSwimState(swimSeries, asOf, spw.swim, dropped);
   const swim = perfFromTrend(swimState.trend);
-  // State v3 DOT — swim threshold pace is lower-is-better (faster = fitter).
-  if (swim) swim.range = positionInRange(swimSeries, { higherIsBetter: false });
+  // NO swim fitness DOT (was: positionInRange on pace). Swim is described by VOLUME FACTS, not graded —
+  // pace is too fins/equipment-contaminated to place on an honest axis (see swimVolumeFacts). The pace
+  // verdict is kept (noise-gated in computeSwimState) only so the backend/coach never asserts a false
+  // swim direction that would contradict the facts line; it renders nowhere on the State screen.
+  const swimVolume = swimVolumeFacts(inp.swimRows, asOf, STATE_TREND_WINDOWS.swimDays);
 
   // swim rest fraction (D-194) — comparable-distance filtered; Q-061 contamination excluded upstream
   const { series: swimRestSeries, dropped: restOob } = swimRestToSeries(inp.swimRows);
@@ -292,6 +329,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   return {
     cards, headline: synthesizeHeadline(cards), bikeFitness, runFitness, strengthFitness, perfByDisc, provisionalByDisc, spw,
     swimRest, swimRestProvisional: isProvisionalTrend(swimRestState.trend),
+    swimVolume,
     cadenceCounts: inp.cadenceCounts,
   };
 }
@@ -321,6 +359,8 @@ export interface StateDisplayV1 {
   runFitness: RunFitness;
   strengthFitness: StrengthFitness;
   swimRest: PerfSummary | null;
+  /** Swim VOLUME facts — the described-not-graded swim row (no dot). */
+  swimVolume: SwimVolume;
   cadenceCounts: Record<string, number>;
 }
 
@@ -485,6 +525,7 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       runFitness: r.runFitness,
       strengthFitness: r.strengthFitness,
       swimRest: r.swimRest,
+      swimVolume: r.swimVolume,
       cadenceCounts: r.cadenceCounts,
     },
     strength: {
