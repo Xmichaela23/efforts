@@ -100,16 +100,47 @@ export function spineDirectionToTrend(v: TrendVerdict | null | undefined): 'up' 
 // max-volume 5×5 block can't peg the dot to "fitness: maximum". Confident only with ≥2 primaries that
 // have a real spread. (Anchoring to the baseline 1RM as the right edge is a follow-up — needs baseline
 // threaded into the spine; this uses the 12wk range like every other row.)
-export function computeE1rmBand(series: LiftSeries[]): RangePosition | null {
-  const positions = (Array.isArray(series) ? series : [])
-    .filter((s) => PRIMARY_LIFTS.has(s.canonical))
-    .map((s) => positionInRange(s.points, { higherIsBetter: true }))
-    .filter((r): r is RangePosition => r != null);
+/** Build the PRIMARY_LIFTS→baseline-1RM map from user_baselines. Typed performance_numbers first,
+ *  learned_fitness.strength_1rms fills gaps. Keys match PRIMARY_LIFTS canonical — used by BOTH the
+ *  server (compute-snapshot) and the client live path so the strength dot's frame is identical. */
+export function buildStrengthBaselines(perfRaw: any, learnedRaw: any): Record<string, number> | null {
+  const perf = perfRaw || {};
+  const learned = learnedRaw || {};
+  const num = (v: any) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : undefined; };
+  const m: Record<string, number> = {};
+  const put = (k: string, ...cands: any[]) => { const v = cands.map(num).find((x) => x != null); if (v != null) m[k] = v; };
+  put('squat', perf.squat, perf.squat1RM, perf.squat_1rm, learned.squat);
+  put('bench_press', perf.bench, perf.bench1RM, perf.bench_1rm, learned.bench);
+  put('deadlift', perf.deadlift, perf.deadlift1RM, perf.deadlift_1rm, learned.deadlift);
+  put('trap_bar_deadlift', perf.deadlift, perf.deadlift1RM, learned.deadlift);
+  put('overhead_press', perf.overhead, perf.overheadPress1RM, perf.overhead_1rm, learned.overhead);
+  return Object.keys(m).length ? m : null;
+}
+
+export function computeE1rmBand(series: LiftSeries[], baselineByCanonical?: Record<string, number> | null): RangePosition | null {
+  const primaries = (Array.isArray(series) ? series : []).filter((s) => PRIMARY_LIFTS.has(s.canonical));
+  if (primaries.length === 0) return null;
+  // PREFERRED: e1RM vs BASELINE — the baseline 1RM is the right edge, and the dot is current e1RM ÷
+  // baseline. This is the honest frame for strength: you have a KNOWN max, so "where am I versus it"
+  // beats "where am I in my 12wk range" — which pegs the dot right in ANY build block (e1RM is
+  // highest-in-12wk by construction). Working at ~82% of baseline lands the dot at 0.82, not maxed.
+  if (baselineByCanonical) {
+    const ratios = primaries.map((s) => {
+      const cur = s.points.length ? s.points[s.points.length - 1].value : null;
+      const base = baselineByCanonical[s.canonical];
+      return cur != null && base != null && base > 0 ? cur / base : null;
+    }).filter((r): r is number => r != null);
+    if (ratios.length) {
+      const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+      return { low: 0, high: 1, current: avg, positionPct: Math.max(0, Math.min(1, avg)), confident: ratios.length >= 2 };
+    }
+  }
+  // FALLBACK (no baseline yet): 12wk range, but NEVER fully confident — it pegs right while building,
+  // so hedge it grey rather than assert "at your max".
+  const positions = primaries.map((s) => positionInRange(s.points, { higherIsBetter: true })).filter((r): r is RangePosition => r != null);
   if (positions.length === 0) return null;
-  const confidentOnes = positions.filter((p) => p.confident);
-  const use = confidentOnes.length ? confidentOnes : positions;
-  const avgPct = use.reduce((a, p) => a + p.positionPct, 0) / use.length;
-  return { low: 0, high: 1, current: avgPct, positionPct: avgPct, confident: confidentOnes.length >= 2 };
+  const avgPct = positions.reduce((a, p) => a + p.positionPct, 0) / positions.length;
+  return { low: 0, high: 1, current: avgPct, positionPct: avgPct, confident: false };
 }
 
 export interface StrengthFitness {

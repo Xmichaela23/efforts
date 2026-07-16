@@ -24,6 +24,7 @@ import {
 import {
   assembleStateTrends,
   toStateTrendsV1,
+  buildStrengthBaselines,
   disciplineOf,
   todayISO,
   isoMinus,
@@ -785,7 +786,14 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] posture read failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw });
+        // State v3: baseline 1RMs so the strength dot reads current e1RM ÷ baseline (not a 12wk range
+        // that pegs right in a build). Typed first, learned fills gaps. Non-fatal → hedged fallback.
+        let strengthBaselines: Record<string, number> | null = null;
+        try {
+          const { data: ub } = await supabase.from("user_baselines").select("performance_numbers, learned_fitness").eq("user_id", userId).maybeSingle();
+          strengthBaselines = buildStrengthBaselines((ub as any)?.performance_numbers, (ub as any)?.learned_fitness?.strength_1rms);
+        } catch { /* non-fatal */ }
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines });
         stateTrendsV1 = toStateTrendsV1(result, asOf);
       } catch (e: any) {
         console.log("⚠️ state_trends_v1 (spine) failed (non-fatal):", e?.message || e);

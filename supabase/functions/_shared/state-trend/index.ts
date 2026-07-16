@@ -12,6 +12,8 @@ export {
   computeStrengthState,
   strengthVolumeToSeries,
   computeStrengthVolumeState,
+  computeE1rmBand,
+  buildStrengthBaselines,
   PRIMARY_LIFTS,
   type LiftSeries,
   type LiftVerdict,

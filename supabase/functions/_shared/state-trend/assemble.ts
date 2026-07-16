@@ -88,6 +88,9 @@ export interface StateTrendInputs {
   /** Q-179 Tier 1: the DECLARED sessions/week per discipline (`run_days`, `strength_frequency`).
    *  The yardstick for "are you maintaining it?" — absent → the row stays silent rather than guess. */
   declaredSessionsPerWeek?: Partial<Record<string, number>> | null;
+  /** State v3: baseline 1RM per PRIMARY_LIFTS canonical (squat/bench_press/deadlift/overhead_press) so
+   *  the strength DOT reads current e1RM ÷ baseline (the honest frame). Absent → hedged 12wk fallback. */
+  strengthBaselines?: Record<string, number> | null;
 }
 
 export interface StateTrendResult {
@@ -224,7 +227,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   }));
   // State v3 DOT — strength = e1RM (what you CAN lift), not volume (what you DID). Volume keeps its
   // trend/verdict for OTHER consumers (coach), but the FITNESS DOT rides e1RM.
-  const strengthE1rmBand = computeE1rmBand(liftSeries);
+  const strengthE1rmBand = computeE1rmBand(liftSeries, inp.strengthBaselines);
   const strengthFitness: StrengthFitness = {
     volume: {
       verdict: strengthVolTrend.verdict, pctChange: strengthVolTrend.pctChange,

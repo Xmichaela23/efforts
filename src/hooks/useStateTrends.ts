@@ -11,6 +11,7 @@ import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useExerciseLog } from './useExerciseLog';
 import {
   assembleStateTrends,
+  buildStrengthBaselines,
   disciplineOf,
   todayISO,
   isoMinus,
@@ -41,6 +42,7 @@ interface RawInputs {
   // line whenever the coach payload is absent — the exact divergence Constitution Law 1 forbids.
   posture: StateTrendInputs['posture'];
   declaredSessionsPerWeek: StateTrendInputs['declaredSessionsPerWeek'];
+  strengthBaselines: StateTrendInputs['strengthBaselines'];
 }
 
 export interface StateTrends {
@@ -141,12 +143,16 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
         .limit(1)
         .maybeSingle();
 
-      const [bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR, goalR] = await Promise.all([bikeP, runP, swimP, plannedP, doneP, cadenceP, runFactsP, strengthVolP, goalP]);
+      // State v3: baseline 1RMs for the strength dot (current e1RM ÷ baseline) — same read compute-snapshot does.
+      const baselinesP = supabase.from('user_baselines').select('performance_numbers, learned_fitness').eq('user_id', userId).maybeSingle();
+
+      const [bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR, goalR, baselinesR] = await Promise.all([bikeP, runP, swimP, plannedP, doneP, cadenceP, runFactsP, strengthVolP, goalP, baselinesP]);
       if (cancelled) return;
 
       const tp = (goalR as any)?.data?.training_prefs ?? null;
       const posture = sanitizePosture(tp?.per_discipline_posture);
       const declaredSessionsPerWeek = declaredSessionsPerWeek_(tp);
+      const strengthBaselines = buildStrengthBaselines((baselinesR as any)?.data?.performance_numbers, (baselinesR as any)?.data?.learned_fitness?.strength_1rms);
 
       // cadence counts
       const cadenceCounts: Record<string, number> = {};
@@ -218,7 +224,7 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
       }
 
       const strengthVolumeRows = (strengthVolR.data || []).map((f: any) => ({ date: f.date, total_volume_lbs: f.strength_facts?.total_volume_lbs ?? null }));
-      setRaw({ bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek });
+      setRaw({ bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek, strengthBaselines });
     })();
     return () => { cancelled = true; };
   }, [hasContract]);
