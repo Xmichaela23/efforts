@@ -55,7 +55,7 @@ function asOf(ageDays: number | null | undefined): string | null {
 
 // Bike row — Power leads, Efficiency alongside (disagreement surfaced, never collapsed). The
 // efficiency basis carries the zone-band source (coggan_ftp = estimated; personal = from test).
-function BikeFitnessRow({ fitness }: { fitness: BikeFitness }) {
+function BikeFitnessRow({ fitness, showAxis }: { fitness: BikeFitness; showAxis?: boolean }) {
   const src = fitness.efficiency.basis === 'personal' ? 'personal'
     : fitness.efficiency.basis === 'coggan_ftp' ? 'est (FTP)' : null;
   // D-232 glass-box: the shared evidence tail (window · rides · recency) is the LEAD sub-trend's
@@ -69,15 +69,14 @@ function BikeFitnessRow({ fitness }: { fitness: BikeFitness }) {
   const leadIsPower = fitness.power.verdict !== 'needs_data';
   const range = (fitness as any).range as { positionPct: number; confident: boolean } | null | undefined;
   const showDot = range != null && lead.verdict !== 'needs_data';
+  const isProvisional = src === 'est (FTP)'; // estimated baseline → provisional (same rule swim carries)
   return (
     <Row label="bike">
       {showDot ? (
-        <FitnessDotBlock label={leadIsPower ? 'power' : 'bike efficiency'} range={range!} verdict={lead.verdict} provisional={(lead as any).provisional} />
+        <FitnessDotBlock label={leadIsPower ? 'power' : 'efficiency'} range={range!} verdict={lead.verdict} provisional={isProvisional} showAxis={showAxis} />
       ) : (
         <Signal label="Power" sig={fitness.power} />
       )}
-      {/* the OTHER read stays a quiet secondary chip */}
-      {leadIsPower && fitness.efficiency.verdict !== 'needs_data' && <Signal label="Efficiency" sig={fitness.efficiency} />}
       {tail && <span className="text-white/35 text-[10px]">{tail}</span>}
       {src && <span className="text-white/25 text-[10px]">{src}</span>}
       {asOf(lead.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(lead.newestAgeDays)}</span>}
@@ -96,37 +95,28 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
   needs_data: { word: 'needs data', cls: 'text-white/40', arr: '' },
 };
 
-function StrengthFitnessRow({ fitness }: { fitness: StrengthFitness }) {
-  const vol = fitness.volume;
+// STRENGTH row — the DOT is e1RM (what you CAN lift), NOT volume (item 1). Volume is what you DID
+// (a LOAD/Home concept) and is gone from this section; the "4 sessions this week" adherence leak is
+// gone too (the calendar owns week counts). The per-lift "from your logged sets" detail follows the row.
+function StrengthFitnessRow({ fitness, showAxis }: { fitness: StrengthFitness; showAxis?: boolean }) {
+  const vol = fitness.volume; // kept only for the freshness/provenance stamp
   const e = fitness.e1rm;
-  const vv = VOLUME_WORD[vol.verdict];
-  const range = (vol as any).range as { positionPct: number; confident: boolean } | null | undefined;
+  const range = e ? (e as any).range as { positionPct: number; confident: boolean } | null | undefined : null;
   return (
     <Row label="strength">
-      {range && vol.verdict !== 'needs_data' ? (
-        <FitnessDotBlock label="volume" range={range} verdict={vol.verdict} provisional={vol.provisional} wordMap={VOLUME_WORD} />
-      ) : vol.verdict !== 'needs_data' ? (
-        <span className="inline-flex items-baseline gap-1">
-          <span className="text-white/50">Volume</span>
-          <span className={`inline-flex items-baseline gap-0.5 ${vv.cls}`}>{vv.arr && <span>{vv.arr}</span>}<span>{vv.word}</span></span>
-          <span className="text-white/30 text-[10px]">over 6wk</span>
+      {e && range ? (
+        <FitnessDotBlock label="e1RM" range={range} verdict={e.verdict} showAxis={showAxis} />
+      ) : e ? (
+        <span className="basis-full flex items-baseline justify-between gap-2">
+          <span className="text-white/55 text-[12px]">e1RM</span>
+          <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${VERDICT[e.verdict].cls}`}>{VERDICT[e.verdict].arr && <span>{VERDICT[e.verdict].arr}</span>}<span>{VERDICT[e.verdict].word}</span></span>
         </span>
       ) : (
-        <span className="text-white/40">volume needs 2+ sessions to trend</span>
+        <span className="text-white/40">needs 2+ logged lifts to trend</span>
       )}
-      {fitness.sessionsThisWeek > 0 && (
-        <span className="text-white/35 text-[11px]">{fitness.sessionsThisWeek} session{fitness.sessionsThisWeek === 1 ? '' : 's'} this week</span>
+      {vol.sampleCount != null && vol.sampleCount > 0 && (
+        <span className="basis-full text-white/35 text-[10px]">over 6wk · {vol.sampleCount} session{vol.sampleCount === 1 ? '' : 's'}{asOf(vol.newestAgeDays) ? ` · ${asOf(vol.newestAgeDays)}` : ''}</span>
       )}
-      {/* e1RM SECONDARY — only when there IS a trend to hold; thin → drop the clause (no "holding" claim) */}
-      {e && (
-        <span className="inline-flex items-baseline gap-1">
-          <span className="text-white/40">e1RM</span>
-          <span className={`inline-flex items-baseline gap-0.5 ${VERDICT[e.verdict].cls}`}>{VERDICT[e.verdict].arr && <span>{VERDICT[e.verdict].arr}</span>}<span>{VERDICT[e.verdict].word}</span></span>
-        </span>
-      )}
-      {fitness.unplanned > 0 && <span className="text-white/25 text-[10px]">· {fitness.unplanned} unplanned</span>}
-      {vol.provisional && <span className="text-white/30 text-[10px]">prov</span>}
-      {asOf(vol.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(vol.newestAgeDays)}</span>}
     </Row>
   );
 }
@@ -183,12 +173,14 @@ function FitnessDot({ pct, confident }: { pct: number; confident: boolean }) {
 
 // Shared dot+arrow block: metric name + trend ARROW on top, the DOT (level in the 12wk range) below, the
 // relative-frame label under it. Used by bike/swim/strength; run has its own (adds an "i" explainer).
-function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT }: {
+function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT, showAxis = true, frame = 'vs your 12-week range' }: {
   label: string;
   range: { positionPct: number; confident: boolean };
   verdict: TrendVerdict;
   provisional?: boolean;
   wordMap?: Record<TrendVerdict, { word: string; cls: string; arr: string }>;
+  showAxis?: boolean; // the "weaker / frame / stronger" grammar renders on the FIRST band only (item 7)
+  frame?: string;
 }) {
   const v = wordMap[verdict];
   return (
@@ -196,13 +188,17 @@ function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT
       <span className="basis-full flex items-baseline justify-between gap-2">
         <span className="text-white/55 text-[12px]">{label}</span>
         {verdict !== 'needs_data' && (
-          <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{provisional && <span className="text-white/30 text-[10px] ml-1">prov</span>}</span>
+          <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{provisional && <span className="text-white/30 text-[10px] ml-1">provisional</span>}</span>
         )}
       </span>
       <FitnessDot pct={range.positionPct} confident={range.confident} />
-      <span className="basis-full flex items-center justify-between text-[9px] text-white/25">
-        <span>weaker</span><span>{range.confident ? 'vs your 12-week range' : 'thin data'}</span><span>stronger</span>
-      </span>
+      {showAxis ? (
+        <span className="basis-full flex items-center justify-between text-[9px] text-white/25">
+          <span>weaker</span><span>{range.confident ? frame : 'thin data'}</span><span>stronger</span>
+        </span>
+      ) : !range.confident ? (
+        <span className="basis-full text-center text-[9px] text-white/25">thin data</span>
+      ) : null}
     </>
   );
 }
@@ -211,39 +207,45 @@ function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT
 // dot answers the LEVEL, the arrow answers the TREND — so "needs work" and "improving" can no longer read
 // as the app arguing with itself. The old clipped verdict ("aerobic base needs work ↑ improving 6%") is
 // gone. efficiency_index stays a quiet secondary arrow.
-function RunFitnessRow({ fitness }: { fitness: RunFitness }) {
+function RunFitnessRow({ fitness, showAxis }: { fitness: RunFitness; showAxis?: boolean }) {
   const d = fitness.decoupling;
   const v = VERDICT[d.verdict];
   const range = (d as any).range as { positionPct: number; confident: boolean } | null | undefined;
   const [explainOpen, setExplainOpen] = React.useState(false);
   const showDot = d.verdict !== 'needs_data' && range != null;
+  // Provenance line so run cites like bike/swim do (item 5 — every band cites or none do).
+  const evidence = d.sampleCount != null
+    ? trendEvidence({ windowDays: 42, sampleCount: d.sampleCount, newestAgeDays: d.newestAgeDays, discipline: 'run' as Discipline })
+    : null;
   return (
     <Row label="run">
       {showDot ? (
         <>
           <span className="basis-full flex items-baseline justify-between gap-2">
             <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[12px]">
-              aerobic durability <span className="text-white/30 text-[9px]">{explainOpen ? '▾' : 'ⓘ'}</span>
+              durability <span className="text-white/30 text-[9px]">{explainOpen ? '▾' : 'ⓘ'}</span>
             </button>
-            <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{d.provisional && <span className="text-white/30 text-[10px] ml-1">prov</span>}</span>
+            <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{d.provisional && <span className="text-white/30 text-[10px] ml-1">provisional</span>}</span>
           </span>
           <FitnessDot pct={range!.positionPct} confident={range!.confident} />
-          <span className="basis-full flex items-center justify-between text-[9px] text-white/25">
-            <span>weaker</span>
-            <span>{range!.confident ? 'vs your 12-week range' : 'thin data'}</span>
-            <span>stronger</span>
-          </span>
+          {showAxis ? (
+            <span className="basis-full flex items-center justify-between text-[9px] text-white/25">
+              <span>weaker</span><span>{range!.confident ? 'vs your 12-week range' : 'thin data'}</span><span>stronger</span>
+            </span>
+          ) : !range!.confident ? (
+            <span className="basis-full text-center text-[9px] text-white/25">thin data</span>
+          ) : null}
         </>
       ) : d.stale ? (
         <span className="inline-flex items-baseline gap-1.5 text-white/40">
-          <span>aerobic durability</span>
+          <span>durability</span>
           <span className="text-white/30 text-[11px]">last steady run {d.newestAgeDays}d ago</span>
           <span className="text-white/30 text-[10px]">limited data</span>
         </span>
       ) : (
         <span className="text-white/40">needs 20+ min steady effort</span>
       )}
-      {asOf(d.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(d.newestAgeDays)}</span>}
+      {showDot && evidence && <span className="basis-full text-white/35 text-[10px]">{evidence}</span>}
       {explainOpen && (
         <p className="basis-full text-[10px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">
           The dot is where your aerobic durability sits versus your own last 12 weeks — how much your heart rate drifts on a long steady run. Left is the weakest it's been, right the strongest. It's a relative frame, not an absolute score.
@@ -271,7 +273,7 @@ function RestTag({ rest }: { rest: PerfSummary | null | undefined }) {
   );
 }
 
-function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: PerfSummary | null }) {
+function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; restTrend?: PerfSummary | null; showAxis?: boolean }) {
   if (card.primaryAxis === 'performance' && card.headlineVerdict) {
     const v = VERDICT[card.headlineVerdict];
     const perf = card.performance;
@@ -294,7 +296,7 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
       <Row label={card.discipline}>
         {range ? (
           <>
-            <FitnessDotBlock label={metricLabel ? metricLabel.toLowerCase() : card.discipline} range={range} verdict={card.headlineVerdict} />
+            <FitnessDotBlock label={metricLabel ? metricLabel.toLowerCase() : card.discipline} range={range} verdict={card.headlineVerdict} provisional={PROVISIONAL_PERF.has(card.discipline)} showAxis={showAxis} />
             {evidence && <span className="basis-full text-white/35 text-[10px]">{evidence}</span>}
           </>
         ) : (
@@ -318,7 +320,7 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
         )}
         {thinStale && <span className="text-white/30 text-[10px]">limited data</span>}
         {asOf(perf?.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(perf?.newestAgeDays)}</span>}
-        {PROVISIONAL_PERF.has(card.discipline) && <span className="text-white/30 text-[11px]">provisional</span>}
+        {/* 'provisional' now rides the dot block's arrow line (item 6, uniform) — no trailing chip */}
         {/* swim rest-fraction chip removed — "rest ↓ sliding −38.2%" was the same clipped telegram voice
             next to a clean dot. The swim row is the pace dot + arrow. */}
       </Row>
@@ -391,14 +393,10 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay }
   // else the adherence card. Volume gives the row a real verdict so it stops falling to the shrug.
   const strengthHasSubstance = !!strengthFitness && (strengthFitness.volume.verdict !== 'needs_data' || strengthFitness.e1rm != null || strengthFitness.sessionsThisWeek > 0);
 
-  // Dynamic ordering: most-trained discipline first, by STABLE 90d session count (cadenceCounts) so
-  // rows don't jump per-load; ties keep the canonical ORDER. Activity facts only — no inferred importance.
-  const ORDER_IDX: Record<string, number> = { strength: 0, bike: 1, run: 2, swim: 3 };
-  const sortedCards = [...cards].sort((a, b) => {
-    const ca = cadenceCounts[a.discipline] ?? 0, cb = cadenceCounts[b.discipline] ?? 0;
-    if (cb !== ca) return cb - ca;
-    return (ORDER_IDX[a.discipline] ?? 9) - (ORDER_IDX[b.discipline] ?? 9);
-  });
+  // BLOCK-PRIORITY order (item 9): strength (the build) → run → swim → bike. Fixed, meaningful — it
+  // matches how posture thinks, and it stops the thinnest data (bike, 7 rides est FTP) leading the scan.
+  const ORDER_IDX: Record<string, number> = { strength: 0, run: 1, swim: 2, bike: 3 };
+  const sortedCards = [...cards].sort((a, b) => (ORDER_IDX[a.discipline] ?? 9) - (ORDER_IDX[b.discipline] ?? 9));
 
   return (
     <div className="px-3 py-3">
@@ -413,12 +411,13 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay }
       {/* NO aggregate roll-up (Michael 2026-07-04): a cross-discipline headline ("Building — bike up,
           run up") is a lossy, cherry-picking, clock-mismatched summary (run 6wk vs bike 8wk). Fitness
           is handed to the individual sport rows below — each owns its own verdict AND its own window. */}
-      {sortedCards.map((card) => {
+      {sortedCards.map((card, idx) => {
+        const showAxis = idx === 0; // axis grammar on the first band only (item 7)
         const inner = (() => {
-          if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} />;
-          if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} />;
-          if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} />{strengthDetail}</>;
-          const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} />;
+          if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} />;
+          if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} showAxis={showAxis} />;
+          if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} showAxis={showAxis} />{strengthDetail}</>;
+          const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
           // Q-107 H3: nest the per-lift detail directly under the STRENGTH trend row — one STRENGTH header,
           // the lifts as provisional "from your logged sets" detail (no competing second top-line).
           return (card.discipline === 'strength' && strengthDetail) ? <>{row}{strengthDetail}</> : row;

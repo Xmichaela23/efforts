@@ -9,7 +9,7 @@
 
 // Import from source modules (NOT ./index.ts) — index.ts re-exports this file, so importing the
 // barrel here would create a load-order cycle.
-import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, type LiftSeries, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
+import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, computeE1rmBand, type LiftSeries, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { positionInRange } from './position-in-range.ts';
@@ -222,17 +222,16 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     newestAgeDays: l.trend.newestAgeDays,
     provisional: isProvisionalTrend(l.trend),
   }));
-  // State v3 DOT — strength VOLUME position in the 12wk range (higher = more work; a deload lands low,
-  // which is honest — the arrow says whether that's a dip or a trend).
-  const strengthVolRange = positionInRange(strengthVolumeToSeries(inp.strengthVolumeRows), { higherIsBetter: true });
+  // State v3 DOT — strength = e1RM (what you CAN lift), not volume (what you DID). Volume keeps its
+  // trend/verdict for OTHER consumers (coach), but the FITNESS DOT rides e1RM.
+  const strengthE1rmBand = computeE1rmBand(liftSeries);
   const strengthFitness: StrengthFitness = {
     volume: {
       verdict: strengthVolTrend.verdict, pctChange: strengthVolTrend.pctChange,
       sampleCount: strengthVolTrend.sampleCount, newestAgeDays: strengthVolTrend.newestAgeDays,
       provisional: isProvisionalTrend(strengthVolTrend),
-      range: strengthVolRange,
     },
-    e1rm: strength.overall !== 'needs_data' ? { verdict: strength.overall, pctChange: strength.overallPctChange } : null,
+    e1rm: strength.overall !== 'needs_data' ? { verdict: strength.overall, pctChange: strength.overallPctChange, range: strengthE1rmBand } : null,
     perLift: strengthPerLift,
     sessionsThisWeek: inp.doneBy['strength'] || 0,
     unplanned: Math.max(0, (inp.doneBy['strength'] || 0) - (inp.plannedBy['strength'] || 0)),

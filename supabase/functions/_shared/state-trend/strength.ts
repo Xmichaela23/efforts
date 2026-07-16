@@ -9,6 +9,7 @@ import type { TrendPoint, TrendResult, TrendVerdict } from './types.ts';
 import { classifyTrend } from './classify.ts';
 import { resolveThresholds } from './thresholds.ts';
 import { isDeloadWeek } from './deload.ts';
+import { positionInRange, type RangePosition } from './position-in-range.ts';
 
 /** Per-lift dated e1RM series. value = estimated_1rm; meta.name carries the workout name (deload detect). */
 export interface LiftSeries {
@@ -94,9 +95,26 @@ export function spineDirectionToTrend(v: TrendVerdict | null | undefined): 'up' 
 // render DROPS the clause rather than assert "holding" (holding is a claim; same honesty gate as
 // every other row). "unplanned" is a dim receipt, never the verdict. perLift is the per-lift breakdown
 // the aggregate rolls up FROM — persisted so surfaces read one direction (D-270), not re-derive it.
+// State v3 DOT for strength = e1RM (what you CAN lift), NOT volume (what you DID — that's a LOAD/Home
+// concept). Aggregate the PRIMARY lifts' e1RM position in their own 12wk range (higher = fitter), so a
+// max-volume 5×5 block can't peg the dot to "fitness: maximum". Confident only with ≥2 primaries that
+// have a real spread. (Anchoring to the baseline 1RM as the right edge is a follow-up — needs baseline
+// threaded into the spine; this uses the 12wk range like every other row.)
+export function computeE1rmBand(series: LiftSeries[]): RangePosition | null {
+  const positions = (Array.isArray(series) ? series : [])
+    .filter((s) => PRIMARY_LIFTS.has(s.canonical))
+    .map((s) => positionInRange(s.points, { higherIsBetter: true }))
+    .filter((r): r is RangePosition => r != null);
+  if (positions.length === 0) return null;
+  const confidentOnes = positions.filter((p) => p.confident);
+  const use = confidentOnes.length ? confidentOnes : positions;
+  const avgPct = use.reduce((a, p) => a + p.positionPct, 0) / use.length;
+  return { low: 0, high: 1, current: avgPct, positionPct: avgPct, confident: confidentOnes.length >= 2 };
+}
+
 export interface StrengthFitness {
   volume: { verdict: TrendVerdict; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; provisional: boolean; range?: import('./position-in-range.ts').RangePosition | null };
-  e1rm: { verdict: TrendVerdict; pctChange: number | null } | null;
+  e1rm: { verdict: TrendVerdict; pctChange: number | null; range?: RangePosition | null } | null;
   perLift: StrengthPerLift[];
   sessionsThisWeek: number;
   unplanned: number;
