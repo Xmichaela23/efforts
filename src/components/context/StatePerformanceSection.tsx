@@ -423,12 +423,10 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay }
           // the lifts as provisional "from your logged sets" detail (no competing second top-line).
           return (card.discipline === 'strength' && strengthDetail) ? <>{row}{strengthDetail}</> : row;
         })();
-        return (
-          <React.Fragment key={card.discipline}>
-            {inner}
-            <PostureLine card={card} />
-          </React.Fragment>
-        );
+        // PostureLine ("You said 3 a week…") REMOVED from FITNESS — it's the PLAN story, not a fitness
+        // trend, and it broke the clean dot-and-arrow rhythm. The data still lives on the card; it belongs
+        // in the week/plan surface if we resurface it, not among the fitness dots.
+        return <React.Fragment key={card.discipline}>{inner}</React.Fragment>;
       })}
       {/* defensive: if there's no strength trend card at all, still surface the per-lift detail */}
       {strengthDetail && !cards.some((c) => c.discipline === 'strength') && strengthDetail}
