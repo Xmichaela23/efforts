@@ -213,7 +213,6 @@ function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT
 // gone. efficiency_index stays a quiet secondary arrow.
 function RunFitnessRow({ fitness }: { fitness: RunFitness }) {
   const d = fitness.decoupling;
-  const e = fitness.efficiency;
   const v = VERDICT[d.verdict];
   const range = (d as any).range as { positionPct: number; confident: boolean } | null | undefined;
   const [explainOpen, setExplainOpen] = React.useState(false);
@@ -250,12 +249,8 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness }) {
           The dot is where your aerobic durability sits versus your own last 12 weeks — how much your heart rate drifts on a long steady run. Left is the weakest it's been, right the strongest. It's a relative frame, not an absolute score.
         </p>
       )}
-      {e.verdict !== 'needs_data' && (
-        <span className="inline-flex items-baseline gap-1">
-          <span className="text-white/40">Efficiency</span>
-          <span className={`inline-flex items-baseline gap-0.5 ${VERDICT[e.verdict].cls}`}>{VERDICT[e.verdict].arr && <span>{VERDICT[e.verdict].arr}</span>}<span>{VERDICT[e.verdict].word}</span></span>
-        </span>
-      )}
+      {/* efficiency_index secondary REMOVED — the clipped "Efficiency ↓ sliding" chip re-introduced the
+          telegram voice next to a clean dot. The run row is ONE read now: the durability dot + arrow. */}
     </Row>
   );
 }
@@ -324,7 +319,8 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
         {thinStale && <span className="text-white/30 text-[10px]">limited data</span>}
         {asOf(perf?.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(perf?.newestAgeDays)}</span>}
         {PROVISIONAL_PERF.has(card.discipline) && <span className="text-white/30 text-[11px]">provisional</span>}
-        {card.discipline === 'swim' && <RestTag rest={restTrend} />}
+        {/* swim rest-fraction chip removed — "rest ↓ sliding −38.2%" was the same clipped telegram voice
+            next to a clean dot. The swim row is the pace dot + arrow. */}
       </Row>
     );
   }
