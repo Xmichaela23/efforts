@@ -10,6 +10,7 @@ import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../
 import type { ReadinessSnapshotV1 } from '../readiness-types.ts';
 import { packageSessionDetailReadiness } from './readiness-load-context.ts';
 import { swimPacePer100Seconds } from '../swim/swim-pace.ts';
+import { detectSwimEquipment } from '../swim/swim-equipment.ts';
 import type { SwimScalars } from '../swim/swim-scalars.ts';
 import { resolveRunGap, type RunScalars } from '../run/run-scalars.ts';
 import { routeHeadline } from '../heat-adjust.ts';
@@ -169,6 +170,9 @@ export type SessionDetailInput = {
   completedRunScalars?: RunScalars | null;
   /** Completed workout's refined_type (e.g. 'pool_swim', 'open_water_swim'). */
   completedRefinedType?: string | null;
+  /** Raw workouts.workout_metadata — for the swim pace equipment caveat (detectSwimEquipment). The
+   *  builder only READS it to compose the note (Law 4); workout-detail is the DB reader that passes it. */
+  completedWorkoutMetadata?: unknown;
   /** Next planned session from the week (forward-looking context). */
   nextSession?: { name: string; date: string | null; type: string | null; prescription: string | null } | null;
   /** From buildReadiness(asOf = workout date). If fetch threw, set readinessUnavailable. */
@@ -592,6 +596,20 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
     return `Work ${fmt(swimMovingS)} · Rest ${fmt(completedElapsedS - swimMovingS)}`;
   })();
+  // SWIM PACE EQUIPMENT CAVEAT — fins/buoy/paddles read FASTER than unaided, kick/drill read SLOWER, so a
+  // swim's pace isn't a clean number when gear was logged. Deterministic (detectSwimEquipment, the same
+  // detector the trend substrate uses), never the LLM. Only fires when equipment was actually logged on
+  // THIS swim; null otherwise → nothing renders. Names only the actual gear used (D-192).
+  const swimPaceEquipmentNote = (() => {
+    if (type !== 'swim') return null;
+    const eq = detectSwimEquipment(input.completedWorkoutMetadata);
+    if (!eq.contaminated || eq.names.length === 0) return null;
+    const gear = eq.names.join(', ');
+    const dir = eq.direction === 'optimistic' ? 'reads faster than unaided'
+      : eq.direction === 'pessimistic' ? 'reads slower than unaided'
+      : 'not comparable to unaided';
+    return `with ${gear} — ${dir}`;
+  })();
   const completedTotals: SessionDetailV1['completed_totals'] = {
     duration_s: (type === 'swim' && completedElapsedS != null && completedElapsedS > 0) ? completedElapsedS : swimDurS,
     distance_m: swimDistM,
@@ -608,6 +626,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     avg_hr: (type === 'swim' ? completedSwimScalars?.avgHr : (type === 'run' ? completedRunScalars?.avgHr : null)) ?? fin(compOverall?.avg_hr) ?? fin(fpFacts?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
     swim_pace_per_100_s: completedSwimPer100,
     swim_work_rest: swimWorkRest, // D-194
+    swim_pace_equipment_note: swimPaceEquipmentNote, // "with fins — reads faster than unaided"; null = no gear logged
   };
 
   // Single planned/executed row must match completed_totals (same source as Details / chips).

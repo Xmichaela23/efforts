@@ -197,6 +197,10 @@ export type SessionDetailV1 = {
     swim_pace_per_100_s: number | null;
     /** D-194: SWIM work:rest readout, preformatted (e.g. "Work 24:00 · Rest 11:00"). Null otherwise. */
     swim_work_rest: string | null;
+    /** SWIM pace equipment caveat, preformatted (e.g. "with fins — reads faster than unaided"). Fins/
+     *  buoy/paddles read faster, kick/drill read slower, so pace isn't a clean unaided number. Null when
+     *  no equipment was logged on this swim → nothing renders. Deterministic (detectSwimEquipment). */
+    swim_pace_equipment_note: string | null;
   };
   planned_totals: {
     duration_s: number | null;

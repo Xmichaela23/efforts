@@ -575,7 +575,14 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
         </div>
       )}
 
-      {finsUsed && <div className="mt-2 text-center text-[11px] text-white/40">· some sets with fins</div>}
+      {/* SWIM pace equipment caveat — server-composed (detectSwimEquipment), single-sourced and stating
+          the pace consequence ("with fins — reads faster than unaided"). Falls back to the legacy
+          client-derived fins line for any session_detail built before this field existed. */}
+      {(ct as any).swim_pace_equipment_note ? (
+        <div className="mt-2 text-center text-[11px] text-white/40">{(ct as any).swim_pace_equipment_note}</div>
+      ) : finsUsed ? (
+        <div className="mt-2 text-center text-[11px] text-white/40">· some sets with fins</div>
+      ) : null}
 
       {(distPct != null || timePct != null) && (
         <div className="mt-4 flex items-center justify-center gap-5">

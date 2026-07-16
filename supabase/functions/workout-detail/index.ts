@@ -399,7 +399,10 @@ async function runSessionDetailPipelineAndPersist(
     try {
       const st = snapRes?.data?.[0]?.state_trends_v1;
       const disc = disciplineOf(row?.type);
-      if (st && disc && st[disc]) {
+      // Swim is DESCRIBED, not graded (no honest fitness instrument — pace/rest are fins/set-structure
+      // contaminated; the State swim row shows volume facts, no verdict). So the single-session view
+      // shows no swim trend line either — "described, not graded" holds on BOTH screens, not one.
+      if (st && disc && disc !== 'swim' && st[disc]) {
         disciplineTrend = { discipline: disc, verdict: st[disc].verdict, pct_change: st[disc].pctChange ?? null };
       }
     } catch {}
@@ -726,6 +729,8 @@ async function runSessionDetailPipelineAndPersist(
           })
         : null,
       completedRefinedType: (detail as any).refined_type ?? row?.refined_type ?? null,
+      // Raw metadata for the swim pace equipment caveat (build.ts composes it; this is the DB reader).
+      completedWorkoutMetadata: (detail as any).workout_metadata ?? row?.workout_metadata ?? null,
       nextSession,
       readinessSnapshot: readinessUnavailable ? null : readinessSnapshot,
       readinessUnavailable,
