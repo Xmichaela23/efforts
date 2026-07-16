@@ -355,6 +355,13 @@ export default function PostWorkoutFeedback({
         if (prescribedEquip.length > 0 && swamAsPlanned) {
           meta.swim_steps_equipment_confirmed = prescribedEquip.map((p) => ({ step_index: p.step_index, equipment: p.equipment, used: true }));
         }
+        // Ad-hoc gear the athlete tagged on an UNPLANNED swim → swim_equipment_unplanned (what
+        // detectSwimEquipment reads). Independent of the clean flag: a fins swim can still be a "normal
+        // swim" (left checked), so we can't infer gear from that boolean — this is the only path that
+        // carries the gear NAMES the pace caveat + the trend contamination filter need.
+        if (unplannedEquip.size > 0) {
+          meta.swim_equipment_unplanned = [...unplannedEquip].map((e) => e.toLowerCase());
+        }
         {
           updateData.workout_metadata = meta;
         }
@@ -657,6 +664,47 @@ export default function PostWorkoutFeedback({
               Skip
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Swim EQUIPMENT (unplanned swims): the gap-closer. A Strava/FORM swim carries no gear metadata, and
+          the clean flag below is a boolean, not gear NAMES — so fins never reached the pace caveat or the
+          trend contamination filter. This optional chip row writes swim_equipment_unplanned, the exact
+          field detectSwimEquipment reads. Only shown when there's no prescribed gear to auto-confirm. */}
+      {isSwim && prescribedEquip.length === 0 && (
+        <div>
+          <label className="text-sm font-light text-white/70 mb-2 block">
+            Any equipment? <span className="text-xs text-white/40 font-light">(affects pace)</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {UNPLANNED_EQUIP.map((eq) => {
+              const active = unplannedEquip.has(eq);
+              return (
+                <button
+                  key={eq}
+                  onClick={() => setUnplannedEquip((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(eq)) next.delete(eq); else next.add(eq);
+                    return next;
+                  })}
+                  className={`px-3 py-2 text-sm font-light rounded-lg border-2 backdrop-blur-md transition-all duration-300 ${
+                    active
+                      ? 'bg-white/[0.15] border-white/40 text-white'
+                      : 'bg-white/[0.08] border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white/90 hover:border-white/30'
+                  }`}
+                  style={{
+                    backgroundColor: active ? `rgba(${rgb}, 0.2)` : undefined,
+                    borderColor: active ? `rgba(${rgb}, 0.5)` : undefined,
+                  }}
+                >
+                  {eq}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-white/40 mt-1.5 leading-snug">
+            Optional. Fins, paddles and pull buoy read faster than unaided; kick reads slower.
+          </p>
         </div>
       )}
 
