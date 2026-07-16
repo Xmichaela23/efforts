@@ -207,6 +207,50 @@ export function calculateStrengthWorkload(exercises: any[], sessionRPE?: number)
   return Math.round(effectiveVolumeFactor * Math.pow(intensity, 2) * 100);
 }
 
+// RIR → strength intensity, the ONE band table both sides use. (Actual reads it inline in
+// getStrengthIntensity from logged RIR; planned reads it here from the prescription's target RIR.)
+export function rirToStrengthIntensity(rir: number): number {
+  if (rir <= 1) return 0.95;
+  if (rir <= 2) return 0.90;
+  if (rir <= 3) return 0.85;
+  if (rir <= 4) return 0.80;
+  if (rir <= 5) return 0.75;
+  return 0.70;
+}
+
+/**
+ * PLANNED strength workload — the SAME tonnage basis as `calculateStrengthWorkload` (actual), computed
+ * from the MATERIALIZED prescription (resolved weight in lb × sets × reps). This finishes a half-done
+ * migration: actual moved to tonnage long ago; planned stayed on the CLOCK (`calculateDurationWorkload`)
+ * and so a session read e.g. 56 planned / 25 done for the identical work. The clock is meaningless for
+ * lifting — only the weight moved counts, on both sides.
+ *
+ * Carries (no resolved weight, distance/time "reps") contribute 0 tonnage here EXACTLY as they do on the
+ * actual side today, so planned and actual reconcile for the weighted lifts. Capturing carry load is a
+ * separate fix owed on BOTH sides (planned "Heavy" + the actual logger's weight:0) — see Q-180.
+ *
+ * Intensity mirrors actual's method: band each exercise's target RIR, then average the bands.
+ */
+export function calculatePlannedStrengthWorkload(
+  exercises: Array<{ sets?: number | any[]; reps?: number | string; weight?: number | string | null; target_rir?: number | null }>,
+): number {
+  if (!Array.isArray(exercises) || exercises.length === 0) return 0;
+  let totalVolume = 0;
+  const intensities: number[] = [];
+  for (const ex of exercises) {
+    const sets = Number(ex.sets) || 0; // materialized prescription: sets is a COUNT
+    const reps = typeof ex.reps === 'number' ? ex.reps : Number.parseInt(String(ex.reps ?? ''), 10);
+    const weight = Number(ex.weight) || 0; // resolved lb; 0 for bodyweight/carry/unresolved → no tonnage
+    if (sets > 0 && Number.isFinite(reps) && reps > 0 && weight > 0) {
+      totalVolume += sets * reps * weight;
+    }
+    if (typeof ex.target_rir === 'number' && ex.target_rir >= 0) intensities.push(rirToStrengthIntensity(ex.target_rir));
+  }
+  const effectiveVolumeFactor = Math.max(totalVolume / 10000, 0.1);
+  const intensity = intensities.length ? intensities.reduce((a, b) => a + b, 0) / intensities.length : 0.75;
+  return Math.round(effectiveVolumeFactor * Math.pow(intensity, 2) * 100);
+}
+
 // ---------------------------------------------------------------------------
 // Mobility workload
 // ---------------------------------------------------------------------------

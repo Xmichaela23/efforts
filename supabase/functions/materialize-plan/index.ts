@@ -16,6 +16,7 @@ import {
   resolveStrengthEquipmentTypeForPlan,
 } from '../_shared/strength-equipment-tier.ts';
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
+import { calculatePlannedStrengthWorkload } from '../_shared/workload.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from '../../../src/lib/exercise-config.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
 import {
@@ -2954,12 +2955,25 @@ Deno.serve(async (req) => {
             }
           }
           
+          // Planned STRENGTH load = weight lifted, not the clock. The activate-plan estimate is
+          // duration-based (calculateDurationWorkload) while the DONE side is tonnage-based, so a session
+          // read e.g. 56 planned / 25 done for identical work. Here the weights are resolved to lb, so
+          // recompute workload_planned on the SAME tonnage basis as actual — they now reconcile. Carries
+          // (weight 0) contribute 0 on both sides for now; capturing carry load is a separate fix (Q-180).
+          if (row.type === 'strength') {
+            const strengthEx = steps
+              .filter((st:any) => st?.kind === 'strength' && st?.strength && typeof st.strength === 'object')
+              .map((st:any) => ({ sets: st.strength.sets, reps: st.strength.reps, weight: st.strength.weight, target_rir: st.strength.target_rir }));
+            const plannedLoad = calculatePlannedStrengthWorkload(strengthEx);
+            if (plannedLoad > 0) update.workload_planned = plannedLoad;
+          }
+
           // Debug: Log band exercises before DB write
           const bandSteps = v3.filter((st:any) => st?.kind === 'strength' && String(st?.strength?.name ?? '').toLowerCase().includes('band'));
           if (bandSteps.length > 0) {
             console.log(`💾 Writing ${bandSteps.length} band exercises to DB:`, bandSteps.map((st:any) => ({ name: st.strength.name, notes: st.strength.notes })));
           }
-          
+
           await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
           count += 1;
         }
