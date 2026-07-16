@@ -95,7 +95,7 @@ export function spineDirectionToTrend(v: TrendVerdict | null | undefined): 'up' 
 // every other row). "unplanned" is a dim receipt, never the verdict. perLift is the per-lift breakdown
 // the aggregate rolls up FROM — persisted so surfaces read one direction (D-270), not re-derive it.
 export interface StrengthFitness {
-  volume: { verdict: TrendVerdict; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; provisional: boolean };
+  volume: { verdict: TrendVerdict; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; provisional: boolean; range?: import('./position-in-range.ts').RangePosition | null };
   e1rm: { verdict: TrendVerdict; pctChange: number | null } | null;
   perLift: StrengthPerLift[];
   sessionsThisWeek: number;

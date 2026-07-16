@@ -17,6 +17,8 @@ export type AxisMode = 'performance' | 'adherence';
 export interface PerfSummary {
   verdict: TrendVerdict;
   pctChange: number | null;
+  /** State v3 DOT: where the metric sits in the athlete's 12wk range (oriented so 1=best). Swim uses it. */
+  range?: import('./position-in-range.ts').RangePosition | null;
   /** D-232 glass-box receipt evidence — sample count, newest-point age (days), window length (days).
    *  Optional: strength passes {overall, overallPctChange} with no series, so these are absent there. */
   sampleCount?: number;

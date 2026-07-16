@@ -66,25 +66,22 @@ function BikeFitnessRow({ fitness }: { fitness: BikeFitness }) {
   const tail = (lead.sampleCount != null && lead.windowDays != null)
     ? trendEvidence({ windowDays: lead.windowDays, sampleCount: lead.sampleCount, newestAgeDays: lead.newestAgeDays, discipline: 'bike' })
     : null;
-  const effN = fitness.efficiency.verdict !== 'needs_data' ? fitness.efficiency.sampleCount ?? null : null;
-  const showEffN = effN != null && lead.sampleCount != null && effN !== lead.sampleCount;
+  const leadIsPower = fitness.power.verdict !== 'needs_data';
+  const range = (fitness as any).range as { positionPct: number; confident: boolean } | null | undefined;
+  const showDot = range != null && lead.verdict !== 'needs_data';
   return (
-    <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">bike</span>
-      <div className="flex-1 text-[12px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
+    <Row label="bike">
+      {showDot ? (
+        <FitnessDotBlock label={leadIsPower ? 'power' : 'bike efficiency'} range={range!} verdict={lead.verdict} provisional={(lead as any).provisional} />
+      ) : (
         <Signal label="Power" sig={fitness.power} />
-        <span className="inline-flex items-baseline gap-1">
-          <Signal label="Efficiency" sig={fitness.efficiency} />
-          {/* item 2: efficiency rests on a SUBSET of the row's rides (D-237 excludes corrupt-HR rides
-              from efficiency, not power). Label it "N clean-HR" so it reads as efficiency's own count,
-              not a leftover of the tail's window ride-count. */}
-          {showEffN && <span className="text-white/30 text-[10px]">· {effN} clean-HR</span>}
-        </span>
-        {tail && <span className="text-white/35 text-[10px]">{tail}</span>}
-        {src && <span className="text-white/25 text-[10px]">{src}</span>}
-        {asOf(lead.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(lead.newestAgeDays)}</span>}
-      </div>
-    </div>
+      )}
+      {/* the OTHER read stays a quiet secondary chip */}
+      {leadIsPower && fitness.efficiency.verdict !== 'needs_data' && <Signal label="Efficiency" sig={fitness.efficiency} />}
+      {tail && <span className="text-white/35 text-[10px]">{tail}</span>}
+      {src && <span className="text-white/25 text-[10px]">{src}</span>}
+      {asOf(lead.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(lead.newestAgeDays)}</span>}
+    </Row>
   );
 }
 
@@ -103,14 +100,15 @@ function StrengthFitnessRow({ fitness }: { fitness: StrengthFitness }) {
   const vol = fitness.volume;
   const e = fitness.e1rm;
   const vv = VOLUME_WORD[vol.verdict];
+  const range = (vol as any).range as { positionPct: number; confident: boolean } | null | undefined;
   return (
     <Row label="strength">
-      {vol.verdict !== 'needs_data' ? (
+      {range && vol.verdict !== 'needs_data' ? (
+        <FitnessDotBlock label="volume" range={range} verdict={vol.verdict} provisional={vol.provisional} wordMap={VOLUME_WORD} />
+      ) : vol.verdict !== 'needs_data' ? (
         <span className="inline-flex items-baseline gap-1">
           <span className="text-white/50">Volume</span>
           <span className={`inline-flex items-baseline gap-0.5 ${vv.cls}`}>{vv.arr && <span>{vv.arr}</span>}<span>{vv.word}</span></span>
-          {/* volume is a 6wk trend (slow clock) — label its window so the fast "this week" receipt
-              beside it isn't mistaken for the trend's clock. */}
           <span className="text-white/30 text-[10px]">over 6wk</span>
         </span>
       ) : (
@@ -180,6 +178,32 @@ function FitnessDot({ pct, confident }: { pct: number; confident: boolean }) {
         />
       </div>
     </div>
+  );
+}
+
+// Shared dot+arrow block: metric name + trend ARROW on top, the DOT (level in the 12wk range) below, the
+// relative-frame label under it. Used by bike/swim/strength; run has its own (adds an "i" explainer).
+function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT }: {
+  label: string;
+  range: { positionPct: number; confident: boolean };
+  verdict: TrendVerdict;
+  provisional?: boolean;
+  wordMap?: Record<TrendVerdict, { word: string; cls: string; arr: string }>;
+}) {
+  const v = wordMap[verdict];
+  return (
+    <>
+      <span className="basis-full flex items-baseline justify-between gap-2">
+        <span className="text-white/55 text-[12px]">{label}</span>
+        {verdict !== 'needs_data' && (
+          <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{provisional && <span className="text-white/30 text-[10px] ml-1">prov</span>}</span>
+        )}
+      </span>
+      <FitnessDot pct={range.positionPct} confident={range.confident} />
+      <span className="basis-full flex items-center justify-between text-[9px] text-white/25">
+        <span>weaker</span><span>{range.confident ? 'vs your 12-week range' : 'thin data'}</span><span>stronger</span>
+      </span>
+    </>
   );
 }
 
@@ -270,21 +294,31 @@ function DisciplineRow({ card, restTrend }: { card: DisciplineCard; restTrend?: 
     const evidence = hasEvidence
       ? trendEvidence({ windowDays: perf!.windowDays!, sampleCount: perf!.sampleCount!, newestAgeDays: perf!.newestAgeDays, discipline: card.discipline as Discipline })
       : null;
+    const range = (perf as any)?.range as { positionPct: number; confident: boolean } | null | undefined;
     return (
       <Row label={card.discipline}>
-        {metricLabel && <span className="text-white/50 text-[12px]">{metricLabel}</span>}
-        {hasEvidence ? (
+        {range ? (
           <>
-            <span className={`text-[12px] ${vCls}`}>{trendHeadline(card.headlineVerdict, perf!.pctChange)}</span>
-            <span className="text-white/35 text-[11px]">{evidence}</span>
+            <FitnessDotBlock label={metricLabel ? metricLabel.toLowerCase() : card.discipline} range={range} verdict={card.headlineVerdict} />
+            {evidence && <span className="basis-full text-white/35 text-[10px]">{evidence}</span>}
           </>
         ) : (
           <>
-            <span className={`inline-flex items-baseline gap-1 ${vCls}`}>
-              {v.arr && <span>{v.arr}</span>}
-              <span>{v.word}</span>
-            </span>
-            {perf?.pctChange != null && <span className={thinStale ? 'text-white/30' : 'text-white/40'}>{verdictSignedPct(card.headlineVerdict, perf.pctChange)}</span>}
+            {metricLabel && <span className="text-white/50 text-[12px]">{metricLabel}</span>}
+            {hasEvidence ? (
+              <>
+                <span className={`text-[12px] ${vCls}`}>{trendHeadline(card.headlineVerdict, perf!.pctChange)}</span>
+                <span className="text-white/35 text-[11px]">{evidence}</span>
+              </>
+            ) : (
+              <>
+                <span className={`inline-flex items-baseline gap-1 ${vCls}`}>
+                  {v.arr && <span>{v.arr}</span>}
+                  <span>{v.word}</span>
+                </span>
+                {perf?.pctChange != null && <span className={thinStale ? 'text-white/30' : 'text-white/40'}>{verdictSignedPct(card.headlineVerdict, perf.pctChange)}</span>}
+              </>
+            )}
           </>
         )}
         {thinStale && <span className="text-white/30 text-[10px]">limited data</span>}

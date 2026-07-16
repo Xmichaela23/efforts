@@ -120,6 +120,7 @@ export interface BikeSignal {
 export interface BikeFitness {
   power: BikeSignal; // LEADS the bike verdict
   efficiency: BikeSignal; // secondary read (HR-at-power)
+  range?: import('./position-in-range.ts').RangePosition | null; // State v3 DOT: lead metric in 12wk range
 }
 
 /** A — terrain-binned 20-min power. Trend each bin like-for-like; surface the FRESHEST bin that

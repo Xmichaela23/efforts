@@ -133,6 +133,13 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike);
   bikeFitness.efficiency.basis = inp.bikeRows.map((r) => r.band_source).find((s) => s) ?? null;
   const bikeLead = bikeFitness.power.verdict !== 'needs_data' ? bikeFitness.power : bikeFitness.efficiency;
+  // State v3 DOT — the lead metric's position in the 12wk range. Power is higher-is-better (more watts =
+  // fitter); HR-at-power efficiency is lower-is-better (less HR for the same power = fitter).
+  const bikeLeadIsPower = bikeFitness.power.verdict !== 'needs_data';
+  const bikeBandSeries = bikeLeadIsPower
+    ? binRides.map((r) => ({ date: r.date, value: Number(r.w20) })).filter((p) => Number.isFinite(p.value) && p.value > 0)
+    : hrPts;
+  bikeFitness.range = positionInRange(bikeBandSeries, { higherIsBetter: bikeLeadIsPower });
   const bike: PerfSummary | null = bikeLead.verdict !== 'needs_data'
     ? { verdict: bikeLead.verdict, pctChange: bikeLead.pctChange, sampleCount: bikeLead.sampleCount, newestAgeDays: bikeLead.newestAgeDays, windowDays: bikeLead.windowDays }
     : null;
@@ -186,6 +193,8 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const { series: swimSeries, dropped } = swimPaceToSeries(inp.swimRows);
   const swimState = computeSwimState(swimSeries, asOf, spw.swim, dropped);
   const swim = perfFromTrend(swimState.trend);
+  // State v3 DOT — swim threshold pace is lower-is-better (faster = fitter).
+  if (swim) swim.range = positionInRange(swimSeries, { higherIsBetter: false });
 
   // swim rest fraction (D-194) — comparable-distance filtered; Q-061 contamination excluded upstream
   const { series: swimRestSeries, dropped: restOob } = swimRestToSeries(inp.swimRows);
@@ -213,11 +222,15 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     newestAgeDays: l.trend.newestAgeDays,
     provisional: isProvisionalTrend(l.trend),
   }));
+  // State v3 DOT — strength VOLUME position in the 12wk range (higher = more work; a deload lands low,
+  // which is honest — the arrow says whether that's a dip or a trend).
+  const strengthVolRange = positionInRange(strengthVolumeToSeries(inp.strengthVolumeRows), { higherIsBetter: true });
   const strengthFitness: StrengthFitness = {
     volume: {
       verdict: strengthVolTrend.verdict, pctChange: strengthVolTrend.pctChange,
       sampleCount: strengthVolTrend.sampleCount, newestAgeDays: strengthVolTrend.newestAgeDays,
       provisional: isProvisionalTrend(strengthVolTrend),
+      range: strengthVolRange,
     },
     e1rm: strength.overall !== 'needs_data' ? { verdict: strength.overall, pctChange: strength.overallPctChange } : null,
     perLift: strengthPerLift,
