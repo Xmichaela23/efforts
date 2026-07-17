@@ -6,7 +6,7 @@
 // tagged as such; swim is additionally Q-038-clouded.
 
 import React from 'react';
-import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand, StrengthFitness, StateDisplayV1, SwimVolume, FitnessMode } from '@shared/state-trend';
+import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand, StrengthFitness, StateDisplayV1, SwimVolume, FitnessMode, FitnessAnchor } from '@shared/state-trend';
 import { useStateTrends } from '@/hooks/useStateTrends';
 import { useAppContext } from '@/contexts/AppContext';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
@@ -56,7 +56,7 @@ function asOf(ageDays: number | null | undefined): string | null {
 
 // Bike row — Power leads, Efficiency alongside (disagreement surfaced, never collapsed). The
 // efficiency basis carries the zone-band source (coggan_ftp = estimated; personal = from test).
-function BikeFitnessRow({ fitness, showAxis, mode }: { fitness: BikeFitness; showAxis?: boolean; mode: FitnessMode }) {
+function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitness; showAxis?: boolean; mode: FitnessMode; anchor?: FitnessAnchor }) {
   const src = fitness.efficiency.basis === 'personal' ? 'personal'
     : fitness.efficiency.basis === 'coggan_ftp' ? 'est (FTP)' : null;
   // D-232 glass-box: the shared evidence tail (window · rides · recency) is the LEAD sub-trend's
@@ -86,6 +86,7 @@ function BikeFitnessRow({ fitness, showAxis, mode }: { fitness: BikeFitness; sho
       {src && <span className="text-white/25 text-[10px]">{src}</span>}
       {asOf(lead.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(lead.newestAgeDays)}</span>}
       {trendOnly && <NoBaselineTag hint={src === 'est (FTP)' ? 'accept your FTP to anchor' : undefined} />}
+      {showDot && anchor?.label && <span className="basis-full text-[9px] text-white/30">{anchor.label}</span>}
     </Row>
   );
 }
@@ -159,11 +160,19 @@ const DECOUPLING_BAND: Record<DecouplingBand, { word: string; cls: string }> = {
 // right = best; the server orients positionPct so 1 = best for any metric). Confident → bright dot; thin
 // or flat data → grey (a positioned dot on thin data is a lie with a coordinate). No number on the dot —
 // the POSITION is the claim; a percent would relocate false precision onto it (SPEC §4).
-function FitnessDot({ pct, confident }: { pct: number; confident: boolean }) {
+function FitnessDot({ pct, confident, tickPct, overflow }: { pct: number; confident: boolean; tickPct?: number | null; overflow?: 'better' | 'worse' | null }) {
   const left = `${Math.round(Math.max(0, Math.min(1, pct)) * 100)}%`;
+  const tickLeft = tickPct != null ? `${Math.round(Math.max(0, Math.min(1, tickPct)) * 100)}%` : null;
   return (
     <div className="basis-full mt-1.5 mb-0.5">
       <div className="relative h-1 rounded-full bg-white/[0.08]">
+        {/* The TICK — the anchor/baseline on the same band. A vertical mark; when the anchor is BETTER than
+            the recent range (overflow) it pins at the edge with a caret ("you've been better than recently"). */}
+        {tickLeft != null && (
+          <div className="absolute top-1/2 h-3 w-[2px] rounded" style={{ left: tickLeft, transform: 'translate(-50%, -50%)', backgroundColor: 'rgba(255,255,255,0.4)' }}>
+            {overflow === 'better' && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-white/40 text-[9px]">›</span>}
+          </div>
+        )}
         <div
           className="absolute top-1/2 w-2.5 h-2.5 rounded-full"
           style={{
@@ -223,7 +232,7 @@ function NoBaselineTag({ hint }: { hint?: string }) {
 // dot answers the LEVEL, the arrow answers the TREND — so "needs work" and "improving" can no longer read
 // as the app arguing with itself. The old clipped verdict ("aerobic base needs work ↑ improving 6%") is
 // gone. efficiency_index stays a quiet secondary arrow.
-function RunFitnessRow({ fitness, showAxis, mode }: { fitness: RunFitness; showAxis?: boolean; mode: FitnessMode }) {
+function RunFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: RunFitness; showAxis?: boolean; mode: FitnessMode; anchor?: FitnessAnchor }) {
   const d = fitness.decoupling;
   const v = VERDICT[d.verdict];
   const range = (d as any).range as { positionPct: number; confident: boolean } | null | undefined;
@@ -250,7 +259,7 @@ function RunFitnessRow({ fitness, showAxis, mode }: { fitness: RunFitness; showA
       {showDot ? (
         <>
           {header}
-          <FitnessDot pct={range!.positionPct} confident={range!.confident} />
+          <FitnessDot pct={range!.positionPct} confident={range!.confident} tickPct={anchor?.tickPct} overflow={anchor?.overflow} />
           {showAxis ? (
             <span className="basis-full flex items-center justify-between text-[9px] text-white/25">
               <span>weaker</span><span>{range!.confident ? 'vs your 12-week range' : 'thin data'}</span><span>stronger</span>
@@ -258,6 +267,8 @@ function RunFitnessRow({ fitness, showAxis, mode }: { fitness: RunFitness; showA
           ) : !range!.confident ? (
             <span className="basis-full text-center text-[9px] text-white/25">thin data</span>
           ) : null}
+          {/* the anchor label — "auto · steady run · Jun 20" (provisional) or "steady run · Jun 20" (confirmed) */}
+          {anchor?.label && <span className="basis-full text-[9px] text-white/30">{anchor.label}</span>}
         </>
       ) : trendOnly ? (
         <>
@@ -437,7 +448,7 @@ function PostureLine({ card }: { card: DisciplineCard }) {
 export default function StatePerformanceSection({ strengthDetail, stateDisplay }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
-  const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, cadenceCounts, loading } = useStateTrends(stateDisplay);
+  const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, loading } = useStateTrends(stateDisplay);
   if (loading || cards.length === 0) return null;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
@@ -475,8 +486,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay }
         // strength→run→swim→bike order that's row 0 (strength) + row 1 (the first endurance row).
         const showAxis = idx === 0 || (idx === 1 && sortedCards[0]?.discipline === 'strength');
         const inner = (() => {
-          if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} />;
-          if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} />;
+          if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} />;
+          if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
           // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
           if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
           if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} showAxis={showAxis} />{strengthDetail}</>;

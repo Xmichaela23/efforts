@@ -12,7 +12,7 @@
 import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, computeE1rmBand, type LiftSeries, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
-import { positionInRange } from './position-in-range.ts';
+import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
 import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSummary } from './discipline.ts';
@@ -29,6 +29,32 @@ export const ORDER = ['strength', 'bike', 'run', 'swim'] as const;
  *  - `facts_only` → no trend-qualified metric (swim today) → neutral facts. */
 export type FitnessMode = 'anchored' | 'trend_only' | 'facts_only';
 
+/** The ACTIVE fitness baseline for a discipline (from the fitness_baselines table), reduced to what the
+ *  spine needs to render the anchor. provisional = auto-derived; confirmed = the athlete's deliberate pick. */
+export interface ActiveFitnessBaseline {
+  value: number; metric: string; lowerIsBetter: boolean;
+  sourceLabel: string; sourceDate: string | null; sourceEventId: string | null;
+  status: 'provisional' | 'confirmed';
+}
+
+/** The rendered anchor for a row: where its tick sits on the band + the label. `tickPct` is null when the
+ *  anchor can't be placed on this band (metric mismatch — e.g. bike FTP vs an efficiency band, this pass). */
+export interface FitnessAnchor {
+  tickPct: number | null;
+  overflow: 'better' | 'worse' | null;
+  status: 'provisional' | 'confirmed';
+  label: string;   // "auto · steady run · Jan 15" (provisional) | "steady run · Jan 15" (confirmed — no "auto")
+}
+
+/** Format the anchor label: provisional gets the "auto ·" prefix; confirmed (any human touch) never does. */
+function anchorLabel(b: ActiveFitnessBaseline): string {
+  const date = b.sourceDate
+    ? new Date(b.sourceDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+    : null;
+  const tail = [b.sourceLabel, date].filter(Boolean).join(' · ');
+  return b.status === 'provisional' ? `auto · ${tail}` : tail;
+}
+
 // UTC date helpers — match the client hook exactly (new Date().toISOString().slice(0,10)).
 export const todayISO = (): string => new Date().toISOString().slice(0, 10);
 export const isoMinus = (days: number): string => new Date(Date.now() - days * DAY).toISOString().slice(0, 10);
@@ -41,6 +67,26 @@ export const STATE_TREND_WINDOWS = {
   swimDays: 56, // pace/100 8wk
   cadenceDays: 90, // sessions/week
   adherenceDays: ADHERENCE_WINDOW_DAYS,
+  // Baseline auto-derivation horizon. ⛔ THE INVARIANT IS THE GAP, NOT THE NUMBER: this window MUST stay
+  // LONGER than the DOT's band window (the recent 12-week range). The band answers "where am I recently";
+  // the ANCHOR answers "my established level", and the tick's whole purpose is to reach PAST the recent
+  // range — so "you've been better than this" is expressible, which a single-window system structurally
+  // cannot say. If the two windows were equal the tick would pin at the band's max by construction
+  // (best-in-12wk == band-max) and add nothing. If this number is ever tuned, preserve anchor > band.
+  //
+  // WHY 24wk (vs the field's 42–90d for capacity anchoring): those short windows assume a cyclist power-
+  // testing every 6–8 weeks — frequent hard data, short memory. A concurrent masters athlete in a 5×5
+  // block produces sparse hard aerobic efforts; a 90d window routinely holds ZERO qualifying runs. 24wk
+  // is the window that actually catches signal, and physiological ceilings move slowly enough at age that
+  // a 6-month-old effort is still a fair capacity claim. Recency-bounded (not all-time) → memorial solved.
+  //
+  // ⚠ FAILURE MODE THE LENGTH BUYS: a genuine decline (e.g. return-from-injury) reads as "below your
+  // anchor" for up to ~6 months until the strong run ages out. NOT hidden — softened HONESTLY by the tick
+  // rules: the anchor carries its SOURCE DATE ("auto · steady run · Jan 15"), so it reads as a dated,
+  // resettable claim (the change flow) rather than a mysterious permanent scold, and the ARROW still shows
+  // the comeback direction. Do NOT add injury-detection logic to auto-soften — that would be dishonest;
+  // visible staleness + the change flow are the mitigation.
+  baselineWindowDays: 168, // 24 weeks — the "established level" horizon; the GAP over the 12wk band is the real property
 };
 
 // Pure asOf-relative window boundary (mirrors classify.ts's isoMinusDays; kept local to avoid a cycle).
@@ -129,6 +175,9 @@ export interface StateTrendInputs {
   /** State v3: baseline 1RM per PRIMARY_LIFTS canonical (squat/bench_press/deadlift/overhead_press) so
    *  the strength DOT reads current e1RM ÷ baseline (the honest frame). Absent → hedged 12wk fallback. */
   strengthBaselines?: Record<string, number> | null;
+  /** Active auto/manual fitness baselines (fitness_baselines table), keyed by discipline (run/bike/swim).
+   *  Presence → ANCHORED mode + the tick. Absent → the discipline falls to trend_only / facts_only. */
+  fitnessBaselines?: Record<string, ActiveFitnessBaseline> | null;
 }
 
 export interface StateTrendResult {
@@ -149,6 +198,8 @@ export interface StateTrendResult {
   swimVolume: SwimVolume;
   /** SLICE 1: per-discipline anchoring mode (anchored → dot; trend_only → arrow + "no baseline set"). */
   fitnessMode: Record<string, FitnessMode>;
+  /** Per-discipline rendered anchor (tick position + "auto/confirmed · source · date" label). */
+  fitnessAnchors: Record<string, FitnessAnchor>;
   /** S2: per-discipline 90d session counts (the card sort key) — carried so the cached DISPLAY contract
    *  is self-contained and the client no longer needs the raw cadence rows to render. */
   cadenceCounts: Record<string, number>;
@@ -294,13 +345,31 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // Bike upgrades to ANCHORED the moment the athlete ACCEPTS its FTP estimate (basis flips to 'personal');
   // run's anchor (flag a reference effort) is Slice 2 — until then run stays TREND-ONLY by construction.
   const strengthAnchored = !!inp.strengthBaselines && Object.keys(inp.strengthBaselines).length > 0;
-  const bikeAnchored = bikeFitness.efficiency.basis === 'personal'; // accepted FTP only — never est(FTP)
+  const fb = inp.fitnessBaselines ?? {};
   const fitnessMode: Record<string, FitnessMode> = {
+    // strength anchors on its typed 1RM (unchanged); run/bike/swim anchor when an active fitness_baselines
+    // record exists (auto-derived provisional OR the athlete's confirmed pick). No record → Slice-1 fallback.
     strength: strengthAnchored ? 'anchored' : 'trend_only',
-    bike: bikeAnchored ? 'anchored' : 'trend_only',
-    run: 'trend_only',
-    swim: 'facts_only',
+    bike: fb.bike ? 'anchored' : 'trend_only',
+    run: fb.run ? 'anchored' : 'trend_only',
+    swim: fb.swim ? 'anchored' : 'facts_only',
   };
+
+  // The TICK: place each anchor on its row's band (same low/high the dot uses). Run's anchor metric IS the
+  // band metric (decoupling) → placeable. Bike's anchor is FTP (power) vs a power/efficiency band — only
+  // placeable when the band is power, deferred this pass (tickPct null → dot + label, no tick). The label
+  // carries "auto ·" for provisional, bare for confirmed (§2b/§4a).
+  const fitnessAnchors: Record<string, FitnessAnchor> = {};
+  if (fb.run && runDecoupRange) {
+    const p = placeAnchorOnBand(fb.run.value, runDecoupRange.low, runDecoupRange.high, !fb.run.lowerIsBetter);
+    fitnessAnchors.run = { tickPct: p.tickPct, overflow: p.overflow, status: fb.run.status, label: anchorLabel(fb.run) };
+  }
+  if (fb.bike) {
+    fitnessAnchors.bike = { tickPct: null, overflow: null, status: fb.bike.status, label: anchorLabel(fb.bike) };
+  }
+  if (fb.swim) {
+    fitnessAnchors.swim = { tickPct: null, overflow: null, status: fb.swim.status, label: anchorLabel(fb.swim) };
+  }
 
   const perfByDisc: Record<string, PerfSummary | null> = {
     strength: { verdict: strength.overall, pctChange: strength.overallPctChange },
@@ -356,6 +425,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     swimRest, swimRestProvisional: isProvisionalTrend(swimRestState.trend),
     swimVolume,
     fitnessMode,
+    fitnessAnchors,
     cadenceCounts: inp.cadenceCounts,
   };
 }
@@ -389,6 +459,8 @@ export interface StateDisplayV1 {
   swimVolume: SwimVolume;
   /** SLICE 1: per-discipline anchoring mode — the client renders the dot ONLY where mode==='anchored'. */
   fitnessMode: Record<string, FitnessMode>;
+  /** Per-discipline rendered anchor (tick + label) for anchored rows. */
+  fitnessAnchors: Record<string, FitnessAnchor>;
   cadenceCounts: Record<string, number>;
 }
 
@@ -555,6 +627,7 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       swimRest: r.swimRest,
       swimVolume: r.swimVolume,
       fitnessMode: r.fitnessMode,
+      fitnessAnchors: r.fitnessAnchors,
       cadenceCounts: r.cadenceCounts,
     },
     strength: {

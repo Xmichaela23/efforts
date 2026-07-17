@@ -25,6 +25,8 @@ import {
   assembleStateTrends,
   toStateTrendsV1,
   buildStrengthBaselines,
+  deriveProvisionalBaselines,
+  reconcileBaseline,
   disciplineOf,
   todayISO,
   isoMinus,
@@ -789,11 +791,93 @@ serve(async (req: Request) => {
         // State v3: baseline 1RMs so the strength dot reads current e1RM ÷ baseline (not a 12wk range
         // that pegs right in a build). Typed first, learned fills gaps. Non-fatal → hedged fallback.
         let strengthBaselines: Record<string, number> | null = null;
+        let ub: any = null;
         try {
-          const { data: ub } = await supabase.from("user_baselines").select("performance_numbers, learned_fitness").eq("user_id", userId).maybeSingle();
-          strengthBaselines = buildStrengthBaselines((ub as any)?.performance_numbers, (ub as any)?.learned_fitness?.strength_1rms);
+          const r = await supabase.from("user_baselines").select("performance_numbers, learned_fitness").eq("user_id", userId).maybeSingle();
+          ub = r.data;
+          strengthBaselines = buildStrengthBaselines(ub?.performance_numbers, ub?.learned_fitness?.strength_1rms);
         } catch { /* non-fatal */ }
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines });
+
+        // ── AUTO-DERIVED FITNESS BASELINES (run/bike/swim) → fitness_baselines (idempotent) ──────────
+        // Derive over the 24wk "established level" horizon — a SEPARATE, wider read than the 90d trend
+        // fetch (the band must stay 12wk, so the derivation can't reuse runJoined). Reconcile against the
+        // active records via the tested reconcileBaseline (confirmed never auto-touched; provisional
+        // superseded ONLY when the pick changes — no supersede churn), then hand the ACTIVE anchors to
+        // the assembly. Non-fatal: any failure here must never break the snapshot.
+        let fitnessBaselines: Record<string, any> | null = null;
+        try {
+          const derivStart = isoMinus(STATE_TREND_WINDOWS.baselineWindowDays);
+          const { data: drpm } = await supabase.from("route_progress_metrics")
+            .select("metric_date,workout_id").eq("user_id", userId).gte("metric_date", derivStart);
+          const dWids = [...new Set(((drpm ?? []) as any[]).map((r) => r.workout_id).filter(Boolean))];
+          const dHrs = new Map<string, any>();
+          if (dWids.length) {
+            const { data: dw } = await supabase.from("workouts").select("id,workout_analysis").in("id", dWids);
+            for (const w of (dw ?? []) as any[]) dHrs.set(w.id, w.workout_analysis?.heart_rate_summary ?? null);
+          }
+          const runDerivRows = ((drpm ?? []) as any[]).map((r) => {
+            const hrs = dHrs.get(r.workout_id) || null;
+            return {
+              workout_id: r.workout_id, date: r.metric_date,
+              decoupling_pct: hrs?.decouplingPct ?? null, decoupling_basis: hrs?.decouplingBasis ?? null,
+              workout_type: hrs?.workoutType ?? null, duration_minutes: hrs?.durationMinutes ?? null,
+            };
+          });
+          const ftp = ub?.learned_fitness?.ride_ftp_estimated ?? null;
+          const bikeFtpEstimate = ftp && Number(ftp.value) > 0
+            ? { value: Number(ftp.value), confidence: ftp.confidence ?? null, asOf: ftp.as_of ?? ftp.asOf ?? null }
+            : null;
+          // Swim hard-effort gathering (RPE + id) is a small follow-up; with none, swim → calibration (item f, honest).
+          const swimEfforts: any[] = [];
+
+          const derived = deriveProvisionalBaselines(
+            { runDecouplingRows: runDerivRows, bikeFtpEstimate, swimEfforts },
+            { asOf, windowDays: STATE_TREND_WINDOWS.baselineWindowDays },
+          );
+
+          const { data: activeRows } = await supabase.from("fitness_baselines")
+            .select("id,discipline,metric,value,lower_is_better,source_label,source_date,source_event_id,status")
+            .eq("user_id", userId).is("superseded_at", null);
+          const activeByDisc = new Map<string, any>();
+          for (const r of (activeRows ?? []) as any[]) activeByDisc.set(r.discipline, r);
+
+          const nowIso = new Date().toISOString();
+          const finalActive: Record<string, any> = {};
+          const toActive = (o: any, status: string) => ({ value: o.value, metric: o.metric, lowerIsBetter: o.lowerIsBetter, sourceLabel: o.sourceLabel, sourceDate: o.sourceDate, sourceEventId: o.sourceEventId, status });
+          const insertRow = (disc: string, cand: any) => supabase.from("fitness_baselines").insert({
+            user_id: userId, discipline: disc, metric: cand.metric, value: cand.value, lower_is_better: cand.lowerIsBetter,
+            source_event_id: cand.sourceEventId, source_date: cand.sourceDate || null, source_label: cand.sourceLabel,
+            confidence: cand.confidence ?? null, status: "provisional",
+          }).select("id").single();
+
+          for (const disc of ["run", "bike", "swim"] as const) {
+            const active = activeByDisc.get(disc) || null;
+            const cand = (derived as any)[disc];
+            const activeReduced = active ? { status: active.status, sourceEventId: active.source_event_id ?? null, value: Number(active.value) } : null;
+            const action = reconcileBaseline(activeReduced, cand);
+            if (action.kind === "insert") {
+              await insertRow(disc, cand);
+              finalActive[disc] = toActive(cand, "provisional");
+            } else if (action.kind === "supersede") {
+              // retire old FIRST (the partial unique index allows only one active), then insert new, then link lineage
+              await supabase.from("fitness_baselines").update({ superseded_at: nowIso }).eq("id", active.id);
+              const { data: ins } = await insertRow(disc, cand);
+              if (ins?.id) await supabase.from("fitness_baselines").update({ superseded_by: ins.id }).eq("id", active.id);
+              finalActive[disc] = toActive(cand, "provisional");
+            } else if (action.kind === "retire") {
+              await supabase.from("fitness_baselines").update({ superseded_at: nowIso }).eq("id", active.id);
+              // no active anymore → calibration (nothing added to finalActive)
+            } else if (active) {
+              // noop → keep the existing active anchor (this is the idempotent path — no write)
+              finalActive[disc] = { value: Number(active.value), metric: active.metric, lowerIsBetter: !!active.lower_is_better, sourceLabel: active.source_label, sourceDate: active.source_date, sourceEventId: active.source_event_id, status: active.status };
+            }
+          }
+          fitnessBaselines = Object.keys(finalActive).length ? finalActive : null;
+        } catch (e: any) {
+          console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
+        }
+
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines });
         stateTrendsV1 = toStateTrendsV1(result, asOf);
       } catch (e: any) {
         console.log("⚠️ state_trends_v1 (spine) failed (non-fatal):", e?.message || e);

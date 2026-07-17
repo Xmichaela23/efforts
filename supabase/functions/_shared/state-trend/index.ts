@@ -84,6 +84,8 @@ export {
   swimVolumeFacts,
   type SwimVolume,
   type FitnessMode,
+  type FitnessAnchor,
+  type ActiveFitnessBaseline,
   toStateTrendsV1,
   rollupFitnessDirection,
   rollupFitness,
@@ -103,6 +105,13 @@ export {
   type DisciplineTrendCache,
   type ExerciseLogLite,
 } from './assemble.ts';
+export {
+  deriveProvisionalBaselines,
+  reconcileBaseline,
+  type BaselineCandidate,
+  type BaselineAction,
+  type ActiveBaseline,
+} from './baseline-derive.ts';
 export {
   resolveDisciplineCard,
   performanceLeads,

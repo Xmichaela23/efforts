@@ -20,6 +20,19 @@ export interface RangePosition {
   confident: boolean;          // ≥ floor samples AND a real spread → colour the dot; else grey/unlabeled
 }
 
+/** Where the ANCHOR (baseline) value sits on the SAME band the dot uses — the tick. `overflow` fires when
+ *  the anchor is BETTER than the band's best edge (the anchor window reaches past the recent range): the
+ *  tick pins at the 'better' end with an indicator ("you've been better than your recent range") — the whole
+ *  point of anchor-window > band-window. `overflow: 'worse'` = below the recent worst (a long decline). */
+export interface AnchorPlacement { tickPct: number; overflow: 'better' | 'worse' | null; }
+export function placeAnchorOnBand(value: number, low: number, high: number, higherIsBetter: boolean): AnchorPlacement {
+  const spread = high - low;
+  const rawFromLow = spread > 0 ? (value - low) / spread : 0.5;
+  const oriented = higherIsBetter ? rawFromLow : 1 - rawFromLow; // 1 = best end, matching positionPct
+  const overflow: AnchorPlacement['overflow'] = oriented > 1 ? 'better' : oriented < 0 ? 'worse' : null;
+  return { tickPct: Math.max(0, Math.min(1, oriented)), overflow };
+}
+
 export function positionInRange(
   series: Array<{ date?: string; value: number }>,
   opts: { higherIsBetter: boolean; minSamples?: number },

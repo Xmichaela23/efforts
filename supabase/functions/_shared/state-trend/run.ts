@@ -166,6 +166,8 @@ export function isSteadyAerobic(workoutType?: string | null): boolean {
 
 export interface DecouplingRow {
   date?: string; metric_date?: string;
+  /** Source workout id — carried so the baseline derivation can name the SOURCE EVENT of a picked run. */
+  workout_id?: string | null;
   decoupling_pct?: number | null;
   decoupling_basis?: string | null;   // 'gap' | 'raw' | null — TERRAIN only; used to drop confirmed 'raw'
   /** Variance gate: heterogeneous efforts → the ratio is low-confidence. A HEDGE, never a filter.
@@ -206,15 +208,24 @@ export interface DecouplingRow {
 // athlete's own data does not earn it (the machinery already exists: `_shared/heat-adjust.ts` fits the
 // coefficient by regression and refuses when heat and fitness are not separable). This athlete exercises
 // the "refuse" branch; correcting him would be multiplying by 1 with extra steps.
+/** The SINGLE "does this run count for durability?" rule — steady aerobic, ≥20 min, not terrain-confirmed-
+ *  raw, plausible band. Exported so the BASELINE DERIVATION (baseline-derive.ts) qualifies its candidate
+ *  runs with the EXACT same predicate the trend uses — one rule, no second copy that could drift. */
+export function isQualifyingDecouplingRow(r: DecouplingRow): boolean {
+  if (!(typeof r.decoupling_pct === 'number' && Number.isFinite(Number(r.decoupling_pct)))) return false;
+  if (r.decoupling_basis === 'raw') return false;               // drop confirmed terrain-confounded
+  if (!isSteadyAerobic(r.workout_type)) return false;           // steady aerobic only
+  if (!(r.duration_minutes == null || Number(r.duration_minutes) >= 20)) return false; // ≥20 min (null = keep)
+  const v = Number(r.decoupling_pct);
+  return v >= -30 && v <= 50;                                   // plausible decoupling band
+}
+
 export function decouplingToSeries(rows: DecouplingRow[] | null | undefined): TrendPoint[] {
   if (!Array.isArray(rows)) return [];
   return rows
-    .filter((r) => typeof r.decoupling_pct === 'number' && Number.isFinite(Number(r.decoupling_pct)))
-    .filter((r) => r.decoupling_basis !== 'raw')                                  // drop confirmed terrain-confounded
-    .filter((r) => isSteadyAerobic(r.workout_type))                              // steady aerobic only
-    .filter((r) => r.duration_minutes == null || Number(r.duration_minutes) >= 20) // ≥20 min (null = don't drop)
+    .filter(isQualifyingDecouplingRow)
     .map((r) => ({ date: r.date ?? r.metric_date ?? '', value: Number(r.decoupling_pct) }))
-    .filter((p) => p.date && p.value >= -30 && p.value <= 50);                    // plausible decoupling band
+    .filter((p) => !!p.date);
 }
 
 // classifyTrend drops values ≤ 0 (its noise filter) and divides by earlyAvg for %-change — both break

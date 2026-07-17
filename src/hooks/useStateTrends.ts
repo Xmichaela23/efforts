@@ -29,6 +29,8 @@ import {
   type StateDisplayV1,
   type SwimVolume,
   type FitnessMode,
+  type FitnessAnchor,
+  type ActiveFitnessBaseline,
 } from '@shared/state-trend';
 
 interface RawInputs {
@@ -45,6 +47,7 @@ interface RawInputs {
   posture: StateTrendInputs['posture'];
   declaredSessionsPerWeek: StateTrendInputs['declaredSessionsPerWeek'];
   strengthBaselines: StateTrendInputs['strengthBaselines'];
+  fitnessBaselines: StateTrendInputs['fitnessBaselines'];
 }
 
 export interface StateTrends {
@@ -56,6 +59,7 @@ export interface StateTrends {
   swimRest: PerfSummary | null;    // D-194: swim rest-fraction (work:rest) trend
   swimVolume: SwimVolume | null;   // swim VOLUME facts (count/total/longest) — the described-not-graded row
   fitnessMode: Record<string, FitnessMode>; // SLICE 1: per-row anchoring mode (dot only where 'anchored')
+  fitnessAnchors: Record<string, FitnessAnchor>; // per-row rendered anchor (tick + auto/confirmed label)
   cadenceCounts: Record<string, number>; // per-discipline 90d session count — the stable sort key
   loading: boolean;
 }
@@ -150,8 +154,22 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
       // State v3: baseline 1RMs for the strength dot (current e1RM ÷ baseline) — same read compute-snapshot does.
       const baselinesP = supabase.from('user_baselines').select('performance_numbers, learned_fitness').eq('user_id', userId).maybeSingle();
 
-      const [bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR, goalR, baselinesR] = await Promise.all([bikeP, runP, swimP, plannedP, doneP, cadenceP, runFactsP, strengthVolP, goalP, baselinesP]);
+      // Active fitness baselines (auto/confirmed anchors) — the ACTIVE row per discipline (superseded_at IS NULL).
+      // Degrades gracefully to empty if the table isn't there yet (staged migration) → rows fall to trend_only.
+      const fitnessBaselinesP = supabase.from('fitness_baselines')
+        .select('discipline,metric,value,lower_is_better,source_label,source_date,source_event_id,status')
+        .eq('user_id', userId).is('superseded_at', null);
+
+      const [bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR, goalR, baselinesR, fitnessBaselinesR] = await Promise.all([bikeP, runP, swimP, plannedP, doneP, cadenceP, runFactsP, strengthVolP, goalP, baselinesP, fitnessBaselinesP]);
       if (cancelled) return;
+
+      const fitnessBaselines: Record<string, ActiveFitnessBaseline> = {};
+      for (const r of (((fitnessBaselinesR as any)?.data) || []) as any[]) {
+        fitnessBaselines[r.discipline] = {
+          value: Number(r.value), metric: r.metric, lowerIsBetter: !!r.lower_is_better,
+          sourceLabel: r.source_label, sourceDate: r.source_date, sourceEventId: r.source_event_id, status: r.status,
+        };
+      }
 
       const tp = (goalR as any)?.data?.training_prefs ?? null;
       const posture = sanitizePosture(tp?.per_discipline_posture);
@@ -228,7 +246,7 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
       }
 
       const strengthVolumeRows = (strengthVolR.data || []).map((f: any) => ({ date: f.date, total_volume_lbs: f.strength_facts?.total_volume_lbs ?? null }));
-      setRaw({ bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek, strengthBaselines });
+      setRaw({ bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek, strengthBaselines, fitnessBaselines });
     })();
     return () => { cancelled = true; };
   }, [hasContract]);
@@ -246,13 +264,14 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
       swimRest: displayContract.swimRest,
       swimVolume: displayContract.swimVolume ?? null,
       fitnessMode: displayContract.fitnessMode ?? {},
+      fitnessAnchors: displayContract.fitnessAnchors ?? {},
       cadenceCounts: displayContract.cadenceCounts,
       loading: false,
     };
   }
 
   const loading = liftsLoading || raw == null;
-  if (loading) return { cards: [], headline: null, bikeFitness: null, runFitness: null, strengthFitness: null, swimRest: null, swimVolume: null, fitnessMode: {}, cadenceCounts: {}, loading: true };
+  if (loading) return { cards: [], headline: null, bikeFitness: null, runFitness: null, strengthFitness: null, swimRest: null, swimVolume: null, fitnessMode: {}, fitnessAnchors: {}, cadenceCounts: {}, loading: true };
 
   const exerciseRows: ExerciseLogLite[] = (exercises || []).map((e) => ({
     date: e.date,
@@ -262,7 +281,7 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
   }));
 
   const result = assembleStateTrends({ asOf: todayISO(), exerciseRows, ...raw! });
-  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, runFitness: result.runFitness, strengthFitness: result.strengthFitness, swimRest: result.swimRest, swimVolume: result.swimVolume, fitnessMode: result.fitnessMode, cadenceCounts: raw!.cadenceCounts, loading: false };
+  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, runFitness: result.runFitness, strengthFitness: result.strengthFitness, swimRest: result.swimRest, swimVolume: result.swimVolume, fitnessMode: result.fitnessMode, fitnessAnchors: result.fitnessAnchors, cadenceCounts: raw!.cadenceCounts, loading: false };
 }
 
 // SCALABILITY NOTE (now realized): the assembly is `assembleStateTrends` in @shared/state-trend,
