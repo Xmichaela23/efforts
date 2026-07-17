@@ -103,7 +103,7 @@ function deriveBike(est: BaselineDeriveInputs['bikeFtpEstimate']): BaselineCandi
   if (!est || !(Number(est.value) > 0)) return null;
   return {
     discipline: 'bike', metric: 'ftp', value: Number(est.value), lowerIsBetter: false,
-    sourceEventId: null, sourceDate: est.asOf ?? '', sourceLabel: 'FTP estimate', confidence: est.confidence ?? null,
+    sourceEventId: null, sourceDate: est.asOf ?? '', sourceLabel: 'FTP est', confidence: est.confidence ?? null,
   };
 }
 

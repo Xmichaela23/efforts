@@ -99,3 +99,24 @@ Inside the run expand, a boxed line naming WHY the trend is what it is:
 - **Range window = 12wk?** The trend window is 42d (6wk). A 12wk band + a 6wk trend arrow is defensible (level is slower than trend) but the two windows must be LABELLED distinctly so they don't read as one number over one period.
 - **The backfill cost** — the band needs each metric's 12wk min/max historically. Scope the recompute before starting; it is not free.
 - **Strength band** — e1RM "vs baseline" is already a ratio, not a range. Does strength get a band, or keep its current "squat ~90/110" receipt? (Likely: baseline IS the right edge; the band is current-vs-baseline. Decide explicitly.)
+
+---
+
+## ADDENDUM 2026-07-17 — SHIPPED + ACCEPTED (the fitness-anchor arc)
+
+**Status: SHIPPED and ACCEPTED on device.** The run row that claimed "improving" off contaminated data now makes only defensible claims and passed the athlete's read (rolling anchor "auto · steady run · Jul 12", corroborated tick inside the band, dot below it, direction withheld at low run volume). All hold points from this arc are released.
+
+### What shipped (each verified on real data)
+- **Auto-derived provisional baselines** (`baseline-derive.ts`, `fitness_baselines` table) — the fitness dot is reachable without a manual step; honest via the "auto · source · date" label, not absence. Crown-from-N (rule b): the crown is the **2nd-best qualifying value** — a level reached ≥2 times; a lone day is structurally uncrownable. Negative-crown floor (≥0). Idempotent reconcile (`reconcileBaseline`): confirmed never auto-touched; supersede only on a real pick change.
+- **Volume gate** — below `runDirectionMinRuns` (8) qualifying steady runs in the trend window, the durability direction is **`withheld`** (a 4th verdict state; counts voice, no arrow). Kills the "improving" claim sparse data can't back.
+- **Band floor (Fix A)** — the band's coordinate frame floors sub-zero decoupling with the same crown constant (one floor per axis).
+- **route_progress_metrics one-row-per-workout (root data fix)** — `UNIQUE(workout_id)` replaced `UNIQUE(route_cluster_id, workout_id)`; a re-clustered run no longer inserts a twin. Killed a phantom "reached twice" crown + inflated counts.
+- **⟳ ROLLING ANCHOR (DECISION REVERSAL, dated).** The 24wk "established level" horizon is **superseded**. The anchor now tracks CURRENT capacity, Garmin-style, sharing the band's ~12wk window (`cadenceDays`). **Rationale:** the long-memory model produced a months-old "below your established level" scold. We deliberately GIVE UP the tick-reaches-past-the-band property; retained differentiators are event citation, crown-from-N corroboration, the audit trail, and a **descent that arrives with an explanation** (below) instead of a scold. Tick ≈ band's better edge is now the NORMAL state — do not re-open tick ≠ range-max.
+- **Anchor-descent accent** (`anchorDescentCandidate`, composer tier 3.5) — a supersede-by-aging emits a candidate; the credit clause ("swims and rides are carrying the aerobic load") is GATED (cross-training carries the load AND HR-response not degrading), else the bare template. Cause carried on `state_trends_v1.run_anchor_descent` (JSONB, no schema change).
+
+### PARKED — record only, build nothing without an explicit block
+- **a. Change affordance** ("use a different run", writes `confirmed`) — wakes if a legal-but-wrong crown appears on real data and persists past a re-derivation.
+- **b. Crown-from-N refinements** (N>2, tie handling) — wakes if the crown lands on flukes repeatedly.
+- **c. Orphan `route_progress_metrics` rows** (NULL `workout_id`) — wakes with the next data-hygiene pass; harmless to reads (no workout join → no decoupling → never a candidate).
+- **d. Descent-accent first REAL firing** — not work; watch for it on the next natural anchor descent and check the gate once against real cross-signals.
+- **e. Swim anchor** — wakes when a first RPE≥7 swim effort exists; calibration is correct until then.

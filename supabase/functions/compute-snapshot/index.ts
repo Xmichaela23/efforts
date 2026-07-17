@@ -828,8 +828,10 @@ serve(async (req: Request) => {
             };
           });
           const ftp = ub?.learned_fitness?.ride_ftp_estimated ?? null;
+          // as-of date of the FTP estimate = when the learned profile was last computed (ride_ftp_estimated
+          // itself carries no date; learned_fitness.last_updated is its stamp). Drives the bike anchor label.
           const bikeFtpEstimate = ftp && Number(ftp.value) > 0
-            ? { value: Number(ftp.value), confidence: ftp.confidence ?? null, asOf: ftp.as_of ?? ftp.asOf ?? null }
+            ? { value: Number(ftp.value), confidence: ftp.confidence ?? null, asOf: (ub?.learned_fitness?.last_updated ?? "").slice(0, 10) || null }
             : null;
           // Swim hard-effort gathering (RPE + id) is a small follow-up; with none, swim → calibration (item f, honest).
           const swimEfforts: any[] = [];
@@ -883,8 +885,18 @@ serve(async (req: Request) => {
               await supabase.from("fitness_baselines").update({ superseded_at: nowIso }).eq("id", active.id);
               // no active anymore → calibration (nothing added to finalActive)
             } else if (active) {
-              // noop → keep the existing active anchor (this is the idempotent path — no write)
-              finalActive[disc] = { value: Number(active.value), metric: active.metric, lowerIsBetter: !!active.lower_is_better, sourceLabel: active.source_label, sourceDate: active.source_date, sourceEventId: active.source_event_id, status: active.status };
+              // noop → the ANCHOR (value/source event) is unchanged. But a PROVISIONAL anchor's cosmetic
+              // metadata (label/date) can still freshen — e.g. the bike FTP estimate keeps the same value but
+              // gains its as-of date. Refresh IN PLACE (not a supersede — the anchor didn't move). Confirmed
+              // records are never auto-touched.
+              const labelChanged = active.status === "provisional" && cand &&
+                (active.source_label !== cand.sourceLabel || String(active.source_date ?? "") !== String(cand.sourceDate ?? ""));
+              if (labelChanged) {
+                await supabase.from("fitness_baselines").update({ source_label: cand.sourceLabel, source_date: cand.sourceDate || null }).eq("id", active.id);
+                finalActive[disc] = toActive(cand, active.status);
+              } else {
+                finalActive[disc] = { value: Number(active.value), metric: active.metric, lowerIsBetter: !!active.lower_is_better, sourceLabel: active.source_label, sourceDate: active.source_date, sourceEventId: active.source_event_id, status: active.status };
+              }
             }
           }
           fitnessBaselines = Object.keys(finalActive).length ? finalActive : null;
