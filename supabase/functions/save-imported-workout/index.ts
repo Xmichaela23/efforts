@@ -3,6 +3,7 @@
 // Accepts raw import shape from FitFileImporter, maps to DB schema, inserts, returns saved workout.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { zone3FloorBpm } from '../../../src/lib/friel-zones.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -167,13 +168,18 @@ Deno.serve(async (req) => {
             resting_heart_rate: fitRestHr ? Number(fitRestHr) : null,
             updated_at: new Date().toISOString(),
           };
-          // If we have LTHR, compute Friel 5-zone boundaries
+          // If we have LTHR, compute Friel 5-zone boundaries from the ONE canonical model (friel-zones.ts),
+          // NOT a local 0.90 seam. D-286 + audit 2026-07-17: this WRITES the field that is Priority 1 for
+          // every downstream binner, so a hardcoded 0.90 here re-seeded the exact zone-seam bug D-286 fixed
+          // (136 vs the canonical 135 at LTHR 151). The Z2/Z3 boundary is now `zone3FloorBpm`, byte-matching
+          // the from-scratch bins in compute-workout-analysis.
           if (fitLthr) {
             const lthr = Number(fitLthr);
+            const z2z3 = zone3FloorBpm(lthr);
             configuredZones.zones = [
               { min: 0, max: Math.round(lthr * 0.85) },
-              { min: Math.round(lthr * 0.85), max: Math.round(lthr * 0.90) },
-              { min: Math.round(lthr * 0.90), max: Math.round(lthr * 0.95) },
+              { min: Math.round(lthr * 0.85), max: z2z3 },
+              { min: z2z3, max: Math.round(lthr * 0.95) },
               { min: Math.round(lthr * 0.95), max: Math.round(lthr * 1.05) },
               { min: Math.round(lthr * 1.05), max: null },
             ];

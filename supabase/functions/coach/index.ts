@@ -32,6 +32,7 @@ import { getRunningFatigueWeight, getCyclingFatigueWeight } from '../_shared/fat
 import { isLowTrustWorkload } from '../_shared/workload.ts';
 import { reconcileLoadStatus } from '../_shared/load-status-reconcile.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolvePlanPhaseDetailed, phaseNameToWeekIntent, type PhaseSource } from '../_shared/plan-phase.ts';
 import { offPlanAdherenceBanner, offPlanAdherenceResult } from '../_shared/off-plan-banner.ts';
 import { computePerDomainLoad, type SliceSession } from '../_shared/per-domain-load.ts';
@@ -2098,8 +2099,10 @@ Deno.serve(async (req) => {
     // different FTP than compute-facts/the analyzer. Now all cycling FTP reads agree. No-learned athlete → typed,
     // unchanged. Absent → HR/power bins still cascade to sRPE (pin 3), so null is safe.
     const ftpForBins = resolveCurrentFtp({ learned_fitness: learnedFitness, performance_numbers: arc.performance_numbers } as any)?.value ?? null;
-    const lthrForBins = Number.isFinite(Number((learnedFitness as any)?.run_threshold_hr?.value))
-      ? Number((learnedFitness as any).run_threshold_hr.value) : null;
+    // D-lthr-one-anchor (audit 2026-07-17): route the RUN LTHR through the ONE resolver too — learned-first,
+    // sample_count-gated, honours the athlete's choice — the SAME bpm the zone bins and easy band use. Was a
+    // local learned-only read with no gate. No-learned athlete → typed value, unchanged for the primary user.
+    const lthrForBins = resolveCurrentLthr({ learned_fitness: learnedFitness, performance_numbers: arc.performance_numbers } as any)?.bpm ?? null;
     const perDomainSessions: SliceSession[] = completedRolling.map((r: any) => ({
       date: String(r?.date),
       type: String(r?.type || ''),

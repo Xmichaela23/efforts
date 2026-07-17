@@ -49,6 +49,7 @@
 // learner. Re-exported here so every existing importer keeps working unchanged.
 export { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, easyCeilingBpm, zone3FloorBpm, frielRunZones } from '../../../src/lib/friel-zones.ts';
 import { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, easyCeilingBpm, zone3FloorBpm } from '../../../src/lib/friel-zones.ts';
+import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 /** Friel Z3 floor — kept as a named export for existing importers; delegates to the ONE model (D-286). */
 export function runEasyZone3FloorBpm(lthr: number): number {
   return zone3FloorBpm(lthr);
@@ -113,18 +114,21 @@ export function resolveRunEasyHrBand(
   learnedFitness: Record<string, unknown> | null | undefined,
   manualThresholdHr?: number | null,
 ): EasyHrBand {
-  const lthr = readMetric(learnedFitness, 'run_threshold_hr')
-    ?? (Number.isFinite(Number(manualThresholdHr)) && Number(manualThresholdHr) > 0
-      ? { value: Number(manualThresholdHr), confidence: null as 'high' | 'medium' | 'low' | null }
-      : null);
+  // D-lthr-one-anchor (audit 2026-07-17): the LTHR resolution + the sample_count:0 gate that used to
+  // live in `readMetric` above now come from the ONE resolver — the same bpm every surface reads.
+  // The %max bootstrap below is unchanged (it is this band's own cold-start, not an LTHR source).
+  const lthr = resolveCurrentLthr({
+    learned_fitness: learnedFitness as any,
+    performance_numbers: { threshold_heart_rate: manualThresholdHr ?? null },
+  });
 
-  if (lthr) {
+  if (lthr.bpm != null) {
     return {
-      ceiling: easyCeilingBpm(lthr.value),
-      floor: Math.round(lthr.value * EASY_FLOOR_PCT_LTHR),
+      ceiling: easyCeilingBpm(lthr.bpm),
+      floor: Math.round(lthr.bpm * EASY_FLOOR_PCT_LTHR),
       anchor: 'lthr',
       confidence: lthr.confidence,
-      basis: `Friel Z2 — at or below ${Math.round(EASY_CEILING_PCT_LTHR * 100)}% of your threshold HR (${Math.round(lthr.value)} bpm)`,
+      basis: `Friel Z2 — at or below ${Math.round(EASY_CEILING_PCT_LTHR * 100)}% of your threshold HR (${Math.round(lthr.bpm)} bpm)`,
     };
   }
 

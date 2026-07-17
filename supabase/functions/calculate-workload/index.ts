@@ -38,6 +38,7 @@ import {
   classifyWorkloadMethod,
 } from '../_shared/workload.ts'
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts'
+import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts'
 
 interface WorkoutData {
   type: 'run' | 'bike' | 'swim' | 'strength' | 'mobility';
@@ -220,6 +221,10 @@ serve(async (req) => {
     let userFtp: number | null = null;
     let userThresholdHr: number | null = null;
     let runThresholdHr: number | null = null;
+    // D-lthr-one-anchor (audit 2026-07-17): captured to resolve the RUN threshold through the ONE resolver
+    // after both baseline blocks (learned + manual live in sibling blocks below).
+    let lthrLearnedObj: any = null;
+    let lthrPerfObj: any = null;
     let rideThresholdHr: number | null = null;
     let runMaxHr: number | null = null;
     let rideMaxHr: number | null = null;
@@ -237,7 +242,9 @@ serve(async (req) => {
             ? JSON.parse(baseline.learned_fitness) 
             : baseline.learned_fitness;
           
-          // Run threshold HR from learned data
+          lthrLearnedObj = learned;
+          // Run threshold HR from learned data (superseded by the resolver after both blocks — kept so
+          // ride/max reads below are unaffected).
           if (learned?.run_threshold_hr?.value) {
             runThresholdHr = Number(learned.run_threshold_hr.value);
           }
@@ -275,6 +282,7 @@ serve(async (req) => {
             userFtp = ftpResolved.value;
           }
           
+          lthrPerfObj = perfNumbers;
           // Manual threshold HR as fallback
           if (perfNumbers?.thresholdHeartRate || perfNumbers?.threshold_heart_rate) {
             userThresholdHr = Number(perfNumbers.thresholdHeartRate || perfNumbers.threshold_heart_rate);
@@ -288,7 +296,14 @@ serve(async (req) => {
         }
       } catch {}
     }
-    
+
+    // D-lthr-one-anchor (audit 2026-07-17): resolve the RUN threshold HR through the ONE resolver
+    // (learned-first, sample_count-gated, honours the athlete's choice) — the SAME bpm the zone bins,
+    // easy band and coach use. Unconditional: it must also NULL OUT a zero-sample learned LTHR the old
+    // ungated read would have accepted. The device-first reconciliation below still wins with the
+    // workout's own threshold_heart_rate column. Byte-identical for a learned athlete with >0 samples.
+    runThresholdHr = resolveCurrentLthr({ learned_fitness: lthrLearnedObj, performance_numbers: lthrPerfObj }).bpm;
+
     // If workout_data not provided, fetch full workout data
     if (!finalWorkoutData) {
       const { data: workout, error: workoutError } = await supabaseClient

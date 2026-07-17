@@ -5,6 +5,7 @@ import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
 import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
 
 const ANALYSIS_VERSION = 'v0.1.9'; // NP zero-preserve + 30s Coggan startup trim (D-112)
@@ -920,6 +921,10 @@ Deno.serve(async (req) => {
     // Q-169: the learned LTHR (Friel anchor). Null -> the %HRmax fallback below.
     let learnedLthr: number | null = null;
     let configuredHrZones: any = null;
+    // D-lthr-one-anchor (audit 2026-07-17): the Priority-2 LTHR for zone bins, resolved ONCE from the
+    // baselines below, so it can't diverge from the easy band. Computed inside the baseline block (where
+    // the JSONB cols are in scope) and read at the zone-schema chain. null → falls through to %HRmax.
+    let priorityTwoLthr: number | null = null;
     try {
       if (w.user_id) {
         const { data: baseline } = await supabase
@@ -995,6 +1000,19 @@ Deno.serve(async (req) => {
             ? JSON.parse(baseline.configured_hr_zones)
             : baseline.configured_hr_zones;
           console.log('[HR ZONES] Configured zones from', configuredHrZones?.source, ':', JSON.stringify(configuredHrZones?.zones?.length ?? 0), 'zones');
+        }
+        // Resolve the RUN LTHR once, through the ONE resolver (learned-first, sample_count-gated) — the
+        // SAME bpm the easy band uses. The BIKE keeps its own ride_threshold_hr chain (separate anchor).
+        {
+          const isRide = sport.includes('ride') || sport.includes('bike') || sport.includes('cycling');
+          priorityTwoLthr = isRide
+            ? (configuredHrZones?.threshold_heart_rate
+                || (Number.isFinite((w as any)?.threshold_heart_rate) ? Number((w as any).threshold_heart_rate) : null)
+                || learnedLthr)
+            : resolveCurrentLthr(
+                { learned_fitness: lf, performance_numbers: perfNumbers, configured_hr_zones: configuredHrZones },
+                { deviceThresholdHr: (w as any)?.threshold_heart_rate },
+              ).bpm;
         }
       }
     } catch (e) {
@@ -1575,9 +1593,10 @@ Deno.serve(async (req) => {
       // configured zones and a device-supplied threshold still win — but it means an athlete whose LTHR
       // the app LEARNED no longer silently falls through to %HRmax zones that contradict the Friel
       // zones their own Baselines screen displays.
-      const lthr = configuredHrZones?.threshold_heart_rate
-        || (Number.isFinite((w as any)?.threshold_heart_rate) ? Number((w as any).threshold_heart_rate) : null)
-        || learnedLthr;
+      // D-lthr-one-anchor (audit 2026-07-17): resolved ONCE above (priorityTwoLthr) — RUN via the one
+      // resolver (learned-first, gated, congruent with the easy band); BIKE via its own chain. This
+      // deletes the old configured-first chain that was inverted against easy-hr.
+      const lthr = priorityTwoLthr;
       if (lthr && lthr > 100) {
         // Q-171 — the Z2/Z3 boundary is sourced from the ONE easy band (`_shared/easy-hr.ts`), not a second
         // hardcoded 0.90. They shipped 40 min apart and rounded independently (134 vs 136 at LTHR 151), so a
