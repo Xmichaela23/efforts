@@ -674,7 +674,7 @@ export default function PostWorkoutFeedback({
       {isSwim && prescribedEquip.length === 0 && (
         <div>
           <label className="text-sm font-light text-white/70 mb-2 block">
-            Any equipment? <span className="text-xs text-white/40 font-light">(affects pace)</span>
+            Used any equipment? <span className="text-xs text-white/40 font-light">(affects pace — leave blank for a normal swim)</span>
           </label>
           <div className="flex flex-wrap gap-2">
             {UNPLANNED_EQUIP.map((eq) => {
@@ -708,10 +708,12 @@ export default function PostWorkoutFeedback({
         </div>
       )}
 
-      {/* Swim clean flag (D-201 simplified model): one default-checked box. Planned → "Swam as planned";
-          ad-hoc (no plan) → "Normal swim". Checked = clean → counts toward fitness markers; unchecked =
-          deviated / drills-kick → excluded. Volume (time + distance) feeds the markers from the activity. */}
-      {isSwim && (
+      {/* Swim clean flag — PLANNED swims only. Default is "normal": an unplanned swim needs no checkbox
+          (Michael 2026-07-16 — "by default they should all be normal; the user checks equipment if it
+          affected pace"). The equipment chips above own the pace-caveat + contamination for unplanned
+          swims. For a PLANNED swim, "Swam as planned" is a real ADHERENCE question (did you follow the
+          prescription), so it stays. swamAsPlanned defaults true, so an unplanned swim writes clean. */}
+      {isSwim && prescribedEquip.length > 0 && (
         <div>
           <label className="flex items-center gap-2.5 cursor-pointer">
             <input
@@ -721,12 +723,10 @@ export default function PostWorkoutFeedback({
               className="h-4 w-4 rounded border-white/30 bg-white/[0.08]"
               style={{ accentColor: `rgb(${rgb})` }}
             />
-            <span className="text-sm font-light text-white/80">{prescribedEquip.length > 0 ? 'Swam as planned' : 'Normal swim'}</span>
+            <span className="text-sm font-light text-white/80">Swam as planned</span>
           </label>
           <p className="text-[11px] text-white/40 mt-1.5 leading-snug">
-            {prescribedEquip.length > 0
-              ? 'Leave checked if you swam the session as prescribed. Uncheck if you changed it up — keeps your fitness markers clean.'
-              : 'Leave checked for a normal swim. Uncheck if it was mostly drills or kick — keeps your fitness markers clean.'}
+            Leave checked if you swam the session as prescribed. Uncheck if you changed it up — keeps your fitness markers clean.
           </p>
         </div>
       )}

@@ -83,6 +83,7 @@ export {
   liftSeriesFromExerciseLog,
   swimVolumeFacts,
   type SwimVolume,
+  type FitnessMode,
   toStateTrendsV1,
   rollupFitnessDirection,
   rollupFitness,

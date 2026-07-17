@@ -33,7 +33,8 @@ Deno.test('trade names only aerobic carriers, leads with the count, folds RIR', 
   assertStringIncludes(t!.sentence, 'Running came in at 1 of 3');
   assertStringIncludes(t!.sentence, 'swimming carried the endurance load');
   assertEquals(t!.sentence.includes('strength'), false); // strength is NOT an endurance carrier
-  assertStringIncludes(t!.sentence, 'if this stays here'); // conditional, not a prophecy
+  assertStringIncludes(t!.sentence, 'running-specific speed only comes from running'); // scoped to SPEED, not "run" broadly (no contradiction with the durability row)
+  assertStringIncludes(t!.sentence, 'fades if running stays this low'); // conditional, not a prophecy
   assertStringIncludes(t!.sentence, 'RIR 0.5');            // folded tail
 });
 

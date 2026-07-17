@@ -23,6 +23,12 @@ import { ADHERENCE_WINDOW_DAYS } from './thresholds.ts';
 const DAY = 86_400_000;
 export const ORDER = ['strength', 'bike', 'run', 'swim'] as const;
 
+/** SLICE 1 anchoring mode for a fitness row (Michael 2026-07-16):
+ *  - `anchored`   → a real baseline of the athlete's own exists → render the DOT (position) + arrow.
+ *  - `trend_only` → metric trends but has NO anchor → render the ARROW only + "no baseline set". No dot.
+ *  - `facts_only` → no trend-qualified metric (swim today) → neutral facts. */
+export type FitnessMode = 'anchored' | 'trend_only' | 'facts_only';
+
 // UTC date helpers — match the client hook exactly (new Date().toISOString().slice(0,10)).
 export const todayISO = (): string => new Date().toISOString().slice(0, 10);
 export const isoMinus = (days: number): string => new Date(Date.now() - days * DAY).toISOString().slice(0, 10);
@@ -141,6 +147,8 @@ export interface StateTrendResult {
   swimRestProvisional: boolean;
   /** Swim VOLUME facts (count / total distance / longest) — the described-not-graded swim row. */
   swimVolume: SwimVolume;
+  /** SLICE 1: per-discipline anchoring mode (anchored → dot; trend_only → arrow + "no baseline set"). */
+  fitnessMode: Record<string, FitnessMode>;
   /** S2: per-discipline 90d session counts (the card sort key) — carried so the cached DISPLAY contract
    *  is self-contained and the client no longer needs the raw cadence rows to render. */
   cadenceCounts: Record<string, number>;
@@ -277,6 +285,23 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     unplanned: Math.max(0, (inp.doneBy['strength'] || 0) - (inp.plannedBy['strength'] || 0)),
   };
 
+  // SLICE 1 — THREE-MODE ANCHORING (Michael 2026-07-16). A DOT is a "where am I in my range" POSITION
+  // claim; it renders ONLY when a real anchor of the athlete's OWN exists (a typed / accepted baseline).
+  // With no anchor the row is TREND-ONLY: the arrow (improving/holding/sliding) + "no baseline set", never
+  // a dot — a positioned dot with no reference is the lie the rule forbids. Swim is FACTS-ONLY. Population
+  // norms (Friel, VO2max tables) NEVER anchor a row; they may appear only as labeled fine print in a
+  // tap-down. Mode is resolved HERE (the coach/spine), per row per payload — the client never decides it.
+  // Bike upgrades to ANCHORED the moment the athlete ACCEPTS its FTP estimate (basis flips to 'personal');
+  // run's anchor (flag a reference effort) is Slice 2 — until then run stays TREND-ONLY by construction.
+  const strengthAnchored = !!inp.strengthBaselines && Object.keys(inp.strengthBaselines).length > 0;
+  const bikeAnchored = bikeFitness.efficiency.basis === 'personal'; // accepted FTP only — never est(FTP)
+  const fitnessMode: Record<string, FitnessMode> = {
+    strength: strengthAnchored ? 'anchored' : 'trend_only',
+    bike: bikeAnchored ? 'anchored' : 'trend_only',
+    run: 'trend_only',
+    swim: 'facts_only',
+  };
+
   const perfByDisc: Record<string, PerfSummary | null> = {
     strength: { verdict: strength.overall, pctChange: strength.overallPctChange },
     bike,
@@ -330,6 +355,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     cards, headline: synthesizeHeadline(cards), bikeFitness, runFitness, strengthFitness, perfByDisc, provisionalByDisc, spw,
     swimRest, swimRestProvisional: isProvisionalTrend(swimRestState.trend),
     swimVolume,
+    fitnessMode,
     cadenceCounts: inp.cadenceCounts,
   };
 }
@@ -361,6 +387,8 @@ export interface StateDisplayV1 {
   swimRest: PerfSummary | null;
   /** Swim VOLUME facts — the described-not-graded swim row (no dot). */
   swimVolume: SwimVolume;
+  /** SLICE 1: per-discipline anchoring mode — the client renders the dot ONLY where mode==='anchored'. */
+  fitnessMode: Record<string, FitnessMode>;
   cadenceCounts: Record<string, number>;
 }
 
@@ -526,6 +554,7 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       strengthFitness: r.strengthFitness,
       swimRest: r.swimRest,
       swimVolume: r.swimVolume,
+      fitnessMode: r.fitnessMode,
       cadenceCounts: r.cadenceCounts,
     },
     strength: {

@@ -728,6 +728,9 @@ export default function StateTab({
   const [narrativeOpen, setNarrativeOpen] = useState(false);
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null); // D-232 BODY-row provenance tap
   const [adjustingLift, setAdjustingLift] = useState<string | null>(null);
+  // Strength per-lift detail is COLLAPSED by default (Michael 2026-07-16) — the e1RM dot is the read;
+  // the per-lift "from your logged sets" list is drill-down, folded until tapped.
+  const [strengthDetailOpen, setStrengthDetailOpen] = useState<boolean>(false);
   const [resolvedGoalId, setResolvedGoalId] = useState<string | null>(null);
   const [stateCourseRow, setStateCourseRow] = useState<{ id: string; name: string } | null>(null);
   const [courseBusy, setCourseBusy] = useState(false);
@@ -1270,8 +1273,18 @@ export default function StateTab({
   // trend says needs-data. All state/handlers stay here; only the rendered node is passed down.
   const strengthPerLiftDetail: React.ReactNode = perLift.length > 0 ? (
     <div className="mt-1.5 ml-[84px] pl-3 border-l border-white/[0.07] space-y-2">
-      <div className="text-[10px] uppercase tracking-wider text-white/35">from your logged sets</div>
-      {perLift.map((lt: any) => {
+      {/* Collapsed by default — the e1RM dot above is the read; this list is drill-down. */}
+      <button
+        type="button"
+        onClick={() => setStrengthDetailOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-white/35 hover:text-white/55 transition-colors"
+        aria-expanded={strengthDetailOpen}
+      >
+        <span className={`inline-block transition-transform duration-200 ${strengthDetailOpen ? 'rotate-90' : ''}`}>›</span>
+        from your logged sets
+        <span className="text-white/25 normal-case tracking-normal">· {perLift.length} {perLift.length === 1 ? 'lift' : 'lifts'}</span>
+      </button>
+      {strengthDetailOpen && perLift.map((lt: any) => {
         const verdictLabel: string = lt.verdict_label ?? '—';
         const verdictColor = verdictToneToColor(lt.verdict_tone ?? 'neutral');
         const suggestedWeight: number | null = lt.suggested_weight ?? null;

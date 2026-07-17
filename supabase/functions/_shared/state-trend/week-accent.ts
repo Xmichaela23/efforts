@@ -101,7 +101,7 @@ export function overReachCandidate(opts: {
   return {
     source: 'overreach',
     tier: ACCENT_TIER.overreach,
-    sentence: `${lead} — the pairing that usually needs absorbing before more.`,
+    sentence: `${lead} — that combination usually needs absorbing before more load.`,
     trace: { kind: 'load', detail: `${hasAcwr ? `${opts.runningAcwr!.toFixed(1)}× load, ` : ''}readiness ${opts.readiness}` },
   };
 }
@@ -197,7 +197,9 @@ export function tradeCandidate(opts: {
     ? `${cap(under)} came in at ${underDoneDone} of ${underDonePlanned} this week`
     : `${cap(under)} came in light this week`;
   // Fact first, then the trade: aerobic work transfers, specificity does not — conditional, mechanism named.
-  let sentence = `${lead}; ${joinWords(aerobicCarriers)} carried the endurance load. Aerobic fitness holds across sports — ${under}-specific speed is the part that does not, if this stays here.`;
+  // Scoped to "{under}-specific SPEED" (not "{under}" broadly) so it never contradicts the durability row,
+  // which reads the AEROBIC axis (that one improves off cross-training); speed is the axis only {under} builds.
+  let sentence = `${lead}; ${joinWords(aerobicCarriers)} carried the endurance load. Aerobic fitness carries over — but ${under}-specific speed only comes from ${under}, so it fades if ${under} stays this low.`;
   const rirUnder = typeof rirActual === 'number' && typeof rirTarget === 'number' && rirActual <= rirTarget - 1;
   if (rirUnder) {
     sentence += ` Lifts landed near RIR ${round05(rirActual)} against a ${round05(rirTarget)} target — closer to failure than planned.`;

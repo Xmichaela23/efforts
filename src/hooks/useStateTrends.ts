@@ -28,6 +28,7 @@ import {
   type PerfSummary,
   type StateDisplayV1,
   type SwimVolume,
+  type FitnessMode,
 } from '@shared/state-trend';
 
 interface RawInputs {
@@ -54,6 +55,7 @@ export interface StateTrends {
   strengthFitness: StrengthFitness | null; // strength row's "Volume · e1RM · sessions" composite
   swimRest: PerfSummary | null;    // D-194: swim rest-fraction (work:rest) trend
   swimVolume: SwimVolume | null;   // swim VOLUME facts (count/total/longest) — the described-not-graded row
+  fitnessMode: Record<string, FitnessMode>; // SLICE 1: per-row anchoring mode (dot only where 'anchored')
   cadenceCounts: Record<string, number>; // per-discipline 90d session count — the stable sort key
   loading: boolean;
 }
@@ -243,13 +245,14 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
       strengthFitness: displayContract.strengthFitness,
       swimRest: displayContract.swimRest,
       swimVolume: displayContract.swimVolume ?? null,
+      fitnessMode: displayContract.fitnessMode ?? {},
       cadenceCounts: displayContract.cadenceCounts,
       loading: false,
     };
   }
 
   const loading = liftsLoading || raw == null;
-  if (loading) return { cards: [], headline: null, bikeFitness: null, runFitness: null, strengthFitness: null, swimRest: null, swimVolume: null, cadenceCounts: {}, loading: true };
+  if (loading) return { cards: [], headline: null, bikeFitness: null, runFitness: null, strengthFitness: null, swimRest: null, swimVolume: null, fitnessMode: {}, cadenceCounts: {}, loading: true };
 
   const exerciseRows: ExerciseLogLite[] = (exercises || []).map((e) => ({
     date: e.date,
@@ -259,7 +262,7 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
   }));
 
   const result = assembleStateTrends({ asOf: todayISO(), exerciseRows, ...raw! });
-  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, runFitness: result.runFitness, strengthFitness: result.strengthFitness, swimRest: result.swimRest, swimVolume: result.swimVolume, cadenceCounts: raw!.cadenceCounts, loading: false };
+  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, runFitness: result.runFitness, strengthFitness: result.strengthFitness, swimRest: result.swimRest, swimVolume: result.swimVolume, fitnessMode: result.fitnessMode, cadenceCounts: raw!.cadenceCounts, loading: false };
 }
 
 // SCALABILITY NOTE (now realized): the assembly is `assembleStateTrends` in @shared/state-trend,
