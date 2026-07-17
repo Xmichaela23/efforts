@@ -1290,9 +1290,17 @@ async function mergeSameSwimIfExists(supabase: any, userId: string, row: any) {
   }
   if (Object.keys(u).length) {
     await supabase.from('workouts').update(u).eq('id', match.id);
+    // F4 (fan-out ordering fix): this path used to refresh summary+facts but SKIP analysis, so
+    // computed.analysis (time-in-zone, HR drift) went stale on a merged workout. Route through the
+    // single ordered orchestrator instead — it re-runs the full chain in dependency order.
+    // See docs/AUDIT-fanout-ordering-2026-07-17.md.
     try {
-      await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: match.id } });
-      await supabase.functions.invoke('compute-facts', { body: { workout_id: match.id } });
+      const svcKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/recompute-workout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${svcKey}`, 'apikey': svcKey },
+        body: JSON.stringify({ workout_id: match.id, user_id: userId, include_summary: true }),
+      });
     } catch (_e) { /* recompute non-fatal */ }
   }
   return { id: match.id, keptSource: u.source || match.source, mergedFields: Object.keys(u) };
@@ -1475,176 +1483,29 @@ Deno.serve(async (req)=>{
           metrics_updated_at: new Date().toISOString()
         }).eq('id', wid);
 
-        // FIX: Await auto-attach-planned BEFORE triggering analysis (deterministic ordering)
-        // This ensures planned_id exists before analyze-running-workout runs
-        console.log('[ingest-activity] Awaiting auto-attach-planned for deterministic ordering...');
-        try {
-          const attachResponse = await fetch(fnUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${key}`,
-              'apikey': key
-            },
-            body: JSON.stringify({
-              workout_id: wid
-            })
-          });
-          if (!attachResponse.ok) {
-            const errText = await attachResponse.text();
-            console.error('[ingest-activity] auto-attach-planned returned non-OK status:', attachResponse.status, errText);
-          } else {
-            console.log('[ingest-activity] auto-attach-planned succeeded for workout:', wid);
-          }
-        } catch (attachErr) {
-          console.error('[ingest-activity] auto-attach-planned failed:', attachErr);
-        }
-
-        // Now trigger processing functions (planned_id is set if match found)
-        // All fire-and-forget (background processing)
-        // Trigger processing functions as fire-and-forget (background processing)
-        // Functions will use advisory locks to prevent duplicates
-        const sumUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
-        fetch(sumUrl, {
+        // ── FAN-OUT ORDERING FIX (2026-07-17). The scattered fire-and-forget block that used to
+        //    live here (auto-attach awaited; summary+analysis fire-and-forget; workload+adaptation+
+        //    facts awaited; analyze fire-and-forget) had two data-dependency races: compute-facts
+        //    read `computed` before summary/analysis had written it, and compute-snapshot ran before
+        //    analyze wrote workout_analysis (one workout behind). See docs/AUDIT-fanout-ordering-2026-07-17.md.
+        //
+        //    It is now a SINGLE ordered orchestrator (recompute-workout), fired fire-and-forget so the
+        //    provider webhook ack stays fast. Correctness comes from ordering INSIDE the chain
+        //    ("await what you read"), not from the webhook awaiting it. The orchestrator owns
+        //    auto-attach → summary → analysis → workload/adaptation → facts(skip_snapshot) → analyze →
+        //    snapshot(fresh watermark) → cache-invalidate. Service-role door requires the exact
+        //    SERVICE_ROLE_KEY + an explicit user_id (NOT the anon fallback).
+        const svcKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        const orchestrateUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/recompute-workout`;
+        fetch(orchestrateUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${key}`,
-            'apikey': key
+            'Authorization': `Bearer ${svcKey}`,
+            'apikey': svcKey
           },
-          body: JSON.stringify({
-            workout_id: wid
-          })
-        }).catch(err => console.error('[ingest-activity] compute-workout-summary failed:', err));
-
-        const anUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
-        fetch(anUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${key}`,
-            'apikey': key
-          },
-          body: JSON.stringify({
-            workout_id: wid
-          })
-        }).catch(err => console.error('[ingest-activity] compute-workout-analysis failed:', err));
-
-        // Calculate workload for completed workouts (Garmin/Strava imports)
-        try {
-          const workloadUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calculate-workload`;
-          const workloadResp = await fetch(workloadUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${key}`,
-              'apikey': key
-            },
-            body: JSON.stringify({
-              workout_id: wid
-            })
-          });
-          if (!workloadResp.ok) {
-            const errText = await workloadResp.text();
-            console.error('[ingest-activity] calculate-workload returned non-OK status:', workloadResp.status, errText);
-          } else {
-            console.log('[ingest-activity] calculate-workload succeeded for workout:', wid);
-          }
-        } catch (workloadErr) {
-          console.error('[ingest-activity] calculate-workload failed:', workloadErr);
-        }
-
-        // Compute cheap adaptation metrics (fast lane). Never fail ingestion on error.
-        try {
-          const adaptUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-adaptation-metrics`;
-          const adaptResp = await fetch(adaptUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${key}`,
-              'apikey': key
-            },
-            body: JSON.stringify({ workout_id: wid })
-          });
-          if (!adaptResp.ok) {
-            const errText = await adaptResp.text();
-            console.error('[ingest-activity] compute-adaptation-metrics returned non-OK status:', adaptResp.status, errText);
-          } else {
-            console.log('[ingest-activity] compute-adaptation-metrics succeeded for workout:', wid);
-          }
-        } catch (adaptErr) {
-          console.error('[ingest-activity] compute-adaptation-metrics failed:', adaptErr);
-        }
-
-        // Compute deterministic facts (Phase 1 – deterministic layer). Never fail ingestion.
-        try {
-          const factsUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-facts`;
-          const factsResp = await fetch(factsUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${key}`,
-              'apikey': key
-            },
-            body: JSON.stringify({ workout_id: wid })
-          });
-          if (!factsResp.ok) {
-            console.error('[ingest-activity] compute-facts failed:', factsResp.status, await factsResp.text().catch(() => ''));
-          } else {
-            console.log('[ingest-activity] compute-facts succeeded for workout:', wid);
-          }
-        } catch (factsErr) {
-          console.error('[ingest-activity] compute-facts error:', factsErr);
-        }
-
-        await invalidateUserTrainingCache(supabase, userId, 'ingest-activity');
-
-        // Generate details chat/context for completed workouts (fire-and-forget background processing)
-        // Note: analyze-running-workout will now have planned_id available (deterministic ordering)
-        if (workoutStatus === 'completed' && workoutType) {
-          try {
-            // Route to appropriate analyzer based on workout type
-            let analyzerFunction = null;
-            const typeLower = String(workoutType).toLowerCase();
-            if (typeLower === 'run' || typeLower === 'running') {
-              analyzerFunction = 'analyze-running-workout';
-            } else if (typeLower === 'ride') {
-              // Provider mappers (mapStravaToWorkout, mapGarminToWorkout, mapFitSportToAppType)
-              // all normalize cycling activities to type='ride' upstream. The 'cycling' and
-              // 'bike' synonyms previously listed here never fired in production data.
-              analyzerFunction = 'analyze-cycling-workout';
-            } else if (typeLower === 'strength' || typeLower === 'strength_training') {
-              analyzerFunction = 'analyze-strength-workout';
-            } else if (typeLower === 'swim' || typeLower === 'swimming') {
-              analyzerFunction = 'analyze-swim-workout';
-            }
-            
-            if (analyzerFunction) {
-              const analyzeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${analyzerFunction}`;
-              fetch(analyzeUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${key}`,
-                  'apikey': key
-                },
-                body: JSON.stringify({
-                  workout_id: wid
-                })
-              }).then(resp => {
-                if (!resp.ok) {
-                  console.error(`[ingest-activity] ${analyzerFunction} returned non-OK status:`, resp.status);
-                } else {
-                  console.log(`[ingest-activity] ${analyzerFunction} succeeded for workout:`, wid);
-                }
-              }).catch(analyzeErr => {
-                console.error(`[ingest-activity] ${analyzerFunction} failed:`, analyzeErr);
-              });
-            }
-          } catch (analyzeErr) {
-            console.error('[ingest-activity] Failed to trigger details chat processing:', analyzeErr);
-          }
-        }
+          body: JSON.stringify({ workout_id: wid, user_id: row.user_id, include_summary: true })
+        }).catch(err => console.error('[ingest-activity] recompute-workout orchestrator failed:', err));
       }
     } catch  {}
 

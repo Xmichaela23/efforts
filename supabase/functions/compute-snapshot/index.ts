@@ -39,6 +39,7 @@ import {
 import { computeAcwr, type LoadRow } from "../_shared/acwr.ts";
 import { resolvePlanPhase } from "../_shared/plan-phase.ts";
 import { localDateInTz } from "../_shared/local-date.ts";
+import { deriveSnapshotWatermark } from "./watermark.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -49,6 +50,10 @@ function addCalendarDays(iso: string, delta: number): string {
   d.setDate(d.getDate() + delta);
   return formatLocalDate(d);
 }
+
+// F3 version guard — the freshness token's SINGLE definition lives in ./watermark.ts, imported
+// above. The COMPARISON lives only in the DB trigger trg_guard_snapshot_watermark. See
+// docs/AUDIT-fanout-ordering-2026-07-17.md.
 
 function avg(arr: number[]): number | null {
   if (arr.length === 0) return null;
@@ -971,6 +976,11 @@ serve(async (req: Request) => {
       intensity_distribution: current.intensityDistribution,
 
       computed_at: new Date().toISOString(),
+      // F3 version guard: the freshness token this write carries. The DB trigger
+      // trg_guard_snapshot_watermark refuses to overwrite a row assembled from newer
+      // inputs. Value derived in ONE place (deriveSnapshotWatermark); the comparison
+      // lives ONLY in the trigger. See docs/AUDIT-fanout-ordering-2026-07-17.md.
+      input_watermark: deriveSnapshotWatermark(body),
     };
 
     const { error: uErr } = await supabase

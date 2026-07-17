@@ -287,14 +287,21 @@ serve(async (req) => {
       }
     }
 
-    // Trigger compute-workout-summary (async, don't wait)
+    // Fan-out ordering fix (2026-07-17): a phone-logged workout used to fire ONLY
+    // compute-workout-summary — it never reached compute-facts, so it was invisible to the spine
+    // (snapshot/arc/coach) and State. Route through the single ordered orchestrator so it reaches
+    // the spine like a synced workout. Fire-and-forget; forward-only (no historical backfill); this
+    // does NOT drive adapt-plan. See docs/AUDIT-fanout-ordering-2026-07-17.md.
     try {
-      await supabase.functions.invoke('compute-workout-summary', {
-        body: { workout_id: workout.id },
+      const svcKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/recompute-workout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${svcKey}`, 'apikey': svcKey },
+        body: JSON.stringify({ workout_id: workout.id, user_id: user.id, include_summary: true }),
       });
-      console.log(`[ingest-phone-workout] Triggered compute-workout-summary`);
+      console.log(`[ingest-phone-workout] Triggered recompute-workout orchestrator`);
     } catch (e) {
-      console.warn('[ingest-phone-workout] Failed to trigger compute-workout-summary:', e);
+      console.warn('[ingest-phone-workout] Failed to trigger recompute-workout orchestrator:', e);
     }
 
     // Return success

@@ -191,13 +191,17 @@ Deno.serve(async (req) => {
       console.warn('[FIT ZONES] Non-fatal error persisting FIT HR data:', e);
     }
 
-    // Invoke compute-workout-summary to add intervals / enhance when sensor_data exists
+    // Fan-out ordering fix (2026-07-17): an imported workout used to fire ONLY
+    // compute-workout-summary — it never reached compute-facts, so it was invisible to the spine
+    // (snapshot/arc/coach) and State. Route through the single ordered orchestrator so it reaches the
+    // spine. Fire-and-forget; forward-only (no historical backfill); does NOT drive adapt-plan.
+    // See docs/AUDIT-fanout-ordering-2026-07-17.md.
     if (baseUrl && serviceKey && data?.id) {
-      fetch(`${baseUrl}/functions/v1/compute-workout-summary`, {
+      fetch(`${baseUrl}/functions/v1/recompute-workout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-        body: JSON.stringify({ workout_id: data.id }),
-      }).catch((e) => console.warn('[save-imported-workout] compute-workout-summary trigger:', e?.message));
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}`, 'apikey': serviceKey },
+        body: JSON.stringify({ workout_id: data.id, user_id: data.user_id, include_summary: true }),
+      }).catch((e) => console.warn('[save-imported-workout] recompute-workout orchestrator trigger:', e?.message));
     }
 
     return new Response(JSON.stringify({ workout: data }), {

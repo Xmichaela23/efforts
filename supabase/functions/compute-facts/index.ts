@@ -1495,7 +1495,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { workout_id, dry_run: reqDryRun } = await req.json();
+    const { workout_id, dry_run: reqDryRun, skip_snapshot: reqSkipSnapshot } = await req.json();
     if (!workout_id) {
       return new Response(JSON.stringify({ error: "workout_id required" }), {
         status: 400,
@@ -1818,6 +1818,21 @@ serve(async (req: Request) => {
       console.error("[compute-facts] session_load failed:", slErr?.message ?? slErr);
     }
 
+    // Chain-completeness signal for the client's "analysis pending" gate. metrics_status is
+    // initialized to 'pending' at ingest and, before this, nothing ever flipped it — a dead column.
+    // compute-facts finishing is the honest "the numbers exist now" moment (facts/session_load are
+    // written above), so it owns the flip. dry_run must not touch it. See docs/AUDIT-fanout-ordering-2026-07-17.md.
+    if (reqDryRun !== true) {
+      try {
+        await supabase.from("workouts").update({
+          metrics_status: "complete",
+          metrics_updated_at: new Date().toISOString(),
+        }).eq("id", w.id);
+      } catch (statusErr) {
+        console.warn("[compute-facts] metrics_status flip failed (non-fatal):", statusErr);
+      }
+    }
+
     // Fire-and-forget: refresh segment core EFFORTS for this run.
     // ── SEGMENT INVARIANT: efforts refresh rides HERE — every reprocess path funnels through this
     //    chokepoint (compute-facts), so a new reprocess path inherits it for free; do NOT scatter it
@@ -1841,8 +1856,15 @@ serve(async (req: Request) => {
       } catch {}
     }
 
-    // Fire-and-forget: recompute weekly snapshot for this user
-    try {
+    // Fire-and-forget: recompute weekly snapshot for this user.
+    // skip_snapshot: when an orchestrator (recompute-workout) owns the fan-out ordering, it
+    // runs analyze-{sport} FIRST and then fires compute-snapshot itself with a fresh
+    // source_watermark. Firing here too would trigger a ONE-BEHIND snapshot (analyze hasn't
+    // run yet) that races the orchestrator's fresh one — the F3 clobber. The DB watermark guard
+    // is the structural backstop; this flag avoids the wasted duplicate compute entirely.
+    if (reqSkipSnapshot === true) {
+      // Orchestrated path owns the snapshot. Do nothing here.
+    } else try {
       const snapshotUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/compute-snapshot`;
       const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       fetch(snapshotUrl, {

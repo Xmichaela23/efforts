@@ -1,19 +1,28 @@
 /**
- * recompute-workout — user-triggered pipeline: compute-workout-analysis → compute-facts → analyze-*.
- * Auth: user JWT + workouts.user_id match. Downstream invokes use service role.
+ * recompute-workout — THE canonical post-process orchestrator (fan-out ordering fix, 2026-07-17).
+ *
+ * Ordered, awaited chain — "await what you read":
+ *   auto-attach → [summary] → analysis → workload ∥ adaptation → facts(skip_snapshot) → analyze → snapshot(watermark)
+ *
+ * Every entry path fires this fire-and-forget so the webhook ack stays fast while correctness comes
+ * from ordering INSIDE the chain (not from the webhook awaiting it). See docs/AUDIT-fanout-ordering-2026-07-17.md.
+ *
+ * Auth — two doors, one hardened:
+ *   A) user JWT + workouts.user_id match (byte-identical to the prior gate; external callers).
+ *   B) trusted service-role: bearer == SERVICE_ROLE_KEY (constant-time) AND explicit body.user_id.
+ *   Anything else → 401. Downstream invokes use the service role.
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
+import {
+  mondayOf,
+  resolveAnalyzeEdgeFn,
+  decideAuthDoor,
+  invokeWithRetry,
+} from './orchestrator-lib.ts';
 
-type RecomputeStep = 'compute-workout-analysis' | 'compute-facts' | 'analyze' | 'snapshot';
-
-// Monday (UTC) of the week containing dateStr — for compute-snapshot's per-week cache key.
-function mondayOf(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00Z');
-  const day = d.getUTCDay(); // 0=Sun..6=Sat
-  d.setUTCDate(d.getUTCDate() + (day === 0 ? -6 : 1 - day));
-  return d.toISOString().slice(0, 10);
-}
+type RecomputeStep =
+  | 'auto-attach' | 'summary' | 'analysis' | 'workload' | 'adaptation' | 'facts' | 'analyze' | 'snapshot';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -24,23 +33,18 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-/** Same routing as MobileSummary; default matches mobility / unknown types. */
-function resolveAnalyzeEdgeFn(workoutType: string | null | undefined): string {
-  const t = (workoutType ?? '').toLowerCase();
-  if (t === 'run' || t === 'running') return 'analyze-running-workout';
-  // Provider mappers normalize cycling activities to type='ride' upstream;
-  // 'cycling' and 'bike' synonyms previously listed here never fired in production data.
-  if (t === 'ride') return 'analyze-cycling-workout';
-  if (t === 'strength' || t === 'strength_training') return 'analyze-strength-workout';
-  if (t === 'swim' || t === 'swimming') return 'analyze-swim-workout';
-  return 'analyze-running-workout';
+async function markStatus(client: any, workout_id: string, patch: Record<string, unknown>): Promise<void> {
+  try {
+    await client.from('workouts').update(patch).eq('id', workout_id);
+  } catch (e) {
+    console.warn('[recompute-workout] status flip failed (non-fatal):', (e as Error)?.message ?? e);
+  }
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
-
   if (req.method !== 'POST') {
     return json({ ok: false, code: 'method_not_allowed', error: 'POST only', steps: [] as RecomputeStep[] }, 405);
   }
@@ -51,23 +55,39 @@ Deno.serve(async (req) => {
     return json({ ok: false, code: 'unauthorized', error: 'Missing token', steps: [] }, 401);
   }
 
-  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
-  const { data: { user }, error: authErr } = await userClient.auth.getUser();
-  if (authErr || !user) {
-    return json({ ok: false, code: 'unauthorized', error: 'Invalid token', steps: [] }, 401);
-  }
-
-  let workout_id: string;
+  // Parse the body BEFORE auth — the trusted-service door needs the explicit user_id from it.
+  let body: any = {};
   try {
-    const body = await req.json();
-    workout_id = String(body?.workout_id ?? '').trim();
+    body = await req.json();
   } catch {
     return json({ ok: false, code: 'bad_request', error: 'Invalid JSON body', steps: [] }, 400);
   }
+  const workout_id = String(body?.workout_id ?? '').trim();
   if (!workout_id) {
     return json({ ok: false, code: 'bad_request', error: 'workout_id required', steps: [] }, 400);
+  }
+  const includeSummary = body?.include_summary !== false; // default true (idempotent re-normalize)
+  const bodyUserId = body?.user_id ? String(body.user_id) : null;
+
+  // ── AUTH: two doors (decision is pure + fixtured in orchestrator-lib.test.ts) ─────────────
+  const decision = decideAuthDoor({ token, serviceKey: SUPABASE_SERVICE_ROLE_KEY, bodyUserId });
+  let ownerUserId: string;
+  const isService = decision.kind === 'service';
+  if (decision.kind === 'reject') {
+    return json({ ok: false, code: decision.code, error: decision.error, steps: [] }, 401);
+  } else if (decision.kind === 'service') {
+    // Door B — trusted service caller named the user explicitly (verified IS the service role).
+    ownerUserId = decision.ownerUserId;
+  } else {
+    // Door A — user JWT gate. BYTE-IDENTICAL to the prior external gate.
+    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data: { user }, error: authErr } = await userClient.auth.getUser();
+    if (authErr || !user) {
+      return json({ ok: false, code: 'unauthorized', error: 'Invalid token', steps: [] }, 401);
+    }
+    ownerUserId = user.id;
   }
 
   const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -75,7 +95,7 @@ Deno.serve(async (req) => {
     .from('workouts')
     .select('id, type, user_id, date')
     .eq('id', workout_id)
-    .eq('user_id', user.id)
+    .eq('user_id', ownerUserId) // scopes both doors: a service caller can only recompute the user it named
     .maybeSingle();
 
   if (rowErr || !workout) {
@@ -83,59 +103,82 @@ Deno.serve(async (req) => {
   }
 
   const analyzeFn = resolveAnalyzeEdgeFn(workout.type as string | null);
+  const workoutDate = String((workout as any).date || '').slice(0, 10);
   const steps: RecomputeStep[] = [];
 
-  const analysisRes = await serviceClient.functions.invoke('compute-workout-analysis', {
-    body: { workout_id },
-  });
-  if (analysisRes.error) {
-    // 200 so the client reads body from res.data (not only FunctionsHttpError).
-    return json({
-      ok: false,
-      stale: false,
-      steps: [],
-      code: 'analysis_failed',
-      error: analysisRes.error.message ?? 'compute-workout-analysis failed',
+  // D-078: user-triggered recompute forces fresh ai_summary; the automatic (service/ingest) path
+  // PRESERVES existing narrative on a transient LLM null — the original ingest-activity behaviour.
+  const forceRegenerate = !isService;
+
+  // ── 0. auto-attach-planned — planned_id before adherence/analysis. Idempotent; continue on fail.
+  {
+    const r = await invokeWithRetry(serviceClient, 'auto-attach-planned', { workout_id });
+    if (r?.error) console.warn('[recompute-workout] auto-attach-planned failed (non-fatal):', r.error.message);
+    else steps.push('auto-attach');
+  }
+
+  // ── 1. compute-workout-summary — writes computed.overall/intervals. Everything reads computed → STOP on fail.
+  if (includeSummary) {
+    const r = await invokeWithRetry(serviceClient, 'compute-workout-summary', { workout_id });
+    if (r?.error) {
+      await markStatus(serviceClient, workout_id, { summary_status: 'failed' });
+      console.warn('[recompute-workout] compute-workout-summary failed — halting chain:', r.error.message);
+      return json({ ok: false, stale: true, steps, code: 'summary_failed', error: r.error.message });
+    }
+    steps.push('summary');
+  }
+
+  // ── 2. compute-workout-analysis — writes computed.analysis. Degradable → CONTINUE on fail.
+  {
+    const r = await invokeWithRetry(serviceClient, 'compute-workout-analysis', { workout_id });
+    if (r?.error) console.warn('[recompute-workout] compute-workout-analysis failed (continuing degraded):', r.error.message);
+    else steps.push('analysis');
+  }
+
+  // ── 3a. calculate-workload — ACWR substrate; must precede snapshot. Continue on fail.
+  {
+    const r = await invokeWithRetry(serviceClient, 'calculate-workload', { workout_id });
+    if (r?.error) console.warn('[recompute-workout] calculate-workload failed (non-fatal):', r.error.message);
+    else steps.push('workload');
+  }
+  // ── 3b. compute-adaptation-metrics — reads computed (must follow analysis; F5). No retry, continue.
+  {
+    const r = await serviceClient.functions.invoke('compute-adaptation-metrics', { body: { workout_id } });
+    if (r?.error) console.warn('[recompute-workout] compute-adaptation-metrics failed (non-fatal):', r.error.message);
+    else steps.push('adaptation');
+  }
+
+  // ── 4. compute-facts — reads computed; writes facts/route_progress_metrics/session_load. STOP on fail.
+  //    skip_snapshot: the orchestrator owns the snapshot (fired after analyze, with a fresh watermark).
+  {
+    const r = await invokeWithRetry(serviceClient, 'compute-facts', { workout_id, skip_snapshot: true });
+    if (r?.error) {
+      await markStatus(serviceClient, workout_id, { metrics_status: 'failed' });
+      console.warn('[recompute-workout] compute-facts failed — halting downstream:', r.error.message);
+      return json({ ok: true, stale: true, steps, code: 'facts_failed' });
+    }
+    steps.push('facts');
+  }
+
+  // ── 5. analyze-{sport} — writes workout_analysis (the field the snapshot reads). Continue on fail.
+  {
+    const r = await invokeWithRetry(serviceClient, analyzeFn, {
+      workout_id,
+      force_regenerate_ai_summary: forceRegenerate,
     });
+    if (r?.error) console.warn(`[recompute-workout] ${analyzeFn} failed (continuing):`, r.error.message);
+    else steps.push('analyze');
   }
-  steps.push('compute-workout-analysis');
 
-  const factsRes = await serviceClient.functions.invoke('compute-facts', {
-    body: { workout_id },
-  });
-  if (factsRes.error) {
-    console.warn('[recompute-workout] compute-facts failed:', factsRes.error.message);
-    return json({ ok: true, stale: true, steps });
-  }
-  steps.push('compute-facts');
-
-  // D-078: explicit user-triggered recompute MUST force ai_summary
-  // regeneration. Pre-fix, both run + cycling analyzers preserved the
-  // existing ai_summary when the LLM call returned null (the original
-  // intent: don't blow away good narrative on a transient sync-time
-  // LLM hiccup). That preservation is correct for ingest-activity's
-  // automatic bulk-sync path but wrong for the user-triggered
-  // "Recompute analysis" button — the user expects fresh text, and
-  // any prompt-rule change (D-046, D-076) leaves prior narrative
-  // governed by stale rules. The flag is consumed only by the
-  // analyzers; ingest-activity doesn't pass it.
-  const analyzeRes = await serviceClient.functions.invoke(analyzeFn, {
-    body: { workout_id, force_regenerate_ai_summary: true },
-  });
-  if (analyzeRes.error) {
-    console.warn(`[recompute-workout] ${analyzeFn} failed:`, analyzeRes.error.message);
-    return json({ ok: true, stale: true, steps });
-  }
-  steps.push('analyze');
-
-  // D-178: refresh the cached snapshot + invalidate the training caches so the recomputed workout
-  // reaches every CACHED reader (LOAD bar, coach, the athlete-state spine) — not just its own
-  // Performance/Details tabs (which read live). Before this, recompute left the snapshot stale, so a
-  // manual swim (and any recompute) was invisible to LOAD/coach until the next real ingest. Non-fatal.
+  // ── 6. compute-snapshot — OWNED here, AFTER analyze, with a fresh input watermark (F3 guard).
+  //    source_watermark = inputs-assembled-now (post-analyze). A one-behind trigger would carry an
+  //    older watermark and be REFUSED by trg_guard_snapshot_watermark. Non-fatal; self-heals next run.
   try {
-    const d = String((workout as any).date || '').slice(0, 10);
-    await serviceClient.functions.invoke('compute-snapshot', {
-      body: { user_id: workout.user_id, ...(d ? { week_start: mondayOf(d) } : {}) },
+    const source_watermark = new Date().toISOString();
+    await invokeWithRetry(serviceClient, 'compute-snapshot', {
+      user_id: workout.user_id,
+      ...(workoutDate ? { week_start: mondayOf(workoutDate) } : {}),
+      source_watermark,
     });
     await invalidateUserTrainingCache(serviceClient, workout.user_id, 'recompute-workout');
     steps.push('snapshot');
