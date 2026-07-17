@@ -13,6 +13,7 @@ import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeStat
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
+import { CROWN_MIN_DECOUPLING } from './baseline-derive.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
 import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSummary } from './discipline.ts';
@@ -253,6 +254,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // off the steady-run (decoupling) pool.
   const runDecoupSeries = decouplingToSeries(inp.runJoined);
   const runSteadyCadence = runDecoupSeries.length / WEEKS_90D;
+  // TREND uses the FULLER series (keeps sub-zero readings for slope) — untouched by Fix A.
   const runDecoupling = computeRunDecouplingState(runDecoupSeries, asOf, runSteadyCadence);
   const runEffSeries = efficiencyIndexToSeries(inp.runJoined);
   const runEfficiency = computeRunEfficiencyState(runEffSeries, asOf, runEffSeries.length / WEEKS_90D);
@@ -265,7 +267,12 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // State v3 dot-and-arrow: WHERE the current value sits in the athlete's own 12wk range (oriented so
   // 1 = best). Decoupling is lower-is-better, so a low value lands at the best edge — the dot shows the
   // LEVEL, the arrow shows the DIRECTION, and "needs work" (level) + "improving" (trend) stop fighting.
-  const runDecoupRange = positionInRange(runDecoupSeries, { higherIsBetter: false });
+  // FIX A — ONE FLOOR PER AXIS: the BAND's coordinate frame (where the dot + tick sit) floors sub-zero
+  // decoupling with the SAME crown constant, so the band's "stronger" edge isn't defined by a confounded
+  // negative run (which left the tick pinned mid-band even for an excellent crown). Band placement ONLY —
+  // the trend series above is untouched.
+  const runDecoupBandSeries = runDecoupSeries.filter((p) => p.value >= CROWN_MIN_DECOUPLING);
+  const runDecoupRange = positionInRange(runDecoupBandSeries, { higherIsBetter: false });
   const runFitness: RunFitness = {
     decoupling: {
       verdict: runDecoupling.trend.verdict,

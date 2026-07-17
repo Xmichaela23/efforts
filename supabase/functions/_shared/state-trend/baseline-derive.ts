@@ -71,9 +71,13 @@ export function deriveProvisionalBaselines(inp: BaselineDeriveInputs, opts: Base
 // HEDGE-never-a-filter (run.ts). But crowning is stricter than trending: a negative decoupling (HR drifting
 // DOWN vs pace) is almost always a confounded/under-warmed start, not superhuman durability — a "memorial",
 // not a benchmark. So auto-derivation will only CROWN a run whose decoupling is >= 0. (The athlete may still
-// pick a negative-drift run manually via the change flow; auto just won't.) This threshold is benchmark-scoped
-// and does NOT touch the trend series.
-const CROWN_MIN_DECOUPLING = 0;
+// pick a negative-drift run manually via the change flow; auto just won't.)
+//
+// FIX A (2026-07-16): this is the CLEAN edge of the decoupling axis. A reading not clean enough to CROWN
+// is not clean enough to define the BAND's "stronger" edge either — so assemble.ts floors the band's
+// COORDINATE FRAME with THIS SAME constant (imported, one definition, no second copy). It still does NOT
+// touch classifyTrend's series — the trend keeps the fuller data for slope.
+export const CROWN_MIN_DECOUPLING = 0;
 
 function deriveRun(rows: DecouplingRow[] | null | undefined, windowStart: string, asOf: string): BaselineCandidate | null {
   const qualifying = (Array.isArray(rows) ? rows : [])

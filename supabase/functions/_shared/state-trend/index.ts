@@ -108,6 +108,7 @@ export {
 export {
   deriveProvisionalBaselines,
   reconcileBaseline,
+  CROWN_MIN_DECOUPLING,
   type BaselineCandidate,
   type BaselineAction,
   type ActiveBaseline,
