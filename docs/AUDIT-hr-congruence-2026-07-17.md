@@ -84,12 +84,13 @@ D-286 consolidated the Friel zone *math* into `src/lib/friel-zones.ts` (easy cei
 
 ## Ranked fracture list (what to fix, biggest leverage first)
 
-1. **Build `resolveCurrentLthr()` and route the four sites (A–D).** The root. Collapses the typed-vs-learned inversion, the device-column divergence, the coach's blindness to a typed value, and the sample-count gate — all at once. Spec exists (`SPEC-lthr-one-anchor.md`); this is the same pattern as `resolveCurrentFtp`.
-2. **Fix `save-imported-workout:173` (0.90 → canonical 0.89).** Small, high-value — it re-seeds the exact bug D-286 fixed, on the FIT-import path D-286 didn't touch, into the field that overrides everything.
-3. **Route `analyze-running-workout:1030/:1944` through `friel-zones.ts`** instead of its 0.75/0.85/0.92/0.98 hardcodes — kills the second zone distribution.
-4. **Delete the dead `_shared/endurance/hr-zones.ts`** (0.90 copy, no importers).
-5. **One max-HR resolver** — unify the `180` / `220−age` / Tanaka / `obsMax/0.95` estimates behind a single fallback (folds naturally into #1).
-6. **Bike efficiency double** (spine 56-day HR-at-power vs coach 7-day HR-drift) — contained by scope labels today; lowest priority.
+1. ✅ **SHIPPED (D-296) — `resolveCurrentLthr()` built + all four sites (A–D) routed.** Collapses the typed-vs-learned inversion, the device-column divergence, the coach's blindness to a typed value, and the sample-count gate. `src/lib/resolve-current-lthr.ts`; byte-identical for the primary user.
+2. ✅ **SHIPPED (D-296) — `save-imported-workout` 0.90 → canonical `zone3FloorBpm`.** No longer re-seeds the D-286 bug on the FIT-import path.
+3. ✅ **SHIPPED (D-296) — `analyze-running-workout:1030/:1944` routed to the canonical model.** Kills the second zone distribution. ⚠️ NOT byte-identical for the primary user (no configured zones → debrief zones move to match the facts); deterministic history recompute owed.
+4. ⏸️ **Delete the dead `_shared/endurance/hr-zones.ts`** — DEFERRED: a run generator (`sustainable.ts`) still references its symbols; needs a live/dead check before removal (zero correctness risk meanwhile).
+5. ⏳ **One max-HR resolver** — unify the `180` / `220−age` / Tanaka / `obsMax/0.95` estimates behind a single fallback (next pass).
+6. ⏳ **`threshold_pace`** — same disease, ~15 files, 3 units; its own annexation.
+7. **Bike efficiency double** (spine 56-day HR-at-power vs coach 7-day HR-drift) — contained by scope labels; lowest priority.
 
 ---
 

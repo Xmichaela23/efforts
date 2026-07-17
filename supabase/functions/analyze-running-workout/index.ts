@@ -35,7 +35,8 @@ import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
-import { resolveRunEasyHrBand, isEasyHr } from '../_shared/easy-hr.ts';
+import { resolveRunEasyHrBand, isEasyHr, easyCeilingBpm, zone3FloorBpm } from '../_shared/easy-hr.ts';
+import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -1024,13 +1025,16 @@ Deno.serve(async (req) => {
             return { z1Max, z2Max, z3Max, z4Max, z5Max: 999 };
           }
         }
-        // Priority 2: Friel %LTHR from learned threshold HR
-        const thr = Number((learnedFitness as any)?.run_threshold_hr?.value ?? (learnedFitness as any)?.runThresholdHr?.value);
-        if (!Number.isFinite(thr) || thr <= 0) return undefined;
-        const z1Max = Math.round(thr * 0.75);
-        const z2Max = Math.round(thr * 0.85);
-        const z3Max = Math.round(thr * 0.92);
-        const z4Max = Math.round(thr * 0.98);
+        // Priority 2: the CANONICAL Friel %LTHR model (friel-zones.ts) from the resolved threshold —
+        // the SAME boundaries the facts bins, the Baselines screen, and the easy band use. Was a local
+        // non-Friel table (0.75/0.85/0.92/0.98) that produced a SECOND, differently-binned distribution
+        // surfacing next to the facts. audit 2026-07-17. LTHR via the one resolver (learned-first, gated).
+        const thr = resolveCurrentLthr({ learned_fitness: learnedFitness as any }).bpm;
+        if (thr == null || thr <= 0) return undefined;
+        const z1Max = Math.round(thr * 0.85);
+        const z2Max = zone3FloorBpm(thr);
+        const z3Max = Math.round(thr * 0.95);
+        const z4Max = Math.round(thr * 1.05);
         return { z1Max, z2Max, z3Max, z4Max, z5Max: 999 };
       } catch {
         return undefined;
@@ -1939,9 +1943,10 @@ Deno.serve(async (req) => {
           const z2Max = Number(czArr[1]?.max ?? 0);
           if (z2Max > 0) return z2Max;
         }
-        const thr = Number((learnedFitness as any)?.run_threshold_hr?.value ?? (learnedFitness as any)?.runThresholdHr?.value);
-        if (!Number.isFinite(thr) || thr <= 0) return null;
-        return Math.round(thr * 0.85);
+        // Canonical easy ceiling (0.89·LTHR, friel-zones.ts) via the one resolver — NOT a local 0.85.
+        const thr = resolveCurrentLthr({ learned_fitness: learnedFitness as any }).bpm;
+        if (thr == null || thr <= 0) return null;
+        return easyCeilingBpm(thr);
       } catch {
         return null;
       }
