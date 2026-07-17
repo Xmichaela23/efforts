@@ -1,6 +1,8 @@
 # SPEC — State v3: the Fitness band, the Plan tick, and the prognosis expand
 
-**Status:** SPEC (2026-07-14). Not built. A real redesign of the State PERFORMANCE section — NEW scalars, not a re-skin. Sign-off gated.
+> ⛔ **SHIPPED 2026-07-17 — substance folded into D-293 / D-294 / D-295 (DEPLOYED + VERIFIED on device).** The fitness band (dot + arrow), the three anchoring modes, auto-derived rolling anchors, the `withheld` volume gate, and the swim facts-only ruling all LANDED — see those D-entries and the 2026-07-17 ADDENDUM below. **§2a's "a dot on every row" was SUPERSEDED by the three-mode ruling** (dot only where a real anchor of the athlete's own exists; textbook norms are never the reference line). This file is retained ONLY for the PARKED remainder in the addendum (change-affordance UI, crown-from-N N>2, prognosis expand). Everything above the addendum is history — read D-294 first.
+
+**Status:** SPEC (2026-07-14) — CORE SHIPPED 2026-07-17 (D-294); file now holds only the parked remainder. A real redesign of the State PERFORMANCE section — NEW scalars, not a re-skin. Sign-off gated.
 **Voice / honesty frame:** `DECISIONS-LOG.md` **D-242** ("label what's computed, never compute to match the label"; corollary: *a label needing a computation that doesn't exist is NEW scope*) and **D-240** (no cross-discipline composite). `CONSTITUTION.md` Laws 1, 2, 4.
 **Depends on:** the Q-179 posture join, shipped 2026-07-14 (`_shared/state-trend/posture.ts`). **This spec is that work's payoff** — the "lever" line cannot exist without it.
 

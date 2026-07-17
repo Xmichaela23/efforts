@@ -24,7 +24,30 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-14 EOD — POSTURE SHIPPED. THE STALE-DURABILITY MYSTERY IS SOLVED. NEXT: PHASE 2 (FAN-OUT) or the STATE v3 REDESIGN.)
+## 🧭 NEXT SESSION — START HERE (2026-07-17 EOD — STATE v3 FITNESS ANCHORS SHIPPED + ACCEPTED ON DEVICE)
+
+> ## READ `docs/GAME-PLAN.md`, then `START-HERE.md` + `LIFECYCLE.md`. **Before touching State fitness: the `docs/SPEC-state-fitness-band.md` 2026-07-17 ADDENDUM** — the shipped anchor arc + the PARKED list with wake-triggers.
+>
+> ### WHAT SHIPPED — Option B from the last banner (State v3 fitness band) is DONE, and the athlete ACCEPTED it on device.
+> The run row that claimed "improving" off doubled-up data now anchors to a real recent run, withholds the direction it can't back at low volume, and explains a descent instead of scolding. The arc (all verified on real data; see D-293/294/295):
+> - **Swim = described, not graded** — volume facts, no fitness dot (pace is fins/equipment-contaminated). Fins pace caveat on the session screen; unplanned-swim equipment capture wired. **D-293.**
+> - **Auto-derived fitness anchors** (`fitness_baselines` table, `baseline-derive.ts`): **crown-from-N** (the crown is the 2nd-best qualifying value = a level reached ≥2 times; a lone day is uncrownable), ≥0 crown floor, idempotent reconcile (confirmed never auto-touched). **Volume gate → `withheld`** — a 4th verdict state; below 8 qualifying steady runs in the window the direction is NOT asserted (counts voice, no arrow). Band-floor one-per-axis. **D-294.**
+> - **⟳ ROLLING ANCHOR (decision reversal, SAME session)** — the 24wk "established level" horizon was built then REVERSED; the anchor now tracks CURRENT capacity (shares the band's ~12wk `cadenceDays` window), descending as runs age out. Rationale: the long-memory model was a months-old scold. + **anchor-descent accent** (composer tier 3.5, GATED credit clause; cause carried on `state_trends_v1.run_anchor_descent`, no schema change). **D-294.**
+> - **`route_progress_metrics` one-row-per-workout (SCHEMA ROOT FIX)** — `UNIQUE(workout_id)` replaced `UNIQUE(route_cluster_id, workout_id)`; a re-clustered run no longer inserts a twin. Killed a PHANTOM "reached twice" crown + inflated the run count. + **snapshot read=write fix**: the coach reads the current-week snapshot (`week_start ≤ mondayOfToday`), not `MAX(week_start)` — a stray non-Monday `07-14` row was shadowing the anchors. **D-295.** (This closes the FILED coach-reads-MAX bug from the last banner.)
+>
+> ### YOUR JOB — Michael's call:
+> **OPTION A — PHASE 2, FIX THE FAN-OUT** — STILL OWED, untouched by this arc (`GAME-PLAN.md`). `compute-facts` (awaited) reads `workouts.computed` written by two fire-and-forget calls; `compute-snapshot` reads `workout_analysis` written fire-and-forget AFTER it → durability one workout behind by construction; `ingest-phone-workout`/`save-imported-workout` never reach the spine. Real and unfixed.
+> **OR the PARKED list** (`SPEC-state-fitness-band.md` addendum) — change affordance, crown-from-N refinements, orphan-row cleanup, descent-accent first-firing watch, swim anchor. Each has a wake-trigger; **build none without an explicit block.**
+>
+> ### ⚠️ WATCH / UNVERIFIED — do NOT report as done:
+> - **The descent accent's FIRST REAL firing** was only TEST-triggered (I reset the anchor to re-trigger it, then it self-healed). Watch for it on the next NATURAL anchor descent + check the gate once against real cross-signals. **Q-186.**
+> - **Audit-trail test artifacts**: the live-verify reset left ~2 extra superseded run rows in `fitness_baselines`. The ACTIVE crown is correct (3.4%, Jul 12); the lineage has 2 stray historical rows. Prune carefully — timestamps overlap real supersedes. **Q-187.**
+> - **Orphan `route_progress_metrics` NULL-`workout_id` rows** — harmless to reads (no workout join → no decoupling → never a candidate). Data-hygiene pass. **Q-185.**
+> - Swim anchor stays calibration until a first RPE≥7 swim. **Q-188.**
+
+---
+
+## 🧭 NEXT SESSION — START HERE (SUPERSEDED 2026-07-14 EOD — POSTURE SHIPPED. THE STALE-DURABILITY MYSTERY IS SOLVED. NEXT: PHASE 2 (FAN-OUT) or the STATE v3 REDESIGN.)
 
 > ## READ `docs/GAME-PLAN.md` (dependency-ordered), then `START-HERE.md` + `LIFECYCLE.md`. **New this session: `docs/STATE-SOURCE-MAP.md` and `docs/SPEC-state-fitness-band.md` — read both before touching State.**
 >

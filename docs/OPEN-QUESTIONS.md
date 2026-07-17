@@ -25,6 +25,22 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 **Why it wasn't chased:** it predates all of 2026-07-14's work, and the posture render fix (D-292) made the live path read the goal too, so posture is correct on BOTH paths regardless. **Two things to settle in a dedicated pass:** (1) WHERE does the non-Monday row come from — who writes an athlete_snapshot with a non-Monday `week_start`? (2) the coach should select the CURRENT-WEEK snapshot (`mondayOfToday`), not `max(week_start)` — but guard for the case where this week's row doesn't exist yet. **Do NOT confuse this with anything shipped 2026-07-14.**
 
+## Q-185 — orphan NULL-`workout_id` rows in `route_progress_metrics` (2026-07-17, deferred — data hygiene, non-blocking)
+
+D-295 set `UNIQUE(workout_id)` on `route_progress_metrics`, but a UNIQUE index permits MULTIPLE NULLs — so pre-existing rows with a null `workout_id` survive the dedup. They are harmless to every rendered read (no workout join → no decoupling row → never a baseline candidate and never in the trend series). A cleanup pass can delete them, but there is no read-path reason to rush it. Wake-trigger: any future query that trusts `route_progress_metrics` row COUNTS (nothing does today).
+
+## Q-186 — the anchor-descent accent's FIRST REAL firing is unobserved; only test-triggered (2026-07-17, unverified — watch)
+
+The `anchor_descent` accent (D-294) fired live ONLY because I reset the anchor to re-trigger it during verification (it then self-healed). It has never fired on a NATURAL descent (the athlete's crown source aging out on its own). ⛔ This is DEPLOYED, not VERIFIED. What settles it: watch for it on the next real anchor descent and check the credit gate (`aerobicCarriers.length>0 && hrResp.verdict!=='sliding'`) once against real cross-signals — confirm the credit clause renders only when the aerobic work genuinely covered the load.
+
+## Q-187 — ~2 stray superseded rows in `fitness_baselines` lineage from the live-verify reset (2026-07-17, deferred — prune carefully)
+
+Verifying the descent accent required resetting the run anchor on real data, which left ~2 extra superseded rows in `fitness_baselines`' history for Michael's run/decoupling. The ACTIVE crown is correct (3.4%, Jul 12) — only the audit lineage has test artifacts. ⚠️ Prune WITH Michael, not blind: the stray rows' `superseded_at` timestamps overlap genuine supersedes from the same session, so a naive "delete recent superseded rows" would eat real history.
+
+## Q-188 — swim anchor stays in calibration until a first RPE≥7 swim (2026-07-17, intentional — not a bug)
+
+`deriveSwim` (D-293/D-294) anchors on the 2nd-fastest CONFIRMED-HARD swim (RPE≥7, crown-from-N). Michael has no qualifying hard swim on record in-window, so the swim fitness mode is `facts_only` with no anchor — correct and honest (no dot invented from easy swims). Wake-trigger: the first RPE≥7 swim gives it a second hard effort → a provisional swim anchor appears automatically. Nothing to fix; noted so the next session doesn't "fix" the missing swim dot.
+
 ## Q-184 — four SILENT-DROP / staleness fractures on the State screen, catalogued in `STATE-SOURCE-MAP.md` (ENGINE, 2026-07-14 — code-verified, deferred)
 
 Found while building the State source map. All four verified in code; none blocking; all worth a pass:

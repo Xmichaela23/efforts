@@ -25,6 +25,11 @@ Q-178 fixed the predicate so a set flagged `completed` with **zero reps, zero we
 - [ ] **The durability trend is un-frozen (D-291).** The run row should read **"as of Jul 13"**, not late June, and count your Jul 12/13 runs (`newestAgeDays 1`, not 16). Verified in DB; confirm on screen.
 - [ ] **Grade-Adj Pace tile (D-291).** Open a recent outdoor run → **Details**. There should be a **Grade-Adj Pace** tile next to Avg Pace (the hills-removed pace; on a hilly run it reads a few sec/mi slower than raw). And the **route chart** now plots the real grade-adjusted number, not the HR-normalized one.
 
+### Shipped 2026-07-17 (State v3 fitness anchors) — arc ACCEPTED on device; two items still to WATCH
+- [x] **The fitness band, anchors, `withheld` gate, swim facts-only (D-293/294/295)** — accepted on device 2026-07-17. Run anchor 3.4% (Jul 12), direction withheld at low volume, swim shows facts, bike `auto · FTP est`. **Do NOT re-litigate.**
+- [ ] **⚠️ WATCH — descent accent's FIRST REAL firing (Q-186).** It only fired TEST-triggered. On the next NATURAL anchor descent (a strong old run aging out of the ~12wk window), confirm the coach line reads as an explanation-with-credit, not a scold — and that the credit clause is absent when the aerobic work didn't cover the load.
+- [ ] **⚠️ CLEANUP — ~2 stray superseded rows in `fitness_baselines` (Q-187).** From the live-verify reset. Active crown is correct; prune the lineage WITH Michael (timestamps overlap real supersedes).
+
 ### Shipped 2026-07-13/14 (strength) — verify on device
 - [ ] **The SWAP (Q-181 / D-289 + D-290).** In a prescribed strength session, hit the **⟳ Swap** icon on an exercise. Expect: a sheet of **same-movement-pattern** alternatives you can actually load (Bulgarian Split Squat → walking lunge, reverse lunge, step-up — **never** hip thrust). Pick one → **no dock**, the weight **clears** (it was computed for the other exercise), reps stay.
   Then try an **out-of-slot** override — type "Hip Thrust" into the name field — and check Performance says: *"Swapped Bulgarian Split Squat → Hip Thrust. Hip-dominant instead of knee-dominant — same session, different stimulus."*
@@ -171,7 +176,7 @@ The 2026-07-13 audit found the same disease three times, and it is the highest-l
 - [ ] **`generate-run-plan`'s `simplePlacementPolicy`** is the only real §4.21 gap left, and it needs a **design pass, not a wire-up**. *(`generate-plan` is dead; `generate-triathlon-plan` has no per-day layer.)*
 
 ### Swim
-- [ ] **Swim CSS is ORPHANED.** Written by two engines (`learn-fitness-profile:355`, `compute-workout-analysis:772`), read by **nothing**. `planning-context.ts:238 SWIM_CSS_LIVE = false`. **The swim verdict is anchorless, and a 70.3 plan's swim leg is not calibrated to the athlete's swimming.** *(Product call needed: anchor it, or accept the hole and say so.)*
+- [ ] **Swim CSS is ORPHANED.** Written by two engines (`learn-fitness-profile:355`, `compute-workout-analysis:772`), read by **nothing**. `planning-context.ts:238 SWIM_CSS_LIVE = false`. **A 70.3 plan's swim leg is not calibrated to the athlete's swimming.** ✅ **2026-07-17 (D-293): the STATE swim verdict question is RESOLVED — swim is deliberately grade-less on State (`facts_only`), because pace is fins/equipment-contaminated. Anchorless-for-grading is now by design. A provisional swim anchor wakes on the first RPE≥7 swim (Q-188).** The PLAN-calibration hole (swim leg not anchored) is the part that remains.
 - [ ] **Swim protocol drift audit** — `SWIM-PROTOCOL.md` exists; generation was never cross-checked against it. The 2026-05-27 protocol audit was cycling+run only.
 - [ ] **Q-038 — swim stays provisional.** `StatePerformanceSection.tsx:136` hardcodes `PROVISIONAL_PERF = new Set(['swim'])`. Routing is now correct (`ingest-activity:1619`); needs **one live FORM→Strava swim re-ingest** to confirm and close.
 - [ ] **Q-016 — drill/main ratio by experience.** `swim-drill-tokens.ts:274` is still a flat 350yd floor; only Path A landed.

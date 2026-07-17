@@ -70,9 +70,10 @@
 | **e1RM series (trend)** | `exercise_log.estimated_1rm` ← `compute-facts:124` | 3 readers, 2 estimators | 🟡 `state-trend/strength.ts:79`, `adapt-plan:1138`, `analyze-strength-workout:814` |
 | **ACWR ratio** | ✅ `_shared/acwr.ts:155` | ✅ all 4 | 🟢 clean |
 | **ACWR band/status** | ✅ `_shared/acwr-state.ts:31` (plan-aware) | **6 bypass it** | 🔴 `response-model/weekly.ts:313` is **plan-blind** and ships in the same payload. Taper week @ 1.15: canon says `elevated` (cap 1.1), copy says `optimal` (cap 1.3). |
-| **fitness direction** | ✅ `_shared/state-trend/assemble.ts:335` (`rollupFitness`) | ✅ | 🟢 clean |
+| **fitness direction** | ✅ `_shared/state-trend/assemble.ts:335` (`rollupFitness`) | ✅ | 🟢 clean. 2026-07-17: gains a `withheld` verdict below 8 qualifying runs (D-294) — direction is not asserted at low volume. |
+| **fitness ANCHOR (band dot)** | ✅ `_shared/state-trend/baseline-derive.ts` → `fitness_baselines` table (D-294) | server ✅ + client `useStateTrends`→`StatePerformanceSection.tsx` | 🟢 auto-derived, rolling (shares the band's ~12wk window), crown-from-N. Run/bike anchored; swim `facts_only` until first RPE≥7 swim (Q-188). |
 | **RPE / effort perception** | `_shared/response-model/body-response.ts:369` | — | 🔴 **`makeTrend` splits THIS WEEK's sessions in half BY ORDER.** Hard Monday + easy Friday = "improving"; swap the days = "declining". It is the **necessary** leg for the safety floor (`load-status-reconcile.ts:83-95`, D-266). Q-167. |
-| **swim CSS** | ❌ none | — | ⚫ **ORPHANED.** Written by two engines (`learn-fitness-profile:355`, `compute-workout-analysis:772`), read by **nothing**. `planning-context.ts:238` `SWIM_CSS_LIVE = false`. The swim verdict is anchorless. |
+| **swim CSS** | ❌ none | — | ⚫ **ORPHANED.** Written by two engines (`learn-fitness-profile:355`, `compute-workout-analysis:772`), read by **nothing**. `planning-context.ts:238` `SWIM_CSS_LIVE = false`. 2026-07-17: swim is now DELIBERATELY grade-less on State (`facts_only`, D-293) — pace is fins/equipment-contaminated, so anchorless-for-grading is by design, not a fracture. A provisional swim anchor wakes on the first RPE≥7 swim (Q-188). |
 
 ---
 
