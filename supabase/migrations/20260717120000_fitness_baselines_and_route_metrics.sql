@@ -1,0 +1,20 @@
+-- Applied via the Supabase SQL editor (repo migration-tracking divergence), reviewed. Recorded here.
+--
+-- (1) route_progress_metrics — one row per WORKOUT, not per (cluster, workout). The old
+--     UNIQUE(route_cluster_id, workout_id) let a re-clustered run insert a twin row, which the fitness
+--     baseline derivation counted as "reached twice" (a phantom crown) and which inflated the run count
+--     + trend. Cleanup keeps the newest created_at per workout, then the lock is swapped to UNIQUE(workout_id).
+--     compute-facts's upsert conflict target flips to workout_id to honor it (deployed 2026-07-17).
+--
+--   BEGIN;
+--   DELETE FROM route_progress_metrics a USING route_progress_metrics b
+--     WHERE a.workout_id = b.workout_id
+--       AND (a.created_at < b.created_at OR (a.created_at = b.created_at AND a.id < b.id));
+--   ALTER TABLE route_progress_metrics DROP CONSTRAINT route_progress_metrics_route_cluster_id_workout_id_key;
+--   ALTER TABLE route_progress_metrics ADD CONSTRAINT route_progress_metrics_workout_id_key UNIQUE (workout_id);
+--   COMMIT;
+--
+--   NOTE: UNIQUE(workout_id) permits multiple NULLs — orphan metric rows with a NULL workout_id remain a
+--   separate, minor hygiene item; they carry no workout join → no decoupling → never a derivation candidate.
+--
+-- (2) fitness_baselines — see 20260716120000_create_fitness_baselines.sql (the per-discipline anchor table).

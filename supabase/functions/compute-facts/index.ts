@@ -858,7 +858,9 @@ async function upsertRouteIntelligence(
       metadata: {
         fingerprint,
       },
-    }, { onConflict: "route_cluster_id,workout_id" });
+    }, { onConflict: "workout_id" }); // one row per WORKOUT (not per cluster) — a re-clustered run UPDATES its
+    // single row instead of inserting a twin. Matches the fitness-baselines duplicate fix (2026-07-17): the
+    // schema now has UNIQUE(workout_id), so this conflict target is honored and re-analysis can't double-write.
   }
 }
 
