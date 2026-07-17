@@ -86,9 +86,20 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
     }
   }
   const total = [...byDiscipline.values()].reduce((a, b) => a + b, 0);
-  const comp = [...byDiscipline.entries()]
+  const rawComp = [...byDiscipline.entries()]
     .map(([type, l]) => ({ type, load: l, pct: total > 0 ? (l / total) * 100 : 0 }))
     .sort((a, b) => b.load - a.load);
+  // Displayed integer percentages via LARGEST-REMAINDER rounding, so the labels sum to EXACTLY 100.
+  // Rounding each independently can total 99 or 101 (e.g. 42+24+21+12 = 99). The bar WIDTHS still use
+  // the raw fractional pct (flexGrow below), so the segments stay proportionally exact.
+  const targetSum = total > 0 ? 100 : 0;
+  const comp = rawComp.map((c) => ({ ...c, displayPct: Math.floor(c.pct) }));
+  let leftover = targetSum - comp.reduce((a, c) => a + c.displayPct, 0);
+  for (const c of [...comp].sort((a, b) => (b.pct % 1) - (a.pct % 1))) {
+    if (leftover <= 0) break;
+    c.displayPct += 1;
+    leftover -= 1;
+  }
   const dominant = comp[0]?.type ?? null;
 
   return (
@@ -121,7 +132,10 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
         <div className="mt-3">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[10px] text-white/65 uppercase tracking-[0.08em]">Where your load is going</span>
-            <span className="text-[10px] tabular-nums text-white/55">{Math.round(load.wtd_actual_load ?? total)} pts WTD</span>
+            {/* The composition below is the ROLLING last-7-days load (daily_load_7d). Show that same
+                window's total here — NOT wtd_actual_load (week-to-date), which is a different window and
+                mislabeled this number as WTD over a 7-day bar. `total` is the sum the bar itself represents. */}
+            <span className="text-[10px] tabular-nums text-white/55">{Math.round(total)} pts · 7d</span>
           </div>
           <div className="flex h-6 rounded-md overflow-hidden gap-[2px]">
             {comp.map((c) => {
@@ -135,11 +149,11 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
                     backgroundColor: getDisciplineColor(c.type),
                     boxShadow: isDom ? 'inset 0 0 0 1.5px rgba(255,255,255,0.42)' : undefined,
                   }}
-                  title={`${disciplineName(c.type)} ${Math.round(c.pct)}%`}
+                  title={`${disciplineName(c.type)} ${c.displayPct}%`}
                 >
                   {c.pct >= 26 && (
                     <span className="text-[10px] font-semibold" style={{ color: 'rgba(0,0,0,0.62)' }}>
-                      {isDom ? `${disciplineName(c.type)} ${Math.round(c.pct)}%` : `${Math.round(c.pct)}%`}
+                      {isDom ? `${disciplineName(c.type)} ${c.displayPct}%` : `${c.displayPct}%`}
                     </span>
                   )}
                 </div>
@@ -151,7 +165,7 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
               <span key={c.type} className="inline-flex items-center gap-1.5 text-[11.5px] text-white/70">
                 <span className="inline-block w-2 h-2 rounded-[2px]" style={{ backgroundColor: getDisciplineColor(c.type) }} />
                 <span className={c.type === dominant ? 'text-white font-semibold' : ''}>{disciplineName(c.type)}</span>
-                <span className="text-[10px] tabular-nums text-white/40">{Math.round(c.pct)}%</span>
+                <span className="text-[10px] tabular-nums text-white/40">{c.displayPct}%</span>
               </span>
             ))}
           </div>
