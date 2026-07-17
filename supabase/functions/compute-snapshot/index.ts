@@ -806,7 +806,10 @@ serve(async (req: Request) => {
         // the assembly. Non-fatal: any failure here must never break the snapshot.
         let fitnessBaselines: Record<string, any> | null = null;
         try {
-          const derivStart = isoMinus(STATE_TREND_WINDOWS.baselineWindowDays);
+          // ⟳ ROLLING ANCHOR (2026-07-17): the derivation shares the band's RECENT window (cadenceDays,
+          // ~12wk) — NOT the retired 24wk horizon. The crown descends as recent runs age out and climbs as
+          // they build; each move a supersede with lineage. One window per axis (anchor ≈ band frame).
+          const derivStart = isoMinus(STATE_TREND_WINDOWS.cadenceDays);
           const { data: drpm } = await supabase.from("route_progress_metrics")
             .select("metric_date,workout_id").eq("user_id", userId).gte("metric_date", derivStart);
           const dWids = [...new Set(((drpm ?? []) as any[]).map((r) => r.workout_id).filter(Boolean))];
@@ -832,7 +835,7 @@ serve(async (req: Request) => {
 
           const derived = deriveProvisionalBaselines(
             { runDecouplingRows: runDerivRows, bikeFtpEstimate, swimEfforts },
-            { asOf, windowDays: STATE_TREND_WINDOWS.baselineWindowDays },
+            { asOf, windowDays: STATE_TREND_WINDOWS.cadenceDays }, // ⟳ rolling: band's recent window, not 24wk
           );
 
           const { data: activeRows } = await supabase.from("fitness_baselines")

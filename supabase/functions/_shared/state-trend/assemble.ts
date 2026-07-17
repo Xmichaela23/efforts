@@ -68,26 +68,17 @@ export const STATE_TREND_WINDOWS = {
   swimDays: 56, // pace/100 8wk
   cadenceDays: 90, // sessions/week
   adherenceDays: ADHERENCE_WINDOW_DAYS,
-  // Baseline auto-derivation horizon. ⛔ THE INVARIANT IS THE GAP, NOT THE NUMBER: this window MUST stay
-  // LONGER than the DOT's band window (the recent 12-week range). The band answers "where am I recently";
-  // the ANCHOR answers "my established level", and the tick's whole purpose is to reach PAST the recent
-  // range — so "you've been better than this" is expressible, which a single-window system structurally
-  // cannot say. If the two windows were equal the tick would pin at the band's max by construction
-  // (best-in-12wk == band-max) and add nothing. If this number is ever tuned, preserve anchor > band.
-  //
-  // WHY 24wk (vs the field's 42–90d for capacity anchoring): those short windows assume a cyclist power-
-  // testing every 6–8 weeks — frequent hard data, short memory. A concurrent masters athlete in a 5×5
-  // block produces sparse hard aerobic efforts; a 90d window routinely holds ZERO qualifying runs. 24wk
-  // is the window that actually catches signal, and physiological ceilings move slowly enough at age that
-  // a 6-month-old effort is still a fair capacity claim. Recency-bounded (not all-time) → memorial solved.
-  //
-  // ⚠ FAILURE MODE THE LENGTH BUYS: a genuine decline (e.g. return-from-injury) reads as "below your
-  // anchor" for up to ~6 months until the strong run ages out. NOT hidden — softened HONESTLY by the tick
-  // rules: the anchor carries its SOURCE DATE ("auto · steady run · Jan 15"), so it reads as a dated,
-  // resettable claim (the change flow) rather than a mysterious permanent scold, and the ARROW still shows
-  // the comeback direction. Do NOT add injury-detection logic to auto-soften — that would be dishonest;
-  // visible staleness + the change flow are the mitigation.
-  baselineWindowDays: 168, // 24 weeks — the "established level" horizon; the GAP over the 12wk band is the real property
+  // ⟳ ROLLING ANCHOR (2026-07-17 — DECISION REVERSAL of the 24wk "established level" horizon below).
+  // The anchor now tracks CURRENT capacity, Garmin-style: it follows the athlete DOWN as well as up. It
+  // shares the band's RECENT window instead of reaching back into deep history, so run/swim derivation
+  // uses `cadenceDays` (~12wk, the same window the band's run series is fetched over) — one window per
+  // axis, no separate horizon. RATIONALE: the long-memory model produced a months-old "below your
+  // established level" scold (a Feb 0.5% run anchoring a July screen). We deliberately GIVE UP the
+  // tick-reaches-past-the-band property; retained differentiators are event citation, crown-from-N
+  // corroboration, the audit trail, and a DESCENT that arrives with an explanation (the composer's anchor-
+  // descent candidate), not a scold. `baselineWindowDays` (24wk) is retired — the derivation reads
+  // cadenceDays now. Kept below only as a dated record of the superseded decision.
+  baselineWindowDays: 168, // ⟳ SUPERSEDED 2026-07-17 — no longer read; the anchor rolls on cadenceDays. See the note above.
   // NEW RULE (2026-07-16, not inherited): the minimum qualifying steady runs IN THE TREND WINDOW to ASSERT
   // a durability direction. Below it, the direction is 'withheld' (stated as a count, no claim) — a handful
   // of runs can't earn "improving" (nor "holding"). Data-sufficiency only, never plan-adherence. 8 ≈ ~1.3
