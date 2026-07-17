@@ -667,6 +667,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       pct: typeof pct === 'number' && Number.isFinite(pct) ? Math.round(pct * 10) / 10 : null,
       basis: (basis === 'gap' || basis === 'raw') ? basis : null,
       assessment: (['good','needs_work'] as const).includes(assessment as any) ? assessment : null,
+      // Heat/effort-confounded flag — the SAME one State reads to EXCLUDE a run from the durability
+      // verdict. Threaded here so the per-workout row can't scold "aerobic base needs work" off a
+      // number the app itself flagged unreliable (a hot run's decoupling). audit 2026-07-17.
+      confounded: (hrs as any)?.decouplingConfounded === true,
     };
   })();
 
@@ -1285,7 +1289,7 @@ export function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
   intervals: IntervalRow[] = [], sport: string = '', vsSimilar: any = null,
   weatherTempF: number | null = null,
-  decoupling: { pct: number | null; basis: 'gap' | 'raw' | null; assessment: 'excellent' | 'good' | 'moderate' | 'high' | null } | null = null,
+  decoupling: { pct: number | null; basis: 'gap' | 'raw' | null; assessment: 'excellent' | 'good' | 'moderate' | 'high' | null; confounded?: boolean } | null = null,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
@@ -1566,16 +1570,20 @@ export function buildAnalysisDetailRows(
     // system hold up" — the descriptive bpm line below is suppressed so there is exactly
     // one HR-behaviour read, never two that can disagree. Raw/confounded/short/interval
     // runs have no % → fall through to the measured (verdict-free) bpm description.
+    // A CONFOUNDED run (heat/effort) has an unreliable % — the app already flagged it and State EXCLUDES
+    // it from the durability verdict. So it must not render a per-run verdict either; it falls through to
+    // the measured HR line + the heat-aware narrative (which already explain it). audit 2026-07-17.
     const decouplingShown = !!(decoupling && decoupling.basis === 'gap'
-      && typeof decoupling.pct === 'number' && decoupling.assessment);
+      && typeof decoupling.pct === 'number' && decoupling.assessment && !decoupling.confounded);
     if (decouplingShown) {
-      // ONE vocabulary with State (docs/STATE-WEEK-EXECUTION.md continuity). The old 4-tier read
-      // (excellent/good/moderate/high) included an "excellent" tier for near-zero/negative drift that
-      // Q-161 killed as indefensible (a negative usually reflects a soft start, not superior durability).
-      // State collapsed to the single Friel ~5% line; this row now reads the SAME shared `decouplingLabel`
-      // (frielBand) so a run's decoupling can never say one thing here and another on State.
-      const { word } = decouplingBandDisplay(frielBand(decoupling!.pct));
-      rows.push({ label: 'Aerobic decoupling', value: `${decoupling!.pct}% — ${word ?? 'measured'}` });
+      // PER-RUN FACT, not a base verdict. "Aerobic base needs work / is sound" is a LONGITUDINAL claim
+      // about fitness — it belongs to the TREND (State, confound-excluded, personal + posture-aware), which
+      // OWNS it (Law 1). A single run only states how HR held vs pace THIS run; the base verdict is State's.
+      const p = decoupling!.pct as number;
+      const desc = p < 5 ? 'HR held steady with pace'
+        : p <= 10 ? 'moderate HR drift over the run'
+        : 'notable HR drift late in the run';
+      rows.push({ label: 'Aerobic decoupling', value: `${p}% — ${desc}` });
     }
 
     if (decouplingShown || sport === 'swim' || shouldSuppressSessionHrDrift(factPacket, intervals)) {

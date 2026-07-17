@@ -40,17 +40,30 @@ const labels = (rows: Array<{ label: string; value: string }>) => rows.map((r) =
 const find = (rows: Array<{ label: string; value: string }>, label: string) =>
   rows.find((r) => r.label === label);
 
-Deno.test('Q-158 (1): GAP decoupling renders the % verdict and SUPPRESSES the bpm line', () => {
+Deno.test('Q-158 (1): GAP decoupling renders the run FACT (not a base verdict) and SUPPRESSES the bpm line', () => {
   const rows = buildAnalysisDetailRows(
     factPacketWithDrift(6), [], false, null, false, [], 'run', null, null, GAP_GOOD,
   );
   const dec = find(rows, 'Aerobic decoupling');
   assertEquals(!!dec, true, 'Aerobic decoupling row must render on a GAP-basis read');
   assertStringIncludes(dec!.value, '4.2%');
-  // ONE vocabulary with the State "Fitness" card (frielBand): ≤5% → "aerobic base is sound".
-  assertStringIncludes(dec!.value, 'aerobic base is sound');
+  // audit 2026-07-17: the per-run row states a RUN FACT, not a base verdict. "aerobic base needs work / is
+  // sound" is a LONGITUDINAL claim owned by the State trend (confound-excluded, personal). ≤5% → held steady.
+  assertStringIncludes(dec!.value, 'HR held steady with pace');
+  assertEquals(dec!.value.includes('aerobic base'), false, 'per-run row must NOT issue the base verdict');
   // Exactly one HR-behaviour read: the descriptive bpm "Heart rate" line is gone.
   assertEquals(labels(rows).includes('Heart rate'), false, 'bpm line must be suppressed when % shown');
+});
+
+Deno.test('audit 2026-07-17: a CONFOUNDED run stamps NO verdict — it falls through to the measured line', () => {
+  // Heat/effort-confounded run (the July 13 84°F case): the app flagged the % unreliable and State EXCLUDES
+  // it, so the per-run row must NOT scold "aerobic base needs work" off it. No decoupling row; bpm line owns it.
+  const CONFOUNDED = { ...GAP_HIGH, confounded: true }; // 9.1% but confounded
+  const rows = buildAnalysisDetailRows(
+    factPacketWithDrift(9), [], false, null, false, [], 'run', null, null, CONFOUNDED,
+  );
+  assertEquals(labels(rows).includes('Aerobic decoupling'), false, 'confounded run must NOT stamp a decoupling verdict');
+  assertEquals(!!find(rows, 'Heart rate'), true, 'the measured bpm line renders instead');
 });
 
 Deno.test('Q-158 (1b): high decoupling still suppresses the bpm line (no competing verdict)', () => {
