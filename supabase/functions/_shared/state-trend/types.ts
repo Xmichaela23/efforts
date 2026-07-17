@@ -3,7 +3,11 @@
 // dated metric series + its thresholds, and feeds the shared `classifyTrend` primitive.
 // Adding run/swim later (post-Q-038) is a new adapter, not new scaffolding.
 
-export type TrendVerdict = 'improving' | 'holding' | 'sliding' | 'needs_data';
+// 'withheld' (2026-07-16): enough data to COMPUTE a direction but too few qualifying samples to ASSERT one.
+// A distinct fourth direction-state — NOT 'holding' ("stable" is itself a claim sparse data can't back).
+// Only produced when a caller passes classify's `directionFloor` opt (run durability this round). Consumers
+// that roll up direction must treat it as non-directional (like needs_data), never as a movement.
+export type TrendVerdict = 'improving' | 'holding' | 'sliding' | 'needs_data' | 'withheld';
 
 /** One dated metric reading. `value` is the discipline's metric (e1RM lbs, 20-min W, …). */
 export interface TrendPoint {

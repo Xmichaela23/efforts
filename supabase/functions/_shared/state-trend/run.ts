@@ -240,7 +240,7 @@ export interface DecouplingState {
   recentPct: number | null;    // raw recent decoupling — shown with its date for carry-forward when stale
   metricLabel: string;
 }
-export function computeRunDecouplingState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): DecouplingState {
+export function computeRunDecouplingState(series: TrendPoint[], asOf: string, sessionsPerWeek: number, directionFloor?: number): DecouplingState {
   const offset = series.map((p) => ({ date: p.date, value: p.value + DECOUPLING_OFFSET }));
   const trend = classifyTrend(
     offset,
@@ -249,7 +249,8 @@ export function computeRunDecouplingState(series: TrendPoint[], asOf: string, se
     asOf,
     // noiseGuardStdev: decoupling swings run-to-run on confounds we can't see (weather/sleep/fatigue), so
     // the early→recent shift must beat 1 SD of the series' own scatter — else it's noise and reads holding.
-    { exclude: isDeloadWeek, noiseGuardStdev: 1.0 },
+    // directionFloor: below N qualifying steady runs in the window, no direction is asserted → 'withheld'.
+    { exclude: isDeloadWeek, noiseGuardStdev: 1.0, directionFloor },
   );
   // Recent representative pct (un-offset): the smoothed recent end when there's a verdict, else the
   // newest in-window point so a stale/thin row can still carry-forward "last steady run Nd ago: X%".

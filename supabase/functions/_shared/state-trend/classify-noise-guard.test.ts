@@ -26,3 +26,14 @@ Deno.test('holding stays holding under the gate', () => {
   const series = pts([['2026-06-14', 38], ['2026-06-28', 37], ['2026-07-05', 38], ['2026-07-13', 37]]);
   assertEquals(classifyTrend(series, TH, '2026-07-16', { noiseGuardStdev: 1.0 }).verdict, 'holding');
 });
+
+// VOLUME / DATA-SUFFICIENCY gate (directionFloor): below N in-window samples, withhold the direction.
+Deno.test('volume gate — at floor-1 → withheld; at floor → the direction is asserted', () => {
+  // 8 clean improving points (offset positive so classify math is happy). floor = 8.
+  const pts = (n: number) => Array.from({ length: n }, (_, i) => ({ date: `2026-06-${String(10 + i).padStart(2, '0')}`, value: 40 - i }));
+  const TH2 = { ...TH, lowerIsBetter: false }; // higher = better here so the falling series reads sliding; direction either way
+  // 7 points (floor-1) → withheld
+  assertEquals(classifyTrend(pts(7), TH2, '2026-07-16', { directionFloor: 8 }).verdict, 'withheld');
+  // 8 points (at floor) → a real direction (not withheld)
+  assertEquals(classifyTrend(pts(8), TH2, '2026-07-16', { directionFloor: 8 }).verdict !== 'withheld', true);
+});

@@ -16,6 +16,7 @@ const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
   holding: { word: 'holding', cls: 'text-amber-300', arr: '→' },
   sliding: { word: 'sliding', cls: 'text-red-400', arr: '↓' },
   needs_data: { word: 'needs data', cls: 'text-white/40', arr: '' },
+  withheld: { word: 'too few to read', cls: 'text-white/40', arr: '' },
 };
 
 // D-160: pctChange is the RAW metric delta (classify.ts keeps it raw so the UI knows real direction).
@@ -100,6 +101,7 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
   holding: { word: 'steady', cls: 'text-amber-300', arr: '→' },
   sliding: { word: 'down', cls: 'text-white/50', arr: '↓' },
   needs_data: { word: 'needs data', cls: 'text-white/40', arr: '' },
+  withheld: { word: 'too few to read', cls: 'text-white/40', arr: '' },
 };
 
 // STRENGTH row — the DOT is e1RM (what you CAN lift), NOT volume (item 1). Volume is what you DID
@@ -238,20 +240,29 @@ function RunFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: RunFitnes
   const range = (d as any).range as { positionPct: number; confident: boolean } | null | undefined;
   const [explainOpen, setExplainOpen] = React.useState(false);
   const anchored = mode === 'anchored';
-  // SLICE 1: dot ONLY when anchored (a real baseline of yours). Run has none yet (reference-effort =
-  // Slice 2) → TREND-ONLY: the arrow + "no baseline set", never a positioned dot without a reference.
+  // VOLUME GATE: 'withheld' = too few qualifying runs to ASSERT a direction. The DOT (level) can still show
+  // when anchored; only the DIRECTION is withheld — replaced by the counts-voice line, no arrow, no color.
+  const withheld = d.verdict === 'withheld';
+  // SLICE 1: dot ONLY when anchored (a real baseline of yours). needs_data has no dot; withheld keeps the
+  // level dot (it's a direction claim we're withholding, not a data absence).
   const showDot = anchored && d.verdict !== 'needs_data' && range != null;
   const trendOnly = !anchored && d.verdict !== 'needs_data';
   // Provenance line so run cites like bike/swim do (item 5 — the arrow cites its data like the dot did).
   const evidence = d.sampleCount != null
     ? trendEvidence({ windowDays: 42, sampleCount: d.sampleCount, newestAgeDays: d.newestAgeDays, discipline: 'run' as Discipline })
     : null;
+  const runWk = Math.round(42 / 7); // run durability window ≈ 6wk
   const header = (
     <span className="basis-full flex items-baseline justify-between gap-2">
       <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[12px]">
         durability <span className="text-white/30 text-[9px]">{explainOpen ? '▾' : 'ⓘ'}</span>
       </button>
-      <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{d.provisional && <span className="text-white/30 text-[10px] ml-1">provisional</span>}</span>
+      {withheld ? (
+        // counts voice, no color, no arrow — state the data, claim nothing (Amendment 1).
+        <span className="text-white/40 text-[10px]">{d.sampleCount ?? 0} run{d.sampleCount === 1 ? '' : 's'} in {runWk}wk — too few to read direction</span>
+      ) : (
+        <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{d.provisional && <span className="text-white/30 text-[10px] ml-1">provisional</span>}</span>
+      )}
     </span>
   );
   return (
@@ -284,7 +295,7 @@ function RunFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: RunFitnes
       ) : (
         <span className="text-white/40">needs 20+ min steady effort</span>
       )}
-      {(showDot || trendOnly) && evidence && <span className="basis-full text-white/35 text-[10px]">{evidence}</span>}
+      {(showDot || trendOnly) && !withheld && evidence && <span className="basis-full text-white/35 text-[10px]">{evidence}</span>}
       {explainOpen && (
         <p className="basis-full text-[10px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">
           {anchored

@@ -88,6 +88,12 @@ export const STATE_TREND_WINDOWS = {
   // the comeback direction. Do NOT add injury-detection logic to auto-soften — that would be dishonest;
   // visible staleness + the change flow are the mitigation.
   baselineWindowDays: 168, // 24 weeks — the "established level" horizon; the GAP over the 12wk band is the real property
+  // NEW RULE (2026-07-16, not inherited): the minimum qualifying steady runs IN THE TREND WINDOW to ASSERT
+  // a durability direction. Below it, the direction is 'withheld' (stated as a count, no claim) — a handful
+  // of runs can't earn "improving" (nor "holding"). Data-sufficiency only, never plan-adherence. 8 ≈ ~1.3
+  // steady runs/wk over the 6wk window — enough that the early/recent 2-run endpoint averages aren't the
+  // whole series. Judgment call; calibrate with real data, don't tune to one athlete.
+  runDirectionMinRuns: 8,
 };
 
 // Pure asOf-relative window boundary (mirrors classify.ts's isoMinusDays; kept local to avoid a cycle).
@@ -255,7 +261,8 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const runDecoupSeries = decouplingToSeries(inp.runJoined);
   const runSteadyCadence = runDecoupSeries.length / WEEKS_90D;
   // TREND uses the FULLER series (keeps sub-zero readings for slope) — untouched by Fix A.
-  const runDecoupling = computeRunDecouplingState(runDecoupSeries, asOf, runSteadyCadence);
+  // VOLUME GATE: below runDirectionMinRuns qualifying runs in the window, the direction is 'withheld'.
+  const runDecoupling = computeRunDecouplingState(runDecoupSeries, asOf, runSteadyCadence, STATE_TREND_WINDOWS.runDirectionMinRuns);
   const runEffSeries = efficiencyIndexToSeries(inp.runJoined);
   const runEfficiency = computeRunEfficiencyState(runEffSeries, asOf, runEffSeries.length / WEEKS_90D);
   const runState = runDecoupling; // decoupling drives the provisional flag below
@@ -534,7 +541,8 @@ export function rollupFitness(v1: StateTrendsV1 | null | undefined): FitnessRoll
     ['swim', v1.swim],
   ] as const)
     .map(([key, d]) => ({ key, verdict: d?.verdict, provisional: !!d?.provisional }))
-    .filter((d) => d.verdict && d.verdict !== 'needs_data');
+    // 'withheld' is non-directional (like needs_data) — a withheld direction never drives the composite.
+    .filter((d) => d.verdict && d.verdict !== 'needs_data' && d.verdict !== 'withheld');
 
   const dirOf = (set: Array<{ verdict?: string }>): FitnessDirection => {
     const vs = set.map((d) => d.verdict);
@@ -587,7 +595,7 @@ export function rollupHrResponse(v1: StateTrendsV1 | null | undefined): HrRespon
   const all: Array<{ discipline: 'run' | 'bike'; verdict?: string; provisional: boolean; newestAgeDays: number | null }> = [];
   if (runD) all.push({ discipline: 'run', verdict: runD.verdict, provisional: !!runD.provisional, newestAgeDays: runD.newestAgeDays ?? null });
   if (bikeE) all.push({ discipline: 'bike', verdict: bikeE.verdict, provisional: !!bikeE.provisional, newestAgeDays: bikeE.newestAgeDays ?? null });
-  const contributors = all.filter((c) => c.verdict && c.verdict !== 'needs_data') as HrResponseRollup['contributors'];
+  const contributors = all.filter((c) => c.verdict && c.verdict !== 'needs_data' && c.verdict !== 'withheld') as HrResponseRollup['contributors'];
   if (contributors.length === 0) return { verdict: 'needs_data', contributors: [], asOfAgeDays: null };
 
   const solid = contributors.filter((c) => !c.provisional);

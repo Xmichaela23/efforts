@@ -84,17 +84,18 @@ function deriveRun(rows: DecouplingRow[] | null | undefined, windowStart: string
     .filter(isQualifyingDecouplingRow)                                   // SAME rule as the trend (one source)
     .filter((r) => { const d = rowDate(r); return d > windowStart && d <= asOf; }) // #2 recency
     .filter((r) => Number(r.decoupling_pct) >= CROWN_MIN_DECOUPLING);    // #3 don't crown a confounded negative
-  if (qualifying.length === 0) return null;
-  // best durability = the LOWEST decoupling %. Ties → the more RECENT run (a fresher anchor of equal quality).
-  const best = qualifying.reduce((a, b) => {
-    const av = Number(a.decoupling_pct), bv = Number(b.decoupling_pct);
-    if (bv < av) return b;
-    if (bv > av) return a;
-    return (rowDate(b) > rowDate(a)) ? b : a;
+  // CROWN-FROM-N (rule b): the crown is the level reached AT LEAST TWICE — the best value matched-or-beaten
+  // by ≥2 qualifying efforts, i.e. the 2ND-BEST qualifying value. A lone outlier (one kind day) is
+  // structurally uncrownable: a benchmark you hit once is an event, not a level. <2 qualifying → no crown.
+  if (qualifying.length < 2) return null;
+  const sorted = [...qualifying].sort((a, b) => {
+    const d = Number(a.decoupling_pct) - Number(b.decoupling_pct); // best (lowest drift) first
+    return d !== 0 ? d : rowDate(b).localeCompare(rowDate(a));      // ties → the more RECENT run
   });
+  const crown = sorted[1]; // 2nd-best
   return {
-    discipline: 'run', metric: 'decoupling', value: Number(best.decoupling_pct), lowerIsBetter: true,
-    sourceEventId: best.workout_id ?? null, sourceDate: rowDate(best), sourceLabel: 'steady run',
+    discipline: 'run', metric: 'decoupling', value: Number(crown.decoupling_pct), lowerIsBetter: true,
+    sourceEventId: crown.workout_id ?? null, sourceDate: rowDate(crown), sourceLabel: 'steady run',
   };
 }
 
@@ -110,16 +111,16 @@ function deriveSwim(efforts: BaselineDeriveInputs['swimEfforts'], windowStart: s
   const hard = (Array.isArray(efforts) ? efforts : [])
     .filter((e) => e?.confirmedHard === true && Number(e?.pacePer100m) > 0)
     .filter((e) => { const d = String(e?.date || ''); return d > windowStart && d <= asOf; }); // #2 recency
-  if (hard.length === 0) return null; // no hard effort on record → calibration state, never a faked anchor
-  const best = hard.reduce((a, b) => {
-    const av = Number(a.pacePer100m), bv = Number(b.pacePer100m);
-    if (bv < av) return b;            // faster pace = better
-    if (bv > av) return a;
-    return (String(b.date || '') > String(a.date || '')) ? b : a;
+  // CROWN-FROM-N (rule b), same as run: the 2nd-fastest confirmed-hard swim — a lone fast day can't crown.
+  if (hard.length < 2) return null; // <2 hard efforts → calibration
+  const sorted = [...hard].sort((a, b) => {
+    const d = Number(a.pacePer100m) - Number(b.pacePer100m); // faster (lower) first
+    return d !== 0 ? d : String(b.date || '').localeCompare(String(a.date || '')); // ties → recent
   });
+  const crown = sorted[1]; // 2nd-best
   return {
-    discipline: 'swim', metric: 'css_pace', value: Number(best.pacePer100m), lowerIsBetter: true,
-    sourceEventId: best.workout_id ?? null, sourceDate: String(best.date || ''), sourceLabel: 'hard swim',
+    discipline: 'swim', metric: 'css_pace', value: Number(crown.pacePer100m), lowerIsBetter: true,
+    sourceEventId: crown.workout_id ?? null, sourceDate: String(crown.date || ''), sourceLabel: 'hard swim',
   };
 }
 

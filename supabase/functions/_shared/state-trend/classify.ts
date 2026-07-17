@@ -32,6 +32,10 @@ export interface ClassifyOpts {
    *  can't see — weather, sleep, fatigue), a fixed dead-band isn't enough; the shift has to clear the
    *  data's OWN noise. Uses only the series — no new inputs. ~1.0 = "the shift beats one SD of scatter". */
   noiseGuardStdev?: number;
+  /** DATA-SUFFICIENCY / VOLUME gate (opt-in). Below this many in-window qualifying samples, the series has
+   *  enough to COMPUTE a direction but too few to ASSERT one → verdict 'withheld' (a distinct state, NOT
+   *  'holding'). Data-sufficiency only (a count), never plan-adherence. Run durability passes this. */
+  directionFloor?: number;
 }
 
 /**
@@ -100,6 +104,14 @@ export function classifyTrend(
     if (sd > 0 && Math.abs(recentAvg - earlyAvg) < opts.noiseGuardStdev * sd) {
       verdict = 'holding';
     }
+  }
+
+  // VOLUME / DATA-SUFFICIENCY gate: above the min-session floor we can COMPUTE a direction, but below
+  // `directionFloor` in-window qualifying samples we won't ASSERT one — a handful of runs can't earn
+  // "improving" (nor "holding" — stable is a claim too). Withhold: state the count, claim nothing. This
+  // is the app knowing its running is too thin to read, instead of contradicting the accent's own warning.
+  if (opts.directionFloor != null && verdict !== 'needs_data' && inWindow.length < opts.directionFloor) {
+    verdict = 'withheld';
   }
 
   // STALENESS GATE: a real verdict whose newest qualifying point is older than freshnessDays
