@@ -805,6 +805,7 @@ serve(async (req: Request) => {
         // superseded ONLY when the pick changes — no supersede churn), then hand the ACTIVE anchors to
         // the assembly. Non-fatal: any failure here must never break the snapshot.
         let fitnessBaselines: Record<string, any> | null = null;
+        let runAnchorDescent: any = null; // carried to state_trends_v1 for the composer's descent accent (no schema change)
         try {
           // ⟳ ROLLING ANCHOR (2026-07-17): the derivation shares the band's RECENT window (cadenceDays,
           // ~12wk) — NOT the retired 24wk horizon. The crown descends as recent runs age out and climbs as
@@ -862,6 +863,17 @@ serve(async (req: Request) => {
               await insertRow(disc, cand);
               finalActive[disc] = toActive(cand, "provisional");
             } else if (action.kind === "supersede") {
+              // DESCENT-BY-AGING (run): the accent's trigger. A supersede where the NEW crown is worse than
+              // the old AND the old source aged OUT of the window (not a better-run climb, not a data fix).
+              // The spine carries the cause so the composer never infers it. (decoupling lower-is-better →
+              // a higher new value = worse.)
+              if (disc === "run" && active?.source_date) {
+                const worse = Number(cand.value) > Number(active.value);
+                const oldAgedOut = !runDerivRows.some((r: any) => r.workout_id === active.source_event_id);
+                if (worse && oldAgedOut) {
+                  runAnchorDescent = { agedOutMonth: new Date(active.source_date + "T12:00:00Z").toLocaleDateString("en-US", { month: "long", timeZone: "UTC" }) };
+                }
+              }
               // retire old FIRST (the partial unique index allows only one active), then insert new, then link lineage
               await supabase.from("fitness_baselines").update({ superseded_at: nowIso }).eq("id", active.id);
               const { data: ins } = await insertRow(disc, cand);
@@ -882,6 +894,9 @@ serve(async (req: Request) => {
 
         const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines });
         stateTrendsV1 = toStateTrendsV1(result, asOf);
+        // Carry the descent cause on the payload (JSONB, no schema change) so the coach's composer receives
+        // it as a candidate rather than inferring it (contract §3a/§4).
+        if (runAnchorDescent && stateTrendsV1) (stateTrendsV1 as any).run_anchor_descent = runAnchorDescent;
       } catch (e: any) {
         console.log("⚠️ state_trends_v1 (spine) failed (non-fatal):", e?.message || e);
         stateTrendsV1 = null;

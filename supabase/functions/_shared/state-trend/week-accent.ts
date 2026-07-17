@@ -12,6 +12,7 @@
 export type AccentSource =
   | 'overreach'      // safety-adjacent: load AND body both read high
   | 'lever'          // trend + plan-gap agreement (DORMANT — see below)
+  | 'anchor_descent' // the rolling run anchor descended because its source aged out of the window
   | 'rir'            // logged sets landed below the prescribed RIR target
   | 'substitution'   // swap / load-carried-by-another-slice
   | 'positive'       // positive maintenance (load held via cross-training)
@@ -22,6 +23,7 @@ export type AccentSource =
 export const ACCENT_TIER: Record<AccentSource, number> = {
   overreach: 1,
   lever: 2,
+  anchor_descent: 3.5, // below safety/over-reach + the lever, above substitution reads (contract §3e)
   rir: 3,
   substitution: 4,
   positive: 5,
@@ -223,4 +225,32 @@ export function tradeCandidate(opts: {
  */
 export function leverCandidate(): WeekAccent | null {
   return null; // owed by State v3 (SPEC-state-fitness-band §2c). See docs/STATE-WEEK-EXECUTION.md.
+}
+
+/**
+ * ANCHOR DESCENT — the rolling run anchor eased because the runs behind it aged out of the window (2026-07-17).
+ * The DESCENT with an explanation is the piece Garmin lacks (a descent that arrives without a scold). It fires
+ * ONLY on a supersede-by-aging (the spine carries the cause; we never infer it here). The CREDIT clause —
+ * "swims and rides are carrying the aerobic load" — is GATED lever-guard style: it renders only when the
+ * cross-signals actually corroborate (aerobic load carried by other disciplines AND efficiency not degrading).
+ * No corroboration → the bare template. Never credit as courtesy. Voice: LOAD language only (carried, covered),
+ * never an adaptation claim for cross-training; no verdict words, no "detraining", no imperatives.
+ */
+export function anchorDescentCandidate(opts: {
+  agedOutMonth: string | null;    // the month of the aged-out source run, e.g. 'February' (spine-provided)
+  aerobicCarriers: string[];      // ONLY swim/bike (endurance carriers) — same set the trade uses
+  creditSupported: boolean;       // the GATE: aerobic load carried by others AND efficiency not degrading
+}): WeekAccent | null {
+  const { agedOutMonth, aerobicCarriers, creditSupported } = opts;
+  if (!agedOutMonth) return null; // no cause carried → not a descent-by-aging → silence
+  const base = `Run benchmark eased — the ${agedOutMonth} runs behind it aged out.`;
+  const sentence = (creditSupported && aerobicCarriers.length > 0)
+    ? `${base} ${cap(joinWords(aerobicCarriers))} are carrying the aerobic load; running-specific durability is the part they don't cover.`
+    : `${base} Little recent running behind it.`;
+  return {
+    source: 'anchor_descent',
+    tier: ACCENT_TIER.anchor_descent,
+    sentence,
+    trace: { kind: 'trend', detail: `run anchor descended; ${agedOutMonth} source aged out${creditSupported ? '; cross-signals support the credit' : ''}` },
+  };
 }

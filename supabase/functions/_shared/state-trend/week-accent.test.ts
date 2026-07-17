@@ -78,3 +78,40 @@ Deno.test('composer drops a candidate that trips the voice check', () => {
   assertEquals(composeWeekAccent([bad, good])?.source, 'substitution'); // the good (trade) survives
   assertEquals(composeWeekAccent([bad]), null);                          // only the bad one → dropped → silence
 });
+
+// ── ANCHOR DESCENT (rolling anchor eased by window aging) ──────────────────────────────────────────
+import { anchorDescentCandidate } from './week-accent.ts';
+
+Deno.test('anchor descent: no cause carried → silence', () => {
+  assertEquals(anchorDescentCandidate({ agedOutMonth: null, aerobicCarriers: ['swim'], creditSupported: true }), null);
+});
+
+Deno.test('anchor descent: credit clause renders ONLY when cross-signals support it', () => {
+  const withCredit = anchorDescentCandidate({ agedOutMonth: 'February', aerobicCarriers: ['swim', 'ride'], creditSupported: true })!;
+  assertStringIncludes(withCredit.sentence, 'the February runs behind it aged out');
+  assertStringIncludes(withCredit.sentence, 'carrying the aerobic load');
+  assertStringIncludes(withCredit.sentence, "durability is the part they don't cover");
+
+  const noCredit = anchorDescentCandidate({ agedOutMonth: 'February', aerobicCarriers: ['swim', 'ride'], creditSupported: false })!;
+  assertStringIncludes(noCredit.sentence, 'Little recent running behind it');
+  assertEquals(noCredit.sentence.includes('carrying'), false); // no courtesy credit
+});
+
+Deno.test('anchor descent: no carriers → bare template even if creditSupported flips true', () => {
+  const b = anchorDescentCandidate({ agedOutMonth: 'March', aerobicCarriers: [], creditSupported: true })!;
+  assertStringIncludes(b.sentence, 'Little recent running behind it');
+});
+
+Deno.test('anchor descent: both templates pass the voice check', () => {
+  for (const credit of [true, false]) {
+    const a = anchorDescentCandidate({ agedOutMonth: 'February', aerobicCarriers: ['swim', 'ride'], creditSupported: credit })!;
+    assertEquals(voiceViolation(a.sentence), null, a.sentence);
+  }
+});
+
+Deno.test('anchor descent: outranks substitution, ranks below the lever', () => {
+  const descent = anchorDescentCandidate({ agedOutMonth: 'February', aerobicCarriers: ['swim'], creditSupported: false });
+  const trade = tradeCandidate({ underDone: 'run', underDoneDone: 1, underDonePlanned: 3, aerobicCarriers: ['swim'] });
+  assertEquals(composeWeekAccent([trade, descent])?.source, 'anchor_descent'); // beats substitution
+  assertEquals(ACCENT_TIER.anchor_descent > ACCENT_TIER.lever && ACCENT_TIER.anchor_descent < ACCENT_TIER.substitution, true);
+});

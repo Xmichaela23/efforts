@@ -73,6 +73,7 @@ export {
   bannerCandidate,
   tradeCandidate,
   leverCandidate,
+  anchorDescentCandidate,
   ACCENT_TIER,
   type WeekAccent,
   type AccentSource,
