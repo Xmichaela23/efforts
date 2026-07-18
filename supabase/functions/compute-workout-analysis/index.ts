@@ -6,6 +6,7 @@ import { parseRunningTokens } from '../_shared/token-parser.ts';
 import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
 
 const ANALYSIS_VERSION = 'v0.1.9'; // NP zero-preserve + 30s Coggan startup trim (D-112)
@@ -1617,20 +1618,22 @@ Deno.serve(async (req) => {
 
     // Priority 3-5: Max HR based (%HRmax standard zones)
     if (!hrZoneBoundaries) {
-      let effectiveMaxHR = configuredHrZones?.max_heart_rate ?? userMaxHR;
-      if (!effectiveMaxHR) {
-        // Check workout's own FIT data
-        const fitMax = Number.isFinite((w as any)?.default_max_heart_rate) ? Number((w as any).default_max_heart_rate) : null;
-        if (fitMax && fitMax > 100) effectiveMaxHR = fitMax;
-      }
-      if (!effectiveMaxHR) {
-        const hrVals: number[] = [];
-        for (const v of hr_bpm) if (typeof v === 'number' && Number.isFinite(v) && v > 0) hrVals.push(v);
-        if (hrVals.length > 0) {
-          effectiveMaxHR = Math.round(Math.max(...hrVals) / 0.95);
-        }
-      }
-      if (!effectiveMaxHR) effectiveMaxHR = 180;
+      // ONE max-HR resolver (audit 2026-07-17 #5): configured → learned → device FIT → this-session
+      // peak ÷ the single PEAK_TO_MAX divisor. `userMaxHR` already carries the sport learned peak; pass it
+      // as the learned tier via configured_hr_zones so the resolver's precedence is authoritative here too.
+      const hrVals: number[] = [];
+      for (const v of hr_bpm) if (typeof v === 'number' && Number.isFinite(v) && v > 0) hrVals.push(v);
+      const fitMax = Number.isFinite((w as any)?.default_max_heart_rate) ? Number((w as any).default_max_heart_rate) : null;
+      const resolvedMax = resolveCurrentMaxHr(
+        { configured_hr_zones: { max_heart_rate: configuredHrZones?.max_heart_rate ?? userMaxHR ?? null } },
+        {
+          sport,
+          deviceMaxHr: fitMax && fitMax > 100 ? fitMax : null,
+          observedSessionPeak: hrVals.length > 0 ? Math.max(...hrVals) : null,
+          allowAgeEstimate: false, // no age in scope here — keep the historical 180 floor below
+        },
+      );
+      const effectiveMaxHR = resolvedMax.bpm ?? 180;
       hrZoneBoundaries = [
         0,
         Math.round(effectiveMaxHR * 0.60),

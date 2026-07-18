@@ -26,6 +26,7 @@ import { buildAthleteSnapshot } from '../_shared/athlete-snapshot.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
 import { effectiveStrengthFrequency } from '../shared/strength-system/frequency-policy.ts';
 import { addTimingLogic } from './timing-logic.ts';
+import { resolveCurrentMaxHr, ageEstimateMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 import {
   calculateEffortScore,
   getPacesFromScore,
@@ -177,11 +178,14 @@ Deno.serve(async (req: Request) => {
           let age = t.getFullYear() - d.getFullYear();
           const m = t.getMonth() - d.getMonth();
           if (m < 0 || (m === 0 && t.getDate() < d.getDate())) age--;
-          if (age > 0 && age < 120) { ageMaxHr = 220 - age; ageLthr = Math.round(ageMaxHr * 0.88); }
+          if (age > 0 && age < 120) { ageMaxHr = ageEstimateMaxHr(age); ageLthr = Math.round(ageMaxHr * 0.88); } // ONE formula (Tanaka), was 220 − age (audit 2026-07-17 #5)
         }
       }
-      // The resolution chain, identical to TrainingBaselines.tsx:1869-1875.
-      zoneMaxHr = num(cfg.manual_run_max_hr) ?? num(lf.run_max_hr_observed) ?? ageMaxHr;
+      // The resolution chain (manual → learned), via the ONE max-HR resolver; age fallback below.
+      zoneMaxHr = resolveCurrentMaxHr(
+        { athlete_config: cfg, learned_fitness: lf },
+        { sport: 'run', allowAgeEstimate: false },
+      ).bpm ?? ageMaxHr;
       zoneLthr = num(cfg.manual_run_lthr) ?? num(lf.run_threshold_hr) ?? ageLthr;
       zoneRestingHr = num(pn.restingHeartRate) ?? num(pn.resting_hr) ?? num(cfg.resting_heart_rate) ?? 60;
       // VDOT (pace zones) — from the learned threshold pace; else a 5K-derived score. Pace has no

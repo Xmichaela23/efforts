@@ -15,6 +15,7 @@
 // =============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { ageEstimateMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -189,7 +190,7 @@ function isComparableZ2Run(
     source = 'derived_from_threshold_hr';
   } else {
     const age = userAge != null ? clamp(userAge, 10, 95) : 35;
-    const maxHr = 220 - age;
+    const maxHr = ageEstimateMaxHr(age); // ONE formula (Tanaka), was 220 − age (audit 2026-07-17 #5)
     z2Lower = maxHr * 0.65;
     z2Upper = maxHr * 0.75;
     conf = 0.35;

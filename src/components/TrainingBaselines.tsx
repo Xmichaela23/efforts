@@ -15,6 +15,7 @@ import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { frielRunZones } from '@/lib/friel-zones';
 import { resolveCurrentRunEasyPace } from '@/lib/resolve-current-run-pace';
+import { ageEstimateMaxHr } from '@/lib/resolve-current-max-hr';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
@@ -577,11 +578,13 @@ const calculateAge = (birthday: string | undefined): number | null => {
 };
 
 // Calculate age-based HR estimates
-const getAgeBasedHREstimates = (birthday: string | undefined) => {
+const getAgeBasedHREstimates = (birthday: string | undefined, gender?: string) => {
   const age = calculateAge(birthday);
   if (!age) return null;
-  
-  const maxHR = 220 - age;
+
+  // ONE age formula (Tanaka / Gulati for female) so this matches the HRZoneChart "auto" default —
+  // was 220 − age, which no other surface used (audit 2026-07-17 #5).
+  const maxHR = ageEstimateMaxHr(age, gender);
   const thresholdHR = Math.round(maxHR * 0.88);
   
   return {
@@ -1981,7 +1984,7 @@ return (
                     </div>
 
                     {(() => {
-                      const ageEstimates = getAgeBasedHREstimates(data.birthday);
+                      const ageEstimates = getAgeBasedHREstimates(data.birthday, data.gender);
                       const restingInfo = getRestingHR(customRestingHR, garminRestingHR);
 
                       const sportSections: { key: string; label: string; icon: React.ReactNode; color: string;

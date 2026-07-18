@@ -6,6 +6,7 @@
  */
 
 import { SensorSample, ZoneDistribution, ZoneTime } from './types.ts';
+import { PEAK_TO_MAX } from '../../../../../src/lib/resolve-current-max-hr.ts';
 
 interface HRZones {
   z1Max: number;  // Recovery ceiling
@@ -137,9 +138,10 @@ function estimateZonesFromSamples(samples: SensorSample[]): HRZones {
   const hrValues = samples.map(s => s.heart_rate!);
   const maxHR = Math.max(...hrValues);
   
-  // If max HR seems too low (probably didn't hit max), estimate higher
-  // Rule of thumb: during a workout, peak HR is often 85-95% of true max
-  const estimatedMaxHR = maxHR < 150 ? 180 : Math.round(maxHR / 0.90);
+  // If max HR seems too low (probably didn't hit max), estimate higher.
+  // ONE divisor (PEAK_TO_MAX, resolve-current-max-hr.ts) so this and the compute-workout-analysis
+  // %HRmax path stop producing two different maxes from the same session peak (audit 2026-07-17 #5).
+  const estimatedMaxHR = maxHR < 150 ? 180 : Math.round(maxHR / PEAK_TO_MAX);
   
   return {
     z1Max: Math.round(estimatedMaxHR * DEFAULT_ZONE_PERCENTAGES.z1Max),
