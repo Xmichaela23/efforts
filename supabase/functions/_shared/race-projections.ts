@@ -3,6 +3,7 @@
  */
 import type { AthleteIdentity, LearnedFitness } from './arc-context.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 
 export type CourseData = {
   elevation_gain_m?: number;
@@ -290,19 +291,6 @@ function resolveNoPrior703SwimOwMin(
   return { swimOWMin: SWIM_FALLBACK_OW_MIN, source: 'fallback' };
 }
 
-function learnedMetric(
-  m: unknown,
-): { value: number; ok: boolean } {
-  if (!m || typeof m !== 'object' || Array.isArray(m)) return { value: 0, ok: false };
-  const o = m as { value?: unknown; confidence?: string };
-  const c = String(o.confidence || '').toLowerCase();
-  if (c === 'low') return { value: 0, ok: false };
-  if (c !== 'medium' && c !== 'high') return { value: 0, ok: false };
-  const v = Number(o.value);
-  if (!Number.isFinite(v) || v <= 0) return { value: 0, ok: false };
-  return { value: v, ok: true };
-}
-
 function formatHMSFromMinutes(totalMin: number): string {
   const s = Math.round(totalMin * 60);
   const h = Math.floor(s / 3600);
@@ -367,7 +355,13 @@ export function projectRaceSplits(inputs: ProjectionInputs): RaceProjection {
     assumptions.push('Non-70.3 v1: rough estimate using 70.3 split model.');
   }
 
-  const thr = learnedMetric(inputs.learned_fitness?.run_threshold_pace_sec_per_km);
+  // Threshold pace via the ONE resolver (audit 2026-07-17 #6) — sec/KM, gated to trusted auto-learned
+  // (source==='learned' == the old medium/high `learnedMetric` gate: not manual, not low-confidence).
+  // Same shared precedence the coach now reads, so the two surfaces can no longer speak two paces.
+  const thrResolved = resolveCurrentRunThresholdPace({ learned_fitness: inputs.learned_fitness as any });
+  const thr = thrResolved.source === 'learned' && thrResolved.sec_per_km != null
+    ? { value: thrResolved.sec_per_km, ok: true }
+    : { value: 0, ok: false };
   // Quality-gated: race projections only accept high-quality auto-learned FTP (not manual,
   // not low-confidence learned). Behavior matches the prior `learnedMetric()` call which
   // rejected confidence !== 'medium' && !== 'high'. Resolver `source === 'learned'` enforces

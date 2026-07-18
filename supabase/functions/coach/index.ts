@@ -33,6 +33,7 @@ import { isLowTrustWorkload } from '../_shared/workload.ts';
 import { reconcileLoadStatus } from '../_shared/load-status-reconcile.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolvePlanPhaseDetailed, phaseNameToWeekIntent, type PhaseSource } from '../_shared/plan-phase.ts';
 import { offPlanAdherenceBanner, offPlanAdherenceResult } from '../_shared/off-plan-banner.ts';
 import { computePerDomainLoad, type SliceSession } from '../_shared/per-domain-load.ts';
@@ -128,7 +129,7 @@ const corsHeaders: Record<string, string> = {
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
 /** v61: Q-111 fact-only — a strength DECLINE ("back off weight") no longer emits a `suggested_weight` (the "go lighter" prescription is dropped; the client then renders "Working ~125 vs your 150 baseline" with no action). Progression ("add weight") suggestions unchanged. Bump so cached "suggest 115 / back off" per-lift rows recompute to the fact-only row. */
-const COACH_PAYLOAD_VERSION = 115; // 115: UPKEEP accent (D-297) — a MAINTAIN discipline is measured against its OWN stored target (run = target_weekly_miles), in miles, on the trailing pattern, with a science-backed gentle read (docs/SCIENCE-upkeep-maintenance.md) — replacing the session-count "1 of 3 runs / speed fades" trade for maintain disciplines. Bump so cached rows re-source. // 114: bike anchor label gains its as-of date ("auto - FTP est - <date>") to match the run anchor grammar; cosmetic. Bump so cached rows re-source.
+const COACH_PAYLOAD_VERSION = 116; // 116: threshold-pace single-source (audit #6) — the baseline prose line now reads the ONE resolver (learned/measured wins over the wizard effort_paces it read first), formatted m:ss, so the coach speaks the SAME threshold pace race-projections predicts off. Bump so cached rows re-source the corrected line. // 115: UPKEEP accent (D-297) — a MAINTAIN discipline is measured against its OWN stored target (run = target_weekly_miles), in miles, on the trailing pattern, with a science-backed gentle read (docs/SCIENCE-upkeep-maintenance.md) — replacing the session-count "1 of 3 runs / speed fades" trade for maintain disciplines. Bump so cached rows re-source. // 114: bike anchor label gains its as-of date ("auto - FTP est - <date>") to match the run anchor grammar; cosmetic. Bump so cached rows re-source.
 // 113: // 113: ROLLING ANCHOR (derivation shares the band 12wk window; the anchor tracks current capacity, descending as runs age out) + ANCHOR-DESCENT ACCENT (a supersede-by-aging emits a composer candidate: "Run benchmark eased - the <month> runs behind it aged out" + a GATED credit clause when cross-training carries the aerobic load and efficiency is not degrading). Bump so cached rows re-source.
 // 112: // 112: run durability VOLUME GATE (below 8 qualifying steady runs in the window the direction is "withheld" - a 4th state, counts voice, no arrow - so a handful of runs cannot claim "improving" and contradict the accent) + CROWN-FROM-N (the baseline is the 2nd-best qualifying effort, so one kind day cannot define the anchor; <2 qualifying = calibration). Bump so cached rows re-source.
 // 111: // 111: Fix A (band floors sub-zero decoupling with the crown constant so the tick is not pinned mid-band by a confounded negative run) + Fix B (coach reads state_trends_v1 for week_start <= this Monday, so a stray future-dated snapshot no longer shadows the current week that carries the anchors). Bump so caches re-source.
@@ -4442,8 +4443,15 @@ Deno.serve(async (req) => {
           const cssSecs = Math.round(Number(swimCssSec) % 60);
           baselineLines.push(`Swim CSS: ${cssMins}:${String(cssSecs).padStart(2, '0')}/100yd`);
         }
-        const threshPace = effortPaces?.threshold || effortPaces?.z4 || perfNums?.threshold_pace_min_per_mi || null;
-        if (threshPace) baselineLines.push(`Run threshold pace: ${threshPace} min/${isImperial ? 'mi' : 'km'}`);
+        // Threshold pace via the ONE resolver (audit 2026-07-17 #6): learned (measured) wins over the
+        // wizard/VDOT effort_paces this line used to read FIRST — so the coach speaks the SAME threshold
+        // pace race-projections predicts off, and it's formatted m:ss (was a raw number printed as min/mi).
+        const threshResolved = resolveCurrentRunThresholdPace({ learned_fitness: learnedFitness, performance_numbers: perfNums, effort_paces: effortPaces } as any);
+        const threshSec = isImperial ? threshResolved.sec_per_mi : threshResolved.sec_per_km;
+        if (threshSec != null) {
+          const _tm = Math.floor(threshSec / 60), _ts = Math.round(threshSec % 60);
+          baselineLines.push(`Run threshold pace: ${_tm}:${String(_ts).padStart(2, '0')} min/${isImperial ? 'mi' : 'km'}`);
+        }
         const fiveKPace = effortPaces?.five_k || perfNums?.five_k_pace_min_per_mi || null;
         if (fiveKPace) baselineLines.push(`5K pace: ${fiveKPace} min/${isImperial ? 'mi' : 'km'}`);
         if (baselineLines.length > 0) {
