@@ -6,6 +6,7 @@
 
 import type { ArcContext, CompletedEvent } from './arc-context.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 
 export type TrainingFitnessLevel = 'beginner' | 'intermediate' | 'advanced';
 
@@ -33,14 +34,11 @@ function ftpFromLearned(lf: Record<string, unknown> | null | undefined): number 
 }
 
 function runThresholdSecPerKm(lf: Record<string, unknown> | null | undefined): number | null {
-  const m = lf?.run_threshold_pace_sec_per_km;
-  if (!m || typeof m !== 'object' || Array.isArray(m)) return null;
-  const o = m as { value?: unknown; confidence?: string };
-  const c = String(o.confidence || '').toLowerCase();
-  if (c === 'low') return null;
-  if (c !== 'medium' && c !== 'high') return null;
-  const v = Number(o.value);
-  return Number.isFinite(v) && v > 40 && v < 600 ? v : null;
+  // Mirror the resolveCurrentFtp gate above: 'learned' == medium/high confidence (measured-only, as this
+  // is an inference FROM measured data). One shared resolver instead of a bespoke copy (audit #6).
+  const tp = resolveCurrentRunThresholdPace({ learned_fitness: lf as any });
+  const v = tp.sec_per_km;
+  return tp.source === 'learned' && v != null && v > 40 && v < 600 ? v : null;
 }
 
 function isLongTriDistance(dist: string | null | undefined): boolean {
