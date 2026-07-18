@@ -24,25 +24,25 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-18 EOD — LTHR SINGLE-SOURCED · DECOUPLING + UPKEEP COPY FIXED · FAN-OUT SHIPPED)
+## 🧭 NEXT SESSION — START HERE (2026-07-18 EOD #2 — MAX-HR + THRESHOLD-PACE SINGLE-SOURCED · HR-CONGRUENCE TAIL CLOSED)
 
-> ## READ `docs/GAME-PLAN.md`, then `START-HERE.md` + `LIFECYCLE.md`. **New this session:** `AUDIT-hr-congruence-2026-07-17.md` (the HR map + ranked fracture list), `AUDIT-fanout-ordering-2026-07-17.md` (the fan-out fix + its verification design), `SCIENCE-upkeep-maintenance.md` (receipted science, seeds the glass-box section).
+> ## READ `docs/GAME-PLAN.md`, then `START-HERE.md` + `LIFECYCLE.md`. The HR-congruence audit (`AUDIT-hr-congruence-2026-07-17.md`) is now **fully worked** — #4 (dead-file) is the only ranked item left, and it's a delete-after-check.
 >
-> ### YOUR JOB — Michael's call, two owed:
-> **① VERIFY THE FAN-OUT (a–d) — needs ONE real Garmin/Strava sync.** The ordering fix (D-298) shipped, deployed, and the guard's stale-refusal was **verified live (e)**. But a–d still need a real sync to close (`AUDIT-fanout-ordering-2026-07-17.md` §4): (a) facts present on the synced workout (execution_score / time_in_zone / hr_drift — no race loss), (b) `athlete_snapshot.input_watermark` set + the snapshot current to THAT workout, (c) a phone-logged + an imported workout each reaching the spine, (d) idempotency across ≥3 back-to-back recomputes. Verify DB-first; don't claim done off code.
-> **② THE HR-CONGRUENCE TAIL** (`AUDIT-hr-congruence-2026-07-17.md`, ranked): **#5** one max-HR resolver (the `180` / `220−age` / Tanaka / `obsMax÷0.95` scatter — folds into the LTHR resolver pattern); **#6** `threshold_pace` (no resolver at all, ~15 files, 3 units — its own annexation, biggest); **#4** delete the dead `_shared/endurance/hr-zones.ts` 0.90 copy (⚠ `generate-run-plan/generators/sustainable.ts` still references its symbols — check live/dead FIRST).
+> ### YOUR JOB — Michael's call:
+> **① VERIFY THE FAN-OUT (a–d) — STILL OWED, needs ONE real Garmin/Strava sync.** D-298 shipped + deployed, guard verified live (e); a–d still need a real sync (`AUDIT-fanout-ordering-2026-07-17.md` §4): (a) facts present on the synced workout (execution_score / time_in_zone / hr_drift — no race loss), (b) `athlete_snapshot.input_watermark` set + snapshot current to THAT workout, (c) a phone-logged + an imported workout each reaching the spine, (d) idempotency across ≥3 recomputes. Verify DB-first.
+> **② THEN PHASE 4 REMAINDER** (`GAME-PLAN.md`) — the single-source campaign continues: **One ACWR band** (re-derived 6×, taper reads elevated+optimal at once), **`adapt-plan` one writer** (silently re-prices strength every ingest, skipping the sign-off gate), **FTP: route the 8 stragglers** (incl. `athlete-snapshot/identity.ts:67` → the LLM prompt). Plus **#4** delete the dead `_shared/endurance/hr-zones.ts` (⚠ `generate-run-plan/generators/sustainable.ts` still refs its symbols — live/dead check FIRST).
 >
-> ### WHAT SHIPPED — deployed + (most) device-verified. DON'T re-litigate:
-> - **Fan-out ordering (D-298).** `recompute-workout` is now THE canonical post-process orchestrator (auto-attach → summary → analysis → workload/adaptation → facts[skip_snapshot] → analyze → snapshot[watermark]); every entry path fires it fire-and-forget so the webhook stays fast. Snapshot **version guard** = a `BEFORE UPDATE` trigger (migration `20260717_snapshot_input_watermark_guard.sql`, applied via SQL editor) that refuses a stale overwrite — **verified live**. Both orphan paths (`ingest-phone-workout`, `save-imported-workout`) now reach the spine (forward-only). `metrics_status` flip made live (dead column → the client "pending" signal, deferred).
-> - **LTHR single-source (D-296).** `src/lib/resolve-current-lthr.ts` — one resolver, 4 sites routed (easy-hr / zone-bins / coach / workload); FIT-import 0.90 seam → canonical `zone3FloorBpm`; the run analyzer's non-Friel fallback → canonical. **Byte-identical for the primary user** (all four chains already = 151). His **20 recent runs were recomputed** for the analyzer-zone change (debrief zones now match facts). `SPEC-lthr-one-anchor.md` folded → D-296 and **DELETED**.
-> - **Decoupling per-run copy.** A heat/effort-**confounded** run no longer gets "aerobic base needs work" — the per-run row states a run FACT, the base verdict is the Fitness card's (`session-detail/build.ts`). **Verified on device** (the Jul 13 run). Terrain was already handled (GAP); this added the heat/effort gate.
-> - **Upkeep accent (D-297).** A **maintain** discipline is measured vs its OWN stored target (run = `target_weekly_miles`), in miles, on the trailing pattern — COMPLIANCE-ONLY (apps show weekly compliance, never a weekly "fitness may fade" prediction; that's the Fitness card + the glass box). **Verified on device.** Discipline-agnostic; `SCIENCE-upkeep-maintenance.md` seeds the future science section.
-> - **LoadBar.** Percentages sum to exactly 100 (largest-remainder); the figure is the true rolling-7d total labeled "· 7d", not week-to-date. **Verified on device + against his history.**
+> ### WHAT SHIPPED THIS SESSION (2026-07-18 #2) — pushed + deployed + fixture-verified. DON'T re-litigate:
+> - **Max-HR single-source (D-299).** `src/lib/resolve-current-max-hr.ts` — one resolver behind the %HRmax fallbacks: one divisor (`PEAK_TO_MAX` 0.95, was 0.90 vs 0.95), one age formula (**Tanaka / Gulati female; Fox 220−age retired**). Routed compute-workout-analysis / analyze-running zones / compute-adaptation-metrics / generate-run-plan / client TrainingBaselines (now = the zone chart). `resolveMaxHrCeiling` + cycling display left separate on purpose. 11 fixtures. **Byte-identical for a data-rich account** (fallbacks don't fire).
+> - **Threshold-pace single-source (D-300).** `resolveCurrentRunThresholdPace` (in `resolve-current-run-pace.ts`, beside the easy twin) — 3 units → sec/mi (+ sec/km carried), learned-first, Q-174 choice honored. Routed the two disjoint authorities (coach — inversion fixed, was wizard-first, `COACH_PAYLOAD_VERSION` 116; race-projections) + the **snapshot spine** (`athlete-snapshot.ts` both paths, mirroring D-287) + infer-training-fitness. The rest of the "~30 readers" were writers/types/presence-checks/deliberate — see D-300 for the LEFT list. 12 fixtures.
+>
+> ### PRIOR SESSION (2026-07-18 #1) — still true, don't re-open: Fan-out ordering (D-298, a–d UNVERIFIED — see ①), LTHR single-source (D-296), decoupling per-run copy, upkeep accent (D-297), LoadBar %. All deployed; the copy ones device-verified.
 >
 > ### ⚠️ UNVERIFIED / WATCH — do NOT report as done:
 > - **Fan-out a–d** (above) — code + one live guard test only; needs a real sync.
-> - **`SCIENCE-upkeep-maintenance.md` figures are SEARCH-LEVEL** — the directions are settled, but confirm the exact magnitudes against the primary papers before any number goes user-facing.
-> - Q-185 / Q-186 / Q-187 / Q-188 (the 2026-07-17 fitness-anchor session) still open, untouched this session.
+> - **D-299 / D-300 have no device look** — fixture-verified + full suite (1188) green, and byte-identical for a learned-data account, so nothing to eyeball except the coach's threshold-pace line (now measured + `m:ss`). No acceptance run owed; a formula/plumbing change.
+> - **`SCIENCE-upkeep-maintenance.md` figures are SEARCH-LEVEL** — confirm magnitudes vs primary papers before any number goes user-facing.
+> - Q-185 / Q-186 / Q-187 / Q-188 (the 2026-07-17 fitness-anchor session) still open, untouched.
 
 ---
 

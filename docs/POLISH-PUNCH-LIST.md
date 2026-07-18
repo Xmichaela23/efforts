@@ -25,6 +25,10 @@ Q-178 fixed the predicate so a set flagged `completed` with **zero reps, zero we
 - [ ] **The durability trend is un-frozen (D-291).** The run row should read **"as of Jul 13"**, not late June, and count your Jul 12/13 runs (`newestAgeDays 1`, not 16). Verified in DB; confirm on screen.
 - [ ] **Grade-Adj Pace tile (D-291).** Open a recent outdoor run → **Details**. There should be a **Grade-Adj Pace** tile next to Avg Pace (the hills-removed pace; on a hilly run it reads a few sec/mi slower than raw). And the **route chart** now plots the real grade-adjusted number, not the HR-normalized one.
 
+### Shipped 2026-07-18 #2 — max HR + threshold pace single-source (HR-congruence tail closed)
+- [x] **Max-HR single-source (D-299)** — one resolver, one divisor + Tanaka/Gulati (Fox retired). Byte-identical for a data-rich account (fallbacks don't fire). Nothing to eyeball on your device; on a brand-new birthday-only profile, Baselines' max HR now matches the zone chart. Don't re-litigate.
+- [x] **Threshold-pace single-source (D-300)** — coach + race-projections + snapshot spine now read one pace; 3 units unified. One visible change: the coach's baseline notes quote your **measured** threshold pace, formatted `m:ss` (was a wizard guess). Fixture + full-suite verified; no acceptance run owed. Don't re-litigate.
+
 ### Shipped 2026-07-18 — LTHR / decoupling / upkeep / fan-out
 - [x] **LoadBar % sum to 100 + "· 7d" label** — verified on device + against history. Don't re-litigate.
 - [x] **Decoupling per-run copy (confounded runs)** — verified on device (Jul 13 run no longer says "aerobic base needs work"). Don't re-litigate.

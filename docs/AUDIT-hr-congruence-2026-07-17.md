@@ -88,8 +88,8 @@ D-286 consolidated the Friel zone *math* into `src/lib/friel-zones.ts` (easy cei
 2. ✅ **SHIPPED (D-296) — `save-imported-workout` 0.90 → canonical `zone3FloorBpm`.** No longer re-seeds the D-286 bug on the FIT-import path.
 3. ✅ **SHIPPED (D-296) — `analyze-running-workout:1030/:1944` routed to the canonical model.** Kills the second zone distribution. ⚠️ NOT byte-identical for the primary user (no configured zones → debrief zones move to match the facts); deterministic history recompute owed.
 4. ⏸️ **Delete the dead `_shared/endurance/hr-zones.ts`** — DEFERRED: a run generator (`sustainable.ts`) still references its symbols; needs a live/dead check before removal (zero correctness risk meanwhile).
-5. ⏳ **One max-HR resolver** — unify the `180` / `220−age` / Tanaka / `obsMax/0.95` estimates behind a single fallback (next pass).
-6. ⏳ **`threshold_pace`** — same disease, ~15 files, 3 units; its own annexation.
+5. ✅ **SHIPPED (D-299, 2026-07-18) — `src/lib/resolve-current-max-hr.ts`.** One resolver; `180`/`220−age`/Tanaka/`obsMax÷0.95` unified behind one divisor (`PEAK_TO_MAX`) + one formula (Tanaka/Gulati, Fox retired). Ceiling + cycling display left separate on purpose.
+6. ✅ **SHIPPED (D-300, 2026-07-18) — `resolveCurrentRunThresholdPace`.** Coach + race-projections (the disjoint authorities) + the snapshot spine now read one source; 3 units normalized to sec/mi (+ sec/km carried). The rest of the "~30 readers" were writers/types/presence-checks/already-learned-first — fracture closed by the spine.
 7. **Bike efficiency double** (spine 56-day HR-at-power vs coach 7-day HR-drift) — contained by scope labels; lowest priority.
 
 ---
