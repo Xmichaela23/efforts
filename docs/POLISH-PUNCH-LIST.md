@@ -25,6 +25,13 @@ Q-178 fixed the predicate so a set flagged `completed` with **zero reps, zero we
 - [ ] **The durability trend is un-frozen (D-291).** The run row should read **"as of Jul 13"**, not late June, and count your Jul 12/13 runs (`newestAgeDays 1`, not 16). Verified in DB; confirm on screen.
 - [ ] **Grade-Adj Pace tile (D-291).** Open a recent outdoor run → **Details**. There should be a **Grade-Adj Pace** tile next to Avg Pace (the hills-removed pace; on a hilly run it reads a few sec/mi slower than raw). And the **route chart** now plots the real grade-adjusted number, not the HR-normalized one.
 
+### Shipped 2026-07-18 — LTHR / decoupling / upkeep / fan-out
+- [x] **LoadBar % sum to 100 + "· 7d" label** — verified on device + against history. Don't re-litigate.
+- [x] **Decoupling per-run copy (confounded runs)** — verified on device (Jul 13 run no longer says "aerobic base needs work"). Don't re-litigate.
+- [x] **Upkeep accent (D-297)** — verified on device ("Running's at about 4 of your 18-mile upkeep — 4 weeks now…"). Don't re-litigate.
+- [x] **LTHR single-source (D-296)** — byte-identical for the primary user (all 4 chains already 151); 20 recent runs recomputed for the analyzer-zone change. Nothing to eyeball; the point is nothing moved.
+- [ ] **⚠️ VERIFY — fan-out a–d (D-298).** Needs ONE real Garmin/Strava sync. Confirm DB-first: (a) `workout_facts` for the synced run has `execution_score` / `time_in_zone` / `hr_drift` (no race loss); (b) `athlete_snapshot.input_watermark` is set and the week reflects THAT workout; (c) a phone-logged + an imported workout each produce `workout_facts`; (d) ≥3 back-to-back `recompute-workout` runs are idempotent. The guard's stale-refusal (e) is already verified live. See `AUDIT-fanout-ordering-2026-07-17.md` §4.
+
 ### Shipped 2026-07-17 (State v3 fitness anchors) — arc ACCEPTED on device; two items still to WATCH
 - [x] **The fitness band, anchors, `withheld` gate, swim facts-only (D-293/294/295)** — accepted on device 2026-07-17. Run anchor 3.4% (Jul 12), direction withheld at low volume, swim shows facts, bike `auto · FTP est`. **Do NOT re-litigate.**
 - [ ] **⚠️ WATCH — descent accent's FIRST REAL firing (Q-186).** It only fired TEST-triggered. On the next NATURAL anchor descent (a strong old run aging out of the ~12wk window), confirm the coach line reads as an explanation-with-credit, not a scold — and that the credit clause is absent when the aerobic work didn't cover the load.

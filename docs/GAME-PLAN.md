@@ -45,7 +45,9 @@ That is the whole diagnosis, and it produces exactly three diseases:
 
 *Everything downstream is only as good as this. It is the root of the analysis complaints.*
 
-- [ ] **The fan-out awaits the wrong things.** Two verified instances of one bug:
+> **✅ SHIPPED 2026-07-18 (D-298) — a–d UNVERIFIED.** `recompute-workout` is now the one ordered orchestrator; every entry path (incl. both orphans) fires it; the snapshot version guard (migration `20260717…`, applied) refuses stale overwrites and was **verified live**. All three items below are addressed by the orchestrator. **What's left is VERIFICATION on a real sync**, not more building — see `AUDIT-fanout-ordering-2026-07-17.md` §4 (a–d) and the top-of-ENGINE-STATE banner. The stale "16-day durability" symptom (item 4) was a SEPARATE cause (D-291, the `basis='raw'` collision) already fixed — Phase 2 is the ordering, and it shipped.
+
+- [x] **The fan-out awaits the wrong things.** ✅ D-298 — the orchestrator serializes to data dependencies.
   1. `compute-facts` is **awaited** (`ingest-activity:1582`) but reads `workouts.computed`, written by two **fire-and-forget** calls (`:1508`, `:1521`). When it loses the race: **no time-in-zone, no interval hits, no HR drift, no execution score. No error anywhere.**
   2. `compute-snapshot` (fired *from* `compute-facts:1844`) reads `workouts.workout_analysis` (`:689`) — written by `analyze-{sport}`, which is fired **after**, fire-and-forget (`ingest-activity:1624`). **So the run durability trend is ALWAYS AT LEAST ONE WORKOUT BEHIND, by construction.**
   **Fix: order the fan-out to match its data dependencies.** Await what you read.
@@ -81,9 +83,9 @@ That is the whole diagnosis, and it produces exactly three diseases:
 
 ## PHASE 4 — ONE SOURCE PER FACT (kill the DOUBLED disease)
 
-- [ ] **One LTHR** (`SPEC-lthr-one-anchor.md`) + **`threshold_pace`** (no resolver at all; read raw in ~17 files across 3 units). **The root of the run stack.** ✅ Ruled: default learned, athlete override wins (mirrors Q-174).
+- [x] **One LTHR — ✅ SHIPPED 2026-07-18 (D-296).** `resolveCurrentLthr` built; all 4 anchor sites routed (easy-hr / zone-bins / coach / workload); FIT-import 0.90 seam + the run analyzer's non-Friel fallback both → canonical. `SPEC-lthr-one-anchor.md` folded to D-296 and deleted. Byte-identical for the primary user. **`threshold_pace` STILL OWED** (no resolver, ~15 files, 3 units — next annexation; see `AUDIT-hr-congruence-2026-07-17.md` #6). Max-HR resolver (#5) also owed.
 - [ ] **One ACWR band.** The *ratio* is clean; the *band* is re-derived **6×**, one of them plan-blind and shipping in the same payload as the real one. **A taper week at 1.15 reads `elevated` and `optimal` simultaneously.**
-- [ ] **One zone table.** D-286 fixed three copies of the Friel seam. **There were five.** Kill `_shared/endurance/hr-zones.ts` (0.90) and the non-Friel fallback in `analyze-running-workout:1030` (whose threshold zone caps **below** a real LTHR). *(Latent today — see Phase 5.)*
+- [~] **One zone table.** D-286 fixed three copies; **D-296 (2026-07-18) fixed two more** — the FIT-import 0.90 seam (`save-imported-workout`) and the non-Friel fallback in `analyze-running-workout:1030/:1934`, both → canonical `friel-zones.ts`. **Remaining:** delete the dead `_shared/endurance/hr-zones.ts` 0.90 copy — DEFERRED (`generate-run-plan/generators/sustainable.ts` still refs its symbols; check live/dead first).
 - [ ] **`adapt-plan`: ONE writer, and the athlete gets the choice.** It silently re-prices strength on **every ingest**, skipping the fatigue gate the `suggest` path applies — while the consent path (`StrengthAdjustmentModal`, mounted) asks permission for a thing already done. **This violates the standing "prescribed load changes are sign-off-gated" rule in code.** ✅ Ruled: mirror the easy-pace chooser. Default = today's behaviour, visible, overridable.
 - [ ] **FTP: route the 8 stragglers** — incl. `get-week:436` (week-view watts) and `athlete-snapshot/identity.ts:67` → **the LLM prompt** (so the coach can *speak* a different FTP than the screens show).
 
