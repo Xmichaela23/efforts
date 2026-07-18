@@ -6,6 +6,7 @@
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callLLM } from '../_shared/llm.ts';
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import {
   normalizeElevationProfile,
   smoothElevation,
@@ -518,7 +519,10 @@ Deno.serve(async (req) => {
 
   const implied = impliedAvgPaceSecPerMi(terrainGoalTimeSec, distMi);
 
-  const ftpW = Number(pn.ftp ?? pn.ftp_watts ?? pn.ftpWatts) || null;
+  // FTP via the resolver (learned-first) so the bike leg strategy uses the SAME FTP as the screens/coach —
+  // was manual-only `pn.ftp` (CAPABILITY-MAP straggler). arc carries learned_fitness.
+  const ftpW = resolveCurrentFtp({ learned_fitness: (arc as any).learned_fitness, performance_numbers: pn as any }).value
+    ?? (Number(pn.ftp_watts ?? pn.ftpWatts) || null);
   let roleIntro = 'You are a running coach building a race-day pacing strategy.';
   let legExtraInstructions = '';
   if (courseLeg === 'bike') {

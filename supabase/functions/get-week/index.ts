@@ -17,6 +17,7 @@
 // - Provides weekly stats and training plan context
 // - No daily context generation - moved to dedicated overall context system
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -432,9 +433,11 @@ Deno.serve(async (req)=>{
     // Fetch user FTP for power range calculations
     let userFtp = null;
     try {
-      const { data: baselines } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', userId).maybeSingle();
-      userFtp = Number(baselines?.performance_numbers?.ftp);
-      if (!Number.isFinite(userFtp) || userFtp <= 0) userFtp = null;
+      const { data: baselines } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness').eq('user_id', userId).maybeSingle();
+      // FTP via the resolver (learned-first) so week-view power ranges match every other surface — was
+      // manual-only `performance_numbers.ftp` (CAPABILITY-MAP straggler).
+      userFtp = resolveCurrentFtp({ learned_fitness: baselines?.learned_fitness, performance_numbers: baselines?.performance_numbers }).value;
+      if (userFtp == null || !Number.isFinite(userFtp) || userFtp <= 0) userFtp = null;
     } catch  {}
     // Transitional fill: for rows missing planned_data/executed_data, derive from legacy tables
     // 1) Preload planned rows for range keyed by (date|type)

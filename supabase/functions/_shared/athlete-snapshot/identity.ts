@@ -5,6 +5,7 @@
 import type { AthleteIdentity, PlanPosition, LiftMax, PlannedSession } from './types.ts';
 
 import { parseLocalDate } from '../parse-local-date.ts';
+import { resolveCurrentFtp } from '../../../../src/lib/resolve-current-ftp.ts';
 
 // ---------------------------------------------------------------------------
 // Identity: who the athlete is (goals, key numbers, preferences)
@@ -64,7 +65,9 @@ export function buildIdentity(opts: {
     })),
     key_numbers: {
       threshold_pace: perfNumbers.threshold_pace || null,
-      ftp: Number(perfNumbers.ftp) || null,
+      // FTP via the resolver (learned-first) so the LLM prompt speaks the SAME FTP as the screens —
+      // was manual-only `perfNumbers.ftp`, the "coach can voice a different FTP" straggler (CAPABILITY-MAP).
+      ftp: resolveCurrentFtp({ learned_fitness: baselines?.learned_fitness, performance_numbers: perfNumbers }).value,
       max_hr: Number(perfNumbers.max_hr) || null,
       resting_hr: Number(perfNumbers.resting_hr) || null,
       lift_maxes: liftMaxes,

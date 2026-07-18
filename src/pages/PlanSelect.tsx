@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getLibraryPlan } from '@/services/LibraryPlans';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { supabase, getStoredUserId } from '@/lib/supabase';
+import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { useAppContext } from '@/contexts/AppContext';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { expandSession, DEFAULTS_FALLBACK } from '@/services/plans/plan_dsl';
@@ -584,7 +585,8 @@ export default function PlanSelect() {
       const fiveK = candidate5k ? String(candidate5k) : null;
       const easyPace = pnObj.easyPace || null;
       const swimPace100 = pnObj.swimPace100 || null;
-      const ftp = pnObj.ftp || null;
+      // FTP via the resolver (learned-first) so this matches the coach/screens — was manual-only pnObj.ftp.
+      const ftp = resolveCurrentFtp({ learned_fitness: (baselines as any)?.learned_fitness, performance_numbers: pnObj } as any).value ?? null;
       
       
       
