@@ -353,7 +353,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const structured = (workout as any)?.workout_structure;
       if (structured && typeof structured === 'object') {
         try {
-          const res = normalizeStructuredSession(workout, { performanceNumbers: pn });
+          const res = normalizeStructuredSession(workout, { performanceNumbers: pn, learned_fitness: (baselines as any)?.learned_fitness });
           if (res?.friendlySummary) return res.friendlySummary;
         } catch {}
       }

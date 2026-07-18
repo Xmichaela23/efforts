@@ -1303,7 +1303,7 @@ export default function PlanSelect() {
                   const mins = sess.reduce((t: number, s: any)=>{
                     try {
                       const sClone = JSON.parse(JSON.stringify(s));
-                      const norm = normalizePlannedSession(sClone, { performanceNumbers: (baselines?.performance_numbers || {}) }, libPlan.template?.export_hints || {});
+                      const norm = normalizePlannedSession(sClone, { performanceNumbers: (baselines?.performance_numbers || {}), learned_fitness: (baselines as any)?.learned_fitness }, libPlan.template?.export_hints || {});
                       if (typeof norm?.durationMinutes === 'number' && isFinite(norm.durationMinutes)) return t + Math.max(0, Math.round(norm.durationMinutes));
                     } catch {}
                     return t + (typeof s.duration==='number'?s.duration:0);

@@ -226,7 +226,7 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines): string | unde
     const structured = (workout as any)?.workout_structure;
     if (structured && typeof structured === 'object') {
       try {
-        const res = normalizeStructuredSession(workout, { performanceNumbers: pn } as any);
+        const res = normalizeStructuredSession(workout, { performanceNumbers: pn, learned_fitness: (baselines as any)?.learned_fitness } as any);
         if (res?.friendlySummary) return res.friendlySummary;
       } catch {}
     }
@@ -320,7 +320,7 @@ function buildStructuredSubtitleOnly(workout: any, baselines?: Baselines): strin
     const structured = (workout as any)?.workout_structure;
     if (structured && typeof structured === 'object') {
       try {
-        const res = normalizeStructuredSession(workout, { performanceNumbers: pn } as any);
+        const res = normalizeStructuredSession(workout, { performanceNumbers: pn, learned_fitness: (baselines as any)?.learned_fitness } as any);
         if (res?.friendlySummary) return res.friendlySummary;
       } catch {}
     }

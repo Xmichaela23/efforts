@@ -3,6 +3,7 @@
 // Output: friendly summary, concrete targets with ranges, total duration (minutes)
 
 import { swimDrillDisplayName } from '@/lib/plan-tokens/swim-drill-tokens';
+import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
 export interface Baselines {
   performanceNumbers?: {
@@ -14,6 +15,16 @@ export interface Baselines {
     tenKPace?: string;
     ftp?: number;
   };
+  /** carried so plan-watts use the ONE FTP (learned-first), not manual-only. Callers pass it. */
+  learned_fitness?: Record<string, any> | null;
+}
+
+/** The athlete's current FTP (learned-first) or 0 — plan-watts render off the SAME FTP as the coach/screens. */
+function resolvedFtp(baselines: Baselines | null | undefined): number {
+  return resolveCurrentFtp({
+    learned_fitness: (baselines as any)?.learned_fitness,
+    performance_numbers: baselines?.performanceNumbers,
+  } as any).value ?? 0;
 }
 
 export interface ExportHints {
@@ -305,7 +316,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     const reps = parseInt(bikeSet[2], 10);
     const tmin = parseInt(bikeSet[3], 10);
     const rmin = bikeSet[4] ? parseInt(bikeSet[4], 10) : 0;
-    const ftp = baselines?.performanceNumbers?.ftp || 0;
+    const ftp = resolvedFtp(baselines);
     const center = kind === 'vo2' ? 1.1 * ftp : kind === 'thr' ? 0.98 * ftp : 0.91 * ftp;
     const tol = kind === 'vo2' ? hVO2 : hSS;
     const pr = powerRange(center, tol);
@@ -895,7 +906,8 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
   const struct: any[] = Array.isArray(ws.structure) ? ws.structure : [];
   const parentDisc = String((session?.discipline || session?.type) || '').toLowerCase();
   const isRun = parentDisc === 'run';
-  const ftpNum: number | undefined = typeof (pn?.ftp) === 'number' ? pn.ftp : undefined;
+  const _ftpResolved = resolvedFtp(baselines);
+  const ftpNum: number | undefined = _ftpResolved > 0 ? _ftpResolved : undefined;
   // Pace range helpers (default tolerances)
   const parsePaceTxt = (p?: string): { sec: number; unit: 'mi'|'km' } | null => {
     if (!p) return null; const m = String(p).match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i); if (!m) return null; return { sec: parseInt(m[1],10)*60+parseInt(m[2],10), unit: m[3].toLowerCase() as any };
@@ -932,7 +944,8 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
         return `@ ${lo}–${hi} W`;
       } catch { return pctRange ? `@ ${pctRange}` : undefined; }
     };
-    const ftp: number | undefined = typeof (pn?.ftp) === 'number' ? pn.ftp : undefined;
+    const _ftpR = resolvedFtp(baselines);
+    const ftp: number | undefined = _ftpR > 0 ? _ftpR : undefined;
     for (const seg of struct) {
       const segType = String(seg?.type || '').toLowerCase();
       if (segType === 'transition') {
