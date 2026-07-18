@@ -59,9 +59,17 @@ one or none. Producers never write to the section directly. All sources already 
 
 ### Voice rules (enforced in copy, not left to producers)
 - Conditional, never prophetic: "may start declining," never "will decline."
-- **Load vs adaptation boundary:** substitution sentences speak in **load only** ("load carried").
-  Adaptation consequences belong to PERFORMANCE bands and the lever. A ride carries load; it does not
-  carry run adaptation — the accent never claims otherwise.
+- **Load vs adaptation boundary — HELD (reaffirmed 2026-07-18, D-297).** The accent speaks in **load /
+  compliance only** — what you did vs your target, and what carried the load. It does **NOT** state an
+  adaptation consequence ("X may fade"), for three reasons, all decided with Michael:
+  1. **Apps agree with it.** TrainingPeaks/Garmin/Intervals show weekly *compliance* + a *measured* status;
+     none push a weekly prose prediction that fitness will fade. That is coach behaviour, not app behaviour.
+  2. **It risks nagging** — a consequence that repeats every under-target week is the scold we removed.
+  3. **The measured "has" is owned by the FITNESS card**; the *specificity science* (what erodes and why)
+     lives in the **glass-box science section** (`docs/SCIENCE-upkeep-maintenance.md`), on tap — never a
+     weekly line. So one claim, one home: compliance on the accent, measured trend on the card, science on tap.
+  - The **upkeep candidate** requires a numeric target and fires only after a **pattern** (≥2 weeks under);
+    it states the compliance fact ("at ~4 of your 18-mile upkeep") + a load-carried clause. Nothing predictive.
 - **Traceable:** tapping an accent opens its source measurement (logged sets, trend window, load
   numbers). A candidate that cannot cite its measurement is not a valid candidate.
 - No scores, no streaks, no percentages in the accent.

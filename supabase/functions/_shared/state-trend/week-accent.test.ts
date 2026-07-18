@@ -2,8 +2,41 @@
 import { assertEquals, assertStringIncludes } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import {
   composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate,
-  tradeCandidate, leverCandidate, voiceViolation, ACCENT_TIER,
+  tradeCandidate, upkeepCandidate, leverCandidate, voiceViolation, ACCENT_TIER,
 } from './week-accent.ts';
+
+// ── THE UPKEEP READ — COMPLIANCE FACT ONLY (2026-07-18, app-aligned; no weekly adaptation consequence) ─
+Deno.test('upkeep RUN: states the COMPLIANCE fact (miles vs target + load carried), no consequence', () => {
+  const a = upkeepCandidate({ discipline: 'run', actualPerWeek: 4, targetPerWeek: 18, unit: 'mile', weeksUnder: 6, aerobicCarriers: ['swim', 'ride'] });
+  assertEquals(!!a, true);
+  assertStringIncludes(a!.sentence, '18-mile upkeep');                 // the TARGET, in miles — not "1 of 3 runs"
+  assertStringIncludes(a!.sentence, 'carried the endurance load');      // load language (§7), app-aligned
+  assertStringIncludes(a!.sentence, '6 weeks now');                     // trailing pattern
+  assertEquals(a!.sentence.includes('fade'), false);                   // NO adaptation consequence on the weekly
+  assertEquals(a!.sentence.includes('impact-tolerance'), false);       // that lives in the glass box / Fitness card
+  assertEquals(voiceViolation(a!.sentence), null);
+  assertEquals(a!.source, 'upkeep');
+});
+
+Deno.test('upkeep RUN: near target (16 of 18 ≈ 89%) does NOT fire — still maintaining', () => {
+  assertEquals(upkeepCandidate({ discipline: 'run', actualPerWeek: 16, targetPerWeek: 18, unit: 'mile', aerobicCarriers: ['swim'] }), null);
+});
+
+Deno.test('upkeep RUN: ONE light week (weeksUnder < 2) is silent — not yet a pattern', () => {
+  assertEquals(upkeepCandidate({ discipline: 'run', actualPerWeek: 4, targetPerWeek: 18, unit: 'mile', weeksUnder: 1, aerobicCarriers: ['swim', 'ride'] }), null);
+});
+
+Deno.test('upkeep: NO numeric target → null (nothing app-standard to say weekly; science lives in the glass box)', () => {
+  assertEquals(upkeepCandidate({ discipline: 'swim', aerobicCarriers: ['run', 'ride'] }), null);
+  assertEquals(upkeepCandidate({ discipline: 'strength', aerobicCarriers: [] }), null);
+});
+
+Deno.test('upkeep OUTRANKS the session-count substitution read (tier 3.8 < 4)', () => {
+  const up = upkeepCandidate({ discipline: 'run', actualPerWeek: 4, targetPerWeek: 18, unit: 'mile', weeksUnder: 6, aerobicCarriers: ['swim', 'ride'] });
+  const trade = tradeCandidate({ underDone: 'run', underDoneDone: 1, underDonePlanned: 3, aerobicCarriers: ['swim', 'ride'] });
+  const chosen = composeWeekAccent([trade, up]);
+  assertEquals(chosen!.source, 'upkeep'); // the target read wins over "1 of 3"
+});
 
 // ── THE VOICE, ENFORCED — banned words + exclamations fail; clean copy passes ───────────────────────
 Deno.test('voiceViolation catches the banned register', () => {

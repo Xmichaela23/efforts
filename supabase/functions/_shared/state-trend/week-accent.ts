@@ -14,6 +14,7 @@ export type AccentSource =
   | 'lever'          // trend + plan-gap agreement (DORMANT — see below)
   | 'anchor_descent' // the rolling run anchor descended because its source aged out of the window
   | 'rir'            // logged sets landed below the prescribed RIR target
+  | 'upkeep'         // a MAINTAIN discipline is under its own target — the science-backed gentle read
   | 'substitution'   // swap / load-carried-by-another-slice
   | 'positive'       // positive maintenance (load held via cross-training)
   | 'nothing_loaded'; // genuine under-training nudge
@@ -25,6 +26,7 @@ export const ACCENT_TIER: Record<AccentSource, number> = {
   lever: 2,
   anchor_descent: 3.5, // below safety/over-reach + the lever, above substitution reads (contract §3e)
   rir: 3,
+  upkeep: 3.8,         // above the session-count substitution read: a posture-aware target read is truer
   substitution: 4,
   positive: 5,
   nothing_loaded: 6,
@@ -211,6 +213,55 @@ export function tradeCandidate(opts: {
     tier: ACCENT_TIER.substitution,
     sentence,
     trace: { kind: 'load', detail: `${under} ${hasCount ? `${underDoneDone}/${underDonePlanned}` : 'under plan'}; endurance carried by ${aerobicCarriers.join(', ')}${rirUnder ? '; RIR under target' : ''}` },
+  };
+}
+
+/**
+ * THE UPKEEP READ (tier 3.8) — a discipline the athlete set to MAINTAIN is under its OWN target.
+ *
+ * SCOPE (Michael, 2026-07-18, grounded in commercial-app practice): the weekly accent states the
+ * COMPLIANCE FACT only — "you're at X of your Y-target" + what carried the load. This is what apps
+ * actually show weekly (TrainingPeaks/Garmin/Intervals compliance). It does NOT state an adaptation
+ * consequence ("X may fade") — that is coach behaviour apps don't do weekly, it risks nagging, and the
+ * measured "has" is owned by the FITNESS card. The specificity science (what erodes and why) lives in
+ * the glass-box section (docs/SCIENCE-upkeep-maintenance.md), on tap — never pushed as a weekly line.
+ *
+ * Requires a numeric target (run = target_weekly_miles today). Discipline-agnostic for when other
+ * disciplines gain stored targets. Measured on the TRAILING pattern (≥2 weeks under) — not one week.
+ * Load-only voice (§7): "carried the load", never an adaptation claim.
+ */
+export function upkeepCandidate(opts: {
+  discipline: 'run' | 'ride' | 'bike' | 'swim' | 'strength';
+  actualPerWeek?: number | null;   // trailing avg in the target's unit (e.g. miles/wk for run)
+  targetPerWeek?: number | null;   // the stored upkeep target (e.g. target_weekly_miles)
+  unit?: string;                   // e.g. 'mile' for run
+  weeksUnder?: number | null;      // weeks in the window under target (the pattern gate + framing)
+  aerobicCarriers: string[];       // endurance disciplines that carried the load this week (swim/bike/run)
+}): WeekAccent | null {
+  const { discipline, actualPerWeek, targetPerWeek, unit, weeksUnder, aerobicCarriers } = opts;
+  const d = discipline === 'bike' ? 'ride' : discipline;
+
+  // Requires a numeric target — the compliance fact is the whole read. No target → nothing app-standard
+  // to say weekly (the science lives in the glass box, not here) → silence.
+  const hasTarget = typeof actualPerWeek === 'number' && typeof targetPerWeek === 'number' && targetPerWeek > 0;
+  if (!hasTarget) return null;
+  if (!(actualPerWeek! < targetPerWeek! * 0.85)) return null;           // ≥85% ≈ still maintaining
+  if (typeof weeksUnder === 'number' && weeksUnder < 2) return null;     // one light week is not a pattern
+
+  const disc = DISC_WORD[d] ?? d;
+  const carriers = joinWords(aerobicCarriers.filter((c) => (c === 'bike' ? 'ride' : c) !== d));
+  const weeks = typeof weeksUnder === 'number' && weeksUnder >= 3 ? ` — ${weeksUnder} weeks now` : '';
+  const loadClause = carriers ? ` ${cap(carriers)} carried the endurance load.` : '';
+
+  return {
+    source: 'upkeep',
+    tier: ACCENT_TIER.upkeep,
+    // Compliance fact + load-carried. No adaptation consequence (that's the Fitness card + glass box).
+    sentence: `${cap(disc)}'s at about ${Math.round(actualPerWeek!)} of your ${Math.round(targetPerWeek!)}-${unit ?? 'unit'} upkeep${weeks}.${loadClause}`,
+    trace: {
+      kind: 'adherence',
+      detail: `${d} ${Math.round(actualPerWeek!)}/${Math.round(targetPerWeek!)} ${unit ?? ''}/wk upkeep${weeksUnder ? `, ${weeksUnder}wk` : ''}; load carried by ${aerobicCarriers.join(', ') || 'n/a'}`,
+    },
   };
 }
 

@@ -41,7 +41,7 @@ import { assessAbsorption } from '../_shared/absorption.ts';
 import { computeSafetyFloor, resolvePlanPrimary, computePrimaryAdherence, resolvePrimarySport } from '../_shared/load-status-reconcile.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
-import { rollupFitnessDirection, rollupFitness, rollupHrResponse, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel, decouplingBandDisplay, bikeRideIntensityAerobic, bikeEfficiencyDisplay, composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate, tradeCandidate, leverCandidate, anchorDescentCandidate, type WeekAccent } from '../_shared/state-trend/index.ts';
+import { rollupFitnessDirection, rollupFitness, rollupHrResponse, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel, decouplingBandDisplay, bikeRideIntensityAerobic, bikeEfficiencyDisplay, composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate, tradeCandidate, upkeepCandidate, leverCandidate, anchorDescentCandidate, type WeekAccent } from '../_shared/state-trend/index.ts';
 import {
   computeWeeklyResponse,
   type WeeklyResponseState,
@@ -128,7 +128,7 @@ const corsHeaders: Record<string, string> = {
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
 /** v61: Q-111 fact-only — a strength DECLINE ("back off weight") no longer emits a `suggested_weight` (the "go lighter" prescription is dropped; the client then renders "Working ~125 vs your 150 baseline" with no action). Progression ("add weight") suggestions unchanged. Bump so cached "suggest 115 / back off" per-lift rows recompute to the fact-only row. */
-const COACH_PAYLOAD_VERSION = 114; // 114: bike anchor label gains its as-of date ("auto - FTP est - <date>") to match the run anchor grammar; cosmetic. Bump so cached rows re-source.
+const COACH_PAYLOAD_VERSION = 115; // 115: UPKEEP accent (D-297) — a MAINTAIN discipline is measured against its OWN stored target (run = target_weekly_miles), in miles, on the trailing pattern, with a science-backed gentle read (docs/SCIENCE-upkeep-maintenance.md) — replacing the session-count "1 of 3 runs / speed fades" trade for maintain disciplines. Bump so cached rows re-source. // 114: bike anchor label gains its as-of date ("auto - FTP est - <date>") to match the run anchor grammar; cosmetic. Bump so cached rows re-source.
 // 113: // 113: ROLLING ANCHOR (derivation shares the band 12wk window; the anchor tracks current capacity, descending as runs age out) + ANCHOR-DESCENT ACCENT (a supersede-by-aging emits a composer candidate: "Run benchmark eased - the <month> runs behind it aged out" + a GATED credit clause when cross-training carries the aerobic load and efficiency is not degrading). Bump so cached rows re-source.
 // 112: // 112: run durability VOLUME GATE (below 8 qualifying steady runs in the window the direction is "withheld" - a 4th state, counts voice, no arrow - so a handful of runs cannot claim "improving" and contradict the accent) + CROWN-FROM-N (the baseline is the 2nd-best qualifying effort, so one kind day cannot define the anchor; <2 qualifying = calibration). Bump so cached rows re-source.
 // 111: // 111: Fix A (band floors sub-zero decoupling with the crown constant so the tick is not pinned mid-band by a confounded negative run) + Fix B (coach reads state_trends_v1 for week_start <= this Monday, so a stray future-dated snapshot no longer shadows the current week that carries the anchors). Bump so caches re-source.
@@ -1901,7 +1901,7 @@ Deno.serve(async (req) => {
 
     const { data: rolling, error: rErr } = await supabase
       .from('workouts')
-      .select('id,workload_actual,date,workout_status,type,name,planned_id,workout_metadata,avg_power,avg_heart_rate,avg_pace,sensor_data')
+      .select('id,workload_actual,date,workout_status,type,name,planned_id,workout_metadata,avg_power,avg_heart_rate,avg_pace,sensor_data,distance')
       .eq('user_id', userId)
       .gte('date', chronicStart)
       .lte('date', asOfDate);
@@ -5134,10 +5134,52 @@ ${narrativeFacts.join('\n')}`;
         creditSupported: aerobicCarriers.length > 0 && hrResp.verdict !== 'sliding',
       });
 
+      // UPKEEP READ (D-297, docs/SCIENCE-upkeep-maintenance.md): DISCIPLINE-AGNOSTIC. Loop over WHATEVER
+      // the athlete set to MAINTAIN and measure each against its own signal on the TRAILING window —
+      // never this week's session count. Nothing tuned to running or to any athlete: the target/cadence
+      // is read from their own training_prefs; volume from their own workouts.
+      //  · a discipline with a stored VOLUME target (run → target_weekly_miles) → miles vs target.
+      //  · otherwise → trailing session cadence vs the declared per-discipline frequency (a real drop).
+      const upkeepCandidates: (WeekAccent | null)[] = [];
+      try {
+        const upkeepPrefs: any = (goalContext?.goals || [])
+          .map((g: any) => g?.training_prefs)
+          .find((tp: any) => tp && tp.per_discipline_posture) || null;
+        const posture: Record<string, string> = upkeepPrefs?.per_discipline_posture || {};
+        const KM_TO_MI = 0.621371;
+        const WINDOW_WEEKS = 4; // chronicStart = asOfDate − 27 → a 28-day trailing window
+        const TYPES: Record<string, string[]> = {
+          run: ['run', 'running'], ride: ['ride', 'bike', 'cycling'],
+          swim: ['swim', 'swimming'], strength: ['strength', 'strength_training'],
+        };
+        const mondayOf = (d: string) => { const x = new Date(d + 'T12:00:00Z'); const dy = x.getUTCDay(); x.setUTCDate(x.getUTCDate() + (dy === 0 ? -6 : 1 - dy)); return x.toISOString().slice(0, 10); };
+        const rowsFor = (disc: string) => completedRolling.filter((r: any) => (TYPES[disc] || []).includes(String(r?.type || '').toLowerCase()));
+        // A MAINTAIN discipline measured against its stored VOLUME target (run = target_weekly_miles today;
+        // discipline-agnostic for when others gain targets). Compliance fact only — no consequence weekly.
+        for (const [rawDisc, p] of Object.entries(posture)) {
+          if (String(p).toLowerCase() !== 'maintain') continue;
+          const disc = rawDisc === 'bike' ? 'ride' : rawDisc;
+          if (!TYPES[disc]) continue;
+          const targetMiles = disc === 'run' ? Number(upkeepPrefs?.target_weekly_miles) : NaN; // extend per discipline as targets are stored
+          if (!(Number.isFinite(targetMiles) && targetMiles > 0)) continue;
+          const carriers = counts
+            .filter((c: any) => ['swim', 'ride', 'run'].includes(c.discipline) && c.discipline !== disc && c.done > 0)
+            .map((c: any) => c.discipline);
+          const rows = rowsFor(disc);
+          const perWeek = rows.reduce((s: number, r: any) => s + (Number(r?.distance) || 0) * KM_TO_MI, 0) / WINDOW_WEEKS;
+          if (perWeek >= targetMiles * 0.85) continue;
+          const byWeek: Record<string, number> = {};
+          for (const r of rows) { const w = mondayOf(String(r?.date)); byWeek[w] = (byWeek[w] || 0) + (Number(r?.distance) || 0) * KM_TO_MI; }
+          const weeksUnder = Object.values(byWeek).filter((mi) => mi < targetMiles * 0.85).length;
+          upkeepCandidates.push(upkeepCandidate({ discipline: disc as any, actualPerWeek: perWeek, targetPerWeek: targetMiles, unit: 'mile', weeksUnder, aerobicCarriers: carriers }));
+        }
+      } catch { /* upkeep read is non-fatal */ }
+
       const accent: WeekAccent | null = composeWeekAccent([
         overReachCandidate({ loadStatus: lsX?.status, readiness: readinessState, runningAcwr: lsX?.acwr }),
         leverCandidate(),
         anchorDescent,
+        ...upkeepCandidates, // tier 3.8 — a maintain discipline under its own target outranks the session-count trade
         // RIR alone only when it is NOT already folded into a trade sentence.
         trade ? null : rirCandidate({ actualRir: rirActual, targetRir: rirTarget, sampleSize: rirN }),
         trade,
