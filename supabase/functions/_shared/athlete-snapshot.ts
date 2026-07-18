@@ -1,5 +1,5 @@
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
-import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 
 /**
  * AthleteSnapshot — single source of truth for the athlete-input values used to build a plan.
@@ -246,15 +246,16 @@ function extractBike(state: Record<string, unknown>): AthleteSnapshotV1['bike'] 
  * "Pace-unit footgun" for the units background. Manual run paces (effort_paces or
  * performance_numbers) are NOT pinned here; the materializer reads those live.
  */
-const KM_TO_MI = 1.609344;
 function extractRun(state: Record<string, unknown>): AthleteSnapshotV1['run'] {
   const lf = state.learned_fitness;
   if (!lf || typeof lf !== 'object' || Array.isArray(lf)) return null;
-  const lfRec = lf as Record<string, unknown>;
   const out: NonNullable<AthleteSnapshotV1['run']> = {};
 
-  const thr = readLearnedSecPerKm(lfRec.run_threshold_pace_sec_per_km);
-  if (thr != null) out.threshold_pace_sec_per_mi = Math.round(thr * KM_TO_MI);
+  // Threshold pace — mirror the D-287 easy-pace fix below: pin what the ONE resolver says threshold IS,
+  // not learned-only. The old learned-only read (line kept for easy's low-tier) silently ignored a typed
+  // value AND the Q-174 choice, so a plan could freeze a threshold the athlete had rejected (audit #6).
+  const resolvedThreshold = resolveCurrentRunThresholdPace(state as any);
+  if (resolvedThreshold.sec_per_mi != null) out.threshold_pace_sec_per_mi = resolvedThreshold.sec_per_mi;
 
   // D-287 — the PIN now captures what the ONE resolver says the athlete's easy pace IS, not learned-only.
   // It used to read `run_easy_pace_sec_per_km` and NOTHING else, so it silently ignored the athlete's typed
@@ -265,13 +266,6 @@ function extractRun(state: Record<string, unknown>): AthleteSnapshotV1['run'] {
   if (resolvedEasy.sec_per_mi != null) out.easy_pace_sec_per_mi = resolvedEasy.sec_per_mi;
 
   return Object.keys(out).length > 0 ? out : null;
-}
-
-function readLearnedSecPerKm(metric: unknown): number | null {
-  if (!metric || typeof metric !== 'object' || Array.isArray(metric)) return null;
-  const o = metric as { value?: unknown };
-  const v = Number(o.value);
-  return Number.isFinite(v) && v > 0 ? v : null;
 }
 
 // ── Read helpers ────────────────────────────────────────────────────────────
@@ -406,12 +400,12 @@ function resolveLiveRun(live: LiveBaselinesFallback): AthleteResolved['run'] {
   const lf = (live.learned_fitness && typeof live.learned_fitness === 'object' && !Array.isArray(live.learned_fitness)
     ? live.learned_fitness
     : {}) as Record<string, unknown>;
-  const thr = readLearnedSecPerKm(lf.run_threshold_pace_sec_per_km);
-  // D-287 — same correction as the pin writer: the LIVE read routes through the one resolver, so a plan
-  // without a pin resolves easy pace identically to every other surface (and honours the Q-174 choice).
+  // D-287 + audit #6 — the LIVE read routes threshold AND easy through the one resolver, so a plan without
+  // a pin resolves both paces identically to every other surface (and honours the Q-174 choice).
+  const resolvedThreshold = resolveCurrentRunThresholdPace(live as any);
   const resolvedEasy = resolveCurrentRunEasyPace(live as any);
   return {
-    threshold_pace_sec_per_mi: thr != null ? Math.round(thr * KM_TO_MI) : null,
+    threshold_pace_sec_per_mi: resolvedThreshold.sec_per_mi,
     easy_pace_sec_per_mi: resolvedEasy.sec_per_mi,
     fiveK_pace_sec_per_mi: null,
   };
