@@ -21,7 +21,7 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, onSelectWorkout }) =
 
         <div aria-hidden="true" className="instrument-divider" />
 
-        <div className="flex-1 overflow-y-auto min-h-0 px-1 pb-1">
+        <div className="flex-1 overflow-y-auto min-h-0 px-0.5 pb-1">
           <StateTab coachData={coachData} onClose={onClose} onSelectWorkout={onSelectWorkout} />
         </div>
       </div>

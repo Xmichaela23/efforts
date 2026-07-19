@@ -156,13 +156,13 @@ function WeekAccentLine({ sentence, detail }: { sentence: string; detail: string
       <button
         type="button"
         onClick={() => { if (detail) setOpen((o) => !o); }}
-        className="text-left text-[11px] leading-snug text-white/55 max-w-[min(100%,360px)]"
+        className="text-left text-[12px] leading-snug text-white/55 max-w-[min(100%,360px)]"
       >
         {sentence}
-        {detail && <span className="text-white/30 text-[9px]"> {open ? '▾' : 'ⓘ'}</span>}
+        {detail && <span className="text-white/30 text-[10px]"> {open ? '▾' : 'ⓘ'}</span>}
       </button>
       {open && detail && (
-        <p className="mt-1 text-[10px] text-white/35 leading-snug max-w-[min(100%,340px)]">Based on: {detail}</p>
+        <p className="mt-1 text-[11px] text-white/35 leading-snug max-w-[min(100%,340px)]">Based on: {detail}</p>
       )}
     </div>
   );
@@ -180,7 +180,7 @@ function WeekMixBar({ counts }: { counts: Array<{ discipline: string; planned: n
   const scale = Math.max(totalPlanned, totalDone, 1);
   const Bar = ({ label, pick }: { label: string; pick: (c: { planned: number; done: number }) => number }) => (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] text-white/40 w-12 shrink-0 lowercase">{label}</span>
+      <span className="text-[11px] text-white/40 w-12 shrink-0 lowercase">{label}</span>
       <div className="flex-1 flex h-2 rounded-full overflow-hidden bg-white/[0.05]">
         {ordered.map((c) => {
           const v = pick(c);
@@ -196,7 +196,7 @@ function WeekMixBar({ counts }: { counts: Array<{ discipline: string; planned: n
       <Bar label="actual" pick={(c) => c.done} />
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-14 pt-1">
         {ordered.filter((c) => c.planned > 0 || c.done > 0).map((c) => (
-          <span key={c.discipline} className="inline-flex items-center gap-1 text-[10px] text-white/45">
+          <span key={c.discipline} className="inline-flex items-center gap-1 text-[11px] text-white/45">
             <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: getDisciplineColor(c.discipline) }} />
             {NAME[c.discipline] ?? c.discipline}
           </span>
@@ -242,10 +242,10 @@ function goalMetaFromGoalLite(
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">
+      <span className="text-[11px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">
         {label}
       </span>
-      <div className="flex-1 text-[12px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
+      <div className="flex-1 text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
         {children}
       </div>
     </div>
@@ -255,7 +255,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function Chip({ label, value, valueClass }: { label?: string; value: React.ReactNode; valueClass?: string }) {
   return (
     <span className="inline-flex items-baseline gap-1">
-      {label != null && <span className="text-white/60 text-[11px]">{label}</span>}
+      {label != null && <span className="text-white/60 text-[12px]">{label}</span>}
       <span className={valueClass ?? 'text-white/80'}>{value}</span>
     </span>
   );
@@ -371,33 +371,33 @@ function RaceSection({
     return (
       <div className="px-3 py-3 space-y-2.5">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
-          <span className="text-[11px] text-white/55 text-right leading-snug">{distLabel} · result on file</span>
+          <span className="text-[11px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
+          <span className="text-[12px] text-white/55 text-right leading-snug">{distLabel} · result on file</span>
         </div>
         {statedGoalDisplay != null && (
           <div className="flex flex-col gap-0.5">
-            <p className="text-[10px] text-white/45 leading-snug">Your goal</p>
+            <p className="text-[11px] text-white/45 leading-snug">Your goal</p>
             <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
               {statedGoalDisplay}
             </span>
           </div>
         )}
         <div className="flex flex-col gap-0.5">
-          <p className="text-[10px] text-white/45 leading-snug">Completed</p>
+          <p className="text-[11px] text-white/45 leading-snug">Completed</p>
           <span className="text-[22px] font-semibold tabular-nums text-emerald-300/90 tracking-tight">
             {fmtGoalClock(officialResult.actual_seconds)}
           </span>
-          <p className="text-[10px] text-white/40 leading-snug max-w-[min(100%,320px)]">
+          <p className="text-[11px] text-white/40 leading-snug max-w-[min(100%,320px)]">
             Official finish: elapsed (chip) time, not moving time. Training “projected” is replaced after you save this result.
           </p>
         </div>
         {officialResult.goal_target_seconds != null && (
-          <p className="text-[11px] text-white/50">
+          <p className="text-[12px] text-white/50">
             {fmtSignedDeltaVsGoal(officialResult.actual_seconds, officialResult.goal_target_seconds)}
           </p>
         )}
         {officialResult.modelProjected && (
-          <p className="text-[11px] text-white/50 leading-snug">
+          <p className="text-[12px] text-white/50 leading-snug">
             Model had projected {officialResult.modelProjected.display} · {fmtSignedDeltaVsModel(officialResult.actual_seconds, officialResult.modelProjected.seconds)}
           </p>
         )}
@@ -411,38 +411,38 @@ function RaceSection({
     return (
       <div className="px-3 py-3 space-y-2.5">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
-          <span className="text-[11px] text-white/55 text-right leading-snug">{distLabel} · {postLabel}</span>
+          <span className="text-[11px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
+          <span className="text-[12px] text-white/55 text-right leading-snug">{distLabel} · {postLabel}</span>
         </div>
         {statedGoalDisplay != null && (
           <div className="flex flex-col gap-0.5">
-            <p className="text-[10px] text-white/45 leading-snug">Your goal</p>
+            <p className="text-[11px] text-white/45 leading-snug">Your goal</p>
             <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
               {statedGoalDisplay}
             </span>
           </div>
         )}
         <div className="flex flex-col gap-0.5">
-          <p className="text-[10px] text-white/45 leading-snug">Your finish (from log)</p>
+          <p className="text-[11px] text-white/45 leading-snug">Your finish (from log)</p>
           <span className="text-[22px] font-semibold tabular-nums text-emerald-300/90 tracking-tight">
             {fmtGoalClock(postRaceUnofficial.loggedSeconds)}
           </span>
-          <p className="text-[10px] text-white/40 leading-snug max-w-[min(100%,320px)]">
+          <p className="text-[11px] text-white/40 leading-snug max-w-[min(100%,320px)]">
             Elapsed (chip) time if your device reported it; otherwise we fall back to other durations. The large “Projected” block is hidden after race day so this stays primary.
           </p>
         </div>
         {modelProjected && (
           <div className="space-y-1">
-            <p className="text-[10px] text-white/45 leading-snug">Model had projected (pre-race)</p>
+            <p className="text-[11px] text-white/45 leading-snug">Model had projected (pre-race)</p>
             <p className="text-[20px] font-semibold tabular-nums text-white/75">
               {modelProjected.display}
             </p>
-            <p className="text-[11px] text-white/50">
+            <p className="text-[12px] text-white/50">
               {fmtSignedDeltaVsModel(postRaceUnofficial.loggedSeconds, modelProjected.seconds)}
             </p>
           </div>
         )}
-        <p className="text-[10px] text-white/40 leading-snug">
+        <p className="text-[11px] text-white/40 leading-snug">
           Race result auto-saves to My Record once your run is logged. The plan then moves to past on its own.
         </p>
       </div>
@@ -472,9 +472,9 @@ function RaceSection({
     <div className="px-3 py-3 space-y-2.5">
       {/* Header: goal + weeks out */}
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
+        <span className="text-[11px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
         {hasRealRace && (
-          <span className="text-[11px] text-white/55 text-right leading-snug">{distLabel}{raceWeeksOut != null ? ` — ${raceWeeksOut}w out` : ''}</span>
+          <span className="text-[12px] text-white/55 text-right leading-snug">{distLabel}{raceWeeksOut != null ? ` — ${raceWeeksOut}w out` : ''}</span>
         )}
       </div>
 
@@ -483,7 +483,7 @@ function RaceSection({
         <div className="flex flex-col gap-3 min-w-0 flex-1">
           {statedGoalDisplay != null && (
             <div className="flex flex-col gap-0.5">
-              <p className="text-[10px] text-white/45 leading-snug">Your goal</p>
+              <p className="text-[11px] text-white/45 leading-snug">Your goal</p>
               <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
                 {statedGoalDisplay}
               </span>
@@ -491,31 +491,31 @@ function RaceSection({
           )}
           {hasProjection && (
             <div className="flex flex-col gap-0.5">
-              <p className="text-[10px] text-white/45 leading-snug">Projected</p>
+              <p className="text-[11px] text-white/45 leading-snug">Projected</p>
               <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
                 {projectedFromTraining}
               </span>
               {rr && (
-                <p className="text-[10px] text-white/32 leading-snug max-w-[280px]">
+                <p className="text-[11px] text-white/32 leading-snug max-w-[280px]">
                   Matches the gap and details below — one model: threshold, durability, data confidence.
                 </p>
               )}
             </div>
           )}
           {showProjectionPlaceholder && (
-            <p className="text-[11px] text-white/35 leading-snug pr-1">
+            <p className="text-[12px] text-white/35 leading-snug pr-1">
               Can’t project a finish time yet (race date on the goal/plan, or baselines).
             </p>
           )}
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
           {rr?.delta_display && (
-            <span className={`text-[13px] font-medium tabular-nums ${assessmentColor(rr.assessment)}`}>
+            <span className={`text-[14px] font-medium tabular-nums ${assessmentColor(rr.assessment)}`}>
               {rr.delta_display}
             </span>
           )}
           {rr && (
-            <span className={`text-[10px] font-semibold uppercase tracking-wider ${assessmentColor(rr.assessment)}`}>
+            <span className={`text-[11px] font-semibold uppercase tracking-wider ${assessmentColor(rr.assessment)}`}>
               {assessmentLabel(rr.assessment)}
             </span>
           )}
@@ -525,14 +525,14 @@ function RaceSection({
       {/* Factual projection: framing + grouped sections (server); legacy flat list still supported */}
       {rr?.projection_display?.sections && rr.projection_display.sections.length > 0 && (
         <div className="space-y-3 pt-0.5">
-          <p className="text-[10px] text-white/40 uppercase tracking-wide">From your data</p>
+          <p className="text-[11px] text-white/40 uppercase tracking-wide">From your data</p>
           {rr.projection_display.framing ? (
-            <p className="text-[11px] text-white/60 leading-relaxed">{rr.projection_display.framing}</p>
+            <p className="text-[12px] text-white/60 leading-relaxed">{rr.projection_display.framing}</p>
           ) : null}
           {rr.projection_display.sections.map((sec) => (
             <div key={sec.label} className="space-y-1.5">
-              <p className="text-[10px] font-semibold tracking-[0.1em] text-white/45 uppercase">{sec.label}</p>
-              <ul className="list-disc pl-4 space-y-1 text-[11px] text-white/65 leading-relaxed">
+              <p className="text-[11px] font-semibold tracking-[0.1em] text-white/45 uppercase">{sec.label}</p>
+              <ul className="list-disc pl-4 space-y-1 text-[12px] text-white/65 leading-relaxed">
                 {sec.lines.map((line, i) => (
                   <li key={`${sec.label}-${i}`}>{line}</li>
                 ))}
@@ -543,8 +543,8 @@ function RaceSection({
       )}
       {rr?.projection_facts && rr.projection_facts.length > 0 && !(rr.projection_display?.sections?.length) && (
         <div className="space-y-1.5 pt-0.5">
-          <p className="text-[10px] text-white/40 uppercase tracking-wide">From your data</p>
-          <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-white/60 leading-relaxed">
+          <p className="text-[11px] text-white/40 uppercase tracking-wide">From your data</p>
+          <ul className="list-disc pl-4 space-y-1.5 text-[12px] text-white/60 leading-relaxed">
             {rr.projection_facts.map((line, i) => (
               <li key={i}>{line}</li>
             ))}
@@ -553,17 +553,17 @@ function RaceSection({
       )}
 
       {projection?.mismatch_blurb && !hasRaceProjectionDetail(rr) && (
-        <p className="text-[11px] text-white/50 leading-relaxed">{projection.mismatch_blurb}</p>
+        <p className="text-[12px] text-white/50 leading-relaxed">{projection.mismatch_blurb}</p>
       )}
       {!hasAnyFinishTime && (
-        <p className="text-[11px] text-white/40 leading-snug">
+        <p className="text-[12px] text-white/40 leading-snug">
           Add a race target in your plan to see your goal and projection.
         </p>
       )}
 
       {/* Target comparison — full race_readiness only */}
       {rr?.target_finish_display && (
-        <div className="flex items-baseline gap-2 text-[11px] text-white/55">
+        <div className="flex items-baseline gap-2 text-[12px] text-white/55">
           <span>Target {rr.target_finish_display}</span>
           <Dot />
           <span>Race pace {rr.predicted_race_pace_display}</span>
@@ -572,7 +572,7 @@ function RaceSection({
 
       {/* VDOT trend */}
       {rr && (
-        <div className="flex items-baseline gap-2 text-[11px]">
+        <div className="flex items-baseline gap-2 text-[12px]">
           <span className="text-white/55">VDOT {rr.current_vdot.toFixed(1)}</span>
           {rr.plan_vdot != null && rr.vdot_delta != null && rr.vdot_direction !== 'stable' && (
             <>
@@ -587,18 +587,18 @@ function RaceSection({
 
       {/* Legacy narrative — hidden when projection display supplies factual copy */}
       {rr && !hasRaceProjectionDetail(rr) && (
-        <p className="text-[12px] text-white/65 leading-relaxed">{rr.assessment_message}</p>
+        <p className="text-[13px] text-white/65 leading-relaxed">{rr.assessment_message}</p>
       )}
 
       {resolvedGoalId && (
         <div className="pt-0.5">
           {courseBusy ? (
-            <p className="text-[11px] text-white/40">Working on course…</p>
+            <p className="text-[12px] text-white/40">Working on course…</p>
           ) : courseRow ? (
             <button
               type="button"
               onClick={onViewStrategy}
-              className="w-full text-left text-[12px] text-sky-400/85 hover:text-sky-300/90 py-1"
+              className="w-full text-left text-[13px] text-sky-400/85 hover:text-sky-300/90 py-1"
             >
               View terrain strategy → <span className="text-white/40">{courseRow.name}</span>
             </button>
@@ -606,7 +606,7 @@ function RaceSection({
             <button
               type="button"
               onClick={onAddCourse}
-              className="w-full text-left text-[12px] text-sky-400/85 hover:text-sky-300/90 py-1"
+              className="w-full text-left text-[13px] text-sky-400/85 hover:text-sky-300/90 py-1"
             >
               Add course for terrain strategy based on your data →
             </button>
@@ -621,21 +621,21 @@ function RaceSection({
           onClick={() => onOpenKeyRun(primaryRaceReadiness.workout_id)}
           className="w-full text-left rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-3 space-y-2.5 mt-1 active:opacity-90"
         >
-          <span className="text-[10px] font-medium text-white/45 uppercase tracking-wide">Key run</span>
-          <p className="text-[11px] text-white/50 tabular-nums">
+          <span className="text-[11px] font-medium text-white/45 uppercase tracking-wide">Key run</span>
+          <p className="text-[12px] text-white/50 tabular-nums">
             {fmtDate(primaryRaceReadiness.workout_date)} · {primaryRaceReadiness.distance_miles}mi
           </p>
-          <p className="text-[13px] font-semibold text-white/90 leading-snug">{primaryRaceReadiness.headline}</p>
+          <p className="text-[14px] font-semibold text-white/90 leading-snug">{primaryRaceReadiness.headline}</p>
           {!!String(primaryRaceReadiness.tactical_instruction || '').trim() && (
             <div className="rounded-md border border-white/15 bg-white/[0.08] px-2.5 py-2">
-              <span className="text-[10px] font-medium text-white/45 uppercase tracking-wide">Race day</span>
-              <p className="text-[12px] text-white/85 mt-0.5 leading-snug">{primaryRaceReadiness.tactical_instruction}</p>
+              <span className="text-[11px] font-medium text-white/45 uppercase tracking-wide">Race day</span>
+              <p className="text-[13px] text-white/85 mt-0.5 leading-snug">{primaryRaceReadiness.tactical_instruction}</p>
             </div>
           )}
           {!!String(primaryRaceReadiness.projection || '').trim() && (
-            <p className="text-[11px] text-white/45 leading-relaxed">{primaryRaceReadiness.projection}</p>
+            <p className="text-[12px] text-white/45 leading-relaxed">{primaryRaceReadiness.projection}</p>
           )}
-          <span className="text-[11px] font-normal text-white/40">View full analysis →</span>
+          <span className="text-[12px] font-normal text-white/40">View full analysis →</span>
         </button>
       )}
 
@@ -643,7 +643,7 @@ function RaceSection({
       {rr && rr.training_signals.length > 0 && (
         <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
           {rr.training_signals.map((s, i) => (
-            <span key={i} className="text-[11px]">
+            <span key={i} className="text-[12px]">
               <span className="text-white/50">{s.label}</span>{' '}
               <span className={signalToneColor(s.tone)}>{s.value}</span>
             </span>
@@ -653,7 +653,7 @@ function RaceSection({
 
       {/* Pace zones */}
       {rr && (
-        <div className="flex items-center gap-3 pt-0.5 text-[10px] text-white/45">
+        <div className="flex items-center gap-3 pt-0.5 text-[11px] text-white/45">
           <span>Easy {rr.pace_zones.easy}</span>
           <span>Threshold {rr.pace_zones.threshold}</span>
           <span>Race {rr.pace_zones.race}</span>
@@ -662,7 +662,7 @@ function RaceSection({
 
       {/* Modifiers */}
       {rr && (
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/35">
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-white/35">
           {rr.data_source === 'plan_targets' && (
             <span className="italic">Based on plan targets</span>
           )}
@@ -684,9 +684,9 @@ function RaceSection({
           null → hide. The colored-% branch is dark until block-adaptation data exists (Q-080). */}
       {blockVerdict && (
         blockVerdict.drivers.length === 0 ? (
-          <p className="text-[11px] text-white/40 pt-0.5">Goal trajectory · needs more comparable sessions</p>
+          <p className="text-[12px] text-white/40 pt-0.5">Goal trajectory · needs more comparable sessions</p>
         ) : (
-          <div className="flex items-baseline gap-2 pt-0.5 text-[11px]">
+          <div className="flex items-baseline gap-2 pt-0.5 text-[12px]">
             <span className="text-white/50">Goal trajectory</span>
             <span className={
               blockVerdict.goal_probability_pct >= 70 ? 'text-emerald-400/85'
@@ -702,7 +702,7 @@ function RaceSection({
       {divergence && divergence.observations.length > 0 && (
         <div className="pt-0.5 space-y-0.5">
           {divergence.observations.map((o, i) => (
-            <p key={i} className="text-[11px] text-amber-400/70 leading-snug">{o.note}</p>
+            <p key={i} className="text-[12px] text-amber-400/70 leading-snug">{o.note}</p>
           ))}
         </div>
       )}
@@ -1008,11 +1008,11 @@ export default function StateTab({
   }
 
   if (error || !data) {
-    return <div className="py-8 text-center text-[12px] text-white/50">{error ?? 'No data'}</div>;
+    return <div className="py-8 text-center text-[13px] text-white/50">{error ?? 'No data'}</div>;
   }
 
   const wsv = data.weekly_state_v1;
-  if (!wsv) return <div className="py-8 text-center text-[12px] text-white/50">Loading state…</div>;
+  if (!wsv) return <div className="py-8 text-center text-[13px] text-white/50">Loading state…</div>;
 
   const week = wsv.week;
   const load = wsv.load;
@@ -1277,7 +1277,7 @@ export default function StateTab({
       <button
         type="button"
         onClick={() => setStrengthDetailOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-white/35 hover:text-white/55 transition-colors"
+        className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-white/35 hover:text-white/55 transition-colors"
         aria-expanded={strengthDetailOpen}
       >
         <span className={`inline-block transition-transform duration-200 ${strengthDetailOpen ? 'rotate-90' : ''}`}>›</span>
@@ -1318,15 +1318,15 @@ export default function StateTab({
         return (
           <div key={lt.canonical_name} className="space-y-1">
             <div className="flex items-start justify-between gap-3">
-              <span className="text-[12px] text-white/80 shrink-0">{lt.display_name}</span>
+              <span className="text-[13px] text-white/80 shrink-0">{lt.display_name}</span>
               <span className="relative max-w-[68%]">
                 {hasWeightSuggestion ? (
                   <button
                     onClick={() => setAdjustingLift(adjustingLift === lt.canonical_name ? null : lt.canonical_name)}
-                    className={`text-[12px] ${verdictColor} underline decoration-dotted underline-offset-2 hover:opacity-80 text-right`}
+                    className={`text-[13px] ${verdictColor} underline decoration-dotted underline-offset-2 hover:opacity-80 text-right`}
                   >{rowText}</button>
                 ) : (
-                  <span className={`text-[12px] ${verdictColor} text-right`}>{rowText}</span>
+                  <span className={`text-[13px] ${verdictColor} text-right`}>{rowText}</span>
                 )}
                 {adjustingLift === lt.canonical_name && (
                   <StrengthAdjustmentModal
@@ -1345,7 +1345,7 @@ export default function StateTab({
               </span>
             </div>
             {lt.last_session_date && (
-              <div className="text-[10px] text-white/25">as of {new Date(lt.last_session_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+              <div className="text-[11px] text-white/25">as of {new Date(lt.last_session_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
             )}
             {e1rmPct != null && (
               <div className="h-[3px] w-full rounded-full bg-white/[0.06]">
@@ -1373,19 +1373,19 @@ export default function StateTab({
       <div className="flex items-start justify-between mb-4 px-0.5">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-[11px] font-semibold tracking-widest text-white/65 uppercase">{weekLabel}</span>
+            <span className="text-[12px] font-semibold tracking-widest text-white/65 uppercase">{weekLabel}</span>
             {/* Chip Option A / research (Whoop): readiness is STRAIN-class — never headline/crown material.
                 It moved to BODY as the row's driver. "WEEK" stays as the plain section header. */}
           </div>
           {isAimless ? (
             <>
-              <span className="text-[14px] font-medium text-white/85 leading-snug">{aimlessHeadline}</span>
-              <span className="text-[12px] text-white/50 leading-snug">{aimlessSubtext}</span>
+              <span className="text-[15px] font-medium text-white/85 leading-snug">{aimlessHeadline}</span>
+              <span className="text-[13px] text-white/50 leading-snug">{aimlessSubtext}</span>
               {aimlessCtaAction !== 'none' && (
                 <button
                   type="button"
                   onClick={() => navigate(aimlessCtaTarget)}
-                  className="mt-1 self-start rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-1.5 text-[12px] font-medium text-teal-100/95 hover:bg-teal-500/15 active:opacity-90"
+                  className="mt-1 self-start rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-1.5 text-[13px] font-medium text-teal-100/95 hover:bg-teal-500/15 active:opacity-90"
                 >
                   {aimlessCtaLabel}
                 </button>
@@ -1394,17 +1394,17 @@ export default function StateTab({
           ) : (
             <>
               {intentSummary && (
-                <span className="text-[14px] font-medium text-white/85 leading-snug">{intentSummary}</span>
+                <span className="text-[15px] font-medium text-white/85 leading-snug">{intentSummary}</span>
               )}
               {loadHeadline && (
-                <span className="text-[13px] font-medium text-white/80 leading-snug">{loadHeadline}</span>
+                <span className="text-[14px] font-medium text-white/80 leading-snug">{loadHeadline}</span>
               )}
               {(weekNarrative || readinessWhy) && (
                 <div className="flex flex-col">
                   <button
                     type="button"
                     onClick={() => setNarrativeOpen((o) => !o)}
-                    className="self-start flex items-center gap-1 text-[11px] text-white/45 hover:text-white/70 transition-colors mt-0.5 touch-manipulation"
+                    className="self-start flex items-center gap-1 text-[12px] text-white/45 hover:text-white/70 transition-colors mt-0.5 touch-manipulation"
                     aria-expanded={narrativeOpen}
                   >
                     {narrativeOpen ? 'Show less' : 'open for more'}
@@ -1413,9 +1413,9 @@ export default function StateTab({
                   {narrativeOpen && (
                     <>
                       {/* D-232: the FATIGUED headline expands to its real factors, then the loaded-legs suggestion, then prose. */}
-                      {readinessWhy && <span className="text-[12px] text-amber-300/70 leading-snug mt-1">{readinessWhy}</span>}
-                      {readinessSuggestion && <span className="text-[12px] text-white/60 leading-snug mt-1">{readinessSuggestion}</span>}
-                      {weekNarrative && <span className="text-[12px] text-white/55 leading-snug mt-1">{weekNarrative}</span>}
+                      {readinessWhy && <span className="text-[13px] text-amber-300/70 leading-snug mt-1">{readinessWhy}</span>}
+                      {readinessSuggestion && <span className="text-[13px] text-white/60 leading-snug mt-1">{readinessSuggestion}</span>}
+                      {weekNarrative && <span className="text-[13px] text-white/55 leading-snug mt-1">{weekNarrative}</span>}
                     </>
                   )}
                 </div>
@@ -1428,10 +1428,10 @@ export default function StateTab({
               role="region"
               aria-label="Race-week guidance"
             >
-              <p className="text-[10px] font-semibold tracking-[0.12em] text-sky-300/85 uppercase mb-1.5">
+              <p className="text-[11px] font-semibold tracking-[0.12em] text-sky-300/85 uppercase mb-1.5">
                 {raceWeekGuidance.title}
               </p>
-              <ul className="text-[11px] text-white/72 leading-relaxed space-y-1.5 list-disc pl-3.5 marker:text-sky-400/50">
+              <ul className="text-[12px] text-white/72 leading-relaxed space-y-1.5 list-disc pl-3.5 marker:text-sky-400/50">
                 {raceWeekGuidance.bullets.map((line, i) => (
                   <li key={i}>{line}</li>
                 ))}
@@ -1452,7 +1452,7 @@ export default function StateTab({
 
       {/* Section clock label: LOAD + BODY are the FAST clock (how the last 7 days feel vs typical).
           Named once here; per-row specifics (WTD pts, RPE receipt) inherit it. */}
-      <div className="px-1 mb-1 text-[10px] text-white/30 lowercase">last 7 days vs your typical</div>
+      <div className="px-1 mb-1 text-[11px] text-white/30 lowercase">load · rolling last 7 days vs your typical week</div>
 
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] divide-y divide-white/[0.055]">
 
@@ -1461,8 +1461,8 @@ export default function StateTab({
 
         {showTopLastRaceCard && lastCompletedRace && (
           <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-1">
-            <p className="text-[10px] font-semibold tracking-[0.12em] text-white/50 uppercase">Last race</p>
-            <p className="text-[12px] text-white/80">
+            <p className="text-[11px] font-semibold tracking-[0.12em] text-white/50 uppercase">Last race</p>
+            <p className="text-[13px] text-white/80">
               <span className="text-white/60">{lastCompletedRace.name}</span>
               <span className="text-white/40"> · {fmtDate(lastCompletedRace.target_date)}</span>
             </p>
@@ -1470,10 +1470,10 @@ export default function StateTab({
               <span className="text-[20px] font-semibold tabular-nums text-white/90">
                 {fmtGoalClock(lastCompletedRace.actual_seconds)}
               </span>
-              <span className="text-[11px] text-white/45">actual (elapsed / chip)</span>
+              <span className="text-[12px] text-white/45">actual (elapsed / chip)</span>
             </div>
             {lastCompletedRace.goal_target_seconds != null && (
-              <p className="text-[11px] text-white/50">
+              <p className="text-[12px] text-white/50">
                 Goal {fmtGoalClock(lastCompletedRace.goal_target_seconds)}
                 <Dot />
                 <span
@@ -1491,7 +1491,7 @@ export default function StateTab({
               </p>
             )}
             {lastCompletedRace.projected_seconds != null && (
-              <p className="text-[11px] text-white/50">
+              <p className="text-[12px] text-white/50">
                 Projected {fmtGoalClock(lastCompletedRace.projected_seconds)}
                 <Dot />
                 <span
@@ -1513,8 +1513,8 @@ export default function StateTab({
 
         {showAmberRecordBar && (
           <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-1">
-            <p className="text-[10px] font-semibold tracking-[0.12em] text-amber-300/80 uppercase">Race day</p>
-            <p className="text-[11px] text-white/55 leading-snug">
+            <p className="text-[11px] font-semibold tracking-[0.12em] text-amber-300/80 uppercase">Race day</p>
+            <p className="text-[12px] text-white/55 leading-snug">
               Log your race as a completed run. We&apos;ll auto-save the elapsed (chip) result to My Record and end this plan — no extra tap needed.
             </p>
           </div>
@@ -1523,13 +1523,13 @@ export default function StateTab({
         {/* BODY */}
         <div className="px-3 py-3">
           <div className="flex items-start gap-3">
-            <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
+            <span className="text-[11px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
             <div className="flex-1 space-y-1.5">
               {visibleSignals.length === 0 && (rm as any)?.overall_training_read?.summary && (
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-[12px] text-white/70">This week</span>
+                  <span className="text-[13px] text-white/70">This week</span>
                   <span
-                    className={`text-[12px] text-right max-w-[min(100%,220px)] leading-snug ${
+                    className={`text-[13px] text-right max-w-[min(100%,220px)] leading-snug ${
                       (rm as any).overall_training_read.tone === 'positive'
                         ? 'text-emerald-400/90'
                         : (rm as any).overall_training_read.tone === 'warning'
@@ -1556,30 +1556,30 @@ export default function StateTab({
                     onClick={() => s.provenance && setExpandedSignal(expandedSignal === s.label ? null : s.label)}
                     className="w-full flex items-start justify-between gap-3 text-left"
                   >
-                    <span className="text-[12px] text-white/70 shrink-0">{s.label}</span>
+                    <span className="text-[13px] text-white/70 shrink-0">{s.label}</span>
                     <div className="flex items-start gap-2 min-w-0">
-                      <span className={`text-[12px] text-right leading-snug ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
-                      {s.provenance && <span className="text-white/30 text-[9px] shrink-0 mt-0.5">{expandedSignal === s.label ? '▾' : '▸'}</span>}
+                      <span className={`text-[13px] text-right leading-snug ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
+                      {s.provenance && <span className="text-white/30 text-[10px] shrink-0 mt-0.5">{expandedSignal === s.label ? '▾' : '▸'}</span>}
                     </div>
                   </button>
                   {/* Whoop pairing (verdict + its driver, together): the RPE driver — which session
                       moved the week — sits WITH the "how hard it feels" verdict, dim + always-visible.
                       RPE-clause only (server guarantees no non-RPE factor reaches this row). */}
                   {s.label === 'How hard it feels' && readinessRpeDriver && (
-                    <p className="text-[11px] text-white/45 leading-snug mt-0.5">{readinessRpeDriver}</p>
+                    <p className="text-[12px] text-white/45 leading-snug mt-0.5">{readinessRpeDriver}</p>
                   )}
                   {fmtBodyAsOf(s.as_of_date) && (
-                    <p className="text-[10px] text-white/25 leading-snug mt-0.5">{fmtBodyAsOf(s.as_of_date)}</p>
+                    <p className="text-[11px] text-white/25 leading-snug mt-0.5">{fmtBodyAsOf(s.as_of_date)}</p>
                   )}
                   {expandedSignal === s.label && s.provenance && (
-                    <p className="text-[10px] text-white/40 leading-snug mt-1 max-w-[min(100%,320px)]">{s.provenance}</p>
+                    <p className="text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,320px)]">{s.provenance}</p>
                   )}
                 </div>
               ))}
               {crossTrainingSignal && (
                 <div className="flex items-start justify-between gap-3 pt-0.5">
-                  <span className="text-[12px] text-white/70 shrink-0">Cross-training</span>
-                  <span className={`text-[12px] text-right leading-snug min-w-0 ${
+                  <span className="text-[13px] text-white/70 shrink-0">Cross-training</span>
+                  <span className={`text-[13px] text-right leading-snug min-w-0 ${
                     crossTrainingSignal.tone === 'positive' ? 'text-emerald-400/90' :
                     crossTrainingSignal.tone === 'warning' ? 'text-amber-400/90' :
                     crossTrainingSignal.tone === 'info' ? 'text-sky-400/85' :
@@ -1638,7 +1638,7 @@ export default function StateTab({
           if (counts.length === 0 && !accent) return null; // nothing to say → render nothing
           return (
             <>
-              <div className="px-4 pt-3 text-[10px] text-white/30 lowercase tracking-[0.12em]">the week · mix</div>
+              <div className="px-4 pt-3 text-[11px] text-white/30 lowercase tracking-[0.12em]">this week · planned vs actual</div>
               {counts.length > 0 && <WeekMixBar counts={counts} />}
               {accent?.sentence && <WeekAccentLine sentence={accent.sentence} detail={accent.trace?.detail ?? null} />}
             </>
@@ -1654,15 +1654,15 @@ export default function StateTab({
           <div className="mt-3 rounded-lg border border-sky-400/20 bg-sky-500/[0.07] px-3 py-2.5">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold tracking-[0.12em] text-sky-300/85 uppercase mb-1">Swim check-in</p>
-                <p className="text-[12px] text-white/75 leading-snug">
+                <p className="text-[11px] font-semibold tracking-[0.12em] text-sky-300/85 uppercase mb-1">Swim check-in</p>
+                <p className="text-[13px] text-white/75 leading-snug">
                   About {Math.round(swimNudge.weeksSince)} weeks of steady swimming since your last update — a quick CSS test would refresh your threshold.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => { snoozeNudge('swim_retest'); setNudgeDismissNonce((n) => n + 1); }}
-                className="text-[11px] text-white/40 hover:text-white/70 shrink-0 touch-manipulation"
+                className="text-[12px] text-white/40 hover:text-white/70 shrink-0 touch-manipulation"
                 aria-label="Dismiss swim check-in"
               >
                 Dismiss
@@ -1675,10 +1675,10 @@ export default function StateTab({
         {showNudge && (
           <div className="px-3 py-3">
             <div className="flex items-start gap-3">
-              <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">SIGNAL</span>
+              <span className="text-[11px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">SIGNAL</span>
               <div className="flex-1">
                 <div className="flex items-start justify-between gap-2">
-                  <span className={`text-[12px] leading-snug flex-1 ${
+                  <span className={`text-[13px] leading-snug flex-1 ${
                     nudgeDecision.severity === 'concern' ? 'text-amber-400/85' : 'text-white/75'
                   }`}>
                     {nudgeDecision.headline}
@@ -1699,7 +1699,7 @@ export default function StateTab({
                 </div>
                 <button
                   type="button"
-                  className="mt-1.5 text-[11px] text-teal-400/70 hover:text-teal-300/90 bg-transparent border-none cursor-pointer p-0"
+                  className="mt-1.5 text-[12px] text-teal-400/70 hover:text-teal-300/90 bg-transparent border-none cursor-pointer p-0"
                   onClick={() => navigate('/arc-setup', { state: { arcNudgeSeed: nudgeDecision.headline } })}
                 >
                   Review with Arc →
@@ -1785,7 +1785,7 @@ export default function StateTab({
       </div>
 
       {wsv.plan.plan_name && (
-        <div className="mt-2 px-0.5 text-[10px] text-white/60 uppercase tracking-widest">
+        <div className="mt-2 px-0.5 text-[11px] text-white/60 uppercase tracking-widest">
           {wsv.plan.plan_name}
         </div>
       )}

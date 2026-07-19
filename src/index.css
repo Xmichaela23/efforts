@@ -247,7 +247,7 @@
   .instrument-panel {
     position: relative;
     border-radius: 14px;
-    padding: 10px;
+    padding: 5px;
     overflow: hidden;
     /* Option 1 lighting: top-left key light + neutral depth */
     background:
@@ -295,7 +295,7 @@
     position: relative;
     z-index: 1;
     border-radius: 12px;
-    padding: 10px;
+    padding: 6px;
     background: rgba(0,0,0,0.65);
     box-shadow:
       inset 0 0 0 1px rgba(255,255,255,0.05),

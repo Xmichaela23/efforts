@@ -40,7 +40,7 @@ function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
         {v.arr && <span>{v.arr}</span>}<span>{v.word}</span>
       </span>
       {sig.pctChange != null && sig.verdict !== 'needs_data' && <span className="text-white/40">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
-      {sig.provisional && <span className="text-white/30 text-[10px]">prov</span>}
+      {sig.provisional && <span className="text-white/30 text-[11px]">prov</span>}
     </span>
   );
 }
@@ -79,15 +79,17 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
   return (
     <Row label="bike">
       {showDot ? (
-        <FitnessDotBlock label={leadIsPower ? 'power' : 'efficiency'} range={range!} verdict={lead.verdict} showAxis={showAxis} />
+        <FitnessDotBlock label={leadIsPower ? 'power' : 'efficiency'} range={range!} verdict={lead.verdict} showAxis={showAxis} explain={leadIsPower
+          ? "Power = how your cycling power is trending versus your own baseline (from your ride power against your FTP). The dot is where it sits, the arrow the direction."
+          : "Efficiency = how much power you hold per heartbeat on steady rides. Rising means you’re doing the same work at a lower heart rate — your aerobic engine getting fitter. The dot is where it sits versus your baseline; the arrow is the direction."} />
       ) : (
         <Signal label={leadIsPower ? 'Power' : 'Efficiency'} sig={lead} />
       )}
-      {tail && <span className="text-white/35 text-[10px]">{tail}</span>}
-      {src && <span className="text-white/25 text-[10px]">{src}</span>}
-      {asOf(lead.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(lead.newestAgeDays)}</span>}
+      {tail && <span className="text-white/35 text-[11px]">{tail}</span>}
+      {src && <span className="text-white/25 text-[11px]">{src}</span>}
+      {asOf(lead.newestAgeDays) && <span className="text-white/25 text-[11px]">· {asOf(lead.newestAgeDays)}</span>}
       {trendOnly && <NoBaselineTag hint={src === 'est (FTP)' ? 'accept your FTP to anchor' : undefined} />}
-      {showDot && anchor?.label && <span className="basis-full text-[9px] text-white/30">{anchor.label}</span>}
+      {showDot && anchor?.label && <span className="basis-full text-[10px] text-white/30">{anchor.label}</span>}
     </Row>
   );
 }
@@ -114,17 +116,17 @@ function StrengthFitnessRow({ fitness, showAxis }: { fitness: StrengthFitness; s
   return (
     <Row label="strength">
       {e && range ? (
-        <FitnessDotBlock label="e1RM" range={range} verdict={e.verdict} showAxis={showAxis} frame="vs your baseline" />
+        <FitnessDotBlock label="e1RM" range={range} verdict={e.verdict} showAxis={showAxis} frame="vs your baseline" explain="e1RM = your estimated one-rep max — the most you could lift once, worked out from the weights and reps you log (you never have to actually max out). The dot is where it sits versus your own baseline; the arrow is the direction. “Holding” means it isn’t moving up or down." />
       ) : e ? (
         <span className="basis-full flex items-baseline justify-between gap-2">
-          <span className="text-white/55 text-[12px]">e1RM</span>
-          <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${VERDICT[e.verdict].cls}`}>{VERDICT[e.verdict].arr && <span>{VERDICT[e.verdict].arr}</span>}<span>{VERDICT[e.verdict].word}</span></span>
+          <span className="text-white/55 text-[13px]">e1RM</span>
+          <span className={`inline-flex items-baseline gap-0.5 text-[12px] ${VERDICT[e.verdict].cls}`}>{VERDICT[e.verdict].arr && <span>{VERDICT[e.verdict].arr}</span>}<span>{VERDICT[e.verdict].word}</span></span>
         </span>
       ) : (
         <span className="text-white/40">needs 2+ logged lifts to trend</span>
       )}
       {vol.sampleCount != null && vol.sampleCount > 0 && (
-        <span className="basis-full text-white/35 text-[10px]">over 6wk · {vol.sampleCount} session{vol.sampleCount === 1 ? '' : 's'}{asOf(vol.newestAgeDays) ? ` · ${asOf(vol.newestAgeDays)}` : ''}</span>
+        <span className="basis-full text-white/35 text-[11px]">over 6wk · {vol.sampleCount} session{vol.sampleCount === 1 ? '' : 's'}{asOf(vol.newestAgeDays) ? ` · ${asOf(vol.newestAgeDays)}` : ''}</span>
       )}
     </Row>
   );
@@ -137,10 +139,10 @@ const PROVISIONAL_PERF = new Set(['swim']);
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">
+      <span className="text-[11px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">
         {label}
       </span>
-      <div className="flex-1 text-[12px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
+      <div className="flex-1 text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
         {children}
       </div>
     </div>
@@ -172,7 +174,7 @@ function FitnessDot({ pct, confident, tickPct, overflow }: { pct: number; confid
             the recent range (overflow) it pins at the edge with a caret ("you've been better than recently"). */}
         {tickLeft != null && (
           <div className="absolute top-1/2 h-3 w-[2px] rounded" style={{ left: tickLeft, transform: 'translate(-50%, -50%)', backgroundColor: 'rgba(255,255,255,0.4)' }}>
-            {overflow === 'better' && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-white/40 text-[9px]">›</span>}
+            {overflow === 'better' && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-white/40 text-[10px]">›</span>}
           </div>
         )}
         <div
@@ -190,7 +192,7 @@ function FitnessDot({ pct, confident, tickPct, overflow }: { pct: number; confid
 
 // Shared dot+arrow block: metric name + trend ARROW on top, the DOT (level in the 12wk range) below, the
 // relative-frame label under it. Used by bike/swim/strength; run has its own (adds an "i" explainer).
-function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT, showAxis = true, frame = 'vs your 12-week range' }: {
+function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT, showAxis = true, frame = 'vs your 12-week range', explain }: {
   label: string;
   range: { positionPct: number; confident: boolean };
   verdict: TrendVerdict;
@@ -198,24 +200,35 @@ function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT
   wordMap?: Record<TrendVerdict, { word: string; cls: string; arr: string }>;
   showAxis?: boolean; // the "weaker / frame / stronger" grammar renders on the FIRST band only (item 7)
   frame?: string;
+  explain?: string; // when set, the label becomes a tap-ⓘ that reveals this plain-language definition
 }) {
   const v = wordMap[verdict];
+  const [explainOpen, setExplainOpen] = React.useState(false);
   return (
     <>
       <span className="basis-full flex items-baseline justify-between gap-2">
-        <span className="text-white/55 text-[12px]">{label}</span>
+        {explain ? (
+          <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[13px]">
+            {label} <span className="text-white/30 text-[10px]">{explainOpen ? '▾' : 'ⓘ'}</span>
+          </button>
+        ) : (
+          <span className="text-white/55 text-[13px]">{label}</span>
+        )}
         {verdict !== 'needs_data' && (
-          <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{provisional && <span className="text-white/30 text-[10px] ml-1">provisional</span>}</span>
+          <span className={`inline-flex items-baseline gap-0.5 text-[12px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{provisional && <span className="text-white/30 text-[11px] ml-1">provisional</span>}</span>
         )}
       </span>
       <FitnessDot pct={range.positionPct} confident={range.confident} />
       {showAxis ? (
-        <span className="basis-full flex items-center justify-between text-[9px] text-white/25">
+        <span className="basis-full flex items-center justify-between text-[10px] text-white/25">
           <span>weaker</span><span>{range.confident ? frame : 'thin data'}</span><span>stronger</span>
         </span>
       ) : !range.confident ? (
-        <span className="basis-full text-center text-[9px] text-white/25">thin data</span>
+        <span className="basis-full text-center text-[10px] text-white/25">thin data</span>
       ) : null}
+      {explain && explainOpen && (
+        <p className="basis-full text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">{explain}</p>
+      )}
     </>
   );
 }
@@ -226,7 +239,7 @@ function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT
 // is Slice 2, so it shows the plain "no baseline set" — honest, not broken.
 function NoBaselineTag({ hint }: { hint?: string }) {
   return (
-    <span className="basis-full text-[10px] text-white/30">no baseline set{hint ? ` · ${hint}` : ''}</span>
+    <span className="basis-full text-[11px] text-white/30">no baseline set{hint ? ` · ${hint}` : ''}</span>
   );
 }
 
@@ -254,14 +267,14 @@ function RunFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: RunFitnes
   const runWk = Math.round(42 / 7); // run durability window ≈ 6wk
   const header = (
     <span className="basis-full flex items-baseline justify-between gap-2">
-      <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[12px]">
-        durability <span className="text-white/30 text-[9px]">{explainOpen ? '▾' : 'ⓘ'}</span>
+      <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[13px]">
+        durability <span className="text-white/30 text-[10px]">{explainOpen ? '▾' : 'ⓘ'}</span>
       </button>
       {withheld ? (
         // counts voice, no color, no arrow — state the data, claim nothing (Amendment 1).
-        <span className="text-white/40 text-[10px]">{d.sampleCount ?? 0} run{d.sampleCount === 1 ? '' : 's'} in {runWk}wk — too few to read direction</span>
+        <span className="text-white/40 text-[11px]">{d.sampleCount ?? 0} run{d.sampleCount === 1 ? '' : 's'} in {runWk}wk — too few to read direction</span>
       ) : (
-        <span className={`inline-flex items-baseline gap-0.5 text-[11px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{d.provisional && <span className="text-white/30 text-[10px] ml-1">provisional</span>}</span>
+        <span className={`inline-flex items-baseline gap-0.5 text-[12px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{d.provisional && <span className="text-white/30 text-[11px] ml-1">provisional</span>}</span>
       )}
     </span>
   );
@@ -272,14 +285,14 @@ function RunFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: RunFitnes
           {header}
           <FitnessDot pct={range!.positionPct} confident={range!.confident} tickPct={anchor?.tickPct} overflow={anchor?.overflow} />
           {showAxis ? (
-            <span className="basis-full flex items-center justify-between text-[9px] text-white/25">
+            <span className="basis-full flex items-center justify-between text-[10px] text-white/25">
               <span>weaker</span><span>{range!.confident ? 'vs your 12-week range' : 'thin data'}</span><span>stronger</span>
             </span>
           ) : !range!.confident ? (
-            <span className="basis-full text-center text-[9px] text-white/25">thin data</span>
+            <span className="basis-full text-center text-[10px] text-white/25">thin data</span>
           ) : null}
           {/* the anchor label — "auto · steady run · Jun 20" (provisional) or "steady run · Jun 20" (confirmed) */}
-          {anchor?.label && <span className="basis-full text-[9px] text-white/30">{anchor.label}</span>}
+          {anchor?.label && <span className="basis-full text-[10px] text-white/30">{anchor.label}</span>}
         </>
       ) : trendOnly ? (
         <>
@@ -289,15 +302,15 @@ function RunFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: RunFitnes
       ) : d.stale ? (
         <span className="inline-flex items-baseline gap-1.5 text-white/40">
           <span>durability</span>
-          <span className="text-white/30 text-[11px]">last steady run {d.newestAgeDays}d ago</span>
-          <span className="text-white/30 text-[10px]">limited data</span>
+          <span className="text-white/30 text-[12px]">last steady run {d.newestAgeDays}d ago</span>
+          <span className="text-white/30 text-[11px]">limited data</span>
         </span>
       ) : (
         <span className="text-white/40">needs 20+ min steady effort</span>
       )}
-      {(showDot || trendOnly) && !withheld && evidence && <span className="basis-full text-white/35 text-[10px]">{evidence}</span>}
+      {(showDot || trendOnly) && !withheld && evidence && <span className="basis-full text-white/35 text-[11px]">{evidence}</span>}
       {explainOpen && (
-        <p className="basis-full text-[10px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">
+        <p className="basis-full text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">
           {anchored
             ? "The dot is where your aerobic durability sits versus your own last 12 weeks — how much your heart rate drifts on a long steady run. Left is the weakest it's been, right the strongest. It's a relative frame, not an absolute score."
             : "Durability = how much your heart rate drifts on a long steady run — less drift is better. The arrow is the direction over your recent steady runs. No baseline is set, so there's no high/low dot yet. (Coaches commonly treat under ~5% drift as strong — a field norm, not your number.)"}
@@ -338,17 +351,17 @@ function SwimVolumeRow({ vol }: { vol: SwimVolume }) {
   if (!vol.swims) {
     return (
       <Row label="swim">
-        <span className="text-white/40 text-[12px]">no swims logged</span>
-        <span className="text-white/25 text-[10px]">· last {weeks}wk</span>
+        <span className="text-white/40 text-[13px]">no swims logged</span>
+        <span className="text-white/25 text-[11px]">· last {weeks}wk</span>
       </Row>
     );
   }
   return (
     <Row label="swim">
-      <span className="text-white/80 text-[12px]">{vol.swims} {vol.swims === 1 ? 'swim' : 'swims'}</span>
-      <span className="text-white/60 text-[12px]">{toDisp(vol.totalDistanceM).toLocaleString()} {unit}</span>
-      <span className="text-white/60 text-[12px]">longest {toDisp(vol.longestM).toLocaleString()} {unit}</span>
-      <span className="text-white/25 text-[10px] basis-full">last {weeks}wk</span>
+      <span className="text-white/80 text-[13px]">{vol.swims} {vol.swims === 1 ? 'swim' : 'swims'}</span>
+      <span className="text-white/60 text-[13px]">{toDisp(vol.totalDistanceM).toLocaleString()} {unit}</span>
+      <span className="text-white/60 text-[13px]">longest {toDisp(vol.longestM).toLocaleString()} {unit}</span>
+      <span className="text-white/25 text-[11px] basis-full">last {weeks}wk</span>
     </Row>
   );
 }
@@ -377,15 +390,15 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
         {range ? (
           <>
             <FitnessDotBlock label={metricLabel ? metricLabel.toLowerCase() : card.discipline} range={range} verdict={card.headlineVerdict} provisional={PROVISIONAL_PERF.has(card.discipline)} showAxis={showAxis} />
-            {evidence && <span className="basis-full text-white/35 text-[10px]">{evidence}</span>}
+            {evidence && <span className="basis-full text-white/35 text-[11px]">{evidence}</span>}
           </>
         ) : (
           <>
-            {metricLabel && <span className="text-white/50 text-[12px]">{metricLabel}</span>}
+            {metricLabel && <span className="text-white/50 text-[13px]">{metricLabel}</span>}
             {hasEvidence ? (
               <>
-                <span className={`text-[12px] ${vCls}`}>{trendHeadline(card.headlineVerdict, perf!.pctChange)}</span>
-                <span className="text-white/35 text-[11px]">{evidence}</span>
+                <span className={`text-[13px] ${vCls}`}>{trendHeadline(card.headlineVerdict, perf!.pctChange)}</span>
+                <span className="text-white/35 text-[12px]">{evidence}</span>
               </>
             ) : (
               <>
@@ -398,8 +411,8 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
             )}
           </>
         )}
-        {thinStale && <span className="text-white/30 text-[10px]">limited data</span>}
-        {asOf(perf?.newestAgeDays) && <span className="text-white/25 text-[10px]">· {asOf(perf?.newestAgeDays)}</span>}
+        {thinStale && <span className="text-white/30 text-[11px]">limited data</span>}
+        {asOf(perf?.newestAgeDays) && <span className="text-white/25 text-[11px]">· {asOf(perf?.newestAgeDays)}</span>}
         {/* 'provisional' now rides the dot block's arrow line (item 6, uniform) — no trailing chip */}
         {/* swim rest-fraction chip removed — "rest ↓ sliding −38.2%" was the same clipped telegram voice
             next to a clean dot. The swim row is the pace dot + arrow. */}
@@ -421,7 +434,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
   return (
     <Row label={card.discipline}>
       {ndReceipt ? (
-        <span className={`text-[11px] ${nd.cls}`}>{ndReceipt}</span>
+        <span className={`text-[12px] ${nd.cls}`}>{ndReceipt}</span>
       ) : (
         <>
           <span className={nd.cls}>{nd.word}</span>
@@ -450,7 +463,7 @@ function PostureLine({ card }: { card: DisciplineCard }) {
   if (!sentence) return null;
   const concern = (card as any).postureRead === 'develop_declining' || (card as any).postureRead === 'develop_stalled';
   return (
-    <p className={`pl-[62px] pr-1 -mt-0.5 mb-1.5 text-[11px] leading-snug max-w-[min(100%,360px)] ${concern ? 'text-amber-400/80' : 'text-white/45'}`}>
+    <p className={`pl-[62px] pr-1 -mt-0.5 mb-1.5 text-[12px] leading-snug max-w-[min(100%,360px)] ${concern ? 'text-amber-400/80' : 'text-white/45'}`}>
       {sentence}
     </p>
   );
@@ -485,8 +498,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay }
       <div className="mb-2.5 flex items-baseline gap-2">
         {/* Named "Fitness" (not "Performance") so it can't be confused with the per-workout Performance
             tab that grades a single session. This card is the multi-week fitness TREND. */}
-        <span className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Fitness</span>
-        <span className="text-[10px] text-white/30 lowercase">trends over recent weeks</span>
+        <span className="text-[11px] font-semibold tracking-[0.12em] text-white/45 uppercase">Fitness</span>
+        <span className="text-[11px] text-white/30 lowercase">trends over recent weeks</span>
       </div>
       {/* NO aggregate roll-up (Michael 2026-07-04): a cross-discipline headline ("Building — bike up,
           run up") is a lossy, cherry-picking, clock-mismatched summary (run 6wk vs bike 8wk). Fitness

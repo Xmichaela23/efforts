@@ -101,15 +101,16 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
     leftover -= 1;
   }
   const dominant = comp[0]?.type ?? null;
+  const [showAcwrInfo, setShowAcwrInfo] = React.useState(false);
 
   return (
     <div className="px-3 py-3">
       {/* Verdict leads; ACWR is the demoted reference number (D-260: ACWR describes, never decides). */}
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">LOAD</span>
+        <span className="text-[11px] font-semibold tracking-[0.12em] text-white/70 uppercase">LOAD</span>
         <div className="flex items-center gap-2">
           {showVerdict && (
-            <span className={`text-[14px] font-semibold tracking-tight ${loadVolumeColor(verdict)}`}>{verdict}</span>
+            <span className={`text-[15px] font-semibold tracking-tight ${loadVolumeColor(verdict)}`}>{verdict}</span>
           )}
           {load.acwr != null && (
             <>
@@ -118,24 +119,51 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
                   editorializes and competes with the engine's verdict (a 1.2 "optimal" next to a
                   "build more" verdict reads as a contradiction). One voice: the verdict judges, ACWR
                   is just the datapoint (D-260). */}
-              <span className="text-[10px] tabular-nums text-white/40 leading-none">ACWR {load.acwr.toFixed(1)}</span>
+              <span className="text-[11px] tabular-nums text-white/40 leading-none">ACWR {load.acwr.toFixed(1)}</span>
               {load.acwr_provisional && (
-                <span className="text-[9px] text-white/30 leading-none">· provisional</span>
+                <span className="text-[10px] text-white/30 leading-none">· provisional</span>
               )}
+              <button
+                type="button"
+                aria-label="What is ACWR?"
+                onClick={() => setShowAcwrInfo((v) => !v)}
+                className="text-white/30 hover:text-white/60 text-[10px] leading-none bg-transparent border-none cursor-pointer p-0"
+              >
+                {showAcwrInfo ? '▾' : 'ⓘ'}
+              </button>
             </>
           )}
         </div>
       </div>
 
+      {showAcwrInfo && (
+        <div className="mt-2 space-y-1.5 text-[11px] leading-snug text-white/45">
+          <p>
+            <span className="text-white/70">Points</span> — training stress: how long × how hard, scaled so
+            ~1 hour at your threshold ≈ 100. The bar splits your rolling-7-day total by sport.
+          </p>
+          <p>
+            <span className="text-white/70">ACWR</span> — your last-7-days points ÷ your typical week
+            (the ~4-week average). Near 1.0 is your normal amount; higher means you're ramping up. A reference
+            number, not a verdict.
+          </p>
+          <p>
+            <span className="text-white/70">The word</span> (e.g. "balanced") combines all of it — your points
+            <span className="italic"> and</span> ACWR together with how your body's handling it (heart rate,
+            effort, readiness) — so it can differ from the bare ratio on purpose.
+          </p>
+        </div>
+      )}
+
       {/* Composition strip — the primary load visual (full surface only). */}
       {!compact && comp.length > 0 && total > 0 && (
         <div className="mt-3">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] text-white/65 uppercase tracking-[0.08em]">Where your load is going</span>
+            <span className="text-[11px] text-white/65 uppercase tracking-[0.08em]">Where your load is going</span>
             {/* The composition below is the ROLLING last-7-days load (daily_load_7d). Show that same
                 window's total here — NOT wtd_actual_load (week-to-date), which is a different window and
                 mislabeled this number as WTD over a 7-day bar. `total` is the sum the bar itself represents. */}
-            <span className="text-[10px] tabular-nums text-white/55">{Math.round(total)} pts · 7d</span>
+            <span className="text-[11px] tabular-nums text-white/55">{Math.round(total)} pts · rolling 7d</span>
           </div>
           <div className="flex h-6 rounded-md overflow-hidden gap-[2px]">
             {comp.map((c) => {
@@ -152,7 +180,7 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
                   title={`${disciplineName(c.type)} ${c.displayPct}%`}
                 >
                   {c.pct >= 26 && (
-                    <span className="text-[10px] font-semibold" style={{ color: 'rgba(0,0,0,0.62)' }}>
+                    <span className="text-[11px] font-semibold" style={{ color: 'rgba(0,0,0,0.62)' }}>
                       {isDom ? `${disciplineName(c.type)} ${c.displayPct}%` : `${c.displayPct}%`}
                     </span>
                   )}
@@ -162,10 +190,10 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
           </div>
           <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-2">
             {comp.map((c) => (
-              <span key={c.type} className="inline-flex items-center gap-1.5 text-[11.5px] text-white/70">
+              <span key={c.type} className="inline-flex items-center gap-1.5 text-[12.5px] text-white/70">
                 <span className="inline-block w-2 h-2 rounded-[2px]" style={{ backgroundColor: getDisciplineColor(c.type) }} />
                 <span className={c.type === dominant ? 'text-white font-semibold' : ''}>{disciplineName(c.type)}</span>
-                <span className="text-[10px] tabular-nums text-white/40">{c.displayPct}%</span>
+                <span className="text-[11px] tabular-nums text-white/40">{c.displayPct}%</span>
               </span>
             ))}
           </div>
