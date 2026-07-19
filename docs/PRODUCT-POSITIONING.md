@@ -5,6 +5,24 @@
 
 ---
 
+## North Star (2026-07-18 — frame + voice refinement)
+
+**Efforts. Fitness is an emergent process.** A little more cerebral than bro.
+
+**Who it's for: the generalist athlete.** (Retire "hybrid" — it's a tired term now, with a look attached.) Not a runner, not a triathlete, not a lifter. Someone who's just *fit*, and does a bit of everything — a trail race, a 70.3, a marathon, a half, whatever's next. The events rotate; **one thing never does — you always lift.** Even in maintenance, strength never fully switches off. So a generalist is, by definition, **always cross-training.** There is no off-season from being an athlete.
+
+**The philosophy that makes us different: fitness is emergent, not a score.** Every other tool treats fitness as one number to maximize (Whoop recovery, TrainingPeaks CTL). We treat it as something that *emerges* from the interplay of everything you do — so we track the interplay, and only speak up when it shifts in a way you'd care about. That's why we can be **simple on the surface, deep underneath**: the depth is in understanding the interplay, not in showing more dials.
+
+**The four questions we answer** (not forty metrics):
+1. Am I getting more efficient?
+2. Is my cross-training interfering with itself?
+3. Am I losing the fitness I care about somewhere?
+4. Am I building strength when I mean to be?
+
+**What we refuse to be:** a metric firehose. Metric fatigue is real and named in the field ("fewer metrics with clear meaning beats chasing every number"). The market splits into *shallow-simple* (Whoop) and *deep-complex* (TrainingPeaks); the gap is **balanced simplicity with real analytical depth for the generalist** — and it also means we track you whether you're on a plan, chasing a race, or just freeballing. Nobody owns that seat.
+
+---
+
 ## What Efforts Is
 
 Efforts is the training app for endurance athletes who want to get stronger.

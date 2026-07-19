@@ -237,6 +237,12 @@ Send our per-segment course pacing to the athlete's watch. **Both halves already
 - **Cycling ≈ 2× the work:** it's a POWER sport, but our bike course output is speed/pace + FTP-in-cue-text, not structured per-segment watts. Needs a power-pacing brain upgrade (Best-Bike-Split-style) before any bike delivery. **Run first.**
 - Full analysis: this session's transcript (2026-07-18).
 
+### State screen needs more detail for SPEED-FOCUSED plans (NOTED 2026-07-18 — build when speed plans ship)
+The reorganized State (Building vs Holding, posture-aware metric per discipline — see PRODUCT-POSITIONING north star) puts a *develop* discipline up top. But a get-faster athlete needs *progress* reads, not *retention* reads:
+- **Building → run/bike (develop):** lead with **threshold-pace trend** + **race projection / VDOT** (both exist) + **durability-at-speed** (NEW).
+- **Holding → (maintain):** steady aerobic durability + the slip flag (exists).
+- **⚠️ The one genuinely new metric: DURABILITY-AT-SPEED.** Today "durability" = HR-vs-pace decoupling on STEADY runs only (aerobic, easy pace). A speed athlete needs "do you hold pace/power deep into a HARD or LONG effort" — i.e. fade. **The ingredient exists:** `hr_drift_pct` (first-half vs second-half HR) is computed on EVERY workout incl. hard ones, plus `execution_score` / interval-hold (nail rep 8 like rep 1). So it's a SURFACING build for non-steady efforts, not a new measurement. Build alongside the speed-focused training plans (runners + cyclists).
+
 ---
 
 # 5. BLOCKED ON MICHAEL
