@@ -24,25 +24,34 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-18 EOD #2 — MAX-HR + THRESHOLD-PACE SINGLE-SOURCED · HR-CONGRUENCE TAIL CLOSED)
+## 🧭 NEXT SESSION — START HERE (2026-07-19 — STATE SCREEN REFRAMED FOR THE GENERALIST · AUDIT OWED)
 
-> ## READ `docs/GAME-PLAN.md`, then `START-HERE.md` + `LIFECYCLE.md`. The HR-congruence audit (`AUDIT-hr-congruence-2026-07-17.md`) is now **fully worked** — #4 (dead-file) is the only ranked item left, and it's a delete-after-check.
+> ## READ `docs/GAME-PLAN.md`, then `START-HERE.md` + `LIFECYCLE.md`, and the new north star in **`docs/PRODUCT-POSITIONING.md`** (the 2026-07-18 block: the GENERALIST athlete, "fitness is an emergent process," cerebral-not-bro, the four questions, refuse-the-metric-firehose).
 >
-> ### YOUR JOB — Michael's call:
-> **① VERIFY THE FAN-OUT (a–d) — STILL OWED, needs ONE real Garmin/Strava sync.** D-298 shipped + deployed, guard verified live (e); a–d still need a real sync (`AUDIT-fanout-ordering-2026-07-17.md` §4): (a) facts present on the synced workout (execution_score / time_in_zone / hr_drift — no race loss), (b) `athlete_snapshot.input_watermark` set + snapshot current to THAT workout, (c) a phone-logged + an imported workout each reaching the spine, (d) idempotency across ≥3 recomputes. Verify DB-first.
-> **② THEN PHASE 4 REMAINDER** (`GAME-PLAN.md`) — the single-source campaign continues: **One ACWR band** (re-derived 6×, taper reads elevated+optimal at once), **`adapt-plan` one writer** (silently re-prices strength every ingest, skipping the sign-off gate), **FTP: route the 8 stragglers** (incl. `athlete-snapshot/identity.ts:67` → the LLM prompt). Plus **#4** delete the dead `_shared/endurance/hr-zones.ts` (⚠ `generate-run-plan/generators/sustainable.ts` still refs its symbols — live/dead check FIRST).
+> ### ⛔ YOUR JOB — AUDIT THE STATE SCREEN ANALYSIS (Michael asked for it explicitly). The whole session pushed the State screen toward the generalist frame, but the last batch (posture-aware reads) is **SHIPPED-PENDING-AUDIT — grounded but NOT verified.** Audit before treating any of it as truth. What to check:
+> 1. **Do the underlying verdicts hold?** The new wording sits on top of the engine's e1RM / decoupling / efficiency verdicts. If e1RM "holding" is noise (e1RM off working sets on a 5×5 IS noisy), the nice new word is confidently wrong. Trace the e1RM verdict + decoupling.
+> 2. **Posture-aware reads correct per intent + science?** The strength read (`StrengthFitnessRow`, `StatePerformanceSection.tsx`): develop → getting stronger / on plan / gains flat / easing off. Line up vs the field (RTS/RIR, plateau = 3–4wk, gains lag early — all sourced in the transcript).
+> 3. **Thresholds grounded or just plausible?** `planWeek ≥ 4` (plateau gate), `activeDisciplines` = session in last **28d** (detraining-onset), `sustained`. Michael picked the numbers; validate.
+> 4. **Data check** — recompute vs his REAL data (the LoadBar numbers audited clean earlier this session: Run 40/Str 24/Ride 23/Swim 13, 354 pts, ACWR 1.3 — all matched). DB access = the `!`-prefix read-only curl pattern (service key in `.env`; classifier blocks Claude running it, so Michael runs it).
+> 5. **Missing layer:** the strength read has NO RIR/deload fatigue signal yet — so "on plan" can hide grinding. `strength_rir_below/above_prescription` exist in `longitudinal-signals.ts`; wiring them is the owed second slice.
 >
-> ### WHAT SHIPPED THIS SESSION (2026-07-18 #2) — pushed + deployed + fixture-verified. DON'T re-litigate:
-> - **Max-HR single-source (D-299).** `src/lib/resolve-current-max-hr.ts` — one resolver behind the %HRmax fallbacks: one divisor (`PEAK_TO_MAX` 0.95, was 0.90 vs 0.95), one age formula (**Tanaka / Gulati female; Fox 220−age retired**). Routed compute-workout-analysis / analyze-running zones / compute-adaptation-metrics / generate-run-plan / client TrainingBaselines (now = the zone chart). `resolveMaxHrCeiling` + cycling display left separate on purpose. 11 fixtures. **Byte-identical for a data-rich account** (fallbacks don't fire).
-> - **Threshold-pace single-source (D-300).** `resolveCurrentRunThresholdPace` (in `resolve-current-run-pace.ts`, beside the easy twin) — 3 units → sec/mi (+ sec/km carried), learned-first, Q-174 choice honored. Routed the two disjoint authorities (coach — inversion fixed, was wizard-first, `COACH_PAYLOAD_VERSION` 116; race-projections) + the **snapshot spine** (`athlete-snapshot.ts` both paths, mirroring D-287) + infer-training-fitness. The rest of the "~30 readers" were writers/types/presence-checks/deliberate — see D-300 for the LEFT list. 12 fixtures.
+> ### THEN, still owed from before the State work:
+> - **VERIFY THE FAN-OUT (a–d)** — needs ONE real Garmin/Strava sync (`AUDIT-fanout-ordering-2026-07-17.md` §4). D-298 shipped+deployed, guard verified live (e); a–d unverified.
+> - **GAME-PLAN Phase 4 remainder:** `adapt-plan` one writer (silently re-prices strength every ingest, skips the sign-off gate); delete dead `_shared/endurance/hr-zones.ts` (⚠ `generate-run-plan/generators/sustainable.ts` refs its symbols — live/dead check first).
 >
-> ### PRIOR SESSION (2026-07-18 #1) — still true, don't re-open: Fan-out ordering (D-298, a–d UNVERIFIED — see ①), LTHR single-source (D-296), decoupling per-run copy, upkeep accent (D-297), LoadBar %. All deployed; the copy ones device-verified.
+> ### WHAT SHIPPED THIS SESSION (2026-07-18 → 19) — pushed + (server) deployed. Fixture-verified UNLESS flagged:
+> - **Max-HR single-source (D-299)** + **Threshold-pace single-source (D-300)** — resolvers; fixture-verified; byte-identical for a data-rich account. HR-congruence audit #5/#6 CLOSED.
+> - **FTP stragglers routed** (identity.ts→LLM prompt, get-week, course-strategy, PlanSelect, normalizer) — FTP now single-source. **ACWR band (D-301)** — CoachWeekTab reads the reconciled verdict (no raw-ratio "back off"); the 4 other band fns were dead, deleted.
+> - **RACE gate** (only renders for a real race), **SIGNAL gate** (allow-list — only distinct/actionable signals nudge; the redundant ones suppressed), **upkeep SLIP GATE (refines D-297)** — measured "aerobic base has started to slip" only when hr_drift declining, gated, `COACH_PAYLOAD_VERSION` 117.
+> - **State UI pass** — edge-to-edge (instrument-panel/surface padding trimmed), all text +1px, tap-ⓘ explainers on ACWR / e1RM / bike efficiency.
+> - **⚠️ State posture-aware reads (SHIPPED-PENDING-AUDIT)** — see YOUR JOB. Fitness rows: focus-first, dropped+inactive dims to bottom (never penalised), active-but-"out" shows normally. Strength read posture-aware. `useStateTrends` now always-fetches declared posture + last-4wk activity. **NO fixtures, thresholds are judgment calls, RIR layer missing.**
+> - **Positioning north star + speed-plan State note** logged (`PRODUCT-POSITIONING.md`, `POLISH`). Course→watch pacing PARKED in POLISH (full analysis: Garmin sealed-workout limits, PacePro no-API, cycling = power-model upgrade, Apple-Watch-easier-but-wrong-audience).
 >
 > ### ⚠️ UNVERIFIED / WATCH — do NOT report as done:
-> - **Fan-out a–d** (above) — code + one live guard test only; needs a real sync.
-> - **D-299 / D-300 have no device look** — fixture-verified + full suite (1188) green, and byte-identical for a learned-data account, so nothing to eyeball except the coach's threshold-pace line (now measured + `m:ss`). No acceptance run owed; a formula/plumbing change.
-> - **`SCIENCE-upkeep-maintenance.md` figures are SEARCH-LEVEL** — confirm magnitudes vs primary papers before any number goes user-facing.
-> - Q-185 / Q-186 / Q-187 / Q-188 (the 2026-07-17 fitness-anchor session) still open, untouched.
+> - **State posture-aware reads** — the whole point of the audit above. Grounded + reads right on device, NOT proven.
+> - **Fan-out a–d** — needs a real sync.
+> - **iOS builds were STALE all session** (Xcode wasn't re-bundling web assets) — the client work only showed once we used the **Vite dev server (`npm run dev` → localhost:8080, hot-reload)**. Use that for client iteration; don't trust an unrebuilt iOS app to reflect a push. iOS bundle refreshed via `npm run ios` (build+cap sync); Michael runs the Xcode ▶.
+> - Q-185 / Q-186 / Q-187 / Q-188 still open, untouched.
 
 ---
 
