@@ -10,7 +10,7 @@
  */
 
 import { assert, assertEquals, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { buildLoadHeadline, acwrZone, statusVolumeLabel } from './load-headline.ts';
+import { buildLoadHeadline, statusVolumeLabel } from './load-headline.ts';
 
 // ── D-260/D-266: the verdict word reads the RECONCILED status, not ACWR ──────
 Deno.test('statusVolumeLabel: reconciled status → descriptive verdict; elevated is NOT "back off"', () => {
@@ -29,18 +29,6 @@ Deno.test('buildLoadHeadline: reconciled elevated → "Load a bit high" (descrip
 Deno.test('buildLoadHeadline: reconciled high → "Load high"', () => {
   const h = buildLoadHeadline({ loadLabel: statusVolumeLabel('high'), readinessState: 'fatigued', readinessLabel: null })!;
   assertStringIncludes(h, 'Load high');
-});
-
-// ── Item 0: ACWR zone names align with the verdict bands (0.8 / 1.3 / 1.5) ──
-Deno.test('acwrZone: standard-app band names match the verdict boundaries', () => {
-  assertEquals(acwrZone(0.7), 'building');
-  assertEquals(acwrZone(0.8), 'optimal');   // boundary: 0.8 is in-band
-  assertEquals(acwrZone(1.1), 'optimal');
-  assertEquals(acwrZone(1.3), 'optimal');   // boundary: ≤1.3 optimal
-  assertEquals(acwrZone(1.4), 'pushing');
-  assertEquals(acwrZone(1.5), 'pushing');   // boundary: ≤1.5 pushing
-  assertEquals(acwrZone(1.6), 'spike');
-  assertEquals(acwrZone(null), null);
 });
 
 // ── D-232/D-233: refined chip label wins; no false systemic fatigue (now in §5 split format) ──

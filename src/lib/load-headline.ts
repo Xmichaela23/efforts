@@ -7,16 +7,6 @@
 // Prescribing a specific adjustment is the gated autoregulation line (Step 5), not this glance.
 // See docs/SPEC-state-headline.md (bounded composition now; authored phrase bank is the follow-on).
 
-// The VOLUME verdict bands — single source for the ACWR→label mapping (LoadBar imports this too,
-// so the gauge label and the headline can never drift apart).
-export function acwrVolumeLabel(v: number | null | undefined): string {
-  if (v == null) return '—';
-  if (v < 0.8) return 'build more';
-  if (v <= 1.3) return 'balanced';
-  if (v <= 1.5) return 'back off';
-  return 'rest now';
-}
-
 // The LOAD verdict word reads the RECONCILED load_status (the two-key engine — D-260 sole verdict
 // authority, D-266 weighted), NOT acwrVolumeLabel. ACWR survives only as the gauge number. Descriptive,
 // not prescriptive — and deliberately: reconciled 'elevated' is where the two-key cap parks UNcorroborated
@@ -35,18 +25,6 @@ export function statusVolumeLabel(status: string | null | undefined): string {
 // REMOVED — its logic is now owned server-side by the reconciler's Gate 2 build-band (single source,
 // D-264). The client reads the reconciled verdict via statusVolumeLabel; it never re-derives plan
 // awareness. If the "building on plan" phrasing is wanted, expose it from the reconciler, not here.
-
-// The ACWR standard-app ZONE name (item 0) — the TrainingPeaks/Garmin vocabulary for the same
-// bands `acwrVolumeLabel` reads, so the naked number gets a scale word ("ACWR 1.1 · optimal").
-// Boundaries MUST match acwrVolumeLabel (0.8 / 1.3 / 1.5) and the LoadBar gauge bands — else the
-// marker color, the verdict word, and the zone word could disagree (the honesty gap item 0 fixes).
-export function acwrZone(v: number | null | undefined): string | null {
-  if (v == null) return null;
-  if (v < 0.8) return 'building';
-  if (v <= 1.3) return 'optimal';
-  if (v <= 1.5) return 'pushing';
-  return 'spike';
-}
 
 // D-232/D-233: the refined display label (LEGS LOADED / LEGS SORE / EFFORT UP / FATIGUED) wins over the
 // raw readinessState so the headline can never contradict the chip. Only FATIGUED is systemic.

@@ -213,39 +213,3 @@ export const DeltaIndicator: React.FC<{
 
 
 // ---------------------------------------------------------------------------
-// TrainingStateBar — horizontal fatigue/recovery gauge
-// ---------------------------------------------------------------------------
-
-export const TrainingStateBar: React.FC<{
-  acwr: number | null;
-  className?: string;
-}> = ({ acwr, className = '' }) => {
-  if (acwr == null) return null;
-
-  const clamped = Math.max(0.5, Math.min(2.0, acwr));
-  const pct = ((clamped - 0.5) / 1.5) * 100;
-
-  const zoneColor = acwr < 0.8 ? '#60a5fa' : acwr <= 1.3 ? '#34d399' : acwr <= 1.5 ? '#fbbf24' : '#f87171';
-  const zoneLabel = acwr < 0.8 ? 'Under-reached' : acwr <= 1.3 ? 'Optimal' : acwr <= 1.5 ? 'Overreaching' : 'Danger';
-
-  return (
-    <div className={className}>
-      <div className="relative h-2 rounded-full overflow-hidden border border-white/10"
-        style={{ background: 'linear-gradient(90deg, #60a5fa33 0%, #34d39933 35%, #fbbf2433 65%, #f8717133 100%)' }}
-      >
-        <div className="absolute top-0 h-full w-1 rounded-full"
-          style={{
-            left: `calc(${pct}% - 2px)`,
-            background: zoneColor,
-            boxShadow: `0 0 6px ${zoneColor}, 0 0 12px ${zoneColor}60`,
-          }}
-        />
-      </div>
-      <div className="flex justify-between mt-1 text-[9px] text-white/30">
-        <span>Under</span>
-        <span>Optimal</span>
-        <span>Over</span>
-      </div>
-    </div>
-  );
-};
