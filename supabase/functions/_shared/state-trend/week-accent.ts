@@ -237,8 +237,17 @@ export function upkeepCandidate(opts: {
   unit?: string;                   // e.g. 'mile' for run
   weeksUnder?: number | null;      // weeks in the window under target (the pattern gate + framing)
   aerobicCarriers: string[];       // endurance disciplines that carried the load this week (swim/bike/run)
+  /**
+   * THE SLIP GATE (2026-07-18, refines D-297). The measured aerobic-base direction, TRUE only when the
+   * base is genuinely declining with sufficient data (never on thin data → Law 2). When true, the read
+   * flips from compliance-only ("carried the load") to the tipping-point fact ("the base has started to
+   * slip"). This is the MEASURED "has" D-297 parked on the Fitness card — brought onto the accent ONLY at
+   * the moment cross-training stops covering the shortfall, never as a routine weekly prediction. Same
+   * gated-measured pattern as anchorDescentCandidate. Absent/false → D-297 behaviour, unchanged.
+   */
+  baseSlipping?: boolean;
 }): WeekAccent | null {
-  const { discipline, actualPerWeek, targetPerWeek, unit, weeksUnder, aerobicCarriers } = opts;
+  const { discipline, actualPerWeek, targetPerWeek, unit, weeksUnder, aerobicCarriers, baseSlipping } = opts;
   const d = discipline === 'bike' ? 'ride' : discipline;
 
   // Requires a numeric target — the compliance fact is the whole read. No target → nothing app-standard
@@ -251,16 +260,20 @@ export function upkeepCandidate(opts: {
   const disc = DISC_WORD[d] ?? d;
   const carriers = joinWords(aerobicCarriers.filter((c) => (c === 'bike' ? 'ride' : c) !== d));
   const weeks = typeof weeksUnder === 'number' && weeksUnder >= 3 ? ` — ${weeksUnder} weeks now` : '';
-  const loadClause = carriers ? ` ${cap(carriers)} carried the endurance load.` : '';
+  // Base holding → the cross-training COVERED the shortfall (compliance-only, D-297). Base measurably
+  // slipping → it did NOT; the two can't both be true, so the slip clause REPLACES the carried-load clause.
+  // Measured "has", not predicted "may" — fact-first, no imperative, no scold (voice check).
+  const tail = baseSlipping
+    ? ' And your aerobic base has started to slip.'
+    : (carriers ? ` ${cap(carriers)} carried the endurance load.` : '');
 
   return {
     source: 'upkeep',
     tier: ACCENT_TIER.upkeep,
-    // Compliance fact + load-carried. No adaptation consequence (that's the Fitness card + glass box).
-    sentence: `${cap(disc)}'s at about ${Math.round(actualPerWeek!)} of your ${Math.round(targetPerWeek!)}-${unit ?? 'unit'} upkeep${weeks}.${loadClause}`,
+    sentence: `${cap(disc)}'s at about ${Math.round(actualPerWeek!)} of your ${Math.round(targetPerWeek!)}-${unit ?? 'unit'} upkeep${weeks}.${tail}`,
     trace: {
       kind: 'adherence',
-      detail: `${d} ${Math.round(actualPerWeek!)}/${Math.round(targetPerWeek!)} ${unit ?? ''}/wk upkeep${weeksUnder ? `, ${weeksUnder}wk` : ''}; load carried by ${aerobicCarriers.join(', ') || 'n/a'}`,
+      detail: `${d} ${Math.round(actualPerWeek!)}/${Math.round(targetPerWeek!)} ${unit ?? ''}/wk upkeep${weeksUnder ? `, ${weeksUnder}wk` : ''}; ${baseSlipping ? 'base slipping' : `load carried by ${aerobicCarriers.join(', ') || 'n/a'}`}`,
     },
   };
 }

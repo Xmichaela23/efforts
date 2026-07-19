@@ -18,6 +18,25 @@ Deno.test('upkeep RUN: states the COMPLIANCE fact (miles vs target + load carrie
   assertEquals(a!.source, 'upkeep');
 });
 
+// ── THE SLIP GATE (refines D-297): base measurably slipping → tipping-point flag; else compliance-only ──
+Deno.test('upkeep RUN: base SLIPPING flips the read to the measured tipping-point fact (replaces carried-load)', () => {
+  const a = upkeepCandidate({ discipline: 'run', actualPerWeek: 4, targetPerWeek: 18, unit: 'mile', weeksUnder: 6, aerobicCarriers: ['swim', 'ride'], baseSlipping: true });
+  assertStringIncludes(a!.sentence, '18-mile upkeep');
+  assertStringIncludes(a!.sentence, 'has started to slip');              // measured "has", the tipping-point flag
+  assertEquals(a!.sentence.includes('carried the endurance load'), false); // slip REPLACES the positive — no contradiction
+  assertEquals(a!.sentence.includes('may'), false);                     // measured, not a prediction (D-297 held)
+  assertEquals(voiceViolation(a!.sentence), null);                      // still fact-first, no imperative/scold
+});
+
+Deno.test('upkeep RUN: base HOLDING (or absent) is compliance-only — D-297 unchanged, no slip claim', () => {
+  const holding = upkeepCandidate({ discipline: 'run', actualPerWeek: 4, targetPerWeek: 18, unit: 'mile', weeksUnder: 6, aerobicCarriers: ['swim', 'ride'], baseSlipping: false });
+  assertStringIncludes(holding!.sentence, 'carried the endurance load');
+  assertEquals(holding!.sentence.includes('slip'), false);
+  // absent flag behaves identically to false (Law 2 — no data → no claim)
+  const absent = upkeepCandidate({ discipline: 'run', actualPerWeek: 4, targetPerWeek: 18, unit: 'mile', weeksUnder: 6, aerobicCarriers: ['swim', 'ride'] });
+  assertEquals(absent!.sentence.includes('slip'), false);
+});
+
 Deno.test('upkeep RUN: near target (16 of 18 ≈ 89%) does NOT fire — still maintaining', () => {
   assertEquals(upkeepCandidate({ discipline: 'run', actualPerWeek: 16, targetPerWeek: 18, unit: 'mile', aerobicCarriers: ['swim'] }), null);
 });
