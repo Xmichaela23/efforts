@@ -370,9 +370,9 @@ function RaceSection({
   if (officialResult) {
     return (
       <div className="px-3 py-3 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">RACE</span>
-          <span className="text-[11px] text-white/55">{distLabel} · result on file</span>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
+          <span className="text-[11px] text-white/55 text-right leading-snug">{distLabel} · result on file</span>
         </div>
         {statedGoalDisplay != null && (
           <div className="flex flex-col gap-0.5">
@@ -410,9 +410,9 @@ function RaceSection({
     const postLabel = wk === 1 ? '1 day after race' : wk < 7 ? `${wk} days after race` : 'after your race';
     return (
       <div className="px-3 py-3 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">RACE</span>
-          <span className="text-[11px] text-white/55">{distLabel} · {postLabel}</span>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
+          <span className="text-[11px] text-white/55 text-right leading-snug">{distLabel} · {postLabel}</span>
         </div>
         {statedGoalDisplay != null && (
           <div className="flex flex-col gap-0.5">
@@ -471,10 +471,10 @@ function RaceSection({
   return (
     <div className="px-3 py-3 space-y-2.5">
       {/* Header: goal + weeks out */}
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">RACE</span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
         {hasRealRace && (
-          <span className="text-[11px] text-white/55">{distLabel}{raceWeeksOut != null ? ` — ${raceWeeksOut}w out` : ''}</span>
+          <span className="text-[11px] text-white/55 text-right leading-snug">{distLabel}{raceWeeksOut != null ? ` — ${raceWeeksOut}w out` : ''}</span>
         )}
       </div>
 
