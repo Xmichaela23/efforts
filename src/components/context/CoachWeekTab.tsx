@@ -4,6 +4,7 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { StackedHBar } from '@/components/ui/charts';
+import { statusVolumeLabel } from '@/lib/load-headline';
 
 // ─── Link Extras Dialog ────────────────────────────────────────────────────
 
@@ -1009,14 +1010,15 @@ export default function CoachWeekTab() {
 // ─── Snapshot Load Bar ─────────────────────────────────────────────────────
 
 function SnapshotLoadBar({ status, interpretation, acwr }: { status: string; interpretation: string; acwr: number | null }) {
-  // LOAD reads the VOLUME verdict (the ACWR band) — NOT the body-response `status`/`interpretation`
-  // (which conflated readiness into LOAD and could say "high" off thin/skipped weeks). One load
-  // verdict; body-response lives on the readiness axis. `status`/`interpretation` retained in the
-  // signature but no longer drive the bar.
-  const band = acwr == null ? null : acwr < 0.8 ? 'build more' : acwr <= 1.3 ? 'balanced' : acwr <= 1.5 ? 'back off' : 'rest now';
-  const positions: Record<string, number> = { 'build more': 15, 'balanced': 50, 'back off': 72, 'rest now': 90 };
-  const pct = band ? positions[band] : 50;
-  const dotColor = band === 'rest now' ? 'bg-red-400' : band === 'back off' ? 'bg-amber-400' : band === 'build more' ? 'bg-sky-400' : 'bg-emerald-400';
+  // LOAD reads the RECONCILED verdict (`status`, the two-key phase-aware engine — D-260 sole authority)
+  // it is already handed — NOT a raw-ACWR re-derivation. This kills the client-side 'back off'/'rest now'
+  // PRESCRIPTION off the bare ratio (D-281/Q-137: the ratio DESCRIBES, the body PRESCRIBES; reconciled
+  // 'elevated' → "a bit high", never a scold — only a corroborated 'high' earns "pull back"). Matches the
+  // main LoadBar and Garmin/TrainingPeaks (verdict leads, ACWR stays a bare reference number).
+  const band = (() => { const w = statusVolumeLabel(status); return w === '—' ? null : w; })();
+  const positions: Record<string, number> = { 'build more': 15, 'balanced': 50, 'productive': 60, 'a bit high': 75, 'pull back': 90 };
+  const pct = band ? (positions[band] ?? 50) : 50;
+  const dotColor = band === 'pull back' ? 'bg-red-400' : band === 'a bit high' ? 'bg-amber-400' : band === 'build more' ? 'bg-sky-400' : 'bg-emerald-400';
 
   return (
     <div>
