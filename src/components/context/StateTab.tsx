@@ -1554,12 +1554,12 @@ export default function StateTab({
                     type="button"
                     disabled={!s.provenance}
                     onClick={() => s.provenance && setExpandedSignal(expandedSignal === s.label ? null : s.label)}
-                    className="w-full flex items-center justify-between text-left"
+                    className="w-full flex items-start justify-between gap-3 text-left"
                   >
-                    <span className="text-[12px] text-white/70">{s.label}</span>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[12px] ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
-                      {s.provenance && <span className="text-white/30 text-[9px] shrink-0">{expandedSignal === s.label ? '▾' : '▸'}</span>}
+                    <span className="text-[12px] text-white/70 shrink-0">{s.label}</span>
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className={`text-[12px] text-right leading-snug ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
+                      {s.provenance && <span className="text-white/30 text-[9px] shrink-0 mt-0.5">{expandedSignal === s.label ? '▾' : '▸'}</span>}
                     </div>
                   </button>
                   {/* Whoop pairing (verdict + its driver, together): the RPE driver — which session
@@ -1577,9 +1577,9 @@ export default function StateTab({
                 </div>
               ))}
               {crossTrainingSignal && (
-                <div className="flex items-center justify-between pt-0.5">
-                  <span className="text-[12px] text-white/70">Cross-training</span>
-                  <span className={`text-[12px] ${
+                <div className="flex items-start justify-between gap-3 pt-0.5">
+                  <span className="text-[12px] text-white/70 shrink-0">Cross-training</span>
+                  <span className={`text-[12px] text-right leading-snug min-w-0 ${
                     crossTrainingSignal.tone === 'positive' ? 'text-emerald-400/90' :
                     crossTrainingSignal.tone === 'warning' ? 'text-amber-400/90' :
                     crossTrainingSignal.tone === 'info' ? 'text-sky-400/85' :
