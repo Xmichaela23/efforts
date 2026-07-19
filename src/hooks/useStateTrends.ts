@@ -73,6 +73,33 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
   const { exercises, loading: liftsLoading } = useExerciseLog(STATE_TREND_WINDOWS.liftWeeks, !hasContract);
   const [raw, setRaw] = useState<RawInputs | null>(null);
 
+  // Declared posture (per_discipline_posture) — fetched ALWAYS, even when the server contract drives the
+  // cards. It's config, not computed, and the contract's card.posture can lag a stale snapshot, so the
+  // Building/Holding grouping reads THIS instead. One tiny goals read; the same one compute-snapshot does.
+  const [declaredPosture, setDeclaredPosture] = useState<Record<string, string> | null>(null);
+  // Disciplines with a session in the last ~4 weeks — the detraining onset window (VO2max starts dropping
+  // at 2–4wk; Garmin's own "Detraining" gate). Drives "still doing it" vs "dropped" for the dim.
+  const [activeDisciplines, setActiveDisciplines] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const userId = getStoredUserId();
+      if (!userId) return;
+      const [goalR, wkR] = await Promise.all([
+        supabase.from('goals').select('training_prefs')
+          .eq('user_id', userId).eq('status', 'active')
+          .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('workouts').select('type').eq('user_id', userId).gte('date', isoMinus(28)),
+      ]);
+      if (cancelled) return;
+      setDeclaredPosture((sanitizePosture((goalR as any)?.data?.training_prefs?.per_discipline_posture) as Record<string, string>) ?? null);
+      const active = new Set<string>();
+      for (const w of (((wkR as any)?.data ?? []) as Array<{ type?: string }>)) { const d = disciplineOf(w.type); if (d) active.add(d); }
+      setActiveDisciplines([...active]);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     if (hasContract) return; // server contract present → no client fetch/assembly
     let cancelled = false;
@@ -266,12 +293,14 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
       fitnessMode: displayContract.fitnessMode ?? {},
       fitnessAnchors: displayContract.fitnessAnchors ?? {},
       cadenceCounts: displayContract.cadenceCounts,
+      posture: declaredPosture,
+      activeDisciplines,
       loading: false,
     };
   }
 
   const loading = liftsLoading || raw == null;
-  if (loading) return { cards: [], headline: null, bikeFitness: null, runFitness: null, strengthFitness: null, swimRest: null, swimVolume: null, fitnessMode: {}, fitnessAnchors: {}, cadenceCounts: {}, loading: true };
+  if (loading) return { cards: [], headline: null, bikeFitness: null, runFitness: null, strengthFitness: null, swimRest: null, swimVolume: null, fitnessMode: {}, fitnessAnchors: {}, cadenceCounts: {}, posture: declaredPosture, activeDisciplines, loading: true };
 
   const exerciseRows: ExerciseLogLite[] = (exercises || []).map((e) => ({
     date: e.date,
@@ -281,7 +310,7 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
   }));
 
   const result = assembleStateTrends({ asOf: todayISO(), exerciseRows, ...raw! });
-  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, runFitness: result.runFitness, strengthFitness: result.strengthFitness, swimRest: result.swimRest, swimVolume: result.swimVolume, fitnessMode: result.fitnessMode, fitnessAnchors: result.fitnessAnchors, cadenceCounts: raw!.cadenceCounts, loading: false };
+  return { cards: result.cards, headline: result.headline, bikeFitness: result.bikeFitness, runFitness: result.runFitness, strengthFitness: result.strengthFitness, swimRest: result.swimRest, swimVolume: result.swimVolume, fitnessMode: result.fitnessMode, fitnessAnchors: result.fitnessAnchors, cadenceCounts: raw!.cadenceCounts, posture: declaredPosture, activeDisciplines, loading: false };
 }
 
 // SCALABILITY NOTE (now realized): the assembly is `assembleStateTrends` in @shared/state-trend,

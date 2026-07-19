@@ -1646,7 +1646,7 @@ export default function StateTab({
         })()}
 
         {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
-        <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} />
+        <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} />
 
         {/* SWIM re-test nudge (D-200) — fires after ≥4 weeks + ≥4 honored swims; auto-clears when the
             threshold is updated/tested (lastUpdatedAt moves). Dismiss = 7-day snooze (shared pattern). */}

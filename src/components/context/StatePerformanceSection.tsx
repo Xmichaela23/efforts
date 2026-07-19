@@ -109,18 +109,38 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
 // STRENGTH row — the DOT is e1RM (what you CAN lift), NOT volume (item 1). Volume is what you DID
 // (a LOAD/Home concept) and is gone from this section; the "4 sessions this week" adherence leak is
 // gone too (the calendar owns week counts). The per-lift "from your logged sets" detail follows the row.
-function StrengthFitnessRow({ fitness, showAxis }: { fitness: StrengthFitness; showAxis?: boolean }) {
+function StrengthFitnessRow({ fitness, showAxis, isDevelop, planWeek }: { fitness: StrengthFitness; showAxis?: boolean; isDevelop?: boolean; planWeek?: number | null }) {
   const vol = fitness.volume; // kept only for the freshness/provenance stamp
   const e = fitness.e1rm;
   const range = e ? (e as any).range as { positionPct: number; confident: boolean } | null | undefined : null;
+  // POSTURE-AWARE READ (strength apps + RTS/RIR autoregulation, 2026-07-19): when you're DEVELOPING
+  // strength, "holding" is not neutral — it means trying to build and not building. e1RM rising = getting
+  // stronger; flat but EARLY IN THE BLOCK = on plan (gains lag — no app calls a plateau at week 2); flat
+  // ~4+ weeks INTO THE PLAN = gains flat, a gentle plateau note (the 3–4wk line the field uses), never an
+  // alarm. Gated on WEEKS-INTO-PLAN, not total session count — the block needs time before you judge it.
+  // (RIR-grinding / weight-dropped "deload due" is the separate autoregulation layer.)
+  const sustained = typeof planWeek === 'number' && planWeek >= 4;
+  const developWords: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
+    improving: { word: 'getting stronger', cls: 'text-emerald-400', arr: '↑' },
+    holding: sustained
+      ? { word: 'gains flat', cls: 'text-amber-300/85', arr: '→' }
+      : { word: 'on plan', cls: 'text-white/60', arr: '→' },
+    sliding: { word: 'easing off', cls: 'text-amber-300', arr: '↓' },
+    needs_data: { word: 'needs data', cls: 'text-white/40', arr: '' },
+    withheld: { word: 'too few to read', cls: 'text-white/40', arr: '' },
+  };
+  const wordMap = isDevelop ? developWords : VERDICT;
+  const explain = isDevelop
+    ? "You're developing strength, so this reads as progress: getting stronger (e1RM rising) · on plan (early, gains lag) · gains flat (a plateau if e1RM stays flat past ~3–4 weeks — worth looking at the stimulus, not an alarm). e1RM = estimated one-rep max from the weights and reps you log; you never max out."
+    : "e1RM = your estimated one-rep max — the most you could lift once, worked out from the weights and reps you log (you never have to actually max out). The dot is where it sits versus your own baseline; the arrow is the direction. “Holding” means it isn’t moving up or down.";
   return (
     <Row label="strength">
       {e && range ? (
-        <FitnessDotBlock label="e1RM" range={range} verdict={e.verdict} showAxis={showAxis} frame="vs your baseline" explain="e1RM = your estimated one-rep max — the most you could lift once, worked out from the weights and reps you log (you never have to actually max out). The dot is where it sits versus your own baseline; the arrow is the direction. “Holding” means it isn’t moving up or down." />
+        <FitnessDotBlock label="e1RM" range={range} verdict={e.verdict} showAxis={showAxis} frame="vs your baseline" wordMap={wordMap} explain={explain} />
       ) : e ? (
         <span className="basis-full flex items-baseline justify-between gap-2">
           <span className="text-white/55 text-[13px]">e1RM</span>
-          <span className={`inline-flex items-baseline gap-0.5 text-[12px] ${VERDICT[e.verdict].cls}`}>{VERDICT[e.verdict].arr && <span>{VERDICT[e.verdict].arr}</span>}<span>{VERDICT[e.verdict].word}</span></span>
+          <span className={`inline-flex items-baseline gap-0.5 text-[12px] ${wordMap[e.verdict].cls}`}>{wordMap[e.verdict].arr && <span>{wordMap[e.verdict].arr}</span>}<span>{wordMap[e.verdict].word}</span></span>
         </span>
       ) : (
         <span className="text-white/40">needs 2+ logged lifts to trend</span>
@@ -469,10 +489,10 @@ function PostureLine({ card }: { card: DisciplineCard }) {
   );
 }
 
-export default function StatePerformanceSection({ strengthDetail, stateDisplay }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null }) {
+export default function StatePerformanceSection({ strengthDetail, stateDisplay, primaryDiscipline, planWeek }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; primaryDiscipline?: string | null; planWeek?: number | null }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
-  const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, loading } = useStateTrends(stateDisplay);
+  const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
   if (loading || cards.length === 0) return null;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
@@ -504,27 +524,42 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay }
       {/* NO aggregate roll-up (Michael 2026-07-04): a cross-discipline headline ("Building — bike up,
           run up") is a lossy, cherry-picking, clock-mismatched summary (run 6wk vs bike 8wk). Fitness
           is handed to the individual sport rows below — each owns its own verdict AND its own window. */}
-      {sortedCards.map((card, idx) => {
-        // Axis grammar once PER FRAME (item 7): strength reads "vs your baseline", the endurance rows
-        // read "vs your 12-week range" — two different frames, so label the first of each. With the fixed
-        // strength→run→swim→bike order that's row 0 (strength) + row 1 (the first endurance row).
-        const showAxis = idx === 0 || (idx === 1 && sortedCards[0]?.discipline === 'strength');
-        const inner = (() => {
-          if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} />;
-          if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
-          // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
-          if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
-          if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} showAxis={showAxis} />{strengthDetail}</>;
-          const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
-          // Q-107 H3: nest the per-lift detail directly under the STRENGTH trend row — one STRENGTH header,
-          // the lifts as provisional "from your logged sets" detail (no competing second top-line).
-          return (card.discipline === 'strength' && strengthDetail) ? <>{row}{strengthDetail}</> : row;
-        })();
-        // PostureLine ("You said 3 a week…") REMOVED from FITNESS — it's the PLAN story, not a fitness
-        // trend, and it broke the clean dot-and-arrow rhythm. The data still lives on the card; it belongs
-        // in the week/plan surface if we resurface it, not among the fitness dots.
-        return <React.Fragment key={card.discipline}>{inner}</React.Fragment>;
-      })}
+      {(() => {
+        // One card renderer, reused across the posture groups. showAxis labels the first row of a group
+        // ("vs your baseline" for strength, "vs your 12-week range" for endurance).
+        const renderCard = (card: DisciplineCard, showAxis: boolean) => {
+          const inner = (() => {
+            if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} />;
+            if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
+            // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
+            if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
+            if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} showAxis={showAxis} isDevelop={(declaredPosture?.[card.discipline] ?? String((card as any).posture ?? '')) === 'develop'} planWeek={planWeek} />{strengthDetail}</>;
+            const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
+            return (card.discipline === 'strength' && strengthDetail) ? <>{row}{strengthDetail}</> : row;
+          })();
+          return <React.Fragment key={card.discipline}>{inner}</React.Fragment>;
+        };
+
+        // No "Building/Holding" labels — the athlete knows their focus, and "HOLDING" collides with the
+        // "→ holding" verdict word. We keep the existing focus-first sort as-is; the only change is that a
+        // DROPPED discipline (not in the plan AND not being done recently) dims to the bottom — never graded
+        // or penalised (Michael's rule). Everything you're actually doing renders normally, in order.
+        const postureOf = (c: DisciplineCard) => (declaredPosture?.[c.discipline] ?? String((c as any).posture ?? ''));
+        const isActive = (c: DisciplineCard) => (activeDisciplines ?? []).includes(c.discipline); // session in last ~4wk (detraining onset)
+        const inPlanOrActive = (c: DisciplineCard) => postureOf(c) === 'develop' || postureOf(c) === 'maintain' || isActive(c);
+        const active = sortedCards.filter(inPlanOrActive);
+        const resting = sortedCards.filter((c) => !inPlanOrActive(c)); // dropped + inactive → dimmed
+        return (
+          <>
+            {active.map((card, idx) => renderCard(card, idx === 0 || (idx === 1 && active[0]?.discipline === 'strength')))}
+            {resting.length > 0 && (
+              <div className="opacity-45 mt-1">
+                {resting.map((card) => renderCard(card, false))}
+              </div>
+            )}
+          </>
+        );
+      })()}
       {/* defensive: if there's no strength trend card at all, still surface the per-lift detail */}
       {strengthDetail && !cards.some((c) => c.discipline === 'strength') && strengthDetail}
     </div>
