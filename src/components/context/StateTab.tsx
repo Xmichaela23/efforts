@@ -762,6 +762,11 @@ export default function StateTab({
   }, []);
 
   const nudgeDecision = shouldShowNudge(longitudinalSignals as Parameters<typeof shouldShowNudge>[0]);
+  // D-302 slice 2: the grinding read (RIR below prescription) is rendered on the STRENGTH READ itself
+  // (StatePerformanceSection), not as a nudge — so it lives in one place next to the e1RM verdict. Pulled
+  // from the nudge allow-list (nudge-policy.ts) so it can't also fire a banner. One fact, one home.
+  const strengthFatigue = Array.isArray(longitudinalSignals)
+    && (longitudinalSignals as Array<{ id?: string }>).some((s) => s?.id === 'strength_rir_below_prescription');
   // nudgeDismissNonce is incremented on dismiss to force re-evaluation of isNudgeSnoozed.
   const showNudge =
     nudgeDismissNonce >= 0 &&
@@ -1646,7 +1651,7 @@ export default function StateTab({
         })()}
 
         {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
-        <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} />
+        <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} strengthFatigue={strengthFatigue} />
 
         {/* SWIM re-test nudge (D-200) — fires after ≥4 weeks + ≥4 honored swims; auto-clears when the
             threshold is updated/tested (lastUpdatedAt moves). Dismiss = 7-day snooze (shared pattern). */}

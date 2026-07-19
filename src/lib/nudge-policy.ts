@@ -20,7 +20,9 @@ export type NudgeDecision = {
 const STATE_NUDGE_ALLOWED = new Set<string>([
   'easy_pace_creeping_faster',       // running easy days too hard (fatigue risk) — on no other card
   'ride_easy_intensity_factor_up',   // riding easy days too hard — same, for the bike
-  'strength_rir_below_prescription', // lifting closer to failure than prescribed — execution vs plan
+  // 'strength_rir_below_prescription' — MOVED to the STRENGTH READ (D-302 slice 2): grinding renders as
+  //   the autoregulation line on the fitness row itself (StatePerformanceSection), not a nudge. It's a
+  //   strength-fitness fact, so it belongs next to the e1RM verdict, not in the nudge stack. One home.
   'strength_rir_above_prescription', // lifting easier than prescribed — leaving gains on the table
   'chronic_short_sleep',             // chronic short sleep — recovery flag on NO other card
   'soreness_overreaching',           // multi-week soreness/overreaching pattern (not just today)

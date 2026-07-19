@@ -109,7 +109,7 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
 // STRENGTH row — the DOT is e1RM (what you CAN lift), NOT volume (item 1). Volume is what you DID
 // (a LOAD/Home concept) and is gone from this section; the "4 sessions this week" adherence leak is
 // gone too (the calendar owns week counts). The per-lift "from your logged sets" detail follows the row.
-function StrengthFitnessRow({ fitness, showAxis, isDevelop, planWeek }: { fitness: StrengthFitness; showAxis?: boolean; isDevelop?: boolean; planWeek?: number | null }) {
+function StrengthFitnessRow({ fitness, showAxis, isDevelop, planWeek, fatigue }: { fitness: StrengthFitness; showAxis?: boolean; isDevelop?: boolean; planWeek?: number | null; fatigue?: boolean }) {
   const vol = fitness.volume; // kept only for the freshness/provenance stamp
   const e = fitness.e1rm;
   const range = e ? (e as any).range as { positionPct: number; confident: boolean } | null | undefined : null;
@@ -147,6 +147,17 @@ function StrengthFitnessRow({ fitness, showAxis, isDevelop, planWeek }: { fitnes
       )}
       {vol.sampleCount != null && vol.sampleCount > 0 && (
         <span className="basis-full text-white/35 text-[11px]">over 6wk · {vol.sampleCount} session{vol.sampleCount === 1 ? '' : 's'}{asOf(vol.newestAgeDays) ? ` · ${asOf(vol.newestAgeDays)}` : ''}</span>
+      )}
+      {/* AUTOREGULATION read — the FATIGUE axis, distinct from the e1RM direction above (D-302 slice 2).
+          Grinding shows as RIR running below prescription BEFORE it shows in e1RM: the weight's still moving
+          but it's costing more than planned. This is the RTS/RP signal (fatigue, not the number). Sourced
+          from the spine's `strength_rir_below_prescription` (longitudinal-signals.ts) — rendered here, NOT
+          recomputed, and pulled from the nudge list so it lives in ONE place. ⚠ WORDING is a placeholder to
+          tune to voice: fact-first, conditional consequence, no imperative. */}
+      {fatigue && (
+        <span className="basis-full text-[12px] text-amber-300/80 leading-snug mt-0.5">
+          Reps in reserve have run below target — you're training closer to failure than the plan called for. Sustained, that's the fatigue a deload clears.
+        </span>
       )}
     </Row>
   );
@@ -489,7 +500,7 @@ function PostureLine({ card }: { card: DisciplineCard }) {
   );
 }
 
-export default function StatePerformanceSection({ strengthDetail, stateDisplay, primaryDiscipline, planWeek }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; primaryDiscipline?: string | null; planWeek?: number | null }) {
+export default function StatePerformanceSection({ strengthDetail, stateDisplay, primaryDiscipline, planWeek, strengthFatigue }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; primaryDiscipline?: string | null; planWeek?: number | null; strengthFatigue?: boolean }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
   const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
@@ -533,7 +544,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
             if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
-            if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} showAxis={showAxis} isDevelop={(declaredPosture?.[card.discipline] ?? String((card as any).posture ?? '')) === 'develop'} planWeek={planWeek} />{strengthDetail}</>;
+            if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} showAxis={showAxis} isDevelop={(declaredPosture?.[card.discipline] ?? String((card as any).posture ?? '')) === 'develop'} planWeek={planWeek} fatigue={strengthFatigue} />{strengthDetail}</>;
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
             return (card.discipline === 'strength' && strengthDetail) ? <>{row}{strengthDetail}</> : row;
           })();

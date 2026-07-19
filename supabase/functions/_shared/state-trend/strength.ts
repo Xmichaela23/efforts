@@ -151,13 +151,22 @@ export interface StrengthFitness {
   unplanned: number;
 }
 
+// SIGNAL-VS-NOISE guard for e1RM (2026-07-19). e1RM off working sets scatters ~4-8% session to
+// session — RIR-estimate wobble (the Brzycki offset is only as steady as the logged RIR), best-set
+// selection, and thin per-lift cadence (often n=3-4 in the 6wk window). Without a guard a lift whose
+// e1RM moved LESS than its own scatter still earns "improving"/"sliding" off the dead-band alone. This
+// is the same gate run decoupling already uses (run.ts, noiseGuardStdev 1.0): a directional verdict must
+// clear ~1 within-window SD or it reads holding. Data-only, no new inputs (Michael's rule). Measured
+// live on real data: a squat reading "sliding" −2.5% on σ=4.1% scatter — noise wearing a verdict.
+const E1RM_NOISE_GUARD_STDEV = 1.0;
+
 export function computeStrengthState(series: LiftSeries[], asOf: string, sessionsPerWeek: number): StrengthState {
   const thresholds = resolveThresholds('strength', sessionsPerWeek); // per-lift cadence (Q-052)
   const lifts: LiftVerdict[] = series.map((s) => ({
     canonical: s.canonical,
     displayName: s.displayName,
     isPrimary: PRIMARY_LIFTS.has(s.canonical),
-    trend: classifyTrend(s.points, thresholds, asOf, { exclude: isDeloadWeek }),
+    trend: classifyTrend(s.points, thresholds, asOf, { exclude: isDeloadWeek, noiseGuardStdev: E1RM_NOISE_GUARD_STDEV }),
   }));
 
   const { overall, overallPctChange } = rollUp(lifts);

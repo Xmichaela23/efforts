@@ -4626,9 +4626,14 @@ Deno.serve(async (req) => {
           }
         } catch { /* non-fatal */ }
 
+        // D-302 slice 2: the grinding read (strength_rir_below_prescription) now OWNS a spot on the
+        // deterministic strength read (State), so it is stripped from the LLM prompt here — moved, not
+        // duplicated, and keeps the coach's narration minimal. It STAYS in the client payload (line ~5587,
+        // unfiltered) so the strength read can render it. Filter the PROMPT feed only.
+        const promptSignals = (longitudinalSignalsResult?.signals ?? []).filter((s) => s.id !== 'strength_rir_below_prescription');
         const longLegacyBlock =
-          longitudinalSignalsResult?.signals?.length
-            ? longitudinalSignalsToPrompt(longitudinalSignalsResult, { swimIntent: triSwimIntent })
+          promptSignals.length
+            ? longitudinalSignalsToPrompt({ ...longitudinalSignalsResult!, signals: promptSignals }, { swimIntent: triSwimIntent })
             : '';
         for (const line of swimCutoffPressureCoachFacts(planConfig)) {
           narrativeFacts.push(line);
