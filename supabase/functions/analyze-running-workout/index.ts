@@ -16,7 +16,7 @@ import { fetchGoalRaceCompletionForWorkout, type GoalRaceCompletionMatch } from 
 import { buildMarathonGoalRaceAdherenceSummary } from './lib/analysis/marathon-race-narrative.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
-import { computePositiveSplitSec, guardNarrativeHonesty, fadeLeadBullets, structuredBySignalSuppressesFade } from '../_shared/fact-packet/execution-honesty.ts';
+import { computePositiveSplitSec, guardNarrativeHonesty, fadeLeadBullets, structuredBySignalSuppressesFade, paceVariedPct } from '../_shared/fact-packet/execution-honesty.ts';
 import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, resolveCarriedInSoreness, CARRYOVER_WINDOW_DAYS, type SorenessEntry } from '../_shared/cross-domain-carryover.ts';
 // D-036: GAP enrichment lifted to top-level so both pace-adherence and the
 // HR analyzer consume the same grade-adjusted sample series.
@@ -1895,6 +1895,10 @@ Deno.serve(async (req) => {
     const _ehPosSplitSec = (Number.isFinite(_ehDecoupling) && _ehDecoupling <= 5)
       ? null
       : computePositiveSplitSec(_ehSplitsMi, true);
+    // Pacing-verdict guard signal: raw pace variability, INDEPENDENT of the fade/HR gate above — a run can
+    // be even-EFFORT (fade suppressed) yet have a wildly varying PACE (rolling terrain). Feeds the ai-summary
+    // validator that forbids "the pace held steady" when the pace didn't.
+    const _ehPaceVariedPct = paceVariedPct(_ehSplitsMi);
 
     // Build minimal computed object - DON'T spread (avoids sending thousands of sensor samples)
     // CRITICAL: Preserve analysis.series and overall from compute-workout-analysis (contains chart data and metrics)
@@ -2269,6 +2273,7 @@ Deno.serve(async (req) => {
           { runEasyPaceAtHrTrendPct: arc_run_easy_pace_at_hr_trend },
           run_spine_verdict,
           _executionHonesty,
+          _ehPaceVariedPct,
         );
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
 

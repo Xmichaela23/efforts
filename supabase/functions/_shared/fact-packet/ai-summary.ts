@@ -1,6 +1,6 @@
 import type { FactPacketV1, FlagV1 } from './types.ts';
 import { coerceNumber, secondsToPaceString } from './utils.ts';
-import { tripsHonestyGuard, guardNarrativeHonesty, narrativeHasUnearnedCleanClaim, executionHonestyPromptRule, type ExecutionHonestyInput } from './execution-honesty.ts';
+import { tripsHonestyGuard, guardNarrativeHonesty, narrativeHasUnearnedCleanClaim, executionHonestyPromptRule, narrativeClaimsPaceSteady, PACE_STEADY_FALSE_ABOVE_CV, type ExecutionHonestyInput } from './execution-honesty.ts';
 import { callLLM } from '../llm.ts';
 // Shared narrative-reasoning core (continuity leg #3 — D-187). The 7-rule scaffold + the shared
 // validator suite, single-sourced; run plugs in via the run adapter. See docs/WORK-ORDER-narrative-core.md.
@@ -1160,6 +1160,7 @@ export async function generateAISummaryV1(
   aerobicTrend?: AerobicTrendOptions | null,
   spineVerdict?: DisciplineVerdict | null, // Q-112 step 2: the run's state_trends_v1 verdict (rules 6/7)
   executionHonesty?: ExecutionHonestyInput | null, // Q-128: below-baseline positive-split → forbid "clean/steady"
+  paceVariedPctVal?: number | null, // 2026-07-19 pacing-verdict guard: raw pace CV% → forbid "steady PACE" when pace varied
 ): Promise<string | null> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     console.warn('[ai-summary] ANTHROPIC_API_KEY not set — skipping narrative generation');
@@ -1173,6 +1174,14 @@ export async function generateAISummaryV1(
   const _ehValidate = (s: string) =>
     _ehTrips && narrativeHasUnearnedCleanClaim(s)
       ? { ok: false, why: 'EXECUTION HONESTY: this run faded (positive split) and was below the athlete\'s norm — do NOT call it clean/steady/held-steady; name the slowdown.' }
+      : { ok: true, why: null as string | null };
+
+  // PACING-VERDICT GUARD (ground rule): the narrative may not call the PACE steady/even when it materially
+  // varied (CV over the app's "high" line). Effort/HR-steady stays legal. Catches the whole family, not a phrase.
+  const _paceVariedBad = typeof paceVariedPctVal === 'number' && paceVariedPctVal > PACE_STEADY_FALSE_ABOVE_CV;
+  const _pcValidate = (s: string) =>
+    _paceVariedBad && narrativeClaimsPaceSteady(s)
+      ? { ok: false, why: `PACING TRUTH: the pace varied (${Math.round(paceVariedPctVal as number)}% CV) — do NOT say the PACE held steady/even/constant. If effort held even, say EFFORT (or HR) was even, never the pace.` }
       : { ok: true, why: null as string | null };
 
   const displayPacket = toDisplayFormatV1(factPacket, flags, varianceGate ?? null, unplannedGate ?? null, arcNarrative ?? null, aerobicTrend ?? null);
@@ -1216,12 +1225,13 @@ export async function generateAISummaryV1(
     const rp1 = validateNoRpeClaimsWithoutAthleteReport(s1, displayPacket);
     const nc1 = validateNarrative(s1, ncCtx); // D-187 shared core: rules 1/2/4/5 (heat-silo, contradiction, cause, single-session)
     const eh1 = _ehValidate(s1); // Q-128: faded run must not be narrated as clean/steady
-    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && hr1.ok && pd1.ok && ac1.ok && rp1.ok && nc1.ok && eh1.ok) return _finalizeHonesty(s1);
-    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, hr: hr1.why, pd: pd1.why, ac: ac1.why, rp: rp1.why, core: nc1.failures.map(f => f.code), eh: eh1.ok }));
+    const pc1 = _pcValidate(s1); // pacing-verdict guard: no "steady pace" when pace varied
+    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && hr1.ok && pd1.ok && ac1.ok && rp1.ok && nc1.ok && eh1.ok && pc1.ok) return _finalizeHonesty(s1);
+    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, hr: hr1.why, pd: pd1.why, ac: ac1.why, rp: rp1.why, core: nc1.failures.map(f => f.code), eh: eh1.ok, pc: pc1.ok }));
 
     const corrections = [
       v1.bad.length ? 'Bad numeric tokens: ' + v1.bad.join(', ') : null,
-      z1.why, len1.why, td1.why, g1.why, hr1.why, pd1.why, ac1.why, rp1.why, eh1.why,
+      z1.why, len1.why, td1.why, g1.why, hr1.why, pd1.why, ac1.why, rp1.why, eh1.why, pc1.why,
       ...nc1.failures.map(f => f.why),
     ].filter(Boolean);
     const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
@@ -1238,8 +1248,9 @@ export async function generateAISummaryV1(
     const rp2 = validateNoRpeClaimsWithoutAthleteReport(s2, displayPacket);
     const nc2 = validateNarrative(s2, ncCtx);
     const eh2 = _ehValidate(s2); // Q-128
-    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && hr2.ok && pd2.ok && ac2.ok && rp2.ok && nc2.ok && eh2.ok) return _finalizeHonesty(s2);
-    console.warn('[ai-summary] attempt 2 also rejected:', JSON.stringify({ num: v2.ok, zone: z2.why, len: len2.why, td: td2.why, filler: g2.why, hr: hr2.why, pd: pd2.why, ac: ac2.why, rp: rp2.why, core: nc2.failures.map(f => f.code), eh: eh2.ok }));
+    const pc2 = _pcValidate(s2); // pacing-verdict guard
+    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && hr2.ok && pd2.ok && ac2.ok && rp2.ok && nc2.ok && eh2.ok && pc2.ok) return _finalizeHonesty(s2);
+    console.warn('[ai-summary] attempt 2 also rejected:', JSON.stringify({ num: v2.ok, zone: z2.why, len: len2.why, td: td2.why, filler: g2.why, hr: hr2.why, pd: pd2.why, ac: ac2.why, rp: rp2.why, core: nc2.failures.map(f => f.code), eh: eh2.ok, pc: pc2.ok }));
     if (!hr2.ok || !ac2.ok || !rp2.ok) return null;
     // Q-128 hard seatbelt: even if attempt 2 still slipped, the exact banned claim cannot reach the screen.
     return _finalizeHonesty(s2);

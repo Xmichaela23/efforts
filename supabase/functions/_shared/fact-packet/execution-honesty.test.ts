@@ -153,3 +153,27 @@ Deno.test('a genuine PLANNED interval session (interval_execution) still suppres
     ['Typical vs similar workouts.', 'HR drift 4 bpm.'], // untouched — a prescribed cooldown is not a fade
   );
 });
+
+// ── Pacing-verdict guard (2026-07-19): "the pace held steady" is false when the pace varied ──────────
+import { paceVariedPct, narrativeClaimsPaceSteady, PACE_STEADY_FALSE_ABOVE_CV } from './execution-honesty.ts';
+
+Deno.test('paceVariedPct: computes CV; a wildly varying pace reads high', () => {
+  // the real 80-min out-and-back: mile paces 787..950s/mi (13:07..15:50) → CV well above the "high" line
+  const splits = [787, 895, 950, 826, 855].map((p) => ({ avgPace_s_per_km: p / 1.60934 }));
+  const cv = paceVariedPct(splits)!;
+  assertEquals(cv > PACE_STEADY_FALSE_ABOVE_CV, true);
+});
+
+Deno.test('paceVariedPct: a truly even pace reads low', () => {
+  const splits = [600, 602, 599, 601].map((p) => ({ avgPace_s_per_km: p / 1.60934 }));
+  assertEquals(paceVariedPct(splits)! <= PACE_STEADY_FALSE_ABOVE_CV, true);
+});
+
+Deno.test('narrativeClaimsPaceSteady: catches PACE-steady, leaves EFFORT/HR-steady legal', () => {
+  assertEquals(narrativeClaimsPaceSteady('The pace held steady and your RPE stayed low.'), true);
+  assertEquals(narrativeClaimsPaceSteady('You held an even pace throughout.'), true);
+  assertEquals(narrativeClaimsPaceSteady('Consistent pacing across the run.'), true);
+  // legal — effort/HR, not pace:
+  assertEquals(narrativeClaimsPaceSteady('Even effort (grade-adjusted); your HR stayed controlled at 135.'), false);
+  assertEquals(narrativeClaimsPaceSteady('Steady effort across the rolling terrain.'), false);
+});

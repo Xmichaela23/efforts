@@ -91,6 +91,40 @@ export function computePositiveSplitSec(splitsMi: any[], gapAdjusted: boolean): 
   return Math.round(slowdown);
 }
 
+// ── PACING-VERDICT GUARD (2026-07-19) — a GROUND RULE, not a phrase patch. ────────────────────────
+// The general principle: the narrative may not characterize a metric in a way that contradicts the
+// engine's deterministic verdict for it. Here that metric is PACE. A "the pace held steady" claim is
+// false whenever the pace actually varied — provable from the splits, no route/athlete tuning. It's a
+// sibling of the fade guard: that one forbids "held steady" on a fade; this one forbids "steady PACE"
+// on a run whose pace moved (which is EVERY run on rolling terrain paced to HR). EFFORT/HR-steady stays
+// legal — those are true. Catches the whole family ("even pace", "held its pace", "consistent pacing"),
+// not one sentence.
+
+/** Raw pace variability (CV%) across the mile splits. Null when < 2 splits. */
+export function paceVariedPct(splitsMi: any[] | null | undefined): number | null {
+  const paces = (Array.isArray(splitsMi) ? splitsMi : [])
+    .map((s: any) => { const k = Number(s?.avgPace_s_per_km); return Number.isFinite(k) && k > 0 ? k : NaN; })
+    .filter((p) => Number.isFinite(p));
+  if (paces.length < 2) return null;
+  const mean = paces.reduce((a, b) => a + b, 0) / paces.length;
+  if (mean <= 0) return null;
+  const sd = Math.sqrt(paces.reduce((a, p) => a + (p - mean) ** 2, 0) / paces.length);
+  return Math.round((sd / mean) * 1000) / 10;
+}
+
+/** Pace CV above this makes "the pace held steady" a FALSE claim. Steady-state running holds pace within
+ *  a few % (CV under ~3-4%); above 5% the pace visibly moved. This is the STEADY-CLAIM line — deliberately
+ *  lower than the app's "moderate vs high variability" quality line (CV 10), which answers a different
+ *  question. A general linguistic bar on the word "steady", not tuned to any athlete/run. */
+export const PACE_STEADY_FALSE_ABOVE_CV = 5;
+
+/** Does the narrative claim the PACE (not effort/HR) held steady/even/constant? Requires "pace/pacing"
+ *  adjacent to a steadiness word, so "even effort", "HR steady", "controlled" all stay legal. */
+const PACE_STEADY_CLAIM = /\bpac(?:e|es|ed|ing)\b[^.]{0,24}\b(steady|even|constant|consistent|held|holding|flat|unchanging)\b|\b(steady|even|constant|consistent|flat)\b[^.]{0,10}\bpac(?:e|es|ing)\b/i;
+export function narrativeClaimsPaceSteady(text: string | null | undefined): boolean {
+  return !!text && PACE_STEADY_CLAIM.test(text);
+}
+
 /**
  * Final deterministic seatbelt. Returns the narrative unchanged unless the run trips the
  * guard AND the text still asserts clean/steady execution — then drops the offending
