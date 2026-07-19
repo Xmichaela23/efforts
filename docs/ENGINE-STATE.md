@@ -24,7 +24,31 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-19 — STATE SCREEN REFRAMED FOR THE GENERALIST · AUDIT OWED)
+## 🧭 NEXT SESSION — START HERE (2026-07-19 EOD — STRENGTH READ REBUILT TO COMMERCIAL-APP STANDARD · FAN-OUT VERIFIED)
+
+> ## READ `docs/GAME-PLAN.md`, `START-HERE.md`, `LIFECYCLE.md`. Today the audit-the-posture-reads job (previous banner) got DONE and then went further — the strength read was rebuilt.
+>
+> ### ⛔ YOUR JOB — two open follow-ups, neither urgent:
+> 1. **Goal-picks-instrument (the one real design piece left).** The strength read now leads with e1RM, which is correct for a **get_stronger** goal. For a **build_muscle** goal the field reads VOLUME, not e1RM (hypertrophy peaks on volume; e1RM is fatigue-suppressed mid-block). The goal already exists (`non-race-goal-seeds.ts`: `get_stronger` vs `build_muscle`); the read just doesn't switch on it yet. Wire: goal=get_stronger → e1RM leads (today), goal=build_muscle → `computeStrengthVolumeState` leads. Verified vs field+science this session.
+> 2. **PR flag needs a fresh snapshot.** `bestE1rm` is a NEW field on `StrengthPerLift` (D-303). The per-lift numbers/directions render from the existing contract, but the **PR badge** only lights once `compute-snapshot` writes a snapshot carrying `bestE1rm` — i.e. Michael's next sync/recompute. Not a bug; confirm it appears after a sync.
+>
+> ### WHAT SHIPPED + DEPLOYED + VERIFIED-ON-DEVICE this session (2026-07-19). Do NOT re-litigate:
+> - **Fan-out D-298 a/c/d VERIFIED.** Wrote a throwaway-user end-to-end harness (`scripts/fanout-audit.mjs`) — creates a fake user, pushes a synthetic run through the real pipeline ×3, asserts facts complete (hr_drift/time-in-zone/workload), snapshot written, no dupes, values converge. ALL PASS on real infra. The "one-workout-stale" + "orphan paths invisible" bugs are structurally fixed AND behavior-verified. (b — "reflects THAT workout vs a prior one" — not covered by a single-workout harness; low risk, watermark-guarded.)
+> - **Strength read rebuilt (D-303), VERIFIED on device (Michael screenshotted it):**
+>   - **e1RM noise guard** — the e1RM trend now must clear the lift's own within-window scatter (same `noiseGuardStdev` run decoupling uses). Killed a LIVE misread: squat read "sliding −2.5%" on σ=4.1% scatter, which made the overall verdict flip on any single session. 3 regression pins; 145/145 state-trend green. On Michael's real data: squat → holding, overall → getting stronger, twitchiness gone (was 3-of-4 pokes flipping, now 0).
+>   - **Grinding moved onto the read** — `strength_rir_below_prescription` now renders as the FATIGUE line on the strength read (distinct from e1RM), pulled from the nudge allow-list (`nudge-policy.ts`) AND the coach prompt (`coach/index.ts`) so it lives in ONE place — client reads the coach-computed signal, no recompute.
+>   - **Per-lift estimated-1RM read** (supersedes D-302's develop word-map + baseline dot) — each main lift: its `~`-marked estimated 1RM, noise-guarded 6-week change, PR flag, per-lift receipts. Referenced to the athlete's OWN best (`bestE1rm`), NOT a typed baseline (the field doesn't use one). Verified vs Strong/Hevy + RTS/RP + the 1RM-estimation/RIR science (sources in D-303). e1RM itself is RIR-adjusted Brzycki (compute-facts) + near-failure-weighted (D-118) — the science's own caveats, already coded.
+>   - **`~` estimate marker** — the number reads "~150 lb": a projection off logged sets (e.g. Michael's bench = 120×5 @ 2.5 RIR → Brzycki ~150), not a tested max. Firms up as sessions stack + a near-failure top set is logged.
+>
+> ### ⚠️ WATCH / NOT DONE:
+> - **Goal-picks-instrument** — see JOB #1. Only get_stronger is wired.
+> - **Copy:** the grinding line wording is a PLACEHOLDER tuned-to-voice pending ("Reps in reserve have run below target…"). The posture "trade" sentence layer (`posture.ts`) is client-orphaned by design (Michael dislikes that reassuring register — see the copy-voice memory); do NOT resurface it.
+> - **iOS builds go stale** (Xcode not re-bundling) — verify client work on the web/PWA (hard-refresh) or `npm run dev`; iOS needs `npm run ios` + Xcode ▶.
+> - Q-185 / Q-186 / Q-187 / Q-188 still open, untouched.
+
+---
+
+## 🧭 NEXT SESSION — START HERE (SUPERSEDED 2026-07-19 midday — STATE SCREEN REFRAMED FOR THE GENERALIST · AUDIT OWED → the audit got done, then the read got rebuilt; see the banner above)
 
 > ## READ `docs/GAME-PLAN.md`, then `START-HERE.md` + `LIFECYCLE.md`, and the new north star in **`docs/PRODUCT-POSITIONING.md`** (the 2026-07-18 block: the GENERALIST athlete, "fitness is an emergent process," cerebral-not-bro, the four questions, refuse-the-metric-firehose).
 >
