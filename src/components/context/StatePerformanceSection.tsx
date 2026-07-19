@@ -106,56 +106,61 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
   withheld: { word: 'too few to read', cls: 'text-white/40', arr: '' },
 };
 
-// STRENGTH row — the DOT is e1RM (what you CAN lift), NOT volume (item 1). Volume is what you DID
-// (a LOAD/Home concept) and is gone from this section; the "4 sessions this week" adherence leak is
-// gone too (the calendar owns week counts). The per-lift "from your logged sets" detail follows the row.
-function StrengthFitnessRow({ fitness, showAxis, isDevelop, planWeek, fatigue }: { fitness: StrengthFitness; showAxis?: boolean; isDevelop?: boolean; planWeek?: number | null; fatigue?: boolean }) {
-  const vol = fitness.volume; // kept only for the freshness/provenance stamp
-  const e = fitness.e1rm;
-  const range = e ? (e as any).range as { positionPct: number; confident: boolean } | null | undefined : null;
-  // POSTURE-AWARE READ (strength apps + RTS/RIR autoregulation, 2026-07-19): when you're DEVELOPING
-  // strength, "holding" is not neutral — it means trying to build and not building. e1RM rising = getting
-  // stronger; flat but EARLY IN THE BLOCK = on plan (gains lag — no app calls a plateau at week 2); flat
-  // ~4+ weeks INTO THE PLAN = gains flat, a gentle plateau note (the 3–4wk line the field uses), never an
-  // alarm. Gated on WEEKS-INTO-PLAN, not total session count — the block needs time before you judge it.
-  // (RIR-grinding / weight-dropped "deload due" is the separate autoregulation layer.)
-  const sustained = typeof planWeek === 'number' && planWeek >= 4;
-  const developWords: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
-    improving: { word: 'getting stronger', cls: 'text-emerald-400', arr: '↑' },
-    holding: sustained
-      ? { word: 'gains flat', cls: 'text-amber-300/85', arr: '→' }
-      : { word: 'on plan', cls: 'text-white/60', arr: '→' },
-    sliding: { word: 'easing off', cls: 'text-amber-300', arr: '↓' },
-    needs_data: { word: 'needs data', cls: 'text-white/40', arr: '' },
-    withheld: { word: 'too few to read', cls: 'text-white/40', arr: '' },
+// STRENGTH row — PER-LIFT estimated 1RM read (Strong/Hevy + RTS/RP, verified vs field + science 2026-07-19).
+// Supersedes the rolled-up "getting stronger" verdict + baseline dot. Commercial strength apps show each MAIN
+// LIFT's estimated 1RM, its trend, and a PR flag, referenced to YOUR OWN best — not a typed baseline (which the
+// field doesn't use and which pegged the dot dumb once you passed it). Each lift's direction is already
+// NOISE-GUARDED on the spine (computeStrengthState) so a single session can't fake up/down; the estimate itself
+// is RIR-adjusted + near-failure-weighted (compute-facts brzycki1RM + D-118), which is the science's own caveat.
+// Receipts kept PER LIFT (sessions · as of). The grinding/RIR fatigue line (D-302) stays below — a distinct
+// fatigue axis, not the number. planWeek/isDevelop/the develop word-map are gone with the rolled-up verdict.
+function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fatigue?: boolean }) {
+  // Main lifts with a real e1RM number; primaries lead (squat/bench/deadlift/press — the field's "main lifts").
+  const lifts = fitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null);
+  // Direction chip off the GUARDED per-lift verdict. Up = green, flat = neutral, down = amber (a single lift
+  // dipping is not an alarm). needs_data/withheld → a number with no trend yet ("new").
+  const dir = (l: (typeof lifts)[number]) => {
+    if (l.direction === 'improving') return { arr: '↑', text: verdictSignedPct('improving', l.pctChange) ?? 'up', cls: 'text-emerald-400' };
+    if (l.direction === 'sliding')   return { arr: '↓', text: verdictSignedPct('sliding', l.pctChange) ?? 'down', cls: 'text-amber-300' };
+    if (l.direction === 'holding')   return { arr: '→', text: 'flat', cls: 'text-white/45' };
+    return { arr: '', text: 'new', cls: 'text-white/35' };
   };
-  const wordMap = isDevelop ? developWords : VERDICT;
-  const explain = isDevelop
-    ? "You're developing strength, so this reads as progress: getting stronger (e1RM rising) · on plan (early, gains lag) · gains flat (a plateau if e1RM stays flat past ~3–4 weeks — worth looking at the stimulus, not an alarm). e1RM = estimated one-rep max from the weights and reps you log; you never max out."
-    : "e1RM = your estimated one-rep max — the most you could lift once, worked out from the weights and reps you log (you never have to actually max out). The dot is where it sits versus your own baseline; the arrow is the direction. “Holding” means it isn’t moving up or down.";
+  // PR = the latest estimate IS your best in the tracked window (needs ≥2 sessions so a first log isn't a "PR").
+  const isPR = (l: (typeof lifts)[number]) => l.sampleCount >= 2 && l.latestE1rm != null && l.bestE1rm != null && l.latestE1rm >= l.bestE1rm - 0.5;
   return (
     <Row label="strength">
-      {e && range ? (
-        <FitnessDotBlock label="e1RM" range={range} verdict={e.verdict} showAxis={showAxis} frame="vs your baseline" wordMap={wordMap} explain={explain} />
-      ) : e ? (
-        <span className="basis-full flex items-baseline justify-between gap-2">
-          <span className="text-white/55 text-[13px]">e1RM</span>
-          <span className={`inline-flex items-baseline gap-0.5 text-[12px] ${wordMap[e.verdict].cls}`}>{wordMap[e.verdict].arr && <span>{wordMap[e.verdict].arr}</span>}<span>{wordMap[e.verdict].word}</span></span>
-        </span>
-      ) : (
+      {lifts.length === 0 ? (
         <span className="text-white/40">needs 2+ logged lifts to trend</span>
+      ) : (
+        <>
+          <span className="basis-full text-white/30 text-[10px] uppercase tracking-wider">estimated 1-rep max · last 6 weeks</span>
+          {lifts.map((l) => {
+            const d = dir(l);
+            return (
+              <React.Fragment key={l.canonical}>
+                <span className="basis-full flex items-baseline justify-between gap-2">
+                  <span className="text-white/80 text-[13px]">{l.displayName}</span>
+                  <span className="inline-flex items-baseline gap-2 text-[12px]">
+                    {/* unit follows the logged convention (lb today — single-user pre-launch); revisit for metric. */}
+                    <span className="text-white/75">{Math.round(l.latestE1rm as number)} lb</span>
+                    {isPR(l) && <span className="text-emerald-300 text-[9px] uppercase tracking-wide font-semibold">PR</span>}
+                    <span className={`inline-flex items-baseline gap-0.5 ${d.cls}`}>{d.arr && <span>{d.arr}</span>}<span>{d.text}</span></span>
+                  </span>
+                </span>
+                <span className="basis-full text-white/30 text-[10px] -mt-0.5">
+                  {l.sampleCount} session{l.sampleCount === 1 ? '' : 's'}{asOf(l.newestAgeDays) ? ` · ${asOf(l.newestAgeDays)}` : ''}{l.provisional ? ' · provisional' : ''}
+                </span>
+              </React.Fragment>
+            );
+          })}
+        </>
       )}
-      {vol.sampleCount != null && vol.sampleCount > 0 && (
-        <span className="basis-full text-white/35 text-[11px]">over 6wk · {vol.sampleCount} session{vol.sampleCount === 1 ? '' : 's'}{asOf(vol.newestAgeDays) ? ` · ${asOf(vol.newestAgeDays)}` : ''}</span>
-      )}
-      {/* AUTOREGULATION read — the FATIGUE axis, distinct from the e1RM direction above (D-302 slice 2).
-          Grinding shows as RIR running below prescription BEFORE it shows in e1RM: the weight's still moving
-          but it's costing more than planned. This is the RTS/RP signal (fatigue, not the number). Sourced
-          from the spine's `strength_rir_below_prescription` (longitudinal-signals.ts) — rendered here, NOT
-          recomputed, and pulled from the nudge list so it lives in ONE place. ⚠ WORDING is a placeholder to
-          tune to voice: fact-first, conditional consequence, no imperative. */}
+      {/* AUTOREGULATION read — the FATIGUE axis, distinct from the e1RM numbers above (D-302 slice 2). Grinding
+          shows as RIR below prescription BEFORE it shows in e1RM. Sourced from the spine's
+          `strength_rir_below_prescription` — rendered here, NOT recomputed, pulled from the nudge list so it
+          lives in ONE place. ⚠ WORDING placeholder to tune to voice: fact-first, conditional, no imperative. */}
       {fatigue && (
-        <span className="basis-full text-[12px] text-amber-300/80 leading-snug mt-0.5">
+        <span className="basis-full text-[12px] text-amber-300/80 leading-snug mt-1">
           Reps in reserve have run below target — you're training closer to failure than the plan called for. Sustained, that's the fatigue a deload clears.
         </span>
       )}
@@ -544,7 +549,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
             if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
-            if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} showAxis={showAxis} isDevelop={(declaredPosture?.[card.discipline] ?? String((card as any).posture ?? '')) === 'develop'} planWeek={planWeek} fatigue={strengthFatigue} />{strengthDetail}</>;
+            if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} fatigue={strengthFatigue} />{strengthDetail}</>;
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
             return (card.discipline === 'strength' && strengthDetail) ? <>{row}{strengthDetail}</> : row;
           })();

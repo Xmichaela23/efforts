@@ -78,6 +78,7 @@ export interface StrengthPerLift {
   direction: TrendVerdict;     // the lift's e1RM trend — the spine's owned fact
   pctChange: number | null;
   latestE1rm: number | null;   // most-recent estimated_1rm point (the number the direction is OF)
+  bestE1rm: number | null;     // best estimated_1rm in the tracked window (PR frame — latest===best ⇒ PR)
   sampleCount: number;
   newestAgeDays: number | null;
   provisional: boolean;

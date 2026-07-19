@@ -315,6 +315,9 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // Per-lift direction the aggregate rolls up FROM — persisted so the coach reads one direction (D-270).
   // points are sorted ascending by date (liftSeriesFromExerciseLog), so the last point is the latest e1RM.
   const liftLatest = new Map(liftSeries.map((s) => [s.canonical, s.points.length ? s.points[s.points.length - 1].value : null]));
+  // best e1RM in the tracked window — the commercial-app frame: progress is vs your OWN best, not a typed
+  // baseline. A PR = the latest point IS the best (latestE1rm >= bestE1rm), so the client can flag it.
+  const liftBest = new Map(liftSeries.map((s) => [s.canonical, s.points.length ? Math.max(...s.points.map((p) => p.value)) : null]));
   const strengthPerLift: StrengthPerLift[] = strength.lifts.map((l) => ({
     canonical: l.canonical,
     displayName: l.displayName,
@@ -322,6 +325,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     direction: l.trend.verdict,
     pctChange: l.trend.pctChange,
     latestE1rm: liftLatest.get(l.canonical) ?? null,
+    bestE1rm: liftBest.get(l.canonical) ?? null,
     sampleCount: l.trend.sampleCount,
     newestAgeDays: l.trend.newestAgeDays,
     provisional: isProvisionalTrend(l.trend),
