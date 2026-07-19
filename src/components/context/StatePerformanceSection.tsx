@@ -141,8 +141,9 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
                 <span className="basis-full flex items-baseline justify-between gap-2">
                   <span className="text-white/80 text-[13px]">{l.displayName}</span>
                   <span className="inline-flex items-baseline gap-2 text-[12px]">
-                    {/* unit follows the logged convention (lb today — single-user pre-launch); revisit for metric. */}
-                    <span className="text-white/75">{Math.round(l.latestE1rm as number)} lb</span>
+                    {/* "~" marks it as an ESTIMATE, not a tested max — it's a projection off your logged sets
+                        (RIR-adjusted), most reliable near failure. Provisional (below) clears as sessions stack. */}
+                    <span className="text-white/75">~{Math.round(l.latestE1rm as number)} lb</span>
                     {isPR(l) && <span className="text-emerald-300 text-[9px] uppercase tracking-wide font-semibold">PR</span>}
                     <span className={`inline-flex items-baseline gap-0.5 ${d.cls}`}>{d.arr && <span>{d.arr}</span>}<span>{d.text}</span></span>
                   </span>
