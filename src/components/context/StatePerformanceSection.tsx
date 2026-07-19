@@ -284,6 +284,9 @@ function NoBaselineTag({ hint }: { hint?: string }) {
 // dot answers the LEVEL, the arrow answers the TREND — so "needs work" and "improving" can no longer read
 // as the app arguing with itself. The old clipped verdict ("aerobic base needs work ↑ improving 6%") is
 // gone. efficiency_index stays a quiet secondary arrow.
+// Mirrors STATE_TREND_WINDOWS.runDirectionMinRuns (assemble.ts): steady runs in the 6wk window needed
+// before a DIRECTION arrow is drawn. The LEVEL dot needs no such floor — one steady run reads a level.
+const RUN_TREND_MIN_RUNS = 8;
 function RunFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: RunFitness; showAxis?: boolean; mode: FitnessMode; anchor?: FitnessAnchor }) {
   const d = fitness.decoupling;
   const v = VERDICT[d.verdict];
@@ -308,8 +311,10 @@ function RunFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: RunFitnes
         durability <span className="text-white/30 text-[10px]">{explainOpen ? '▾' : 'ⓘ'}</span>
       </button>
       {withheld ? (
-        // counts voice, no color, no arrow — state the data, claim nothing (Amendment 1).
-        <span className="text-white/40 text-[11px]">{d.sampleCount ?? 0} run{d.sampleCount === 1 ? '' : 's'} in {runWk}wk — too few to read direction</span>
+        // The DOT below is the level (real, from your steady runs). This line is ONLY the trend receipt:
+        // the arrow needs RUN_TREND_MIN_RUNS steady runs, so say how close — not "too few to read", which
+        // read as "we can't read you at all" next to a confident dot (the contradiction Michael caught).
+        <span className="text-white/40 text-[11px]">{d.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs for a trend</span>
       ) : (
         <span className={`inline-flex items-baseline gap-0.5 text-[12px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{d.provisional && <span className="text-white/30 text-[11px] ml-1">provisional</span>}</span>
       )}
@@ -349,7 +354,7 @@ function RunFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: RunFitnes
       {explainOpen && (
         <p className="basis-full text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">
           {anchored
-            ? "The dot is where your aerobic durability sits versus your own last 12 weeks — how much your heart rate drifts on a long steady run. Left is the weakest it's been, right the strongest. It's a relative frame, not an absolute score."
+            ? `Two reads here. The DOT is your level — where your aerobic durability sits versus your own last 12 weeks (how much your heart rate drifts on a long steady run; left is the weakest it's been, right the strongest). One steady run reads a level, so the dot is current. The ARROW is the direction — which way that's trending — and it only appears once you've logged ${RUN_TREND_MIN_RUNS} steady runs in 6 weeks, because a few runs can't tell a real trend from a noisy day. A relative frame, not an absolute score.`
             : "Durability = how much your heart rate drifts on a long steady run — less drift is better. The arrow is the direction over your recent steady runs. No baseline is set, so there's no high/low dot yet. (Coaches commonly treat under ~5% drift as strong — a field norm, not your number.)"}
         </p>
       )}
