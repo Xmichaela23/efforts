@@ -230,6 +230,13 @@ The 2026-07-13 audit found the same disease three times, and it is the highest-l
 - [ ] **`invokeFunction` token-IIFE is duplicated** (`src/lib/supabase.ts:126-134` vs `:189-196`); the anon-fallback masks a "user but no access_token" race.
 - [ ] **iOS bundle rebuild** (`npm run ios`) — `ios/App/App/public/` is a day stale. ⚠️ **Will NOT surface the segment card** — that's starved at the source (see §0).
 
+### Course → watch pacing (PARKED 2026-07-18 — nice-to-have, revisit AFTER everything else)
+Send our per-segment course pacing to the athlete's watch. **Both halves already exist** — course-strategy computes terrain-adjusted per-segment pace (+HR + cue), and `send-workout-to-garmin` pushes structured workouts with distance + SPEED targets. The gap is just the adapter (course_segments → Garmin workout steps) + a "Send to watch" button on the course view.
+- **Tiers:** (1) distance-based workout push — small, low-friction, minor late-race drift (~1% / ¼ mile over a marathon, from watch-reads-long; gradual pace targets so it barely matters). (2) GPS-position-glued, no drift — needs our OWN watch app (Garmin Connect IQ, or **easier on Apple Watch** — real native app, no sealed-workout wall — but Apple Watch is the wrong audience for endurance racing; Garmin is where the racers are).
+- **Dead ends checked:** can't GPS-steer a native Garmin workout (sealed, distance/lap-advance only); can't inject our paces into Garmin PacePro (no public API — it regenerates generic gradient splits). Lap-advance steps correct drift but add mid-race button-press friction → not worth it; ship distance-based if/when we do this.
+- **Cycling ≈ 2× the work:** it's a POWER sport, but our bike course output is speed/pace + FTP-in-cue-text, not structured per-segment watts. Needs a power-pacing brain upgrade (Best-Bike-Split-style) before any bike delivery. **Run first.**
+- Full analysis: this session's transcript (2026-07-18).
+
 ---
 
 # 5. BLOCKED ON MICHAEL

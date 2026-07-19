@@ -1719,12 +1719,15 @@ export default function StateTab({
           // has_active_plan=true but no goal/projection → this used to render an empty RACE header.
           // (This is the QUICK half of the Q-120 overlap — a render narrowing, no logic added, so it
           // does not complicate the full Q-120 readiness-gating redesign.)
+          // RACE only when there is a REAL race. Hard race artifacts (a computed projection / official
+          // result) always qualify. A soft goal or readiness qualifies ONLY with an actual race DATE —
+          // because goalMetaFromGoalLite defaults distance to 'marathon', so `goalMeta` is truthy for ANY
+          // linked goal (incl. a non-race "Get Stronger" plan), which was leaking an empty RACE prompt.
           const hasRaceContent =
             raceFinishProjection ||
-            raceReadiness ||
-            goalMeta ||
             officialForRace ||
-            postRaceUnofficial;
+            postRaceUnofficial ||
+            (!!raceYmdForActivePlan && (raceReadiness || goalMeta));
           if (!hasRaceContent) return null;
           const upcomingDays = daysSinceYmd(raceYmdForActivePlan);
           const stillRaceWeek = upcomingDays == null || upcomingDays <= 7;
