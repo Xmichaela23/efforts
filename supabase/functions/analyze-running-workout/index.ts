@@ -1884,7 +1884,17 @@ Deno.serve(async (req) => {
       ? (() => { try { return JSON.parse((workoutToUse as any).computed); } catch { return null; } })()
       : (workoutToUse as any)?.computed;
     const _ehSplitsMi = _ehComp?.analysis?.events?.splits?.mi;
-    const _ehPosSplitSec = computePositiveSplitSec(_ehSplitsMi, true);
+    // EFFORT = HR, NOT grade-adjusted pace (2026-07-19). A GAP half-vs-half FALSELY reads a "positive
+    // split" on an OUT-AND-BACK — GAP credits the uphill leg, penalizes the downhill return, a terrain
+    // artifact, not a fade. A fade may only be NAMED when HR agrees it drifted up. decouplingPct is the
+    // single-source HR-drift read the State durability row + the session-detail PACING line also use;
+    // HR held (≤5%, the Friel line) = even effort = terrain → suppress. Gating at the SOURCE suppresses
+    // all three narrative surfaces (hr_drift guard, LLM prompt, fade bullets) at once. A real fade drifts
+    // HR up (high/absent decoupling) → still named.
+    const _ehDecoupling = Number(hrAnalysisResult?.summary?.decouplingPct);
+    const _ehPosSplitSec = (Number.isFinite(_ehDecoupling) && _ehDecoupling <= 5)
+      ? null
+      : computePositiveSplitSec(_ehSplitsMi, true);
 
     // Build minimal computed object - DON'T spread (avoids sending thousands of sensor samples)
     // CRITICAL: Preserve analysis.series and overall from compute-workout-analysis (contains chart data and metrics)

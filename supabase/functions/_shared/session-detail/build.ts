@@ -1380,8 +1380,16 @@ export function buildAnalysisDetailRows(
         const diff = firstAvg - secondAvg;
         const absDiff = Math.abs(Math.round(diff));
         const effortLabel = hasGap ? 'effort' : 'pacing';
+        // EFFORT = HR, NOT grade-adjusted pace (2026-07-19). A GAP half-vs-half FALSELY reads a "positive
+        // split" on an OUT-AND-BACK: GAP credits the uphill leg and penalizes the downhill return — a
+        // terrain artifact, not a fade. So a slowdown may only be NAMED an effort fade when HR agrees it
+        // drifted up. `decoupling.pct` is the SAME single-source HR-drift read the State durability row
+        // uses (both import run.ts) — HR held (≤5%, the Friel line) = even effort → terrain, not a fade.
+        // A real fade drifts HR up (high decoupling) and still gets named. This makes Performance and State
+        // tell ONE story off ONE number.
+        const hrHeld = decoupling?.pct != null && Number(decoupling.pct) <= 5;
         let pattern: string;
-        if (absDiff <= 15) {
+        if (absDiff <= 15 || (hrHeld && diff < 0)) {
           pattern = hasGap ? 'Even effort (grade-adjusted)' : 'Even pacing';
         } else if (diff > 0) {
           pattern = `Negative split — ${effortLabel} ${absDiff}s/mi faster in second half`;
