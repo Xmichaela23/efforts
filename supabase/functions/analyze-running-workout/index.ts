@@ -17,6 +17,7 @@ import { buildMarathonGoalRaceAdherenceSummary } from './lib/analysis/marathon-r
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
 import { computePositiveSplitSec, guardNarrativeHonesty, fadeLeadBullets, structuredBySignalSuppressesFade, paceVariedPct } from '../_shared/fact-packet/execution-honesty.ts';
+import { composeRunInsight, buildRunInsightInputFromPacket } from '../_shared/insights/run-insights.ts';
 import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, resolveCarriedInSoreness, CARRYOVER_WINDOW_DAYS, type SorenessEntry } from '../_shared/cross-domain-carryover.ts';
 // D-036: GAP enrichment lifted to top-level so both pace-adherence and the
 // HR analyzer consume the same grade-adjusted sample series.
@@ -2261,21 +2262,16 @@ Deno.serve(async (req) => {
         // Q-128 (D-242): a run that FADED within itself did not "hold steady" — the within-run
         // positive split (`_executionHonesty`, computed once at the workoutToUse re-read above) is
         // the honesty key fed to the summary generator's PRIMARY prompt rule + validator backstop.
-        ai_summary = await generateAISummaryV1(
-          fact_packet_v1, flags_v1, null, null, arc_narrative_for_summary,
-          { isMixedEffort: _varGate.is_mixed_effort, intervalBreakdown: detailedAnalysis?.interval_breakdown ?? null },
-          // D-035: pass unplanned flag so the LLM input drops prescribed-range
-          // signals and the UNPLANNED MODE prompt rule fires.
-          { isUnplanned: !isLinkedPlanSession },
-          // D-042 / D-043: weekly aerobic efficiency trend from athlete_snapshot.
-          // Drives AEROBIC EFFICIENCY TREND prompt rule. Field name reflects
-          // what the value actually is (pace-at-HR delta, not HR-over-time).
-          { runEasyPaceAtHrTrendPct: arc_run_easy_pace_at_hr_trend },
-          run_spine_verdict,
-          _executionHonesty,
-          _ehPaceVariedPct,
-        );
+        // DETERMINISTIC INSIGHTS (2026-07-19) — the LLM ai_summary is REPLACED by the run composer. Same
+        // verdicts (pacing via the shared pacingVerdict, decoupling, terrain, conditions, type), composed
+        // deterministically: no model, no wild card, no honesty guard needed. generateAISummaryV1 and its
+        // validators are now dead for runs (kept for the cleanup pass). Reads fact_packet_v1 + the splits,
+        // the SAME sources the PACING/TERRAIN rows use — one story across Performance and (later) State.
+        const _ib = (detailedAnalysis as any)?.interval_breakdown;
+        const _intervals = _ib ? { hit: _ib.completed ?? _ib.hit ?? null, total: _ib.total ?? _ib.count ?? null, consistent: _ib.consistent ?? null } : null;
+        ai_summary = composeRunInsight(buildRunInsightInputFromPacket(fact_packet_v1, _ehSplitsMi, _intervals));
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
+        void generateAISummaryV1; void arc_narrative_for_summary; void _varGate; void isLinkedPlanSession; void arc_run_easy_pace_at_hr_trend; void run_spine_verdict; void _executionHonesty; void _ehPaceVariedPct; // dead LLM-path refs, retained for cleanup
 
         // Axis 1 — cross-domain carryover (run card, greenfield, CONSERVATIVE first ship). Signal = RPE
         // (athlete-declared, strongest). RPE can't be mechanically deconfounded, so any material terrain/

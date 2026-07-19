@@ -6,6 +6,7 @@ import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretat
 import type { VerdictDirection } from '../core-verdict.ts';
 import type { ArcPerformanceBridgeV1 } from './arc-performance-bridge.ts';
 import { mergeArcPerformanceNarrative } from './arc-performance-bridge.ts';
+import { pacingVerdict } from '../insights/run-insights.ts';
 import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../athlete-snapshot/types.ts';
 import type { ReadinessSnapshotV1 } from '../readiness-types.ts';
 import { packageSessionDetailReadiness } from './readiness-load-context.ts';
@@ -1365,44 +1366,22 @@ export function buildAnalysisDetailRows(
         };
       }).filter((s) => Number.isFinite(s.mile) && s.mile > 0 && Number.isFinite(s.pace) && s.pace > 0);
 
-      if (rawSplits.length >= 2) {
-        const hasGap = gapAdjusted && rawSplits.every((s) => Number.isFinite(s.gap) && s.gap > 0);
-        const splits = hasGap
-          ? rawSplits.map((s) => ({ mile: s.mile, pace: s.gap }))
-          : rawSplits.map((s) => ({ mile: s.mile, pace: s.pace }));
-
-        const mid = Math.ceil(splits.length / 2);
-        const firstHalf = splits.slice(0, mid);
-        const secondHalf = splits.slice(mid);
-        const avg = (arr: typeof splits) => arr.reduce((s, x) => s + x.pace, 0) / arr.length;
-        const firstAvg = avg(firstHalf);
-        const secondAvg = avg(secondHalf);
-        const diff = firstAvg - secondAvg;
-        const absDiff = Math.abs(Math.round(diff));
-        const effortLabel = hasGap ? 'effort' : 'pacing';
-        // EFFORT = HR, NOT grade-adjusted pace (2026-07-19). A GAP half-vs-half FALSELY reads a "positive
-        // split" on an OUT-AND-BACK: GAP credits the uphill leg and penalizes the downhill return — a
-        // terrain artifact, not a fade. So a slowdown may only be NAMED an effort fade when HR agrees it
-        // drifted up. `decoupling.pct` is the SAME single-source HR-drift read the State durability row
-        // uses (both import run.ts) — HR held (≤5%, the Friel line) = even effort → terrain, not a fade.
-        // A real fade drifts HR up (high decoupling) and still gets named. This makes Performance and State
-        // tell ONE story off ONE number.
-        const hrHeld = decoupling?.pct != null && Number(decoupling.pct) <= 5;
-        let pattern: string;
-        if (absDiff <= 15 || (hrHeld && diff < 0)) {
-          pattern = hasGap ? 'Even effort (grade-adjusted)' : 'Even pacing';
-        } else if (diff > 0) {
-          pattern = `Negative split — ${effortLabel} ${absDiff}s/mi faster in second half`;
-        } else {
-          pattern = `Positive split — ${effortLabel} slowed ${absDiff}s/mi${hasGap ? ' (grade-adjusted)' : ''}`;
-        }
-
-        const fastest = rawSplits.reduce((a, b) => a.pace < b.pace ? a : b);
-        const fm = Math.floor(fastest.pace / 60);
-        const fs = Math.round(fastest.pace % 60);
-        const fastestStr = `Fastest: Mile ${fastest.mile} at ${fm}:${String(fs).padStart(2, '0')}/mi`;
-
-        rows.push({ label: 'Pacing', value: `${pattern}. ${fastestStr}` });
+      // SINGLE SOURCE: the pacing verdict is computed by the SHARED pacingVerdict() (run-insights.ts) — the
+      // SAME call the deterministic INSIGHTS composer uses — so this row and the paragraph can never diverge.
+      // Effort = HR: an out-and-back's GAP "positive split" (GAP credits the climb, penalizes the descent) is
+      // suppressed to even-effort when HR held (decoupling ≤5%, the read State's durability row also uses).
+      const pv = pacingVerdict(splitsMi, decoupling?.pct, gapAdjusted);
+      if (pv) {
+        const effortLabel = pv.hasGap ? 'effort' : 'pacing';
+        const pattern =
+          pv.pattern === 'even_effort' ? 'Even effort (grade-adjusted)'
+          : pv.pattern === 'even_pace' ? 'Even pacing'
+          : pv.pattern === 'negative_split' ? `Negative split — ${effortLabel} ${pv.absDiffSec}s/mi faster in second half`
+          : `Positive split — ${effortLabel} slowed ${pv.absDiffSec}s/mi${pv.hasGap ? ' (grade-adjusted)' : ''}`;
+        const fastestStr = pv.fastestMile != null && pv.fastestPaceSec != null
+          ? `Fastest: Mile ${pv.fastestMile} at ${Math.floor(pv.fastestPaceSec / 60)}:${String(Math.round(pv.fastestPaceSec % 60)).padStart(2, '0')}/mi`
+          : '';
+        rows.push({ label: 'Pacing', value: `${pattern}.${fastestStr ? ' ' + fastestStr : ''}` });
       }
     }
   } catch { /* */ }
