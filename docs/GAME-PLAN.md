@@ -39,6 +39,16 @@ That is the whole diagnosis, and it produces exactly three diseases:
 - [ ] **Q-164 — the dead "Aerobic fitness" BODY row.** *(⏭️ DEFERRED to Phase 4 — it is DEAD, not LYING. A row that never renders tells no one anything false.)* `coach:2131` `cardiac_efficiency_current: null, sample_size: 0` → the render gate can never be true. **Feed it or delete it.**
 - [x] **The 5 red tests** (`_shared/cycling-v1/*`) assert an NP-trend fallback that `cb4eb1d5` deliberately deleted. **Green must mean green.**
 
+### REOPENED 2026-07-20 — the Monday alarm survived, in the GRAPHICS. See `AUDIT-state-screen-2026-07-20.md`.
+
+> **Q-177 was killed in the signal layer and left standing in the picture.** The guard was written for the sentence and never applied to the bar. **Twice.** Both are live on a real screen (device shots, 2026-07-20 09:21).
+
+- [ ] **The planned-vs-actual bar compares a 7-day plan to a 0-day result** (F21). `coach/index.ts:5223` counts the WHOLE week as `planned`; `done` is bounded to `[weekStart, asOfDate]` (`:5219`). `StateTab.tsx:174` `WeekMixBar` draws both on ONE scale with **no partial-week guard and no numbers** — so every Monday shows a full planned bar over an empty actual bar. Directly beneath a LOAD bar reporting 288 pts across four sports. **The composer HAS a `partialWeek` flag for exactly this. Give the bar one.**
+- [ ] **A no-plan athlete gets an empty bar labelled "planned", forever** (F26). `coach/index.ts:5227` keeps a discipline when `planned > 0 || done > 0`; `StateTab.tsx:1636` gates only on `counts.length === 0 && !accent` — **no `hasPlan` check**. Positioning is explicit that plan-absence is never a deficit, and the PROSE honours it (the composer's no-plan branch). The picture does not.
+- [ ] **The upkeep sentence measures the bad news over 4 weeks and the good news over 0 days** (F15). `coach/index.ts:5300-5337`: shortfall from a 28-day trailing window, but `carriers` is built from **this week's** `counts`. On a Monday the credit clause silently drops. **This is the flagship sentence of `PRODUCT-POSITIONING-v2-DRAFT.md` §4** — "your aerobic engine is holding, that's the riding and swimming" — and the window bug deletes the permission half, leaving only the warning. **Highest-value single fix on the screen.**
+- [ ] **VERIFY: a dormant load gate woke up via an unrelated fix, and its own doc still says it's inert** (F25). `_shared/load-status-reconcile.ts` header still reads *"Gate 2 is inert until phase labeling is populated upstream"*. **That is no longer true** — `compute-snapshot/index.ts:581` now populates `plan_phase` from the single resolver (D-261/Q-138, "was a dead null stub"), the coach resolves `weekIntent` off the same resolver (`coach/index.ts:1045`), and `plan-phase.ts:141-143` confirms `build`/`baseline` are reachable. **So Gate 2 now fires**, softening an uncorroborated 'high'/'elevated' in a build week — i.e. it changes whether the athlete is told to pull back. **Nobody re-verified it when it woke up, and no doc in either subsystem records the crossing.** This is the "every fix opens a hole" pattern caught in the act. **Not a fix — a verification, then correct the stale header.**
+- [ ] **"Handling combined load well" over-claims what it checked** (F17). `coach/index.ts:5566` fires on five STRESS signals being absent; it never looks at volume, adherence or upkeep. Renders in green two inches above the upkeep shortfall. **Same class as the composer all-clear fixed 2026-07-19 — scope the claim to what was examined.**
+
 ---
 
 ## PHASE 2 — FIX THE FAN-OUT (this is "the analysis problem")
@@ -79,6 +89,22 @@ That is the whole diagnosis, and it produces exactly three diseases:
   ⛔ **DO NOT SHIP IT FIRST.** A posture-aware banner sitting on top of a posture-blind verdict is not continuity — **it is a third opinion.**
   **Blocked on:** `PRODUCT-POSITIONING-v2-DRAFT.md` (approve or shred — the voice comes from it) and `SCIENCE-run-specificity.md` (owed before Tier-2 prose: the app's only maintenance theory is **discipline-blind** — true of the engine, false of the legs).
 
+> ### THIS BLOCK NOW GATES MORE THAN IT DID (2026-07-20)
+> The v2 draft has sat unapproved since 2026-07-13. Its §4 worked example is **the sentence State already tries to say**:
+> *"You're 11 miles under your run target. Your aerobic engine is holding — that's the riding and swimming. But running is specific: if you want to keep the running, you have to run it."*
+> The live screen (device, 2026-07-20) renders: *"Running's at about 6 of your 18-mile upkeep — 4 weeks now."* — the number, with the permission half deleted by the window bug in Phase 1's reopened list (F15).
+> **So the highest-value fix on State is the execution of a positioning that is still marked DRAFT.** Approve or shred it; the fix's wording depends on which.
+
+---
+
+## THE METHOD NOTE, EARNED TWICE (2026-07-20)
+
+**It happened again.** A full code trace of State produced 29 findings with file:line — real ones. But the two biggest only became clear from **two screenshots**: the empty "actual" bar under a 288-point load bar, and the upkeep sentence rendering as a scold. Both had been read in code and neither was understood until they were seen on a phone, next to what sits above and below them.
+
+**The contradictions on this screen are ASSEMBLY bugs.** Every unit fixture passes. The 23 test files under `_shared/state-trend/` and `_shared/insights/` are good and they all go green — because each piece is right in isolation. **Nothing anywhere renders the assembled screen for a synthetic athlete**, and that is precisely where every one of these lives.
+
+**Why nothing can:** the logic that decides what the cards SAY together is written inline, in anonymous IIFEs, inside `coach/index.ts` — **5,771 lines, `@ts-nocheck`**. No test can reach it. `load-status-reconcile.ts` was extracted from that same file for exactly this reason (D-259: *"a private ~200-line function buried in the ~5k-line coach edge file [that] could not be unit-run"*). **That extraction is the precedent. Do it again for the week-level composition, then build one harness that prints the whole screen as text for ~25 synthetic athletes** — sports, goal types, plan/no-plan, Monday/midweek/Sunday, thin/rich/stale/returning, develop/maintain/dropped. Read it like a page. The contradictions sit next to each other there the way they do on the phone.
+
 ---
 
 ## PHASE 4 — ONE SOURCE PER FACT (kill the DOUBLED disease)
@@ -88,6 +114,16 @@ That is the whole diagnosis, and it produces exactly three diseases:
 - [~] **One zone table.** D-286 fixed three copies; **D-296 (2026-07-18) fixed two more** — the FIT-import 0.90 seam (`save-imported-workout`) and the non-Friel fallback in `analyze-running-workout:1030/:1934`, both → canonical `friel-zones.ts`. **Remaining:** delete the dead `_shared/endurance/hr-zones.ts` 0.90 copy — DEFERRED (`generate-run-plan/generators/sustainable.ts` still refs its symbols; check live/dead first).
 - [ ] **`adapt-plan`: ONE writer, and the athlete gets the choice.** It silently re-prices strength on **every ingest**, skipping the fatigue gate the `suggest` path applies — while the consent path (`StrengthAdjustmentModal`, mounted) asks permission for a thing already done. **This violates the standing "prescribed load changes are sign-off-gated" rule in code.** ✅ Ruled: mirror the easy-pace chooser. Default = today's behaviour, visible, overridable.
 - [ ] **FTP: route the 8 stragglers** — incl. `get-week:436` (week-view watts) and `athlete-snapshot/identity.ts:67` → **the LLM prompt** (so the coach can *speak* a different FTP than the screens show).
+
+### ADDED 2026-07-20 — the DOUBLED disease on STATE. See `AUDIT-state-screen-2026-07-20.md`.
+
+> Phase 4 killed six duplicate ACWR bands and five zone tables — **numbers**. This is the same job on **prose and pictures**, and nobody has done it.
+
+- [ ] **FIVE engines narrate the same week** (F9). `intent_summary` (coach) · `buildLoadHeadline` (**client**, `src/lib/load-headline.ts`) · `coach.narrative` (the composer) · `overall_training_read.summary` (`response-model/weekly.ts:526`) · `week_execution_v1.accent` (week-accent). Different substrates, no engine can see what the other four said. The composer's clause-suppression only guards against itself. **Decide which one speaks; the rest derive from it or die.** ⚠️ Michael's call — this is what the top of the screen SAYS.
+- [ ] **The imperative string tree survived the LLM teardown** (F8). `response-model/weekly.ts:526` `computeOverallTrainingRead` — ~25 branches emitting "Sharpen, don't strain", "Recovery week — easy movement only", "Add a goal to direct training". **Identical shape to the `intent_summary` tree cut on 2026-07-19** for exactly this reason. It survived because it isn't the LLM. D-155 bans the register.
+- [ ] **TWO stacked mix bars, same visual language** (F22). `LoadBar` = load points, rolling 7d, % shares. `WeekMixBar` = session counts, calendar week-to-date, raw counts. Same bar shape, same `getDisciplineColor`, inches apart, distinguished by two grey captions. **The doubling disease drawn literally.**
+- [ ] **Two engines answer "how is it going"** (F7). `adaptation_score` (block-adaptation, focus-weighted 4-week blend) vs the composer's per-discipline ACWR floor (`coach-week-insights.ts:~231`). The coach computes the score every run and **discards it** (`coach/index.ts:2521`), keeping three raw percentages. ⚠️ **Recommend ABANDON, not fix** — see Phase 6 note on its substrate.
+- [ ] **The load headline is composed on the CLIENT** (F3). `src/lib/load-headline.ts` via `StateTab.tsx:1249`. It reads reconciled verdicts rather than re-deriving (so it is formatting, not deciding) — but it is the one week-level verdict not owned by the server. Constitution Law 4.
 
 ---
 
@@ -113,6 +149,14 @@ That is the whole diagnosis, and it produces exactly three diseases:
 - [ ] **The day-count gate** — *stops the wizard silently accepting an impossible week.* 260 lines, 30+ tests, own spec, **ZERO importers**. **Job: mount it + write the warn/block copy.** ⚠️ **Ships AFTER consolidated mode** — its matrix keys on `integration_mode`.
 - [ ] **The segment engine** — *"am I getting faster on this stretch?"* Three stages, spine-wired. **`detect-cores` has zero callers** → `route_cores` always empty → the whole feature produces nothing, on web and iOS. **Job: invoke stage 1.** *(A `npm run ios` rebuild will NOT surface the card — it is starved at the source.)*
 
+### ADDED 2026-07-20 — STARVED and STRANDED on State. See `AUDIT-state-screen-2026-07-20.md`.
+
+- [ ] **Swim HR is resolved and then thrown away** (Michael's ask, 2026-07-20). `_shared/swim/swim-scalars.ts:40` exposes `avgHr`. `compute-facts/index.ts:1207` `buildSwimFacts` **calls `resolveSwimScalars`** (for `rest_fraction`) and never records the HR. So swim has no HR-based read for the same reason run durability had none: **the number exists, is computed, and is discarded one line before it would be saved.** Plumbing, not building. *(Swim is currently volume-only BY DESIGN — D-295 / Q-038. This does not overturn that ruling; it makes the ruling reconsiderable, because an HR-at-pace read is not corrupted by fins the way raw pace is.)*
+- [ ] **The readiness label machine is fully built and effectively never renders** (F23). Server: `coach/index.ts:5586` — OVERREACHED / LEGS LOADED / LEGS SORE / EFFORT UP / FATIGUED / LOW FATIGUE / ABSORBING / TAPER / RECOVERY / LOW vs BASELINE, plus D-232's loaded-legs detection and novel-movement naming, refined across **five payload version bumps** (v49, v52, v53, v56, v58). Client: `StateTab.tsx:1232` reads it and passes it to ONE place — `buildLoadHeadline` — where `stateSlot` discards it whenever a load word exists (`load-headline.ts:60`, `if (l) return l;`). The header chip that showed it was removed (`StateTab.tsx:1382`) and nothing replaced it. **Not starved — STRANDED ON THE OUTPUT SIDE.** Surface it or delete it; leaving it is the worst option. ⚠️ Michael's call.
+- [ ] **The Fitness section is handed the athlete's goal and ignores it** (F18/F19). `StatePerformanceSection.tsx:514` accepts `primaryDiscipline` and `planWeek` — **neither is referenced**. Order is hardcoded `ORDER_IDX = { strength: 0, run: 1, swim: 2, bike: 3 }` (`:533`). And the goal TYPE never reaches State at all: `grep build_muscle|get_stronger` across `state-trend/`, `response-model/` and the State components returns **nothing**. The "goal picks the instrument" job (e1RM leads for get_stronger, volume for build_muscle) is not half-wired — it is absent.
+- [ ] **Five of twelve ride types feed NO fitness read** (Michael's ask — social rides). Power counts `climbing / threshold / sweet_spot / tempo`; efficiency counts `endurance / endurance_long / recovery` (`state-trend/bike-fitness.ts:21,33`). **`group`, `vo2`, `anaerobic`, `sprint`, `over_under` fall between the two buckets** — they add to load and contribute to nothing, silently. A group-ride rider and an interval-heavy rider are both invisible to the bike trend. ⚠️ The power/efficiency SPLIT is deliberate and correct (`bike-fitness.ts:18-23`) — the gap is that nothing catches what falls between. **Violates the "no silent drops" law in `STATE-SOURCE-MAP.md`.**
+- [ ] **The adaptation substrate is run-only** (F4). `compute-adaptation-metrics/index.ts:359` branches on `run|running|walk|hike`; `:407` on `strength`. **No ride branch, no swim branch.** Rides and swims get a record stamped poor/0-confidence with no `workout_type`, so `block-adaptation` drops them from every lane — not even into the excluded counts. Compounding: an EMPTY lane scores as **worst, not unknown** (`block-adaptation/index.ts:~178`, zero long-run samples → `-1`), and three of five focus weightings are unreachable (`:91-98` can only return `hybrid`/`unknown`, so the `marathon_prep` guardrail has never run). **Recommend: abandon `adaptation_score` rather than repair it** — the per-discipline reads are better and already honest about their windows.
+
 ---
 
 ## PHASE 7 — HYGIENE (delete, mostly)
@@ -123,6 +167,16 @@ That is the whole diagnosis, and it produces exactly three diseases:
 - [ ] **24 dead edge functions + 11 empty dirs.** Two are dangerous decoys: `analyze-workout/` (empty, the most guessable name in the repo) and `generate-training-context/` (3.4k lines, dead twin of the live `coach`).
 - [ ] **5 dead run-generator classes** — and `simple-completion.ts:89` exports a class named **`SustainableGenerator`**, identical to the live one. **Editing the wrong file is a silent no-op.**
 - [ ] **9 coach outputs with no mounted surface** — incl. **`reaction`**, the training-reaction axis and the centrepiece of `CANON-arc-inference-model.md`. ⚠️ *the object is load-bearing internally — delete only its dead emission.* **Mount `CoachWeekTab` or delete it. Right now it is neither, which is the worst of both.**
+
+### ADDED 2026-07-20 — DEAD on State. All consumer-checked. See `AUDIT-state-screen-2026-07-20.md`.
+
+- [ ] **The stale raw-ACWR label** (F11). `coach/index.ts:5460-5466` mints `label` from the bare ratio: `back off` / `rest now` — **the D-281 bug Q-166 reverted, still shipping in the payload.** Consumer check: `LoadBar.tsx:37` `loadVolumeColor` handles only the RECONCILED words (`balanced/productive/build more/a bit high/pull back`); neither `back off` nor `rest now` appears anywhere in the client. **No consumer. Delete** (trace non-client readers first).
+- [ ] **`PostureLine`** (F10). `StatePerformanceSection.tsx:503` — defined, **never called**. Carries a 12-line comment explaining the Q-179 bug it closes. It closes nothing. Client-orphaned on purpose (Michael rejected the consoling register) — but the code and comment will convince the next session that posture speaks on screen.
+- [ ] **`readinessColor`** (F24). `StateTab.tsx:1237` — five-branch colour map, **zero references.** Left behind when the readiness chip was removed.
+- [ ] **Two file headers claiming "NOT YET SHIPPED — under review"** (F12) on shipped, rendering code: `StatePerformanceSection.tsx:5` and `StateTab.tsx:1653`.
+- [ ] **`docs/SPEC-state-headline.md`** (F13) — the code shipped; per the SPEC LIFECYCLE in `CLAUDE.md` the substance folds into a `D-NNN` and the file dies.
+- [ ] **Three generations of the race projection renderer, all live** (F29). `StateTab.tsx:526` (grouped, current) → `:544` (`projection_facts`, explicitly "legacy flat list still supported") → `:555` (`mismatch_blurb`). Each with its own gate. Nothing records which is current. **Confirm the live path, delete the other two.**
+- [ ] **153 files in `scripts/`** (F27) — `_d183-verify.mjs`, `_coach-dbg2.ts`, `_dbg-apr19.ts` … one-off debug scripts from individual investigations, none ever removed. Not a State defect; the same accretion, and it buries the real harnesses (`fanout-audit.mjs`).
 
 ---
 
