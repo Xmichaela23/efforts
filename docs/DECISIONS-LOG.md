@@ -897,3 +897,22 @@ A read that looks only at trend lines is a robot: it sees a number move and grad
 
 Three defects the 22 green tests did not catch, found by reading the output: (1) clause 2 and clause 3 both naming the same discipline (the said-twice bug); (2) warning that a discipline dipped and then calling the down week healthy — the app arguing with itself (D-305); (3) "mostly" claimed at 49% share. Fixed: clause 3 is decided FIRST so clause 2 can defer, a whole-week-down suppresses per-discipline dips, "mostly" is earned only above 50%, and the generic all-clear fires **only when no specific finding did**. ⚠️ **Green means the code does what I told it to, not that what I told it was right.** Read the sentences.
 
+
+> **AMENDED 2026-07-19 NIGHT (same session, after seeing it on a real screen).** Three changes below, all
+> from looking at the rendered paragraph rather than at the tests. **30 tests were green through every one
+> of these defects.** See the amendment at the end of this entry.
+
+## D-306 AMENDMENT — what changed once it was on a screen (2026-07-19 NIGHT, PUSHED + DEPLOYED + VERIFIED)
+
+**1. THE MIX SENTENCE IS DELETED.** It read *"The week was led by running — 44% of your load, then strength 22%, riding 22%"* — while the LOAD bar **directly above it** rendered `Run 44% · Strength 22% · Ride 22% · Swim 12%` as a labelled bar. It restated the dashboard, and did it worse (it dropped swim). This is the exact failure the D-306 research documented across five platforms, in users' own words: *"I don't need to be told what I can read from the graphs."* A regression test now forbids any `N% of your load` / `led by` construction. ⛔ If a mix sentence ever returns it must say what the bar CANNOT — how the mix moved against this athlete's own normal — which needs a trailing-share figure nothing currently carries.
+
+**2. THE ALL-CLEAR STOPPED OVER-CLAIMING.** *"Every discipline landed inside the range the plan asked for"* only ever examined disciplines with a planned load. It fired on a week where **bike and swim carried real off-plan work** — and the upkeep line three rows below said so out loud (*"Cycling and swimming carried the endurance load"*). Now: `"What the plan asked for landed in range, and riding and swimming went in on top of it."` Names its scope; keeps the off-plan work visible instead of absorbing it into an all-clear.
+
+**3. THE PARAGRAPH AND THE PLAN NOW DESCRIBE THE SAME WEEK — the real defect, caught by Michael.** State renders TWO windows: *"where your load is going"* is the **ROLLING last 7 days**; *"this week · planned vs actual"* is the **CALENDAR week**. The composer read plan-vs-actual off `acute7_by_type` (rolling) — so consecutive sentences described two different spans and both called them "the week". Plan comparison now runs `computeWtdLoadSummary` (`_shared/adherence-plan.ts:60`) **per discipline**, the same shipped helper the rest of the coach reads. ACWR deliberately stays ROLLING: "drifting below its own normal" is a trailing question.
+
+**4. THE HAND-ROLLED SUNDAY GATE IS RETIRED.** v118 shipped a day-of-week guard so the plan clause only fired on complete weeks. `planned_wtd_load` already bounds the plan to sessions due **on or before today** — the partial-week problem was solved in this codebase months ago (payload `v100`/`v102`, the Q-177 trap). The clause now speaks every day instead of once a week. **See Q-195: this was one of three things rebuilt in a single session that already existed.**
+
+**Cache:** `COACH_PAYLOAD_VERSION` 117 → **120** across the night (118 wiring · 119 redundancy/over-claim · 120 window).
+
+**The transferable lesson, and it is the one worth keeping:** *green tests proved the code did what I told it to; they could not tell me that what I told it was wrong.* Every defect above was invisible to 30 passing tests and obvious in one screenshot. **Render the output and read it. On the real screen, next to whatever else that screen already says.**
+

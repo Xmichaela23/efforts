@@ -19,6 +19,28 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
+## Q-194 — the BANNED-WORD VOICE CHECK is enforced in three places and NOT on the most prominent line on State (PRODUCT, 2026-07-19 — code-verified, LIVE on screen)
+
+The banned-word list is the app's copy law made mechanical ("a quant who trains, not a coach who encourages"). It is enforced in `_shared/state-trend/week-accent.ts:56`, in `_shared/insights/run-insights.ts:84`, and in `bike-insights.ts` / `coach-week-insights.ts`. **It does not run on `intent_summary`** — the headline rendered at the TOP of State (`StateTab.tsx:1401`), above everything else.
+
+**Live proof, screenshotted 2026-07-19:** State reads **"Establishing your baseline — body is ready, stay consistent."** That is a literal template at **`coach/index.ts:5492`** (the deterministic `intent_summary` IIFE — NOT the LLM; confirmed by the string being in source). It contains **two banned phrases**: `stay consistent` (banned in `week-accent.ts:56`) and `body is ready` (banned in the insight composers). The neighbouring branch at `:5493` is clean ("Establishing your baseline — consistency is the goal.").
+
+**Two more, same class, in `_shared/marathon-readiness/index.ts`:** `:273` "Training base looks solid — **stay consistent** and trust the taper." and `:296` "Hit that and **stay consistent** on easy runs." Both also carry IMPERATIVES ("trust the taper", "Hit that"), which the describe-don't-prescribe rule (D-155) bans independently.
+
+**The point is not the three strings — it is that the law is per-surface.** Every new deterministic surface re-implements or forgets the check. **The fix is a SHARED enforcer** (one exported predicate the composers, the accent, `intent_summary` and marathon-readiness all call) rather than three copies and several gaps. ⛔ **Copy not changed — the replacement wording is Michael's call, not a silent edit.**
+
+## Q-195 — THE ANTI-REBUILD WARNING DID NOT WORK ON A SESSION THAT HAD READ IT: three rebuilds in one night (PROCESS, 2026-07-19)
+
+`CLAUDE.md` and the top of `ENGINE-STATE.md` both open with "IT HAS BEEN BUILT… grep the name you were about to give it." The 2026-07-19 D-306 session read both, cited both, **and still hand-rolled three things that already existed**:
+
+1. **A stall detector.** Built a per-set reps-vs-prescribed comparison believing nothing recorded it. `planned_reps` was already written by `analyze-strength-workout:2748-2753`, already on `exercise_log` (`compute-facts:1346`), and already reaching the coach (`coach/index.ts:4343-4353`). The DATA existed; only the comparison was missing. *(Partial credit: the comparison genuinely did not exist.)*
+2. **A partial-week gate.** Wrote a day-of-week "only compare on Sundays" guard for the Q-177 trap. **That trap was solved months earlier** — payload `v100` ("gates on planned-BY-TODAY, not the whole week") and `v102` ("counts days STRICTLY before today"), both recorded in the version comment in the SAME FILE being edited.
+3. **A week-to-date load comparison.** Summed planned-vs-actual by hand off `acute7_by_type`. `computeWtdLoadSummary` (`_shared/adherence-plan.ts:60`) already returns `planned_wtd_load` / `actual_wtd_load` bounded to today, and is **called at `coach/index.ts:1075`** — 2,800 lines above the code that reimplemented it.
+
+**Why the warning failed, and it is not "didn't read the docs":** in all three cases the session was not asking "does X exist?" It was asking "how do I express Y?" — and the answer arrived as a *design idea*, which never triggers the grep reflex. **You grep a NOUN you are about to name. You do not grep a PROBLEM you are about to solve.** All three existed under names the session would not have guessed (`computeWtdLoadSummary` for "compare planned to actual so far"; a payload-version comment for "handle partial weeks").
+
+**Cheap mitigation to try:** before writing any comparison/aggregation, grep the SHAPE not the name — `planned_wtd|wtd_load|by_today|beforeToday|planned_reps` — and read the `COACH_PAYLOAD_VERSION` comment chain, which is a de-facto changelog of every trap already solved in that file. **Not yet adopted anywhere; filed so the next session knows the warning alone is insufficient.**
+
 ## Q-189 — the coach narrative's TEN honesty validators run and are then DISCARDED (ENGINE, 2026-07-19 — code-verified, live)
 
 `generateCoaching` (`_shared/athlete-snapshot/coaching.ts:415-430`) runs `validateNarrative` + a coach-only `add`-ban, and on failure retries ONCE with the violations named — then **accepts whatever comes back regardless.** The comment at `:428` states it outright: *"retry-then-soft-accept (never regress to the deterministic fallback over a rule miss)."* So on the PRIMARY narrative path the validators are advisory. This includes **rule 6, `spine_contradiction`** — the check that stops the prose disagreeing with the engine's own fitness verdict. The strict "return null rather than lie" policy documented in `narrative-core/orchestrate.ts:1-4` governs only the LEGACY fallback path (`coach/index.ts:4846`), which fires only when the primary path throws.
