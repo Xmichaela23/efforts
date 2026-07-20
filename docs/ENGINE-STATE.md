@@ -24,49 +24,45 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-19 NIGHT — THE WEEK NARRATIVE IS DETERMINISTIC · PUSHED + DEPLOYED · ⛔ UNVERIFIED ON DEVICE)
+## 🧭 NEXT SESSION — START HERE (2026-07-20 ~03:30 — STATE'S PROSE IS DETERMINISTIC · TWO PIECES SEEN ON DEVICE, THE THIRD NEVER SEEN SPEAKING)
 
-> ## READ `docs/GAME-PLAN.md`, `START-HERE.md`, `LIFECYCLE.md`, then **D-306** and **Q-189 → Q-193** (all new tonight).
+> ## READ `docs/GAME-PLAN.md`, `START-HERE.md`, `LIFECYCLE.md`, then **D-306 + its AMENDMENT**, and **Q-189 → Q-196**.
 >
-> **What happened:** the LLM teardown reached its last target. `coach.narrative` — the last output-LLM on State — is now composed deterministically and is **PUSHED (652f07e3) + DEPLOYED (coach, 2026-07-19)**. ⛔ **NOBODY HAS SEEN IT ON A DEVICE.** Building it surfaced five verified findings, all filed as Q-entries; every one is the same shape — **the app already knows something and the place that needs it never asks.**
+> **What happened:** the LLM was removed from State's prose. `coach.narrative` is now `composeCoachWeekInsight` (deterministic, protocol-aware, focus-aware) and `intent_summary` — a ~130-line tree of ~25 mostly-IMPERATIVE strings — is now just **plan name + week N of M**. All pushed and deployed. `COACH_PAYLOAD_VERSION` **117 → 122** across the night.
 >
-> ### ⛔ YOUR JOB #1 — VERIFY IT, THEN FIX THE SUNDAY LIMITATION.
-> **(a) ✅ VERIFIED ON DEVICE 2026-07-19** (Michael screenshotted it). It rendered, deterministically, with no LLM. Seeing it produced three fixes the 30 green tests could not — the mix sentence restated the LOAD bar directly above it, the all-clear over-claimed across off-plan disciplines, and the window was wrong. **See the D-306 AMENDMENT.** `COACH_PAYLOAD_VERSION` is now **120**. If the paragraph is EMPTY that may be correct — silence is legal on thin data; check before calling it a bug.
-> **(b) ✅ FIXED LATE — the Sunday gate is gone.** It briefly fired only on complete weeks; plan comparison now runs `computeWtdLoadSummary` (`_shared/adherence-plan.ts:60`) per discipline, which bounds planned load to sessions due ON OR BEFORE today. It speaks every day. **This also fixed the real defect Michael caught on screen: the paragraph was reading plan-vs-actual off the ROLLING 7 days (`acute7_by_type` — what the LOAD bar renders) while the plan lives on the CALENDAR week (what the planned-vs-actual bars render).** Two spans, both called "the week". ACWR stays rolling on purpose.
-> **(c) The LLM still runs** for `coaching.headline` + `next_session_guidance` (separate fields, separate consumers). Only the narrative was replaced. Retiring the rest is the sweep.
+> ### ⛔ READ Q-195 BEFORE YOU BUILD ANYTHING. It is the load-bearing lesson of this session.
+> Six times in one night this session hand-rolled something that already existed — the partial-week gate (solved in payload `v100`/`v102`, in the same file's own comment), the week-to-date load compare (`computeWtdLoadSummary`, called 2,800 lines above), a stall detector whose data was already plumbed, an endurance read that `adaptation_score` already does better, a load synopsis that `buildLoadHeadline` renders on the NEXT LINE, and a voice check that already exists in three places. **The anti-rebuild warning did not prevent this, and the session had read and quoted it.** You grep a NOUN you are about to name; you do not grep a PROBLEM you are about to solve. **Before writing any comparison, aggregation or gate: grep the SHAPE (`wtd|by_today|planned_reps|_label|headline`) and read the `COACH_PAYLOAD_VERSION` comment chain — it is a de-facto changelog of every trap already solved in that file.**
 >
-> ### WHAT WAS BUILT — new files, sole importer is `coach`:
-> - `_shared/insights/coach-week-insights.ts` — `composeCoachWeekInsight()` + `buildCoachWeekInsightInput()`
-> - `_shared/insights/strength-protocol-read.ts` — `readStrengthProtocol()` + `protocolExpectsE1rmToDip()`
+> ### ⛔ YOUR JOB #1 — SEE THE PARAGRAPH ACTUALLY SPEAK. It has never been observed in its current form.
+> Two device sightings exist and NEITHER covers the shipped logic:
+> - **Wk 2 (2026-07-19):** rendered *"The week was led by running — 44% of your load… Every discipline landed inside the range the plan asked for."* That build is **GONE** — the mix sentence was deleted (restated the LOAD bar above it) and the all-clear was rewritten (it over-claimed across off-plan disciplines).
+> - **Wk 3 (2026-07-20, 03:30):** **SILENT** — correctly. The planned-vs-actual `actual` bar was empty; the week had just started, so the calendar-week read had nothing to say.
+> **So the v120 window fix (calendar week via `computeWtdLoadSummary`, per discipline) has NEVER been seen producing a sentence.** Look mid-week, once sessions are logged. If it stays silent with real work on the board, that is a bug — start at the `disciplines[]` mapping in `coach/index.ts` (~:3880) and check `plannedLoad`/`actualLoad` are non-zero per discipline.
 >
-> **The inputs and where they came from (all resolved at the call site, nothing new fetched):**
-> 1. **Load by discipline** — `by_discipline` is assembled at `coach/index.ts:5413` from `training_state.load_ramp.acute7_by_type`; `training_state` is built at **`:2677`**, so the data is available early. It carries `planned_load`, `actual_load`, `session_count`, `acwr`. ⚠️ `coach/types.ts:458-464` does NOT list `maturity`/`acwr` although `:5422-5423` sets them — type drift, harmless, worth fixing while you are there.
-> 2. **Focus (posture)** — `per_discipline_posture`, read in `compute-snapshot/index.ts:775` (`sanitizePosture`). Keyed by discipline, values develop/maintain/dropped.
-> 3. **Strength e1RM verdict** — the spine's noise-guarded `StrengthFitness.e1rm.verdict` (`_shared/state-trend/strength.ts:147`, D-303). ⚠️ **NOT on `by_discipline`** — this is the join you have to write.
-> 4. **Protocol + week-in-block** — `strength_protocol` is chosen at plan creation (`create-goal-and-materialize-plan`), stored in plan config, and **the coach ALREADY reads it at `coach/index.ts:2212`** (`resolveProfile(planConfig?.strength_protocol)`). Continuity here is fine; new plans carry it automatically.
-> 5. **The stall (`missedPrescribedReps`)** — ✅ **NOW BUILT** at the call site (Q-193). Per SET: `reps < planned_reps` at `weight >= planned_weight`; a zero-rep set is unperformed, not missed (Q-178's predicate). ⚠️ **This code has never seen a real `workout_analysis` row** — the shape was verified in the WRITER (`analyze-strength-workout:2748-2753`), not in data. First thing to sanity-check.
+> ### ⚠️ DESIGN DECISION OWED (Michael, not you): **the paragraph is absent every Monday** and fills in as the week goes, because it reads calendar-week-to-date. Honest, possibly too quiet. Decide before "fixing" it.
 >
-> **Done:** `COACH_PAYLOAD_VERSION` bumped **117 → 118**. The legacy LLM path (Q-190) is now gated on `deterministicNarrativeApplied`, so a composed SILENCE can no longer be back-filled by an LLM — that trap was live and is closed. The legacy path still EXISTS and still fires if the snapshot path throws before the composer runs.
+> ### JOB #2 — THE ENDURANCE READ IS THE LAST DUMB HALF, and it should NOT be built.
+> `coach-week-insights.ts:~231` judges every endurance discipline by `acwr < 0.8`, full stop. **`getBlockAdaptation` already does this far better and the coach ALREADY CALLS IT at `coach/index.ts:2520`** — then keeps three raw percentages at `:2521` and throws away `adaptation_score`, `focus` and `drivers`. That score is focus-weighted, and its hybrid branch is a graded concurrent-training read ("don't rob Peter to pay Paul": strength −3% → ×0.75 coefficient, −10% → ×0.20; strength holding + aerobic improving → ×1.12 bonus) — where `compute-snapshot` has a binary interference flag off two diverging arrows (Q-191). ⚠️ It is called with **no focus**, and `deriveFocusFromCounts` can only return `hybrid`/`unknown`, so the `base`/`marathon_prep` weightings have **never run**. Wire the score + focus + drivers; delete the ratio.
 >
-> ### JOB #2 — THE CLEANUP SWEEP (deferred from the last banner, deliberately). The keep/delete list in the superseded banner below still stands, with one addition: **`narrative-core/*` becomes deletable only once the coach narrative stops being an LLM** — i.e. after JOB #1. Sweeping before that means sweeping twice. Delete-on-replacement.
+> ### JOB #3 — the last two LLM lines: `coaching.headline` and `next_session_guidance`. Then State computes end to end, and only then does the CLEANUP SWEEP unblock (`narrative-core` stays alive until the headline goes). Fold Q-194's SHARED voice enforcer in here.
 >
-> ### ⚠️ WHAT IS TRUE ABOUT THE COMPOSER — do not overstate it:
-> - **PUSHED + DEPLOYED + fixture-verified (29 deno tests). NEVER seen on a device, never run against a real coach payload.** Type errors held at baseline (11 before, 11 after) — that proves nothing about runtime, and `coach/index.ts` is `@ts-nocheck`.
-> - **Protocol readings are grounded for `five_by_five` / `minimum_dose` / `neural_speed`, and deliberately SILENT for `triathlon` / `triathlon_performance` / anything unrecognised** — their intent was not traced closely enough to read honestly. That is a named gap, not an oversight. `durability` and `upper_aesthetics` return null on purpose (e1RM is the wrong instrument for both).
-> - **Three defects were found by READING THE OUTPUT, not by the tests** (22 were green at the time). See D-306's last section. Run the preview, read the sentences.
+> ### 👀 TWO THINGS SEEN ON THE Wk-3 SCREEN, NEITHER TRACED — leads, not findings:
+> - **The upkeep line reads "Running's at about 6 of your 18-mile upkeep" on a `Get stronger` plan.** If run posture is `maintain`, that is flagging a shortfall against a target the plan deliberately deprioritises — the Q-179 shape, on a DIFFERENT code path (`upkeepCandidate`, `week-accent.ts:233-279`) from the posture work. Trace before touching; it may be correct (6 of 18 is a real gap against a declared upkeep).
+> - **Run durability anchor reads "auto · steady run · May 20"** on a 20 Jul screen. Inside the 12-week range so probably intended, but confirm it is not stale.
 >
-> ### ⛔ TWO MORE FINDINGS, LATE (Q-194, Q-195):
-> - **Q-194 — the banned-word voice check does NOT run on `intent_summary`**, the headline at the TOP of State. Live on screen: *"Establishing your baseline — body is ready, stay consistent."* — a literal template at `coach/index.ts:5492` carrying TWO banned phrases. Two more in `marathon-readiness` (`:273`, `:296`), which also carry imperatives. The law is enforced per-surface, so every new surface re-implements or forgets it. **Fix = one SHARED enforcer.** ⛔ Copy NOT changed — the wording is Michael's call.
-> - **Q-195 — the anti-rebuild warning failed on a session that had READ it.** Three things were hand-rolled that already existed: the partial-week gate (solved in `v100`/`v102`, in the same file's own version comment), the week-to-date load compare (`computeWtdLoadSummary`, called 2,800 lines above), and a stall detector whose data was already plumbed. **Why:** you grep a NOUN you are about to name, not a PROBLEM you are about to solve. Read it before building anything tomorrow.
+> ### WHAT SHIPPED TONIGHT — do NOT re-litigate:
+> - **D-306 + AMENDMENT** — the composer, the protocol layer (`strength-protocol-read.ts`), the stall signal, the calendar-week fix, the deleted mix sentence, the scoped all-clear. 30 deno tests.
+> - **`intent_summary` → position only** (v121 built a synopsis; v122 deleted it — `buildLoadHeadline` already renders one on the next line).
+> - **Q-189…Q-196 filed.** Q-196 was **filed wrong and corrected in place** — the LOAD row renders the RECONCILED verdict correctly (`LoadBar.tsx:71`); I asserted the client's behaviour from the server's code without opening the client.
+> - `SCIENCE-concurrent-training-interference.md` has a 2026-07-19 addendum (Schumann 2022 contests §2/§3; adds the reverse direction + the measurement ceiling).
 >
-> ### THE FIVE FINDINGS (all code-verified tonight — full detail in the Q-entries):
-> - **Q-189** — the narrative's ten honesty validators run and are **discarded** (`coaching.ts:428` soft-accepts). Includes the spine-contradiction check. Moot once D-306 lands.
-> - **Q-190** — **two** LLM narrative paths, not one; and the deterministic fallback (`coaching.ts:488`) emits the raw "N of M sessions" tally the prompt bans at `coach/index.ts:4732`.
-> - **Q-191** — the interference verdict (`compute-snapshot:537`) is **posture-blind** (posture is read at `:775` in the same file, into a different consumer) **and** makes a causal claim the evidence cannot carry (the effect is smaller than e1RM's measurement noise). D-306 supersedes rather than repairs it.
-> - **Q-192** — **`five_by_five` is missing from `_shared/strength-profiles.ts`** and falls back to `durability`. Read by `adapt-plan` and `response-model/weekly`. ⚠️ Absence verified; IMPACT NOT TRACED — do not edit the table before tracing `adapt-plan`.
-> - **Q-193** — the stall is invisible (see JOB #1 item 5).
->
-> ### ALSO UPDATED: `SCIENCE-concurrent-training-interference.md` carries a 2026-07-19 addendum — Schumann 2022 (43 studies) **contests §2 (cycling-vs-running) and §3 (frequency)**, confirms §4/§5, and adds the reverse direction (strength → economy, the best-supported material in the domain) plus the measurement ceiling that governs what the app may ever claim. ⛔ It does NOT ask you to change shipped scheduling logic.
+> ### ⚠️ STILL TRUE, DO NOT OVERSTATE:
+> - The composer is **fixture-verified (30 tests) and only partly device-verified.** Green tests proved the code did what it was told; **every real defect this session was found by looking at the rendered screen.** Render it and read it, next to whatever else that screen already says.
+> - The **stall code has never fired** — needs a session with missed reps at the prescribed load.
+> - **Protocol readings cover 5 of 7**; `triathlon` / `triathlon_performance` return null BY CHOICE (untraced intent), not by oversight.
+> - A **stale raw-ACWR `label`** survives at `coach/index.ts:5464` with `back off`/`rest now` — a ratio prescribing alone (the D-281 bug Q-166 reverted). No client consumer found. **Trace every consumer, then delete — do not reword in place.**
+
+---
 
 ---
 
