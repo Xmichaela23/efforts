@@ -326,16 +326,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         onRecompute={recomputeAnalysis}
       />
 
-      {/* Layer 3 swim enrichment — RELOCATED to the bottom (D-160): it was a near-top hero element
-          above the swim metrics; demoted to a quiet opt-in row at the end of the swim view (also
-          fills the dead space left by the suppressed pool-swim narrative). Hidden when the swim
-          already came through HealthKit / already carries rich data (gated inside the component). */}
-      {type === 'swim' && (
-        <AppleHealthSwimEnrichment
-          source={(completed as any)?.source ?? null}
-          hasRichData={Number((completed as any)?.pool_length) > 0}
-        />
-      )}
+      {/* Swim "richer data — join the iOS beta" CTA REMOVED (2026-07-19, Michael) — a promo pitch on the
+          swim screen; not wanted. The swim read is facts-only; we don't upsell on it. Component left in
+          the tree (unrendered) for the cleanup sweep. */}
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
         <div className="py-2">
           <div className="grid grid-cols-2 gap-4">
