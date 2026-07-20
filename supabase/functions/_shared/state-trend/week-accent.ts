@@ -230,6 +230,36 @@ export function tradeCandidate(opts: {
  * disciplines gain stored targets. Measured on the TRAILING pattern (≥2 weeks under) — not one week.
  * Load-only voice (§7): "carried the load", never an adaptation claim.
  */
+
+/**
+ * The aerobic disciplines that CARRIED the endurance load over the SAME window as the upkeep
+ * shortfall (F15, 2026-07-20). Extracted from an inline block in `coach/index.ts` so it is
+ * unit-testable — the bug lived exactly here and could not be reached by any test.
+ *
+ * THE BUG IT FIXES: carriers were built from THIS WEEK's completed-session counts while the
+ * shortfall (miles vs target, weeks-under) is a TRAILING read. On a Monday this-week counts are
+ * 0 for every discipline, so the credit clause silently dropped and the sentence rendered as a
+ * bare shortfall — "Running's at 6 of 18 — 4 weeks now." with no "Riding and swimming carried
+ * the endurance load." — deleting the permission half of the app's flagship sentence every Monday.
+ *
+ * FIX: presence over the trailing window (a completed session of that type exists), NOT this-week
+ * counts. Same window as the number it credits, so the two halves can never disagree by clock.
+ * `completedRows` is the caller's trailing completed-workout set (coach `completedRolling`).
+ */
+const UPKEEP_CARRIER_TYPES: Record<string, string[]> = {
+  run: ['run', 'running'], ride: ['ride', 'bike', 'cycling'], swim: ['swim', 'swimming'],
+};
+export function resolveAerobicCarriers(
+  discipline: string,
+  completedRows: Array<{ type?: string | null }> | null | undefined,
+): string[] {
+  const rows = Array.isArray(completedRows) ? completedRows : [];
+  const disc = discipline === 'bike' ? 'ride' : discipline;
+  const has = (d: string) =>
+    rows.some((r) => (UPKEEP_CARRIER_TYPES[d] || []).includes(String(r?.type || '').toLowerCase()));
+  return (['swim', 'ride', 'run'] as const).filter((c) => c !== disc && has(c));
+}
+
 export function upkeepCandidate(opts: {
   discipline: 'run' | 'ride' | 'bike' | 'swim' | 'strength';
   actualPerWeek?: number | null;   // trailing avg in the target's unit (e.g. miles/wk for run)

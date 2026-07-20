@@ -2,7 +2,7 @@
 import { assertEquals, assertStringIncludes } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import {
   composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate,
-  tradeCandidate, upkeepCandidate, leverCandidate, voiceViolation, ACCENT_TIER,
+  tradeCandidate, upkeepCandidate, resolveAerobicCarriers, leverCandidate, voiceViolation, ACCENT_TIER,
 } from './week-accent.ts';
 
 // ── THE UPKEEP READ — COMPLIANCE FACT ONLY (2026-07-18, app-aligned; no weekly adaptation consequence) ─
@@ -166,4 +166,41 @@ Deno.test('anchor descent: outranks substitution, ranks below the lever', () => 
   const trade = tradeCandidate({ underDone: 'run', underDoneDone: 1, underDonePlanned: 3, aerobicCarriers: ['swim'] });
   assertEquals(composeWeekAccent([trade, descent])?.source, 'anchor_descent'); // beats substitution
   assertEquals(ACCENT_TIER.anchor_descent > ACCENT_TIER.lever && ACCENT_TIER.anchor_descent < ACCENT_TIER.substitution, true);
+});
+
+// ── F15 REGRESSION (2026-07-20) — the Monday credit-clause drop. PERMANENT: this is the bug that
+//    turned the app's flagship sentence into a bare scold every Monday. Do not delete. ─────────────
+Deno.test('F15 carriers: a MONDAY (no sessions logged yet this week) still credits the trailing carriers', () => {
+  // The exact live shape: it is Monday of wk3, nothing done YET this week, but over the trailing
+  // 28d the athlete rode and swam while under-running. The OLD code read this-week counts → empty →
+  // the credit clause vanished. resolveAerobicCarriers reads the trailing rows, so it stays populated.
+  const trailing = [
+    { type: 'run' }, { type: 'ride' }, { type: 'ride' }, { type: 'swim' }, { type: 'swim' },
+  ];
+  const carriers = resolveAerobicCarriers('run', trailing);
+  assertEquals(carriers.includes('ride'), true);
+  assertEquals(carriers.includes('swim'), true);
+  assertEquals(carriers.includes('run'), false); // never credits the discipline that fell short
+
+  // …and the sentence it produces carries the permission half back.
+  const a = upkeepCandidate({ discipline: 'run', actualPerWeek: 6, targetPerWeek: 18, unit: 'mile', weeksUnder: 4, aerobicCarriers: carriers });
+  assertStringIncludes(a!.sentence, '18-mile upkeep');
+  assertStringIncludes(a!.sentence, 'carried the endurance load'); // the half F15 deleted
+  assertEquals(voiceViolation(a!.sentence), null);
+});
+
+Deno.test('F15 carriers: no trailing aerobic work → no false credit (bare shortfall is correct)', () => {
+  // Genuinely no riding or swimming in the window → carriers empty → the sentence is an honest
+  // shortfall with NO invented "carried it" clause. The fix must not manufacture credit.
+  const carriers = resolveAerobicCarriers('run', [{ type: 'run' }, { type: 'strength' }]);
+  assertEquals(carriers.length, 0);
+  const a = upkeepCandidate({ discipline: 'run', actualPerWeek: 6, targetPerWeek: 18, unit: 'mile', weeksUnder: 4, aerobicCarriers: carriers });
+  assertEquals(a!.sentence.includes('carried the endurance load'), false);
+});
+
+Deno.test('F15 carriers: bike alias normalises (discipline "bike" is not credited as its own carrier)', () => {
+  const carriers = resolveAerobicCarriers('bike', [{ type: 'ride' }, { type: 'run' }, { type: 'swim' }]);
+  assertEquals(carriers.includes('ride'), false); // 'bike' → 'ride', so it can't credit itself
+  assertEquals(carriers.includes('run'), true);
+  assertEquals(carriers.includes('swim'), true);
 });

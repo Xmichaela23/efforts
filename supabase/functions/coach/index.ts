@@ -44,7 +44,7 @@ import { assessAbsorption } from '../_shared/absorption.ts';
 import { computeSafetyFloor, resolvePlanPrimary, computePrimaryAdherence, resolvePrimarySport } from '../_shared/load-status-reconcile.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
-import { rollupFitnessDirection, rollupFitness, rollupHrResponse, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel, decouplingBandDisplay, bikeRideIntensityAerobic, bikeEfficiencyDisplay, composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate, tradeCandidate, upkeepCandidate, leverCandidate, anchorDescentCandidate, type WeekAccent } from '../_shared/state-trend/index.ts';
+import { rollupFitnessDirection, rollupFitness, rollupHrResponse, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel, decouplingBandDisplay, bikeRideIntensityAerobic, bikeEfficiencyDisplay, composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate, tradeCandidate, upkeepCandidate, resolveAerobicCarriers, leverCandidate, anchorDescentCandidate, type WeekAccent } from '../_shared/state-trend/index.ts';
 import {
   computeWeeklyResponse,
   type WeeklyResponseState,
@@ -5319,9 +5319,10 @@ ${narrativeFacts.join('\n')}`;
           if (!TYPES[disc]) continue;
           const targetMiles = disc === 'run' ? Number(upkeepPrefs?.target_weekly_miles) : NaN; // extend per discipline as targets are stored
           if (!(Number.isFinite(targetMiles) && targetMiles > 0)) continue;
-          const carriers = counts
-            .filter((c: any) => ['swim', 'ride', 'run'].includes(c.discipline) && c.discipline !== disc && c.done > 0)
-            .map((c: any) => c.discipline);
+          // CARRIERS OVER THE SAME TRAILING WINDOW AS THE SHORTFALL (F15) — resolveAerobicCarriers
+          // reads `completedRolling`, not this-week `counts`. See the fn's doc: this-week counts are
+          // 0 on a Monday, which silently deleted the "riding and swimming carried it" credit clause.
+          const carriers = resolveAerobicCarriers(disc, completedRolling);
           const rows = rowsFor(disc);
           const perWeek = rows.reduce((s: number, r: any) => s + (Number(r?.distance) || 0) * KM_TO_MI, 0) / WINDOW_WEEKS;
           if (perWeek >= targetMiles * 0.85) continue;

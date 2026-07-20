@@ -73,6 +73,7 @@ export {
   bannerCandidate,
   tradeCandidate,
   upkeepCandidate,
+  resolveAerobicCarriers,
   leverCandidate,
   anchorDescentCandidate,
   ACCENT_TIER,
