@@ -64,14 +64,17 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
       // steadiness of the power itself (VI near 1.0 = you held it smooth), then the load.
       if (vi != null && vi <= 1.05) parts.push(`You held the power smooth (${np} W normalized${vi <= 1.03 ? ', barely a surge' : ''}).`);
       else parts.push(`Steady aerobic ride at ${np} W normalized.`);
-      // the efficiency read — same watts at a lower HR is the fitness gain cyclists track.
-      if (hrHeld && dcpTxt) parts.push(`Heart rate held (drift ${dcpTxt}), so the aerobic engine carried it — the watts didn't cost you HR.`);
-      else if (dcpTxt) parts.push(`Heart rate drifted ${dcpTxt} over the ride.`);
+      // The efficiency read — same watts at a lower HR is the fitness gain cyclists track. NO drift NUMBER
+      // here: the EFFICIENCY row owns the figure (Friel aerobic decoupling); the paragraph makes the
+      // qualitative claim. This is what feeds `hrHeld` — raw HR drift, a proxy for the row's decoupling —
+      // so the DECISION stays honest even though we don't print a second, differing number.
+      if (hrHeld) parts.push(`Heart rate stayed in step with the power — the aerobic engine carried it, the watts didn't cost you HR.`);
+      else if (dcp != null) parts.push(`Heart rate crept up relative to the power over the ride.`);
       if (iff != null && tss != null) parts.push(`${tss} TSS at ${r2(iff)} intensity — an aerobic-base load.`);
     } else {
-      // HR-only: no watts. The honest lighter read.
-      if (hrHeld && dcpTxt) parts.push(`Steady aerobic ride — heart rate held (drift ${dcpTxt}), the effort stayed even.`);
-      else if (dcpTxt) parts.push(`Heart rate drifted ${dcpTxt} across the ride.`);
+      // HR-only: no watts. The honest lighter read (again, no number — the HEART RATE row shows it).
+      if (hrHeld) parts.push('Steady aerobic ride — heart rate held, the effort stayed even.');
+      else if (dcp != null) parts.push('Steady aerobic ride — heart rate crept up across it.');
       else parts.push('A steady aerobic ride.');
     }
     return clean(parts);
