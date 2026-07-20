@@ -36,6 +36,8 @@ import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolvePlanPhaseDetailed, phaseNameToWeekIntent, type PhaseSource } from '../_shared/plan-phase.ts';
 import { offPlanAdherenceBanner, offPlanAdherenceResult } from '../_shared/off-plan-banner.ts';
+// D-306: the deterministic week narrative. Replaces the LLM `coaching.narrative` on State.
+import { composeCoachWeekInsight } from '../_shared/insights/coach-week-insights.ts';
 import { computePerDomainLoad, type SliceSession } from '../_shared/per-domain-load.ts';
 import { computeFitnessFatigue } from '../_shared/fitness-fatigue.ts';
 import { assessAbsorption } from '../_shared/absorption.ts';
@@ -129,7 +131,7 @@ const corsHeaders: Record<string, string> = {
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
 /** v61: Q-111 fact-only — a strength DECLINE ("back off weight") no longer emits a `suggested_weight` (the "go lighter" prescription is dropped; the client then renders "Working ~125 vs your 150 baseline" with no action). Progression ("add weight") suggestions unchanged. Bump so cached "suggest 115 / back off" per-lift rows recompute to the fact-only row. */
-const COACH_PAYLOAD_VERSION = 117; // 117: upkeep SLIP GATE (refines D-297) — the upkeep accent flips from compliance-only to a gated measured "aerobic base has started to slip" ONLY when hr_drift is measurably declining (never routine, never a prediction); holding/thin → unchanged. Bump so cached rows re-source. // 116: threshold-pace single-source (audit #6) — the baseline prose line now reads the ONE resolver (learned/measured wins over the wizard effort_paces it read first), formatted m:ss, so the coach speaks the SAME threshold pace race-projections predicts off. Bump so cached rows re-source the corrected line. // 115: UPKEEP accent (D-297) — a MAINTAIN discipline is measured against its OWN stored target (run = target_weekly_miles), in miles, on the trailing pattern, with a science-backed gentle read (docs/SCIENCE-upkeep-maintenance.md) — replacing the session-count "1 of 3 runs / speed fades" trade for maintain disciplines. Bump so cached rows re-source. // 114: bike anchor label gains its as-of date ("auto - FTP est - <date>") to match the run anchor grammar; cosmetic. Bump so cached rows re-source.
+const COACH_PAYLOAD_VERSION = 118; // 118: D-306 — the week narrative is DETERMINISTIC. `coach.narrative` is now composed by `_shared/insights/coach-week-insights.ts` (protocol-aware, focus-aware) instead of written by the LLM. A composed SILENCE is a real answer, so the legacy LLM fallback is gated on `deterministicNarrativeApplied` and can no longer back-fill an intentional quiet. Bump so cached rows re-source — otherwise coach_cache serves the old LLM prose for 24h and the change looks like it did not ship (the D-281/Q-170 trap). // 117: upkeep SLIP GATE (refines D-297) — the upkeep accent flips from compliance-only to a gated measured "aerobic base has started to slip" ONLY when hr_drift is measurably declining (never routine, never a prediction); holding/thin → unchanged. Bump so cached rows re-source. // 116: threshold-pace single-source (audit #6) — the baseline prose line now reads the ONE resolver (learned/measured wins over the wizard effort_paces it read first), formatted m:ss, so the coach speaks the SAME threshold pace race-projections predicts off. Bump so cached rows re-source the corrected line. // 115: UPKEEP accent (D-297) — a MAINTAIN discipline is measured against its OWN stored target (run = target_weekly_miles), in miles, on the trailing pattern, with a science-backed gentle read (docs/SCIENCE-upkeep-maintenance.md) — replacing the session-count "1 of 3 runs / speed fades" trade for maintain disciplines. Bump so cached rows re-source. // 114: bike anchor label gains its as-of date ("auto - FTP est - <date>") to match the run anchor grammar; cosmetic. Bump so cached rows re-source.
 // 113: // 113: ROLLING ANCHOR (derivation shares the band 12wk window; the anchor tracks current capacity, descending as runs age out) + ANCHOR-DESCENT ACCENT (a supersede-by-aging emits a composer candidate: "Run benchmark eased - the <month> runs behind it aged out" + a GATED credit clause when cross-training carries the aerobic load and efficiency is not degrading). Bump so cached rows re-source.
 // 112: // 112: run durability VOLUME GATE (below 8 qualifying steady runs in the window the direction is "withheld" - a 4th state, counts voice, no arrow - so a handful of runs cannot claim "improving" and contradict the accent) + CROWN-FROM-N (the baseline is the 2nd-best qualifying effort, so one kind day cannot define the anchor; <2 qualifying = calibration). Bump so cached rows re-source.
 // 111: // 111: Fix A (band floors sub-zero decoupling with the crown constant so the tick is not pinned mid-band by a confounded negative run) + Fix B (coach reads state_trends_v1 for week_start <= this Monday, so a stray future-dated snapshot no longer shadows the current week that carries the anchors). Bump so caches re-source.
@@ -3382,6 +3384,9 @@ Deno.serve(async (req) => {
     // =========================================================================
     let athleteSnapshot: AthleteSnapshot | null = null;
     let week_narrative: string | null = null;
+    // D-306: set once the deterministic composer has run. A composed SILENCE is a real answer, so the
+    // legacy LLM fallback must not treat an empty narrative as "nothing tried".
+    let deterministicNarrativeApplied = false;
     let longitudinalSignalsResult: Awaited<ReturnType<typeof computeLongitudinalSignals>> | null = null;
     try {
       const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
@@ -3817,14 +3822,127 @@ Deno.serve(async (req) => {
         };
       }
 
-      week_narrative = coaching.narrative || null;
+      // ── D-306: THE WEEK NARRATIVE IS DETERMINISTIC. ────────────────────────────────────────────────
+      // Replaces `coaching.narrative` (the last output-LLM). The LLM call above still runs for the
+      // HEADLINE and next-session guidance — those are separate fields with separate consumers, and
+      // retiring them is the cleanup sweep's job, not this one.
+      //
+      // Every input is already in scope by here: training_state (:2677), latestSnapshot.state_trends_v1
+      // (:2228), planConfig (:1017), goalContext (:1019), weekWorkouts (:1095). Nothing new is fetched.
+      try {
+        // Posture — the athlete's DECLARED intent per discipline. Same source the upkeep read uses.
+        // Narrowed, not cast: an unrecognised posture string is DROPPED rather than passed through.
+        // The composer treats an absent posture as 'unknown' and stays neutral — which is the correct
+        // behaviour for a value we don't understand. A cast would let garbage decide the copy.
+        const rawPosture: Record<string, unknown> =
+          ((goalContext?.goals || [])
+            .map((g: any) => g?.training_prefs)
+            .find((tp: any) => tp && tp.per_discipline_posture)?.per_discipline_posture) || {};
+        const postureMap: Record<string, 'develop' | 'maintain' | 'dropped'> = {};
+        for (const [k, v] of Object.entries(rawPosture)) {
+          const p = String(v || '').toLowerCase();
+          if (p === 'develop' || p === 'maintain' || p === 'dropped') postureMap[String(k).toLowerCase()] = p;
+        }
+
+        // Strength direction — the SPINE's noise-guarded e1RM verdict (D-303). Never a volume ratio:
+        // lifting adapts to load, not to time-under-load. See D-306.
+        const strengthE1rmVerdict: string | null =
+          latestSnapshot?.state_trends_v1?.strength?.e1rm?.verdict ?? null;
+
+        // Q-193 — THE STALL. Missing reps at the prescribed load: on a linear block this is the
+        // protocol's own terminal event. Both existing summaries round it away (best-set MAX, and
+        // set-completion adherence), so it is computed here, per SET.
+        //   · only counts a set at or above the prescribed LOAD — lighter work is a different story
+        //   · a ZERO-rep set is "not performed" (Q-178's predicate), not a stall — skipped
+        let missedPrescribedReps = false;
+        for (const w of (Array.isArray(weekWorkouts) ? weekWorkouts : [])) {
+          if (missedPrescribedReps) break;
+          if (normalizeType((w as any)?.type) !== 'strength') continue;
+          const exRaw = (w as any)?.strength_exercises;
+          const exArr = Array.isArray(exRaw) ? exRaw : (typeof exRaw === 'string' ? (parseJson(exRaw) || []) : []);
+          if (!Array.isArray(exArr)) continue;
+          const waRaw = (w as any)?.workout_analysis;
+          const waObj = typeof waRaw === 'object' ? waRaw : (typeof waRaw === 'string' ? (parseJson(waRaw) || {}) : {});
+          const adhList = waObj?.strength_facts?.exercises ?? waObj?.exercise_adherence ?? [];
+          const plannedByName: Record<string, { reps: number | null; weight: number | null }> = {};
+          if (Array.isArray(adhList)) {
+            for (const ea of adhList) {
+              const k = String(ea?.name || ea?.canonical || '').toLowerCase().trim();
+              if (k) plannedByName[k] = { reps: safeNum(ea?.planned_reps), weight: safeNum(ea?.planned_weight) };
+            }
+          }
+          for (const ex of exArr) {
+            const p = plannedByName[String(ex?.name || '').toLowerCase().trim()];
+            if (!p || p.reps == null || p.reps <= 0) continue;
+            for (const s of (Array.isArray(ex?.sets) ? ex.sets : [])) {
+              const rp = safeNum((s as any)?.reps);
+              const wt = safeNum((s as any)?.weight);
+              if (rp == null || rp <= 0) continue;
+              if (p.weight != null && p.weight > 0 && (wt ?? 0) < p.weight) continue;
+              if (rp < p.reps) { missedPrescribedReps = true; break; }
+            }
+            if (missedPrescribedReps) break;
+          }
+        }
+
+        const acuteByType = (training_state as any)?.load_ramp?.acute7_by_type || [];
+        const deterministicWeek = composeCoachWeekInsight({
+          hasPlan: Boolean(activePlan),
+          disciplines: (Array.isArray(acuteByType) ? acuteByType : []).map((r: any) => {
+            const disc = String(r?.type || 'other');
+            const dp = disciplineProfiles.find((p: any) =>
+              p.discipline === disc || (disc === 'ride' && p.discipline === 'bike') || (disc === 'cycling' && p.discipline === 'bike'));
+            return {
+              discipline: disc,
+              actualLoad: Number(r?.total_load || 0),
+              plannedLoad: typeof r?.linked_load === 'number' ? r.linked_load : null,
+              sessionCount: Number(r?.total_sessions || 0),
+              acwr: dp?.acwr ?? null,
+              // The e1RM verdict is the STRENGTH instrument only. It is not on acute7_by_type — this
+              // join is the one piece of plumbing D-306 needed (the load view and the outcome view
+              // never met before).
+              verdict: /^strength$/i.test(disc) ? (strengthE1rmVerdict as any) : null,
+            };
+          }),
+          posture: postureMap,
+          // Q-177 TRAP: `linked_load` on acute7_by_type is the WHOLE week's plan, while actual load is
+          // only week-to-date. Comparing them mid-week makes every Monday read as "came in lighter".
+          // So the plan comparison is allowed only once the week is actually done. Weeks start Monday
+          // (mondayOfToday, used by the snapshot spine) → complete on Sunday, day 7.
+          //  ⚠️ This means the plan-vs-actual clause fires ONCE A WEEK, on Sunday. That is honest but
+          //  thin; the better fix is to prorate the plan to today, which needs a planned-by-date figure
+          //  acute7_by_type does not carry. Left as the deliberate conservative choice.
+          partialWeek: (() => {
+            const d = new Date(`${asOfDate}T00:00:00`);
+            const dow = d.getDay(); // 0=Sun
+            return dow !== 0;
+          })(),
+          strengthProtocol: {
+            protocolId: planConfig?.strength_protocol ?? null,
+            e1rmVerdict: strengthE1rmVerdict as any,
+            missedPrescribedReps,
+          },
+        });
+        // Silence is legal — a thin week says nothing rather than padding.
+        week_narrative = deterministicWeek;
+        // ⛔ AND IT MUST STICK. The legacy LLM fallback below is gated on `!week_narrative`, so a
+        // deliberate silence would otherwise hand the paragraph straight back to an LLM — the exact
+        // outcome D-306 exists to prevent. This flag says "the deterministic path ran", not "it spoke".
+        deterministicNarrativeApplied = true;
+      } catch (composeErr: any) {
+        // A THROW is not a silence. If the composer itself broke we have no deterministic answer, so
+        // the flag stays false and the legacy path may still cover us.
+        console.warn('[coach] deterministic week narrative failed:', composeErr?.message || composeErr);
+        week_narrative = null;
+      }
 
     } catch (snapErr: any) {
       console.warn('[coach] athlete snapshot failed, falling back to legacy:', snapErr?.message || snapErr);
     }
 
-    // Legacy narrative fallback — only if snapshot failed
-    if (!week_narrative) try {
+    // Legacy narrative fallback — only if the snapshot path THREW before the deterministic composer
+    // ran (D-306). A composed silence is intentional and must never be back-filled by an LLM.
+    if (!week_narrative && !deterministicNarrativeApplied) try {
       const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
       if (anthropicKey) {
         const narrativeFacts: string[] = [];
