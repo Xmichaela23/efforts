@@ -20,24 +20,25 @@ Deno.test('one discipline, no plan, no ratio → silent (a single sport is self-
   assertEquals(composeCoachWeekInsight({ hasPlan: false, disciplines: [d('run', 100, 4)] }), null);
 });
 
-// ── CLAUSE 1 — where the week went ──────────────────────────────────────────────────────────────────
-Deno.test('a real mix names the lead discipline and the shares', () => {
+// ── THE MIX SENTENCE IS GONE — and must not come back (2026-07-19, on sight of the real screen) ─────
+// It restated the LOAD bar rendered directly above it on State. This is a REGRESSION GUARD, not a
+// behaviour test: the paragraph must never recite load shares again.
+Deno.test('never restates the load-share list — the bar owns the mix', () => {
   const out = composeCoachWeekInsight({
     hasPlan: false,
     disciplines: [d('run', 40, 4), d('strength', 24, 3), d('ride', 23, 2), d('swim', 13, 1)],
   });
-  assert(out, 'expected a paragraph');
-  assert(out!.includes('running'), out!);
-  assert(out!.includes('40%'), out!);
-  assert(out!.includes('strength 24%'), out!);
+  if (out) {
+    assert(!/\d+% of your load/i.test(out), out);
+    assert(!/led by|went mostly to/i.test(out), out);
+  }
 });
 
-Deno.test('a rounding-error discipline is not named', () => {
+Deno.test('a week with nothing to flag says nothing at all', () => {
   const out = composeCoachWeekInsight({
     hasPlan: false,
     disciplines: [d('run', 95, 5), d('walk', 2, 1)],
   });
-  // walk is 2% — below the floor, so there is no mix worth describing.
   assertEquals(out, null);
 });
 
@@ -59,8 +60,7 @@ Deno.test('no acwr data → no disappearance claim (no inference without evidenc
     hasPlan: false,
     disciplines: [d('run', 70, 5), d('strength', 30, 1)],
   });
-  assert(out, 'expected the mix clause');
-  assert(!out!.includes('below its own recent normal'), out!);
+  assert(!out || !out.includes('below its own recent normal'), String(out));
 });
 
 // ── CLAUSE 3 — against the reference ────────────────────────────────────────────────────────────────
@@ -148,6 +148,7 @@ Deno.test('DROPPED: a dropped discipline is invisible — never named, never pen
   const out = composeCoachWeekInsight({
     hasPlan: false,
     posture: { swim: 'dropped' },
+    weekLoadVsNormal: 1.0, // gives the reference clause something to say, so `out` is non-null
     disciplines: [d('run', 60, 4, { acwr: 1.0 }), d('strength', 35, 3, { acwr: 1.0 }), d('swim', 20, 1, { acwr: 0.2 })],
   });
   assert(out, 'expected a paragraph');
@@ -168,6 +169,7 @@ Deno.test('CREDIT does not fire when the lifting is actually falling away', () =
   const out = composeCoachWeekInsight({
     hasPlan: false,
     posture: { run: 'develop', strength: 'develop' },
+    weekLoadVsNormal: 1.0,
     disciplines: [d('run', 70, 4, { acwr: 1.1 }), d('strength', 30, 1, { acwr: 0.4 })],
   });
   assert(out, 'expected a paragraph');
@@ -331,4 +333,20 @@ Deno.test('an ungrounded protocol stays silent rather than guessing', () => {
     disciplines: [d('run', 50, 3, { plannedLoad: 50 }), d('strength', 40, 2, { plannedLoad: 40 })],
   });
   assert(!out || !/stall|retest|holding is the one thing/i.test(out), String(out));
+});
+
+Deno.test('the all-clear names only what the plan actually asked for, and surfaces off-plan work', () => {
+  const out = composeCoachWeekInsight({
+    hasPlan: true,
+    disciplines: [
+      d('run', 44, 4, { plannedLoad: 44 }),
+      d('strength', 22, 3, { plannedLoad: 22 }),
+      d('ride', 22, 2),  // off-plan — no planned load
+      d('swim', 12, 1),  // off-plan
+    ],
+  });
+  assert(out, 'expected a paragraph');
+  // Must NOT claim coverage over disciplines the plan never asked for.
+  assert(!/every discipline/i.test(out!), out!);
+  assert(out!.includes('riding and swimming'), out!);
 });

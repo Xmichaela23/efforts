@@ -138,18 +138,15 @@ export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | nu
   const share = (d: CoachWeekDiscipline) => (Number(d.actualLoad) / totalLoad) * 100;
   const Cap = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`;
 
-  // ── 1. WHERE THE WEEK WENT ────────────────────────────────────────────────────────────────────────
-  // Only worth saying when there is a MIX to describe. One discipline is self-evident from the calendar.
-  if (active.length >= 2) {
-    const named = active.filter((d) => share(d) >= MIN_SHARE_PCT).slice(0, 3);
-    if (named.length >= 2) {
-      const lead = named[0];
-      const rest = named.slice(1).map((d) => `${label(d.discipline)} ${pct(share(d))}`).join(', ');
-      // "Mostly" is a majority claim — only earn it above half. Otherwise it just LED the week.
-      const verb = share(lead) >= 50 ? 'went mostly to' : 'was led by';
-      parts.push(`The week ${verb} ${label(lead.discipline)} — ${pct(share(lead))} of your load, then ${rest}.`);
-    }
-  }
+  // ── 1. WHERE THE WEEK WENT — DELETED 2026-07-19, on sight of the real screen. ────────────────────
+  // It said "led by running — 44% of your load, then strength 22%, riding 22%" while the LOAD bar
+  // THREE INCHES ABOVE IT rendered exactly those shares, plus swim, as a labelled bar. Restating the
+  // dashboard in prose is the single failure every rejected AI-narration feature shares, in users'
+  // own words: "I don't need to be told what I can read from the graphs." The bar owns the mix.
+  //
+  // ⛔ DO NOT REINSTATE IT AS A SHARE LIST. If a mix sentence ever comes back it must say what the bar
+  // CANNOT: how the mix moved against this athlete's own normal. That needs a trailing-share figure
+  // nothing currently carries.
 
   // ── 3 (decided first, so clause 2 can defer to it) — AGAINST THE REFERENCE. Plan, or the athlete's
   //    own normal. Same clause, swapped yardstick. ────────────────────────────────────────────────────
@@ -176,7 +173,15 @@ export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | nu
       // The generic all-clear. Suppressed below if anything specific fired — "you missed reps" followed
       // by "everything landed inside the plan" is the app arguing with itself (D-305). Load-based
       // adherence and a missed rep are both true at once; the specific claim wins.
-      allClearLine = 'Every discipline landed inside the range the plan asked for.';
+      //
+      // ⚠️ SAY WHAT WAS ACTUALLY CHECKED. This only ever examined disciplines the plan ASKED for, so
+      // "every discipline" over-claimed: on the verified week it fired while bike and swim carried real
+      // off-plan load and the upkeep line right below said so. Naming the scope makes it true, and the
+      // off-plan work stays visible instead of being absorbed into an all-clear.
+      const off = active.filter((d) => !(typeof d.plannedLoad === 'number' && (d.plannedLoad as number) > 0));
+      allClearLine = off.length
+        ? `What the plan asked for landed in range, and ${off.map((d) => label(d.discipline)).join(' and ')} went in on top of it.`
+        : 'Everything the plan asked for landed in range.';
     }
   } else if (!inp.hasPlan) {
     // NO PLAN IS NOT A DEFICIT. Their own trailing normal is the yardstick — the Strava band pattern,
