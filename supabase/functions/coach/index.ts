@@ -131,7 +131,7 @@ const corsHeaders: Record<string, string> = {
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
 /** v61: Q-111 fact-only — a strength DECLINE ("back off weight") no longer emits a `suggested_weight` (the "go lighter" prescription is dropped; the client then renders "Working ~125 vs your 150 baseline" with no action). Progression ("add weight") suggestions unchanged. Bump so cached "suggest 115 / back off" per-lift rows recompute to the fact-only row. */
-const COACH_PAYLOAD_VERSION = 119; // 119: D-306 follow-up, ON SIGHT OF THE REAL SCREEN. Dropped the mix sentence — it restated the LOAD bar rendered directly above it ("44% of your load, then strength 22%") which is the exact redundancy every rejected AI-narration feature was killed for. And the all-clear no longer says "every discipline": it only ever checked disciplines the PLAN asked for, and fired on a week where bike and swim carried real off-plan load. It now names the scope and surfaces the off-plan work. Bump so cached rows re-source. // 118: D-306 — the week narrative is DETERMINISTIC. `coach.narrative` is now composed by `_shared/insights/coach-week-insights.ts` (protocol-aware, focus-aware) instead of written by the LLM. A composed SILENCE is a real answer, so the legacy LLM fallback is gated on `deterministicNarrativeApplied` and can no longer back-fill an intentional quiet. Bump so cached rows re-source — otherwise coach_cache serves the old LLM prose for 24h and the change looks like it did not ship (the D-281/Q-170 trap). // 117: upkeep SLIP GATE (refines D-297) — the upkeep accent flips from compliance-only to a gated measured "aerobic base has started to slip" ONLY when hr_drift is measurably declining (never routine, never a prediction); holding/thin → unchanged. Bump so cached rows re-source. // 116: threshold-pace single-source (audit #6) — the baseline prose line now reads the ONE resolver (learned/measured wins over the wizard effort_paces it read first), formatted m:ss, so the coach speaks the SAME threshold pace race-projections predicts off. Bump so cached rows re-source the corrected line. // 115: UPKEEP accent (D-297) — a MAINTAIN discipline is measured against its OWN stored target (run = target_weekly_miles), in miles, on the trailing pattern, with a science-backed gentle read (docs/SCIENCE-upkeep-maintenance.md) — replacing the session-count "1 of 3 runs / speed fades" trade for maintain disciplines. Bump so cached rows re-source. // 114: bike anchor label gains its as-of date ("auto - FTP est - <date>") to match the run anchor grammar; cosmetic. Bump so cached rows re-source.
+const COACH_PAYLOAD_VERSION = 120; // 120: D-306 window fix — the paragraph was reading plan-vs-actual off the ROLLING 7-day window (acute7_by_type) while the plan lives on the CALENDAR week, so consecutive sentences described two different spans and both called it "the week" (Michael, on sight of the screen). Plan comparison now uses computeWtdLoadSummary (_shared/adherence-plan.ts) PER DISCIPLINE — the same shipped helper the rest of the week reads — which bounds planned load to sessions due ON OR BEFORE today. That RETIRES the hand-rolled Sunday gate from v118: partial weeks were already solved here (v100/v102, the Q-177 trap), so the clause now speaks every day instead of once a week. ACWR stays ROLLING on purpose — "drifting below its own normal" is a trailing question. Bump so cached rows re-source. // 119: D-306 follow-up, ON SIGHT OF THE REAL SCREEN. Dropped the mix sentence — it restated the LOAD bar rendered directly above it ("44% of your load, then strength 22%") which is the exact redundancy every rejected AI-narration feature was killed for. And the all-clear no longer says "every discipline": it only ever checked disciplines the PLAN asked for, and fired on a week where bike and swim carried real off-plan load. It now names the scope and surfaces the off-plan work. Bump so cached rows re-source. // 118: D-306 — the week narrative is DETERMINISTIC. `coach.narrative` is now composed by `_shared/insights/coach-week-insights.ts` (protocol-aware, focus-aware) instead of written by the LLM. A composed SILENCE is a real answer, so the legacy LLM fallback is gated on `deterministicNarrativeApplied` and can no longer back-fill an intentional quiet. Bump so cached rows re-source — otherwise coach_cache serves the old LLM prose for 24h and the change looks like it did not ship (the D-281/Q-170 trap). // 117: upkeep SLIP GATE (refines D-297) — the upkeep accent flips from compliance-only to a gated measured "aerobic base has started to slip" ONLY when hr_drift is measurably declining (never routine, never a prediction); holding/thin → unchanged. Bump so cached rows re-source. // 116: threshold-pace single-source (audit #6) — the baseline prose line now reads the ONE resolver (learned/measured wins over the wizard effort_paces it read first), formatted m:ss, so the coach speaks the SAME threshold pace race-projections predicts off. Bump so cached rows re-source the corrected line. // 115: UPKEEP accent (D-297) — a MAINTAIN discipline is measured against its OWN stored target (run = target_weekly_miles), in miles, on the trailing pattern, with a science-backed gentle read (docs/SCIENCE-upkeep-maintenance.md) — replacing the session-count "1 of 3 runs / speed fades" trade for maintain disciplines. Bump so cached rows re-source. // 114: bike anchor label gains its as-of date ("auto - FTP est - <date>") to match the run anchor grammar; cosmetic. Bump so cached rows re-source.
 // 113: // 113: ROLLING ANCHOR (derivation shares the band 12wk window; the anchor tracks current capacity, descending as runs age out) + ANCHOR-DESCENT ACCENT (a supersede-by-aging emits a composer candidate: "Run benchmark eased - the <month> runs behind it aged out" + a GATED credit clause when cross-training carries the aerobic load and efficiency is not degrading). Bump so cached rows re-source.
 // 112: // 112: run durability VOLUME GATE (below 8 qualifying steady runs in the window the direction is "withheld" - a 4th state, counts voice, no arrow - so a handful of runs cannot claim "improving" and contradict the accent) + CROWN-FROM-N (the baseline is the 2nd-best qualifying effort, so one kind day cannot define the anchor; <2 qualifying = calibration). Bump so cached rows re-source.
 // 111: // 111: Fix A (band floors sub-zero decoupling with the crown constant so the tick is not pinned mid-band by a confounded negative run) + Fix B (coach reads state_trends_v1 for week_start <= this Monday, so a stray future-dated snapshot no longer shadows the current week that carries the anchors). Bump so caches re-source.
@@ -3885,38 +3885,64 @@ Deno.serve(async (req) => {
           }
         }
 
+        // ⛔ TWO DIFFERENT WEEKS — do not mix them in one paragraph (Michael, on sight of the screen).
+        //   · `acute7_by_type` is the ROLLING last 7 days — what the LOAD bar renders.
+        //   · the plan lives on the CALENDAR week — what the planned-vs-actual bars render.
+        // The first build read plan-vs-actual off the rolling window, so consecutive sentences described
+        // two different spans and both called it "the week".
+        //
+        // The plan comparison now uses `computeWtdLoadSummary` (_shared/adherence-plan.ts) per discipline
+        // — the SAME shipped helper the rest of the week reads. It bounds planned load to sessions dated
+        // ON OR BEFORE today, which is why the hand-rolled Sunday gate is gone: partial weeks were
+        // already solved here (payload v100/v102, the Q-177 trap).
+        // ACWR stays ROLLING on purpose: "is anything drifting below its own normal" is a trailing
+        // question, and acute:chronic is the right instrument for it.
+        const CANON_DISC = (t: unknown): string | null => {
+          const s = String(t || '').toLowerCase();
+          if (s === 'run') return 'run';
+          if (s === 'ride' || s === 'bike' || s === 'cycling') return 'ride';
+          if (s === 'strength') return 'strength';
+          if (s === 'swim') return 'swim';
+          return null;
+        };
+        const plannedWeekRows = Array.isArray(plannedWeek) ? plannedWeek : [];
+        const doneWeekRows = (Array.isArray(weekWorkouts) ? weekWorkouts : []).filter((w: any) =>
+          String(w?.workout_status || '').toLowerCase() === 'completed' &&
+          String(w?.date || '') >= weekStartDate && String(w?.date || '') <= asOfDate);
         const acuteByType = (training_state as any)?.load_ramp?.acute7_by_type || [];
+        const discSet = new Set<string>();
+        for (const r of (Array.isArray(acuteByType) ? acuteByType : [])) { const c = CANON_DISC(r?.type); if (c) discSet.add(c); }
+        for (const r of plannedWeekRows) { const c = CANON_DISC((r as any)?.type); if (c) discSet.add(c); }
+        for (const r of doneWeekRows) { const c = CANON_DISC((r as any)?.type); if (c) discSet.add(c); }
+
         const deterministicWeek = composeCoachWeekInsight({
           hasPlan: Boolean(activePlan),
-          disciplines: (Array.isArray(acuteByType) ? acuteByType : []).map((r: any) => {
-            const disc = String(r?.type || 'other');
+          disciplines: Array.from(discSet).map((disc) => {
+            const wtdDisc = computeWtdLoadSummary(
+              plannedWeekRows.filter((p: any) => CANON_DISC(p?.type) === disc) as any[],
+              doneWeekRows.filter((w: any) => CANON_DISC(w?.type) === disc) as any[],
+              asOfDate,
+            );
             const dp = disciplineProfiles.find((p: any) =>
-              p.discipline === disc || (disc === 'ride' && p.discipline === 'bike') || (disc === 'cycling' && p.discipline === 'bike'));
+              p.discipline === disc || (disc === 'ride' && p.discipline === 'bike'));
             return {
               discipline: disc,
-              actualLoad: Number(r?.total_load || 0),
-              plannedLoad: typeof r?.linked_load === 'number' ? r.linked_load : null,
-              sessionCount: Number(r?.total_sessions || 0),
+              actualLoad: Number(wtdDisc.actual_wtd_load || 0),
+              // Planned load DUE BY TODAY — null when the plan asked for nothing in this discipline, so
+              // genuinely off-plan work is never scored against a plan that never mentioned it.
+              plannedLoad: wtdDisc.planned_wtd_load > 0 ? wtdDisc.planned_wtd_load : null,
+              sessionCount: doneWeekRows.filter((w: any) => CANON_DISC(w?.type) === disc).length,
               acwr: dp?.acwr ?? null,
-              // The e1RM verdict is the STRENGTH instrument only. It is not on acute7_by_type — this
-              // join is the one piece of plumbing D-306 needed (the load view and the outcome view
-              // never met before).
-              verdict: /^strength$/i.test(disc) ? (strengthE1rmVerdict as any) : null,
+              // The e1RM verdict is the STRENGTH instrument only. It is on neither view — this join is
+              // the plumbing D-306 needed (the load view and the outcome view never met before).
+              verdict: disc === 'strength' ? (strengthE1rmVerdict as any) : null,
             };
           }),
           posture: postureMap,
-          // Q-177 TRAP: `linked_load` on acute7_by_type is the WHOLE week's plan, while actual load is
-          // only week-to-date. Comparing them mid-week makes every Monday read as "came in lighter".
-          // So the plan comparison is allowed only once the week is actually done. Weeks start Monday
-          // (mondayOfToday, used by the snapshot spine) → complete on Sunday, day 7.
-          //  ⚠️ This means the plan-vs-actual clause fires ONCE A WEEK, on Sunday. That is honest but
-          //  thin; the better fix is to prorate the plan to today, which needs a planned-by-date figure
-          //  acute7_by_type does not carry. Left as the deliberate conservative choice.
-          partialWeek: (() => {
-            const d = new Date(`${asOfDate}T00:00:00`);
-            const dow = d.getDay(); // 0=Sun
-            return dow !== 0;
-          })(),
+          // The Sunday gate is RETIRED. `planned_wtd_load` already bounds the plan to sessions due on
+          // or before today, so a Tuesday compares Tuesday's plan against Tuesday's work — the partial
+          // week is handled at the source instead of by refusing to speak six days out of seven.
+          partialWeek: false,
           strengthProtocol: {
             protocolId: planConfig?.strength_protocol ?? null,
             e1rmVerdict: strengthE1rmVerdict as any,
