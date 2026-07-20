@@ -19,6 +19,47 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
+## Q-189 — the coach narrative's TEN honesty validators run and are then DISCARDED (ENGINE, 2026-07-19 — code-verified, live)
+
+`generateCoaching` (`_shared/athlete-snapshot/coaching.ts:415-430`) runs `validateNarrative` + a coach-only `add`-ban, and on failure retries ONCE with the violations named — then **accepts whatever comes back regardless.** The comment at `:428` states it outright: *"retry-then-soft-accept (never regress to the deterministic fallback over a rule miss)."* So on the PRIMARY narrative path the validators are advisory. This includes **rule 6, `spine_contradiction`** — the check that stops the prose disagreeing with the engine's own fitness verdict. The strict "return null rather than lie" policy documented in `narrative-core/orchestrate.ts:1-4` governs only the LEGACY fallback path (`coach/index.ts:4846`), which fires only when the primary path throws.
+
+**Why it matters beyond the copy:** the cache-version comments (`coach/index.ts:125-126`) describe the drop policy as if it covers the week narrative generally. It does not. **Moot if the deterministic composer (D-306) lands** — a composer has nothing to validate. Filed so nobody trusts the guard in the meantime.
+
+## Q-190 — there are TWO LLM narrative paths, not one; and the deterministic fallback emits the tally the app bans (ENGINE, 2026-07-19 — code-verified)
+
+The ENGINE-STATE banner named one output-LLM on State. There are two. **Primary:** `coaching.ts:408` (`claude-sonnet-4-20250514`, passed as a raw string, bypassing the `MODELS` alias map in `_shared/llm.ts:33-38` — so the coach is pinned to an older Sonnet than the app's alias). **Legacy:** an inline fetch at `coach/index.ts:4826` (`claude-sonnet-4-5-20250929`), reached only when the primary throws or returns empty (`:3827`). **Delete one and the other silently takes over.**
+
+Separately, `fallbackCoaching` (`coaching.ts:477-491`) — reached when the LLM call itself fails or `ANTHROPIC_API_KEY` is unset — emits `` `${done} of ${planned} planned sessions completed so far.` `` That is exactly the **NO RAW COMPLETION TALLIES** form the prompt bans at `coach/index.ts:4732` as scolding. The safety net says the one thing the design forbids.
+
+## Q-191 — the interference verdict is POSTURE-BLIND and makes a causal claim the evidence cannot carry (ENGINE + SCIENCE, 2026-07-19 — code-verified)
+
+`compute-snapshot/index.ts:537` computes `interferenceScore` from two trend arrows: aerobic improving + structural declining → `endurance_dominating`; the reverse → `strength_dominating` ("Heavy lifting may be limiting endurance adaptation"). Two problems.
+
+**1. Posture-blind — the Q-179 bug class, one level down.** The declared `per_discipline_posture` is read in the SAME FILE at `:775`, into a different consumer (`assembleStateTrends`). The interference score never sees it. So an athlete who declares run=maintain / strength=develop and **executes that plan perfectly** produces exactly the divergence the engine labels interference. D-292 fixed this for the run row; this path was missed.
+
+**2. It is not a claim the data supports.** Divergence is not interference. Attribution needs a control condition; an app has one uncontrolled athlete. Worse, the outcome measure is e1RM, whose measurement CV is 2.4–9.7%, while the interference effect on explosive strength is SMD −0.28 — **the effect is smaller than the instrument's error bar**, and the literature states directly that daily 1RM prediction cannot detect fatigue. What IS sayable is scheduling STRUCTURE (same-session pairing, order, hours of separation), because that is recorded exactly. See the 2026-07-19 addendum in `SCIENCE-concurrent-training-interference.md`.
+
+**Live reach is limited:** the interference line reaches prose only via the legacy path (`coach/index.ts:4610`). A second consumer at `:3452` was NOT traced. **D-306 supersedes this rather than repairing it** — the composer answers "what is affecting what" from declared focus + scheduling instead.
+
+## Q-192 — `five_by_five` is MISSING from `strength-profiles.ts` and silently falls back to DURABILITY (ENGINE, 2026-07-19 — code-verified, impact untraced)
+
+`_shared/strength-profiles.ts` calls itself "single source of truth for protocol-specific progression/deload thresholds," consumed by **`adapt-plan`** (auto weight adjustments) and **`response-model/weekly`** (lift verdicts). Its `StrengthProtocolId` union lists six protocols and **`five_by_five` is not one of them** (0 occurrences in the file). `resolveProfile()` (`:163-166`) falls through to `DEFAULT_PROFILE`, which is `PROTOCOL_PROFILES.durability` (`:91`).
+
+So a 5×5 plan is progressed and graded against durability's numbers — target RIR 2.5, `minGainPct` 3%, deload at deviation ≤ −1.0 over 3 sessions — where durability is described in that same file as "high rep, endurance support, conservative progression." For a linear block whose load is supposed to climb ~1.25%/week on a schedule (`protocols/five-by-five.ts`), an RIR-gated progression model is the wrong shape.
+
+⚠️ **What is verified:** the absence and the fallback. **What is NOT:** whether it changes behaviour. The 5×5 ramp is computed at plan build in `five-by-five.ts:loadForWeek`, so the PRESCRIPTION may be correct and only the ADAPTATION layer wrong. **Needs an `adapt-plan` trace before anyone edits the table** — and the right numbers should come from `SCIENCE-5x5-linear-progression.md`, not invention.
+
+## Q-193 — THE STALL IS INVISIBLE: two separate aggregations each round away "prescribed 5, did 3" (ENGINE, 2026-07-19 — code-verified)
+
+On a linear block the **stall** — missing reps at the prescribed load — is the protocol's own terminal event (`SCIENCE-5x5-linear-progression.md` §4 → retest). The data to detect it is present and reaches the coach. Nothing compares it.
+
+- `planned_reps` reaches the coach per exercise (`coach/index.ts:4343-4353`, from `workout_analysis.strength_facts`; written by `analyze-strength-workout:2748-2753`, and also on `exercise_log` via `compute-facts:1346`).
+- Actual per-set reps are in the same loop (`coach/index.ts:4361-4368`).
+- **But `bestReps = Math.max(...reps)` (`:4370`)** — so 5×5 executed as 5,5,5,4,3 reports "5 reps" and reads perfect.
+- **And `adherence_pct` is `ea.adherence.set_completion`** (`analyze-strength-workout:2753`) — SET completion, not rep completion. All 5 sets were performed, so that reads 100% too.
+
+The existing code DOES compare weight against plan (`coach/index.ts:4386-4391`, "exceeded plan by / below plan by / on target") — it simply never does the same for reps. **The signal is one per-set subtraction away, on data already loaded at narrative-mint time:** any set with `reps < planned_reps` at `weight >= planned_weight`. Wanted by D-306's protocol read; not yet built.
+
 ## Q-183 — a STRAY non-Monday `athlete_snapshot` row silently disables the ENTIRE S2 server-render path for the primary user (ENGINE, 2026-07-14 — found while shipping D-292, deliberately NOT chased)
 
 **Status: unverified root cause, real symptom.** The coach reads the athlete_snapshot with **MAX `week_start`** (`coach/index.ts:2209`, `order('week_start', desc).limit(1)`). But there is a snapshot row keyed to a **non-Monday** date (`2026-07-14`, a Tuesday) that has **no `state_trends_v1`** (the spine block only computes for `week_start === mondayOfToday()`, i.e. the Monday row `2026-07-13`). So the coach grabs the stray row → `state_trends_v1.display` is null → `weekly_state_v1.trends.display` is null → **the client falls back to its LIVE in-browser assembly on EVERY load.** The whole S2 optimization (server-assembled cards, ~9 fewer client queries, D-260-era) has been **silently inactive** for this user.

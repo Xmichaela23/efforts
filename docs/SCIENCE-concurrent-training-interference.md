@@ -6,6 +6,26 @@
 
 ---
 
+> ## ⚠️ 2026-07-19 ADDENDUM — Schumann et al. 2022 refines §2 and §3. Everything below still stands as history; read this first.
+>
+> A research pass for D-306 surfaced the **updated compatibility review — Schumann et al., *Sports Med* 2022, 43 studies** ([PubMed 34757594](https://pubmed.ncbi.nlm.nih.gov/34757594/)) — which is larger and better-controlled than Wilson 2012, and moves two of the five findings below.
+>
+> **§1 STRENGTHENED.** Maximal strength SMD **−0.06** (95% CI −0.20 to 0.09, p=0.446) and hypertrophy SMD **−0.01** (−0.16 to 0.18, p=0.919) — both null. Explosive strength SMD **−0.28** (−0.48 to −0.08, p=0.007) — real, small-to-moderate. So "interference is power-specific" is now the *only* surviving effect, not merely the largest one.
+>
+> **§2 CONTESTED — "cycling interferes far less than running" is called the load-bearing rule here, and that is now stronger than the evidence supports.** Wilson 2012 found the modality split; **Schumann 2022, with more studies, found NO modality moderation** (results independent of aerobic mode, frequency, training status and age). The mechanism remains credible (running's repeated eccentric loading, muscle damage; cycling is near-purely concentric — see [PMC9474354](https://pmc.ncbi.nlm.nih.gov/articles/PMC9474354/) on type-I fibres). **Treat as a plausible mechanism with split meta-analytic support, not a settled rule.** ⛔ This does NOT mean change the shipped scheduling logic — the rule is conservative and harmless in the direction it errs. It means do not cite it as established, and do not build a NEW claim on it.
+>
+> **§3 CONTESTED.** Wilson's frequency/duration correlations stand as reported, but **Schumann found no frequency moderation at all.** Volume-dependence is directionally supported and mechanistically sensible; **any numeric threshold the app states would be invented.** Say it as a tendency, never with a number.
+>
+> **§4 CONFIRMED and sharpened.** Robineau et al. 2016 (58 rugby players, 7 weeks, randomised 0h/6h/24h): half-squat 1RM **+16.8% at 0h separation vs +31.2% at 6h and +25.9% at 24h** (strength-only +23.9%). **Only the back-to-back group underperformed** — the cliff is at zero separation, not a graded 24h ideal. Schumann's same-session subgroup agrees (attenuation p=0.043 same-session, n.s. at ≥3h). This is the engine's 6-hour gate (`week-builder.ts:1917`), and it is correct.
+>
+> **§5 CONFIRMED.** Eddens et al. 2018 meta (10 studies): resistance-first beat endurance-first for lower-body dynamic strength by **6.91%** (CI 1.96–11.87, p=0.006); no difference for hypertrophy or VO2max. Their own framing: use RT-first *only if you cannot separate the sessions*.
+>
+> **NEW — the reverse direction, which this doc never covered and which is the best-supported material in the domain.** Strength training does not cost aerobic fitness and improves economy: **running economy ES −0.266** high-load (CI −0.516 to −0.015, p=0.039), **−0.426** combined methods ([PMC11052887](https://pmc.ncbi.nlm.nih.gov/articles/PMC11052887/), 31 studies); **cycling efficiency ES 0.353** (p=0.012) with VO2max unchanged ([PMC12881108](https://pmc.ncbi.nlm.nih.gov/articles/PMC12881108/), 17 studies). Both low-to-moderate certainty. **The honest frame for a hybrid app is CREDIT, not hazard** — see D-306.
+>
+> **NEW — the measurement ceiling, and it governs what the app may ever say.** e1RM from load-velocity has intra/inter-day **CV 2.4–9.7%**, and the literature states directly that daily 1RM prediction is **not sensitive enough to detect fatigue** ([PMC10154341](https://pmc.ncbi.nlm.nih.gov/articles/PMC10154341/)). The interference effect (−0.28) is **smaller than the instrument's error bar.** So: the app can defensibly comment on **scheduling structure** (same-day pairing, order, separation — recorded exactly) and **never on whether interference occurred**. See Q-191.
+>
+> **Also worth knowing:** submaximal HR is a trap as a fatigue detector — overreached athletes show HR going *down* and HR recovery getting *faster* while RPE rises ([PubMed 28704885](https://pubmed.ncbi.nlm.nih.gov/28704885/)). "HR at fixed pace is climbing → fatigued" can be actively backwards. And the whole field has been shrinking: Hickson 1980's dramatic result came from ~11 sessions/week in untrained subjects, and every better-controlled meta since has narrowed it.
+
 ## The five findings that ground the distribution logic
 
 ### 1. Interference is power-specific, not strength/hypertrophy-specific

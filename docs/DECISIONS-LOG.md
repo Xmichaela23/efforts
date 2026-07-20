@@ -838,3 +838,62 @@ Two related fixes this session under one principle — a surface may not say two
 **Run-row level-vs-trend contradiction (State, `StatePerformanceSection.tsx`, LIVE).** The run durability row showed "too few to read direction" (the trend arrow withheld, `runDirectionMinRuns=8`, only 6 qualifying steady runs) next to a CONFIDENT dot near "stronger" — reading as the app not being able to read you while planting a confident verdict. Fix: the dot is the LEVEL (readable from ONE steady run — decoupling is a single-run measurement), the arrow is the TREND (needs 8 steady runs). Reworded the withheld line to a trend receipt — "N of 8 steady runs for a trend" (`RUN_TREND_MIN_RUNS`) — and expanded the durability ⓘ to teach both reads. The level dot stays (verified real on Michael's data: today's 80-min run, decoupling 4.4% = genuinely strong). Only the arrow waits on volume. Open, NOT tuned to Michael: whether 8 is too high now that decoupling ALSO has the noise guard — a universal call, deferred.
 
 **"A fade is an HR claim, not a pace claim" (Performance + State parity, `session-detail/build.ts` + `run-insights.ts`, LIVE).** A grade-adjusted half-vs-half FALSELY reads a "positive split" on an out-and-back — GAP credits the uphill leg and penalizes the downhill return, a terrain artifact, not a fade. Verified on Michael's run: raw split −37s/mi (2nd half FASTER), GAP +93 (the artifact), HR flat (decoupling 4.4%). So a slowdown is only NAMED a fade when HR agrees it drifted up. `pacingVerdict()` (in `run-insights.ts`) is the SINGLE SOURCE the PACING row and the deterministic paragraph both call — effort=HR, decoupling ≤5% (Friel) = even effort. This is what makes Performance and State tell ONE story off ONE number, and it is LIVE (the run composer embeds it; not dead with the LLM guards). The LLM-era guards that policed this (the honesty seatbelt, the pace-steady validator) ARE dead — see D-304 — but the PRINCIPLE and the `pacingVerdict` mechanism stay.
+
+---
+
+## D-306 — The coach week narrative goes deterministic: a PROTOCOL-AWARE, FOCUS-AWARE week composer (2026-07-19 LATE, BUILT + FIXTURE-VERIFIED · NOT WIRED · NOT DEPLOYED)
+
+Finishes what D-304 started. D-304 replaced the per-workout LLM narration (run + bike); this is the **last output-LLM**, the multi-week coach paragraph on State (`StateTab.tsx:1423`). New files: **`_shared/insights/coach-week-insights.ts`** (the composer) + **`_shared/insights/strength-protocol-read.ts`** (the protocol layer), 29 deno tests green. ⛔ **Nothing is wired yet — `coach.narrative` is still the LLM.** See the ENGINE-STATE banner for the wiring job.
+
+### What it says — four questions, one swapped yardstick
+
+Grounded in a 2026-07-19 research pass over commercial practice + the concurrent-training literature (below). The read answers: **where did the week go · does it match what you meant · is anything quietly disappearing · is the lifting still moving.**
+
+**The plan-follower and the no-plan athlete are NOT two composers.** They are the same four questions with the reference swapped — the plan, or the athlete's own trailing baseline. Same idiom as the bike composer's power-vs-HR fork: fork on what data EXISTS, never on what it says. This is the "generalist" positioning expressed as code rather than copy.
+
+### The instrument is per-discipline, and this is the whole point
+
+**Endurance is judged by volume** (acute:chronic vs its own trailing normal) — aerobic adaptation is dose-response to accumulated duration, so a volume ratio is the right tool. **Strength is judged by e1RM** (the spine's noise-guarded `StrengthFitness.e1rm` verdict, D-303) — lifting adapts to load and progressive overload, not time-under-load. Judging strength by a volume ratio imports the endurance model onto the barbell, which is the exact two-lane failure the product exists to fix. *(First draft did precisely that. Caught by Michael.)*
+
+Also: **adherence does not suppress the e1RM verdict.** Doing every prescribed session and STILL sliding is the most informative case there is — the work happened and it is not producing. But a prescribed lighter week (deload), executed, is never a shortfall.
+
+### THE PROTOCOL OWNS ITS OWN READING (`strength-protocol-read.ts`)
+
+A read that looks only at trend lines is a robot: it sees a number move and grades it with no idea what the block was DESIGNED to make that number do. The same observation inverts by protocol:
+
+- **`five_by_five`** — load climbs 70→85% at ~1.25%/wk (`protocols/five-by-five.ts`). So RIR falls BY DESIGN, and the RIR-adjusted e1RM estimate falls with it. **A dipping e1RM here is the ramp, and is never reported.** The real events are the **stall** (reps missed at the prescribed load) and the **85% ceiling** that ends the block → retest (`SCIENCE-5x5-linear-progression.md` §2/§4).
+- **`minimum_dose`** — the block's one job is to hold. **Sliding IS the story.** Low volume is never a shortfall; spending less time is the point.
+- **`neural_speed`** — 85-90% 1RM, volume deliberately too low for hypertrophy. Volume shortfall never reported; e1RM is the correct instrument.
+- **`durability`** — the RIR TARGET itself steps 3→2 across Base, and the adaptation is tendon/tissue, not a 1RM. No e1RM claim is made at all.
+- **`upper_aesthetics`** — e1RM is fatigue-suppressed for the block's duration by design; volume is the instrument.
+- **`triathlon` / `triathlon_performance` / unrecognised** — **UNGROUNDED, returns null.** Their intent was not traced closely enough to invert or endorse a trend honestly. Silence beats a confident misread. A named gap, not an oversight.
+
+`protocolExpectsE1rmToDip()` defaults **TRUE** for unknown protocols — the safe direction is to say nothing, not to accuse.
+
+### What it REFUSES to say (each is a documented failure in a shipped product)
+
+- **No raw completion tally.** Runna's model: *"When you skip a run, Runna notes it and moves on… a plan that reflects where you are now, not where you were supposed to be."* Fact + consequence, no score.
+- **Never "you have no plan"**, and plan-absence is never a deficit state. Lowest-value item in the research ranking; the BJHP 2025 study (58,881 posts, 13,799 negative) ties prescriptive framing to shame, avoidance, and disengagement from the BEHAVIOUR, not just the app.
+- **No shortage/excess verdict against an ideal the athlete never agreed to** — the largest single source of resentment in the corpus (Garmin has had to post *"An Unproductive Training Status does not mean we hate you"*).
+- **No monotony risk claim.** The systematic review is explicit: *"the role of monotony and strain in monitoring and injury prevention is not currently supported by the literature."* It is also content-blind — 3 runs + 3 lifts at similar RPE×duration score as "monotonous" despite maximal stimulus diversity. Fatal for a hybrid app.
+- **No injury risk off a ramp number** (ACWR contested as a predictor). **No claim that interference HAPPENED** (see Q-191).
+- **A `maintain` discipline drifting down is not reported at all** — not as a warning and **not as reassurance**. The consoling "that's a trade, not a mistake" register was rejected on purpose (client-orphaned `posture.ts`); the honest move is not to raise it. A `dropped` discipline is invisible.
+
+### What it CAN say, that nothing else does
+
+**Credit.** Strength work does not cost aerobic fitness and improves running economy (ES −0.27 high-load, −0.43 combined) and cycling efficiency (0.35) with VO2max unchanged. When endurance is the declared focus and the lifts are holding, that is a CONTRIBUTION. The app's positioning has always implied this and never said it. Fires only on a POSITIVE e1RM verdict — absence of a sliding verdict is not evidence of holding.
+
+### Thresholds are field-standard, not hand-picked
+
+±20% planned-vs-actual is where **TrainingPeaks, Intervals.icu and Final Surge independently converged** (green 80–120%, amber 50–150%). The 0.8 floor is the conventional ACWR under-training line, used **purely descriptively** ("below your own normal"), never as a risk claim.
+
+### The competitive finding that justifies the whole thing
+
+**No commercial platform connects strength to endurance in a weekly narrative. Not one.** Intervals.icu excludes strength from fitness *by design* (developer, verbatim: *"That change was by design. By default strength workouts now only count towards fatigue and not fitness"*); Coros documents that its TRIMP model "has not been designed to accurately estimate the load for anaerobic or power activities"; Garmin's Training Status is gated on run/bike VO2max; TrainingPeaks shipped a *manually entered* strength TSS field in May 2026 after a 187-vote request; Athletica's founder — a published sports scientist — states on record that strength load quantification is *"apples and oranges"* against TRIMP/TSS, *"with nobody yet to crack it,"* and *"down on our list of dev items."* The weekly-narrative slot itself is unoccupied: two Intervals.icu feature requests for exactly this sit with zero developer replies.
+
+**And the bar for narrative is one question:** *could I have gotten this by pasting a screenshot into a general LLM?* Every rejected implementation fails it, in near-identical words across platforms — *"This isn't particularly wrong, but neither is it useful in any way"* / *"I certainly don't need to be told what I can read from the graphs."*
+
+### Anti-doubling rules learned by RUNNING it (not from the tests)
+
+Three defects the 22 green tests did not catch, found by reading the output: (1) clause 2 and clause 3 both naming the same discipline (the said-twice bug); (2) warning that a discipline dipped and then calling the down week healthy — the app arguing with itself (D-305); (3) "mostly" claimed at 49% share. Fixed: clause 3 is decided FIRST so clause 2 can defer, a whole-week-down suppresses per-discipline dips, "mostly" is earned only above 50%, and the generic all-clear fires **only when no specific finding did**. ⚠️ **Green means the code does what I told it to, not that what I told it was right.** Read the sentences.
+

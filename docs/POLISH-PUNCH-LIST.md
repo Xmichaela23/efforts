@@ -8,6 +8,12 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+### Built 2026-07-19 night (coach week composer, D-306) — ⛔ NOT WIRED, nothing to verify yet
+- [ ] **Wire `composeCoachWeekInsight` into the coach** to replace the LLM `coach.narrative`. Needs: the strength e1RM verdict joined onto `by_discipline`, the protocol id + week-in-block (already at `coach/index.ts:2212`), and `COACH_PAYLOAD_VERSION` bumped from 117. ⚠️ Two LLM paths — kill both (Q-190).
+- [ ] **Build the stall signal (Q-193)** — per-set `reps < planned_reps` at `weight >= planned_weight`, in the loop at `coach/index.ts:4356-4379`. The most useful sentence in the set; currently rounded away by `Math.max` and by set-completion adherence.
+- [ ] **Ground the two triathlon protocols** in `strength-protocol-read.ts` (currently silent by design) — needs a trace of `triathlon.ts` / `triathlon_performance.ts` intent, then a reading each.
+- [ ] **Trace `adapt-plan` for Q-192** before touching `strength-profiles.ts` — `five_by_five` is absent and falls back to durability's thresholds; the prescription may still be right and only the adaptation layer wrong.
+
 # ⚡ AWAITING MICHAEL — SHIPPED 2026-07-13/14, NOT YET VERIFIED ON DEVICE
 
 **All deployed and live.** Fixtures are green; **none of this has been driven by a human yet.** Tick these off as you train.

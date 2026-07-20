@@ -24,7 +24,44 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-19 LATE — LLM TEARDOWN: RUN + BIKE INSIGHTS ARE DETERMINISTIC · SWEEP THE DEAD CODE NEXT)
+## 🧭 NEXT SESSION — START HERE (2026-07-19 NIGHT — THE COACH WEEK COMPOSER IS BUILT AND NOT WIRED · WIRE IT, THEN SWEEP)
+
+> ## READ `docs/GAME-PLAN.md`, `START-HERE.md`, `LIFECYCLE.md`, then **D-306** and **Q-189 → Q-193** (all new tonight).
+>
+> **What happened:** the LLM teardown reached its last target — the coach week narrative on State. The composer is **BUILT and fixture-verified (29 deno tests) but WIRED TO NOTHING.** `coach.narrative` is still the LLM. Building it surfaced five verified findings, all filed as Q-entries; every one is the same shape — **the app already knows something and the place that needs it never asks.**
+>
+> ### ⛔ YOUR JOB #1 — WIRE THE COMPOSER. New files, both pure functions, no importers yet:
+> - `_shared/insights/coach-week-insights.ts` — `composeCoachWeekInsight()` + `buildCoachWeekInsightInput()`
+> - `_shared/insights/strength-protocol-read.ts` — `readStrengthProtocol()` + `protocolExpectsE1rmToDip()`
+>
+> **The inputs it needs, and where they already live (all reachable BEFORE the narrative is minted at `coach/index.ts:3820`):**
+> 1. **Load by discipline** — `by_discipline` is assembled at `coach/index.ts:5413` from `training_state.load_ramp.acute7_by_type`; `training_state` is built at **`:2677`**, so the data is available early. It carries `planned_load`, `actual_load`, `session_count`, `acwr`. ⚠️ `coach/types.ts:458-464` does NOT list `maturity`/`acwr` although `:5422-5423` sets them — type drift, harmless, worth fixing while you are there.
+> 2. **Focus (posture)** — `per_discipline_posture`, read in `compute-snapshot/index.ts:775` (`sanitizePosture`). Keyed by discipline, values develop/maintain/dropped.
+> 3. **Strength e1RM verdict** — the spine's noise-guarded `StrengthFitness.e1rm.verdict` (`_shared/state-trend/strength.ts:147`, D-303). ⚠️ **NOT on `by_discipline`** — this is the join you have to write.
+> 4. **Protocol + week-in-block** — `strength_protocol` is chosen at plan creation (`create-goal-and-materialize-plan`), stored in plan config, and **the coach ALREADY reads it at `coach/index.ts:2212`** (`resolveProfile(planConfig?.strength_protocol)`). Continuity here is fine; new plans carry it automatically.
+> 5. **The stall (`missedPrescribedReps`)** — ⛔ **NOT BUILT. See Q-193.** Everything needed is in one loop at `coach/index.ts:4356-4379`, but `bestReps = Math.max(...)` (`:4370`) and `adherence_pct = set_completion` both round the stall away. It is one per-set subtraction: any set with `reps < planned_reps` at `weight >= planned_weight`. **This is the single most useful sentence in the set** (on a linear block the stall is the protocol's own terminal event) — build it.
+>
+> **Then:** bump `COACH_PAYLOAD_VERSION` (currently **117**, `coach/index.ts:132`) or `coach_cache` will serve the old prose for 24h. And ⚠️ **there are TWO LLM narrative paths (Q-190)** — primary `coaching.ts:408`, legacy `coach/index.ts:4826`. Kill one and the other silently takes over.
+>
+> ### JOB #2 — THE CLEANUP SWEEP (deferred from the last banner, deliberately). The keep/delete list in the superseded banner below still stands, with one addition: **`narrative-core/*` becomes deletable only once the coach narrative stops being an LLM** — i.e. after JOB #1. Sweeping before that means sweeping twice. Delete-on-replacement.
+>
+> ### ⚠️ WHAT IS TRUE ABOUT THE COMPOSER — do not overstate it:
+> - **BUILT + fixture-verified. NOT wired, NOT pushed, NOT deployed, NEVER seen on a device.** Nothing on State changed tonight.
+> - **Protocol readings are grounded for `five_by_five` / `minimum_dose` / `neural_speed`, and deliberately SILENT for `triathlon` / `triathlon_performance` / anything unrecognised** — their intent was not traced closely enough to read honestly. That is a named gap, not an oversight. `durability` and `upper_aesthetics` return null on purpose (e1RM is the wrong instrument for both).
+> - **Three defects were found by READING THE OUTPUT, not by the tests** (22 were green at the time). See D-306's last section. Run the preview, read the sentences.
+>
+> ### THE FIVE FINDINGS (all code-verified tonight — full detail in the Q-entries):
+> - **Q-189** — the narrative's ten honesty validators run and are **discarded** (`coaching.ts:428` soft-accepts). Includes the spine-contradiction check. Moot once D-306 lands.
+> - **Q-190** — **two** LLM narrative paths, not one; and the deterministic fallback (`coaching.ts:488`) emits the raw "N of M sessions" tally the prompt bans at `coach/index.ts:4732`.
+> - **Q-191** — the interference verdict (`compute-snapshot:537`) is **posture-blind** (posture is read at `:775` in the same file, into a different consumer) **and** makes a causal claim the evidence cannot carry (the effect is smaller than e1RM's measurement noise). D-306 supersedes rather than repairs it.
+> - **Q-192** — **`five_by_five` is missing from `_shared/strength-profiles.ts`** and falls back to `durability`. Read by `adapt-plan` and `response-model/weekly`. ⚠️ Absence verified; IMPACT NOT TRACED — do not edit the table before tracing `adapt-plan`.
+> - **Q-193** — the stall is invisible (see JOB #1 item 5).
+>
+> ### ALSO UPDATED: `SCIENCE-concurrent-training-interference.md` carries a 2026-07-19 addendum — Schumann 2022 (43 studies) **contests §2 (cycling-vs-running) and §3 (frequency)**, confirms §4/§5, and adds the reverse direction (strength → economy, the best-supported material in the domain) plus the measurement ceiling that governs what the app may ever claim. ⛔ It does NOT ask you to change shipped scheduling logic.
+
+---
+
+## 🧭 NEXT SESSION — START HERE (SUPERSEDED 2026-07-19 NIGHT — run + bike composers still stand; the sweep moved to JOB #2 behind the coach composer)
 
 > ## READ `docs/GAME-PLAN.md`, `START-HERE.md`, `LIFECYCLE.md`. **The product decision this session: LOSE THE LLM from all output narration.** Michael's call, after a year of proving the deterministic spine — the insight was always the engine's VERDICT, the LLM only phrased it (and drifted: "pace held steady" on a run whose pace ran 13:07→15:50). Research backs it (users hate AI-narrative fluff; DIS-2026 paper "Who Gets to Interpret the Workout"). Positioning: "the app that doesn't make anything up." **Keep the LLM ONLY for INPUT PARSING** (onboarding goal-parse `llm-arc-setup.ts`, `extract-races`) — unstructured→structured is the one thing it's good at, and the user confirms the parse. Never structured→prose again.
 >
