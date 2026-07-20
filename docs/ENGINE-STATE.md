@@ -24,7 +24,37 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-19 EOD — STRENGTH READ REBUILT TO COMMERCIAL-APP STANDARD · FAN-OUT VERIFIED)
+## 🧭 NEXT SESSION — START HERE (2026-07-19 LATE — LLM TEARDOWN: RUN + BIKE INSIGHTS ARE DETERMINISTIC · SWEEP THE DEAD CODE NEXT)
+
+> ## READ `docs/GAME-PLAN.md`, `START-HERE.md`, `LIFECYCLE.md`. **The product decision this session: LOSE THE LLM from all output narration.** Michael's call, after a year of proving the deterministic spine — the insight was always the engine's VERDICT, the LLM only phrased it (and drifted: "pace held steady" on a run whose pace ran 13:07→15:50). Research backs it (users hate AI-narrative fluff; DIS-2026 paper "Who Gets to Interpret the Workout"). Positioning: "the app that doesn't make anything up." **Keep the LLM ONLY for INPUT PARSING** (onboarding goal-parse `llm-arc-setup.ts`, `extract-races`) — unstructured→structured is the one thing it's good at, and the user confirms the parse. Never structured→prose again.
+>
+> ### ⛔ YOUR JOB #1 — THE CLEANUP SWEEP. Run + bike composers shipped and VERIFIED on device; the LLM per-workout generators are now DEAD but still in the tree (bypassed, `void`'d). Delete them.
+> **DELETE (dead after the composers):** `_shared/fact-packet/ai-summary.ts` (generateAISummaryV1 + its whole validator suite incl. the pacing/HR guards), `_shared/cycling-v1/ai-summary.ts` (generateCyclingAISummaryV1), and the honesty-guard plumbing + `void`'d dead refs in `analyze-running-workout` and `analyze-cycling-workout`.
+> **⛔ KEEP — do NOT delete (a cold chat WILL get this wrong):**
+> - `_shared/insights/run-insights.ts` + `bike-insights.ts` — the composers (the whole point).
+> - `pacingVerdict` — lives in `run-insights.ts`, imported by `session-detail/build.ts` (the PACING row single-sources off it). Load-bearing.
+> - `_shared/narrative-core/*` — SHARED with the **coach narrative** (still live LLM). Delete it and State's coach prose breaks.
+> - `_shared/fact-packet/execution-honesty.ts` bits still imported by `analyze-cycling-workout` + `cycling-v1/cross-workout-types.ts` — trace before touching.
+> - `llm-arc-setup.ts`, `extract-races` — input parsing, stays.
+> **CONSTRAINTS:** trace every importer before deleting a shared file; redeploy ALL importers (the `_shared` deploy trap); typecheck each touched function (baseline-vs-change error count, they carry pre-existing errors); after, recompute a run AND a ride and confirm both still analyze.
+>
+> ### JOB #2 (after the sweep) — THE COACH NARRATIVE, the LAST output-LLM. It's the multi-week prose on the STATE screen (`coach/index.ts`, `athlete-snapshot/coaching.ts`). Same treatment: deterministic composer over the verdicts. This is a bigger composer (cross-discipline, multi-week) — its own job.
+>
+> ### STATE SCREEN STATUS (Michael asked): its fitness reads are ALREADY deterministic (strength per-lift, run durability, bike, swim, load bar, week-accent — all templates/verdicts, never LLM). The ONE LLM piece on State is the coach narrative (JOB #2). The sweep does NOT touch State.
+>
+> ### WHAT SHIPPED + DEPLOYED + VERIFIED-ON-DEVICE this session. Do NOT re-litigate:
+> - **RUN insights composer** (`_shared/insights/run-insights.ts`, D-304) — deterministic, replaces the LLM `ai_summary`. Three families (steady/easy/long · interval/tempo/hills/etc · fartlek-mixed), verdict-per-clause, silent when thin. `pacingVerdict` single-sourced with the PACING row (build.ts). LLM call removed from `analyze-running-workout`. Verified: "even effort across rolling terrain… HR held, pace swing was terrain not fatigue."
+> - **BIKE insights composer** (`_shared/insights/bike-insights.ts`, D-304) — same, plus a POWER-vs-HR switch (full read with a meter: NP/IF/TSS/"watts didn't cost you HR"; HR-only: zone read, never a fabricated watt). LLM removed from `analyze-cycling-workout`. Verified on device. Fixed a live doubling: INSIGHTS printed raw HR drift (−8.4%) while the EFFICIENCY row shows Friel aerobic decoupling (−4.6%) — the paragraph no longer prints a drift number; the row owns it.
+> - **Guards from earlier today are now DEAD** (they policed the LLM): the run HR-gate, the pace-steady/pacing-verdict guard, execution-honesty. Their LOGIC lives in the composers; the CODE dies in the sweep.
+>
+> ### ⚠️ RESIDUAL / WATCH:
+> - Bike composer's `hrHeld` decision uses raw HR drift as a proxy, not the exact `aerobic_decoupling_pct` the EFFICIENCY row shows (they agreed in direction on the verified ride; could diverge on some ride). Wiring the exact figure into the decision is a follow-up — it's not a clean var at compose-time.
+> - Run composer consciously dropped "out-and-back" specificity (no clean signal) and the "maintenance" closer (posture not in the packet) — silence over a guess. Optional polish.
+> - iOS bundle stale caveat persists; verify client work on web/PWA.
+
+---
+
+## 🧭 NEXT SESSION — START HERE (SUPERSEDED 2026-07-19 LATE — see the LLM-teardown banner above; the strength-read + fan-out work below still stands as history)
 
 > ## READ `docs/GAME-PLAN.md`, `START-HERE.md`, `LIFECYCLE.md`. Today the audit-the-posture-reads job (previous banner) got DONE and then went further — the strength read was rebuilt.
 >

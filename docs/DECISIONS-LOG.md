@@ -806,3 +806,25 @@ Supersedes D-302's STRENGTH develop word-map. Michael asked the read to "mimic w
 **Instrument-follows-goal (designed, only get_stronger wired — the owed follow-up).** e1RM leads for a `get_stronger` goal (correct — max strength IS 1RM). A `build_muscle` goal should lead with VOLUME (hypertrophy peaks on volume; e1RM is fatigue-suppressed mid-block) — the science's own strength-vs-hypertrophy distinction. Goal exists (`non-race-goal-seeds.ts`); the read doesn't switch on it yet. See ENGINE-STATE banner JOB #1.
 
 **Also this session (not a D-entry):** fan-out D-298 a/c/d VERIFIED end-to-end via a throwaway-user harness (`scripts/fanout-audit.mjs`) — real infra, ×3 idempotent, all pass. And `scripts/strength-e1rm-check.ts` (read-only e1RM derivation/twitchiness diagnostic).
+
+---
+
+## D-304 — Lose the LLM from output narration: deterministic run + bike insight composers (2026-07-19 LATE, PUSHED + DEPLOYED + VERIFIED-ON-DEVICE)
+
+**The product decision (Michael, after a year building the deterministic spine):** the LLM leaves all OUTPUT narration. The insight was always the engine's VERDICT — the LLM only phrased it, added zero information, and introduced drift ("pace held steady" on a run whose pace ran 13:07→15:50; a self-rewriting narrative every recompute). Grounded in both app practice and research: users reject AI-narrative fluff ("highlights things they already know" — Strava Athlete Intelligence reception; DIS-2026 "Who Gets to Interpret the Workout"), and want substance/transparency. **Positioning: "the app that doesn't make anything up" — every insight a computed fact with its receipt.**
+
+**The principle (the line, not a whim):** interpret in proportion to how trustworthy the input is.
+- **Strength** — you TYPE the weight/reps. Self-explanatory; the lift table is the story. No composer.
+- **Run / bike** — reliable sensors. Trustworthy → deterministic composers.
+- **Swim** — unreliable sensors (equipment, lap detection). Show the numbers, interpret NOTHING (Michael: "if you really care, you have your own system").
+- **Input parsing** (onboarding goal-parse, race extraction) — the ONE legitimate LLM use: unstructured→structured, which templates can't do, and the user confirms the parse. KEPT. Never structured→prose again.
+
+**Run composer** (`_shared/insights/run-insights.ts`): three families — steady/easy/long (aerobic story: pacing-as-effort, decoupling, terrain), interval/tempo/hills/track/vo2/threshold (work story: reps hit, consistency), fartlek/surge (mixed BY DESIGN — never graded for steadiness, the trap). Verdict-per-clause, banned-word check, silent when thin. `pacingVerdict()` extracted as the SINGLE SOURCE the PACING row (build.ts) and the paragraph both call — they can't diverge. Maps from `fact_packet_v1`. LLM `generateAISummaryV1` call removed from `analyze-running-workout`.
+
+**Bike composer** (`_shared/insights/bike-insights.ts`): same three families + the fork running lacks — POWER vs HR. With a meter: NP/IF/TSS/VI, held-target intervals, "the watts didn't cost you HR." HR-only: zone read, decoupling, never a fabricated watt. Maps from `CyclingFactPacketV1` + analyzer extras (TSS, HR-drift, interval breakdown). LLM `generateCyclingAISummaryV1` removed from `analyze-cycling-workout`. Fixed a doubling caught on device: the paragraph printed raw HR drift while the EFFICIENCY row shows Friel aerobic decoupling — the paragraph now prints NO drift number, the row owns it.
+
+**The guards built earlier today (D-303's HR-gate, the pace-steady/verdict guard, execution-honesty) are now DEAD** — they existed to police the LLM output that no longer exists. Their LOGIC lives in the composers (terrain-vs-fatigue, the fartlek trap); the CODE dies in the cleanup sweep.
+
+**Verified on device:** run reads "even effort across rolling terrain… HR held, the pace swing was terrain not fatigue"; bike reads "steady aerobic ride at 112 W… heart rate stayed in step with the power." Both STABLE across recomputes — the whole point (deterministic = same inputs, same words, forever). Composer tests: run 7/7, bike 6/6; `pacingVerdict` shared with build.ts.
+
+**Next:** the CLEANUP SWEEP (delete the dead LLM per-workout layer — see the ENGINE-STATE banner for the keep/delete/caveat list; `narrative-core` stays, it's shared with the still-live coach narrative), then JOB #2 the COACH NARRATIVE (the last output-LLM, on State).
