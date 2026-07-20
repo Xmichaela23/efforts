@@ -24,29 +24,34 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-19 NIGHT — THE COACH WEEK COMPOSER IS BUILT AND NOT WIRED · WIRE IT, THEN SWEEP)
+## 🧭 NEXT SESSION — START HERE (2026-07-19 NIGHT — THE WEEK NARRATIVE IS DETERMINISTIC · PUSHED + DEPLOYED · ⛔ UNVERIFIED ON DEVICE)
 
 > ## READ `docs/GAME-PLAN.md`, `START-HERE.md`, `LIFECYCLE.md`, then **D-306** and **Q-189 → Q-193** (all new tonight).
 >
-> **What happened:** the LLM teardown reached its last target — the coach week narrative on State. The composer is **BUILT and fixture-verified (29 deno tests) but WIRED TO NOTHING.** `coach.narrative` is still the LLM. Building it surfaced five verified findings, all filed as Q-entries; every one is the same shape — **the app already knows something and the place that needs it never asks.**
+> **What happened:** the LLM teardown reached its last target. `coach.narrative` — the last output-LLM on State — is now composed deterministically and is **PUSHED (652f07e3) + DEPLOYED (coach, 2026-07-19)**. ⛔ **NOBODY HAS SEEN IT ON A DEVICE.** Building it surfaced five verified findings, all filed as Q-entries; every one is the same shape — **the app already knows something and the place that needs it never asks.**
 >
-> ### ⛔ YOUR JOB #1 — WIRE THE COMPOSER. New files, both pure functions, no importers yet:
+> ### ⛔ YOUR JOB #1 — VERIFY IT, THEN FIX THE SUNDAY LIMITATION.
+> **(a) Verify on device.** Open State → the collapsed paragraph under "open for more". It should read as facts about the week's mix and either the plan comparison or your own-normal band. If it is EMPTY that may be correct (silence is legal on thin data) — check the function logs before treating it as a bug. `COACH_PAYLOAD_VERSION` is **118**; a stale cache would serve the old LLM prose for 24h.
+> **(b) ⚠️ THE PLAN-VS-ACTUAL CLAUSE ONLY FIRES ON SUNDAYS — a real, deliberate limitation.** `acute7_by_type.linked_load` is the WHOLE week's planned load while actual is week-to-date, so a mid-week compare makes every Monday read "came in lighter" (the Q-177 trap). It is gated to complete weeks (`partialWeek` = day-of-week !== 0, commented in place at the call site). **The proper fix is a planned-BY-TODAY figure**, which `acute7_by_type` does not carry — that is the next real piece of work on this.
+> **(c) The LLM still runs** for `coaching.headline` + `next_session_guidance` (separate fields, separate consumers). Only the narrative was replaced. Retiring the rest is the sweep.
+>
+> ### WHAT WAS BUILT — new files, sole importer is `coach`:
 > - `_shared/insights/coach-week-insights.ts` — `composeCoachWeekInsight()` + `buildCoachWeekInsightInput()`
 > - `_shared/insights/strength-protocol-read.ts` — `readStrengthProtocol()` + `protocolExpectsE1rmToDip()`
 >
-> **The inputs it needs, and where they already live (all reachable BEFORE the narrative is minted at `coach/index.ts:3820`):**
+> **The inputs and where they came from (all resolved at the call site, nothing new fetched):**
 > 1. **Load by discipline** — `by_discipline` is assembled at `coach/index.ts:5413` from `training_state.load_ramp.acute7_by_type`; `training_state` is built at **`:2677`**, so the data is available early. It carries `planned_load`, `actual_load`, `session_count`, `acwr`. ⚠️ `coach/types.ts:458-464` does NOT list `maturity`/`acwr` although `:5422-5423` sets them — type drift, harmless, worth fixing while you are there.
 > 2. **Focus (posture)** — `per_discipline_posture`, read in `compute-snapshot/index.ts:775` (`sanitizePosture`). Keyed by discipline, values develop/maintain/dropped.
 > 3. **Strength e1RM verdict** — the spine's noise-guarded `StrengthFitness.e1rm.verdict` (`_shared/state-trend/strength.ts:147`, D-303). ⚠️ **NOT on `by_discipline`** — this is the join you have to write.
 > 4. **Protocol + week-in-block** — `strength_protocol` is chosen at plan creation (`create-goal-and-materialize-plan`), stored in plan config, and **the coach ALREADY reads it at `coach/index.ts:2212`** (`resolveProfile(planConfig?.strength_protocol)`). Continuity here is fine; new plans carry it automatically.
-> 5. **The stall (`missedPrescribedReps`)** — ⛔ **NOT BUILT. See Q-193.** Everything needed is in one loop at `coach/index.ts:4356-4379`, but `bestReps = Math.max(...)` (`:4370`) and `adherence_pct = set_completion` both round the stall away. It is one per-set subtraction: any set with `reps < planned_reps` at `weight >= planned_weight`. **This is the single most useful sentence in the set** (on a linear block the stall is the protocol's own terminal event) — build it.
+> 5. **The stall (`missedPrescribedReps`)** — ✅ **NOW BUILT** at the call site (Q-193). Per SET: `reps < planned_reps` at `weight >= planned_weight`; a zero-rep set is unperformed, not missed (Q-178's predicate). ⚠️ **This code has never seen a real `workout_analysis` row** — the shape was verified in the WRITER (`analyze-strength-workout:2748-2753`), not in data. First thing to sanity-check.
 >
-> **Then:** bump `COACH_PAYLOAD_VERSION` (currently **117**, `coach/index.ts:132`) or `coach_cache` will serve the old prose for 24h. And ⚠️ **there are TWO LLM narrative paths (Q-190)** — primary `coaching.ts:408`, legacy `coach/index.ts:4826`. Kill one and the other silently takes over.
+> **Done:** `COACH_PAYLOAD_VERSION` bumped **117 → 118**. The legacy LLM path (Q-190) is now gated on `deterministicNarrativeApplied`, so a composed SILENCE can no longer be back-filled by an LLM — that trap was live and is closed. The legacy path still EXISTS and still fires if the snapshot path throws before the composer runs.
 >
 > ### JOB #2 — THE CLEANUP SWEEP (deferred from the last banner, deliberately). The keep/delete list in the superseded banner below still stands, with one addition: **`narrative-core/*` becomes deletable only once the coach narrative stops being an LLM** — i.e. after JOB #1. Sweeping before that means sweeping twice. Delete-on-replacement.
 >
 > ### ⚠️ WHAT IS TRUE ABOUT THE COMPOSER — do not overstate it:
-> - **BUILT + fixture-verified. NOT wired, NOT pushed, NOT deployed, NEVER seen on a device.** Nothing on State changed tonight.
+> - **PUSHED + DEPLOYED + fixture-verified (29 deno tests). NEVER seen on a device, never run against a real coach payload.** Type errors held at baseline (11 before, 11 after) — that proves nothing about runtime, and `coach/index.ts` is `@ts-nocheck`.
 > - **Protocol readings are grounded for `five_by_five` / `minimum_dose` / `neural_speed`, and deliberately SILENT for `triathlon` / `triathlon_performance` / anything unrecognised** — their intent was not traced closely enough to read honestly. That is a named gap, not an oversight. `durability` and `upper_aesthetics` return null on purpose (e1RM is the wrong instrument for both).
 > - **Three defects were found by READING THE OUTPUT, not by the tests** (22 were green at the time). See D-306's last section. Run the preview, read the sentences.
 >

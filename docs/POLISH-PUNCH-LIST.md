@@ -8,9 +8,12 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-### Built 2026-07-19 night (coach week composer, D-306) — ⛔ NOT WIRED, nothing to verify yet
-- [ ] **Wire `composeCoachWeekInsight` into the coach** to replace the LLM `coach.narrative`. Needs: the strength e1RM verdict joined onto `by_discipline`, the protocol id + week-in-block (already at `coach/index.ts:2212`), and `COACH_PAYLOAD_VERSION` bumped from 117. ⚠️ Two LLM paths — kill both (Q-190).
-- [ ] **Build the stall signal (Q-193)** — per-set `reps < planned_reps` at `weight >= planned_weight`, in the loop at `coach/index.ts:4356-4379`. The most useful sentence in the set; currently rounded away by `Math.max` and by set-completion adherence.
+### ⚡ Shipped 2026-07-19 night — DEPLOYED, NOT VERIFIED (coach week composer, D-306)
+- [x] **Wired `composeCoachWeekInsight`** — `coach.narrative` is deterministic. Pushed `652f07e3`, `coach` deployed, `COACH_PAYLOAD_VERSION` 118.
+- [x] **Stall signal built (Q-193)** — per-set reps vs prescribed, at or above the prescribed load.
+- [ ] **⛔ VERIFY ON DEVICE.** State → the collapsed paragraph under "open for more". Expect facts about the week's mix, plus either the plan comparison or your own-normal band. **An EMPTY paragraph may be CORRECT** — silence is legal when data is thin; check logs before calling it broken. ⚠️ The stall code has never seen a real `workout_analysis` row.
+- [ ] **⚠️ The plan-vs-actual sentence only fires on SUNDAYS.** `linked_load` is whole-week planned vs week-to-date actual, so mid-week compares are gated off (Q-177 trap). Proper fix needs a planned-by-today figure `acute7_by_type` does not carry. Deliberate, commented, thin.
+- [ ] **The LLM still writes `coaching.headline` + next-session guidance.** Only the narrative was replaced; retiring the rest is the sweep.
 - [ ] **Ground the two triathlon protocols** in `strength-protocol-read.ts` (currently silent by design) — needs a trace of `triathlon.ts` / `triathlon_performance.ts` intent, then a reading each.
 - [ ] **Trace `adapt-plan` for Q-192** before touching `strength-profiles.ts` — `five_by_five` is absent and falls back to durability's thresholds; the prescription may still be right and only the adaptation layer wrong.
 
