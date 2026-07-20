@@ -19,15 +19,15 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
-## Q-196 — the LOAD ROW and the LOAD VERDICT are two different computations, and they can disagree on screen (ENGINE, 2026-07-20 — code-verified)
+## Q-196 — CORRECTED: the LOAD row is FINE. A stale raw-ACWR `label` survives server-side with no known consumer (ENGINE, 2026-07-20)
 
-State's LOAD row renders `label` (`coach/index.ts:5464-5470`), a **raw ACWR band**: `<0.8` → "build more", `<=1.3` → "balanced", `<=1.5` → "back off", else "rest now". Separately, `body_response.load_status.status` is the **RECONCILED** verdict (`'under' | 'on_target' | 'elevated' | 'high'`, `_shared/athlete-snapshot/types.ts:206`) — the one THE LAW calls the sole verdict authority, and the one that carries the thin-base/cross-training discounting (`acwr_provisional`, D-146/D-147, v88/v89).
+> ⛔ **THIS ENTRY WAS FILED WRONG AND IS CORRECTED IN PLACE.** The original claimed State's LOAD row renders a raw ACWR band and could contradict the reconciled verdict. **It does not.** `LoadBar.tsx:71` renders `statusVolumeLabel(loadStatus?.status)` — the RECONCILED verdict, exactly as D-260/D-266 require. "balanced" on screen is reconciled `on_target`, not an ACWR band. I asserted the client's behaviour from the server's code without opening the client. Filed, and corrected, in the same session that catalogued this failure mode (Q-195).
 
-**They are not derived from each other.** A reconciled `'high'` can sit directly above a row reading **"balanced"**, because a discounted spike is exactly the case the reconciler exists to soften and the raw band does not know about. Found while rewriting `intent_summary` (2026-07-20): the new headline first read `load_status.status`, which would have let it contradict the row three inches beneath it.
+**What is actually true.** `coach/index.ts:5464-5470` still computes a raw-ACWR `label` (`<0.8` "build more" / `<=1.3` "balanced" / `<=1.5` "back off" / `>1.5` "rest now"). Two of those four words are PRESCRIPTIONS minted from a ratio alone, which is what D-281 shipped and Q-166 reverted — **THE RULE: the ratio DESCRIBES; the body PRESCRIBES** (Item 3: "escalates only when both keys agree; Load-high + body-fine → `elevated` max, descriptive copy only").
 
-**Mitigated, not fixed.** The headline now speaks about load ONLY when the two agree in direction (`loadAgrees`, `coach/index.ts:~5395`), and otherwise says nothing about load and lets readiness carry the line. That is deliberately conservative — it hides the disagreement rather than resolving it.
+**No client consumer was found** for that field in `LoadBar.tsx` or `StateTab.tsx`. `src/lib/load-headline.ts:48-49` still carries defensive fallbacks FOR "back off"/"rest now", which suggests it was once wired and is now vestigial.
 
-**The real question, and it is NOT obvious which way it goes:** Q-166 established that a raw ratio must never reach the prescriptive band (the D-281 revert — a raw-ratio "back off" was live and wrong). THE LAW says the reconciler is the sole verdict authority. **Yet the row the athlete actually reads still renders the raw band, and two of its four labels ("back off", "rest now") are prescriptive.** So either the row should render the reconciled verdict, or the raw band should stop using prescriptive words. ⛔ Do not "simplify" the headline by picking a source until this is settled — picking wrong re-introduces the D-281 bug on a more prominent surface.
+**What to settle:** trace every consumer of that payload field. If none, DELETE it — a prescriptive raw-ratio label sitting in the payload is a loaded gun for the next surface that renders it "because it's there". If something does consume it, align it to `statusVolumeLabel`'s reconciled, descriptive vocabulary. **Do not simply reword it in place** without knowing who reads it.
 
 ## Q-194 — the BANNED-WORD VOICE CHECK is enforced in three places and NOT on the most prominent line on State (PRODUCT, 2026-07-19 — code-verified, LIVE on screen)
 
