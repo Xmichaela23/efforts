@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
+import { composeBikeInsight, buildBikeInsightInputFromPacket } from '../_shared/insights/bike-insights.ts';
 import { spineVerdictFor } from '../_shared/narrative-core/index.ts';
 import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, resolveCarriedInSoreness, CARRYOVER_WINDOW_DAYS, type SorenessEntry } from '../_shared/cross-domain-carryover.ts';
 // Step 2 (spine): first server consumer of the relocated deterministic core. The narrative
@@ -2548,28 +2549,24 @@ Deno.serve(async (req) => {
     }
 
     try {
-      ai_summary = await generateCyclingAISummaryV1(cyclingFactPacketV1, cyclingFlagsV1, null, {
-        vsSimilar: cyclingVsSimilar,
-        achievements: cyclingPRs,
-        npTrend: npTrendV1,
-        // Type-filtered 20-min-power series — lets the narrative mirror the
-        // TREND row's series selection (pwr20 if same-type ≥3, else np_trend)
-        // so the cited ride count/type match what the row shows.
-        pwr20Trend: pwr20TrendV1,
-        spineBikeTrend, // Step 2: deterministic, staleness-gated verdict the narrative describes
-        spineVerdict: bike_spine_verdict, // rules 6/7: state_trends_v1.bike (single source)
-        limiter: cyclingLimiter,
-        fitness: fitnessV1, // design #9 — CTL/ATL/TSB into the INSIGHTS narrative
-      }, arc_narrative_for_summary, {
-        isMixedEffort: _varGateRide.is_mixed_effort,
-        intervalBreakdown: (detailedAnalysis as any)?.interval_breakdown ?? null,
-      },
-      // D-035: cycling unplanned gate. cross_workout stays populated for
-      // unplanned rides (NP-vs-typical is honest history); the UNPLANNED MODE
-      // prompt rule fires on is_unplanned in the display packet.
-      { isUnplanned: !plannedWorkout },
-      aiSummaryDebug);
+      // DETERMINISTIC INSIGHTS (2026-07-19) — the LLM cycling ai_summary is REPLACED by the bike composer.
+      // Same verdicts (NP/IF/VI/TSS from the packet, power-at-HR decoupling, work-interval hits), power-vs-HR
+      // aware, no model, no wild card. generateCyclingAISummaryV1 is now dead for the main path (cleanup with
+      // the run LLM layer once bike is verified). Reads the SAME cycling packet the rows/State bike read use.
+      const _bikeIntv = (detailedAnalysis as any)?.interval_breakdown;
+      const _bikeIntervals = _bikeIntv ? {
+        hit: _bikeIntv.completed ?? _bikeIntv.hit ?? null,
+        total: _bikeIntv.total ?? _bikeIntv.count ?? null,
+        heldTarget: _bikeIntv.held_target ?? _bikeIntv.on_target ?? null,
+        consistent: _bikeIntv.consistent ?? null,
+      } : null;
+      ai_summary = composeBikeInsight(buildBikeInsightInputFromPacket(cyclingFactPacketV1, {
+        tss: (fitnessV1 as any)?.tss_today ?? null,
+        decouplingPct: typeof cyclingHrDriftPct === 'number' ? cyclingHrDriftPct : null,
+        intervals: _bikeIntervals,
+      }));
       if (ai_summary) ai_summary_generated_at = new Date().toISOString();
+      void generateCyclingAISummaryV1; void cyclingFlagsV1; void cyclingVsSimilar; void cyclingPRs; void npTrendV1; void pwr20TrendV1; void spineBikeTrend; void bike_spine_verdict; void cyclingLimiter; void _varGateRide; void plannedWorkout; void aiSummaryDebug; // dead LLM-path refs, retained for the cleanup sweep
 
       // Axis 1 — cross-domain carryover (BIKE card). Discipline-correct signal: power-at-HR decoupling
       // (cyclingHrDriftPct — HR rising relative to power = engine straining to hold watts). For cycling,
