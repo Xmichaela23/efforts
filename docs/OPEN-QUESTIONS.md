@@ -19,6 +19,16 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
+## Q-196 — the LOAD ROW and the LOAD VERDICT are two different computations, and they can disagree on screen (ENGINE, 2026-07-20 — code-verified)
+
+State's LOAD row renders `label` (`coach/index.ts:5464-5470`), a **raw ACWR band**: `<0.8` → "build more", `<=1.3` → "balanced", `<=1.5` → "back off", else "rest now". Separately, `body_response.load_status.status` is the **RECONCILED** verdict (`'under' | 'on_target' | 'elevated' | 'high'`, `_shared/athlete-snapshot/types.ts:206`) — the one THE LAW calls the sole verdict authority, and the one that carries the thin-base/cross-training discounting (`acwr_provisional`, D-146/D-147, v88/v89).
+
+**They are not derived from each other.** A reconciled `'high'` can sit directly above a row reading **"balanced"**, because a discounted spike is exactly the case the reconciler exists to soften and the raw band does not know about. Found while rewriting `intent_summary` (2026-07-20): the new headline first read `load_status.status`, which would have let it contradict the row three inches beneath it.
+
+**Mitigated, not fixed.** The headline now speaks about load ONLY when the two agree in direction (`loadAgrees`, `coach/index.ts:~5395`), and otherwise says nothing about load and lets readiness carry the line. That is deliberately conservative — it hides the disagreement rather than resolving it.
+
+**The real question, and it is NOT obvious which way it goes:** Q-166 established that a raw ratio must never reach the prescriptive band (the D-281 revert — a raw-ratio "back off" was live and wrong). THE LAW says the reconciler is the sole verdict authority. **Yet the row the athlete actually reads still renders the raw band, and two of its four labels ("back off", "rest now") are prescriptive.** So either the row should render the reconciled verdict, or the raw band should stop using prescriptive words. ⛔ Do not "simplify" the headline by picking a source until this is settled — picking wrong re-introduces the D-281 bug on a more prominent surface.
+
 ## Q-194 — the BANNED-WORD VOICE CHECK is enforced in three places and NOT on the most prominent line on State (PRODUCT, 2026-07-19 — code-verified, LIVE on screen)
 
 The banned-word list is the app's copy law made mechanical ("a quant who trains, not a coach who encourages"). It is enforced in `_shared/state-trend/week-accent.ts:56`, in `_shared/insights/run-insights.ts:84`, and in `bike-insights.ts` / `coach-week-insights.ts`. **It does not run on `intent_summary`** — the headline rendered at the TOP of State (`StateTab.tsx:1401`), above everything else.

@@ -131,7 +131,7 @@ const corsHeaders: Record<string, string> = {
 /** v58: grounding correction (Michael 2026-07-03) — NO time window at all ("8 weeks" still over-claimed a last-performed date the lookback edge can't pin). LEGS LOADED Why now: "{movement} (not in your recent training)". Bump so cached "8 weeks" rows recompute. */
 /** v59: stale-anchor class closure — the plan week claim (narrative line + week chip) now END-gated (planActiveNow = planHasStarted && !planHasEnded), so a naturally-expired, never-replaced plan stops narrating "week {duration}". Bump so cached rows for any ended plan recompute. */
 /** v61: Q-111 fact-only — a strength DECLINE ("back off weight") no longer emits a `suggested_weight` (the "go lighter" prescription is dropped; the client then renders "Working ~125 vs your 150 baseline" with no action). Progression ("add weight") suggestions unchanged. Bump so cached "suggest 115 / back off" per-lift rows recompute to the fact-only row. */
-const COACH_PAYLOAD_VERSION = 120; // 120: D-306 window fix — the paragraph was reading plan-vs-actual off the ROLLING 7-day window (acute7_by_type) while the plan lives on the CALENDAR week, so consecutive sentences described two different spans and both called it "the week" (Michael, on sight of the screen). Plan comparison now uses computeWtdLoadSummary (_shared/adherence-plan.ts) PER DISCIPLINE — the same shipped helper the rest of the week reads — which bounds planned load to sessions due ON OR BEFORE today. That RETIRES the hand-rolled Sunday gate from v118: partial weeks were already solved here (v100/v102, the Q-177 trap), so the clause now speaks every day instead of once a week. ACWR stays ROLLING on purpose — "drifting below its own normal" is a trailing question. Bump so cached rows re-source. // 119: D-306 follow-up, ON SIGHT OF THE REAL SCREEN. Dropped the mix sentence — it restated the LOAD bar rendered directly above it ("44% of your load, then strength 22%") which is the exact redundancy every rejected AI-narration feature was killed for. And the all-clear no longer says "every discipline": it only ever checked disciplines the PLAN asked for, and fired on a week where bike and swim carried real off-plan load. It now names the scope and surfaces the off-plan work. Bump so cached rows re-source. // 118: D-306 — the week narrative is DETERMINISTIC. `coach.narrative` is now composed by `_shared/insights/coach-week-insights.ts` (protocol-aware, focus-aware) instead of written by the LLM. A composed SILENCE is a real answer, so the legacy LLM fallback is gated on `deterministicNarrativeApplied` and can no longer back-fill an intentional quiet. Bump so cached rows re-source — otherwise coach_cache serves the old LLM prose for 24h and the change looks like it did not ship (the D-281/Q-170 trap). // 117: upkeep SLIP GATE (refines D-297) — the upkeep accent flips from compliance-only to a gated measured "aerobic base has started to slip" ONLY when hr_drift is measurably declining (never routine, never a prediction); holding/thin → unchanged. Bump so cached rows re-source. // 116: threshold-pace single-source (audit #6) — the baseline prose line now reads the ONE resolver (learned/measured wins over the wizard effort_paces it read first), formatted m:ss, so the coach speaks the SAME threshold pace race-projections predicts off. Bump so cached rows re-source the corrected line. // 115: UPKEEP accent (D-297) — a MAINTAIN discipline is measured against its OWN stored target (run = target_weekly_miles), in miles, on the trailing pattern, with a science-backed gentle read (docs/SCIENCE-upkeep-maintenance.md) — replacing the session-count "1 of 3 runs / speed fades" trade for maintain disciplines. Bump so cached rows re-source. // 114: bike anchor label gains its as-of date ("auto - FTP est - <date>") to match the run anchor grammar; cosmetic. Bump so cached rows re-source.
+const COACH_PAYLOAD_VERSION = 121; // 121: the TOP LINE is now POSITION + SYNOPSIS. Replaced a ~130-line nested tree keyed on FOUR crossed axes (load x cross-training composition x week intent x readiness) emitting ~25 hardcoded strings, nearly all IMPERATIVES ("protect recovery now", "Rest fully", "back off and recover") — the register D-155 bans and that nothing enforced here. Now: plan name + week N of M, then AT MOST ONE synopsis clause naming a verdict the rows below actually render, in their vocabulary. Silence when nothing rises. Also kills the live banned-copy ("body is ready, stay consistent", Q-194) and the possible "cross-training pushing load high" vs BODY row "handling combined load well" contradiction. Load is spoken about ONLY when the raw ACWR band and the reconciled verdict agree (Q-196). Bump so cached rows re-source. // 120: D-306 window fix — the paragraph was reading plan-vs-actual off the ROLLING 7-day window (acute7_by_type) while the plan lives on the CALENDAR week, so consecutive sentences described two different spans and both called it "the week" (Michael, on sight of the screen). Plan comparison now uses computeWtdLoadSummary (_shared/adherence-plan.ts) PER DISCIPLINE — the same shipped helper the rest of the week reads — which bounds planned load to sessions due ON OR BEFORE today. That RETIRES the hand-rolled Sunday gate from v118: partial weeks were already solved here (v100/v102, the Q-177 trap), so the clause now speaks every day instead of once a week. ACWR stays ROLLING on purpose — "drifting below its own normal" is a trailing question. Bump so cached rows re-source. // 119: D-306 follow-up, ON SIGHT OF THE REAL SCREEN. Dropped the mix sentence — it restated the LOAD bar rendered directly above it ("44% of your load, then strength 22%") which is the exact redundancy every rejected AI-narration feature was killed for. And the all-clear no longer says "every discipline": it only ever checked disciplines the PLAN asked for, and fired on a week where bike and swim carried real off-plan load. It now names the scope and surfaces the off-plan work. Bump so cached rows re-source. // 118: D-306 — the week narrative is DETERMINISTIC. `coach.narrative` is now composed by `_shared/insights/coach-week-insights.ts` (protocol-aware, focus-aware) instead of written by the LLM. A composed SILENCE is a real answer, so the legacy LLM fallback is gated on `deterministicNarrativeApplied` and can no longer back-fill an intentional quiet. Bump so cached rows re-source — otherwise coach_cache serves the old LLM prose for 24h and the change looks like it did not ship (the D-281/Q-170 trap). // 117: upkeep SLIP GATE (refines D-297) — the upkeep accent flips from compliance-only to a gated measured "aerobic base has started to slip" ONLY when hr_drift is measurably declining (never routine, never a prediction); holding/thin → unchanged. Bump so cached rows re-source. // 116: threshold-pace single-source (audit #6) — the baseline prose line now reads the ONE resolver (learned/measured wins over the wizard effort_paces it read first), formatted m:ss, so the coach speaks the SAME threshold pace race-projections predicts off. Bump so cached rows re-source the corrected line. // 115: UPKEEP accent (D-297) — a MAINTAIN discipline is measured against its OWN stored target (run = target_weekly_miles), in miles, on the trailing pattern, with a science-backed gentle read (docs/SCIENCE-upkeep-maintenance.md) — replacing the session-count "1 of 3 runs / speed fades" trade for maintain disciplines. Bump so cached rows re-source. // 114: bike anchor label gains its as-of date ("auto - FTP est - <date>") to match the run anchor grammar; cosmetic. Bump so cached rows re-source.
 // 113: // 113: ROLLING ANCHOR (derivation shares the band 12wk window; the anchor tracks current capacity, descending as runs age out) + ANCHOR-DESCENT ACCENT (a supersede-by-aging emits a composer candidate: "Run benchmark eased - the <month> runs behind it aged out" + a GATED credit clause when cross-training carries the aerobic load and efficiency is not degrading). Bump so cached rows re-source.
 // 112: // 112: run durability VOLUME GATE (below 8 qualifying steady runs in the window the direction is "withheld" - a 4th state, counts voice, no arrow - so a handful of runs cannot claim "improving" and contradict the accent) + CROWN-FROM-N (the baseline is the 2nd-best qualifying effort, so one kind day cannot define the anchor; <2 qualifying = calibration). Bump so cached rows re-source.
 // 111: // 111: Fix A (band floors sub-zero decoupling with the crown constant so the tick is not pinned mid-band by a confounded negative run) + Fix B (coach reads state_trends_v1 for week_start <= this Monday, so a stray future-dated snapshot no longer shadows the current week that carries the anchors). Bump so caches re-source.
@@ -5368,131 +5368,76 @@ ${narrativeFacts.join('\n')}`;
         intent: weekIntent,
         focus_label: weekFocusLabel,
         phase_source: weekPhaseSource, // D-261: glass-box receipt for how `intent` resolved
+        // ── THE TOP LINE — POSITION + SYNOPSIS (2026-07-20). ────────────────────────────────────────
+        // REPLACES a ~130-line nested tree keyed on FOUR crossed axes (load status x cross-training
+        // composition x week intent x readiness) that emitted ~25 hardcoded strings, nearly all of them
+        // IMPERATIVES — "protect recovery now", "Rest fully", "back off and recover", "Keep it
+        // controlled, protect your legs". D-155 bans that register and was enforced on the narrative and
+        // on nothing here. Crossing axes is also what made it 25 strings: the field crosses none (Coros
+        // keys 6 strings off one band, Garmin 5, Strava 3).
+        //
+        // WHAT THIS LINE IS FOR: everything is rendered BELOW it — load verdict + ACWR, body response,
+        // the mix bars, the upkeep receipt, the per-discipline fitness rows. So it is a SYNOPSIS or it
+        // is nothing. Michael: "plan, week number, quick synopsis of what's below."
+        //
+        // ⛔ THE RULE THAT KEEPS IT HONEST: it may only name a verdict THE ROWS BELOW ACTUALLY RENDER,
+        // and it reads those verdicts rather than re-deriving them. That is why it cannot contradict the
+        // screen — the old tree could say "Cross-training pushing total load high" while the BODY row
+        // said "Handling combined load well". Headline states it; the rows explain WHY (Garmin's model,
+        // minus Garmin's failure, which is a verdict with no receipt under it).
         intent_summary: (() => {
           const rs = readinessState;
-          const intent = weekIntent;
           const ls = athleteSnapshot?.body_response?.load_status?.status;
-          const lsData = athleteSnapshot?.body_response?.load_status;
-          const bodyTrends = athleteSnapshot?.body_response?.weekly_trends;
-          const weeksOutVal = goalContext.upcoming_races?.[0]?.weeks_out ?? null;
 
-          // Body response quality: are run signals positive despite load?
-          const runBodyOk = bodyTrends
-            && (bodyTrends.run_quality?.trend === 'stable' || bodyTrends.run_quality?.trend === 'improving')
-            && bodyTrends.run_quality?.based_on_sessions >= 2;
-          // Is the excess load primarily cross-training (not running)?
-          const runLoadPct = lsData?.run_only_week_load_pct;
-          const excessIsCrossTraining = runLoadPct != null && runLoadPct <= 100;
+          // POSITION — plan name + week N of M. Silent about position when there is no plan.
+          const planName = String(activePlan?.name || '').trim();
+          const totalW = Number(activePlan?.duration_weeks) || null;
+          const wIdx = Number(weekIndex) || null;
+          const position = !planName ? null
+            : (wIdx && totalW) ? `${planName} · Week ${wIdx} of ${totalW}.`
+            : wIdx ? `${planName} · Week ${wIdx}.`
+            : `${planName}.`;
 
-          // Build plan-aware context string
-          const posLabel = weeksOutVal != null ? `${weeksOutVal}w from race` : null;
+          // SYNOPSIS — at most ONE clause, highest concern first. Every branch names a verdict that is
+          // rendered below, in the same vocabulary, so the detail underneath explains this sentence.
+          // No imperatives: each states what IS, never what to do. Silence when nothing rises.
+          // ⚠️ THE LOAD ROW AND THE LOAD VERDICT ARE TWO DIFFERENT COMPUTATIONS (see Q-196).
+          // The row's word is a RAW ACWR BAND (`label` below: <0.8 "build more" / <=1.3 "balanced" /
+          // <=1.5 "back off" / else "rest now"). `load_status.status` is the RECONCILED verdict. They can
+          // disagree — reconciled 'high' next to a row reading "balanced" — which is precisely the
+          // contradiction this rewrite exists to kill. So the headline speaks about load ONLY when both
+          // agree in direction, and otherwise says nothing about it and lets readiness carry the line.
+          // ⛔ Do NOT "simplify" this by picking one source: which one is authoritative is an open
+          // question (Q-166 says a raw ratio must never be prescriptive; THE LAW says the reconciler is
+          // the sole verdict authority — yet the row still renders the raw band). Settle that first.
+          const acwrBand = (() => {
+            const a = acwr;
+            if (a == null) return null;
+            if (a < 0.8) return 'under';
+            if (a <= 1.3) return 'ok';
+            if (a <= 1.5) return 'elevated';
+            return 'high';
+          })();
+          const lsBand = ls === 'on_target' ? 'ok' : ls === 'under' ? 'under' : ls === 'elevated' ? 'elevated' : ls === 'high' ? 'high' : null;
+          const loadAgrees = acwrBand != null && lsBand != null && acwrBand === lsBand;
 
-          // When load is high, surface load composition + body response
-          if (ls === 'high') {
-            if (runBodyOk && excessIsCrossTraining) {
-              // Running is fine, excess is from cross-training. D-268 Phase 3: name the PRIMARY discipline.
-              const primaryNoun = planPrimary === 'strength' ? 'strength sessions' : 'run sessions';
-              const ctNote = posLabel ? ` ${posLabel} — keep your ${primaryNoun} on plan.` : ` Keep your ${primaryNoun} on plan.`;
-              if (intent === 'peak' || intent === 'taper') return `Extra cross-training is adding load.${ctNote}`;
-              if (intent === 'recovery') return 'Recovery week — cross-training is adding load. Keep it easy.';
-              return `Cross-training pushing total load high.${ctNote}`;
-            }
-            // Running itself is elevated + body showing strain
-            if (intent === 'peak' || intent === 'taper') {
-              const pos = posLabel ? ` ${posLabel}` : '';
-              return `Load is elevated${pos} — protect recovery now.`;
-            }
-            if (intent === 'recovery') return 'Recovery week — but load is still elevated. Rest fully.';
-            return 'Load is high — back off and recover before your next key session.';
-          }
-          if (ls === 'elevated' && (intent === 'peak' || intent === 'taper')) {
-            if (runBodyOk && excessIsCrossTraining) {
-              return 'Peak week — running is on plan. Watch cross-training volume.';
-            }
-            return 'Peak week — load is creeping up. Keep it controlled, protect your legs.';
-          }
+          const synopsis = (() => {
+            // Readiness first where it is concerning — it is its own row, with its own receipt.
+            if (rs === 'overreached') return 'Signs of overreaching.';
+            if (loadAgrees && lsBand === 'high') return 'Load is high.';
+            if (rs === 'fatigued') return 'You are carrying fatigue.';
+            if (loadAgrees && lsBand === 'elevated') return 'Load is elevated.';
+            if (rs === 'detrained') return 'Training has been light enough that fitness is drifting down.';
+            if (loadAgrees && lsBand === 'under') return 'Load is below your usual.';
+            if (loadAgrees && lsBand === 'ok' && rs === 'fresh') return 'Load balanced, readiness fresh.';
+            if (loadAgrees && lsBand === 'ok' && rs === 'adapting') return 'Load balanced, and you are absorbing it.';
+            if (loadAgrees && lsBand === 'ok') return 'Load balanced.';
+            if (rs === 'fresh') return 'Readiness fresh.';
+            return null; // nothing rose above ordinary, or the two load reads disagree — rows carry it.
+          })();
 
-          // ── Off-plan adherence (D-147) — takes precedence over race-phase
-          // encouragement on a genuine skip ──────────────────────────────────
-          // Substantially under planned running on a normal training week with no
-          // overload signal = a SKIPPED-the-plan week, not a light plan. The
-          // actionable message is adherence (get back on schedule), NOT added
-          // volume — and "final build, every session counts" is worse than useless
-          // when the sessions were skipped, so this fires BEFORE the race-aware
-          // overrides. Gated on a real planned-running shortfall (runLoadPct ≤ -50,
-          // i.e. did ≤ half the planned running) and excluded on intents MEANT to
-          // be light (recovery/taper/deload/peak). Only for low/normal
-          // load_status; 'high'/'elevated' (real overload) are handled above.
-          // D-262: extracted for testability + coherence guard (no "add more"
-          // prescription while total load reads high — can't say add-more + rest-now).
-          const offPlanLine = offPlanAdherenceBanner({
-            loadStatus: ls, runLoadPct, weekIntent: intent,
-            totalAcwr: lsData?.acwr,
-            perDomain: perDomain ?? null, // D-263 bs3: attribution by acute-load composition
-            planPrimary, primaryAdherence, // D-268 Phase 2: strength-primary → key on strength, not a run shortfall
-          });
-          if (offPlanLine) return offPlanLine;
-
-          // ── Race-aware overrides (≤21 days out) ─────────────────────────
-          const raceNameForSummary = goalContext?.primary_event?.name ?? activePlan?.name ?? null;
-          if (weeksOutVal != null && weeksOutVal <= 21 && raceNameForSummary) {
-            const projection =
-              raceFinishProjectionV1?.anchor_display ?? raceReadiness?.predicted_finish_display ?? null;
-            const source = raceReadiness?.data_source ?? 'plan_targets';
-            const sourceLabel = source === 'observed' ? 'from recent runs' : 'based on plan targets';
-
-            if (intent === 'taper') {
-              if (primary_race_readiness) {
-                return `${weeksOutVal}w to ${raceNameForSummary} — key run locked in. Protect what you've built.`;
-              }
-              if (projection) {
-                return `${weeksOutVal}w to ${raceNameForSummary} — ${projection} ${sourceLabel}. Protect the legs, keep sessions crisp.`;
-              }
-              if (rs === 'fresh') return `${weeksOutVal}w to ${raceNameForSummary} — fitness is banked. Taper means protecting what you've built, not adding to it.`;
-              if (rs === 'fatigued') return `${weeksOutVal}w to ${raceNameForSummary} — you still need to freshen up. Race is close, prioritize rest.`;
-              return `${weeksOutVal}w to ${raceNameForSummary} — freshen up, protect your legs.`;
-            }
-            if (intent === 'build') {
-              return `${weeksOutVal}w to ${raceNameForSummary} — final build. Every session should leave you recovered by race morning.`;
-            }
-            if (intent === 'recovery') {
-              return `${weeksOutVal}w to ${raceNameForSummary} — recovery is the work right now. Don't add stress.`;
-            }
-            if (intent === 'peak') {
-              if (rs === 'fresh') return `${weeksOutVal}w to ${raceNameForSummary} — you're sharp. Keep sessions crisp, the work is done.`;
-              return `${weeksOutVal}w to ${raceNameForSummary} — peak week. Quality over volume, protect your legs.`;
-            }
-          }
-
-          if (intent === 'recovery') {
-            if (rs === 'fresh') return 'Recovery week — you\'re absorbing well, keep it easy.';
-            if (rs === 'fatigued' || rs === 'overreached') return 'Recovery week — you need this. Back off completely.';
-            return 'Recovery week — back off, let the adaptation happen.';
-          }
-          if (intent === 'taper') {
-            if (rs === 'fresh') return 'Tapering — you\'re sharp. Keep sessions crisp, protect your legs.';
-            if (rs === 'fatigued') return 'Tapering — you still need to freshen up. Race week, prioritize rest.';
-            return 'Tapering — freshen up, race is close.';
-          }
-          if (intent === 'peak') {
-            if (rs === 'fresh') return 'Peak week — you\'re sharp and ready. Keep sessions crisp.';
-            if (rs === 'adapting') return 'Peak week — load is high but your body is handling it. Quality over volume.';
-            if (rs === 'fatigued') return 'Ease into peak week — you\'re still absorbing last week\'s load.';
-            if (rs === 'overreached') return 'Hold on peak work — recover first, then sharpen.';
-            return 'Sharpening — quality over volume, protect your legs.';
-          }
-          if (intent === 'build') {
-            if (rs === 'fresh') return 'Building fitness — body is responding well, keep adding stress.';
-            if (rs === 'adapting') return 'Building fitness — load is accumulating, your body is absorbing it.';
-            if (rs === 'fatigued') return 'Building fitness — carry the work, but keep easy days easy.';
-            if (rs === 'overreached') return 'Back off before building more — signs of overreaching.';
-            return 'Building fitness — add stress, absorb the work.';
-          }
-          if (intent === 'baseline') {
-            if (rs === 'fresh') return 'Establishing your baseline — body is ready, stay consistent.';
-            return 'Establishing your baseline — consistency is the goal.';
-          }
-          return null;
+          const line = [position, synopsis].filter(Boolean).join(' ').trim();
+          return line || null;
         })(),
       },
       plan: {
