@@ -391,9 +391,14 @@ Deno.serve(async (req) => {
       return Math.round((_swimElapsedSec / plannedSec) * 100);
     })();
 
-    // Generate AI insights if OpenAI key is available
+    // SWIM = FACTS ONLY, NO INTERPRETATION (2026-07-19, D-304 principle). Watch/goggle swim data is too
+    // unreliable to interpret honestly (equipment, lap detection, set type), so we show the numbers and
+    // say nothing — the athlete who cares uses their own system. The LLM narrative is DISABLED; the
+    // deterministic facts fallback below (distance / pace / intervals) is the read. Dead block → sweep.
     let narrativeInsights: string[] = [];
-    if (Deno.env.get('ANTHROPIC_API_KEY')) {
+    // Gate on an env var that is never set → the LLM block never runs (swim = facts only). Kept as a
+    // runtime gate rather than `if (false)` so TS control-flow/definite-assignment is unchanged.
+    if (Deno.env.get('SWIM_INSIGHTS_LLM') === '1' && Deno.env.get('ANTHROPIC_API_KEY')) {
       try {
         // D-168: swim has no power/GPS/per-length data, so build the read around what it DOES have —
         // HR, the work:rest split (moving vs elapsed), and the felt/RPE signal (swim's best subjective
@@ -776,10 +781,12 @@ Write 3-4 plain-prose observations addressed to the swimmer as "you" (one or two
           stroke_rate: swimData.strokeRate || null
         }
       },
+      // SWIM = FACTS ONLY (no LLM). Deterministic facts, NOT interpretation. The distance/duration bullet
+      // is dropped — it restated the top card in METERS while a yard pool shows "yd" (a visible mismatch).
+      // Pace + interval count are unit-correct (poolUnit) and don't fight the card.
       insights: narrativeInsights.length > 0 ? narrativeInsights : [
-        `Swam ${totalDistanceMeters.toFixed(0)} meters in ${workout.duration || 0} minutes.`,
-        `Average pace: ${avgPacePer100 > 0 ? formatPace(avgPacePer100) : 'N/A'} per 100${poolUnit}.`,
-        intervals.length > 0 ? `Completed ${intervals.length} intervals.` : 'Continuous swim.'
+        `Average pace ${avgPacePer100 > 0 ? formatPace(avgPacePer100) : 'N/A'} per 100${poolUnit}.`,
+        intervals.length > 0 ? `${intervals.length} interval${intervals.length === 1 ? '' : 's'}.` : 'Continuous swim.',
       ]
     };
 
