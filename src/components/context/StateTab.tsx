@@ -171,13 +171,23 @@ function WeekAccentLine({ sentence, detail }: { sentence: string; detail: string
 // THE WEEK · MIX — planned vs actual by discipline, so a swap is SEEN, not just counted (a run traded
 // for a swim shows the run share shrink and the swim share grow). Bars share one scale, so an over- or
 // under-done week reads as a longer/shorter actual bar. Colors are the app's SPORT_COLORS.
-function WeekMixBar({ counts }: { counts: Array<{ discipline: string; planned: number; done: number }> }) {
+function WeekMixBar({ counts, hasPlan, partialWeek }: { counts: Array<{ discipline: string; planned: number; done: number }>; hasPlan: boolean; partialWeek: boolean }) {
   const ORDER = ['strength', 'run', 'ride', 'swim'];
   const NAME: Record<string, string> = { run: 'run', ride: 'bike', strength: 'strength', swim: 'swim' };
   const ordered = ORDER.map((d) => counts.find((c) => c.discipline === d)).filter(Boolean) as typeof counts;
   const totalPlanned = ordered.reduce((s, c) => s + c.planned, 0);
   const totalDone = ordered.reduce((s, c) => s + c.done, 0);
   const scale = Math.max(totalPlanned, totalDone, 1);
+  // F26 (2026-07-20): a no-plan athlete has NOTHING planned, so there is no "planned" row to draw.
+  // The old code drew an empty "planned" bar above a full "actual" bar — a shortfall a freeballer
+  // never signed up for. When nothing was planned, show only what they did, labelled as such.
+  const showPlanned = hasPlan && totalPlanned > 0;
+  // F21 (2026-07-20): `done` is week-TO-DATE while `planned` is the WHOLE week (server: coach counts
+  // planned over the full week, done bounded to [weekStart, today]). Drawn on one scale, a Monday
+  // shows a full plan over an empty result with no explanation. The SENTENCE already guards partial
+  // weeks (the Q-177 trap); the PICTURE never did. Label the result "so far" so the two bars aren't
+  // read on the same footing.
+  const doneLabel = !showPlanned ? 'this week' : partialWeek ? 'so far' : 'actual';
   const Bar = ({ label, pick }: { label: string; pick: (c: { planned: number; done: number }) => number }) => (
     <div className="flex items-center gap-2">
       <span className="text-[11px] text-white/40 w-12 shrink-0 lowercase">{label}</span>
@@ -192,8 +202,8 @@ function WeekMixBar({ counts }: { counts: Array<{ discipline: string; planned: n
   );
   return (
     <div className="px-4 py-3 space-y-1.5">
-      <Bar label="planned" pick={(c) => c.planned} />
-      <Bar label="actual" pick={(c) => c.done} />
+      {showPlanned && <Bar label="planned" pick={(c) => c.planned} />}
+      <Bar label={doneLabel} pick={(c) => c.done} />
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-14 pt-1">
         {ordered.filter((c) => c.planned > 0 || c.done > 0).map((c) => (
           <span key={c.discipline} className="inline-flex items-center gap-1 text-[11px] text-white/45">
@@ -1641,10 +1651,19 @@ export default function StateTab({
           const counts = Array.isArray(we?.counts) ? we!.counts! : [];
           const accent = we?.accent ?? null;
           if (counts.length === 0 && !accent) return null; // nothing to say → render nothing
+          const hasPlan = !!wsv.plan?.has_active_plan;
+          const totalPlanned = counts.reduce((s, c) => s + (c.planned || 0), 0);
+          // F21/F26: partial week = the calendar week has not closed yet (end_date is still in the
+          // future). daysSinceYmd = today − end_date, so < 0 means the week is still running.
+          const endDays = daysSinceYmd((week as any)?.end_date ?? null);
+          const partialWeek = endDays != null && endDays < 0;
+          // Header: only claim "planned vs actual" when there IS a plan to compare against (F26).
+          const showsPlanned = hasPlan && totalPlanned > 0;
+          const sectionLabel = showsPlanned ? 'this week · planned vs actual' : 'this week';
           return (
             <>
-              <div className="px-4 pt-3 text-[11px] text-white/30 lowercase tracking-[0.12em]">this week · planned vs actual</div>
-              {counts.length > 0 && <WeekMixBar counts={counts} />}
+              <div className="px-4 pt-3 text-[11px] text-white/30 lowercase tracking-[0.12em]">{sectionLabel}</div>
+              {counts.length > 0 && <WeekMixBar counts={counts} hasPlan={hasPlan} partialWeek={partialWeek} />}
               {accent?.sentence && <WeekAccentLine sentence={accent.sentence} detail={accent.trace?.detail ?? null} />}
             </>
           );

@@ -128,8 +128,11 @@ function printScreen(p: Persona): string {
     const actualBar = p.partialWeek ? '(empty — week just started)' : p.disciplines.filter((d) => d.sessionCount > 0).map((d) => d.discipline).join(' ');
     line(`  │  planned: ${plannedBar || '—'}`);
     line(`  │  actual:  ${actualBar || '—'}`);
-    if (p.partialWeek && planned.length && !p.hasPlan) line(`  │  ⚠ NO-PLAN athlete should not see a 'planned' bar at all (F26)`);
-    if (p.partialWeek && planned.length) line(`  │  ⚠ partial week: full plan over an empty actual — no guard (F21)`);
+    // F21/F26 are CLIENT-rendered (WeekMixBar, StateTab.tsx) — deno can't render TSX, so these are
+    // DATA-SHAPE notes, not live-render checks. Both are now guarded client-side (2026-07-20): no
+    // plan → no "planned" bar (labelled "this week"); partial week → the result bar reads "so far".
+    if (!p.hasPlan && planned.length) line(`  │  ℹ no-plan: client drops the 'planned' bar, labels it 'this week' (F26 fixed client-side)`);
+    if (p.partialWeek && planned.length && p.hasPlan) line(`  │  ℹ partial week: client labels the result bar 'so far' (F21 fixed client-side)`);
   }
 
   // 7. THE ACCENT (the upkeep / trade line — the real composer)
@@ -192,7 +195,7 @@ const PERSONAS: Persona[] = [
     ],
     strengthProtocol: { protocolId: 'five_by_five' } as StrengthProtocolContext,
     upkeep: { discipline: 'run', actualPerWeek: 6, targetPerWeek: 18, trailingRows: [{ type: 'run' }, { type: 'ride' }, { type: 'ride' }, { type: 'swim' }], weeksUnder: 4, baseSlipping: false },
-    crossTrainingLine: 'Handling combined load well',
+    crossTrainingLine: 'No interference between disciplines',
     overallTrainingRead: null,
     bodyHrResponse: 'holding steady · as of Jul 15',
     bodyHowHard: 'about as hard as usual — 3.8 vs 4.2',
@@ -215,7 +218,7 @@ const PERSONAS: Persona[] = [
     ],
     strengthProtocol: { protocolId: 'five_by_five' } as StrengthProtocolContext,
     upkeep: { discipline: 'run', actualPerWeek: 6, targetPerWeek: 18, trailingRows: [{ type: 'run' }, { type: 'ride' }, { type: 'ride' }, { type: 'swim' }, { type: 'swim' }], weeksUnder: 4, baseSlipping: false },
-    crossTrainingLine: 'Handling combined load well',
+    crossTrainingLine: 'No interference between disciplines',
     overallTrainingRead: null,
     bodyHrResponse: 'holding steady · as of Jul 18',
     bodyHowHard: 'about as hard as usual — 3.9 vs 4.2',
