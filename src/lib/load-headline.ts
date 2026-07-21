@@ -84,11 +84,29 @@ export function buildLoadHeadline(opts: {
   const { loadLabel, readinessState, readinessLabel, isTaperOrPeak, acwr } = opts;
   // In taper/peak, a "build more" reading is by-design low volume — don't lead the glance with it.
   const effLoad = isTaperOrPeak && loadLabel === 'build more' ? 'balanced' : loadLabel;
+
+  // ── SILENT UNLESS THE LOAD GENUINELY DEVIATES (Michael, 2026-07-20). ────────────────────────────────
+  // On a plan the load is SUPPOSED to vary week to week (a build week is heavy, a deload light), so
+  // stamping a verdict on a normal week ("Balanced load") reads as evaluation of something the plan
+  // chose — and it duplicated the LOAD row's own verdict rendered right below it, on the WRONG clock
+  // (the line said "This week" while the read is rolling-7d). The honest lead says NOTHING when the
+  // load is being managed fine (under / on_target / productive AND body not flagged) — the position
+  // line ("Week 3 of 12") and the LOAD card carry it. It speaks ONLY when the load genuinely deviates:
+  //   · reconciled 'elevated'/'high' — carrying more than the body is absorbing.
+  // 'productive' is a real elevation the body IS absorbing — that is the plan working, not a deviation,
+  // so it stays silent too. Readiness is NOT keyed here on purpose: it already has its own home (the
+  // BODY "how hard it feels" row + the readiness chip, Michael 2026-07-04), and the headline is
+  // load-only. This preserves the one real load signal — genuine over-load — without editorialising
+  // expected variation.
+  const notableLoad = effLoad === 'a bit high' || effLoad === 'pull back' || effLoad === 'back off' || effLoad === 'rest now';
+  if (!notableLoad) return null;
+
   const state = stateSlot(effLoad, readinessState, readinessLabel);
   const obs = state ? observationSlot(effLoad, readinessState, acwr) : null;
 
   // The headline reflects THE WEEK only (Michael 2026-07-04) — one clock. Fitness is a different clock
   // and is NOT rolled up here: it's handed to the individual discipline rows under PERFORMANCE, each
   // on its own 6–8wk window. No aggregate fitness verdict anywhere (it would have to lie about the clock).
-  return state ? `This week: ${obs ? `${state} — ${obs}` : state}.` : null;
+  // No "This week:" frame — the read is rolling-7d, not the calendar week (Michael's rolling-week catch).
+  return state ? `${obs ? `${state} — ${obs}` : state}.` : null;
 }

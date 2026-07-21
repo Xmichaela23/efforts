@@ -22,69 +22,43 @@ Deno.test('statusVolumeLabel: reconciled status → descriptive verdict; elevate
   // The whole point of the fix: a reconciled 'elevated' must never render the prescriptive "back off".
   if (statusVolumeLabel('elevated') === 'back off') throw new Error('elevated must not say back off');
 });
-Deno.test('buildLoadHeadline: reconciled elevated → "Load a bit high" (descriptive, not a prescription)', () => {
+// ── SILENT UNLESS THE LOAD GENUINELY DEVIATES (Michael, 2026-07-20) ──────────────────────────────────
+// On a plan the load is SUPPOSED to vary; a verdict on a normal week editorialises what the plan chose
+// and duplicates the LOAD row below it on the wrong (rolling) clock. The headline now speaks ONLY on a
+// reconciled 'elevated'/'high'. No "This week:" frame (the read is rolling-7d, not the calendar week).
+Deno.test('NORMAL load is SILENT — balanced/under/productive return null', () => {
+  assertEquals(buildLoadHeadline({ loadLabel: statusVolumeLabel('on_target'), readinessState: 'fresh', readinessLabel: null }), null);
+  assertEquals(buildLoadHeadline({ loadLabel: statusVolumeLabel('under'), readinessState: 'fresh', readinessLabel: null }), null);
+  assertEquals(buildLoadHeadline({ loadLabel: statusVolumeLabel('productive'), readinessState: 'adapting', readinessLabel: null }), null);
+});
+
+Deno.test('elevated SPEAKS → "Load a bit high." (no "This week:" frame)', () => {
   const h = buildLoadHeadline({ loadLabel: statusVolumeLabel('elevated'), readinessState: 'adapting', readinessLabel: null })!;
-  assertStringIncludes(h, 'Load a bit high');
+  assertEquals(h, 'Load a bit high.');
+  assert(!h.startsWith('This week'), 'no calendar-week frame on a rolling read');
 });
-Deno.test('buildLoadHeadline: reconciled high → "Load high"', () => {
+
+Deno.test('high SPEAKS → "Load high."', () => {
   const h = buildLoadHeadline({ loadLabel: statusVolumeLabel('high'), readinessState: 'fatigued', readinessLabel: null })!;
-  assertStringIncludes(h, 'Load high');
+  assertEquals(h, 'Load high.');
 });
 
-// ── D-232/D-233: refined chip label wins; no false systemic fatigue (now in §5 split format) ──
-
-// ── The headline reflects THE WEEK ONLY (Michael 2026-07-04). Readiness → chip/BODY; fitness → the ──
-// ── PERFORMANCE discipline rows (each its own 6–8wk clock). No fitness clause here, ever. ───────────
-Deno.test('EFFORT UP: headline is the week only — no readiness, no fitness', () => {
-  const h = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fatigued', readinessLabel: 'EFFORT UP', fitnessDirection: 'improving' })!;
-  assertEquals(h, 'This week: Balanced load.');
-  assert(!h.includes('effort up') && !h.includes('fatigue') && !h.includes('fitness') && !h.includes('6 weeks'));
+// Readiness does NOT rescue a normal load — it has its own home (BODY row + chip). A fatigued athlete
+// on a balanced week gets a silent headline; the fatigue shows in BODY, not here.
+Deno.test('readiness never speaks through the headline — balanced + FATIGUED is still silent', () => {
+  assertEquals(buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fatigued', readinessLabel: 'FATIGUED', fitnessDirection: 'declining' }), null);
+  assertEquals(buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fatigued', readinessLabel: 'LEGS LOADED', fitnessDirection: 'improving' }), null);
 });
 
-Deno.test('LEGS LOADED: week only', () => {
-  const h = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fatigued', readinessLabel: 'LEGS LOADED', fitnessDirection: 'improving' })!;
-  assertEquals(h, 'This week: Balanced load.');
-});
-
-Deno.test('LEGS SORE: week only (fitness "stable" never surfaces here)', () => {
-  const h = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fatigued', readinessLabel: 'LEGS SORE', fitnessDirection: 'stable' })!;
-  assertEquals(h, 'This week: Balanced load.');
-  assert(!h.includes('legs sore') && !h.includes('fitness'));
-});
-
-Deno.test('FATIGUED: week only (readiness → chip, no "carrying fatigue")', () => {
-  const h = buildLoadHeadline({ loadLabel: 'back off', readinessState: 'fatigued', readinessLabel: 'FATIGUED', fitnessDirection: 'declining' })!;
-  assertEquals(h, 'This week: Load running high.');
-  assert(!h.includes('fatigue') && !h.includes('carrying') && !h.includes('fitness'));
-});
-
-Deno.test('D-268 P5: headroom only when load genuinely light (acwr < 1.0)', () => {
-  // Light load + fresh → headroom shows.
-  const light = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fresh', readinessLabel: null, fitnessDirection: 'improving', acwr: 0.9 })!;
-  assertEquals(light, 'This week: Balanced load — you have headroom.');
-  assert(!light.includes('fitness') && !light.includes('6 weeks'));
-  // Above-chronic load (acwr 1.3) + fresh → NO headroom (the old bug).
-  const loaded = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fresh', readinessLabel: null, fitnessDirection: 'improving', acwr: 1.3 })!;
-  assertEquals(loaded, 'This week: Balanced load.');
-  if (loaded.includes('headroom')) throw new Error('must not claim headroom at acwr 1.3: ' + loaded);
-  // acwr absent → no headroom (conservative).
-  const noAcwr = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'fresh', readinessLabel: null })!;
-  if (noAcwr.includes('headroom')) throw new Error('no acwr → no headroom claim');
-});
-
-// ── one-clock: fitness NEVER appears in the headline (it lives on the discipline rows) ──────────────
-Deno.test('fitness direction is ignored entirely — a "mixed" week is still just the load', () => {
-  const h = buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'normal', readinessLabel: 'EFFORT UP', fitnessDirection: 'mixed' });
-  assertEquals(h, 'This week: Balanced load.');
-  assertEquals(h?.includes(' · '), false);
+// fitness NEVER appears in the headline (it lives on the discipline rows, each its own clock)
+Deno.test('fitness direction is ignored entirely; a normal week with any fitness is silent', () => {
+  assertEquals(buildLoadHeadline({ loadLabel: 'balanced', readinessState: 'normal', readinessLabel: 'EFFORT UP', fitnessDirection: 'mixed' }), null);
 });
 
 Deno.test('no load reading → null even if fitness is improving (fitness cannot rescue the headline)', () => {
-  const h = buildLoadHeadline({ loadLabel: '—', readinessState: null, readinessLabel: null, fitnessDirection: 'improving' });
-  assertEquals(h, null);
+  assertEquals(buildLoadHeadline({ loadLabel: '—', readinessState: null, readinessLabel: null, fitnessDirection: 'improving' }), null);
 });
 
-Deno.test('§5 neither → null (unchanged)', () => {
-  const h = buildLoadHeadline({ loadLabel: '—', readinessState: null, readinessLabel: null, fitnessDirection: null });
-  assertEquals(h, null);
+Deno.test('neither → null (unchanged)', () => {
+  assertEquals(buildLoadHeadline({ loadLabel: '—', readinessState: null, readinessLabel: null, fitnessDirection: null }), null);
 });

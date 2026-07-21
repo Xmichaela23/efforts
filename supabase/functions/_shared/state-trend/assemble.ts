@@ -608,6 +608,33 @@ export function rollupHrResponse(v1: StateTrendsV1 | null | undefined): HrRespon
   return { verdict, contributors, asOfAgeDays };
 }
 
+/**
+ * NO SILENT DROP on the heart-rate response (2026-07-20, Michael's "is it lagging?" catch).
+ *
+ * The rollup only takes a discipline that has a real DIRECTION (verdict ≠ needs_data), and run
+ * durability needs `floor` steady runs to call one. So an athlete maintaining a low run volume can
+ * have RECENT steady runs that still can't form a trend — the run drops out, the read leans on the
+ * last discipline with a verdict (often an older bike), and the "as of" date looks stale/lagging even
+ * though fresh runs exist. The read was silently dropping them (STATE-SOURCE-MAP law: an exclusion is
+ * not allowed to be silent).
+ *
+ * Returns a one-line disclosure when a run is PRESENT (sampleCount > 0) but BELOW the trend floor and
+ * therefore not contributing. Null when the run is contributing, absent, or the floor is met.
+ * `floor` mirrors RUN_TREND_MIN_RUNS (StatePerformanceSection.tsx) — the arrow's own threshold.
+ */
+export function hrResponseExcludedRunNote(
+  v1: StateTrendsV1 | null | undefined,
+  contributors: HrResponseRollup['contributors'],
+  floor = 8,
+): string | null {
+  const runD = v1?.run?.decoupling as { sampleCount?: number } | undefined;
+  if (!runD) return null;
+  const n = Number(runD.sampleCount);
+  const runContributing = contributors.some((c) => c.discipline === 'run');
+  if (runContributing || !(n > 0) || n >= floor) return null;
+  return `Your runs aren't in this yet — ${n} of ${floor} steady runs needed to read a direction.`;
+}
+
 /** Shape the assembled result into the cached contract. Per-discipline = the model's performance
  *  verdict (needs_data when no real trend), independent of the card's display axis. */
 export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV1 {

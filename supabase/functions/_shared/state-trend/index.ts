@@ -93,6 +93,7 @@ export {
   rollupFitnessDirection,
   rollupFitness,
   rollupHrResponse,
+  hrResponseExcludedRunNote,
   type FitnessRollup,
   type HrResponseRollup,
   type FitnessDirection,
