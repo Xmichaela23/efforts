@@ -673,10 +673,16 @@ serve(async (req: Request) => {
           supabase.from("workouts").select("date,workout_analysis,workout_metadata")
             .eq("user_id", userId).in("type", ["ride", "bike"]).not("workout_analysis", "is", null)
             .order("date", { ascending: false }).limit(STATE_TREND_WINDOWS.bikeLimit),
-          // 90d cadence window (not 42d trend window): assemble derives the comparable-easy-run cadence
-          // for the min-session floor; classifyTrend windows the trend to runDays internally (D-237 run fix).
-          supabase.from("route_progress_metrics").select("metric_date,effort_adjusted_pace_sec_per_km,workout_id")
-            .eq("user_id", userId).gte("metric_date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).order("metric_date"),
+          // RUN durability substrate — seeded from the SPINE (workouts.workout_analysis), NOT
+          // route_progress_metrics. A treadmill / no-GPS run writes no route row but has a perfectly
+          // good decoupling number in workout_analysis.heart_rate_summary; driving the read off the
+          // routes table made those runs INVISIBLE to durability (STATE-SOURCE-MAP #3/#4 — "a courtesy
+          // feature may never gate a fitness verdict"; found live by scripts/state-data-check.mjs,
+          // 2026-07-21). 90d cadence window; classifyTrend windows the trend to runDays internally.
+          supabase.from("workouts").select("id,date,workout_analysis")
+            .eq("user_id", userId).in("type", ["run", "running"]).eq("workout_status", "completed")
+            .not("workout_analysis", "is", null)
+            .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).order("date"),
           supabase.from("workout_facts").select("date,swim_facts")
             .eq("user_id", userId).eq("discipline", "swim").gte("date", isoMinus(STATE_TREND_WINDOWS.swimDays)).order("date"),
           supabase.from("planned_workouts").select("type,date").eq("user_id", userId).gte("date", adhStart).lte("date", asOf),
@@ -705,15 +711,18 @@ serve(async (req: Request) => {
           hr_corrupt: !!r.workout_metadata?.hr_corrupt,
         }));
 
+        // Runs now come straight from the spine (workout_analysis is on each row). effort_adjusted_pace
+        // is the ONE column route_progress_metrics owns — joined by workout_id when a route row exists,
+        // null otherwise (treadmill). No rendered verdict reads it (audit), so its absence never drops
+        // a run from the durability read — that was the whole bug.
         const runRows = (runR.data ?? []) as any[];
-        const runWids = [...new Set(runRows.map((r) => r.workout_id).filter(Boolean))];
-        const runCtById = new Map<string, string | null>();
-        const runHrsByWid = new Map<string, any>(); // Tier 1: heart_rate_summary → decoupling join
+        const runWids = [...new Set(runRows.map((r) => r.id).filter(Boolean))];
+        const routePaceByWid = new Map<string, number>();
         if (runWids.length) {
-          const { data: rw } = await supabase.from("workouts").select("id,workout_analysis").in("id", runWids);
-          for (const w of (rw ?? []) as any[]) {
-            runCtById.set(w.id, w.workout_analysis?.classified_type ?? null);
-            runHrsByWid.set(w.id, w.workout_analysis?.heart_rate_summary ?? null);
+          const { data: rpm } = await supabase.from("route_progress_metrics")
+            .select("workout_id,effort_adjusted_pace_sec_per_km").in("workout_id", runWids);
+          for (const r of (rpm ?? []) as any[]) {
+            if (r.effort_adjusted_pace_sec_per_km != null) routePaceByWid.set(r.workout_id, r.effort_adjusted_pace_sec_per_km);
           }
         }
         const runEffIndexByDate = new Map<string, number>();
@@ -722,18 +731,18 @@ serve(async (req: Request) => {
           if (typeof v === "number") runEffIndexByDate.set(f.date, v);
         }
         const runJoined = runRows.map((r) => {
-          const hrs = runHrsByWid.get(r.workout_id) || null;
+          const hrs = r.workout_analysis?.heart_rate_summary ?? null;
           return {
-            metric_date: r.metric_date,
-            effort_adjusted_pace_sec_per_km: r.effort_adjusted_pace_sec_per_km,
-            efficiency_index: runEffIndexByDate.get(r.metric_date) ?? null,
+            metric_date: r.date,
+            effort_adjusted_pace_sec_per_km: routePaceByWid.get(r.id) ?? null,
+            efficiency_index: runEffIndexByDate.get(r.date) ?? null,
             decoupling_pct: hrs?.decouplingPct ?? null,
             decoupling_basis: hrs?.decouplingBasis ?? null,
             decoupling_mixed_effort: hrs?.decouplingMixedEffort ?? null, // confidence hedge — NOT a filter
             decoupling_confounded: hrs?.decouplingConfounded ?? null, // heat/RPE-confounded → excluded from the durability substrate
             workout_type: hrs?.workoutType ?? null,
             duration_minutes: hrs?.durationMinutes ?? null,
-            classified_type: runCtById.get(r.workout_id) ?? null,
+            classified_type: r.workout_analysis?.classified_type ?? null,
           };
         });
 
