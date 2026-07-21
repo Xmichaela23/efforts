@@ -528,10 +528,20 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // else the adherence card. Volume gives the row a real verdict so it stops falling to the shrug.
   const strengthHasSubstance = !!strengthFitness && (strengthFitness.volume.verdict !== 'needs_data' || strengthFitness.e1rm != null || strengthFitness.sessionsThisWeek > 0);
 
-  // BLOCK-PRIORITY order (item 9): strength (the build) → run → swim → bike. Fixed, meaningful — it
-  // matches how posture thinks, and it stops the thinnest data (bike, 7 rides est FTP) leading the scan.
-  const ORDER_IDX: Record<string, number> = { strength: 0, run: 1, swim: 2, bike: 3 };
-  const sortedCards = [...cards].sort((a, b) => (ORDER_IDX[a.discipline] ?? 9) - (ORDER_IDX[b.discipline] ?? 9));
+  // GOAL-LED order (2026-07-21): the athlete's PRIMARY discipline leads — strength leads a strength
+  // block, the race's sport leads a race plan. `primaryDiscipline` was already passed in from the
+  // payload (weekly_state_v1.plan.primary_discipline) and IGNORED — the order was a hardcoded list
+  // (F18). Now it drives the lead; everything else keeps the block-priority order below (which also
+  // keeps the thinnest data — bike on an est-FTP — from leading the scan). Multi-sport primaries
+  // (tri / duathlon / hybrid) and an absent primary fall back entirely to block-priority.
+  const primaryDisc = (() => {
+    const p = String(primaryDiscipline || '').toLowerCase();
+    if (p === 'ride' || p === 'cycling') return 'bike';
+    return (p === 'strength' || p === 'run' || p === 'swim' || p === 'bike') ? p : null;
+  })();
+  const BLOCK_PRIORITY: Record<string, number> = { strength: 0, run: 1, swim: 2, bike: 3 };
+  const orderIdx = (d: string) => (primaryDisc && d === primaryDisc ? -1 : (BLOCK_PRIORITY[d] ?? 9));
+  const sortedCards = [...cards].sort((a, b) => orderIdx(a.discipline) - orderIdx(b.discipline));
 
   return (
     <div className="px-3 py-3">
