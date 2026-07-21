@@ -26,8 +26,18 @@ export interface CrossDisciplineState {
   posture: CrossPosture;
   /** The discipline's OWN fitness outcome verdict from the spine (strength = noise-guarded e1RM). */
   verdict: CrossVerdict;
-  /** Per-discipline acute:chronic load ratio. >~1.1 = being pushed; <~0.8 = eased off. Null = unknown. */
+  /** Per-discipline acute:chronic load ratio. >~1.1 = a weekly UPTICK; <~0.8 = a weekly dip. Null = unknown. */
   acwr: number | null;
+  /**
+   * TRAILING truth (window-consistent with the upkeep line): the discipline is UNDER its maintenance
+   * target over the block. This OVERRIDES a weekly acwr uptick — a discipline sitting under its target
+   * for weeks is EASED, never "being pushed", however much one week ticked up. Without this the read
+   * called a maintain discipline "pushed" off a 1-week blip while the upkeep line right below it said the
+   * SAME discipline was under for 4 weeks — one number, two windows, on one screen (found on device
+   * 2026-07-21). A discipline with no stored target (bike/swim) leaves this false, and a genuine
+   * sustained push there still reads via acwr.
+   */
+  underTarget?: boolean;
 }
 
 export interface CrossTrainingRead {
@@ -66,8 +76,14 @@ export function composeCrossTrainingRead(states: CrossDisciplineState[]): CrossT
   if (!F || F.verdict === 'needs_data') return null; // can't speak to a focus we can't yet read
 
   const others = active.filter((s) => s.discipline !== F.discipline);
-  const easedMaintain = others.find((s) => s.posture === 'maintain' && typeof s.acwr === 'number' && (s.acwr as number) < EASED);
-  const pushedOther = others.find((s) => typeof s.acwr === 'number' && (s.acwr as number) > PUSHING);
+  // EASED = under its trailing target (window-consistent with upkeep) OR a genuine weekly dip.
+  const eased = (s: CrossDisciplineState) => s.underTarget === true || (typeof s.acwr === 'number' && (s.acwr as number) < EASED);
+  // PUSHED = a real weekly uptick that is NOT just a blip under the target — a discipline sitting under
+  // its maintenance target is eased, never pushed, whatever one week says. (No target → underTarget
+  // false → a genuine sustained push still reads.)
+  const pushed = (s: CrossDisciplineState) => s.underTarget !== true && typeof s.acwr === 'number' && (s.acwr as number) > PUSHING;
+  const easedMaintain = others.find((s) => s.posture === 'maintain' && eased(s));
+  const pushedOther = others.find((s) => pushed(s));
 
   // CASE A — THE TRADE, WORKING (the anti-"Unproductive"). Focus is coming AND a maintain discipline
   // eased to make room. This is the sentence Garmin cannot say, because it never saw the strength.

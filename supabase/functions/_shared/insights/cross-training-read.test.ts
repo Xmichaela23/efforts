@@ -2,8 +2,8 @@
 import { assertEquals, assertStringIncludes } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { composeCrossTrainingRead, type CrossDisciplineState } from './cross-training-read.ts';
 
-const S = (discipline: string, posture: any, verdict: any, acwr: number | null): CrossDisciplineState =>
-  ({ discipline, posture, verdict, acwr });
+const S = (discipline: string, posture: any, verdict: any, acwr: number | null, underTarget?: boolean): CrossDisciplineState =>
+  ({ discipline, posture, verdict, acwr, underTarget });
 
 // ── THE ANTI-"UNPRODUCTIVE" CASE (Michael, live on Garmin) ──────────────────────────────────────────
 Deno.test('trade working: building strength, it is coming, running eased → names the trade, not lost fitness', () => {
@@ -17,6 +17,20 @@ Deno.test('trade working: building strength, it is coming, running eased → nam
   assertStringIncludes(r.label, 'building strength');
   assertStringIncludes(r.label, 'running eased');
   assertStringIncludes(r.label, 'not lost fitness'); // the exact reframe Garmin cannot make
+});
+
+// ── THE WINDOW-MISMATCH REGRESSION (found on device 2026-07-21). A maintain discipline UNDER its
+//    trailing target must NOT read as "pushed" off a 1-week acwr uptick — that contradicted the upkeep
+//    line right below it ("running's under for 4 weeks"). underTarget overrides the weekly blip. ───────
+Deno.test('under-target maintain run with a WEEKLY uptick reads as the TRADE (eased), never "pushing"', () => {
+  const r = composeCrossTrainingRead([
+    S('strength', 'develop', 'improving', null),
+    S('run', 'maintain', 'holding', 1.2, /* underTarget */ true), // acwr up this week, but under for the block
+    S('bike', 'maintain', 'holding', 0.9),
+  ])!;
+  assertEquals(r.kind, 'trade_working');          // NOT 'room' — the bug was 'room' ("you're pushing your running")
+  assertStringIncludes(r.label, 'running eased');
+  assertEquals(r.label.includes('pushing your running'), false);
 });
 
 // ── THE COST ────────────────────────────────────────────────────────────────────────────────────────
