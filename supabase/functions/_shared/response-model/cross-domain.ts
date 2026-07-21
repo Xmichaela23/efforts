@@ -40,47 +40,30 @@ export function computeCrossDomain(pairs: CrossDomainPair[]): CrossDomainRespons
 
   const patterns: CrossDomainPattern[] = [];
 
-  // Check if endurance HR is elevated after lower/full body strength days
+  // ── THE INTERFERENCE VERDICT IS RETIRED (Michael, 2026-07-21). ──────────────────────────────────────
+  // Three reasons, all decisive:
+  //   1. The plan already prevents the stacking that causes acute interference (the 6-hour separation
+  //      gate, week-builder.ts — SCIENCE §4, confirmed). On a plan there is nothing to catch.
+  //   2. The signals it fired on are too weak to trust: HR-at-pace day-to-day is swamped by heat/sleep/
+  //      hydration AND inverts under real overreaching (HR drops, not rises — PubMed 28704885). The
+  //      strength-side effect (SMD −0.28, power only) is SMALLER than e1RM's own measurement error
+  //      (CV 2.4–9.7%). SCIENCE-concurrent-training-interference.md addendum: "the app can defensibly
+  //      comment on scheduling structure and NEVER on whether interference occurred."
+  //   3. A false "interference detected" is the confident-wrong claim the whole product refuses.
+  // So computeCrossDomain no longer EMITS an interference verdict — interference_detected stays false and
+  // the alarm patterns (post_strength_hr_elevated / post_strength_pace_reduced) are not pushed. The
+  // REASSURANCE (concurrent_gains) stays. A scheduling nudge for the OFF-PLAN case (you stacked a hard
+  // lift and a hard run — space them) is the honest replacement, and it reads the SCHEDULE (a recorded
+  // fact), not HR — see OPEN-QUESTIONS (a separate build, not this function).
+  //
+  // The HR/execution deltas are still COMPUTED below (data kept, cheap) but no longer produce a verdict —
+  // if a future signal earns trust it can read them; nothing renders them today.
   const hrPairs = relevantPairs.filter(
     (p) => p.next_endurance_hr_at_pace != null && p.baseline_hr_at_pace != null
   );
-  if (hrPairs.length >= MIN_PAIRS) {
-    const hrDeltas = hrPairs.map(
-      (p) => p.next_endurance_hr_at_pace! - p.baseline_hr_at_pace!
-    );
-    const avgHrDelta = hrDeltas.reduce((s, d) => s + d, 0) / hrDeltas.length;
-
-    if (avgHrDelta >= HR_ELEVATION_THRESHOLD) {
-      patterns.push({
-        code: 'post_strength_hr_elevated',
-        description: `Your heart works harder on runs after lower-body lifting — ${Math.round(avgHrDelta)} bpm above normal.`,
-        magnitude: avgHrDelta >= 7 ? 'notable' : 'slight',
-        data: { avg_delta: Math.round(avgHrDelta * 10) / 10, sample_pairs: hrPairs.length },
-      });
-    }
-  }
-
-  // Check if execution drops after lower/full body strength days
   const execPairs = relevantPairs.filter(
     (p) => p.next_endurance_execution != null && p.baseline_execution != null
   );
-  if (execPairs.length >= MIN_PAIRS) {
-    const execDeltas = execPairs.map(
-      (p) => p.next_endurance_execution! - p.baseline_execution!
-    );
-    const avgExecDelta = execDeltas.reduce((s, d) => s + d, 0) / execDeltas.length;
-
-    if (avgExecDelta <= -EXECUTION_DROP_THRESHOLD) {
-      const pts = Math.abs(Math.round(avgExecDelta));
-      patterns.push({
-        code: 'post_strength_pace_reduced',
-        // execution scores are 0–100 quality metrics, not pace % or distance — avoid "runs suffer X%"
-        description: `The day after lower-body strength, run execution scores average about ${pts} points lower than on your other runs in this window (0–100 quality score from logs; not the same as pace or mileage). Based on ${execPairs.length} strength→run pairs.`,
-        magnitude: avgExecDelta <= -10 ? 'notable' : 'slight',
-        data: { avg_delta: Math.round(avgExecDelta * 10) / 10, sample_pairs: execPairs.length },
-      });
-    }
-  }
 
   // Positive pattern: if no interference detected and we have enough pairs, note concurrent gains
   if (patterns.length === 0 && relevantPairs.length >= MIN_PAIRS) {

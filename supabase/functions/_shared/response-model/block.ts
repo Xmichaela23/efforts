@@ -365,6 +365,8 @@ function blockHeadline(assessment: Assessment, endurance: BlockResponseState['en
     parts.push('Training is on track.');
   }
 
+  // Interference verdict retired 2026-07-21 (computeCrossDomain) — interference_detected is now always
+  // false; this line no longer fires. Kept as a no-op guard so the shape is obvious to the next reader.
   if (crossDomain.interference_detected) {
     parts.push('Strength-endurance interference detected.');
   }
