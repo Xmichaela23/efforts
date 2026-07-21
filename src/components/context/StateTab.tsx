@@ -1591,17 +1591,36 @@ export default function StateTab({
                   )}
                 </div>
               ))}
-              {crossTrainingSignal && (
-                <div className="flex items-start justify-between gap-3 pt-0.5">
-                  <span className="text-[13px] text-white/70 shrink-0">Cross-training</span>
-                  <span className={`text-[13px] text-right leading-snug min-w-0 ${
-                    crossTrainingSignal.tone === 'positive' ? 'text-emerald-400/90' :
-                    crossTrainingSignal.tone === 'warning' ? 'text-amber-400/90' :
-                    crossTrainingSignal.tone === 'info' ? 'text-sky-400/85' :
-                    'text-white/70'
-                  }`}>{crossTrainingSignal.label}</span>
-                </div>
-              )}
+              {crossTrainingSignal && (() => {
+                // GLANCE + OPEN: the frank verdict (label) is always shown; the receipts (detail) reveal
+                // on tap, matching the BODY-row provenance pattern. Uses expandedSignal keyed on a
+                // sentinel so only one row is open at a time.
+                const toneCls =
+                  crossTrainingSignal.tone === 'positive' ? 'text-emerald-400/90' :
+                  crossTrainingSignal.tone === 'warning' ? 'text-amber-400/90' :
+                  crossTrainingSignal.tone === 'info' ? 'text-sky-400/85' : 'text-white/70';
+                const detail = crossTrainingSignal.detail ?? null;
+                const open = expandedSignal === '__cross_training__';
+                return (
+                  <div className="pt-0.5">
+                    <button
+                      type="button"
+                      disabled={!detail}
+                      onClick={() => detail && setExpandedSignal(open ? null : '__cross_training__')}
+                      className="w-full flex items-start justify-between gap-3 text-left"
+                    >
+                      <span className="text-[13px] text-white/70 shrink-0">Cross-training</span>
+                      <div className="flex items-start gap-2 min-w-0">
+                        <span className={`text-[13px] text-right leading-snug ${toneCls}`}>{crossTrainingSignal.label}</span>
+                        {detail && <span className="text-white/30 text-[10px] shrink-0 mt-0.5">{open ? '▾' : '▸'}</span>}
+                      </div>
+                    </button>
+                    {open && detail && (
+                      <p className="text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,320px)]">{detail}</p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

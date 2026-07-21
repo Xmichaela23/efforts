@@ -1,55 +1,45 @@
 // DETERMINISTIC CROSS-TRAINING READ (2026-07-21) — the honest replacement for the retired
 // interference verdict. It answers the one question "cross-training" actually means: is pushing one
-// thing COSTING another thing you care about? — and it answers it off OUTCOMES (your strength e1RM
-// verdict, your endurance verdict, per-discipline load), never off a fragile proxy (HR-at-pace).
+// thing COSTING another thing you care about? — off OUTCOMES (spine strength e1RM + endurance
+// verdicts + per-discipline load), never off a fragile proxy (HR-at-pace).
 //
-// WHY THIS SHAPE:
-//   · The old "interference detected — HR +Nbpm after lifting" fired on a signal smaller than its own
-//     measurement error, for a situation the plan already prevents (6h separation gate). Retired.
-//   · The push→cost frame is field-proven — Garmin "Productive/Unproductive", TrainingPeaks Form,
-//     WHOOP strain-vs-recovery all do a version. Every one is SINGLE-AXIS (endurance-only, or whole-
-//     body), so all of them get the hybrid athlete WRONG — Garmin calls a lifting runner "Unproductive"
-//     because it can't see the lifting. This read fixes exactly that failure: it can see both sides, so
-//     it says the true thing — "your running eased because you're building strength — that's the trade."
+// GLANCE + OPEN (Michael, 2026-07-21): returns a short HEADLINE (the frank verdict, always shown) and a
+// DETAIL (the receipts, revealed on tap). Frank at the glance, mechanism on demand — the app's own BODY
+// row pattern. Do NOT bury the frank verdict in the detail; the headline carries it.
 //
-// VOICE (the app's copy law): fact first, name the trade never the fault, conditional consequence,
-// no imperative that isn't a real lever, no banned words. SILENCE IS LEGAL — it speaks only when there
-// is a declared FOCUS and a real story (a trade, a cost, or genuine room). Otherwise it returns null
-// and the caller falls back to the quiet reassurance.
+// USER-AGNOSTIC, NOT TUNED: reads each athlete's OWN posture, verdicts, declared target (underTarget)
+// and load. Thresholds are the field-standard bands (Garmin/TrainingPeaks), not fitted to anyone.
+//
+// PER-DISCIPLINE FRANKNESS IS A SCIENCE CALL, NOT A COPY WHIM. The "it fades" claim is strong for
+// RUNNING (impact + eccentric loading; running economy, durability and impact tolerance are use-it-or-
+// lose-it — the SAID/specificity principle) and WEAKER for cycling/swimming (largely concentric /
+// low-impact; aerobic fitness transfers and is retained better). So the eased ENDURANCE discipline
+// drives how frank the fade language is — run: it fades; bike: the top end eases; swim: it drifts.
 
 export type CrossVerdict = 'improving' | 'holding' | 'sliding' | 'needs_data';
 export type CrossPosture = 'develop' | 'maintain' | 'dropped' | 'unknown';
 
 export interface CrossDisciplineState {
-  /** 'strength' | 'run' | 'bike' | 'swim' — canonical. */
-  discipline: string;
+  discipline: string;          // 'strength' | 'run' | 'bike' | 'swim' — canonical
   posture: CrossPosture;
-  /** The discipline's OWN fitness outcome verdict from the spine (strength = noise-guarded e1RM). */
-  verdict: CrossVerdict;
-  /** Per-discipline acute:chronic load ratio. >~1.1 = a weekly UPTICK; <~0.8 = a weekly dip. Null = unknown. */
-  acwr: number | null;
-  /**
-   * TRAILING truth (window-consistent with the upkeep line): the discipline is UNDER its maintenance
-   * target over the block. This OVERRIDES a weekly acwr uptick — a discipline sitting under its target
-   * for weeks is EASED, never "being pushed", however much one week ticked up. Without this the read
-   * called a maintain discipline "pushed" off a 1-week blip while the upkeep line right below it said the
-   * SAME discipline was under for 4 weeks — one number, two windows, on one screen (found on device
-   * 2026-07-21). A discipline with no stored target (bike/swim) leaves this false, and a genuine
-   * sustained push there still reads via acwr.
-   */
+  verdict: CrossVerdict;       // the discipline's OWN fitness outcome (strength = noise-guarded e1RM)
+  acwr: number | null;         // per-discipline acute:chronic — a WEEKLY signal (>1.1 uptick / <0.8 dip)
+  /** TRAILING truth (window-consistent with upkeep): under its maintenance target over the block.
+   *  Overrides a weekly acwr uptick — under-target = eased, never "pushed", whatever one week says. */
   underTarget?: boolean;
 }
 
 export interface CrossTrainingRead {
-  label: string;
+  /** The frank verdict — ALWAYS shown at the glance. Short. */
+  headline: string;
+  /** The receipts — revealed on tap. Mechanism, specificity, what the trade buys. May be null. */
+  detail: string | null;
   tone: 'positive' | 'info' | 'warning';
-  /** which cased fired — for tests + glass-box, never rendered raw */
-  kind: 'trade_working' | 'cost' | 'room' | null;
+  kind: 'trade_working' | 'cost' | 'room';
 }
 
-// Field-standard load bands, used PURELY descriptively (never a risk claim).
-const PUSHING = 1.1;   // acute above chronic → adding load to this discipline
-const EASED = 0.8;     // acute below chronic → this discipline eased off (the conventional under floor)
+const PUSHING = 1.1;   // acute above chronic → a weekly uptick
+const EASED = 0.8;     // acute below chronic → a weekly dip
 
 const LABEL: Record<string, string> = {
   strength: 'strength', run: 'running', running: 'running',
@@ -57,61 +47,82 @@ const LABEL: Record<string, string> = {
 };
 const lab = (d: string) => LABEL[String(d || '').toLowerCase()] ?? String(d || '').toLowerCase();
 const working = (v: CrossVerdict) => v === 'improving' || v === 'holding';
+const canon = (d: string) => { const x = String(d || '').toLowerCase(); return x === 'ride' || x === 'cycling' ? 'bike' : x === 'running' ? 'run' : x; };
+
+// How frank the fade language is when THIS endurance discipline eases — a specificity call:
+//  run: high (use-it-or-lose-it) · bike: moderate (retained better) · swim: low (technique, low-impact).
+function fadeClause(easedDisc: string): { glance: string; detail: string } {
+  switch (canon(easedDisc)) {
+    case 'run':
+      return {
+        glance: `your running's starting to fade`,
+        detail: `Running is specific — cross-training holds your aerobic base but not your running, so at this volume your running itself erodes. Hold it here long and the legs, economy and impact tolerance go; they only come back by running.`,
+      };
+    case 'bike':
+      return {
+        glance: `your riding's easing`,
+        detail: `Cycling fitness holds better than running would at low volume — it's largely aerobic and retained — but the top end still eases if you stay here.`,
+      };
+    case 'swim':
+      return {
+        glance: `your swimming's easing`,
+        detail: `Swim fitness is mostly technique and aerobic, so it drifts slowly at low volume — the feel goes before the fitness does.`,
+      };
+    default:
+      return { glance: `your ${lab(easedDisc)}'s easing`, detail: `At this volume it eases; only ${lab(easedDisc)} holds ${lab(easedDisc)}.` };
+  }
+}
 
 /**
- * Compose the honest cross-training read. Returns null when there is no declared focus, or no real
- * story — the caller then falls back to the existing quiet reassurance.
+ * Compose the honest cross-training read. Null when there's no declared focus or no real story — the
+ * caller then falls back to the quiet reassurance.
  */
 export function composeCrossTrainingRead(states: CrossDisciplineState[]): CrossTrainingRead | null {
   if (!Array.isArray(states) || states.length < 2) return null;
 
   const active = states.filter((s) => s && s.posture !== 'dropped');
   const focus = active.filter((s) => s.posture === 'develop');
-  // No declared focus → this read has nothing to trade off. Stay out; the caller reassures.
-  if (focus.length === 0) return null;
+  if (focus.length === 0) return null; // nothing to trade off → caller reassures
 
-  // The primary focus = the develop discipline with a real verdict (prefer one that's actually moving).
-  const F =
-    focus.find((s) => s.verdict !== 'needs_data') ?? focus[0];
-  if (!F || F.verdict === 'needs_data') return null; // can't speak to a focus we can't yet read
+  const F = focus.find((s) => s.verdict !== 'needs_data') ?? focus[0];
+  if (!F || F.verdict === 'needs_data') return null;
 
   const others = active.filter((s) => s.discipline !== F.discipline);
-  // EASED = under its trailing target (window-consistent with upkeep) OR a genuine weekly dip.
   const eased = (s: CrossDisciplineState) => s.underTarget === true || (typeof s.acwr === 'number' && (s.acwr as number) < EASED);
-  // PUSHED = a real weekly uptick that is NOT just a blip under the target — a discipline sitting under
-  // its maintenance target is eased, never pushed, whatever one week says. (No target → underTarget
-  // false → a genuine sustained push still reads.)
   const pushed = (s: CrossDisciplineState) => s.underTarget !== true && typeof s.acwr === 'number' && (s.acwr as number) > PUSHING;
   const easedMaintain = others.find((s) => s.posture === 'maintain' && eased(s));
   const pushedOther = others.find((s) => pushed(s));
 
+  const F_ing = F.verdict === 'improving' ? "and it's coming" : 'and it is holding';
+
   // CASE A — THE TRADE, WORKING (the anti-"Unproductive"). Focus is coming AND a maintain discipline
-  // eased to make room. This is the sentence Garmin cannot say, because it never saw the strength.
+  // eased. Frankness switches on the EASED discipline's specificity.
   if (working(F.verdict) && easedMaintain) {
-    const coming = F.verdict === 'improving' ? "and it's coming" : 'and it is holding';
+    const fc = fadeClause(easedMaintain.discipline);
     return {
-      label: `You're building ${lab(F.discipline)} ${coming} — your ${lab(easedMaintain.discipline)} eased to make room. That's the trade, not lost fitness.`,
+      headline: `Building ${lab(F.discipline)}; ${fc.glance} — the trade you chose.`,
+      detail: `${fc.detail} Your ${lab(F.discipline)} is ${F.verdict === 'improving' ? 'climbing' : 'holding'} — that's what the trade buys. Not lost fitness; a chosen one.`,
       tone: 'positive', kind: 'trade_working',
     };
   }
 
-  // CASE B — THE COST. Focus is giving ground WHILE another discipline is being pushed. Named as a
-  // trade tipping, with a real lever (ease one), never a fault and never a causation claim.
+  // CASE B — THE COST. Focus giving ground WHILE another discipline is pushed. A tipping trade + a lever.
   if (F.verdict === 'sliding' && pushedOther) {
     return {
-      label: `Your ${lab(pushedOther.discipline)} is up and your ${lab(F.discipline)} has started to give — ease one so the other can move.`,
+      headline: `Your ${lab(pushedOther.discipline)} is up and your ${lab(F.discipline)} has started to give.`,
+      detail: `You're developing ${lab(F.discipline)}, and it's sliding while ${lab(pushedOther.discipline)} load climbs — the endurance may be crowding it. Ease one so the other can move; they compete for the same recovery.`,
       tone: 'warning', kind: 'cost',
     };
   }
 
-  // CASE C — ROOM. You're pushing a non-focus discipline and the focus is still holding/coming. The
-  // green light: the pushing isn't costing you (yet).
+  // CASE C — ROOM. Pushing a non-focus discipline, focus still holding/coming. The green light.
   if (working(F.verdict) && pushedOther) {
     return {
-      label: `You're pushing your ${lab(pushedOther.discipline)} and your ${lab(F.discipline)} is holding — you've got room.`,
+      headline: `Pushing your ${lab(pushedOther.discipline)}; your ${lab(F.discipline)} is holding — you've got room.`,
+      detail: `${F.discipline === 'strength' ? 'Your lifts are' : `Your ${lab(F.discipline)} is`} ${F_ing.replace(/^and (it'?s|it is) /, '')} while ${lab(pushedOther.discipline)} load climbs — no sign the ${lab(pushedOther.discipline)} is costing it yet. Keep an eye on the lift numbers as you add more.`,
       tone: 'positive', kind: 'room',
     };
   }
 
-  return null; // no clear trade / cost / room story → caller reassures or stays silent
+  return null;
 }
