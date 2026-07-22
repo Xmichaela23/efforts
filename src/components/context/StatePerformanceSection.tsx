@@ -10,6 +10,7 @@ import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary
 import { useStateTrends } from '@/hooks/useStateTrends';
 import { useAppContext } from '@/contexts/AppContext';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
+import { formatPace } from '@/utils/workoutFormatting';
 
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
   improving: { word: 'improving', cls: 'text-emerald-400', arr: '↑' },
@@ -317,6 +318,7 @@ const RUN_TREND_MIN_RUNS = 8;
 // that: a rising trend = fitter. Durability (decoupling) is demoted to a quiet secondary read. No dot;
 // a clear verdict + arrow + %, and an honest "N of 8 runs to read it" until there's a trend.
 function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; mode?: FitnessMode; anchor?: FitnessAnchor }) {
+  const { useImperial } = useAppContext();
   const eff = fitness.efficiency;
   const dur = fitness.decoupling;
   const [explainOpen, setExplainOpen] = React.useState(false);
@@ -344,6 +346,13 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
         )}
       </span>
       {hasTrend && evidence && <span className="basis-full text-white/35 text-[11px]">{evidence}</span>}
+      {/* THE "WHAT" under the index "why" (Michael 2026-07-22) — recent steady-run pace at the HR it took,
+          in units the runner feels. Derived from the same index driving the verdict, so it can't disagree. */}
+      {hasTrend && eff.recentPaceSecPerKm != null && (
+        <span className="basis-full text-white/45 text-[11px]">
+          pace ~{formatPace(eff.recentPaceSecPerKm, useImperial)}{eff.recentHrAvg != null ? ` at ${eff.recentHrAvg} bpm` : ''}
+        </span>
+      )}
       {/* durability — the SECONDARY read now (fatigue resistance within a run), quiet, only when real */}
       {durWord && (
         <span className="basis-full text-[11px] text-white/35">durability · {durWord}{dur.stale ? ` · last steady run ${dur.newestAgeDays}d ago` : ''}</span>
@@ -352,8 +361,15 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
         <p className="basis-full text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">
           Efficiency = how much speed you get per heartbeat on steady runs, adjusted for hills so terrain
           doesn't skew it. Rising means you're running faster at the same heart rate — your aerobic engine
-          getting fitter. It's a trend, so it needs a few steady runs to read a direction. Durability, below,
-          is the other half: how well that efficiency holds across a single long run.
+          getting fitter.
+          {eff.pctChange != null && (
+            <> The {verdictSignedPct(eff.verdict, eff.pctChange)} is the change across the window below:
+            about {Math.abs(eff.pctChange)}% {eff.pctChange < 0 ? 'less' : 'more'} speed per heartbeat than
+            6 weeks ago.</>
+          )}
+          {' '}"Easing off" means it's still drifting down; "settled lower" means it dropped, then levelled.
+          It's a trend, so it needs a few steady runs to read a direction. Durability, below, is the other
+          half: how well that efficiency holds across a single long run.
         </p>
       )}
     </Row>

@@ -11,7 +11,7 @@
 // barrel here would create a load-order cycle.
 import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, computeE1rmBand, type LiftSeries, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, type BikeFitness } from './bike-fitness.ts';
-import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
+import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, recentEfficiencyPaceHr, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
 import { CROWN_MIN_DECOUPLING } from './baseline-derive.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
@@ -260,6 +260,9 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const runDecoupling = computeRunDecouplingState(runDecoupSeries, asOf, runSteadyCadence, STATE_TREND_WINDOWS.runDirectionMinRuns);
   const runEffSeries = efficiencyIndexToSeries(inp.runJoined);
   const runEfficiency = computeRunEfficiencyState(runEffSeries, asOf, runEffSeries.length / WEEKS_90D);
+  // The "what" under the "why": recent steady-run pace + HR (pace-at-HR), derived from the SAME index the
+  // verdict reads so the two lines can't disagree. STATE_TREND_WINDOWS.runDays = the efficiency window.
+  const runEffPaceHr = recentEfficiencyPaceHr(inp.runJoined, asOf, STATE_TREND_WINDOWS.runDays);
   const runState = runDecoupling; // decoupling drives the provisional flag below
   // Card verdict = decoupling (the lead). pctChange is NULLED: decoupling's trend runs on offset
   // values, so its pctChange isn't a meaningful run % — the real band/pct live in runFitness. This
@@ -292,6 +295,8 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       sampleCount: runEfficiency.trend.sampleCount,
       newestAgeDays: runEfficiency.trend.newestAgeDays,
       recentlyFlat: runEfficiency.trend.recentlyFlat,
+      recentPaceSecPerKm: runEffPaceHr.paceSecPerKm,
+      recentHrAvg: runEffPaceHr.hrAvg,
     },
   };
 
@@ -501,7 +506,7 @@ export interface StateTrendsV1 {
    *  ("building aerobic base"), not just the improving/sliding direction the base verdict carries. */
   run: DisciplineTrendCache & {
     decoupling: { verdict: string; band: string | null; recentPct: number | null; provisional: boolean; stale: boolean; newestAgeDays: number | null; sampleCount: number };
-    efficiency: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; recentlyFlat?: boolean };
+    efficiency: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; recentlyFlat?: boolean; recentPaceSecPerKm?: number | null; recentHrAvg?: number | null };
   };
   /** D-194: `rest` = the rest-fraction (work:rest) trend, nested like bike's power/efficiency. */
   swim: DisciplineTrendCache & { rest: DisciplineTrendCache };

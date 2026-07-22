@@ -87,6 +87,44 @@ export function efficiencyIndexToSeries(
     .filter((p) => p.date && Number.isFinite(p.value) && p.value >= MIN_EFF_INDEX && p.value <= MAX_EFF_INDEX);
 }
 
+export interface EffPaceHr { paceSecPerKm: number | null; hrAvg: number | null; runs: number; }
+
+/** The recent steady-run PACE + HR behind the efficiency verdict — the plain-language "what" under the
+ *  index "why" (Michael 2026-07-22, "another line for pace"). Derives pace from the SAME index the verdict
+ *  reads (gap_efficiency_index ?? efficiency_index) and hr_avg, so the pace line CANNOT disagree with the
+ *  number above it: index = (1000/pace)/hr × 100  ⇒  pace_s_per_km = 100000 / (index × hr). Where the run
+ *  had GAP the pace is grade-adjusted (matches the terrain-honest verdict); where it fell back to raw, the
+ *  pace is raw (matches the watch). Averages the last `endpointN` in-window steady runs — the SAME points
+ *  classifyTrend's recentAvg uses — so "pace at HR" describes the current end of the trend, not one run. */
+export function recentEfficiencyPaceHr(
+  rows: Array<{ date?: string; metric_date?: string; efficiency_index?: number | null; gap_efficiency_index?: number | null; hr_avg?: number | null; workout_type?: string | null; duration_minutes?: number | null }> | null | undefined,
+  asOf: string,
+  windowDays = 42,
+  endpointN = 2,
+): EffPaceHr {
+  const start = new Date(new Date(asOf + 'T12:00:00Z').getTime() - windowDays * 86_400_000).toISOString().slice(0, 10);
+  const pts = (Array.isArray(rows) ? rows : [])
+    .filter((r) => isSteadyAerobic(r.workout_type))
+    .filter((r) => typeof r.duration_minutes === 'number' && r.duration_minutes >= 30 && r.duration_minutes <= 70)
+    .map((r) => ({
+      date: r.date ?? r.metric_date ?? '',
+      idx: Number(r.gap_efficiency_index ?? r.efficiency_index),
+      hr: Number(r.hr_avg),
+    }))
+    .filter((p) => p.date && p.date > start && p.date <= asOf &&
+      Number.isFinite(p.idx) && p.idx >= MIN_EFF_INDEX && p.idx <= MAX_EFF_INDEX &&
+      Number.isFinite(p.hr) && p.hr > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (!pts.length) return { paceSecPerKm: null, hrAvg: null, runs: 0 };
+  const recent = pts.slice(-Math.min(endpointN, pts.length));
+  const avg = (a: number[]) => a.reduce((s, n) => s + n, 0) / a.length;
+  return {
+    paceSecPerKm: avg(recent.map((p) => 100000 / (p.idx * p.hr))),
+    hrAvg: Math.round(avg(recent.map((p) => p.hr))),
+    runs: pts.length,
+  };
+}
+
 export function computeRunEfficiencyState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): RunState {
   return {
     // efficiency_index is HIGHER-is-better → lowerIsBetter: false (a RISING index = improving fitness).
@@ -289,5 +327,7 @@ export interface RunFitness {
     sampleCount: number;
     newestAgeDays: number | null;
     recentlyFlat?: boolean;         // sliding split: true = dropped then levelled ("settled lower")
+    recentPaceSecPerKm?: number | null; // the "what": recent steady-run pace behind the index (grade-adj where GAP exists)
+    recentHrAvg?: number | null;        // …at this heart rate — pace-at-HR in units the runner feels
   };
 }
