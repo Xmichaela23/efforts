@@ -778,6 +778,22 @@ serve(async (req: Request) => {
           date: e.date, canonical_name: e.canonical_name, exercise_name: e.exercise_name, estimated_1rm: e.estimated_1rm,
         }));
 
+        // REAL PR frame (2026-07-21) — the best estimated 1RM across ALL logged history per lift, NOT
+        // the 6wk window. A PR must be a genuine new all-time high (a new 1RM), not "best of 6 weeks".
+        // One extra lightweight query (2 cols, all history); reduced to a per-lift {best,count} in code.
+        const allTimeBestByLift: Record<string, { best: number; count: number }> = {};
+        try {
+          const { data: allHist } = await supabase.from("exercise_log")
+            .select("canonical_name,estimated_1rm")
+            .eq("user_id", userId).not("estimated_1rm", "is", null);
+          for (const e of (allHist ?? []) as any[]) {
+            const k = e.canonical_name; const v = Number(e.estimated_1rm);
+            if (!k || !Number.isFinite(v) || v <= 0) continue;
+            const cur = allTimeBestByLift[k];
+            allTimeBestByLift[k] = cur ? { best: Math.max(cur.best, v), count: cur.count + 1 } : { best: v, count: 1 };
+          }
+        } catch (e: any) { console.warn('[compute-snapshot] all-time-best e1RM query failed (non-fatal):', e?.message ?? e); }
+
         const strengthVolumeRows = (strengthVolR.data ?? []).map((f: any) => ({ date: f.date, total_volume_lbs: f.strength_facts?.total_volume_lbs ?? null }));
 
         // Q-179 — READ THE ATHLETE'S DECLARED INTENT. It has been sitting on the goal since plan
@@ -918,7 +934,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift });
         stateTrendsV1 = toStateTrendsV1(result, asOf);
         // Carry the descent cause on the payload (JSONB, no schema change) so the coach's composer receives
         // it as a candidate rather than inferring it (contract §3a/§4).

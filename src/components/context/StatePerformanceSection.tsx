@@ -125,8 +125,13 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
     if (l.direction === 'holding')   return { arr: '→', text: 'flat', cls: 'text-white/45' };
     return { arr: '', text: 'new', cls: 'text-white/35' };
   };
-  // PR = the latest estimate IS your best in the tracked window (needs ≥2 sessions so a first log isn't a "PR").
-  const isPR = (l: (typeof lifts)[number]) => l.sampleCount >= 2 && l.latestE1rm != null && l.bestE1rm != null && l.latestE1rm >= l.bestE1rm - 0.5;
+  // PR = a REAL PR — a genuine new ALL-TIME high estimated 1RM (Michael 2026-07-21: "a PR should be a
+  // real PR, basically a new 1RM"). Was best-of-6-weeks, which fired on almost every progressing lift
+  // and even stamped a lift reading "new". Now: the latest must top the athlete's all-history best, and
+  // there must be real history to have beaten (≥3 all-time points). Null all-time data → NEVER a PR.
+  const isPR = (l: (typeof lifts)[number]) =>
+    l.latestE1rm != null && (l as any).allTimeBestE1rm != null && ((l as any).allTimeCount ?? 0) >= 3 &&
+    l.latestE1rm >= (l as any).allTimeBestE1rm - 0.5;
   return (
     <Row label="strength">
       {lifts.length === 0 ? (
@@ -145,7 +150,11 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
                         (RIR-adjusted), most reliable near failure. Provisional (below) clears as sessions stack. */}
                     <span className="text-white/75">~{Math.round(l.latestE1rm as number)} lb</span>
                     {isPR(l) && <span className="text-emerald-300 text-[9px] uppercase tracking-wide font-semibold">PR</span>}
-                    <span className={`inline-flex items-baseline gap-0.5 ${d.cls}`}>{d.arr && <span>{d.arr}</span>}<span>{d.text}</span></span>
+                    {/* A real PR carries "it went up" — so suppress the bare "new" direction next to it
+                        (the "PR · new" contradiction). Real trend arrows still show alongside PR. */}
+                    {!(isPR(l) && d.text === 'new') && (
+                      <span className={`inline-flex items-baseline gap-0.5 ${d.cls}`}>{d.arr && <span>{d.arr}</span>}<span>{d.text}</span></span>
+                    )}
                   </span>
                 </span>
                 <span className="basis-full text-white/30 text-[10px] -mt-0.5">

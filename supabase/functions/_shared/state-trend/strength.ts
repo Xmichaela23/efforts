@@ -78,7 +78,12 @@ export interface StrengthPerLift {
   direction: TrendVerdict;     // the lift's e1RM trend — the spine's owned fact
   pctChange: number | null;
   latestE1rm: number | null;   // most-recent estimated_1rm point (the number the direction is OF)
-  bestE1rm: number | null;     // best estimated_1rm in the tracked window (PR frame — latest===best ⇒ PR)
+  bestE1rm: number | null;     // best estimated_1rm in the TRACKED WINDOW (6wk) — the band frame, NOT the PR frame
+  /** A REAL PR frame: best estimated 1RM across ALL logged history (not 6wk), + how many all-history
+   *  points back it. PR = latest is a genuine new all-time high (latest >= allTimeBestE1rm). null when
+   *  the all-history read wasn't supplied — the client then must NOT flag a PR (no false records). */
+  allTimeBestE1rm: number | null;
+  allTimeCount: number;
   sampleCount: number;
   newestAgeDays: number | null;
   provisional: boolean;

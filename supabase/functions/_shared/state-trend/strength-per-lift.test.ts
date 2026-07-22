@@ -21,7 +21,7 @@ function lift(canonical: string, name: string, values: number[]): ExerciseLogLit
   return values.map((v, i) => ({ date: WEEKS[i], canonical_name: canonical, exercise_name: name, estimated_1rm: v }));
 }
 
-function inputs(exerciseRows: ExerciseLogLite[]): StateTrendInputs {
+function inputs(exerciseRows: ExerciseLogLite[], allTimeBestByLift?: Record<string, { best: number; count: number }>): StateTrendInputs {
   return {
     asOf: AS_OF,
     exerciseRows,
@@ -29,8 +29,31 @@ function inputs(exerciseRows: ExerciseLogLite[]): StateTrendInputs {
     plannedBy: { strength: 2 },
     doneBy: { strength: 3 },
     cadenceCounts: { strength: 24 }, // ~1.9/wk → low min-session floor
+    allTimeBestByLift,
   };
 }
+
+// ── REAL PR frame (2026-07-21): per_lift carries the ALL-TIME best, so a PR is a genuine new 1RM ──────
+Deno.test('per_lift carries allTimeBestE1rm/allTimeCount; PR = latest is a new all-time high', () => {
+  const rows = lift('bench_press', 'Bench Press', [200, 208, 216, 224, 232]); // 6wk window, latest 232
+  // all-history says the real best-ever is 250 → the latest 232 is NOT a PR (only best-of-window).
+  const notPr = toStateTrendsV1(assembleStateTrends(inputs(rows, { bench_press: { best: 250, count: 30 } })), AS_OF);
+  const bp1 = (notPr.strength.per_lift as any[]).find((l) => l.canonical === 'bench_press');
+  assertEquals(bp1.allTimeBestE1rm, 250);
+  assertEquals(bp1.allTimeCount, 30);
+  assertEquals(bp1.latestE1rm >= bp1.allTimeBestE1rm - 0.5, false); // 232 < 250 → NOT a PR
+
+  // all-history best is 232 (the latest IS the all-time high) → a real PR.
+  const isPr = toStateTrendsV1(assembleStateTrends(inputs(rows, { bench_press: { best: 232, count: 30 } })), AS_OF);
+  const bp2 = (isPr.strength.per_lift as any[]).find((l) => l.canonical === 'bench_press');
+  assertEquals(bp2.latestE1rm >= bp2.allTimeBestE1rm - 0.5, true); // 232 >= 232 → PR
+
+  // no all-history supplied → allTimeBestE1rm null → the client can NEVER flag a PR (no invented records)
+  const noData = toStateTrendsV1(assembleStateTrends(inputs(rows)), AS_OF);
+  const bp3 = (noData.strength.per_lift as any[]).find((l) => l.canonical === 'bench_press');
+  assertEquals(bp3.allTimeBestE1rm, null);
+  assertEquals(bp3.allTimeCount, 0);
+});
 
 Deno.test('D-270: per_lift carries each lift direction + latest e1RM, keyed by canonical', () => {
   const rows = [

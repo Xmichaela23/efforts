@@ -172,6 +172,10 @@ export interface StateTrendInputs {
   declaredSessionsPerWeek?: Partial<Record<string, number>> | null;
   /** State v3: baseline 1RM per PRIMARY_LIFTS canonical (squat/bench_press/deadlift/overhead_press) so
    *  the strength DOT reads current e1RM ÷ baseline (the honest frame). Absent → hedged 12wk fallback. */
+  /** A REAL PR frame — best estimated 1RM across ALL logged history per canonical lift (NOT the 6wk
+   *  window), + the all-history point count. Supplied by compute-snapshot's all-history query. Absent →
+   *  the client cannot flag a PR (we don't invent records from 6 weeks). */
+  allTimeBestByLift?: Record<string, { best: number; count: number }> | null;
   strengthBaselines?: Record<string, number> | null;
   /** Active auto/manual fitness baselines (fitness_baselines table), keyed by discipline (run/bike/swim).
    *  Presence → ANCHORED mode + the tick. Absent → the discipline falls to trend_only / facts_only. */
@@ -326,6 +330,9 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     pctChange: l.trend.pctChange,
     latestE1rm: liftLatest.get(l.canonical) ?? null,
     bestE1rm: liftBest.get(l.canonical) ?? null,
+    // REAL PR frame — all-history best (not 6wk). Null when the all-history read wasn't supplied.
+    allTimeBestE1rm: inp.allTimeBestByLift?.[l.canonical]?.best ?? null,
+    allTimeCount: inp.allTimeBestByLift?.[l.canonical]?.count ?? 0,
     sampleCount: l.trend.sampleCount,
     newestAgeDays: l.trend.newestAgeDays,
     provisional: isProvisionalTrend(l.trend),
