@@ -4,6 +4,8 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-07-22 status:** current active work is the **State screen → 100%** track (per the roadmap in Michael's memory: State → plan builder → intro flow → freeballer). This session put a large UX/craft/chart pass on the RUN row + FITNESS section — precise verdict words, pace-at-HR + GAP toggle, goal-free race projections, the discipline-icon/traffic-light color system, and the 12-week efficiency chart. See **D-307 → D-311**, **Q-197/Q-198**, and the ENGINE-STATE banner. The phase list below (the 2026-07-13 continuity plan) is still valid but is not what's currently being worked.
+
 ---
 
 ## Why the app is like this (say it once, then stop re-litigating it)

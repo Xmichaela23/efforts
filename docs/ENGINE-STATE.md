@@ -24,7 +24,38 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-20 ~03:30 — STATE'S PROSE IS DETERMINISTIC · TWO PIECES SEEN ON DEVICE, THE THIRD NEVER SEEN SPEAKING)
+## 🧭 NEXT SESSION — START HERE (2026-07-22 — STATE RUN ROW + FITNESS: BIG UX/CRAFT + CHART PASS · MOSTLY DEVICE-SEEN · STRENGTH CHART BLOCKED ON A DATA-SPLIT BUG)
+
+> ## READ `docs/GAME-PLAN.md`, then **D-307 → D-311** (this session's decisions) and **Q-197** (the squat split — a real data bug).
+>
+> **What happened:** a long, Michael-driven, device-iterated pass on the State screen — the RUN row and the whole FITNESS section. `COACH_PAYLOAD_VERSION` **135 → 141**. Every step: pushed, edge functions deployed (`compute-snapshot` + `coach`), iOS synced, and Michael's snapshot recomputed via `scripts/_trigger-snapshot.mjs`. Michael SAW most of it on device (screenshots), so it's closer to VERIFIED than usual — but read "unverified" below.
+>
+> ### WHAT SHIPPED — do NOT re-litigate (device-seen unless flagged):
+> - **Precise verdict words (D-307):** `classifyTrend` gains `recentlyFlat`; "sliding" is retired as a *display* word → **"easing off"** (still dropping) vs **"settled lower"** (dropped then flat). Shared engine — every discipline. Fixtures: `classify-recently-flat.test.ts`.
+> - **Run pace-at-HR line + GAP toggle (D-308):** the row shows the **raw** pace the watch recorded ("~12:46/mi at 134 bpm"), derived from the *same* index as the verdict; a "GAP" chip toggles the grade-adjusted twin. Field-standard split (raw displayed, graded under the hood). `recentEfficiencyPaceHr`, `run-efficiency-pace.test.ts`.
+> - **Projected race times (D-309):** **goal-free** VDOT — `projectStandardRaces` (`_shared/race-readiness/index.ts`) reuses the shipped engine (`estimateVdotFromPace` → `getTargetTime`) with NO goal race. 5k/10k/half/marathon off current fitness; longer distances **UNLOCK** on estimated long-run distance. `project-standard-races.test.ts`.
+> - **State color system (D-310):** discipline = a small colored **ICON** on the row label (matches WorkoutCalendar's set), label text WHITE; verdicts are **traffic-light** — green=improving, **GRAY**=holding/steady/settled-lower (was amber: a false caution AND a collision with run-gold), amber=easing-off/declining. Cross-training sentence colored by its **subject discipline** (was blue = swim's color). Two load bars unified (one word "bike", one casing, labeled windows).
+> - **12-week efficiency chart (D-311):** `run.efficiency.series` (same points as the verdict, 84d window, recent-6 flagged). Sparkline on the RUN row — verdict answers "is my *current* training working" (6wk), chart answers "am I *trending up over the block*" (12wk). Charts **OUTPUT** (efficiency), not TP's **LOAD** (CTL/ATL/TSB). **Fills-as-you-build** for new users. `EfficiencySparkline` (self-contained SVG).
+> - **Readability:** uniform brightness/size bump + `tabular-nums` + aligned grid columns + left-aligned prose across FITNESS + BODY.
+>
+> ### ⛔ Q-197 — REAL DATA BUG, fix before the strength chart: squat e1RM is split across TWO canonical names (`squat` AND `barbell_back_squat`) in `exercise_log`. It fragments any squat series AND may be skewing today's "Back Squat" verdict (best/trend on half the sessions). Trace `computeStrengthState` + the canonicalizer.
+>
+> ### OPEN THREADS (Michael-approved direction, NOT yet built) — see Q-198:
+> - **Tap-to-expand** the efficiency sparkline into the full detail-screen chart pattern (toggle chips).
+> - **Strength e1RM chart** — same `EfficiencySparkline`, building state — AFTER Q-197.
+> - A **load/form-over-time chart** is the one thing TP charts that we don't (ACWR is on the spine) — optional TP-parity.
+>
+> ### ⚠️ UNVERIFIED / WATCH:
+> - Cross-training discipline color needed the coach cache to re-source (v141) — confirm the line renders **gold** (run), not white, on device after a refresh.
+> - `bikeEfficiencyDisplay` (`bike-fitness.ts:103`) still tones holding=`warning`; the FITNESS bike verdict renders via the **client** VERDICT map (now gray), so it's fine there — but if bike "holding" shows amber on any *other* surface, that's the server path.
+> - Chart data-depth is athlete-specific: Michael has ~12wk run efficiency (14 pts) but only ~5wk strength e1RM/lift. The "building" state handles this honestly.
+> - Two throwaway diagnostic scripts left on disk (`scripts/_trigger-snapshot.mjs`, `_check-run-pace.mjs`, `_chart-data-depth.mjs`) — read `.env` service key, no secrets in them; delete when convenient.
+>
+> ### ⛔ DOCS OVER THE CAP: `DECISIONS-LOG` 210KB · `ENGINE-STATE` 162KB · `OPEN-QUESTIONS` 155KB — all past the ~150KB archive line. Next session that edits them should move closed/superseded entries to the `-archive` files (CLAUDE.md rule).
+
+---
+
+## 🧭 NEXT SESSION — START HERE (SUPERSEDED 2026-07-22 — the deterministic-prose/composer work below still stands; this session moved to the RUN row + FITNESS craft/chart pass)
 
 > ## READ `docs/GAME-PLAN.md`, `START-HERE.md`, `LIFECYCLE.md`, then **D-306 + its AMENDMENT**, and **Q-189 → Q-196**.
 >

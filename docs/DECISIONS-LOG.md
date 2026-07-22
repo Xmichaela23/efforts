@@ -916,3 +916,46 @@ Three defects the 22 green tests did not catch, found by reading the output: (1)
 
 **The transferable lesson, and it is the one worth keeping:** *green tests proved the code did what I told it to; they could not tell me that what I told it was wrong.* Every defect above was invisible to 30 passing tests and obvious in one screenshot. **Render the output and read it. On the real screen, next to whatever else that screen already says.**
 
+
+---
+
+## D-307 — Precise verdict words: "settled lower" vs "easing off" (`recentlyFlat`) (2026-07-22, PUSHED + DEPLOYED + DEVICE-SEEN)
+
+Michael: *"all the words for every scenario has to be precise."* The trend verdict is the NET early→recent change; on its own it can't tell a metric STILL declining from one that DROPPED then STEADIED. `classifyTrend` now carries **`recentlyFlat`** — true when the SECOND HALF of the window sits inside the holding band (`classify.ts`). The display splits the moving verdict:
+- **improving** — rising · **holding** — flat the whole window · **easing off** — still drifting down (sliding + still moving) · **settled lower** — dropped, then levelled (sliding + `recentlyFlat`).
+
+"sliding" is **retired as a display word**; its non-alarming default everywhere is "easing off" (softer than Garmin's "Detraining"). Shared engine — every discipline's trend gains the flag; run efficiency renders it via `verdictLabel` (`StatePerformanceSection.tsx`). Industry map: improving≈Garmin Productive, holding≈Maintaining, "settled lower"=our edge (nobody distinguishes it), "easing off"=neutral Detraining. Fixtures: `classify-recently-flat.test.ts` (Michael's real efficiency series 1.76→1.55 → "settled lower"). Payload `v135→136`.
+
+## D-308 — Run row: pace-at-HR line, RAW by default, GAP toggle (2026-07-22, PUSHED + DEPLOYED + DEVICE-SEEN)
+
+The efficiency index is a real fitness signal but "1.55" means nothing to a human, so the RUN row shows the recent steady-run **pace + HR** behind it ("pace ~12:46/mi at 134 bpm"). `recentEfficiencyPaceHr` (`run.ts`) derives pace from the SAME index the verdict reads (`efficiency_index ?? gap_efficiency_index`) and `hr_avg` — `pace_s_per_km = 100000 / (index × hr)` — averaged over the last-2 in-window steady runs, so the pace line CANNOT disagree with the number above it.
+
+**Field-standard split (Strava/TrainingPeaks):** the efficiency VERDICT stays grade-adjusted (TP's NGP÷HR), but the DISPLAYED pace is **RAW** — what the watch recorded — because that's what every platform shows and what the athlete recognizes. A **GAP toggle** carries the grade-adjusted twin (`recentGapPaceSecPerKm`); suppressed when any recent run lacks GAP or the two differ <3 s/km. `run-efficiency-pace.test.ts`. Payload `v136→138` (137 pace line, 138 raw+toggle).
+
+## D-309 — Projected race times on the RUN row: goal-free VDOT + long-run unlock (2026-07-22, PUSHED + DEPLOYED + DEVICE-SEEN)
+
+For the "varied runner" the efficiency row can't serve. `projectStandardRaces` (`_shared/race-readiness/index.ts`) **reuses the shipped VDOT engine** (`estimateVdotFromPace` → `getTargetTime`, the same path `computeRaceReadiness` uses) but needs **no goal race** — the goal's `target_date` was only ever used to say "on track", never to compute the number. Projects 5k/10k/half/marathon off current fitness (threshold pace → VDOT), with the engine's own hedges (durability + confidence) so thin/fatigued data reads conservative.
+
+**UNLOCK by distance (Michael's idea — and the honest move):** a projection is only trustworthy near the distances you actually run; a marathon estimate off 5-mile long runs is a fantasy (VDOT/Riegel error grows with extrapolation). Longer distances unlock as the long run grows (10k ~6mi, half ~10mi, marathon ~16mi — estimated from the longest recent run's DURATION at easy pace, avoiding the codebase's inconsistent raw-distance units). Computed in `compute-snapshot` (kept OFF the client-math fallback), attached to `display.runFitness.projections`. `project-standard-races.test.ts`. Payload `v138→139`. **Why VDOT not Riegel:** VDOT works off training pace (no race result needed); Riegel needs an anchor performance. Both are field-standard; VDOT was already wired.
+
+## D-310 — State color system: discipline ICON + traffic-light verdicts (categorical vs semantic collision) (2026-07-22, PUSHED + DEPLOYED + DEVICE-SEEN)
+
+Introducing per-discipline color created a collision: green meant both "improving" (verdict) AND "bike" (discipline); amber meant both "holding" AND "run-gold". **Resolution (the textbook one — reserve semantic hues, contain categorical color):**
+- **Discipline = a small colored ICON** on the row label (`getDisciplineColor`, icons match WorkoutCalendar's app-wide set: run=Activity, strength=Dumbbell, swim=Waves, bike=Bike); **label text stays WHITE** for legibility. Category is a contained icon, not competing text.
+- **Verdicts = traffic-light, one meaning each:** improving=green (good), **holding/steady/settled-lower = neutral GRAY** (was amber — a false caution that *also* read as run-gold, and made "steady" look identical to "slipping"), easing-off/declining=amber (mild bad). `VERDICT` + `VOLUME_WORD` maps.
+- **Cross-training sentence** colored by its **subject discipline** (`cross_training_signal.discipline`, new field) instead of blue — blue is swim's own color, so a blue sentence about running collided. Warnings stay amber.
+- **Two load bars unified:** LoadBar (rolling-7d composition) said "Ride" (capitalized); WeekMixBar (this-week planned-vs-actual) said "bike". One word **"bike"** (swim-bike-run is the tri canon), one lowercase casing, each keeps its distinct window label. Discipline word "ride" purged from user-facing labels (`LoadBar.tsx` DISPLAY_NAME).
+
+Also: uniform readability bump (brightness +~20%, size +1 step), `tabular-nums`, aligned grid columns (strength e1RM, race times), left-aligned wrapping prose in BODY (was right-aligned — the cardinal sin). Payload `v139→140` (cross-training discipline field). Rest is client-only.
+
+## D-311 — The 12-week efficiency chart: OUTPUT not LOAD, two-horizon, fills-as-you-build (2026-07-22, PUSHED + DEPLOYED + DEVICE-SEEN)
+
+TP's gap-closer, on our terms. `run.efficiency.series` carries the SAME efficiency points the verdict reads, over an **84d (12wk)** window vs the verdict's **42d (6wk)**, each flagged `recent` when inside the verdict window (`assemble.ts`). The RUN-row sparkline (`EfficiencySparkline`, self-contained SVG) draws recent-6 in the run color (the slice the verdict judges) + older weeks dim (context), so **chart and word are one truth** — the chart's recent tail IS the verdict's data, they can't contradict.
+
+**Two horizons, two questions:** verdict = "is my *current* training working?" (acute, 6wk, reacts fast); chart = "am I *trending up over the block*?" (chronic, 12wk = one training block). Most apps blur these.
+
+**Charts OUTPUT, not LOAD.** TP's PMC (CTL/ATL/TSB) charts training *load* — "you trained more", not "you got faster". This charts the actual performance output. It's the chart TP's model skips. (TP *can* build an EF-over-time chart, but makes you configure it and decode acronyms; we curate + surface + plain-language + strength-capable.)
+
+**FILLS-AS-YOU-BUILD:** designed for new users first, not veterans. A 12-week canvas that shows what exists, honestly labeled ("building · N of 12 weeks"); **<2 points draws no line** (no fabricated trend through one dot). Michael's data revealed the value immediately — a June efficiency PEAK (~1.90) the recent-6 verdict ("settled lower") can't show. Payload `v140→141` (`run.efficiency.series`).
+
+**Data-integrity gate (Michael: "if we are 100% on the data"):** traced actual depth before building — run efficiency 14 pts / 11-of-12 weeks (chart is real); strength e1RM only ~5wk/lift + the Q-197 split (NOT ready → strength chart deferred). The gate did its job: run passed, strength didn't.

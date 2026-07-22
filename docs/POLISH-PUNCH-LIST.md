@@ -8,6 +8,17 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+### ⚡ Shipped 2026-07-22 — State RUN row + FITNESS craft/chart pass (D-307 → D-311) — DEPLOYED + MOSTLY DEVICE-SEEN
+- [x] **Precise verdict words** (D-307): `recentlyFlat` → "settled lower" vs "easing off". `classify-recently-flat.test.ts`.
+- [x] **Pace-at-HR line + GAP toggle** (D-308): raw pace default, grade-adjusted on tap.
+- [x] **Projected race times** (D-309): goal-free VDOT 5k/10k/half/marathon, distance-unlocked.
+- [x] **Color system** (D-310): discipline ICONs + white labels; verdicts traffic-light (holding=gray); cross-training by discipline; two load bars unified ("bike"); readability + tabular + aligned grids + left-aligned BODY prose.
+- [x] **12-week efficiency chart** (D-311): `EfficiencySparkline`, output-not-load, two-horizon, fills-as-you-build. Michael saw it render (June-peak visible).
+- [ ] **⛔ Q-197 — squat canonical split** (`squat` vs `barbell_back_squat`) — may skew the "Back Squat" verdict; fix before the strength chart.
+- [ ] **Open threads (Q-198):** tap-to-expand chart · strength e1RM chart (after Q-197) · optional load/form-over-time chart (TP-parity).
+- [ ] **Delete throwaway scripts** `scripts/_trigger-snapshot.mjs` / `_check-run-pace.mjs` / `_chart-data-depth.mjs` (read `.env`, no secrets in them).
+- [ ] **WATCH:** confirm cross-training line renders gold (not white) on device after a coach refresh; confirm bike "holding" is gray everywhere (`bikeEfficiencyDisplay` server tone still `warning`).
+
 ### ⚡ Shipped 2026-07-19 night — DEPLOYED, NOT VERIFIED (coach week composer, D-306)
 - [x] **Wired `composeCoachWeekInsight`** — `coach.narrative` is deterministic. Pushed `652f07e3`, `coach` deployed, `COACH_PAYLOAD_VERSION` 118.
 - [x] **Stall signal built (Q-193)** — per-set reps vs prescribed, at or above the prescribed load.

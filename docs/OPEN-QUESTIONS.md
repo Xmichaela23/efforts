@@ -840,3 +840,22 @@ So a declared, honest swap is read as **two separate failures**:
 `accessory_bias` is written by the wizard (`NonRaceBuilder.tsx:145`), read only at plan-build (`create-goal…:2423` → `generate-strength-plan:59`), and `GoalsScreen:1653` merely **displays** it. **There is NO edit path — changing your focus means rebuilding the whole plan.** `per_discipline_posture` has the identical problem (Q-179). **The app asks the athlete what they want, captures it once, and then neither reads it again nor lets them change their mind. Fix one edit path; serve both.**
 
 **SPEC: `docs/SPEC-strength-focus.md`.** Sign-off gated (changes prescribed volume). **Open before building:** `vertical_pull` is not a `primaryRef` value today (a pull-up focus needs it) · where a per-athlete MRV comes from (do NOT fabricate one) · interference with concurrent endurance.
+
+---
+
+## Q-197 — Squat e1RM is split across TWO canonical names (data bug) (2026-07-22, UNVERIFIED-cause / CONFIRMED-symptom)
+
+Found while tracing chart data-depth for D-311. Michael's `exercise_log` logs squat under **both** `squat` (4 sessions) **and** `barbell_back_squat` (3 sessions) over the last 12 weeks. Two consequences:
+1. **Any squat e1RM chart fragments** into two half-series (blocks the strength chart, D-311 open thread).
+2. **The current "Back Squat" verdict may be wrong** — `computeStrengthState` picks a `canonical`, and best/trend/PR-flag would compute on only *one* of the two name-buckets, i.e. half the sessions. The "→ flat · 4 sessions" reading Michael sees may be missing 3 sessions under the other name.
+
+**Before touching:** confirm the canonicalizer (whatever maps raw exercise names → canonical in `compute-facts`/exercise-config) — is `barbell_back_squat` supposed to fold into `squat`? If yes, it's a canonicalizer miss; fix at the write site so future logs merge, and decide whether to backfill. If they're *intentionally* distinct (e.g., a specific bar variant), then the chart just treats them as separate lifts and there's no verdict bug. **Trace, don't assume** — this is a LEAD with a confirmed symptom (the split counts), not yet a confirmed bug (the verdict impact).
+
+## Q-198 — State chart: open threads after the first sparkline (2026-07-22, intentional-deferral)
+
+D-311 shipped the run-efficiency 12-week sparkline. Three Michael-approved follow-ons, deliberately not built this session:
+1. **Tap-to-expand** the sparkline into the full detail-screen chart pattern (the `PACE/BPM/ELEV/CAD/PWR`-style toggle chips + draggable line). The component already toggles a taller SVG; the full detail-chart reuse is the next step.
+2. **Strength e1RM chart** — reuses `EfficiencySparkline` in its building state — **gated on Q-197** (points must be correct before charting).
+3. **Load/form-over-time chart** — the one thing TP's PMC charts that we don't (CTL/ATL/TSB / freshness). ACWR + load are already on the spine, so it's a render + a retained-window question, not new logic. Optional TP-parity; only if Michael wants the "am I fresh/peaked?" axis, distinct from the "am I improving?" (output) charts we now have.
+
+Also: the chart series is 84d because that's what `runJoined`'s ~90d window carries. A *season-length* (year) chart — TP's real timescale — would need a wider retained window. Out of scope unless asked.
