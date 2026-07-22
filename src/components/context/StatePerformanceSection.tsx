@@ -14,10 +14,25 @@ import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/l
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
   improving: { word: 'improving', cls: 'text-emerald-400', arr: '↑' },
   holding: { word: 'holding', cls: 'text-amber-300', arr: '→' },
-  sliding: { word: 'sliding', cls: 'text-red-400', arr: '↓' },
+  sliding: { word: 'easing off', cls: 'text-amber-300', arr: '↓' },
   needs_data: { word: 'needs data', cls: 'text-white/40', arr: '' },
   withheld: { word: 'too few to read', cls: 'text-white/40', arr: '' },
 };
+
+// PRECISE VERDICT WORDS (2026-07-22, Michael — "all the words for every scenario has to be precise").
+// The trend engine's raw verdict is a NET early→recent direction; on its own it can't tell a metric
+// STILL falling from one that DROPPED then STEADIED. classifyTrend now carries `recentlyFlat` (the recent
+// half sits inside the holding band). Four shared words, one vocabulary for every discipline:
+//   improving   — rising
+//   holding     — flat the whole window
+//   easing off  — still drifting down (sliding + still moving)   ← softer than Garmin's "Detraining"
+//   settled lower — dropped, then levelled off (sliding + recentlyFlat)   ← the split nobody else draws
+// Only the sliding verdict splits; "sliding" as a bare word is retired everywhere in favour of "easing
+// off" (its non-alarming default). Falls back to VERDICT for improving/holding/needs_data/withheld.
+function verdictLabel(verdict: TrendVerdict, recentlyFlat?: boolean): { word: string; cls: string; arr: string } {
+  if (verdict === 'sliding' && recentlyFlat) return { word: 'settled lower', cls: 'text-white/55', arr: '→' };
+  return VERDICT[verdict];
+}
 
 // D-160: pctChange is the RAW metric delta (classify.ts keeps it raw so the UI knows real direction).
 // For lower-is-better disciplines (swim/run pace) an improvement is a NEGATIVE delta — printing it
@@ -305,7 +320,7 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
   const eff = fitness.efficiency;
   const dur = fitness.decoupling;
   const [explainOpen, setExplainOpen] = React.useState(false);
-  const v = VERDICT[eff.verdict];
+  const v = verdictLabel(eff.verdict, eff.recentlyFlat);
   const hasTrend = eff.verdict !== 'needs_data' && eff.verdict !== 'withheld';
   const evidence = eff.sampleCount != null
     ? trendEvidence({ windowDays: 42, sampleCount: eff.sampleCount, newestAgeDays: eff.newestAgeDays, discipline: 'run' as Discipline })

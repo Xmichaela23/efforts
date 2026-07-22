@@ -288,5 +288,6 @@ export interface RunFitness {
     pctChange: number | null;
     sampleCount: number;
     newestAgeDays: number | null;
+    recentlyFlat?: boolean;         // sliding split: true = dropped then levelled ("settled lower")
   };
 }

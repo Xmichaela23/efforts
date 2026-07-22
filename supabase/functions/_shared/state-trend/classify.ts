@@ -127,5 +127,24 @@ export function classifyTrend(
     return { ...base, verdict: 'needs_data', pctChange: null, earlyAvg: null, recentAvg: null, stale: true };
   }
 
-  return { ...base, verdict, pctChange, earlyAvg, recentAvg, stale: false };
+  // "STILL MOVING vs FLATTENED" (2026-07-22, Michael — precise words for every scenario). The verdict is
+  // the NET early→recent change; it can't tell a metric STILL declining from one that DROPPED then HELD.
+  // Read the trend of the SECOND HALF of the window alone: if it isn't itself clearing the improve/slide
+  // bands, the recent portion is FLAT — it moved, then settled. Lets the display say "settled lower"
+  // (dropped, holding) vs "easing off" (still declining) — a precision the big apps don't do. Only
+  // meaningful on a moving verdict.
+  let recentlyFlat = false;
+  if ((verdict === 'sliding' || verdict === 'improving') && inWindow.length >= 4) {
+    const secondHalf = inWindow.slice(Math.floor(inWindow.length / 2));
+    if (secondHalf.length >= 2) {
+      const rk = Math.min(endpointN, Math.max(1, Math.floor(secondHalf.length / 2)));
+      const rEarly = avg(secondHalf.slice(0, rk).map((p) => p.value));
+      const rLate = avg(secondHalf.slice(-rk).map((p) => p.value));
+      const rPct = rEarly > 0 ? ((rLate - rEarly) / rEarly) * 100 : 0;
+      const rEff = lowerIsBetter ? -rPct : rPct;
+      recentlyFlat = rEff < improvePct && rEff > slidePct; // recent half sits inside the holding band
+    }
+  }
+
+  return { ...base, verdict, pctChange, earlyAvg, recentAvg, stale: false, recentlyFlat };
 }

@@ -291,6 +291,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       pctChange: runEfficiency.trend.pctChange,
       sampleCount: runEfficiency.trend.sampleCount,
       newestAgeDays: runEfficiency.trend.newestAgeDays,
+      recentlyFlat: runEfficiency.trend.recentlyFlat,
     },
   };
 
@@ -500,7 +501,7 @@ export interface StateTrendsV1 {
    *  ("building aerobic base"), not just the improving/sliding direction the base verdict carries. */
   run: DisciplineTrendCache & {
     decoupling: { verdict: string; band: string | null; recentPct: number | null; provisional: boolean; stale: boolean; newestAgeDays: number | null; sampleCount: number };
-    efficiency: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null };
+    efficiency: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; recentlyFlat?: boolean };
   };
   /** D-194: `rest` = the rest-fraction (work:rest) trend, nested like bike's power/efficiency. */
   swim: DisciplineTrendCache & { rest: DisciplineTrendCache };
