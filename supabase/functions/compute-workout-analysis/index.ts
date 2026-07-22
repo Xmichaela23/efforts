@@ -8,6 +8,7 @@ import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
+import { paceToGAP } from '../_shared/gap.ts'; // ONE canonical Grade-Adjusted Pace (Minetti) — no inline copy
 
 const ANALYSIS_VERSION = 'v0.1.9'; // NP zero-preserve + 30s Coggan startup trim (D-112)
 
@@ -1382,12 +1383,13 @@ Deno.serve(async (req) => {
           const avgGradePct = sElev != null && eElev != null && dist_m > 0
             ? Math.round(((eElev - sElev) / dist_m) * 1000) / 10
             : null;
-          let gapPace: number | null = null;
-          if (pace != null && avgGradePct != null && Math.abs(avgGradePct) >= 0.3) {
-            const g = avgGradePct / 100;
-            const cost = 155.4*g**5 - 30.4*g**4 - 43.3*g**3 + 46.3*g**2 + 19.5*g + 3.6;
-            if (cost > 0.5) gapPace = Math.round(pace * (3.6 / cost));
-          }
+          // ONE SOURCE (2026-07-21): the Minetti coefficients were hardcoded here, a silent duplicate of
+          // _shared/gap.ts. Change the model there and this copy would diverge (the exact "one fact, two
+          // engines" fork). Now the canonical paceToGAP; null unless the grade is significant enough to
+          // adjust (paceToGAP returns raw pace for <0.3%, so guard here to keep the "no adjustment → null").
+          const gapPace: number | null = (pace != null && avgGradePct != null && Math.abs(avgGradePct) >= 0.3)
+            ? Math.round(paceToGAP(pace, avgGradePct))
+            : null;
           out.push({
             n: out.length+1,
             t0: Math.max(0,(s.t||0)-t0),
@@ -1879,7 +1881,7 @@ Deno.serve(async (req) => {
     // Compute overall GAP from per-sample GAP (more accurate on rolling terrain than per-mile-split)
     if (sport.includes('run') || sport.includes('walk')) {
       try {
-        const { computeSampleGrades, paceToGAP, hasUsableElevation, aggregateGapPace } = await import('../_shared/gap.ts');
+        const { computeSampleGrades, hasUsableElevation, aggregateGapPace } = await import('../_shared/gap.ts'); // paceToGAP is the static import (one source)
         // Rows from normalizeSamples use v_mps (not speed_mps). GAP does not need HR — filtering
         // by HR breaks the 1 Hz assumption in computeSampleGrades unless distance_m is supplied.
         const gapSamples = rows.map((r: any) => {

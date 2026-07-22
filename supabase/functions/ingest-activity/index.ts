@@ -5,6 +5,7 @@
 // Body: { userId: string, provider: 'strava'|'garmin', activity: any }
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
+import { metabolicCostPerMeter } from '../_shared/gap.ts'; // ONE canonical Minetti cost — no inline copy
 const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY'));
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -552,11 +553,9 @@ function computeGAPSecPerMi(normalized) {
     ema = e == null ? ema : ema == null ? e : alpha * e + (1 - alpha) * ema;
     elevSm[i] = ema ?? 0;
   }
-  // Minetti energy cost (J/kg/m), clamp grade to ±30%
-  const minetti = (g)=>{
-    const x = Math.max(-0.30, Math.min(0.30, g));
-    return (((155.4 * x - 30.4) * x - 43.3) * x + 46.3) * x * x + 19.5 * x + 3.6;
-  };
+  // ONE SOURCE (2026-07-21): Minetti cost was a third inline copy of _shared/gap.ts. Now canonical
+  // (gap.ts clamps ±0.45 vs the old ±0.30 — a wider, harmless bound); no silent divergence.
+  const minetti = metabolicCostPerMeter;
   let eqMeters = 0, moveSec = 0;
   for(let i = 1; i < normalized.length; i++){
     const a = normalized[i - 1], b = normalized[i];

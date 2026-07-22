@@ -12,7 +12,7 @@
  * Metabolic cost of locomotion in J/kg/m for a given grade (decimal).
  * Valid for grades roughly -0.45 to +0.45.
  */
-function metabolicCostPerMeter(gradeDecimal: number): number {
+export function metabolicCostPerMeter(gradeDecimal: number): number {
   const g = Math.max(-0.45, Math.min(0.45, gradeDecimal));
   return (
     155.4 * g ** 5 -

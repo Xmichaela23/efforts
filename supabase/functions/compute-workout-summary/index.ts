@@ -5,6 +5,7 @@
 //           Also normalizes pace units and tags records with normalization_version='v1'.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
+import { metabolicCostPerMeter } from '../_shared/gap.ts'; // ONE canonical Minetti cost — no inline copy
 
 // ---------- small helpers ----------
 const ydToM = (yd:number)=> yd * 0.9144;
@@ -383,10 +384,10 @@ function gapSecPerMi(rows:any[], sIdx:number, eIdx:number) {
     if (e <= s) return null;
     let adjMeters = 0; let timeSec = 0;
     const alpha = 0.1; // EMA smoothing (~10-15s at ~1 Hz)
-    function minettiCost(g:number){
-      const x = Math.max(-0.30, Math.min(0.30, g));
-      return (((155.4*x - 30.4)*x - 43.3)*x + 46.3)*x*x + 19.5*x + 3.6;
-    }
+    // ONE SOURCE (2026-07-21): the Minetti cost was hardcoded here — a third copy of _shared/gap.ts.
+    // Now the canonical metabolicCostPerMeter (gap.ts clamps ±0.45 vs the old inline ±0.30; a wider,
+    // harmless bound). Change the model in gap.ts and this follows, instead of silently diverging.
+    const minettiCost = metabolicCostPerMeter;
     let ema:number|null = null;
     for (let i=s+1;i<=e;i+=1) {
       const a:any = rows[i-1] || {};
