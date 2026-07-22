@@ -296,79 +296,51 @@ function NoBaselineTag({ hint }: { hint?: string }) {
 // Mirrors STATE_TREND_WINDOWS.runDirectionMinRuns (assemble.ts): steady runs in the 6wk window needed
 // before a DIRECTION arrow is drawn. The LEVEL dot needs no such floor — one steady run reads a level.
 const RUN_TREND_MIN_RUNS = 8;
-function RunFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: RunFitness; showAxis?: boolean; mode: FitnessMode; anchor?: FitnessAnchor }) {
-  const d = fitness.decoupling;
-  const v = VERDICT[d.verdict];
-  const range = (d as any).range as { positionPct: number; confident: boolean } | null | undefined;
+// RUN row — LEADS WITH EFFICIENCY (2026-07-21, Michael): grade-adjusted "faster at the same heart rate"
+// (GAP-pace ÷ HR on steady runs, terrain-honest). Replaces the durability DOT-lead, which was confusing
+// — a confident dot off a single run that couldn't answer "am I improving". Efficiency answers exactly
+// that: a rising trend = fitter. Durability (decoupling) is demoted to a quiet secondary read. No dot;
+// a clear verdict + arrow + %, and an honest "N of 8 runs to read it" until there's a trend.
+function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; mode?: FitnessMode; anchor?: FitnessAnchor }) {
+  const eff = fitness.efficiency;
+  const dur = fitness.decoupling;
   const [explainOpen, setExplainOpen] = React.useState(false);
-  const anchored = mode === 'anchored';
-  // VOLUME GATE: 'withheld' = too few qualifying runs to ASSERT a direction. The DOT (level) can still show
-  // when anchored; only the DIRECTION is withheld — replaced by the counts-voice line, no arrow, no color.
-  const withheld = d.verdict === 'withheld';
-  // SLICE 1: dot ONLY when anchored (a real baseline of yours). needs_data has no dot; withheld keeps the
-  // level dot (it's a direction claim we're withholding, not a data absence).
-  const showDot = anchored && d.verdict !== 'needs_data' && range != null;
-  const trendOnly = !anchored && d.verdict !== 'needs_data';
-  // Provenance line so run cites like bike/swim do (item 5 — the arrow cites its data like the dot did).
-  const evidence = d.sampleCount != null
-    ? trendEvidence({ windowDays: 42, sampleCount: d.sampleCount, newestAgeDays: d.newestAgeDays, discipline: 'run' as Discipline })
+  const v = VERDICT[eff.verdict];
+  const hasTrend = eff.verdict !== 'needs_data' && eff.verdict !== 'withheld';
+  const evidence = eff.sampleCount != null
+    ? trendEvidence({ windowDays: 42, sampleCount: eff.sampleCount, newestAgeDays: eff.newestAgeDays, discipline: 'run' as Discipline })
     : null;
-  const runWk = Math.round(42 / 7); // run durability window ≈ 6wk
-  const header = (
-    <span className="basis-full flex items-baseline justify-between gap-2">
-      <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[13px]">
-        durability <span className="text-white/30 text-[10px]">{explainOpen ? '▾' : 'ⓘ'}</span>
-      </button>
-      {withheld ? (
-        // The DOT below is the level (real, from your steady runs). This line is ONLY the trend receipt:
-        // the arrow needs RUN_TREND_MIN_RUNS steady runs, so say how close — not "too few to read", which
-        // read as "we can't read you at all" next to a confident dot (the contradiction Michael caught).
-        <span className="text-white/40 text-[11px]">{d.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs for a trend</span>
-      ) : (
-        <span className={`inline-flex items-baseline gap-0.5 text-[12px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{d.provisional && <span className="text-white/30 text-[11px] ml-1">provisional</span>}</span>
-      )}
-    </span>
-  );
+  // Durability shows as a quiet secondary ONLY when it has a real read (not needs_data/withheld).
+  const durWord = (dur.verdict !== 'needs_data' && dur.verdict !== 'withheld') ? DECOUPLING_BAND[dur.band as DecouplingBand]?.word : null;
   return (
     <Row label="run">
-      {showDot ? (
-        <>
-          {header}
-          <FitnessDot pct={range!.positionPct} confident={range!.confident} tickPct={anchor?.tickPct} overflow={anchor?.overflow} />
-          {showAxis ? (
-            <span className="basis-full flex items-center justify-between text-[10px] text-white/25">
-              <span>weaker</span><span>{range!.confident ? 'vs your 12-week range' : 'thin data'}</span><span>stronger</span>
-            </span>
-          ) : !range!.confident ? (
-            <span className="basis-full text-center text-[10px] text-white/25">thin data</span>
-          ) : null}
-          {/* the anchor label — "auto · steady run · Jun 20" (provisional) or "steady run · Jun 20" (confirmed) */}
-          {anchor?.label && <span className="basis-full text-[10px] text-white/30">{anchor.label}</span>}
-        </>
-      ) : trendOnly ? (
-        <>
-          {header}
-          <NoBaselineTag />
-        </>
-      ) : d.stale ? (
-        <span className="inline-flex items-baseline gap-1.5 text-white/40">
-          <span>durability</span>
-          <span className="text-white/30 text-[12px]">last steady run {d.newestAgeDays}d ago</span>
-          <span className="text-white/30 text-[11px]">limited data</span>
-        </span>
-      ) : (
-        <span className="text-white/40">needs 20+ min steady effort</span>
+      <span className="basis-full flex items-baseline justify-between gap-2">
+        <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[13px]">
+          efficiency <span className="text-white/30 text-[10px]">{explainOpen ? '▾' : 'ⓘ'}</span>
+        </button>
+        {hasTrend ? (
+          <span className={`inline-flex items-baseline gap-1 text-[12px] ${v.cls}`}>
+            {v.arr && <span>{v.arr}</span>}<span>{v.word}</span>
+            {eff.pctChange != null && <span className="text-white/40">{verdictSignedPct(eff.verdict, eff.pctChange)}</span>}
+          </span>
+        ) : (
+          // Honest: efficiency is a TREND, so one run can't read it. Say how close — not a confident dot.
+          <span className="text-white/40 text-[11px]">{eff.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs to read it</span>
+        )}
+      </span>
+      {hasTrend && evidence && <span className="basis-full text-white/35 text-[11px]">{evidence}</span>}
+      {/* durability — the SECONDARY read now (fatigue resistance within a run), quiet, only when real */}
+      {durWord && (
+        <span className="basis-full text-[11px] text-white/35">durability · {durWord}{dur.stale ? ` · last steady run ${dur.newestAgeDays}d ago` : ''}</span>
       )}
-      {(showDot || trendOnly) && !withheld && evidence && <span className="basis-full text-white/35 text-[11px]">{evidence}</span>}
       {explainOpen && (
         <p className="basis-full text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">
-          {anchored
-            ? `Two reads here. The DOT is your level — where your aerobic durability sits versus your own last 12 weeks (how much your heart rate drifts on a long steady run; left is the weakest it's been, right the strongest). One steady run reads a level, so the dot is current. The ARROW is the direction — which way that's trending — and it only appears once you've logged ${RUN_TREND_MIN_RUNS} steady runs in 6 weeks, because a few runs can't tell a real trend from a noisy day. A relative frame, not an absolute score.`
-            : "Durability = how much your heart rate drifts on a long steady run — less drift is better. The arrow is the direction over your recent steady runs. No baseline is set, so there's no high/low dot yet. (Coaches commonly treat under ~5% drift as strong — a field norm, not your number.)"}
+          Efficiency = how much speed you get per heartbeat on steady runs, adjusted for hills so terrain
+          doesn't skew it. Rising means you're running faster at the same heart rate — your aerobic engine
+          getting fitter. It's a trend, so it needs a few steady runs to read a direction. Durability, below,
+          is the other half: how well that efficiency holds across a single long run.
         </p>
       )}
-      {/* efficiency_index secondary REMOVED — the clipped "Efficiency ↓ sliding" chip re-introduced the
-          telegram voice next to a clean dot. The run row is ONE read now: the durability arrow (+ dot when anchored). */}
     </Row>
   );
 }

@@ -70,17 +70,20 @@ export function computeRunState(series: TrendPoint[], asOf: string, sessionsPerW
 const MIN_EFF_INDEX = 0.5;
 const MAX_EFF_INDEX = 5;
 
-/** SOURCE ADAPTER (SECONDARY signal): efficiency_index on steady aerobic runs in a comparable-DURATION
- * band (30–70 min). The duration band blunts efficiency_index's whole-run distance confound (longer
- * runs drift lower) — decoupling is the confound-free LEAD, so it's acceptable to thin this secondary. */
+/** SOURCE ADAPTER: run efficiency on steady aerobic runs in a comparable-DURATION band (30–70 min).
+ * GRADE-ADJUSTED (2026-07-21): reads `gap_efficiency_index` (GAP-pace ÷ HR — terrain-honest, the
+ * "faster at the same heart rate" number) and falls back to the raw `efficiency_index` only where GAP
+ * is absent (flat / treadmill runs, where raw pace IS the grade-adjusted pace). So a hilly run no
+ * longer reads as false decline. This is the run row's LEAD now — decoupling becomes the secondary
+ * durability read. The duration band blunts the whole-run distance confound. */
 export function efficiencyIndexToSeries(
-  rows: Array<{ date?: string; metric_date?: string; efficiency_index?: number | null; workout_type?: string | null; duration_minutes?: number | null }> | null | undefined,
+  rows: Array<{ date?: string; metric_date?: string; efficiency_index?: number | null; gap_efficiency_index?: number | null; workout_type?: string | null; duration_minutes?: number | null }> | null | undefined,
 ): TrendPoint[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .filter((r) => isSteadyAerobic(r.workout_type))
     .filter((r) => typeof r.duration_minutes === 'number' && r.duration_minutes >= 30 && r.duration_minutes <= 70)
-    .map((r) => ({ date: r.date ?? r.metric_date ?? '', value: Number(r.efficiency_index) }))
+    .map((r) => ({ date: r.date ?? r.metric_date ?? '', value: Number(r.gap_efficiency_index ?? r.efficiency_index) }))
     .filter((p) => p.date && Number.isFinite(p.value) && p.value >= MIN_EFF_INDEX && p.value <= MAX_EFF_INDEX);
 }
 

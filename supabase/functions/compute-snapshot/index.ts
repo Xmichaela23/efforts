@@ -38,6 +38,7 @@ import {
 } from "../_shared/state-trend/index.ts";
 import { computeAcwr, type LoadRow } from "../_shared/acwr.ts";
 import { resolvePlanPhase } from "../_shared/plan-phase.ts";
+import { computeEfficiencyIndex } from "../_shared/efficiency-index.ts"; // ONE efficiency formula (grade-adjusted feed)
 import { localDateInTz } from "../_shared/local-date.ts";
 import { deriveSnapshotWatermark } from "./watermark.ts";
 
@@ -726,16 +727,29 @@ serve(async (req: Request) => {
           }
         }
         const runEffIndexByDate = new Map<string, number>();
+        const runHrByDate = new Map<string, number>(); // for the GRADE-ADJUSTED efficiency (GAP-pace ÷ HR)
         for (const f of (runFactsR.data ?? []) as any[]) {
           const v = f.run_facts?.efficiency_index;
           if (typeof v === "number") runEffIndexByDate.set(f.date, v);
+          const h = f.run_facts?.hr_avg;
+          if (typeof h === "number" && h > 0) runHrByDate.set(f.date, h);
         }
+        const MI_PER_KM = 1 / 1.60934;
         const runJoined = runRows.map((r) => {
           const hrs = r.workout_analysis?.heart_rate_summary ?? null;
+          // GRADE-ADJUSTED efficiency (2026-07-21): the canonical per-sample GAP (overall.avg_gap_s_per_mi,
+          // sec/MI → sec/KM) fed into the ONE efficiency formula (computeEfficiencyIndex) with the run's
+          // HR. This is the terrain-honest "faster at the same heart rate" number the run row will lead
+          // with. Falls to null when GAP or HR is absent (flat/treadmill runs keep the raw efficiency_index).
+          const gapPaceSecPerMi = Number(r.workout_analysis?.overall?.avg_gap_s_per_mi);
+          const gapPaceSecPerKm = Number.isFinite(gapPaceSecPerMi) && gapPaceSecPerMi > 0 ? gapPaceSecPerMi * MI_PER_KM : null;
+          const gapEfficiencyIndex = computeEfficiencyIndex(gapPaceSecPerKm, runHrByDate.get(r.date) ?? null);
           return {
             metric_date: r.date,
             effort_adjusted_pace_sec_per_km: routePaceByWid.get(r.id) ?? null,
             efficiency_index: runEffIndexByDate.get(r.date) ?? null,
+            gap_efficiency_index: gapEfficiencyIndex, // grade-adjusted; the run row's new lead
+            hr_avg: runHrByDate.get(r.date) ?? null,
             decoupling_pct: hrs?.decouplingPct ?? null,
             decoupling_basis: hrs?.decouplingBasis ?? null,
             decoupling_mixed_effort: hrs?.decouplingMixedEffort ?? null, // confidence hedge — NOT a filter
