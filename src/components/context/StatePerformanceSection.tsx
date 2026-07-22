@@ -16,8 +16,8 @@ const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
   improving: { word: 'improving', cls: 'text-emerald-400', arr: '↑' },
   holding: { word: 'holding', cls: 'text-amber-300', arr: '→' },
   sliding: { word: 'easing off', cls: 'text-amber-300', arr: '↓' },
-  needs_data: { word: 'needs data', cls: 'text-white/40', arr: '' },
-  withheld: { word: 'too few to read', cls: 'text-white/40', arr: '' },
+  needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
+  withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
 };
 
 // PRECISE VERDICT WORDS (2026-07-22, Michael — "all the words for every scenario has to be precise").
@@ -55,8 +55,8 @@ function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
       <span className={`inline-flex items-baseline gap-0.5 ${v.cls}`}>
         {v.arr && <span>{v.arr}</span>}<span>{v.word}</span>
       </span>
-      {sig.pctChange != null && sig.verdict !== 'needs_data' && <span className="text-white/40">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
-      {sig.provisional && <span className="text-white/30 text-[11px]">prov</span>}
+      {sig.pctChange != null && sig.verdict !== 'needs_data' && <span className="text-white/60">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
+      {sig.provisional && <span className="text-white/50 text-[12px]">prov</span>}
     </span>
   );
 }
@@ -101,11 +101,11 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
       ) : (
         <Signal label={leadIsPower ? 'Power' : 'Efficiency'} sig={lead} />
       )}
-      {tail && <span className="text-white/35 text-[11px]">{tail}</span>}
-      {src && <span className="text-white/25 text-[11px]">{src}</span>}
-      {asOf(lead.newestAgeDays) && <span className="text-white/25 text-[11px]">· {asOf(lead.newestAgeDays)}</span>}
+      {tail && <span className="text-white/55 text-[12px]">{tail}</span>}
+      {src && <span className="text-white/45 text-[12px]">{src}</span>}
+      {asOf(lead.newestAgeDays) && <span className="text-white/45 text-[12px]">· {asOf(lead.newestAgeDays)}</span>}
       {trendOnly && <NoBaselineTag hint={src === 'est (FTP)' ? 'accept your FTP to anchor' : undefined} />}
-      {showDot && anchor?.label && <span className="basis-full text-[10px] text-white/30">{anchor.label}</span>}
+      {showDot && anchor?.label && <span className="basis-full text-[11px] text-white/50">{anchor.label}</span>}
     </Row>
   );
 }
@@ -118,8 +118,8 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
   improving: { word: 'up', cls: 'text-emerald-400', arr: '↑' },
   holding: { word: 'steady', cls: 'text-amber-300', arr: '→' },
   sliding: { word: 'down', cls: 'text-white/50', arr: '↓' },
-  needs_data: { word: 'needs data', cls: 'text-white/40', arr: '' },
-  withheld: { word: 'too few to read', cls: 'text-white/40', arr: '' },
+  needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
+  withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
 };
 
 // STRENGTH row — PER-LIFT estimated 1RM read (Strong/Hevy + RTS/RP, verified vs field + science 2026-07-19).
@@ -138,8 +138,8 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
   const dir = (l: (typeof lifts)[number]) => {
     if (l.direction === 'improving') return { arr: '↑', text: verdictSignedPct('improving', l.pctChange) ?? 'up', cls: 'text-emerald-400' };
     if (l.direction === 'sliding')   return { arr: '↓', text: verdictSignedPct('sliding', l.pctChange) ?? 'down', cls: 'text-amber-300' };
-    if (l.direction === 'holding')   return { arr: '→', text: 'flat', cls: 'text-white/45' };
-    return { arr: '', text: 'new', cls: 'text-white/35' };
+    if (l.direction === 'holding')   return { arr: '→', text: 'flat', cls: 'text-white/65' };
+    return { arr: '', text: 'new', cls: 'text-white/55' };
   };
   // PR = a REAL PR — a genuine new ALL-TIME high estimated 1RM (Michael 2026-07-21: "a PR should be a
   // real PR, basically a new 1RM"). Was best-of-6-weeks, which fired on almost every progressing lift
@@ -151,17 +151,17 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
   return (
     <Row label="strength">
       {lifts.length === 0 ? (
-        <span className="text-white/40">needs 2+ logged lifts to trend</span>
+        <span className="text-white/60">needs 2+ logged lifts to trend</span>
       ) : (
         <>
-          <span className="basis-full text-white/30 text-[10px] uppercase tracking-wider">estimated 1-rep max · last 6 weeks</span>
+          <span className="basis-full text-white/50 text-[11px] uppercase tracking-wider">estimated 1-rep max · last 6 weeks</span>
           {lifts.map((l) => {
             const d = dir(l);
             return (
               <React.Fragment key={l.canonical}>
                 <span className="basis-full flex items-baseline justify-between gap-2">
                   <span className="text-white/80 text-[13px]">{l.displayName}</span>
-                  <span className="inline-flex items-baseline gap-2 text-[12px]">
+                  <span className="inline-flex items-baseline gap-2 text-[13px]">
                     {/* "~" marks it as an ESTIMATE, not a tested max — it's a projection off your logged sets
                         (RIR-adjusted), most reliable near failure. Provisional (below) clears as sessions stack. */}
                     <span className="text-white/75">~{Math.round(l.latestE1rm as number)} lb</span>
@@ -173,7 +173,7 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
                     )}
                   </span>
                 </span>
-                <span className="basis-full text-white/30 text-[10px] -mt-0.5">
+                <span className="basis-full text-white/50 text-[11px] -mt-0.5">
                   {l.sampleCount} session{l.sampleCount === 1 ? '' : 's'}{asOf(l.newestAgeDays) ? ` · ${asOf(l.newestAgeDays)}` : ''}{l.provisional ? ' · provisional' : ''}
                 </span>
               </React.Fragment>
@@ -186,7 +186,7 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
           `strength_rir_below_prescription` — rendered here, NOT recomputed, pulled from the nudge list so it
           lives in ONE place. ⚠ WORDING placeholder to tune to voice: fact-first, conditional, no imperative. */}
       {fatigue && (
-        <span className="basis-full text-[12px] text-amber-300/80 leading-snug mt-1">
+        <span className="basis-full text-[13px] text-amber-300/80 leading-snug mt-1">
           Reps in reserve have run below target — you're training closer to failure than the plan called for. Sustained, that's the fatigue a deload clears.
         </span>
       )}
@@ -201,7 +201,7 @@ const PROVISIONAL_PERF = new Set(['swim']);
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      <span className="text-[11px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">
+      <span className="text-[12px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">
         {label}
       </span>
       <div className="flex-1 text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
@@ -236,7 +236,7 @@ function FitnessDot({ pct, confident, tickPct, overflow }: { pct: number; confid
             the recent range (overflow) it pins at the edge with a caret ("you've been better than recently"). */}
         {tickLeft != null && (
           <div className="absolute top-1/2 h-3 w-[2px] rounded" style={{ left: tickLeft, transform: 'translate(-50%, -50%)', backgroundColor: 'rgba(255,255,255,0.4)' }}>
-            {overflow === 'better' && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-white/40 text-[10px]">›</span>}
+            {overflow === 'better' && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-white/60 text-[11px]">›</span>}
           </div>
         )}
         <div
@@ -271,25 +271,25 @@ function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT
       <span className="basis-full flex items-baseline justify-between gap-2">
         {explain ? (
           <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[13px]">
-            {label} <span className="text-white/30 text-[10px]">{explainOpen ? '▾' : 'ⓘ'}</span>
+            {label} <span className="text-white/50 text-[11px]">{explainOpen ? '▾' : 'ⓘ'}</span>
           </button>
         ) : (
           <span className="text-white/55 text-[13px]">{label}</span>
         )}
         {verdict !== 'needs_data' && (
-          <span className={`inline-flex items-baseline gap-0.5 text-[12px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{provisional && <span className="text-white/30 text-[11px] ml-1">provisional</span>}</span>
+          <span className={`inline-flex items-baseline gap-0.5 text-[13px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{provisional && <span className="text-white/50 text-[12px] ml-1">provisional</span>}</span>
         )}
       </span>
       <FitnessDot pct={range.positionPct} confident={range.confident} />
       {showAxis ? (
-        <span className="basis-full flex items-center justify-between text-[10px] text-white/25">
+        <span className="basis-full flex items-center justify-between text-[11px] text-white/45">
           <span>weaker</span><span>{range.confident ? frame : 'thin data'}</span><span>stronger</span>
         </span>
       ) : !range.confident ? (
-        <span className="basis-full text-center text-[10px] text-white/25">thin data</span>
+        <span className="basis-full text-center text-[11px] text-white/45">thin data</span>
       ) : null}
       {explain && explainOpen && (
-        <p className="basis-full text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">{explain}</p>
+        <p className="basis-full text-[12px] text-white/60 leading-snug mt-1 max-w-[min(100%,340px)]">{explain}</p>
       )}
     </>
   );
@@ -301,7 +301,7 @@ function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT
 // is Slice 2, so it shows the plain "no baseline set" — honest, not broken.
 function NoBaselineTag({ hint }: { hint?: string }) {
   return (
-    <span className="basis-full text-[11px] text-white/30">no baseline set{hint ? ` · ${hint}` : ''}</span>
+    <span className="basis-full text-[12px] text-white/50">no baseline set{hint ? ` · ${hint}` : ''}</span>
   );
 }
 
@@ -340,27 +340,27 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
     <Row label="run">
       <span className="basis-full flex items-baseline justify-between gap-2">
         <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[13px]">
-          efficiency <span className="text-white/30 text-[10px]">{explainOpen ? '▾' : 'ⓘ'}</span>
+          efficiency <span className="text-white/50 text-[11px]">{explainOpen ? '▾' : 'ⓘ'}</span>
         </button>
         {hasTrend ? (
-          <span className={`inline-flex items-baseline gap-1 text-[12px] ${v.cls}`}>
+          <span className={`inline-flex items-baseline gap-1 text-[13px] ${v.cls}`}>
             {v.arr && <span>{v.arr}</span>}<span>{v.word}</span>
-            {eff.pctChange != null && <span className="text-white/40">{verdictSignedPct(eff.verdict, eff.pctChange)}</span>}
+            {eff.pctChange != null && <span className="text-white/60">{verdictSignedPct(eff.verdict, eff.pctChange)}</span>}
           </span>
         ) : (
           // Honest: efficiency is a TREND, so one run can't read it. Say how close — not a confident dot.
-          <span className="text-white/40 text-[11px]">{eff.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs to read it</span>
+          <span className="text-white/60 text-[12px]">{eff.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs to read it</span>
         )}
       </span>
-      {hasTrend && evidence && <span className="basis-full text-white/35 text-[11px]">{evidence}</span>}
+      {hasTrend && evidence && <span className="basis-full text-white/55 text-[12px]">{evidence}</span>}
       {/* THE "WHAT" under the index "why" (Michael 2026-07-22) — recent steady-run pace at the HR it took,
           in units the runner feels. RAW by default (matches the watch); a GAP toggle grade-adjusts it. */}
       {hasTrend && shownPace != null && (
-        <span className="basis-full inline-flex items-baseline gap-2 text-white/45 text-[11px]">
+        <span className="basis-full inline-flex items-baseline gap-2 text-white/65 text-[12px]">
           <span>pace ~{formatPace(shownPace, useImperial)}{eff.recentHrAvg != null ? ` at ${eff.recentHrAvg} bpm` : ''}</span>
           {canToggleGap && (
             <button type="button" onClick={() => setGapOn((o) => !o)}
-              className={`text-[10px] px-1 rounded ${gapOn ? 'text-emerald-300/80 bg-emerald-400/10' : 'text-white/35'}`}>
+              className={`text-[11px] px-1 rounded ${gapOn ? 'text-emerald-300/80 bg-emerald-400/10' : 'text-white/55'}`}>
               {gapOn ? 'grade-adj' : 'GAP'}
             </button>
           )}
@@ -368,31 +368,31 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
       )}
       {/* durability — the SECONDARY read now (fatigue resistance within a run), quiet, only when real */}
       {durWord && (
-        <span className="basis-full text-[11px] text-white/35">durability · {durWord}{dur.stale ? ` · last steady run ${dur.newestAgeDays}d ago` : ''}</span>
+        <span className="basis-full text-[12px] text-white/55">durability · {durWord}{dur.stale ? ` · last steady run ${dur.newestAgeDays}d ago` : ''}</span>
       )}
       {/* PROJECTED RACE TIMES (Michael 2026-07-22) — goal-free VDOT off current fitness, for the varied
           runner the efficiency row can't serve. Longer distances unlock as the long run grows (a marathon
           estimate off short runs is a fantasy). Locked rows shown dim so the progression is visible. */}
       {Array.isArray(fitness.projections) && fitness.projections.length > 0 && (
         <span className="basis-full flex flex-col gap-0.5 mt-1.5">
-          <span className="text-white/25 text-[10px] uppercase tracking-wider">projected race times</span>
+          <span className="text-white/45 text-[11px] uppercase tracking-wider">projected race times</span>
           {fitness.projections.map((p) => (
-            <span key={p.distance} className="flex items-baseline justify-between gap-2 text-[11px]">
-              <span className={p.unlocked ? 'text-white/60' : 'text-white/25'}>{p.label}</span>
+            <span key={p.distance} className="flex items-baseline justify-between gap-2 text-[12px]">
+              <span className={p.unlocked ? 'text-white/60' : 'text-white/45'}>{p.label}</span>
               {p.unlocked ? (
                 <span className="inline-flex items-baseline gap-1.5">
                   <span className="text-white/75">{p.display}</span>
-                  <span className="text-white/30">{p.paceDisplay}</span>
+                  <span className="text-white/50">{p.paceDisplay}</span>
                 </span>
               ) : (
-                <span className="text-white/25">unlocks at ~{p.unlockLongRunMiles} mi long run</span>
+                <span className="text-white/45">unlocks at ~{p.unlockLongRunMiles} mi long run</span>
               )}
             </span>
           ))}
         </span>
       )}
       {explainOpen && (
-        <p className="basis-full text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">
+        <p className="basis-full text-[12px] text-white/60 leading-snug mt-1 max-w-[min(100%,340px)]">
           Efficiency = how much speed you get per heartbeat on steady runs, adjusted for hills so terrain
           doesn't skew it. Rising means you're running faster at the same heart rate — your aerobic engine
           getting fitter.
@@ -418,10 +418,10 @@ function RestTag({ rest }: { rest: PerfSummary | null | undefined }) {
   const v = VERDICT[rest.verdict];
   return (
     <span className={`inline-flex items-baseline gap-1 ${v.cls}`}>
-      <span className="text-white/40">· rest</span>
+      <span className="text-white/60">· rest</span>
       {v.arr && <span>{v.arr}</span>}
       <span>{v.word}</span>
-      {rest.pctChange != null && <span className="text-white/40">{verdictSignedPct(rest.verdict, rest.pctChange)}</span>}
+      {rest.pctChange != null && <span className="text-white/60">{verdictSignedPct(rest.verdict, rest.pctChange)}</span>}
     </span>
   );
 }
@@ -439,8 +439,8 @@ function SwimVolumeRow({ vol }: { vol: SwimVolume }) {
   if (!vol.swims) {
     return (
       <Row label="swim">
-        <span className="text-white/40 text-[13px]">no swims logged</span>
-        <span className="text-white/25 text-[11px]">· last {weeks}wk</span>
+        <span className="text-white/60 text-[13px]">no swims logged</span>
+        <span className="text-white/45 text-[12px]">· last {weeks}wk</span>
       </Row>
     );
   }
@@ -449,7 +449,7 @@ function SwimVolumeRow({ vol }: { vol: SwimVolume }) {
       <span className="text-white/80 text-[13px]">{vol.swims} {vol.swims === 1 ? 'swim' : 'swims'}</span>
       <span className="text-white/60 text-[13px]">{toDisp(vol.totalDistanceM).toLocaleString()} {unit}</span>
       <span className="text-white/60 text-[13px]">longest {toDisp(vol.longestM).toLocaleString()} {unit}</span>
-      <span className="text-white/25 text-[11px] basis-full">last {weeks}wk</span>
+      <span className="text-white/45 text-[12px] basis-full">last {weeks}wk</span>
     </Row>
   );
 }
@@ -466,7 +466,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
     // item 4: a THIN + STALE trend must not render at full confidence. De-weight (dim + "limited
     // data") when < 5 samples AND newest point > 21d old — the counts are already at the render.
     const thinStale = (perf?.sampleCount ?? 99) < 5 && (perf?.newestAgeDays ?? 0) > 21;
-    const vCls = thinStale ? 'text-white/40' : v.cls;
+    const vCls = thinStale ? 'text-white/60' : v.cls;
     // D-232 glass-box: verdict-colored delta + a DIMMED evidence tail (window · samples · recency).
     const hasEvidence = perf?.sampleCount != null && perf.windowDays != null;
     const evidence = hasEvidence
@@ -478,7 +478,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
         {range ? (
           <>
             <FitnessDotBlock label={metricLabel ? metricLabel.toLowerCase() : card.discipline} range={range} verdict={card.headlineVerdict} provisional={PROVISIONAL_PERF.has(card.discipline)} showAxis={showAxis} />
-            {evidence && <span className="basis-full text-white/35 text-[11px]">{evidence}</span>}
+            {evidence && <span className="basis-full text-white/55 text-[12px]">{evidence}</span>}
           </>
         ) : (
           <>
@@ -486,7 +486,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
             {hasEvidence ? (
               <>
                 <span className={`text-[13px] ${vCls}`}>{trendHeadline(card.headlineVerdict, perf!.pctChange)}</span>
-                <span className="text-white/35 text-[12px]">{evidence}</span>
+                <span className="text-white/55 text-[13px]">{evidence}</span>
               </>
             ) : (
               <>
@@ -494,13 +494,13 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
                   {v.arr && <span>{v.arr}</span>}
                   <span>{v.word}</span>
                 </span>
-                {perf?.pctChange != null && <span className={thinStale ? 'text-white/30' : 'text-white/40'}>{verdictSignedPct(card.headlineVerdict, perf.pctChange)}</span>}
+                {perf?.pctChange != null && <span className={thinStale ? 'text-white/50' : 'text-white/60'}>{verdictSignedPct(card.headlineVerdict, perf.pctChange)}</span>}
               </>
             )}
           </>
         )}
-        {thinStale && <span className="text-white/30 text-[11px]">limited data</span>}
-        {asOf(perf?.newestAgeDays) && <span className="text-white/25 text-[11px]">· {asOf(perf?.newestAgeDays)}</span>}
+        {thinStale && <span className="text-white/50 text-[12px]">limited data</span>}
+        {asOf(perf?.newestAgeDays) && <span className="text-white/45 text-[12px]">· {asOf(perf?.newestAgeDays)}</span>}
         {/* 'provisional' now rides the dot block's arrow line (item 6, uniform) — no trailing chip */}
         {/* swim rest-fraction chip removed — "rest ↓ sliding −38.2%" was the same clipped telegram voice
             next to a clean dot. The swim row is the pace dot + arrow. */}
@@ -522,11 +522,11 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
   return (
     <Row label={card.discipline}>
       {ndReceipt ? (
-        <span className={`text-[12px] ${nd.cls}`}>{ndReceipt}</span>
+        <span className={`text-[13px] ${nd.cls}`}>{ndReceipt}</span>
       ) : (
         <>
           <span className={nd.cls}>{nd.word}</span>
-          {card.adherence && <span className="text-white/35">· {card.adherence.ratioLabel}</span>}
+          {card.adherence && <span className="text-white/55">· {card.adherence.ratioLabel}</span>}
         </>
       )}
       {card.discipline === 'swim' && <RestTag rest={restTrend} />}
@@ -551,7 +551,7 @@ function PostureLine({ card }: { card: DisciplineCard }) {
   if (!sentence) return null;
   const concern = (card as any).postureRead === 'develop_declining' || (card as any).postureRead === 'develop_stalled';
   return (
-    <p className={`pl-[62px] pr-1 -mt-0.5 mb-1.5 text-[12px] leading-snug max-w-[min(100%,360px)] ${concern ? 'text-amber-400/80' : 'text-white/45'}`}>
+    <p className={`pl-[62px] pr-1 -mt-0.5 mb-1.5 text-[13px] leading-snug max-w-[min(100%,360px)] ${concern ? 'text-amber-400/80' : 'text-white/65'}`}>
       {sentence}
     </p>
   );
@@ -596,8 +596,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       <div className="mb-2.5 flex items-baseline gap-2">
         {/* Named "Fitness" (not "Performance") so it can't be confused with the per-workout Performance
             tab that grades a single session. This card is the multi-week fitness TREND. */}
-        <span className="text-[11px] font-semibold tracking-[0.12em] text-white/45 uppercase">Fitness</span>
-        <span className="text-[11px] text-white/30 lowercase">trends over recent weeks</span>
+        <span className="text-[12px] font-semibold tracking-[0.12em] text-white/65 uppercase">Fitness</span>
+        <span className="text-[12px] text-white/50 lowercase">trends over recent weeks</span>
       </div>
       {/* NO aggregate roll-up (Michael 2026-07-04): a cross-discipline headline ("Building — bike up,
           run up") is a lossy, cherry-picking, clock-mismatched summary (run 6wk vs bike 8wk). Fitness
