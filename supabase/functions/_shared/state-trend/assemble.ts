@@ -637,9 +637,9 @@ export function hrResponseExcludedRunNote(
   // refreshes the read), and does DOUBLE DUTY when the athlete is also under their declared running
   // target: the same run holds the running they've been low on. Never "you failed" (Garmin's mistake).
   const tail = opts?.runUnderTarget
-    ? " A steady run does double duty: it refreshes this and it's the running you've been under target on."
-    : ' A steady run refreshes it.';
-  return `Your runs aren't in this yet — ${n} of ${floor} steady runs to read a direction.${tail}`;
+    ? " and it's the running you're under target on"
+    : '';
+  return `${n} of ${floor} steady runs to trend — a steady run refreshes this${tail}.`;
 }
 
 /** Shape the assembled result into the cached contract. Per-discipline = the model's performance

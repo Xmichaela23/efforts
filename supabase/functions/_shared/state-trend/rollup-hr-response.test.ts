@@ -68,15 +68,14 @@ Deno.test('excluded-run note: run present but below floor (his exact case) → n
   assertEquals(r.contributors.length, 1);                  // only bike contributes
   assertEquals(r.contributors[0].discipline, 'bike');
   const note = hrResponseExcludedRunNote(state, r.contributors)!;
-  assertEquals(note, "Your runs aren't in this yet — 7 of 8 steady runs to read a direction. A steady run refreshes it.");
+  assertEquals(note, "7 of 8 steady runs to trend — a steady run refreshes this.");
 });
 
 Deno.test('excluded-run note: DOUBLE DUTY when the athlete is also under their run target (opportunity, not scold)', () => {
   const state = v1({ bike: { verdict: 'holding', newestAgeDays: 6 }, run: { verdict: 'needs_data', sampleCount: 6 } });
   const note = hrResponseExcludedRunNote(state, rollupHrResponse(state).contributors, 8, { runUnderTarget: true })!;
-  assertStringIncludes(note, '6 of 8 steady runs');
-  assertStringIncludes(note, 'double duty');
-  assertStringIncludes(note, "running you've been under target on");
+  assertStringIncludes(note, '6 of 8 steady runs to trend');
+  assertStringIncludes(note, "running you're under target on"); // the double-duty payoff
   assertEquals(note.toLowerCase().includes('unproductive'), false); // never a scold
 });
 
