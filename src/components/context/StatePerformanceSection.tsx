@@ -343,12 +343,16 @@ function EfficiencySparkline({ series }: { series?: Array<{ date: string; value:
       : null;
   }
   const runColor = getDisciplineColor('run');
-  const W = 300, H = expanded ? 96 : 42, PAD_Y = 6, PAD_X = 2;
+  const W = 300, H = expanded ? 72 : 42, PAD_Y = expanded ? 10 : 6, PAD_X = 2;
   const vals = pts.map((p) => p.value);
   const minV = Math.min(...vals), maxV = Math.max(...vals);
-  const range = maxV - minV || 1;
+  const rawRange = maxV - minV || 1;
+  // Domain HEADROOM (Michael 2026-07-22) — pad the value scale 15% each side so the line never touches the
+  // top/bottom edge. Without it, stretching the range to fill the height turns normal run-to-run wobble into
+  // cliffs (worse when expanded/taller) — reads alarming and over-states the noise. Calmer = truer.
+  const dMin = minV - rawRange * 0.15, dMax = maxV + rawRange * 0.15, dRange = dMax - dMin || 1;
   const x = (i: number) => PAD_X + (i / (pts.length - 1)) * (W - 2 * PAD_X);
-  const y = (v: number) => PAD_Y + (1 - (v - minV) / range) * (H - 2 * PAD_Y); // higher efficiency = higher on chart
+  const y = (v: number) => PAD_Y + (1 - (v - dMin) / dRange) * (H - 2 * PAD_Y); // higher efficiency = higher on chart
   const firstRecent = pts.findIndex((p) => p.recent);
   const recentStart = firstRecent <= 0 ? 0 : firstRecent - 1; // include the join point so the segments connect
   const dimPoly = pts.map((p, i) => `${x(i)},${y(p.value)}`).join(' ');
@@ -356,17 +360,28 @@ function EfficiencySparkline({ series }: { series?: Array<{ date: string; value:
   const last = pts[pts.length - 1];
   const spanWeeks = Math.min(12, Math.max(1, Math.ceil((Date.parse(last.date + 'T12:00:00Z') - Date.parse(pts[0].date + 'T12:00:00Z')) / (7 * 86_400_000))));
   const building = spanWeeks < 11;
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const fmtD = (iso: string) => { const [, m, d] = iso.split('-'); return `${MON[+m - 1]} ${+d}`; };
+  const gridYs = expanded ? [maxV, (maxV + minV) / 2, minV] : []; // subtle reference lines only when expanded
   return (
     <span className="basis-full flex flex-col gap-1 mt-1.5">
       <button type="button" onClick={() => setExpanded((e) => !e)} className="text-left w-full" aria-label="toggle efficiency chart size">
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block">
+          {gridYs.map((gv, i) => <line key={`g${i}`} x1={0} x2={W} y1={y(gv)} y2={y(gv)} stroke="rgba(255,255,255,0.055)" strokeWidth={1} vectorEffect="non-scaling-stroke" />)}
           <polyline points={dimPoly} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
           {recentPoly && <polyline points={recentPoly} fill="none" stroke={runColor} strokeOpacity={0.9} strokeWidth={1.75} vectorEffect="non-scaling-stroke" />}
+          {/* expanded → a dot per actual run, so the jags read as "each dot is a reading", not chart noise */}
+          {expanded && pts.map((p, i) => <circle key={`d${i}`} cx={x(i)} cy={y(p.value)} r={1.6} fill={p.recent ? runColor : 'rgba(255,255,255,0.32)'} />)}
           <circle cx={x(pts.length - 1)} cy={y(last.value)} r={2.5} fill={runColor} />
         </svg>
       </button>
+      {expanded && (
+        <span className="text-[10px] text-white/30 flex items-center justify-between tabular-nums -mt-0.5">
+          <span>{fmtD(pts[0].date)}</span><span>{fmtD(last.date)}</span>
+        </span>
+      )}
       <span className="text-[10px] text-white/45 flex items-center justify-between">
-        <span>{building ? `building · ${spanWeeks} of 12 weeks` : 'last 12 weeks · recent 6 in color'}</span>
+        <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? 'each dot = one steady run · recent 6 in color' : 'last 12 weeks · recent 6 in color · tap to expand')}</span>
         <span className="tabular-nums text-white/30">{minV.toFixed(2)}–{maxV.toFixed(2)} · {pts.length} runs</span>
       </span>
     </span>
