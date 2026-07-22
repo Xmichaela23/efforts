@@ -370,6 +370,27 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
       {durWord && (
         <span className="basis-full text-[11px] text-white/35">durability · {durWord}{dur.stale ? ` · last steady run ${dur.newestAgeDays}d ago` : ''}</span>
       )}
+      {/* PROJECTED RACE TIMES (Michael 2026-07-22) — goal-free VDOT off current fitness, for the varied
+          runner the efficiency row can't serve. Longer distances unlock as the long run grows (a marathon
+          estimate off short runs is a fantasy). Locked rows shown dim so the progression is visible. */}
+      {Array.isArray(fitness.projections) && fitness.projections.length > 0 && (
+        <span className="basis-full flex flex-col gap-0.5 mt-1.5">
+          <span className="text-white/25 text-[10px] uppercase tracking-wider">projected race times</span>
+          {fitness.projections.map((p) => (
+            <span key={p.distance} className="flex items-baseline justify-between gap-2 text-[11px]">
+              <span className={p.unlocked ? 'text-white/60' : 'text-white/25'}>{p.label}</span>
+              {p.unlocked ? (
+                <span className="inline-flex items-baseline gap-1.5">
+                  <span className="text-white/75">{p.display}</span>
+                  <span className="text-white/30">{p.paceDisplay}</span>
+                </span>
+              ) : (
+                <span className="text-white/25">unlocks at ~{p.unlockLongRunMiles} mi long run</span>
+              )}
+            </span>
+          ))}
+        </span>
+      )}
       {explainOpen && (
         <p className="basis-full text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,340px)]">
           Efficiency = how much speed you get per heartbeat on steady runs, adjusted for hills so terrain

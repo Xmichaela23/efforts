@@ -336,4 +336,8 @@ export interface RunFitness {
     recentGapPaceSecPerKm?: number | null; // grade-adjusted twin for the GAP toggle; null when any recent run lacks GAP
     recentHrAvg?: number | null;           // …at this heart rate — pace-at-HR in units the runner feels
   };
+  /** VDOT race-time projections off CURRENT fitness (Michael 2026-07-22) — goal-free, unlocked by long-run
+   *  distance so a marathon estimate never shows off 5-mile runs. Server-computed (compute-snapshot, via
+   *  projectStandardRaces); the client renders. Absent when there's no resolvable threshold pace. */
+  projections?: Array<{ distance: string; label: string; display: string; paceDisplay: string; unlocked: boolean; unlockLongRunMiles: number }>;
 }

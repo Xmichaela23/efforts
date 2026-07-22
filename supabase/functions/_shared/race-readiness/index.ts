@@ -348,6 +348,74 @@ export function computeRaceReadiness(input: RaceReadinessInput): RaceReadinessV1
   };
 }
 
+// =============================================================================
+// Goal-free standard-distance projections (Michael 2026-07-22)
+// =============================================================================
+// The SAME VDOT engine computeRaceReadiness uses, unfenced from a goal race: given the athlete's current
+// fitness (threshold pace → VDOT), project 5K / 10K / half / marathon off current fitness — no target date
+// needed (the goal is only ever used to say "on track", never to compute the number). Serves the "varied
+// runner" the efficiency row can't: as they add quality, these numbers drop.
+//
+// UNLOCK BY DISTANCE (Michael's idea, and it's the honest move): a projection is only trustworthy near the
+// distances the athlete actually runs — a marathon estimate off 5-mile long runs is a fantasy (it ignores
+// the "can you hold it" wall, and VDOT/Riegel error grows the further you extrapolate). So longer distances
+// UNLOCK as the long run grows. Long-run distance is estimated from the longest recent run's DURATION at
+// easy pace (robust — avoids the codebase's inconsistent raw-distance units); gate thresholds come from
+// standard training-plan long-run builds (10k ~6mi, half ~10mi, marathon ~16-18mi long runs).
+export interface StandardRaceProjection {
+  distance: RaceDistKey;
+  label: string;              // '5K' | '10K' | 'half' | 'marathon'
+  display: string;            // 'H:MM:SS' / 'MM:SS'
+  paceDisplay: string;        // '~M:SS/mi'
+  unlocked: boolean;          // false → render dim as "unlock at ~N mi long run"
+  unlockLongRunMiles: number; // the long-run distance that unlocks it
+}
+
+const UNLOCK_LONG_RUN_MI: Record<RaceDistKey, number> = { '5k': 0, '10k': 6, half: 10, marathon: 16 };
+const RACE_LABEL: Record<RaceDistKey, string> = { '5k': '5K', '10k': '10K', half: 'half', marathon: 'marathon' };
+const PROJECTION_ORDER: RaceDistKey[] = ['5k', '10k', 'half', 'marathon'];
+
+export function projectStandardRaces(args: {
+  thresholdPaceSecPerMi: number | null;
+  longestRunDurationMin: number | null;
+  learnedFitness: Record<string, any> | null;
+  dataSource: 'observed' | 'plan_targets';
+  easyRunDecouplingPct?: number | null;
+}): { vdot: number; longRunMiles: number | null; projections: StandardRaceProjection[] } | null {
+  const tp = args.thresholdPaceSecPerMi;
+  if (tp == null || !Number.isFinite(tp) || tp <= 0) return null;
+  const vdot = estimateVdotFromPace(tp);
+  if (vdot == null) return null;
+
+  // Estimate the longest recent run's distance from its duration at easy pace (gate only — not displayed).
+  const easyPaceSecPerMi = getPacesFromScore(vdot).base;
+  const longRunMiles = (args.longestRunDurationMin != null && args.longestRunDurationMin > 0 && easyPaceSecPerMi > 0)
+    ? Math.round(((args.longestRunDurationMin * 60) / easyPaceSecPerMi) * 10) / 10
+    : null;
+
+  // Same two hedges the goal engine applies — so a thin-data or fatigued athlete gets a conservative number.
+  const { factor: durability } = computeDurabilityFactor(null, null, args.easyRunDecouplingPct ?? null);
+  const conf = confidenceAdjustment(args.learnedFitness, args.dataSource);
+
+  const projections: StandardRaceProjection[] = [];
+  for (const d of PROJECTION_ORDER) {
+    const raw = getTargetTime(vdot, d);
+    if (raw == null) continue;
+    const secs = Math.round((raw / durability) * conf);
+    const miles = RACE_DISTANCE_MILES[d];
+    const unlocked = d === '5k' ? true : (longRunMiles != null && longRunMiles >= UNLOCK_LONG_RUN_MI[d]);
+    projections.push({
+      distance: d,
+      label: RACE_LABEL[d],
+      display: formatFinishTime(secs),
+      paceDisplay: miles > 0 ? `~${formatPace(Math.round(secs / miles))}/mi` : '—',
+      unlocked,
+      unlockLongRunMiles: UNLOCK_LONG_RUN_MI[d],
+    });
+  }
+  return { vdot, longRunMiles, projections };
+}
+
 function buildAssessmentMessage(
   assessment: RaceReadinessV1['assessment'],
   predictedDisplay: string,

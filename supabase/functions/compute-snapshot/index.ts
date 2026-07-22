@@ -39,6 +39,7 @@ import {
 import { computeAcwr, type LoadRow } from "../_shared/acwr.ts";
 import { resolvePlanPhase } from "../_shared/plan-phase.ts";
 import { computeEfficiencyIndex } from "../_shared/efficiency-index.ts"; // ONE efficiency formula (grade-adjusted feed)
+import { projectStandardRaces } from "../_shared/race-readiness/index.ts"; // goal-free VDOT 5k/10k/half/marathon
 import { localDateInTz } from "../_shared/local-date.ts";
 import { deriveSnapshotWatermark } from "./watermark.ts";
 
@@ -951,6 +952,31 @@ serve(async (req: Request) => {
         }
 
         const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift });
+        // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
+        // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
+        // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside
+        // projectStandardRaces from the longest recent run's DURATION. Attached to runFitness (by reference,
+        // so toStateTrendsV1's display.runFitness carries it). Non-fatal — never breaks the snapshot.
+        try {
+          let projTp: number | null = null;
+          let projSrc: 'observed' | 'plan_targets' = 'plan_targets';
+          const lfTpRaw = ub?.learned_fitness?.run_threshold_pace_sec_per_km;
+          const lfTp = lfTpRaw && typeof lfTpRaw === 'object' ? (lfTpRaw as any).value : lfTpRaw;
+          if (Number.isFinite(Number(lfTp)) && Number(lfTp) > 0) { projTp = Number(lfTp) * 1.60934; projSrc = 'observed'; }
+          else {
+            const pnTp = ub?.performance_numbers?.threshold_pace ?? ub?.performance_numbers?.threshold_pace_sec_per_mi;
+            if (Number.isFinite(Number(pnTp)) && Number(pnTp) > 0) { projTp = Number(pnTp); }
+          }
+          const longestDur = runJoined.reduce((m, r) => Math.max(m, Number(r.duration_minutes) || 0), 0);
+          const proj = projectStandardRaces({
+            thresholdPaceSecPerMi: projTp,
+            longestRunDurationMin: longestDur > 0 ? longestDur : null,
+            learnedFitness: ub?.learned_fitness ?? null,
+            dataSource: projSrc,
+            easyRunDecouplingPct: null,
+          });
+          if (proj && result?.runFitness) (result.runFitness as any).projections = proj.projections;
+        } catch (e: any) { console.log("⚠️ race projections (non-fatal):", e?.message || e); }
         stateTrendsV1 = toStateTrendsV1(result, asOf);
         // Carry the descent cause on the payload (JSONB, no schema change) so the coach's composer receives
         // it as a candidate rather than inferring it (contract §3a/§4).
