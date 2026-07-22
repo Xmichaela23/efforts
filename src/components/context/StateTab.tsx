@@ -1600,7 +1600,9 @@ export default function StateTab({
                   crossTrainingSignal.tone === 'warning' ? 'text-amber-400/90' :
                   crossTrainingSignal.tone === 'info' ? 'text-sky-400/85' : 'text-white/70';
                 const detail = crossTrainingSignal.detail ?? null;
+                const info = crossTrainingSignal.info ?? null; // the CEILING ⓘ — "you know your body"
                 const open = expandedSignal === '__cross_training__';
+                const infoOpen = expandedSignal === '__cross_training_info__';
                 return (
                   <div className="pt-0.5">
                     <button
@@ -1617,6 +1619,20 @@ export default function StateTab({
                     </button>
                     {open && detail && (
                       <p className="text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,320px)]">{detail}</p>
+                    )}
+                    {info && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSignal(infoOpen ? null : '__cross_training_info__')}
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-white/30 hover:text-white/50"
+                        aria-label="What this is based on"
+                      >
+                        <span className="inline-flex items-center justify-center w-3 h-3 rounded-full border border-white/25 text-[8px]">i</span>
+                        what this is based on
+                      </button>
+                    )}
+                    {infoOpen && info && (
+                      <p className="text-[11px] text-white/40 leading-snug mt-1 max-w-[min(100%,320px)] italic">{info}</p>
                     )}
                   </div>
                 );

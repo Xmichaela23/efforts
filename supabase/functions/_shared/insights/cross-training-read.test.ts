@@ -1,105 +1,92 @@
 // Run: deno test --no-check supabase/functions/_shared/insights/cross-training-read.test.ts
 import { assertEquals, assertStringIncludes } from 'https://deno.land/std@0.208.0/assert/mod.ts';
-import { composeCrossTrainingRead, type CrossDisciplineState } from './cross-training-read.ts';
+import { composeCoachEye, type CoachEyeDiscipline } from './cross-training-read.ts';
 
-const S = (discipline: string, posture: any, verdict: any, acwr: number | null, underTarget?: boolean): CrossDisciplineState =>
-  ({ discipline, posture, verdict, acwr, underTarget });
+const D = (discipline: string, posture: any, verdict: any, acwr: number | null, extra: Partial<CoachEyeDiscipline> = {}): CoachEyeDiscipline =>
+  ({ discipline, posture, verdict, acwr, ...extra });
+const eye = (disciplines: CoachEyeDiscipline[], readinessDeclining = false) => composeCoachEye({ disciplines, readinessDeclining });
 
-// ── GLANCE + OPEN — every fired read carries a headline AND a detail ────────────────────────────────
-Deno.test('shape: fired reads return a non-empty headline and a detail', () => {
-  const r = composeCrossTrainingRead([S('strength', 'develop', 'improving', null), S('run', 'maintain', 'holding', 0.6)])!;
-  assertEquals(typeof r.headline, 'string');
-  assertEquals(r.headline.length > 0, true);
-  assertEquals(typeof r.detail, 'string');
-});
-
-// ── THE ANTI-"UNPRODUCTIVE" CASE, RUNNING (Michael) — run gets the STRONG fade language ─────────────
-Deno.test('trade working, RUN eased: frank "running fades" at the glance; specificity in the detail', () => {
-  const r = composeCrossTrainingRead([
-    S('strength', 'develop', 'improving', null),
-    S('run', 'maintain', 'holding', 0.6),
-    S('bike', 'maintain', 'holding', 0.9),
+// ── FLOOR — a maintain discipline under its DECLARED target (Michael's live case) ───────────────────
+Deno.test('FLOOR: maintain running under its 18-mile target → the number + specificity, tone info', () => {
+  const r = eye([
+    D('strength', 'develop', 'improving', null),
+    D('run', 'maintain', 'holding', 0.6, { underTarget: true, actualPerWeek: 6, targetPerWeek: 18, unit: 'mile' }),
   ])!;
-  assertEquals(r.kind, 'trade_working');
-  assertStringIncludes(r.headline, 'Building strength');
-  assertStringIncludes(r.headline, "running's starting to fade"); // frank AT the glance
-  assertStringIncludes(r.detail!, 'Running is specific');          // mechanism on tap
-  assertStringIncludes(r.detail!, 'chosen one');                   // trade, not a scold
+  assertEquals(r.kind, 'floor');
+  assertEquals(r.tone, 'info');
+  assertStringIncludes(r.headline, '6 of your 18-mile');
+  assertStringIncludes(r.detail!, 'Running is specific');
+  assertEquals(r.headline.includes('trade'), false); // no editorializing
 });
 
-// ── SAME STRUCTURE, DIFFERENT DISCIPLINE — bike eased gets SOFTER language (not "fades") ────────────
-Deno.test('trade working, BIKE eased: softer "easing", never the run-specific "fades"', () => {
-  const r = composeCrossTrainingRead([
-    S('strength', 'develop', 'improving', null),
-    S('bike', 'maintain', 'holding', 0.6),
+// ── CEILING — focus slipping while a supplement climbs → PROMPT + lever + the ⓘ, never a verdict ────
+Deno.test('CEILING: strength slipping while riding pushed → correlation prompt, a lever, and the info popup', () => {
+  const r = eye([
+    D('strength', 'develop', 'sliding', null),
+    D('bike', 'maintain', 'improving', 1.4),
   ])!;
-  assertEquals(r.kind, 'trade_working');
-  assertStringIncludes(r.headline, "riding's easing");
-  assertEquals(r.headline.includes('fade'), false);          // bike is NOT use-it-or-lose-it
-  assertStringIncludes(r.detail!, 'holds better than running');
-});
-
-// ── GENERALISES OFF STRENGTH — a MARATHONER developing RUNNING, adding strength on the side ─────────
-Deno.test('generalises: run-focus marathoner, running holding, strength being pushed → "room" (focus=run)', () => {
-  const r = composeCrossTrainingRead([
-    S('run', 'develop', 'holding', 0.9),     // the FOCUS is running
-    S('strength', 'maintain', 'improving', 1.4), // pushing strength on the side
-  ])!;
-  assertEquals(r.kind, 'room');
-  assertStringIncludes(r.headline, 'Pushing your strength'); // the non-focus pushed discipline
-  assertStringIncludes(r.headline, 'your running is holding');
-});
-
-// ── developing+pushing your OWN focus, nothing else moving → null (not a cross-training story) ───────
-Deno.test('pushing your own focus, nothing else → null (the strength/run read owns it, not cross-training)', () => {
-  assertEquals(composeCrossTrainingRead([
-    S('run', 'develop', 'improving', 1.3),
-    S('strength', 'maintain', 'holding', 0.9),
-  ]), null);
-});
-
-// ── THE WINDOW-MISMATCH REGRESSION (device 2026-07-21): under-target run + weekly uptick = TRADE ─────
-Deno.test('under-target maintain run with a weekly uptick reads as the TRADE, never "pushing"', () => {
-  const r = composeCrossTrainingRead([
-    S('strength', 'develop', 'improving', null),
-    S('run', 'maintain', 'holding', 1.2, /* underTarget */ true),
-    S('bike', 'maintain', 'holding', 0.9),
-  ])!;
-  assertEquals(r.kind, 'trade_working');
-  assertEquals(r.headline.includes('Pushing'), false);
-});
-
-// ── THE COST ────────────────────────────────────────────────────────────────────────────────────────
-Deno.test('cost: strength sliding while riding pushed → tipping trade at the glance, lever in the detail', () => {
-  const r = composeCrossTrainingRead([
-    S('strength', 'develop', 'sliding', null),
-    S('bike', 'maintain', 'improving', 1.4),
-  ])!;
-  assertEquals(r.kind, 'cost');
+  assertEquals(r.kind, 'ceiling');
   assertEquals(r.tone, 'warning');
-  assertStringIncludes(r.headline, 'riding is up');
-  assertStringIncludes(r.headline, 'strength has started to give');
-  assertStringIncludes(r.detail!, 'Ease one');
+  assertStringIncludes(r.headline, 'strength is slipping');
+  assertStringIncludes(r.headline, 'riding climbs');
+  assertStringIncludes(r.detail!, 'the lever');
+  assertStringIncludes(r.detail!, "isn't a number anyone can hand you"); // no false precision
+  assertStringIncludes(r.info!, 'you find your ceiling');                // the honest hand-back
 });
 
-// ── ROOM ──────────────────────────────────────────────────────────────────────────────────────────
-Deno.test('room: pushing riding, strength holding → green light + a watch-the-numbers detail', () => {
-  const r = composeCrossTrainingRead([
-    S('strength', 'develop', 'holding', null),
-    S('bike', 'maintain', 'improving', 1.4),
+// ── CEILING via recovery — focus HOLDING but recovery dipping while pushing ─────────────────────────
+Deno.test('CEILING: focus holding but recovery dipping while riding pushed → the flat-and-dipping prompt', () => {
+  const r = eye([
+    D('strength', 'develop', 'holding', null),
+    D('bike', 'maintain', 'improving', 1.4),
+  ], /* readinessDeclining */ true)!;
+  assertEquals(r.kind, 'ceiling');
+  assertStringIncludes(r.headline, 'recovery is dipping');
+});
+
+// ── ROOM — pushing a supplement, focus holding, no cost → the maximiser's green light ───────────────
+Deno.test('ROOM: pushing riding, strength holding, recovery fine → room to push + watch-the-numbers', () => {
+  const r = eye([
+    D('strength', 'develop', 'holding', null),
+    D('bike', 'maintain', 'improving', 1.4),
   ])!;
   assertEquals(r.kind, 'room');
-  assertStringIncludes(r.headline, "you've got room");
-  assertStringIncludes(r.detail!, 'lift numbers');
+  assertEquals(r.tone, 'positive');
+  assertStringIncludes(r.headline, 'room to push');
+  assertStringIncludes(r.detail!, 'ceiling shows first');
 });
 
-// ── SILENCE — the honesty gates (a FREEBALLER with no focus, thin data, boring week) ────────────────
-Deno.test('freeballer / no declared focus → null (caller reassures)', () => {
-  assertEquals(composeCrossTrainingRead([S('strength', 'maintain', 'holding', 1.0), S('run', 'maintain', 'holding', 0.6)]), null);
+// ── GENERALISES — a marathoner (run focus) with strength being pushed on the side ──────────────────
+Deno.test('generalises: run-focus marathoner, running holding, strength pushed → room (focus=run)', () => {
+  const r = eye([
+    D('run', 'develop', 'holding', 0.9),
+    D('strength', 'maintain', 'improving', 1.4),
+  ])!;
+  assertEquals(r.kind, 'room');
+  assertStringIncludes(r.headline, 'strength is up');
+  assertStringIncludes(r.headline, 'running is holding');
 });
-Deno.test('thin data: focus has no verdict yet → null', () => {
-  assertEquals(composeCrossTrainingRead([S('strength', 'develop', 'needs_data', null), S('run', 'maintain', 'holding', 0.6)]), null);
+
+// ── the window regression: under-target maintain + weekly uptick is NEVER read as "pushed" ──────────
+Deno.test('under-target run with a weekly acwr uptick is the FLOOR, never a ceiling/room "push"', () => {
+  const r = eye([
+    D('strength', 'develop', 'improving', null),
+    D('run', 'maintain', 'holding', 1.2, { underTarget: true, actualPerWeek: 6, targetPerWeek: 18, unit: 'mile' }),
+  ])!;
+  assertEquals(r.kind, 'floor');       // NOT room — underTarget suppresses "pushed"
 });
-Deno.test('boring good week: focus working, nothing eased or pushed → null', () => {
-  assertEquals(composeCrossTrainingRead([S('strength', 'develop', 'improving', null), S('run', 'maintain', 'holding', 0.95)]), null);
+
+// ── SILENCE — the honesty gates ─────────────────────────────────────────────────────────────────────
+Deno.test('no declared focus (freeballer) → null', () => {
+  assertEquals(eye([D('strength', 'maintain', 'holding', 1.0), D('run', 'maintain', 'holding', 0.6)]), null);
+});
+Deno.test('thin data: focus has no verdict → null', () => {
+  assertEquals(eye([D('strength', 'develop', 'needs_data', null), D('run', 'maintain', 'holding', 0.6)]), null);
+});
+Deno.test('nothing crosses a line: focus holding, nothing pushed, nothing under target → null', () => {
+  assertEquals(eye([D('strength', 'develop', 'improving', null), D('run', 'maintain', 'holding', 0.95)]), null);
+});
+Deno.test('overdoing at NO cost is silent: riding pushed but focus improving + recovery fine → room, not a cost flag', () => {
+  const r = eye([D('strength', 'develop', 'improving', null), D('bike', 'maintain', 'holding', 1.3)])!;
+  assertEquals(r.kind, 'room'); // the gate: overdoing only "costs" when the goal is actually impacted
 });
