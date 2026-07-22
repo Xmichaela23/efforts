@@ -16,24 +16,25 @@ import { recentEfficiencyPaceHr } from './run.ts';
 
 const AS_OF = '2026-07-22';
 
-Deno.test('derives pace from the verdict index + HR, averaged over the last 2 in-window steady runs', () => {
+Deno.test('shows RAW pace by default, carries the grade-adjusted twin for the toggle', () => {
   const rows = [
-    { date: '2026-06-20', gap_efficiency_index: 1.70, hr_avg: 142, workout_type: 'easy', duration_minutes: 45 },
-    { date: '2026-07-10', gap_efficiency_index: 1.60, hr_avg: 140, workout_type: 'easy', duration_minutes: 45 }, // recent-2
-    { date: '2026-07-18', gap_efficiency_index: 1.55, hr_avg: 138, workout_type: 'long',  duration_minutes: 50 }, // recent-2
+    { date: '2026-06-20', efficiency_index: 1.68, gap_efficiency_index: 1.70, hr_avg: 142, workout_type: 'easy', duration_minutes: 45 },
+    { date: '2026-07-10', efficiency_index: 1.62, gap_efficiency_index: 1.60, hr_avg: 140, workout_type: 'easy', duration_minutes: 45 }, // recent-2
+    { date: '2026-07-18', efficiency_index: 1.57, gap_efficiency_index: 1.55, hr_avg: 138, workout_type: 'long',  duration_minutes: 50 }, // recent-2
   ];
   const r = recentEfficiencyPaceHr(rows, AS_OF);
-  // last two: 100000/(1.60*140)=446.43, 100000/(1.55*138)=467.51 → avg 456.97 s/km
-  assertAlmostEquals(r.paceSecPerKm!, (100000 / (1.60 * 140) + 100000 / (1.55 * 138)) / 2, 0.01);
+  // raw uses efficiency_index; gap uses gap_efficiency_index — over the last two runs
+  assertAlmostEquals(r.paceSecPerKm!, (100000 / (1.62 * 140) + 100000 / (1.57 * 138)) / 2, 0.01);
+  assertAlmostEquals(r.gapPaceSecPerKm!, (100000 / (1.60 * 140) + 100000 / (1.55 * 138)) / 2, 0.01);
   assertEquals(r.hrAvg, 139); // round((140+138)/2)
   assertEquals(r.runs, 3);    // count is the whole in-window steady pool
 });
 
 Deno.test('excludes interval + out-of-band-duration runs (same gate as the efficiency trend)', () => {
   const rows = [
-    { date: '2026-07-05', gap_efficiency_index: 1.60, hr_avg: 140, workout_type: 'interval', duration_minutes: 45 }, // interval → out
-    { date: '2026-07-12', gap_efficiency_index: 1.58, hr_avg: 139, workout_type: 'easy',     duration_minutes: 22 }, // too short → out
-    { date: '2026-07-16', gap_efficiency_index: 1.56, hr_avg: 138, workout_type: 'easy',     duration_minutes: 48 }, // counts
+    { date: '2026-07-05', efficiency_index: 1.60, hr_avg: 140, workout_type: 'interval', duration_minutes: 45 }, // interval → out
+    { date: '2026-07-12', efficiency_index: 1.58, hr_avg: 139, workout_type: 'easy',     duration_minutes: 22 }, // too short → out
+    { date: '2026-07-16', efficiency_index: 1.56, hr_avg: 138, workout_type: 'easy',     duration_minutes: 48 }, // counts
   ];
   const r = recentEfficiencyPaceHr(rows, AS_OF);
   assertEquals(r.runs, 1);
@@ -41,18 +42,19 @@ Deno.test('excludes interval + out-of-band-duration runs (same gate as the effic
   assertEquals(r.hrAvg, 138);
 });
 
-Deno.test('falls back to raw efficiency_index when GAP is absent (flat/treadmill)', () => {
+Deno.test('no GAP on a recent run → gapPaceSecPerKm null (no toggle, never a half-adjusted average)', () => {
   const rows = [
-    { date: '2026-07-14', efficiency_index: 1.50, hr_avg: 135, workout_type: 'easy', duration_minutes: 40 },
+    { date: '2026-07-14', efficiency_index: 1.50, hr_avg: 135, workout_type: 'easy', duration_minutes: 40 }, // no gap index
   ];
   const r = recentEfficiencyPaceHr(rows, AS_OF);
   assertAlmostEquals(r.paceSecPerKm!, 100000 / (1.50 * 135), 0.01);
+  assertEquals(r.gapPaceSecPerKm, null); // raw shows; toggle suppressed
   assertEquals(r.hrAvg, 135);
 });
 
 Deno.test('no usable steady runs → nulls, never a crash', () => {
   const r = recentEfficiencyPaceHr([], AS_OF);
-  assertEquals(r, { paceSecPerKm: null, hrAvg: null, runs: 0 });
-  const r2 = recentEfficiencyPaceHr([{ date: '2026-07-14', gap_efficiency_index: 1.5, hr_avg: 0, workout_type: 'easy', duration_minutes: 45 }], AS_OF);
+  assertEquals(r, { paceSecPerKm: null, gapPaceSecPerKm: null, hrAvg: null, runs: 0 });
+  const r2 = recentEfficiencyPaceHr([{ date: '2026-07-14', efficiency_index: 1.5, hr_avg: 0, workout_type: 'easy', duration_minutes: 45 }], AS_OF);
   assertEquals(r2.runs, 0); // hr_avg 0 → dropped
 });

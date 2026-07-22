@@ -87,15 +87,17 @@ export function efficiencyIndexToSeries(
     .filter((p) => p.date && Number.isFinite(p.value) && p.value >= MIN_EFF_INDEX && p.value <= MAX_EFF_INDEX);
 }
 
-export interface EffPaceHr { paceSecPerKm: number | null; hrAvg: number | null; runs: number; }
+export interface EffPaceHr { paceSecPerKm: number | null; gapPaceSecPerKm: number | null; hrAvg: number | null; runs: number; }
 
 /** The recent steady-run PACE + HR behind the efficiency verdict — the plain-language "what" under the
- *  index "why" (Michael 2026-07-22, "another line for pace"). Derives pace from the SAME index the verdict
- *  reads (gap_efficiency_index ?? efficiency_index) and hr_avg, so the pace line CANNOT disagree with the
- *  number above it: index = (1000/pace)/hr × 100  ⇒  pace_s_per_km = 100000 / (index × hr). Where the run
- *  had GAP the pace is grade-adjusted (matches the terrain-honest verdict); where it fell back to raw, the
- *  pace is raw (matches the watch). Averages the last `endpointN` in-window steady runs — the SAME points
- *  classifyTrend's recentAvg uses — so "pace at HR" describes the current end of the trend, not one run. */
+ *  index "why" (Michael 2026-07-22, "another line for pace"). FIELD-STANDARD SPLIT (Strava/TrainingPeaks):
+ *  the efficiency VERDICT is grade-adjusted (terrain-honest, TP's NGP÷HR), but the pace we SHOW defaults to
+ *  RAW — what the watch recorded — because that's the number every platform displays. We carry BOTH so the
+ *  client can offer a GAP toggle (Strava does the same). Pace is back-derived from each stored index and
+ *  hr_avg: index = (1000/pace)/hr × 100  ⇒  pace_s_per_km = 100000 / (index × hr) — `efficiency_index` for
+ *  raw, `gap_efficiency_index` for grade-adjusted. Averages the last `endpointN` in-window steady runs —
+ *  the SAME points classifyTrend's recentAvg uses. `gapPaceSecPerKm` is null unless EVERY recent run has a
+ *  finite GAP index (no toggle rather than a half-adjusted average). */
 export function recentEfficiencyPaceHr(
   rows: Array<{ date?: string; metric_date?: string; efficiency_index?: number | null; gap_efficiency_index?: number | null; hr_avg?: number | null; workout_type?: string | null; duration_minutes?: number | null }> | null | undefined,
   asOf: string,
@@ -108,18 +110,21 @@ export function recentEfficiencyPaceHr(
     .filter((r) => typeof r.duration_minutes === 'number' && r.duration_minutes >= 30 && r.duration_minutes <= 70)
     .map((r) => ({
       date: r.date ?? r.metric_date ?? '',
-      idx: Number(r.gap_efficiency_index ?? r.efficiency_index),
+      idxRaw: Number(r.efficiency_index ?? r.gap_efficiency_index), // RAW = what the watch showed (GAP only as fallback)
+      idxGap: Number(r.gap_efficiency_index),                       // grade-adjusted (may be NaN on flat/no-GAP runs)
       hr: Number(r.hr_avg),
     }))
     .filter((p) => p.date && p.date > start && p.date <= asOf &&
-      Number.isFinite(p.idx) && p.idx >= MIN_EFF_INDEX && p.idx <= MAX_EFF_INDEX &&
+      Number.isFinite(p.idxRaw) && p.idxRaw >= MIN_EFF_INDEX && p.idxRaw <= MAX_EFF_INDEX &&
       Number.isFinite(p.hr) && p.hr > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
-  if (!pts.length) return { paceSecPerKm: null, hrAvg: null, runs: 0 };
+  if (!pts.length) return { paceSecPerKm: null, gapPaceSecPerKm: null, hrAvg: null, runs: 0 };
   const recent = pts.slice(-Math.min(endpointN, pts.length));
   const avg = (a: number[]) => a.reduce((s, n) => s + n, 0) / a.length;
+  const allGap = recent.every((p) => Number.isFinite(p.idxGap) && p.idxGap >= MIN_EFF_INDEX && p.idxGap <= MAX_EFF_INDEX);
   return {
-    paceSecPerKm: avg(recent.map((p) => 100000 / (p.idx * p.hr))),
+    paceSecPerKm: avg(recent.map((p) => 100000 / (p.idxRaw * p.hr))),
+    gapPaceSecPerKm: allGap ? avg(recent.map((p) => 100000 / (p.idxGap * p.hr))) : null,
     hrAvg: Math.round(avg(recent.map((p) => p.hr))),
     runs: pts.length,
   };
@@ -327,7 +332,8 @@ export interface RunFitness {
     sampleCount: number;
     newestAgeDays: number | null;
     recentlyFlat?: boolean;         // sliding split: true = dropped then levelled ("settled lower")
-    recentPaceSecPerKm?: number | null; // the "what": recent steady-run pace behind the index (grade-adj where GAP exists)
-    recentHrAvg?: number | null;        // …at this heart rate — pace-at-HR in units the runner feels
+    recentPaceSecPerKm?: number | null;    // the "what": recent steady-run RAW pace (what the watch showed) — default display
+    recentGapPaceSecPerKm?: number | null; // grade-adjusted twin for the GAP toggle; null when any recent run lacks GAP
+    recentHrAvg?: number | null;           // …at this heart rate — pace-at-HR in units the runner feels
   };
 }

@@ -322,6 +322,13 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
   const eff = fitness.efficiency;
   const dur = fitness.decoupling;
   const [explainOpen, setExplainOpen] = React.useState(false);
+  // GAP toggle (Michael 2026-07-22) — default RAW (what the watch showed, field-standard); tap to grade-
+  // adjust. Only offered when a grade-adjusted twin exists AND it differs enough to be worth a toggle.
+  const [gapOn, setGapOn] = React.useState(false);
+  const rawPace = eff.recentPaceSecPerKm;
+  const gapPace = eff.recentGapPaceSecPerKm;
+  const canToggleGap = rawPace != null && gapPace != null && Math.abs(gapPace - rawPace) >= 3; // ≥3 s/km = ~5 s/mi
+  const shownPace = gapOn && canToggleGap ? gapPace : rawPace;
   const v = verdictLabel(eff.verdict, eff.recentlyFlat);
   const hasTrend = eff.verdict !== 'needs_data' && eff.verdict !== 'withheld';
   const evidence = eff.sampleCount != null
@@ -347,10 +354,16 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
       </span>
       {hasTrend && evidence && <span className="basis-full text-white/35 text-[11px]">{evidence}</span>}
       {/* THE "WHAT" under the index "why" (Michael 2026-07-22) — recent steady-run pace at the HR it took,
-          in units the runner feels. Derived from the same index driving the verdict, so it can't disagree. */}
-      {hasTrend && eff.recentPaceSecPerKm != null && (
-        <span className="basis-full text-white/45 text-[11px]">
-          pace ~{formatPace(eff.recentPaceSecPerKm, useImperial)}{eff.recentHrAvg != null ? ` at ${eff.recentHrAvg} bpm` : ''}
+          in units the runner feels. RAW by default (matches the watch); a GAP toggle grade-adjusts it. */}
+      {hasTrend && shownPace != null && (
+        <span className="basis-full inline-flex items-baseline gap-2 text-white/45 text-[11px]">
+          <span>pace ~{formatPace(shownPace, useImperial)}{eff.recentHrAvg != null ? ` at ${eff.recentHrAvg} bpm` : ''}</span>
+          {canToggleGap && (
+            <button type="button" onClick={() => setGapOn((o) => !o)}
+              className={`text-[10px] px-1 rounded ${gapOn ? 'text-emerald-300/80 bg-emerald-400/10' : 'text-white/35'}`}>
+              {gapOn ? 'grade-adj' : 'GAP'}
+            </button>
+          )}
         </span>
       )}
       {/* durability — the SECONDARY read now (fatigue resistance within a run), quiet, only when real */}
