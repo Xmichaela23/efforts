@@ -211,7 +211,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   const Icon = DISCIPLINE_ICON[label.toLowerCase()];
   return (
     <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      <span className="text-[12px] font-semibold tracking-[0.12em] uppercase w-[72px] shrink-0 pt-0.5 inline-flex items-center gap-1.5 text-white/70">
+      <span className="text-[12px] font-semibold tracking-[0.1em] uppercase w-[94px] shrink-0 pt-0.5 inline-flex items-center gap-1.5 text-white/70">
         {Icon && <Icon size={13} strokeWidth={2.25} style={{ color: getDisciplineColor(label) }} className="shrink-0" />}
         {label}
       </span>
@@ -564,7 +564,7 @@ function PostureLine({ card }: { card: DisciplineCard }) {
   if (!sentence) return null;
   const concern = (card as any).postureRead === 'develop_declining' || (card as any).postureRead === 'develop_stalled';
   return (
-    <p className={`pl-[62px] pr-1 -mt-0.5 mb-1.5 text-[13px] leading-snug max-w-[min(100%,360px)] ${concern ? 'text-amber-400/80' : 'text-white/65'}`}>
+    <p className={`pl-[84px] pr-1 -mt-0.5 mb-1.5 text-[13px] leading-snug max-w-[min(100%,360px)] ${concern ? 'text-amber-400/80' : 'text-white/65'}`}>
       {sentence}
     </p>
   );
