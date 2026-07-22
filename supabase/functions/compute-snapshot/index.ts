@@ -680,7 +680,7 @@ serve(async (req: Request) => {
           // routes table made those runs INVISIBLE to durability (STATE-SOURCE-MAP #3/#4 — "a courtesy
           // feature may never gate a fitness verdict"; found live by scripts/state-data-check.mjs,
           // 2026-07-21). 90d cadence window; classifyTrend windows the trend to runDays internally.
-          supabase.from("workouts").select("id,date,workout_analysis")
+          supabase.from("workouts").select("id,date,workout_analysis,computed")
             .eq("user_id", userId).in("type", ["run", "running"]).eq("workout_status", "completed")
             .not("workout_analysis", "is", null)
             .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).order("date"),
@@ -737,11 +737,13 @@ serve(async (req: Request) => {
         const MI_PER_KM = 1 / 1.60934;
         const runJoined = runRows.map((r) => {
           const hrs = r.workout_analysis?.heart_rate_summary ?? null;
-          // GRADE-ADJUSTED efficiency (2026-07-21): the canonical per-sample GAP (overall.avg_gap_s_per_mi,
-          // sec/MI → sec/KM) fed into the ONE efficiency formula (computeEfficiencyIndex) with the run's
-          // HR. This is the terrain-honest "faster at the same heart rate" number the run row will lead
-          // with. Falls to null when GAP or HR is absent (flat/treadmill runs keep the raw efficiency_index).
-          const gapPaceSecPerMi = Number(r.workout_analysis?.overall?.avg_gap_s_per_mi);
+          // GRADE-ADJUSTED efficiency (2026-07-21): the stored GAP pace fed into the ONE efficiency
+          // formula (computeEfficiencyIndex) with the run's HR — terrain-honest "faster at the same
+          // heart rate". FIX (2026-07-22, from reading Michael's DB): the GAP lives at
+          // computed.overall.gap_pace_s_per_mi (Minetti, now one-source), NOT
+          // workout_analysis.overall.avg_gap_s_per_mi (which is empty — the per-sample analysis GAP isn't
+          // persisted there; a separate follow-up). Falls to null → raw efficiency_index for flat/no-GAP.
+          const gapPaceSecPerMi = Number(r.computed?.overall?.gap_pace_s_per_mi);
           const gapPaceSecPerKm = Number.isFinite(gapPaceSecPerMi) && gapPaceSecPerMi > 0 ? gapPaceSecPerMi * MI_PER_KM : null;
           const gapEfficiencyIndex = computeEfficiencyIndex(gapPaceSecPerKm, runHrByDate.get(r.date) ?? null);
           return {
