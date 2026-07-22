@@ -12,6 +12,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
 import { formatPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor } from '@/lib/context-utils';
+import { Activity, Bike, Waves, Dumbbell, type LucideIcon } from 'lucide-react';
 
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
   improving: { word: 'improving', cls: 'text-emerald-400', arr: '↑' },
@@ -200,21 +201,19 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
 // in the UI. This row-level tag is separate from headline gating (HEADLINE_GATED_DISCIPLINES).
 const PROVISIONAL_PERF = new Set(['swim']);
 
-// Discipline rows carry their OWN signature color on the label (Michael 2026-07-22) — the same
-// run=gold / strength=orange / bike=green / swim=blue system the mix-bar legend uses, so the whole
-// screen is scannable by color. Structural sections (BODY/LOAD/FITNESS) stay neutral; only the
-// discipline rows get a hue. getDisciplineColor is the ONE source shared with the bars.
-const DISCIPLINE_LABELS = new Set(['run', 'strength', 'swim', 'bike', 'ride']);
+// Discipline rows are tagged by a small COLORED ICON, not colored text (Michael 2026-07-22, UX-nerd call).
+// Categorical color (which discipline) lives on a contained icon; the LABEL stays white for legibility;
+// semantic color (green=improving / amber=holding, the traffic light) is left free for the verdicts. This
+// resolves the collision where green/amber meant both a discipline AND a status. Icons match the app-wide
+// set in WorkoutCalendar (one run icon everywhere), tinted with the ONE shared getDisciplineColor.
+const DISCIPLINE_ICON: Record<string, LucideIcon> = { run: Activity, strength: Dumbbell, swim: Waves, bike: Bike, ride: Bike };
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  const disc = DISCIPLINE_LABELS.has(label.toLowerCase());
+  const Icon = DISCIPLINE_ICON[label.toLowerCase()];
   return (
     <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      <span
-        className="text-[12px] font-semibold tracking-[0.12em] uppercase w-[72px] shrink-0 pt-0.5"
-        style={disc ? { color: getDisciplineColor(label) } : undefined}
-      >
-        {!disc && <span className="text-white/70">{label}</span>}
-        {disc && label}
+      <span className="text-[12px] font-semibold tracking-[0.12em] uppercase w-[72px] shrink-0 pt-0.5 inline-flex items-center gap-1.5 text-white/70">
+        {Icon && <Icon size={13} strokeWidth={2.25} style={{ color: getDisciplineColor(label) }} className="shrink-0" />}
+        {label}
       </span>
       <div className="flex-1 text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none tabular-nums">
         {children}
