@@ -159,18 +159,19 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
             const d = dir(l);
             return (
               <React.Fragment key={l.canonical}>
-                <span className="basis-full flex items-baseline justify-between gap-2">
-                  <span className="text-white/80 text-[13px]">{l.displayName}</span>
-                  <span className="inline-flex items-baseline gap-2 text-[13px]">
-                    {/* "~" marks it as an ESTIMATE, not a tested max — it's a projection off your logged sets
-                        (RIR-adjusted), most reliable near failure. Provisional (below) clears as sessions stack. */}
-                    <span className="text-white/75">~{Math.round(l.latestE1rm as number)} lb</span>
-                    {isPR(l) && <span className="text-emerald-300 text-[9px] uppercase tracking-wide font-semibold">PR</span>}
-                    {/* A real PR carries "it went up" — so suppress the bare "new" direction next to it
-                        (the "PR · new" contradiction). Real trend arrows still show alongside PR. */}
-                    {!(isPR(l) && d.text === 'new') && (
-                      <span className={`inline-flex items-baseline gap-0.5 ${d.cls}`}>{d.arr && <span>{d.arr}</span>}<span>{d.text}</span></span>
-                    )}
+                {/* 3-column grid: name (fills) | e1RM value (right-aligned number column) | trend
+                    (fixed-width right-aligned column) — so the lb column and the trend column each stack
+                    into a clean vertical edge across lifts (tabular-nums makes the digits equal-width). */}
+                <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto_4.75rem] items-baseline gap-x-2">
+                  <span className="text-white/85 text-[14px] truncate inline-flex items-baseline gap-1.5">
+                    {l.displayName}
+                    {/* "~" marks it as an ESTIMATE, not a tested max — a projection off your logged sets. */}
+                    {isPR(l) && <span className="text-emerald-300 text-[10px] uppercase tracking-wide font-semibold">PR</span>}
+                  </span>
+                  <span className="text-white/85 text-[14px] text-right">~{Math.round(l.latestE1rm as number)} lb</span>
+                  {/* A real PR carries "it went up" — suppress the bare "new" next to it (the PR·new bug). */}
+                  <span className={`text-[13px] text-right inline-flex items-baseline justify-end gap-0.5 ${isPR(l) && d.text === 'new' ? 'text-transparent' : d.cls}`}>
+                    {d.arr && <span>{d.arr}</span>}<span>{isPR(l) && d.text === 'new' ? '' : d.text}</span>
                   </span>
                 </span>
                 <span className="basis-full text-white/50 text-[11px] -mt-0.5">
@@ -204,7 +205,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <span className="text-[12px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">
         {label}
       </span>
-      <div className="flex-1 text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
+      <div className="flex-1 text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none tabular-nums">
         {children}
       </div>
     </div>
@@ -374,18 +375,20 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
           runner the efficiency row can't serve. Longer distances unlock as the long run grows (a marathon
           estimate off short runs is a fantasy). Locked rows shown dim so the progression is visible. */}
       {Array.isArray(fitness.projections) && fitness.projections.length > 0 && (
-        <span className="basis-full flex flex-col gap-0.5 mt-1.5">
+        <span className="basis-full flex flex-col gap-1 mt-1.5">
           <span className="text-white/45 text-[11px] uppercase tracking-wider">projected race times</span>
+          {/* 3-column grid: distance | finish time (right-aligned number column) | pace — so the times
+              stack into one clean edge. Locked rows span the two value columns with a left-aligned note. */}
           {fitness.projections.map((p) => (
-            <span key={p.distance} className="flex items-baseline justify-between gap-2 text-[12px]">
-              <span className={p.unlocked ? 'text-white/60' : 'text-white/45'}>{p.label}</span>
+            <span key={p.distance} className="grid grid-cols-[4.5rem_auto_1fr] items-baseline gap-x-2 text-[12px]">
+              <span className={p.unlocked ? 'text-white/65' : 'text-white/45'}>{p.label}</span>
               {p.unlocked ? (
-                <span className="inline-flex items-baseline gap-1.5">
-                  <span className="text-white/75">{p.display}</span>
-                  <span className="text-white/50">{p.paceDisplay}</span>
-                </span>
+                <>
+                  <span className="text-white/80 text-right">{p.display}</span>
+                  <span className="text-white/50 text-right">{p.paceDisplay}</span>
+                </>
               ) : (
-                <span className="text-white/45">unlocks at ~{p.unlockLongRunMiles} mi long run</span>
+                <span className="col-span-2 text-white/45 text-right">unlocks at ~{p.unlockLongRunMiles} mi long run</span>
               )}
             </span>
           ))}

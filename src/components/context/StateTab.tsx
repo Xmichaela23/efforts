@@ -1539,12 +1539,12 @@ export default function StateTab({
         <div className="px-3 py-3">
           <div className="flex items-start gap-3">
             <span className="text-[12px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
-            <div className="flex-1 space-y-1.5">
+            <div className="flex-1 space-y-1.5 tabular-nums">
               {visibleSignals.length === 0 && (rm as any)?.overall_training_read?.summary && (
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-[13px] text-white/70">This week</span>
+                <div className="flex items-start gap-3">
+                  <span className="text-[13px] text-white/70 shrink-0 w-[104px]">This week</span>
                   <span
-                    className={`text-[13px] text-right max-w-[min(100%,220px)] leading-snug ${
+                    className={`flex-1 text-[13px] text-left leading-snug ${
                       (rm as any).overall_training_read.tone === 'positive'
                         ? 'text-emerald-400/90'
                         : (rm as any).overall_training_read.tone === 'warning'
@@ -1569,11 +1569,11 @@ export default function StateTab({
                     type="button"
                     disabled={!s.provenance}
                     onClick={() => s.provenance && setExpandedSignal(expandedSignal === s.label ? null : s.label)}
-                    className="w-full flex items-start justify-between gap-3 text-left"
+                    className="w-full flex items-start gap-3 text-left"
                   >
-                    <span className="text-[13px] text-white/70 shrink-0">{s.label}</span>
-                    <div className="flex items-start gap-2 min-w-0">
-                      <span className={`text-[13px] text-right leading-snug ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
+                    <span className="text-[13px] text-white/70 shrink-0 w-[104px]">{s.label}</span>
+                    <div className="flex-1 flex items-start gap-2 min-w-0">
+                      <span className={`flex-1 text-[13px] text-left leading-snug ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
                       {s.provenance && <span className="text-white/50 text-[11px] shrink-0 mt-0.5">{expandedSignal === s.label ? '▾' : '▸'}</span>}
                     </div>
                   </button>
@@ -1609,11 +1609,11 @@ export default function StateTab({
                       type="button"
                       disabled={!detail}
                       onClick={() => detail && setExpandedSignal(open ? null : '__cross_training__')}
-                      className="w-full flex items-start justify-between gap-3 text-left"
+                      className="w-full flex items-start gap-3 text-left"
                     >
-                      <span className="text-[13px] text-white/70 shrink-0">Cross-training</span>
-                      <div className="flex items-start gap-2 min-w-0">
-                        <span className={`text-[13px] text-right leading-snug ${toneCls}`}>{crossTrainingSignal.label}</span>
+                      <span className="text-[13px] text-white/70 shrink-0 w-[104px]">Cross-training</span>
+                      <div className="flex-1 flex items-start gap-2 min-w-0">
+                        <span className={`flex-1 text-[13px] text-left leading-snug ${toneCls}`}>{crossTrainingSignal.label}</span>
                         {detail && <span className="text-white/50 text-[11px] shrink-0 mt-0.5">{open ? '▾' : '▸'}</span>}
                       </div>
                     </button>
