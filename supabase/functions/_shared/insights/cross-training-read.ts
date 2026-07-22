@@ -46,6 +46,10 @@ export interface CoachEyeRead {
   detail: string | null;
   tone: 'positive' | 'info' | 'warning';
   kind: 'floor' | 'ceiling' | 'room';
+  /** The SUBJECT discipline the line is about (run/bike/swim/strength) — so the client can color it in
+   *  that discipline's signature hue instead of a generic tone (blue collided with swim). Ceiling/room =
+   *  the focus discipline; floor = the discipline under its target. (Michael 2026-07-22.) */
+  discipline: string;
   /** ⓘ popup — CEILING only. States what the read is built on and hands the judgment back. */
   info?: string;
 }
@@ -107,7 +111,7 @@ export function composeCoachEye(inp: CoachEyeInput): CoachEyeRead | null {
     return {
       headline: `Your ${lab(focus.discipline)} ${state} while your ${lab(pushed.discipline)} climbs.`,
       detail: `If ${lab(focus.discipline)} is the priority, easing the ${lab(pushed.discipline)} is the lever — they draw on the same recovery. Your exact ceiling isn't a number anyone can hand you.`,
-      tone: 'warning', kind: 'ceiling', info: CEILING_INFO,
+      tone: 'warning', kind: 'ceiling', discipline: focus.discipline, info: CEILING_INFO,
     };
   }
 
@@ -119,7 +123,7 @@ export function composeCoachEye(inp: CoachEyeInput): CoachEyeRead | null {
         ? `${Cap(lab(floorBreach.discipline))}'s at ${num} target${floorBreach.unit === 'mile' ? '' : ''} — under what holds it.`
         : `${Cap(lab(floorBreach.discipline))}'s under the level that holds it.`,
       detail: floorDetail(floorBreach.discipline),
-      tone: 'info', kind: 'floor',
+      tone: 'info', kind: 'floor', discipline: floorBreach.discipline,
     };
   }
 
@@ -128,7 +132,7 @@ export function composeCoachEye(inp: CoachEyeInput): CoachEyeRead | null {
     return {
       headline: `Your ${lab(pushed.discipline)} is up and your ${lab(focus.discipline)} is holding — room to push.`,
       detail: `No sign the ${lab(pushed.discipline)} is costing your ${lab(focus.discipline)} yet. Watch the ${lab(focus.discipline)} numbers as you add more — that's where the ceiling shows first.`,
-      tone: 'positive', kind: 'room', info: CEILING_INFO,
+      tone: 'positive', kind: 'room', discipline: focus.discipline, info: CEILING_INFO,
     };
   }
 

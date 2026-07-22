@@ -1595,10 +1595,14 @@ export default function StateTab({
                 // GLANCE + OPEN: the frank verdict (label) is always shown; the receipts (detail) reveal
                 // on tap, matching the BODY-row provenance pattern. Uses expandedSignal keyed on a
                 // sentinel so only one row is open at a time.
+                // Color the sentence by the DISCIPLINE it's about (Michael 2026-07-22), not a generic tone —
+                // blue collided with swim's own color. Warnings (CEILING) stay amber (it's a caution); the
+                // neutral/positive reads take the subject discipline's signature hue.
+                const ctDisc = (crossTrainingSignal as any).discipline as string | null;
                 const toneCls =
-                  crossTrainingSignal.tone === 'positive' ? 'text-emerald-400/90' :
-                  crossTrainingSignal.tone === 'warning' ? 'text-amber-400/90' :
-                  crossTrainingSignal.tone === 'info' ? 'text-sky-400/85' : 'text-white/70';
+                  crossTrainingSignal.tone === 'warning' ? 'text-amber-400/90' : 'text-white/85';
+                const toneStyle = crossTrainingSignal.tone !== 'warning' && ctDisc
+                  ? { color: getDisciplineColor(ctDisc) } : undefined;
                 const detail = crossTrainingSignal.detail ?? null;
                 const info = crossTrainingSignal.info ?? null; // the CEILING ⓘ — "you know your body"
                 const open = expandedSignal === '__cross_training__';
@@ -1613,7 +1617,7 @@ export default function StateTab({
                     >
                       <span className="text-[13px] text-white/70 shrink-0 w-[104px]">Cross-training</span>
                       <div className="flex-1 flex items-start gap-2 min-w-0">
-                        <span className={`flex-1 text-[13px] text-left leading-snug ${toneCls}`}>{crossTrainingSignal.label}</span>
+                        <span className={`flex-1 text-[13px] text-left leading-snug ${toneCls}`} style={toneStyle}>{crossTrainingSignal.label}</span>
                         {detail && <span className="text-white/50 text-[11px] shrink-0 mt-0.5">{open ? '▾' : '▸'}</span>}
                       </div>
                     </button>
