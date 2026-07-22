@@ -7,7 +7,7 @@
  * Run from repo root:
  *   deno test supabase/functions/_shared/state-trend/rollup-hr-response.test.ts --no-check
  */
-import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assertEquals, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { rollupHrResponse, hrResponseExcludedRunNote } from './assemble.ts';
 
 type D = { verdict?: string; provisional?: boolean; newestAgeDays?: number | null; sampleCount?: number };
@@ -61,14 +61,23 @@ Deno.test('no reliable-HR endurance data → needs_data (swim never contributes)
 
 // ── NO SILENT DROP — Michael's "is the HR response lagging?" catch (2026-07-20). A run PRESENT but
 //    below the 8-run trend floor is excluded from the rollup and must be NAMED, not hidden. ──────────
-Deno.test('excluded-run note: run present but below floor (his exact case) → named', () => {
+Deno.test('excluded-run note: run present but below floor (his exact case) → named + the refresh lever', () => {
   // Bike holds (6d ago), run has 7 steady runs — under 8, no direction → dropped from the rollup.
   const state = v1({ bike: { verdict: 'holding', newestAgeDays: 6 }, run: { verdict: 'needs_data', sampleCount: 7 } });
   const r = rollupHrResponse(state);
   assertEquals(r.contributors.length, 1);                  // only bike contributes
   assertEquals(r.contributors[0].discipline, 'bike');
   const note = hrResponseExcludedRunNote(state, r.contributors)!;
-  assertEquals(note, "Your runs aren't in this yet — 7 of 8 steady runs needed to read a direction.");
+  assertEquals(note, "Your runs aren't in this yet — 7 of 8 steady runs to read a direction. A steady run refreshes it.");
+});
+
+Deno.test('excluded-run note: DOUBLE DUTY when the athlete is also under their run target (opportunity, not scold)', () => {
+  const state = v1({ bike: { verdict: 'holding', newestAgeDays: 6 }, run: { verdict: 'needs_data', sampleCount: 6 } });
+  const note = hrResponseExcludedRunNote(state, rollupHrResponse(state).contributors, 8, { runUnderTarget: true })!;
+  assertStringIncludes(note, '6 of 8 steady runs');
+  assertStringIncludes(note, 'double duty');
+  assertStringIncludes(note, "running you've been under target on");
+  assertEquals(note.toLowerCase().includes('unproductive'), false); // never a scold
 });
 
 Deno.test('excluded-run note: silent when the run IS contributing, absent, or floor met', () => {

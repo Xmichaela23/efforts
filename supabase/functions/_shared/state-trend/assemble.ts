@@ -626,13 +626,20 @@ export function hrResponseExcludedRunNote(
   v1: StateTrendsV1 | null | undefined,
   contributors: HrResponseRollup['contributors'],
   floor = 8,
+  opts?: { runUnderTarget?: boolean },
 ): string | null {
   const runD = v1?.run?.decoupling as { sampleCount?: number } | undefined;
   if (!runD) return null;
   const n = Number(runD.sampleCount);
   const runContributing = contributors.some((c) => c.discipline === 'run');
   if (runContributing || !(n > 0) || n >= floor) return null;
-  return `Your runs aren't in this yet — ${n} of ${floor} steady runs needed to read a direction.`;
+  // OPPORTUNITY framing, not a scold (Michael, 2026-07-21) — the note names the lever (a steady run
+  // refreshes the read), and does DOUBLE DUTY when the athlete is also under their declared running
+  // target: the same run holds the running they've been low on. Never "you failed" (Garmin's mistake).
+  const tail = opts?.runUnderTarget
+    ? " A steady run does double duty: it refreshes this and it's the running you've been under target on."
+    : ' A steady run refreshes it.';
+  return `Your runs aren't in this yet — ${n} of ${floor} steady runs to read a direction.${tail}`;
 }
 
 /** Shape the assembled result into the cached contract. Per-discipline = the model's performance
