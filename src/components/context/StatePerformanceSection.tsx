@@ -16,8 +16,8 @@ import { Activity, Bike, Waves, Dumbbell, type LucideIcon } from 'lucide-react';
 
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
   improving: { word: 'improving', cls: 'text-emerald-400', arr: '↑' },
-  holding: { word: 'holding', cls: 'text-amber-300', arr: '→' },
-  sliding: { word: 'easing off', cls: 'text-amber-300', arr: '↓' },
+  holding: { word: 'holding', cls: 'text-white/70', arr: '→' }, // NEUTRAL (Michael) — steady is neither good nor bad; gray, not amber (amber was a false caution AND collided with run-gold)
+  sliding: { word: 'easing off', cls: 'text-amber-300', arr: '↓' }, // mild decline stays amber — so "steady" and "slipping" no longer read identical
   needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
   withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
 };
@@ -118,7 +118,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
 // not red (a deload/taper isn't a fitness loss). Industry-standard (Strong/Hevy/JEFIT).
 const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
   improving: { word: 'up', cls: 'text-emerald-400', arr: '↑' },
-  holding: { word: 'steady', cls: 'text-amber-300', arr: '→' },
+  holding: { word: 'steady', cls: 'text-white/70', arr: '→' }, // NEUTRAL — steady volume is not a caution
   sliding: { word: 'down', cls: 'text-white/50', arr: '↓' },
   needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
   withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
