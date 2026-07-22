@@ -263,6 +263,16 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // The "what" under the "why": recent steady-run pace + HR (pace-at-HR), derived from the SAME index the
   // verdict reads so the two lines can't disagree. STATE_TREND_WINDOWS.runDays = the efficiency window.
   const runEffPaceHr = recentEfficiencyPaceHr(inp.runJoined, asOf, STATE_TREND_WINDOWS.runDays);
+  // 12-WEEK efficiency chart series (the "long view") — the SAME points the verdict reads, over a wider 84d
+  // window than the verdict's 42d, so the recent tail of the chart IS the verdict's data (no contradiction
+  // possible). Each point flagged `recent` when inside the 42d verdict window. Fills as the athlete trains.
+  const CHART_WINDOW_DAYS = 84;
+  const _chartStart = new Date(new Date(asOf + 'T12:00:00Z').getTime() - CHART_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const _verdictStart = new Date(new Date(asOf + 'T12:00:00Z').getTime() - STATE_TREND_WINDOWS.runDays * 86_400_000).toISOString().slice(0, 10);
+  const effChartSeries = runEffSeries
+    .filter((p) => p.date > _chartStart && p.date <= asOf)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((p) => ({ date: p.date, value: Math.round(p.value * 1000) / 1000, recent: p.date > _verdictStart }));
   const runState = runDecoupling; // decoupling drives the provisional flag below
   // Card verdict = decoupling (the lead). pctChange is NULLED: decoupling's trend runs on offset
   // values, so its pctChange isn't a meaningful run % — the real band/pct live in runFitness. This
@@ -298,6 +308,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       recentPaceSecPerKm: runEffPaceHr.paceSecPerKm,
       recentGapPaceSecPerKm: runEffPaceHr.gapPaceSecPerKm,
       recentHrAvg: runEffPaceHr.hrAvg,
+      series: effChartSeries,
     },
   };
 
@@ -507,7 +518,7 @@ export interface StateTrendsV1 {
    *  ("building aerobic base"), not just the improving/sliding direction the base verdict carries. */
   run: DisciplineTrendCache & {
     decoupling: { verdict: string; band: string | null; recentPct: number | null; provisional: boolean; stale: boolean; newestAgeDays: number | null; sampleCount: number };
-    efficiency: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; recentlyFlat?: boolean; recentPaceSecPerKm?: number | null; recentGapPaceSecPerKm?: number | null; recentHrAvg?: number | null };
+    efficiency: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; recentlyFlat?: boolean; recentPaceSecPerKm?: number | null; recentGapPaceSecPerKm?: number | null; recentHrAvg?: number | null; series?: Array<{ date: string; value: number; recent: boolean }> };
   };
   /** D-194: `rest` = the rest-fraction (work:rest) trend, nested like bike's power/efficiency. */
   swim: DisciplineTrendCache & { rest: DisciplineTrendCache };

@@ -328,6 +328,51 @@ const RUN_TREND_MIN_RUNS = 8;
 // — a confident dot off a single run that couldn't answer "am I improving". Efficiency answers exactly
 // that: a rising trend = fitter. Durability (decoupling) is demoted to a quiet secondary read. No dot;
 // a clear verdict + arrow + %, and an honest "N of 8 runs to read it" until there's a trend.
+// THE LONG VIEW (Michael 2026-07-22) — a 12-week efficiency sparkline that answers "am I trending up over
+// the block?" while the verdict above answers "is my current training working?". Plots the SAME series the
+// verdict reads (recent-6wk in the run color = the slice the verdict judges; older weeks dim for context),
+// so chart and word are one truth. FILLS AS YOU BUILD: a new user sees a few points on the 12-week canvas
+// with an honest coverage label ("building · N of 12 weeks"), never a fabricated smooth line. <2 points →
+// no line (can't imply a trend through one dot). Tap to expand. TP charts LOAD; this charts OUTPUT.
+function EfficiencySparkline({ series }: { series?: Array<{ date: string; value: number; recent: boolean }> }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const pts = Array.isArray(series) ? series : [];
+  if (pts.length < 2) {
+    return pts.length === 1
+      ? <span className="basis-full text-[11px] text-white/45">building — 1 steady run so far; a few more draws the 12-week trend</span>
+      : null;
+  }
+  const runColor = getDisciplineColor('run');
+  const W = 300, H = expanded ? 96 : 42, PAD_Y = 6, PAD_X = 2;
+  const vals = pts.map((p) => p.value);
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+  const range = maxV - minV || 1;
+  const x = (i: number) => PAD_X + (i / (pts.length - 1)) * (W - 2 * PAD_X);
+  const y = (v: number) => PAD_Y + (1 - (v - minV) / range) * (H - 2 * PAD_Y); // higher efficiency = higher on chart
+  const firstRecent = pts.findIndex((p) => p.recent);
+  const recentStart = firstRecent <= 0 ? 0 : firstRecent - 1; // include the join point so the segments connect
+  const dimPoly = pts.map((p, i) => `${x(i)},${y(p.value)}`).join(' ');
+  const recentPoly = firstRecent >= 0 ? pts.slice(recentStart).map((p, i) => `${x(recentStart + i)},${y(p.value)}`).join(' ') : '';
+  const last = pts[pts.length - 1];
+  const spanWeeks = Math.min(12, Math.max(1, Math.ceil((Date.parse(last.date + 'T12:00:00Z') - Date.parse(pts[0].date + 'T12:00:00Z')) / (7 * 86_400_000))));
+  const building = spanWeeks < 11;
+  return (
+    <span className="basis-full flex flex-col gap-1 mt-1.5">
+      <button type="button" onClick={() => setExpanded((e) => !e)} className="text-left w-full" aria-label="toggle efficiency chart size">
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block">
+          <polyline points={dimPoly} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
+          {recentPoly && <polyline points={recentPoly} fill="none" stroke={runColor} strokeOpacity={0.9} strokeWidth={1.75} vectorEffect="non-scaling-stroke" />}
+          <circle cx={x(pts.length - 1)} cy={y(last.value)} r={2.5} fill={runColor} />
+        </svg>
+      </button>
+      <span className="text-[10px] text-white/45 flex items-center justify-between">
+        <span>{building ? `building · ${spanWeeks} of 12 weeks` : 'last 12 weeks · recent 6 in color'}</span>
+        <span className="tabular-nums text-white/30">{minV.toFixed(2)}–{maxV.toFixed(2)} · {pts.length} runs</span>
+      </span>
+    </span>
+  );
+}
+
 function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; mode?: FitnessMode; anchor?: FitnessAnchor }) {
   const { useImperial } = useAppContext();
   const eff = fitness.efficiency;
@@ -364,6 +409,8 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
         )}
       </span>
       {hasTrend && evidence && <span className="basis-full text-white/55 text-[12px]">{evidence}</span>}
+      {/* THE LONG VIEW — 12-week efficiency sparkline (the arc behind the verdict). */}
+      {hasTrend && <EfficiencySparkline series={eff.series} />}
       {/* THE "WHAT" under the index "why" (Michael 2026-07-22) — recent steady-run pace at the HR it took,
           in units the runner feels. RAW by default (matches the watch); a GAP toggle grade-adjusts it. */}
       {hasTrend && shownPace != null && (

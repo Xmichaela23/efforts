@@ -335,6 +335,11 @@ export interface RunFitness {
     recentPaceSecPerKm?: number | null;    // the "what": recent steady-run RAW pace (what the watch showed) — default display
     recentGapPaceSecPerKm?: number | null; // grade-adjusted twin for the GAP toggle; null when any recent run lacks GAP
     recentHrAvg?: number | null;           // …at this heart rate — pace-at-HR in units the runner feels
+    /** 12-WEEK CHART series — the "long view" (Michael 2026-07-22). Same efficiency points the verdict
+     *  reads, over a WIDER 84d window (verdict is 42d), so the chart's recent tail IS the verdict's data —
+     *  they can't contradict. `recent` = inside the 42d verdict window (client brightens it). Fills as the
+     *  athlete trains: a new user sees a few points building toward 12 weeks. Higher value = fitter. */
+    series?: Array<{ date: string; value: number; recent: boolean }>;
   };
   /** VDOT race-time projections off CURRENT fitness (Michael 2026-07-22) — goal-free, unlocked by long-run
    *  distance so a marathon estimate never shows off 5-mile runs. Server-computed (compute-snapshot, via
