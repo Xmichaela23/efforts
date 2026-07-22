@@ -43,10 +43,12 @@ function loadVolumeColor(label: string): string {
   return 'text-white/45';
 }
 
+// One discipline vocabulary app-wide (Michael 2026-07-22): "bike" not "Ride" (swim-bike-run is the tri
+// canon), lowercase to match the calm secondary-label style everywhere else on the screen.
 const DISPLAY_NAME: Record<string, string> = {
-  run: 'Run', running: 'Run', bike: 'Ride', ride: 'Ride', cycling: 'Ride',
-  swim: 'Swim', swimming: 'Swim', strength: 'Strength', strength_training: 'Strength',
-  weight: 'Strength', weights: 'Strength', mobility: 'Mobility', pilates_yoga: 'Mobility',
+  run: 'run', running: 'run', bike: 'bike', ride: 'bike', cycling: 'bike',
+  swim: 'swim', swimming: 'swim', strength: 'strength', strength_training: 'strength',
+  weight: 'strength', weights: 'strength', mobility: 'mobility', pilates_yoga: 'mobility',
 };
 function disciplineName(type: string): string {
   const t = (type || '').toLowerCase();
