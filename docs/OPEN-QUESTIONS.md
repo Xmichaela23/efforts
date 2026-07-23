@@ -845,6 +845,15 @@ So a declared, honest swap is read as **two separate failures**:
 
 ## Q-197 — Squat e1RM is split across TWO canonical names (data bug) (2026-07-22, UNVERIFIED-cause / CONFIRMED-symptom)
 
+> **CLOSED 2026-07-23 (commit `3f983bc8`, DEPLOYED, VERIFIED-in-DB).** Confirmed a canonicalizer miss, and it hit THREE anchors + one non-anchor, not just squat:
+> - `barbell_back_squat` (3 sessions), `conventional_deadlift` (5), `standing_barbell_overhead_press` (2) all slugged to lone buckets and were dropped from `STRENGTH_ANCHORS` — so squat/deadlift/OHP verdicts each ran on partial history.
+> - Plural class: `bulgarian_split_squats`, `walking_lunges` split off their singulars.
+> **Fix (`_shared/canonicalize.ts`):** added the synonyms (back squat / conventional deadlift / standing OHP / high+low bar) + a general plural fallback (trailing-s folds into a mapped singular; never over-merges an unmapped name). 7 deno fixtures (`canonicalize.test.ts`). Recomputed the 13 affected workouts through `recompute-workout` (no direct DB write); verified the buckets collapsed and squat went 4→7 sessions in the 12wk window. Genuinely-distinct lifts (Romanian DL, DB bench, front/goblet squat) correctly stayed separate.
+> **Also fixed the same bug on the CLIENT** (`StrengthLogger.tsx` `normalizeExerciseName`): the D-097 prefill + D-122 "last:" anchor matched on raw name, so "Hip Thrusts" ≠ "Hip Thrust" and autofill silently failed for plural-logged lifts. Now drops a trailing plural 's'. Michael confirmed the symptom (hip thrust weight not auto-filling when adding). PUSHED, client not yet VERIFIED on device.
+> **Left open → Q-199** (hip thrust is a server anchor but not a client baseline-test lift).
+> Everything below is the original lead.
+
+
 Found while tracing chart data-depth for D-311. Michael's `exercise_log` logs squat under **both** `squat` (4 sessions) **and** `barbell_back_squat` (3 sessions) over the last 12 weeks. Two consequences:
 1. **Any squat e1RM chart fragments** into two half-series (blocks the strength chart, D-311 open thread).
 2. **The current "Back Squat" verdict may be wrong** — `computeStrengthState` picks a `canonical`, and best/trend/PR-flag would compute on only *one* of the two name-buckets, i.e. half the sessions. The "→ flat · 4 sessions" reading Michael sees may be missing 3 sessions under the other name.
@@ -859,3 +868,7 @@ D-311 shipped the run-efficiency 12-week sparkline. Three Michael-approved follo
 3. **Load/form-over-time chart** — the one thing TP's PMC charts that we don't (CTL/ATL/TSB / freshness). ACWR + load are already on the spine, so it's a render + a retained-window question, not new logic. Optional TP-parity; only if Michael wants the "am I fresh/peaked?" axis, distinct from the "am I improving?" (output) charts we now have.
 
 Also: the chart series is 84d because that's what `runJoined`'s ~90d window carries. A *season-length* (year) chart — TP's real timescale — would need a wider retained window. Out of scope unless asked.
+
+## Q-199 — Hip thrust is a server anchor but not a client baseline-test lift (2026-07-23, inconsistency, deferred)
+
+Found while fixing Q-197's autofill half. `hip_thrust` is in `STRENGTH_ANCHORS` (compute-facts) — it gets an e1RM, a trend, a PR flag, and a State verdict. But the client baseline system only knows 5 lifts: `getBaselineKeyForExercise` / `baselineSeedFor` (`StrengthLogger.tsx:869/882`) cover squat, deadlift, bench, OHP, pull-ups. So hip thrust has no stored-1RM baseline and can't be seeded as a %-based baseline test, even though the app tracks and grades its e1RM. Same likely true for `trap_bar_deadlift` and `barbell_row` (also anchors, also absent from the client baseline list). Not a bug Michael reported — the day-to-day autofill (D-097, fixed in Q-197) is the path he uses — but the server/client lift lists disagree on what a "tracked lift" is. Decide whether the client baseline list should match `STRENGTH_ANCHORS`.
