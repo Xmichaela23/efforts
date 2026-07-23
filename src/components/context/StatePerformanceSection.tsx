@@ -196,6 +196,7 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
                     dotNoun="session"
                     fmtVal={(v) => String(Math.round(v))}
                     unit=" lb"
+                    minSpanFraction={0.25}
                   />
                 )}
               </React.Fragment>
@@ -355,9 +356,9 @@ const RUN_TREND_MIN_RUNS = 8;
 // no line (can't imply a trend through one dot). Tap to expand. TP charts LOAD; this charts OUTPUT.
 // Generalized 2026-07-23 so the same visual serves run efficiency AND per-lift strength e1RM (Michael's
 // big-4 chart). Props default to the run row's exact look/copy; strength passes color + nouns + a lb formatter.
-function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '' }: {
+function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0 }: {
   series?: Array<{ date: string; value: number; recent: boolean }>;
-  color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string;
+  color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const pts = Array.isArray(series) ? series : [];
@@ -370,11 +371,16 @@ function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: nu
   const W = 300, H = expanded ? 72 : 42, PAD_Y = expanded ? 10 : 6, PAD_X = 2;
   const vals = pts.map((p) => p.value);
   const minV = Math.min(...vals), maxV = Math.max(...vals);
-  const rawRange = maxV - minV || 1;
+  const rawRange = maxV - minV;
+  const center = (minV + maxV) / 2 || 1;
   // Domain HEADROOM (Michael 2026-07-22) — pad the value scale 15% each side so the line never touches the
-  // top/bottom edge. Without it, stretching the range to fill the height turns normal run-to-run wobble into
-  // cliffs (worse when expanded/taller) — reads alarming and over-states the noise. Calmer = truer.
-  const dMin = minV - rawRange * 0.15, dMax = maxV + rawRange * 0.15, dRange = dMax - dMin || 1;
+  // top/bottom edge. Without it, stretching the range to fill the height turns normal wobble into cliffs.
+  // NOISE FLOOR (2026-07-23) — the domain spans at LEAST minSpanFraction of the center value, so a small move
+  // on a slow lift stays visually small. Strength e1RM wobbles ~5-8% session to session; without a floor a
+  // 10lb bounce on a 100lb lift fills the whole height and reads as a crash. minSpanFraction=0 (run default)
+  // leaves the run chart unchanged; strength passes a fraction so its full height = a real % change, not noise.
+  const dRange = Math.max(rawRange * 1.3, center * minSpanFraction, 1e-6);
+  const dMin = center - dRange / 2, dMax = center + dRange / 2;
   const x = (i: number) => PAD_X + (i / (pts.length - 1)) * (W - 2 * PAD_X);
   const y = (v: number) => PAD_Y + (1 - (v - dMin) / dRange) * (H - 2 * PAD_Y); // higher efficiency = higher on chart
   const firstRecent = pts.findIndex((p) => p.recent);
