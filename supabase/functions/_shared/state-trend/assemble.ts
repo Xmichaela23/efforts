@@ -10,7 +10,7 @@
 // Import from source modules (NOT ./index.ts) — index.ts re-exports this file, so importing the
 // barrel here would create a load-order cycle.
 import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, computeE1rmBand, type LiftSeries, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
-import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, type BikeFitness } from './bike-fitness.ts';
+import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, bikePowerChartSeries, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, recentEfficiencyPaceHr, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
 import { CROWN_MIN_DECOUPLING } from './baseline-derive.ts';
@@ -233,6 +233,10 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     .map((r) => ({ date: r.date, value: Number(r.hr_at_band) }));
   const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike);
   bikeFitness.efficiency.basis = inp.bikeRows.map((r) => r.band_source).find((s) => s) ?? null;
+  // 12-week POWER chart series — the w20 points of the winning terrain bin (the one the verdict reads), so
+  // chart and word agree. Mirrors run efficiency / strength e1RM. Empty when power has no verdict (needs_data
+  // → basis null → the bike row shows the efficiency read and no power chart). Uses the bike verdict window.
+  bikeFitness.power.series = bikePowerChartSeries(binRides, asOf, bikeFitness.power.basis);
   const bikeLead = bikeFitness.power.verdict !== 'needs_data' ? bikeFitness.power : bikeFitness.efficiency;
   // State v3 DOT — the lead metric's position in the 12wk range. Power is higher-is-better (more watts =
   // fitter); HR-at-power efficiency is lower-is-better (less HR for the same power = fitter).

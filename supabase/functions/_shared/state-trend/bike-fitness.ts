@@ -115,6 +115,10 @@ export interface BikeSignal {
   sampleCount?: number;
   newestAgeDays?: number | null;
   windowDays?: number;
+  /** 12-week dated power series for the sparkline (the "long view" behind the verdict) — the w20 points of
+   *  the SAME terrain bin the verdict reads, over a wider 84d window; `recent` flags points inside the
+   *  verdict window (rendered in color). Populated only for the POWER signal. Mirrors run efficiency.series. */
+  series?: Array<{ date: string; value: number; recent: boolean }>;
 }
 
 export interface BikeFitness {
@@ -139,6 +143,28 @@ export function computeTerrainBinnedPower(rides: BikeEffortRide[], asOf: string,
   }
   if (!best) return { verdict: 'needs_data', pctChange: null, provisional: false, basis: null, sampleCount: 0, newestAgeDays: null, windowDays: thresholds.windowDays };
   return { verdict: best.verdict, pctChange: best.t.pctChange, provisional: isProvisionalTrend(best.t), basis: best.bin, sampleCount: best.t.sampleCount, newestAgeDays: best.t.newestAgeDays, windowDays: best.t.window?.days };
+}
+
+/** 12-week power CHART series for a terrain bin — the w20 points that bin's verdict reads, over a wider
+ *  window, recent-flagged. The bin is the WINNING bin (`BikeSignal.basis`) so chart and verdict agree.
+ *  Watts rounded to int. Empty when the bin is absent/unknown. Mirrors run efficiency / strength e1RM series.
+ *  chartDays default 84 (12wk); verdictDays default 56 (bike window) — points inside it flag `recent`. */
+export function bikePowerChartSeries(
+  rides: BikeEffortRide[],
+  asOf: string,
+  bin: string | null,
+  chartDays = 84,
+  verdictDays = 56,
+): Array<{ date: string; value: number; recent: boolean }> {
+  if (!bin || !POWER_BINS[bin]) return [];
+  const types = POWER_BINS[bin];
+  const dayMs = 86_400_000;
+  const chartStart = new Date(new Date(asOf + 'T12:00:00Z').getTime() - chartDays * dayMs).toISOString().slice(0, 10);
+  const verdictStart = new Date(new Date(asOf + 'T12:00:00Z').getTime() - verdictDays * dayMs).toISOString().slice(0, 10);
+  return rides
+    .filter((r) => r.classified_type && types.has(String(r.classified_type)) && Number(r.w20) > 0 && r.date > chartStart && r.date <= asOf)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((r) => ({ date: r.date, value: Math.round(Number(r.w20)), recent: r.date > verdictStart }));
 }
 
 /** B — HR-at-power efficiency. `hrAtBand` = per-ride mean HR in the reference band ({date,value}). */

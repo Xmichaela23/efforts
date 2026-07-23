@@ -76,6 +76,7 @@ function asOf(ageDays: number | null | undefined): string | null {
 // Bike row — Power leads, Efficiency alongside (disagreement surfaced, never collapsed). The
 // efficiency basis carries the zone-band source (coggan_ftp = estimated; personal = from test).
 function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitness; showAxis?: boolean; mode: FitnessMode; anchor?: FitnessAnchor }) {
+  const [powerInfoOpen, setPowerInfoOpen] = React.useState(false);
   const src = fitness.efficiency.basis === 'personal' ? 'personal'
     : fitness.efficiency.basis === 'coggan_ftp' ? 'est (FTP)' : null;
   // D-232 glass-box: the shared evidence tail (window · rides · recency) is the LEAD sub-trend's
@@ -108,6 +109,33 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
       {asOf(lead.newestAgeDays) && <span className="text-white/45 text-[12px]">· {asOf(lead.newestAgeDays)}</span>}
       {trendOnly && <NoBaselineTag hint={src === 'est (FTP)' ? 'accept your FTP to anchor' : undefined} />}
       {showDot && anchor?.label && <span className="basis-full text-[11px] text-white/50">{anchor.label}</span>}
+      {/* THE LONG VIEW — 12-week power sparkline (the cyclist's e1RM/efficiency analog, 2026-07-23). Only when
+          power LEADS (a real w20 verdict); the winning terrain bin's watts over 12 weeks, recent-8wk in color. */}
+      {leadIsPower && (
+        <TrendSparkline
+          series={fitness.power.series}
+          color={getDisciplineColor('bike')}
+          dotNoun="ride"
+          fmtVal={(v) => String(Math.round(v))}
+          unit=" W"
+          minSpanFraction={0.15}
+          recentLabel="recent 8 wks in color"
+        />
+      )}
+      {/* No power to chart yet (all-aerobic riding) — a tap-ⓘ that NAMES what unlocks the power trend, rather
+          than silently omitting it. Fact-first + conditional, no imperative (copy voice). 2026-07-23. */}
+      {!leadIsPower && (
+        <>
+          <button type="button" onClick={() => setPowerInfoOpen((o) => !o)} className="basis-full inline-flex items-baseline gap-1 text-white/45 text-[12px]">
+            power trend <span className="text-white/40 text-[11px]">{powerInfoOpen ? '▾' : 'ⓘ'}</span>
+          </button>
+          {powerInfoOpen && (
+            <p className="basis-full text-[12px] text-white/55 leading-snug mt-1 max-w-[min(100%,340px)]">
+              A 12-week power trend appears here once a hard 20-min effort is logged — a threshold, sweet-spot, tempo, or climbing ride records a 20-min power max. Recent rides are all aerobic, so there’s no max to plot yet; the bike is read on efficiency until then.
+            </p>
+          )}
+        </>
+      )}
     </Row>
   );
 }
@@ -227,15 +255,18 @@ const PROVISIONAL_PERF = new Set(['swim']);
 // resolves the collision where green/amber meant both a discipline AND a status. Icons match the app-wide
 // set in WorkoutCalendar (one run icon everywhere), tinted with the ONE shared getDisciplineColor.
 const DISCIPLINE_ICON: Record<string, LucideIcon> = { run: Activity, strength: Dumbbell, swim: Waves, bike: Bike, ride: Bike };
+// Discipline name is a HEADER above the content (2026-07-23) — the content (and its 12-week charts) then
+// spans the FULL row width instead of being indented past a ~94px label gutter, so the sparklines get the
+// horizontal room to breathe. The colored discipline icon still tags the header.
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   const Icon = DISCIPLINE_ICON[label.toLowerCase()];
   return (
-    <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      <span className="text-[12px] font-semibold tracking-[0.1em] uppercase w-[94px] shrink-0 pt-0.5 inline-flex items-center gap-1.5 text-white/70">
-        {Icon && <Icon size={13} strokeWidth={2.25} style={{ color: getDisciplineColor(label) }} className="shrink-0" />}
+    <div className="py-2.5 border-b border-white/[0.055] last:border-0">
+      <div className="text-[13.5px] font-semibold tracking-[0.12em] uppercase flex items-center gap-2 text-white/85 mb-2">
+        {Icon && <Icon size={16} strokeWidth={2.25} style={{ color: getDisciplineColor(label) }} className="shrink-0" />}
         {label}
-      </span>
-      <div className="flex-1 text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none tabular-nums">
+      </div>
+      <div className="text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none tabular-nums">
         {children}
       </div>
     </div>
@@ -356,9 +387,9 @@ const RUN_TREND_MIN_RUNS = 8;
 // no line (can't imply a trend through one dot). Tap to expand. TP charts LOAD; this charts OUTPUT.
 // Generalized 2026-07-23 so the same visual serves run efficiency AND per-lift strength e1RM (Michael's
 // big-4 chart). Props default to the run row's exact look/copy; strength passes color + nouns + a lb formatter.
-function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0 }: {
+function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, recentLabel = 'recent 6 in color' }: {
   series?: Array<{ date: string; value: number; recent: boolean }>;
-  color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number;
+  color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number; recentLabel?: string;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const pts = Array.isArray(series) ? series : [];
@@ -411,7 +442,7 @@ function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: nu
         </span>
       )}
       <span className="text-[10px] text-white/45 flex items-center justify-between">
-        <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? `each dot = one ${dotNoun} · recent 6 in color` : 'last 12 weeks · recent 6 in color · tap to expand')}</span>
+        <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? `each dot = one ${dotNoun} · ${recentLabel}` : `last 12 weeks · ${recentLabel} · tap to expand`)}</span>
         {/* Range only — the session COUNT lives on the lift's name line (the verdict window); repeating a
             different chart-window count here read as a contradiction (UX pass 2026-07-23). */}
         <span className="tabular-nums text-white/30">{fmtVal(minV)}–{fmtVal(maxV)}{unit}</span>
