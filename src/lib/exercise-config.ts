@@ -1255,6 +1255,25 @@ export function getExerciseConfig(exerciseName: string): ExerciseConfig | null {
   return bestScore > 0 ? best : null;
 }
 
+/** The broad training group of an exercise, from its movement pattern. Used by "add an exercise" to
+ *  contain an added lift to matching-focus days (a hip-dominant lift lands where lower work already is,
+ *  not on an upper day) and to derive a session's own focus from the lifts it holds. One source. */
+export type MovementGroup = 'lower' | 'upper' | 'core' | null;
+
+export function movementGroupOfPattern(pattern: MovementPattern | null | undefined): MovementGroup {
+  if (pattern == null) return null;
+  if (pattern === 'knee_dominant' || pattern === 'hip_dominant' || pattern === 'calf') return 'lower';
+  if (pattern === 'horizontal_push' || pattern === 'horizontal_pull'
+    || pattern === 'vertical_push' || pattern === 'vertical_pull') return 'upper';
+  if (pattern === 'core') return 'core';
+  return null; // plyometric etc. — not a strength-slot group
+}
+
+/** The training group of an exercise by NAME (resolves its config, then its pattern). */
+export function getMovementGroup(exerciseName: string): MovementGroup {
+  return movementGroupOfPattern(getExerciseConfig(exerciseName)?.pattern ?? null);
+}
+
 function firstPositiveBaseline(...vals: unknown[]): number | null {
   for (const v of vals) {
     const n = Number(v);

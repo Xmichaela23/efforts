@@ -17,7 +17,7 @@ import {
 } from '../_shared/strength-equipment-tier.ts';
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
 import { calculatePlannedStrengthWorkload } from '../_shared/workload.ts';
-import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from '../../../src/lib/exercise-config.ts';
+import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup } from '../../../src/lib/exercise-config.ts';
 import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
 import { resolvePlanPhase } from '../_shared/plan-phase.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
@@ -37,6 +37,8 @@ type PlanAdjustment = {
   adjustment_factor?: number;
   absolute_weight?: number;
   weight_offset?: number; // Offset maintains plan progression (e.g., -10 lb)
+  substitute_exercise_name?: string | null; // Adapt-a-plan swap: slot renders as this exercise
+  add_meta?: { sets?: number; reps?: string | number } | null; // Adapt-a-plan add: exercise_name is a NEW lift
   applies_from: string;
   applies_until?: string;
   status: string;
@@ -85,6 +87,96 @@ function applyAdjustment(
   
   console.log(`🔧 Applied adjustment to ${exerciseName}: ${calculatedWeight} lb → ${adjustedWeight} lb`);
   return { weight: adjustedWeight, adjusted: true, adjustmentId: adjustment.id };
+}
+
+// Adapt-a-plan permanent swap: if an active swap targets this slot on this date, return the substitute
+// exercise name (else null). Same name-matching + date-window rules as applyAdjustment, so a swap and a
+// weight override read the slot identically. The caller re-resolves the substitute's weight from ITS
+// own reference — no weight is carried across a swap.
+function resolveSwap(
+  exerciseName: string,
+  adjustments: PlanAdjustment[],
+  workoutDate: string,
+): string | null {
+  if (!adjustments.length) return null;
+  const normalizedName = String(exerciseName ?? '').toLowerCase().trim();
+  const swap = adjustments.find(adj => {
+    if (adj.status !== 'active') return false;
+    if (!adj.substitute_exercise_name) return false;
+    const adjName = String(adj.exercise_name ?? '').toLowerCase().trim();
+    if (adjName !== normalizedName && !normalizedName.includes(adjName) && !adjName.includes(normalizedName)) return false;
+    if (adj.applies_from > workoutDate) return false;
+    if (adj.applies_until && adj.applies_until < workoutDate) return false;
+    return true;
+  });
+  return swap?.substitute_exercise_name ?? null;
+}
+
+function parseStrengthExercisesRaw(row: any): any[] {
+  const raw = row?.strength_exercises;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return []; } }
+  return [];
+}
+
+// Science-grounded weekly frequency for an ADDED accessory: 2×/week is the hypertrophy sweet spot
+// (Schoenfeld/Ogborn/Krieger 2016 meta-analysis — 2× beats 1× at equated volume; 3× adds no reliable
+// benefit). The plan still dictates WHICH days (matching focus); this caps HOW MANY per week.
+const ADDED_EXERCISE_WEEKLY_CAP = 2;
+
+// Adapt-a-plan add: decide, across the WHOLE plan, exactly which rows each added lift is injected into.
+// A lift lands only on strength sessions whose focus matches its movement group (a hip-dominant add goes
+// where lower work already is, never an upper-only day; a core/unclassified add fits any strength day),
+// within the add's date window, skipping a session that already holds it — then capped to the weekly
+// frequency above (earliest matching days per week). Returns row_id -> the lifts to inject there.
+function planAddInjections(
+  rows: any[],
+  adjustments: PlanAdjustment[],
+): Map<string, Array<{ name: string; sets: number; reps: string | number }>> {
+  const byRow = new Map<string, Array<{ name: string; sets: number; reps: string | number }>>();
+  const adds = (adjustments || []).filter(
+    (a) => a.status === 'active' && a.add_meta && String(a.exercise_name ?? '').trim(),
+  );
+  if (!adds.length) return byRow;
+
+  for (const adj of adds) {
+    const name = String(adj.exercise_name).trim();
+    const group = getMovementGroup(name);
+    const sets = typeof adj.add_meta!.sets === 'number' ? adj.add_meta!.sets : 3;
+    const reps = adj.add_meta!.reps ?? 10;
+
+    const candidates: any[] = [];
+    for (const row of rows) {
+      if (String(row?.type ?? '').toLowerCase() !== 'strength') continue;
+      const date = String(row?.date ?? '');
+      if (adj.applies_from > date) continue;
+      if (adj.applies_until && adj.applies_until < date) continue;
+      const exs = parseStrengthExercisesRaw(row);
+      if (exs.some((e: any) => String(e?.name ?? '').toLowerCase().trim() === name.toLowerCase())) continue;
+      if (group === 'lower' || group === 'upper') {
+        const sessionGroups = new Set(exs.map((e: any) => getMovementGroup(String(e?.name ?? ''))).filter(Boolean));
+        if (!sessionGroups.has(group)) continue;
+      }
+      candidates.push(row);
+    }
+
+    // Cap per week: earliest matching days each week get the lift, up to the weekly frequency.
+    const byWeek = new Map<number, any[]>();
+    for (const row of candidates) {
+      const wk = typeof row?.week_number === 'number' ? row.week_number : 0;
+      if (!byWeek.has(wk)) byWeek.set(wk, []);
+      byWeek.get(wk)!.push(row);
+    }
+    for (const weekRows of byWeek.values()) {
+      weekRows.sort((a, b) => String(a?.date ?? '').localeCompare(String(b?.date ?? '')));
+      for (const row of weekRows.slice(0, ADDED_EXERCISE_WEEKLY_CAP)) {
+        const rid = String(row.id);
+        if (!byRow.has(rid)) byRow.set(rid, []);
+        byRow.get(rid)!.push({ name, sets, reps });
+      }
+    }
+  }
+  return byRow;
 }
 
 /** Manual performance_numbers first, then exercise_log 1RM, then defaultLb (conservative anchor). */
@@ -1621,6 +1713,7 @@ function expandTokensForRow(
   // (no full regen). Null/absent → getTargetRir falls back to the durability base, still lift-aware.
   strengthProtocolId: string | null = null,
   rowPhase: string | null = null,
+  addsToInject: Array<{ name: string; sets: number; reps: string | number }> = [],
 ): { steps: any[]; total_s: number; swim_equipment_suggested?: string[]; swim_equipment_optional_suggested?: string[] } {
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   // Strength-PRIMARY rows (Get Strong arc) periodize their own peak + 1RM retest: lift the 0.85 clamp
@@ -1647,6 +1740,11 @@ function expandTokensForRow(
       if (Array.isArray(exs) && exs.length > 0) {
         // Get user equipment for substitution
         const userEquipment: string[] = Array.isArray((baselines as any)?.equipment?.strength) ? (baselines as any).equipment.strength : [];
+        // Adapt-a-plan add: inject the added lifts assigned to THIS row by planAddInjections (matching
+        // focus + weekly-frequency cap decided across the whole plan). Idempotent — adds live in
+        // plan_adjustments, never persisted into strength_exercises, so re-materialize re-injects fresh.
+        // They flow through the loop below, so weight seeds from their own reference.
+        for (const _add of addsToInject) exs.push(_add);
         
         for (const ex of exs) {
           const originalName = String(ex?.name||'exercise');
@@ -1662,8 +1760,15 @@ function expandTokensForRow(
           
           // Apply equipment substitution with percentage for intelligent band guidance
           const substituted = substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
-          const name = substituted.name;
+          let name = substituted.name;
           const equipmentNotes = substituted.notes;
+          // Adapt-a-plan permanent swap: an active athlete swap renames this slot to the substitute,
+          // AFTER equipment sub and BEFORE weight resolution. isSlotSwapped forces the weight to
+          // re-resolve from the NEW exercise's own reference below (no old weight carried across). With
+          // no swap row, isSlotSwapped is false and everything below is byte-identical to before.
+          const swapTarget = resolveSwap(name, adjustments, workoutDate);
+          const isSlotSwapped = !!swapTarget && String(swapTarget).toLowerCase().trim() !== String(name).toLowerCase().trim();
+          if (isSlotSwapped) name = swapTarget as string;
           // Q-180: a substitution can change the UNIT, not just the name. A 20 m sled push swapped for a
           // loaded walking lunge (or a sled pull swapped for a dumbbell row) is a REP exercise — it must
           // not inherit the sled's distance. Previously it did: a dumbbell row prescribed in metres.
@@ -1705,13 +1810,13 @@ function expandTokensForRow(
           const isPreResolvedNumeric = preResolvedNum != null && preResolvedNum > 0;
 
           // If the prescription is qualitative (e.g., "Light"), preserve it as display text.
-          if (isQualitativeStrengthWeight((ex as any)?.weight)) {
+          if (!isSlotSwapped && isQualitativeStrengthWeight((ex as any)?.weight)) {
             weightDisplay = qualitativeWeightDisplay((ex as any)?.weight);
             baselineMissing = false;
             requiredBaseline = undefined;
             percent_1rm = undefined;
             resolved_from = undefined;
-          } else if (isPreResolvedNumeric) {
+          } else if (!isSlotSwapped && isPreResolvedNumeric) {
             // Pass-through: dispatcher already resolved this against its 1RM snapshot.
             const isMetricA = !!(baselines as any).isMetric;
             const wUnitA = isMetricA ? 'kg' : 'lb';
@@ -1841,6 +1946,11 @@ function expandTokensForRow(
       if (exs.length) {
         // Get user equipment for substitution
         const userEquipment: string[] = Array.isArray((baselines as any)?.equipment?.strength) ? (baselines as any).equipment.strength : [];
+        // Adapt-a-plan add: inject the added lifts assigned to THIS row by planAddInjections (matching
+        // focus + weekly-frequency cap decided across the whole plan). Idempotent — adds live in
+        // plan_adjustments, never persisted into strength_exercises, so re-materialize re-injects fresh.
+        // They flow through the loop below, so weight seeds from their own reference.
+        for (const _add of addsToInject) exs.push(_add);
         
         for (const ex of exs) {
           const originalName = String(ex?.name||'exercise');
@@ -1856,8 +1966,15 @@ function expandTokensForRow(
           
           // Apply equipment substitution with percentage for intelligent band guidance
           const substituted = substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
-          const name = substituted.name;
+          let name = substituted.name;
           const equipmentNotes = substituted.notes;
+          // Adapt-a-plan permanent swap: an active athlete swap renames this slot to the substitute,
+          // AFTER equipment sub and BEFORE weight resolution. isSlotSwapped forces the weight to
+          // re-resolve from the NEW exercise's own reference below (no old weight carried across). With
+          // no swap row, isSlotSwapped is false and everything below is byte-identical to before.
+          const swapTarget = resolveSwap(name, adjustments, workoutDate);
+          const isSlotSwapped = !!swapTarget && String(swapTarget).toLowerCase().trim() !== String(name).toLowerCase().trim();
+          if (isSlotSwapped) name = swapTarget as string;
           // Q-180: a substitution can change the UNIT, not just the name. A 20 m sled push swapped for a
           // loaded walking lunge (or a sled pull swapped for a dumbbell row) is a REP exercise — it must
           // not inherit the sled's distance. Previously it did: a dumbbell row prescribed in metres.
@@ -1887,13 +2004,13 @@ function expandTokensForRow(
           const isPreResolvedNumeric2 = preResolvedNum2 != null && preResolvedNum2 > 0;
 
           // If the prescription is qualitative (e.g., "Light"), preserve it as display text.
-          if (isQualitativeStrengthWeight((ex as any)?.weight)) {
+          if (!isSlotSwapped && isQualitativeStrengthWeight((ex as any)?.weight)) {
             weightDisplay = qualitativeWeightDisplay((ex as any)?.weight);
             baselineMissing = false;
             requiredBaseline = undefined;
             percent_1rm = undefined;
             resolved_from = undefined;
-          } else if (isPreResolvedNumeric2) {
+          } else if (!isSlotSwapped && isPreResolvedNumeric2) {
             const isMetricB = !!(baselines as any).isMetric;
             const wUnitB = isMetricB ? 'kg' : 'lb';
             prescribed = preResolvedNum2 as number;
@@ -2839,7 +2956,7 @@ Deno.serve(async (req) => {
     try {
       const { data: adjData } = await supabase
         .from('plan_adjustments')
-        .select('id, exercise_name, adjustment_factor, absolute_weight, weight_offset, applies_from, applies_until, status')
+        .select('id, exercise_name, adjustment_factor, absolute_weight, weight_offset, substitute_exercise_name, add_meta, applies_from, applies_until, status')
         .eq('user_id', userId)
         .eq('status', 'active');
       adjustments = adjData || [];
@@ -2867,6 +2984,10 @@ Deno.serve(async (req) => {
       rirPlanConfig = planRowForRir?.config ?? null;
       rirProtocolId = (rirPlanConfig?.strength_protocol as string | undefined) ?? null;
     } catch (_e) { /* graceful: null → getTargetRir uses the durability base, still lift-aware */ }
+
+    // Adapt-a-plan add: decide once, across all rows, which added lifts land on which strength days
+    // (matching focus + the 2×/week science cap), then hand each row only its share below.
+    const addInjectionsByRow = planAddInjections(rows, adjustments);
     if (swimIntentMat) {
       console.log('[materialize-plan] swim_intent:', swimIntentMat);
     }
@@ -2906,7 +3027,8 @@ Deno.serve(async (req) => {
             ? row.week_number
             : null;
         const rowPhaseForRir = resolvePlanPhase(rirPlanConfig, weekNum);
-        const { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum, rirProtocolId, rowPhaseForRir);
+        const addsForRow = addInjectionsByRow.get(String(row.id)) || [];
+        const { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum, rirProtocolId, rowPhaseForRir, addsForRow);
         console.log(`  ✅ Generated ${steps.length} steps, total_s: ${total_s} (${Math.floor(total_s/60)}:${String(total_s%60).padStart(2,'0')})`);
         
         // Log error if materialization failed but tokens exist

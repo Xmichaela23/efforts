@@ -286,7 +286,10 @@ Deno.serve(async (req) => {
       );
       if (alreadyAdjusted) continue;
 
-      const targetRir = getTargetRir(profile, liftName);
+      // Phase-aware, matching the target the plan stamps + the analyzer/State verdict grade against
+      // (Step 0). Without the phaseTag this graded on the protocol BASE while everything else used the
+      // phase-modulated value — a quiet RIR split. One target now, everywhere.
+      const targetRir = getTargetRir(profile, liftName, null, phaseTag);
       const deviation = recentAvgRir != null ? recentAvgRir - targetRir : null;
 
       // Progression: e1RM up by protocol threshold AND deviation shows headroom
@@ -1113,95 +1116,26 @@ async function autoAdapt(
     }
   }
 
-  // 2. Strength auto-progression (protocol-aware, phase-gated)
-  const autoCfg = planRow?.config || {};
-  const autoProfile = resolveProfile(autoCfg.strength_protocol);
-  const autoWeek = Number(planRow?.current_week) || 1;
-  const autoPhaseTag = Array.isArray(autoCfg.plan_contract_v1?.phase_by_week)
-    ? autoCfg.plan_contract_v1.phase_by_week[autoWeek - 1]
-    : null;
-  const autoPhase = resolvePhaseRule(autoPhaseTag);
-
-  const liftGroups = groupByLift(exerciseLogs || []);
-
-  for (const [liftName, sessions] of Object.entries(liftGroups)) {
-    if (sessions.length < 3) continue;
-
-    const alreadyAdjusted = (existingAdj || []).some(
-      (a: any) => a.exercise_name.toLowerCase() === liftName.toLowerCase() && a.status === 'active',
-    );
-    if (alreadyAdjusted) continue;
-
-    const recent = sessions.slice(-3);
-    const earlier = sessions.slice(0, Math.max(1, sessions.length - 3));
-
-    const recentAvg1rm = avg(recent.map((s) => s.estimated_1rm));
-    const earlierAvg1rm = avg(earlier.map((s) => s.estimated_1rm));
-    const recentRirs = recent.map((s) => s.avg_rir).filter((r) => r != null) as number[];
-    const recentAvgRir = avg(recentRirs);
-
-    if (recentAvg1rm == null || earlierAvg1rm == null || earlierAvg1rm <= 0) continue;
-    const gainPct = ((recentAvg1rm - earlierAvg1rm) / earlierAvg1rm) * 100;
-
-    const targetRir = getTargetRir(autoProfile, liftName);
-    const deviation = recentAvgRir != null ? recentAvgRir - targetRir : null;
-
-    // Auto-progress: e1RM gain meets protocol threshold + RIR shows headroom + phase allows
-    if (
-      autoPhase.allowProgress &&
-      gainPct >= autoProfile.progression.minGainPct * 100 &&
-      recentRirs.length >= 2 &&
-      (deviation == null || deviation >= autoProfile.progression.minDeviation)
-    ) {
-      const factor = recentAvg1rm / earlierAvg1rm;
-
-      await supabase.from('plan_adjustments').update({ status: 'expired', updated_at: new Date().toISOString() })
-        .eq('user_id', userId).ilike('exercise_name', liftName).eq('status', 'active');
-
-      await supabase.from('plan_adjustments').insert({
-        user_id: userId,
-        plan_id: planId,
-        exercise_name: liftName,
-        adjustment_factor: Math.round(factor * 1000) / 1000,
-        applies_from: today,
-        reason: `Auto-progression: 1RM +${gainPct.toFixed(0)}%, RIR deviation ${deviation != null ? (deviation > 0 ? '+' : '') + deviation.toFixed(1) : 'n/a'} vs target ${targetRir}`,
-        status: 'active',
-      });
-
-      adaptations.push({
-        type: 'strength_progression',
-        detail: `${liftName}: weight increased ${gainPct.toFixed(0)}% (1RM ${earlierAvg1rm.toFixed(0)} → ${recentAvg1rm.toFixed(0)})`,
-        applied: true,
-      });
-    }
-
-    // Auto-deload: deviation below threshold (adjusted by phase sensitivity)
-    const autoDeloadThreshold = autoProfile.deload.maxDeviation * autoPhase.deloadSensitivity;
-    if (
-      deviation != null &&
-      deviation <= autoDeloadThreshold &&
-      recentRirs.length >= autoProfile.deload.minSessions
-    ) {
-      await supabase.from('plan_adjustments').update({ status: 'expired', updated_at: new Date().toISOString() })
-        .eq('user_id', userId).ilike('exercise_name', liftName).eq('status', 'active');
-
-      await supabase.from('plan_adjustments').insert({
-        user_id: userId,
-        plan_id: planId,
-        exercise_name: liftName,
-        adjustment_factor: 0.9,
-        applies_from: today,
-        reason: `Auto-deload: RIR deviation ${deviation.toFixed(1)} vs target ${targetRir} (threshold ${autoDeloadThreshold.toFixed(1)})`,
-        status: 'active',
-      });
-
-      adaptations.push({
-        type: 'strength_deload',
-        detail: `${liftName}: weight reduced 10% (RIR ${recentAvgRir?.toFixed(1)} vs target ${targetRir})`,
-        applied: true,
-      });
-    }
-  }
+  // 2. Strength weights: THE APP NO LONGER AUTO-CHANGES THE ATHLETE'S WORKING WEIGHT (consent-first).
+  //
+  // DELETED: the silent auto-progression / auto-deload writes that lived here. On every ingest, when a
+  // lift's e1RM had risen (or RIR run below target), this block WROTE a `plan_adjustments` row and
+  // re-materialized every future session — raising or dropping the prescribed weight with no prompt,
+  // no consent, and (unlike the suggest path) skipping the Arc fatigue/taper gate. The athlete opened
+  // the logger to a number they never agreed to.
+  //
+  // WHY DELETING IT COSTS NOTHING: the same computation already runs on the athlete-gated SUGGEST path
+  // (`strength_progression` / `strength_deload`, ~line 290), and the State strength row already shows
+  // the per-lift verdict + suggested weight with an adjust modal that writes the change on the
+  // athlete's tap. Every case the auto-write caught is surfaced as a SUGGESTION the athlete applies.
+  //
+  // WHY IT IS WRONG: no strength app changes your working weight without telling you — RP, Fitbod,
+  // Juggernaut all SUGGEST the load bump and let you take it. And it is the same Law-2 shape as the
+  // endurance auto-write below (D-285): an inference silently displacing the prescription. (Michael's
+  // ruling, 2026-07-23: "we shouldn't auto change weights, the user needs to know.")
+  //
+  // ⛔ DO NOT RE-ADD AN AUTO-WRITE HERE. A weight change goes through the suggestion + the athlete's
+  // tap (the accept path ~line 900, and the State adjust modal), never on ingest.
 
   // ── 3. Endurance baselines: THE APP NO LONGER OVERWRITES THE ATHLETE (D-285, SPEC-run-pace-glass-box) ──
   //

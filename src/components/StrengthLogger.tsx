@@ -508,6 +508,94 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // pick something the app never showed them).
   const [strengthEquipment, setStrengthEquipment] = useState<string[]>([]);
   const [swapFor, setSwapFor] = useState<string | null>(null); // exercise.id whose swap sheet is open
+  const [swapRestOfPlan, setSwapRestOfPlan] = useState(false); // when on, a swap persists to the plan (not just today)
+
+  // Adapt-a-plan #1 — persist a swap for the rest of the plan on the EXISTING override table
+  // (mirrors StrengthAdjustmentModal's plan_adjustments write). The slot keeps its identity via
+  // exercise_name; substitute_exercise_name names the new exercise; materialize re-resolves its weight
+  // from that exercise's own reference. One active swap per slot, so we revert any prior first.
+  const persistPlanSwap = async (slotName: string, substituteName: string) => {
+    try {
+      const userId = getStoredUserId();
+      const planId = (scheduledWorkout as any)?.training_plan_id || null;
+      if (!userId || !slotName || !substituteName) return;
+      const from = targetDate || (scheduledWorkout as any)?.date || new Date().toLocaleDateString('en-CA');
+      await supabase
+        .from('plan_adjustments')
+        .update({ status: 'reverted', updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('exercise_name', slotName)
+        .eq('status', 'active')
+        .not('substitute_exercise_name', 'is', null);
+      await supabase.from('plan_adjustments').insert({
+        user_id: userId,
+        plan_id: planId,
+        exercise_name: slotName,
+        substitute_exercise_name: substituteName,
+        applies_from: from,
+        status: 'active',
+        reason: 'exercise swap',
+      });
+      if (planId) {
+        await (supabase.functions.invoke as any)('materialize-plan', { body: { training_plan_id: planId } });
+      }
+    } catch (e) {
+      console.error('[swap] persistPlanSwap failed', e);
+    }
+  };
+
+  // Close the gap for a TYPED (out-of-slot) swap: if the swap sheet is open with "Rest of plan"
+  // chosen and the athlete renamed the slot to something other than its prescribed name, persist it
+  // too — so the Just-today / Rest-of-plan choice is universal, not just for the offered chips. Takes
+  // the new name explicitly (React state may not have flushed by the onBlur/suggestion-pick).
+  const maybePersistTypedSwap = (exerciseId: string, newName: string) => {
+    if (swapFor !== exerciseId || !swapRestOfPlan) return;
+    const ex = exercises.find((e) => e.id === exerciseId);
+    const slot = ex?.planned_name;
+    if (slot && newName && newName.toLowerCase().trim() !== slot.toLowerCase().trim()) {
+      void persistPlanSwap(slot, newName);
+      setSwapRestOfPlan(false);
+      setSwapFor(null);
+    }
+  };
+
+  // Adapt-a-plan #2 — add a hand-added lift to the plan. Records the lift + its dose on plan_adjustments
+  // (add_meta); materialize does the smart placement — it lands only on matching-focus future days at a
+  // frequency the plan's own shape dictates, and seeds the weight from the athlete's baseline.
+  const [addToPlanFor, setAddToPlanFor] = useState<string | null>(null);
+  const persistPlanAdd = async (ex: LoggedExercise) => {
+    try {
+      const userId = getStoredUserId();
+      const planId = (scheduledWorkout as any)?.training_plan_id || null;
+      const name = String(ex?.name ?? '').trim();
+      if (!userId || !name) return;
+      const from = targetDate || (scheduledWorkout as any)?.date || new Date().toLocaleDateString('en-CA');
+      const sets = Array.isArray(ex.sets) && ex.sets.length ? ex.sets.length : 3;
+      const firstReps = ex.sets?.[0]?.reps;
+      const reps = typeof firstReps === 'number' && firstReps > 0 ? firstReps : 10;
+      await supabase
+        .from('plan_adjustments')
+        .update({ status: 'reverted', updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('exercise_name', name)
+        .eq('status', 'active')
+        .not('add_meta', 'is', null);
+      await supabase.from('plan_adjustments').insert({
+        user_id: userId,
+        plan_id: planId,
+        exercise_name: name,
+        add_meta: { sets, reps },
+        applies_from: from,
+        status: 'active',
+        reason: 'exercise add',
+      });
+      if (planId) {
+        await (supabase.functions.invoke as any)('materialize-plan', { body: { training_plan_id: planId } });
+      }
+    } catch (e) {
+      console.error('[add] persistPlanAdd failed', e);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -4058,6 +4146,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         }
                       }}
                       onBlur={() => {
+                        maybePersistTypedSwap(exercise.id, exercise.name);
                         setTimeout(() => setActiveDropdown(null), 150);
                       }}
                       style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
@@ -4071,6 +4160,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
                             updateExerciseName(exercise.id, suggestion, true);
+                            maybePersistTypedSwap(exercise.id, suggestion);
                             setActiveDropdown(null);
                           }}
                           className="w-full text-left px-3 py-2 hover:bg-white/[0.08] text-sm min-h-[36px] flex items-center text-white/90"
@@ -4093,6 +4183,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     title="Swap this exercise"
                   >
                     <Repeat className="h-4 w-4" />
+                  </button>
+                )}
+                {/* Adapt-a-plan #2 — a hand-added lift (never prescribed) can be added to the plan for
+                    real: the confirm below writes it and lets materialize place it on matching days. */}
+                {!exercise.planned_name && String(exercise.name ?? '').trim().length > 1 && (
+                  <button
+                    onClick={() => setAddToPlanFor(addToPlanFor === exercise.id ? null : exercise.id)}
+                    className={`p-2 transition-colors ${addToPlanFor === exercise.id ? 'text-teal-300' : 'text-white/60 hover:text-white/90'}`}
+                    aria-label="Add this exercise to the plan"
+                    title="Add to plan"
+                  >
+                    <Plus className="h-4 w-4" />
                   </button>
                 )}
                 <button
@@ -4141,13 +4243,30 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         Swap {exercise.planned_name}
                       </span>
                       <button
-                        onClick={() => setSwapFor(null)}
+                        onClick={() => { setSwapRestOfPlan(false); setSwapFor(null); }}
                         className="text-white/40 hover:text-white/70"
                         aria-label="Close swap"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
+
+                    {/* Scope: today-only (default) vs the rest of the plan. Rest-of-plan writes a
+                        reversible override so every future instance of this slot changes too. */}
+                    {exercise.planned_name && (
+                      <div className="flex items-center gap-2 mb-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setSwapRestOfPlan(false)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] border transition-colors ${!swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/55 hover:text-white/80'}`}
+                        >Just today</button>
+                        <button
+                          type="button"
+                          onClick={() => setSwapRestOfPlan(true)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] border transition-colors ${swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/55 hover:text-white/80'}`}
+                        >Rest of plan</button>
+                      </div>
+                    )}
 
                     {alts.length > 0 ? (
                       <>
@@ -4180,6 +4299,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                       }
                                     : ex,
                                 ));
+                                // Rest-of-plan: persist the swap so future weeks change too. Today's
+                                // logged session already reflects it via the rename above.
+                                if (swapRestOfPlan && exercise.planned_name) {
+                                  void persistPlanSwap(exercise.planned_name, a.name);
+                                }
+                                setSwapRestOfPlan(false);
                                 setSwapFor(null);
                               }}
                               className="px-2.5 py-1.5 rounded-lg text-[12px] border border-white/15 bg-white/[0.05] text-white/80 hover:bg-white/[0.10] hover:text-white transition-colors"
@@ -4203,6 +4328,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   </div>
                 );
               })()}
+
+              {/* Adapt-a-plan #2 — add-to-plan confirm for a hand-added lift. */}
+              {addToPlanFor === exercise.id && (
+                <div className="mt-2 mb-3 rounded-xl border-2 border-white/15 bg-white/[0.06] backdrop-blur-md p-3">
+                  <p className="text-[12px] text-white/70 leading-snug mb-2.5">
+                    Add {exercise.name} to the rest of your plan? It’ll show up on your matching training days with a starting weight from your baseline.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { void persistPlanAdd(exercise); setAddToPlanFor(null); }}
+                      className="px-3 py-1.5 rounded-lg text-[12px] border border-teal-300/60 bg-teal-400/15 text-teal-100 hover:bg-teal-400/25 transition-colors"
+                    >Add to plan</button>
+                    <button
+                      onClick={() => setAddToPlanFor(null)}
+                      className="px-3 py-1.5 rounded-lg text-[12px] border border-white/15 bg-white/[0.04] text-white/60 hover:text-white/85 transition-colors"
+                    >Cancel</button>
+                  </div>
+                </div>
+              )}
               </div>
             </div>
 
