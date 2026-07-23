@@ -13,6 +13,11 @@ const CANONICAL: Record<string, string> = {
   // --- Powerlifting / Compound ---
   'squat':                   'squat',
   'back squat':              'squat',
+  'barbell back squat':      'squat',
+  'barbell squat':           'squat',
+  'bb squat':                'squat',
+  'high bar squat':          'squat',
+  'low bar squat':           'squat',
   'front squat':             'front_squat',
   'goblet squat':            'goblet_squat',
   'bodyweight squat':        'bodyweight_squat',
@@ -21,6 +26,8 @@ const CANONICAL: Record<string, string> = {
   'split squat':             'split_squat',
 
   'deadlift':                'deadlift',
+  'conventional deadlift':   'deadlift',
+  'barbell deadlift':        'deadlift',
   'trap bar deadlift':       'trap_bar_deadlift',
   'romanian deadlift':       'romanian_deadlift',
   'rdl':                     'romanian_deadlift',
@@ -34,6 +41,9 @@ const CANONICAL: Record<string, string> = {
   'close grip bench press':  'close_grip_bench_press',
 
   'overhead press':          'overhead_press',
+  'barbell overhead press':  'overhead_press',
+  'standing overhead press': 'overhead_press',
+  'standing barbell overhead press': 'overhead_press',
   'ohp':                     'overhead_press',
   'military press':          'overhead_press',
   'shoulder press':          'overhead_press',
@@ -119,7 +129,14 @@ const CANONICAL: Record<string, string> = {
 export function canonicalize(raw: string): string {
   if (!raw) return 'unknown';
   const key = raw.toLowerCase().trim();
-  return CANONICAL[key] ?? key.replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  if (CANONICAL[key]) return CANONICAL[key];
+  // Plural fallback (Q-197): a trailing-s name whose singular is a known lift folds into
+  // that lift — "bulgarian split squats" -> bulgarian_split_squat, "goblet squats" ->
+  // goblet_squat. Only fires when the de-pluralized form is explicitly mapped, so it can
+  // never over-merge a genuinely distinct exercise into another. Exact matches (e.g.
+  // "pushups", "hip thrusts", already in the map) resolve above this and are untouched.
+  if (key.endsWith('s') && CANONICAL[key.slice(0, -1)]) return CANONICAL[key.slice(0, -1)];
+  return key.replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
 
 /**

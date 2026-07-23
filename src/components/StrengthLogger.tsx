@@ -160,7 +160,12 @@ const normalizeExerciseName = (raw: string): string =>
     .toLowerCase()
     .replace(/\s*\((?:left|right)\)\s*/gi, '')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    // Q-197: drop a trailing plural 's' so "Hip Thrusts" and "Hip Thrust" match
+    // for the D-097 prefill + D-122 "last:" anchor. Applied to both the stored key
+    // and the lookup, so matching stays self-consistent — it only makes the match
+    // plural-insensitive, mirroring the server canonicalizer's plural fallback.
+    .replace(/s$/, '');
 
 // Rest-end LOCAL NOTIFICATIONS (away-alert): iOS suspends the JS countdown when the app is backgrounded,
 // so a scheduled local notification is the only way to buzz the athlete when rest ends while they're out
