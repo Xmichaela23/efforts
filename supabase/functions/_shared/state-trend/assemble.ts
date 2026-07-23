@@ -19,6 +19,7 @@ import { computeAdherenceState } from './adherence.ts';
 import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSummary } from './discipline.ts';
 import { readPosture, postureSentence, disciplineWord, type PerDisciplinePosture } from './posture.ts';
 import { synthesizeHeadline, type Headline } from './headline.ts';
+import { canonicalDisplayName } from '../canonicalize.ts';
 import { ADHERENCE_WINDOW_DAYS } from './thresholds.ts';
 
 const DAY = 86_400_000;
@@ -145,7 +146,9 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[]): LiftSeries[]
       const sorted = [...rs].sort((a, b) => a.date.localeCompare(b.date));
       return {
         canonical,
-        displayName: rs[0].exercise_name ?? canonical,
+        // Clean canonical label (not whichever raw name was logged first) — one lift, one name,
+        // even when it was logged under several variations. See canonicalDisplayName.
+        displayName: canonicalDisplayName(canonical),
         points: sorted.map((r) => ({ date: r.date, value: r.estimated_1rm! })),
       };
     })
