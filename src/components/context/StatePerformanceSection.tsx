@@ -162,6 +162,11 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
           <span className="basis-full text-white/50 text-[11px] uppercase tracking-wider">estimated 1-rep max · last 6 weeks</span>
           {lifts.map((l) => {
             const d = dir(l);
+            // "new" means no 6wk verdict yet. When a 12-week chart IS present (big-4 with ≥2 points), the
+            // chart carries the read — so drop the "new" chip rather than assert it over a visible trend line
+            // (UX pass 2026-07-23). Also suppressed next to a PR (the old PR·new bug). Non-charted lifts keep it.
+            const hasChart = BIG_4_CHART_LIFTS.has(l.canonical) && (l.series?.length ?? 0) >= 2;
+            const suppressNew = d.text === 'new' && (isPR(l) || hasChart);
             return (
               <React.Fragment key={l.canonical}>
                 {/* 3-column grid: name (fills) | e1RM value (right-aligned number column) | trend
@@ -175,8 +180,8 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
                   </span>
                   <span className="text-white/85 text-[14px] text-right">~{Math.round(l.latestE1rm as number)} lb</span>
                   {/* A real PR carries "it went up" — suppress the bare "new" next to it (the PR·new bug). */}
-                  <span className={`text-[13px] text-right inline-flex items-baseline justify-end gap-0.5 ${isPR(l) && d.text === 'new' ? 'text-transparent' : d.cls}`}>
-                    {d.arr && <span>{d.arr}</span>}<span>{isPR(l) && d.text === 'new' ? '' : d.text}</span>
+                  <span className={`text-[13px] text-right inline-flex items-baseline justify-end gap-0.5 ${suppressNew ? 'text-transparent' : d.cls}`}>
+                    {d.arr && <span>{d.arr}</span>}<span>{suppressNew ? '' : d.text}</span>
                   </span>
                 </span>
                 <span className="basis-full text-white/50 text-[11px] -mt-0.5">
@@ -189,7 +194,6 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
                     series={l.series}
                     color={getDisciplineColor('strength')}
                     dotNoun="session"
-                    countNoun="sessions"
                     fmtVal={(v) => String(Math.round(v))}
                     unit=" lb"
                   />
@@ -351,9 +355,9 @@ const RUN_TREND_MIN_RUNS = 8;
 // no line (can't imply a trend through one dot). Tap to expand. TP charts LOAD; this charts OUTPUT.
 // Generalized 2026-07-23 so the same visual serves run efficiency AND per-lift strength e1RM (Michael's
 // big-4 chart). Props default to the run row's exact look/copy; strength passes color + nouns + a lb formatter.
-function TrendSparkline({ series, color, dotNoun = 'steady run', countNoun = 'runs', fmtVal = (v: number) => v.toFixed(2), unit = '' }: {
+function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '' }: {
   series?: Array<{ date: string; value: number; recent: boolean }>;
-  color?: string; dotNoun?: string; countNoun?: string; fmtVal?: (v: number) => string; unit?: string;
+  color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const pts = Array.isArray(series) ? series : [];
@@ -402,7 +406,9 @@ function TrendSparkline({ series, color, dotNoun = 'steady run', countNoun = 'ru
       )}
       <span className="text-[10px] text-white/45 flex items-center justify-between">
         <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? `each dot = one ${dotNoun} · recent 6 in color` : 'last 12 weeks · recent 6 in color · tap to expand')}</span>
-        <span className="tabular-nums text-white/30">{fmtVal(minV)}–{fmtVal(maxV)}{unit} · {pts.length} {countNoun}</span>
+        {/* Range only — the session COUNT lives on the lift's name line (the verdict window); repeating a
+            different chart-window count here read as a contradiction (UX pass 2026-07-23). */}
+        <span className="tabular-nums text-white/30">{fmtVal(minV)}–{fmtVal(maxV)}{unit}</span>
       </span>
     </span>
   );
