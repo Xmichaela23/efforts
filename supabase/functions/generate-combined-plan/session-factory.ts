@@ -18,6 +18,7 @@ import { triathlonProtocol } from '../shared/strength-system/protocols/triathlon
 import { triathlonPerformanceProtocol } from '../shared/strength-system/protocols/triathlon_performance.ts';
 import { getProtocol, resolveProtocolIdForCombinedTriPlan, isValidProtocol } from '../shared/strength-system/protocols/selector.ts';
 import type { ProtocolContext, IntentSession } from '../shared/strength-system/protocols/types.ts';
+import { resolveProfile, getTargetRir, type PlanPhaseId } from '../_shared/strength-profiles.ts';
 import {
   buildSwimGearLine,
   pickSwimDrillInset,
@@ -2243,12 +2244,35 @@ function toStrengthPhase(phase: Phase): { name: string; start_week: number; end_
 }
 
 // Converts a protocol IntentSession to a PlannedSession for the combined plan
+// Maps the combined-plan Phase vocabulary to the strength RIR-phase vocabulary (PlanPhaseId). The one
+// that matters: `race_specific` is the SHARPEN/peak block (toStrengthPhase calls it 'Speed'), so its
+// target RIR tightens toward failure. `rebuild` is scaled-load build; `retest` is taper-shaped.
+function phaseToPlanPhaseId(phase: Phase): PlanPhaseId {
+  switch (phase) {
+    case 'base': return 'base';
+    case 'build': return 'build';
+    case 'race_specific': return 'peak';
+    case 'taper': return 'taper';
+    case 'recovery': return 'recovery';
+    case 'rebuild': return 'build';
+    case 'retest': return 'taper';
+    default: return 'build';
+  }
+}
+
 function intentToPlanned(
   intent: IntentSession,
   day: string,
-  _phase: Phase,
+  phase: Phase,
   goalId: string,
+  protocolId?: string | null,
 ): PlannedSession {
+  // Step 0 (adapt-plan foundation): the strength prescription must carry the RIR target the athlete is
+  // graded against, so the logger preloads the SAME number the analyzer/adapt-plan judge. Resolve it
+  // once here — lift-aware (lower vs upper) + phase-aware — and stamp it below when the protocol
+  // session did not already pin a per-exercise target. One source, both ends.
+  const rirProfile = resolveProfile(protocolId);
+  const rirPhase = phaseToPlanPhaseId(phase);
   const intensityMap: Record<string, Intensity> = {
     hypertrophy: 'MODERATE',
     strength: 'MODERATE',
@@ -2263,14 +2287,18 @@ function intentToPlanned(
     rawEx.length > 0
       ? rawEx.map((ex) => {
         const e = ex as unknown as Record<string, unknown>;
+        const exName = String(e?.name ?? 'Exercise');
+        const pinnedRir = typeof e?.target_rir === 'number' ? (e.target_rir as number) : null;
         return {
-          name: String(e?.name ?? 'Exercise'),
+          name: exName,
           sets: typeof e?.sets === 'number' ? e.sets as number : undefined,
           reps: e?.reps as number | string | undefined,
           weight: e?.weight as string | number | undefined,
           percent_1rm: typeof e?.percent_1rm === 'number' ? (e.percent_1rm as number) : undefined,
           load: e?.load as { percent_1rm?: number } | undefined,
-          target_rir: typeof e?.target_rir === 'number' ? (e.target_rir as number) : undefined,
+          // Stamp the graded target: honour an explicit per-exercise RIR, else the protocol's
+          // lift-aware base modulated by phase. Now the logger preloads what the analyzer grades.
+          target_rir: getTargetRir(rirProfile, exName, pinnedRir, rirPhase),
           notes: typeof e?.notes === 'string' ? (e.notes as string) : undefined,
         };
       })
@@ -2543,7 +2571,7 @@ export function triathlonStrength(
     chosen.description = `${chosen.description} ${equipmentLine}`;
   }
 
-  return intentToPlanned(chosen, day, phase, goalId);
+  return intentToPlanned(chosen, day, phase, goalId, options?.strengthProtocolId);
 }
 
 export function runStrength(day: string, phase: Phase, goalId: string, options?: {
@@ -2596,5 +2624,5 @@ export function runStrength(day: string, phase: Phase, goalId: string, options?:
       tags: ['strength', 'run'], serves_goal: goalId,
     };
   }
-  return intentToPlanned(chosen, day, phase, goalId);
+  return intentToPlanned(chosen, day, phase, goalId, options?.strengthProtocolId);
 }

@@ -18,6 +18,8 @@ import {
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
 import { calculatePlannedStrengthWorkload } from '../_shared/workload.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from '../../../src/lib/exercise-config.ts';
+import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
+import { resolvePlanPhase } from '../_shared/plan-phase.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
 import {
   swimDrillDisplayName,
@@ -1613,6 +1615,12 @@ function expandTokensForRow(
   adjustments: PlanAdjustment[] = [],
   strengthIntent: StrengthIntentMat = null,
   planWeekNumber: number | null = null,
+  // Step 0 (adapt-plan foundation): the protocol + this row's phase, so a strength row that carries no
+  // explicit target RIR still materializes with the correct lift- and phase-aware target — the SAME
+  // number getTargetRir hands the analyzer. Lets an EXISTING plan pick up the target on re-materialize
+  // (no full regen). Null/absent → getTargetRir falls back to the durability base, still lift-aware.
+  strengthProtocolId: string | null = null,
+  rowPhase: string | null = null,
 ): { steps: any[]; total_s: number; swim_equipment_suggested?: string[]; swim_equipment_optional_suggested?: string[] } {
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   // Strength-PRIMARY rows (Get Strong arc) periodize their own peak + 1RM retest: lift the 0.85 clamp
@@ -1780,7 +1788,12 @@ function expandTokensForRow(
             : requiredBaseline;
           
           // Extract target RIR from the exercise (if present from overlay)
-          const target_rir = typeof ex?.target_rir === 'number' ? ex.target_rir : undefined;
+          const target_rir = getTargetRir(
+            resolveProfile(strengthProtocolId),
+            String(name ?? ''),
+            typeof ex?.target_rir === 'number' ? ex.target_rir : null,
+            rowPhase,
+          );
           
           const progressed = isStrengthPrimary ? prescribed : adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);
           // Apply plan adjustments if any
@@ -1956,7 +1969,12 @@ function expandTokensForRow(
             : requiredBaseline;
           
           // Extract target RIR from the exercise (if present from overlay)
-          const target_rir = typeof ex?.target_rir === 'number' ? ex.target_rir : undefined;
+          const target_rir = getTargetRir(
+            resolveProfile(strengthProtocolId),
+            String(name ?? ''),
+            typeof ex?.target_rir === 'number' ? ex.target_rir : null,
+            rowPhase,
+          );
           
           const progressed = isStrengthPrimary ? prescribed : adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);
           const adjustResult = applyAdjustment(name, progressed, adjustments, workoutDate);
@@ -2834,6 +2852,21 @@ Deno.serve(async (req) => {
 
     const strengthIntent = await loadStrengthIntentForPlan(rows[0]?.training_plan_id, supabase);
     const swimIntentMat = await loadSwimIntentForPlan(rows[0]?.training_plan_id, supabase);
+
+    // Step 0 (adapt-plan foundation): the plan's protocol + per-week phase, so strength rows without an
+    // explicit target RIR materialize with the correct lift/phase-aware target. Loaded once; per-row
+    // phase resolved below via the canonical resolver. Failure is graceful (null → durability base).
+    let rirPlanConfig: any = null;
+    let rirProtocolId: string | null = null;
+    try {
+      const { data: planRowForRir } = await supabase
+        .from('plans')
+        .select('config')
+        .eq('id', rows[0]?.training_plan_id)
+        .maybeSingle();
+      rirPlanConfig = planRowForRir?.config ?? null;
+      rirProtocolId = (rirPlanConfig?.strength_protocol as string | undefined) ?? null;
+    } catch (_e) { /* graceful: null → getTargetRir uses the durability base, still lift-aware */ }
     if (swimIntentMat) {
       console.log('[materialize-plan] swim_intent:', swimIntentMat);
     }
@@ -2872,7 +2905,8 @@ Deno.serve(async (req) => {
           typeof row?.week_number === 'number' && Number.isFinite(row.week_number)
             ? row.week_number
             : null;
-        const { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum);
+        const rowPhaseForRir = resolvePlanPhase(rirPlanConfig, weekNum);
+        const { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum, rirProtocolId, rowPhaseForRir);
         console.log(`  ✅ Generated ${steps.length} steps, total_s: ${total_s} (${Math.floor(total_s/60)}:${String(total_s%60).padStart(2,'0')})`);
         
         // Log error if materialization failed but tokens exist

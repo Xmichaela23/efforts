@@ -105,15 +105,27 @@ export type PhaseRule = {
    * Applied as: adjustedThreshold = profile.deload.maxDeviation * deloadSensitivity
    */
   deloadSensitivity: number;
+  /**
+   * Offset applied to the protocol's base target RIR for this phase (added to
+   * profile.defaultTargetRir). NEGATIVE = tighter (closer to failure), POSITIVE = looser (more in
+   * the tank). Field-standard shape (RP/RTS): reps-in-reserve descend across accumulation toward the
+   * peak, then reset up on deload/recovery; taper stays fresh (do not grind a taper). Only applied
+   * when a phase is supplied to getTargetRir AND the exercise carries no explicit per-set target.
+   */
+  targetRirOffset: number;
 };
 
 export const PHASE_RULES: Record<PlanPhaseId, PhaseRule> = {
-  base:     { allowProgress: true,  deloadSensitivity: 1.0  },
-  build:    { allowProgress: true,  deloadSensitivity: 1.0  },
-  peak:     { allowProgress: false, deloadSensitivity: 0.5  },
-  taper:    { allowProgress: false, deloadSensitivity: 0.5  },
-  recovery: { allowProgress: false, deloadSensitivity: 0.25 },
+  base:     { allowProgress: true,  deloadSensitivity: 1.0,  targetRirOffset:  0.0 },
+  build:    { allowProgress: true,  deloadSensitivity: 1.0,  targetRirOffset: -0.5 },
+  peak:     { allowProgress: false, deloadSensitivity: 0.5,  targetRirOffset: -1.0 },
+  taper:    { allowProgress: false, deloadSensitivity: 0.5,  targetRirOffset:  0.5 },
+  recovery: { allowProgress: false, deloadSensitivity: 0.25, targetRirOffset:  1.0 },
 };
+
+/** Clamp a target RIR to a sane band — never prescribe true failure by default, never absurdly easy. */
+const MIN_TARGET_RIR = 0.5;
+const MAX_TARGET_RIR = 4;
 
 const DEFAULT_PHASE_RULE: PhaseRule = PHASE_RULES.build;
 
@@ -172,18 +184,34 @@ export function resolvePhaseRule(phaseTag: string | null | undefined): PhaseRule
 }
 
 /**
- * Returns the protocol's default target RIR for a given lift.
- * If a per-exercise target exists (from planned workout), prefer that.
+ * Returns the target RIR for a given lift.
+ *
+ * Precedence:
+ *   1. An explicit per-exercise target (from the planned workout) always wins — the athlete/coach
+ *      pinned it, so honour it verbatim.
+ *   2. Otherwise the protocol's lift-aware base (lower vs upper body), optionally modulated by the
+ *      plan PHASE (accumulation → peak tightens RIR; deload/recovery/taper loosens it), clamped to a
+ *      sane band.
+ *
+ * `phaseTag` is optional and backward-compatible: omit it (the pre-existing 3-arg callers) and the
+ * result is the un-modulated base — byte-identical to the prior behaviour. Supply it ONLY at the
+ * build/stamp seam, so the phase-aware number is written onto the planned exercise once and every
+ * downstream reader (logger preload, analyzer grade, adapt-plan) reads that one stamped value.
  */
 export function getTargetRir(
   profile: StrengthProtocolProfile,
   canonical: string,
   exerciseLevelTarget?: number | null,
+  phaseTag?: string | null,
 ): number {
   if (exerciseLevelTarget != null && Number.isFinite(exerciseLevelTarget)) {
     return exerciseLevelTarget;
   }
-  return isLowerBodyLift(canonical)
+  const base = isLowerBodyLift(canonical)
     ? profile.defaultTargetRir.lower
     : profile.defaultTargetRir.upper;
+  if (phaseTag == null) return base;
+  const offset = resolvePhaseRule(phaseTag).targetRirOffset;
+  const modulated = base + offset;
+  return Math.min(MAX_TARGET_RIR, Math.max(MIN_TARGET_RIR, modulated));
 }

@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, CheckCircle, Pencil, Repeat } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-alternatives';
+import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
 import CoreTimer from '@/components/CoreTimer';
@@ -3289,7 +3290,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // "hit the number" step (supersedes D-134's blocking confirm). For WORKING sets, surface a small
     // NON-BLOCKING adjust strip so the athlete can tap a different number ONLY if it actually felt
     // different (warmups skip it). Keeps the RIR signal honest without the friction.
-    const suggestedRir = typeof exercise.target_rir === 'number' ? exercise.target_rir : 3;
+    const suggestedRir = rirLoggedSeed(exercise.target_rir) ?? 3;
     // D-203: auto-saved with the SUGGESTED RIR, not an observed signal. Mark it so
     // e1RM + RIR-adherence exclude it; the adjust strip below clears the flag if the
     // athlete taps a real number.
@@ -4596,7 +4597,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               >
                                 {hasValue
                                   ? <span className={set.from_previous && !set.completed ? 'text-white/35' : 'text-white'}>{set.rir >= 5 ? '5+' : set.rir}</span>
-                                  : <span className={targetRir != null ? "text-amber-300/80 font-medium" : "text-white/30"}>{targetRir != null ? (targetRir >= 5 ? '5+' : targetRir) : '—'}</span>}
+                                  : <span className={targetRir != null ? "text-amber-300/80 font-medium" : "text-white/30"}>{formatRirTarget(targetRir)}</span>}
                                 {/* Q-042: subtle tap-to-type affordance */}
                                 <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
                               </button>
@@ -4656,7 +4657,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const nudgeClsRir = 'flex-1 min-w-0 h-10 rounded-md border border-amber-400/30 bg-amber-500/[0.06] text-amber-300/75 text-xs hover:bg-amber-500/15 hover:text-amber-200 active:bg-amber-500/25 tabular-nums leading-none transition-colors';
                         const adjReps = (d: number) => updateSet(exercise.id, setIndex, { reps: Math.max(1, (typeof set.reps === 'number' ? set.reps : 0) + d) });
                         const adjWeight = (d: number) => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + d) * 2) / 2) });
-                        const adjRir = (d: number) => updateSet(exercise.id, setIndex, { rir: Math.max(0, Math.min(5, (set.rir ?? exercise.target_rir ?? 0) + d)) });
+                        const adjRir = (d: number) => updateSet(exercise.id, setIndex, { rir: Math.max(0, Math.min(5, (set.rir ?? rirLoggedSeed(exercise.target_rir) ?? 0) + d)) });
                         // Groups are weighted by button count (reps 2 / wt 4 / rir 2) so every button
                         // ends up ~the same width as the row grows. Hidden groups are omitted and the
                         // weights redistribute (reps stays left, rir stays right).
@@ -4823,7 +4824,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           <div className="flex items-center justify-between">
                             {[0, 1, 2, 3, 4, 5].map((r) => {
                               const isCap = r === 5;  // 5 = "5+"
-                              const isSuggested = targetRir != null && (targetRir === r || (targetRir >= 5 && isCap));
+                              const isSuggested = targetRir != null && (rirSuggestedIntegers(targetRir).includes(r) || (targetRir >= 5 && isCap));
                               return (
                                 <button
                                   key={r}
