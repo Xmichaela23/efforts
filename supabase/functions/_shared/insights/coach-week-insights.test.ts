@@ -73,7 +73,9 @@ Deno.test('PLAN: under-plan reads as consequence, never as a tally', () => {
     ],
   });
   assert(out, 'expected a paragraph');
-  assert(out!.includes('where you are now, not where you were scheduled to be'), out!);
+  assert(out!.includes('came in lighter than the plan asked'), out!);
+  // The consoling closer was dropped (Michael 2026-07-23) — fact-first, no reassurance register.
+  assert(!/where you are now|scheduled to be/i.test(out!), out!);
   // The tally form the prompt bans: "N of M".
   assert(!/\d+\s+of\s+\d+/i.test(out!), out!);
 });

@@ -165,7 +165,10 @@ export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | nu
     const over = planned.filter((d) => Number(d.actualLoad) / Number(d.plannedLoad) > BAND_HI);
     if (under.length === 1 && !over.length) {
       referenceDiscipline = under[0].discipline;
-      referenceLine = `${Cap(label(under[0].discipline))} came in lighter than the plan asked — the plan reflects where you are now, not where you were scheduled to be.`;
+      // Fact, full stop. The old closer ("the plan reflects where you are now, not where you were
+      // scheduled to be") was consoling reassurance — the register this composer explicitly rejects
+      // elsewhere. Michael 2026-07-23: "the last sentence is weird." The bar + fading line carry the rest.
+      referenceLine = `${Cap(label(under[0].discipline))} came in lighter than the plan asked.`;
     } else if (over.length === 1 && !under.length) {
       referenceDiscipline = over[0].discipline;
       referenceLine = `${Cap(label(over[0].discipline))} ran heavier than planned — that load is carried forward, not forgotten.`;
