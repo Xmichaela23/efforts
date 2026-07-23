@@ -24,7 +24,7 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 - [x] **Endurance-rider "power trend ⓘ"** (D-313): names what unlocks the bike power chart.
 - [x] **Full-width row layout + bigger discipline headers** (D-314). Device-seen.
 - [x] **Week-blurb reassurance clause removed** (`coach-week-insights.ts:168`). Verified live.
-- [ ] **⚠️ Bike POWER chart fixture-only** — Michael has 0 power-bin rides; never rendered live. Burner run or real 20-min efforts to see it.
+- [x] **Bike POWER chart — burner-verified end-to-end** (2026-07-23): live `compute-snapshot` + throwaway user w/ threshold rides → correct rising series (225→256W, improving, recent-flagged). Michael's own row stays chart-less until he logs power rides (correct).
 - [ ] **Q-200 — bike efficiency chart for endurance riders** (design call, inverted axis).
 - [ ] **Deferred UX:** cross-lift e1RM believability (bench > squat reads wrong); strength chart density (collapse-by-default?).
 - [ ] **WATCH:** confirm cross-training line renders gold (not white) on device after a coach refresh; confirm bike "holding" is gray everywhere (`bikeEfficiencyDisplay` server tone still `warning`).
