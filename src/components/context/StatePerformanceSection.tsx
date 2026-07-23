@@ -132,6 +132,9 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
 // is RIR-adjusted + near-failure-weighted (compute-facts brzycki1RM + D-118), which is the science's own caveat.
 // Receipts kept PER LIFT (sessions · as of). The grinding/RIR fatigue line (D-302) stays below — a distinct
 // fatigue axis, not the number. planWeek/isDevelop/the develop word-map are gone with the rolled-up verdict.
+// The big-4 lifts that get a 12-week e1RM sparkline (Michael 2026-07-23). Matches BIG_4_LIFTS in
+// assemble.ts — only these canonicals carry a `series` from the server.
+const BIG_4_CHART_LIFTS = new Set(['squat', 'bench_press', 'deadlift', 'overhead_press']);
 function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fatigue?: boolean }) {
   // Main lifts with a real e1RM number; primaries lead (squat/bench/deadlift/press — the field's "main lifts").
   const lifts = fitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null);
@@ -179,6 +182,18 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
                 <span className="basis-full text-white/50 text-[11px] -mt-0.5">
                   {l.sampleCount} session{l.sampleCount === 1 ? '' : 's'}{asOf(l.newestAgeDays) ? ` · ${asOf(l.newestAgeDays)}` : ''}{l.provisional ? ' · provisional' : ''}
                 </span>
+                {/* THE LONG VIEW per lift — 12-week e1RM sparkline (big-4 only, Michael 2026-07-23). Same
+                    component as the run row; server sends the recent-6wk slice in the strength color. */}
+                {BIG_4_CHART_LIFTS.has(l.canonical) && (
+                  <TrendSparkline
+                    series={l.series}
+                    color={getDisciplineColor('strength')}
+                    dotNoun="session"
+                    countNoun="sessions"
+                    fmtVal={(v) => String(Math.round(v))}
+                    unit=" lb"
+                  />
+                )}
               </React.Fragment>
             );
           })}
@@ -334,15 +349,20 @@ const RUN_TREND_MIN_RUNS = 8;
 // so chart and word are one truth. FILLS AS YOU BUILD: a new user sees a few points on the 12-week canvas
 // with an honest coverage label ("building · N of 12 weeks"), never a fabricated smooth line. <2 points →
 // no line (can't imply a trend through one dot). Tap to expand. TP charts LOAD; this charts OUTPUT.
-function EfficiencySparkline({ series }: { series?: Array<{ date: string; value: number; recent: boolean }> }) {
+// Generalized 2026-07-23 so the same visual serves run efficiency AND per-lift strength e1RM (Michael's
+// big-4 chart). Props default to the run row's exact look/copy; strength passes color + nouns + a lb formatter.
+function TrendSparkline({ series, color, dotNoun = 'steady run', countNoun = 'runs', fmtVal = (v: number) => v.toFixed(2), unit = '' }: {
+  series?: Array<{ date: string; value: number; recent: boolean }>;
+  color?: string; dotNoun?: string; countNoun?: string; fmtVal?: (v: number) => string; unit?: string;
+}) {
   const [expanded, setExpanded] = React.useState(false);
   const pts = Array.isArray(series) ? series : [];
   if (pts.length < 2) {
     return pts.length === 1
-      ? <span className="basis-full text-[11px] text-white/45">building — 1 steady run so far; a few more draws the 12-week trend</span>
+      ? <span className="basis-full text-[11px] text-white/45">building — 1 {dotNoun} so far; a few more draws the 12-week trend</span>
       : null;
   }
-  const runColor = getDisciplineColor('run');
+  const runColor = color ?? getDisciplineColor('run');
   const W = 300, H = expanded ? 72 : 42, PAD_Y = expanded ? 10 : 6, PAD_X = 2;
   const vals = pts.map((p) => p.value);
   const minV = Math.min(...vals), maxV = Math.max(...vals);
@@ -381,8 +401,8 @@ function EfficiencySparkline({ series }: { series?: Array<{ date: string; value:
         </span>
       )}
       <span className="text-[10px] text-white/45 flex items-center justify-between">
-        <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? 'each dot = one steady run · recent 6 in color' : 'last 12 weeks · recent 6 in color · tap to expand')}</span>
-        <span className="tabular-nums text-white/30">{minV.toFixed(2)}–{maxV.toFixed(2)} · {pts.length} runs</span>
+        <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? `each dot = one ${dotNoun} · recent 6 in color` : 'last 12 weeks · recent 6 in color · tap to expand')}</span>
+        <span className="tabular-nums text-white/30">{fmtVal(minV)}–{fmtVal(maxV)}{unit} · {pts.length} {countNoun}</span>
       </span>
     </span>
   );
@@ -425,7 +445,7 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
       </span>
       {hasTrend && evidence && <span className="basis-full text-white/55 text-[12px]">{evidence}</span>}
       {/* THE LONG VIEW — 12-week efficiency sparkline (the arc behind the verdict). */}
-      {hasTrend && <EfficiencySparkline series={eff.series} />}
+      {hasTrend && <TrendSparkline series={eff.series} />}
       {/* THE "WHAT" under the index "why" (Michael 2026-07-22) — recent steady-run pace at the HR it took,
           in units the runner feels. RAW by default (matches the watch); a GAP toggle grade-adjusts it. */}
       {hasTrend && shownPace != null && (

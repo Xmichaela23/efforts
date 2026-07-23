@@ -87,6 +87,10 @@ export interface StrengthPerLift {
   sampleCount: number;
   newestAgeDays: number | null;
   provisional: boolean;
+  /** 12-week dated e1RM series for the per-lift sparkline (the "long view" behind the verdict).
+   *  SAME points the verdict reads, over a wider 84d window; `recent` flags the points inside the
+   *  verdict window (rendered in color). Only populated for the big-4 lifts. Mirrors run efficiency.series. */
+  series?: Array<{ date: string; value: number; recent: boolean }>;
 }
 
 /** Bridge the spine's per-lift e1RM `direction` (TrendVerdict) to the per-workout narrative's

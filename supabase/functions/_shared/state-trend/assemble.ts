@@ -340,6 +340,19 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // best e1RM in the tracked window — the commercial-app frame: progress is vs your OWN best, not a typed
   // baseline. A PR = the latest point IS the best (latestE1rm >= bestE1rm), so the client can flag it.
   const liftBest = new Map(liftSeries.map((s) => [s.canonical, s.points.length ? Math.max(...s.points.map((p) => p.value)) : null]));
+  // 12-week per-lift e1RM CHART series (the "long view" sparkline) — big-4 only, per Michael 2026-07-23.
+  // SAME 84d window + recent-flag convention as run efficiency (recent = inside the 42d verdict window, so the
+  // colored tail IS the slice the verdict judges). Values rounded to lb. Reuses _chartStart/_verdictStart above
+  // (strength windowDays === run's 42d). Fills as the athlete logs — <2 points renders no line, only a note.
+  const BIG_4_LIFTS = new Set(['squat', 'bench_press', 'deadlift', 'overhead_press']);
+  const strengthChartByCanonical = new Map(
+    liftSeries
+      .filter((s) => BIG_4_LIFTS.has(s.canonical))
+      .map((s) => [s.canonical, s.points
+        .filter((p) => p.date > _chartStart && p.date <= asOf)
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((p) => ({ date: p.date, value: Math.round(p.value), recent: p.date > _verdictStart }))]),
+  );
   const strengthPerLift: StrengthPerLift[] = strength.lifts.map((l) => ({
     canonical: l.canonical,
     displayName: l.displayName,
@@ -354,6 +367,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     sampleCount: l.trend.sampleCount,
     newestAgeDays: l.trend.newestAgeDays,
     provisional: isProvisionalTrend(l.trend),
+    series: strengthChartByCanonical.get(l.canonical),
   }));
   // State v3 DOT — strength = e1RM (what you CAN lift), not volume (what you DID). Volume keeps its
   // trend/verdict for OTHER consumers (coach), but the FITNESS DOT rides e1RM.
