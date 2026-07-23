@@ -862,6 +862,9 @@ Found while tracing chart data-depth for D-311. Michael's `exercise_log` logs sq
 
 ## Q-198 — State chart: open threads after the first sparkline (2026-07-22, intentional-deferral)
 
+> **MOSTLY CLOSED 2026-07-23 (D-313).** Thread #2 (strength e1RM chart) SHIPPED — big-4 sparklines, gated on Q-197 which is now fixed. A **bike power chart** was added on the same generalized `TrendSparkline` (not originally in this list). Thread #1 (tap-to-expand into the full detail-screen chart) and thread #3 (load/form PMC chart) remain deferred. New: the bike chart only renders when power leads → **Q-200** (efficiency chart for endurance-only riders). Everything below is the original.
+
+
 D-311 shipped the run-efficiency 12-week sparkline. Three Michael-approved follow-ons, deliberately not built this session:
 1. **Tap-to-expand** the sparkline into the full detail-screen chart pattern (the `PACE/BPM/ELEV/CAD/PWR`-style toggle chips + draggable line). The component already toggles a taller SVG; the full detail-chart reuse is the next step.
 2. **Strength e1RM chart** — reuses `EfficiencySparkline` in its building state — **gated on Q-197** (points must be correct before charting).
@@ -872,3 +875,7 @@ Also: the chart series is 84d because that's what `runJoined`'s ~90d window carr
 ## Q-199 — Hip thrust is a server anchor but not a client baseline-test lift (2026-07-23, inconsistency, deferred)
 
 Found while fixing Q-197's autofill half. `hip_thrust` is in `STRENGTH_ANCHORS` (compute-facts) — it gets an e1RM, a trend, a PR flag, and a State verdict. But the client baseline system only knows 5 lifts: `getBaselineKeyForExercise` / `baselineSeedFor` (`StrengthLogger.tsx:869/882`) cover squat, deadlift, bench, OHP, pull-ups. So hip thrust has no stored-1RM baseline and can't be seeded as a %-based baseline test, even though the app tracks and grades its e1RM. Same likely true for `trap_bar_deadlift` and `barbell_row` (also anchors, also absent from the client baseline list). Not a bug Michael reported — the day-to-day autofill (D-097, fixed in Q-197) is the path he uses — but the server/client lift lists disagree on what a "tracked lift" is. Decide whether the client baseline list should match `STRENGTH_ANCHORS`.
+
+## Q-200 — Bike chart for endurance-only riders: chart efficiency when power can't lead? (2026-07-23, design call, not built)
+
+D-313 shipped the bike POWER chart, but it renders only when power LEADS (a real terrain-binned w20 verdict). An endurance-only rider (Michael: 0 power-bin rides in 84d) never gets a bike chart — the row leads on efficiency (HR-at-power) and shows the "power trend ⓘ" explainer instead. To give those riders a chart, we'd plot the **efficiency** series (per-ride mean HR at the reference band). The wrinkle: efficiency is **lower-is-better** (less HR for the same watts = fitter), so the line goes DOWN when you improve — inverted from every other output chart (e1RM, run efficiency-index, bike power all go UP). Options: (a) plot it inverted-but-labeled; (b) plot 1/HR or an efficiency-factor so up=better; (c) leave endurance riders chart-less (the ⓘ already explains why). Michael's UX call — flagged, not built. The infrastructure is there (`hrPts` series already computed in `assemble.ts`; `TrendSparkline` already generalized).

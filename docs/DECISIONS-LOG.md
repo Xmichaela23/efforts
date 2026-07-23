@@ -959,3 +959,35 @@ TP's gap-closer, on our terms. `run.efficiency.series` carries the SAME efficien
 **FILLS-AS-YOU-BUILD:** designed for new users first, not veterans. A 12-week canvas that shows what exists, honestly labeled ("building · N of 12 weeks"); **<2 points draws no line** (no fabricated trend through one dot). Michael's data revealed the value immediately — a June efficiency PEAK (~1.90) the recent-6 verdict ("settled lower") can't show. Payload `v140→141` (`run.efficiency.series`).
 
 **Data-integrity gate (Michael: "if we are 100% on the data"):** traced actual depth before building — run efficiency 14 pts / 11-of-12 weeks (chart is real); strength e1RM only ~5wk/lift + the Q-197 split (NOT ready → strength chart deferred). The gate did its job: run passed, strength didn't.
+
+---
+
+## D-312 — Exercise-name canonicalization: merge synonyms + plurals, one clean display label (Q-197) (2026-07-23, PUSHED + DEPLOYED + DEVICE-SEEN)
+
+Closes Q-197. Several lifts fragmented across canonical buckets because raw names never mapped and slugified into lone buckets — dropping sessions from their e1RM verdict AND breaking last-session autofill. Found in Michael's real `exercise_log`: `Barbell Back Squat`→`barbell_back_squat` (3 sessions), `Conventional Deadlift`→`conventional_deadlift` (5), `Standing Barbell Overhead Press`→`standing_barbell_overhead_press` (2), plus plural `Bulgarian Split Squats`/`Walking Lunges`. The three anchor cases were dropped from `STRENGTH_ANCHORS` entirely, so squat/deadlift/OHP verdicts each ran on partial history.
+
+**Fix (`_shared/canonicalize.ts`):**
+- Added the missing synonyms (back squat / barbell back squat / bb squat / high+low bar → `squat`; conventional + barbell deadlift → `deadlift`; standing/barbell OHP → `overhead_press`).
+- A **general plural fallback**: a trailing-`s` name whose singular is a mapped lift folds into it (`bulgarian split squats`→`bulgarian_split_squat`), and it can NEVER over-merge an unmapped name (only fires when the de-pluralized form is explicitly mapped).
+- `canonicalDisplayName(canonical)` — one clean label per lift ("Back Squat", "Deadlift", "Overhead Press", explicit map for abbreviations/variant-clarity, Title-Case fallback). Used in `liftSeriesFromExerciseLog` so the row shows a stable name, not whichever raw name was logged first.
+
+**The same bug on the CLIENT (`StrengthLogger.tsx`):** the D-097 prefill + D-122 "last:" anchor matched on raw `normalizeExerciseName`, so "Hip Thrusts" ≠ "Hip Thrust" → autofill silently failed for plural-logged lifts. Now drops a trailing plural 's'. Michael confirmed the symptom (hip thrust weight not auto-filling).
+
+**Backfill:** recomputed the 13 affected workouts through `recompute-workout` (no direct DB write) — squat 4→7 sessions in the 12wk window; deadlift/OHP verdicts now read full history. Genuinely-distinct lifts (Romanian DL, DB bench, front/goblet squat) correctly stayed separate. 8 `canonicalize.test.ts` fixtures pin it. **Left open → Q-199** (hip thrust is a server anchor but not a client baseline-test lift).
+
+## D-313 — Strength e1RM + bike power 12-week OUTPUT charts; generalized sparkline (2026-07-23, PUSHED + DEPLOYED · strength DEVICE-SEEN, bike POWER fixture-only)
+
+Extends D-311 (run efficiency chart) to strength and bike — the same "OUTPUT over 12 weeks, fills-as-you-build" pattern.
+
+- **Strength:** per-lift e1RM series (big-4: squat/bench/deadlift/OHP) added to `StrengthPerLift.series` in `assemble.ts` (84d window, recent-6wk flagged). One sparkline under each big-4 lift.
+- **Bike:** `bikePowerChartSeries` charts the w20 points of the **winning terrain bin** (the one the verdict reads), so chart and word agree; 84d window, recent-8wk flagged. Renders only when power LEADS.
+- **`EfficiencySparkline` → `TrendSparkline`** (generalized): props for color / value formatter / unit / `dotNoun` / `recentLabel`. Run render is byte-identical via defaults (verified). **Noise floor** (`minSpanFraction`, 0.25 strength / 0.15 bike): the domain spans at least that fraction of the center value, so a 10lb wobble on a 100lb lift no longer fills the height and reads as a crash. Run passes 0 → unchanged.
+- **Endurance-rider "power trend ⓘ":** when bike power is `needs_data`, a tap-ⓘ names what unlocks the chart (a hard 20-min effort) rather than silently omitting it. Fact-first, conditional, no imperative (copy voice).
+
+**Believability caveat (deferred):** cross-lift e1RM can read bench > squat, which athletes distrust; the `~` marks it an estimate, but the squat likely under-reads off working sets at higher RIR. A data/estimation question, filed for later, not a chart bug.
+
+**Verification:** strength device-seen. Bike power is **fixture-only** — Michael has 0 power-bin rides, so it has never rendered live. `bike-power-chart.test.ts` (7 tests) proves shaping + full-assembly (structured rider fills / endurance rider empty). Deno state-trend suite 165 green.
+
+## D-314 — State FITNESS layout: discipline name as a full-width header (2026-07-23, PUSHED · DEVICE-SEEN)
+
+The discipline label sat in a ~94px left gutter (`Row` = label column + indented content), so the 12-week charts rendered in a narrower column than necessary. Restructured `Row`: the discipline name is now a **header above** full-width content, and headers are bumped (13.5px text / 16px icon, brighter) so they read as the scanning landmark (previously smaller than the lift names below them — inverted hierarchy). Shared component, so run/strength/bike/swim + the generic card all moved together. Subtractive of the indent; adds ~90px of chart width.

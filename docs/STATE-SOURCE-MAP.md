@@ -6,6 +6,8 @@
 
 **Read with:** `LIFECYCLE.md` (frozen vs live) · `CONSTITUTION.md` (Law 1: one source per fact) · `ENGINE-STATE.md`.
 
+> **2026-07-23 update:** three rows now carry a **12-week OUTPUT sparkline** (D-311/D-313) — **RUN efficiency**, **STRENGTH e1RM** (per big-4 lift), **BIKE power** (winning terrain bin's w20). Same `TrendSparkline`, fills-as-you-build, noise-floored. BIKE power renders only when power leads; an endurance-only rider sees a **"power trend ⓘ"** naming what unlocks it (a hard 20-min effort) instead of a silent gap. Layout: the discipline name is now a full-width header (D-314). Lift names are canonical labels (D-312), not whichever raw name was logged.
+
 ---
 
 ## The map
@@ -39,7 +41,7 @@
 
 ## Not a bug — do not "fix" this
 
-**The bike power/efficiency split is deliberate and correct.** Power counts only hard rides (climbing / threshold / sweet-spot / tempo); efficiency counts only easy ones (endurance / recovery). Every ride feeds exactly one of the two. An endurance-only cyclist gets an efficiency read, not a power read — that is the design, not a starvation. `bike-fitness.ts:18-23` states the reason: an endurance ride's 20-minute "best" is not a fitness maximum. **Leave it.**
+**The bike power/efficiency split is deliberate and correct.** Power counts only hard rides (climbing / threshold / sweet-spot / tempo); efficiency counts only easy ones (endurance / recovery). Every ride feeds exactly one of the two. An endurance-only cyclist gets an efficiency read, not a power read — that is the design, not a starvation. `bike-fitness.ts:18-23` states the reason: an endurance ride's 20-minute "best" is not a fitness maximum. **Leave it.** *(2026-07-23: the endurance rider now also sees a "power trend ⓘ" naming what a power chart needs — so the absence is explained, not silent. The efficiency-chart question for these riders is Q-200.)*
 
 ---
 

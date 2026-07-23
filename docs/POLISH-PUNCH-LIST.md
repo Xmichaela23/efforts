@@ -14,9 +14,19 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 - [x] **Projected race times** (D-309): goal-free VDOT 5k/10k/half/marathon, distance-unlocked.
 - [x] **Color system** (D-310): discipline ICONs + white labels; verdicts traffic-light (holding=gray); cross-training by discipline; two load bars unified ("bike"); readability + tabular + aligned grids + left-aligned BODY prose.
 - [x] **12-week efficiency chart** (D-311): `EfficiencySparkline`, output-not-load, two-horizon, fills-as-you-build. Michael saw it render (June-peak visible).
-- [ ] **⛔ Q-197 — squat canonical split** (`squat` vs `barbell_back_squat`) — may skew the "Back Squat" verdict; fix before the strength chart.
-- [ ] **Open threads (Q-198):** tap-to-expand chart · strength e1RM chart (after Q-197) · optional load/form-over-time chart (TP-parity).
+- [x] **Q-197 — exercise-name split FIXED** (2026-07-23, D-312): hit squat/deadlift/OHP + plurals, not just squat; canonicalizer synonyms + plural fallback + clean display names + client autofill fix. Recomputed 13 workouts.
+- [~] **Open threads (Q-198):** strength e1RM chart SHIPPED (D-313) · tap-to-expand chart still open · load/form-over-time chart still open.
 - [ ] **Delete throwaway scripts** `scripts/_trigger-snapshot.mjs` / `_check-run-pace.mjs` / `_chart-data-depth.mjs` (read `.env`, no secrets in them).
+
+### ⚡ Shipped 2026-07-23 — strength + bike output charts, name fix, layout (D-312 → D-314) — DEPLOYED · strength DEVICE-SEEN
+- [x] **Q-197 name-split fix** (D-312) — see above. `canonicalize.test.ts` (8 fixtures).
+- [x] **Strength e1RM charts** (big-4) + **bike power chart** (D-313): generalized `TrendSparkline`, noise floor, `bike-power-chart.test.ts` (7 fixtures). Strength device-seen.
+- [x] **Endurance-rider "power trend ⓘ"** (D-313): names what unlocks the bike power chart.
+- [x] **Full-width row layout + bigger discipline headers** (D-314). Device-seen.
+- [x] **Week-blurb reassurance clause removed** (`coach-week-insights.ts:168`). Verified live.
+- [ ] **⚠️ Bike POWER chart fixture-only** — Michael has 0 power-bin rides; never rendered live. Burner run or real 20-min efforts to see it.
+- [ ] **Q-200 — bike efficiency chart for endurance riders** (design call, inverted axis).
+- [ ] **Deferred UX:** cross-lift e1RM believability (bench > squat reads wrong); strength chart density (collapse-by-default?).
 - [ ] **WATCH:** confirm cross-training line renders gold (not white) on device after a coach refresh; confirm bike "holding" is gray everywhere (`bikeEfficiencyDisplay` server tone still `warning`).
 
 ### ⚡ Shipped 2026-07-19 night — DEPLOYED, NOT VERIFIED (coach week composer, D-306)

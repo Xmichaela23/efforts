@@ -24,7 +24,27 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-22 — STATE RUN ROW + FITNESS: BIG UX/CRAFT + CHART PASS · MOSTLY DEVICE-SEEN · STRENGTH CHART BLOCKED ON A DATA-SPLIT BUG)
+## 🧭 NEXT SESSION — START HERE (2026-07-23 — STRENGTH + BIKE OUTPUT CHARTS SHIPPED · NAME-SPLIT BUG FIXED · STATE LAYOUT WIDENED · ALL DEVICE-SEEN EXCEPT BIKE POWER)
+
+> ## READ `docs/GAME-PLAN.md`, then **D-312 → D-314** (this session) and **Q-200** (the one open design call).
+>
+> **What happened:** a long Michael-driven session that (1) fixed a real data bug, (2) shipped the strength + bike OUTPUT charts the last session teed up, and (3) did a UX pass on the whole FITNESS section. All PUSHED, edge functions DEPLOYED (`compute-facts`, `compute-snapshot`, `coach`), coach cache rebuilt, iOS rebundled. Michael SAW most of it on device.
+>
+> ### WHAT SHIPPED — do NOT re-litigate (device-seen unless flagged):
+> - **Q-197 CLOSED — the exercise-name split (D-312).** Squat/deadlift/OHP verdicts were running on partial history because raw names never canonicalized: `barbell_back_squat`, `conventional_deadlift`, `standing_barbell_overhead_press`, and plural forms slugged into lone buckets and dropped out of `STRENGTH_ANCHORS`. Fixed `_shared/canonicalize.ts` (synonyms + a general plural fallback) + `canonicalDisplayName` (one clean label per lift). Recomputed the 13 affected workouts; squat 4→7 sessions in the 12wk window. **Also fixed the SAME bug on the client** (`StrengthLogger.tsx` `normalizeExerciseName` drops a trailing 's') so "Hip Thrusts"/"Hip Thrust" autofill matches. 8 canonicalize fixtures.
+> - **Strength e1RM charts (big-4) + bike power chart (D-313).** 12-week output sparklines: strength = per-lift e1RM; bike = terrain-binned 20-min power (`w20`) of the winning bin. Generalized the run `EfficiencySparkline` → `TrendSparkline` (run render byte-identical via defaults). Noise floor (`minSpanFraction`) so small moves on slow lifts don't look like cliffs. 12 bike fixtures incl. full-assembly integration.
+> - **Endurance-rider "power trend ⓘ" (D-313).** When bike power is `needs_data` (all-aerobic riding), a tap-ⓘ NAMES what unlocks the chart (a hard 20-min effort) instead of silently omitting it. Fact-first, no imperative.
+> - **State layout widened (D-314).** Discipline name is now a HEADER above full-width content (was a ~94px left gutter), so the 12-week charts use the horizontal room. Headers bumped (13.5px/16px icon) for scanning. Shared `Row`, so all disciplines moved together.
+> - **Week-blurb copy fix.** `coach-week-insights.ts:168` under-plan line lost its consoling closer ("the plan reflects where you are now, not where you were scheduled to be") — now just the fact. Verified live in the coach payload.
+>
+> ### ⛔ Q-200 — THE ONE OPEN DESIGN CALL: bike EFFICIENCY chart for endurance-only riders. The power chart only renders when power leads; a rider like Michael (0 power-bin rides) never sees a bike chart. Charting HR-at-power efficiency would fix that — but efficiency is lower-is-better (line goes DOWN when you improve), inverted from the power/e1RM charts. Michael's UX call, not built.
+>
+> ### ⚠️ UNVERIFIED / WATCH:
+> - **The bike POWER chart has NEVER rendered live.** Michael has zero power-bin rides, so it's fixture-verified ONLY. To see it: a burner account with structured rides (needs no new code — just a deploy'd pipeline + synthetic rides), or Michael logs a few hard 20-min efforts. Everything about the shaping is proven by `bike-power-chart.test.ts` (7 tests incl. structured-rider-fills / endurance-rider-empty).
+> - **Deferred UX items (Michael-flagged, not blockers):** (1) *believability* — cross-lift e1RM reads bench(150) > squat(100), which athletes distrust; likely the squat e1RM under-reads off working sets at higher RIR. A data/estimation question, not UI. (2) *density* — four always-open strength charts push RUN down; could collapse-by-default with tap-to-expand.
+> - **The bike efficiency verdict already leads for Michael** ("holding", 6 rides) — the row is correct, just chart-less until Q-200 or power rides.
+
+## 🧭 NEXT SESSION — START HERE (SUPERSEDED 2026-07-23 — STATE RUN ROW + FITNESS: BIG UX/CRAFT + CHART PASS · MOSTLY DEVICE-SEEN · STRENGTH CHART BLOCKED ON A DATA-SPLIT BUG)
 
 > ## READ `docs/GAME-PLAN.md`, then **D-307 → D-311** (this session's decisions) and **Q-197** (the squat split — a real data bug).
 >

@@ -4,7 +4,7 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
-> **2026-07-22 status:** current active work is the **State screen → 100%** track (per the roadmap in Michael's memory: State → plan builder → intro flow → freeballer). This session put a large UX/craft/chart pass on the RUN row + FITNESS section — precise verdict words, pace-at-HR + GAP toggle, goal-free race projections, the discipline-icon/traffic-light color system, and the 12-week efficiency chart. See **D-307 → D-311**, **Q-197/Q-198**, and the ENGINE-STATE banner. The phase list below (the 2026-07-13 continuity plan) is still valid but is not what's currently being worked.
+> **2026-07-23 status:** current active work is the **State screen → 100%** track (per the roadmap in Michael's memory: State → plan builder → intro flow → freeballer). 2026-07-22 shipped the RUN row + FITNESS craft/chart pass (D-307 → D-311). 2026-07-23 fixed the exercise-name split bug (Q-197 → D-312) and shipped the **strength e1RM + bike power output charts** (D-313) + full-width layout (D-314). State FITNESS output charts now cover run/strength/bike. Remaining State chart threads: bike POWER is fixture-only until Michael logs power rides (or a burner run); the bike EFFICIENCY chart for endurance riders is the one open design call (**Q-200**); plus deferred tap-to-expand + PMC-parity. See **D-312 → D-314**, **Q-200**, and the ENGINE-STATE banner. The phase list below (the 2026-07-13 continuity plan) is still valid but is not what's currently being worked.
 
 ---
 
