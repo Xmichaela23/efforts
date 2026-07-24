@@ -151,14 +151,15 @@ Deno.test('DEVELOP: the discipline being built earns the consequence clause', ()
   assert(out!.includes('the one being built'), out!);
 });
 
-Deno.test('UNKNOWN posture: states the fact, never the "you\'re building it" consequence', () => {
+Deno.test('UNDECLARED posture: a fade in a discipline with no declared stake is NOT narrated (Michael 2026-07-24, #2)', () => {
+  // No posture on strength → its e1RM slide is not the app's business to raise. The app narrates a fade
+  // ONLY in a discipline the athlete declared they are building. Matches posture.ts isConcern (only a
+  // develop discipline can be "failing"). Reverses the old "state the fact even without intent" choice.
   const out = composeCoachWeekInsight({
     hasPlan: false,
     disciplines: [d('run', 70, 4, { acwr: 1.0 }), d('strength', 30, 1, { verdict: 'sliding' })],
   });
-  assert(out, 'expected a paragraph');
-  assert(out!.toLowerCase().includes('estimated one-rep maxes have been sliding'), out!);
-  assert(!out!.includes("you're building"), out!);
+  assert(!out || !/estimated one-rep maxes|below its recent normal/i.test(out), String(out));
 });
 
 Deno.test('DROPPED: a dropped discipline is invisible — never named, never penalised', () => {

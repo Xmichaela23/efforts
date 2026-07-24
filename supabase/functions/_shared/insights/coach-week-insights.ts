@@ -115,8 +115,6 @@ const BAND_LO = 0.8;
 const BAND_HI = 1.2;
 /** A discipline is "below its own normal" under the conventional ACWR under-training floor. */
 const OWN_NORMAL_FLOOR = 0.8;
-/** Below this share of week load, a discipline is a rounding error, not a story. */
-const MIN_SHARE_PCT = 5;
 
 // ── the composer — ordered clauses, silent when thin ───────────────────────────────────────────────────
 export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | null {
@@ -145,7 +143,6 @@ export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | nu
   if (!active.length || totalLoad <= 0) return null; // nothing happened — silence, not "you did nothing".
 
   const parts: (string | null)[] = [];
-  const share = (d: CoachWeekDiscipline) => (Number(d.actualLoad) / totalLoad) * 100;
   const Cap = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`;
 
   // ── 1. WHERE THE WEEK WENT — DELETED 2026-07-19, on sight of the real screen. ────────────────────
@@ -221,14 +218,17 @@ export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | nu
   // ── 2. IS ANYTHING QUIETLY DISAPPEARING ───────────────────────────────────────────────────────────
   // A discipline running below ITS OWN trailing normal, described, not diagnosed. Needs a real ratio.
   //
-  // TWO SUPPRESSIONS, both learned from running it:
+  // ⛔ ONLY A `develop` DISCIPLINE IS FLAGGED HERE (Michael on device 2026-07-24). The app narrates a fade
+  //    ONLY in something the athlete declared they are BUILDING. This reverses the older "state the fact
+  //    even without a declared intent" choice, which twice put a discipline the athlete had no stake in
+  //    onto the screen — a parked bike, an off-plan dip — the "why are you telling me about this, it's not
+  //    my plan" reaction. The government of stakes: develop → flag it; maintain → the upkeep line owns it;
+  //    dropped/parked → silent; undeclared (unknown) → silent. This matches posture.ts's own isConcern
+  //    (only a develop discipline can be "failing").
+  // OTHER SUPPRESSIONS, learned from running it:
   //  - Never name the discipline clause 3 is about to name (the "said twice" bug).
   //  - Never fire when the WHOLE week is down — a light week already explains a light discipline, and
   //    warning about it and then calling the down week healthy is the app arguing with itself (D-305).
-  //  - A `maintain` discipline is NOT reported when it drifts down. That is the plan working, and it is
-  //    the Q-179 bug to call it a loss. It gets SILENCE, not a warning and not reassurance — the
-  //    consoling "that's a trade, not a mistake" register was rejected on purpose (client-orphaned
-  //    `posture.ts`); the honest move is simply not to raise it.
   //  - DID THE PLAN ASK FOR IT? A prescribed lighter week, executed correctly, is not a shortfall. A
   //    deload reading as a warning is the app scolding the athlete for following it.
   //  - RIGHT INSTRUMENT PER DISCIPLINE. Strength is judged by its e1RM verdict, never by a volume ratio.
@@ -252,16 +252,14 @@ export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | nu
   const fading = wholeWeekDown ? [] : active
     .filter(givingGround)
     .filter((d) => d.discipline !== referenceDiscipline)
-    .filter((d) => postureOf(d) !== 'maintain');
+    .filter((d) => postureOf(d) === 'develop'); // build-only: never narrate a fade in a discipline with no declared stake
   if (fading.length) {
     const f = fading[0];
-    // The consequence clause is EARNED by the declared focus. Without a declared posture we state the
-    // fact and stop — "it's the one you're building" is only meaningful against a declared intent.
-    // No injury claim, no "should", ever.
+    // fading is develop-only, so the consequence clause always applies. No injury claim, no "should", ever.
     const what = isStrength(f)
       ? 'Estimated one-rep maxes have been sliding'
       : `${Cap(label(f.discipline))} came in below its recent normal this week`;
-    parts.push(postureOf(f) === 'develop' ? `${what} — the one being built.` : `${what}.`);
+    parts.push(`${what} — the one being built.`);
   }
 
   // ── 2b. CREDIT — the best-supported finding in the concurrent-training literature, and the one the
