@@ -530,28 +530,24 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
         </span>
       )}
       {explainOpen && (
-        <p className="basis-full text-[12px] text-white/60 leading-snug mt-1 max-w-[min(100%,340px)]">
-          Efficiency = how much speed you get per heartbeat on steady runs, adjusted for hills so terrain
-          doesn't skew it. Rising means you're running faster at the same heart rate — getting fitter.
-          {eff.pctChange != null && (
-            <> The {verdictSignedPct(eff.verdict, eff.pctChange)} is the change across the window below:
-            about {Math.abs(eff.pctChange)}% {eff.pctChange < 0 ? 'less' : 'more'} speed per heartbeat than
-            6 weeks ago.</>
+        <>
+          {/* THE "WHY" LEADS — the athlete-specific diagnosis (server-minted from declared posture + how
+              much they've actually been running). Names ONLY the observable (intent + volume), never a
+              physiology cause (posture.ts no-cause law). Null when no posture declared → nothing here, and
+              the definition below stands alone. Trimmed from a 5-thing glossary to diagnosis + one
+              definition (Michael 2026-07-24, "word soup"). */}
+          {postureSentence && (
+            <p className="basis-full text-[12px] text-white/80 leading-snug mt-1 max-w-[min(100%,340px)]">
+              {postureSentence}
+            </p>
           )}
-          {' '}"Easing off" means it's still drifting down; "settled lower" means it dropped, then levelled.
-          It's a trend, so it needs a few steady runs to read a direction. The line below is the other
-          half: whether your pace holds across a single long run.
-        </p>
-      )}
-      {/* THE "WHY" — the athlete-specific cause, server-minted from declared posture + how much they've
-          actually been running (Michael 2026-07-24). Rendered inside the ⓘ tap-down (opt-in "extra
-          understanding"), NOT as an always-visible line, so it doesn't duplicate the week-execution
-          trade sentence. Names ONLY the observable (declared intent + volume) — never a physiology cause
-          (posture.ts's no-cause law). Null when no posture is declared → renders nothing. */}
-      {explainOpen && postureSentence && (
-        <p className="basis-full text-[12px] text-white/70 leading-snug mt-1.5 max-w-[min(100%,340px)]">
-          {postureSentence}
-        </p>
+          <p className="basis-full text-[12px] text-white/55 leading-snug mt-1.5 max-w-[min(100%,340px)]">
+            Efficiency is your speed per heartbeat on steady runs, hill-adjusted — rising means faster at the same effort.
+            {eff.pctChange != null && (
+              <> The {verdictSignedPct(eff.verdict, eff.pctChange)} is about {Math.abs(eff.pctChange)}% {eff.pctChange < 0 ? 'less' : 'more'} than 6 weeks ago.</>
+            )}
+          </p>
+        </>
       )}
     </Row>
   );
