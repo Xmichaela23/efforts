@@ -8,6 +8,13 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+### ⚡ Shipped 2026-07-24 — Load/strain verdict is MULTI-SPORT (D-317 → D-318) — DEPLOYED + DEVICE-VERIFIED
+- [x] **D-317 — load reads TOTAL load, phase-aware** (`body-response.ts:40` `computeTotalLoadStatus`). Killed the run-only `running_acwr>1.3→high` block that read "pull back" on a strength week. `+6` tests, golden updated.
+- [x] **D-318 — strain de-run-brained** (`load-status-reconcile.ts` `computeDecliningSignals` opts): strength-primary drops RIR-as-strain; HR-drift obeys the absorption steady-aerobic gate; absorption ledger neutralized for strength-primary. WK3 → **"balanced" · ACWR 1.2**. 4 permanent regressions (incl. Michael WK3 bug case).
+- [x] **v144 copy** — HR-response "HR easing" → "lower HR at the same effort" (killed the "easing off" collision).
+- [x] **Cache-floor trap fixed** — `COACH_CLIENT_MIN_PAYLOAD_VERSION` had drifted to 35 vs server 142 (the "not budging" cause); pinned to 144 with "bump both" comment.
+- [ ] **AWAITING device-verify (carried):** the D-315 strength-track CLIENT UI (logger RIR range / swap sheet / ＋ Add button) — burner-verified server-side, still not device-seen. Do it with the Adjust-tab build.
+
 ### ⚡ Shipped 2026-07-22 — State RUN row + FITNESS craft/chart pass (D-307 → D-311) — DEPLOYED + MOSTLY DEVICE-SEEN
 - [x] **Precise verdict words** (D-307): `recentlyFlat` → "settled lower" vs "easing off". `classify-recently-flat.test.ts`.
 - [x] **Pace-at-HR line + GAP toggle** (D-308): raw pace default, grade-adjusted on tap.

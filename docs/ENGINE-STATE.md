@@ -24,7 +24,25 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-23 EVENING — "ADAPT A PLAN" STRENGTH TRACK SHIPPED + DEPLOYED + BURNER-VERIFIED · AWAITING MICHAEL'S DEVICE TEST · NEXT = THE REFINE HUB)
+## 🧭 NEXT SESSION — START HERE (2026-07-24 — THE LOAD/STRAIN VERDICT IS NOW MULTI-SPORT (D-317+D-318), DEVICE-VERIFIED · NEXT = BUILD THE STATE-AS-HUB **ADJUST** TAB)
+
+> ## READ `docs/CONCEPT-adapt-plan-strength.md` (the **State-as-hub** section) + **D-316** (the three-tab design), then **D-317 → D-318** (this session's engine fix).
+>
+> **Your JOB:** build the **Adjust** tab of the State-as-hub — the *steer* half. Status (read) is shipped and live; Adjust is a **v0 scaffold only** (`src/components/context/StateAdjustLens.tsx`, wired into `StateHubTabs.tsx` / `StateTab.tsx`). The work is to **re-home the strength edits that currently live in the LOGGER** (swap / add / weight — `StrengthLogger.tsx`, `persistPlanSwap`/`persistPlanAdd`) onto the State strength row, same disciplines/order as Status. Build strength first (re-homes what exists → writes through `adapt-plan`/`materialize`, reads the spine), then clone for run/bike/swim. **Schedule** (sliding-cards week over `week-optimizer`, needs a per-move re-solve endpoint + a touch drag layer like `@dnd-kit`) is its own later build. Full design + diagram: the State-as-hub section of the CONCEPT doc.
+>
+> ### WHAT SHIPPED THIS SESSION — do NOT re-litigate (DEPLOYED + DEVICE-VERIFIED on Michael's WK3 screen):
+> - **D-317 — LOAD is multi-sport.** `body-response.ts` computed `load_status` from a **run-only** block (`running_acwr>1.3 → high`) → a strength week with a bunched maintenance run read "pull back". Now `computeTotalLoadStatus(totalAcwr, totalPct, phase)` (`body-response.ts:40`) reads TOTAL load, phase-aware, descriptive; goal-cost stays in the coach's eye. Necessary but not sufficient →
+> - **D-318 — STRAIN is multi-sport.** The **reconciler** (`load-status-reconcile.ts`, THE LAW, applied `coach/index.ts:3564`) re-escalated off run-brain strain: it counted **"RIR declining"** as strain (in a strength block that's the INTENT — a *systematic* false "a bit high" for any progressing strength athlete) and **"HR drift declining"** even when the absorption engine had excluded drift. `computeDecliningSignals(bodyTrends, opts{planPrimary,driftUsable})` drops both; threaded into escalation **and** safety floor; the absorption ledger is neutralized for strength-primary so `corroborated_strain` can't stay true off the same RIR signal. Result: WK3 → **"balanced" · ACWR 1.2** (was "pull back").
+> - **v144 copy** — BODY HR-response "settling — HR easing…" → "settling — **lower HR** at the same effort" (killed the "easing" clash with the efficiency word "easing off").
+> - **Cache-floor trap (the "not budging" cause):** `COACH_CLIENT_MIN_PAYLOAD_VERSION` (`coach-contract.ts`) had drifted to **35** while the server was at 142 → the client served stale "pull back" rows. Now pinned WITH `COACH_PAYLOAD_VERSION` (144), "bump both" comment. **Deploy note:** `coach` is the ONLY importer of the touched shared files — no `_shared` fan-out.
+> - Tests: 4 new permanent regressions in `load-status-reconcile.test.ts` (incl. the "Michael WK3" bug case); +6 `computeTotalLoadStatus` in `body-response.test.ts`; all 60 prior pass.
+>
+> ### ⛔ STILL UNVERIFIED (carried from 2026-07-23, NOT closed this session — the session pivoted to the load bug before the strength-track client UI was device-seen):
+> - The **D-315 strength-track CLIENT UI** — the logger's RIR **range display**, the **swap** "just today / rest of plan" sheet, and the **＋ Add to plan** button — is burner-verified server-side but **still not confirmed rendering + firing on a real device.** Verify this alongside the Adjust-tab build (it re-homes exactly these controls). If the ＋ button is missing → stale bundle.
+>
+> ### ▶ AFTER THAT (still teed up): the **impact-read** (a permission engine with confident guardrails — chronic interference ~null; only acute timing + load cost; discipline-aware voice) and **Schedule** tab. See D-316's impact-read bullet + `SCIENCE-concurrent-training-interference`.
+
+## 🧭 NEXT SESSION — START HERE (SUPERSEDED 2026-07-24 — the load/strain engine fix moved the session; the "adapt a plan" strength-track detail below still stands as history and is STILL client-unverified)
 
 > ## READ `docs/GAME-PLAN.md` + `docs/CONCEPT-adapt-plan-strength.md`, then **D-315** (this batch) and back-annotated **D-285**.
 >
