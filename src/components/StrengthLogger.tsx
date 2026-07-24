@@ -10,7 +10,7 @@ import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, CheckCircle, Pencil, 
 import { useAppContext } from '@/contexts/AppContext';
 import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-alternatives';
 import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
-import { getExerciseConfig } from '@/lib/exercise-config';
+import { getExerciseConfig, getBaseline1RM } from '@/lib/exercise-config';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
 import CoreTimer from '@/components/CoreTimer';
@@ -4275,19 +4275,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       // in-slot swap shifts the ratio). We let the athlete enter what they used; the
                       // analyzer doesn't grade load on a swap (un-anchored, D-289). Reps/duration stay.
                       // WEIGHT ON SWAP (supersedes Q-181's "always clear"): the new lift starts at a
-                      // computed, rackable weight — current load scaled by the two lifts' loading refs
-                      // (squat 250 → leg press ×1.5 = ~375), rounded to 5 lb / 2.5 kg so it adds up with
-                      // plates. Same reference only; if we can't anchor it (different ref, no current
-                      // weight) we clear and let them enter it. Matches the server math for rest-of-plan.
+                      // computed, rackable weight = the new lift's reference 1RM × its ratio × the
+                      // working % you're already lifting at, rounded to 5 lb / 2.5 kg so it adds up with
+                      // plates. Works ACROSS references (a squat → a bench-referenced lift) and off your
+                      // baselines, not just same-ref. Falls to blank only when we have no baseline for
+                      // the new lift's reference. Matches the server math for the rest-of-plan path.
                       const applySwap = (altName: string) => {
                         const oldCfg = getExerciseConfig(exercise.planned_name || exercise.name);
                         const newCfg = getExerciseConfig(altName);
                         const curW = exercise.sets.find((s) => typeof s.weight === 'number' && s.weight > 0)?.weight ?? 0;
                         const inc = exercise.unit === 'kg' ? 2.5 : 5;
                         let seed = 0;
-                        if (oldCfg?.primaryRef && newCfg?.primaryRef && oldCfg.primaryRef === newCfg.primaryRef
+                        if (oldCfg?.primaryRef && newCfg?.primaryRef === oldCfg.primaryRef
                           && (oldCfg.ratio ?? 0) > 0 && (newCfg.ratio ?? 0) > 0 && curW > 0) {
+                          // Same reference — scale straight off the current load, no baseline needed.
                           seed = Math.round((curW * (newCfg.ratio as number) / (oldCfg.ratio as number)) / inc) * inc;
+                        } else {
+                          // Cross reference (or fresh) — off the new lift's baseline 1RM at the working %
+                          // you're already lifting at (0.70 default if we can't infer it).
+                          const newRef1RM = newCfg ? getBaseline1RM(newCfg, performanceNumbers) : null;
+                          const oldRef1RM = oldCfg ? getBaseline1RM(oldCfg, performanceNumbers) : null;
+                          if (newCfg && newRef1RM && (newCfg.ratio ?? 0) > 0) {
+                            let pct = 0.70;
+                            if (oldRef1RM && (oldCfg?.ratio ?? 0) > 0 && curW > 0) {
+                              pct = Math.max(0.3, Math.min(0.95, curW / (oldRef1RM * (oldCfg!.ratio as number))));
+                            }
+                            seed = Math.round((newRef1RM * (newCfg.ratio as number) * pct) / inc) * inc;
+                          }
                         }
                         setExercises((prev) => prev.map((ex) =>
                           ex.id === exercise.id
