@@ -23,6 +23,8 @@ import { fetchArcContext } from '@/lib/fetch-arc-context';
 import type { ArcReadiness } from '@/lib/arc-types';
 import { shouldShowNudge } from '@/lib/nudge-policy';
 import StatePerformanceSection from '@/components/context/StatePerformanceSection';
+import StateHubTabs, { type StateLens } from '@/components/context/StateHubTabs';
+import StateAdjustLens from '@/components/context/StateAdjustLens';
 import { buildLoadHeadline, statusVolumeLabel } from '@/lib/load-headline';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 import { useAppContext } from '@/contexts/AppContext';
@@ -738,6 +740,7 @@ export default function StateTab({
   const [narrativeOpen, setNarrativeOpen] = useState(false);
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null); // D-232 BODY-row provenance tap
   const [adjustingLift, setAdjustingLift] = useState<string | null>(null);
+  const [stateLens, setStateLens] = useState<StateLens>('status'); // State-as-hub: Status / Adjust / Schedule (D-316)
   // Strength per-lift detail is COLLAPSED by default (Michael 2026-07-16) — the e1RM dot is the read;
   // the per-lift "from your logged sets" list is drill-down, folded until tapped.
   const [strengthDetailOpen, setStrengthDetailOpen] = useState<boolean>(false);
@@ -1384,6 +1387,17 @@ export default function StateTab({
 
   return (
     <div className="pt-1 pb-4">
+      {/* State-as-hub lens switcher (D-316): Status = the screen you know; Adjust/Schedule are new. */}
+      <StateHubTabs value={stateLens} onChange={setStateLens} />
+
+      {stateLens === 'adjust' && <StateAdjustLens perLift={perLift} />}
+      {stateLens === 'schedule' && (
+        <div className="px-2 py-10 text-center text-white/40 text-[13px] leading-snug">
+          Schedule — rearrange your week: drag a session and everything re-flows around it. Coming next.
+        </div>
+      )}
+
+      {stateLens === 'status' && (<>
       {/* ── Header ── */}
       <div className="flex items-start justify-between mb-4 px-0.5">
         <div className="flex flex-col gap-1.5">
@@ -1868,6 +1882,7 @@ export default function StateTab({
           setStrategyCourseId(null);
         }}
       />
+      </>)}
     </div>
   );
 }
