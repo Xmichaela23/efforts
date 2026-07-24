@@ -172,6 +172,20 @@ Deno.test('DROPPED: a dropped discipline is invisible — never named, never pen
   assert(!/swim/i.test(out!), out!);
 });
 
+Deno.test("PARKED ('out') discipline is never mentioned — same as 'dropped' (Michael on device 2026-07-24: parked bike named on a strength plan)", () => {
+  // bike posture='out' was falling through the coach's map → 'unknown' → the "below its recent normal"
+  // clause reported it. 'out' must normalize to 'dropped' so a parked discipline stays silent.
+  const out = composeCoachWeekInsight({
+    hasPlan: true,
+    posture: { bike: 'out' as any, strength: 'develop' },
+    disciplines: [
+      d('bike', 30, 2, { acwr: 0.4 }),   // low acwr would trip the "below its own normal" clause
+      d('strength', 40, 3, { plannedLoad: 40, verdict: 'holding' }),
+    ],
+  });
+  assert(!out || !/bike|riding/i.test(out), String(out));
+});
+
 Deno.test('CREDIT: endurance focus + strength holding reads as contribution, not competition', () => {
   const out = composeCoachWeekInsight({
     hasPlan: false,

@@ -122,8 +122,12 @@ const MIN_SHARE_PCT = 5;
 export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | null {
   if (!inp || !Array.isArray(inp.disciplines)) return null;
 
-  const postureOf = (d: CoachWeekDiscipline): Posture =>
-    (inp.posture?.[String(d.discipline).toLowerCase()] as Posture) || 'unknown';
+  const postureOf = (d: CoachWeekDiscipline): Posture => {
+    // 'out' is posture.ts's parked value; this composer's vocabulary calls it 'dropped'. Normalize at the
+    // single read point so a parked discipline is excluded (active filter drops 'dropped'), never reported.
+    const raw = String(inp.posture?.[String(d.discipline).toLowerCase()] ?? '').toLowerCase();
+    return (raw === 'out' ? 'dropped' : raw || 'unknown') as Posture;
+  };
 
   const active = inp.disciplines
     .filter((d) => d && Number(d.actualLoad) > 0 && Number(d.sessionCount) > 0)
@@ -297,7 +301,9 @@ export function buildCoachWeekInsightInput(
   const rows = Array.isArray(byDiscipline) ? byDiscipline : [];
   const posture: Record<string, Posture> = {};
   for (const [k, v] of Object.entries(opts?.posture ?? {})) {
-    const p = String(v || '').toLowerCase();
+    // 'out' (posture.ts's parked value) → 'dropped' (this composer's vocabulary), so a parked discipline
+    // is excluded, never demoted to 'unknown' and then reported. See coach/index.ts postureMap.
+    const p = String(v || '').toLowerCase() === 'out' ? 'dropped' : String(v || '').toLowerCase();
     if (p === 'develop' || p === 'maintain' || p === 'dropped') posture[String(k).toLowerCase()] = p;
   }
   return {
