@@ -13,9 +13,22 @@ The honest current state: **the machinery to change a plan exists and runs const
 ## The architecture split (decided)
 
 - **Goals = build from scratch.** Plan creation stays where it is (`create-goal-and-materialize-plan` → `generate-combined-plan` → `activate-plan`). Untouched.
-- **State = refine.** The dashboard gets an **"Adjust plan"** button → a **refine hub** → **one screen per discipline**. Creation in one place, modification in the other. Maps onto the lifecycle: Goals = birth, State = life.
+- **State = the hub.** Not a dashboard with a button to a *separate* refine hub — **State itself is where you see AND steer.** Goals = birth, State = life, Logger = doing today.
 
-### Front-door shape
+### State-as-hub, three tabs (2026-07-23 — SUPERSEDES the "separate refine hub / one screen per discipline / Adjust-plan button" sketch below)
+
+**Why State-as-hub:** the insight and the handle belong in the same place. State is where the app reasons about you, so it's where the impulse to steer is born (load's high → pull back; strength's easy → push). Making the athlete leave State to act is a seam. So steering lives *on* State, revealed by the app's existing segmented-tab control (the `Planned / Performance / Details` tabs on the workout detail — reuse it, don't rebuild).
+
+- **Nav is two clean levels** (standard pattern — bottom bar + in-section tabs, like Strava/IG/X): the **bottom 4 (HOME / STATE / GOALS / +) are always there**; **STATE is the gateway** into the hub; inside it the three lenses are tabs.
+- **The three tabs — look / what / when:**
+  - **Status** (read-only, default) — how you're doing: per-discipline trends, load, verdicts. The current State screen. Most athletes live here and never tab away (progressive disclosure — you *may* never need deeper).
+  - **Adjust** (steer — changes WHAT you do) — the **same disciplines, same order as Status**, now steerable: pull back / push load, add intensity, swap / add an exercise, take a suggestion. Status→Adjust reads as the same content flipping from *read* to *edit* — no re-orientation.
+  - **Schedule** (steer — changes WHEN) — the sliding-cards week: drag a session, the week re-flows around it (the optimizer re-solves; every auto-move carries its reason). A **scope toggle** — *this week* vs *rest of plan* (temp re-solve vs move the anchor). Its own build; a thin UI over `week-optimizer` via a new per-move re-solve endpoint. Do NOT bolt it onto `WorkoutCalendar` (the calendar stays a *display*; the current HTML5 drag is desktop-only — Schedule needs a touch drag layer, e.g. `@dnd-kit`).
+- **Naming cue:** verbs for the action tabs (Adjust / Schedule), a noun for the read tab (Status / Now) — the verb/noun contrast signals "this tab changes my plan" vs "just looking."
+- **Layering:** Glance (Status) · Steer (Adjust, the everyday 90%) · Tweak (Schedule + deep per-discipline options — there for the tinkerer, invisible to the casual). Deeper tools drill *from* State, never a competing hub.
+- **Safety:** in Adjust/Schedule nothing changes by accident — every change is an explicit tap, consequential ones confirm (the swap's "rest of plan" step), and nothing auto-applies (consent-first). The bottom **+** stays its own job (quick-log) distinct from Adjust's "add to plan."
+
+### ⛔ SUPERSEDED front-door shape (kept for history — the "separate hub" idea, replaced by State-as-hub above)
 
 - State stays a glanceable dashboard (it is already dense — editing does not belong on it).
 - A top-level "Adjust plan" entry, **plus** each discipline row deep-links straight to its own refine screen.
