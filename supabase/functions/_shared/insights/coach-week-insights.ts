@@ -122,10 +122,16 @@ const MIN_SHARE_PCT = 5;
 export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | null {
   if (!inp || !Array.isArray(inp.disciplines)) return null;
 
+  // Disciplines arrive CANONICALIZED ('ride'), but posture may be keyed by the athlete's word ('bike').
+  // Resolve bike/ride/cycling as one, so a parked bike keyed 'bike' still matches the 'ride' discipline.
+  const RIDE_ALIASES = ['ride', 'bike', 'cycling'];
   const postureOf = (d: CoachWeekDiscipline): Posture => {
-    // 'out' is posture.ts's parked value; this composer's vocabulary calls it 'dropped'. Normalize at the
-    // single read point so a parked discipline is excluded (active filter drops 'dropped'), never reported.
-    const raw = String(inp.posture?.[String(d.discipline).toLowerCase()] ?? '').toLowerCase();
+    const disc = String(d.discipline).toLowerCase();
+    const keys = RIDE_ALIASES.includes(disc) ? RIDE_ALIASES : [disc];
+    let raw = '';
+    for (const key of keys) { const v = inp.posture?.[key]; if (v) { raw = String(v).toLowerCase(); break; } }
+    // 'out' is posture.ts's parked value; this composer's vocabulary calls it 'dropped'. Normalize so a
+    // parked discipline is excluded (active filter drops 'dropped'), never reported.
     return (raw === 'out' ? 'dropped' : raw || 'unknown') as Posture;
   };
 
