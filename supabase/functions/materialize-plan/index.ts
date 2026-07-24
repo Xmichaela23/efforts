@@ -129,21 +129,39 @@ const ADDED_EXERCISE_WEEKLY_CAP = 2;
 // where lower work already is, never an upper-only day; a core/unclassified add fits any strength day),
 // within the add's date window, skipping a session that already holds it — then capped to the weekly
 // frequency above (earliest matching days per week). Returns row_id -> the lifts to inject there.
+// Added-lift periodization — TWO CLOCKS (D-315 follow-up, grounded in SCIENCE-5x5-linear-progression):
+//   (1) the lift's OWN age — it ramps block-linear from a conservative start the day you drop it in, so
+//       it always starts light wherever inserted (a novel movement started submaximal);
+//   (2) the PLAN's deload weeks (phase_by_week recovery/taper) — it backs off WITH the block, gentler
+//       than a main-lift deload (it isn't the primary stressor, and RIR already loosens via Step 0).
+const ADD_START_PCT = 70;      // conservative first-week %1RM
+const ADD_PEAK_PCT = 85;       // block-linear ceiling
+const ADD_STEP_PCT = 1.25;     // ~1-3%/wk linear increment
+const ADD_DELOAD_MULT = 0.85;  // ~15% cut on the plan's deload weeks (accessory-appropriate)
+
+type PlannedAdd = { name: string; sets: number; reps: string | number; weight?: number; percent_1rm?: number };
+
 function planAddInjections(
   rows: any[],
   adjustments: PlanAdjustment[],
-): Map<string, Array<{ name: string; sets: number; reps: string | number }>> {
-  const byRow = new Map<string, Array<{ name: string; sets: number; reps: string | number }>>();
+  baselines: Baselines,
+  planConfig: any,
+): Map<string, PlannedAdd[]> {
+  const byRow = new Map<string, PlannedAdd[]>();
   const adds = (adjustments || []).filter(
     (a) => a.status === 'active' && a.add_meta && String(a.exercise_name ?? '').trim(),
   );
   if (!adds.length) return byRow;
+  const inc = (baselines as any)?.isMetric ? 2.5 : 5;
 
   for (const adj of adds) {
     const name = String(adj.exercise_name).trim();
     const group = getMovementGroup(name);
     const sets = typeof adj.add_meta!.sets === 'number' ? adj.add_meta!.sets : 3;
     const reps = adj.add_meta!.reps ?? 10;
+    const cfg = getExerciseConfig(name);
+    const ref1RM = cfg ? getBaseline1RM(cfg, baselines) : null;
+    const ratio = typeof cfg?.ratio === 'number' ? cfg.ratio : 0;
 
     const candidates: any[] = [];
     for (const row of rows) {
@@ -159,6 +177,9 @@ function planAddInjections(
       }
       candidates.push(row);
     }
+    if (!candidates.length) continue;
+    // Clock 1: the lift's own start = the earliest week it appears (ownWeek counts from here).
+    const startWeek = Math.min(...candidates.map((r) => (typeof r?.week_number === 'number' ? r.week_number : 1)));
 
     // Cap per week: earliest matching days each week get the lift, up to the weekly frequency.
     const byWeek = new Map<number, any[]>();
@@ -170,9 +191,18 @@ function planAddInjections(
     for (const weekRows of byWeek.values()) {
       weekRows.sort((a, b) => String(a?.date ?? '').localeCompare(String(b?.date ?? '')));
       for (const row of weekRows.slice(0, ADDED_EXERCISE_WEEKLY_CAP)) {
+        const wk = typeof row?.week_number === 'number' ? row.week_number : startWeek;
+        const ownWeek = wk - startWeek + 1;                                   // clock 1
+        const phase = String(resolvePlanPhase(planConfig, wk) ?? '').toLowerCase();
+        const isDeload = phase === 'recovery' || phase === 'taper';           // clock 2
+        const rampPct = Math.min(ADD_PEAK_PCT, ADD_START_PCT + Math.max(0, ownWeek - 1) * ADD_STEP_PCT);
+        const workingPct = isDeload ? rampPct * ADD_DELOAD_MULT : rampPct;
+        const weight = ref1RM && ratio > 0
+          ? Math.round((ref1RM * ratio * (workingPct / 100)) / inc) * inc
+          : 0;                                                                // 0 → resolver flags baseline-missing → athlete enters
         const rid = String(row.id);
         if (!byRow.has(rid)) byRow.set(rid, []);
-        byRow.get(rid)!.push({ name, sets, reps });
+        byRow.get(rid)!.push({ name, sets, reps, weight, percent_1rm: Math.round(workingPct) });
       }
     }
   }
@@ -1713,7 +1743,7 @@ function expandTokensForRow(
   // (no full regen). Null/absent → getTargetRir falls back to the durability base, still lift-aware.
   strengthProtocolId: string | null = null,
   rowPhase: string | null = null,
-  addsToInject: Array<{ name: string; sets: number; reps: string | number }> = [],
+  addsToInject: PlannedAdd[] = [],
 ): { steps: any[]; total_s: number; swim_equipment_suggested?: string[]; swim_equipment_optional_suggested?: string[] } {
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   // Strength-PRIMARY rows (Get Strong arc) periodize their own peak + 1RM retest: lift the 0.85 clamp
@@ -2987,7 +3017,7 @@ Deno.serve(async (req) => {
 
     // Adapt-a-plan add: decide once, across all rows, which added lifts land on which strength days
     // (matching focus + the 2×/week science cap), then hand each row only its share below.
-    const addInjectionsByRow = planAddInjections(rows, adjustments);
+    const addInjectionsByRow = planAddInjections(rows, adjustments, baselines, rirPlanConfig);
     if (swimIntentMat) {
       console.log('[materialize-plan] swim_intent:', swimIntentMat);
     }
