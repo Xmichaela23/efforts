@@ -461,6 +461,8 @@ So if a heat correction is ever built, it must be a **per-athlete fitted coeffic
 
 ## D-285 — The run-pace stack: ONE resolver, NO silent writes, NOTHING hidden from the athlete (2026-07-13, SPEC-run-pace-glass-box)
 
+> **↪ EXTENDED to STRENGTH by D-315 (2026-07-23).** This decision deleted the silent ENDURANCE auto-writes; D-315 applied the same rule to STRENGTH — deleting `adapt-plan`'s silent auto-progression/deload writes so working weights change only on the athlete's tap. The "no silent write, the athlete gets the choice" principle now covers both endurance and strength.
+
 - **Date:** 2026-07-13. **Spec:** `docs/SPEC-run-pace-glass-box.md`. **Changes no number's VALUE** — only where it comes from, who may overwrite it, and what travels with it.
 
 ### ⛔ FIRST: what this decision REJECTED (read before "improving" it)
@@ -991,3 +993,21 @@ Extends D-311 (run efficiency chart) to strength and bike — the same "OUTPUT o
 ## D-314 — State FITNESS layout: discipline name as a full-width header (2026-07-23, PUSHED · DEVICE-SEEN)
 
 The discipline label sat in a ~94px left gutter (`Row` = label column + indented content), so the 12-week charts rendered in a narrower column than necessary. Restructured `Row`: the discipline name is now a **header above** full-width content, and headers are bumped (13.5px text / 16px icon, brighter) so they read as the scanning landmark (previously smaller than the lift names below them — inverted hierarchy). Shared component, so run/strength/bike/swim + the generic card all moved together. Subtractive of the indent; adds ~90px of chart width.
+
+## D-315 — "Adapt a plan" strength track: phase-aware RIR, reversible swap/add, consent-first weights (2026-07-23, PUSHED `db912150`+`430c717a` · DEPLOYED `generate-combined-plan`/`materialize-plan`/`adapt-plan` · migration applied · BURNER-VERIFIED 11/11, NOT device-seen)
+
+The first four slices of "steerable plans" (`TARGET-ARCHITECTURE` #3), on the STRENGTH discipline. Full design + trace: `docs/CONCEPT-adapt-plan-strength.md`. Every edit routes through `plan_adjustments` → `materialize-plan` and reads one truth; nothing mutates the frozen `sessions_by_week`.
+
+**Step 0 — phase + lift-aware RIR target, single source.** The RIR grading engine (analyzer + State `computeLiftVerdict`) was well-built but **starved** — the plan never stamped a `target_rir`, so it graded against nothing. Fix: `getTargetRir` (`_shared/strength-profiles.ts`) gains an optional `phaseTag` → `PHASE_RULES.targetRirOffset` (base 0, build −0.5, peak −1.0, taper +0.5, recovery +1.0; RP/RTS mesocycle shape), clamped [0.5, 4]; 3-arg callers unchanged (byte-identical). Stamped at BUILD (`session-factory.ts intentToPlanned`, mapping combined-plan `Phase`→`PlanPhaseId` — `race_specific`→peak) AND at MATERIALIZE (`materialize-plan`, resolving protocol from `config.strength_protocol` + phase via the canonical `resolvePlanPhase`) — the materialize stamp is what lets an existing mid-plan athlete pick it up on re-materialize without a regen. Client renders half-steps as a **range** ("2–3", `src/lib/rir-format.ts`) — field convention (RIR ranges + Tuchscherer 0.5-RPE); logged values stay whole reps. **Continuity proven by trace**: analyzer (`analyze-strength-workout:535` "target_rir is the source of truth") + verdict both read the stamped value, so logger preload = grade = verdict.
+
+**#1 — swap (reversible override).** New nullable `plan_adjustments.substitute_exercise_name`. Logger swap sheet gains "just today / rest of plan" (chips + typed-name path). `materialize` renames the slot BEFORE weight resolution (skips the qualitative + pre-resolved branches when swapped) so the weight re-seeds from the NEW lift's own reference — no old weight carried across. Field-standard (RP/Fitbod/Trainerize substitution) and matches D-289 ("the slot is the unit, not the name").
+
+**#2 — add (smart placement).** New nullable `plan_adjustments.add_meta {sets,reps}`. Logger "＋ Add to plan" on a hand-added lift. `materialize`'s `planAddInjections` decides across the whole plan which strength days each add lands on: matching movement group (`getMovementGroup` in `exercise-config`, lower/upper/core) contained to days that already hold that group, capped **2×/week (Schoenfeld/Ogborn/Krieger 2016 — 2×>1× at equated volume, 3× no added benefit)**, weight seeded from baseline via the lift's loading reference (or `baseline_missing`). Idempotent — never persisted into `strength_exercises`, re-injected fresh each materialize, so fully reversible.
+
+**#3 — consent-first weights (extends D-285 to strength).** DELETED the silent auto-progression/auto-deload writes in `adapt-plan` `autoAdapt` (they re-priced working weight on every ingest, skipping the fatigue gate the suggest path applies). Mirrors the endurance ruling below. Weight now changes ONLY on the athlete's tap (State adjust modal / accept / swap). Michael's ruling: *"we shouldn't auto change weights, the user needs to know."* No strength app (RP/Fitbod/Juggernaut) silently rewrites your loads — they suggest.
+
+**Continuity seam closed:** `adapt-plan` suggest called `getTargetRir(profile, lift)` with no phase → graded on BASE RIR while the plan/logger/verdict used the phase-aware value. Now passes `phaseTag`. One target everywhere.
+
+**Rejected:** a new table for swaps/adds (reused `plan_adjustments` +2 columns — same scope/reversibility machinery); an uncapped add frequency ("plan dictates" was the instinct, but the science caps it at 2×/week); rebuilding a plan to surface the features (the materialize-side stamp makes re-materialize enough — avoids re-deriving weights from a stale typed baseline).
+
+**Verified:** RIR fixtures 6/6, classification 7/7, burner 11/11 on the live pipeline, all touched fns type-check clean. **NOT device-verified** — the logger UI (range/swap toggle/＋ button) and the `generate-combined-plan` build-stamp on a real plan are the outstanding proof; Michael's hip-thrust add tomorrow is the acceptance test.

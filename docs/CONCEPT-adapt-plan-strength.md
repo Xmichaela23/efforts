@@ -1,6 +1,6 @@
 # CONCEPT — "Adapt a Plan" (strength first)
 
-Status: **design doc, uncommitted. No code written.** Written 2026-07-23 from a full trace (server + client + docs). This is the plan we build against; it captures what already exists so the build is wiring, not re-invention. Read `TARGET-ARCHITECTURE.md` (steerable plans), `LIFECYCLE.md` (frozen-vs-live) and `CONCEPT-plan-your-week.md` (the reschedule half) alongside it.
+Status: **SHIPPED + DEPLOYED + BURNER-VERIFIED 2026-07-23** (server data-path; client device-verification in progress). Substance is in **D-315**. Read `TARGET-ARCHITECTURE.md` (steerable plans), `LIFECYCLE.md` (frozen-vs-live) and `CONCEPT-plan-your-week.md` (the reschedule half) alongside it. The **Receipts ledger** at the bottom is the evidence base — formulas, groundings, verification.
 
 ---
 
@@ -109,3 +109,33 @@ Not a new build. `adapt-plan auto` already bumps weight when e1RM trends up + RI
 
 ## Sequencing
 Design the hub to hold all four disciplines, build **strength only** first: **Step 0 (RIR wiring) → 1 (permanent swap) → 3 (surface+consent auto-progress) → 2 (add exercise)**. Prove the pattern, then clone for run/bike/swim. Everything writes through `adapt-plan`/materialize, reads the spine.
+
+---
+
+## Receipts ledger (the evidence base)
+
+The numbers and rules in this system are grounded and verified, not hand-picked. This is the receipt trail — cite it before changing a coefficient.
+
+### 1. Loading model — how a lift's weight is computed
+**`weight = reference 1RM × exercise ratio × working %`**, rounded to a rackable increment (5 lb / 2.5 kg).
+- Ratios live in `src/lib/exercise-config.ts` (one per exercise, keyed to a `primaryRef` of squat/bench/deadlift/overhead/hipThrust). Sample: **leg press 1.50×** squat · front squat 0.85× · goblet 0.45× · Bulgarian split 0.50× · **hip thrust 0.90×** deadlift.
+- Server (authoritative, rest-of-plan): `materialize-plan` `calculateWeightFromConfig`. Client (today-only swap estimate): `StrengthLogger` `applySwap` — same formula, so they agree. Same-ref swaps scale straight off the current load (no baseline needed); cross-ref/fresh use `getBaseline1RM × ratio × working%`.
+- **Verified outputs** (real configs): squat 250 → leg press **375** / front squat **215** / goblet **115**; deadlift 300 → trap bar **300**; cross-ref squat 250 → chest fly **65**; fresh hip thrust off a 405 deadlift → **255**. All land on plate-loadable numbers.
+
+### 2. RIR model — how hard each set is prescribed
+Lift-aware base (protocol `defaultTargetRir`, lower vs upper) **+ phase offset**, clamped [0.5, 4].
+- Phase offsets (`strength-profiles.ts PHASE_RULES.targetRirOffset`): base 0 · build −0.5 · peak −1.0 · taper +0.5 · recovery +1.0.
+- **Grounding:** RP/RTS mesocycle model (reps-in-reserve descend across accumulation toward the peak, reset up on deload; taper stays fresh). Half-step display as a range ("2–3") = the Tuchscherer/RTS 0.5-RPE convention.
+- **Single source (continuity receipt):** the stamped `target_rir` is read by the analyzer (`analyze-strength-workout:535`, "target_rir is the source of truth"), the State verdict (`response-model/weekly.ts computeLiftVerdict`), and the logger preload — one number, three surfaces.
+
+### 3. Added-exercise frequency — how often an add appears
+Capped at **2×/week** per added lift (`materialize-plan` `ADDED_EXERCISE_WEEKLY_CAP`).
+- **Grounding:** Schoenfeld / Ogborn / Krieger 2016 meta-analysis — training a muscle 2×/week beats 1× at equated volume; a 3rd session shows no reliable additional benefit. Placement (which days) is contained to the lift's movement group via `getMovementGroup`; frequency then emerges from the plan's own matching-day count, capped here.
+
+### 4. Direct-swap grouping — what counts as "the same movement"
+A curated equivalence map (`exercise-alternatives.ts DIRECT_FAMILIES`) — squat / deadlift / horizontal-press / vertical-press / rows / pulls. A member of the slot's family is a **Direct swap** (Leg Press for a Back Squat); a same-pattern lift outside the family is an **Alternative** (Hip Thrust on a deadlift — same hinge, loads off the deadlift, but not a deadlift). Ranked within the movement-pattern filter, so it never trips the primaryRef push/pull trap (Q-181).
+
+### 5. Verification performed
+- **Burner 11/11 on the LIVE deployed pipeline** (`scripts/_burner-strength-adapt.mjs`, gitignored): a throwaway user → generate/materialize a strength plan → asserts RIR stamped phase+lift-aware, swap renames + reseeds, add lands lower-days-only capped 2×/week — then deletes the user.
+- RIR fixtures 6/6 (`strength-profiles-rir-phase.test.ts`), movement-group classification 7/7, all touched edge functions type-check clean.
+- **NOT device-verified** at time of writing: the logger UI (range/swap/add render) and `generate-combined-plan`'s build-time stamp on a real plan.

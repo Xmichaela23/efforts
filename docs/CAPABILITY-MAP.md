@@ -153,7 +153,7 @@ Law 2 says measured ≠ inferred. These are inferred and presented as measured.
 
 | change | trigger | asked? |
 |---|---|---|
-| **Strength weight auto-progression / deload** | `adapt-plan` action=`auto`, fire-and-forget from **every workout ingest** + cron (`adapt-plan:1161/1188`) → `materialize-plan:1232` rewrites future rows | **NO — silent.** Only trace is `plan_adjustments.reason`. ⚠️ It also **skips the Arc fatigue/taper/adherence gate** that the *suggest* path applies (`buildAdaptSuggestionGates:484` is only called in the suggest branch) — so a bump too risky to **suggest** still gets **written**. |
+| **Strength weight auto-progression / deload** | ⛔ **DELETED 2026-07-23 (D-315).** The silent auto-write on every ingest is gone (consent-first, extends D-285). Weights now change ONLY on the athlete's tap: State adjust modal, `adapt-plan` accept, or a swap/add. The `suggest` path still computes the progression signal (now phase-aware, matching the stamped target); the State strength row surfaces it; the athlete applies it. | **YES — always asked now.** |
 | Strength week relayout | `adapt-plan:750` on plan-JSON fingerprint change | NO on auto; YES on suggest→accept |
 | Manual 1RM override | `StrengthAdjustmentModal.tsx:82` → `materialize-plan` | **YES** — athlete initiates. Mounted at `StateTab.tsx:1370`. |
 | Drag-reschedule | `WorkoutCalendar.tsx:397` | PARTLY (see above) |

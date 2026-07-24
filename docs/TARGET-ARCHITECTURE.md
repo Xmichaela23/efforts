@@ -43,6 +43,8 @@ Each anchor has one resolver. The resolver decides how much the **live (learned)
 
 A user adjustment to one discipline, at any stage, in either direction, flows through **one adaptation path**: it re-materializes the plan coherently, is explained ("you eased the bike this week"), respects the plan's structure and the interference model, and every screen reflects it because they all read the one truth. State changes the plan; the change is legible (Self-Awareness Axis 5).
 
+> **First built slice — STRENGTH (2026-07-23, D-315).** The "adapt a plan" strength track is the first of this destination actually built + deployed + burner-verified: phase+lift-aware RIR (one stamped target the logger, analyzer, and State verdict all read), reversible swap + add on `plan_adjustments`, and consent-first weights (no silent auto-changes). Every edit writes through `adapt-plan`/`materialize-plan` and reads the spine — the one adaptation path, exactly as above. **The loading model, RIR model, frequency cap, and swap grouping are grounded + verified — the receipts ledger is in `CONCEPT-adapt-plan-strength.md`.** Run/bike/swim clone this pattern next; the refine-hub UI (State → per-discipline screens) is the outstanding surface.
+
 ## History-aware plan building
 
 The plan generators read the **full picture** — history + live baselines + the spine — through the same layer everything else reads, so a generated plan is built from the same truth the app judges you against. No generator builds from partial or stale inputs. (Consolidating the four fragmented generators serves this.)

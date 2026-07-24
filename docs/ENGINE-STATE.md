@@ -24,7 +24,30 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-23 — STRENGTH + BIKE OUTPUT CHARTS SHIPPED · NAME-SPLIT BUG FIXED · STATE LAYOUT WIDENED · ALL DEVICE-SEEN EXCEPT BIKE POWER)
+## 🧭 NEXT SESSION — START HERE (2026-07-23 EVENING — "ADAPT A PLAN" STRENGTH TRACK SHIPPED + DEPLOYED + BURNER-VERIFIED · AWAITING MICHAEL'S DEVICE TEST · NEXT = THE REFINE HUB)
+
+> ## READ `docs/GAME-PLAN.md` + `docs/CONCEPT-adapt-plan-strength.md`, then **D-315** (this batch) and back-annotated **D-285**.
+>
+> **What happened:** built the whole "adapt a plan" **strength** track. All PUSHED (`db912150` Step 0, `430c717a` the rest), edge functions DEPLOYED (`generate-combined-plan`, `materialize-plan`, `adapt-plan`), migration APPLIED (`plan_adjustments` +`substitute_exercise_name` +`add_meta`). **Burner-verified 11/11 on the LIVE pipeline** (`scripts/_burner-strength-adapt.mjs`, gitignored — a throwaway user, real materialize, deleted after).
+>
+> ### WHAT SHIPPED — do NOT re-litigate (server burner-verified; NOT device-seen yet):
+> - **Step 0 — phase + lift-aware RIR target, single-sourced (D-315).** `getTargetRir` gains a phase arg (`PHASE_RULES.targetRirOffset`, clamped [0.5,4]); stamped at BUILD (`session-factory`) AND at MATERIALIZE (`materialize-plan`, via `resolvePlanPhase`+`resolveProfile`) so existing mid-plan athletes pick it up on re-materialize (no regen). Logger renders half-steps as a field-standard RANGE ("2–3") via `src/lib/rir-format.ts`; logged values stay whole reps. Burner: squat base 2.5 → build 2.0. **This closed the STARVATION** — the RIR grade had no target before; now the logger preload = analyzer grade = State verdict, all on the one stamped value.
+> - **#1 SWAP (D-315).** Reversible override on `plan_adjustments.substitute_exercise_name`. Logger swap sheet gains "just today / rest of plan" (chips + typed). `materialize` renames the slot before weight resolution and re-seeds from the NEW lift's reference. Burner: bench → dumbbell bench, original gone, weight reseeded.
+> - **#2 ADD (D-315).** `plan_adjustments.add_meta`. Logger "＋ Add to plan" on a hand-added lift → `materialize` injects it into future strength days whose focus matches the lift's movement group (`getMovementGroup` in `exercise-config`), **capped 2×/week (Schoenfeld 2016)**, weight seeded from baseline. Idempotent (never persisted into `strength_exercises`). Burner: hip thrust on lower days only, 2 placements, seeded.
+> - **#3 CONSENT-FIRST WEIGHTS (D-315, extends D-285).** DELETED `adapt-plan`'s silent auto-progression/deload writes. Weights change ONLY on the athlete's tap now (State adjust modal / swap / add). Michael's ruling: "we shouldn't auto change weights, the user needs to know."
+> - **Continuity fix:** `adapt-plan` suggest now passes `phaseTag` to `getTargetRir` — the suggestion engine graded on BASE RIR while everything else used the phase-aware value (a quiet split). One target everywhere now.
+>
+> ### ⛔ UNVERIFIED — this is JOB #1 for the device: the CLIENT UI + the GENERATE path.
+> The burner proves the DEPLOYED materialize (RIR stamp + swap + add) on synthetic data. It does NOT prove: (a) the logger's range display / swap toggle / ＋ button render + fire on a real device; (b) `generate-combined-plan`'s build-time stamp on a REAL plan (burner hand-built the plan + ran materialize only — same `getTargetRir`, low risk). **Michael is adding hip thrusts tomorrow on his week-3 plan** — that add triggers the re-materialize that ALSO surfaces RIR on his upcoming weeks. He must be on the FRESH client (web/PWA hard-refresh, or `npm run ios`). If the ＋ button is missing → stale bundle.
+>
+> ### ⚠️ WATCH:
+> - **Do NOT back-date / rebuild to "see" the features** — they work on the existing plan via re-materialize (that's why the materialize-side stamp exists). A rebuild re-derives weights from typed baseline (could start lighter than his progressed loads) and creates orphan past planned rows. Logged history/e1RM is user-scoped, never at risk.
+> - **Typed-name swap edge case:** a swap recorded against a slot renamed by equipment-substitution could miss the name match. Rare.
+> - **Single-row materialize** (`planned_workout_id` path) can't see sibling days, so the 2×/week add cap is only exact on a full-plan re-materialize (which the add flow triggers). Fine in practice.
+>
+> ### ▶ NEXT JOB — THE REFINE HUB (the architecture we agreed, NOT yet built). Today's strength edits live in the LOGGER (swap sheet, ＋ button) + the StateTab weight link — scattered. The agreed front door: **State = dashboard + an "Adjust plan" button → a refine hub → one screen per discipline** (Goals = build from scratch, State = refine). Build strength's screen first (it just re-homes what exists), then clone for run/bike/swim. `AllPlansInterface` has NOTHING to migrate (its edit features are all dead/stubbed — see the audit); the one live pattern to reuse is `TodaysEffort`'s optional-session/XOR-swap. See `CONCEPT-adapt-plan-strength.md`.
+
+## 🧭 NEXT SESSION — START HERE (SUPERSEDED 2026-07-23 EVENING — strength charts below still stand; the session moved to the "adapt a plan" strength track)
 
 > ## READ `docs/GAME-PLAN.md`, then **D-312 → D-314** (this session) and **Q-200** (the one open design call).
 >
