@@ -44,6 +44,33 @@
  */
 import { EXERCISE_CONFIG, getExerciseConfig, type ExerciseConfig } from './exercise-config.ts';
 
+// DIRECT-SWAP FAMILIES — a small curated map of "the same movement, programmed differently," the way a
+// strength app groups substitutes. Members of the same family are DIRECT swaps for each other (Leg Press
+// for a Back Squat); a same-pattern lift NOT in the family is a same-muscle ALTERNATIVE (Hip Thrust is
+// hip-dominant like a deadlift but it is not a deadlift). Names are in normalized form (lowercase,
+// punctuation→space). A slot not found in any family falls back to a loadable-compound heuristic below.
+const DIRECT_FAMILIES: Array<Set<string>> = [
+  // Squat / quad-dominant compounds
+  new Set(['back squat', 'barbell back squat', 'squat', 'front squat', 'leg press', 'hack squat', 'goblet squat', 'box squat', 'safety bar squat', 'zercher squat', 'belt squat']),
+  // Deadlift / bilateral hip-hinge compounds (NOT hip thrust / glute bridge — those are accessories)
+  new Set(['conventional deadlift', 'deadlift', 'sumo deadlift', 'trap bar deadlift', 'hex bar deadlift', 'romanian deadlift', 'rdl', 'stiff leg deadlift', 'stiff legged deadlift', 'deficit deadlift', 'rack pull', 'good morning']),
+  // Horizontal press
+  new Set(['bench press', 'barbell bench press', 'incline bench press', 'decline bench press', 'close grip bench press', 'dumbbell bench press', 'dumbbell incline press', 'floor press']),
+  // Vertical press
+  new Set(['overhead press', 'standing overhead press', 'strict press', 'military press', 'push press', 'seated dumbbell press', 'dumbbell shoulder press', 'arnold press', 'z press']),
+  // Horizontal pull (rows)
+  new Set(['barbell row', 'bent over row', 'pendlay row', 'dumbbell row', 't bar row', 'seal row', 'chest supported row', 'cable row', 'seated cable row']),
+  // Vertical pull
+  new Set(['pull up', 'chin up', 'lat pulldown', 'pulldown', 'neutral grip pulldown']),
+];
+
+/** The family a lift belongs to (by normalized name, singular-tolerant), or null if uncurated. */
+function directFamilyOf(normName: string): Set<string> | null {
+  const singular = normName.endsWith('s') ? normName.slice(0, -1) : normName;
+  for (const fam of DIRECT_FAMILIES) if (fam.has(normName) || fam.has(singular)) return fam;
+  return null;
+}
+
 export interface AlternativeOption {
   /** The exercise name, title-cased for display. */
   name: string;
@@ -110,13 +137,10 @@ export function getInSlotAlternatives(
   const norm = (n: string) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 
   const selfNorm = norm(plannedName);
-  // The lift's family word — the last token of its name ("conventional deadlift" → "deadlift",
-  // "back squat" → "squat"). A "direct swap" is a VARIATION of the same lift (shares this word);
-  // everything else in the same movement pattern is a same-muscle ALTERNATIVE, not the same lift.
-  // This is what separates deadlift variants (Trap Bar / Sumo / RDL) from a heavy glute movement
-  // (Hip Thrust — same pattern, loads off the deadlift, but not a deadlift). Trade-off: an oddly-named
-  // legit swap (Leg Press for a squat) lands in Alternatives — acceptable; it IS a different movement.
-  const familyWord = selfNorm.split(' ').filter(Boolean).pop() || '';
+  // DIRECT = same curated family (Leg Press IS a direct swap for a Back Squat); a same-pattern lift NOT
+  // in the family is an ALTERNATIVE (Hip Thrust). If the slot isn't in any family, fall back to a
+  // loadable-compound heuristic (a barbell/dumbbell compound is direct; band/bodyweight is lighter).
+  const slotFamily = directFamilyOf(selfNorm);
   const selfTight = selfNorm.replace(/ /g, '');
   const seen = new Set<string>([selfNorm, selfTight.endsWith('s') ? selfTight.slice(0, -1) : selfTight]);
   const out: AlternativeOption[] = [];
@@ -157,12 +181,13 @@ export function getInSlotAlternatives(
     const need = equipmentOf(c);
     if (!canDo(equipment, need)) continue;                   // they cannot load it
 
-    // DIRECT = a variation of the same lift (shares the family word); everything else same-pattern is a
-    // same-muscle ALTERNATIVE. Ranked within the pattern-filtered list, heaviest first inside each tier.
+    // DIRECT = same curated family; else same-pattern is an ALTERNATIVE. Ranked heaviest-first per tier.
     const ratio = typeof c.ratio === 'number' ? c.ratio : 0;
     const loadable = need === 'barbell' || need === 'dumbbell';
-    const tier: AlternativeOption['tier'] =
-      familyWord && loadable && k.split(' ').includes(familyWord) ? 'direct' : 'lighter';
+    const kSingular = k.endsWith('s') ? k.slice(0, -1) : k;
+    const tier: AlternativeOption['tier'] = slotFamily
+      ? (slotFamily.has(k) || slotFamily.has(kSingular) ? 'direct' : 'lighter')  // curated slot
+      : (loadable ? 'direct' : 'lighter');                                        // uncurated fallback
     out.push({ name: titleCase(key), same_pattern: true, equipment: need, tier, _ratio: ratio } as AlternativeOption & { _ratio: number });
   }
 

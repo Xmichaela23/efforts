@@ -10,6 +10,7 @@ import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, CheckCircle, Pencil, 
 import { useAppContext } from '@/contexts/AppContext';
 import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-alternatives';
 import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
+import { getExerciseConfig } from '@/lib/exercise-config';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
 import CoreTimer from '@/components/CoreTimer';
@@ -4273,10 +4274,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       // lift — a hip thrust is 90% of your deadlift, a lunge 50% of your squat; even an
                       // in-slot swap shifts the ratio). We let the athlete enter what they used; the
                       // analyzer doesn't grade load on a swap (un-anchored, D-289). Reps/duration stay.
+                      // WEIGHT ON SWAP (supersedes Q-181's "always clear"): the new lift starts at a
+                      // computed, rackable weight — current load scaled by the two lifts' loading refs
+                      // (squat 250 → leg press ×1.5 = ~375), rounded to 5 lb / 2.5 kg so it adds up with
+                      // plates. Same reference only; if we can't anchor it (different ref, no current
+                      // weight) we clear and let them enter it. Matches the server math for rest-of-plan.
                       const applySwap = (altName: string) => {
+                        const oldCfg = getExerciseConfig(exercise.planned_name || exercise.name);
+                        const newCfg = getExerciseConfig(altName);
+                        const curW = exercise.sets.find((s) => typeof s.weight === 'number' && s.weight > 0)?.weight ?? 0;
+                        const inc = exercise.unit === 'kg' ? 2.5 : 5;
+                        let seed = 0;
+                        if (oldCfg?.primaryRef && newCfg?.primaryRef && oldCfg.primaryRef === newCfg.primaryRef
+                          && (oldCfg.ratio ?? 0) > 0 && (newCfg.ratio ?? 0) > 0 && curW > 0) {
+                          seed = Math.round((curW * (newCfg.ratio as number) / (oldCfg.ratio as number)) / inc) * inc;
+                        }
                         setExercises((prev) => prev.map((ex) =>
                           ex.id === exercise.id
-                            ? { ...ex, name: altName, sets: ex.sets.map((st) => ({ ...st, weight: 0, completed: false })) }
+                            ? { ...ex, name: altName, sets: ex.sets.map((st) => ({ ...st, weight: seed, completed: false })) }
                             : ex,
                         ));
                         if (swapRestOfPlan && exercise.planned_name) void persistPlanSwap(exercise.planned_name, altName);
