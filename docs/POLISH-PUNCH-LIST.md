@@ -50,6 +50,15 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 **All deployed and live.** Fixtures are green; **none of this has been driven by a human yet.** Tick these off as you train.
 
+## ⚡ AWAITING MICHAEL — 2026-07-24 COPY VOICE SWEEP + WEEK-NARRATIVE FIXES (coach v149, DEPLOYED, client PUSHED)
+
+The coach narrative + posture sentence are **server-verified** (live `skip_cache` call). The **~45 client copy strings are NOT device-seen** — needs a fresh bundle (web hard-refresh, or `npm run ios` for the phone). Look for:
+- [ ] Run row ⓘ → the new posture line ("Running's at about half the 3-a-week plan…") + "pace fading on long efforts" (was "aerobic base needs work").
+- [ ] State "Show more" → week narrative reads clean/silent (no "Riding came in below…" on your parked bike, no "heavier than planned" contradiction).
+- [ ] BODY section → the pushy "This week: prioritize recovery" fallback is GONE.
+- [ ] Workout screen → "Heavier than the plan called for" (was "you went heavier — intentional?").
+- [ ] BlockSummary / CoachWeek / Adjust tabs → no "X detected", "Insufficient data", "move the needle", "Cardiac drift".
+
 ## ⚠️ READ THIS FIRST — do NOT recompute the Mon 2026-07-13 strength session
 
 Q-178 fixed the predicate so a set flagged `completed` with **zero reps, zero weight, zero duration** no longer counts as performed. **That is correct — but that Monday row is genuinely incomplete**, because the logger had no weight box and never persisted the duration (Q-180). So a **recompute of that session will now honestly report the Farmers Carry as unrecorded**, and the score will fall. **The work happened; the record of it does not exist, and no amount of recomputing will conjure it.**

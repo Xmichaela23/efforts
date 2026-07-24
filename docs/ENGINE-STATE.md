@@ -24,7 +24,28 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-24 — THE LOAD/STRAIN VERDICT IS NOW MULTI-SPORT (D-317+D-318), DEVICE-VERIFIED · NEXT = BUILD THE STATE-AS-HUB **ADJUST** TAB)
+## 🧭 NEXT SESSION — START HERE (2026-07-24 EVE — APP-WIDE COPY VOICE RESET + WEEK-NARRATIVE POSTURE FIXES SHIPPED (coach v149) · NEXT = DEVICE-VERIFY THE COPY, THEN RESUME THE STATE-AS-HUB **ADJUST** TAB)
+
+> ## READ `docs/COPY-VOICE.md` (the new voice template) + **D-319 → D-321** (this session), then the still-valid Adjust-tab banner below.
+>
+> **Your JOB:** (1) DEVICE-VERIFY this session's copy/voice sweep on a FRESH bundle — the coach narrative + posture sentence are server-verified, but the ~45 CLIENT strings need Michael's eyes (web hard-refresh, or `npm run ios` for the phone). (2) Then resume the roadmap: build the State-as-hub **Adjust** tab (see the banner below + `CONCEPT-adapt-plan-strength.md`).
+>
+> ### WHAT SHIPPED — do NOT re-litigate (coach DEPLOYED v145→149, compute-snapshot + workout-detail DEPLOYED, client PUSHED to Netlify, snapshot recomputed, narrative + posture SERVER-VERIFIED via live coach call):
+> - **App-wide copy voice reset to the "quant who trains" template** — new `docs/COPY-VOICE.md` (10 rules + banned idiom/jargon lists). ~45 live strings rewritten across State / Adjust / CoachWeek / BlockSummary / workout-detail + server prose (posture, week-narrative, cross-training, strength-protocol). Michael-calibrated: no "you said", no idioms, present-participle ("fading" not "fades"), "fell short by N", cause as "as a result of". The hard-check `voiceViolation` lives in `week-accent.ts`; wiring it app-wide is the NEXT enforcement step (NOT built).
+> - **Posture diagnosis (D-292/Q-179) rewritten fact-first AND finally surfaced** — renders in the run efficiency ⓘ tap-down (`StatePerformanceSection.RunFitnessRow`). Orphaned always-visible `PostureLine` (F10) DELETED.
+> - **State continuity — client fallback DELETED** (`useStateTrends.ts`): the server display contract is the single source; loading state when absent, zero client re-derivation.
+> - **`overall_training_read` "This week" fallback DELETED (F8)** — the ~25-branch imperative tree duplicating the load bar. Client render + server function + emission gone; type nullable.
+> - **Week-narrative posture GOVERNMENT (3 device-caught bugs, all `coach-week-insights.ts`, 32 tests green):** (a) MAINTAIN disciplines excluded from the plan-adherence line — killed "Running came in heavier than planned" over "under what holds it"; (b) PARKED ('out') disciplines stay silent — fixed 'out'→'dropped' + bike/ride alias (took 2 tries: v147 keyed 'bike', but disciplines canonicalize to 'ride'); (c) the fade clause fires ONLY for a `develop` discipline you're building (was: any undeclared one). Deleted the dead `MIN_SHARE_PCT` guard.
+>
+> ### ⛔ STILL UNVERIFIED / OPEN:
+> - **CLIENT copy on device** — the ~45 client strings are server-correct + build-clean but NOT device-seen. Michael must be on the fresh bundle (iOS needs `npm run ios`).
+> - **Copy stragglers (deliberately left):** the dead `buildVerdict` taper cues (shown nowhere → deletion pass), the `ai-summary` LLM prompt example text, `longitudinal-signals.ts` "efficiency factor".
+> - **Q-201** — one rare cross-engine contradiction (narrative load-read vs coach's-eye fitness-read on a develop focus); DEFERRED, needs a coach reorder → Phase 7.
+> - **Voice check not wired app-wide** — `voiceViolation` gates only week-accent today.
+>
+> ### ▶ THE PLAN (Michael, end of session): lock in behavior, THEN a dedicated DEAD-CODE / REFACTOR pass (GAME-PLAN Phase 7 — dead edge functions, orphaned components, 150+ one-off scripts). Its OWN careful pass with tests, never mixed into feature work.
+
+## 🧭 NEXT SESSION — START HERE (SUPERSEDED 2026-07-24 EVE — the copy/voice + continuity + week-narrative-bug session moved the work; the load/strain multi-sport fix + Adjust-tab roadmap below still stand as history)
 
 > ## READ `docs/CONCEPT-adapt-plan-strength.md` (the **State-as-hub** section) + **D-316** (the three-tab design), then **D-317 → D-318** (this session's engine fix).
 >
