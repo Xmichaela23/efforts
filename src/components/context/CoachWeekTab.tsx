@@ -232,7 +232,7 @@ function PlanAdaptationCard({
 
   return (
     <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-900/5 p-4">
-      <div className="text-sm font-medium text-amber-200/90 mb-2">Plan adjustment suggestion</div>
+      <div className="text-sm font-medium text-amber-200/90 mb-2">Suggested plan change</div>
       <div className="space-y-2">
         {suggestions.map((s) => (
           <div key={s.code} className="rounded-lg bg-white/[0.04] border border-white/10 px-3 py-2">
@@ -560,7 +560,7 @@ export default function CoachWeekTab() {
           <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-center">
             <Target className="w-6 h-6 text-white/30 mx-auto mb-2" />
             <div className="text-sm text-white/60 mb-1">No active training plan</div>
-            <div className="text-xs text-white/35">Add a goal to generate a plan and unlock weekly coaching.</div>
+            <div className="text-xs text-white/35">A goal generates a plan and weekly coaching.</div>
           </div>
         </div>
       ) : (
@@ -626,8 +626,8 @@ export default function CoachWeekTab() {
                 <div className={`mt-3 text-xs leading-relaxed ${readiness.summary === 'on_track' ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
                   {(readiness as any).summary_line
                     ?? (readiness.summary === 'on_track'
-                      ? 'Training base looks solid — stay consistent and trust the taper.'
-                      : 'Focus on the flagged items above before taper week.')}
+                      ? 'Training base is solid heading into taper.'
+                      : 'The flagged items above are still short heading into taper.')}
                 </div>
               )}
               {readiness.context_note && (
@@ -647,7 +647,7 @@ export default function CoachWeekTab() {
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div>
                   <div className="text-sm text-white/80">Key sessions</div>
-                  <div className="text-[10px] text-white/40 mt-0.5">Intervals, long runs, tempo — the sessions that move the needle.</div>
+                  <div className="text-[10px] text-white/40 mt-0.5">Intervals, long runs, and tempo — the sessions that build fitness.</div>
                 </div>
                 <div className="text-sm text-white/90 font-medium shrink-0">
                   {keySessionsLinked}/{keySessionsPlanned} done
@@ -1059,7 +1059,7 @@ function SnapshotTrends({ trends }: { trends: any }) {
   const rows = [
     { label: 'Run quality', data: trends.run_quality },
     { label: 'Perceived effort', data: trends.effort_perception },
-    { label: 'Cardiac drift', data: trends.cardiac },
+    { label: 'Heart-rate drift', data: trends.cardiac },
     { label: 'Strength', data: trends.strength },
   ].filter(r => r.data && r.data.trend !== 'insufficient');
 
@@ -1092,7 +1092,7 @@ function SnapshotTrends({ trends }: { trends: any }) {
       )}
       {trends.cross_training && !trends.cross_training.interference && rows.length > 0 && (
         <div className="text-[10px] text-emerald-400/60">
-          Strength and endurance are working well together.
+          Strength and endurance aren't interfering.
         </div>
       )}
 

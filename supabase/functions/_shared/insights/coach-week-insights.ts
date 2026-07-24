@@ -168,10 +168,10 @@ export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | nu
       // Fact, full stop. The old closer ("the plan reflects where you are now, not where you were
       // scheduled to be") was consoling reassurance — the register this composer explicitly rejects
       // elsewhere. Michael 2026-07-23: "the last sentence is weird." The bar + fading line carry the rest.
-      referenceLine = `${Cap(label(under[0].discipline))} came in lighter than the plan asked.`;
+      referenceLine = `${Cap(label(under[0].discipline))} came in lighter than planned.`;
     } else if (over.length === 1 && !under.length) {
       referenceDiscipline = over[0].discipline;
-      referenceLine = `${Cap(label(over[0].discipline))} ran heavier than planned — that load is carried forward, not forgotten.`;
+      referenceLine = `${Cap(label(over[0].discipline))} came in heavier than planned — it carries into next week's rolling load.`;
     } else if (!under.length && !over.length && planned.length >= 2) {
       // The generic all-clear. Suppressed below if anything specific fired — "you missed reps" followed
       // by "everything landed inside the plan" is the app arguing with itself (D-305). Load-based
@@ -183,8 +183,8 @@ export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | nu
       // off-plan work stays visible instead of being absorbed into an all-clear.
       const off = active.filter((d) => !(typeof d.plannedLoad === 'number' && (d.plannedLoad as number) > 0));
       allClearLine = off.length
-        ? `What the plan asked for landed in range, and ${off.map((d) => label(d.discipline)).join(' and ')} went in on top of it.`
-        : 'Everything the plan asked for landed in range.';
+        ? `Planned sessions landed in range, with ${off.map((d) => label(d.discipline)).join(' and ')} on top.`
+        : 'Planned sessions landed in range.';
     }
   } else if (!inp.hasPlan) {
     // NO PLAN IS NOT A DEFICIT. Their own trailing normal is the yardstick — the Strava band pattern,
@@ -193,11 +193,11 @@ export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | nu
     if (typeof r === 'number' && Number.isFinite(r)) {
       if (r < BAND_LO) {
         wholeWeekDown = true;
-        referenceLine = 'That is a lighter week than your recent normal, which is how a down week is supposed to look.';
+        referenceLine = 'Lighter than the recent normal — the shape of a down week.';
       } else if (r > BAND_HI) {
-        referenceLine = 'That is more than your recent normal — a bigger week reads as fitness later only if the recovery lands.';
+        referenceLine = 'More than the recent normal — a bigger week only turns into fitness if it is absorbed.';
       } else {
-        referenceLine = 'That sits inside your recent normal.';
+        referenceLine = 'Sits inside the recent normal.';
       }
     }
   }
@@ -243,9 +243,9 @@ export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | nu
     // fact and stop — "it's the one you're building" is only meaningful against a declared intent.
     // No injury claim, no "should", ever.
     const what = isStrength(f)
-      ? 'Your estimated one-rep maxes have been sliding'
-      : `${Cap(label(f.discipline))} ran below its own recent normal this week`;
-    parts.push(postureOf(f) === 'develop' ? `${what} — and it's the one you're building.` : `${what}.`);
+      ? 'Estimated one-rep maxes have been sliding'
+      : `${Cap(label(f.discipline))} came in below its recent normal this week`;
+    parts.push(postureOf(f) === 'develop' ? `${what} — the one being built.` : `${what}.`);
   }
 
   // ── 2b. CREDIT — the best-supported finding in the concurrent-training literature, and the one the

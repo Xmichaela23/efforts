@@ -38,7 +38,7 @@ function buildRouteReadout(history: unknown): RouteReadout | null {
         direction: 'improving', points: n };
     case 'declining':
       return { badge: 'Slower at effort', headline: 'Slipping a little on this route.',
-        why: 'Lately you’re running it slower at the same heart rate. Worth a look — not a verdict.',
+        why: 'Lately this route is running slower at the same heart rate.',
         direction: 'declining', points: n };
     case 'holding':
       return { badge: 'Holding', headline: 'Holding steady here.',
@@ -46,7 +46,7 @@ function buildRouteReadout(history: unknown): RouteReadout | null {
         direction: 'holding', points: n };
     default:
       return { badge: 'Still reading', headline: `${n} runs in — the trend isn’t clear yet.`,
-        why: 'Your easy runs here vary a lot day to day. Keep logging this route and the read sharpens.',
+        why: 'Easy runs on this route swing a lot day to day, so the read is still coarse.',
         direction: 'still_learning', points: n };
   }
 }
@@ -774,8 +774,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     }
     if (Number.isFinite(vi) && vi > 0) {
       parts.push(vi <= 1.05
-        ? `Steady output (VI ${vi.toFixed(2)}) — well-controlled power.`
-        : `Variable output (VI ${vi.toFixed(2)}) — surgey power delivery.`);
+        ? 'Power held steady the whole way.'
+        : 'Power came in uneven as a result of surging.');
     }
     if (Number.isFinite(avgHr) && avgHr > 0) parts.push(`Avg HR ${Math.round(avgHr)} bpm.`);
     const flag = Array.isArray(flagsV1)
@@ -1725,10 +1725,10 @@ function buildSessionInterpretation(params: {
   // Strength: weight and volume deviations
   if (type === 'strength' || type === 'mobility') {
     if (weightDeviation?.direction === 'heavier') {
-      deviations.push({ dimension: 'weight', direction: 'over', detail: 'Went heavier than planned' });
+      deviations.push({ dimension: 'weight', direction: 'over', detail: 'Heavier than planned' });
       overall = 'deviated';
     } else if (weightDeviation?.direction === 'lighter') {
-      deviations.push({ dimension: 'weight', direction: 'under', detail: 'Went lighter than planned' });
+      deviations.push({ dimension: 'weight', direction: 'under', detail: 'Lighter than planned' });
       overall = 'deviated';
     } else if (weightDeviation?.direction === 'on_target' && (weightDeviation as any)?.message?.includes('heavier') && (weightDeviation as any)?.message?.includes('lighter')) {
       deviations.push({ dimension: 'weight', direction: 'matched', detail: 'Some heavier, some lighter' });
@@ -1915,14 +1915,14 @@ function computeStrengthWeightDeviation(
   if (anyHeavier && !anyLighter) {
     return {
       direction: 'heavier',
-      message: 'You went heavier than planned — intentional?',
+      message: 'Heavier than the plan called for.',
       show_prompt: true,
     };
   }
   if (anyLighter && !anyHeavier) {
     return {
       direction: 'lighter',
-      message: 'You went lighter than planned — intentional?',
+      message: 'Lighter than the plan called for.',
       show_prompt: true,
     };
   }
@@ -1985,7 +1985,7 @@ function computeStrengthVolumeDeviation(
     const detail = overDetails.length === 1 ? overDetails[0] : `${overDetails.length} exercises over plan`;
     return {
       direction: 'over',
-      message: `You did more volume than planned${detail ? ` (${detail})` : ''} — intentional?`,
+      message: `More total volume than planned${detail ? ` (${detail})` : ''}.`,
       show_prompt: true,
     };
   }
@@ -1993,7 +1993,7 @@ function computeStrengthVolumeDeviation(
     const detail = underDetails.length === 1 ? underDetails[0] : `${underDetails.length} exercises under plan`;
     return {
       direction: 'under',
-      message: `You did less volume than planned${detail ? ` (${detail})` : ''} — intentional?`,
+      message: `Less total volume than planned${detail ? ` (${detail})` : ''}.`,
       show_prompt: true,
     };
   }

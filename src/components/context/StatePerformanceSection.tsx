@@ -100,7 +100,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
       {showDot ? (
         <FitnessDotBlock label={leadIsPower ? 'power' : 'efficiency'} range={range!} verdict={lead.verdict} showAxis={showAxis} explain={leadIsPower
           ? "Power = how your cycling power is trending versus your own baseline (from your ride power against your FTP). The dot is where it sits, the arrow the direction."
-          : "Efficiency = how much power you hold per heartbeat on steady rides. Rising means you’re doing the same work at a lower heart rate — your aerobic engine getting fitter. The dot is where it sits versus your baseline; the arrow is the direction."} />
+          : "Efficiency = how much power you hold per heartbeat on steady rides. Rising means the same work at a lower heart rate — getting fitter. The dot is where it sits versus your baseline; the arrow is the direction."} />
       ) : (
         <Signal label={leadIsPower ? 'Power' : 'Efficiency'} sig={lead} />
       )}
@@ -235,10 +235,10 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
       {/* AUTOREGULATION read — the FATIGUE axis, distinct from the e1RM numbers above (D-302 slice 2). Grinding
           shows as RIR below prescription BEFORE it shows in e1RM. Sourced from the spine's
           `strength_rir_below_prescription` — rendered here, NOT recomputed, pulled from the nudge list so it
-          lives in ONE place. ⚠ WORDING placeholder to tune to voice: fact-first, conditional, no imperative. */}
+          lives in ONE place. Voice: fact-first, conditional, no imperative (docs/COPY-VOICE.md). */}
       {fatigue && (
         <span className="basis-full text-[13px] text-amber-300/80 leading-snug mt-1">
-          Reps in reserve have run below target — you're training closer to failure than the plan called for. Sustained, that's the fatigue a deload clears.
+          Recent sets are landing below the planned reps in reserve — closer to failure than the plan called for. Held for weeks, that's the fatigue a deload clears.
         </span>
       )}
     </Row>
@@ -280,8 +280,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 // (never a current verdict); sparse → "needs 20+ min steady effort" (what the metric needs, not what
 // the user did wrong); the label SCOPES the claim to steady runs (not intervals/short runs).
 const DECOUPLING_BAND: Record<DecouplingBand, { word: string; cls: string }> = {
-  sound: { word: 'aerobic base is sound', cls: 'text-emerald-300' },
-  needs_work: { word: 'aerobic base needs work', cls: 'text-amber-400/90' },
+  sound: { word: 'pace holds on long efforts', cls: 'text-emerald-300' },
+  needs_work: { word: 'pace fading on long efforts', cls: 'text-amber-400/90' },
 };
 
 // State v3 fitness DOT — the current value's position in the athlete's OWN 12-week range (left = worst,
@@ -451,7 +451,7 @@ function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: nu
   );
 }
 
-function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; mode?: FitnessMode; anchor?: FitnessAnchor }) {
+function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; postureSentence?: string | null; showAxis?: boolean; mode?: FitnessMode; anchor?: FitnessAnchor }) {
   const { useImperial } = useAppContext();
   const eff = fitness.efficiency;
   const dur = fitness.decoupling;
@@ -504,7 +504,7 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
       )}
       {/* durability — the SECONDARY read now (fatigue resistance within a run), quiet, only when real */}
       {durWord && (
-        <span className="basis-full text-[12px] text-white/55">durability · {durWord}{dur.stale ? ` · last steady run ${dur.newestAgeDays}d ago` : ''}</span>
+        <span className="basis-full text-[12px] text-white/55">{durWord}{dur.stale ? ` · last steady run ${dur.newestAgeDays}d ago` : ''}</span>
       )}
       {/* PROJECTED RACE TIMES (Michael 2026-07-22) — goal-free VDOT off current fitness, for the varied
           runner the efficiency row can't serve. Longer distances unlock as the long run grows (a marathon
@@ -532,16 +532,25 @@ function RunFitnessRow({ fitness }: { fitness: RunFitness; showAxis?: boolean; m
       {explainOpen && (
         <p className="basis-full text-[12px] text-white/60 leading-snug mt-1 max-w-[min(100%,340px)]">
           Efficiency = how much speed you get per heartbeat on steady runs, adjusted for hills so terrain
-          doesn't skew it. Rising means you're running faster at the same heart rate — your aerobic engine
-          getting fitter.
+          doesn't skew it. Rising means you're running faster at the same heart rate — getting fitter.
           {eff.pctChange != null && (
             <> The {verdictSignedPct(eff.verdict, eff.pctChange)} is the change across the window below:
             about {Math.abs(eff.pctChange)}% {eff.pctChange < 0 ? 'less' : 'more'} speed per heartbeat than
             6 weeks ago.</>
           )}
           {' '}"Easing off" means it's still drifting down; "settled lower" means it dropped, then levelled.
-          It's a trend, so it needs a few steady runs to read a direction. Durability, below, is the other
-          half: how well that efficiency holds across a single long run.
+          It's a trend, so it needs a few steady runs to read a direction. The line below is the other
+          half: whether your pace holds across a single long run.
+        </p>
+      )}
+      {/* THE "WHY" — the athlete-specific cause, server-minted from declared posture + how much they've
+          actually been running (Michael 2026-07-24). Rendered inside the ⓘ tap-down (opt-in "extra
+          understanding"), NOT as an always-visible line, so it doesn't duplicate the week-execution
+          trade sentence. Names ONLY the observable (declared intent + volume) — never a physiology cause
+          (posture.ts's no-cause law). Null when no posture is declared → renders nothing. */}
+      {explainOpen && postureSentence && (
+        <p className="basis-full text-[12px] text-white/70 leading-snug mt-1.5 max-w-[min(100%,340px)]">
+          {postureSentence}
         </p>
       )}
     </Row>
@@ -672,28 +681,11 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
   );
 }
 
-// Q-179 — WHAT THE ATHLETE SAID, next to what the numbers did.
-//
-// The line is MINTED ON THE SERVER (`_shared/state-trend/posture.ts`). This renders it and decides
-// nothing — Constitution Law 4. If the athlete declared no posture, `postureSentence` is null and
-// this renders nothing at all, so a user without a declared intent sees exactly what they saw before.
-//
-// The bug it closes: the athlete declared run='maintain' while building strength, ran 3x/month
-// instead of 19x, got slower at the same effort — precisely what maintaining implies — and this
-// screen said "aerobic base needs work" in amber. Every number above this line was correct. The app
-// simply never asked what he was trying to do.
-//
-// Deliberately NOT amber, NOT a warning, NOT an icon. A trade is not a failure (SPEC-posture-flag §6).
-function PostureLine({ card }: { card: DisciplineCard }) {
-  const sentence = (card as any).postureSentence as string | null | undefined;
-  if (!sentence) return null;
-  const concern = (card as any).postureRead === 'develop_declining' || (card as any).postureRead === 'develop_stalled';
-  return (
-    <p className={`pl-[84px] pr-1 -mt-0.5 mb-1.5 text-[13px] leading-snug max-w-[min(100%,360px)] ${concern ? 'text-amber-400/80' : 'text-white/65'}`}>
-      {sentence}
-    </p>
-  );
-}
+// Q-179 — WHAT THE ATHLETE SAID, next to what the numbers did. The server mints the sentence
+// (`_shared/state-trend/posture.ts`, on `card.postureSentence`); it now renders inside the RUN row's
+// efficiency ⓘ tap-down (see RunFitnessRow) as opt-in "extra understanding", so it can't duplicate the
+// always-visible week-execution trade sentence. (The old always-visible `PostureLine` — orphaned since
+// it was written, F10 — is removed 2026-07-24 now that the ⓘ carries this.)
 
 export default function StatePerformanceSection({ strengthDetail, stateDisplay, primaryDiscipline, planWeek, strengthFatigue }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; primaryDiscipline?: string | null; planWeek?: number | null; strengthFatigue?: boolean }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
@@ -746,7 +738,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         const renderCard = (card: DisciplineCard, showAxis: boolean) => {
           const inner = (() => {
             if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} />;
-            if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
+            if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} postureSentence={card.postureSentence} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
             if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
             if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} fatigue={strengthFatigue} />{strengthDetail}</>;

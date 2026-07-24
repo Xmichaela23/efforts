@@ -74,7 +74,7 @@ const CEILING_INFO =
 // bike/swim lower (largely aerobic, retained better).
 function floorDetail(disc: string): string {
   switch (canon(disc)) {
-    case 'run': return 'Running is specific — only running holds it. Your aerobic base can hold on other work, but running fitness, economy and impact tolerance ease at this volume and only come back by running.';
+    case 'run': return 'Running is specific — only running holds it. Easy fitness carries over from riding and swimming, but running speed and impact tolerance ease at this volume and come back only by running.';
     case 'bike': return 'Cycling holds better than running would at low volume — largely aerobic and retained — but the top end eases if you stay here.';
     case 'swim': return 'Swim fitness is mostly technique and aerobic, so it drifts slowly — the feel goes before the fitness does.';
     default: return `Only ${lab(disc)} holds ${lab(disc)}; at this volume it eases.`;

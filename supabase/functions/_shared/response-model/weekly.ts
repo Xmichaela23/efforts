@@ -26,7 +26,6 @@ import {
   type ContextPrompt,
   type GoalSummary,
   type WeekHeadline,
-  type OverallTrainingRead,
   type EmptyState,
   type ArcInputsForResponse,
 } from './types.ts';
@@ -519,136 +518,6 @@ function daysUntilYmd(asOfYmd: string, targetYmd: string | null | undefined): nu
   }
 }
 
-/** Holistic week copy; always computed. Clients show it only when they have no endurance lines to render.
- * Arc-aware: phase, recent races, and goal stack drive the wording instead of the
- * generic "very little completed" / "past weeks still anchor fitness" fallback.
- */
-function computeOverallTrainingRead(args: {
-  asOfDate: string;
-  discipline: { runs: number; rides: number; strength: number; swims: number };
-  load: LoadContext;
-  assessment: Assessment;
-  planIntent: string | null;
-  completionPct: number | null;
-  arc?: ArcInputsForResponse | null;
-}): OverallTrainingRead {
-  const { runs, rides, strength, swims } = args.discipline;
-  const bits: string[] = [];
-  if (runs > 0) bits.push(`${runs} run${runs === 1 ? '' : 's'}`);
-  if (rides > 0) bits.push(`${rides} ride${rides === 1 ? '' : 's'}`);
-  if (strength > 0) bits.push(`${strength} strength`);
-  if (swims > 0) bits.push(`${swims} swim${swims === 1 ? '' : 's'}`);
-  const completed = bits.length ? `${bits.join(', ')} completed this week.` : '';
-
-  const arc = args.arc ?? null;
-  const phase = arc?.current_phase ?? null;
-  const goals = arc?.active_goals ?? [];
-  const recent = arc?.recent_completed_events ?? [];
-  const hasPlan = arc?.active_plan != null;
-
-  // ── Arc-grounded primary lines ─────────────────────────────────────────────
-  // Most recent race within the last ~14 days takes priority — recovery framing trumps phase guesses.
-  const veryRecentRace = recent.length > 0 && recent[0].days_ago <= 14 ? recent[0] : null;
-
-  let primary: string | null = null;
-  let tone: OverallTrainingRead['tone'] = 'neutral';
-
-  if (veryRecentRace) {
-    primary = `${veryRecentRace.days_ago} day${veryRecentRace.days_ago === 1 ? '' : 's'} post ${veryRecentRace.name}. Recovery week — easy movement only, no quality sessions.`;
-    tone = 'info';
-  } else if (phase === 'recovery') {
-    primary = 'Recovery week — easy aerobic work only. No quality sessions until load normalizes.';
-    tone = 'info';
-  } else if (phase === 'taper' && goals.length > 0) {
-    const next = goals[0];
-    const days = daysUntilYmd(args.asOfDate, next.target_date);
-    primary = days != null && days >= 0
-      ? `${days} day${days === 1 ? '' : 's'} to ${next.name} — taper week. Sharpen, don't strain.`
-      : `Taper week for ${next.name}. Sharpen, don't strain.`;
-    tone = 'info';
-  } else if ((phase === 'build' || phase === 'maintenance') && goals.length > 0) {
-    const next = goals[0];
-    const days = daysUntilYmd(args.asOfDate, next.target_date);
-    const weeks = days != null && days >= 0 ? Math.round(days / 7) : null;
-    const head = weeks != null
-      ? `${weeks} week${weeks === 1 ? '' : 's'} to ${next.name}.`
-      : `${next.name} on the calendar.`;
-    primary = completed ? `${head} ${completed}` : `${head} Light week so far — keep building.`;
-    tone = args.assessment.label === 'responding' ? 'positive' : 'neutral';
-  } else if (goals.length > 0) {
-    const next = goals[0];
-    const days = daysUntilYmd(args.asOfDate, next.target_date);
-    const weeks = days != null && days >= 0 ? Math.round(days / 7) : null;
-    const head = weeks != null ? `${weeks} week${weeks === 1 ? '' : 's'} to ${next.name}.` : `${next.name} on the calendar.`;
-    primary = completed ? `${head} ${completed}` : head;
-  } else if (!hasPlan && goals.length === 0) {
-    primary = completed
-      ? `No goal set — ${completed.toLowerCase().replace(/\.$/, '')}. Add a goal to direct training.`
-      : 'No goal set — maintaining general fitness. Add a goal to direct training.';
-    tone = 'info';
-  }
-
-  // ── Plan-intent and load fragments (only when we have a plan + intent) ────
-  const intent = String(args.planIntent || '').toLowerCase();
-  let intentFrag = '';
-  if (!veryRecentRace && hasPlan) {
-    if (intent === 'taper') intentFrag = ' Taper week: fewer hard runs can be intentional before your race.';
-    else if (intent === 'recovery') intentFrag = ' Recovery week: reduced run volume is often by design.';
-  }
-
-  const wv = args.load.week_vs_plan_pct;
-  let planFrag = '';
-  if (hasPlan && wv != null && intent !== 'taper' && intent !== 'recovery' && !veryRecentRace) {
-    if (wv < 70) planFrag = ' Total workload is well below what the plan targeted.';
-    else if (wv > 120) planFrag = ' Total workload is above planned.';
-  }
-
-  // Load framing — only when ACWR has signal AND we are not in an Arc-driven recovery context.
-  // Suppresses the old "past weeks still anchor fitness" line right after a race.
-  const inArcRecovery = veryRecentRace != null || phase === 'recovery';
-  const loadFrag = inArcRecovery
-    ? ''
-    : args.load.acwr_status === 'high_risk'
-      ? ' Training stress is high versus your recent baseline — prioritize recovery.'
-      : args.load.acwr_status === 'elevated'
-        ? ' Training stress is somewhat elevated versus baseline.'
-        : args.load.acwr_status === 'detrained' || args.load.acwr_status === 'undertrained'
-          ? hasPlan
-            ? ' Recent load is below your typical 4-week baseline — past weeks still anchor fitness.'
-            : ''
-          : '';
-
-  // ── Compose the line ──────────────────────────────────────────────────────
-  // If Arc gave us a primary line, use it; otherwise fall back to the legacy mosaic.
-  const base = primary != null
-    ? primary
-    : completed
-      ? completed
-      : 'Light week — aerobic maintenance.';
-
-  const summary = (base + intentFrag + planFrag + loadFrag).replace(/\s+/g, ' ').trim();
-
-  // ── Tone resolution ───────────────────────────────────────────────────────
-  if (args.load.acwr_status === 'high_risk') tone = 'warning';
-  else if (
-    !inArcRecovery &&
-    args.completionPct != null &&
-    args.completionPct < 40 &&
-    intent !== 'taper' &&
-    intent !== 'recovery' &&
-    hasPlan
-  ) {
-    tone = 'warning';
-  } else if (intent === 'taper' || intent === 'recovery') {
-    tone = 'info';
-  } else if (args.assessment.label === 'responding') {
-    tone = 'positive';
-  } else if (tone === 'neutral' && runs + rides + strength + swims >= 3) {
-    tone = 'info';
-  }
-
-  return { summary, tone };
-}
 
 /**
  * Build the State header empty-state copy when there's no active plan, no upcoming event,
@@ -849,7 +718,7 @@ function computeContextPrompt(
   if (totalSessionsGaps >= 2) {
     return {
       show: true,
-      question: `You missed ${totalSessionsGaps} planned sessions this week. What happened?`,
+      question: `Planned sessions fell short by ${totalSessionsGaps} this week.`,
       tags: CONTEXT_TAGS,
     };
   }
@@ -857,7 +726,7 @@ function computeContextPrompt(
   if (completionPct != null && completionPct < 50) {
     return {
       show: true,
-      question: 'Training volume is well below plan. Anything going on?',
+      question: 'Volume this week landed well under the plan.',
       tags: CONTEXT_TAGS,
     };
   }
@@ -865,7 +734,7 @@ function computeContextPrompt(
   if (rpeDecline) {
     return {
       show: true,
-      question: 'Your sessions are feeling harder than usual. What\'s up?',
+      question: 'Sessions have felt harder than usual lately.',
       tags: CONTEXT_TAGS,
     };
   }
@@ -897,7 +766,7 @@ export function computeWeeklyResponse(opts: {
   discipline_mix?: { runs: number; rides: number; strength: number; swims: number } | null;
   /**
    * ArcContext subset (current phase, goals, recent races, active plan). Threads through to
-   * computeOverallTrainingRead and computeEmptyState so coach can speak from Arc, not vibes.
+   * computeEmptyState so coach can speak from Arc, not vibes.
    */
   arc?: ArcInputsForResponse | null;
 }): WeeklyResponseState {
@@ -912,15 +781,10 @@ export function computeWeeklyResponse(opts: {
   const visible_signals = computeVisibleSignals(endurance, strength);
   const disciplineMix = opts.discipline_mix ?? { runs: 0, rides: 0, strength: 0, swims: 0 };
   const arc = opts.arc ?? null;
-  const overall_training_read = computeOverallTrainingRead({
-    asOfDate: opts.asOfDate,
-    discipline: disciplineMix,
-    load,
-    assessment,
-    planIntent: pc?.week_intent ?? null,
-    completionPct: opts.completionPct ?? null,
-    arc,
-  });
+  // overall_training_read DELETED 2026-07-24 — its ~25-branch imperative fallback ("prioritize recovery",
+  // "Sharpen, don't strain", "Your body is responding well") duplicated the load bar it rendered beside on
+  // State (F8 / docs/COPY-VOICE.md). The client now reads "not enough data" when BODY has no signals.
+  const overall_training_read = null;
 
   const empty_state = computeEmptyState({
     asOfDate: opts.asOfDate,

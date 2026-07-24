@@ -469,8 +469,8 @@ export type CoachWeekContextV1 = {
     trends: {
       fitness_direction: string;
       /** S2: the pre-assembled State display contract (cards + per-discipline fitness reads), built on
-       *  the server and rendered verbatim by StatePerformanceSection. null when the snapshot predates S2
-       *  → the client falls back to the legacy in-browser assembly (useStateTrends). */
+       *  the server and rendered verbatim by StatePerformanceSection. null only before the first snapshot
+       *  produces it → the client shows a loading state (there is NO client-side fallback assembly anymore). */
       display?: StateDisplayV1 | null;
       readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
       readiness_label: string | null;

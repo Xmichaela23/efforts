@@ -50,7 +50,7 @@ Deno.test('a discipline below its own normal is named, as description not diagno
     disciplines: [d('run', 70, 5, { acwr: 1.1 }), d('strength', 30, 1, { verdict: 'sliding' })],
   });
   assert(out, 'expected a paragraph');
-  assert(out!.includes('estimated one-rep maxes have been sliding'), out!);
+  assert(out!.toLowerCase().includes('estimated one-rep maxes have been sliding'), out!);
   // NOT a prescription and NOT an injury claim.
   assert(!/should|need to|must|risk|injur/i.test(out!), out!);
 });
@@ -73,7 +73,7 @@ Deno.test('PLAN: under-plan reads as consequence, never as a tally', () => {
     ],
   });
   assert(out, 'expected a paragraph');
-  assert(out!.includes('came in lighter than the plan asked'), out!);
+  assert(out!.includes('came in lighter than planned'), out!);
   // The consoling closer was dropped (Michael 2026-07-23) — fact-first, no reassurance register.
   assert(!/where you are now|scheduled to be/i.test(out!), out!);
   // The tally form the prompt bans: "N of M".
@@ -89,7 +89,7 @@ Deno.test('PLAN: a partial week cannot read as "came in lighter" (the Q-177 trap
       d('strength', 2, 1, { plannedLoad: 30 }),
     ],
   });
-  assert(!out || !out.includes('lighter than the plan asked'), String(out));
+  assert(!out || !out.includes('lighter than planned'), String(out));
 });
 
 Deno.test('NO PLAN: a down week is explicitly not a failure state', () => {
@@ -99,7 +99,7 @@ Deno.test('NO PLAN: a down week is explicitly not a failure state', () => {
     disciplines: [d('run', 60, 2), d('strength', 40, 2)],
   });
   assert(out, 'expected a paragraph');
-  assert(out!.includes('how a down week is supposed to look'), out!);
+  assert(out!.includes('the shape of a down week'), out!);
   // Never render plan-absence as a deficit.
   assert(!/plan/i.test(out!), out!);
 });
@@ -111,7 +111,7 @@ Deno.test('NO PLAN: within-normal reads flat, with no praise', () => {
     disciplines: [d('run', 60, 3), d('ride', 40, 2)],
   });
   assert(out, 'expected a paragraph');
-  assert(out!.includes('inside your recent normal'), out!);
+  assert(out!.includes('inside the recent normal'), out!);
 });
 
 // ── FOCUS (posture) — "what is affecting what" ──────────────────────────────────────────────────────
@@ -133,7 +133,7 @@ Deno.test('DEVELOP: the discipline being built earns the consequence clause', ()
     disciplines: [d('run', 70, 4, { acwr: 1.0 }), d('strength', 30, 1, { verdict: 'sliding' })],
   });
   assert(out, 'expected a paragraph');
-  assert(out!.includes("it's the one you're building"), out!);
+  assert(out!.includes('the one being built'), out!);
 });
 
 Deno.test('UNKNOWN posture: states the fact, never the "you\'re building it" consequence', () => {
@@ -142,7 +142,7 @@ Deno.test('UNKNOWN posture: states the fact, never the "you\'re building it" con
     disciplines: [d('run', 70, 4, { acwr: 1.0 }), d('strength', 30, 1, { verdict: 'sliding' })],
   });
   assert(out, 'expected a paragraph');
-  assert(out!.includes('estimated one-rep maxes have been sliding'), out!);
+  assert(out!.toLowerCase().includes('estimated one-rep maxes have been sliding'), out!);
   assert(!out!.includes("you're building"), out!);
 });
 
@@ -208,8 +208,8 @@ Deno.test('STRENGTH is judged by e1RM, not by a volume ratio', () => {
     disciplines: [d('run', 70, 4, { acwr: 1.0 }), d('strength', 30, 3, { acwr: 1.1, verdict: 'sliding' })],
   });
   assert(sliding, 'expected a paragraph');
-  assert(sliding!.includes('estimated one-rep maxes have been sliding'), sliding!);
-  assert(sliding!.includes("it's the one you're building"), sliding!);
+  assert(sliding!.toLowerCase().includes('estimated one-rep maxes have been sliding'), sliding!);
+  assert(sliding!.includes('the one being built'), sliding!);
 });
 
 Deno.test('no e1RM verdict → no strength claim at all (no inference without evidence)', () => {
@@ -265,8 +265,8 @@ Deno.test('doing every prescribed session and STILL sliding is reported, not swa
     ],
   });
   assert(out, 'expected a paragraph');
-  assert(out!.includes('estimated one-rep maxes have been sliding'), out!);
-  assert(out!.includes("it's the one you're building"), out!);
+  assert(out!.toLowerCase().includes('estimated one-rep maxes have been sliding'), out!);
+  assert(out!.includes('the one being built'), out!);
 });
 
 // ── PROTOCOL AWARENESS — the block's design decides what the number means ───────────────────────────
@@ -291,7 +291,7 @@ Deno.test('5x5: the STALL is the event worth naming', () => {
     disciplines: [d('run', 50, 3, { plannedLoad: 50 }), d('strength', 40, 2, { plannedLoad: 40 })],
   });
   assert(out, 'expected a paragraph');
-  assert(out!.includes('that is the stall'), out!);
+  assert(out!.includes('stall'), out!);
 });
 
 Deno.test('5x5: hitting the 85% ceiling reads as the block ending, not a problem', () => {
@@ -324,7 +324,7 @@ Deno.test('MAINTENANCE dose: sliding IS the story, because holding is its only j
     disciplines: [d('run', 70, 4, { plannedLoad: 70, acwr: 1.1 }), d('strength', 15, 1, { plannedLoad: 15 })],
   });
   assert(out, 'expected a paragraph');
-  assert(out!.includes('holding is the one thing that block is for'), out!);
+  assert(out!.includes('the one job of that block is to hold'), out!);
 });
 
 Deno.test('an ungrounded protocol stays silent rather than guessing', () => {

@@ -60,7 +60,7 @@ export function readStrengthProtocol(ctx: StrengthProtocolContext | null | undef
     // SIGNAL: the stall (reps missed at the prescribed load), and the 85% ceiling that ends the block.
     case 'five_by_five': {
       if (ctx.missedPrescribedReps === true) {
-        return 'You missed reps at the prescribed load — on a linear block that is the stall, and it is what ends the ramp rather than a bad week.';
+        return 'Reps came up short at the prescribed load. On a linear block that stall is the signal the ramp is done — a retest sets the next block.';
       }
       if (typeof ctx.workingPct === 'number' && ctx.workingPct >= FIVE_BY_FIVE_CEILING_PCT) {
         return `You are at the top of the 5×5 ramp (${Math.round(ctx.workingPct)}% of your max). Linear progression runs out here — a retest is what sets the next block's numbers.`;
@@ -73,7 +73,7 @@ export function readStrengthProtocol(ctx: StrengthProtocolContext | null | undef
     // SIGNAL: sliding, because holding is the single job this block has.
     case 'minimum_dose': {
       if (sliding) {
-        return 'Your lifts have drifted down while on a maintenance dose — holding is the one thing that block is for, so it is worth a look.';
+        return 'Estimated maxes have drifted down on a maintenance dose — the one job of that block is to hold them.';
       }
       return null;
     }

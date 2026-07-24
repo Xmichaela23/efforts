@@ -24,8 +24,9 @@ Deno.test('Q-179 REGRESSION: a MAINTAIN discipline that slides while STILL BEING
   assertEquals(read, 'maintain_slipping');
   assertEquals(isConcern(read), false); // ⛔ THE WHOLE POINT. Not orange. Not a warning. Not a scold.
   const s = postureSentence(read, disciplineWord('run'), KEEPING_IT_UP)!;
-  assertStringIncludes(s, 'running');
-  assertStringIncludes(s, "That's the trade");
+  assertStringIncludes(s.toLowerCase(), 'running');
+  assertStringIncludes(s, 'holding near the plan');
+  assertEquals(s.toLowerCase().includes('you said'), false); // voice reset: no accusatory second person
 });
 
 Deno.test('Q-179: the SAME slide, declared DEVELOP, IS a concern — intent is the whole difference', () => {
@@ -46,15 +47,17 @@ Deno.test('⛔ FALSE COMFORT: an "improving" trend must NEVER be read as "you ar
   const read = readPosture('maintain', 'improving', STOPPED);
   assertEquals(read, 'maintain_dropped');
   const s = postureSentence(read, disciplineWord('run'), STOPPED)!;
-  assertStringIncludes(s, 'You said 3 a week');
-  assertStringIncludes(s, 'less than one a week');
+  assertStringIncludes(s, 'well under half the 3-a-week plan'); // 0.75/3 = 0.25 → the coarse gap phrase
+  assertStringIncludes(s, 'picks back up when the running does'); // the reversible-mechanism clause
+  assertEquals(s.toLowerCase().includes('you said'), false); // no accusatory second person
   assertEquals(s.includes('and you are'), false); // the false-comfort sentence must not appear
 });
 
 Deno.test('maintain_dropped is a TRADE, not a failure — it is never painted as a concern', () => {
   assertEquals(isConcern(readPosture('maintain', 'improving', STOPPED)), false);
   const s = postureSentence('maintain_dropped', 'running', STOPPED)!;
-  assertStringIncludes(s, "That's a trade, not a mistake");
+  assertStringIncludes(s, 'the 3-a-week plan'); // states the gap vs the plan, not a scold
+  assertEquals(s.toLowerCase().includes('mistake'), false);
 });
 
 Deno.test('NO DECLARED TARGET -> we cannot claim they are or are not maintaining -> SILENCE, not reassurance', () => {
@@ -170,7 +173,7 @@ Deno.test("REAL GOAL ROW, 2026-07-14 — the exact bag on the athlete's active g
   assertEquals(runRead, 'maintain_dropped');
   assertEquals(isConcern(runRead), false); // a trade is not a failure — never amber
   const s = postureSentence(runRead, disciplineWord('run'), runBehaviour)!;
-  assertStringIncludes(s, 'You said 3 a week');
+  assertStringIncludes(s, 'well under half the 3-a-week plan');
 
   // The lifting is the job he chose, and it is holding rather than moving → THAT is the concern.
   assertEquals(isConcern(readPosture(posture.strength, 'holding')), true);

@@ -204,8 +204,7 @@ const BlockSummaryTab: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-white/60">
         <Loader2 className="w-8 h-8 animate-spin mb-3" />
-        <div className="text-sm">Analyzing your training block...</div>
-        <div className="text-xs text-white/40 mt-1">This may take a moment</div>
+        <div className="text-sm">Reading your last four weeks…</div>
       </div>
     );
   }
@@ -216,7 +215,7 @@ const BlockSummaryTab: React.FC = () => {
       <div className="px-4 py-8">
         <div className="text-center">
           <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-2" />
-          <h3 className="text-base font-semibold text-white mb-2">Error Loading Analysis</h3>
+          <h3 className="text-base font-semibold text-white mb-2">The block summary didn't load.</h3>
           <p className="text-sm text-white/60 mb-4">{error}</p>
           <button 
             onClick={handleRefresh} 
@@ -234,13 +233,13 @@ const BlockSummaryTab: React.FC = () => {
   if (!data) {
     return (
       <div className="px-4 py-8 text-center">
-        <p className="text-sm text-white/60">No analysis data available</p>
-        <p className="text-xs text-white/40 mt-2">Complete some workouts to see your block summary</p>
+        <p className="text-sm text-white/60">No block summary yet</p>
+        <p className="text-xs text-white/40 mt-2">It fills in as workouts land.</p>
         <button 
           onClick={handleRefresh} 
           className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white transition-colors"
         >
-          Generate Analysis
+          Build block summary
         </button>
       </div>
     );
@@ -253,7 +252,7 @@ const BlockSummaryTab: React.FC = () => {
         <div className="text-center">
           <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-2" />
           <h3 className="text-base font-semibold text-white mb-2">Block Data Unavailable</h3>
-          <p className="text-sm text-white/60 mb-4">Block data contract missing</p>
+          <p className="text-sm text-white/60 mb-4">Block summary didn't load.</p>
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
@@ -368,7 +367,7 @@ const BlockSummaryTab: React.FC = () => {
               </div>
             )}
             {crossDomain?.interference_detected && (
-              <div className="text-[10px] text-amber-400/70 mt-2">Strength-endurance interference detected</div>
+              <div className="text-[10px] text-amber-400/70 mt-2">Strength and endurance are pulling against each other.</div>
             )}
           </div>
         );
@@ -544,7 +543,7 @@ const TrendItem: React.FC<{ discipline: string; trend: any; quality: any }> = ({
         <Icon className={`w-4 h-4 mt-0.5 ${config.color}`} />
         <div>
           <span className={`text-sm capitalize ${config.color}`}>{discipline}</span>
-          <p className="text-xs text-white/50 mt-0.5">{trend.message || 'Insufficient data'}</p>
+          <p className="text-xs text-white/50 mt-0.5">{trend.message || 'Not enough data yet'}</p>
         </div>
       </div>
     );
@@ -683,7 +682,7 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
 
       {!adaptation ? (
         <div className="text-sm text-white/60">
-          Not enough adaptation data yet. New workouts will populate this automatically.
+          Not enough data yet. It fills in as workouts land.
         </div>
       ) : (
         <div className="space-y-4">
@@ -705,7 +704,7 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
                   {drivers.length ? (
                     <>Driven by: <span className="text-white/75">{drivers.join(' • ')}</span></>
                   ) : (
-                    <>Add more workouts to increase signal quality.</>
+                    <>More workouts sharpen this read.</>
                   )}
                 </div>
               </div>
@@ -725,7 +724,7 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
           {/* Aerobic efficiency */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs uppercase tracking-wide text-white/50">Aerobic efficiency (easy/Z2)</div>
+              <div className="text-xs uppercase tracking-wide text-white/50">Aerobic efficiency (easy runs)</div>
               <div className="text-xs text-white/50">
                 {aero?.sample_count ? `${aero.sample_count} samples` : '—'}
                 {aero?.confidence ? ` • ${String(aero.confidence).toUpperCase()}` : ''}
@@ -762,7 +761,7 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
               </div>
             ) : (
               <div className="text-sm text-white/60">
-                No comparable easy/Z2 runs detected in this block yet.
+                No comparable easy runs in this block yet.
               </div>
             )}
 
@@ -814,7 +813,7 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
               </div>
             ) : (
               <div className="text-sm text-white/60">
-                No long runs detected in this block yet.
+                No long runs in this block yet.
               </div>
             )}
           </div>
@@ -854,7 +853,7 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
               </div>
             ) : (
               <div className="text-sm text-white/60">
-                No major lift data detected in this block yet.
+                No major lifts in this block yet.
               </div>
             )}
           </div>
@@ -899,7 +898,7 @@ const FitnessAdaptationSection: React.FC<{ adaptation: any | null | undefined }>
               </div>
             ) : (
               <div className="text-sm text-white/60">
-                No high-confidence baseline updates to suggest right now.
+                No baseline updates to suggest yet.
               </div>
             )}
           </div>
@@ -991,7 +990,7 @@ const WorkoutQualitySection: React.FC<{ quality: any }> = ({ quality }) => {
   const TREND_LABELS: Record<string, string> = {
     improving: 'improving',
     stable: 'stable',
-    worsening: 'worsening'
+    worsening: 'easing off'
   };
   
   return (

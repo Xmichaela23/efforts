@@ -509,7 +509,7 @@ function RaceSection({
               </span>
               {rr && (
                 <p className="text-[12px] text-white/32 leading-snug max-w-[280px]">
-                  Matches the gap and details below — one model: threshold, durability, data confidence.
+                  Matches the gap and details below — one model, from your threshold, fade over distance, and data confidence.
                 </p>
               )}
             </div>
@@ -1277,11 +1277,11 @@ export default function StateTab({
   // Arc-grounded empty-state copy authored by coach (response model). Falls back to a minimal
   // generic line only if the server payload is missing the field (e.g. older cache row).
   const serverEmptyState = wsv.empty_state ?? null;
-  const aimlessHeadline = serverEmptyState?.headline ?? 'No active plan — keep it general fitness.';
+  const aimlessHeadline = serverEmptyState?.headline ?? 'No active plan — training stays general fitness.';
   const aimlessSubtext =
     serverEmptyState?.subtitle ??
-    'Mostly easy aerobic work + one harder day, plus your usual strength. Avoid stacking hard sessions until you set a goal.';
-  const aimlessCtaLabel = serverEmptyState?.cta_label ?? 'No current goals — Create new goal';
+    'Mostly easy aerobic work, one harder day, and your usual strength. Without a goal to shape the week, back-to-back hard days add up faster than they help.';
+  const aimlessCtaLabel = serverEmptyState?.cta_label ?? 'Set a goal';
   const aimlessCtaAction = serverEmptyState?.cta_action ?? 'create_goal';
   const aimlessCtaTarget = aimlessCtaAction === 'plan_season' ? '/goals' : '/goals';
 
@@ -1436,7 +1436,7 @@ export default function StateTab({
                     className="self-start flex items-center gap-1 text-[13px] text-white/65 hover:text-white/70 transition-colors mt-0.5 touch-manipulation"
                     aria-expanded={narrativeOpen}
                   >
-                    {narrativeOpen ? 'Show less' : 'open for more'}
+                    {narrativeOpen ? 'Show less' : 'Show more'}
                     <ChevronDown className={`w-3 h-3 transition-transform ${narrativeOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {narrativeOpen && (
@@ -1544,7 +1544,7 @@ export default function StateTab({
           <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-1">
             <p className="text-[12px] font-semibold tracking-[0.12em] text-amber-300/80 uppercase">Race day</p>
             <p className="text-[13px] text-white/55 leading-snug">
-              Log your race as a completed run. We&apos;ll auto-save the elapsed (chip) result to My Record and end this plan — no extra tap needed.
+              Logging your race as a completed run auto-saves the elapsed (chip) result to My Record and ends this plan.
             </p>
           </div>
         )}
@@ -1554,25 +1554,10 @@ export default function StateTab({
           <div className="flex items-start gap-3">
             <span className="text-[12px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
             <div className="flex-1 space-y-1.5 tabular-nums">
-              {visibleSignals.length === 0 && (rm as any)?.overall_training_read?.summary && (
-                <div className="flex items-start gap-3">
-                  <span className="text-[13px] text-white/70 shrink-0 w-[104px]">This week</span>
-                  <span
-                    className={`flex-1 text-[13px] text-left leading-snug ${
-                      (rm as any).overall_training_read.tone === 'positive'
-                        ? 'text-emerald-400/90'
-                        : (rm as any).overall_training_read.tone === 'warning'
-                          ? 'text-amber-400/90'
-                          : (rm as any).overall_training_read.tone === 'info'
-                            ? 'text-sky-400/85'
-                            : 'text-white/70'
-                    }`}
-                  >
-                    {(rm as any).overall_training_read.summary}
-                  </span>
-                </div>
-              )}
-              {visibleSignals.length === 0 && !(rm as any)?.overall_training_read?.summary && (
+              {/* overall_training_read "This week" fallback DELETED 2026-07-24 — the ~25-branch summary
+                  duplicated the load bar above (F8 / docs/COPY-VOICE.md). When BODY has no per-metric
+                  signals it now simply reads "not enough data". */}
+              {visibleSignals.length === 0 && (
                 <Chip value="not enough data" valueClass="text-white/55" />
               )}
               {visibleSignals.map((s) => (

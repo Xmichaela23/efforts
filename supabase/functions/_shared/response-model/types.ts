@@ -254,8 +254,9 @@ export type WeeklyResponseState = {
   // Server-computed presentation — client renders verbatim
   headline: WeekHeadline;
   visible_signals: VisibleSignal[];
-  /** Holistic week line; clients show only when they render no endurance visible_signals. */
-  overall_training_read: OverallTrainingRead;
+  /** DELETED 2026-07-24 — the holistic "This week" fallback duplicated the load bar (F8/COPY-VOICE);
+   *  always null now, retained as a field so older cached readers don't break. */
+  overall_training_read: OverallTrainingRead | null;
   /** Server-authored State header copy when no plan/goal/event is active. Null when a plan or event drives the screen. */
   empty_state: EmptyState | null;
   context_prompt: ContextPrompt;

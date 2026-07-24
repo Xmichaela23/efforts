@@ -179,44 +179,55 @@ export function postureSentence(
   disciplineWord: string,
   behaviour?: PostureBehaviour | null,
 ): string | null {
-  // The two numbers, in the athlete's own units. "3 a week" / "about 1 a week" — never "0.74/wk".
-  const perWeek = (n: number): string => {
-    const r = Math.round(n * 10) / 10;
-    if (r === 0) return 'none';
-    if (r < 1) return 'less than one a week';
-    if (Math.abs(r - Math.round(r)) < 0.15) return `${Math.round(r)} a week`;
-    return `about ${r} a week`;
+  // ⛔ VOICE RESET 2026-07-24. The old copy read as an indictment — "You said 3 a week. You've been
+  // doing about 1.6 a week. That's a trade, not a mistake." Second-person accusatory, and a decimal
+  // rate ("1.6 a week") on top. The rule (docs: "quant who trains, not a coach who encourages"):
+  // FACT-FIRST, no "you said", no scold, no console, no imperative. State the SITUATION and the
+  // MECHANISM. Name ONLY the observable (volume) — never a physiology cause. A conditional consequence
+  // ("comes back when the running does") is allowed; a verdict on the person is not.
+  const cap = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`;
+  const endurance = disciplineWord !== 'lifting';
+  // The volume gap as a COARSE, honest phrase — never a decimal. Only used below the maintenance volume
+  // the athlete set (dropped fires below 80% of target, so the buckets only cover < 0.8).
+  const volumeGap = (act: number, tgt: number): string => {
+    const r = act / tgt;
+    if (r < 0.4) return `well under half the ${tgt}-a-week plan`;
+    if (r < 0.6) return `about half the ${tgt}-a-week plan`;
+    return `about two-thirds of the ${tgt}-a-week plan`;
   };
+  const t = behaviour?.targetSessionsPerWeek ?? null;
+  const a = behaviour?.actualSessionsPerWeek ?? null;
   switch (read) {
     case 'maintain_dropped': {
-      // ⛔ THE ONE THE APP OWED HIM. His words, his calendar, nothing else. No physiology, no cause,
-      // no verdict — and NOT a telling-off. SPEC-posture-flag §0: "You said maintain running. You've
-      // run once in three weeks." The app's job is not to stop you moving along the spectrum; it is
-      // to make sure you know you moved.
-      const t = behaviour?.targetSessionsPerWeek;
-      const a = behaviour?.actualSessionsPerWeek;
-      const said = t != null ? `You said ${perWeek(t)}` : `You chose to hold ${disciplineWord} steady`;
-      const did = a != null ? `You've been doing ${perWeek(a)}` : `You've been doing less`;
-      return `${said}. ${did}. That's a trade, not a mistake — but it's yours to make on purpose.`;
+      // Below the maintenance volume set. State the GAP + the MECHANISM + that it reverses. No "you said".
+      const gap = (t != null && a != null) ? volumeGap(a, t) : (t != null ? `below the ${t}-a-week plan` : 'below the plan');
+      const mech = endurance
+        ? `Easy pace drifts slower at lower volume, and picks back up when the ${disciplineWord} does.`
+        : `Strength eases at lower frequency, and rebuilds when the sessions do.`;
+      return `${cap(disciplineWord)}'s at ${gap}. ${mech}`;
     }
     case 'maintain_slipping':
-      // Still doing it, just slower in the sessions they did. The expected cost of holding steady.
-      return `You're holding ${disciplineWord} steady while you build elsewhere, and you're slower at the same effort. That's the trade, not a problem.`;
+      // Doing ~the planned volume, just slower in the sessions logged. The expected cost, stated flat.
+      return endurance
+        ? `${cap(disciplineWord)}'s holding near the plan, just slower at the same effort while the focus is elsewhere.`
+        : `${cap(disciplineWord)}'s holding near the plan, with the logged sessions a touch lighter.`;
     case 'maintaining':
-      return `You chose to hold ${disciplineWord} steady, and you are.`;
+      return `${cap(disciplineWord)}'s holding at the plan.`;
     case 'develop_declining':
-      // The one read that earns concern. Still names NO cause — we cannot see sleep, stress,
-      // illness or nutrition, and neither Garmin nor TrainingPeaks will name a cause with more.
-      return `You're building ${disciplineWord}, but you're slower at the same effort than you were. Worth a look at how much you've been doing.`;
+      // The one read that earns concern. Names NO cause (we cannot see sleep, stress, illness, nutrition) —
+      // states the fact and stops.
+      return endurance
+        ? `${cap(disciplineWord)}'s the focus, and it's slower at the same effort than it was.`
+        : `${cap(disciplineWord)}'s the focus, and it isn't moving up.`;
     case 'develop_stalled':
-      return `You're building ${disciplineWord}, and it's holding rather than moving.`;
+      return `${cap(disciplineWord)}'s the focus, and it's holding rather than rising.`;
     case 'developing':
-      return `${disciplineWord[0].toUpperCase()}${disciplineWord.slice(1)} is moving in the right direction.`;
+      return `${cap(disciplineWord)}'s moving in the right direction.`;
     case 'parked':
       return null; // Parked. Say nothing at all — an unasked question needs no answer.
     case 'unknown':
     default:
-      return null; // No declared intent → no posture claim. Today's behaviour, unchanged.
+      return null; // No declared intent → no posture claim.
   }
 }
 

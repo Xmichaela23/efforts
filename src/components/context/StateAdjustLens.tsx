@@ -12,14 +12,14 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   return (
     <div className="px-0.5">
       <p className="text-[13px] text-white/55 mb-4 leading-snug">
-        Steer your training. Changes apply from today forward — nothing changes on its own.
+        Everything here changes your training from today forward. Nothing applies on its own.
       </p>
 
       {/* STRENGTH — the deepest steer (swap / add / adjust weight already built; re-homing here next) */}
       <section className="mb-5">
         <div className="text-[12px] uppercase tracking-wider text-white/45 mb-2">Strength</div>
         {perLift.length === 0 ? (
-          <p className="text-[13px] text-white/40 leading-snug">Log some lifts and they show up here to steer.</p>
+          <p className="text-[13px] text-white/40 leading-snug">Logged lifts show up here.</p>
         ) : (
           <div className="space-y-1.5">
             {perLift.map((lt) => (
@@ -31,7 +31,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           </div>
         )}
         <p className="text-[11px] text-white/35 mt-2.5 leading-snug">
-          Swap, add, and adjust-weight live in the logger today — moving onto this row next.
+          Swap, add, and weight changes live in the logger for now.
         </p>
       </section>
 
@@ -39,7 +39,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       <section>
         <div className="text-[12px] uppercase tracking-wider text-white/45 mb-2">Run · Bike · Swim</div>
         <p className="text-[13px] text-white/40 leading-snug">
-          Ease or push each discipline's load — the everyday steer — is the next lens to wire here.
+          Ease or push each discipline's load — coming next.
         </p>
       </section>
     </div>
