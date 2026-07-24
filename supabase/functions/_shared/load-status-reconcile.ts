@@ -60,16 +60,38 @@ export interface BodyTrends {
 }
 
 /**
+ * Context that de-run-brains the strain signals (D-318). Both flags default to the
+ * pre-D-318 behavior, so any caller that omits them is byte-identical to before.
+ */
+export interface DecliningSignalOpts {
+  /** The plan's primary discipline. For a strength-primary plan, declining RIR is the training
+   *  INTENT (pushing closer to failure across a build), NOT strain — so it stops counting as a
+   *  declining body signal. The genuine strength-strain signal (e1RM declining) still flows through
+   *  computePrimaryAdherence, exactly as computePrimaryAdherence's Fix 1 already reasons. */
+  planPrimary?: PlanPrimary;
+  /** The absorption engine's steady-aerobic gate (absorption.signals.drift.available). When there is
+   *  no valid steady session to read HR drift from, the absorption engine excludes drift ("no steady
+   *  aerobic effort to corroborate") — so the reconciler's looser all-runs cardiac trend must NOT count
+   *  "HR drift declining" as strain either. Default true = pre-D-318 (drift always counted). */
+  driftUsable?: boolean;
+}
+
+/**
  * The declining body-signal names (≥2 sessions + declining trend). ONE canonical
  * computation (D-264) — the reconciler's `nDeclining` and Item 3's absorption
  * safety-floor (`nDeclining ≥ 2`) both read this, so they can never disagree.
+ *
+ * D-318: two signals are de-run-brained via `opts` — see DecliningSignalOpts. Both
+ * gates default OFF (opts omitted ⇒ identical to the pre-D-318 four-signal set).
  */
-export function computeDecliningSignals(bodyTrends: BodyTrends): string[] {
+export function computeDecliningSignals(bodyTrends: BodyTrends, opts: DecliningSignalOpts = {}): string[] {
   const s: string[] = [];
-  if (bodyTrends.cardiac.based_on_sessions >= 2 && bodyTrends.cardiac.trend === 'declining') s.push('HR drift');
+  const driftUsable = opts.driftUsable !== false; // default true (pre-D-318)
+  if (driftUsable && bodyTrends.cardiac.based_on_sessions >= 2 && bodyTrends.cardiac.trend === 'declining') s.push('HR drift');
   if (bodyTrends.effort_perception.based_on_sessions >= 2 && bodyTrends.effort_perception.trend === 'declining') s.push('RPE');
   if (bodyTrends.run_quality.based_on_sessions >= 2 && bodyTrends.run_quality.trend === 'declining') s.push('execution');
-  if (bodyTrends.strength.based_on_sessions >= 2 && bodyTrends.strength.trend === 'declining') s.push('RIR');
+  const rirCountsAsStrain = opts.planPrimary !== 'strength'; // strength-primary: declining RIR = intent, not strain
+  if (rirCountsAsStrain && bodyTrends.strength.based_on_sessions >= 2 && bodyTrends.strength.trend === 'declining') s.push('RIR');
   return s;
 }
 
@@ -79,7 +101,7 @@ export function computeDecliningSignals(bodyTrends: BodyTrends): string[] {
  * `assessAbsorption` as `safetyFloor`, which makes `corroborated_strain` true, so the
  * reconciler two-key cap lets it through. One shared computation (D-264).
  */
-export function computeSafetyFloor(bodyTrends: BodyTrends, readiness: string): boolean {
+export function computeSafetyFloor(bodyTrends: BodyTrends, readiness: string, opts: DecliningSignalOpts = {}): boolean {
   // D-266: the strong-evidence leg (effort_perception / RPE) is NECESSARY for the floor to fire.
   // Closes two leaks the safety floor was carrying: (1) two DEMOTED trends (HR drift + RIR) tripping
   // nDeclining≥2 with RPE flat; (2) readiness 'fatigued'/'overreached' fabricated upstream by
@@ -93,7 +115,7 @@ export function computeSafetyFloor(bodyTrends: BodyTrends, readiness: string): b
   const primaryDeclining =
     bodyTrends.effort_perception.based_on_sessions >= 2 &&
     bodyTrends.effort_perception.trend === 'declining';
-  const corroboratedDecline = primaryDeclining && computeDecliningSignals(bodyTrends).length >= 2; // primary + ≥1 other
+  const corroboratedDecline = primaryDeclining && computeDecliningSignals(bodyTrends, opts).length >= 2; // primary + ≥1 other
   const readinessHardFloor = readiness === 'overreached' && primaryDeclining;
   return corroboratedDecline || readinessHardFloor;
 }
@@ -207,11 +229,17 @@ export function reconcileLoadStatus(
    *  overreached), body/safety-driven highs pass; only load-only highs cap. Default true =
    *  no cap (backward-compat for callers that don't pass it). */
   corroboratedStrain: boolean = true,
+  /** D-318: the absorption engine's steady-aerobic drift gate. false ⇒ HR drift is not a strain signal
+   *  (no valid steady session to read it from). Default true = pre-D-318. Fed into computeDecliningSignals
+   *  alongside planPrimary so the escalation and the safety floor read the SAME de-run-brained signal set. */
+  driftUsable: boolean = true,
 ): { status: LoadStatusLevel; interpretation: string; acwrProvisional: boolean } {
   const reasons: string[] = [];
 
   // ── 0. Assess body response quality (shared computation — D-264) ───────
-  const decliningSignals = computeDecliningSignals(bodyTrends);
+  // D-318: strength-primary drops RIR-as-strain; an unusable drift gate drops HR-drift-as-strain.
+  const decliningOpts: DecliningSignalOpts = { planPrimary: planPosition.planPrimary ?? 'unknown', driftUsable };
+  const decliningSignals = computeDecliningSignals(bodyTrends, decliningOpts);
   const nDeclining = decliningSignals.length;
 
   const runBodyOk =

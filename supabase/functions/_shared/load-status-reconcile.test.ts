@@ -57,6 +57,7 @@ function run(overrides: {
   discProfiles?: Args[8];
   spikeOnEmptyBase?: boolean;
   corroboratedStrain?: boolean;
+  driftUsable?: boolean;
 }) {
   const raw: ReconcileLoadInput = {
     status: 'high',
@@ -85,6 +86,7 @@ function run(overrides: {
     overrides.discProfiles,
     overrides.spikeOnEmptyBase ?? false,
     overrides.corroboratedStrain ?? true, // default true = no cap (preserves pre-Item-3 tests)
+    overrides.driftUsable ?? true, // default true = HR drift always counts (pre-D-318)
   );
 }
 
@@ -376,4 +378,81 @@ Deno.test('D-268 P1 NEG: endurance-primary keeps the "Running load" lead (unchan
     planPosition: { weekIntent: 'baseline', planPrimary: 'endurance', primaryAdherence: null },
   });
   assertStringIncludes(r.interpretation, 'Running load');   // endurance-primary: run framing preserved
+});
+
+// ── D-318: STRAIN IS MULTI-SPORT — de-run-brain the two run-brain strain signals ──────────
+// The D-317 load block reads TOTAL load, but the reconciler then re-escalated to 'high' off
+// STRAIN signals: it counted "RIR declining" as strain (in a strength-primary plan that's the
+// INTENT — pushing toward failure) AND "HR drift declining" even when the absorption engine had
+// excluded drift (no usable steady session). computeDecliningSignals now drops both via opts.
+
+Deno.test('D-318 UNIT: strength-primary drops RIR-as-strain (declining RIR = pushing to failure)', () => {
+  const trends: BodyTrends = {
+    cardiac: trend('stable', 3),
+    effort_perception: trend('stable', 3),
+    run_quality: trend('stable', 3),
+    strength: trend('declining', 3), // RIR declining
+  };
+  assertEquals(computeDecliningSignals(trends), ['RIR']);                       // pre-D-318 / non-strength
+  assertEquals(computeDecliningSignals(trends, { planPrimary: 'endurance' }), ['RIR']);
+  assertEquals(computeDecliningSignals(trends, { planPrimary: 'strength' }), []); // strength: not strain
+});
+
+Deno.test('D-318 UNIT: HR drift only counts when the absorption drift gate is usable', () => {
+  const trends: BodyTrends = {
+    cardiac: trend('declining', 3), // HR drift declining
+    effort_perception: trend('stable', 3),
+    run_quality: trend('stable', 3),
+    strength: trend('stable', 3),
+  };
+  assertEquals(computeDecliningSignals(trends), ['HR drift']);                        // default: counts
+  assertEquals(computeDecliningSignals(trends, { driftUsable: true }), ['HR drift']);
+  assertEquals(computeDecliningSignals(trends, { driftUsable: false }), []);          // no usable steady session → not strain
+});
+
+Deno.test('D-318 UNIT: computeSafetyFloor honors the same opts (no false floor off RIR+drift)', () => {
+  // effort declining (primary) + RIR + HR drift declining → 3 signals → floor true (pre-D-318).
+  const trends: BodyTrends = {
+    cardiac: trend('declining', 3),
+    effort_perception: trend('declining', 3),
+    run_quality: trend('stable', 3),
+    strength: trend('declining', 3),
+  };
+  assertEquals(computeSafetyFloor(trends, 'adapting'), true);                                        // pre-D-318: 3 signals
+  // strength-primary + drift unusable → only RPE remains (1 signal) → floor false (no corroboration).
+  assertEquals(computeSafetyFloor(trends, 'adapting', { planPrimary: 'strength', driftUsable: false }), false);
+});
+
+Deno.test('D-318 REGRESSION (Michael WK3, 2026-07-24): strength week, RIR+drift junk → productive, not "pull back"', () => {
+  // His exact v142 load_status: total ACWR 1.272, running_acwr 1.39, 3 declining signals
+  // (HR drift, RPE, RIR) but drift had NO usable steady session and RIR-declining is the strength
+  // block's intent. Pre-D-318 → 'high' ("pull back"). Post-D-318 → 'productive'.
+  const trends: BodyTrends = {
+    cardiac: trend('declining', 3),        // HR drift (drift NOT usable → dropped)
+    effort_perception: trend('declining', 3), // RPE (the one real signal)
+    run_quality: trend('stable', 3),          // execution fine
+    strength: trend('declining', 3),          // RIR (strength intent → dropped)
+  };
+  // Pre-D-318 shape: driftUsable true, RIR counts, corroborated → 'high'.
+  const before = run({
+    raw: { status: 'on_target', interpretation: 'total load on target.', running_acwr: 1.39, actual_vs_planned_pct: 92 },
+    bodyTrends: trends, readiness: 'adapting',
+    planPosition: { weekIntent: 'unknown', planPrimary: 'strength', primaryAdherence: { discipline: 'strength', met: true, note: 'strength 3/3 sessions' } },
+    unweightedAcwr: 1.272, runLoadPct: 59,
+    unplannedLoad: { count: 2, totalLoad: 76, plannedWeekLoad: 400 }, // 19% < 25% gate
+    corroboratedStrain: true, driftUsable: true,
+  });
+  assertEquals(before.status, 'high'); // the bug: "pull back"
+
+  // Post-D-318: drift unusable + strength-primary drops RIR → 1 signal (RPE) → two-key cap → productive.
+  const after = run({
+    raw: { status: 'on_target', interpretation: 'total load on target.', running_acwr: 1.39, actual_vs_planned_pct: 92 },
+    bodyTrends: trends, readiness: 'adapting',
+    planPosition: { weekIntent: 'unknown', planPrimary: 'strength', primaryAdherence: { discipline: 'strength', met: true, note: 'strength 3/3 sessions' } },
+    unweightedAcwr: 1.272, runLoadPct: 59,
+    unplannedLoad: { count: 2, totalLoad: 76, plannedWeekLoad: 400 },
+    corroboratedStrain: false, driftUsable: false, // absorption ledger neutralized upstream → not corroborated
+  });
+  assertEquals(after.status, 'productive');
+  assertStringIncludes(after.interpretation, 'absorbing it');
 });
