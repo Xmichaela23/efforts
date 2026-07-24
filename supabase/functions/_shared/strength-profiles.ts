@@ -18,7 +18,8 @@ export type StrengthProtocolId =
   | 'upper_aesthetics'
   | 'triathlon'
   | 'triathlon_performance'
-  | 'minimum_dose';
+  | 'minimum_dose'
+  | 'strength_primary';
 
 export type StrengthProtocolProfile = {
   /** Default target RIR when no exercise-level override exists. */
@@ -85,6 +86,25 @@ export const PROTOCOL_PROFILES: Record<StrengthProtocolId, StrengthProtocolProfi
     defaultTargetRir: { lower: 2, upper: 2 },
     progression: { minDeviation: 0.75, minGainPct: 0.05 },
     deload:      { maxDeviation: -1.0, minSessions: 3 },
+  },
+
+  // D-316. Strength-PRIMARY blocks (the "Get Strong" composer) periodize their own
+  // intensity — a base ramp at 5 reps, an intensification at 3, a peak of doubles at
+  // 88–94%, then an AMRAP retest. They had NO entry here, and they don't populate
+  // `config.strength_protocol` either, so every one of them fell through
+  // `resolveProfile(null)` to `durability` — a concurrent-support profile prescribing a
+  // flat RIR 2.5 over a block that finishes with 94% doubles. A peak week was asking for
+  // the same reps-in-reserve as an easy base week.
+  //
+  // 2.0 base, taken with the PHASE_RULES offsets below, lands the block on
+  // base 2.0 → intensification 1.5 → peak 1.0 → deload 3.0 → retest 2.5, which is the
+  // field-standard shape for a strength peaking block (RP / RTS: ~2–3 RIR accumulating,
+  // 1–2 intensifying, 0–1 at peak). Progression thresholds mirror neural_speed: the
+  // composer owns the ramp, so only a clear, repeated signal should move a working load.
+  strength_primary: {
+    defaultTargetRir: { lower: 2, upper: 2 },
+    progression: { minDeviation: 0.25, minGainPct: 0.02 },
+    deload:      { maxDeviation: -0.5, minSessions: 2 },
   },
 };
 
@@ -177,10 +197,37 @@ export function resolveProfile(protocolId: string | null | undefined): StrengthP
   return PROTOCOL_PROFILES[protocolId as StrengthProtocolId] ?? DEFAULT_PROFILE;
 }
 
+/**
+ * Map a plan's own phase NAME onto one of the five canonical rule keys.
+ *
+ * D-316. `PHASE_RULES` is keyed base/build/peak/taper/recovery, but plans do not all speak
+ * that vocabulary — a strength-primary block names its phases Base / Power / Deload / Peak /
+ * Retest, and `resolvePlanPhase` hands those through verbatim. Only "Base" and "Peak" matched;
+ * Power, Deload and Retest all missed and fell to `DEFAULT_PHASE_RULE`, which is **build**, and
+ * build carries a NEGATIVE (tighter) RIR offset.
+ *
+ * So a DELOAD week was prescribing a tighter target RIR than the base weeks it was meant to
+ * recover from — backwards, and silent, because an unmatched key looks identical to a matched
+ * one at the call site. Anything still unrecognised keeps falling back to build, but the
+ * vocabularies plans actually emit now resolve to the rule that matches their intent.
+ */
+export function normalizePhaseKey(phaseTag: string | null | undefined): PlanPhaseId | null {
+  const raw = String(phaseTag ?? '').toLowerCase().trim();
+  if (!raw) return null;
+  if (raw in PHASE_RULES) return raw as PlanPhaseId;
+  // Intensification blocks: harder than base, not yet the peak.
+  if (raw === 'power' || raw === 'strength' || raw === 'intensification' || raw === 'build2') return 'build';
+  // Planned unloading — must LOOSEN the target, never tighten it.
+  if (raw === 'deload' || raw === 'unload' || raw === 'restoration' || raw === 'rest') return 'recovery';
+  // Fresh-for-a-number weeks. A retest is a test: arrive rested, do not grind into it.
+  if (raw === 'retest' || raw === 'test' || raw === 'race' || raw === 'race_week' || raw === 'peak_taper') return 'taper';
+  return null;
+}
+
 export function resolvePhaseRule(phaseTag: string | null | undefined): PhaseRule {
   if (!phaseTag) return DEFAULT_PHASE_RULE;
-  const key = phaseTag.toLowerCase() as PlanPhaseId;
-  return PHASE_RULES[key] ?? DEFAULT_PHASE_RULE;
+  const key = normalizePhaseKey(phaseTag);
+  return key ? PHASE_RULES[key] : DEFAULT_PHASE_RULE;
 }
 
 /**

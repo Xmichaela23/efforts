@@ -1319,7 +1319,11 @@ export function calculatePrescribedWeight(
   exerciseName: string,
   targetPercent: number, // e.g., 0.70 for 70% 1RM
   baselines: any, // Accept any to handle various field name formats (ohp, overheadPress1RM, etc.)
-  reps?: number
+  reps?: number,
+  // Strength-primary rows pass false: their explicit % ALREADY encodes intensity (the composer
+  // periodized it), so the rep scale would double-count — 100% must render as the real max, not
+  // 106%. Mirrors `applyRepScale` in materialize-plan's calculateWeightFromConfig.
+  applyRepScale: boolean = true,
 ): { weight: number | null; displayFormat: string; notes?: string } {
   const config = getExerciseConfig(exerciseName);
   
@@ -1343,7 +1347,7 @@ export function calculatePrescribedWeight(
   if ((exerciseNameLower === 'dips' || exerciseNameLower === 'dip') && config.primaryRef === 'bench') {
     // Calculate target total load (bodyweight + added weight)
     const inferred1RM = base1RM * config.ratio; // Dip 1RM = 90% of bench
-    const repScale = getRepScale(reps);
+    const repScale = applyRepScale ? getRepScale(reps) : 1;
     const targetTotalLoad = inferred1RM * targetPercent * repScale;
     
     // Get bodyweight from baselines (check multiple field names)
@@ -1384,7 +1388,7 @@ export function calculatePrescribedWeight(
   const inferred1RM = base1RM * config.ratio;
   
   // Apply target percentage and rep adjustment
-  const repScale = getRepScale(reps);
+  const repScale = applyRepScale ? getRepScale(reps) : 1;
   let prescribedWeight = inferred1RM * targetPercent * repScale;
   
   // For perHand exercises: divide BEFORE rounding (so we round to real dumbbell weights)
@@ -1415,6 +1419,93 @@ function getRepScale(reps?: number): number {
   if (reps <= 12) return 0.97;
   if (reps <= 15) return 0.93;
   return 0.90;
+}
+
+// ─── SWAP SEED (D-316) ────────────────────────────────────────────────────────
+// When a slot is swapped to a different lift, what weight goes in the box?
+//
+// THE INVARIANT, and everything here exists to hold it:
+//
+//     swapping INTO a lift must give the weight the plan would have prescribed for
+//     that lift, in this week, had it been the authored slot all along.
+//
+// So the seed is a plain derivation from the NEW lift's own reference at the block's
+// authored intensity — never a transform of the OLD lift's number:
+//
+//     seed = baseline1RM(newRef) × newRatio × authored %1RM        (rounded to plate)
+//
+// The logger's swap sheet and materialize-plan's rest-of-plan path both call this, so
+// "just today" and "rest of plan" agree by construction. They used to disagree because
+// the client rescaled and the server derived.
+//
+// ⛔ WHY NOT SCALE OFF THE CURRENT LOAD — the bug this replaced, worth stating because
+// the arithmetic looks equivalent and is not. `curW × newRatio / oldRatio` is algebraically
+// the same derivation ONLY on unrounded numbers. Real prescriptions are rounded to the plate
+// increment first, so the rescale multiplies that rounding error and then rounds again:
+//
+//     front squat  110 × 0.85 × 0.785 = 73.4  → displayed 75      (+1.6 rounding)
+//     rescaled     75 × (1.00 / 0.85)  = 88.2 → 90
+//     derived      110 × 1.00 × 0.785  = 86.4 → 85                 ← what the plan says
+//
+// Back-inferring the intensity from the displayed load has the identical defect one step
+// removed: 75 / (110 × 0.85) = 0.802 against an authored 0.785. The authored % is the only
+// intensity not downstream of a rounding step, which is why callers must pass it when they
+// have it.
+//
+// ⛔ AND NOT THE ATHLETE'S LOG. Seeding from the last time they did the lift was tried and
+// reverted: it silently leaves the protocol. It happens to look right on a lift they train at
+// the block's intensity and is badly wrong on anything else — a Bulgarian split squat logged
+// as accessory work at 20 lb seeds 20 where the block prescribes 45. A %1RM program's job is
+// to prescribe, not to repeat. Load feedback belongs in the RIR loop, which is designed for
+// it and is consent-gated (D-315); it does not belong in a substitution.
+
+export interface SwapSeedResult {
+  /** null = leave the box blank; no baseline for this lift's reference. */
+  weight: number | null;
+  displayFormat: string;
+  /** Which branch produced it. */
+  source: 'baseline' | 'none';
+}
+
+/**
+ * Resolve the weight to seed a swapped-in lift with. Pure; see the block comment above.
+ *
+ * @param exerciseName  the lift being swapped IN
+ * @param targetPercent the block's AUTHORED working %1RM (e.g. 0.785) — not one inferred
+ *                      from a displayed load, except as a legacy fallback by the caller
+ * @param baselines     performance_numbers
+ * @param reps          target reps, for the rep scale
+ * @param applyRepScale false for strength-primary rows, whose authored % already encodes
+ *                      intensity per rep bracket
+ */
+export function resolveSwapSeedWeight(
+  exerciseName: string,
+  targetPercent: number,
+  baselines: any,
+  reps?: number,
+  applyRepScale: boolean = true,
+): SwapSeedResult {
+  const config = getExerciseConfig(exerciseName);
+  const derived = calculatePrescribedWeight(exerciseName, targetPercent, baselines, reps, applyRepScale);
+  if (derived.weight != null) {
+    return { weight: derived.weight, displayFormat: derived.displayFormat, source: 'baseline' };
+  }
+  return { weight: null, displayFormat: config?.displayFormat ?? 'total', source: 'none' };
+}
+
+/**
+ * Key an exercise name for cross-session matching: lowercase, drop (Left)/(Right),
+ * collapse whitespace, drop a trailing plural 's' (Q-197, so "Hip Thrusts" matches
+ * "Hip Thrust"). Applied to both the stored key and the lookup, so matching stays
+ * self-consistent. Shared by the logger's prefill and the D-122 "last:" anchor.
+ */
+export function normalizeLiftKey(raw: string): string {
+  return String(raw || '')
+    .toLowerCase()
+    .replace(/\s*\((?:left|right)\)\s*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/s$/, '');
 }
 
 /**

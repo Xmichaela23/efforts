@@ -10,7 +10,12 @@ import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, CheckCircle, Pencil, 
 import { useAppContext } from '@/contexts/AppContext';
 import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-alternatives';
 import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
-import { getExerciseConfig, getBaseline1RM } from '@/lib/exercise-config';
+import {
+  getExerciseConfig,
+  getBaseline1RM,
+  normalizeLiftKey,
+  resolveSwapSeedWeight,
+} from '@/lib/exercise-config';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
 import CoreTimer from '@/components/CoreTimer';
@@ -61,6 +66,15 @@ interface LoggedExercise {
   notes?: string;
   target_rir?: number; // Target RIR from prescription (1-5)
   target_reps?: string; // Target reps from prescription, e.g. "4-6" or "8" (display only)
+  // D-316: the working %1RM the PLAN authored for this slot (0.785 = "78.5% 1RM"), carried
+  // straight off `computed.steps[].strength.percent_1rm`. Its one job is to let a SWAP derive
+  // the substitute's weight at the intensity the block actually intended, instead of
+  // back-inferring an intensity from the displayed load. That inference is lossy: the load on
+  // screen has already been rounded to the plate increment, and dividing it back out inflates
+  // the percentage by however much the rounding added — which then gets re-multiplied into the
+  // new lift. On a real week-3 row (front squat true 73.4, shown 75) it inflated 0.785 to 0.802
+  // and turned an 85 lb back squat into 90.
+  planned_percent_1rm?: number;
   // Q-181: the PLANNED exercise this row came from. Stamped ONLY when prefilled from the plan.
   // The name field in the header is an editable search box, so the athlete's natural way to swap an
   // exercise is to type over the prescribed one. That is a DECLARATION — they took the prescribed row
@@ -155,19 +169,12 @@ const isPlyometric = (exerciseName: string): boolean => {
 };
 
 // Normalize an exercise name for cross-session matching: lowercase, strip
-// (Left)/(Right) suffixes, collapse whitespace. Shared by the D-097 prefill and
-// the D-122 "last:" anchor so both key prior sessions the same way.
-const normalizeExerciseName = (raw: string): string =>
-  String(raw || '')
-    .toLowerCase()
-    .replace(/\s*\((?:left|right)\)\s*/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    // Q-197: drop a trailing plural 's' so "Hip Thrusts" and "Hip Thrust" match
-    // for the D-097 prefill + D-122 "last:" anchor. Applied to both the stored key
-    // and the lookup, so matching stays self-consistent — it only makes the match
-    // plural-insensitive, mirroring the server canonicalizer's plural fallback.
-    .replace(/s$/, '');
+// (Left)/(Right) suffixes, collapse whitespace, drop a trailing plural 's' (Q-197).
+// Shared by the D-097 prefill, the D-122 "last:" anchor, and the D-316 swap seed so
+// all three key prior sessions the same way. The rules now live in exercise-config
+// (`normalizeLiftKey`) because the SERVER's swap seed has to key history identically —
+// two copies of these regexes is exactly how the two sides drift apart.
+const normalizeExerciseName = normalizeLiftKey;
 
 // Rest-end LOCAL NOTIFICATIONS (away-alert): iOS suspends the JS countdown when the app is backgrounded,
 // so a scheduled local notification is the only way to buzz the athlete when rest ends while they're out
@@ -1825,6 +1832,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const rawNotes = String(notes || '').trim();
           // Extract target RIR + target reps from the strength prescription (display only)
           const targetRir = typeof s?.target_rir === 'number' ? s.target_rir : undefined;
+          // D-316: the authored working %1RM, kept for the swap seed. Accept both the 0-1 form the
+          // materializer writes (0.785) and a whole-number form (78.5) in case an older row carries
+          // one, so the swap can't silently derive at 78× the intended intensity.
+          const pctRaw = typeof s?.percent_1rm === 'number' ? s.percent_1rm : undefined;
+          const plannedPct = pctRaw == null || !(pctRaw > 0)
+            ? undefined
+            : (pctRaw > 1.5 ? pctRaw / 100 : pctRaw);
           const targetReps = typeof repsRaw === 'string' && /\d/.test(repsRaw)
             ? repsRaw.trim()
             : (typeof repsRaw === 'number' && repsRaw > 0 ? String(repsRaw) : undefined);
@@ -1839,6 +1853,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             rir: null,
             target_rir: targetRir, // Target RIR from prescription
             target_reps: targetReps, // Target reps from prescription (e.g. "4-6")
+            planned_percent_1rm: plannedPct, // D-316: authored intensity, for the swap seed
             planned_name: name, // Q-181: remember what was PRESCRIBED, so a rename reads as a swap
           } as LoggedExercise;
         }
@@ -4270,42 +4285,71 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     )}
 
                     {alts.length > 0 ? (() => {
-                      // A swap CLEARS the prescribed weight (the number was computed for a different
-                      // lift — a hip thrust is 90% of your deadlift, a lunge 50% of your squat; even an
-                      // in-slot swap shifts the ratio). We let the athlete enter what they used; the
-                      // analyzer doesn't grade load on a swap (un-anchored, D-289). Reps/duration stay.
-                      // WEIGHT ON SWAP (supersedes Q-181's "always clear"): the new lift starts at a
-                      // computed, rackable weight = the new lift's reference 1RM × its ratio × the
-                      // working % you're already lifting at, rounded to 5 lb / 2.5 kg so it adds up with
-                      // plates. Works ACROSS references (a squat → a bench-referenced lift) and off your
-                      // baselines, not just same-ref. Falls to blank only when we have no baseline for
-                      // the new lift's reference. Matches the server math for the rest-of-plan path.
+                      // A swap does not carry the old lift's weight across (the number was computed for a
+                      // different lift — a hip thrust is 90% of your deadlift, a lunge 50% of your squat).
+                      // Reps/duration stay. The analyzer doesn't grade load on a swap (un-anchored, D-289).
+                      //
+                      // WEIGHT ON SWAP — D-316. Supersedes Q-181's "always clear" and the D-315 rescale.
+                      // ONE rule, and the invariant it has to satisfy:
+                      //
+                      //     swapping INTO a lift must give the weight the plan would have prescribed
+                      //     for that lift, in this week, had it been the authored slot all along.
+                      //
+                      // So: derive from the NEW lift's own reference at the block's authored intensity.
+                      //     seed = baseline1RM(newRef) × newRatio × planned_percent_1rm
+                      // Same expression the server runs for the rest-of-plan path, off the same authored
+                      // %, so the two paths agree by construction rather than by coincidence.
+                      //
+                      // What was wrong before (both of these produced 90 where the plan says 85):
+                      //  1. The old same-reference branch scaled off the CURRENT LOAD,
+                      //     `curW × newRatio / oldRatio`. The displayed load is already rounded to the
+                      //     plate increment, so rescaling multiplies the rounding error and rounds again
+                      //     (front squat true 73.4 → shown 75 → ×1.176 → 88.2 → 90). It also compounded
+                      //     across a second swap, since `planned_name` never advances.
+                      //  2. Back-inferring the intensity from that same rounded load, `curW / (ref × ratio)`,
+                      //     has the identical defect one step removed: 75 / (110 × 0.85) = 0.802 against an
+                      //     authored 0.785 — 2.2% inflated, straight back to 90.
+                      // The authored % is the only intensity that isn't downstream of a rounding step,
+                      // which is why it is the one we use. Inference survives ONLY as the legacy fallback
+                      // for rows materialized before percent_1rm was carried.
                       const applySwap = (altName: string) => {
                         const oldCfg = getExerciseConfig(exercise.planned_name || exercise.name);
-                        const newCfg = getExerciseConfig(altName);
                         const curW = exercise.sets.find((s) => typeof s.weight === 'number' && s.weight > 0)?.weight ?? 0;
-                        const inc = exercise.unit === 'kg' ? 2.5 : 5;
-                        let seed = 0;
-                        if (oldCfg?.primaryRef && newCfg?.primaryRef === oldCfg.primaryRef
-                          && (oldCfg.ratio ?? 0) > 0 && (newCfg.ratio ?? 0) > 0 && curW > 0) {
-                          // Same reference — scale straight off the current load, no baseline needed.
-                          seed = Math.round((curW * (newCfg.ratio as number) / (oldCfg.ratio as number)) / inc) * inc;
-                        } else {
-                          // Cross reference (or fresh) — off the new lift's baseline 1RM at the working %
-                          // you're already lifting at (0.70 default if we can't infer it).
-                          const newRef1RM = newCfg ? getBaseline1RM(newCfg, performanceNumbers) : null;
-                          const oldRef1RM = oldCfg ? getBaseline1RM(oldCfg, performanceNumbers) : null;
-                          if (newCfg && newRef1RM && (newCfg.ratio ?? 0) > 0) {
-                            let pct = 0.70;
-                            if (oldRef1RM && (oldCfg?.ratio ?? 0) > 0 && curW > 0) {
-                              pct = Math.max(0.3, Math.min(0.95, curW / (oldRef1RM * (oldCfg!.ratio as number))));
-                            }
-                            seed = Math.round((newRef1RM * (newCfg.ratio as number) * pct) / inc) * inc;
-                          }
+                        const oldRef1RM = oldCfg ? getBaseline1RM(oldCfg, performanceNumbers) : null;
+
+                        // 1. The block's authored intensity, if the row carried one. Exact.
+                        let pct = exercise.planned_percent_1rm;
+                        // 2. Legacy rows only: back-infer, accepting the rounding inflation above as the
+                        //    lesser evil versus a flat default.
+                        if (!(typeof pct === 'number' && pct > 0)
+                          && oldRef1RM && (oldCfg?.ratio ?? 0) > 0 && curW > 0) {
+                          pct = Math.max(0.3, Math.min(0.95, curW / (oldRef1RM * (oldCfg!.ratio as number))));
                         }
+                        // 3. Nothing to go on — the long-standing default.
+                        if (!(typeof pct === 'number' && pct > 0)) pct = 0.70;
+
+                        const targetReps = exercise.sets.find((s) => typeof s.reps === 'number')?.reps;
+                        const seedRes = resolveSwapSeedWeight(altName, pct, performanceNumbers, targetReps);
+                        const seed = seedRes.weight ?? 0;
                         setExercises((prev) => prev.map((ex) =>
                           ex.id === exercise.id
-                            ? { ...ex, name: altName, sets: ex.sets.map((st) => ({ ...st, weight: seed, completed: false })) }
+                            ? {
+                                ...ex,
+                                name: altName,
+                                // The prescription (target reps, target RIR, authored %) belongs to the
+                                // SLOT, not to the lift that was sitting in it, so it rides through the
+                                // swap untouched. The athlete's own entries do not: `rir` was their
+                                // report on the OLD lift and would read as a report on the new one.
+                                sets: ex.sets.map((st) => ({
+                                  ...st,
+                                  weight: seed,
+                                  completed: false,
+                                  rir: undefined,
+                                  rir_autofilled: undefined,
+                                  from_previous: undefined,
+                                  prefilled: undefined,
+                                })),
+                              }
                             : ex,
                         ));
                         if (swapRestOfPlan && exercise.planned_name) void persistPlanSwap(exercise.planned_name, altName);

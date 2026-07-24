@@ -17,7 +17,7 @@ import {
 } from '../_shared/strength-equipment-tier.ts';
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
 import { calculatePlannedStrengthWorkload } from '../_shared/workload.ts';
-import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup } from '../../../src/lib/exercise-config.ts';
+import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup, resolveSwapSeedWeight } from '../../../src/lib/exercise-config.ts';
 import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
 import { resolvePlanPhase } from '../_shared/plan-phase.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
@@ -1868,7 +1868,15 @@ function expandTokensForRow(
               strengthIntent,
               strengthMaxPct,
             );
-            const result = calculateWeightFromConfig(name, targetPercent, baselines as any, reps, !isStrengthPrimary);
+            // D-316: a SWAPPED slot derives through the SHARED resolver — the same function the
+            // logger's swap sheet calls, at the same authored `targetPercent` this row carries.
+            // That is what makes "just today" and "rest of plan" agree by construction instead of
+            // by coincidence. An unswapped slot takes the derivation directly, exactly as before.
+            // (Both expressions are the same arithmetic today; the shared call is the guarantee
+            // they STAY the same when one side is edited.)
+            const result = isSlotSwapped
+              ? resolveSwapSeedWeight(name, targetPercent, baselines as any, reps, !isStrengthPrimary)
+              : calculateWeightFromConfig(name, targetPercent, baselines as any, reps, !isStrengthPrimary);
             if (result.weight != null && result.weight > 0) {
               prescribed = result.weight;
               weightDisplay = formatWeightDisplay(result.weight, result.displayFormat);
@@ -2061,7 +2069,15 @@ function expandTokensForRow(
               strengthIntent,
               strengthMaxPct,
             );
-            const result = calculateWeightFromConfig(name, targetPercent, baselines as any, typeof reps === 'number' ? reps : undefined, !isStrengthPrimary);
+            // D-316: a SWAPPED slot derives through the SHARED resolver — the same function the
+            // logger's swap sheet calls, at the same authored `targetPercent` this row carries.
+            // That is what makes "just today" and "rest of plan" agree by construction instead of
+            // by coincidence. An unswapped slot takes the derivation directly, exactly as before.
+            // (Both expressions are the same arithmetic today; the shared call is the guarantee
+            // they STAY the same when one side is edited.)
+            const result = isSlotSwapped
+              ? resolveSwapSeedWeight(name, targetPercent, baselines as any, typeof reps === 'number' ? reps : undefined, !isStrengthPrimary)
+              : calculateWeightFromConfig(name, targetPercent, baselines as any, typeof reps === 'number' ? reps : undefined, !isStrengthPrimary);
             if (result.weight != null && result.weight > 0) {
               prescribed = result.weight;
               weightDisplay = formatWeightDisplay(result.weight, result.displayFormat);
@@ -3013,6 +3029,13 @@ Deno.serve(async (req) => {
         .maybeSingle();
       rirPlanConfig = planRowForRir?.config ?? null;
       rirProtocolId = (rirPlanConfig?.strength_protocol as string | undefined) ?? null;
+      // D-316: strength-PRIMARY plans ("Get Strong") never write `config.strength_protocol` —
+      // they aren't produced by the run/tri protocol selector at all. So `rirProtocolId` stayed
+      // null and every one of them resolved to the `durability` default: a flat RIR 2.5 across a
+      // block that ends in 94% doubles. The plan says what it is in `config.source`; read it.
+      if (!rirProtocolId && String(rirPlanConfig?.source ?? '').toLowerCase() === 'strength_primary') {
+        rirProtocolId = 'strength_primary';
+      }
     } catch (_e) { /* graceful: null → getTargetRir uses the durability base, still lift-aware */ }
 
     // Adapt-a-plan add: decide once, across all rows, which added lifts land on which strength days
