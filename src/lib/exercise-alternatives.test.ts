@@ -102,3 +102,47 @@ Deno.test('the planned exercise never offers itself, and aliases do not duplicat
   // 'walking lunge' and 'walking lunges' are separate config keys — the same option must not appear twice.
   assertEquals(alts.filter((n) => n.startsWith('reverse lunge')).length <= 1, true);
 });
+
+// ═══ D-315 addendum: DIRECT-SWAP TIERS + curated families. "Direct swaps" = variations of the same
+// lift the athlete would program as a replacement (Leg Press for a Back Squat); a same-pattern lift
+// that is NOT in the family is an ALTERNATIVE (Hip Thrust is hip-dominant like a deadlift, loads off
+// the deadlift — but it is not a deadlift). Ranked over the movement-pattern filter, never across it. ═══
+
+const tierOf = (opts: { name: string; tier: string }[], name: string) =>
+  opts.find((o) => o.name.toLowerCase() === name.toLowerCase())?.tier ?? null;
+
+Deno.test('THE MICHAEL CASE II: Leg Press is a DIRECT squat swap; a curated family, not just "heavy"', () => {
+  const alts = getInSlotAlternatives('Back Squat', FULL_GYM);
+  assertEquals(tierOf(alts, 'Leg Press'), 'direct');     // loads 1.5× squat, same family
+  assertEquals(tierOf(alts, 'Front Squat'), 'direct');
+  assertEquals(tierOf(alts, 'Goblet Squat'), 'direct');
+  // NOT direct: unilateral / machine-isolation / plyo in the same pattern
+  assertEquals(tierOf(alts, 'Squat Jump'), 'lighter');   // bodyweight plyo, not a loaded swap
+});
+
+Deno.test('⛔ Hip Thrust is an ALTERNATIVE for a deadlift, NOT a direct swap (Michael flagged it)', () => {
+  const alts = getInSlotAlternatives('Conventional Deadlift', FULL_GYM);
+  // Direct = the deadlift variations
+  assertEquals(tierOf(alts, 'Trap Bar Deadlift'), 'direct');
+  assertEquals(tierOf(alts, 'Sumo Deadlift'), 'direct');
+  assertEquals(tierOf(alts, 'Romanian Deadlift'), 'direct');
+  // ⛔ Hip Thrust loads off the deadlift + is hip-dominant, but it is NOT a deadlift → Alternative
+  assertEquals(tierOf(alts, 'Hip Thrust'), 'lighter');
+  assertEquals(tierOf(alts, 'Glute Bridge'), 'lighter');
+});
+
+Deno.test('DIRECT swaps rank ABOVE alternatives (order the athlete reads top-to-bottom)', () => {
+  const alts = getInSlotAlternatives('Conventional Deadlift', FULL_GYM);
+  const firstLighter = alts.findIndex((a) => a.tier === 'lighter');
+  const lastDirect = alts.map((a) => a.tier).lastIndexOf('direct');
+  // every 'direct' comes before every 'lighter'
+  assertEquals(lastDirect < firstLighter || firstLighter === -1, true);
+});
+
+Deno.test('bench: Incline / Close-Grip / DB Bench are DIRECT; Chest Fly + push-ups are alternatives', () => {
+  const alts = getInSlotAlternatives('Bench Press', FULL_GYM);
+  assertEquals(tierOf(alts, 'Incline Bench Press'), 'direct');
+  assertEquals(tierOf(alts, 'Close Grip Bench Press'), 'direct');
+  assertEquals(tierOf(alts, 'Chest Fly'), 'lighter');
+  assertEquals(tierOf(alts, 'Push-up'), 'lighter');
+});
