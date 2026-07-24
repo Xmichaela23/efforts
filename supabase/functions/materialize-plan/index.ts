@@ -1936,6 +1936,8 @@ function expandTokensForRow(
             String(name ?? ''),
             typeof ex?.target_rir === 'number' ? ex.target_rir : null,
             rowPhase,
+            typeof reps === 'number' ? reps : null,
+            typeof percent_1rm === 'number' ? percent_1rm : null
           );
           
           const progressed = isStrengthPrimary ? prescribed : adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);
@@ -2137,6 +2139,8 @@ function expandTokensForRow(
             String(name ?? ''),
             typeof ex?.target_rir === 'number' ? ex.target_rir : null,
             rowPhase,
+            typeof reps === 'number' ? reps : null,
+            typeof percent_1rm === 'number' ? percent_1rm : null
           );
           
           const progressed = isStrengthPrimary ? prescribed : adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);

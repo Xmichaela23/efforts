@@ -147,6 +147,90 @@ export const PHASE_RULES: Record<PlanPhaseId, PhaseRule> = {
 const MIN_TARGET_RIR = 0.5;
 const MAX_TARGET_RIR = 4;
 
+// ─── TARGET RIR FROM THE PRESCRIPTION ITSELF (D-316) ──────────────────────────
+//
+// When a row states its own intensity — "5 reps at 78.5% 1RM" — the target RIR is NOT
+// a matter of opinion. Reps, %1RM and RIR are three views of one thing, and the mapping
+// between them is the standard Tuchscherer/Helms RPE chart used across autoregulated
+// powerlifting. Look up the row, read off the RPE, and RIR = 10 − RPE.
+//
+// This replaced a set of hand-picked per-phase constants. Those were a judgement call
+// dressed up as a setting: they said "RIR 2 for all of base", while the block's own
+// percentages ramp 72% → 82% across those same four weeks — an easy opener and a genuinely
+// hard week 4 given the identical target. The chart gives a DIFFERENT number each week,
+// derived from what the block already says it wants, with nothing left to pick.
+//
+// The profile/phase defaults below still apply, and are still the right answer, for rows
+// that state no intensity: accessories, bodyweight work, "Heavy" carries. You can't derive
+// a target from a prescription that doesn't have one.
+//
+// ⚠️ This inherits the anchor's accuracy. The chart is relative to a TRUE 1RM, so if the
+// stored 1RM is stale the derived target drifts with it — the same exposure the prescribed
+// WEIGHT already has, not a new one. It surfaces rather than hides it: an athlete whose
+// anchor is high will read consistently below target, which is exactly the "back off"
+// signal the RIR loop exists to produce.
+
+/** Tuchscherer/Helms RPE chart: %1RM by reps (index) and RPE. Rows are reps 1-12. */
+const RPE_COLUMNS = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10] as const;
+const RPE_CHART_PCT: Record<number, number[]> = {
+  1:  [86.3, 87.8, 89.2, 90.7, 92.2, 93.9, 95.5, 97.8, 100.0],
+  2:  [83.7, 85.0, 86.3, 87.8, 89.2, 90.7, 92.2, 93.9, 95.5],
+  3:  [81.1, 82.4, 83.7, 85.0, 86.3, 87.8, 89.2, 90.7, 92.2],
+  4:  [78.6, 79.9, 81.1, 82.4, 83.7, 85.0, 86.3, 87.8, 89.2],
+  5:  [76.2, 77.4, 78.6, 79.9, 81.1, 82.4, 83.7, 85.0, 86.3],
+  6:  [73.9, 75.1, 76.2, 77.4, 78.6, 79.9, 81.1, 82.4, 83.7],
+  7:  [70.7, 72.3, 73.9, 75.1, 76.2, 77.4, 78.6, 79.9, 81.1],
+  8:  [68.0, 69.4, 70.7, 72.3, 73.9, 75.1, 76.2, 77.4, 78.6],
+  9:  [65.3, 66.7, 68.0, 69.4, 70.7, 72.3, 73.9, 75.1, 76.2],
+  10: [62.6, 64.0, 65.3, 66.7, 68.0, 69.4, 70.7, 72.3, 73.9],
+  11: [59.9, 61.3, 62.6, 64.0, 65.3, 66.7, 68.0, 69.4, 70.7],
+  12: [57.2, 58.6, 59.9, 61.3, 62.6, 64.0, 65.3, 66.7, 68.0],
+};
+
+/**
+ * Target RIR implied by a prescription of `reps` at `percent1RM` (0-1), via the RPE chart.
+ * Returns null when the row states no usable intensity — the caller then falls back to the
+ * protocol/phase default. Rounded to 0.5 (the chart's own granularity) and clamped to the
+ * same band as every other target, so a 100% single reads 0.5, not 0.
+ */
+export function targetRirFromPrescription(
+  reps: number | null | undefined,
+  percent1RM: number | null | undefined,
+): number | null {
+  const r = Number(reps);
+  const p = Number(percent1RM);
+  if (!Number.isFinite(r) || !Number.isFinite(p) || r < 1 || p <= 0) return null;
+  // Accept either 0-1 (0.785) or whole-number (78.5) forms.
+  const pct = p > 1.5 ? p : p * 100;
+  if (pct <= 0 || pct > 120) return null;
+
+  const row = RPE_CHART_PCT[Math.min(12, Math.max(1, Math.round(r)))];
+  if (!row) return null;
+
+  // The row ascends left (RPE 6) to right (RPE 10). Find where this % sits.
+  let rpe: number;
+  if (pct <= row[0]) {
+    // Lighter than the chart's easiest entry — more than 4 reps in reserve. Clamped below.
+    rpe = RPE_COLUMNS[0];
+  } else if (pct >= row[row.length - 1]) {
+    rpe = RPE_COLUMNS[RPE_COLUMNS.length - 1];
+  } else {
+    rpe = RPE_COLUMNS[RPE_COLUMNS.length - 1];
+    for (let i = 0; i < row.length - 1; i++) {
+      if (pct >= row[i] && pct <= row[i + 1]) {
+        const span = row[i + 1] - row[i];
+        const frac = span > 0 ? (pct - row[i]) / span : 0;
+        rpe = RPE_COLUMNS[i] + frac * (RPE_COLUMNS[i + 1] - RPE_COLUMNS[i]);
+        break;
+      }
+    }
+  }
+
+  const rir = 10 - rpe;
+  const snapped = Math.round(rir * 2) / 2;     // the chart's own 0.5 granularity
+  return Math.min(MAX_TARGET_RIR, Math.max(MIN_TARGET_RIR, snapped));
+}
+
 const DEFAULT_PHASE_RULE: PhaseRule = PHASE_RULES.build;
 
 // ---------------------------------------------------------------------------
@@ -250,10 +334,18 @@ export function getTargetRir(
   canonical: string,
   exerciseLevelTarget?: number | null,
   phaseTag?: string | null,
+  // D-316: the row's own prescription. When it states reps at a %1RM, the target is READ
+  // OFF the RPE chart rather than taken from the profile default — see
+  // targetRirFromPrescription. Omit both (every pre-D-316 caller) and behaviour is unchanged.
+  reps?: number | null,
+  percent1RM?: number | null,
 ): number {
   if (exerciseLevelTarget != null && Number.isFinite(exerciseLevelTarget)) {
     return exerciseLevelTarget;
   }
+  // 2. Derived from the prescription itself, when there is one to derive from.
+  const derived = targetRirFromPrescription(reps, percent1RM);
+  if (derived != null) return derived;
   const base = isLowerBodyLift(canonical)
     ? profile.defaultTargetRir.lower
     : profile.defaultTargetRir.upper;
