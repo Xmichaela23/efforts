@@ -4178,11 +4178,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 {exercise.planned_name && (
                   <button
                     onClick={() => setSwapFor(swapFor === exercise.id ? null : exercise.id)}
-                    className={`p-2 transition-colors ${swapFor === exercise.id ? 'text-teal-300' : 'text-white/60 hover:text-white/90'}`}
+                    className={`flex items-center gap-1 pl-1.5 pr-1 py-2 text-[11px] font-medium transition-colors ${swapFor === exercise.id ? 'text-teal-300' : 'text-white/55 hover:text-white/90'}`}
                     aria-label="Swap this exercise"
-                    title="Swap this exercise"
                   >
                     <Repeat className="h-4 w-4" />
+                    <span>Swap</span>
                   </button>
                 )}
                 {/* Adapt-a-plan #2 — a hand-added lift (never prescribed) can be added to the plan for
@@ -4190,11 +4190,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 {!exercise.planned_name && String(exercise.name ?? '').trim().length > 1 && (
                   <button
                     onClick={() => setAddToPlanFor(addToPlanFor === exercise.id ? null : exercise.id)}
-                    className={`p-2 transition-colors ${addToPlanFor === exercise.id ? 'text-teal-300' : 'text-white/60 hover:text-white/90'}`}
+                    className={`flex items-center gap-1 pl-1.5 pr-1 py-2 text-[11px] font-medium transition-colors ${addToPlanFor === exercise.id ? 'text-teal-300' : 'text-white/55 hover:text-white/90'}`}
                     aria-label="Add this exercise to the plan"
-                    title="Add to plan"
                   >
                     <Plus className="h-4 w-4" />
+                    <span>Add</span>
                   </button>
                 )}
                 <button
@@ -4268,53 +4268,47 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </div>
                     )}
 
-                    {alts.length > 0 ? (
-                      <>
-                        <p className="text-[11px] text-white/40 mb-2 leading-snug">
-                          Same movement pattern, with your equipment.
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {alts.map((a) => (
-                            <button
-                              key={a.name}
-                              onClick={() => {
-                                // Q-181: CLEAR THE PRESCRIBED WEIGHT ON A SWAP.
-                                //
-                                // The number on those sets was computed for a DIFFERENT exercise — a
-                                // Bulgarian Split Squat is 50% of your squat; a Hip Thrust is 90% of your
-                                // deadlift. Carrying it across would show the athlete a weight the app
-                                // cannot stand behind, and (worse) one they might actually load. Even an
-                                // in-slot swap shifts the ratio (walking lunge 0.50 vs step-up 0.40).
-                                //
-                                // So we clear it and let them enter what they used. Law 2: we do not
-                                // display a number we cannot anchor. It costs one tap, and the analyzer
-                                // does not grade load on a swap anyway (un-anchored — see D-289).
-                                // Reps/duration are KEPT: the volume prescription (3×8) still stands.
-                                setExercises((prev) => prev.map((ex) =>
-                                  ex.id === exercise.id
-                                    ? {
-                                        ...ex,
-                                        name: a.name,
-                                        sets: ex.sets.map((st) => ({ ...st, weight: 0, completed: false })),
-                                      }
-                                    : ex,
-                                ));
-                                // Rest-of-plan: persist the swap so future weeks change too. Today's
-                                // logged session already reflects it via the rename above.
-                                if (swapRestOfPlan && exercise.planned_name) {
-                                  void persistPlanSwap(exercise.planned_name, a.name);
-                                }
-                                setSwapRestOfPlan(false);
-                                setSwapFor(null);
-                              }}
-                              className="px-2.5 py-1.5 rounded-lg text-[12px] border border-white/15 bg-white/[0.05] text-white/80 hover:bg-white/[0.10] hover:text-white transition-colors"
-                            >
-                              {a.name}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
+                    {alts.length > 0 ? (() => {
+                      // A swap CLEARS the prescribed weight (the number was computed for a different
+                      // lift — a hip thrust is 90% of your deadlift, a lunge 50% of your squat; even an
+                      // in-slot swap shifts the ratio). We let the athlete enter what they used; the
+                      // analyzer doesn't grade load on a swap (un-anchored, D-289). Reps/duration stay.
+                      const applySwap = (altName: string) => {
+                        setExercises((prev) => prev.map((ex) =>
+                          ex.id === exercise.id
+                            ? { ...ex, name: altName, sets: ex.sets.map((st) => ({ ...st, weight: 0, completed: false })) }
+                            : ex,
+                        ));
+                        if (swapRestOfPlan && exercise.planned_name) void persistPlanSwap(exercise.planned_name, altName);
+                        setSwapRestOfPlan(false);
+                        setSwapFor(null);
+                      };
+                      const chip = (a: AlternativeOption) => (
+                        <button
+                          key={a.name}
+                          onClick={() => applySwap(a.name)}
+                          className="px-2.5 py-1.5 rounded-lg text-[12px] border border-white/15 bg-white/[0.05] text-white/80 hover:bg-white/[0.10] hover:text-white transition-colors"
+                        >{a.name}</button>
+                      );
+                      const direct = alts.filter((a) => a.tier === 'direct');
+                      const lighter = alts.filter((a) => a.tier === 'lighter');
+                      return (
+                        <>
+                          {direct.length > 0 && (
+                            <>
+                              <p className="text-[10px] uppercase tracking-wide text-white/40 mb-1.5">Direct swaps</p>
+                              <div className="flex flex-wrap gap-1.5 mb-3">{direct.map(chip)}</div>
+                            </>
+                          )}
+                          {lighter.length > 0 && (
+                            <>
+                              <p className="text-[10px] uppercase tracking-wide text-white/35 mb-1.5">Lighter alternatives</p>
+                              <div className="flex flex-wrap gap-1.5">{lighter.map(chip)}</div>
+                            </>
+                          )}
+                        </>
+                      );
+                    })() : (
                       /* We do not know this exercise's movement pattern — so we do not guess at a
                          substitute. Say so, and let them search. (Law 2.) */
                       <p className="text-[11px] text-white/40 leading-snug">

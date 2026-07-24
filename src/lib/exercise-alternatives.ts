@@ -51,6 +51,13 @@ export interface AlternativeOption {
   same_pattern: true;
   /** What the athlete needs. Derived from displayFormat — coarse, but not invented. */
   equipment: 'barbell' | 'dumbbell' | 'bodyweight' | 'band' | 'unknown';
+  /**
+   * How TRUE a swap this is for the slot. 'direct' = a loadable compound at a substantial load
+   * (a real replacement — Trap Bar / Sumo / RDL for a deadlift). 'lighter' = a band/bodyweight or
+   * low-load accessory in the same pattern (Clamshell, Glute Bridge) — same muscles, not the same lift.
+   * Same movement pattern either way (never a wrong-muscle offer); this only ranks closeness.
+   */
+  tier: 'direct' | 'lighter';
 }
 
 function equipmentOf(cfg: ExerciseConfig): AlternativeOption['equipment'] {
@@ -143,8 +150,18 @@ export function getInSlotAlternatives(
     const need = equipmentOf(c);
     if (!canDo(equipment, need)) continue;                   // they cannot load it
 
-    out.push({ name: titleCase(key), same_pattern: true, equipment: need });
+    // Closeness: a loadable compound at a real load is a DIRECT swap; a band/bodyweight or low-load
+    // accessory in the same pattern is a LIGHTER alternative. Rank direct first, heaviest first — so
+    // "true swaps" (Trap Bar / Sumo / RDL for a deadlift) sit above accessories (Clamshell, band walk).
+    // We rank within the already-pattern-filtered list, so this never trips the primaryRef push/pull
+    // trap (Q-181) — every option here is already the right muscle group.
+    const ratio = typeof c.ratio === 'number' ? c.ratio : 0;
+    const loadable = need === 'barbell' || need === 'dumbbell';
+    const tier: AlternativeOption['tier'] = loadable && ratio >= 0.5 ? 'direct' : 'lighter';
+    out.push({ name: titleCase(key), same_pattern: true, equipment: need, tier, _ratio: ratio } as AlternativeOption & { _ratio: number });
   }
 
-  return out;
+  return (out as Array<AlternativeOption & { _ratio: number }>)
+    .sort((a, b) => (a.tier !== b.tier ? (a.tier === 'direct' ? -1 : 1) : b._ratio - a._ratio))
+    .map(({ _ratio, ...opt }) => opt);
 }
