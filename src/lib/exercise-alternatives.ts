@@ -52,10 +52,10 @@ export interface AlternativeOption {
   /** What the athlete needs. Derived from displayFormat — coarse, but not invented. */
   equipment: 'barbell' | 'dumbbell' | 'bodyweight' | 'band' | 'unknown';
   /**
-   * How TRUE a swap this is for the slot. 'direct' = a loadable compound at a substantial load
-   * (a real replacement — Trap Bar / Sumo / RDL for a deadlift). 'lighter' = a band/bodyweight or
-   * low-load accessory in the same pattern (Clamshell, Glute Bridge) — same muscles, not the same lift.
-   * Same movement pattern either way (never a wrong-muscle offer); this only ranks closeness.
+   * How TRUE a swap this is for the slot. 'direct' = a loadable VARIATION of the same lift (shares the
+   * lift's family word — Trap Bar / Sumo / Romanian Deadlift for a deadlift). 'lighter' = a same-muscle
+   * ALTERNATIVE in the same movement pattern that isn't the same lift (Hip Thrust, Glute Bridge, a
+   * machine, a bodyweight move). Same movement pattern either way (never a wrong-muscle offer).
    */
   tier: 'direct' | 'lighter';
 }
@@ -110,6 +110,13 @@ export function getInSlotAlternatives(
   const norm = (n: string) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 
   const selfNorm = norm(plannedName);
+  // The lift's family word — the last token of its name ("conventional deadlift" → "deadlift",
+  // "back squat" → "squat"). A "direct swap" is a VARIATION of the same lift (shares this word);
+  // everything else in the same movement pattern is a same-muscle ALTERNATIVE, not the same lift.
+  // This is what separates deadlift variants (Trap Bar / Sumo / RDL) from a heavy glute movement
+  // (Hip Thrust — same pattern, loads off the deadlift, but not a deadlift). Trade-off: an oddly-named
+  // legit swap (Leg Press for a squat) lands in Alternatives — acceptable; it IS a different movement.
+  const familyWord = selfNorm.split(' ').filter(Boolean).pop() || '';
   const selfTight = selfNorm.replace(/ /g, '');
   const seen = new Set<string>([selfNorm, selfTight.endsWith('s') ? selfTight.slice(0, -1) : selfTight]);
   const out: AlternativeOption[] = [];
@@ -150,14 +157,12 @@ export function getInSlotAlternatives(
     const need = equipmentOf(c);
     if (!canDo(equipment, need)) continue;                   // they cannot load it
 
-    // Closeness: a loadable compound at a real load is a DIRECT swap; a band/bodyweight or low-load
-    // accessory in the same pattern is a LIGHTER alternative. Rank direct first, heaviest first — so
-    // "true swaps" (Trap Bar / Sumo / RDL for a deadlift) sit above accessories (Clamshell, band walk).
-    // We rank within the already-pattern-filtered list, so this never trips the primaryRef push/pull
-    // trap (Q-181) — every option here is already the right muscle group.
+    // DIRECT = a variation of the same lift (shares the family word); everything else same-pattern is a
+    // same-muscle ALTERNATIVE. Ranked within the pattern-filtered list, heaviest first inside each tier.
     const ratio = typeof c.ratio === 'number' ? c.ratio : 0;
     const loadable = need === 'barbell' || need === 'dumbbell';
-    const tier: AlternativeOption['tier'] = loadable && ratio >= 0.5 ? 'direct' : 'lighter';
+    const tier: AlternativeOption['tier'] =
+      familyWord && loadable && k.split(' ').includes(familyWord) ? 'direct' : 'lighter';
     out.push({ name: titleCase(key), same_pattern: true, equipment: need, tier, _ratio: ratio } as AlternativeOption & { _ratio: number });
   }
 

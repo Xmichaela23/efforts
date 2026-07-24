@@ -4302,7 +4302,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           )}
                           {lighter.length > 0 && (
                             <>
-                              <p className="text-[10px] uppercase tracking-wide text-white/35 mb-1.5">Lighter alternatives</p>
+                              <p className="text-[10px] uppercase tracking-wide text-white/35 mb-1.5">Alternatives</p>
                               <div className="flex flex-wrap gap-1.5">{lighter.map(chip)}</div>
                             </>
                           )}
