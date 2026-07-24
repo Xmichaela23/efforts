@@ -160,7 +160,13 @@ export function composeCoachWeekInsight(inp: CoachWeekInsightInput): string | nu
 
   if (inp.hasPlan && !inp.partialWeek) {
     // Consequence, never a tally. Only fires where the plan actually asked for something.
-    const planned = active.filter((d) => typeof d.plannedLoad === 'number' && (d.plannedLoad as number) > 0);
+    // ⛔ A MAINTAIN discipline is EXCLUDED here. Its story is the trailing UPKEEP target (the coach's-eye /
+    // cross-training line, D-297/D-130), NOT this week's plan-adherence ratio. Without this exclusion the
+    // week narrative said "Running came in heavier than planned" (this-week load over a small maintenance
+    // plan) two inches above "Running's under what holds it" (28-day upkeep) — the app contradicting itself
+    // about the same discipline (Michael on device 2026-07-24). One discipline, one window, one owner.
+    const planned = active.filter((d) =>
+      typeof d.plannedLoad === 'number' && (d.plannedLoad as number) > 0 && postureOf(d) !== 'maintain');
     const under = planned.filter((d) => Number(d.actualLoad) / Number(d.plannedLoad) < BAND_LO);
     const over = planned.filter((d) => Number(d.actualLoad) / Number(d.plannedLoad) > BAND_HI);
     if (under.length === 1 && !over.length) {

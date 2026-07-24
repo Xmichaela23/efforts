@@ -80,6 +80,21 @@ Deno.test('PLAN: under-plan reads as consequence, never as a tally', () => {
   assert(!/\d+\s+of\s+\d+/i.test(out!), out!);
 });
 
+Deno.test('PLAN: a MAINTAIN discipline over its week plan is NOT "heavier than planned" — the upkeep line owns it (Michael on device 2026-07-24)', () => {
+  // Running is maintain, did more load than this week's small maintenance plan, but is under its 28-day
+  // upkeep. The old code said "Running came in heavier than planned" two inches above "under what holds
+  // it" — the app contradicting itself. The week narrative must defer to the upkeep line for maintain.
+  const out = composeCoachWeekInsight({
+    hasPlan: true,
+    posture: { run: 'maintain', strength: 'develop' },
+    disciplines: [
+      d('run', 60, 3, { plannedLoad: 30, acwr: 1.0 }),   // actual 60 vs planned 30 → would be "heavier"
+      d('strength', 40, 3, { plannedLoad: 40 }),
+    ],
+  });
+  assert(!out || !/came in heavier than planned/i.test(out), String(out));
+});
+
 Deno.test('PLAN: a partial week cannot read as "came in lighter" (the Q-177 trap)', () => {
   const out = composeCoachWeekInsight({
     hasPlan: true,
