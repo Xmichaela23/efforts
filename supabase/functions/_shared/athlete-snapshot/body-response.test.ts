@@ -92,3 +92,36 @@ Deno.test('cycling vs running fatigue weights — asymmetric per design', () => 
   assertEquals(getCyclingFatigueWeight({ type: 'mobility' }), 0);
   assertEquals(getRunningFatigueWeight({ type: 'mobility' }), 0);
 });
+
+// ── §D-317: TOTAL-load status (sport-neutral, phase-aware) — the fix for the run-engine load verdict ──
+import { computeTotalLoadStatus } from './body-response.ts';
+
+Deno.test('THE MICHAEL CASE: strength plan, TOTAL acwr 1.3 in a BUILD week → NOT "pull back"', () => {
+  // Was 'high' because the base read running_acwr alone (a bunched maintenance run). Now judged on
+  // TOTAL load, and a build week tolerates 1.3 as the intent.
+  assertEquals(computeTotalLoadStatus(1.3, null, 'build').status, 'on_target');
+  // The status takes ONLY the total acwr — there is no running input, so a running spike CANNOT drive it.
+});
+
+Deno.test('phase-aware: a BUILD week tolerates more before it flags', () => {
+  assertEquals(computeTotalLoadStatus(1.5, null, 'build').status, 'elevated'); // building fast, not alarm
+  assertEquals(computeTotalLoadStatus(1.7, null, 'build').status, 'high');     // real overload still flags
+});
+
+Deno.test('phase-aware: an EASY (recovery/taper) week tightens — load should be LOW', () => {
+  assertEquals(computeTotalLoadStatus(1.3, null, 'recovery').status, 'elevated');
+  assertEquals(computeTotalLoadStatus(1.4, null, 'taper').status, 'high'); // high load in a taper is wrong
+});
+
+Deno.test('default (baseline/unknown) uses the Gabbett sweet spot: 0.8–1.3 optimal, >1.5 high', () => {
+  assertEquals(computeTotalLoadStatus(1.3, null, 'baseline').status, 'on_target'); // top of the sweet spot
+  assertEquals(computeTotalLoadStatus(1.4, null, 'baseline').status, 'elevated');
+  assertEquals(computeTotalLoadStatus(1.6, null, 'baseline').status, 'high');
+  assertEquals(computeTotalLoadStatus(0.7, null, 'baseline').status, 'under');
+});
+
+Deno.test('thin base (no acwr) falls back to total actual-vs-planned', () => {
+  assertEquals(computeTotalLoadStatus(null, 40, 'baseline').status, 'elevated');
+  assertEquals(computeTotalLoadStatus(null, -30, 'baseline').status, 'under');
+  assertEquals(computeTotalLoadStatus(null, 10, 'baseline').status, 'on_target');
+});

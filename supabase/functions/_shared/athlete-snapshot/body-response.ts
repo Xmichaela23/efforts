@@ -30,6 +30,36 @@ function isEasyPhase(phase: WeekPhase): boolean {
   return phase === 'recovery' || phase === 'deload' || phase === 'taper';
 }
 
+/**
+ * TOTAL-load status — sport-neutral + phase-aware (D-317). Judges the athlete's WHOLE load (every
+ * discipline, like TP's TSS pool), NOT running alone. Gabbett/ACWR bands (0.8–1.3 sweet spot),
+ * softened in a BUILD phase (an elevated ratio is the intent there) and tightened in an EASY phase.
+ * Descriptive words only — whether the load is COSTING the goal is the coach's eye's job, not this.
+ * Exported so the band thresholds are pinnable and single-sourced.
+ */
+export function computeTotalLoadStatus(
+  totalAcwr: number | null,
+  totalPct: number | null,
+  phase: WeekPhase,
+): { status: 'under' | 'on_target' | 'elevated' | 'high'; interp: string } {
+  const easy = isEasyPhase(phase);
+  const isBuild = phase === 'build';
+  if (totalAcwr != null) {
+    const highBand = easy ? 1.3 : isBuild ? 1.6 : 1.5;
+    const elevBand = easy ? 1.15 : isBuild ? 1.4 : 1.3;
+    if (totalAcwr > highBand) return { status: 'high', interp: 'total load ramping quickly' };
+    if (totalAcwr > elevBand) return { status: 'elevated', interp: 'total load building' };
+    if (totalAcwr < 0.8) return { status: 'under', interp: 'total load below your recent weeks' };
+    return { status: 'on_target', interp: 'total load on target' };
+  }
+  if (totalPct != null) {
+    const status = totalPct > 30 ? 'elevated' : totalPct < -20 ? 'under' : 'on_target';
+    const pctWord = totalPct > 0 ? `${totalPct}% above plan` : totalPct < 0 ? `${Math.abs(totalPct)}% below plan` : 'on target';
+    return { status, interp: `Total load ${pctWord}` };
+  }
+  return { status: 'on_target', interp: 'insufficient data for load assessment' };
+}
+
 // ---------------------------------------------------------------------------
 // Norms: what we compare against
 // ---------------------------------------------------------------------------
@@ -457,42 +487,16 @@ export function buildBodyResponse(
     crossTrainingLoadSummary = xParts.join(', ');
   }
 
-  // ── Load interpretation ──
-  // Primary signal: run-only load vs run plan. ACWR gates false alarms.
-  const rAcwr = loadStatus.running_acwr;
-  const runPct = runOnlyWeekLoadPct;
-  let loadStatusLabel: BodyResponse['load_status']['status'] = 'on_target';
-  let loadInterp: string;
-
-  if (runPct != null) {
-    if (runPct > 30) { loadStatusLabel = 'high'; }
-    else if (runPct > 15) { loadStatusLabel = 'elevated'; }
-    else if (runPct < -20) { loadStatusLabel = 'under'; }
-
-    // ACWR gate: cap alarm level when running ACWR confirms manageable fatigue
-    if (rAcwr != null && rAcwr < 1.2 && loadStatusLabel === 'high') {
-      loadStatusLabel = 'elevated';
-    }
-    if (rAcwr != null && rAcwr < 1.0 && loadStatusLabel === 'elevated') {
-      loadStatusLabel = 'on_target';
-    }
-    if (easy && rAcwr != null && rAcwr < 1.3 && loadStatusLabel === 'high') {
-      loadStatusLabel = 'elevated';
-    }
-
-    const pctWord = runPct > 0 ? `${runPct}% above plan` : runPct < 0 ? `${Math.abs(runPct)}% below plan` : 'on target';
-    loadInterp = `Running load ${pctWord}`;
-    if (rAcwr != null && runPct > 15 && rAcwr < 1.2) {
-      loadInterp += ` (ACWR ${rAcwr.toFixed(2)} — manageable)`;
-    }
-  } else if (rAcwr != null) {
-    if (rAcwr > 1.3) { loadStatusLabel = 'high'; loadInterp = 'running load ramping quickly'; }
-    else if (rAcwr > 1.1) { loadStatusLabel = 'elevated'; loadInterp = 'running load building gradually'; }
-    else if (rAcwr < 0.7) { loadStatusLabel = 'under'; loadInterp = 'running volume lower than recent weeks'; }
-    else { loadInterp = 'running load on target'; }
-  } else {
-    loadInterp = 'insufficient data for running load assessment';
-  }
+  // ── Load interpretation — TOTAL load, sport-neutral (D-317) ──
+  // WAS run-only ("Primary signal: run-only load vs run plan") — which judged a strength / multi-sport
+  // athlete's WHOLE load off running (running_acwr > 1.3 → 'high'), so an on-plan strength week with a
+  // slightly-bunched maintenance run read "pull back." This is a MULTI-SPORT engine: the status now
+  // reflects the athlete's TOTAL load (every discipline, like TP's TSS pool), phase-aware, and
+  // DESCRIPTIVE. Whether that load is COSTING the goal is NOT decided here — that lives in the coach's
+  // eye (cross-training-read.ts). One meter (how much load), one judge (is it hurting the goal).
+  const totalStatus = computeTotalLoadStatus(loadStatus.acwr, loadStatus.actual_vs_planned_pct, phase);
+  let loadStatusLabel: BodyResponse['load_status']['status'] = totalStatus.status;
+  let loadInterp: string = totalStatus.interp;
 
   if (crossTrainingLoadSummary) {
     loadInterp += `. Cross-training: ${crossTrainingLoadSummary}`;

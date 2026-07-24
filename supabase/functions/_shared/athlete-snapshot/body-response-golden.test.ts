@@ -112,7 +112,7 @@ Deno.test('golden: load_status strings (status, interpretation, load receipts, u
     unplanned_summary: '5 unplanned: 3 runs, 2 strengths',
     cross_training_load_summary: '2 strength (185 pts, moderate running impact, learning — 6 sessions)',
     status: 'on_target',
-    interpretation: 'running load on target. Cross-training: 2 strength (185 pts, moderate running impact, learning — 6 sessions). 5 unplanned: 3 runs, 2 strengths',
+    interpretation: 'total load on target. Cross-training: 2 strength (185 pts, moderate running impact, learning — 6 sessions). 5 unplanned: 3 runs, 2 strengths',
     avg_run_hr_drift_bpm: 5.4, // D-264 step 0 receipt: mean of the 3 runs' drift (4.2/5.1/6.8)
   });
 });
