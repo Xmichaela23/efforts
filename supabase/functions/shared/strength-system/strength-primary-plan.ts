@@ -35,7 +35,7 @@ export type StrengthPrimaryArgs = {
   /** Get Strong maintenance-endurance band (run only). Typed weekly miles + the athlete's easy pace
    *  (min/mi) → the run volume, clamped to the science band: floor holds the aerobic base (Hickson/
    *  Spiering, freq 2-3×/wk), ceiling caps interference (Wilson, running>cycling). Flat, no ramp.
-   *  Absent → the fixed ~2×35min default. See SCIENCE-strength-primary-loading.md. */
+   *  Absent → the fixed ~2×35min default. See docs/archive/superseded-strength-2026-07-25/SCIENCE-strength-primary-loading.md. */
   targetWeeklyMiles?: number;
   easyPaceMinPerMile?: number;
   /** Optional accessory-bias add-on: injects ONE posterior-chain accessory slot on Upper A — glute

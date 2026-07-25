@@ -11,7 +11,7 @@
 // block pairs with a ~20–30% reduction in concurrent endurance volume). So a
 // 4-day strength week is only legal when endurance is NOT itself developing.
 //
-// Spec: docs/SPEC-q088-freq4-run-path.md.
+// Spec: docs/archive/superseded-strength-2026-07-25/SPEC-q088-freq4-run-path.md.
 // ============================================================================
 
 /**

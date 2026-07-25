@@ -17,7 +17,7 @@
 //     an even 2L/2U. Reuses neural's session builders verbatim (no new content).
 //
 // Selected ONLY at strengthFrequency 4 — the frequency policy
-// (../frequency-policy.ts) gates it there. Spec: docs/SPEC-q088-freq4-run-path.md.
+// (../frequency-policy.ts) gates it there. Spec: docs/archive/superseded-strength-2026-07-25/SPEC-q088-freq4-run-path.md.
 // ============================================================================
 
 import {

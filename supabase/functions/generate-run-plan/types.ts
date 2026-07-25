@@ -31,7 +31,7 @@ export interface GeneratePlanRequest {
    * (per_discipline_posture.run). Gates the strength-frequency ceiling: develop → ≤3,
    * maintain/out → may reach 4. Absent ≡ develop (safe). Engine-first: today the producer
    * (create-goal) does not set it yet, so freq-4 is provable only via an injected value
-   * (like E3b's budget). See docs/SPEC-q088-freq4-run-path.md.
+   * (like E3b's budget). See docs/archive/superseded-strength-2026-07-25/SPEC-q088-freq4-run-path.md.
    */
   endurance_posture?: 'develop' | 'maintain' | 'out';
   strength_tier?: 'injury_prevention' | 'strength_power';
