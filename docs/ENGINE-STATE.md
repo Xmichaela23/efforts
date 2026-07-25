@@ -102,12 +102,20 @@ buildable / has-profile) must agree with nothing enforcing it.
 > The fix is one test asserting the three lists agree, plus a log line when `resolveProfile` falls back.
 > Adding the `five_by_five` entry ends this instance; the test ends the class.
 
-**⚠️ TWO PLACES THE SPEC CONFLICTS WITH THIS REPO'S OWN SCIENCE DOCS — Q-202 lines 31, 32.**
-`SCIENCE-concurrent-training-interference.md` §2 marks the Wilson-2012 running-vs-cycling split
-**CONTESTED** (Schumann 2022, more studies, found no modality moderation). The spec cites it **T1** twice,
-in athlete-facing copy. And `SCIENCE-5x5-linear-progression.md` carries a **sourced ~20-30%** endurance
-volume reduction where the spec invents **~66% [T3]**. **Read both science docs before writing the copy** —
-they are already in `docs/` and they are better than they look.
+**THE SPEC IS WELL-VETTED. TRUST IT.** It is tier-marked, its standing rule puts every new call at T3
+until placed, it states plainly that the combination is unstudied, and its Limits section cites the
+meta-analysis that weakens its own strongest claim. That is rarer than it should be — **do not treat
+lines 31/32 as reasons to re-litigate it.**
+
+Two small copy notes only, both `[SPEC]`, neither a design flaw:
+- **31** — the spec already discloses Schumann 2022 on interference MAGNITUDE. Schumann also found no
+  **modality** moderation, and that half isn't carried beside *"Why cyclists have more room [T1 Wilson
+  2012]"*. One sentence to soften. `SCIENCE-concurrent-training-interference.md` §2 has the wording.
+- **32** — the spec's ~66% volume cut is marked `[T3]`, which is honest. `SCIENCE-5x5-linear-progression.md`
+  has a sourced ~20-30% if Michael prefers to cite rather than choose. An option.
+
+**Still read both science docs before writing the copy** — they are already in `docs/`, and I filed 31 as a
+contradiction before reading the spec's own Limits section.
 
 **⚠️ AND THE SPEC ADDS WORK.** Its §9 "required, not yet built" is six new items: season gate, stall
 handling, retest gating, easy-effort drift detection, quality placement, discipline availability check.
