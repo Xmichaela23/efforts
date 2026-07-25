@@ -1936,7 +1936,7 @@ function expandTokensForRow(
             String(name ?? ''),
             typeof ex?.target_rir === 'number' ? ex.target_rir : null,
             rowPhase,
-            typeof reps === 'number' ? reps : null,
+            typeof reps === 'number' ? reps : (Number.parseInt(String(reps ?? ''), 10) || null),
             typeof percent_1rm === 'number' ? percent_1rm : null
           );
           
@@ -1960,6 +1960,24 @@ function expandTokensForRow(
             finalWeightDisplay = fallbackUnresolvedPercentDisplay((ex as any)?.weight, reps);
           }
 
+          // D-316 modality guard. Three-way, and only the third case fires here:
+          //   bodyweight/band with no weight        -> allow (39 such rows in prod, all correct)
+          //   loaded lift with no resolvable 1RM    -> caught upstream at plan creation
+          //   BODYWEIGHT LIFT CARRYING A WEIGHT     -> strip it, loudly
+          // The third was live: "Pull Up" missed the hyphenated `pull-up` key, fell to the legacy
+          // barbell fallback, and rendered "110 lb" off the athlete's BENCH. The lookup fold fixes
+          // the cause; this is the backstop, because a bodyweight lift showing a plate number is
+          // the kind of wrong an athlete acts on. Corrects rather than throws — materialize also
+          // runs over EXISTING plans, and a throw would brick re-materialize on legacy rows.
+          const modalityCfg = getExerciseConfig(String(name ?? ''));
+          if ((modalityCfg?.displayFormat === 'bodyweight' || modalityCfg?.displayFormat === 'band')
+            && typeof finalWeight === 'number' && finalWeight > 0) {
+            console.error(`⛔ [materialize] ${name}: bodyweight/band lift carried ${finalWeight} lb (resolved_from=${resolved_from}) — stripped.`);
+            finalWeight = undefined as any;
+            finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
+            resolved_from = undefined;
+            percent_1rm = undefined;
+          }
           const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
@@ -2139,7 +2157,7 @@ function expandTokensForRow(
             String(name ?? ''),
             typeof ex?.target_rir === 'number' ? ex.target_rir : null,
             rowPhase,
-            typeof reps === 'number' ? reps : null,
+            typeof reps === 'number' ? reps : (Number.parseInt(String(reps ?? ''), 10) || null),
             typeof percent_1rm === 'number' ? percent_1rm : null
           );
           
@@ -2160,6 +2178,24 @@ function expandTokensForRow(
             finalWeightDisplay = fallbackUnresolvedPercentDisplay((ex as any)?.weight, reps);
           }
 
+          // D-316 modality guard. Three-way, and only the third case fires here:
+          //   bodyweight/band with no weight        -> allow (39 such rows in prod, all correct)
+          //   loaded lift with no resolvable 1RM    -> caught upstream at plan creation
+          //   BODYWEIGHT LIFT CARRYING A WEIGHT     -> strip it, loudly
+          // The third was live: "Pull Up" missed the hyphenated `pull-up` key, fell to the legacy
+          // barbell fallback, and rendered "110 lb" off the athlete's BENCH. The lookup fold fixes
+          // the cause; this is the backstop, because a bodyweight lift showing a plate number is
+          // the kind of wrong an athlete acts on. Corrects rather than throws — materialize also
+          // runs over EXISTING plans, and a throw would brick re-materialize on legacy rows.
+          const modalityCfg = getExerciseConfig(String(name ?? ''));
+          if ((modalityCfg?.displayFormat === 'bodyweight' || modalityCfg?.displayFormat === 'band')
+            && typeof finalWeight === 'number' && finalWeight > 0) {
+            console.error(`⛔ [materialize] ${name}: bodyweight/band lift carried ${finalWeight} lb (resolved_from=${resolved_from}) — stripped.`);
+            finalWeight = undefined as any;
+            finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
+            resolved_from = undefined;
+            percent_1rm = undefined;
+          }
           const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });

@@ -14,6 +14,7 @@ import {
   resolveSwapSeedWeight,
   calculatePrescribedWeight,
   normalizeLiftKey,
+  getExerciseConfig,
 } from './exercise-config.ts';
 
 // ── THE BUG CASE, kept as a permanent regression ──────────────────────────────
@@ -167,4 +168,55 @@ Deno.test('lift keys match across plural + side suffixes (Q-197)', () => {
   assertEquals(normalizeLiftKey('Hip Thrusts'), normalizeLiftKey('Hip Thrust'));
   assertEquals(normalizeLiftKey('Step Up (Left)'), normalizeLiftKey('Step Up'));
   assertEquals(normalizeLiftKey('  Back   Squat '), 'back squat');
+});
+
+// ── NAME FOLDING (D-316) ──────────────────────────────────────────────────────
+// The table is written hyphenated (`pull-up`, `push-up`, `chin-up`, 17 keys). Callers
+// write the spaced form. The lookup only lowercased and trimmed, so every one of those
+// entries was unreachable — "Pull Up" returned null and fell through to materialize's
+// legacy barbell fallback, which prescribed a pull-up off the athlete's BENCH and
+// rendered "110 lb". The entries were always correct; they just couldn't be found.
+
+Deno.test('BUG CASE: spaced bodyweight names resolve to their hyphenated entries', () => {
+  for (const n of ['Pull Up', 'Pull Ups', 'Push Up', 'Push Ups', 'Chin Up',
+                   'Pike Push Up', 'Diamond Push Ups', 'Decline Push Up']) {
+    const c = getExerciseConfig(n);
+    assertEquals(c?.displayFormat, 'bodyweight', `${n} must resolve as bodyweight`);
+    assertEquals(c?.primaryRef, null, `${n} must not derive off another lift`);
+  }
+});
+
+Deno.test('BUG CASE: a bodyweight lift can never produce a plate number', () => {
+  // The exact shape that shipped: a pull-up priced off a 150 lb bench.
+  for (const n of ['Pull Up', 'Push Up', 'Chin Up']) {
+    const w = calculatePrescribedWeight(n, AUTHORED, B, REPS, NO_REP_SCALE).weight;
+    assertEquals(w, 0, `${n} must be 0 (bodyweight), not a derived load`);
+  }
+});
+
+Deno.test('hyphen/space/underscore forms are interchangeable', () => {
+  const want = getExerciseConfig('pull-up');
+  for (const n of ['pull up', 'Pull-Up', 'PULL UP', 'pull_up', '  pull   up  ']) {
+    assertEquals(getExerciseConfig(n), want, n);
+  }
+});
+
+Deno.test('folding does not regress the existing table', () => {
+  const expect: Array<[string, string | null, number]> = [
+    ['squat', 'squat', 1.0],
+    ['Back Squat', 'squat', 1.0],
+    ['Bulgarian Split Squat', 'squat', 0.50],
+    ['Barbell Row', 'bench', 0.80],
+    ['Front Squat', 'squat', 0.85],
+    ['Leg Press', 'squat', 1.50],
+    ['Hip Thrust', 'deadlift', 0.90],
+    ['Romanian Deadlift', 'deadlift', 0.75],
+    ['Step Up', 'squat', 0.40],
+    ['Goblet Squat', 'squat', 0.45],
+  ];
+  for (const [name, ref, ratio] of expect) {
+    const c = getExerciseConfig(name);
+    assertEquals(c?.primaryRef ?? null, ref, `${name} ref`);
+    assertEquals(c?.ratio, ratio, `${name} ratio`);
+  }
 });

@@ -1230,23 +1230,68 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
 };
 
 /**
+ * Fold an exercise name to a punctuation-insensitive form: lowercase, hyphens and
+ * underscores to spaces, whitespace collapsed.
+ *
+ * D-316. This exists because the table is written in hyphenated form — `pull-up`,
+ * `push-up`, `chin-up`, `pike push-up`, 17 keys in all — while callers write the
+ * SPACED form. `getExerciseConfig` only lowercased and trimmed, so "Pull Up" missed
+ * every one of them, returned null, and dropped the caller into materialize-plan's
+ * legacy `pickPrimary1RMAndBase` fallback. That fallback derives a load from whichever
+ * barbell 1RM it can find, so a PULL-UP was being prescribed off the athlete's BENCH
+ * and rendered as "110 lb", climbing to 130 across the block.
+ *
+ * The entries themselves were always right — `pull-up` is `primaryRef: null,
+ * displayFormat: 'bodyweight'`. They were simply unreachable. Every bodyweight
+ * push/pull variant in the table had the same hole; pull-ups is just the one that
+ * showed up in a plan.
+ */
+function foldExerciseName(raw: string): string {
+  return String(raw ?? '')
+    .toLowerCase()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Folded key → config, built once. First writer wins, mirroring object key order. */
+const FOLDED_CONFIG_INDEX: Record<string, ExerciseConfig> = (() => {
+  const idx: Record<string, ExerciseConfig> = {};
+  for (const [key, config] of Object.entries(EXERCISE_CONFIG)) {
+    const folded = foldExerciseName(key);
+    if (!(folded in idx)) idx[folded] = config;
+  }
+  return idx;
+})();
+
+/**
  * Look up exercise configuration, with fuzzy matching fallback
  */
 export function getExerciseConfig(exerciseName: string): ExerciseConfig | null {
   const normalized = String(exerciseName ?? '').toLowerCase().trim();
-  
+
   // Exact match first
   if (EXERCISE_CONFIG[normalized]) {
     return EXERCISE_CONFIG[normalized];
   }
-  
-  // Longest-key fuzzy match so "squat" hits primary `squat`, not "bulgarian split squat"
+
+  // Punctuation-insensitive exact match: "Pull Up" → `pull-up`. Runs BEFORE the fuzzy
+  // pass so a spaced name resolves to its real entry rather than to whatever substring
+  // happens to overlap most.
+  const folded = foldExerciseName(exerciseName);
+  if (FOLDED_CONFIG_INDEX[folded]) {
+    return FOLDED_CONFIG_INDEX[folded];
+  }
+
+  // Longest-key fuzzy match so "squat" hits primary `squat`, not "bulgarian split squat".
+  // Compared on the FOLDED forms too, so "Barbell Pull Up" still reaches `pull-up`.
   let best: ExerciseConfig | null = null;
   let bestScore = -1;
   for (const [key, config] of Object.entries(EXERCISE_CONFIG)) {
+    const fkey = foldExerciseName(key);
     let score = -1;
-    if (normalized.includes(key)) score = key.length;
-    else if (key.includes(normalized)) score = normalized.length;
+    if (folded.includes(fkey)) score = fkey.length;
+    else if (fkey.includes(folded)) score = folded.length;
     if (score > bestScore) {
       bestScore = score;
       best = config;

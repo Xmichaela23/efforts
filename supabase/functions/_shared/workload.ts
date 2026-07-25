@@ -176,7 +176,10 @@ export function getStrengthIntensity(exercises: any[], sessionRPE?: number): num
       base = INTENSITY_FACTORS.strength['bodyweight'];
     }
 
-    const reps = typeof ex.reps === 'number' ? ex.reps : 8;
+    // D-316: parse, don't type-check. A rep RANGE ("5-8") is a string, and the old
+    // type-check silently fell to the 8-rep default — flipping the intensity multiplier
+    // the wrong way for a heavy 5. Takes the BOTTOM of the range, the day-one prescription.
+    const reps = typeof ex.reps === 'number' ? ex.reps : (Number.parseInt(String(ex.reps ?? ''), 10) || 8);
     if (reps <= 5) base *= 1.05;
     else if (reps >= 13) base *= 0.90;
 
