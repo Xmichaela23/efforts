@@ -19,6 +19,8 @@
 // (strength_focus_power et al.), so the (b)-run path + the base structure stay untouched.
 // ============================================================================
 
+import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
+
 export type StrengthPrimaryArgs = {
   durationWeeks: number;
   strengthFrequency: 3 | 4;
@@ -142,8 +144,21 @@ function workLoad(phase: ArcPhase, week: number): WorkLoad {
   }
 }
 
+// D-322: a BODYWEIGHT lift is never authored with a %1RM. This helper stamped the session's
+// percentage onto every lift unconditionally, which is where "Pull Up @ 78.5% 1RM" came from —
+// a value with no meaning for a lift that has no bar, and the single root of three separate
+// downstream bugs (priced as a barbell load off the athlete's BENCH, turned into RIR 0.5 by the
+// RPE chart, and rendered as "pick a weight you can do for 5 reps"). Each was fixed where it
+// surfaced; none of them stopped the next one. Not writing the number is what ends the class.
 function exer(name: string, s: Scheme): StrengthExercise {
-  return { name, sets: s.sets, reps: s.reps, weight: `${s.pct}% 1RM` };
+  const cfg = getExerciseConfig(name);
+  const isBodyweight = cfg?.displayFormat === 'bodyweight' || cfg?.displayFormat === 'band';
+  return {
+    name,
+    sets: s.sets,
+    reps: s.reps,
+    weight: isBodyweight ? 'Bodyweight' : `${s.pct}% 1RM`,
+  };
 }
 
 // Spread the weekly maintenance miles across N runs as a LONG-RUN share + easy fill — NOT total÷N

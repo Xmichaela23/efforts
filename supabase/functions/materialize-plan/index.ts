@@ -1811,6 +1811,15 @@ function expandTokensForRow(
           
           // Use research-based exercise config for weight calculation
           const exerciseConfig = getExerciseConfig(name);
+          // D-322: a BODYWEIGHT row must never carry a %1RM. The composers stamp the session's
+          // percentage onto every lift in the session, including pull-ups — and "78.5% 1RM" on a
+          // pull-up is not a small mislabel, it is a number three separate consumers have now
+          // re-derived a bug from: the legacy fallback priced it as a barbell load, the RPE chart
+          // turned it into RIR 0.5, and the display copy told the athlete to pick a weight. Killing
+          // it HERE, before anything reads it, is what makes the class of bug can't-happen rather
+          // than a fourth patch. The three-way modality assertion below stays as the guard.
+          const isBodyweightModality = exerciseConfig?.displayFormat === 'bodyweight';
+          if (isBodyweightModality) percentRaw = undefined;
           const isBandExercise = exerciseConfig?.displayFormat === 'band' || String(name).toLowerCase().includes('band');
           
           let prescribed: number | undefined = undefined;
@@ -1937,7 +1946,12 @@ function expandTokensForRow(
             typeof ex?.target_rir === 'number' ? ex.target_rir : null,
             rowPhase,
             typeof reps === 'number' ? reps : (Number.parseInt(String(reps ?? ''), 10) || null),
-            typeof percent_1rm === 'number' ? percent_1rm : null
+            typeof percent_1rm === 'number' ? percent_1rm : null,
+            // D-322: bodyweight lifts resolve RIR from reps vs the tested max, never a percentage.
+            isBodyweightModality && typeof (baselines as any)?.pullupMaxReps === 'number'
+              && /pull\s*up|chin\s*up/i.test(String(name ?? ''))
+              ? (baselines as any).pullupMaxReps
+              : null
           );
           
           const progressed = isStrengthPrimary ? prescribed : adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);
@@ -1957,7 +1971,13 @@ function expandTokensForRow(
           // RIR-anchored cue instead. Numeric weights computed above are
           // preserved — this only fires when display would otherwise be empty.
           if (finalWeightDisplay == null) {
-            finalWeightDisplay = fallbackUnresolvedPercentDisplay((ex as any)?.weight, reps);
+            // D-322: never on a bodyweight row. This fallback reads the RAW authored string, so
+            // stripping the derived percent above is not enough — a stored "72% 1RM" on a pull-up
+            // still reaches it and produces "Pick a weight you can do for 5 reps…" for a lift with
+            // no bar. This is the third consumer to re-derive a bug from that one value.
+            finalWeightDisplay = isBodyweightModality
+              ? 'Bodyweight'
+              : fallbackUnresolvedPercentDisplay((ex as any)?.weight, reps);
           }
 
           // D-322 modality guard. Three-way, and only the third case fires here:
@@ -2040,6 +2060,15 @@ function expandTokensForRow(
           
           // Use research-based exercise config for weight calculation
           const exerciseConfig = getExerciseConfig(name);
+          // D-322: a BODYWEIGHT row must never carry a %1RM. The composers stamp the session's
+          // percentage onto every lift in the session, including pull-ups — and "78.5% 1RM" on a
+          // pull-up is not a small mislabel, it is a number three separate consumers have now
+          // re-derived a bug from: the legacy fallback priced it as a barbell load, the RPE chart
+          // turned it into RIR 0.5, and the display copy told the athlete to pick a weight. Killing
+          // it HERE, before anything reads it, is what makes the class of bug can't-happen rather
+          // than a fourth patch. The three-way modality assertion below stays as the guard.
+          const isBodyweightModality = exerciseConfig?.displayFormat === 'bodyweight';
+          if (isBodyweightModality) percentRaw = undefined;
           const isBandExercise = exerciseConfig?.displayFormat === 'band' || String(name).toLowerCase().includes('band');
           
           let prescribed: number | undefined = undefined;
@@ -2158,7 +2187,12 @@ function expandTokensForRow(
             typeof ex?.target_rir === 'number' ? ex.target_rir : null,
             rowPhase,
             typeof reps === 'number' ? reps : (Number.parseInt(String(reps ?? ''), 10) || null),
-            typeof percent_1rm === 'number' ? percent_1rm : null
+            typeof percent_1rm === 'number' ? percent_1rm : null,
+            // D-322: bodyweight lifts resolve RIR from reps vs the tested max, never a percentage.
+            isBodyweightModality && typeof (baselines as any)?.pullupMaxReps === 'number'
+              && /pull\s*up|chin\s*up/i.test(String(name ?? ''))
+              ? (baselines as any).pullupMaxReps
+              : null
           );
           
           const progressed = isStrengthPrimary ? prescribed : adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);
@@ -2175,7 +2209,13 @@ function expandTokensForRow(
           // D-071: mirror first call site — RIR-anchored fallback when
           // resolution bailed on a "% 1RM" prescription and 1RM is missing.
           if (finalWeightDisplay == null) {
-            finalWeightDisplay = fallbackUnresolvedPercentDisplay((ex as any)?.weight, reps);
+            // D-322: never on a bodyweight row. This fallback reads the RAW authored string, so
+            // stripping the derived percent above is not enough — a stored "72% 1RM" on a pull-up
+            // still reaches it and produces "Pick a weight you can do for 5 reps…" for a lift with
+            // no bar. This is the third consumer to re-derive a bug from that one value.
+            finalWeightDisplay = isBodyweightModality
+              ? 'Bodyweight'
+              : fallbackUnresolvedPercentDisplay((ex as any)?.weight, reps);
           }
 
           // D-322 modality guard. Three-way, and only the third case fires here:
@@ -2930,6 +2970,20 @@ Deno.serve(async (req) => {
       const perfOhp = Number(
         perfRaw.overheadPress1RM ?? perfRaw.ohp ?? perfRaw.overhead_press ?? perfRaw.overhead,
       );
+
+      // D-322 line 10: pull-ups are a REP COUNT, not a 1RM, and the five-key assembly below
+      // dropped them entirely — a value that saves and reads back perfectly (verified end-to-end
+      // on a throwaway user) was discarded at the last hop, so no generator could ever see it.
+      // Deliberately NOT routed through mergeAnchor1RmLb: that resolver exists to pick a LOAD and
+      // falls back to a default pounds figure, which is meaningless here. Pass through only when
+      // the athlete actually gave a number. **0 is valid** — "goal: your first pull-up" (Q-102) —
+      // so the guard is `>= 0`, not truthy.
+      const perfPullups = Number(
+        perfRaw.pullupMaxReps ?? perfRaw.pullup_max_reps ?? perfRaw.pullups ?? perfRaw.pullup,
+      );
+      if (Number.isFinite(perfPullups) && perfPullups >= 0) {
+        (baselines as any).pullupMaxReps = Math.round(perfPullups);
+      }
 
       (baselines as any).squat = mergeAnchor1RmLb(
         Number.isFinite(perfSquat) && perfSquat > 0 ? perfSquat : undefined,

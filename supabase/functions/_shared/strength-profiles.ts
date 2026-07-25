@@ -193,6 +193,33 @@ const RPE_CHART_PCT: Record<number, number[]> = {
  * protocol/phase default. Rounded to 0.5 (the chart's own granularity) and clamped to the
  * same band as every other target, so a 100% single reads 0.5, not 0.
  */
+/**
+ * Target RIR for a BODYWEIGHT lift, from reps relative to the athlete's tested max.
+ *
+ * D-322. This is the definition of reps-in-reserve, not a model of it: prescribe 5 of an
+ * 8-rep max and 3 are in reserve. No chart, no percentage, no proxy.
+ *
+ * It exists because a bodyweight row was deriving its target from a %1RM it has no business
+ * carrying. Pull-ups were authored at the session's percentage ("78.5% 1RM"), and the RPE chart
+ * dutifully consumed it — 8 reps at 82% came out as RIR 0.5 on a lift with no bar. That was the
+ * THIRD bug from one root (a pound value, then this, then load-picking display copy), which is
+ * why the percentage is no longer authored onto these rows at all.
+ *
+ * Returns null when there is no tested max — the caller then falls back to the protocol default.
+ * A max of 0 is a real answer ("goal: your first pull-up", Q-102) and yields the clamp floor,
+ * not null.
+ */
+export function targetRirFromRepsVsMax(
+  reps: number | null | undefined,
+  maxReps: number | null | undefined,
+): number | null {
+  const r = Number(reps);
+  const m = Number(maxReps);
+  if (!Number.isFinite(r) || !Number.isFinite(m) || r < 1 || m < 0) return null;
+  const rir = m - r;
+  return Math.min(MAX_TARGET_RIR, Math.max(MIN_TARGET_RIR, Math.round(rir * 2) / 2));
+}
+
 export function targetRirFromPrescription(
   reps: number | null | undefined,
   percent1RM: number | null | undefined,
@@ -339,11 +366,20 @@ export function getTargetRir(
   // targetRirFromPrescription. Omit both (every pre-D-322 caller) and behaviour is unchanged.
   reps?: number | null,
   percent1RM?: number | null,
+  /** D-322: tested max reps for a BODYWEIGHT lift. Supplied only for bodyweight modality. */
+  bodyweightMaxReps?: number | null,
 ): number {
   if (exerciseLevelTarget != null && Number.isFinite(exerciseLevelTarget)) {
     return exerciseLevelTarget;
   }
-  // 2. Derived from the prescription itself, when there is one to derive from.
+  // 2a. BODYWEIGHT lifts: reps against the athlete's tested max. Checked BEFORE the %1RM chart,
+  //     because a bodyweight row must never resolve a target from a percentage — see
+  //     targetRirFromRepsVsMax. Falls through to the profile default when no max is on file.
+  if (bodyweightMaxReps != null) {
+    const bw = targetRirFromRepsVsMax(reps, bodyweightMaxReps);
+    if (bw != null) return bw;
+  }
+  // 2b. Loaded lifts: derived from the prescription itself, when there is one to derive from.
   const derived = targetRirFromPrescription(reps, percent1RM);
   if (derived != null) return derived;
   const base = isLowerBodyLift(canonical)
