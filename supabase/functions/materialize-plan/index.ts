@@ -1990,13 +1990,19 @@ function expandTokensForRow(
           // the kind of wrong an athlete acts on. Corrects rather than throws — materialize also
           // runs over EXISTING plans, and a throw would brick re-materialize on legacy rows.
           const modalityCfg = getExerciseConfig(String(name ?? ''));
-          if ((modalityCfg?.displayFormat === 'bodyweight' || modalityCfg?.displayFormat === 'band')
-            && typeof finalWeight === 'number' && finalWeight > 0) {
-            console.error(`⛔ [materialize] ${name}: bodyweight/band lift carried ${finalWeight} lb (resolved_from=${resolved_from}) — stripped.`);
-            finalWeight = undefined as any;
-            finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
-            resolved_from = undefined;
+          if (modalityCfg?.displayFormat === 'bodyweight' || modalityCfg?.displayFormat === 'band') {
+            // Clear the intensity fields on EVERY bodyweight row, not only ones that arrived
+            // carrying a load. Stripping the authored percentage upstream left a hole that
+            // `resolveStrengthPercentForLift` filled with its own 0.70 default, so the row still
+            // shipped `percent_1rm: 0.7` — a fabricated intensity for a lift that has none, and
+            // exactly the value the next consumer would have re-derived a bug from.
             percent_1rm = undefined;
+            resolved_from = undefined;
+            if (typeof finalWeight === 'number' && finalWeight > 0) {
+              console.error(`⛔ [materialize] ${name}: bodyweight/band lift carried ${finalWeight} lb — stripped.`);
+              finalWeight = undefined as any;
+              finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
+            }
           }
           const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
@@ -2228,13 +2234,19 @@ function expandTokensForRow(
           // the kind of wrong an athlete acts on. Corrects rather than throws — materialize also
           // runs over EXISTING plans, and a throw would brick re-materialize on legacy rows.
           const modalityCfg = getExerciseConfig(String(name ?? ''));
-          if ((modalityCfg?.displayFormat === 'bodyweight' || modalityCfg?.displayFormat === 'band')
-            && typeof finalWeight === 'number' && finalWeight > 0) {
-            console.error(`⛔ [materialize] ${name}: bodyweight/band lift carried ${finalWeight} lb (resolved_from=${resolved_from}) — stripped.`);
-            finalWeight = undefined as any;
-            finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
-            resolved_from = undefined;
+          if (modalityCfg?.displayFormat === 'bodyweight' || modalityCfg?.displayFormat === 'band') {
+            // Clear the intensity fields on EVERY bodyweight row, not only ones that arrived
+            // carrying a load. Stripping the authored percentage upstream left a hole that
+            // `resolveStrengthPercentForLift` filled with its own 0.70 default, so the row still
+            // shipped `percent_1rm: 0.7` — a fabricated intensity for a lift that has none, and
+            // exactly the value the next consumer would have re-derived a bug from.
             percent_1rm = undefined;
+            resolved_from = undefined;
+            if (typeof finalWeight === 'number' && finalWeight > 0) {
+              console.error(`⛔ [materialize] ${name}: bodyweight/band lift carried ${finalWeight} lb — stripped.`);
+              finalWeight = undefined as any;
+              finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
+            }
           }
           const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
