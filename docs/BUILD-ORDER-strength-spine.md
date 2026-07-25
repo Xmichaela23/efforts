@@ -445,13 +445,31 @@ endurance sessions (Hickson) · 24h separation (Robineau — 6h is the real floo
 `feedback_efforts_verification_method`: deno fixtures, not prod. Every bug case becomes a permanent
 regression. One Michael-driven acceptance run at the end.
 
-Harnesses written this session, keep them:
-- `scratchpad/gs-block-audit.ts` — runs a full 12-week block through the real composer + weight resolver
-  + RIR derivation for four athlete sizes. Re-run after every change.
-- `scratchpad/gs-spec-math.ts` — checks the spec's entry percentages against the engine's own RPE chart.
-- `scratchpad/gs-grid-check.ts` — round-down against a real plate grid, and where it breaks the RIR-2
-  guarantee.
-- `scratchpad/gs-review8.ts` · `gs-item3-8.ts` — the review items.
+**One harness kept, and it is TRACKED:**
+
+`scripts/audit-strength-block.ts` — runs a full 12-week block through the real composer, weight resolver
+and RIR derivation for four athlete sizes (strong → novice) and prints every authored weight and target
+week by week, flagging weeks where the load does not change. Run with
+`~/.deno/bin/deno run --allow-read scripts/audit-strength-block.ts`.
+
+**Right now it audits the OLD composer** — which is the point: it is the **before** picture. Re-run it
+after the 5/3/1 rebuild and the repeated-weight flags should be gone (the % ramp created them; a fixed
+working number does not).
+
+> ### ⛔ WHERE VERIFICATION SCRIPTS GO — this is a documented rule, not a preference
+> `.gitignore` carries: `scripts/_*` → *"Throwaway local verification/debug scripts."* So:
+> - **Keeping it?** `scripts/<name>.ts`, no underscore. Tracked. 1,044 files live there.
+> - **Throwaway?** `scripts/_<name>.ts`. Gitignored by rule.
+> - **`scratchpad/` is NOT a repo convention.** It is a Claude Code session directory that earlier
+>   sessions leaked into the repo.
+>
+> **Live consequence:** `ENGINE-STATE.md` cites `scratchpad/q202-deployed.ts` as *"the verification
+> harness that found the last three bugs."* **That file is not in the repo.** A doc pointing at a
+> harness that does not exist is the same rot this session spent the day clearing — if that harness is
+> worth the reference, it needs rewriting into `scripts/`.
+>
+> Four other harnesses were written this session and **deliberately deleted**: they validated *derived
+> entry percentages*, and V1 does not derive them — Wendler supplies them. Spent, not lost.
 
 And the D-322 lesson: **read the row, invoke the deployed function.** Asserting from the formula instead
 of the output was the shape of every error that session.
