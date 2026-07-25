@@ -625,7 +625,7 @@ function perfBaseLower(
     });
   } else {
     ex.push({
-      name: 'Single-Leg RDL',
+      name: 'Single Leg RDL',
       sets: 2,
       reps: '8/leg',
       weight: tier === 'commercial_gym' ? 'Light-moderate DB/barbell' : 'Heaviest available',
@@ -736,7 +736,7 @@ function perfBaseUpper(
     });
     if (hasCable) {
       ex.push({
-        name: 'Lat Pull-Down',
+        name: 'Lat Pull Down',
         sets,
         reps: 10,
         weight: 'Moderate — full ROM',
@@ -744,7 +744,7 @@ function perfBaseUpper(
       });
     } else {
       ex.push({
-        name: 'Pull-ups',
+        name: 'Pull ups',
         sets,
         reps: limiter === 'swim' ? 6 : 8,
         weight: 'Bodyweight',
@@ -793,7 +793,7 @@ function perfBaseUpper(
     // Pull-ups conditional on bar; otherwise band pull-down (spec §8.2).
     if (dbCtx.hasPullUpBar) {
       ex.push({
-        name: 'Pull-ups',
+        name: 'Pull ups',
         sets,
         reps: limiter === 'swim' ? 6 : 8,
         weight: 'Bodyweight (add a band for assist if needed)',
@@ -802,7 +802,7 @@ function perfBaseUpper(
       });
     } else {
       ex.push({
-        name: 'Band Pull-Down',
+        name: 'Band Pull Down',
         sets,
         reps: 12,
         weight: 'Heavy band — anchor overhead',
@@ -818,7 +818,7 @@ function perfBaseUpper(
     reps: 15,
     weight: hasCable ? 'Light cable (rope)' : 'Band',
   });
-  ex.push({ name: 'Band Pull-Aparts', sets: 3, reps: 20, weight: 'Light-moderate band' });
+  ex.push({ name: 'Band Pull Aparts', sets: 3, reps: 20, weight: 'Light-moderate band' });
 
   if (limiter === 'swim') {
     ex.push({
@@ -932,7 +932,7 @@ function perfBuildLower(
 
   if (limiter === 'run' || limiter === 'bike') {
     ex.push({
-      name: 'Weighted Single-Leg Calf Raises',
+      name: 'Weighted Single Leg Calf Raises',
       sets: 3,
       reps: 10,
       weight: tier === 'commercial_gym' ? 'Hold DB' : 'Backpack',
@@ -991,7 +991,7 @@ function perfBuildUpper(
       notes: 'Horizontal push — pairs with Row for chest/back balance',
     });
     ex.push({
-      name: 'Pull-ups',
+      name: 'Pull ups',
       sets: 3,
       reps: '4-6',
       weight: 'Bodyweight + small load when ready — or assisted',
@@ -1035,7 +1035,7 @@ function perfBuildUpper(
     });
     if (dbCtx.hasPullUpBar) {
       ex.push({
-        name: 'Pull-ups',
+        name: 'Pull ups',
         sets: 3,
         reps: '4-6',
         weight: 'Bodyweight + small load when ready — or band-assisted',
@@ -1044,7 +1044,7 @@ function perfBuildUpper(
       });
     } else {
       ex.push({
-        name: 'Band Pull-Down',
+        name: 'Band Pull Down',
         sets: 3,
         reps: 10,
         weight: 'Heavy band',
@@ -1069,7 +1069,7 @@ function perfBuildUpper(
     reps: 15,
     weight: hasCable ? 'Cable' : 'Band',
   });
-  ex.push({ name: 'Band Pull-Aparts', sets: 3, reps: 20, weight: 'Band' });
+  ex.push({ name: 'Band Pull Aparts', sets: 3, reps: 20, weight: 'Band' });
 
   if (limiter === 'swim') {
     ex.push({
@@ -1266,7 +1266,7 @@ function perfRaceLower(
   // Part 3: Step-ups need a box/step; without → Reverse Lunge (BW or DB).
   if (dbCtx.hasBox) {
     ex.push({
-      name: 'Explosive Step-ups',
+      name: 'Explosive Step ups',
       sets: 3,
       reps: '4/leg',
       weight: tier3 === 'full_barbell' ? 'Light DBs' : 'Bodyweight or light DBs',
@@ -1285,7 +1285,7 @@ function perfRaceLower(
 
   if (limiter === 'run') {
     ex.push({
-      name: 'Single-Leg Calf Raises',
+      name: 'Single Leg Calf Raises',
       sets: 3,
       reps: 10,
       weight: '3s eccentric',
@@ -1331,7 +1331,7 @@ function perfRaceUpper(
     });
     if (hasCable) {
       ex.push({
-        name: 'Explosive Lat Pull-Down',
+        name: 'Explosive Lat Pull Down',
         sets: 3,
         reps: 5,
         weight: 'Moderate — fast concentric',
@@ -1386,7 +1386,7 @@ function perfRaceUpper(
     reps: 15,
     weight: hasCable ? 'Light cable' : 'Band',
   });
-  ex.push({ name: 'Band Pull-Aparts', sets: 3, reps: 20, weight: 'Band' });
+  ex.push({ name: 'Band Pull Aparts', sets: 3, reps: 20, weight: 'Band' });
 
   if (limiter === 'swim') {
     ex.push({
@@ -1462,7 +1462,7 @@ function perfTaperSession(
   }
 
   ex.push({
-    name: 'Band Pull-Aparts',
+    name: 'Band Pull Aparts',
     sets: 2,
     reps: 15,
     weight: 'Light band — activation only',

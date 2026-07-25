@@ -152,7 +152,7 @@ function createLowerMaintenanceSession(
       exercises.push(
         { name: 'Hip Thrusts', sets: 2, reps: 15, weight: '65% 1RM' },
         { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: 'Moderate load' },
-        { name: 'Box Step-ups', sets: 2, reps: '10/leg', weight: 'Moderate load' }
+        { name: 'Box Step ups', sets: 2, reps: '10/leg', weight: 'Moderate load' }
       );
       duration = 30;
       description = `Week ${displayWeek} Race Prep - Minimal maintenance only. No heavy loading, no plyos. Running is the priority.`;
@@ -192,7 +192,7 @@ function createLowerMaintenanceSession(
       exercises.push(
         { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' },
         { name: 'Single Leg RDL', sets: 2, reps: '8/leg', weight: 'Bodyweight' },
-        { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'Bodyweight' }
+        { name: 'Step ups', sets: 2, reps: '10/leg', weight: 'Bodyweight' }
       );
       duration = 25;
       description = `Week ${displayWeek} Race Prep - Light maintenance only. No jumping, running is the priority.`;
@@ -243,7 +243,7 @@ function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 3, reps: 8, weight: '75% 1RM' },
         { name: 'Barbell Rows', sets: 3, reps: 8, weight: '70% 1RM' },
-        { name: 'Pull-ups', sets: 3, reps: 8, weight: 'Bodyweight' },
+        { name: 'Pull ups', sets: 3, reps: 8, weight: 'Bodyweight' },
         { name: 'Overhead Press', sets: 2, reps: 5, weight: '60% 1RM', notes: 'Light - Focus on crisp technique' },
         { name: 'Cable Face Pulls', sets: 3, reps: 15, weight: 'Light cable' }
       );
@@ -257,7 +257,7 @@ function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 4, reps, weight: `${baseLoad}% 1RM` },
         { name: 'Barbell Rows', sets: 4, reps, weight: `${baseLoad}% 1RM` },
-        { name: 'Pull-ups', sets: 4, reps: '8-10', weight: 'Bodyweight' },
+        { name: 'Pull ups', sets: 4, reps: '8-10', weight: 'Bodyweight' },
         { name: 'DB Shoulder Press', sets: 3, reps: 10, weight: `${Math.max(57, baseLoad - 5)}% 1RM` },
         { name: 'Lateral Raises', sets: 3, reps: 12, weight: 'Light-moderate DBs' },
         { name: 'Cable Face Pulls', sets: 3, reps: 15, weight: 'Light cable' }
@@ -272,7 +272,7 @@ function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 4, reps, weight: `${speedLoad}% 1RM` },
         { name: 'Barbell Rows', sets: 4, reps, weight: `${speedLoad}% 1RM` },
-        { name: 'Pull-ups', sets: 4, reps: '6-8', weight: 'Add weight — track this' },
+        { name: 'Pull ups', sets: 4, reps: '6-8', weight: 'Add weight — track this' },
         { name: 'DB Shoulder Press', sets: 3, reps, weight: `${Math.max(67, speedLoad - 5)}% 1RM` },
         { name: 'Lateral Raises', sets: 3, reps: 12, weight: 'Moderate DBs' },
         { name: 'Cable Face Pulls', sets: 3, reps: 15, weight: 'Moderate cable' }
@@ -284,7 +284,7 @@ function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 3, reps: 5, weight: '80-85% 1RM' },
         { name: 'Barbell Rows', sets: 3, reps: 5, weight: '80-85% 1RM' },
-        { name: 'Pull-ups', sets: 3, reps: 'Max reps', weight: 'Max weight possible' },
+        { name: 'Pull ups', sets: 3, reps: 'Max reps', weight: 'Max weight possible' },
         { name: 'Shoulder Press', sets: 3, reps: 6, weight: 'Heavy DBs' },
         { name: 'Cable Face Pulls', sets: 2, reps: 15, weight: 'Light cable' }
       );
@@ -295,7 +295,7 @@ function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 2, reps: 8, weight: '70% 1RM' },
         { name: 'Barbell Rows', sets: 2, reps: 8, weight: '70% 1RM' },
-        { name: 'Pull-ups', sets: 2, reps: 8, weight: 'Bodyweight' },
+        { name: 'Pull ups', sets: 2, reps: 8, weight: 'Bodyweight' },
         { name: 'Overhead Press', sets: 2, reps: 5, weight: 'Light', notes: 'Activation - Mobility focus' }
       );
       duration = 30;
@@ -306,9 +306,9 @@ function createUpperStrengthSession(
     // Bodyweight tier
     if (isRecovery) {
       exercises.push(
-        { name: 'Push-ups', sets: 3, reps: 12, weight: 'Standard' },
+        { name: 'Push ups', sets: 3, reps: 12, weight: 'Standard' },
         { name: 'Inverted Rows', sets: 3, reps: 10, weight: 'Standard angle' },
-        { name: 'Pike Push-ups', sets: 2, reps: 8, weight: 'Standard' },
+        { name: 'Pike Push ups', sets: 2, reps: 8, weight: 'Standard' },
         { name: 'Band Face Pulls', sets: 3, reps: 15, weight: 'Light band' }
       );
       duration = 30;
@@ -317,10 +317,10 @@ function createUpperStrengthSession(
     } else if (phase.name === 'Base') {
       const pushProgression = wip <= 2 ? 'Standard push-ups' : wip <= 4 ? 'Diamond push-ups' : 'Decline push-ups';
       exercises.push(
-        { name: 'Push-ups', sets: 4, reps: 12, weight: `Progress: ${pushProgression}` },
+        { name: 'Push ups', sets: 4, reps: 12, weight: `Progress: ${pushProgression}` },
         { name: 'Inverted Rows', sets: 4, reps: 12, weight: 'Feet elevated when easy' },
-        { name: 'Pike Push-ups', sets: 3, reps: 10, weight: 'Elevate feet to progress' },
-        { name: 'Pull-ups', sets: 3, reps: '5-8', weight: 'Assisted or negatives OK' },
+        { name: 'Pike Push ups', sets: 3, reps: 10, weight: 'Elevate feet to progress' },
+        { name: 'Pull ups', sets: 3, reps: '5-8', weight: 'Assisted or negatives OK' },
         { name: 'Band Lateral Raises', sets: 3, reps: 15, weight: 'Light band or light DBs' },
         { name: 'Band Face Pulls', sets: 3, reps: 15, weight: 'Light band' }
       );
@@ -330,10 +330,10 @@ function createUpperStrengthSession(
     } else if (phase.name === 'Speed') {
       const pushProgression = 'Decline or archer push-ups';
       exercises.push(
-        { name: 'Push-ups', sets: 4, reps: 10, weight: `Advanced: ${pushProgression}` },
+        { name: 'Push ups', sets: 4, reps: 10, weight: `Advanced: ${pushProgression}` },
         { name: 'Inverted Rows', sets: 4, reps: 10, weight: 'Feet elevated, slow tempo' },
-        { name: 'Pike Push-ups', sets: 3, reps: 10, weight: 'Elevated pike (near HSPU)' },
-        { name: 'Pull-ups', sets: 4, reps: 'Max reps', weight: 'Aim for +2 reps vs Week 1' },
+        { name: 'Pike Push ups', sets: 3, reps: 10, weight: 'Elevated pike (near HSPU)' },
+        { name: 'Pull ups', sets: 4, reps: 'Max reps', weight: 'Aim for +2 reps vs Week 1' },
         { name: 'Band Lateral Raises', sets: 3, reps: 15, weight: 'Moderate band or DBs' },
         { name: 'Band Face Pulls', sets: 3, reps: 15, weight: 'Moderate band' }
       );
@@ -342,19 +342,19 @@ function createUpperStrengthSession(
       repProfile = 'strength';
     } else if (isUpperPeakWeek) {
       exercises.push(
-        { name: 'Push-ups', sets: 3, reps: 'Max reps', weight: 'Your hardest variation' },
-        { name: 'Pull-ups', sets: 3, reps: 'Max reps', weight: 'Test your PR!' },
+        { name: 'Push ups', sets: 3, reps: 'Max reps', weight: 'Your hardest variation' },
+        { name: 'Pull ups', sets: 3, reps: 'Max reps', weight: 'Test your PR!' },
         { name: 'Inverted Rows', sets: 3, reps: 'Max reps', weight: 'Feet elevated' },
-        { name: 'Pike Push-ups', sets: 3, reps: 'Max reps', weight: 'Your hardest variation' }
+        { name: 'Pike Push ups', sets: 3, reps: 'Max reps', weight: 'Your hardest variation' }
       );
       duration = 35;
       description = `UPPER BODY PEAK WEEK - Test your gains! How many pull-ups can you do? What push-up variation can you master? Celebrate your progress!`;
       repProfile = 'strength';
     } else {
       exercises.push(
-        { name: 'Push-ups', sets: 2, reps: 15, weight: 'Standard' },
+        { name: 'Push ups', sets: 2, reps: 15, weight: 'Standard' },
         { name: 'Inverted Rows', sets: 2, reps: 12, weight: 'Standard' },
-        { name: 'Pike Push-ups', sets: 2, reps: 10, weight: 'Standard' }
+        { name: 'Pike Push ups', sets: 2, reps: 10, weight: 'Standard' }
       );
       duration = 25;
       description = `Week ${displayWeek} Race Prep - Maintain gains, minimal volume. Stay fresh for race day.`;
@@ -534,7 +534,7 @@ function createTaperSessions(
       exercises: [
         { name: 'Bodyweight Squats', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
         { name: 'Glute Bridges', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
-        { name: 'Push-ups', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR }
+        { name: 'Push ups', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR }
       ],
       repProfile: 'maintenance',
       tags: ['strength', 'full_body', 'phase:taper', 'optional', `tier:${tier}`],
@@ -550,7 +550,7 @@ function createTaperSessions(
         ]
       : [
           { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight', target_rir: taperRIR },
-          { name: 'Push-ups', sets: 2, reps: 12, weight: 'Standard', target_rir: taperRIR },
+          { name: 'Push ups', sets: 2, reps: 12, weight: 'Standard', target_rir: taperRIR },
           { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard', target_rir: taperRIR },
           { name: 'Walking Lunges', sets: 2, reps: '8/leg', weight: 'Bodyweight', target_rir: taperRIR }
         ];
@@ -574,9 +574,9 @@ function createTaperSessions(
           { name: 'Cable Face Pulls', sets: 2, reps: 15, weight: 'Light cable', target_rir: taperRIR }
         ]
       : [
-          { name: 'Push-ups', sets: 2, reps: 12, weight: 'Standard', target_rir: taperRIR },
+          { name: 'Push ups', sets: 2, reps: 12, weight: 'Standard', target_rir: taperRIR },
           { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard', target_rir: taperRIR },
-          { name: 'Pike Push-ups', sets: 2, reps: 8, weight: 'Standard', target_rir: taperRIR }
+          { name: 'Pike Push ups', sets: 2, reps: 8, weight: 'Standard', target_rir: taperRIR }
         ];
         
     sessions.push({

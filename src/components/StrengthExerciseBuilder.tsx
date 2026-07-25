@@ -35,12 +35,12 @@ const commonExercises = [
   'Dumbbell Press', 'Dumbbell Row', 'Dumbbell Curls', 'Dumbbell Flyes',
   'Lateral Raises', 'Tricep Extensions', 'Hammer Curls', 'Chest Flyes',
   'Shoulder Press', 'Single Arm Row', 'Bulgarian Split Squats',
-  'Push-ups', 'Pull-ups', 'Chin-ups', 'Dips', 'Planks', 'Burpees',
-  'Mountain Climbers', 'Lunges', 'Jump Squats', 'Pike Push-ups',
-  'Handstand Push-ups', 'L-Sits', 'Pistol Squats', 'Ring Dips',
+  'Push ups', 'Pull ups', 'Chin ups', 'Dips', 'Planks', 'Burpees',
+  'Mountain Climbers', 'Lunges', 'Jump Squats', 'Pike Push ups',
+  'Handstand Push ups', 'L Sits', 'Pistol Squats', 'Ring Dips',
   'Lat Pulldown', 'Cable Row', 'Leg Press', 'Leg Curls', 'Leg Extensions',
   'Cable Crossover', 'Tricep Pushdown', 'Face Pulls', 'Cable Curls',
-  'Kettlebell Swings', 'Turkish Get-ups', 'Kettlebell Snatches',
+  'Kettlebell Swings', 'Turkish Get ups', 'Kettlebell Snatches',
   'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows'
 ];
 

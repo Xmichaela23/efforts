@@ -26,7 +26,7 @@ const StrengthPlansView: React.FC<StrengthPlansViewProps> = ({
   // Common strength exercises for autocomplete
   const commonExercises = [
     'Bench Press', 'Squat', 'Deadlift', 'Overhead Press', 'Barbell Row',
-    'Incline Bench Press', 'Front Squat', 'Romanian Deadlift', 'Pull-ups',
+    'Incline Bench Press', 'Front Squat', 'Romanian Deadlift', 'Pull ups',
     'Dips', 'Close Grip Bench Press', 'Sumo Deadlift', 'Bulgarian Split Squat'
   ];
 

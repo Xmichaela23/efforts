@@ -187,7 +187,7 @@ function workSessions(load: WorkLoad): { name: string; focus: 'upper' | 'lower';
 // materialize's qualitative path renders it verbatim; these are NOT %1RM-anchored barbell lifts.
 const GLUTE_ROTATION: StrengthExercise[] = [
   { name: 'Barbell Hip Thrust', sets: 3, reps: '8-12', weight: 'Heavy' },       // Contreras 2015 (glute-specific)
-  { name: 'Single-Leg Squat', sets: 3, reps: '8/leg', weight: 'Add weight if able' }, // DiStefano 2009 (max glute-max recruitment)
+  { name: 'Single Leg Squat', sets: 3, reps: '8/leg', weight: 'Add weight if able' }, // DiStefano 2009 (max glute-max recruitment)
   { name: 'Back Extension', sets: 3, reps: '12-15', weight: 'Bodyweight' },
 ];
 // Q-180 — THE UNIT. Read this before changing a `reps` value here.

@@ -129,7 +129,7 @@ function createFullBodyMaintenanceSession(
     if (isRecovery) {
       exercises.push(
         { name: 'Bodyweight Squats', sets: 2, reps: 12, weight: 'Bodyweight' },
-        { name: 'Push-ups', sets: 2, reps: 12, weight: 'Standard' },
+        { name: 'Push ups', sets: 2, reps: 12, weight: 'Standard' },
         { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard' }
       );
       duration = 20;
@@ -137,7 +137,7 @@ function createFullBodyMaintenanceSession(
     } else if (phase.name === 'Base') {
       exercises.push(
         { name: 'Bodyweight Squats', sets: 3, reps: 15, weight: 'Bodyweight' },
-        { name: 'Push-ups', sets: 3, reps: 12, weight: 'Standard' },
+        { name: 'Push ups', sets: 3, reps: 12, weight: 'Standard' },
         { name: 'Inverted Rows', sets: 3, reps: 12, weight: 'Standard' }
       );
       duration = 25;
@@ -145,7 +145,7 @@ function createFullBodyMaintenanceSession(
     } else if (phase.name === 'Speed') {
       exercises.push(
         { name: 'Bodyweight Squats', sets: 3, reps: 12, weight: 'Bodyweight' },
-        { name: 'Push-ups', sets: 3, reps: 10, weight: 'Standard' },
+        { name: 'Push ups', sets: 3, reps: 10, weight: 'Standard' },
         { name: 'Inverted Rows', sets: 3, reps: 10, weight: 'Standard' }
       );
       duration = 25;
@@ -153,7 +153,7 @@ function createFullBodyMaintenanceSession(
     } else {
       exercises.push(
         { name: 'Bodyweight Squats', sets: 2, reps: 10, weight: 'Bodyweight' },
-        { name: 'Push-ups', sets: 2, reps: 10, weight: 'Standard' },
+        { name: 'Push ups', sets: 2, reps: 10, weight: 'Standard' },
         { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard' }
       );
       duration = 20;
@@ -201,7 +201,7 @@ function createUpperMaintenanceSession(
     description = 'Optional upper body maintenance. Light work to maintain patterns.';
   } else {
     exercises.push(
-      { name: 'Push-ups', sets: 2, reps: 12, weight: 'Standard' },
+      { name: 'Push ups', sets: 2, reps: 12, weight: 'Standard' },
       { name: 'Inverted Rows', sets: 2, reps: 12, weight: 'Standard' },
       { name: 'Band Face Pulls', sets: 2, reps: 15, weight: 'Light band' }
     );
@@ -294,7 +294,7 @@ function createTaperSessions(
       exercises: [
         { name: 'Bodyweight Squats', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
         { name: 'Glute Bridges', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
-        { name: 'Push-ups', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR }
+        { name: 'Push ups', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR }
       ],
       repProfile: 'maintenance',
       tags: ['strength', 'full_body', 'phase:taper', 'optional', `tier:${tier}`],
@@ -309,7 +309,7 @@ function createTaperSessions(
         ]
       : [
           { name: 'Bodyweight Squats', sets: 2, reps: 12, weight: 'Bodyweight', target_rir: taperRIR },
-          { name: 'Push-ups', sets: 2, reps: 12, weight: 'Bodyweight', target_rir: taperRIR },
+          { name: 'Push ups', sets: 2, reps: 12, weight: 'Bodyweight', target_rir: taperRIR },
           { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR }
         ];
         

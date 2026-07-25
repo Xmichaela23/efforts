@@ -77,7 +77,7 @@ Deno.test('canonicalDisplayName gives one clean label per lift, regardless of ra
   assertEquals(canonicalDisplayName('hack_squat'), 'Hack Squat');
   // Abbreviation cases title-case can't do.
   assertEquals(canonicalDisplayName('db_row'), 'DB Row');
-  assertEquals(canonicalDisplayName('single_leg_rdl'), 'Single-Leg RDL');
+  assertEquals(canonicalDisplayName('single_leg_rdl'), 'Single Leg RDL');
 });
 
 Deno.test('pre-existing explicit plurals are unchanged by the fallback', () => {

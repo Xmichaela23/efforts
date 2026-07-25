@@ -132,7 +132,7 @@ export function getInSlotAlternatives(
   // as a substitute for a ROW. A push for a pull. See MovementPattern in exercise-config.ts.
   if (!cfg || !cfg.pattern) return [];
 
-  // Normalize with punctuation → SPACE (not deletion), or 'step-ups' becomes 'stepups' and fails to
+  // Normalize with punctuation → SPACE (not deletion), or 'step ups' becomes 'stepups' and fails to
   // dedupe against 'step ups'.
   const norm = (n: string) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -149,16 +149,16 @@ export function getInSlotAlternatives(
     if (c.pattern !== cfg.pattern) continue;                // different movement pattern → not a substitute
 
     // The config carries plural ALIASES as separate keys ('reverse lunge' AND 'reverse lunges',
-    // 'step up' / 'step ups' / 'step-ups'). Offering the same movement three times is noise.
+    // 'step up' / 'step ups' / 'step ups'). Offering the same movement three times is noise.
     // Dedupe EXACTLY, not by guessing at plurals: a key is an alias iff dropping its trailing 's'
     // yields ANOTHER REAL KEY. ('bench press' → 'bench pres' is not a key, so it survives — which is
     // why a naive "strip the s" rule would have been wrong.)
     if (key.endsWith('s') && Object.prototype.hasOwnProperty.call(EXERCISE_CONFIG, key.slice(0, -1))) continue;
 
     // Dedupe on the SINGULARIZED normalized form too. The exact-alias rule above misses hyphenated
-    // plurals: 'step-ups' → slice off the 's' → 'step-up', which is NOT a config key, so it survives —
+    // plurals: 'step ups' → slice off the 's' → 'step up', which is NOT a config key, so it survives —
     // and then normalizes to 'step ups', which does not equal the already-seen 'step up'.
-    // Collapse every alias form to ONE option. The config carries 'pull-up' / 'pull-ups' / 'pullup' /
+    // Collapse every alias form to ONE option. The config carries 'pull up' / 'pull ups' / 'pullup' /
     // 'pullups' as four separate keys; offering the same movement four times is noise. Dedupe on the
     // normalized form with spaces removed AND singularized, so all four collapse to 'pullup'.
     const k = norm(key);

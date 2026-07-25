@@ -44,15 +44,15 @@ Deno.test('⛔ A ROW NEVER OFFERS A BENCH PRESS (the primaryRef bug — a push i
 
 Deno.test('PULL-UPS get alternatives — the most-substituted exercise in the gym had ZERO before', () => {
   // primaryRef is null for every bodyweight movement, so pull-ups used to offer nothing at all.
-  const alts = names(getInSlotAlternatives('Pull-up', FULL_GYM));
-  assertEquals(alts.includes('chin-up'), true);
+  const alts = names(getInSlotAlternatives('Pull up', FULL_GYM));
+  assertEquals(alts.includes('chin up'), true);
   assertEquals(alts.includes('lat pulldown'), true);   // the field's #1 pull-up substitute
   assertEquals(alts.includes('bench press'), false);   // still not a push
 });
 
 Deno.test('a bench press offers horizontal PUSHES, including bodyweight ones', () => {
   const alts = names(getInSlotAlternatives('Bench Press', FULL_GYM));
-  assertEquals(alts.includes('push-up'), true);        // bodyweight, same pattern
+  assertEquals(alts.includes('push up'), true);        // bodyweight, same pattern
   assertEquals(alts.includes('barbell row'), false);   // a pull is not a push
   assertEquals(alts.includes('overhead press'), false); // vertical, not horizontal
 });
@@ -144,5 +144,5 @@ Deno.test('bench: Incline / Close-Grip / DB Bench are DIRECT; Chest Fly + push-u
   assertEquals(tierOf(alts, 'Incline Bench Press'), 'direct');
   assertEquals(tierOf(alts, 'Close Grip Bench Press'), 'direct');
   assertEquals(tierOf(alts, 'Chest Fly'), 'lighter');
-  assertEquals(tierOf(alts, 'Push-up'), 'lighter');
+  assertEquals(tierOf(alts, 'Push Up'), 'lighter');
 });

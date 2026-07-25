@@ -145,8 +145,8 @@ const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' 
     // labelled as a single total load instead of per-hand. Carries are two implements, one per hand.
     'farmer walk', 'farmer walks', 'farmers carry', 'farmer carry', 'farmers walk', 'suitcase carry',
     'walking lunge', 'reverse lunge', 'forward lunge', 'lunge',
-    'single leg rdl', 'single-leg rdl',  // Single-leg RDLs are typically dumbbell; regular RDL is barbell
-    'step up', 'step-up'
+    'single leg rdl', 'single leg rdl',  // Single-leg RDLs are typically dumbbell; regular RDL is barbell
+    'step up', 'step up'
   ];
   if (dbPatterns.some(p => name.includes(p))) return 'dumbbell';
   
@@ -975,7 +975,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (name.includes('bench') && name.includes('press')) return 'bench';
     if ((name.includes('overhead') || name.includes('ohp')) && name.includes('press')) return 'overheadPress1RM';
     // Pull-ups: rep-based bodyweight tracked lift — the max-clean-rep COUNT is stored (integer), NOT a %1RM (Q-102).
-    if (name.includes('pull-up') || name.includes('pullup') || name.includes('pull up')) return 'pullupMaxReps';
+    if (name.includes('pull up') || name.includes('pullup') || name.includes('pull up')) return 'pullupMaxReps';
     return null;
   };
 
@@ -1000,7 +1000,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Pull-ups: a rep-MAX test, not a %1RM lift. Bodyweight warm-up guidance, then ONE all-out set — the
     // clean-rep COUNT is the result (no working weight, no e1RM). 0 reps is a valid baseline. (Q-102 baseline model)
     const pn = exerciseName.toLowerCase();
-    if (pn.includes('pull-up') || pn.includes('pullup') || pn.includes('pull up')) {
+    if (pn.includes('pull up') || pn.includes('pullup') || pn.includes('pull up')) {
       return {
         id: `ex-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: exerciseName,
@@ -1157,7 +1157,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         : (k === 'pullup' || k === 'pull_up' || k === 'pullups' || k === 'pullupmaxreps') ? 'pullupMaxReps'
         : k;
       const liftLabel = (k: string): string =>
-        ({ bench: 'Bench Press', squat: 'Squat', deadlift: 'Deadlift', overheadPress1RM: 'Overhead Press', pullupMaxReps: 'Pull-ups' } as any)[k] || k;
+        ({ bench: 'Bench Press', squat: 'Squat', deadlift: 'Deadlift', overheadPress1RM: 'Overhead Press', pullupMaxReps: 'Pull ups' } as any)[k] || k;
 
       // Partition results: a RAISE / first-time / equal auto-writes (an unambiguous improvement — no friction).
       // A DOWN result (tested < stored) is NOT silently held (superseding D-223's ratchet-up-only) NOR silently
@@ -1447,7 +1447,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       { move: 'Front Plank', time_sec: 60 },
     ]},
     'addon_core_5.v2': { name: 'Core — 5 min (v2)', duration_min: 5, sequence: [
-      { move: 'Sit-Up', time_sec: 60 },
+      { move: 'Sit Up', time_sec: 60 },
       { move: 'Leg Raises (lying)', time_sec: 60 },
       { move: 'Scissor Kicks', time_sec: 60 },
       { move: 'Side Plank (Left)', time_sec: 60 },
@@ -1459,7 +1459,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       { move: 'Bicycle Crunch', time_sec: 60 },
       { move: 'Flutter Kicks', time_sec: 60 },
       { move: 'Front Plank', time_sec: 60 },
-      { move: 'Sit-Up', time_sec: 60 },
+      { move: 'Sit Up', time_sec: 60 },
       { move: 'Leg Raises (lying)', time_sec: 60 },
       { move: 'Scissor Kicks', time_sec: 60 },
       { move: 'Side Plank (Left)', time_sec: 60 },
@@ -1595,23 +1595,29 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     'Dumbbell Press', 'Dumbbell Row', 'Dumbbell Curls', 'Dumbbell Flyes',
     'Lateral Raises', 'Tricep Extensions', 'Hammer Curls', 'Chest Flyes',
     'Shoulder Press', 'Single Arm Row', 'Bulgarian Split Squats',
-    'Push-ups', 'Pull-ups', 'Chin-ups', 'Dips', 'Planks', 'Burpees',
-    'Mountain Climbers', 'Lunges', 'Squats', 'Jump Squats', 'Pike Push-ups',
-    'Handstand Push-ups', 'L-Sits', 'Pistol Squats', 'Ring Dips',
+    'Push ups', 'Pull ups', 'Chin ups', 'Dips', 'Planks', 'Burpees',
+    // D-322: lifts the config can price that the curated list never offered. Hip Thrust is the
+    // clearest miss — it has a config entry (deadlift x 0.90) and a measured e1RM, and typing
+    // "hip" returned Hip Extension and Side Plank with Hip Dip. Added by hand every session as
+    // unconfigured free text as a result.
+    'Hip Thrust', 'Glute Bridge', 'Good Morning', 'Sumo Deadlift', 'Trap Bar Deadlift',
+    'Leg Curl', 'Single Leg RDL', 'Reverse Lunge', 'Lateral Lunge', 'Step Up', 'Calf Raise',
+    'Mountain Climbers', 'Lunges', 'Squats', 'Jump Squats', 'Pike Push ups',
+    'Handstand Push ups', 'L Sits', 'Pistol Squats', 'Ring Dips',
     'Lat Pulldown', 'Cable Row', 'Leg Press', 'Leg Curls', 'Leg Extensions',
     'Cable Crossover', 'Tricep Pushdown', 'Face Pulls', 'Cable Curls',
-    'Kettlebell Swings', 'Turkish Get-ups', 'Kettlebell Snatches',
+    'Kettlebell Swings', 'Turkish Get ups', 'Kettlebell Snatches',
     'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows',
     // Core suggestions
-    'Sit-Up', 'Crunch', 'Reverse Crunch', 'Cross-Body Crunch', 'Bicycle Crunch', 'V-Up',
+    'Sit Up', 'Crunch', 'Reverse Crunch', 'Cross Body Crunch', 'Bicycle Crunch', 'V Up',
     'Flutter Kicks', 'Scissor Kicks', 'Toe Touches',
     'Plank', 'Side Plank', 'Side Plank with Hip Dip', 'Plank with Shoulder Taps', 'Copenhagen Plank',
-    'Hanging Knee Raise', 'Hanging Leg Raise', 'Toes-to-Bar', 'Hanging Windshield Wipers',
+    'Hanging Knee Raise', 'Hanging Leg Raise', 'Toes to Bar', 'Hanging Windshield Wipers',
     'Stability Ball Rollout', 'Stir the Pot', 'TRX Fallout', 'Ab Wheel Rollout',
     'Russian Twist', 'Cable Woodchopper', 'Landmine Twist', 'Pallof Press',
     "Farmer's Carry", 'Suitcase Carry', 'Overhead Carry',
     'Superman Hold', 'Back Extension', 'Hip Extension', 'Glute Bridge March', 'Reverse Hyperextension',
-    'Cable Crunch', 'Ab Machine Crunch', "Captain's Chair Knee Raise", 'Roman Chair Sit-Up', 'GHD Sit-Up'
+    'Cable Crunch', 'Ab Machine Crunch', "Captain's Chair Knee Raise", 'Roman Chair Sit Up', 'GHD Sit Up'
   ];
 
 
@@ -2319,8 +2325,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const testType = getBaselineTestType(workoutToLoad);
       if (testType) {
         const testExercises = testType === 'lower' ? ['Back Squat', 'Deadlift']
-          : testType === 'upper' ? ['Bench Press', 'Overhead Press', 'Pull-ups']
-          : ['Back Squat', 'Deadlift', 'Bench Press', 'Overhead Press', 'Pull-ups']; // 'full' / both
+          : testType === 'upper' ? ['Bench Press', 'Overhead Press', 'Pull ups']
+          : ['Back Squat', 'Deadlift', 'Bench Press', 'Overhead Press', 'Pull ups']; // 'full' / both
         // Baselines launcher (Q-097/Q-102): the Lower/Upper/Full links run the SAME guided AMRAP flow as the
         // plan retest — seed each lift's test set at ~88% off the stored 1RM when one exists; otherwise
         // createBaselineTestExercise bar-starts (45 / DL 95) into the discovery loop. One flow, two entry
@@ -2985,12 +2991,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }));
   };
 
+  // D-322: match punctuation-insensitively. The list is now written without hyphens, but an
+  // athlete typing "pull-up" (or a legacy name coming back off a saved workout) must still
+  // find "Pull ups". Same fold the config lookup uses — one canonical comparison form, so a
+  // hyphen can never again decide whether a lift is findable.
+  const foldForSearch = (s: string) => s.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
   const getFilteredExercises = (searchTerm: string) => {
-    return searchTerm.length > 0 
-      ? commonExercises
-          .filter(exercise => exercise.toLowerCase().includes(searchTerm.toLowerCase()))
-          .slice(0, 8)
-      : [];
+    const q = foldForSearch(searchTerm);
+    if (!q) return [];
+    // Prefix matches rank first, so "hip" surfaces "Hip Thrust" above "Side Plank with Hip Dip".
+    const scored = commonExercises
+      .map((exercise) => ({ exercise, f: foldForSearch(exercise) }))
+      .filter(({ f }) => f.includes(q))
+      .sort((a, b) => (a.f.startsWith(q) === b.f.startsWith(q) ? 0 : a.f.startsWith(q) ? -1 : 1));
+    return scored.slice(0, 8).map(({ exercise }) => exercise);
   };
 
   const filteredExercises = getFilteredExercises(currentExercise);

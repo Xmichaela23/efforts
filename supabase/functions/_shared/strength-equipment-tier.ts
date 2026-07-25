@@ -255,17 +255,17 @@ export function exerciseRequiredGearKeys(name: string): string[] {
   if (/single-leg\s+rdl\s*\(heavy\s*db|single-leg\s+rdl\s*\(.*db/.test(n)) return ['dumbbells'];
   if (/goblet\s+squat/.test(n)) return ['dumbbells']; // KB also works — counted via optional pool
   // Cable / pulley.
-  if (/lat\s*pull-?down/.test(n)) return ['cable'];
+  if (/lat\s*pull[-\s]?down/.test(n)) return ['cable'];
   // Pull-up patterns.
-  if (/^pull-?ups?\b|^pull-?ups\s+\(explosive/.test(n)) return ['pull_up_bar'];
-  if (/band-?assisted\s+pull-?up/.test(n)) return ['pull_up_bar', 'bands'];
+  if (/^pull[-\s]?ups?\b|^pull[-\s]?ups\s+\(explosive/.test(n)) return ['pull_up_bar'];
+  if (/band[-\s]?assisted\s+pull[-\s]?up/.test(n)) return ['pull_up_bar', 'bands'];
   if (/ring\s+rows?/.test(n)) return ['rings']; // (F-6) explicit rings only; plain "Inverted Rows" falls through to [] ("…or band row" choices handled by the top or-guard)
   // Plyo / power.
   if (/box\s+jumps?/.test(n)) return ['box'];
   // Kettlebell-specific.
   if (/^kb\s+swings?|^kettlebell\s+swings?/.test(n)) return ['kettlebell'];
   // Bands.
-  if (/band\s+pull-?aparts?|band\s+pull-?down|band\s+lateral\s+walks|band\s+overhead\s+press|band\s+row/.test(n)) {
+  if (/band\s+pull[-\s]?aparts?|band\s+pull[-\s]?down|band\s+lateral\s+walks|band\s+overhead\s+press|band\s+row/.test(n)) {
     return ['bands'];
   }
   if (/face\s+pulls?/.test(n)) {

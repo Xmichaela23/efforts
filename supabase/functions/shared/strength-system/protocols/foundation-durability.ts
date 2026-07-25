@@ -106,7 +106,7 @@ function createLowerDurabilitySession(
     if (tier === 'commercial_gym') {
       if (isRecovery) {
         exercises.push(
-          { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'DBs (light)', notes: '2-1-2 tempo' },
+          { name: 'Step ups', sets: 2, reps: '10/leg', weight: 'DBs (light)', notes: '2-1-2 tempo' },
           { name: 'Lateral Lunges', sets: 2, reps: '10/leg', weight: 'DBs (light)' },
           { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight', notes: '3s eccentric' },
           { name: 'Soleus Raises', sets: 2, reps: 15, weight: 'Bodyweight', notes: 'Bent knee, 3s eccentric' },
@@ -117,7 +117,7 @@ function createLowerDurabilitySession(
       } else if (phase.name === 'Base') {
         if (isEarlyBase) {
           exercises.push(
-            { name: 'Step-ups', sets: 3, reps: '12/leg', weight: 'DBs (light)', notes: '2-1-2 tempo (2s up, 1s hold, 2s down)' },
+            { name: 'Step ups', sets: 3, reps: '12/leg', weight: 'DBs (light)', notes: '2-1-2 tempo (2s up, 1s hold, 2s down)' },
             { name: 'Lateral Lunges', sets: 3, reps: '12/leg', weight: 'DBs (light)' },
             { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bilateral, bodyweight', notes: '3s eccentric (lower slowly for 3 full seconds)' },
             { name: 'Soleus Raises', sets: 2, reps: 15, weight: 'Bilateral, bodyweight', notes: 'Bent knee, 3s eccentric' },
@@ -128,7 +128,7 @@ function createLowerDurabilitySession(
           description = `Week ${weekInPhase} Base - Establishing baseline. Focus on controlled tempo and movement quality. Calf raises: 3s lowering phase.`;
         } else if (isMidBase) {
           exercises.push(
-            { name: 'Step-ups', sets: 3, reps: '10/leg', weight: 'DBs (moderate)', notes: '2-1-2 tempo' },
+            { name: 'Step ups', sets: 3, reps: '10/leg', weight: 'DBs (moderate)', notes: '2-1-2 tempo' },
             { name: 'Lateral Lunges', sets: 3, reps: '10/leg', weight: 'DBs (moderate)' },
             { name: 'Single Leg Calf Raises', sets: 3, reps: 12, weight: 'Bodyweight', notes: '3s eccentric. Hold rail for balance only.' },
             { name: 'Soleus Raises', sets: 2, reps: 12, weight: 'Single leg, bodyweight', notes: 'Bent knee, 3s eccentric' },
@@ -139,7 +139,7 @@ function createLowerDurabilitySession(
           description = `Week ${weekInPhase} Base - Progressing to single-leg calf work and heavier step-ups. Maintain 3s eccentric on all calf raises.`;
         } else {
           exercises.push(
-            { name: 'Step-ups', sets: 3, reps: '8/leg', weight: 'DBs (challenging for RIR 2)', notes: '2-1-2 tempo' },
+            { name: 'Step ups', sets: 3, reps: '8/leg', weight: 'DBs (challenging for RIR 2)', notes: '2-1-2 tempo' },
             { name: 'Lateral Lunges', sets: 3, reps: '8/leg', weight: 'DBs (moderate-heavy)' },
             { name: 'Single Leg Calf Raises', sets: 3, reps: 10, weight: 'Hold DB for load', notes: '3s eccentric' },
             { name: 'Soleus Raises', sets: 2, reps: 10, weight: 'Single leg, hold DB', notes: 'Bent knee, 3s eccentric' },
@@ -151,7 +151,7 @@ function createLowerDurabilitySession(
         }
       } else if (phase.name === 'Speed') {
         exercises.push(
-          { name: 'Step-ups', sets: 2, reps: '8/leg', weight: 'DBs (same load as late Base)', notes: '2-1-2 tempo' },
+          { name: 'Step ups', sets: 2, reps: '8/leg', weight: 'DBs (same load as late Base)', notes: '2-1-2 tempo' },
           { name: 'Lateral Lunges', sets: 2, reps: '8/leg', weight: 'DBs (moderate)' },
           { name: 'Single Leg Calf Raises', sets: 2, reps: 10, weight: 'Hold DB (same as late Base)', notes: '3s eccentric' },
           { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Moderate band' }
@@ -160,7 +160,7 @@ function createLowerDurabilitySession(
         description = `Week ${weekInPhase} Speed - Maintain peak loads from Base, reduced volume (2 sets not 3). Running is high — keep intensity, cut volume.`;
       } else {
         exercises.push(
-          { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'DBs (light)' },
+          { name: 'Step ups', sets: 2, reps: '10/leg', weight: 'DBs (light)' },
           { name: 'Single Leg Calf Raises', sets: 2, reps: 12, weight: 'Bodyweight', notes: '3s eccentric' },
           { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' }
         );
@@ -171,7 +171,7 @@ function createLowerDurabilitySession(
       // Home gym tier - Variant A
       if (isRecovery) {
         exercises.push(
-          { name: 'Step-ups', sets: 2, reps: '12/leg', weight: 'Bodyweight', notes: '2-1-2 tempo' },
+          { name: 'Step ups', sets: 2, reps: '12/leg', weight: 'Bodyweight', notes: '2-1-2 tempo' },
           { name: 'Lateral Lunges', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
           { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight', notes: '3s eccentric' },
           { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' }
@@ -181,7 +181,7 @@ function createLowerDurabilitySession(
       } else if (phase.name === 'Base') {
         if (isEarlyBase) {
           exercises.push(
-            { name: 'Step-ups', sets: 3, reps: '15/leg', weight: 'Bodyweight', notes: '2-1-2 tempo' },
+            { name: 'Step ups', sets: 3, reps: '15/leg', weight: 'Bodyweight', notes: '2-1-2 tempo' },
             { name: 'Lateral Lunges', sets: 3, reps: '12/leg', weight: 'Bodyweight' },
             { name: 'Calf Raises', sets: 3, reps: 20, weight: 'Bilateral, bodyweight', notes: '3s eccentric' },
             { name: 'Soleus Raises', sets: 2, reps: 15, weight: 'Bilateral, bodyweight', notes: 'Bent knee, 3s eccentric' },
@@ -192,7 +192,7 @@ function createLowerDurabilitySession(
           description = `Week ${weekInPhase} Base - Establishing baseline with bodyweight. Master the 3s eccentric on calves before progressing.`;
         } else if (isMidBase) {
           exercises.push(
-            { name: 'Step-ups', sets: 3, reps: '12/leg', weight: 'Add light DBs if available', notes: '2-1-2 tempo' },
+            { name: 'Step ups', sets: 3, reps: '12/leg', weight: 'Add light DBs if available', notes: '2-1-2 tempo' },
             { name: 'Lateral Lunges', sets: 3, reps: '10/leg', weight: 'Bodyweight' },
             { name: 'Single Leg Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight', notes: '3s eccentric. Hold wall for balance.' },
             { name: 'Soleus Raises', sets: 2, reps: 12, weight: 'Single leg', notes: 'Bent knee, 3s eccentric' },
@@ -203,7 +203,7 @@ function createLowerDurabilitySession(
           description = `Week ${weekInPhase} Base - Progressing to single-leg calf work. Add DBs to step-ups if bodyweight is easy.`;
         } else {
           exercises.push(
-            { name: 'Step-ups', sets: 3, reps: '10/leg', weight: 'DBs or backpack for load', notes: '2-1-2 tempo' },
+            { name: 'Step ups', sets: 3, reps: '10/leg', weight: 'DBs or backpack for load', notes: '2-1-2 tempo' },
             { name: 'Lateral Lunges', sets: 3, reps: '10/leg', weight: 'Add load if possible' },
             { name: 'Single Leg Calf Raises', sets: 3, reps: 12, weight: 'Hold weight for load', notes: '3s eccentric' },
             { name: 'Soleus Raises', sets: 2, reps: 10, weight: 'Single leg, add weight', notes: 'Bent knee, 3s eccentric' },
@@ -215,7 +215,7 @@ function createLowerDurabilitySession(
         }
       } else if (phase.name === 'Speed') {
         exercises.push(
-          { name: 'Step-ups', sets: 2, reps: '12/leg', weight: 'Same load as late Base', notes: '2-1-2 tempo' },
+          { name: 'Step ups', sets: 2, reps: '12/leg', weight: 'Same load as late Base', notes: '2-1-2 tempo' },
           { name: 'Lateral Lunges', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
           { name: 'Single Leg Calf Raises', sets: 2, reps: 12, weight: 'Same as late Base', notes: '3s eccentric' },
           { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' }
@@ -224,7 +224,7 @@ function createLowerDurabilitySession(
         description = `Week ${weekInPhase} Speed - Maintain loads, reduced volume. Controlled movement.`;
       } else {
         exercises.push(
-          { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
+          { name: 'Step ups', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
           { name: 'Single Leg Calf Raises', sets: 2, reps: 12, weight: 'Bodyweight', notes: '3s eccentric' },
           { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' }
         );
@@ -409,7 +409,7 @@ function createUpperPostureSession(
     
     exercises.push(
       { name: 'Cable Face Pulls', sets, reps: 15, weight: 'Moderate cable' },
-      { name: 'Band Pull-Aparts', sets, reps: 15, weight: 'Moderate band' },
+      { name: 'Band Pull Aparts', sets, reps: 15, weight: 'Moderate band' },
       { name: 'Cable Rows', sets: phase.name === 'Race Prep' ? 2 : 3, reps: 12, weight: 'Moderate, controlled' },
       { name: 'Prone Y/T/W Raises', sets: 2, reps: 12, weight: 'Light DBs (5-10 lb)' },
       { name: 'Dead Hang', sets: 2, reps: '30-45s', weight: 'Bodyweight (optional)' }
@@ -425,7 +425,7 @@ function createUpperPostureSession(
     
     exercises.push(
       { name: 'Band Face Pulls', sets, reps: 15, weight: 'Moderate band' },
-      { name: 'Band Pull-Aparts', sets, reps: 15, weight: 'Moderate band' },
+      { name: 'Band Pull Aparts', sets, reps: 15, weight: 'Moderate band' },
       { name: 'Inverted Rows', sets: phase.name === 'Race Prep' ? 2 : 3, reps: 12, weight: 'Feet elevated when easy' },
       { name: 'Wall Angels', sets: 2, reps: 12, weight: 'Bodyweight' },
       { name: 'Dead Hang', sets: 2, reps: '30-45s', weight: 'Bodyweight (optional, if bar exists)' }
@@ -488,12 +488,12 @@ function createTaperSessions(
     // Taper week (not race week): LOWER_MAINTENANCE + UPPER_POSTURE
     const lowerExercises: StrengthExercise[] = tier === 'commercial_gym' 
       ? [
-          { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'DBs (light)', target_rir: taperRIR },
+          { name: 'Step ups', sets: 2, reps: '10/leg', weight: 'DBs (light)', target_rir: taperRIR },
           { name: 'Glute Bridges', sets: 2, reps: 12, weight: 'Bodyweight', target_rir: taperRIR },
           { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight', target_rir: taperRIR }
         ]
       : [
-          { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'Bodyweight', target_rir: taperRIR },
+          { name: 'Step ups', sets: 2, reps: '10/leg', weight: 'Bodyweight', target_rir: taperRIR },
           { name: 'Glute Bridges', sets: 2, reps: 12, weight: 'Bodyweight', target_rir: taperRIR },
           { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight', target_rir: taperRIR }
         ];
@@ -512,11 +512,11 @@ function createTaperSessions(
     const upperExercises: StrengthExercise[] = tier === 'commercial_gym'
       ? [
           { name: 'Cable Face Pulls', sets: 2, reps: 15, weight: 'Light cable', target_rir: taperRIR },
-          { name: 'Band Pull-Aparts', sets: 2, reps: 15, weight: 'Light band', target_rir: taperRIR }
+          { name: 'Band Pull Aparts', sets: 2, reps: 15, weight: 'Light band', target_rir: taperRIR }
         ]
       : [
           { name: 'Band Face Pulls', sets: 2, reps: 15, weight: 'Light band', target_rir: taperRIR },
-          { name: 'Band Pull-Aparts', sets: 2, reps: 15, weight: 'Light band', target_rir: taperRIR }
+          { name: 'Band Pull Aparts', sets: 2, reps: 15, weight: 'Light band', target_rir: taperRIR }
         ];
     
     sessions.push({

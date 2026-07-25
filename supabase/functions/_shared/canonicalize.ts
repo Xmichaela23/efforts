@@ -59,18 +59,15 @@ const CANONICAL: Record<string, string> = {
   'seated row':              'seated_row',
 
   // --- Pull / Upper ---
-  'pull-up':                 'pullup',
   'pull up':                 'pullup',
   'pullup':                  'pullup',
   'pullups':                 'pullup',
-  'chin-up':                 'chinup',
   'chin up':                 'chinup',
   'chinup':                  'chinup',
   'chinups':                 'chinup',
   'lat pulldown':            'lat_pulldown',
 
   // --- Push ---
-  'push-up':                 'pushup',
   'push up':                 'pushup',
   'pushup':                  'pushup',
   'dip':                     'dip',
@@ -88,7 +85,6 @@ const CANONICAL: Record<string, string> = {
   'lunge':                   'lunge',
   'walking lunge':           'walking_lunge',
   'step up':                 'step_up',
-  'step-up':                 'step_up',
   'leg press':               'leg_press',
   'leg curl':                'leg_curl',
   'leg extension':           'leg_extension',
@@ -114,8 +110,8 @@ const CANONICAL: Record<string, string> = {
   'pallof press':            'pallof_press',
   'farmer carry':            'farmer_carry',
   'suitcase carry':          'suitcase_carry',
-  'turkish get-up':          'turkish_getup',
-  'l-sit':                   'l_sit',
+  'turkish get up':          'turkish_getup',
+  'l sit':                   'l_sit',
 
   // --- Sport-Specific ---
   "swimmer's pull":          'swimmers_pull',
@@ -248,10 +244,10 @@ const DISPLAY_NAME: Record<string, string> = {
   db_bench_press: 'DB Bench Press',
   db_row: 'DB Row',
   db_shoulder_press: 'DB Shoulder Press',
-  single_leg_rdl: 'Single-Leg RDL',
-  close_grip_bench_press: 'Close-Grip Bench Press',
-  turkish_getup: 'Turkish Get-Up',
-  l_sit: 'L-Sit',
+  single_leg_rdl: 'Single Leg RDL',
+  close_grip_bench_press: 'Close Grip Bench Press',
+  turkish_getup: 'Turkish Get Up',
+  l_sit: 'L Sit',
   med_ball_throw: 'Med Ball Throw',
   swimmers_pull: "Swimmer's Pull",
 };

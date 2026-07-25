@@ -219,7 +219,7 @@ function createAASession(
       });
     } else {
       exercises.push({
-        name: 'Push-ups',
+        name: 'Push ups',
         sets: 3, reps: '15-20',
         weight: 'Bodyweight (incline if needed for form)',
         target_rir: 3,
@@ -276,14 +276,14 @@ function createAASession(
       });
     } else if (tier === 'commercial_gym') {
       exercises.push({
-        name: 'Band-Assisted Pull-up',
+        name: 'Band Assisted Pull up',
         sets: 3, reps: '8-12',
         weight: 'Heavy assistance band',
         target_rir: 3,
       });
     } else {
       exercises.push({
-        name: 'Band Pull-Down',
+        name: 'Band Pull Down',
         sets: 3, reps: '20',
         weight: 'Medium band',
         target_rir: 4,
@@ -441,7 +441,7 @@ function createMSSession(
       });
     } else {
       exercises.push({
-        name: 'Pull-ups',
+        name: 'Pull ups',
         sets: 3, reps: '6-8',
         weight: 'Bodyweight (add load when ready)',
         target_rir: 2,
@@ -555,7 +555,7 @@ function createSMSession(
       target_rir: 3,
     });
     exercises.push({
-      name: variant === 'A' ? 'Barbell Row' : 'Pull-ups',
+      name: variant === 'A' ? 'Barbell Row' : 'Pull ups',
       sets, reps: variant === 'A' ? '8-10' : '6-8',
       weight: variant === 'A' ? '65% 1RM' : 'Bodyweight',
       target_rir: 3,
@@ -568,7 +568,7 @@ function createSMSession(
       target_rir: 3,
     });
     exercises.push({
-      name: variant === 'A' ? 'DB Row (Chest-Supported)' : 'Band-Assisted Pull-up',
+      name: variant === 'A' ? 'DB Row (Chest-Supported)' : 'Band Assisted Pull up',
       sets, reps: variant === 'A' ? 10 : '8-12',
       weight: variant === 'A' ? 'Moderate DBs' : 'Medium band',
       target_rir: 3,
@@ -660,7 +660,7 @@ function createTaperSession(
   });
 
   exercises.push({
-    name: 'Band Pull-Aparts',
+    name: 'Band Pull Aparts',
     sets: 2, reps: 15,
     weight: 'Light band',
     notes: 'Shoulder activation — race-week posture',
@@ -731,7 +731,7 @@ function createRecoverySession(
         target_rir: 5,
       },
       {
-        name: 'Band Pull-Aparts',
+        name: 'Band Pull Aparts',
         sets: 2, reps: 15,
         weight: 'Light band',
       },
@@ -804,7 +804,7 @@ function bwAASession(
       target_rir: 4,
     });
     ex.push({
-      name: hasPullUpBar ? 'Band-Assisted Pull-up' : 'Band Pull-Down',
+      name: hasPullUpBar ? 'Band Assisted Pull up' : 'Band Pull Down',
       sets: 3, reps: hasPullUpBar ? '8-12' : '15-20',
       weight: hasPullUpBar ? 'Heavy band loop for assist' : 'Heavy band — anchor overhead',
       target_rir: 4,
@@ -901,7 +901,7 @@ function bwMSSession(
     });
   } else {
     ex.push({
-      name: 'Pike Push-ups',
+      name: 'Pike Push ups',
       sets: 3, reps: '8-10',
       weight: 'Bodyweight — feet elevated when ready',
       target_rir: 2,
@@ -910,7 +910,7 @@ function bwMSSession(
 
   if (hasPullUpBar) {
     ex.push({
-      name: 'Pull-ups',
+      name: 'Pull ups',
       sets: 3, reps: '4-8',
       weight: 'Bodyweight (band-assist if needed)',
       target_rir: 2,
@@ -927,7 +927,7 @@ function bwMSSession(
   ex.push({ name: 'Dead Bug', sets: 2, reps: '8/side', weight: 'Bodyweight' });
   if (limiter === 'run') {
     ex.push({
-      name: 'Single-Leg Calf Raises',
+      name: 'Single Leg Calf Raises',
       sets: 2, reps: 12,
       weight: 'Bodyweight — 3s eccentric',
     });
@@ -967,14 +967,14 @@ function bwSMSession(
   });
 
   ex.push({
-    name: variant === 'A' ? 'Push-ups' : 'Band Overhead Press',
+    name: variant === 'A' ? 'Push ups' : 'Band Overhead Press',
     sets: 2, reps: variant === 'A' ? '12-15' : 12,
     weight: variant === 'A' ? 'Bodyweight' : 'Medium band',
     target_rir: 3,
   });
 
   ex.push({
-    name: hasPullUpBar ? 'Pull-ups (Band-Assisted)' : 'Band Pull-Down',
+    name: hasPullUpBar ? 'Pull-ups (Band-Assisted)' : 'Band Pull Down',
     sets: 2, reps: hasPullUpBar ? '6-8' : 12,
     weight: hasPullUpBar ? 'Heavy band assist' : 'Medium band',
     target_rir: 3,

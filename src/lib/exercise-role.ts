@@ -38,7 +38,7 @@ function canonical(name: string): string {
     .replace(/[^a-z0-9]+/g, ' ')     // hyphens/slashes/punct → space
     .trim();
   // Depluralize the LAST word only — the plural marker always lands there ("Soleus Raises",
-  // "Barbell Rows", "Push-ups"). Depluralizing every word wrongly stripped singular words that
+  // "Barbell Rows", "Push ups"). Depluralizing every word wrongly stripped singular words that
   // end in 's' (soleus→soleu, tibialis→tibiali). "ss" guard keeps "press"; len>2 so "ups"→"up".
   const parts = base.split(/\s+/).filter(Boolean);
   if (parts.length) {
@@ -119,7 +119,7 @@ const ROLE_TABLE: Record<string, StrengthRole> = {
   'glute bridge': 'accessory',
   'single leg glute bridge': 'accessory',
   // Accessory-bias add-on (glute | hyrox) — strength-primary. Keys are canonical() space-forms (hyphens
-  // are stripped to spaces, so "Single-Leg Squat" → "single leg squat"). Qualitative-loaded, accessory role.
+  // are stripped to spaces, so "Single Leg Squat" → "single leg squat"). Qualitative-loaded, accessory role.
   // NOTE: bare 'hip thrust' already maps to 'primary' above (line ~75) — looks inconsistent with S-005
   // (hip thrust = required ACCESSORY), but left untouched to avoid changing other protocols' scoring.
   // The glute bias uses the precise 'barbell hip thrust' → accessory. FLAGGED for review.

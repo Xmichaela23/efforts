@@ -20,7 +20,7 @@ Deno.test('exerciseRequiredGearKeys — F-6: unprefixed barbell compounds detect
 
 Deno.test('exerciseRequiredGearKeys — F-6: rings / step-ups no longer over-required', () => {
   assertEquals(exerciseRequiredGearKeys('Inverted Rows'), []);                       // was ['rings']
-  assertEquals(exerciseRequiredGearKeys('Step-ups'), []);                            // was ['bench']
+  assertEquals(exerciseRequiredGearKeys('Step ups'), []);                            // was ['bench']
   assertEquals(exerciseRequiredGearKeys('Ring Rows'), ['rings']);                    // explicit rings still required
 });
 
@@ -39,7 +39,7 @@ Deno.test('exerciseRequiredGearKeys — no DB/band/bodyweight regression (guards
   assertEquals(exerciseRequiredGearKeys('DB Romanian Deadlift'), ['dumbbells']);
   assertEquals(exerciseRequiredGearKeys('Band Overhead Press'), ['bands']);
   assertEquals(exerciseRequiredGearKeys('Goblet Squat'), ['dumbbells']);
-  assertEquals(exerciseRequiredGearKeys('Pull-ups'), ['pull_up_bar']);
+  assertEquals(exerciseRequiredGearKeys('Pull ups'), ['pull_up_bar']);
   assertEquals(exerciseRequiredGearKeys('Box Jumps'), ['box']);
   assertEquals(exerciseRequiredGearKeys('Glute Bridges'), []);                       // bodyweight
 });

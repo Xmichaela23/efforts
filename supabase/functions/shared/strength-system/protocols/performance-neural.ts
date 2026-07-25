@@ -143,7 +143,7 @@ export function createBaseHypertrophyLower(
         notes: 'Full hip extension at top — pause 1s',
       },
       {
-        name: 'Single-Leg Calf Raises',
+        name: 'Single Leg Calf Raises',
         sets: 2, reps: '15/leg',
         weight: 'Bodyweight or light dumbbell',
         notes: 'Slow — 2s up, 2s down',
@@ -151,10 +151,10 @@ export function createBaseHypertrophyLower(
     );
   } else {
     exercises.push(
-      { name: 'Single-Leg RDL', sets, reps: '10/leg', weight: 'Heaviest available', target_rir: rir, notes: '2s lowering, controlled' },
+      { name: 'Single Leg RDL', sets, reps: '10/leg', weight: 'Heaviest available', target_rir: rir, notes: '2s lowering, controlled' },
       { name: 'Goblet Squat', sets, reps: 12, weight: 'Heaviest dumbbell', target_rir: rir },
       { name: 'Hip Thrusts', sets, reps: 15, weight: 'Bodyweight or load hips', notes: 'Pause at top' },
-      { name: 'Single-Leg Calf Raises', sets: 2, reps: '15/leg', weight: 'Bodyweight' },
+      { name: 'Single Leg Calf Raises', sets: 2, reps: '15/leg', weight: 'Bodyweight' },
     );
   }
 
@@ -177,17 +177,17 @@ function createPerfRecoverySession(tier: 'barbell' | 'bodyweight'): IntentSessio
   const ex: StrengthExercise[] = tier === 'barbell'
     ? [
         { name: 'Hip Thrusts', sets: 2, reps: 8, weight: '55% 1RM', target_rir: 4, notes: 'No spinal loading — hip hinge only. Move well, not hard.' },
-        { name: 'Step-ups', sets: 2, reps: '8/leg', weight: 'Light dumbbell', target_rir: 4, notes: 'Controlled — no fatigue chase' },
+        { name: 'Step ups', sets: 2, reps: '8/leg', weight: 'Light dumbbell', target_rir: 4, notes: 'Controlled — no fatigue chase' },
         { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight or light', target_rir: 4 },
         { name: 'Face Pulls', sets: 2, reps: 12, weight: 'Light cable', target_rir: 4, notes: 'Scapular health. Keep shoulders happy post-race.' },
-        { name: 'Band Pull-Aparts', sets: 2, reps: 15, weight: 'Light band', target_rir: 4 },
+        { name: 'Band Pull Aparts', sets: 2, reps: 15, weight: 'Light band', target_rir: 4 },
         { name: 'Light DB Row', sets: 2, reps: 12, weight: '50% usual', target_rir: 4, notes: 'Light — not a training stimulus. Maintain tissue.' },
       ]
     : [
         { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight', target_rir: 4 },
-        { name: 'Step-ups', sets: 2, reps: '8/leg', weight: 'Bodyweight', target_rir: 4 },
+        { name: 'Step ups', sets: 2, reps: '8/leg', weight: 'Bodyweight', target_rir: 4 },
         { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight', target_rir: 4 },
-        { name: 'Band Pull-Aparts', sets: 2, reps: 15, weight: 'Light band', target_rir: 4 },
+        { name: 'Band Pull Aparts', sets: 2, reps: 15, weight: 'Light band', target_rir: 4 },
         { name: 'Resistance Band Row', sets: 2, reps: 12, weight: 'Light band', target_rir: 4 },
       ];
   return {
@@ -394,7 +394,7 @@ export function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 2, reps: 6, weight: '70% 1RM' },
         { name: 'Barbell Rows', sets: 2, reps: 6, weight: '70% 1RM' },
-        { name: 'Pull-ups', sets: 2, reps: '6-8', weight: 'Bodyweight' },
+        { name: 'Pull ups', sets: 2, reps: '6-8', weight: 'Bodyweight' },
         { name: 'Overhead Press', sets: 2, reps: 5, weight: '60% 1RM', notes: 'Light - Focus on crisp technique' }
       );
       duration = 25;
@@ -406,7 +406,7 @@ export function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 3, reps: 6, weight: `${load}% 1RM` },
         { name: 'Barbell Rows', sets: 3, reps: 6, weight: `${load}% 1RM` },
-        { name: 'Pull-ups', sets: 3, reps: '6-8', weight: 'Add weight when bodyweight is easy' },
+        { name: 'Pull ups', sets: 3, reps: '6-8', weight: 'Add weight when bodyweight is easy' },
         { name: 'Overhead Press', sets: 3, reps: 6, weight: `${Math.max(65, load - 5)}% 1RM` }
       );
       duration = 40;
@@ -420,7 +420,7 @@ export function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 3, reps: 5, weight: `${load}% 1RM` },
         { name: 'Barbell Rows', sets: 3, reps: 5, weight: `${load}% 1RM` },
-        { name: 'Pull-ups', sets: 3, reps: '5-7', weight: 'Add weight when bodyweight is easy' },
+        { name: 'Pull ups', sets: 3, reps: '5-7', weight: 'Add weight when bodyweight is easy' },
         { name: 'Overhead Press', sets: 3, reps: 5, weight: `${Math.max(70, load - 5)}% 1RM` }
       );
       duration = 40;
@@ -432,7 +432,7 @@ export function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 3, reps: 5, weight: `${load}% 1RM` },
         { name: 'Barbell Rows', sets: 3, reps: 5, weight: `${load}% 1RM` },
-        { name: 'Pull-ups', sets: 3, reps: '4-6', weight: 'Weighted — add load each week' },
+        { name: 'Pull ups', sets: 3, reps: '4-6', weight: 'Weighted — add load each week' },
         { name: 'Overhead Press', sets: 2, reps: 5, weight: `${Math.max(72, load - 5)}% 1RM` }
       );
       duration = 40;
@@ -443,7 +443,7 @@ export function createUpperStrengthSession(
       exercises.push(
         { name: 'Bench Press', sets: 2, reps: 5, weight: '65% 1RM' },
         { name: 'Barbell Rows', sets: 2, reps: 5, weight: '65% 1RM' },
-        { name: 'Pull-ups', sets: 2, reps: '6-8', weight: 'Bodyweight' },
+        { name: 'Pull ups', sets: 2, reps: '6-8', weight: 'Bodyweight' },
         // Keep OHP qualitative in race prep to avoid fatigue; users choose a very easy load.
         { name: 'Overhead Press', sets: 2, reps: 5, weight: 'Light', notes: 'Activation + posture. Very easy load: move fast, no grind (RPE 4–5 / leave ~5+ reps in the tank).' }
       );
@@ -455,36 +455,36 @@ export function createUpperStrengthSession(
     // Bodyweight tier
     if (isRecovery) {
       exercises.push(
-        { name: 'Push-ups', sets: 2, reps: 10, weight: 'Standard' },
+        { name: 'Push ups', sets: 2, reps: 10, weight: 'Standard' },
         { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard' },
-        { name: 'Pike Push-ups', sets: 2, reps: 8, weight: 'Standard' }
+        { name: 'Pike Push ups', sets: 2, reps: 8, weight: 'Standard' }
       );
       duration = 20;
       description = 'Recovery Week - Reduced volume.';
       repProfile = 'maintenance';
     } else if (phase.name === 'Base') {
       exercises.push(
-        { name: 'Push-ups', sets: 3, reps: 10, weight: 'Progress: Diamond or Decline' },
+        { name: 'Push ups', sets: 3, reps: 10, weight: 'Progress: Diamond or Decline' },
         { name: 'Inverted Rows', sets: 3, reps: 10, weight: 'Feet elevated when easy' },
-        { name: 'Pike Push-ups', sets: 2, reps: 10, weight: 'Elevate feet to progress' },
-        { name: 'Pull-ups', sets: 3, reps: '5-8', weight: 'Assisted or negatives OK' }
+        { name: 'Pike Push ups', sets: 2, reps: 10, weight: 'Elevate feet to progress' },
+        { name: 'Pull ups', sets: 3, reps: '5-8', weight: 'Assisted or negatives OK' }
       );
       duration = 30;
       description = `Week ${displayWeek} Base - Upper body strength with bodyweight progressions.`;
       repProfile = 'strength';
     } else if (phase.name === 'Speed') {
       exercises.push(
-        { name: 'Push-ups', sets: 3, reps: 8, weight: 'Advanced: Decline or Archer' },
+        { name: 'Push ups', sets: 3, reps: 8, weight: 'Advanced: Decline or Archer' },
         { name: 'Inverted Rows', sets: 3, reps: 8, weight: 'Feet elevated, slow tempo' },
-        { name: 'Pike Push-ups', sets: 2, reps: 8, weight: 'Elevated pike' },
-        { name: 'Pull-ups', sets: 3, reps: 'Max reps', weight: 'Aim for progression' }
+        { name: 'Pike Push ups', sets: 2, reps: 8, weight: 'Elevated pike' },
+        { name: 'Pull ups', sets: 3, reps: 'Max reps', weight: 'Aim for progression' }
       );
       duration = 30;
       description = `Week ${displayWeek} Speed - Upper body strength. Focus on progression.`;
       repProfile = 'strength';
     } else {
       exercises.push(
-        { name: 'Push-ups', sets: 2, reps: 10, weight: 'Standard' },
+        { name: 'Push ups', sets: 2, reps: 10, weight: 'Standard' },
         { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Standard' }
       );
       duration = 20;
@@ -532,7 +532,7 @@ export function createUpperMaintenanceSession(
     description = 'Optional maintenance session. Light work to maintain patterns.';
   } else {
     exercises.push(
-      { name: 'Push-ups', sets: 2, reps: 12, weight: 'Standard' },
+      { name: 'Push ups', sets: 2, reps: 12, weight: 'Standard' },
       { name: 'Inverted Rows', sets: 2, reps: 12, weight: 'Standard' },
       { name: 'Band Face Pulls', sets: 2, reps: 15, weight: 'Light band' }
     );
@@ -583,7 +583,7 @@ function createTaperSessions(
       exercises: [
         { name: 'Bodyweight Squats', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
         { name: 'Glute Bridges', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR },
-        { name: 'Push-ups', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR }
+        { name: 'Push ups', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR }
       ],
       repProfile: 'maintenance',
       tags: ['strength', 'full_body', 'phase:taper', 'optional', `tier:${tier}`],
@@ -602,7 +602,7 @@ function createTaperSessions(
       : [
           { name: 'Glute Bridges', sets: 1, reps: 5, weight: 'Bodyweight', target_rir: taperRIR, notes: 'Explosive hip extension.' },
           { name: 'Push-ups (explosive)', sets: 1, reps: 5, weight: 'Bodyweight', target_rir: taperRIR, notes: 'Push away from floor fast.' },
-          { name: 'Band Pull-Aparts', sets: 1, reps: 10, weight: 'Light band', target_rir: taperRIR },
+          { name: 'Band Pull Aparts', sets: 1, reps: 10, weight: 'Light band', target_rir: taperRIR },
         ];
 
     sessions.push({

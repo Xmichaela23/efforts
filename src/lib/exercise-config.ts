@@ -213,13 +213,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'perHand',
     isUnilateral: true
   },
-  'step-ups': {
-    pattern: 'knee_dominant',
-    primaryRef: 'squat',
-    ratio: 0.40,
-    displayFormat: 'perHand',
-    isUnilateral: true
-  },
   
   // Front Squat: ~85% of back squat (Gulick et al., 2015)
   'front squat': {
@@ -826,7 +819,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // Pull-ups: Bodyweight by default, can add weight for advanced
   // ============================================================================
   
-  'pull-up': {
+  'pull up': {
     pattern: 'vertical_pull',
     primaryRef: null,
     ratio: 0.0,
@@ -834,7 +827,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     notes: 'Bodyweight. Add weight when 3x12 is easy.'
   },
-  'pull-ups': {
+  'pull ups': {
     pattern: 'vertical_pull',
     primaryRef: null,
     ratio: 0.0,
@@ -855,14 +848,14 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false
   },
-  'chin-up': {
+  'chin up': {
     pattern: 'vertical_pull',
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
     isUnilateral: false
   },
-  'chin-ups': {
+  'chin ups': {
     pattern: 'vertical_pull',
     primaryRef: null,
     ratio: 0.0,
@@ -898,7 +891,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // PUSH-UPS / BODYWEIGHT UPPER PUSH
   // ============================================================================
   
-  'push-up': {
+  'push up': {
     pattern: 'horizontal_push',
     primaryRef: null,
     ratio: 0.0,
@@ -906,7 +899,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     notes: 'Standard → Diamond → Decline → Archer for progression.'
   },
-  'push-ups': {
+  'push ups': {
     pattern: 'horizontal_push',
     primaryRef: null,
     ratio: 0.0,
@@ -927,49 +920,49 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false
   },
-  'diamond push-up': {
+  'diamond push up': {
     pattern: 'horizontal_push',
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
     isUnilateral: false
   },
-  'diamond push-ups': {
+  'diamond push ups': {
     pattern: 'horizontal_push',
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
     isUnilateral: false
   },
-  'decline push-up': {
+  'decline push up': {
     pattern: 'horizontal_push',
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
     isUnilateral: false
   },
-  'decline push-ups': {
+  'decline push ups': {
     pattern: 'horizontal_push',
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
     isUnilateral: false
   },
-  'archer push-up': {
+  'archer push up': {
     pattern: 'horizontal_push',
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
     isUnilateral: true
   },
-  'archer push-ups': {
+  'archer push ups': {
     pattern: 'horizontal_push',
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
     isUnilateral: true
   },
-  'pike push-up': {
+  'pike push up': {
     pattern: 'vertical_push',
     primaryRef: null,
     ratio: 0.0,
@@ -977,7 +970,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     notes: 'Elevate feet to progress toward HSPU.'
   },
-  'pike push-ups': {
+  'pike push ups': {
     pattern: 'vertical_push',
     primaryRef: null,
     ratio: 0.0,
@@ -1166,14 +1159,14 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // STEP-UPS (Squat Reference) - additional aliases
   // ============================================================================
   
-  'box step-up': {
+  'box step up': {
     pattern: 'knee_dominant',
     primaryRef: 'squat',
     ratio: 0.40,
     displayFormat: 'perHand',
     isUnilateral: true
   },
-  'box step-ups': {
+  'box step ups': {
     pattern: 'knee_dominant',
     primaryRef: 'squat',
     ratio: 0.40,

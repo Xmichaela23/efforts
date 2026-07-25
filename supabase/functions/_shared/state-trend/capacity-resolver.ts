@@ -65,7 +65,7 @@ const LABELS: Record<CanonicalLiftKey, string> = {
   bench: 'Bench Press',
   deadlift: 'Deadlift',
   overheadPress1RM: 'Overhead Press',
-  pullupMaxReps: 'Pull-ups',
+  pullupMaxReps: 'Pull ups',
 };
 
 export type CapacitySource = 'typed' | 'learned_gapfill' | 'none';
