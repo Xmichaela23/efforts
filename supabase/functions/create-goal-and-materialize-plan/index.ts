@@ -2384,21 +2384,22 @@ Deno.serve(async (req: Request) => {
         if (gsPosture?.strength === 'develop' && !gsEnduranceDevelops) {
           const { data: gsBaseline } = await supabase
             .from('user_baselines').select('equipment, performance_numbers, learned_fitness').eq('user_id', user_id).maybeSingle();
-          const gsEquip = resolveStrengthEquipmentTypeForPlan(
-            gsTp.equipment_type, gsBaseline?.equipment?.strength ?? [], gsBaseline?.performance_numbers,
-          );
           // ── D-323 / SPEC-get-stronger §0 — THE ENTRY GATE ────────────────────────────────────
-          // Strength Focus needs a BARBELL. Previously a non-barbell athlete fell silently through
-          // this branch to the (b)-run path, which builds `five_by_five` — Back Squat, Bench, Barbell
-          // Row, OHP and Deadlift at %1RM, TO A DUMBBELL-ONLY ATHLETE. Refuse instead. The dumbbell
-          // plan is its own product (BUILD-ORDER-strength-spine.md); until it ships, say so.
-          if (gsEquip !== 'commercial_gym') {
-            throw new AppError(
-              'barbell_required',
-              'Strength Focus needs a barbell, rack and bench. A dumbbell version is coming; until then this plan cannot be built from your current equipment.',
-              409,
-            );
-          }
+          // ⛔ THERE IS NO EQUIPMENT GATE, DELIBERATELY. Michael, 2026-07-25: all cards are
+          // pickable, the CARD states what it needs ("barbell, rack, bench"), and the athlete
+          // decides. Equipment data goes stale and someone may want a plan their stored kit does
+          // not match. Choosing a plan is stating your situation, not composing the programme.
+          //
+          // A `barbell_required` refusal was written here and REMOVED the same day, for two reasons:
+          //   1. It contradicted the decision above.
+          //   2. It did not even work. `resolveStrengthEquipmentTypeForPlan` treats **two or more
+          //      compound 1RM fields** as barbell-capable (a deliberate fallback for a stale
+          //      equipment list), so a dumbbell-only athlete carrying old gym numbers resolves to
+          //      `commercial_gym` and passes — the exact case the refusal was written to catch. The
+          //      only athlete it could stop had <2 numbers, and the baseline gate below catches them
+          //      with a more useful message.
+          // The `resolveStrengthEquipmentTypeForPlan` call that gated this branch is gone with it.
+          // Do not reinstate an equipment gate.
           {
             // ⛔ NO 1RM, NO ENTRY — and ALL FOUR lifts, not two.
             // The old check tested bench + squat only, then set `needs_baseline` so week 1 became an
