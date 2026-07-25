@@ -49,6 +49,23 @@ Three facts to start from, all file:line, all verified:
 3. `exer()` (`shared/strength-system/strength-primary-plan.ts:145`) is where the phase percentage is
    stamped onto every lift. It now skips bodyweight modality. **That one line caused three separate bugs.**
 
+### 🏷️ READ THE TAGS FIRST — the 20 open lines are not one pile
+
+Every open line in Q-202 is tagged. **Do not treat them as one backlog.**
+
+| tag | count | means |
+|---|---|---|
+| **`[REBUILD]`** | 9 | the Get Stronger rebuild creates or forces these — 9/15-22 |
+| **`[ENGINE]`** | 9 | defects in code running **today**, independent of the rebuild — 13/23/24/25/29/30/34/35 |
+| **`[SPEC]`** | 2 | defects in **Michael's spec document**. Fix the spec, not the code — 31/32 |
+| **`[BLOCKS-SPEC]`** | 1 | existing behaviour the spec silently depends on, **unverified** — 33 |
+
+The one to notice is **33 `[BLOCKS-SPEC]`**. `seedFromGoal` sets endurance to `maintain` when strength is
+`develop`, but **whether `maintain` caps INTENSITY or only trims VOLUME was never traced.** The entire
+interference argument — Part 2 of the spec, and the reason the block parks quality work — is about
+intensity. If `maintain` leaves hard sessions in, the spec's central premise isn't enforced by anything.
+**Trace it before building Part 2.**
+
 ### 🕳️ WHAT THE SPEC DOES **NOT** COVER — the potholes
 
 The spec is good and it covers **11 of the 15 open Q-202 lines** — the whole rep-range cluster (20/21/22/9),
