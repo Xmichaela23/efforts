@@ -75,6 +75,24 @@ Separately, `fallbackCoaching` (`coaching.ts:477-491`) — reached when the LLM 
 
 ## Q-192 — `five_by_five` is MISSING from `strength-profiles.ts` and silently falls back to DURABILITY (ENGINE, 2026-07-19 — code-verified, impact untraced)
 
+> ### ✅ CLOSED 2026-07-25 — `ad62947b`. Everything below is history.
+> Filed 2026-07-19. Hit again independently as `strength_primary` in the D-322 session, where **only that
+> second instance was fixed** — the entry here was left open and the root cause untouched. **Found twice,
+> fixed at the root the third time.**
+>
+> **Three changes, and only the first is the one people reach for:**
+> 1. `five_by_five` has its own `PROTOCOL_PROFILES` entry. Verified before/after across the phases:
+>    a flat **2.5 / 2.5 / 2.5 / 2.5 / 2.5** became **2 / 1.5 / 1 / 2.5 / 3**.
+> 2. **`resolveProfile()` no longer falls back SILENTLY.** It still falls back — throwing would brick
+>    materialize over legacy rows — but it warns. **The silence was the root cause, not the missing key:**
+>    it is what made a missing entry and a deliberate choice identical at every call site.
+> 3. **`_shared/strength-protocol-registry.test.ts`** — the three hand-maintained lists (pickable /
+>    buildable / has-a-profile) must agree, with nothing previously enforcing it. Hard-fails if a
+>    *reachable* protocol has no profile; pins the two unreachable unprofiled ones rather than staying
+>    permanently red.
+>
+> Also tracked as **Q-202 line 25** (likewise closed).
+
 > **↪ CONFIRMED AND STILL OPEN, and it is not the only one (D-322, 2026-07-24).** The identical failure was hit
 > independently for `strength_primary` ("Get Strong"), which also had no profile AND does not populate
 > `config.strength_protocol` — so every such plan resolved to `durability`, a concurrent-support profile
@@ -982,7 +1000,7 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 | 35 | **[ENGINE]** Unreachable protocols are either wired up or deleted | `minimum_dose` (buildable, has a profile, offered nowhere), `strength_focus_build`, `strength_focus_power` (buildable, **no profile**, offered nowhere). Roughly a third of the protocol surface. Not inert — two carry the same missing-profile defect as line 25 and would break identically the day anyone reaches them. CLAUDE.md's rule is "replace = delete the old". |
 | 29 | **[ENGINE]** A bodyweight lift's difficulty PERIODISES across the block | **Currently INVERTED, not merely flat.** Real Get Strong Pull Up scheme against a tested max of 8: base 3×5 → RIR **3**, Power 3×3 → RIR **4**, deload 2×5 → RIR **3**, peak 2×3 → RIR **4**. Back squat over the same weeks runs 4 → 1.5 → 4 → 0.5. The composer drops reps 5→3 into the intensification, which is right for a barbell lift *because the percentage rises to compensate*; a bodyweight lift has no percentage to raise, so fewer reps is simply easier. **Peak pull-ups are the easiest work in the block and the deload is harder than the peak.** Raised by Michael off the line-26 verification output. Almost certainly the same fix as rep ranges (line 20) — a bodyweight lift periodises by climbing reps toward its max, not by cutting them. |
 | 30 | **[ENGINE]** The five baseline slots hold what the engine actually reads | **Observation from lines 10/13, worth its own line.** `hipThrust` occupies a slot and **nothing reads it** (0 exercises use `primaryRef: 'hipThrust'`; hip thrust derives off deadlift × 0.90). `pullupMaxReps` needed a slot and did not have one until D-322. The assembly was carrying a number nobody wants while dropping one people need — the slot list was never audited against its consumers. |
-| 25 | **[ENGINE]** 🔴 `five_by_five` has a profile in `strength-profiles.ts` | **THE ONLY OPEN LINE ACTIVELY WRONG IN PRODUCTION, and it is the DEFAULT PATH — not dormant.** `defaultStrengthDeveloper()` returns `five_by_five` for any non-triathlon athlete with barbell/dumbbell equipment, and it is first in the `BARBELL_DEVELOPERS` picker. So the *next* "Get stronger" plan a barbell athlete builds lands on the one protocol with **no entry in `PROTOCOL_PROFILES`** — it resolves to `durability` and gets a flat RIR 2.5 for the whole block. |
+| ~~25~~ | **✅ CLOSED 2026-07-25 (`ad62947b`)** — `five_by_five` now has its own `PROTOCOL_PROFILES` entry, `resolveProfile()` WARNS instead of falling back silently (the silence was the root cause, not the missing key), and `strength-protocol-registry.test.ts` hard-fails if a *reachable* protocol has no profile. Verified: base/build/peak/taper/recovery went from a flat 2.5 to **2 / 1.5 / 1 / 2.5 / 3**. Everything below is history. | **THE ONLY OPEN LINE ACTIVELY WRONG IN PRODUCTION, and it is the DEFAULT PATH — not dormant.** `defaultStrengthDeveloper()` returns `five_by_five` for any non-triathlon athlete with barbell/dumbbell equipment, and it is first in the `BARBELL_DEVELOPERS` picker. So the *next* "Get stronger" plan a barbell athlete builds lands on the one protocol with **no entry in `PROTOCOL_PROFILES`** — it resolves to `durability` and gets a flat RIR 2.5 for the whole block. |
 | | | *Corrected 2026-07-24: this was previously filed as "no plan currently uses it, so it harms nobody today." That read the DB (1 strength_primary, 2 neural_speed, 3 unset) and mistook it for the reachable set. "Get stronger" is the GOAL; the protocol is derived from it, and for barbell the derivation is five_by_five. The existing plan escapes only because it came through the older `config.source: 'strength_primary'` path with no `strength_protocol` at all — which is why it hit the other half of this same bug and why only `strength_primary` got fixed.* |
 | | | Filed as **Q-192, 2026-07-19**. Hit again independently in this session. Still open. |
 

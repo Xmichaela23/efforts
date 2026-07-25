@@ -19,6 +19,20 @@ because a fresh session would have followed them.** Several contained live build
 | `SPEC-getstronger-contract-row.md` | "APPROVED 2026-06-29" — an approval stamp on the old shape |
 | `STATE-nonrace-getstrong-2026-06-29.md` | a June state snapshot presented as current |
 | `SPEC-amrap-retest.md` | **a spec-lifecycle violation** — marked BUILT 2026-07-01 (D-224) and never deleted. Also now partly wrong: V1 measures on the top set every week, so there is no separate end-of-block retest |
+| `SCIENCE-strength-primary-loading.md` | the science doc **for the loading curve V1 replaces** — the ATR arc, the weekly % ramp, the deload timing. Reads as the justification for what is in the code, and it is about to stop being |
+| `ROADMAP-hybrid-strength-addons.md` | the Hyrox / glute / pull-up add-on consolidation. **Add-ons are OUT of the Get Stronger flow (D-323).** ⚠️ **Keep this one findable** — it is the reference for **re-homing them to the Adjust tab**, not dead work |
+
+**Second pass, same day.** The first sweep missed these two, plus a third handled differently:
+
+**`SPEC-strength-focus.md` was NOT archived — it has a disambiguation header instead.** Its name now
+collides with the product ("Strength Focus" = the front-door barbell plan since 2026-07-25) but its
+content is about **accessory specialisation**, and its claim — *a focus redistributes volume rather than
+adding it* — is still good, still unbuilt, and is the right reference when add-ons move to Adjust.
+
+**⚠️ Code comments were repointed at this folder, not left dangling.** Archiving `SPEC-q088-freq4-run-path.md`
+in the first pass broke three live references (`frequency-policy.ts`, `strength-focus-split.ts`,
+`generate-run-plan/types.ts`); `SCIENCE-strength-primary-loading.md` was referenced from
+`strength-primary-plan.ts`. All four now point here. **If you archive another doc, grep the code first.**
 
 **Still live, deliberately not moved:** the `SCIENCE-*.md` docs. `SCIENCE-concurrent-training-interference.md`
 is actively useful. The others (`SCIENCE-5x5-linear-progression`, `-minimum-dose-maintenance`,

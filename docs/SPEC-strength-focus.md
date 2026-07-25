@@ -1,3 +1,16 @@
+> # ⚠️ NAME COLLISION — this is NOT the "Strength Focus" product
+>
+> **Since 2026-07-25, "Strength Focus" is the name of the front-door barbell plan** —
+> `docs/SPEC-get-stronger.md` (Wendler 5/3/1, 12 weeks, leader/leader/anchor). **That is the
+> product. This document is not about it.**
+>
+> This is about **accessory specialisation** — the glute / Hyrox / pull-up bias — and its core
+> claim (*a focus REDISTRIBUTES volume, it does not ADD it*) is still good and still unbuilt.
+> It is the right reference **when the add-ons are re-homed to the Adjust tab**, where Wendler's
+> push / pull / single-leg assistance budget is the thing being redistributed.
+>
+> **Do not build from this for the Strength Focus plan. Do not treat it as superseded either.**
+
 # SPEC — Strength focus: specialization is REDISTRIBUTION, not addition
 
 **Status:** SPEC (2026-07-14). Not built. **Supersedes the "+1 accessory bias" as the mechanism for a FOCUS.**

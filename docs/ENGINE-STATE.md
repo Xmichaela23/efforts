@@ -28,86 +28,80 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ### YOUR JOB
 
-# ⛔ `docs/SPEC-get-stronger.md` IS THE NORTH STAR. Then `BUILD-ORDER-strength-spine.md`, then `ARCH-strength-spine.md`.
+# ⛔ `docs/SPEC-get-stronger.md` IS THE NORTH STAR. Read it, then `BUILD-ORDER-strength-spine.md`, then `ARCH-strength-spine.md`. Nothing else about strength is current.
 
-> **Seven superseded strength docs were archived 2026-07-25** to
-> `docs/archive/superseded-strength-2026-07-25/` — a competing roadmap, a live "build Cut 4" instruction,
-> the freq-4 run-path spec, two stale status docs, an approval-stamped old contract, and a shipped spec
-> that never died. **A fresh session would have followed them.** Do not resurrect; read the README there
-> if you need to know why.
+**Continue the Strength Focus (Barbell) build. It is started and committed, not finished.**
 
-> **⛔ V1 SCOPE IS LOCKED (2026-07-25) — start at the V1 section of `BUILD-ORDER-strength-spine.md`.**
-> Two plans at the top of Goals, separate flows: **Strength Focus — Barbell (build this)** and Strength
-> Focus — Dumbbell (later). V1 is **Wendler's four-week cycle** at an 80–85% working number; 8 weeks = two
-> cycles, scales by adding cycles. **No rep ranges, no reactive plan, no plate grid, no beginner path, no
-> retest anchor — all deleted by the switch.** Zero database migrations; the one addition is a stored
-> working number in `plans.config`. The rep spec and the progression trigger move to the dumbbell plan.
+## Where the build actually stopped
 
-**`ARCH-strength-spine.md` is where things live.** Three strength entry points exist today with no shared
-loading logic, and the Get Stronger composer is **deliberately self-contained** — correct when written,
-wrong now that race plans use the same tools at a lower dose. The map says what moves out of that file,
-what the registry loses, and which five structural decisions are settled vs open. **Read it before editing
-any composer**, or the protocol gets authored twice.
+**DONE, committed, NOT pushed, NOT deployed, NOT device-seen:**
 
-**`BUILD-ORDER-strength-spine.md` is the live doc** — the layer order, the shared machinery, and the
-**open science questions**, several of which point at the spec's design rather than its implementation.
-**It is deliberately unfinished; sections marked OPEN are not implementable yet.** `SPEC-get-stronger.md`
-says what Get Stronger *is*; the build order says what gets built and in what sequence.
+| commit | what |
+|---|---|
+| `ad62947b` | **Q-192 closed.** `five_by_five` had no `PROTOCOL_PROFILES` entry — the DEFAULT for any barbell athlete — so it fell through `resolveProfile()` to `durability`: flat RIR 2.5 for a whole block, peak included. Verified before/after: 2.5/2.5/2.5/2.5/2.5 → **2 / 1.5 / 1 / 2.5 / 3**. `resolveProfile` now WARNS on fallback (the silence was the root cause, not the missing key). New `strength-protocol-registry.test.ts` hard-fails if a *reachable* protocol has no profile. **The entry gate:** all FOUR lifts required (was bench+squat only — missing deadlift or press left two of four lifting days with no weight), refusal names the missing lift. |
+| `29c57321` | **Removed a barbell gate I added an hour earlier.** It contradicted Michael's same-day ruling (all cards pickable, the card states what it needs) **and it did not work** — the equipment resolver treats 2+ compound 1RM fields as barbell-capable, so the dumbbell athlete it targeted passed straight through. Caught by Michael pushing back. |
+| `807de1de` | **`shared/strength-system/loading/wendler-531.ts`** — the loading module. Pure: 1RM + week → sets. 14 tests. Extracted rather than buried in the composer because race plans need the same loading at a lower dose (`ARCH` Layer 2). |
 
-**Get Stronger is the FIRST CONSUMER of the strength spine, not its owner.** Michael, 2026-07-24: this is
-"going to be the entire backbone of the app," and users may later "start at a strength build and map out
-longer plans where emphasis shifts." Build the rep spec and the progression engine as **general
-infrastructure** — and settle the block-scoped-vs-plan-scoped question in the build order's first section
-before writing any of it.
+**NEXT, and it is the big one: wire the loading module into `strength-primary-plan.ts`.**
+Replace `workLoad` / `rampPct` / `buildArcPhases` / `workSessions` / `retestAmrapSessions`. Four lifts,
+one per day (Mon bench · Tue squat · Thu press · Fri deadlift), 10–15 jumps or throws, then 25 reps each
+of push / pull / single-leg-core. Store the working number in `plans.config`. **Zero DB migrations.**
 
-**`docs/SPEC-get-stronger.md` + `D-323` are the build contract**, written 2026-07-24 from Michael's three
-source documents plus a live scope session with him. It exists because the scope had been re-decided across
-banners, Q-202 lines and chat with no single home — Michael: *"we need some clarity and part of the problem
-is the 100000 iterations it took to get here."* **Everything below this line is background. The contract
-wins on any disagreement, including with this banner.**
+Then: strip Glutes/Hyrox from the flow (⚠️ Michael has a LIVE Hyrox plan — re-home, do not lose), the
+endurance card, the copy.
 
-**It is NOT a rebuild.** `composeStrengthPrimaryPlan` already has the four-day upper/lower split, the exact
-lift pairing, the five-phase ATR arc, the AMRAP retest and easy-only endurance underneath. The one real
-behavioural change is **double progression** — the engine ramps the *percentage* weekly at fixed reps; the
-spec enters at a fixed % and adds *reps*. See the contract §8 for the full diff and §11 for the build order.
+## What changed today, so you don't re-litigate it
 
-**The governing principle, and it settles design questions:** *"this whole app will be a sushi menu · strength
-is Omakase."* Endurance is à la carte (the athlete picks volume, days, quality on/off — everything optional is
-opt-in). **Strength is omakase — the engine designs the block and the athlete does not pick.** Contract §2.
+**The protocol was REPLACED, not tuned.** The old spec assembled a block from five sources and produced
+~8 unmarked invented numbers. **V1 is Wendler's 5/3/1 in his endurance-athlete configuration**, which
+supplies a complete parameter set with none. 12 weeks = **leader, leader, anchor** (his 2:1). Working
+number **85% of 1RM, rounded down**. Leader = programmed fives, **no all-out set**. Anchor = 5/3/1 proper,
+weeks 9/10/11 are the measurement. **No separate retest week** — which deleted the frozen-retest-weight
+problem outright.
 
-**Michael has already made these calls. Do not re-ask:** run asked in **miles**, bike in **hours** (researched
-— the app learns no ride speed, and terrain wrecks bike mileage) · quality session **off by default**, for VO2
-maintenance not race sharpness · swim is a **scheduling courtesy**, not coached · **Glutes / Hyrox add-ons come
-OUT** of the flow and re-home later.
+**`SPEC-get-stronger.md` §3 is a citation register** — 17 T1, 12 T2 (Wendler split *strong* vs *thin*),
+4 flagged secondary-source, 6 marked as ours, plus a **struck list** of claims that were carried as fact
+and did not survive checking. Read the struck list before quoting anything at Michael.
 
-**Michael's three source documents** are on disk at `~/Downloads/` (not in the repo — **read them, don't ask**):
-`get-stronger-spec-short.md`, `get-stronger-protocol (3).md`, `get-stronger-science (1).md`.
+**⛔ CLAIMS STRUCK TODAY — do not reinstate:** "concurrent training suppresses hypertrophy" (Schumann 2022
+says otherwise, and the old spec cited it against itself in its own Limits) · "interference scales with
+intensity" (Wilson's moderators were modality/frequency/duration; Fyfe tested intensity directly, no
+mediation) · Prilepin cited as the loading tradition and never followed · a stacking rationale citing
+Rønnestad 2016 and Hickson 1980 for a scheduling rule neither study tested.
 
-**⛔ READ THEM BEFORE YOU ASK MICHAEL ANYTHING.** The first session to reach this banner asked him two
-questions the spec had already answered on its own first page — *which protocol shape wins* (four-day
-upper/lower, twelve weeks; §"What this protocol is") and *what "endurance maintain" means* (Part 2, in a
-table). **The spec is the design authority. Ask only where it is genuinely silent** — which is essentially
-one place: the protocol **registry** (Q-202 line 25), because that is engine bookkeeping and not something a
-training protocol has any reason to specify.
+## Strength docs: 9 archived, 1 disambiguated. Nothing else is current.
 
-The spec is good and it is **tier-marked** — T1 sourced / T2 named method / T3 design call / T4 unstudied
-combination. **Do not launder a T3 into evidence.** Its standing rule: any new call enters at T3 until placed.
+`docs/archive/superseded-strength-2026-07-25/` + its README. One of them contained a live
+**"build Cut 4 fresh after /clear"** instruction — an order waiting for a fresh session to obey.
 
-**The work list is `OPEN-QUESTIONS.md` Q-202** — a line-by-line ledger, one testable assertion per fix,
-three states (open / built / verified). **Report against it line by line. Never by topic.** It exists because
-a topic-level "hip thrust — done" was true of one of four fixes and read as all four.
+**⚠️ Archiving broke four code comments; they were repointed at the archive.** If you archive another
+doc, **grep the code first**. `SPEC-strength-focus.md` was NOT archived — its name collides with the
+product but its content (accessory specialisation) is the reference for re-homing add-ons to Adjust.
 
-Three facts to start from, all file:line, all verified:
-1. `getTargetRir` (`_shared/strength-profiles.ts`) derives target RIR from the Tuchscherer/Helms RPE
-   chart at the row's authored %1RM — **verified against the deployed function**, and the spec's entry
-   percentages (74 / 81 / 87%) all derive to exactly RIR 2 on it. Spec and engine already agree.
-2. `resolveSwapSeedWeight` (`src/lib/exercise-config.ts`) is the ONE swap-weight function, shared by the
-   logger and `materialize-plan`. Invariant: *swapping into a lift gives what the plan would have
-   prescribed for that lift that week.*
-3. `exer()` (`shared/strength-system/strength-primary-plan.ts:145`) is where the phase percentage is
-   stamped onto every lift. It now skips bodyweight modality. **That one line caused three separate bugs.**
+## The rules Michael set today, which govern the rest of this build
 
-### 🏷️ READ THE TAGS FIRST — the 20 open lines are not one pile
+- **Sushi menu / omakase.** Endurance is à la carte (they pick volume, days, quality on/off). **Strength
+  is omakase — the engine designs the block, no build-time picker.**
+- **No "we thought for you" gates.** All cards pickable. The card states what it needs. **The ONE gate is
+  no 1RM, no entry** — an input we cannot invent, not a judgement about the athlete.
+- **Run in miles, bike in hours, swim is a scheduling courtesy.** Researched: the app learns no ride
+  speed and terrain wrecks bike mileage.
+- **No add-ons in this flow.** Glutes/Hyrox move to Adjust.
+- **Flag invented numbers and STOP.** Do not substitute a different invented number.
+
+### 🏷️ READ THE TAGS FIRST — but the tags predate the 2026-07-25 protocol switch
+
+> **⚠️ STALE IN PART.** These tags were written when the plan was to rebuild the block protocol.
+> **V1 is now Wendler 5/3/1**, so:
+> - **`[REBUILD]` lines about REP RANGES (9, 20, 21, 22, 29) are NOT V1.** Reps are 5/3/1 — there are no
+>   ranges to parse. They move to the **dumbbell plan**, where the loading is entirely rep-range based.
+> - **Line 25 (`five_by_five` has no profile) is CLOSED** — fixed in `ad62947b`, with a test.
+> - **Line 23 (deload deadlift % vs its header) dissolves** — the new loading authors no such row.
+> - **Line 34 (one implementation, not three)** is still open and is now the registry consolidation
+>   (`ARCH-strength-spine.md` §3.3).
+> - Lines **3, 6, 11, 12, 14** are unchanged and still blocked on one iOS run.
+
+### The original tag table
 
 Every open line in Q-202 is tagged. **Do not treat them as one backlog.**
 

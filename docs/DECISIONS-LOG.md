@@ -1134,7 +1134,9 @@ Inherits the anchor's accuracy: the chart is relative to a TRUE 1RM, so a stale 
 
 ### What this does NOT cover
 
-`five_by_five` is still missing from `PROTOCOL_PROFILES` and still falls back to `durability` — **Q-192, filed 2026-07-19, same root cause, not fixed here.** D-322 added `strength_primary` only.
+~~`five_by_five` is still missing from `PROTOCOL_PROFILES` and still falls back to `durability` — **Q-192, filed 2026-07-19, same root cause, not fixed here.** D-322 added `strength_primary` only.~~
+
+> **✅ SUPERSEDED 2026-07-25 (`ad62947b`).** Fixed, and at the root this time: `five_by_five` got its entry, `resolveProfile()` now WARNS instead of falling back silently (that silence was the actual root cause), and `strength-protocol-registry.test.ts` fails the build if a reachable protocol has no profile. Q-192 and Q-202 line 25 both closed.
 
 > **↩ Related:** **Q-192** (five_by_five profile missing — same failure mode, still open) · **Q-199** (hip thrust is a server anchor but not a client baseline-test lift — the `hipThrust` `getBaseline1RM` branch is confirmed DEAD: 0 exercises use it) · **D-315** (consent-first weights — upheld, not superseded) · **D-289** (a swap is not a skip) · **Q-181** ("swap clears the weight" — superseded; the swap now seeds a derived weight).
 
