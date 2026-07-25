@@ -75,6 +75,15 @@ Separately, `fallbackCoaching` (`coaching.ts:477-491`) — reached when the LLM 
 
 ## Q-192 — `five_by_five` is MISSING from `strength-profiles.ts` and silently falls back to DURABILITY (ENGINE, 2026-07-19 — code-verified, impact untraced)
 
+> **↪ CONFIRMED AND STILL OPEN, and it is not the only one (D-322, 2026-07-24).** The identical failure was hit
+> independently for `strength_primary` ("Get Strong"), which also had no profile AND does not populate
+> `config.strength_protocol` — so every such plan resolved to `durability`, a concurrent-support profile
+> prescribing a flat RIR 2.5 across a block ending in 94% doubles. D-322 added `strength_primary` and
+> `normalizePhaseKey`, and **deliberately did not touch `five_by_five`**, which remains exactly as described below.
+> The class of bug is now proven live, not theoretical: **a protocol with no profile fails silently and looks fine.**
+> Tracked as line 25 of the Q-202 ledger.
+
+
 `_shared/strength-profiles.ts` calls itself "single source of truth for protocol-specific progression/deload thresholds," consumed by **`adapt-plan`** (auto weight adjustments) and **`response-model/weekly`** (lift verdicts). Its `StrengthProtocolId` union lists six protocols and **`five_by_five` is not one of them** (0 occurrences in the file). `resolveProfile()` (`:163-166`) falls through to `DEFAULT_PROFILE`, which is `PROTOCOL_PROFILES.durability` (`:91`).
 
 So a 5×5 plan is progressed and graded against durability's numbers — target RIR 2.5, `minGainPct` 3%, deload at deviation ≤ −1.0 over 3 sessions — where durability is described in that same file as "high rep, endurance support, conservative progression." For a linear block whose load is supposed to climb ~1.25%/week on a schedule (`protocols/five-by-five.ts`), an RIR-gated progression model is the wrong shape.
@@ -779,6 +788,14 @@ I first wrote this up as *"4 of 5 Hyrox stations are unloggable"*. **Wrong.** Th
 
 ## Q-181 — A SWAP IS NOT A SKIP: the app docks the athlete TWICE for an honest exercise substitution (PRODUCT + ENGINE, 2026-07-13 — RAISED BY MICHAEL)
 
+> **↪ Its "the swap CLEARS the weight" resolution is SUPERSEDED TWICE (D-322, 2026-07-24).** D-315 first replaced
+> clearing with a seeded weight, computed by rescaling the old lift's load. **That rescale was wrong** — it multiplied
+> plate-rounding error and ignored per-hand halving (45/hand against a prescribed 20). D-322 replaced it with a
+> derivation from the NEW lift's own reference at the block's authored %1RM, held to one invariant: *swapping into a
+> lift gives what the plan would have prescribed for that lift that week.* The "a swap is not a skip" finding below
+> is unchanged and still law.
+
+
 > **Michael:** *"I'm gonna swap Bulgarian split squats for hip thrust… I don't think the app should dock the user for substitutions if they are actual substitutions. Now it does."*
 
 **Verified.** `analyze-strength-workout:520` `matchExercises` links planned↔executed **BY NAME ONLY** (exact, then a fuzzy `includes()`), and **no substitution concept exists anywhere in the codebase** (`grep substituted_for|swapped_from|original_name` → **0 hits**).
@@ -876,6 +893,13 @@ Also: the chart series is 84d because that's what `runJoined`'s ~90d window carr
 
 ## Q-199 — Hip thrust is a server anchor but not a client baseline-test lift (2026-07-23, inconsistency, deferred)
 
+> **↪ SHARPENED by D-322 (2026-07-24): the anchor is not merely inconsistent, it is DEAD.** Audited: **zero**
+> exercises in `EXERCISE_CONFIG` use `primaryRef: 'hipThrust'` — hip thrust itself derives off `deadlift × 0.90`.
+> So `getBaseline1RM`'s `case 'hipThrust'` is unreachable, and `materialize-plan` computes `baselines.hipThrust`
+> at :2961/:2993/:3025 every run for a consumer that cannot exist. The athlete has a measured hip-thrust e1RM
+> (135, 5 sessions) that nothing reads. Making the branch reachable is line 13 of the Q-202 ledger.
+
+
 Found while fixing Q-197's autofill half. `hip_thrust` is in `STRENGTH_ANCHORS` (compute-facts) — it gets an e1RM, a trend, a PR flag, and a State verdict. But the client baseline system only knows 5 lifts: `getBaselineKeyForExercise` / `baselineSeedFor` (`StrengthLogger.tsx:869/882`) cover squat, deadlift, bench, OHP, pull-ups. So hip thrust has no stored-1RM baseline and can't be seeded as a %-based baseline test, even though the app tracks and grades its e1RM. Same likely true for `trap_bar_deadlift` and `barbell_row` (also anchors, also absent from the client baseline list). Not a bug Michael reported — the day-to-day autofill (D-097, fixed in Q-197) is the path he uses — but the server/client lift lists disagree on what a "tracked lift" is. Decide whether the client baseline list should match `STRENGTH_ANCHORS`.
 
 ## Q-200 — Bike chart for endurance-only riders: chart efficiency when power can't lead? (2026-07-23, design call, not built)
@@ -887,3 +911,63 @@ D-313 shipped the bike POWER chart, but it renders only when power LEADS (a real
 Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked-exclusion, and develop-only-fade fixes, D-306 family, coach v146→149). ONE contradiction class survives: the week narrative (`coach-week-insights.ts`) fade clause can say a `develop` discipline "came in below its recent normal" — a **load** statement (acwr < 0.8, you did less this block) — while the coach's-eye ROOM read (`cross-training-read.ts:131`) says that same discipline "is holding — room to push" — a **fitness verdict** statement. Same discipline, two windows/signals, clashing words. Triggers only when the athlete deloads their develop FOCUS (endurance) **and** a supplement is pushed (acwr > `PUSHING`) **and** the focus fitness verdict is holding. **Does NOT affect the primary user** (strength focus → the fade path is e1RM-sliding, not endurance load).
 
 **Why deferred, not fixed:** the clean fix is for the narrative to defer any discipline the coach's-eye already owns (symmetric with the maintain→upkeep exclusion). But coach's-eye (`composeCoachEye`, `coach/index.ts:5591`) is computed AFTER the narrative (`composeCoachWeekInsight`, `coach/index.ts:3969`). Fixing it means reordering part of the ~5,800-line coach file to compute coach's-eye first and pass its owned discipline in — higher-risk than the rare cosmetic bug it closes. Duplicating the "which discipline does coach's-eye own" logic inside the narrative would be a doubled engine (the disease). **Recommended fix, for when the coach ordering is next touched with reason:** hoist coach's-eye above the narrative, pass `coachEyeDiscipline` into `composeCoachWeekInsight`, and exclude it from the fade filter (one line, same shape as the maintain exclusion). Belongs to the planned cleanup/refactor pass (GAME-PLAN Phase 7).
+
+---
+
+## Q-202 — THE STRENGTH-NUMBERS LEDGER (D-322). One testable line per fix; report against this, never by topic (PROCESS + ENGINE, 2026-07-24)
+
+> **This entry is a LEDGER, not a question.** It exists because a status report by TOPIC lied.
+> "Hip thrust — done" was true of one of four fixes; the other three had never been written, and
+> the topic being mentioned made it read as finished. Same shape as "deload weeks fixed" — which
+> does *not* include the deload deadlift authored at 60% under a 65% header.
+>
+> **Rules this ledger exists to enforce:**
+> 1. One line per fix, each phrased so it can be checked **true or false in one look**. If it can't, it's two lines.
+> 2. Three states — **open / built / verified**. *Built* means the code changed. *Verified* means it was proven working. They are not the same, and collapsing them is how "built" gets reported as done.
+> 3. **Never report status by topic.** Read this list back line by line.
+> 4. **Any revert is checked against every open line before it lands.** The swap revert was correct for swaps and silently took the widened history fetch with it, breaking added-exercise prefill. Nothing flagged the dependency.
+> 5. Decisions are written to DECISIONS-LOG **when decided**, not when built.
+
+### BUILT — code changed, NOT verified on a device
+
+| # | assertion | evidence |
+|---|---|---|
+| 1 | `getExerciseConfig('Pull Up' / 'Pull Ups' / 'Chin Up')` returns the bodyweight config, not null | `exercise-config.ts` fold + 17 keys renamed |
+| 2 | The bodyweight assertion is three-way: bodyweight+no weight allow / loaded+no baseline fail / bodyweight+weight fail | guard at both `materialize-plan` sites |
+| 3 | A swap derives the new lift's weight from its own reference; it never scales the old lift's load | `resolveSwapSeedWeight`, shared client+server |
+| 4 | Target RIR is derived per week from the Tuchscherer/Helms RPE chart at the row's authored %1RM | `targetRirFromPrescription` |
+| 5 | Deload weeks carry a LOOSER target RIR than base weeks | `normalizePhaseKey`: Deload→recovery |
+| 6 | Hip Thrust (+10 other config-priceable lifts) appears in the logger's exercise search | `commonExercises` |
+| 7 | No exercise name in source carries a hyphen; every legacy hyphenated name still resolves | 176 literals, 20 files, fold as the net |
+
+### OPEN
+
+| # | assertion | note |
+|---|---|---|
+| 8 | A value entered in TrainingBaselines for `pullupMaxReps` persists to `performance_numbers` and reads back | write test blocked: `user_baselines.user_id` FKs `auth.users`, needs a throwaway auth user. **All four client↔DB hops traced clean; the break is #10.** |
+| 9 | The three parse sites accept a rep RANGE: `workload.ts` rep-scale, `match-exercises.ts`, the RIR derivation | **BUILT but listed open until rep ranges exist to exercise them.** All three type-checked `reps` as number and fell back silently. MUST hold before rep ranges or RIR goes dark. |
+| 10 | The server's baselines object carries a pull-up rep count | it lifts exactly five keys — squat, bench, deadlift, overheadPress1RM, hipThrust. `getBaseline1RM` has no pull-up concept. **This is a build, not a wire.** |
+| 11 | `addExercise` (`StrengthLogger.tsx:3025`) resolves a weight instead of `{reps:0, weight:0}` | still hardcoded |
+| 12 | An added exercise resolves weight by: own computed baseline → last logged → config proxy → blank | not started |
+| 13 | The `getBaseline1RM` `hipThrust` branch is reachable | dead: **0** exercises use `primaryRef: 'hipThrust'`; server computes `baselines.hipThrust` at 2961/2993/3025 and nothing reads it. See **Q-199**. |
+| 14 | The prior-session prefill reaches exercises added after page load | `didAutofillRef` (1964/1969) short-circuits; effect keys off `exercises.length`. Needs the widened fetch restored, scoped to added exercises. |
+| 15 | Plan creation refuses to build when a required baseline is missing | protocols must declare their required lifts |
+| 16 | That refusal surfaces a prompt naming the lift and where to enter it | not a validation error. **All three accounts lack `pullupMaxReps`, so every one hits this first.** |
+| 17 | The candidate exercise pool is filtered by the equipment profile BEFORE selection | authoring time, new plans only |
+| 18 | Render-path equipment substitution is retained for already-stored rows | legacy, no migration this pass |
+| 19 | Session prose is generated from the RESOLVED exercise, not the intended one | prose says "Sled Push 4×25 m @ Heavy"; delivered is Dumbbell Walking Lunge |
+| 20 | Prescriptions are sets × rep_range, not sets × fixed_reps | 5 lb on a 110 lb squat is 4.5%; weekly steps are 2–3.5%, so weeks repeat |
+| 21 | Entry ceilings are derived from the RPE chart at RIR 2, not hardcoded | expected ~74 / ~81 / ~87% — verify, don't literal |
+| 22 | The peak rep range is 2-3 | not 2-4; see D-322 |
+| 23 | The deload deadlift's authored % matches its session header | currently 60% vs a 65% header |
+| 24 | No other config entry has a computed baseline bypassed by a proxy derivation | audited: exactly two — hip thrust and barbell row — and **both produce the identical number today**, so fixing the precedence is a no-op on current data |
+| 25 | `five_by_five` has a profile in `strength-profiles.ts` | **STILL OPEN — see Q-192.** D-322 added `strength_primary` and did NOT cover this. Same root cause, same silent `durability` fallback. |
+
+### VERIFIED
+
+*(empty — nothing in this workstream has been seen working on a device)*
+
+### Also noted
+
+- `OPEN-QUESTIONS.md` (165KB) and `DECISIONS-LOG.md` (244KB) are both past the ~150KB archive threshold in CLAUDE.md.
+- 25 code comments were stamped **D-316** during this work. D-316 is *State-as-hub* (2026-07-23). Corrected to **D-322** across 8 files; the refs in `StateTab` / `StateHubTabs` / `StateAdjustLens` are the real D-316 and were left alone.

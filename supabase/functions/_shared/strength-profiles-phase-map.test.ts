@@ -1,4 +1,4 @@
-// D-316: phase-name mapping + the strength_primary RIR profile.
+// D-322: phase-name mapping + the strength_primary RIR profile.
 //
 // Two silent failures this pins:
 //   1. PHASE_RULES is keyed base/build/peak/taper/recovery, but plans emit their OWN phase
@@ -106,7 +106,7 @@ Deno.test('targets stay inside the clamp for every profile × phase', () => {
   }
 });
 
-// ── TARGET RIR DERIVED FROM THE PRESCRIPTION (D-316) ──────────────────────────
+// ── TARGET RIR DERIVED FROM THE PRESCRIPTION (D-322) ──────────────────────────
 // The profile constants above are the fallback for rows that state no intensity. When a row
 // DOES state one ("5 reps at 78.5% 1RM"), the target is read off the Tuchscherer/Helms RPE
 // chart instead — reps, %1RM and RIR are three views of the same thing, so there is nothing

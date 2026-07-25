@@ -69,7 +69,7 @@ export function normalizePlannedExercise(planned: any): any {
   if (Array.isArray(planned?.sets)) return planned;
 
   const numSets = typeof planned?.sets === 'number' ? planned.sets : 0;
-  // D-316: parse, don't pass through. A rep RANGE ("5-8") would otherwise land in
+  // D-322: parse, don't pass through. A rep RANGE ("5-8") would otherwise land in
   // LoggedSet.reps as a STRING and leak a non-numeric into every downstream consumer.
   const reps = typeof planned?.reps === 'number'
     ? planned.reps

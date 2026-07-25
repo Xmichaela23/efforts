@@ -1868,7 +1868,7 @@ function expandTokensForRow(
               strengthIntent,
               strengthMaxPct,
             );
-            // D-316: a SWAPPED slot derives through the SHARED resolver — the same function the
+            // D-322: a SWAPPED slot derives through the SHARED resolver — the same function the
             // logger's swap sheet calls, at the same authored `targetPercent` this row carries.
             // That is what makes "just today" and "rest of plan" agree by construction instead of
             // by coincidence. An unswapped slot takes the derivation directly, exactly as before.
@@ -1960,7 +1960,7 @@ function expandTokensForRow(
             finalWeightDisplay = fallbackUnresolvedPercentDisplay((ex as any)?.weight, reps);
           }
 
-          // D-316 modality guard. Three-way, and only the third case fires here:
+          // D-322 modality guard. Three-way, and only the third case fires here:
           //   bodyweight/band with no weight        -> allow (39 such rows in prod, all correct)
           //   loaded lift with no resolvable 1RM    -> caught upstream at plan creation
           //   BODYWEIGHT LIFT CARRYING A WEIGHT     -> strip it, loudly
@@ -2089,7 +2089,7 @@ function expandTokensForRow(
               strengthIntent,
               strengthMaxPct,
             );
-            // D-316: a SWAPPED slot derives through the SHARED resolver — the same function the
+            // D-322: a SWAPPED slot derives through the SHARED resolver — the same function the
             // logger's swap sheet calls, at the same authored `targetPercent` this row carries.
             // That is what makes "just today" and "rest of plan" agree by construction instead of
             // by coincidence. An unswapped slot takes the derivation directly, exactly as before.
@@ -2178,7 +2178,7 @@ function expandTokensForRow(
             finalWeightDisplay = fallbackUnresolvedPercentDisplay((ex as any)?.weight, reps);
           }
 
-          // D-316 modality guard. Three-way, and only the third case fires here:
+          // D-322 modality guard. Three-way, and only the third case fires here:
           //   bodyweight/band with no weight        -> allow (39 such rows in prod, all correct)
           //   loaded lift with no resolvable 1RM    -> caught upstream at plan creation
           //   BODYWEIGHT LIFT CARRYING A WEIGHT     -> strip it, loudly
@@ -3069,7 +3069,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       rirPlanConfig = planRowForRir?.config ?? null;
       rirProtocolId = (rirPlanConfig?.strength_protocol as string | undefined) ?? null;
-      // D-316: strength-PRIMARY plans ("Get Strong") never write `config.strength_protocol` —
+      // D-322: strength-PRIMARY plans ("Get Strong") never write `config.strength_protocol` —
       // they aren't produced by the run/tri protocol selector at all. So `rirProtocolId` stayed
       // null and every one of them resolved to the `durability` default: a flat RIR 2.5 across a
       // block that ends in 94% doubles. The plan says what it is in `config.source`; read it.

@@ -1233,7 +1233,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
  * Fold an exercise name to a punctuation-insensitive form: lowercase, hyphens and
  * underscores to spaces, whitespace collapsed.
  *
- * D-316. This exists because the table is written in hyphenated form — `pull-up`,
+ * D-322. This exists because the table is written in hyphenated form — `pull-up`,
  * `push-up`, `chin-up`, `pike push-up`, 17 keys in all — while callers write the
  * SPACED form. `getExerciseConfig` only lowercased and trimmed, so "Pull Up" missed
  * every one of them, returned null, and dropped the caller into materialize-plan's
@@ -1466,7 +1466,7 @@ function getRepScale(reps?: number): number {
   return 0.90;
 }
 
-// ─── SWAP SEED (D-316) ────────────────────────────────────────────────────────
+// ─── SWAP SEED (D-322) ────────────────────────────────────────────────────────
 // When a slot is swapped to a different lift, what weight goes in the box?
 //
 // THE INVARIANT, and everything here exists to hold it:

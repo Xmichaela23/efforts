@@ -1,4 +1,4 @@
-// D-316: the swap seed.
+// D-322: the swap seed.
 //
 // THE INVARIANT under test, and the only one that matters:
 //
@@ -170,7 +170,7 @@ Deno.test('lift keys match across plural + side suffixes (Q-197)', () => {
   assertEquals(normalizeLiftKey('  Back   Squat '), 'back squat');
 });
 
-// ── NAME FOLDING (D-316) ──────────────────────────────────────────────────────
+// ── NAME FOLDING (D-322) ──────────────────────────────────────────────────────
 // The table is written hyphenated (`pull-up`, `push-up`, `chin-up`, 17 keys). Callers
 // write the spaced form. The lookup only lowercased and trimmed, so every one of those
 // entries was unreachable — "Pull Up" returned null and fell through to materialize's

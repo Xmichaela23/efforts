@@ -88,7 +88,7 @@ export const PROTOCOL_PROFILES: Record<StrengthProtocolId, StrengthProtocolProfi
     deload:      { maxDeviation: -1.0, minSessions: 3 },
   },
 
-  // D-316. Strength-PRIMARY blocks (the "Get Strong" composer) periodize their own
+  // D-322. Strength-PRIMARY blocks (the "Get Strong" composer) periodize their own
   // intensity — a base ramp at 5 reps, an intensification at 3, a peak of doubles at
   // 88–94%, then an AMRAP retest. They had NO entry here, and they don't populate
   // `config.strength_protocol` either, so every one of them fell through
@@ -147,7 +147,7 @@ export const PHASE_RULES: Record<PlanPhaseId, PhaseRule> = {
 const MIN_TARGET_RIR = 0.5;
 const MAX_TARGET_RIR = 4;
 
-// ─── TARGET RIR FROM THE PRESCRIPTION ITSELF (D-316) ──────────────────────────
+// ─── TARGET RIR FROM THE PRESCRIPTION ITSELF (D-322) ──────────────────────────
 //
 // When a row states its own intensity — "5 reps at 78.5% 1RM" — the target RIR is NOT
 // a matter of opinion. Reps, %1RM and RIR are three views of one thing, and the mapping
@@ -284,7 +284,7 @@ export function resolveProfile(protocolId: string | null | undefined): StrengthP
 /**
  * Map a plan's own phase NAME onto one of the five canonical rule keys.
  *
- * D-316. `PHASE_RULES` is keyed base/build/peak/taper/recovery, but plans do not all speak
+ * D-322. `PHASE_RULES` is keyed base/build/peak/taper/recovery, but plans do not all speak
  * that vocabulary — a strength-primary block names its phases Base / Power / Deload / Peak /
  * Retest, and `resolvePlanPhase` hands those through verbatim. Only "Base" and "Peak" matched;
  * Power, Deload and Retest all missed and fell to `DEFAULT_PHASE_RULE`, which is **build**, and
@@ -334,9 +334,9 @@ export function getTargetRir(
   canonical: string,
   exerciseLevelTarget?: number | null,
   phaseTag?: string | null,
-  // D-316: the row's own prescription. When it states reps at a %1RM, the target is READ
+  // D-322: the row's own prescription. When it states reps at a %1RM, the target is READ
   // OFF the RPE chart rather than taken from the profile default — see
-  // targetRirFromPrescription. Omit both (every pre-D-316 caller) and behaviour is unchanged.
+  // targetRirFromPrescription. Omit both (every pre-D-322 caller) and behaviour is unchanged.
   reps?: number | null,
   percent1RM?: number | null,
 ): number {

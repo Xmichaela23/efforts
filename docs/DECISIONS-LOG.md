@@ -996,6 +996,16 @@ Extends D-311 (run efficiency chart) to strength and bike — the same "OUTPUT o
 
 The discipline label sat in a ~94px left gutter (`Row` = label column + indented content), so the 12-week charts rendered in a narrower column than necessary. Restructured `Row`: the discipline name is now a **header above** full-width content, and headers are bumped (13.5px text / 16px icon, brighter) so they read as the scanning landmark (previously smaller than the lift names below them — inverted hierarchy). Shared component, so run/strength/bike/swim + the generic card all moved together. Subtractive of the indent; adds ~90px of chart width.
 
+> **↪ UPHELD, NOT SUPERSEDED, by D-322 (2026-07-24) — and its swap weight math was WRONG.** D-322 examined whether
+> double progression forces an engine-side weight change and concluded it does not: the plan authors one entry
+> weight + rep range per phase, materialize stays stateless, and the weight increase rides this decision's own
+> consent-gated suggestion path. **The "no silent write" rule stands.**
+>
+> The half that did not survive is this entry's swap seeding. Its client rescale (`curW × newRatio / oldRatio`)
+> multiplied plate-rounding error and ignored `ratioIsTotal` entirely — a barbell→dumbbell swap put the TOTAL load
+> in each hand (45/hand against a prescribed 20). Three of eight offered alternatives were wrong. D-322 replaced it
+> with a derivation from the new lift's own reference at the authored %1RM. Everything below is otherwise current.
+
 ## D-315 — "Adapt a plan" strength track: phase-aware RIR, reversible swap/add, consent-first weights (2026-07-23, PUSHED `db912150`+`430c717a` · DEPLOYED `generate-combined-plan`/`materialize-plan`/`adapt-plan` · migration applied · BURNER-VERIFIED 11/11, NOT device-seen)
 
 The first four slices of "steerable plans" (`TARGET-ARCHITECTURE` #3), on the STRENGTH discipline. Full design + trace: `docs/CONCEPT-adapt-plan-strength.md`. Every edit routes through `plan_adjustments` → `materialize-plan` and reads one truth; nothing mutates the frozen `sessions_by_week`.
@@ -1085,3 +1095,45 @@ All pinned with regression tests (32 green). Every fix SERVER-VERIFIED via a liv
 `useStateTrends.ts` had a legacy fallback: when the server display contract (`weekly_state_v1.trends.display`) was absent, the client re-ran `assembleStateTrends` itself off ~11 in-browser queries. Two problems: it violated smart-server/dumb-client (Constitution Law 4 — the one place run math still ran on the client), and it was fed WORSE inputs than the server (dropped `gap_efficiency_index` + `hr_avg`), so when it fired it silently degraded to a raw, pace-at-HR-less trend. Michael: "we're in dev, we shouldn't be relying on fallbacks... they are a cancer."
 
 **Decision:** delete the client assembly entirely. The hook is now a pure renderer — server contract present → render it; absent → loading state (never re-derive). Verified the contract is reliably produced (`compute-snapshot` writes `state_trends_v1.display` every snapshot via the SAME `assembleStateTrends`; coach forwards it; the cache gate re-sources anything below the current version, so a loaded payload always carries it). The only client fetches left are two config reads (declared posture + active disciplines). Build clean, no regression on the primary user (whose payload always carries the contract).
+
+---
+
+## D-322 — Strength numbers: swaps derive, target RIR is read off the RPE chart, and names lose their hyphens (2026-07-24, PUSHED `f77f3cc3`+`aa6baa58`+`b027d7f6` · DEPLOYED materialize-plan/adapt-plan/analyze-strength-workout/coach · NOT device-seen)
+
+**Working ledger: `OPEN-QUESTIONS.md` Q-202.** Report progress against that list line by line, never by topic — a topic-level "hip thrust: done" covered one of four fixes and read as all four.
+
+### The decisions
+
+**1. A swap DERIVES; it never rescales.** The invariant: *swapping into a lift gives the weight the plan would have prescribed for that lift, that week, had it been the authored slot all along.* One shared `resolveSwapSeedWeight` serves the logger and `materialize-plan`, so the two paths agree by construction.
+
+`curW × newRatio / oldRatio` is algebraically the same derivation **only on unrounded numbers**. Real prescriptions round to the plate first, so the rescale multiplies the rounding error and rounds again (front squat 73.4 → shown 75 → ×1.176 → 90, where the plan says 85). It also ignored `ratioIsTotal` entirely, so a barbell→dumbbell swap skipped the per-hand halving and put the TOTAL load in each hand — 45/hand against a prescribed 20. Three of eight offered alternatives were wrong.
+
+**Back-inferring the intensity from the displayed load has the same defect one step removed** (75 / (110 × 0.85) = 0.802 vs an authored 0.785). The authored `percent_1rm` is the only intensity not downstream of a rounding step. It was already on the planned step; the logger was discarding it.
+
+**2. Target RIR is DERIVED, not chosen.** Reps, %1RM and RIR are three views of one thing; the mapping is the published Tuchscherer/Helms chart. RIR = 10 − RPE.
+
+> This reverses a set of per-phase constants written earlier the same day. Michael's ruling: *"you don't make calls, the training science does."* He was right — checked against a real block, the constants were wrong on **10 of 11 weeks**, holding RIR flat at 2 across a base phase whose own percentages ramp 72% → 82%.
+
+The profile/phase defaults **remain correct** for rows that state no intensity — accessories, bodyweight work, "Heavy" carries. Precedence: explicit per-exercise target → derived from the prescription → protocol/phase default.
+
+Inherits the anchor's accuracy: the chart is relative to a TRUE 1RM, so a stale stored max drifts the target with it. Same exposure the prescribed weight already carries, and it **surfaces** rather than hides it — a high anchor reads consistently below target, which is the "back off" signal the RIR loop exists to produce.
+
+**3. RIR 2 (RPE 8) is the entry-ceiling anchor.** Deriving the ceiling from "top-of-range at target RIR" is circular, because target RIR is itself derived from (reps, %). It needs one fixed constant. RIR 2 is the standard working-set anchor and reproduces the expected ~74 / ~81 / ~87%.
+
+**4. The peak rep range is 2-3, not 2-4.** At an 84% entry the bottom of a 2-4 range sits near RIR 5, making peak the lightest per-rep work in the block and inverting the phase's purpose. A four-week peak also has no room to climb a wide range and earn a jump. 2-3 derives to ~87%.
+
+**5. D-315 is NOT superseded.** Double progression needs no engine-side weight change and no per-lift progression state. The plan authors ONE entry weight + rep range per phase; that materializes identically from baselines every time. The athlete progresses REPS inside a fixed prescription. The weight increase rides the existing consent-gated suggestion path. Logger carry-forward holds the actual working weight; the plan holds the entry weight, and divergence between them is expected.
+> *A case where this framing doesn't hold is a stop-and-report, not a licence to build progression state.*
+
+**6. History-seeding is WRONG for swaps and RIGHT for added exercises.** A swap has a plan prescription to stay faithful to; seeding from the log silently leaves the protocol, agreeing only on lifts trained at the block's intensity. An added exercise has no prescription, so the athlete's own log is the only real signal. Built for swaps, then reverted.
+> ⚠️ **That revert took the widened history fetch with it and silently broke added-exercise prefill.** Nothing flagged the dependency. This is why Q-202 rule 4 exists.
+
+**7. Rows → bench at ~80% and lateral raises → overhead are INTENTIONAL.** Audited every `resolved_from` that differs from the lift's own family; these two are documented proxies, not bugs. Exactly two entries have a measured baseline bypassed by a proxy — hip thrust and barbell row — and **both produce the identical number on current data**, so correcting the precedence is a no-op today and only matters as real ratios drift from the table.
+
+**8. Hyphens are removed from exercise names, everywhere.** The table was written hyphenated (`pull-up`, `push-up`, 17 keys) while callers wrote the spaced form, so `getExerciseConfig('Pull Up')` returned null and dropped into the legacy barbell fallback — pricing a PULL-UP off the athlete's BENCH at "110 lb". 176 literals renamed across 20 files, with a punctuation-fold underneath so every legacy stored name still resolves. The sweep surfaced six duplicate keys and one genuine regression (the equipment matcher's `/^pull-?ups?\b/` stopped requiring a pull-up bar).
+
+### What this does NOT cover
+
+`five_by_five` is still missing from `PROTOCOL_PROFILES` and still falls back to `durability` — **Q-192, filed 2026-07-19, same root cause, not fixed here.** D-322 added `strength_primary` only.
+
+> **↩ Related:** **Q-192** (five_by_five profile missing — same failure mode, still open) · **Q-199** (hip thrust is a server anchor but not a client baseline-test lift — the `hipThrust` `getBaseline1RM` branch is confirmed DEAD: 0 exercises use it) · **D-315** (consent-first weights — upheld, not superseded) · **D-289** (a swap is not a skip) · **Q-181** ("swap clears the weight" — superseded; the swap now seeds a derived weight).

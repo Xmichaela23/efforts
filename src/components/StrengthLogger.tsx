@@ -66,7 +66,7 @@ interface LoggedExercise {
   notes?: string;
   target_rir?: number; // Target RIR from prescription (1-5)
   target_reps?: string; // Target reps from prescription, e.g. "4-6" or "8" (display only)
-  // D-316: the working %1RM the PLAN authored for this slot (0.785 = "78.5% 1RM"), carried
+  // D-322: the working %1RM the PLAN authored for this slot (0.785 = "78.5% 1RM"), carried
   // straight off `computed.steps[].strength.percent_1rm`. Its one job is to let a SWAP derive
   // the substitute's weight at the intensity the block actually intended, instead of
   // back-inferring an intensity from the displayed load. That inference is lossy: the load on
@@ -170,7 +170,7 @@ const isPlyometric = (exerciseName: string): boolean => {
 
 // Normalize an exercise name for cross-session matching: lowercase, strip
 // (Left)/(Right) suffixes, collapse whitespace, drop a trailing plural 's' (Q-197).
-// Shared by the D-097 prefill, the D-122 "last:" anchor, and the D-316 swap seed so
+// Shared by the D-097 prefill, the D-122 "last:" anchor, and the D-322 swap seed so
 // all three key prior sessions the same way. The rules now live in exercise-config
 // (`normalizeLiftKey`) because the SERVER's swap seed has to key history identically —
 // two copies of these regexes is exactly how the two sides drift apart.
@@ -1832,7 +1832,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const rawNotes = String(notes || '').trim();
           // Extract target RIR + target reps from the strength prescription (display only)
           const targetRir = typeof s?.target_rir === 'number' ? s.target_rir : undefined;
-          // D-316: the authored working %1RM, kept for the swap seed. Accept both the 0-1 form the
+          // D-322: the authored working %1RM, kept for the swap seed. Accept both the 0-1 form the
           // materializer writes (0.785) and a whole-number form (78.5) in case an older row carries
           // one, so the swap can't silently derive at 78× the intended intensity.
           const pctRaw = typeof s?.percent_1rm === 'number' ? s.percent_1rm : undefined;
@@ -1853,7 +1853,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             rir: null,
             target_rir: targetRir, // Target RIR from prescription
             target_reps: targetReps, // Target reps from prescription (e.g. "4-6")
-            planned_percent_1rm: plannedPct, // D-316: authored intensity, for the swap seed
+            planned_percent_1rm: plannedPct, // D-322: authored intensity, for the swap seed
             planned_name: name, // Q-181: remember what was PRESCRIBED, so a rename reads as a swap
           } as LoggedExercise;
         }
@@ -4289,7 +4289,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       // different lift — a hip thrust is 90% of your deadlift, a lunge 50% of your squat).
                       // Reps/duration stay. The analyzer doesn't grade load on a swap (un-anchored, D-289).
                       //
-                      // WEIGHT ON SWAP — D-316. Supersedes Q-181's "always clear" and the D-315 rescale.
+                      // WEIGHT ON SWAP — D-322. Supersedes Q-181's "always clear" and the D-315 rescale.
                       // ONE rule, and the invariant it has to satisfy:
                       //
                       //     swapping INTO a lift must give the weight the plan would have prescribed
