@@ -1137,3 +1137,54 @@ Inherits the anchor's accuracy: the chart is relative to a TRUE 1RM, so a stale 
 `five_by_five` is still missing from `PROTOCOL_PROFILES` and still falls back to `durability` — **Q-192, filed 2026-07-19, same root cause, not fixed here.** D-322 added `strength_primary` only.
 
 > **↩ Related:** **Q-192** (five_by_five profile missing — same failure mode, still open) · **Q-199** (hip thrust is a server anchor but not a client baseline-test lift — the `hipThrust` `getBaseline1RM` branch is confirmed DEAD: 0 exercises use it) · **D-315** (consent-first weights — upheld, not superseded) · **D-289** (a swap is not a skip) · **Q-181** ("swap clears the weight" — superseded; the swap now seeds a derived weight).
+
+---
+
+## D-323 — Get Stronger scope lock: omakase strength / à la carte endurance, run-in-miles / bike-in-hours, add-ons out (2026-07-24, DECIDED — not built. Contract: `docs/SPEC-get-stronger.md`)
+
+**Written when decided, not when built** (CLAUDE.md). Nothing in this entry has shipped. It exists because the Get Stronger scope had been re-decided across banners, Q-202 lines and chat with no single home — Michael: *"we need some clarity and part of the problem is the 100000 iterations it took to get here."* **`docs/SPEC-get-stronger.md` is now the only place the scope lives.**
+
+### The governing principle — and it settles design questions, it is not a style note
+
+> **"this whole app will be a sushi menu."** · **"strength is Omakase."** — Michael, 2026-07-24
+
+- **Endurance is à la carte.** The athlete sets volume, days, and whether to keep a quality session. Everything optional is opt-in with its cost stated. Nothing bundled because it seemed nice; nothing on by default because it is cheap.
+- **Strength is omakase.** No lift chooser, no split chooser, no seasoning at build time. Baselines + availability in, whole block out.
+
+**Boundary to hold:** the logger's in-session swap / add / weight controls (**D-315**) stay — they are *deviations from* a designed block, not menu choices. **Do not let them grow into a build-time picker.** D-315 is upheld, not superseded.
+
+### The decisions
+
+1. **Get Stronger is a strength block, nothing else.** 8 or 12 weeks, four lifting days, endurance held not trained. One door: the non-race *Add a goal* path.
+2. **Accessory-bias add-ons come OUT of the flow** — the Glutes / Hyrox picker (`NonRaceBuilder.tsx:391-408`), the Hyrox fatigued-legs combo, the Upper-A bias slot. **Rejected here on omakase grounds:** they are the athlete reaching into the strength plan. Not deleted as an idea — **the Hyrox bias is SHIPPED and works** — they re-home to their own selectable section later. ⚠️ Michael has a LIVE Hyrox-biased plan; removal must not corrupt stored sessions.
+3. **The optional quality session is OFF by default.** Rejected: default-on for anyone with a bike, which is defensible on cost (bike quality is nearly free) but hands over a trade the athlete never chose. Making them choose surfaces it.
+4. **Its promise is VO2 maintenance, not race sharpness.** Sharpened from the source spec's *"keep some of your speed."* The smaller claim is the one the research supports; *"base stays"* still may not extend to threshold or race pace.
+5. **Swim is a scheduling courtesy.** Get Stronger stops forcing swim to `out`. Days + rough length in, slots booked, nothing prescribed — no yardage, no sets, no drills, no week-to-week adjustment. **The copy must say it is upkeep.** Swim is **not** an option for the weekly quality session (hard swimming competes with upper-body lifting) — which also keeps it honest: we don't claim to train it, so we don't hand them a hard one.
+6. **⛔ Run is asked in MILES; bike is asked in HOURS.** The researched call, and the one place a same-shape input would have been wrong.
+
+### Why the units differ — researched 2026-07-24, not picked
+
+| | asked in | why |
+|---|---|---|
+| **Run** | miles + days | Consumer running products land on miles near-universally (Runna asks weekly mileage + days); races are distances. **And the app already learns a runner's easy pace**, so miles convert cleanly into session lengths. Coaches argue for time ([TrainingPeaks](https://www.trainingpeaks.com/blog/minutes-or-miles-why-you-should-train-by-time-not-distance/): distance pushes people to run harder to finish the total) — the field still ships miles. |
+| **Bike** | hours + days | Not close. **~99% of pro riders train on time, not mileage** ([Cycling Weekly](https://www.cyclingweekly.com/fitness/training/distance-versus-time-which-is-best-for-keeping-track-of-your-training-volume)) — terrain and wind distort distance badly. TrainerRoad and every structured cycling platform organise by hours + days. **And `learn-fitness-profile` learns ride HR and FTP but NO ride speed**, so bike miles cannot become a session length without guessing — 20 miles is 65 min flat and 2 h+ in hills. |
+
+**The tension and the resolution.** *"Everyone talks about their 100-mile rides; they don't talk about their five hour rides."* People **talk** in miles and **train** in hours → **ask hours, say miles.** Rides carry distance and duration, so a ride speed is learnable later; show the mile equivalent beside the hours once it is known.
+
+**And the input is a starting position, not a commitment** — Michael: *"modify after you have the meal."* The athlete sees the built week and adjusts it, which takes the pressure off the intake number entirely.
+
+7. **Volume distribution is never asked, always derived.** Athlete gives a total and a day count; the engine divides. Run: long run ≈45% + easy fill (`distributeRunMiles`, unchanged). Bike: long ride takes a **bigger** share (≈half) because easy riding costs far less than easy running — **with a duration ceiling**, since three hours of easy riding is still three hours of legs in a week carrying heavy squats and heavy deadlifts. Long day on the weekend for both (heavy lower is Tue/Fri).
+
+### What this corrects in the existing docs
+
+- **The ENGINE-STATE banner called this a REBUILD.** It is a **re-parameterisation and gap-fill**: `composeStrengthPrimaryPlan` already has the 4-day U/L/U/L split, the exact lift pairing, the five-phase ATR arc, the AMRAP retest and easy-only endurance. **The one real behavioural change is double progression** — the engine ramps the *percentage* weekly at fixed reps; the spec enters at a fixed % and adds *reps*.
+- **An earlier banner read Michael's intent as a 2×/wk 5×5 full-body block.** Wrong — written off the protocol's *name* before the spec was read. The spec is four days, upper/lower. Corrected in the banner and in Q-202 line 34.
+- **Q-202 line 25's reachability note is wrong.** A barbell athlete with equipment chips or compound 1RMs on file lands on `strength_primary`, not `five_by_five`. **The exposed case is the dumbbell / no-signal athlete** — and they get worse than a bad RIR target: `five_by_five` prescribes Back Squat, Bench, Barbell Row, OHP and Deadlift at %1RM to someone with dumbbells.
+- **Q-202 line 34's parenthetical is inaccurate** — `strength-focus-split.ts` **is** in the `getProtocol` switch (`selector.ts:291-294`).
+- **The intake already asks the quality question and throws it away.** *"Keep a fixed hard session?"* (`NonRaceBuilder.tsx:462+`) writes `preferred_days.quality_*`; the Get Strong composer never reads it. **Reuse it as the §5 opt-in — do not add a second question.**
+
+### The thing that survives all of it
+
+`resolveProfile()` returns `durability` for any unrecognised key, so a missing entry and a deliberate choice are **indistinguishable at every call site**, with three hand-maintained lists agreeing by hand. Filed **Q-192 (2026-07-19)**, hit again in D-322, root-fixed neither time. **The source spec has no reason to cover this** — it is engine bookkeeping, not a training protocol, and it is the one place to use judgement rather than the spec. **One test asserting the three lists agree + a fallback log line.** Adding an entry ends the instance; the test ends the class.
+
+> **↩ Related:** **D-315** (consent-first weights + swap/add — upheld; the omakase boundary is drawn around it) · **D-322** (the strength-numbers audit this scope sits on top of) · **D-285** (no silent weight writes) · **Q-202** (the working ledger — report line by line, never by topic) · **Q-192** (the registry hole, twice found) · **D-316** (State-as-hub — unrelated; do not confuse the citation, D-322 mis-stamped 23 comments with it).

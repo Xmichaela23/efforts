@@ -28,9 +28,67 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ### YOUR JOB
 
-**Rebuild the Get Stronger protocol.** Michael has written the spec — three files in `~/Downloads/`:
-`get-stronger-spec-short.md` (the implementation spec), `get-stronger-protocol (3).md`, `get-stronger-science (1).md`.
-Ask him for them; they are not in the repo.
+# ⛔ `docs/SPEC-get-stronger.md` IS THE NORTH STAR. Then `BUILD-ORDER-strength-spine.md`, then `ARCH-strength-spine.md`.
+
+> **Seven superseded strength docs were archived 2026-07-25** to
+> `docs/archive/superseded-strength-2026-07-25/` — a competing roadmap, a live "build Cut 4" instruction,
+> the freq-4 run-path spec, two stale status docs, an approval-stamped old contract, and a shipped spec
+> that never died. **A fresh session would have followed them.** Do not resurrect; read the README there
+> if you need to know why.
+
+> **⛔ V1 SCOPE IS LOCKED (2026-07-25) — start at the V1 section of `BUILD-ORDER-strength-spine.md`.**
+> Two plans at the top of Goals, separate flows: **Strength Focus — Barbell (build this)** and Strength
+> Focus — Dumbbell (later). V1 is **Wendler's four-week cycle** at an 80–85% working number; 8 weeks = two
+> cycles, scales by adding cycles. **No rep ranges, no reactive plan, no plate grid, no beginner path, no
+> retest anchor — all deleted by the switch.** Zero database migrations; the one addition is a stored
+> working number in `plans.config`. The rep spec and the progression trigger move to the dumbbell plan.
+
+**`ARCH-strength-spine.md` is where things live.** Three strength entry points exist today with no shared
+loading logic, and the Get Stronger composer is **deliberately self-contained** — correct when written,
+wrong now that race plans use the same tools at a lower dose. The map says what moves out of that file,
+what the registry loses, and which five structural decisions are settled vs open. **Read it before editing
+any composer**, or the protocol gets authored twice.
+
+**`BUILD-ORDER-strength-spine.md` is the live doc** — the layer order, the shared machinery, and the
+**open science questions**, several of which point at the spec's design rather than its implementation.
+**It is deliberately unfinished; sections marked OPEN are not implementable yet.** `SPEC-get-stronger.md`
+says what Get Stronger *is*; the build order says what gets built and in what sequence.
+
+**Get Stronger is the FIRST CONSUMER of the strength spine, not its owner.** Michael, 2026-07-24: this is
+"going to be the entire backbone of the app," and users may later "start at a strength build and map out
+longer plans where emphasis shifts." Build the rep spec and the progression engine as **general
+infrastructure** — and settle the block-scoped-vs-plan-scoped question in the build order's first section
+before writing any of it.
+
+**`docs/SPEC-get-stronger.md` + `D-323` are the build contract**, written 2026-07-24 from Michael's three
+source documents plus a live scope session with him. It exists because the scope had been re-decided across
+banners, Q-202 lines and chat with no single home — Michael: *"we need some clarity and part of the problem
+is the 100000 iterations it took to get here."* **Everything below this line is background. The contract
+wins on any disagreement, including with this banner.**
+
+**It is NOT a rebuild.** `composeStrengthPrimaryPlan` already has the four-day upper/lower split, the exact
+lift pairing, the five-phase ATR arc, the AMRAP retest and easy-only endurance underneath. The one real
+behavioural change is **double progression** — the engine ramps the *percentage* weekly at fixed reps; the
+spec enters at a fixed % and adds *reps*. See the contract §8 for the full diff and §11 for the build order.
+
+**The governing principle, and it settles design questions:** *"this whole app will be a sushi menu · strength
+is Omakase."* Endurance is à la carte (the athlete picks volume, days, quality on/off — everything optional is
+opt-in). **Strength is omakase — the engine designs the block and the athlete does not pick.** Contract §2.
+
+**Michael has already made these calls. Do not re-ask:** run asked in **miles**, bike in **hours** (researched
+— the app learns no ride speed, and terrain wrecks bike mileage) · quality session **off by default**, for VO2
+maintenance not race sharpness · swim is a **scheduling courtesy**, not coached · **Glutes / Hyrox add-ons come
+OUT** of the flow and re-home later.
+
+**Michael's three source documents** are on disk at `~/Downloads/` (not in the repo — **read them, don't ask**):
+`get-stronger-spec-short.md`, `get-stronger-protocol (3).md`, `get-stronger-science (1).md`.
+
+**⛔ READ THEM BEFORE YOU ASK MICHAEL ANYTHING.** The first session to reach this banner asked him two
+questions the spec had already answered on its own first page — *which protocol shape wins* (four-day
+upper/lower, twelve weeks; §"What this protocol is") and *what "endurance maintain" means* (Part 2, in a
+table). **The spec is the design authority. Ask only where it is genuinely silent** — which is essentially
+one place: the protocol **registry** (Q-202 line 25), because that is engine bookkeeping and not something a
+training protocol has any reason to specify.
 
 The spec is good and it is **tier-marked** — T1 sourced / T2 named method / T3 design call / T4 unstudied
 combination. **Do not launder a T3 into evidence.** Its standing rule: any new call enters at T3 until placed.
@@ -60,11 +118,15 @@ Every open line in Q-202 is tagged. **Do not treat them as one backlog.**
 | **`[SPEC]`** | 2 | defects in **Michael's spec document**. Fix the spec, not the code — 31/32 |
 | **`[BLOCKS-SPEC]`** | 1 | existing behaviour the spec silently depends on, **unverified** — 33 |
 
-The one to notice is **33 `[BLOCKS-SPEC]`**. `seedFromGoal` sets endurance to `maintain` when strength is
-`develop`, but **whether `maintain` caps INTENSITY or only trims VOLUME was never traced.** The entire
-interference argument — Part 2 of the spec, and the reason the block parks quality work — is about
-intensity. If `maintain` leaves hard sessions in, the spec's central premise isn't enforced by anything.
-**Trace it before building Part 2.**
+The one to notice is **33 `[BLOCKS-SPEC]`** — but **it is no longer a design question.** `seedFromGoal`
+sets endurance to `maintain` when strength is `develop`, and whether `maintain` caps INTENSITY or only
+trims VOLUME was never traced. **The spec settles what it must mean** (Part 2, `get-stronger-spec-short.md`
+lines 73-91): intensity locked to easy/conversational **[T1 Wilson 2012]**, volume ~66% of baseline
+**[T3]**, ~3 sessions/week **[T3]**, lift before endurance on combined days **[T2]**, plus an **opt-in,
+default-off** single quality session that *replaces* an easy one and is held through deload, dropped at
+retest. So line 33 is an **enforcement** job, not a decision: trace what `maintain` does today, then make
+it do that. **Still trace it before building Part 2** — if the engine currently leaves hard sessions in,
+the gap is the work.
 
 ### 🕳️ WHAT THE SPEC DOES **NOT** COVER — the potholes
 
@@ -122,20 +184,31 @@ handling, retest gating, easy-effort drift detection, quality placement, discipl
 **Realistic post-rebuild ledger is ~4 carried + ~6 new, not zero.** Add them to Q-202 as testable lines
 when you start, or they will live only in the spec and be reported as done by topic.
 
-### ⛔ THE DECISION THE REBUILD FORCES
+### ⛔ THE DECISION THE REBUILD FORCES — **ANSWERED BY THE SPEC. Do not re-ask Michael.**
 
-**There are THREE implementations of "get stronger with barbells" and one of them must die.**
+> **CORRECTED 2026-07-24 LATE (2).** An earlier version of this banner said *"Michael's intent is that Get
+> Stronger is a 5×5 compound block."* **That was wrong** — written before the spec was read. The spec
+> states the shape outright: **four days a week, upper/lower split, twelve weeks (or eight).**
+> `get-stronger-spec-short.md` line 16 and `get-stronger-protocol (3).md` lines 66 / 188 / 224.
 
-| | shape | load model | reachable? |
-|---|---|---|---|
-| `five_by_five` | full-body A/B, **2×/wk** | 70→85% linear | **yes — the DEFAULT for barbell athletes** |
-| `strength_focus_build` / `_power` | 4-day U/L/U/L | 70→85%, +1.25%/wk — *identical curve* | no |
-| `strength_primary` | 4-day U/L/U/L | 72→94%, 5s→3s→2s block | **no — yet it built the live plan**, via `config.source` |
+**There are THREE implementations of "get stronger with barbells" and NONE of them is the answer.**
+
+| | shape | load model | reachable? | matches the spec? |
+|---|---|---|---|---|
+| `five_by_five` | full-body A/B, **2×/wk** | 70→85% linear | **yes — the DEFAULT for barbell athletes** | **no** — wrong frequency, wrong split |
+| `strength_focus_build` / `_power` | 4-day U/L/U/L | 70→85%, +1.25%/wk — *identical curve* | no | shape yes, load model no |
+| `strength_primary` | 4-day U/L/U/L | 72→94%, 5s→3s→2s block | **no — yet it built the live plan**, via `config.source` | shape yes, phases no |
+
+**The spec is the survivor. All three are replaced by it, not chosen between.** The closest existing shape
+is the 4-day upper/lower of `strength_focus_*` / `strength_primary`, but neither carries the spec's phase
+array (Accumulate 5×5-8 @~74% → Intensify 5×3-5 @~81% → Deload 2×5 @~65% → Peak 3×2-3 @~87% → Retest
+1×AMRAP @~85%), and neither does double progression. `five_by_five`'s **name** is closest to the "5×5" the
+old banner claimed and its **shape is the furthest off** — that is exactly how the wrong reading happened.
 
 `strength_focus_split.ts`'s own header calls its composition "CONVENTION" — an engine invention, not a
-methodology. `strength_primary` sits outside the protocol registry entirely, which is *why* it had no RIR
-profile: nothing that maintains the protocol list knew it existed. **Michael's intent is that Get Stronger
-is a 5×5 compound block.** Resolve the duplication as part of the rebuild; do not add a fourth.
+methodology; the spec supersedes it with a named one (Issurin ATR). `strength_primary` sits outside the
+protocol registry entirely, which is *why* it had no RIR profile: nothing that maintains the protocol list
+knew it existed. Resolve the duplication as part of the rebuild; **do not add a fourth.**
 
 ### 🔴 LIVE BUG — fix before or during the rebuild
 
