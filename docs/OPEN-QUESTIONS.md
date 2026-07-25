@@ -933,20 +933,15 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 | # | assertion | evidence |
 |---|---|---|
 | 1 | `getExerciseConfig('Pull Up' / 'Pull Ups' / 'Chin Up')` returns the bodyweight config, not null | `exercise-config.ts` fold + 17 keys renamed |
-| 2 | The bodyweight assertion is three-way: bodyweight+no weight allow / loaded+no baseline fail / bodyweight+weight fail | guard at both `materialize-plan` sites |
-| 3 | A swap derives the new lift's weight from its own reference; it never scales the old lift's load | `resolveSwapSeedWeight`, shared client+server |
-| 4 | Target RIR is derived per week from the Tuchscherer/Helms RPE chart at the row's authored %1RM | `targetRirFromPrescription` |
-| 5 | Deload weeks carry a LOOSER target RIR than base weeks | `normalizePhaseKey`: Deload→recovery |
-| 6 | Hip Thrust (+10 other config-priceable lifts) appears in the logger's exercise search | `commonExercises` |
+| 3 | A swap derives the new lift's weight from its own reference; it never scales the old lift's load | **BLOCKED on the iOS rebuild** — client-side; nobody can see it until the app bundle ships. Not actionable work. |
+| 6 | Hip Thrust (+10 other config-priceable lifts) appears in the logger's exercise search | **BLOCKED on the iOS rebuild** — client-side. Not actionable work. |
 | 7 | No exercise name in source carries a hyphen; every legacy hyphenated name still resolves | 176 literals, 20 files, fold as the net |
 
 ### OPEN
 
 | # | assertion | note |
 |---|---|---|
-| 8 | A value entered in TrainingBaselines for `pullupMaxReps` persists to `performance_numbers` and reads back | write test blocked: `user_baselines.user_id` FKs `auth.users`, needs a throwaway auth user. **All four client↔DB hops traced clean; the break is #10.** |
 | 9 | The three parse sites accept a rep RANGE: `workload.ts` rep-scale, `match-exercises.ts`, the RIR derivation | **BUILT but listed open until rep ranges exist to exercise them.** All three type-checked `reps` as number and fell back silently. MUST hold before rep ranges or RIR goes dark. |
-| 10 | The server's baselines object carries a pull-up rep count | it lifts exactly five keys — squat, bench, deadlift, overheadPress1RM, hipThrust. `getBaseline1RM` has no pull-up concept. **This is a build, not a wire.** |
 | 11 | `addExercise` (`StrengthLogger.tsx:3025`) resolves a weight instead of `{reps:0, weight:0}` | still hardcoded |
 | 12 | An added exercise resolves weight by: own computed baseline → last logged → config proxy → blank | not started |
 | 13 | The `getBaseline1RM` `hipThrust` branch is reachable | dead: **0** exercises use `primaryRef: 'hipThrust'`; server computes `baselines.hipThrust` at 2961/2993/3025 and nothing reads it. See **Q-199**. |
@@ -965,7 +960,20 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 
 ### VERIFIED
 
-*(empty — nothing in this workstream has been seen working on a device)*
+| # | assertion | how |
+|---|---|---|
+| 2 | The bodyweight assertion is three-way | **Against the DEPLOYED function.** Throwaway user + 4-week plan, real `materialize-plan` invoke: Pull Up returned weight `null`, `resolved_from` null on all 4 weeks; Back Squat returned 145/165/130/190 lb from `squat` on the same rows. |
+| 4 | Target RIR is derived per week from the RPE chart | **Against the DEPLOYED function.** wk1 @72%→**4**, wk4 @82%→**1.5**, wk7 @65%→**4**, wk11 @94%→**0.5**. Three distinct values across the block — the flat-constant behaviour is gone. |
+| 5 | Deload weeks carry a LOOSER target RIR than base weeks | **Against the DEPLOYED function.** deload **4** > base-wk4 **1.5**; peak **0.5** < base-wk4 **1.5**. The inversion is fixed. |
+| 10 | The server's baselines object carries a pull-up rep count | **DEPLOYED.** Was dropped by the five-key assembly (squat / bench / deadlift / overheadPress1RM / **hipThrust** — not ftp, which is endurance). Now passed through, deliberately NOT via `mergeAnchor1RmLb` (that picks a LOAD and defaults to pounds). `0` is valid — "your first pull-up", Q-102 — so the guard is `>= 0`. |
+| 26 | A bodyweight lift derives target RIR from reps vs tested max, never a %1RM | **DEPLOYED.** `targetRirFromRepsVsMax`, checked before the chart. Max 8, prescribed 5 → **RIR 3** on all four weeks, unchanged by the session percentage. |
+| 27 | A bodyweight lift's display reads "Bodyweight", not load-picking copy | **DEPLOYED.** Was *"Pick a weight you can do for 5 reps with 2 in reserve"*; now `Bodyweight` on all four weeks. |
+| 28 | No bodyweight row carries a %1RM value | **DEPLOYED.** Fixed at the ORIGIN — `exer()` in `strength-primary-plan.ts` stamped the session percentage onto every lift. Now emits `'Bodyweight'`. Materialize also neutralises already-stored rows, so no migration. |
+| 8 | A value entered for `pullupMaxReps` persists to `performance_numbers` and reads back | Round trip on a **throwaway auth user** (created, exercised, deleted — 0 rows left). All four hops clean: client transform → DB write → DB read → client load, `pullupMaxReps: 8` intact throughout. The write was never the problem. |
+
+> The same run **disproved the assumption behind line 10 by execution, not inspection**: the value reaches
+> the database perfectly and is then dropped by the server's five-key baseline assembly. Fixing the
+> "write" would have fixed nothing.
 
 ### Also noted
 
