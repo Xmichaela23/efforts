@@ -50,6 +50,29 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 **All deployed and live.** Fixtures are green; **none of this has been driven by a human yet.** Tick these off as you train.
 
+## ⚡ AWAITING MICHAEL — 2026-07-24 STRENGTH NUMBERS (D-322, DEPLOYED · 5 lines blocked on ONE Xcode run)
+
+**The iOS bundle is BUILT AND SYNCED** (`npm run ios` run, new strings confirmed in the bundle). It is not
+on the phone. **One Xcode run closes five ledger lines at once** — `OPEN-QUESTIONS.md` Q-202 lines 3, 6, 11,
+12, 14. Nothing client-side in this workstream has been seen working by a human.
+
+What to look for, in the strength logger:
+
+- [ ] **Swap gives the planned weight.** Open a strength session, hit ⇄ Swap on a lift. The new lift's
+      weight should be what the plan would have prescribed for *that* lift this week — not a rescale of the
+      old one. The old bug was worst on dumbbell lifts: **45 lb per hand against a prescribed 20.**
+- [ ] **Type "hip" in the exercise search.** **Hip Thrust** should appear. It never has — it has a config
+      entry and a measured e1RM, and the search list simply didn't contain it.
+- [ ] **Add an exercise. The weight box should not be empty.** It should fill from your own measured 1RM
+      for that lift, or failing that the last weight you logged for it, or failing that a derived estimate.
+- [ ] **A pull-up shows "Bodyweight", never a pound value.** (Server side already verified — this is the
+      client confirming it renders.)
+
+Everything else in D-322 is **verified against the deployed function**, including on throwaway users. See
+Q-202 for the line-by-line state: 10 verified, 15 open, 5 blocked here.
+
+---
+
 ## ⚡ AWAITING MICHAEL — 2026-07-24 COPY VOICE SWEEP + WEEK-NARRATIVE FIXES (coach v149, DEPLOYED, client PUSHED)
 
 The coach narrative + posture sentence are **server-verified** (live `skip_cache` call). The **~45 client copy strings are NOT device-seen** — needs a fresh bundle (web hard-refresh, or `npm run ios` for the phone). Look for:

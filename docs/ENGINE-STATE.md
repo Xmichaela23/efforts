@@ -24,7 +24,112 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-24 EVE — APP-WIDE COPY VOICE RESET + WEEK-NARRATIVE POSTURE FIXES SHIPPED (coach v149) · NEXT = DEVICE-VERIFY THE COPY, THEN RESUME THE STATE-AS-HUB **ADJUST** TAB)
+## 🧭 NEXT SESSION — START HERE (2026-07-24 LATE — STRENGTH NUMBERS AUDITED + FIXED (D-322) · NEXT = **REBUILD "GET STRONGER"** FROM MICHAEL'S SPEC)
+
+### YOUR JOB
+
+**Rebuild the Get Stronger protocol.** Michael has written the spec — three files in `~/Downloads/`:
+`get-stronger-spec-short.md` (the implementation spec), `get-stronger-protocol (3).md`, `get-stronger-science (1).md`.
+Ask him for them; they are not in the repo.
+
+The spec is good and it is **tier-marked** — T1 sourced / T2 named method / T3 design call / T4 unstudied
+combination. **Do not launder a T3 into evidence.** Its standing rule: any new call enters at T3 until placed.
+
+**The work list is `OPEN-QUESTIONS.md` Q-202** — a line-by-line ledger, one testable assertion per fix,
+three states (open / built / verified). **Report against it line by line. Never by topic.** It exists because
+a topic-level "hip thrust — done" was true of one of four fixes and read as all four.
+
+Three facts to start from, all file:line, all verified:
+1. `getTargetRir` (`_shared/strength-profiles.ts`) derives target RIR from the Tuchscherer/Helms RPE
+   chart at the row's authored %1RM — **verified against the deployed function**, and the spec's entry
+   percentages (74 / 81 / 87%) all derive to exactly RIR 2 on it. Spec and engine already agree.
+2. `resolveSwapSeedWeight` (`src/lib/exercise-config.ts`) is the ONE swap-weight function, shared by the
+   logger and `materialize-plan`. Invariant: *swapping into a lift gives what the plan would have
+   prescribed for that lift that week.*
+3. `exer()` (`shared/strength-system/strength-primary-plan.ts:145`) is where the phase percentage is
+   stamped onto every lift. It now skips bodyweight modality. **That one line caused three separate bugs.**
+
+### ⛔ THE DECISION THE REBUILD FORCES
+
+**There are THREE implementations of "get stronger with barbells" and one of them must die.**
+
+| | shape | load model | reachable? |
+|---|---|---|---|
+| `five_by_five` | full-body A/B, **2×/wk** | 70→85% linear | **yes — the DEFAULT for barbell athletes** |
+| `strength_focus_build` / `_power` | 4-day U/L/U/L | 70→85%, +1.25%/wk — *identical curve* | no |
+| `strength_primary` | 4-day U/L/U/L | 72→94%, 5s→3s→2s block | **no — yet it built the live plan**, via `config.source` |
+
+`strength_focus_split.ts`'s own header calls its composition "CONVENTION" — an engine invention, not a
+methodology. `strength_primary` sits outside the protocol registry entirely, which is *why* it had no RIR
+profile: nothing that maintains the protocol list knew it existed. **Michael's intent is that Get Stronger
+is a 5×5 compound block.** Resolve the duplication as part of the rebuild; do not add a fourth.
+
+### 🔴 LIVE BUG — fix before or during the rebuild
+
+**`five_by_five` has no entry in `PROTOCOL_PROFILES`.** `defaultStrengthDeveloper()` returns it for any
+non-triathlon barbell athlete and it is first in the picker — so **the next Get Stronger plan built lands
+on it** and silently resolves to `durability`, a flat RIR 2.5 for the whole block including the peak.
+
+Filed as **Q-192 on 2026-07-19**, hit again independently this session as `strength_primary`, and only
+`strength_primary` was fixed. *The root cause is structural:* `resolveProfile()` returns the default for a
+missing key, so a missing entry and a deliberate choice are indistinguishable at every call site, and three
+hand-maintained lists (pickable / buildable / has-profile) must agree with nothing checking. **Write the
+test that asserts they agree.** That ends the class; adding the entry only ends this instance.
+
+### WHAT SHIPPED — do not re-litigate
+
+**D-322**, five commits, all pushed, five edge functions deployed. **10 ledger lines VERIFIED against the
+deployed function or real round trips on throwaway users** — not unit tests:
+
+- Swap weight **derives** from the new lift's own reference; never rescales the old load. The old rescale
+  was wrong on 3 of 8 targets — worst was per-hand lifts getting **45 lb/hand against a prescribed 20**,
+  because ratio arithmetic ignored `ratioIsTotal` entirely.
+- Target RIR is **derived per week from the RPE chart**, not hand-picked constants. Those constants were
+  written and reverted the same day: checked against a real block they were wrong on **10 of 11 weeks**.
+- Deload weeks are **looser** than base weeks (`normalizePhaseKey`: Power→build, Deload→recovery,
+  Retest→taper). They were previously *tighter* — the phase names never matched `PHASE_RULES`.
+- **Bodyweight lifts carry no load, no %1RM, and no load-picking copy.** A pull-up was priced off the
+  athlete's **bench** at "110 lb" rising to 130, because the config table is written hyphenated
+  (`pull-up`) and callers write spaced (`Pull Up`), so the lookup missed and fell to the legacy barbell
+  fallback. **176 name literals de-hyphenated across 27 files**, with a punctuation fold so every stored
+  legacy name still resolves.
+- `pullupMaxReps` reaches the server. It saved and read back perfectly all along — the five-key baseline
+  assembly discarded it at the last hop.
+
+### UNVERIFIED — and what settles it
+
+**5 lines are BLOCKED on one Xcode run** (3, 6, 11, 12, 14 — swap weight, Hip Thrust in search, added
+exercises resolving a weight, the priority chain, last-logged fallback). The iOS bundle is **built and
+synced** (`npm run ios` done, new strings confirmed present). Michael runs it through Xcode. One pass
+closes all five. **Nothing client-side has been seen working by a human.**
+
+**Line 13 — a hip thrust now has TWO weight sources that can disagree.** Planned → server, `deadlift ×
+0.90`. Added → client, its own measured e1RM. They agree *today by coincidence* (150 × 0.90 = 135 = the
+measured value) and diverge as either moves: **5% / 19% / 48%** across plausible scenarios. Partly created
+by line 12 this session. `getBaseline1RM`'s `hipThrust` case is still dead — 0 exercises use it.
+
+**Lines 9, 20, 21, 22, 29 move as ONE cluster.** 21 (entry ceilings) and 22 (peak range 2-3) are
+*parameters* of 20 (rep ranges). 29 (bodyweight periodisation, currently **inverted** — peak pull-ups are
+the easiest work in the block) is almost certainly solved by it. 9 (three parse sites) is built but cannot
+be verified until ranges exist to exercise it. **Scheduling any separately produces a half-state that reads
+as progress.**
+
+### HOW THIS SESSION FAILED, so you don't repeat it
+
+Every error I made — and there were several — was the same shape: **asserting from the formula instead of
+reading the row.** I told Michael the plan prescribed 90 when it prescribed 85; claimed a 10 lb
+client/server split that did not exist; inverted the entry ceilings; stamped 23 comments with **D-316**,
+which is *State-as-hub*; called `five_by_five` dormant after reading the plans table instead of the
+derivation. Several were caught by Michael pushing back, not by me.
+
+**Read the row. Invoke the deployed function. A throwaway auth user costs ten minutes and settles what an
+hour of reasoning cannot.** The verification harness that found the last three bugs is the pattern:
+`scratchpad/q202-deployed.ts` — creates a throwaway user + plan, calls the live function, asserts on what
+comes back, deletes everything.
+
+---
+
+## 🧭 NEXT SESSION — START HERE (SUPERSEDED 2026-07-24 LATE — the strength-numbers audit moved the session; the copy-voice work below still stands as history) (2026-07-24 EVE — APP-WIDE COPY VOICE RESET + WEEK-NARRATIVE POSTURE FIXES SHIPPED (coach v149) · NEXT = DEVICE-VERIFY THE COPY, THEN RESUME THE STATE-AS-HUB **ADJUST** TAB)
 
 > ## READ `docs/COPY-VOICE.md` (the new voice template) + **D-319 → D-321** (this session), then the still-valid Adjust-tab banner below.
 >
