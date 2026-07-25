@@ -85,6 +85,13 @@ buildable / has-profile) must agree with nothing enforcing it.
 > The fix is one test asserting the three lists agree, plus a log line when `resolveProfile` falls back.
 > Adding the `five_by_five` entry ends this instance; the test ends the class.
 
+**⚠️ TWO PLACES THE SPEC CONFLICTS WITH THIS REPO'S OWN SCIENCE DOCS — Q-202 lines 31, 32.**
+`SCIENCE-concurrent-training-interference.md` §2 marks the Wilson-2012 running-vs-cycling split
+**CONTESTED** (Schumann 2022, more studies, found no modality moderation). The spec cites it **T1** twice,
+in athlete-facing copy. And `SCIENCE-5x5-linear-progression.md` carries a **sourced ~20-30%** endurance
+volume reduction where the spec invents **~66% [T3]**. **Read both science docs before writing the copy** —
+they are already in `docs/` and they are better than they look.
+
 **⚠️ AND THE SPEC ADDS WORK.** Its §9 "required, not yet built" is six new items: season gate, stall
 handling, retest gating, easy-effort drift detection, quality placement, discipline availability check.
 **Realistic post-rebuild ledger is ~4 carried + ~6 new, not zero.** Add them to Q-202 as testable lines
