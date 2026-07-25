@@ -932,20 +932,18 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 
 | # | assertion | evidence |
 |---|---|---|
-| 1 | `getExerciseConfig('Pull Up' / 'Pull Ups' / 'Chin Up')` returns the bodyweight config, not null | `exercise-config.ts` fold + 17 keys renamed |
 | 11 | `addExercise` resolves a weight instead of `{reps:0, weight:0}` | **BLOCKED on the iOS rebuild** — client-side. |
 | 12 | An added exercise resolves weight by: own measured 1RM → last logged → config proxy → blank | **BLOCKED on the iOS rebuild.** `learned_fitness.strength_1rms` now loads client-side, so (a) has a source for the first time. (a)/(c) are 1RMs and take the day's intensity; (b) is a WORKING weight used verbatim — pinned by test, since scaling it would prescribe 65 where the athlete lifted 85. |
 | 14 | An added exercise picks up its last logged weight | **BLOCKED on the iOS rebuild.** Deliberately NOT the shared prefill effect: `lastLoggedWeight()` owns a single scoped query, fires only on an add and only when (a) and (c) miss. See the scoping note below. |
 | 3 | A swap derives the new lift's weight from its own reference; it never scales the old lift's load | **BLOCKED on the iOS rebuild** — client-side; nobody can see it until the app bundle ships. Not actionable work. |
 | 6 | Hip Thrust (+10 other config-priceable lifts) appears in the logger's exercise search | **BLOCKED on the iOS rebuild** — client-side. Not actionable work. |
-| 7 | No exercise name in source carries a hyphen; every legacy hyphenated name still resolves | 176 literals, 20 files, fold as the net |
 
 ### OPEN
 
 | # | assertion | note |
 |---|---|---|
 | 9 | The three parse sites accept a rep RANGE: `workload.ts` rep-scale, `match-exercises.ts`, the RIR derivation | **BUILT but listed open until rep ranges exist to exercise them.** All three type-checked `reps` as number and fell back silently. MUST hold before rep ranges or RIR goes dark. |
-| 13 | The `getBaseline1RM` `hipThrust` branch is reachable | dead: **0** exercises use `primaryRef: 'hipThrust'`; server computes `baselines.hipThrust` at 2961/2993/3025 and nothing reads it. See **Q-199**. |
+| 13 | **A hip thrust has ONE weight source, not two that can disagree** | **RESTATED — this is worse than a dead branch.** A PLANNED hip thrust resolves server-side off `deadlift × 0.90`; an ADDED one now resolves client-side off its own measured e1RM (line 12). Two independent sources for the same lift. They agree **today by coincidence** (manual DL 150 × 0.90 = 135 = the measured hip thrust), and diverge as soon as either moves: adopt the measured deadlift 155 → **−5 (5%)**; hip thrust improves to 160 → **+20 (19%)**; trained in isolation → **+50 (48%)**. Same lift, same session, two numbers. The `getBaseline1RM` `hipThrust` case is still dead (0 exercises use `primaryRef: 'hipThrust'`) — making it reachable is the likely fix, but the assertion is the single source, not the branch. |
 | 15 | Plan creation refuses to build when a required baseline is missing | protocols must declare their required lifts |
 | 16 | That refusal surfaces a prompt naming the lift and where to enter it | not a validation error. **All three accounts lack `pullupMaxReps`, so every one hits this first.** |
 | 17 | The candidate exercise pool is filtered by the equipment profile BEFORE selection | authoring time, new plans only |
@@ -958,7 +956,7 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 | 24 | No other config entry has a computed baseline bypassed by a proxy derivation | audited: exactly two — hip thrust and barbell row — and **both produce the identical number today**, so fixing the precedence is a no-op on current data |
 | 29 | A bodyweight lift's difficulty PERIODISES across the block | **Currently INVERTED, not merely flat.** Real Get Strong Pull Up scheme against a tested max of 8: base 3×5 → RIR **3**, Power 3×3 → RIR **4**, deload 2×5 → RIR **3**, peak 2×3 → RIR **4**. Back squat over the same weeks runs 4 → 1.5 → 4 → 0.5. The composer drops reps 5→3 into the intensification, which is right for a barbell lift *because the percentage rises to compensate*; a bodyweight lift has no percentage to raise, so fewer reps is simply easier. **Peak pull-ups are the easiest work in the block and the deload is harder than the peak.** Raised by Michael off the line-26 verification output. Almost certainly the same fix as rep ranges (line 20) — a bodyweight lift periodises by climbing reps toward its max, not by cutting them. |
 | 30 | The five baseline slots hold what the engine actually reads | **Observation from lines 10/13, worth its own line.** `hipThrust` occupies a slot and **nothing reads it** (0 exercises use `primaryRef: 'hipThrust'`; hip thrust derives off deadlift × 0.90). `pullupMaxReps` needed a slot and did not have one until D-322. The assembly was carrying a number nobody wants while dropping one people need — the slot list was never audited against its consumers. |
-| 25 | `five_by_five` has a profile in `strength-profiles.ts` | **STILL OPEN — see Q-192.** D-322 added `strength_primary` and did NOT cover this. Same root cause, same silent `durability` fallback. |
+| 25 | 🔴 `five_by_five` has a profile in `strength-profiles.ts` | **THE ONLY OPEN LINE THAT IS ACTIVELY WRONG IN PRODUCTION.** Everything else here is missing work; this one silently degrades live plan generation — a `five_by_five` plan resolves to `durability` and gets a flat RIR 2.5 for the whole block. Filed as **Q-192 on 2026-07-19**, hit again independently as `strength_primary` in this session, and only `strength_primary` was fixed. No plan currently uses it (audited: 1 strength_primary, 2 neural_speed, 3 unset), so it is not hurting anyone *today* — it will the moment one is generated. |
 
 
 > **⛔ SCOPING NOTE for lines 11/12/14 — read this before reverting any swap work.**
@@ -973,10 +971,20 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 > **Do not consolidate them back into the shared prefill effect.** A regression test pins that the
 > swap seed still takes no history arguments.
 
+
+> **📦 LINES 9, 20, 21, 22, 29 MOVE AS ONE CLUSTER.** 21 (entry ceilings) and 22 (peak range 2-3)
+> are *parameters* of 20 (rep ranges) and mean nothing without it. 29 (bodyweight periodisation,
+> currently inverted) is almost certainly solved by it — a bodyweight lift periodises by climbing
+> reps toward its max, which is what a rep range is. 9 (the three parse sites) is already built but
+> cannot be verified until ranges exist to exercise it. Scheduling any of them separately will
+> produce a half-state that reads as progress.
+
 ### VERIFIED
 
 | # | assertion | how |
 |---|---|---|
+| 1 | `Pull Up` / `Push Up` / `Chin Up` resolve to the bodyweight config | **DEPLOYED — not a client-only line.** `getExerciseConfig` runs in `materialize-plan` and `strength-primary-plan` too. Live invoke with spaced names: all returned `Bodyweight`, no weight, no `resolved_from`, while Back Squat on the same row returned 155 lb from `squat`. |
+| 7 | No source name carries a hyphen; every legacy hyphenated name still resolves | **DEPLOYED.** Same live invoke authored `Pull-ups` and `Push-ups` alongside `Pull Up` and `Push Up` — all four resolved identically. Stored rows carrying the old form are safe. |
 | 2 | The bodyweight assertion is three-way | **Against the DEPLOYED function.** Throwaway user + 4-week plan, real `materialize-plan` invoke: Pull Up returned weight `null`, `resolved_from` null on all 4 weeks; Back Squat returned 145/165/130/190 lb from `squat` on the same rows. |
 | 4 | Target RIR is derived per week from the RPE chart | **Against the DEPLOYED function.** wk1 @72%→**4**, wk4 @82%→**1.5**, wk7 @65%→**4**, wk11 @94%→**0.5**. Three distinct values across the block — the flat-constant behaviour is gone. |
 | 5 | Deload weeks carry a LOOSER target RIR than base weeks | **Against the DEPLOYED function.** deload **4** > base-wk4 **1.5**; peak **0.5** < base-wk4 **1.5**. The inversion is fixed. |
