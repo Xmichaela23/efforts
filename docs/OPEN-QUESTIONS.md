@@ -974,6 +974,14 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 > swap seed still takes no history arguments.
 
 
+> **🕳️ LINES 13, 24, 30 AND 25 SURVIVE THE GET STRONGER REBUILD.** The spec covers 11 of the 15 open
+> lines. These four are invisible from inside it: 13/24/30 are the baseline-plumbing layer (where the
+> numbers come from, not what the protocol prescribes), and 25 is the protocol registry. **13 was partly
+> created by line 12** — the added-exercise chain introduced a second weight source for hip thrust. **25
+> has now been found twice** (Q-192, 2026-07-19; again as `strength_primary` in D-322) and fixed neither
+> time at the root. If they are not tracked separately they will survive the rebuild exactly as 25 survived
+> being found in July.
+
 > **📦 LINES 9, 20, 21, 22, 29 MOVE AS ONE CLUSTER.** 21 (entry ceilings) and 22 (peak range 2-3)
 > are *parameters* of 20 (rep ranges) and mean nothing without it. 29 (bodyweight periodisation,
 > currently inverted) is almost certainly solved by it — a bodyweight lift periodises by climbing

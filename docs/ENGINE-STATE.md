@@ -49,6 +49,47 @@ Three facts to start from, all file:line, all verified:
 3. `exer()` (`shared/strength-system/strength-primary-plan.ts:145`) is where the phase percentage is
    stamped onto every lift. It now skips bodyweight modality. **That one line caused three separate bugs.**
 
+### 🕳️ WHAT THE SPEC DOES **NOT** COVER — the potholes
+
+The spec is good and it covers **11 of the 15 open Q-202 lines** — the whole rep-range cluster (20/21/22/9),
+bodyweight periodisation (29), and every plan-builder guardrail (15/16/17/18/19). Line 23 (deload deadlift
+% vs its header) probably falls out when the composer is replaced — **verify, don't assume**.
+
+**Four lines survive the rebuild untouched. They will not fix themselves, and they are invisible from
+inside the spec** because the spec is about what the protocol *prescribes*, not about where the numbers
+*come from* or how protocols get registered.
+
+**A. The baseline-plumbing cluster — Q-202 lines 13, 24, 30.** One layer below the protocol.
+- **13** — a hip thrust has **two weight sources that can disagree by up to 48%**. Planned → server,
+  `deadlift × 0.90`. Added → client, its own measured e1RM. They agree *today by coincidence*
+  (150 × 0.90 = 135 = the measured value). **Partly created by line 12 in the D-322 session** — the added-
+  exercise chain introduced the second source. Own this one; it is ours.
+- **24** — exactly two config entries have a measured baseline bypassed by a proxy derivation (hip thrust,
+  barbell row). Both produce the identical number on current data, so it is a silent no-op *until a real
+  ratio drifts from the table*, which is the whole point of measuring.
+- **30** — the five-key baseline assembly (`squat / bench / deadlift / overheadPress1RM / hipThrust`) was
+  **never audited against its consumers**. It carried `hipThrust`, which nothing reads, while dropping
+  `pullupMaxReps`, which the engine needs. Audit the slot list against actual readers.
+
+**B. The protocol registry — Q-202 line 25.** The rebuild may *dissolve* the duplication (if Get Stronger
+becomes the 5×5 and the other two die, the collision goes with them). **It does not close the hole.**
+`resolveProfile()` returns `durability` for any key it doesn't recognise, so a missing entry and a
+deliberate choice are indistinguishable at every call site — and three hand-maintained lists (pickable /
+buildable / has-profile) must agree with nothing enforcing it.
+
+> **This is not hypothetical and it is not new.** It was filed as **Q-192 on 2026-07-19**, sat open because
+> its impact was written "untraced", and was then hit *again* from a different direction in the D-322
+> session — where only the second instance got fixed, because nobody searched whether it was already known.
+> **Twice found, still open.** A rebuild that doesn't write the test will make it three.
+>
+> The fix is one test asserting the three lists agree, plus a log line when `resolveProfile` falls back.
+> Adding the `five_by_five` entry ends this instance; the test ends the class.
+
+**⚠️ AND THE SPEC ADDS WORK.** Its §9 "required, not yet built" is six new items: season gate, stall
+handling, retest gating, easy-effort drift detection, quality placement, discipline availability check.
+**Realistic post-rebuild ledger is ~4 carried + ~6 new, not zero.** Add them to Q-202 as testable lines
+when you start, or they will live only in the spec and be reported as done by topic.
+
 ### ⛔ THE DECISION THE REBUILD FORCES
 
 **There are THREE implementations of "get stronger with barbells" and one of them must die.**
