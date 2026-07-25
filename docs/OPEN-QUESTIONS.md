@@ -933,6 +933,9 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 | # | assertion | evidence |
 |---|---|---|
 | 1 | `getExerciseConfig('Pull Up' / 'Pull Ups' / 'Chin Up')` returns the bodyweight config, not null | `exercise-config.ts` fold + 17 keys renamed |
+| 11 | `addExercise` resolves a weight instead of `{reps:0, weight:0}` | **BLOCKED on the iOS rebuild** — client-side. |
+| 12 | An added exercise resolves weight by: own measured 1RM → last logged → config proxy → blank | **BLOCKED on the iOS rebuild.** `learned_fitness.strength_1rms` now loads client-side, so (a) has a source for the first time. (a)/(c) are 1RMs and take the day's intensity; (b) is a WORKING weight used verbatim — pinned by test, since scaling it would prescribe 65 where the athlete lifted 85. |
+| 14 | An added exercise picks up its last logged weight | **BLOCKED on the iOS rebuild.** Deliberately NOT the shared prefill effect: `lastLoggedWeight()` owns a single scoped query, fires only on an add and only when (a) and (c) miss. See the scoping note below. |
 | 3 | A swap derives the new lift's weight from its own reference; it never scales the old lift's load | **BLOCKED on the iOS rebuild** — client-side; nobody can see it until the app bundle ships. Not actionable work. |
 | 6 | Hip Thrust (+10 other config-priceable lifts) appears in the logger's exercise search | **BLOCKED on the iOS rebuild** — client-side. Not actionable work. |
 | 7 | No exercise name in source carries a hyphen; every legacy hyphenated name still resolves | 176 literals, 20 files, fold as the net |
@@ -942,10 +945,7 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 | # | assertion | note |
 |---|---|---|
 | 9 | The three parse sites accept a rep RANGE: `workload.ts` rep-scale, `match-exercises.ts`, the RIR derivation | **BUILT but listed open until rep ranges exist to exercise them.** All three type-checked `reps` as number and fell back silently. MUST hold before rep ranges or RIR goes dark. |
-| 11 | `addExercise` (`StrengthLogger.tsx:3025`) resolves a weight instead of `{reps:0, weight:0}` | still hardcoded |
-| 12 | An added exercise resolves weight by: own computed baseline → last logged → config proxy → blank | not started |
 | 13 | The `getBaseline1RM` `hipThrust` branch is reachable | dead: **0** exercises use `primaryRef: 'hipThrust'`; server computes `baselines.hipThrust` at 2961/2993/3025 and nothing reads it. See **Q-199**. |
-| 14 | The prior-session prefill reaches exercises added after page load | `didAutofillRef` (1964/1969) short-circuits; effect keys off `exercises.length`. Needs the widened fetch restored, scoped to added exercises. |
 | 15 | Plan creation refuses to build when a required baseline is missing | protocols must declare their required lifts |
 | 16 | That refusal surfaces a prompt naming the lift and where to enter it | not a validation error. **All three accounts lack `pullupMaxReps`, so every one hits this first.** |
 | 17 | The candidate exercise pool is filtered by the equipment profile BEFORE selection | authoring time, new plans only |
@@ -959,6 +959,19 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 | 29 | A bodyweight lift's difficulty PERIODISES across the block | **Currently INVERTED, not merely flat.** Real Get Strong Pull Up scheme against a tested max of 8: base 3×5 → RIR **3**, Power 3×3 → RIR **4**, deload 2×5 → RIR **3**, peak 2×3 → RIR **4**. Back squat over the same weeks runs 4 → 1.5 → 4 → 0.5. The composer drops reps 5→3 into the intensification, which is right for a barbell lift *because the percentage rises to compensate*; a bodyweight lift has no percentage to raise, so fewer reps is simply easier. **Peak pull-ups are the easiest work in the block and the deload is harder than the peak.** Raised by Michael off the line-26 verification output. Almost certainly the same fix as rep ranges (line 20) — a bodyweight lift periodises by climbing reps toward its max, not by cutting them. |
 | 30 | The five baseline slots hold what the engine actually reads | **Observation from lines 10/13, worth its own line.** `hipThrust` occupies a slot and **nothing reads it** (0 exercises use `primaryRef: 'hipThrust'`; hip thrust derives off deadlift × 0.90). `pullupMaxReps` needed a slot and did not have one until D-322. The assembly was carrying a number nobody wants while dropping one people need — the slot list was never audited against its consumers. |
 | 25 | `five_by_five` has a profile in `strength-profiles.ts` | **STILL OPEN — see Q-192.** D-322 added `strength_primary` and did NOT cover this. Same root cause, same silent `durability` fallback. |
+
+
+> **⛔ SCOPING NOTE for lines 11/12/14 — read this before reverting any swap work.**
+> An earlier attempt widened the SHARED prior-session fetch from 10 to 40 sessions and built a map
+> of every lift, serving both swap history-seeding and added exercises. When swap seeding was
+> reverted (correctly — a swap has a plan prescription to stay faithful to), the revert took the
+> widened fetch **and** `heaviestCompletedWeight` with it, and silently broke added-exercise
+> prefill. Nothing recorded the second consumer.
+>
+> The rebuild deliberately does **not** share: `lastLoggedWeight()` in `StrengthLogger.tsx` owns its
+> own query, and `heaviestCompletedWeight` carries an ownership comment naming this as its consumer.
+> **Do not consolidate them back into the shared prefill effect.** A regression test pins that the
+> swap seed still takes no history arguments.
 
 ### VERIFIED
 

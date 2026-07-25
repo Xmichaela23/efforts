@@ -15,6 +15,8 @@ import {
   getBaseline1RM,
   normalizeLiftKey,
   resolveSwapSeedWeight,
+  calculatePrescribedWeight,
+  heaviestCompletedWeight,
 } from '@/lib/exercise-config';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
@@ -627,6 +629,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [isInitialized, setIsInitialized] = useState(false);
   const [pendingOrOptions, setPendingOrOptions] = useState<Array<{ label: string; name: string; sets: number; reps: number }> | null>(null);
   const [performanceNumbers, setPerformanceNumbers] = useState<any | null>(null);
+  // D-322 line 12: per-lift MEASURED 1RMs from `learned_fitness.strength_1rms`, keyed snake_case
+  // ('hip_thrust', 'barbell_row'). Read only by the added-exercise weight chain.
+  const [learnedStrength1rms, setLearnedStrength1rms] = useState<Record<string, any>>({});
   // Session notes modal
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [notesText, setNotesText] = useState('');
@@ -2083,9 +2088,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       try {
         const userId = getStoredUserId();
         if (!userId) return;
-        const pnResp = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', userId).single();
+        // D-322 line 12: `learned_fitness` joins the select because the added-exercise weight chain
+        // ranks a lift's OWN measured baseline above a proxy derived from a different lift. That
+        // measurement lives in `learned_fitness.strength_1rms` (compute-facts refreshes it every
+        // ingest) and the client had never loaded it — so hip thrust, which has a real e1RM, could
+        // only ever be priced off deadlift x 0.90.
+        const pnResp = await supabase.from('user_baselines')
+          .select('performance_numbers, learned_fitness').eq('user_id', userId).single();
         const pn = (pnResp as any)?.data?.performance_numbers || null;
         if (pn) setPerformanceNumbers(pn);
+        try {
+          const lfRaw = (pnResp as any)?.data?.learned_fitness;
+          const lf = typeof lfRaw === 'string' ? JSON.parse(lfRaw || '{}') : (lfRaw || {});
+          if (lf?.strength_1rms) setLearnedStrength1rms(lf.strength_1rms);
+        } catch { /* graceful: chain falls through to the proxy */ }
       } catch {}
     })();
 
@@ -3009,6 +3025,91 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   const filteredExercises = getFilteredExercises(currentExercise);
 
+  // ─── ADDED-EXERCISE WEIGHT (D-322 lines 11/12/14) ──────────────────────────────
+  // `addExercise` used to hardcode `{ reps: 0, weight: 0 }`, so a hand-added lift arrived with no
+  // number at all — even one the engine can price and the athlete has logged five times. Hip thrust
+  // was the case that surfaced it: a real config entry, a measured e1RM of 135, and an empty box
+  // every session.
+  //
+  // THE PRIORITY, and why it is this order:
+  //   a. the lift's OWN measured 1RM (learned_fitness.strength_1rms) x the day's intensity
+  //   b. the last weight the athlete actually logged for it
+  //   c. the config proxy (hip thrust = deadlift x 0.90 x intensity)
+  //   d. blank
+  // A measurement of the ACTUAL lift beats a proxy derived from a different one. (a) and (c) are
+  // 1RMs and must be scaled by an intensity; (b) is already a WORKING weight and must not be —
+  // multiplying it would prescribe 67 lb where the athlete lifted 85.
+  //
+  // ⚠️ History is right HERE and wrong for a SWAP. A swap has a plan prescription to stay faithful
+  // to; an added exercise has none, so the athlete's own log is the only real signal. Seeding a
+  // swap from history was built and reverted for exactly this reason — see D-322.
+  const dayIntensity = (): number => {
+    const withPct = exercises.find((ex) => typeof ex.planned_percent_1rm === 'number' && ex.planned_percent_1rm > 0);
+    return withPct?.planned_percent_1rm ?? 0.70;
+  };
+
+  /** (a) — the lift's own measured 1RM, if compute-facts has one. */
+  const ownMeasured1RM = (name: string): number | null => {
+    const key = normalizeLiftKey(name).replace(/\s+/g, '_');
+    const v = Number(learnedStrength1rms?.[key]?.value);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  };
+
+  /**
+   * (b) — the last weight logged for THIS lift. Scoped deliberately: one indexed query for one
+   * exercise, fired only on an add, and only when (a) misses.
+   *
+   * ⛔ SCOPING NOTE, and it is load-bearing. An earlier version of this widened the SHARED
+   * prior-session fetch from 10 to 40 sessions and built a map of every lift. That fetch was
+   * removed when swap history-seeding was reverted, and it silently took added-exercise prefill
+   * with it — nothing connected the two. This lookup owns its own query so a future revert of the
+   * swap work cannot reach it. Do not "consolidate" it back into the shared prefill effect.
+   */
+  const lastLoggedWeight = async (name: string): Promise<number | null> => {
+    try {
+      const userId = getStoredUserId();
+      if (!userId) return null;
+      const todayDate = targetDate || getStrengthLoggerDateString();
+      const { data } = await supabase
+        .from('workouts')
+        .select('date,strength_exercises')
+        .eq('user_id', userId)
+        .in('type', ['strength', 'weight_training', 'weights'])
+        .lt('date', todayDate)
+        .order('date', { ascending: false })
+        .limit(20);
+      const want = normalizeLiftKey(name);
+      for (const w of (data || [])) {
+        let exs: any[] = [];
+        try {
+          const raw = (w as any).strength_exercises;
+          exs = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
+        } catch { exs = []; }
+        for (const ex of exs) {
+          if (normalizeLiftKey(ex?.name || '') !== want) continue;
+          const best = heaviestCompletedWeight(ex?.sets);
+          if (best != null) return best;   // rows are date-desc: first hit is the most recent
+        }
+      }
+    } catch { /* graceful: fall through to the proxy */ }
+    return null;
+  };
+
+  /** (a) and (c), both synchronous. Returns null when only (b) or blank can answer. */
+  const seedWeightForAdded = (name: string): number | null => {
+    const cfg = getExerciseConfig(name);
+    if (!cfg || cfg.displayFormat === 'bodyweight' || cfg.displayFormat === 'band') return null;
+    const pct = dayIntensity();
+    const own = ownMeasured1RM(name);
+    if (own != null) {
+      // Its OWN 1RM, so no cross-lift ratio applies — only the per-hand split, if any.
+      let w = own * pct;
+      if (cfg.displayFormat === 'perHand' && cfg.ratioIsTotal) w = w / 2;
+      return Math.max(5, Math.round(w / 5) * 5);
+    }
+    return calculatePrescribedWeight(name, pct, performanceNumbers, undefined, false).weight ?? null;
+  };
+
   const addExercise = (exerciseName?: string) => {
     const nameToAdd = exerciseName || currentExercise.trim();
     
@@ -3039,7 +3140,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         }
       : {
           reps: 0,
-          weight: 0,
+          // D-322 line 11: (a) or (c) of the chain, resolved synchronously. (b) — last logged —
+          // is applied just below, and only when this returned nothing.
+          weight: seedWeightForAdded(nameToAdd) ?? 0,
           barType: 'standard',
           rir: undefined,
           completed: false,
@@ -3053,6 +3156,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     };
     
     setExercises([...exercises, newExercise]);
+    // (b) — only when neither the lift's own measured 1RM nor a config proxy answered. Patched in
+    // asynchronously so the row appears instantly; the common case never waits on a query.
+    if (!isDurationExercise && !(firstSet.weight! > 0)) {
+      void (async () => {
+        const last = await lastLoggedWeight(nameToAdd);
+        if (last == null || !(last > 0)) return;
+        setExercises((prev) => prev.map((ex) => ex.id !== newExercise.id ? ex : {
+          ...ex,
+          // A logged weight is already a WORKING weight — used as-is, never scaled by intensity.
+          sets: ex.sets.map((st, i) => (i === 0 && !st.completed && !(st.weight > 0)
+            ? { ...st, weight: last, from_previous: true } : st)),
+        }));
+      })();
+    }
     setCurrentExercise('');
     setShowSuggestions(false);
     

@@ -1532,6 +1532,27 @@ export function resolveSwapSeedWeight(
 }
 
 /**
+ * Reduce one logged exercise's sets to the heaviest set the athlete actually COMPLETED.
+ * Uncompleted sets are excluded on purpose — an abandoned set is not evidence you can lift that
+ * weight. Returns null when nothing qualifies, which drops the caller to its next fallback.
+ *
+ * D-322. ⛔ OWNERSHIP NOTE: this exists for the ADDED-EXERCISE weight chain, not for swaps. It was
+ * originally written for swap history-seeding, and was DELETED when that was reverted — which
+ * silently broke added-exercise prefill, because nothing recorded that a second consumer depended
+ * on it. It is back with one owner. A future revert of swap work must not remove it again.
+ */
+export function heaviestCompletedWeight(sets: any[] | null | undefined): number | null {
+  if (!Array.isArray(sets)) return null;
+  let best = 0;
+  for (const s of sets) {
+    if (!s || s.completed !== true) continue;
+    const w = Number(s.weight);
+    if (Number.isFinite(w) && w > best) best = w;
+  }
+  return best > 0 ? best : null;
+}
+
+/**
  * Key an exercise name for cross-session matching: lowercase, drop (Left)/(Right),
  * collapse whitespace, drop a trailing plural 's' (Q-197, so "Hip Thrusts" matches
  * "Hip Thrust"). Applied to both the stored key and the lookup, so matching stays

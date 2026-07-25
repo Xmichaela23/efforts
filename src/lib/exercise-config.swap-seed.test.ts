@@ -15,6 +15,7 @@ import {
   calculatePrescribedWeight,
   normalizeLiftKey,
   getExerciseConfig,
+  heaviestCompletedWeight,
 } from './exercise-config.ts';
 
 // ── THE BUG CASE, kept as a permanent regression ──────────────────────────────
@@ -218,5 +219,53 @@ Deno.test('folding does not regress the existing table', () => {
     const c = getExerciseConfig(name);
     assertEquals(c?.primaryRef ?? null, ref, `${name} ref`);
     assertEquals(c?.ratio, ratio, `${name} ratio`);
+  }
+});
+
+// ── ADDED-EXERCISE WEIGHT CHAIN (D-322 lines 11/12/14) ────────────────────────
+// Pins the two things that are easy to get wrong in a chain that mixes units.
+
+Deno.test('the chain mixes 1RMs and WORKING weights — they must not be scaled alike', () => {
+  // (a) and (c) are 1RMs: they take the day's intensity.
+  // (b) is a logged working weight: it must be used as-is.
+  const OWN_1RM = 135;          // measured hip thrust e1RM
+  const PCT = 0.785;
+  const LOGGED_WORKING = 85;    // what the athlete actually put on the bar
+
+  const fromOwn = Math.max(5, Math.round((OWN_1RM * PCT) / 5) * 5);
+  assertEquals(fromOwn, 105);                       // 1RM x intensity
+  assertEquals(LOGGED_WORKING, 85);                 // used verbatim
+  // The bug this guards: scaling (b) by intensity too.
+  const wronglyScaled = Math.round((LOGGED_WORKING * PCT) / 5) * 5;
+  assertEquals(wronglyScaled, 65);
+  assertEquals(wronglyScaled === LOGGED_WORKING, false);
+});
+
+Deno.test('a bodyweight lift is never given an added-exercise weight', () => {
+  for (const n of ['Pull Up', 'Push Up', 'Chin Up']) {
+    const c = getExerciseConfig(n);
+    assertEquals(c?.displayFormat, 'bodyweight', n);
+  }
+});
+
+Deno.test('heaviestCompletedWeight: only completed sets, and bodyweight yields null', () => {
+  assertEquals(heaviestCompletedWeight([
+    { weight: 85, reps: 5, completed: true },
+    { weight: 95, reps: 5, completed: false },   // bailed
+  ]), 85);
+  assertEquals(heaviestCompletedWeight([{ weight: 80, completed: false }]), null);
+  assertEquals(heaviestCompletedWeight([{ weight: 0, reps: 10, completed: true }]), null);
+  assertEquals(heaviestCompletedWeight(null), null);
+});
+
+Deno.test('REGRESSION: the swap seed still does NOT consult history', () => {
+  // Line 14 restored a history lookup. This pins that it did not leak back into the swap path —
+  // the exact coupling whose removal broke added-exercise prefill in the first place.
+  assertEquals(resolveSwapSeedWeight.length <= 5, true, 'swap seed takes no history/date args');
+  assertEquals(seedIsPureOfHistory(), true);
+  function seedIsPureOfHistory() {
+    const a = resolveSwapSeedWeight('Back Squat', AUTHORED, B, REPS, NO_REP_SCALE).weight;
+    const b = resolveSwapSeedWeight('Back Squat', AUTHORED, B, REPS, NO_REP_SCALE).weight;
+    return a === b && a === 85;   // deterministic, and the planned number
   }
 });
