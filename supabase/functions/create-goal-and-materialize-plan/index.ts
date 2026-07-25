@@ -2387,14 +2387,54 @@ Deno.serve(async (req: Request) => {
           const gsEquip = resolveStrengthEquipmentTypeForPlan(
             gsTp.equipment_type, gsBaseline?.equipment?.strength ?? [], gsBaseline?.performance_numbers,
           );
-          if (gsEquip === 'commercial_gym') {
-            // CHECK, don't ask (no question, no bounce-out). The app already knows if the numbers exist:
-            // HAS squat+bench → build silently, train from week 1. EMPTY → week 1 IS a baseline test, weeks
-            // 2-12 train off the result (the named "Baseline Test" sessions write performance_numbers via
-            // the existing logger path, then UnifiedWorkoutView re-materializes the % weeks). Filled-in
-            // users never see friction.
+          // ── D-323 / SPEC-get-stronger §0 — THE ENTRY GATE ────────────────────────────────────
+          // Strength Focus needs a BARBELL. Previously a non-barbell athlete fell silently through
+          // this branch to the (b)-run path, which builds `five_by_five` — Back Squat, Bench, Barbell
+          // Row, OHP and Deadlift at %1RM, TO A DUMBBELL-ONLY ATHLETE. Refuse instead. The dumbbell
+          // plan is its own product (BUILD-ORDER-strength-spine.md); until it ships, say so.
+          if (gsEquip !== 'commercial_gym') {
+            throw new AppError(
+              'barbell_required',
+              'Strength Focus needs a barbell, rack and bench. A dumbbell version is coming; until then this plan cannot be built from your current equipment.',
+              409,
+            );
+          }
+          {
+            // ⛔ NO 1RM, NO ENTRY — and ALL FOUR lifts, not two.
+            // The old check tested bench + squat only, then set `needs_baseline` so week 1 became an
+            // in-plan test. Both are wrong under the new spec:
+            //   • FOUR lifts. Squat, bench, deadlift and overhead press are one main lift per day.
+            //     Missing deadlift or press leaves TWO of four lifting days with no weight on them —
+            //     and the old check passed that athlete straight through.
+            //   • No in-plan baseline test. Entry is gated; the tests live in the Baselines screen
+            //     (Lower = squat + deadlift, Upper = bench + press, Full Body = all four), which ramps
+            //     from the empty bar to a 3–6 rep set rather than a max attempt.
+            // Refuse and NAME the missing lift so the client can send them to the right test.
             const gsPN = (gsBaseline?.performance_numbers ?? {}) as Record<string, any>;
-            const gsNeedsBaseline = !(Number(gsPN.bench) > 0 && Number(gsPN.squat) > 0);
+            const num = (...keys: string[]): number => {
+              for (const k of keys) { const v = Number(gsPN[k]); if (Number.isFinite(v) && v > 0) return v; }
+              return 0;
+            };
+            const gsRequiredLifts: Array<{ label: string; value: number }> = [
+              { label: 'Squat', value: num('squat', 'squat1RM', 'squat_1rm') },
+              { label: 'Bench Press', value: num('bench', 'bench_press', 'benchPress') },
+              { label: 'Deadlift', value: num('deadlift', 'dead_lift') },
+              { label: 'Overhead Press', value: num('overheadPress1RM', 'ohp', 'overhead_press', 'overhead') },
+            ];
+            const gsMissing = gsRequiredLifts.filter((l) => !(l.value > 0)).map((l) => l.label);
+            if (gsMissing.length > 0) {
+              const list = gsMissing.length === 1
+                ? gsMissing[0]
+                : `${gsMissing.slice(0, -1).join(', ')} and ${gsMissing[gsMissing.length - 1]}`;
+              throw new AppError(
+                'missing_strength_baseline',
+                `Before this plan can be built we need your ${list} number${gsMissing.length > 1 ? 's' : ''}. Log a baseline test in Training Baselines.`,
+                409,
+              );
+            }
+            // Dead once the gate above exists — every athlete reaching here has all four. Kept at
+            // `false` until the composer's `baselineTestWeek` path is removed in the protocol rebuild.
+            const gsNeedsBaseline = false;
             const gsSport = gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null;
             // Maintenance-endurance band (run only): the athlete's typed weekly miles + their learned easy
             // pace → the composer clamps to the science band. sec/km → min/mi = ×1.609344 ÷ 60. Absent

@@ -19,7 +19,8 @@ export type StrengthProtocolId =
   | 'triathlon'
   | 'triathlon_performance'
   | 'minimum_dose'
-  | 'strength_primary';
+  | 'strength_primary'
+  | 'five_by_five';
 
 export type StrengthProtocolProfile = {
   /** Default target RIR when no exercise-level override exists. */
@@ -102,6 +103,30 @@ export const PROTOCOL_PROFILES: Record<StrengthProtocolId, StrengthProtocolProfi
   // 1–2 intensifying, 0–1 at peak). Progression thresholds mirror neural_speed: the
   // composer owns the ramp, so only a clear, repeated signal should move a working load.
   strength_primary: {
+    defaultTargetRir: { lower: 2, upper: 2 },
+    progression: { minDeviation: 0.25, minGainPct: 0.02 },
+    deload:      { maxDeviation: -0.5, minSessions: 2 },
+  },
+
+  // Q-192, filed 2026-07-19 — and this is the fix, not another instance of it.
+  //
+  // `five_by_five` is the DEFAULT for any non-triathlon athlete with barbell or dumbbell
+  // equipment (`defaultStrengthDeveloper`) and it is first in the develop picker. It had NO
+  // entry here, so every one of those athletes fell through `resolveProfile()` to `durability`
+  // — a concurrent-SUPPORT profile prescribing a flat RIR 2.5 for the whole block, peak
+  // included. The bug was filed on 2026-07-19, hit again independently as `strength_primary`
+  // in the D-322 session, and root-fixed neither time: D-322 added `strength_primary` only.
+  //
+  // Values MIRROR `strength_primary` above, and for the same stated reason: the composer owns
+  // the ramp (five-by-five runs a block-linear 70→85% curve by week-in-block), so a working
+  // load should move only on a clear, repeated signal rather than a single easy session.
+  // Same shape of protocol, same rationale, same numbers — deliberately not a new judgement.
+  //
+  // ⚠️ The structural cause is NOT a missing key. `resolveProfile()` returns the default for
+  // ANY unrecognised id, so a missing entry and a deliberate choice are indistinguishable at
+  // every call site. This entry ends the instance; `strength-protocol-registry.test.ts` and
+  // the fallback log line below end the class.
+  five_by_five: {
     defaultTargetRir: { lower: 2, upper: 2 },
     progression: { minDeviation: 0.25, minGainPct: 0.02 },
     deload:      { maxDeviation: -0.5, minSessions: 2 },
@@ -303,9 +328,32 @@ export function isLowerBodyLift(canonical: string): boolean {
   return LOWER_BODY_CANONICALS.has(canonical.toLowerCase().replace(/\s+/g, '_'));
 }
 
+/**
+ * ⛔ THE SILENT-FALLBACK HOLE — Q-192. Read before changing this function.
+ *
+ * This returns the `durability` default for ANY id it does not recognise. That is why a
+ * MISSING profile and a DELIBERATE choice are indistinguishable at every call site: nothing
+ * throws, nothing used to log, and the athlete just gets a flat RIR 2.5 for a whole block.
+ * The bug was found twice (Q-192 2026-07-19; again as `strength_primary` in D-322) and fixed
+ * at the root neither time, because each fix added one key rather than closing the hole.
+ *
+ * It still falls back — throwing would brick plan generation and materialize runs over
+ * EXISTING plans carrying legacy ids. But it is no longer silent, and
+ * `strength-protocol-registry.test.ts` now fails the build if a *reachable* protocol has no
+ * entry, so this log should only ever fire for a legacy id.
+ */
 export function resolveProfile(protocolId: string | null | undefined): StrengthProtocolProfile {
   if (!protocolId) return DEFAULT_PROFILE;
-  return PROTOCOL_PROFILES[protocolId as StrengthProtocolId] ?? DEFAULT_PROFILE;
+  const hit = PROTOCOL_PROFILES[protocolId as StrengthProtocolId];
+  if (!hit) {
+    console.warn(
+      `⚠️ [strength-profiles] No PROTOCOL_PROFILES entry for "${protocolId}" — falling back to ` +
+        `durability (flat RIR ${DEFAULT_PROFILE.defaultTargetRir.lower} for the whole block). ` +
+        `If this protocol is reachable by an athlete, it needs its own entry. See Q-192.`,
+    );
+    return DEFAULT_PROFILE;
+  }
+  return hit;
 }
 
 /**
