@@ -658,7 +658,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   <p className="text-white/55 text-sm mb-4 leading-relaxed">
                     {typeof state.usualMiles === 'number' && state.usualMiles > 0
                       ? `This block holds about ${maintenanceDoseFor(state.usualMiles)} ${unit} — two-thirds of normal keeps the aerobic base while strength leads.`
-                      : `Your usual week, before this block — the holding dose comes off it. Not sure is fine: it starts light and grows as the app learns your weeks.`}
+                      : `Your usual week, before this block — the holding dose comes off it. Not sure is fine: it starts light and grows as the app learns your weeks. New to running, small is the right answer — every session here is conversational.`}
                   </p>
                   <p className="text-white/70 text-sm mb-2">Weekly running to hold <span className="text-white/45">(maintenance)</span></p>
                   <div className="flex items-center gap-2">

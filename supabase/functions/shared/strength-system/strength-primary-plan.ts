@@ -288,7 +288,11 @@ function enduranceSession(
     day,
     type: sport === 'bike' ? 'ride' : 'run',
     name: label,
-    description: `~${mins} min easy, conversational — held underneath the lifting, not trained.${extraNote ?? ''}`,
+    // ⛔ CONVERSATIONAL IS THE CEILING, ON EVERY ENDURANCE SESSION IN THE BLOCK. Not a suggestion:
+    // Hickson is that cutting INTENSITY is what loses the aerobic base, so the volume is what gives
+    // here and the effort is what holds. It is also the guardrail that makes the honoured-not-capped
+    // mileage safe — a high-volume EASY week is not the interference case, a high-volume hard one is.
+    description: `~${mins} min easy, all conversational — you could hold a sentence throughout. Held underneath the lifting, not trained.${extraNote ?? ''}`,
     duration: mins,
     tags: ['easy', 'maintenance', 'aerobic'],
   };
