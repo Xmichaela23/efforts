@@ -1142,7 +1142,57 @@ Inherits the anchor's accuracy: the chart is relative to a TRUE 1RM, so a stale 
 
 ---
 
+## D-324 — Strength Focus V1: Wendler 5/3/1 replaces the ATR block, per-set weights reach the phone, RIR scoped off, and volume is a trade rather than a cap (2026-07-25, PUSHED + DEPLOYED, **not device-seen**)
+
+**Folds in `docs/SPEC-get-stronger.md` §1 as built.** Twelve commits, `eb7db0df` → `90c48ee5`. Deployed: `generate-strength-plan` v34, `create-goal-and-materialize-plan` v250, `materialize-plan` v218, `coach` v398, `analyze-strength-workout` v137, `compute-snapshot` v99, `adapt-plan` v33.
+
+### 1. The protocol is replaced, not tuned
+The ATR block (base→power→deload→peak, a 72→94% ramp, a separate AMRAP retest week) is gone. V1 is Wendler's 5/3/1 in his endurance-athlete configuration: 12 weeks = leader, leader, anchor (his 2:1), each cycle ending in a deload. Working number **85% of the true 1RM, rounded down, STORED** in `plans.config.training_max` and stepped +5 upper / +10 lower per cycle. Derived instead of stored, the AMRAP write-back that lifts `performance_numbers` would drag it and the controlled progression would be gone. **The frozen-retest-weight problem deleted itself with the retest week** — under 5/3/1 the last set of every third week IS the test. Zero DB migrations.
+
+Loading lives in `shared/strength-system/loading/wendler-531.ts`, deliberately outside the composer, so race plans can reach the same protocol at a maintenance dose (`ARCH-strength-spine.md` Layer 2).
+
+### 2. ⛔ THE PER-SET PRESCRIPTION — the app could not express the protocol
+5/3/1 is three sets at three weights and a row held one. Copying the top set onto all three prefills a weight the athlete was not asked to lift, **twice a session, four days a week, for twelve weeks**. Rows now carry `set_plan`; `weight`/`reps` stay the TOP set so every pre-existing consumer is unchanged. `materialize-plan` carries it through (`carrySetPlan`, rescaling the ramp if anything moved the top set); the logger prefills each set from ONE reader (`plannedSetsFor`) used by all four prefill paths — the same row was being mapped in four places.
+
+**No `1rm_test` tag on the measured week, deliberately.** The tag makes the logger DISCARD the planned rows and rebuild the session as a warm-up ramp plus one all-out set — the old separate-retest shape — which would delete the prescription the block is built on. The e1RM still lands: `set_plan[].amrap` flags the open set and the write-back fires off that flag alone.
+
+### 3. RIR is OFF for this protocol and NOTHING else
+5/3/1 is deterministic; the engine never reads a reserve estimate to decide anything here, so it is a second instruction that can contradict the first — on the exact set whose prescription reads "as many as you can". **And it was not inert:** learned-1RM is `brzycki(weight, reps + rir)`, so an auto-filled reserve on a deliberately sub-maximal opener read back as a far heavier lift, into the number that seeds the next block. Eight of twelve weeks are sub-maximal by design.
+
+`usesRir: false` on `strength_primary` alone — **opt-out, not opt-in**, so a protocol added later keeps its targets. The switch sits at the STAMP seam (`protocolUsesRir`) rather than inside `getTargetRir`, which returns a plain number to ~a dozen callers: making it nullable would push a null check into every one, and the ones that forgot would read `0` — "grind to failure" — the worst possible failure direction.
+
+### 4. Assistance carries NO prescribed load
+Only the four main lifts are dictated by percentages of the training max. Tie a dumbbell row to a percentage and you force progression on a secondary movement; the athlete arrives at the next main lift already fatigued and the fatigue budget their endurance needs is gone. A row states a MOVEMENT and a REP TOTAL; the athlete splits 25 reps however the day suits and loads by feel. This also dissolved two known-wrong config entries (`Single Leg Hip Thrust` carries the two-legged 0.9× deadlift ratio; `Dumbbell Overhead Press` resolves to the barbell entry) — nothing on the menu is ever priced.
+
+Three slots, athlete-chosen from a shared menu (`src/lib/assistance-menu.ts`, read by the picker AND the composer). They are also the Adjust-tab holes: an add-on REPLACES a slot rather than adding a fourth. A glute emphasis is now reachable as a single-leg hip thrust — which is what the removed Glutes add-on was supposed to do and could not.
+
+### 5. Volume is a TRADE, never a cap
+A ceiling was proposed (30-35 mi, 6-8 h) and **rejected**. D-222's ceiling was already retired 2026-07-01, and this repo's science doc says plainly: *"Volume-dependence is directionally supported and mechanistically sensible; any numeric threshold the app states would be invented."* So `volume_state` — computed and returned by the composer for months, **never rendered** — now renders live as they type. Band is ~⅔ of the athlete's OWN usual week when they give one [Hickson, SPEC §2], absolute fallback when they don't, and **"Not sure" is a valid answer** that starts at the maintenance floor and lets the app learn them. The effort ceiling (all conversational, every session) is what makes honouring the mileage safe: a high-volume EASY week is not the interference case.
+
+### 6. The week builds around endurance absolutes — `place-week.ts` (BUILT, **NOT WIRED**)
+Michael: *"we build around them, that's the whole point."* Long runs, long rides and club days are set by daylight, weather and other people; the four lifting days are solved into what is left. Heavy legs placed first (48h off long days, 24h off quality, apart from each other); upper days take the rest.
+
+**Not built into `_shared/week-optimizer.ts`, deliberately:** its `strength_frequency` is typed `1|2|3` and this is a four-day week, and it has no immovable pin — every anchor it takes is a preference it may overrule. Widening either changes the contract every race plan flows through. The LAW is not duplicated: clearances are imported from `_shared/schedule-session-constraints.ts`.
+
+**The six-hour safeguard.** Stacking is offered only on a day the athlete SAID they can split. Robineau 2016: 0h between lifting and cardio produced lower strength gains; 6h and 24h performed the same. `canSplitDay: undefined` behaves as false — inferring consent from someone accepting a stack is how the app would prescribe the one arrangement shown to make people weaker. `stacksRequired = pins + lifts − 6`, and when it cannot be resolved the athlete gets the honest arithmetic choice, **not an override button**.
+
+### 7. The flow: six steps to four
+One goal card (the other five were placeholders); strength assumed and endurance cannot develop (picking develop silently routes the plan somewhere else entirely); no protocol picker (inert, and the confirm screen was reporting the dead choice back as fact); no hours tier (nothing reads it); no length slider (12 is the only length that runs Wendler's ratio, and the slider offered lengths the composer rounds down).
+
+### ⛔ What this SUPERSEDES
+- **D-323 stands** — this is its build. Its "the one real change is double progression" is **wrong**: the protocol was replaced outright, and double progression moved to the dumbbell plan.
+- **`SPEC-get-stronger.md` §1 is now built** — fold and delete per the spec lifecycle. What survives unbuilt: §1b (the week-12 transition), the 8-week option, the quality-session opt-in.
+- **`SPEC-strength-focus.md`** (accessory specialisation) is still the reference for re-homing add-ons to Adjust — but its mechanism changed: an add-on now REPLACES an assistance slot rather than redistributing set counts.
+
+> **↩ Related:** D-322 (the numbers audit this sits on) · D-323 (the scope lock) · D-315 (consent-first; upheld) · D-222 (the retired ceiling — **do not reinstate**) · Q-192 (the registry hole; the phase-vocabulary test is the class fix) · Q-202 (the ledger).
+
 ## D-323 — Get Stronger scope lock: omakase strength / à la carte endurance, run-in-miles / bike-in-hours, add-ons out (2026-07-24, DECIDED — not built. Contract: `docs/SPEC-get-stronger.md`)
+
+> **↪ BUILT 2026-07-25 — see D-324.** This entry stands, with one correction: *"the one real change is
+> double progression"* is **WRONG**. The protocol was REPLACED, not re-parameterised — the ATR block
+> is gone and V1 is Wendler's 5/3/1. Double progression moved to the dumbbell plan. Everything else
+> here (omakase strength, à la carte endurance, run-in-miles / bike-in-hours, add-ons re-homed) was
+> built as written. Everything below is history.
 
 **Written when decided, not when built** (CLAUDE.md). Nothing in this entry has shipped. It exists because the Get Stronger scope had been re-decided across banners, Q-202 lines and chat with no single home — Michael: *"we need some clarity and part of the problem is the 100000 iterations it took to get here."* **`docs/SPEC-get-stronger.md` is now the only place the scope lives.**
 
