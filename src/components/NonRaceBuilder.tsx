@@ -5,6 +5,9 @@ import { StepLayout } from '@/components/wizard/StepLayout';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor } from '@/lib/context-utils';
+// ONE band, shared with the composer — what the athlete is told while typing and what the plan
+// records cannot disagree. A REFERENCE, never a cap (D-222's ceiling was retired on purpose).
+import { volumeStateForMiles, volumeStateLine } from '@/lib/maintenance-volume-band';
 // ONE source for the block's own words — the composer writes the same sentences onto the plan.
 import { strengthFocusSections, STRENGTH_FOCUS_WEEKS } from '@/lib/strength-focus-copy';
 // ONE menu, shared with the composer that authors the block (`assistance-menu.ts`). A name this
@@ -616,13 +619,22 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     />
                     <span className="text-white/45 text-sm">{unit}/wk</span>
                   </div>
-                  {/* Live honest tradeoff — shown AS they type. D-222 hard cap RETIRED: we honor the typed
-                      miles (no clamp); ~${capDisplay} is a soft reference, not a wall. Matches the server
-                      amendment + the Get-Strong card copy. */}
-                  <p className={`text-xs mt-1.5 ${typeof state.targetMiles === 'number' && state.targetMiles > capDisplay ? 'text-amber-400/80' : 'text-white/35'}`}>
-                    {typeof state.targetMiles === 'number' && state.targetMiles > capDisplay
-                      ? `Above ~${capDisplay} ${unit} your strength gain trends toward the low end — you'll still get stronger, just modestly. Not a cap; it's a strength plan. [Wilson 2012]`
-                      : `Run what you'll actually do — it's all easy, strength leads. Low weeks aren't penalized (more recovery for the lifts).`}
+                  {/* ⛔ THE TRADE, SAID OUT LOUD — and the number stands either way. This is what
+                      replaces a cap: a ceiling would have to name a threshold, and this repo's own
+                      science doc says any numeric threshold the app states would be invented
+                      (Wilson found the volume correlation; Schumann, with more studies, found no
+                      frequency moderation). So the athlete types what they carry, reads what it
+                      costs, and owns it.
+
+                      Was a LOCAL two-state check against its own `capDisplay`, citing "[Wilson 2012]"
+                      for a number Wilson never gives — the exact invented-threshold trap. Now the
+                      SHARED band (`maintenance-volume-band.ts`), which the composer also reads, so
+                      what is said here and what the plan records cannot disagree. Three states: the
+                      old version had no "below", and a runner dropping under a maintenance dose was
+                      told nothing at all. */}
+                  <p className="text-white/70 text-sm mt-2 leading-relaxed">
+                    {volumeStateLine(volumeStateForMiles(Number(state.targetMiles)))
+                      ?? `Run what you'll actually do — it's all easy, strength leads. Low weeks aren't penalized (more recovery for the lifts).`}
                   </p>
                 </div>
                 <div>

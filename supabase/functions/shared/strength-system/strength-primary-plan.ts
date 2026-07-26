@@ -24,6 +24,10 @@
 import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 import { strengthFocusDescription } from '../../../../src/lib/strength-focus-copy.ts';
 import {
+  FALLBACK_EASY_MIN_PER_MILE as FALLBACK_EASY_MIN_PER_MILE_SHARED,
+  volumeStateForMiles,
+} from '../../../../src/lib/maintenance-volume-band.ts';
+import {
   type AssistancePicks,
   ASSISTANCE_GUIDANCE,
   resolveAssistance,
@@ -358,9 +362,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const assistance = assistanceRows(args.assistancePicks);
 
   // ── Endurance underneath (unchanged from the previous composer) ────────────
-  const FLOOR_MIN = 60;   // ~2×/wk maintenance dose floor [Hickson 1981, Spiering 2021]
-  const CEILING_MIN = 180; // ~3 h/wk. Interference tracks total work, not easy volume [Fyfe 2016]
-  const FALLBACK_EASY_MIN_PER_MILE = 10;
+  // ⛔ The band lives in `src/lib/maintenance-volume-band.ts` — the INTAKE reads the same numbers, so
+  // what the athlete is told while typing and what the plan records cannot disagree. It is a
+  // REFERENCE, not a cap: the D-222 ceiling was retired on purpose and must not return.
+  const FALLBACK_EASY_MIN_PER_MILE = FALLBACK_EASY_MIN_PER_MILE_SHARED;
 
   const runFreq = enduranceSport === 'run'
     ? Math.max(ENDURANCE_DAYS.length, Math.min(4, Math.round(Number(args.enduranceFrequency) || ENDURANCE_DAYS.length)))
@@ -391,11 +396,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     const pace = paceKnown ? args.easyPaceMinPerMile! : FALLBACK_EASY_MIN_PER_MILE;
     // Soft reference band — NOT a clamp. HONOR the athlete's typed miles; surface the tradeoff
     // client-side (volume_state), never cap or bump. Easy-intensity guardrail stays.
-    const floor = Math.round(FLOOR_MIN / pace);
-    const ceiling = Math.round(CEILING_MIN / pace);
     const asked = Math.round(args.targetWeeklyMiles!);
     const held = Math.max(1, asked);
-    volume_state = asked > ceiling ? 'above' : (asked < floor ? 'below' : 'in_band');
+    volume_state = volumeStateForMiles(asked, pace);
     if (!paceKnown) {
       volume_notes = `Run durations estimated at ${FALLBACK_EASY_MIN_PER_MILE}:00/mi until we learn your easy pace — they re-map once you log a few easy runs.`;
     }
