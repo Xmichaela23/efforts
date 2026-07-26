@@ -111,8 +111,15 @@ type NonRaceState = {
 
 type StepKey = 'goal' | 'posture' | 'commitment' | 'length' | 'schedule' | 'confirm';
 
-function getSteps(_state: NonRaceState): StepKey[] {
-  return ['goal', 'posture', 'commitment', 'length', 'schedule', 'confirm'];
+function getSteps(state: NonRaceState): StepKey[] {
+  // ⛔ STRENGTH FOCUS SKIPS "What can you sustain?". That step converts a Light/Moderate/Committed
+  // tier into `weekly_hours_available` — and on this path nothing reads it. The lifting is four days,
+  // fixed by the protocol; the endurance volume is TYPED two screens later (run miles, run days,
+  // swims). So the tier decides nothing and its only effect was a stale "≈ 6 h/wk" on the confirm
+  // screen. Michael, 2026-07-25: *"not necessary, user enters these."* Every other goal keeps it —
+  // there the tier really does set the volume.
+  const base: StepKey[] = ['goal', 'posture', 'commitment', 'length', 'schedule', 'confirm'];
+  return state.goal === 'get_stronger' ? base.filter((k) => k !== 'commitment') : base;
 }
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -650,9 +657,23 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               />
               <p className="text-white/35 text-xs mt-1.5">Week 1 begins this week — plans run Monday to Sunday.</p>
             </div>
+            {/* ⛔ TWO FALSEHOODS ON THIS LINE, both created when the engine changed under it.
+                • "ending in a retest" — Strength Focus has NO retest week. The last set of every
+                  third week is the test (5/3/1); weeks 9, 10 and 11 are the measurement. The
+                  separate retest week was deleted with the old protocol.
+                • "from your current fitness (≈ N h/wk)" — the hours tier is not asked on this path
+                  and nothing reads it. Reporting a number the athlete never gave, that changes
+                  nothing, is the shape of bug this file keeps producing.
+                Also fixed the article: "An 12-week" read wrong for every length that is not 8. */}
             <p className="text-white/60 text-sm">
-              An {state.targetWeeks}-week block from your current fitness (≈ {hoursForTier(state.commitment)} h/wk),
-              ending in a <span className="text-white/80">retest</span>.
+              {isStrengthFocus ? (
+                <>A {state.targetWeeks}-week block. The last set of every third week is the
+                measurement — there is no separate retest.</>
+              ) : (
+                <>{state.targetWeeks === 8 || state.targetWeeks === 11 || state.targetWeeks === 18 ? 'An' : 'A'} {state.targetWeeks}-week
+                block from your current fitness (≈ {hoursForTier(state.commitment)} h/wk),
+                ending in a <span className="text-white/80">retest</span>.</>
+              )}
             </p>
           </div>
         </StepLayout>
