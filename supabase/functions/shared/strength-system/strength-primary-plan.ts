@@ -335,6 +335,69 @@ function enduranceSession(
 }
 
 /**
+ * ⛔ THE ONE HARD AEROBIC SESSION — hill repeats, for the athlete with no bike.
+ *
+ * Spec: `docs/DOCTRINE-aerobic-maintenance-run-only.md` §2, §3, §5. Until this existed the hard day
+ * was PINNED AND EMPTY: the athlete named a day, `place-week` correctly kept the bar off it, and
+ * nothing was ever authored to fill it. The composer had never emitted a quality token of any kind.
+ *
+ * ⛔ WHY UPHILL AND NOT FLAT (§2, and it is measured, not reasoned):
+ *  • At MATCHED metabolic cost, loading rate and peak vertical GRF both fall as incline rises
+ *    across 0 → 4 → 8% (iso-efficiency protocol, 11 collegiate distance runners). Same engine work,
+ *    less tissue load — which is the whole argument on a block where mechanical budget binds.
+ *  • The impact transient is what does the damage and uphill removes it; ACTIVE force is unchanged
+ *    (Gottschall & Kram 2005). You keep the effort and lose the collision.
+ *  • Knee extensor torque is PRESERVED after maximal uphill running and reduced after downhill —
+ *    the closest direct evidence that a hard uphill session does not tax what the squat needs.
+ *  ⚠️ 4-8% is the TESTED range, not convention. Do not widen it casually.
+ *
+ * ⛔ LONG REPS, AND THIS REVERSED ON 2026-07-26 (§3, corrected). The first build here was
+ * 10 × 40s on the premise that short bouts accumulate time near VO2max more efficiently. They do
+ * not — that is contradicted at META-ANALYSIS level: long work intervals (>=2 min) elicit
+ * significantly greater time at VO2max than short (<=30s) OR MODERATE (>30s to <2min) intervals,
+ * and 40 seconds sits in the moderate band.
+ *
+ * Head to head at IDENTICAL working time (4 x 3min vs 24 x 30s, 12 min each): 328s vs 201s above
+ * 90% VO2max. The short session produced MORE time above 90% HRmax (820s vs 545s) and felt exactly
+ * as hard (no RPE difference) — it is the more convincing session and the weaker one.
+ *
+ * ⛔ THE MECHANICAL ARGUMENT DID NOT DISAPPEAR, IT MOVED TO THE GRADIENT. Short reps were chosen to
+ * limit mechanical volume; the HILL is what buys that, measured (§2). Once interval length is not
+ * paying for mechanical cost, it should be chosen for stimulus — and long wins.
+ *
+ * ⛔ NEVER DOWNHILL, NEVER LONG FLAT INTERVALS AT VO2 INTENSITY (§2.1). Downhill is the laboratory
+ * MODEL for inducing muscle damage; long flat intervals are the most expensive way to buy the
+ * stimulus. Both are directly antagonistic to the block's purpose.
+ *
+ * ⚠️ Strides (§6) are a SEPARATE quality and do not substitute for this — they defend flat-ground
+ * turnover, ten seconds at a time. Hills for the engine, strides for the legs.
+ */
+function hillSession(day: string): PlanSession {
+  // §5, run-only VO2 defence: 4 x 3min hard / 3min easy at 5-8%. Working time 12 min; ~35-40 min
+  // with warm-up and cool-down. The token carries the grade because the cost row is not "run VO2" —
+  // it is "run VO2 AT grade" (D-325 §1), and a token that cannot carry the constraint cannot be priced.
+  //
+  // ⚠️ 12 min, not the meta's "high volume" >=15 min (which would be 5 x 3). Deliberate: this is a
+  // MAINTENANCE dose, not a gains dose — one hard session a week HOLDS the engine and does not build
+  // it (parent doctrine §5.0). Structure from the evidence, volume from the maintenance context.
+  const token = 'run_hills_4x180s_r180s_g5_8';
+  return {
+    day,
+    type: 'run',
+    name: 'Hill Repeats',
+    // ⛔ NO PACE, ANYWHERE IN THIS COPY. The pace-effort relationship changes with gradient, so a
+    // pace target here is false precision (§2.2). Effort and grade only.
+    description:
+      '4 × 3 min hard uphill, 3 min easy back down, on a 5-8% grade. Hard means hard — you should '
+      + 'not be able to hold a sentence. No pace target: on a hill the number would be wrong. '
+      + 'The climb is what keeps this cheap on your legs, so the lifting still gets what it needs.',
+    duration: 35,
+    steps_preset: [token],
+    tags: ['quality', 'hills', 'aerobic'],
+  };
+}
+
+/**
  * ⛔ SWIM IS BOOKED, NOT COACHED — and the distinction is the whole feature.
  *
  * Michael, 2026-07-25: *"we keep swim, let the user add — we give a courtesy two hour-long swims we
@@ -573,6 +636,19 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
           : undefined;
         weekSessions.push(enduranceSession('run', day, runMinutesByDay[day], note, day === longRunDay ? 'long' : 'easy'));
       });
+      // ⛔ THE HARD DAY GETS FILLED. Until now the pin reserved a day and nothing was authored for
+      // it — `place-week` kept the bar clear of the athlete's chosen day and left it BLANK, which is
+      // worse than dropping the pin, because the week visibly loses a day.
+      //
+      // ⚠️ RUN-ONLY ONLY. If the athlete has a bike, the doctrine puts the hard session THERE
+      // (`DOCTRINE-aerobic-maintenance.md` §6: "both means a choice, and the bike wins") — hard
+      // riding costs the legs less than hard running does. The bike pass is still fenced (Q-126),
+      // so a bike-equipped athlete currently gets no hard session at all rather than the wrong one.
+      // ⛔ Do NOT emit hills as a substitute for the ride: that spends mechanical budget the
+      // doctrine spent the whole day protecting.
+      if (hardPin && args.hardDay?.discipline === 'run') {
+        weekSessions.push(hillSession(hardPin));
+      }
     } else if (enduranceSport) {
       enduranceDays.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day)));
     }

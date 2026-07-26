@@ -1546,6 +1546,59 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
     }
   }
   
+  // ── HILL REPEATS — the run-only athlete's one hard aerobic session ──────────────────────────
+  // Token: run_hills_10x40s_r20s_g5_8  →  10 × 40s hard uphill, 20s easy between, grade 5-8%.
+  // Spec: docs/DOCTRINE-aerobic-maintenance-run-only.md §2, §3, §5.
+  //
+  // ⛔ NO PACE TARGET, AND THAT IS THE POINT (§2.2). The pace-effort relationship changes with
+  // gradient, so the app's velocity anchor is INVALID on a hill — every other run-quality token here
+  // prescribes off 5K pace (run_vo2 at 5K−12s/mi, cruise at 5K+20s/mi) and doing that uphill emits a
+  // measured-looking number with nothing behind it. Prescribe duration at effort, name the grade,
+  // and say nothing about pace. (Same shape the strides expander below already uses deliberately.)
+  //
+  // ⚠️ SECONDS, not minutes. Every other quality token parses `\d+min`, which is why the short-format
+  // work this protocol is built on could not previously be written down at all.
+  //
+  // ⚠️ RECOVERY IS SHORT AND IT IS THE MECHANISM (§3). The point of 40/20 is that VO2 stays elevated
+  // THROUGH the recovery, so time-at-target accumulates across the set rather than only within each
+  // rep. A long float defeats it. Do not inherit run_vo2's 90s.
+  //
+  // ⛔ Grade travels IN the token because the cost row is not "run VO2" — it is "run VO2 at 4-8%"
+  // (D-325 §1). A token that cannot carry the constraint has an unverifiable cost, and the athlete
+  // gets a session the engine cannot price.
+  if (/^run_hills_\d+x\d+s_r\d+s_g\d+_\d+$/.test(lower)) {
+    const m = lower.match(/^run_hills_(\d+)x(\d+)s_r(\d+)s_g(\d+)_(\d+)$/);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const work_s = parseInt(m[2], 10);
+      const rest_s = parseInt(m[3], 10);
+      const gradeLo = parseInt(m[4], 10);
+      const gradeHi = parseInt(m[5], 10);
+      const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
+      const gradeLabel = `${gradeLo}-${gradeHi}% grade`;
+      for (let i = 0; i < reps; i++) {
+        out.push({
+          id: uid(),
+          kind: 'work',
+          duration_s: work_s,
+          // ⛔ Deliberately no `pace_sec_per_mi`. See above. Do not "fix" this by adding one.
+          label: `Hill · ${gradeLabel}`,
+        });
+        if (i < reps - 1) {
+          // Easy jog down. Paced, because the recovery IS flat-ish and easy pace is honest there.
+          out.push({
+            id: uid(),
+            kind: 'recovery',
+            duration_s: rest_s,
+            pace_sec_per_mi: easyPace,
+            label: 'Jog down',
+          });
+        }
+      }
+      return out;
+    }
+  }
+
   // Strides: strides_4x100m or strides_6x20s
   // Strides are fast accelerations done AFTER the main run (warm-up)
   // For "Easy + Strides" workouts, strides come at the END

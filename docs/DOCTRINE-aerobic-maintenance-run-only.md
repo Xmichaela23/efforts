@@ -214,7 +214,76 @@ Prescribe by **duration at effort**, with grade specified. Optionally gate by HR
 
 ## 3. Lever two — interval structure
 
-**Short work bouts accumulate time near VO2max at lower total mechanical volume than long bouts.**
+> ## ⛔ §3 WAS WRONG AND IS CORRECTED 2026-07-26. The premise below is contradicted at meta-analysis level, not by one study.
+>
+> **Michael's rule: *"the doc could be wrong — it's collected science, so we need to be able to back up
+> the plan AND the doc. If there's an issue, we need more research."*** This section could not be backed
+> up. Researched properly, and it reverses.
+>
+> ### What the evidence actually says
+>
+> **1. Long work intervals produce MORE time at VO2max, not less.** A systematic review and
+> meta-analysis of time spent at or near VO2max during HIIT: **protocols with long work intervals
+> (≥ 2 min) elicited significantly greater time at VO2max than short (≤ 30 s) OR MODERATE
+> (> 30 s to < 2 min) work intervals.** ⛔ **40 seconds sits in that moderate band. The format this
+> section prescribed is on the inferior side of the finding.**
+>
+> **2. Head-to-head, at IDENTICAL working time.** 12 highly trained runners, 4 × 3 min at 95% vVO2max
+> vs 24 × 30 s at 100% — both 12 minutes of work:
+>
+> | | 4 × 3 min | 24 × 30 s |
+> |---|---|---|
+> | time > 90% VO2max | **327.9 ± 146.8 s** | 201.3 ± 268.4 s |
+> | time > 90% HRmax | 545 ± 131 s | **820 ± 249 s** |
+> | lactate | 9.69 mmol/L | 7.59 |
+> | RPE | *no difference* | *no difference* |
+>
+> ⛔ **The short session produced MORE time at high heart rate and LESS time at the actual stimulus,
+> and felt exactly as hard.** It is the more convincing session and the weaker one. ⚠️ This repo's
+> register already records HR as a trap for detecting fatigue; it is also a trap for confirming
+> stimulus.
+>
+> **3. Short intervals are not useless — the honest frame is "effective, not maximal."** A separate
+> meta-analysis of RCTs: short intervals (≤ 30 s), low volume (≤ 5 min) and short-term HIIT all
+> produce clear VO2max benefit and are **time-efficient, especially for the general population** —
+> but **long-interval (≥ 2 min), high-volume (≥ 15 min) HIIT shows significantly larger effects.**
+>
+> **4. ⚠️ The metric has a stated limitation, recorded so we do not over-lean on it.** Time ≥ 90%
+> VO2max is a **binary** measure; the continuous *% of VO2max* is a slightly more robust predictor of
+> adaptation because it uses all the data rather than a threshold crossing (Odden 2024). Both show
+> moderate repeatability and both are accepted as expressions of adaptive potential. **The direction
+> holds; the precision of any single number above should not be pressed.**
+>
+> ### ⛔ WHY THIS IS A CLEAN REVERSAL AND NOT AN EMBARRASSMENT: §2 ALREADY SOLVES WHAT §3 WAS SOLVING
+>
+> **Short reps were chosen to hold down mechanical volume. The GRADIENT is the mechanical discount —
+> measured, at matched metabolic cost, lower loading rate and lower peak vertical GRF (§2).** So
+> interval length never had to buy that, and once it does not have to, it should be chosen for
+> **stimulus** — where long intervals win.
+>
+> ⛔ **Which also retires this section's line that "3–5 min repeats are the most mechanically
+> expensive." That is true ON THE FLAT. Uphill the impact transient is gone (Gottschall & Kram) and
+> the sentence does not transfer.**
+>
+> ### THE PRESCRIPTION THAT SURVIVES
+>
+> **4 × 3 min uphill at 5–8%, 3 min easy between.** 12 min of work.
+>
+> - **Long-interval structure**, which is what the evidence says decides the stimulus.
+> - **Helgerud's validated shape** (4 × 4), and the same shape as the bike session — so the run-only
+>   athlete and the bike-equipped athlete get structurally equivalent work instead of one getting half.
+> - **12 min sits inside §5's stated 12–16 min.** ⚠️ The meta's "high volume" threshold is ≥ 15 min,
+>   which would be 5 × 3. **Not taken, deliberately: this is a MAINTENANCE dose, not a gains dose**
+>   (parent doctrine §5.0 — one session a week holds the engine and does not build it). Take the
+>   STRUCTURE from the evidence and the VOLUME from the maintenance context.
+>
+> ⚠️ **THE SHORT FORMAT SURVIVES AS A NAMED FALLBACK, AND ONLY FOR A LOGISTICS REASON.** Three minutes
+> uphill needs a climb you can run for three minutes; 40-second hills are findable almost anywhere.
+> **When the athlete has only a short hill, 10–12 × 40 s is still effective — it is simply not
+> maximal, and the doc should say which one they are getting.** ⛔ Do not present them as equivalent.
+
+**~~Short work bouts accumulate time near VO2max at lower total mechanical volume than long bouts.~~**
+*(Retired — see the box above. The second half is true and now lives in §2; the first half is false.)*
 
 - **30/30 or 40/20** — VO2 stays elevated through the short recovery, so time-at-target accumulates across the set rather than only within each rep. Less total distance covered at speed for the same physiological dose.
 - **60/60** — middle ground, more tolerable to execute, slightly higher mechanical volume.
