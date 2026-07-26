@@ -573,7 +573,9 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 <p className="text-white/85 text-sm font-medium mb-3">Strength</p>
                 <p className="text-white/70 text-sm mb-1">Accessory work</p>
                 <p className="text-white/55 text-sm mb-3 leading-relaxed">
-                  Every session ends with three short slots. The lifting itself is set — these are yours to pick.
+                  Every session ends with three short slots. The main lifting is set — these are yours to
+                  direct. Use them to shore up imbalances, protect your joints from the road, and target
+                  where you want extra attention.
                 </p>
                 <div className="space-y-3">
                   {ASSISTANCE_MENU.map((menu) => {
