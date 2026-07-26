@@ -5,6 +5,8 @@ import { StepLayout } from '@/components/wizard/StepLayout';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor } from '@/lib/context-utils';
+// ONE source for the block's own words — the composer writes the same sentences onto the plan.
+import { strengthFocusSections, STRENGTH_FOCUS_WEEKS } from '@/lib/strength-focus-copy';
 // ONE menu, shared with the composer that authors the block (`assistance-menu.ts`). A name this
 // picker offers that the composer does not recognise would fall back to the default — the athlete
 // would pick something and silently get something else.
@@ -119,7 +121,14 @@ function getSteps(state: NonRaceState): StepKey[] {
   // screen. Michael, 2026-07-25: *"not necessary, user enters these."* Every other goal keeps it —
   // there the tier really does set the volume.
   const base: StepKey[] = ['goal', 'posture', 'commitment', 'length', 'schedule', 'confirm'];
-  return state.goal === 'get_stronger' ? base.filter((k) => k !== 'commitment') : base;
+  // ⛔ AND NO LENGTH SLIDER. Twelve weeks is not a preference — Wendler's ratios are 2:1, 3:2 and
+  // 2:2 over four-week cycles, so 12 is the only length that runs leader-leader-anchor as designed.
+  // The slider offered 8-52 while the composer rounds DOWN to whole cycles, so 10 silently became 8
+  // and 14 became 12: the athlete picked a number the engine never built. 8 ships later as the
+  // short, off-ratio option, labelled as such.
+  return state.goal === 'get_stronger'
+    ? base.filter((k) => k !== 'commitment' && k !== 'length')
+    : base;
 }
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -217,7 +226,9 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
       ...s, goal, discipline,
       posture: seed.per_discipline_posture,
       strengthProtocol: seed.strength_protocol,
-      targetWeeks: Math.max(s.targetWeeks, floor), // never start below the goal's science floor (§13.2)
+      // Strength Focus is FIXED at 12 — the only length that runs Wendler's 2:1 leader/leader/anchor
+      // over four-week cycles. There is no slider on that path, so this is the value, not a default.
+      targetWeeks: goal === 'get_stronger' ? STRENGTH_FOCUS_WEEKS : Math.max(s.targetWeeks, floor),
     }));
   };
   const setPosture = (d: Discipline, p: Posture) => {
@@ -309,11 +320,24 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           develop them."* Every other goal keeps the full screen underneath. */}
       {currentStep === 'posture' && isStrengthFocus && (
         <StepLayout
-          step={2} totalSteps={steps.length} title="What are you keeping?"
-          subtitle="Strength leads for this block. Pick the endurance you want to hold onto — it stays easy, at maintenance."
+          step={2} totalSteps={steps.length} title={`Strength Focus · ${STRENGTH_FOCUS_WEEKS} weeks`}
+          subtitle="What you're buying, before you commit to it."
           onBack={back} onContinue={next} canContinue={postureCanContinue}
         >
           <div className="space-y-3">
+            {/* ⛔ THE BLOCK OPENS WITH WHAT IT IS. Michael, 2026-07-25 — the athlete should read what
+                they are buying before answering a single question about it. Same sentences the plan
+                itself carries (`strength-focus-copy.ts`), so what was promised and what was built
+                cannot drift. */}
+            <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-2.5">
+              {strengthFocusSections({}).map((sec) => (
+                <div key={sec.heading}>
+                  <p className="text-white/70 text-xs font-medium">{sec.heading}</p>
+                  <p className="text-white/45 text-xs leading-relaxed">{sec.body}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-white/55 text-sm pt-1">Which endurance are you keeping?</p>
             {(['run', 'bike', 'swim'] as const).map((d) => {
               const color = getDisciplineColor(d);
               const Icon = DISCIPLINE_ICONS[d];

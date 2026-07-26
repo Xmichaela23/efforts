@@ -22,6 +22,7 @@
 // ============================================================================
 
 import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
+import { strengthFocusDescription } from '../../../../src/lib/strength-focus-copy.ts';
 import {
   type AssistancePicks,
   ASSISTANCE_GUIDANCE,
@@ -484,35 +485,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   return {
     name: args.goalName?.trim() || `Strength Focus — ${weeks} Weeks`,
     description:
-      // ── THE TRADE-OFF (Michael, 2026-07-25). His words. Kept verbatim. ─────────────────────────
-      //
-      // ✅ "adaptation happens during recovery" is BIOLOGY, not a gym aphorism, and an earlier draft
-      // of this comment wrongly called it one. Resistance training supplies the mechanical stimulus —
-      // muscle protein breakdown, mTOR signalling — while net protein synthesis and the structural
-      // remodelling occur post-session, with MPS elevated for roughly 24-48h. The training is the
-      // stimulus; the adaptation is the recovery. It belongs in the copy.
-      //
-      // ⚠️ "the most sustainable approach" is a comparison nothing has measured. It is product voice,
-      // nothing in the engine reads it, and Michael kept it knowingly. **Do not promote it into a
-      // science panel or the citation register.**
-      //
-      // ⛔ "The app will unlock speed and distance blocks once this cycle closes" IS A DEBT. Neither
-      // block exists and there is no week-12 hand-off. Michael reinstated it deliberately after it
-      // was cut once — so it is a commitment the hand-off must honour, not a claim to soften. If
-      // those blocks are still absent when an athlete finishes twelve weeks, this sentence is the
-      // app lying to them. Ship the hand-off.
-      `The trade-off. For the next ${weeks} weeks, strength leads.\n\n` +
-      `The architecture. This block uses sub-maximal loading (Wendler's 5/3/1) to manage fatigue, ` +
-      `making it the most sustainable approach to build structural strength while maintaining an ` +
-      `aerobic base. Four lifting days: bench Monday, squat Tuesday, overhead press Thursday, ` +
-      `deadlift Friday. ${leaders} building cycle${leaders === 1 ? '' : 's'}, then one measuring ` +
-      `cycle from week ${anchorStart}, each ending in a deload week.\n\n` +
-      `The reality check. Training provides the stimulus, but adaptation happens during recovery. ` +
-      `Prioritize how you feel; the math only works if you honor your rest.\n\n` +
-      // The "say once" line (SPEC §4). Flat, once, never repeated and never apologised for.
-      `Weights come off 85% of your max, and that buffer is what makes the last set of every third ` +
-      `week worth measuring. Week one sits well inside you by design.${enduranceNote}\n\n` +
-      `What's next. The app will unlock speed and distance blocks once this cycle closes.`,
+      // ⛔ ONE SOURCE for this copy — `src/lib/strength-focus-copy.ts`, which the BUILD FLOW also
+      // reads so the athlete is shown the same words before committing that the plan carries after.
+      // Provenance for every line (what is biology, what is product voice, what is a debt) lives in
+      // that file's header. Do not re-word it here; there would then be two.
+      strengthFocusDescription({ weeks, leaderCycles: leaders, anchorStartWeek: anchorStart, enduranceNote }),
     duration_weeks: weeks,
     sessions_by_week,
     phaseStructure,
