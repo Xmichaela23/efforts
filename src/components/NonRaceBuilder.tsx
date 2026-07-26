@@ -45,9 +45,19 @@ const DISCIPLINE_LABEL: Record<Discipline, string> = { swim: 'Swim', bike: 'Bike
 const DISCIPLINE_ICONS: Record<Discipline, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   run: Activity, bike: Bike, swim: Waves, strength: Dumbbell,
 };
-const GOAL_ORDER: NonRaceGoalId[] = [
-  'build_endurance', 'build_speed', 'get_stronger', 'build_muscle', 'maintain', 'starting_over',
-];
+// ⛔ ONE CARD, AND THE REST WERE PLACEHOLDERS. Michael, 2026-07-25: *"let's clear out all the
+// placeholders — let's just have Strength Focus now."*
+//
+// Build endurance / Build speed / Build muscle + train / Maintain / Starting over were all pickable
+// and none of them had been built to the standard Strength Focus now sets. A front door offering
+// five things that do not work is worse than a door offering one that does.
+//
+// The goal IDs still exist in `non-race-goal-seeds.ts` and existing goals built on them keep
+// working — this list is only what the picker OFFERS. Add one back the day it is real.
+//
+// (Michael also ruled Maintain should never be a card at all: it is the state between blocks, not
+// something an athlete chooses. The app drops into it when a block ends. See BUILD-ORDER.)
+const GOAL_ORDER: NonRaceGoalId[] = ['get_stronger'];
 const DAYS: DayName[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_SHORT: Record<DayName, string> = {
   monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
@@ -279,16 +289,34 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
       {currentStep === 'goal' && (
         <StepLayout
           step={1} totalSteps={steps.length} title="What's the goal?"
-          subtitle="Pick one — we seed the rest (which disciplines develop, maintain, or sit out)."
+          subtitle="Every plan carries strength. This one puts it in front."
           onBack={back} onContinue={next} canContinue={goalCanContinue}
         >
           <div className="space-y-2">
             {GOAL_ORDER.map((g) => (
               <button key={g} type="button" className={optBtn(state.goal === g)} onClick={() => reseed(g, undefined)}>
-                {GOAL_LABELS[g]}
+                <span className="block">{g === 'get_stronger' ? 'Strength Focus' : GOAL_LABELS[g]}</span>
+                {g === 'get_stronger' && (
+                  <>
+                    {/* The card states what it NEEDS and who it is FOR. The app cannot tell a
+                        beginner from an experienced lifter, and the scope cut governs what we build,
+                        not who gets in (SPEC §4). */}
+                    <span className="block text-white/50 text-xs mt-1 leading-relaxed">
+                      12 weeks of Wendler's 5/3/1, four lifting days. For someone who already lifts and
+                      is months from a race. Needs a barbell, a rack and a bench — and your squat,
+                      bench, deadlift and overhead press maxes on file.
+                    </span>
+                  </>
+                )}
               </button>
             ))}
           </div>
+          {/* Strength is not a mode you switch into — it is in every plan, and only the dose changes.
+              Saying so here is what makes ONE strength card make sense rather than look like a gap. */}
+          <p className="text-white/45 text-xs mt-4 leading-relaxed">
+            Every plan has a strength component built on the same 5/3/1 principle. The load adjusts to
+            the goal — a race build holds it at maintenance, this one develops it.
+          </p>
           {needsDiscipline && (
             <div className="mt-4 space-y-2">
               <p className="text-white/55 text-sm">Which discipline?</p>
