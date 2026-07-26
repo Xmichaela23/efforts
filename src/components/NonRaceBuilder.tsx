@@ -540,7 +540,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
       {currentStep === 'schedule' && (
         <StepLayout
           step={stepNo('schedule')} totalSteps={steps.length} title="When can you train?"
-          subtitle="Days per week, your long days, and any fixed club session to keep."
+          subtitle="Only what you kept shows here."
           onBack={back} onContinue={next} canContinue={state.daysPerWeek >= 4 && state.daysPerWeek <= 7}
         >
           <div className="space-y-5">
@@ -561,8 +561,16 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             {/* The assistance slots, ABOVE the mileage input — a numeric input buries anything below it
                 on mobile (keyboard + Continue eclipse it), which locked users out of the control that
                 used to sit here. */}
+            {/* ⛔ ONE CARD PER DISCIPLINE, AND A DISCIPLINE THEY DID NOT KEEP RENDERS NOTHING.
+                Michael, 2026-07-25: *"it's too busy — can we make the cards blind to what the user
+                doesn't select?"* Every control here was already gated on posture, so the fix is not
+                logic, it is GROUPING: the screen was one undifferentiated column of headings, so a
+                triathlete's run, ride, swim and accessory questions all ran together and read as one
+                impossibly long form. Boxed per discipline, an athlete keeping only the run sees two
+                cards. */}
             {state.posture?.strength === 'develop' && (
-              <div>
+              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4">
+                <p className="text-white/85 text-sm font-medium mb-3">Strength</p>
                 <p className="text-white/70 text-sm mb-1">Accessory work</p>
                 <p className="text-white/55 text-sm mb-3 leading-relaxed">
                   Every session ends with three short slots. The lifting itself is set — these are yours to pick.
@@ -601,7 +609,9 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               </div>
             )}
             {posturePresent('run') && (
-              <div>
+              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4 space-y-4">
+                <p className="text-white/85 text-sm font-medium mb-3">Run</p>
+                <div>
                 <p className="text-white/70 text-sm mb-2">Long run day</p>
                 {/* ⛔ ALL SEVEN DAYS. This was restricted to Sat/Sun with the note "your heavy lower
                     days (Tue/Fri) need clear space" — a rule from the hardcoded grid the 5/3/1
@@ -616,10 +626,11 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     stay clear of it by two days.
                   </p>
                 )}
+                </div>
               </div>
             )}
             {state.posture?.strength === 'develop' && posturePresent('run') && (
-              <div className="space-y-4">
+              <div className={`${'rounded-xl border border-white/12 bg-white/[0.03] p-4'} space-y-4`}>
                 <div>
                   {/* ⛔ THEIR OWN NUMBER FIRST. Michael, 2026-07-25: *"they need to know, they need
                       to slug it in."* Without it the band is absolute and says the same thing to a
@@ -706,7 +717,8 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               </div>
             )}
             {posturePresent('bike') && (
-              <div>
+              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4">
+                <p className="text-white/85 text-sm font-medium mb-3">Bike</p>
                 {/* ⛔ BIKE IS ASKED IN HOURS, NEVER MILES (D-323 §6, researched not picked). ~99% of
                     riders train on time — terrain and wind distort distance badly — and this app
                     learns ride HR and FTP but NO ride speed, so bike miles cannot become a session
@@ -733,8 +745,9 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               </div>
             )}
             {anchorChoices.length > 0 && (
-              <div>
-                <p className="text-white/55 text-sm mb-2">Keep a fixed hard session? (e.g. a club run or ride)</p>
+              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4">
+                <p className="text-white/85 text-sm font-medium mb-3">Fixed sessions</p>
+                <p className="text-white/70 text-sm mb-2">Keep a fixed hard session? (e.g. a club run or ride)</p>
                 <div className="grid grid-cols-2 gap-1.5 mb-2">
                   <button
                     type="button" onClick={() => setState((s) => ({ ...s, anchorDiscipline: null, anchorDay: '' }))}
@@ -769,7 +782,8 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 holds the time and says so. Only asked when swim was kept — one control, no yardage,
                 no sets. It exists for the triathlete who wants the slots on the calendar. */}
             {state.posture?.strength === 'develop' && state.posture?.swim === 'maintain' && (
-              <div>
+              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4">
+                <p className="text-white/85 text-sm font-medium mb-3">Swim</p>
                 <p className="text-white/70 text-sm mb-2">Swims per week</p>
                 <div className="flex gap-1.5 max-w-[240px]">
                   {[1, 2, 3].map((n) => (
