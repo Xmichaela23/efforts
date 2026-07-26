@@ -2454,6 +2454,9 @@ Deno.serve(async (req: Request) => {
               // ⛔ NO accessory_bias. Glute / Hyrox add-ons are OUT of this flow (D-323) and re-home to
               // the Adjust tab, where they REPLACE one of the session's three assistance slots rather
               // than stacking on top of the block.
+              // Swim slots, only when the athlete kept swim for this block. Booked, not coached.
+              ...(gsPosture?.swim === 'maintain' && Number(gsTp.swim_days) > 0
+                ? { swim_days: Number(gsTp.swim_days) } : {}),
               // The athlete's three assistance picks from the build flow. Absent → the composer's
               // bodyweight defaults, so skipping that card still yields a complete block.
               ...(gsTp.assistance_picks && typeof gsTp.assistance_picks === 'object'

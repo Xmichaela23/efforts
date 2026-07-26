@@ -33,7 +33,7 @@ Deno.serve(async (req: Request) => {
     const {
       user_id, duration_weeks,
       endurance_sport, endurance_frequency, goal_name, start_date, preview,
-      target_weekly_miles, easy_pace_min_per_mile, long_run_day, assistance_picks,
+      target_weekly_miles, easy_pace_min_per_mile, long_run_day, assistance_picks, swim_days,
     } = body as Record<string, unknown>;
 
     if (!user_id) return json({ success: false, error: 'user_id is required' }, 400);
@@ -102,6 +102,8 @@ Deno.serve(async (req: Request) => {
       assistancePicks: assistance_picks && typeof assistance_picks === 'object'
         ? assistance_picks as Record<string, string>
         : null,
+      // Swim is BOOKED, not coached — the athlete says how many; the app holds the time (D-323 §5).
+      swimDays: Number(swim_days) > 0 ? Math.min(4, Math.round(Number(swim_days))) : 0,
     });
     console.log(
       `[strength-plan] composed: ${plan.name} (${plan.duration_weeks}wk, ${sport ?? 'strength-only'}) ` +
@@ -137,6 +139,7 @@ Deno.serve(async (req: Request) => {
           training_max: plan.training_max,
           one_rep_maxes_at_build: maxes, // provenance: what the working numbers were computed from
           assistance_picks: assistance_picks ?? null, // what the athlete chose for the three slots
+          swim_days: Number(swim_days) > 0 ? Math.min(4, Math.round(Number(swim_days))) : 0,
           volume_notes: plan.volume_notes ?? null, // pace-estimate disclosure only (cap logic retired)
           volume_state: plan.volume_state ?? null, // above|below|in_band → client renders the tradeoff copy
           user_selected_start_date: start_date ?? null,

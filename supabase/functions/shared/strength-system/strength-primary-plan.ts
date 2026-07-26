@@ -64,6 +64,9 @@ export type StrengthPrimaryArgs = {
   /** The athlete's three assistance picks. Absent → the menu's bodyweight defaults, so skipping the
    *  card still produces a complete block. See `src/lib/assistance-menu.ts`. */
   assistancePicks?: AssistancePicks | null;
+  /** ⛔ SWIM IS A COURTESY, NOT A PRESCRIPTION (D-323 item 5). Number of swims to BOOK per week;
+   *  0 or absent → none. See `swimSessions` for what the app is and is not claiming here. */
+  swimDays?: number;
 };
 
 /** ONE prescribed set. `weight` is absolute lb — resolved at authoring off the stored working
@@ -290,6 +293,38 @@ function enduranceSession(
 }
 
 /**
+ * ⛔ SWIM IS BOOKED, NOT COACHED — and the distinction is the whole feature.
+ *
+ * Michael, 2026-07-25: *"we keep swim, let the user add — we give a courtesy two hour-long swims we
+ * slot in. They are a courtesy. Keep it light."* D-323 item 5 settles the same thing: days and a
+ * rough length in, slots booked, **no yardage, no sets, no drills, no week-to-week adjustment.**
+ *
+ * The app does not learn a swim pace, does not grade a swim, and does not adjust one. So it holds
+ * the time in the athlete's week and says so plainly. Anything more would be the app claiming to
+ * train something it cannot see.
+ *
+ * They land on FREE days only — never on a lifting day and never on a day already carrying an
+ * endurance session. A courtesy that displaces real work is not a courtesy.
+ *
+ * ⚠️ Do NOT add a `steps_preset` here. A token would route this through the workload matcher and the
+ * session would start being graded against a prescription that was never made.
+ */
+const SWIM_COURTESY_MIN = 60;
+
+function swimSessions(days: string[], count: number): PlanSession[] {
+  return days.slice(0, Math.max(0, count)).map((day) => ({
+    day,
+    type: 'swim',
+    name: 'Easy Swim',
+    description:
+      `~${SWIM_COURTESY_MIN} min easy. Booked, not coached — no set, no target. ` +
+      `This is upkeep alongside the lifting; the plan holds the time and leaves the swim to you.`,
+    duration: SWIM_COURTESY_MIN,
+    tags: ['easy', 'maintenance', 'aerobic', 'swim', 'courtesy'],
+  }));
+}
+
+/**
  * Compose the Strength Focus block: 5/3/1 as the spine + maintenance endurance underneath.
  * Returns the standard plan structure — the caller persists it and runs activate-plan.
  */
@@ -420,6 +455,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       });
     } else if (enduranceSport) {
       enduranceDays.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day)));
+    }
+
+    // Swim last, so it only takes days nothing else wanted.
+    if ((args.swimDays ?? 0) > 0) {
+      const taken = new Set(weekSessions.map((x) => x.day));
+      const free = DAYS.filter((d) => !taken.has(d));
+      swimSessions(free, args.swimDays!).forEach((x) => weekSessions.push(x));
     }
 
     weekSessions.sort((a, b) => {

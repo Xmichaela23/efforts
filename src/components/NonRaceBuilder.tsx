@@ -103,6 +103,9 @@ type NonRaceState = {
    *  (Replaced `accessoryBias` — the Glutes/Hyrox add-ons move to the Adjust tab, D-323, where they
    *  REPLACE a slot rather than stacking on top of the block.) */
   assistancePicks: AssistancePicks;
+  /** Swim slots per week. Booked, not coached (D-323 §5) — it exists for the triathlete who wants
+   *  the time held. Only asked when swim is kept for the block. */
+  swimDays: number;
   startDate: string; // Week 1 start (YYYY-MM-DD); plans are Monday-based so this snaps to that week server-side
 };
 
@@ -154,6 +157,7 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
           // shared menu, so a stale one falls back to the default rather than reaching a session.
           ...(state.posture?.strength === 'develop' && Object.keys(state.assistancePicks).length > 0
             ? { assistance_picks: state.assistancePicks } : {}),
+          ...(state.posture?.swim === 'maintain' && state.swimDays > 0 ? { swim_days: state.swimDays } : {}),
         },
       },
     ],
@@ -184,7 +188,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3, assistancePicks: {}, startDate: nextMondayISO(),
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3, assistancePicks: {}, swimDays: 2, startDate: nextMondayISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -458,6 +462,26 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             {/* The assistance slots, ABOVE the mileage input — a numeric input buries anything below it
                 on mobile (keyboard + Continue eclipse it), which locked users out of the control that
                 used to sit here. */}
+            {/* Swim is BOOKED, not coached. The app learns no swim pace and grades no swim, so it
+                holds the time and says so. Only asked when swim was kept — one control, no yardage,
+                no sets. It exists for the triathlete who wants the slots on the calendar. */}
+            {state.posture?.strength === 'develop' && state.posture?.swim === 'maintain' && (
+              <div>
+                <p className="text-white/55 text-sm mb-2">Swims per week</p>
+                <div className="flex gap-1.5 max-w-[240px]">
+                  {[1, 2, 3].map((n) => (
+                    <button
+                      key={n} type="button" onClick={() => setState((st) => ({ ...st, swimDays: n }))}
+                      className={`flex-1 py-2 rounded-lg text-sm border ${state.swimDays === n ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
+                    >{n}</button>
+                  ))}
+                </div>
+                <p className="text-white/35 text-xs mt-1.5">
+                  About an hour each, on days nothing else is booked. Held on the calendar, not coached —
+                  no set, no target.
+                </p>
+              </div>
+            )}
             {state.posture?.strength === 'develop' && (
               <div>
                 <p className="text-white/55 text-sm mb-1">Accessory work</p>
