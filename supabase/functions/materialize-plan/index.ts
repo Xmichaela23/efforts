@@ -18,7 +18,7 @@ import {
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
 import { calculatePlannedStrengthWorkload } from '../_shared/workload.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup, resolveSwapSeedWeight } from '../../../src/lib/exercise-config.ts';
-import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
+import { resolveProfile, getTargetRir, protocolUsesRir } from '../_shared/strength-profiles.ts';
 import { resolvePlanPhase } from '../_shared/plan-phase.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
 import {
@@ -1039,6 +1039,38 @@ export function fallbackUnresolvedPercentDisplay(weight: any, reps: any): string
   return `Pick a weight you can do for ${repText} reps with 2 in reserve`;
 }
 
+/**
+ * THE PER-SET PRESCRIPTION, carried through to the phone.
+ *
+ * 5/3/1 is three sets at three weights (SPEC-get-stronger §1). The authored row states them in
+ * `set_plan`; `weight`/`reps` carry the TOP set so every pre-existing consumer is unchanged. Without
+ * this pass-through the logger prefills the top weight onto all three sets — a number the athlete was
+ * not asked to lift, twice a session, four days a week, for twelve weeks.
+ *
+ * If anything downstream moved the top-set weight (an athlete adjustment, an equipment substitution),
+ * the ramp is rescaled by the SAME factor and re-rounded, so the three sets stay in proportion instead
+ * of the ramp silently pointing at a load the top set no longer uses. Round DOWN, as everywhere else.
+ *
+ * Returns undefined for any row without an authored `set_plan` — which is every row that is not a
+ * 5/3/1 main lift, so nothing else changes shape.
+ */
+export function carrySetPlan(ex: any, finalWeight: number | null | undefined): any[] | undefined {
+  const authored = Array.isArray(ex?.set_plan) ? ex.set_plan : null;
+  if (!authored || authored.length === 0) return undefined;
+  const authoredTop = Number(authored[authored.length - 1]?.weight);
+  const top = Number(finalWeight);
+  const scale = Number.isFinite(authoredTop) && authoredTop > 0 && Number.isFinite(top) && top > 0
+    ? top / authoredTop
+    : 1;
+  return authored.map((s: any) => {
+    const w = Number(s?.weight);
+    const scaled = Number.isFinite(w) && w > 0
+      ? (scale === 1 ? w : Math.max(5, Math.floor((w * scale) / 5) * 5))
+      : w;
+    return { weight: scaled, reps: s?.reps, ...(s?.amrap ? { amrap: true } : null) };
+  });
+}
+
 // Map percentage intensity to band resistance level
 function getBandResistanceFromPercentage(originalPercent: number): string {
   if (originalPercent <= 35) return "Light Band";
@@ -1940,8 +1972,14 @@ function expandTokensForRow(
             : requiredBaseline;
           
           // Extract target RIR from the exercise (if present from overlay)
-          const target_rir = getTargetRir(
-            resolveProfile(strengthProtocolId),
+          // ⛔ THE RIR STAMP SEAM. A protocol that does not auto-regulate gets NO target — see
+          // `protocolUsesRir`. Today that is Strength Focus (5/3/1) and nothing else: the working
+          // number and the reps are fixed at plan creation, so a reserve target is a second
+          // instruction that can contradict the prescription. Every other protocol is unchanged.
+          const strengthProfile = resolveProfile(strengthProtocolId);
+          const tracksRir = protocolUsesRir(strengthProfile);
+          const target_rir = !tracksRir ? undefined : getTargetRir(
+            strengthProfile,
             String(name ?? ''),
             typeof ex?.target_rir === 'number' ? ex.target_rir : null,
             rowPhase,
@@ -2004,7 +2042,7 @@ function expandTokensForRow(
               finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
             }
           }
-          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
+          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight), rir_tracked: tracksRir } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
@@ -2187,8 +2225,14 @@ function expandTokensForRow(
             : requiredBaseline;
           
           // Extract target RIR from the exercise (if present from overlay)
-          const target_rir = getTargetRir(
-            resolveProfile(strengthProtocolId),
+          // ⛔ THE RIR STAMP SEAM. A protocol that does not auto-regulate gets NO target — see
+          // `protocolUsesRir`. Today that is Strength Focus (5/3/1) and nothing else: the working
+          // number and the reps are fixed at plan creation, so a reserve target is a second
+          // instruction that can contradict the prescription. Every other protocol is unchanged.
+          const strengthProfile = resolveProfile(strengthProtocolId);
+          const tracksRir = protocolUsesRir(strengthProfile);
+          const target_rir = !tracksRir ? undefined : getTargetRir(
+            strengthProfile,
             String(name ?? ''),
             typeof ex?.target_rir === 'number' ? ex.target_rir : null,
             rowPhase,
@@ -2248,7 +2292,7 @@ function expandTokensForRow(
               finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
             }
           }
-          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
+          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight), rir_tracked: tracksRir } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }

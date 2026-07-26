@@ -67,6 +67,11 @@ interface LoggedExercise {
   expanded?: boolean;
   notes?: string;
   target_rir?: number; // Target RIR from prescription (1-5)
+  /** ⛔ false = this protocol does NOT auto-regulate, so no RIR is shown, asked for, or stored.
+   *  Stamped by materialize-plan off the protocol profile (`protocolUsesRir`). Today only Strength
+   *  Focus (5/3/1) sets it: the weight and the reps are fixed in advance and nothing reads a reserve
+   *  estimate to make a decision. Absent/true → every existing protocol behaves exactly as before. */
+  rir_tracked?: boolean;
   target_reps?: string; // Target reps from prescription, e.g. "4-6" or "8" (display only)
   // D-322: the working %1RM the PLAN authored for this slot (0.785 = "78.5% 1RM"), carried
   // straight off `computed.steps[].strength.percent_1rm`. Its one job is to let a SWAP derive
@@ -1789,6 +1794,30 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } catch { return []; }
   };
 
+  // ── THE PER-SET PRESCRIPTION ────────────────────────────────────────────────────────────────
+  // 5/3/1 prescribes three sets at three DIFFERENT weights (docs/SPEC-get-stronger.md §1). Every
+  // prefill path in this file used to take the row's single `weight` and copy it onto every set,
+  // which is right for "4×5 @ 135" and wrong for the whole of this protocol: the athlete would open
+  // each session to the TOP weight sitting on all three sets and correct two of them by hand, four
+  // days a week, for twelve weeks.
+  //
+  // The composer authors `set_plan`; `materialize-plan` carries it through (`carrySetPlan`) and
+  // rescales it if anything moved the top-set weight. ONE reader here, used by every prefill path —
+  // the same row shape was being mapped in four places, and that is how this file grows a bug that
+  // only shows up on one of them.
+  //
+  // Returns null for any row with no `set_plan`, which is every row that is not a 5/3/1 main lift.
+  // Those keep the copy-the-one-weight behaviour exactly as before.
+  const plannedSetsFor = (source: any): Array<{ weight?: number; reps?: number; amrap: boolean }> | null => {
+    const sp = Array.isArray(source?.set_plan) ? source.set_plan : null;
+    if (!sp || sp.length === 0) return null;
+    return sp.map((p: any) => ({
+      weight: Number.isFinite(Number(p?.weight)) && Number(p?.weight) > 0 ? Number(p.weight) : undefined,
+      reps: Number.isFinite(Number(p?.reps)) && Number(p?.reps) > 0 ? Math.round(Number(p.reps)) : undefined,
+      amrap: p?.amrap === true,
+    }));
+  };
+
   // Build from computed.steps (single source of truth)
   const parseFromComputed = (computed: any): LoggedExercise[] => {
     try {
@@ -1823,7 +1852,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             reps = parseInt(match[1], 10);
           }
         }
-        const isAmrap = typeof repsRaw === 'string' && /amrap/i.test(repsRaw);
+        // "5+" is an all-out set with a floor — Wendler's notation for the anchor's top set. It reads
+        // as open reps exactly like "AMRAP" does, and without this it fell through as a fixed 5 and
+        // took the ordinary 2–3 RIR gate instead of the near-max one.
+        const isAmrap = typeof repsRaw === 'string' && (/amrap/i.test(repsRaw) || /^\d+\s*\+$/.test(repsRaw.trim()));
         const weightNum = typeof s?.weight === 'number' ? round5(s.weight) : 0;
         const sets = Number(s?.sets) || 0;
         const notes = s?.notes;
@@ -1863,31 +1895,42 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             notes: rawNotes || undefined,
             rir: null,
             target_rir: targetRir, // Target RIR from prescription
+            // Deliberately absent, not missing: a deterministic protocol stamps this false.
+            rir_tracked: s?.rir_tracked === false ? false : undefined,
             target_reps: targetReps, // Target reps from prescription (e.g. "4-6")
             planned_percent_1rm: plannedPct, // D-322: authored intensity, for the swap seed
             planned_name: name, // Q-181: remember what was PRESCRIBED, so a rename reads as a swap
           } as LoggedExercise;
         }
-        const targetSets = Math.max(1, sets);
+        // Per-set prescription when the row carries one; otherwise the row's single weight on every
+        // set, exactly as before.
+        const planned = plannedSetsFor(s);
+        const targetSets = Math.max(1, planned?.length ?? sets);
         for (let i=0;i<targetSets;i+=1) {
+          const p = planned?.[i];
+          const setWeight = p?.weight != null ? round5(p.weight) : weightNum;
+          const setReps = p?.reps ?? reps;
+          const setAmrap = p ? p.amrap : isAmrap === true;
           const baseSet: any = {
-            weight: exerciseType === 'band' ? 0 : weightNum,
+            weight: exerciseType === 'band' ? 0 : setWeight,
             resistance_level: resistanceLevel,
             rir: null,
             done: false,
-            amrap: isAmrap === true,
+            amrap: setAmrap,
             prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
           };
-          
+
           if (isDurationExercise) {
             baseSet.duration_seconds = durationSeconds;
           } else if (shouldConvertToDuration) {
             // Convert reps to duration_seconds for duration-based exercises
             baseSet.duration_seconds = reps;
           } else {
-            baseSet.reps = isAmrap ? 0 : reps;
+            // An all-out set opens at 0 — the athlete enters what they actually got. The prescribed
+            // number is the FLOOR, not the target, and prefilling it would anchor them to it.
+            baseSet.reps = setAmrap ? 0 : setReps;
           }
-          
+
           byName[name].sets.push(baseSet);
         }
       }
@@ -2390,19 +2433,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           name: cleanName || '',
           notes: rawNotes || undefined,
           expanded: true,
-          sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => {
+          sets: Array.from({ length: plannedSetsFor(exercise)?.length ?? (exercise.sets || 3) }, (_, setIndex) => {
+            const plannedSet = plannedSetsFor(exercise)?.[setIndex];
             const baseSet: LoggedSet = {
-              weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
+              weight: isBodyweightMove(exercise.name) ? 0 : (plannedSet?.weight ?? exercise.weight ?? 0),
               barType: 'standard',
               rir: undefined,
               completed: false,
               prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
+              ...(plannedSet?.amrap ? { amrap: true } : null),
             };
-            
+
             // Parse reps - handle strings like "20/side", "8-10", "5 min", "Max reps"
             const rawReps = exercise.reps;
             let numericReps: number | undefined;
-            if (typeof rawReps === 'number' && rawReps > 0) {
+            if (plannedSet) {
+              // The per-set prescription wins: an all-out set opens at 0 (the athlete enters what
+              // they got), every other set opens on its own prescribed number.
+              numericReps = plannedSet.amrap ? undefined : plannedSet.reps;
+            } else if (typeof rawReps === 'number' && rawReps > 0) {
               numericReps = rawReps;
             } else if (typeof rawReps === 'string') {
               // Extract first number from string (e.g., "20/side" -> 20, "8-10" -> 8, "5 min" -> 5)
@@ -2411,7 +2460,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 numericReps = parseInt(match[1], 10);
               }
             }
-            
+
             // Duration-based exercises (planks, holds, carries)
             if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
               baseSet.duration_seconds = exercise.duration_seconds;
@@ -2535,17 +2584,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   name: cleanName || '',
                   notes: rawNotes || undefined,
                   expanded: true,
-                  sets: Array.from({ length: exercise.sets || 3 }, () => {
+                  sets: Array.from({ length: plannedSetsFor(exercise)?.length ?? (exercise.sets || 3) }, (_, setIndex) => {
+                    const plannedSet = plannedSetsFor(exercise)?.[setIndex];
                     const baseSet: LoggedSet = {
-                      weight: exercise.weight || 0,
+                      weight: plannedSet?.weight ?? exercise.weight ?? 0,
                       barType: 'standard',
                       rir: undefined,
-                      completed: false
+                      completed: false,
+                      ...(plannedSet?.amrap ? { amrap: true } : null),
                     };
                     // Parse reps - handle strings like "20/side", "8-10", "5 min"
                     const rawReps = exercise.reps;
                     let numericReps: number | undefined;
-                    if (typeof rawReps === 'number' && rawReps > 0) {
+                    if (plannedSet) {
+                      numericReps = plannedSet.amrap ? undefined : plannedSet.reps;
+                    } else if (typeof rawReps === 'number' && rawReps > 0) {
                       numericReps = rawReps;
                     } else if (typeof rawReps === 'string') {
                       const match = rawReps.match(/^(\d+)/);
@@ -2563,7 +2616,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   })
                 };
               });
-              if (pre.length) { 
+              if (pre.length) {
                 setExercises(prev => {
                   const final = isPlaceholder(prev) ? pre : (prev.length? prev: pre);
                   // Initialize rest timers for loaded exercises
@@ -2639,18 +2692,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               name: cleanName || '',
               notes: rawNotes || undefined,
               expanded: true,
-              sets: Array.from({ length: exercise.sets || 3 }, () => {
+              sets: Array.from({ length: plannedSetsFor(exercise)?.length ?? (exercise.sets || 3) }, (_, setIndex) => {
+                const plannedSet = plannedSetsFor(exercise)?.[setIndex];
                 const baseSet: LoggedSet = {
-                  weight: isBodyweightMove(exercise.name) ? 0 : (exercise.weight || 0),
+                  weight: isBodyweightMove(exercise.name) ? 0 : (plannedSet?.weight ?? exercise.weight ?? 0),
                   barType: 'standard',
                   rir: undefined,
                   completed: false,
                   prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
+                  ...(plannedSet?.amrap ? { amrap: true } : null),
                 };
                 // Parse reps - handle strings like "20/side", "8-10", "5 min"
                 const rawReps = exercise.reps;
                 let numericReps: number | undefined;
-                if (typeof rawReps === 'number' && rawReps > 0) {
+                if (plannedSet) {
+                  numericReps = plannedSet.amrap ? undefined : plannedSet.reps;
+                } else if (typeof rawReps === 'number' && rawReps > 0) {
                   numericReps = rawReps;
                 } else if (typeof rawReps === 'string') {
                   const match = rawReps.match(/^(\d+)/);
@@ -3517,6 +3574,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         completed: true,
         ...(durationToRecord ? { duration_seconds: durationToRecord } : {}),
       });
+      autoStartRestForSet(exerciseId, setIndex);
+      return;
+    }
+
+    // ⛔ A DETERMINISTIC PROTOCOL RECORDS NO RIR. Strength Focus (5/3/1) fixes the weight and the
+    // reps at plan creation; nothing in the engine reads a reserve estimate to decide anything, so
+    // asking for one on a heavy set is cognitive load with no consumer. Worse, an auto-filled value
+    // is not inert: the learned 1RM is estimated as brzycki(weight, reps + rir), so a guessed
+    // reserve on a deliberately sub-maximal opener reads back as a heavier lift than happened.
+    // Done just completes the set. `rir_tracked === false` is stamped by materialize off the
+    // protocol profile — see `protocolUsesRir`. Every other protocol keeps the strip below.
+    if (exercise.rir_tracked === false) {
+      updateSet(exerciseId, setIndex, { completed: true });
       autoStartRestForSet(exerciseId, setIndex);
       return;
     }
@@ -4913,6 +4983,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         {(() => {
                           const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                           if (loggerMode === 'mobility' || isDurationBased || isPlyometric(exercise.name)) return null;
+                          // A DETERMINISTIC protocol has no RIR at all — Strength Focus (5/3/1) fixes the
+                          // weight and the reps in advance, so weight loaded and reps completed are the
+                          // only two numbers the engine reads. Same reasoning as the test case below.
+                          if (exercise.rir_tracked === false) return null;
                           // A 1RM/baseline TEST has no RIR — the AMRAP protocol is the signal, not RIR. Hide
                           // the RIR cell entirely on a test (reps + weight only). (Q-097/Q-102)
                           if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
@@ -4986,7 +5060,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const isTestWorkout = isBaselineTestWorkout(scheduledWorkout || {});
                         const showReps = !isDurationBased && set.reps !== undefined;
                         const showWeight = !isDurationBased && !isBodyweightMove(exercise.name) && exType !== 'band';
-                        const showRir = !isTestWorkout && loggerMode !== 'mobility' && !isDurationBased && !isPlyometric(exercise.name);
+                        // `rir_tracked === false` → a deterministic protocol (5/3/1). Weight loaded and
+                        // reps completed are the only two numbers that mean anything there, so the RIR
+                        // column comes off entirely rather than sitting empty. Every other protocol is
+                        // unaffected — the flag is absent on all of them.
+                        const showRir = exercise.rir_tracked !== false && !isTestWorkout && loggerMode !== 'mobility' && !isDurationBased && !isPlyometric(exercise.name);
                         if (!showReps && !showWeight && !showRir) return null;
                         // D-129: buttons are `flex-1` (basis-0) so they GROW to fill the real row
                         // width — comfortable thumb targets on 390–430px phones — while still

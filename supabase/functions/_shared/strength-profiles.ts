@@ -23,7 +23,27 @@ export type StrengthProtocolId =
   | 'five_by_five';
 
 export type StrengthProtocolProfile = {
-  /** Default target RIR when no exercise-level override exists. */
+  /**
+   * ⛔ DOES THIS PROTOCOL AUTO-REGULATE? Default true; false only where the protocol is
+   * deterministic.
+   *
+   * RIR belongs to auto-regulated training, where how the athlete feels today decides what goes on
+   * the bar. Wendler's 5/3/1 is the opposite: the working number and the reps are fixed in advance,
+   * and the only thing that overrides them is a hard rep count on the week-3 check set. Asking for
+   * a subjective reserve estimate there is not just unused — it is a SECOND instruction that can
+   * contradict the first, on the exact set where the prescription reads "as many as you can".
+   *
+   * And it actively degraded the numbers. `updateLearnedStrengthFromExerciseLog` estimates a 1RM as
+   * `brzycki(weight, reps + rir)` — so a recorded reserve ADDS phantom reps. Eight of this block's
+   * twelve weeks are deliberately sub-maximal, so a light opener logged at RIR 4 would have been
+   * read back as a much heavier lift than it was. With RIR absent the estimate reads what was
+   * actually lifted. Dropping it makes the learned max more accurate, not less.
+   *
+   * false → no target is stamped, the logger does not ask, and nothing infers one.
+   */
+  usesRir?: boolean;
+
+  /** Default target RIR when no exercise-level override exists. Ignored when `usesRir` is false. */
   defaultTargetRir: { lower: number; upper: number };
 
   progression: {
@@ -89,20 +109,28 @@ export const PROTOCOL_PROFILES: Record<StrengthProtocolId, StrengthProtocolProfi
     deload:      { maxDeviation: -1.0, minSessions: 3 },
   },
 
-  // D-322. Strength-PRIMARY blocks (the "Get Strong" composer) periodize their own
-  // intensity — a base ramp at 5 reps, an intensification at 3, a peak of doubles at
-  // 88–94%, then an AMRAP retest. They had NO entry here, and they don't populate
-  // `config.strength_protocol` either, so every one of them fell through
-  // `resolveProfile(null)` to `durability` — a concurrent-support profile prescribing a
-  // flat RIR 2.5 over a block that finishes with 94% doubles. A peak week was asking for
-  // the same reps-in-reserve as an easy base week.
+  // ⛔ STRENGTH FOCUS (Wendler 5/3/1) — THE ONE PROTOCOL THAT DOES NOT USE RIR.
   //
-  // 2.0 base, taken with the PHASE_RULES offsets below, lands the block on
-  // base 2.0 → intensification 1.5 → peak 1.0 → deload 3.0 → retest 2.5, which is the
-  // field-standard shape for a strength peaking block (RP / RTS: ~2–3 RIR accumulating,
-  // 1–2 intensifying, 0–1 at peak). Progression thresholds mirror neural_speed: the
-  // composer owns the ramp, so only a clear, repeated signal should move a working load.
+  // Michael, 2026-07-25: RIR belongs to auto-regulated programmes, where today's feeling sets the
+  // weight. 5/3/1 is deterministic — the working number and the reps are fixed at plan creation and
+  // move only on the hard rep count of the week-3 check set. The engine never reads RIR to decide
+  // anything here, so asking for it is a second instruction that can contradict the first, on a
+  // block whose athletes are already carrying endurance fatigue.
+  //
+  // ⚠️ SCOPE: `usesRir: false` is set HERE and NOWHERE ELSE. Every other protocol in this file is
+  // untouched and keeps its targets, its grading and its logger prompt. This is a property of the
+  // 5/3/1 block, not a change to how the app handles effort.
+  //
+  // The RIR numbers below stay for one reason: `adapt-plan` and the analyzer still resolve a profile
+  // for any legacy plan already carrying `source: strength_primary`, and a missing entry resolves to
+  // `durability` — the Q-192 failure. They are inert while `usesRir` is false.
+  //
+  // (History: D-322 added this entry because these blocks had none and fell through to `durability`
+  // — a flat RIR 2.5 across a block finishing in 94% doubles. That fix was correct for the ATR
+  // protocol it was written against; the 5/3/1 rewrite replaced the protocol, and the honest answer
+  // for the new one is no target at all rather than a better one.)
   strength_primary: {
+    usesRir: false,
     defaultTargetRir: { lower: 2, upper: 2 },
     progression: { minDeviation: 0.25, minGainPct: 0.02 },
     deload:      { maxDeviation: -0.5, minSessions: 2 },
@@ -376,6 +404,12 @@ export function normalizePhaseKey(phaseTag: string | null | undefined): PlanPhas
   if (raw in PHASE_RULES) return raw as PlanPhaseId;
   // Intensification blocks: harder than base, not yet the peak.
   if (raw === 'power' || raw === 'strength' || raw === 'intensification' || raw === 'build2') return 'build';
+  // 5/3/1 (SPEC-get-stronger). A LEADER cycle is programmed fives with no all-out set — accumulation,
+  // so `base`. An ANCHOR reinstates the open top set at a higher working number — intensification, so
+  // `build`. Registered here at the same time the composer started emitting them: an unrecognised name
+  // resolves to the default silently, and that silence is Q-192's whole failure mode.
+  if (raw === 'leader') return 'base';
+  if (raw === 'anchor') return 'build';
   // Planned unloading — must LOOSEN the target, never tighten it.
   if (raw === 'deload' || raw === 'unload' || raw === 'restoration' || raw === 'rest') return 'recovery';
   // Fresh-for-a-number weeks. A retest is a test: arrive rested, do not grind into it.
@@ -390,7 +424,27 @@ export function resolvePhaseRule(phaseTag: string | null | undefined): PhaseRule
 }
 
 /**
+ * Does this protocol auto-regulate off reps-in-reserve?
+ *
+ * ⛔ ASK THIS BEFORE STAMPING A TARGET, rather than changing what `getTargetRir` returns. That
+ * function returns a plain `number` and has ~a dozen callers across the analyzer, adapt-plan, the
+ * coach and both materialize sites; making it nullable to serve one protocol would push a null
+ * check into every one of them, and the ones that forgot would silently read `0` — "grind to
+ * failure" — which is the worst possible failure direction for this.
+ *
+ * So the switch lives at the STAMP SEAM instead: a protocol that does not use RIR simply never gets
+ * a target written onto its rows, and every existing reader sees an absent value, which they all
+ * already handle. Default true — only a profile that explicitly opts out returns false.
+ */
+export function protocolUsesRir(profile: StrengthProtocolProfile | null | undefined): boolean {
+  return profile?.usesRir !== false;
+}
+
+/**
  * Returns the target RIR for a given lift.
+ *
+ * ⚠️ Callers at a STAMP seam must gate on `protocolUsesRir(profile)` first — this function always
+ * returns a number, including for protocols that do not use RIR at all.
  *
  * Precedence:
  *   1. An explicit per-exercise target (from the planned workout) always wins — the athlete/coach
