@@ -1,8 +1,7 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, Bike, Waves, Dumbbell } from 'lucide-react';
 import { StepLayout } from '@/components/wizard/StepLayout';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor } from '@/lib/context-utils';
@@ -99,57 +98,42 @@ function DayPicker({ value, onChange, allowed }: { value: DayName | ''; onChange
 // `long_run` from `preferred_days` to `generate-strength-plan`, so `quality_run` / `quality_bike`
 // reach the GOAL and stop there. So the line states what the session IS (a hard day, same recovery
 // bank), not what the engine will do with it. Promote the copy the day the pin arrives.
-// The line shown once BOTH hard days are taken — the ledger, not a warning. Nothing is refused.
-const TWO_HARD_DAYS_LINE =
-  'Two hard days alongside four lifting days is the ceiling. Hard intervals and heavy bar work draw '
-  + 'on the same recovery, so at this level strength holds rather than climbs.';
+// ⛔ REMOVED 2026-07-26 (D-327): `TWO_HARD_DAYS_LINE` and the "Mulholland" two-hard-days dialog.
+// They stated a ceiling of TWO hard aerobic days. `DOCTRINE-aerobic-maintenance.md` §6 makes it ONE,
+// so the line was wrong, not merely dead, and the dialog fired on a transition that can no longer
+// happen. Michael's call, explicitly: *"it was a late night fun thing, not necessary."*
+// The rule now lives in `QualityDayPicker.blockedBy` — the second hard day is greyed, with the swap
+// one tap away. Do not reinstate a warning here; the gate replaced it.
 
-// ⛔ THE MULHOLLAND DIALOG — and it is deliberate, so do not "clean it up" into house voice.
-// Michael, 2026-07-25: *"we can hand them the keys to the Porsche, but it's up to them how they
-// handle the curves on Mulholland… it's smart and funny, maybe unnecessarily sexy, but it gets the
-// message across and it's language you would never see on a training app."*
+// ⛔ D-327 — ONE HARD AEROBIC DAY. THE SECOND ONE IS GREYED, NOT WARNED.
 //
-// ⚠️ IT BENDS TWO RULES ON PURPOSE, both argued and both accepted:
-//  1. `COPY-VOICE.md` rule 10 bans idiom and metaphor. That rule exists to kill EMPTY filler
-//     ("trust the taper", "move the needle") — sentences that cost nothing and say nothing. This
-//     metaphor carries the actual message: the capability is real and the consequence is yours.
-//     Metaphor doing work, not metaphor doing decoration.
-//  2. *"Gate it, don't warn it — no accept-the-risk button."* Held by CONSTRUCTION, not by wording:
-//     the day is ALREADY SET before this opens, the dialog asks for nothing, and dismissing it
-//     changes no state. There is no checkbox, no "I understand", and no path that refuses the
-//     choice. It is the app being frank, not the app covering itself. **If a future change makes
-//     this dialog decide anything, it has become the button this was not, and it must come out.**
+// The doctrine (`docs/DOCTRINE-aerobic-maintenance.md` §6) allows a strength-led block exactly ONE hard
+// aerobic session: bike if they have one, hill repeats if not. **"Both" means a choice, not two.**
 //
-// Fires ONCE PER BUILD, on the transition to two — not on every tap, and not again if they fiddle.
-// A new block a year later is a new decision and gets it again.
-function MulhollandDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="bg-zinc-950 border-white/12 text-white max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="text-white text-left text-lg">Two hard days</DialogTitle>
-        </DialogHeader>
-        <p className="text-white/90 text-[15px] leading-relaxed">
-          We can hand you the keys to the Porsche. How you take the curves on Mulholland is up to you.
-        </p>
-        <p className="text-white/70 text-sm leading-relaxed">{TWO_HARD_DAYS_LINE}</p>
-        <button
-          type="button" onClick={onClose}
-          className="w-full min-h-[48px] mt-1 rounded-xl bg-teal-500 text-white font-semibold text-base"
-        >Got it</button>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
+// So this is a real gate — the first in this flow that refuses a state rather than pricing it. It is
+// refusable BECAUSE the swap is always one tap away: the athlete is never stuck, they are steered.
+// Nothing is lost, the other day is cleared for them, and they never have to back out to change it.
+//
+// ⚠️ SYMMETRIC ON PURPOSE, though the spec only named step 5. Running (step 4) comes before Bike
+// (step 5), so forward-only greying looks sufficient — until someone taps Back from the bike card and
+// sets a second hard day from the run side, which is the one path a forward-only gate cannot see.
+// The gate belongs to the pair, not to the screen.
 function QualityDayPicker({
-  label, hint, atCeiling, value, onChange,
+  label, hint, value, onChange, blockedBy,
 }: {
-  label: string; hint: string; atCeiling?: boolean;
+  label: string; hint: string;
   value: DayName | ''; onChange: (d: DayName | '') => void;
+  /** The hard day already taken on the OTHER discipline. Present → this section is greyed.
+   *  `onSwap` sets this discipline's day and clears the other one, in a single action. */
+  blockedBy?: { day: DayName; note: string; cta: string; onSwap: (d: DayName) => void } | null;
 }) {
+  // Local, not lifted: revealing the chips is a UI step, not a decision. Nothing is committed until a
+  // day is tapped, and backing out of the reveal must leave the athlete exactly where they were.
+  const [revealed, setRevealed] = useState(false);
+  const blocked = !!blockedBy && !value;
+
   return (
-    <div>
+    <div className={blocked && !revealed ? 'opacity-60' : undefined}>
       <div className="flex items-baseline justify-between gap-2 mb-2">
         <p className="text-white/85 text-sm">{label}</p>
         {value && (
@@ -159,9 +143,27 @@ function QualityDayPicker({
           >Clear</button>
         )}
       </div>
-      <DayPicker value={value} onChange={onChange} />
-      <p className="text-white/70 text-sm mt-1.5 leading-relaxed">{hint}</p>
-      {atCeiling && <p className="text-white/85 text-sm mt-2 leading-relaxed">{TWO_HARD_DAYS_LINE}</p>}
+
+      {blocked && !revealed ? (
+        <>
+          <p className="text-white/70 text-sm leading-relaxed">{blockedBy!.note}</p>
+          <button
+            type="button"
+            onClick={() => setRevealed(true)}
+            className="mt-2 min-h-[44px] px-4 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
+          >{blockedBy!.cta}</button>
+        </>
+      ) : (
+        <>
+          {/* The swap is ONE action — take this day, clear the other. Never two taps, and never a
+              state where both are set even for a render. */}
+          <DayPicker
+            value={value}
+            onChange={(d) => (blocked && d ? blockedBy!.onSwap(d) : onChange(d))}
+          />
+          <p className="text-white/70 text-sm mt-1.5 leading-relaxed">{hint}</p>
+        </>
+      )}
     </div>
   );
 }
@@ -202,6 +204,11 @@ type NonRaceState = {
    *  band tells a 40-mile runner and a 10-mile runner the same thing, and it is only true for one. */
   usualMiles: number | '';
   targetMiles: number | ''; // Get Strong: typed maintenance mileage, in the user's display unit; canonicalized to miles at confirm
+  /** ⛔ Has the athlete typed in the hold field THEMSELVES? The seed re-runs until they have.
+   *  Emptiness is NOT the test: `onChange` fires per keystroke, so typing "28" seeds off "2" first
+   *  (dose 1), and the field is no longer empty when the "8" arrives. The hold then stays at 1 while
+   *  the copy above it correctly reads "holds about 19" — the seed locked on the first digit. */
+  targetTouched: boolean;
   runDays: number; // Get Strong: how many days to run (2/3/4) — engine spreads the miles + stacks extras onto upper lift days
   /** Strength Focus: the athlete's pick for each of the three assistance slots. Empty = the engine's
    *  bodyweight default, so skipping this is a valid answer that still yields a complete block.
@@ -347,7 +354,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', startDate: nextMondayISO(),
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', startDate: nextMondayISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -413,30 +420,23 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   // as no answer.
   const isStrengthFocus = state.goal === 'get_stronger';
   const posturePresent = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
-  // ⛔ TWO HARD DAYS IS THE CEILING, AND THE SHAPE ENFORCES IT — one per discipline, run and bike, so
-  // there is no third to gate. Michael, 2026-07-25: *"two hard days pushes the recovery system to its
-  // absolute limit on a 4-day strength block… you can do it, but you're paying full price for it."*
-  // Field practice, not invented: even trained endurance athletes hold 2-3 genuinely hard sessions a
-  // week, and four heavy lifting days are already drawing on that same account.
+  // ⛔ ONE HARD AEROBIC DAY — D-327, and the PAIR enforces it (`QualityDayPicker.blockedBy`).
   //
-  // The line appears only at TWO. One hard day is unremarkable and says nothing; a ledger that talks
-  // at one is noise by the time it matters. Gate-don't-warn holds — nothing here is refused, and
-  // there is no "accept the risk" button. The cost is stated and the athlete owns it.
-  const hardDayCount = (['run', 'bike'] as const).filter((d) => state.qualityDays[d]).length;
-  // Fires on the TRANSITION to two, once per build. `seen` is a ref, not state: re-rendering must
-  // never re-open it, and toggling a day off and back on is fiddling, not a new decision.
-  const [mulhollandOpen, setMulhollandOpen] = useState(false);
-  const mulhollandSeen = useRef(false);
+  // History, so nobody re-derives it: this was TWO hard days, priced-not-refused, with a one-shot
+  // "Mulholland" dialog on the transition to the second. `DOCTRINE-aerobic-maintenance.md` §6 replaced
+  // that with one — bike if they have one, hill repeats if not; "both" means a choice, not two. The
+  // dialog and the two-day ceiling line were DELETED at Michael's call, not left dead: the state they
+  // fired on cannot occur, and a rule nobody can reach is one somebody tunes later assuming it fires.
+  //
+  // D-327 — take this discipline's hard day and release the other's, in one state write. The athlete
+  // taps a day; they never tap "clear" first, and there is no render where both are set.
+  const swapQualityDay = (d: 'run' | 'bike', day: DayName) => setState((s) => ({
+    ...s,
+    qualityDays: { [d]: day } as Partial<Record<'run' | 'bike', DayName>>,
+  }));
   const setQualityDay = (d: 'run' | 'bike', day: DayName | '') => setState((s) => {
     const next = { ...s.qualityDays };
     if (day) next[d] = day; else delete next[d];
-    // ⛔ THE DAY IS SET FIRST, ALWAYS. The dialog reports a choice already made — it does not stand
-    // between the athlete and the choice. That ordering is what keeps it from being a consent gate.
-    const count = (['run', 'bike'] as const).filter((k) => next[k]).length;
-    if (count === 2 && !mulhollandSeen.current) {
-      mulhollandSeen.current = true;
-      setMulhollandOpen(true);
-    }
     return { ...s, qualityDays: next };
   });
   const strengthDeveloperLabel = (id?: string) => (id ? STRENGTH_PROTOCOL_LABELS[id] ?? id : id);
@@ -457,7 +457,6 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     // h-full (not 100dvh) so it fills GoalsScreen's content area and keeps the app nav/banner when
     // embedded; standalone route still fills its container.
     <div className="h-full bg-zinc-950 text-white flex flex-col">
-      <MulhollandDialog open={mulhollandOpen} onClose={() => setMulhollandOpen(false)} />
       {currentStep === 'goal' && (
         <StepLayout
           step={stepNo('goal')} totalSteps={steps.length} title="What's the goal?"
@@ -825,8 +824,13 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     const usual = e.target.value === '' ? '' : Number(e.target.value);
                     const dose = typeof usual === 'number' ? maintenanceDoseFor(usual) : null;
                     // Seed the hold with the maintenance dose — a suggestion they can overtype,
-                    // never a clamp. Only while they have not typed one themselves.
-                    return { ...st, usualMiles: usual, targetMiles: st.targetMiles === '' && dose ? dose : st.targetMiles };
+                    // never a clamp. Re-seeds on EVERY keystroke until they type in the hold field
+                    // themselves (`targetTouched`).
+                    // ⛔ The test used to be `st.targetMiles === ''` and that is the bug: onChange
+                    // fires per digit, so "28" seeded off "2" (dose 1) and then refused to update,
+                    // because by the time the "8" landed the field was no longer empty. The screen
+                    // read "holds about 19" over a hold of 1. Emptiness is not consent.
+                    return { ...st, usualMiles: usual, targetMiles: !st.targetTouched && dose ? dose : st.targetMiles };
                   })}
                   placeholder="e.g. 20"
                   className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
@@ -855,7 +859,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 <input
                   type="number" inputMode="numeric" min={0}
                   value={state.targetMiles === '' ? '' : state.targetMiles}
-                  onChange={(e) => setState((s) => ({ ...s, targetMiles: e.target.value === '' ? '' : Number(e.target.value) }))}
+                  onChange={(e) => setState((s) => ({ ...s, targetMiles: e.target.value === '' ? '' : Number(e.target.value), targetTouched: true }))}
                   placeholder={`e.g. ${Math.max(4, capDisplay - 4)}`}
                   className="w-24 py-2 px-3 rounded-lg bg-white/[0.04] text-white border border-white/12 text-sm"
                 />
@@ -898,7 +902,15 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             <QualityDayPicker
               label="Hard run day"
               hint="A club night, track repeats, a hard tempo — yours or someone else's. The day it lands, if you have one. It is kept, and it counts as a hard day: intervals draw on the same recovery a heavy squat does."
-              atCeiling={hardDayCount === 2}
+              blockedBy={state.qualityDays.bike ? {
+                day: state.qualityDays.bike,
+                // Reached only by tapping Back from the bike card. Stated as fact, then the trade —
+                // and it does NOT offer to swap the bike out on the doctrine's own reasoning: hard
+                // riding costs the legs less than hard running, so the ride is the one to keep.
+                note: `You've got a hard ride ${state.qualityDays.bike}. One hard day a week — hard riding costs your legs less than hard running does, so the ride is the one worth keeping.`,
+                cta: 'Pick a hard run day instead',
+                onSwap: (d) => swapQualityDay('run', d),
+              } : null}
               value={state.qualityDays.run ?? ''}
               onChange={(d) => setQualityDay('run', d)}
             />
@@ -939,7 +951,14 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             <QualityDayPicker
               label="Hard ride day"
               hint="A chaingang, a club ride, a threshold turbo — yours or someone else's. The day it lands, if you have one. It is kept, and it counts as a hard day rather than easy hours."
-              atCeiling={hardDayCount === 2}
+              blockedBy={state.qualityDays.run ? {
+                day: state.qualityDays.run,
+                // ⛔ D-327's primary case — step 5 following step 4. The offer to swap is not neutral:
+                // the doctrine says the bike WINS when the athlete has both, so this states why.
+                note: `You've got a hard run ${state.qualityDays.run}. One hard day a week — and hard riding costs your legs less than hard running does, so the ride is the better one to keep. Pick a ride and we'll clear the run.`,
+                cta: 'Pick a hard ride day',
+                onSwap: (d) => swapQualityDay('bike', d),
+              } : null}
               value={state.qualityDays.bike ?? ''}
               onChange={(d) => setQualityDay('bike', d)}
             />
