@@ -316,7 +316,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     {/* The card states what it NEEDS and who it is FOR. The app cannot tell a
                         beginner from an experienced lifter, and the scope cut governs what we build,
                         not who gets in (SPEC §4). */}
-                    <span className="block text-white/50 text-xs mt-1 leading-relaxed">
+                    <span className="block text-white/70 text-sm mt-1.5 leading-relaxed">
                       12 weeks of Wendler's 5/3/1, four lifting days. For someone who already lifts and
                       is months from a race. Needs a barbell, a rack and a bench — and your squat,
                       bench, deadlift and overhead press maxes on file.
@@ -328,7 +328,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           </div>
           {/* Strength is not a mode you switch into — it is in every plan, and only the dose changes.
               Saying so here is what makes ONE strength card make sense rather than look like a gap. */}
-          <p className="text-white/45 text-xs mt-4 leading-relaxed">
+          <p className="text-white/60 text-sm mt-5 leading-relaxed">
             Every plan has a strength component built on the same 5/3/1 principle. The load adjusts to
             the goal — a race build holds it at maintenance, this one develops it.
           </p>
