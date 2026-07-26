@@ -131,14 +131,17 @@ function getSteps(state: NonRaceState): StepKey[] {
   // screen. Michael, 2026-07-25: *"not necessary, user enters these."* Every other goal keeps it —
   // there the tier really does set the volume.
   const base: StepKey[] = ['goal', 'posture', 'commitment', 'length', 'schedule', 'confirm'];
+  // ⚠️ On step 1 no goal has been chosen yet, so this returned the FULL six-step flow and the
+  // progress bar read "1 of 6" — then jumped to "2 of 4" the moment the athlete tapped. With one
+  // goal offered, the flow it produces is knowable before it is picked. Count that.
+  const effective = state.goal ?? (GOAL_ORDER.length === 1 ? GOAL_ORDER[0] : null);
+  if (effective === 'get_stronger') return base.filter((k) => k !== 'commitment' && k !== 'length');
   // ⛔ AND NO LENGTH SLIDER. Twelve weeks is not a preference — Wendler's ratios are 2:1, 3:2 and
   // 2:2 over four-week cycles, so 12 is the only length that runs leader-leader-anchor as designed.
   // The slider offered 8-52 while the composer rounds DOWN to whole cycles, so 10 silently became 8
   // and 14 became 12: the athlete picked a number the engine never built. 8 ships later as the
   // short, off-ratio option, labelled as such.
-  return state.goal === 'get_stronger'
-    ? base.filter((k) => k !== 'commitment' && k !== 'length')
-    : base;
+  return base;
 }
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -291,6 +294,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           step={1} totalSteps={steps.length} title="What's the goal?"
           subtitle="Every plan carries strength. This one puts it in front."
           onBack={back} onContinue={next} canContinue={goalCanContinue}
+          hideContinue
         >
           <div className="space-y-2">
             {GOAL_ORDER.map((g) => (

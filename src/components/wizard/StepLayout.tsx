@@ -5,11 +5,15 @@ import React from 'react';
 import { ChevronLeft, Loader2 } from 'lucide-react';
 
 export function StepLayout({
-  step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false,
+  step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false, hideContinue = false,
 }: {
   step: number; totalSteps: number; title: string; subtitle?: string;
   onBack?: () => void; children: React.ReactNode;
   onContinue: () => void; canContinue: boolean; continueLabel?: string; saving?: boolean;
+  /** A step where the CHOICE advances (tapping the card is the answer) has nothing for a Continue
+   *  button to do. Rendering a dead control below the only thing on the screen reads as a missing
+   *  step rather than a finished one. */
+  hideContinue?: boolean;
 }) {
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -49,6 +53,7 @@ export function StepLayout({
       </div>
 
       {/* Continue */}
+      {!hideContinue && (
       <div className="shrink-0 px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-white/10 bg-zinc-950">
         <button
           type="button"
@@ -60,6 +65,7 @@ export function StepLayout({
           {continueLabel}
         </button>
       </div>
+      )}
     </div>
   );
 }
