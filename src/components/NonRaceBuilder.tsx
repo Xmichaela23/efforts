@@ -229,6 +229,11 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   const goalCanContinue = state.goal != null && (!needsDiscipline || state.discipline != null);
   const postureCanContinue = Object.values(state.posture).some((p) => p !== 'out');
   const rows = DISCIPLINE_ORDER; // ungated — always show all four disciplines (don't gate)
+  // The Strength Focus path. Strength is `develop` by definition here, so the screen never asks —
+  // but the VALUE still has to be written, because `create-goal-and-materialize-plan` routes on
+  // `posture.strength === 'develop'`. An assumed answer that never reaches the payload is the same
+  // as no answer.
+  const isStrengthFocus = state.goal === 'get_stronger';
   const posturePresent = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
   const anchorChoices = (['run', 'bike'] as const).filter((d) => posturePresent(d));
   const strengthDeveloperLabel = (id?: string) => (id ? STRENGTH_PROTOCOL_LABELS[id] ?? id : id);
@@ -275,7 +280,60 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
         </StepLayout>
       )}
 
-      {currentStep === 'posture' && (
+      {/* ── STRENGTH FOCUS: strength is the answer they already gave ──────────────────────────────
+          The generic screen below asks develop/maintain/out for all four disciplines and then offers
+          a strength-protocol picker. On this path all three of those questions are already settled:
+
+            • Strength DEVELOPS — that is what "Get stronger" means. Asking again is a form.
+            • Endurance CANNOT develop. `create-goal-and-materialize-plan` routes to the strength
+              engine only when no endurance discipline develops; pick develop and the plan silently
+              stops being a strength block and goes somewhere else entirely. Offering the option is
+              offering to leave.
+            • The PROTOCOL picker (5×5 / Upper Aesthetics / Neural Speed) is inert — the engine builds
+              Wendler 5/3/1 regardless, and the confirm screen was reporting the dead choice back as
+              fact. Omakase: the engine designs the block (D-323).
+
+          So the only real question is which endurance you are keeping through the block. Michael,
+          2026-07-25: *"strength is assumed, question is do you want to run ride swim — and you can't
+          develop them."* Every other goal keeps the full screen underneath. */}
+      {currentStep === 'posture' && isStrengthFocus && (
+        <StepLayout
+          step={2} totalSteps={steps.length} title="What are you keeping?"
+          subtitle="Strength leads for this block. Pick the endurance you want to hold onto — it stays easy, at maintenance."
+          onBack={back} onContinue={next} canContinue={postureCanContinue}
+        >
+          <div className="space-y-3">
+            {(['run', 'bike', 'swim'] as const).map((d) => {
+              const color = getDisciplineColor(d);
+              const Icon = DISCIPLINE_ICONS[d];
+              const keeping = (state.posture[d] ?? 'out') === 'maintain';
+              return (
+                <button
+                  key={d} type="button"
+                  onClick={() => setPosture(d, keeping ? 'out' : 'maintain')}
+                  className={`w-full rounded-xl border p-3 flex items-center justify-between ${keeping ? 'border-white/25 bg-white/[0.06]' : 'border-white/12 bg-white/[0.02]'}`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Icon className="h-4 w-4" style={{ color }} />
+                    <span className="font-medium" style={{ color: keeping ? color : 'rgba(255,255,255,0.45)' }}>
+                      {DISCIPLINE_LABEL[d]}
+                    </span>
+                  </span>
+                  <span className={`text-sm ${keeping ? 'text-white/70' : 'text-white/30'}`}>
+                    {keeping ? 'Keeping' : 'Not this block'}
+                  </span>
+                </button>
+              );
+            })}
+            <p className="text-white/35 text-xs">
+              Held at maintenance — easy sessions, enough to hold the aerobic base. Speed and threshold
+              are not maintained by this block.
+            </p>
+          </div>
+        </StepLayout>
+      )}
+
+      {currentStep === 'posture' && !isStrengthFocus && (
         <StepLayout
           step={2} totalSteps={steps.length} title="Per-discipline focus"
           subtitle="Seeded from your goal — adjust as you like. At most 2 disciplines develop at once."
@@ -540,8 +598,13 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 const color = getDisciplineColor(d);
                 const Icon = DISCIPLINE_ICONS[d];
                 const label = p === 'develop' ? 'Develop' : p === 'maintain' ? 'Maintain' : 'Out';
-                const proto = d === 'strength' && p === 'develop' && state.strengthProtocol
-                  ? ` · ${strengthDeveloperLabel(state.strengthProtocol)}` : '';
+                // ⛔ On the Strength Focus path the protocol label was a LIE. The picker seeds
+                // `strengthProtocol` (5×5 / Upper Aesthetics / Neural Speed), the engine ignores it
+                // entirely and builds Wendler 5/3/1, and this row reported the dead value back to the
+                // athlete as the plan they were about to get. Name what actually gets built.
+                const proto = d !== 'strength' || p !== 'develop' ? ''
+                  : isStrengthFocus ? ' · Wendler 5/3/1'
+                  : state.strengthProtocol ? ` · ${strengthDeveloperLabel(state.strengthProtocol)}` : '';
                 return (
                   <div key={d} className="flex items-center justify-between text-sm">
                     <span className="flex items-center gap-2" style={{ color }}>
