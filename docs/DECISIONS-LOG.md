@@ -1257,13 +1257,52 @@ One goal card (the other five were placeholders); strength assumed and endurance
 
 ---
 
-## D-325 — The Session Cost Ledger + Penalty Scheduler: three ordinal axes, ceilings from emphasis, placement by penalty score, and the ledger is SUBORDINATE to the reconciler (2026-07-25, SPEC — not built)
+## D-325 — The Session Cost Ledger + Penalty Scheduler: three ordinal axes, ceilings from emphasis, placement by penalty score, and the ledger is SUBORDINATE to the reconciler (2026-07-25, SPEC — not built; **AMENDED 2026-07-26**)
 
 **Michael's spec, verbatim in structure. This entry is the contract; deviations need a new D-NNN.**
 
 > ⛔ **Numbered D-325, not D-268.** The spec arrived labelled D-268 — **already taken** (*"Plan-primary is a
 > SYSTEM invariant"*, 2026-07-09, with its own design doc `DESIGN-D268-plan-aware-everywhere.md`). Caught
 > before writing. The log was at D-324.
+
+> ## ⛔ AMENDED 2026-07-26 — eight changes, decided by Michael. The sections below are amended IN PLACE; this block is the index.
+>
+> The spec was checked against the training-science literature and against the code it claims to
+> consolidate. **The physiology held. The encoding of it did not, in one specific way, and two stated
+> facts were arithmetically wrong.**
+>
+> 1. **⛔ LAW RECONCILIATION — blocking, do first (§5 rewritten).** `_shared/schedule-session-constraints.ts`
+>    and the original penalty table price **different harms** and both encoded them as **symmetric
+>    adjacency**. That is the bug. **Interference is DIRECTIONAL.** Penalties are now **ordered pairs**.
+>    `schedule-session-constraints.ts` **remains the single law**; the penalty table is a **rendering of it
+>    into costs, not a second ranking. Do not fork it.**
+> 2. **Mech has one definition (§1).** *Cumulative eccentric tissue loading — force × repetitions*, spanning
+>    barbell and running. Run VO2 **stays 3**. The long-run duration split **stays**. The ordinal/cardinal
+>    weakness is now logged as a weakness, not defended as a design.
+> 3. **Cardio scales with duration (§1).** Long run > 90 min: **3/2/2 → 3/3/2**. The stock week uses the
+>    ≤ 90 row, so **no downstream change**.
+> 4. **`strength_led` cardio 8 is a DOSE CAP, not an interference guard (§2).** It exists so a strength
+>    block does not become a tri block. **Documented so it is never tuned against physiology. Do not raise it.**
+> 5. **Breach output must name the argument (§7).** When more than one axis breaches, the output says which
+>    axis carries the **real reason** and which is dose. Ranked, both stated.
+> 6. **Three corrections to stated fact (§2, §7).** **Bike VO2 alone is LEGAL** — 12/7/9 against 14/8/9; the
+>    claim that it was refused was wrong and it is a feature that shipped into intake. **Run VO2 breaches
+>    TWO axes**, mech 15/14 *and* cns 10/9, not one. The **§7 example string arithmetic was wrong.**
+> 7. **The place-week rationale is RETRACTED (§6).** The stated reason for retiring it — *"walls are why it
+>    could return nothing"* — **is false.** It already never returns empty and already emits
+>    `compromises: string[]`. It is consolidated because **two placers reading one law is still two placers**,
+>    not because it fails. **The real outlier is the hardcoded Mon/Tue/Thu/Fri grid, which ignores the law
+>    and wins by default.**
+> 8. **The gates are named and reconciled with Q-203 (§8).** *"Breach never refuses"* applies **to the
+>    athlete, not to the app's own output.** The two prohibited rules **are hard gates** and are the only two
+>    on the strength side.
+>
+> **What did NOT change:** the three axes, the no-scalar-collapse rule, the cost values other than long-run
+> cardio, all three ceiling sets, the reconciler deltas, §4's subordination to `reconcileLoadStatus`, and
+> the 6h stack gap. **The bike-mech-0 call and the 6h gap are the two best-supported cells in the model** —
+> Wilson 2012 separates modality cleanly (running interferes with strength and hypertrophy; cycling
+> essentially does not), and Robineau 2016 found 0h worse while 6h and 24h tied, which is exactly
+> `MIN_STACK_GAP_H = 6` already in `place-week.ts:82`.
 
 ### Why it exists
 
@@ -1279,6 +1318,23 @@ fifth opinion — it *absorbs* two of the three.
 
 ### 1. Session cost vector — three ordinal values, 0–3, hardcoded
 
+> **⛔ MECH HAS ONE DEFINITION AND THIS IS IT (amended 2026-07-26).**
+> **Mech = cumulative eccentric tissue loading — force × repetitions.** It spans barbell and running, and
+> it is the axis that drives clearance from lifting.
+>
+> **The amendment exists because the axis was being used two ways at once.** The long-run duration split
+> was justified on **foot strikes** — a cumulative model. Run VO2 then carried mech 3, the same as a 2:30
+> long run, on an **intensity** model. One axis, two definitions, and it was the row that does the
+> refusing. **Resolved by force × repetitions: run VO2 stays 3** — the force term is high enough at 5K
+> pace and faster to carry the row on its own — **and the long-run rows stay split by duration.**
+>
+> ⚠️ **STATED WEAKNESS, not a defended design.** The model **sums ordinal values, which is a cardinal
+> operation on an ordinal scale.** A mech 3 is not "one and a half" mech 2s and the arithmetic pretends it
+> is. **This is acceptable only because the ceilings are calibrated EMPIRICALLY against known-good weeks,
+> not derived from the axis.** The sum is a bookkeeping device that happens to rank weeks correctly at the
+> calibrated point; it is not a measurement. ⛔ **Anyone who later derives a ceiling from the table rather
+> than from a summed real week has broken the only thing holding it up.**
+
 | session | mech | cardio | cns |
 |---|---|---|---|
 | 5/3/1 lower, top set | 3 | 0 | 2 |
@@ -1286,12 +1342,18 @@ fifth opinion — it *absorbs* two of the three.
 | Run VO2 | 3 | 3 | 3 |
 | Run threshold | 2 | 2 | 1 |
 | Long run ≤ 90 min | 2 | 2 | 1 |
-| Long run > 90 min | 3 | 2 | 2 |
+| Long run > 90 min | 3 | **3** | 2 |
 | Bike VO2 | 0 | 3 | 2 |
 | Bike sweet spot | 0 | 2 | 1 |
 | Zone 2 run | 1 | 1 | 0 |
 | Zone 2 bike | 0 | 1 | 0 |
 | Swim | 0 | 1 | 0 |
+
+> **Long run > 90 min cardio was 2 and is 3 (amended 2026-07-26).** Mech and cns both stepped up with
+> duration while cardio held flat, and **metabolic cost is the axis that most obviously scales with time.**
+> ⚠️ **The stock `strength_led` week uses the ≤ 90 row, so nothing downstream moves** — the default stays
+> **12 / 4 / 7**. The row matters the moment a race plan hosts the block, which is §0.2 of
+> `ARCH-strength-spine.md` and still open.
 
 **No formula, no scalar collapse, no exchange rate between axes.** Same shape as the existing
 role-weighted exercise table: a visible editorial choice, not a fake measurement. Nothing to defend that
@@ -1299,6 +1361,10 @@ is not on the page.
 
 **Rows are valid only at their spec'd duration.** Quality sessions are fixed-duration — threshold run
 45 min, sweet-spot ride 90 min. **Duration must not float**, or the row stops meaning what it says.
+
+⚠️ **Known flattening, accepted:** one row covers both squat and deadlift. **Deadlift is the more
+systemically costly lift and Wendler spaces it deliberately.** 5/3/1 runs both regardless, so the
+flattening does not change a placement today. Split the row only if a block ever runs one without the other.
 
 ### 2. Emphasis ceilings — weekly sum per axis
 
@@ -1310,17 +1376,104 @@ is not on the page.
 
 Ceilings derive from the **active emphasis state only**. No user-configurable ceiling, no slider anywhere.
 
+> ## ⛔ THE ACTIVE EMPHASIS STATE DOES NOT EXIST. Traced 2026-07-26 — `strength_led`, `balanced` and `endurance_led` appear NOWHERE in the codebase.
+>
+> Not a type, not a constant, not a column — **they live only in this entry and the doctrines.** So the
+> sentence above describes a derivation from a state the app does not compute.
+>
+> **What actually carries emphasis today is `per_discipline_posture`** (`develop` / `maintain` / `out` per
+> discipline — `create-goal-and-materialize-plan:1428`, `:2383`). ⚠️ **It does not map cleanly: posture is
+> per-DISCIPLINE, an emphasis is per-BLOCK.** Deriving one from the other is unwritten work.
+>
+> ⛔ **AND `balanced` IS ALREADY TAKEN, in athlete-facing copy.** `load-headline.ts:17` maps the reconciler's
+> `on_target` to the word **"balanced"** on the LOAD row (`LoadBar.tsx:38`, `CoachWeekTab.tsx:1019`). **Ship
+> an emphasis called `balanced` and the app has two — one a verdict about this week's load, one a
+> description of the block.**
+>
+> ⚠️ **§4 forbids the ledger emitting a load verdict. Two things called `balanced` is that boundary crossed
+> in the VOCABULARY instead of the code — which is worse, because it looks fine in every diff.**
+> ⛔ **Rename before build.** *(Same class as this entry arriving numbered D-268, which was taken. That was
+> caught by reading the log; this one nothing would have caught — the ledger and the load row never meet.)*
+>
+> **Consequence for Q-205:** the two "unvalidated" ceiling sets cannot be validated yet — **there is no
+> default week to sum for an emphasis that does not exist.** `strength_led`'s numbers stay the only
+> calibrated set. See Q-205.
+
 > **The strength_led mech ceiling was 12 and is 14, and the reason is the method.** Summing the composer's
 > ACTUAL default week — 2 lower (6) + 2 upper (2) + long run (3) + 2 easy runs (2) — gave **13 against a
 > ceiling of 12**: a known-good week breaching before the athlete adds anything. Michael's call: *"the
 > model is wrong, not the week."* Two fixes: the long-run row split by duration (mechanical load scales
 > with foot strikes — one row for a 70-min maintenance run and a 2:30 build run was always wrong), and the
-> ceiling to 14. Default now lands **mech 12/14, cardio 4/8, cns 7/9** — two units of headroom: a
-> threshold run lands exactly at the ceiling, a run VO2 breaches by 1 and says so. **That gradient is the
-> intended behaviour.**
+> ceiling to 14. Default now lands **mech 12/14, cardio 4/8, cns 7/9** — two units of headroom. **That
+> gradient is the intended behaviour.** *(This note originally said "a threshold run lands exactly at the
+> ceiling, a run VO2 breaches by 1." The first half is right; the second was wrong on the count. Corrected
+> in the matrix below, 2026-07-26.)*
+
+> **⛔ `strength_led` cardio 8 is a DOSE CAP. It is NOT an interference guard (amended 2026-07-26). DO NOT RAISE IT.**
+>
+> It exists for one reason: **so a strength block does not quietly become a triathlon block.** It is a
+> statement about what the athlete signed up for, not a claim about physiology.
+>
+> **This has to be written down because the number does not behave like an interference guard and will be
+> "corrected" by someone who assumes it is one.** Two bike quality sessions cost the barbell **nothing**
+> mechanically — `Bike VO2` and `Bike sweet spot` are both mech 0, which is Wilson 2012 encoded honestly —
+> and the pair still breaches, on cardio. Read as physiology that looks backwards. **Read as dose it is
+> exactly right: three hard sessions in a strength block is a different block.**
+>
+> ⚠️ **The interference argument on that same pair lives on the cns axis, not this one.** See §7 — when both
+> breach, the output must say which one is the argument.
+
+#### The full opt-in matrix for `strength_led` — corrected 2026-07-26
+
+> ## ⛔ HALF THIS TABLE IS NOW UNREACHABLE BY CONSTRUCTION — read before tuning anything from it.
+>
+> **`DOCTRINE-aerobic-maintenance.md` §6 (decided 2026-07-26) allows a strength-led block EXACTLY ONE hard
+> aerobic session.** Bike if the athlete has one, hill repeats if not. **"Both" means a choice, not two.**
+>
+> **This is a state the DOCTRINE closed, not one the ledger closed** — which means the multi-quality rows
+> below are **unreachable by construction on `strength_led`**, not merely unreached in practice. ⛔ **They
+> remain live and correct for `balanced` and `endurance_led`, where two qualities is still a real
+> configuration.**
+>
+> ### And the consequence for the ceiling itself, stated plainly:
+>
+> > **`strength_led` 14 / 8 / 9 does NOTHING at `on_target`. No verdict, no placement change, no refusal.**
+>
+> **Every ceiling in this system was calibrated to bind at exactly one margin — the second quality session —
+> and on this block that margin no longer exists.** Any single quality fits with room.
+>
+> ✅ **What survives is `elevated` and `high`, where the STOCK WEEK ITSELF breaches, and that was always the
+> more honest job for it:** the ledger's remaining function on a strength block is to notice that **the BASE
+> is too much — not that the extras are.**
+>
+> ⚠️ **Do not read the inert ceiling as a calibration failure and "fix" it by lowering it.** It is inert
+> because the doctrine upstream removed the case it was built to catch. **Lowering it would make the stock
+> week breach at `on_target`, which is the exact error `strength_led` mech 12 → 14 corrected.**
+
+Stock week **12 / 4 / 7** against ceilings **14 / 8 / 9**.
+
+| athlete opts into | week lands at | verdict |
+|---|---|---|
+| nothing (stock) | 12 / 4 / 7 | legal — headroom 2 / 4 / 2 |
+| sweet-spot ride alone | 12 / 6 / 8 | legal, room to spare |
+| threshold run alone | 14 / 6 / 8 | legal — **mech exactly at ceiling** |
+| **bike VO2 alone** | **12 / 7 / 9** | ✅ **LEGAL — cns exactly at ceiling** |
+| threshold run **+** sweet-spot ride | 14 / 8 / 9 | legal — **at ceiling on all three axes** |
+| threshold run **+** bike VO2 | 14 / 9 / 10 | breach: cardio +1, cns +1 |
+| sweet-spot ride **+** bike VO2 | 12 / 9 / 10 | breach: cardio +1, cns +1 |
+| **run VO2**, alone or with anything | **15 / 7 / 10** | breach: **mech +1 AND cns +1** |
+
+⛔ **Two corrections, both load-bearing:**
+
+1. **Bike VO2 alone is LEGAL.** The source spec said *"Bike VO2 → CNS 10, also refused."* **That is only
+   true when it is the SECOND quality session** — on its own it lands at exactly 9. **This matters because
+   bike VO2 is a feature that shipped into intake**; the ledger permits it, and an implementation that
+   refuses it would break something already offered to the athlete.
+2. **Run VO2 breaches TWO axes, not one.** mech 15/14 **and** cns 10/9. Both source and this entry said
+   mech only. §7's ranking rule now governs what the athlete is told.
 
 ⚠️ **`balanced` and `endurance_led` are UNVALIDATED** — neither has been summed against its own default
-week the way `strength_led` was. **Pending calibration.** Do not trust them until that sum is done.
+week the way `strength_led` was. **Pending calibration (Q-205).** Do not trust them until that sum is done.
 
 ### 3. Reconciler deltas — applied uniformly to all three axes
 
@@ -1347,16 +1500,111 @@ be added; it only stops a normal week being called over-budget.
 
 ### 5. Penalty scheduler — score every candidate week, take the minimum, never return empty
 
-| adjacency / conflict | penalty |
+> ## ⛔ REWRITTEN 2026-07-26 — INTERFERENCE IS DIRECTIONAL, AND THE LAW IS NOT THIS TABLE
+>
+> **The original table and `_shared/schedule-session-constraints.ts` price different harms, and both
+> encoded them as SYMMETRIC ADJACENCY. That is the bug.** It surfaced as an apparent inversion: the law's
+> **strictest** single clearance — *after `lower_body_strength`, 48 hours before `quality_bike`*
+> (`schedule-session-constraints.ts:374`, §4.4 cycling-power impairment 24–48h post-heavy-lower) — was the
+> **cheapest** row in the penalty table, at +1 and 0.
+>
+> **Both were right about their own direction and wrong to be symmetric:**
+>
+> - **Bike quality AFTER lower-body strength is expensive.** Cycling power is impaired 24–48h post-heavy-lower
+>   (Robineau 2016, Petré et al. 2021). **The existing law is correct.** The ride is the session that suffers.
+> - **Lower-body strength AFTER bike quality is cheaper.** ⚠️ **This half rests on a CONTESTED claim and
+>   must not be written as settled** — see the boxed warning below. The order should still be preferred; it
+>   should not be priced as free.
+> - **Run VO2 is expensive in BOTH orders.** It interferes bidirectionally: eccentric damage degrades force
+>   production going forward, and pre-fatigued legs degrade the interval session going back.
+>
+> ### ⛔ `_shared/schedule-session-constraints.ts` REMAINS THE SINGLE LAW.
+>
+> **The table below is a RENDERING of that law into costs. It is not a second ranking. DO NOT FORK IT.**
+> When a clearance in the law changes, this table is regenerated from it — never edited beside it. A
+> penalty that cannot be traced to a clearance in the law is a bug in this table, not a new rule.
+> **The law is also what the race-side optimizer reads**, so forking it re-ranks the physiology on one side
+> of the app only — which is the failure this whole entry exists to prevent.
+
+**Ordered pairs, first → second, on consecutive days. `lower` = a lower-body 5/3/1 day.**
+
+| ordered pair (first → second) | penalty | traced to |
+|---|---|---|
+| `lower` → run VO2 | +6 | leg-dominant quality ≥ 24h; legs pre-damaged, the interval session is degraded |
+| run VO2 → `lower` | +6 | **bidirectional** — eccentric damage from fast running impairs force production |
+| `lower` → long run | +3 | leg-dominant long ≥ 48h; mech stacks and the run is degraded |
+| long run → `lower` | +3 | glycogen depletion + muscle damage on top of the signalling window |
+| `lower` → run threshold | +2 | leg-dominant quality ≥ 24h, same prime movers at intensity |
+| run threshold → `lower` | +2 | same, lower magnitude than VO2 |
+| **`lower` → bike VO2** | **+4** | ⛔ **the law's strictest rule** — 48h, cycling-power impairment 24–48h post-heavy-lower |
+| **`lower` → bike sweet spot** | **+3** | same 48h clearance, submaximal so less power-dependent |
+| **bike VO2 → `lower`** | **+1** | the cheap order — ⚠️ **+1 not 0, see the citation warning below** |
+| **bike sweet spot → `lower`** | **+1** | same — **the scheduler should prefer this ordering; it must not price it as free** |
+
+> ## ⛔ THE REVERSE-ORDER DISCOUNT RESTS ON A CLAIM THIS REPO ALREADY DOWNGRADED. Corrected 2026-07-26, same day it was written.
+>
+> **The cheap-order rows were first written as `0`, cited to Wilson 2012 — *"cycling does not attenuate
+> strength adaptation."* That citation was checked against this repo's own register and does not carry the
+> weight that was put on it.**
+>
+> `SCIENCE-concurrent-training-interference.md`, **2026-07-19 addendum**: Wilson 2012 found the modality
+> split, but **Schumann et al. 2022 (*Sports Med*, 43 studies, larger and better-controlled) found NO
+> modality moderation** — results independent of aerobic mode, frequency, training status and age. The
+> register's verdict is explicit and it is a standing instruction: **"Treat as a plausible mechanism with
+> split meta-analytic support, not a settled rule… do not cite it as established, and do not build a NEW
+> claim on it."**
+>
+> **A `0` is a new claim built on it.** It asserts the order is free, which is the **non-conservative**
+> direction of a split question — the register's tolerance for the existing rule is that it *errs safe*, and
+> asserting no cost does not. **Priced at +1: still by far the cheapest ordering, still actively preferred
+> by the scorer, no longer a claim the evidence cannot carry.**
+>
+> ⚠️ **The expensive direction is UNAFFECTED and stays at +4 / +3** — but ⛔ **its citation was wrong too,
+> corrected the same day.** *"Cycling power impaired 24–48h post-heavy-lower"* was attributed to **Petré
+> 2021, which is a strength-development meta-analysis by training status and contains nothing on clearance
+> windows.** Same bad attribution sits in `schedule-session-constraints.ts:28` and `week-optimizer.ts`
+> (×3) — see `DOCTRINE-aerobic-maintenance.md` §3 sweep box.
+>
+> **What actually carries the expensive direction:** Robineau 2016 (0h worst, 6h suboptimal), Schumann 2022
+> (attenuation **especially same-session**), and soreness from strength work impairing endurance
+> performance up to 72h. ⛔ **The asymmetry survives on those. Do not weaken a placement because its
+> citation was bad — replace the citation.**
+>
+> ### ⚠️ AND THE REASON FOR THE WHOLE PENALTY TABLE DOWNGRADED ON 2026-07-26 — the magnitudes were never re-derived
+>
+> **Schumann 2022: concurrent training does not compromise hypertrophy or maximal strength.** Explosive
+> strength may be attenuated, especially same-session, **independent of modality. 5/3/1 is maximal-strength
+> work** — so the adaptation this table was built to protect is **not** being blunted the way the penalties
+> imply.
+>
+> **The placements survive on a different argument: separate the sessions so the athlete PERFORMS WELL IN
+> EACH.** A hard ride 24h after a heavy squat is a worse ride, and that is reason enough. **Same placement,
+> weaker claim — a downgrade in *why*, not in *what*.**
+>
+> ⛔ **These penalty magnitudes were sized against adaptation blunting and have NOT been re-derived against
+> session quality, which is a real cost but a smaller one. Assume they bite too hard until re-checked.**
+>
+> *(The register also notes the reverse relationship — strength training improving running economy and
+> cycling efficiency with VO2max unchanged — is **the best-supported material in the domain**, and that the
+> honest frame for a hybrid app is **credit, not hazard** (D-306). That is the claim to lean on, not this one.)*
+
+**Non-directional — these price the gap or the density, not the order:**
+
+| conflict | penalty |
 |---|---|
-| Run VO2 adjacent to lower-body 5/3/1 | +6 |
-| Long run adjacent to lower-body 5/3/1 | +3 |
-| Run threshold adjacent to lower-body 5/3/1 | +2 |
-| Bike VO2 adjacent to lower-body 5/3/1 | +1 |
-| Bike sweet spot adjacent to lower-body | 0 |
 | Same-day double under 6h apart | +4 |
 | Same-day double, non-emphasis quality first | +2 |
 | Two consecutive days at cns ≥ 2 | +2 |
+
+> **The 6h row is genuinely non-directional and that is Robineau, not an oversight.** The finding was about
+> **the gap**: 0h produced lower strength gains, **6h and 24h performed the same as each other.** Order
+> within a split day is handled by the emphasis rule below; the gap is handled here. Already encoded as
+> `MIN_STACK_GAP_H = 6` in `place-week.ts:82`.
+
+⚠️ **The two bike-after-lower magnitudes (+4 / +3) are the one place this table was AUTHORED rather than
+derived.** The law states a single 48h clearance for `quality_bike` without splitting VO2 from sweet spot;
+the split preserves the distinction the original table drew (+1 / 0) while correcting its direction.
+**If that split is wrong, it is wrong here and nowhere else.**
 
 Non-zero total is **allowed and surfaced**. Within a same-day double, **the quality matching the active
 emphasis goes first**.
@@ -1367,10 +1615,33 @@ emphasis goes first**.
 
 ### 6. Consolidation — what this retires
 
-- **`place-week.ts`'s hard adjacency rules are RETIRED and re-expressed as the penalty table above.** Same
-  intents, costs instead of walls. Walls are why it could return nothing; costs are what makes
-  "never empty" achievable. Its 12 tests re-point accordingly.
-- **The hardcoded Mon/Tue/Thu/Fri grid stops deciding placement.** The scheduler owns it.
+> ## ⛔ THE ORIGINAL RATIONALE FOR RETIRING `place-week.ts` IS RETRACTED (2026-07-26). The consolidation stands; the reason given for it was false.
+>
+> It said: *"Walls are why it could return nothing; costs are what makes 'never empty' achievable."*
+> **Read the file. It does not have walls, and it already never returns empty.**
+>
+> - It already emits **`compromises: string[]`**, with a comment stating that every clearance it could not
+>   honour must be named in plain words and ⛔ **NEVER SILENTLY SWALLOWED** (`place-week.ts:123-127`) —
+>   *"quietly producing a worse plan is how a scheduler lies."*
+> - It already degrades rather than fails: when no full rest day survives, it **places the week and says so**
+>   (`:329`).
+> - **It is already a cost model.** The rationale was describing a different file.
+>
+> **And it is NOT an independent authority on the physiology.** `place-week.ts:25` says so itself: *"What is
+> NOT duplicated is the LAW. The clearance rules come from `_shared/schedule-session-constraints.ts` — the
+> same table the optimizer reads."*
+>
+> ⚠️ **Which means `ARCH-strength-spine.md` §0.6's "three placement authorities" overstates the disorder.**
+> The true shape is **two placers reading one shared law, plus one hardcoded grid that reads nothing.**
+
+- **`place-week.ts` is CONSOLIDATED, and the honest reason is that two placers reading one law is still two
+  placers** — not that it fails. Its adjacency rules are re-expressed as the §5 ordered pairs; **the intents
+  survive unchanged and the direction is corrected.** Its 12 tests re-point accordingly. ⛔ **Do not carry
+  the retracted "walls" reasoning forward into the build** — it would justify discarding the
+  `compromises[]` contract, which is the part worth keeping and is the same contract §7 requires.
+- **⛔ THE REAL OUTLIER IS THE HARDCODED Mon/Tue/Thu/Fri GRID in `strength-primary-plan.ts`, and it is the
+  one that wins today by default.** It ignores the law entirely — no clearance table, no compromises, no
+  pins. **That is the thing being replaced.** The scheduler owns placement.
 - ⛔ **Race plans retain `week-optimizer.ts`. THIS IS A DEFERRAL, NOT A DESIGN.** Recorded explicitly at
   Michael's instruction, because *"otherwise it reads as intentional in six months and nobody merges it."*
   **Direction of travel: race plans converge on the same scorer.** Two schedulers with a written direction
@@ -1381,7 +1652,30 @@ emphasis goes first**.
 - **Ceilings are budgets, not gates.** The solver runs regardless, places the week, and reports the
   overdraft per axis.
 - Breach output names **the axis, the overage, and the largest contributing sessions on that axis**.
-  Shape: *"Mech 15 of 14 — the long run and both lower lifts are 11 of it."*
+  Shape: *"Mech 15 of 14 — both lower lifts and the run VO2 are 9 of it."*
+  > ⛔ **The example string was arithmetically wrong and is corrected (2026-07-26).** It read *"the long run
+  > and both lower lifts are 11 of it"* — two lower lifts are 6 and the long run is 2, which is 8, not 11.
+  > The actual top contributors to a mech-15 week are **the two lower lifts (6) and the run VO2 (3) = 9.**
+  > **This string is the template the athlete-facing copy will be built from. It has to add up.**
+
+> ## ⛔ WHEN MORE THAN ONE AXIS BREACHES, THE OUTPUT MUST NAME WHICH ONE IS THE ARGUMENT (added 2026-07-26).
+>
+> **State both. Rank them. The real reason goes first.** A list of breached axes with no ranking hands the
+> athlete arithmetic and makes them do the reasoning — and they will reason from the wrong number.
+>
+> **Worked case — the second bike quality** (sweet spot + bike VO2 → 12 / 9 / 10). ⚠️ **Drawn from
+> `balanced` / `endurance_led`, where two qualities is reachable — `strength_led` allows one hard aerobic
+> session only (`DOCTRINE-aerobic-maintenance.md` §6). The RANKING RULE is general; only this illustration
+> is configuration-specific:**
+> - **cns 10 of 9 is THE ARGUMENT.** It is a third hard day in a strength block. That is the real objection.
+> - **cardio 9 of 8 is DOSE** (§2) — a statement about what block they signed up for, not about interference.
+>
+> ⚠️ **Get this backwards and the app says "your cardio is too high" to an athlete whose actual problem is a
+> third hard day** — and they will fix it by shortening the ride, which changes nothing that matters.
+>
+> **General rule: mech and cns carry interference arguments. Cardio carries dose.** When cardio breaches
+> alongside either of the others, **cardio is never the headline.**
+
 - **Breach affects placement, not admission**: penalty weights increase on the breaching axis so the
   arrangement degrades gracefully instead of the week being rejected.
 - **Never silently remove or shrink a session to fit.** The athlete added it; the app says what it costs.
@@ -1392,14 +1686,66 @@ emphasis goes first**.
 
 ### 8. Composer posture — regulated; overrides libertarian
 
+> ## ⛔ THE GATES, NAMED — and this reconciles §7 with Q-203 (added 2026-07-26).
+>
+> **"Breach never refuses" applies TO THE ATHLETE. It does not apply to the app's own output.** Those are
+> two different actors and conflating them is why this entry read as if it had no gates at all.
+>
+> - **The composer declining to auto-generate a breaching week is the app refusing to propose what it will
+>   not defend.** That is not a cap on the athlete. It is the app declining to put its own name on a week
+>   it would have to argue against. **The athlete may always force it, with the confirm below.**
+> - **The two prohibited rules are HARD GATES, and they are the only two on the strength side.** Not budget
+>   lines, not penalties — refusals. Naming them as gates is the point; an unnamed gate is the one that gets
+>   deleted by someone who read §7 and concluded nothing here refuses.
+>
+> ⚠️ **Q-203 is filed on the premise that the strength side has no hard gates and only race plans need them.
+> That premise is now corrected — the strength side has exactly two.** The open question is narrower than it
+> was written: **not "does strength need gates" but "does race need MORE than these two, and of what kind."**
+> Back-annotated at Q-203.
+>
+> ### The `high` case, decided — this was the line the source spec asked for and the first write-up lost
+>
+> At reconciler `high` the deltas take `strength_led` to **10 / 4 / 5** while the stock week is **12 / 4 / 7**.
+> **The default week breaches on mech and cns before the athlete has added anything.** That is not a
+> calibration failure — *the model is wrong, not the week* does **not** apply here, because the ceiling is
+> being deliberately pulled down by the athlete's own load state.
+>
+> **The decided behaviour: every week at `high` requires the confirm.** The composer will not auto-generate
+> it, because at `high` it will not defend it. **That is the app saying your baseline is too much right
+> now** — which is the correct thing for it to say, and it says it without removing anything.
+>
+> *(At `elevated` the behaviour is already clean and needs no rule: ceilings 12 / 6 / 7 against a stock week
+> of 12 / 4 / 7 fill mech and cns exactly, so quality drops out on arithmetic alone. **That is the design
+> working.**)*
+
 - The composer **will not auto-generate a breaching week.** The athlete may force it with an explicit
   confirm **that shows the axis arithmetic before acceptance.**
 - **Manual overrides and logged actuals are never blocked** — priced and placed, always.
 - **The prohibited list is exactly two rules. No more:**
   1. Run VO2 within 24h of a lower-body 5/3/1 session at reconciler state `high`
   2. Any quality session at reconciler state `high` where the default week already breaches
-- Opting into **both** a quality run and a quality ride on a `strength_led` block must surface that the
-  week has **zero remaining headroom on all three axes BEFORE acceptance**, not after.
+- Opting into **both** a quality run and a quality ride must surface that the week has **zero remaining
+  headroom on all three axes BEFORE acceptance**, not after.
+  > ⛔ **SCOPE CORRECTED 2026-07-26 — this clause is UNREACHABLE on `strength_led` and LIVE on the other two.**
+  >
+  > It originally read *"on a `strength_led` block."* **`DOCTRINE-aerobic-maintenance.md` §6 allows that
+  > block exactly ONE hard aerobic session**, so an athlete can no longer opt into both there. **The clause
+  > stays — `balanced` and `endurance_led` still permit two qualities, and it is correct for them.**
+  >
+  > ⚠️ **This is why it was re-scoped rather than left alone.** *A rule describing a state nobody can reach
+  > is the thing that gets tuned in six months by someone who assumes it fires.* ⛔ **Do not read a rule
+  > that never triggers on `strength_led` as evidence it is broken.**
+
+> ### ⛔ THE DOWNSTREAM BAR — what is actually left to build (Michael, 2026-07-26)
+>
+> *"We just need to build the downstream bar — react to the user — gate the ability to build a crazy weekly
+> schedule."*
+>
+> **The ledger prices. The bar is what the athlete meets.** Everything above is the model; none of it is
+> reachable by a person yet. The build is: the intake reacts as options are taken, the arithmetic is shown
+> **before** acceptance rather than reported after, and a week that cannot be defended cannot be built
+> without the athlete explicitly taking it on. ⚠️ **That surface does not exist** — the intake collects a
+> hard day per discipline today and says nothing back about what it costs together.
 
 ### 9. Reconcile against actuals
 
@@ -1556,3 +1902,74 @@ instead of week nine.
 > back-annotation there) · **D-318** (why the strength body-trend is excluded for strength-primary) ·
 > **D-315** (consent-first: nothing is written the athlete did not choose) · **D-325** (the ledger that
 > consumes reconciler state).
+
+---
+
+## D-327 — One hard aerobic day: the second one is GREYED, not warned. The intake gate for the aerobic-maintenance doctrine (2026-07-26, BUILT — client, not device-seen)
+
+**Michael's spec. The doctrine decided the rule; this is where an athlete meets it.**
+
+> **The spec, verbatim:** *"Step 5 follows step 4. If a hard run day was set in step 4, grey the Hard ride
+> day section. Note in place of the day chips: 'You've got a hard run Tuesday. One hard day a week — pick a
+> ride instead and we'll clear the run.' [Pick a hard ride day]. Tapping it: show the chips, athlete picks
+> a day, clear the hard run day."*
+
+### Why it is a GATE and not a price — the first one in this flow
+
+`D-325 §7` is emphatic that **breach states cost and never refuses**, and `POLISH-PUNCH-LIST` records
+Michael's rule *"gate it, don't warn it — no accept-the-risk button."* **Those are not in tension here.**
+
+`DOCTRINE-aerobic-maintenance.md` §6 allows a strength-led block **exactly one hard aerobic session** —
+bike if the athlete has one, hill repeats if not. **"Both" means a choice, not two.** That is a doctrine
+decision, not a budget one, so it is enforced by **construction** rather than priced.
+
+⛔ **It is legitimate to refuse here ONLY because the swap is one tap away.** The athlete is never stuck
+and never has to back out: they tap a day on the greyed section and the other discipline's day is released
+for them, in a single state write. **Steered, not blocked.** A gate that made them go back a screen to
+change their mind would be the accept-the-risk button wearing different clothes.
+
+### The offer is NOT neutral, and that is the doctrine
+
+The note says the ride is the one worth keeping, and says **why**: *hard riding costs your legs less than
+hard running does.* **The athlete with both modalities who keeps the run is making the worse choice, and
+the app knows it.** Stating the reason is what separates a steer from a nag — and it is
+`COPY-VOICE`-shaped: fact, then the conditional consequence, no imperative.
+
+*(⚠️ The mechanism behind "costs your legs less" is the modality separation that
+`DOCTRINE-aerobic-maintenance.md` §5 records as **CONTESTED** — Wilson 2012 vs Schumann 2022. The copy
+says "costs less", never "costs nothing", which is the claim the evidence supports.)*
+
+### Symmetric, though the spec named only one direction
+
+Running is step 4 and Bike is step 5, so **forward-only greying looks sufficient.** It is not: **tapping
+Back from the bike card reaches the run section with a bike day already set** — the one path a
+forward-only gate cannot see. **The gate belongs to the pair, not to the screen.** Both sections carry it,
+with the bike's note written as the primary case and the run's as the back-navigation case.
+
+### Where it lives
+
+`NonRaceBuilder.tsx` — `QualityDayPicker` gains a `blockedBy` prop *(the other discipline's day, the note,
+the CTA, and the swap)*; `swapQualityDay()` writes the new day and drops the old one in **one** state
+update, so there is no render where both are set. Revealing the chips is **local** UI state — backing out
+of the reveal commits nothing.
+
+### ⛔ WHAT THIS KILLS — and it is a piece of copy Michael deliberately kept
+
+**`hardDayCount === 2` is now UNREACHABLE BY CONSTRUCTION.** Everything keyed on it is dead:
+
+- **The Mulholland dialog** (*"we can hand you the keys to the Porsche…"*) — it fires on the transition to
+  two hard days, and there is no longer a transition to two.
+- **`TWO_HARD_DAYS_LINE`** — *"Two hard days alongside four lifting days is the ceiling"* — now states a
+  ceiling of two where the rule is one. ⛔ **It is not merely dead, it is WRONG.**
+
+⚠️ **Both are LEFT IN PLACE pending Michael's call, marked in code — not overlooked.** The dialog was
+argued twice and kept on purpose (it bends `COPY-VOICE` rule 10 knowingly). **Deleting it is his decision,
+not a cleanup.** But it is now precisely what he named the same day: *"a rule describing a state nobody can
+reach is the thing that gets tuned in six months by someone who assumes it fires."*
+
+⛔ **Decide it: delete, or re-scope to `balanced` / `endurance_led`, where two qualities is still real.**
+
+> **↩ Related:** **`DOCTRINE-aerobic-maintenance.md` §6** (the rule this enforces) ·
+> **`DOCTRINE-aerobic-maintenance-run-only.md`** (what the no-bike athlete's one session is) ·
+> **D-325 §2/§7/§8** (the ledger clauses this makes unreachable on `strength_led`) · **D-315**
+> (consent-first — the swap is the athlete's tap, never a silent rewrite).

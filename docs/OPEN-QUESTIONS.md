@@ -1061,6 +1061,26 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 
 ## Q-203 — Race plans need HARD gates, not the D-325 budget model (2026-07-25, deliberately deferred, NOT built)
 
+> **⛔ THE PREMISE IS CORRECTED — D-325 §8, amended 2026-07-26. The question survives but it is NARROWER than written below.**
+>
+> This entry was filed on the reading that the strength side has **no** hard gates. **It has exactly two,
+> and they are now named as gates in D-325 §8:** run VO2 within 24h of a lower-body 5/3/1 at reconciler
+> `high`, and any quality session at `high` where the default week already breaches. Those are refusals,
+> not budget lines.
+>
+> **The distinction that was missing:** *"breach never refuses"* applies **to the athlete**, not to the
+> app's own output. The composer declining to auto-generate a breaching week is the app refusing to propose
+> what it will not defend — the athlete can still force it. So the strength side is not the gateless
+> contrast this entry assumed.
+>
+> **The question is therefore not "does strength need gates" but "does RACE need more than these two, and
+> of what kind."** Everything below stands on that narrower framing — including the resolution path, which
+> does not change: answer it where the two schedulers converge.
+>
+> ⚠️ **Also relevant:** D-325 §5 was rewritten to make interference **directional**, and it now defers to
+> `_shared/schedule-session-constraints.ts` as the single law — **the same law the race-side optimizer
+> already reads.** That removes one of the reasons the two contracts looked incompatible.
+
 **Michael, alongside the D-325 handoff: *"race needs hard gates — we don't build this now but make a note."***
 
 D-325 is explicit that **ceilings state cost and never refuse** (§7), and that is right for a
@@ -1101,6 +1121,47 @@ different block than the one the app describes, and the app does not mention it.
 ---
 
 ## Q-205 — `balanced` and `endurance_led` ceilings are UNVALIDATED (2026-07-25, from D-325, blocks trusting two of three emphases)
+
+> ## ⛔ ANSWERED 2026-07-26 — AND THE QUESTION CANNOT BE ASKED YET. Two findings, the second is worse.
+>
+> **Attempted the sum. It is not possible, for a reason nobody had checked.**
+>
+> ### 1. ⛔ THE EMPHASIS STATES DO NOT EXIST IN THE CODEBASE
+>
+> `grep -rn "strength_led\|endurance_led" supabase/functions src` returns **NOTHING**. Not a type, not a
+> constant, not a column. **They exist only inside D-325 and the doctrines.**
+>
+> ⛔ **So there is no default week to sum, because there is no emphasis to have one.** `D-325 §2` says
+> *"ceilings derive from the active emphasis state only"* — **that state is not a thing the app computes.**
+> Q-205 asked which of three calibrations is right; the answer is that **one of them was hand-summed off a
+> composer output and the other two have no referent at all.**
+>
+> **What carries emphasis TODAY is `per_discipline_posture`** — `develop` / `maintain` / `out` per
+> discipline, written at intake and read at `create-goal-and-materialize-plan:1428/2383`. **That is the
+> real signal, and D-325's three states would have to be derived from it.** ⚠️ Note it does not map
+> cleanly: posture is per-discipline and an emphasis is per-block.
+>
+> ### 2. ⛔ AND `balanced` IS ALREADY TAKEN — it is a load verdict shown to the athlete
+>
+> **`load-headline.ts:17` — `if (status === 'on_target') return 'balanced'`.** It is the word on the LOAD
+> row (`LoadBar.tsx:38`, `CoachWeekTab.tsx:1019`, alongside "build more" / "productive" / "a bit high" /
+> "pull back"). ⛔ **Shipping a plan emphasis called `balanced` gives the app two different `balanced`s —
+> one a reconciler verdict about this week's load, one a description of the block's design.**
+>
+> ⚠️ **This is the D-268 collision again, one week later.** That spec arrived carrying a number already
+> taken since July 9th and it was caught by reading the log. **This one is a NAME already taken in
+> athlete-facing copy, and nothing would have caught it — the ledger and the load row never touch.**
+>
+> ⛔ **Rename before it ships.** `D-325 §4` is emphatic that the ledger must never emit a load verdict;
+> **two things called `balanced` is that boundary being crossed in the vocabulary rather than the code**,
+> which is worse, because it looks fine in every diff.
+>
+> ### What this does to the question below
+>
+> **It is not "sum two default weeks." It is, in order:** derive the three emphases from
+> `per_discipline_posture` · rename `balanced` · build a default week for each · *then* sum. ⛔ **Steps 1
+> and 2 are prerequisites nobody had written down.** The `strength_led` numbers remain the only calibrated
+> set and remain trustworthy — they were summed against a real composer output.
 
 D-325's `strength_led` ceilings were validated by summing the composer's **actual default week** — which
 is how the mech ceiling moved 12 → 14, after the stock week breached by 1 before the athlete added

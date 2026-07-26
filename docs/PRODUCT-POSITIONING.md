@@ -108,7 +108,35 @@ AI coaching apps (Future, Vi, etc.) give you a coach. They don't have the sport 
 
 **Efforts is the only app where the endurance plan and the strength plan are built together, know about each other, and adjust together.**
 
-The interference asymmetry between strength and endurance is built into the engine. The sequencing is automatic. The load is managed across both. This is not a feature — it is the product.
+The sequencing is automatic. The load is managed across both. This is not a feature — it is the product.
+
+*(This section previously claimed "the interference asymmetry between strength and endurance is built into the engine." Corrected 2026-07-26: the asymmetry is not settled. Three meta-analyses disagree — Wilson 2012 found running interferes and cycling does not, Schumann 2022 found no modality effect at all, Sabag 2018 found the reverse. What is built into the engine is **spacing and sequencing**, which is well supported. Claim that.)*
+
+---
+
+## The Evidence Posture
+
+**This is the cerebral part, and it is a position, not a disclaimer.**
+
+**1. The research was done on our athlete.**
+
+Most training content extrapolates downward — elite protocols, thinned out for everyone else. The concurrent-training literature runs the other way. Hickson's maintenance experiments, the interference meta-analyses, the interval-dose studies: recreationally active subjects, lifting a few days a week, training a few hours. That is not a footnote about generalizability. **That is our user, and it means we are applying research to the population it came from rather than borrowing someone else's.**
+
+Where the evidence is thin, it is thin because nobody funds twelve-week trials on people who want to squat heavy and hold a half-marathon. There is no competitive category paying for it. **The generalist is under-researched for the same reason they are under-served — and that is the gap the product sits in.**
+
+**2. We show our work, and nobody else does.**
+
+Every claim in the training-app market arrives with the same amount of provenance: none. Efforts separates three things and says which is which — **what is measured, what is reasoned, and what is a product decision.** Each protocol carries that table.
+
+There is a register that records when a claim gets confirmed, contested, or struck. It is not decoration: in one session it caught two citations attached to a scheduling rule that neither paper supported, and it caught a threshold the app had been stating as fact with nothing under it. **The rules survived; the attributions did not.** A system that corrects itself in public is a different kind of claim than a system that sounds confident.
+
+**"Here is the provenance — tell me which row you disagree with"** is a stronger position than any amount of certainty.
+
+**3. Where the evidence splits, we take the cautious side, and we say so.**
+
+Several rules rest on contested findings. In every one, the app takes the conservative option — and states that it is doing so rather than picking the flattering study and moving on. **Erring safe and saying so is a claim almost nobody in this category can make honestly.**
+
+**What this adds up to:** we do not promise what we cannot carry. The block holds your engine rather than building it, because one hard session a week is a maintenance dose and we say maintenance. It builds strength, not explosive speed, because explosive is the one quality concurrent training measurably costs. **The restraint is the credibility.** A generalist who has been sold "hybrid" by four other products can check ours.
 
 ---
 

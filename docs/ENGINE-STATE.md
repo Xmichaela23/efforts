@@ -24,27 +24,48 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-26 — **NOTHING FROM 2026-07-25 LATE IS PUSHED.** Uncommitted client work is sitting in the tree. NEXT = **finish the flow, lock in quality options, wire the bike** — then build ONE plan end to end)
+## 🧭 NEXT SESSION — START HERE (2026-07-26 — **the 2026-07-25 late work is PUSHED and client-DEPLOYED, and NOT device-verified.** NEXT = **finish the flow, lock in quality options, wire the bike** — then build ONE plan end to end. ⛔ **D-325 was AMENDED 2026-07-26 — eight changes, read the amendment block before building the ledger**)
 
-### ⛔ FIRST: THERE IS UNCOMMITTED WORK IN THE TREE. Do not start by rebuilding it.
+### ⛔ FIRST: THE WORK EXISTS AND IT IS ON `main`. Do not start by rebuilding it.
 
-`git status` will show modified: `NonRaceBuilder.tsx`, `StrengthLogger.tsx`, `strength-focus-copy.ts`,
+**Corrected 2026-07-26.** *This section previously said the work was sitting uncommitted in the tree and
+that nothing was pushed. It was written before the commit and was stale within the hour. Both claims are
+now false — and a next session that ran `git status`, found a clean tree, and concluded the work did not
+exist is exactly how this codebase grew four plan generators.*
+
+**It is in `784db4ae` — "feat(strength): one card per discipline, the hard days, and the tap that ends
+the set."** Six files, client only: `NonRaceBuilder.tsx`, `StrengthLogger.tsx`, `strength-focus-copy.ts`,
 `non-race-goal-seeds.ts` + its test, and a new `src/lib/bar-speed-copy.test.ts`. **All of it builds clean
-and 11 + 16 tests pass.** It was left uncommitted deliberately — Michael had not walked the flow yet.
-**Read it before you touch anything.**
+and 11 + 16 tests pass.** ⛔ **Read the commit before you touch anything in those files.**
 
-**Nothing is PUSHED. Nothing is DEPLOYED. Nothing has been on a device.** Michael's own words at close:
+**Where it actually stands, in the three states:**
+
+| state | true? | detail |
+|---|---|---|
+| **PUSHED** | ✅ yes | `main` is at `b375de17`, tracking `origin/main`, nothing ahead. |
+| **DEPLOYED** | ✅ client — nothing else was in scope | Netlify auto-deploys the client from `main` (repo deploy policy). **`784db4ae` touched ZERO edge functions**, so there is nothing pending on the Supabase side. |
+| **VERIFIED** | ❌ **no** | **Nothing has been on a device.** |
+
+⚠️ **NOT device-verified, and that is still the single biggest open risk.** Michael's own words at close:
 *"we can't see it because we haven't finished a plan to materialize it."* **No plan has been built end to
-end with any of tonight's work. That is the single biggest open risk.**
+end with any of this work.** Deployed and unverified is the state that has burned this project before —
+see the three-state table in `CLAUDE.md`.
 
 ---
 
 ### YOUR JOB, IN ORDER — Michael set these three at close
 
-**1. FINISH THE FLOW.** Two intake answers are captured, stored on the goal, and dropped before the
-composer reads them: `usual_weekly_miles` and `target_weekly_ride_hours`. And the hard-day pins are
-dropped the same way — `create-goal-and-materialize-plan:~2465` forwards **only** `long_run` from
-`preferred_days`, so `quality_run` / `quality_bike` reach the goal and stop. **Same wire, one fix.**
+**1. FINISH THE FLOW.** ⛔ **Corrected 2026-07-26 — the earlier version of this job named a key that does
+not exist and sent you after a value that is already working.** Traced, so you don't have to:
+
+| value | where it goes | status |
+|---|---|---|
+| `target_weekly_miles` | written at `NonRaceBuilder.tsx:309`, **read by the composer at `create-goal-and-materialize-plan:2452`** | ✅ **WORKING — leave it alone.** |
+| `usualMiles` | `NonRaceBuilder.tsx:203/350/823` — local state only; derives the maintenance dose and the volume-vs-usual copy, **never enters the payload** | ⚠️ **Not a drop.** It is client-side scratch that feeds `targetMiles`, which does get through. **There is no `usual_weekly_miles` key anywhere in this codebase** — the previous banner invented it. Decide whether the engine ever needs the athlete's *usual* volume as distinct from the *target*; today it does not. |
+| `target_weekly_ride_hours` | written at `NonRaceBuilder.tsx:319`, stored on the goal | ⛔ **GENUINELY DROPPED. Zero readers anywhere under `supabase/functions/`.** This is the real one. |
+| `quality_run` / `quality_bike` pins | collected per discipline, stored on the goal | ⛔ **GENUINELY DROPPED.** `create-goal-and-materialize-plan:~2465` forwards **only** `long_run` from `preferred_days`. |
+
+**So the fix is two values, not two-plus-pins: the ride hours and the hard-day pins. Same wire.**
 
 **2. LOCK IN QUALITY OPTIONS.** The intake now collects a hard day per discipline (§ below). The composer
 has **never emitted a quality session token in its life** — `strength-primary-plan.ts:456-465` knows only
