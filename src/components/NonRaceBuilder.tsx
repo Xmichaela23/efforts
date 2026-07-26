@@ -118,6 +118,8 @@ type NonRaceState = {
   /** Swim slots per week. Booked, not coached (D-323 §5) — it exists for the triathlete who wants
    *  the time held. Only asked when swim is kept for the block. */
   swimDays: number;
+  /** Weekly riding to hold, in HOURS (D-323 §6 — never miles; the app learns no ride speed). */
+  rideHours: number | '';
   startDate: string; // Week 1 start (YYYY-MM-DD); plans are Monday-based so this snaps to that week server-side
 };
 
@@ -187,6 +189,10 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
           ...(state.posture?.strength === 'develop' && Object.keys(state.assistancePicks).length > 0
             ? { assistance_picks: state.assistancePicks } : {}),
           ...(state.posture?.swim === 'maintain' && state.swimDays > 0 ? { swim_days: state.swimDays } : {}),
+          // Bike volume in HOURS (D-323 §6). Stored as typed; the engine turns hours into sessions —
+          // it cannot turn miles into anything, having never learned a ride speed.
+          ...(state.posture?.bike === 'maintain' && Number(state.rideHours) > 0
+            ? { target_weekly_ride_hours: Number(state.rideHours) } : {}),
         },
       },
     ],
@@ -217,7 +223,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3, assistancePicks: {}, swimDays: 2, startDate: nextMondayISO(),
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', startDate: nextMondayISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -539,26 +545,6 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             {/* The assistance slots, ABOVE the mileage input — a numeric input buries anything below it
                 on mobile (keyboard + Continue eclipse it), which locked users out of the control that
                 used to sit here. */}
-            {/* Swim is BOOKED, not coached. The app learns no swim pace and grades no swim, so it
-                holds the time and says so. Only asked when swim was kept — one control, no yardage,
-                no sets. It exists for the triathlete who wants the slots on the calendar. */}
-            {state.posture?.strength === 'develop' && state.posture?.swim === 'maintain' && (
-              <div>
-                <p className="text-white/70 text-sm mb-2">Swims per week</p>
-                <div className="flex gap-1.5 max-w-[240px]">
-                  {[1, 2, 3].map((n) => (
-                    <button
-                      key={n} type="button" onClick={() => setState((st) => ({ ...st, swimDays: n }))}
-                      className={`flex-1 py-2 rounded-lg text-sm border ${state.swimDays === n ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
-                    >{n}</button>
-                  ))}
-                </div>
-                <p className="text-white/55 text-sm mt-1.5 leading-relaxed">
-                  About an hour each, on days nothing else is booked. Held on the calendar, not coached —
-                  no set, no target.
-                </p>
-              </div>
-            )}
             {state.posture?.strength === 'develop' && (
               <div>
                 <p className="text-white/70 text-sm mb-1">Accessory work</p>
@@ -655,7 +641,28 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             )}
             {posturePresent('bike') && (
               <div>
-                <p className="text-white/70 text-sm mb-2">Long ride day</p>
+                {/* ⛔ BIKE IS ASKED IN HOURS, NEVER MILES (D-323 §6, researched not picked). ~99% of
+                    riders train on time — terrain and wind distort distance badly — and this app
+                    learns ride HR and FTP but NO ride speed, so bike miles cannot become a session
+                    length without guessing: 20 miles is 65 minutes flat and over two hours in hills.
+                    People TALK in miles and TRAIN in hours, so: ask hours, show miles later once a
+                    ride speed is learnable. */}
+                <p className="text-white/70 text-sm mb-2">Weekly riding to hold <span className="text-white/45">(maintenance)</span></p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" inputMode="decimal" min={0} step={0.5}
+                    value={state.rideHours === '' ? '' : state.rideHours}
+                    onChange={(e) => setState((st) => ({ ...st, rideHours: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    placeholder="e.g. 4"
+                    className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                    style={{ fontSize: '16px' }}
+                  />
+                  <span className="text-white/60 text-sm">h/wk</span>
+                </div>
+                <p className="text-white/55 text-sm mt-1.5 leading-relaxed">
+                  Hours, not miles — terrain makes distance a poor measure of a ride, and it is all easy here.
+                </p>
+                <p className="text-white/70 text-sm mb-2 mt-4">Long ride day</p>
                 <DayPicker value={state.longRideDay} onChange={(d) => setState((s) => ({ ...s, longRideDay: d }))} />
               </div>
             )}
@@ -687,6 +694,29 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     <DayPicker value={state.anchorDay} onChange={(d) => setState((s) => ({ ...s, anchorDay: d }))} />
                   </div>
                 )}
+              </div>
+            )}
+            {/* ⬇ SWIM SITS LAST. It is a courtesy — booked, not coached — and it was rendering
+                above the lifting and the running it is subordinate to. Order on this screen is the
+                order of what matters: the work first, the slots we merely hold at the end. */}
+            {/* Swim is BOOKED, not coached. The app learns no swim pace and grades no swim, so it
+                holds the time and says so. Only asked when swim was kept — one control, no yardage,
+                no sets. It exists for the triathlete who wants the slots on the calendar. */}
+            {state.posture?.strength === 'develop' && state.posture?.swim === 'maintain' && (
+              <div>
+                <p className="text-white/70 text-sm mb-2">Swims per week</p>
+                <div className="flex gap-1.5 max-w-[240px]">
+                  {[1, 2, 3].map((n) => (
+                    <button
+                      key={n} type="button" onClick={() => setState((st) => ({ ...st, swimDays: n }))}
+                      className={`flex-1 py-2 rounded-lg text-sm border ${state.swimDays === n ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
+                    >{n}</button>
+                  ))}
+                </div>
+                <p className="text-white/55 text-sm mt-1.5 leading-relaxed">
+                  About an hour each, on days nothing else is booked. Held on the calendar, not coached —
+                  no set, no target.
+                </p>
               </div>
             )}
           </div>
