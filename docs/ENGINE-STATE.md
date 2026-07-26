@@ -24,146 +24,145 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-25 LATE — **STRENGTH FOCUS IS BUILT, PUSHED AND DEPLOYED.** Nothing device-verified. NEXT = **split the schedule step into one card per screen**, then wire `place-week.ts`)
+## 🧭 NEXT SESSION — START HERE (2026-07-26 — **NOTHING FROM 2026-07-25 LATE IS PUSHED.** Uncommitted client work is sitting in the tree. NEXT = **finish the flow, lock in quality options, wire the bike** — then build ONE plan end to end)
 
-### YOUR JOB, IN ORDER
+### ⛔ FIRST: THERE IS UNCOMMITTED WORK IN THE TREE. Do not start by rebuilding it.
 
-**1. SPLIT THE SCHEDULE STEP INTO SEPARATE SCREENS.** Michael, last thing tonight: *"everything should
-have its own card, no scroll."* Today's step 3 (`schedule`) stacks Strength / Run / Bike / Swim /
-Fixed-sessions cards in one scrolling column. It should be one screen per card, built dynamically
-from what the athlete kept — a runner gets Accessory → Run → Fixed sessions, a triathlete gets five.
-Step TITLES change too: card one is titled "Accessory work", not "When can you train?".
-Where: `src/components/NonRaceBuilder.tsx` — `StepKey` (~line 109), `getSteps()` (~126), and the
-`currentStep === 'schedule'` block (~540-800). The cards already exist and are already gated on
-posture; this is splitting them into their own `StepLayout`s, not new logic. **~20 minutes fresh.**
+`git status` will show modified: `NonRaceBuilder.tsx`, `StrengthLogger.tsx`, `strength-focus-copy.ts`,
+`non-race-goal-seeds.ts` + its test, and a new `src/lib/bar-speed-copy.test.ts`. **All of it builds clean
+and 11 + 16 tests pass.** It was left uncommitted deliberately — Michael had not walked the flow yet.
+**Read it before you touch anything.**
 
-**2. WIRE `place-week.ts`.** THE BIG ONE, and the reason today's work is only half-live. It is
-committed, tested (12 tests) and **called by nothing.** `strength-primary-plan.ts` still uses the
-hardcoded `MAIN_LIFTS` day grid (Mon/Tue/Thu/Fri) + `ENDURANCE_DAYS`. See "the gap" below.
-
-**3. Pass the two intake values the composer does not yet read** — `usual_weekly_miles` and
-`target_weekly_ride_hours`. Both are captured, stored on the goal, and dropped at the composer.
+**Nothing is PUSHED. Nothing is DEPLOYED. Nothing has been on a device.** Michael's own words at close:
+*"we can't see it because we haven't finished a plan to materialize it."* **No plan has been built end to
+end with any of tonight's work. That is the single biggest open risk.**
 
 ---
 
-## ⛔ THE PROTOCOL WAS REPLACED. `docs/SPEC-get-stronger.md` §1 IS THE CONTRACT.
+### YOUR JOB, IN ORDER — Michael set these three at close
 
-Get Stronger is now **Strength Focus** — Wendler's 5/3/1, 12 weeks, leader / leader / anchor.
-The old ATR block (base→power→deload→peak + a separate AMRAP retest week, a 72→94% ramp) is GONE.
+**1. FINISH THE FLOW.** Two intake answers are captured, stored on the goal, and dropped before the
+composer reads them: `usual_weekly_miles` and `target_weekly_ride_hours`. And the hard-day pins are
+dropped the same way — `create-goal-and-materialize-plan:~2465` forwards **only** `long_run` from
+`preferred_days`, so `quality_run` / `quality_bike` reach the goal and stop. **Same wire, one fix.**
 
-| what | where |
-|---|---|
-| loading (pure: 1RM + week → sets) | `shared/strength-system/loading/wendler-531.ts` |
-| the composer | `shared/strength-system/strength-primary-plan.ts` |
-| the week solver **(unwired)** | `shared/strength-system/place-week.ts` |
-| the four maxes, ONE reader | `shared/strength-system/barbell-maxes.ts` |
-| the assistance menu | `src/lib/assistance-menu.ts` |
-| the block's copy | `src/lib/strength-focus-copy.ts` |
-| the volume band | `src/lib/maintenance-volume-band.ts` |
+**2. LOCK IN QUALITY OPTIONS.** The intake now collects a hard day per discipline (§ below). The composer
+has **never emitted a quality session token in its life** — `strength-primary-plan.ts:456-465` knows only
+easy and long. ⛔ **DO NOT BUILD AN INTERVAL ENGINE. IT EXISTS.** `materialize-plan` already expands
+`run_vo2_*` (`:1467`, 5K pace −12 s/mi), `cruise_*_threshold` (`:1487`, 5K +20 s/mi), `bike_ss_*`
+(`:1643`), `bike_thr_*` (`:1657`), `bike_vo2_*` (`:1660`, 110–120% FTP) — all off LIVE baselines. Sweet
+spot is documented at 88–94% FTP in `session-factory.ts:615`. **`send-workout-to-garmin` is built (1347
+lines) and already wired** from `StructuredPlannedView.tsx:634` and `TodaysEffort.tsx:341`. The job is
+emitting the token, not authoring the session. Full trace: **`ARCH-strength-spine.md` §0.5.**
 
-**Verified by reading the rows (bench off a 225 max):** wk1 `120×5 140×5 160×5` · wk3 `140/160/180` ·
-wk4 deload `75/95/110` · wk9 `130/150/170+` · wk11 `150×5 170×3 190×1+`. Working number 190 = 85% of
-225 rounded down, **stored** in `plans.config.training_max`, +5 upper / +10 lower per cycle.
+**3. WIRE THE BIKE.** ⚠️ It is FENCED ON PURPOSE — `strength-primary-plan.ts:299`: *"Q-126: RUN-only
+token injection. Bike/ride is fenced to its own pass (Gap A-bike)."* Michael: *"we jammed out a strength
+plan with run only and said we'll fuck with the bike later. Well, it's later."* **Do it as its own named
+pass**, not smuggled in behind the run change.
 
----
-
-## ⚠️ THE GAP THAT MATTERS MOST — the intake now describes an engine that is not running
-
-Today's flow tells the athlete their long run can be **any day** and that *"the lifting is placed
-around it — heavy legs stay clear by two days."* **That is not what happens.** The composer still
-lays out Mon bench / Tue squat / Thu press / Fri deadlift regardless.
-
-`place-week.ts` is the thing that makes it true. It takes `EndurancePin[]` (day + kind + label +
-`canSplitDay`) and returns placed lifts, rest days, and named compromises. Its rules:
-- heavy legs placed FIRST, 48h clear of long days, 24h of quality days, and apart from each other
-- **stacking only on a day the athlete SAID they can split** — `canSplitDay: undefined` behaves as
-  false. Robineau 2016: 0h between lifting and cardio hurt strength, 6h and 24h did not. A stack
-  without the gap is the worst arm of the only study on it. There is a test named for this.
-- the stacked lift is always UPPER (no shared prime movers with running legs)
-- `stacksRequired = pins + lifts − 6`. Two pins never asks; three needs one; four needs two.
-- unresolvable → the honest arithmetic choice, **never an override button**
-
-**Also still missing:** the intake does not yet collect long-ride day as a pin, club days as pins, or
-the can-you-split-the-day question. `preferred_days.quality_*` IS written by the builder and
-**dropped** by `create-goal-and-materialize-plan` (~line 2460, which forwards only `long_run`).
+**4. THEN BUILD ONE PLAN END TO END AND READ A REAL SESSION.** Still the highest-value hour available.
 
 ---
 
-## WHAT SHIPPED — do NOT re-litigate
+## ⛔ READ `ARCH-strength-spine.md` §0 BEFORE ANY ARCHITECTURE CALL — it was rewritten last night
 
-**PUSHED and DEPLOYED** (`generate-strength-plan` v34, `create-goal-and-materialize-plan` v250,
-`materialize-plan` v218, `coach` v398, `analyze-strength-workout` v137, `compute-snapshot` v99,
-`adapt-plan` v33). Full reasoning in **D-324**.
+**The frame: the barbell block is the BODY; a goal is a TUNING of it.** Marathon, triathlon and Strength
+Focus are the same body at three settings, not three programs that happen to include lifting.
+`PRODUCT-POSITIONING.md:188` already said it in product terms; §0 makes it structural.
 
-- **Per-set weights, end to end.** 5/3/1 is three sets at three weights; rows carry `set_plan`,
-  `weight`/`reps` stay the TOP set. materialize carries it through (`carrySetPlan`, rescales if the
-  top set moved); the logger prefills each set (`plannedSetsFor`, ONE reader, four call sites).
-- **⛔ NO `1rm_test` TAG, deliberately.** The tag makes the logger DISCARD planned rows and rebuild
-  the session as a warm-up ramp + one all-out set (`StrengthLogger.tsx` ~2337). Under 5/3/1 the
-  measurement IS the third set of an ordinary session. The e1RM still lands via `set_plan[].amrap`.
-- **RIR is OFF for `strength_primary` and nothing else** (`usesRir: false`, opt-OUT not opt-in, test
-  pins the scope). It was not inert: learned-1RM = `brzycki(weight, reps + rir)`, so an auto-filled
-  reserve on a deliberately sub-maximal opener read back as a much heavier lift.
-- **Assistance carries NO prescribed load and no set count** — movement + rep total, by feel. Only
-  the four main lifts are dictated by percentages.
-- **Volume is a TRADE, never a cap.** D-222's ceiling was retired 2026-07-01 and must not return; our
-  own science doc says any numeric threshold would be invented. Band is ~⅔ of the athlete's OWN usual
-  when they give it, absolute fallback when they don't, and "Not sure" is a valid answer.
-- **The flow: 6 steps → 4.** One goal card (the other five were placeholders), strength assumed,
-  no protocol picker, no hours tier, no length slider.
-
-### Three screens were found stating things that were FALSE after the engine changed
-The 5×5 protocol label on confirm (engine builds 5/3/1 regardless) · "ending in a retest" (no retest
-week exists) · the Sat/Sun long-run cage citing Tue/Fri heavy days. **Expect more.** When you change
-an engine, grep the intake for what it promises.
+- **§0.1 — the spine must YIELD.** Present always, priority *sometimes*. Twelve weeks from a marathon the
+  long run wins and the lifting bends. Build it as "four fixed lifting days" and it can never taper.
+- **§0.2 — two rhythms do not agree.** 5/3/1 deloads every 4th week on its own clock; a race plan waves on
+  another. Endurance rows are emitted **identically every week, deload or not** (`:455-465`). Benign now,
+  not benign when a race plan hosts the block at a real endurance dose. **OPEN.**
+- **§0.3 — the session survey.** Four places author sessions. `generate-combined-plan/session-factory.ts`
+  is **the original** (42 constructors, only one covering the bike). `tri-generator.ts` is the same work
+  written longhand. `generate-run-plan` is a narrower copy, no intervals. **`generate-plan/index.ts` is 71
+  lines, dated 2024, dead — delete it.**
+- **§0.6 — THREE PLACEMENT AUTHORITIES.** `week-optimizer.ts` (declared sole authority, strength path does
+  not use it), `place-week.ts` (built, 12 tests, **imported by nothing**), and the hardcoded
+  Mon/Tue/Thu/Fri grid that wins by default. **They agree today only because nothing has stressed them.**
 
 ---
 
-## UNVERIFIED — and what settles it
+## WHAT SHIPPED LAST NIGHT — client only, uncommitted, do NOT re-litigate
 
-**NOTHING HAS BEEN SEEN ON A DEVICE.** Michael reviewed screens in a browser; no plan has been built
-end to end. **Build one and read a real session.** The chain with the most links — and the one I'd
-least like to be wrong about — is whether three different weights actually arrive on the phone:
-plan authors `set_plan` → materialize carries it → logger prefills per set.
+**Intake (`NonRaceBuilder.tsx`):**
+- **One screen per discipline.** The stacked "When can you train?" step is gone. Flow: goal → disciplines →
+  Accessory work → Running → Bike → confirm (+ Swim if kept). Built from what the athlete KEPT.
+- **Accessory work says why it exists** — armour and balance, in Michael's words. ⛔ It says "armor"
+  deliberately; the hedged draft was rewritten OUT. See the comment above the block.
+- **A hard day per discipline**, on that discipline's own card. Two max — the shape enforces it, one per
+  discipline, so there is no third to gate. Both taken → the ledger line states the cost.
+- **The Mulholland dialog** on the second hard day. ⛔ It bends two rules deliberately and both were
+  argued; the file comment holds the reasoning and the one condition that would make it wrong.
+- **All copy brightened one notch** (prose was 55% white on black and read as disabled).
 
-Michael's existing "Get stronger" plan is the OLD ATR block and is untouched. He will delete it.
-
-**Pre-existing and NOT mine:** 7 failures in
-`shared/strength-system/protocols/triathlon_performance.conformance.test.ts` (vertical_pull +
-"Band Pull-Aparts" naming). Failing before today's work — verified by stashing.
+**Logger + copy (`strength-focus-copy.ts`, `StrengthLogger.tsx`):**
+- **Bar-speed doctrine, keyed by SET TYPE.** ⛔ Speed on a prescribed set is a QUALITY CHECK; speed on an
+  AMRAP is a STOP RULE. A prescribed set must never receive "slow rep = last rep" — AMRAPs exist only in
+  the anchor cycle (weeks 9/10/11). **A vocabulary lint pins it**, so editing the copy can't break the rule.
+- **The 95% gate outranks the deload** in `barSpeedLineFor`, and a test derives from `setsForWeek` that
+  they cannot currently collide. Suppressing the line that decides the working number is the expensive
+  failure.
+- **D-326 layer 1 — the difficulty tap.** Top set only (heaviest, not last — `topSetIndex`, tested),
+  three words, replaces the two-step RIR-then-Done. Persists in `strength_exercises` JSON, **no
+  migration**. ⛔ **Nothing reads it yet.**
 
 ---
 
-## THE RULES MICHAEL SET TODAY
+## ⛔ THE SPEC WRITTEN LAST NIGHT — D-325 and D-326. Read them before designing anything adjacent.
 
-- **Endurance absolutes are immovable; strength builds around them.** Long run, long ride, club days
-  are set by daylight, weather and other people.
-- **Gate it, don't warn it.** No "accept the risk" button. When the week cannot hold the work, present
-  the resolved alternative, not an error.
+- **D-325 — Session Cost Ledger + Penalty Scheduler** (`DECISIONS-LOG.md:1260`). Three ordinal axes 0–3,
+  ceilings from emphasis, placement by penalty score, **breach states cost and never refuses**, ledger
+  **subordinate** to the reconciler. ⚠️ **Arrived labelled D-268 — that number was taken since 2026-07-09.**
+  ⚠️ **Q-205: two of the three ceiling sets are UNVALIDATED** — assume wrong until summed against their
+  own default weeks, the way `strength_led`'s mech ceiling had to move 12 → 14 the moment it was checked.
+- **D-326 — per-set difficulty.** ⛔ **Its three-failure table is the thing to read.** Layer 1 (the tap) is
+  built. **Layer 2 — `verdictFrom95Set` wired — and layer 3 — provenance rendered — are NOT.** *Shipping
+  the tap does not close the blindness*, and that misreading is the most likely thing to happen next.
+
+---
+
+## ⚠️ THE FINDING THAT MATTERS MOST — the strength gauge is near-blind for 8 of 12 weeks
+
+Found by tracing, not guessing, and **nothing in the app says it:**
+
+- **AMRAPs exist only in the anchor cycle** — `wendler-531.ts:61`,
+  `amrap: kind === 'anchor' && !isDeload && i === 2`. In a 12-week block that is **weeks 9, 10, 11.**
+- **And a leader-week e1RM is the plan quoting itself.** `brzycki1RM` is `effectiveReps = reps + rir`
+  (`compute-facts:124`); with RIR scoped off by D-324, doing the prescribed 5 reps at the prescribed weight
+  yields `weight × 1.125` — **a pure function of the prescription.** It climbs every cycle because the plan
+  raises the bar. It carries athlete information **only on a miss.**
+- **`verdictFrom95Set` / `applyVerdict` are written, correct, and CALLED BY NOTHING**
+  (`wendler-531.ts:160-200`). Wendler's own rule — five reps at 95% or the number drops 10% — with week 3
+  of every cycle already being the 95% set. **The composer advances by cycle index, unconditionally**
+  (`workingNumberForCycle:112`). Wiring it is what stops the gauge grading its own homework.
+- **The missed-reps half already exists** — Q-193, the stall, `coach/index.ts:3903+`. Counts only sets at
+  or above prescribed load; a zero-rep set is "not performed", not a failure. **Do not rebuild it.**
+
+---
+
+## THE RULES MICHAEL SET — carried forward, still binding
+
+- **Endurance absolutes are immovable; strength builds around them.** *"Get out of days-of-the-week
+  headspace — we move the strength to accommodate long runs, rides and social groups."*
+- **Gate it, don't warn it.** No "accept the risk" button. Present the resolved alternative, not an error.
+- **A cap that refuses is a cap. A number that states the cost is a trade.**
 - **Precise if you know, vibe if you don't.** No data-entry exam before a screen unlocks.
-- **All endurance conversational.** The effort ceiling is what makes honouring the mileage safe.
+- **All endurance conversational** — the effort ceiling is what makes honouring the mileage safe.
 - **Flag invented numbers and STOP.** Do not substitute a different invented number.
+- **"The model is wrong, not the week."** When a known-good week breaches a threshold, fix the model.
 
-### ⛔ CLAIMS CHECKED AND STRUCK TODAY — do not reinstate
-- **"CNS fatigue blunts aerobic adaptations"** as a reason to cap volume — Schumann 2022 (43 studies)
-  found maximal strength SMD −0.06 p=0.446, hypertrophy −0.01. Null.
-- **"Chronically upregulated AMPK inhibits mTOR"** as a capping rationale — Coffey & Hawley: signalling
-  interference is acute and resolves within 24h, which is why alternating days already separates it.
-- **Wendler's 2-day templates pairing Squat/Bench + Deadlift/Press** — cited to justify a 3-day split
-  and then not followed (it recommended Squat/Press). Nobody here has read the books; every Wendler
-  claim we hold is secondary.
-- **A 30-35 mi / 6-8 h volume cap** — no source puts the line there, and the cost is not comparable
-  across athletes.
+### ⛔ STILL TRUE FROM D-324 — do not reinstate
+No `1rm_test` tag on 5/3/1 sessions (it makes the logger discard planned rows). **RIR stays OFF for
+`strength_primary`** — D-326 is a replacement signal, not a reversal. Volume is a trade, never a cap.
+**The block description promises "speed and distance blocks unlock when this cycle closes" — neither
+exists.** A knowingly-taken debt; a test asserts the line is present to keep it visible.
 
-**The 3-day split was considered and dropped.** Scope creep for an edge case, and the argument for it
-had already been walked back in `BUILD-ORDER-strength-spine.md` (the endurance-squeeze case assumed
-24h separation; Robineau's floor is 6h).
-
-### ⛔ A DEBT, KNOWINGLY TAKEN
-The block description promises *"speed and distance blocks unlock when this cycle closes."* Neither
-exists and there is no week-12 hand-off. It was cut once and Michael reinstated it deliberately, so
-it is a commitment — **the test asserts the line is PRESENT** to keep it visible until the hand-off
-ships. `src/lib/strength-focus-copy.ts` header has the provenance of every line in that copy.
+### Pre-existing and NOT from these sessions
+7 failures in `shared/strength-system/protocols/triathlon_performance.conformance.test.ts`
+(`vertical_pull` + "Band Pull-Aparts" naming). Failing before any of this work — verified by stashing.
 
 ---
 

@@ -9,13 +9,16 @@
 > **⛔ WHEN YOU ADD A ROW, SAY WHAT IT DOES FOR AN ATHLETE — not just where the code lives.**
 > The 2026-07-13 audit found three fully-built, fully-tested engines that had **never run once**, and the owner could not remember what any of them were *for*, because every doc described them structurally (*"the rule set ships at `week-optimizer.ts:412`"*) and never in a sentence a runner would understand. **A capability nobody can describe is a capability nobody will wire up.** One plain sentence, then the file path.
 
-### The three that are BUILT, TESTED, and have NEVER EXECUTED (2026-07-13)
+### The FIVE that are BUILT, TESTED, and have NEVER EXECUTED (2026-07-13; +2 found 2026-07-25)
 
 | what it does for an athlete | where | why it never runs |
 |---|---|---|
 | **"Put my lifting on the same day as a hard leg session, so my other days stay free."** The strength-integration fork: dense days vs light days. | engine `_shared/week-optimizer.ts:412-417` · spec `docs/CONSOLIDATED-MODE.md` | **No wizard writes `integration_mode`** → `create-goal…:1895` hardcodes `'separated'` for everyone |
 | **Stops the wizard accepting an IMPOSSIBLE week.** "4 days, 10 hours, hard, lots of strength" → it does the arithmetic and warns or refuses, showing the math. | `src/lib/day-count-gate.ts:237` · spec `docs/DAY-COUNT-GATES.md` | **Zero importers.** Nothing in the app calls it. ⚠️ Ships *after* consolidated mode — its matrix keys on `integration_mode`. |
 | **"Am I getting faster on this stretch?"** Your own personal segments — the chunks of road you actually repeat. *(Deliberately replaces the per-route approach, which flip-flopped on real data.)* | `detect-cores` → `match-cores` → `compute-core-verdict` · spec `docs/DESIGN-segments.md` | **`detect-cores` has ZERO callers.** No cron, no button, no script → `route_cores` is always empty → all three stages produce nothing. |
+
+| **"Place my lifting around my long run, my club night and my rest days."** Takes endurance pins + day/kind/label/`canSplitDay`, returns placed lifts, rest days and named compromises. Heavy legs first, 48h clear of long days, 24h of quality, stacking only where the athlete SAID they can split (Robineau 2016). | `shared/strength-system/place-week.ts` (**12 tests**) | **ZERO IMPORTERS.** `strength-primary-plan.ts` still lays out a hardcoded Mon/Tue/Thu/Fri grid. ⚠️ Its hard rules are RETIRED IN FORM by **D-325** — they become penalty costs — but the capability is the same and still unreachable. See `ARCH-strength-spine.md` §0.6: **three placement authorities, no owner.** |
+| **"Only raise my working weight when I've earned it."** Wendler's 95% validity check — five reps at 95% of the working number or it drops 10%. Week 3 of every cycle already IS the 95% set, so the gate has a home. | `shared/strength-system/loading/wendler-531.ts:160-200` (`verdictFrom95Set`, `applyVerdict`) | **ZERO CALLERS.** `workingNumberForCycle:112` advances by **cycle index, unconditionally** — the plan raises the bar, then reports the bar back as fitness. ⛔ **This is what makes the strength gauge circular** (D-326 layer 2). |
 
 **Status legend:**
 `BUILT` works end to end · `PARTIAL` works but fragile/incomplete (the note says how) · `SEAM` documented extension point, not built · `STUB` placeholder / invented numbers · `DEAD` exists, zero callers OR output never rendered.

@@ -1056,3 +1056,60 @@ Found in the 2026-07-24 cross-engine audit (after the maintain-exclusion, parked
 
 - `OPEN-QUESTIONS.md` (165KB) and `DECISIONS-LOG.md` (244KB) are both past the ~150KB archive threshold in CLAUDE.md.
 - 25 code comments were stamped **D-316** during this work. D-316 is *State-as-hub* (2026-07-23). Corrected to **D-322** across 8 files; the refs in `StateTab` / `StateHubTabs` / `StateAdjustLens` are the real D-316 and were left alone.
+
+---
+
+## Q-203 — Race plans need HARD gates, not the D-325 budget model (2026-07-25, deliberately deferred, NOT built)
+
+**Michael, alongside the D-325 handoff: *"race needs hard gates — we don't build this now but make a note."***
+
+D-325 is explicit that **ceilings state cost and never refuse** (§7), and that is right for a
+self-directed strength block: the athlete added it, the app prices it. **A race plan is a different
+contract.** Someone eight weeks from an A-race who stacks a VO2 session onto a heavy-deadlift day is not
+making a trade — they are damaging the thing they paid for. Race plans plausibly want a genuine refusal,
+or at minimum a much narrower prohibited list than D-325 §8's two rules.
+
+**Do not resolve this by loosening D-325.** The two contracts differ because the emphasis differs, and
+D-325's budget model is correct inside its own scope.
+
+**What would settle it:** the race-plan scheduler is already separate (`week-optimizer.ts`, kept as a
+DEFERRAL under D-325 §6). The gate question should be answered **at the point those two schedulers
+converge**, not before — otherwise we design a gate for a scheduler we are about to replace.
+
+---
+
+## Q-204 — Opt-in flag when an athlete breaks the easy-effort rule on their own runs (2026-07-25, Michael's note, NOT built)
+
+**Michael: *"user gets a flag on their performance screen if they break zone 2 rules — if they opt into this."***
+
+The Strength Focus block's whole safety argument is **conversational is the ceiling** — Hickson: cutting
+intensity is what loses the aerobic base, so volume gives and effort holds. **That guardrail is currently
+stated in copy and enforced by nothing.** An athlete who runs their maintenance miles hard is carrying a
+different block than the one the app describes, and the app does not mention it.
+
+**Design constraints, all pre-existing:**
+- **OPT-IN.** Michael's own framing. Unrequested policing is not this app's voice.
+- The surface exists — the State screen's BODY section already flags how the athlete is doing.
+- **The signal exists:** D-325 §9 recomputes a session's cost from what was *executed* — a Z2 run that
+  drifted to threshold recosts 1/1/0 → 2/2/1. **That recost IS the detection.** This question is the
+  surfacing of it, not a new measurement.
+- ⚠️ Inherits D-325 §9's known risk: the recost depends on `time_in_zone` / `hr_drift_pct`, which the
+  documented ingest race can drop. **It would fail quiet, and always by under-reporting.**
+
+**Blocked on D-325 §9.** There is nothing to flag until actuals are being recosted.
+
+---
+
+## Q-205 — `balanced` and `endurance_led` ceilings are UNVALIDATED (2026-07-25, from D-325, blocks trusting two of three emphases)
+
+D-325's `strength_led` ceilings were validated by summing the composer's **actual default week** — which
+is how the mech ceiling moved 12 → 14, after the stock week breached by 1 before the athlete added
+anything. **`balanced` (10/11/9) and `endurance_led` (8/15/8) have had no such sum run against them.**
+
+They are inherited numbers standing next to one that had to move the moment it was checked. **Assume they
+are wrong until summed the same way.**
+
+**What settles it:** build a default week for each emphasis, sum every axis off the D-325 cost table, and
+confirm the stock week sits *under* its ceiling with roughly the same headroom gradient `strength_led`
+now has — one quality addition tight, the wrong quality addition over by a little. **Adjust the ceiling,
+not the week** — Michael's rule from the first sum: *"the model is wrong, not the week."*

@@ -10,6 +10,117 @@ full dose; race plans at maintenance). The current Get Stronger composer is **de
 structure stay untouched." That isolation was correct when it was written and is wrong now. Undo it on
 purpose, with a map, or we rebuild the protocol twice.
 
+> **§0 was added 2026-07-25 LATE and it reframes everything below it.** §1–§5 answer *"how do we share the
+> strength machinery between plans?"* — still correct, still the build. §0 answers the larger question that
+> came out of the same session: *"which plan is the real one?"* Read §0 first; §1–§5 are the mechanism.
+
+---
+
+## 0. THE FRAME — the block is the body, the goal is the tuning
+
+> **Michael, 2026-07-25 late:** *"I actually see this 5/3/1 as the spine I've been looking for — the one
+> thing that stays through all training, just tuned differently for each goal. Maybe we harvest parts and
+> see this as the main body."*
+
+**This is not a fifth plan generator. It is the one the other four were approximating.**
+
+`PRODUCT-POSITIONING.md:188` already says it in product terms — *"strength is always present — it is not
+an add-on, it is a core feature of every profile."* §0 is that sentence made structural: the thing
+that persists across every athlete and every block is **the barbell block**, and a marathon plan, a
+triathlon plan and a Strength Focus block are the **same body at three different tunings** — not three
+programs that happen to include lifting.
+
+### 0.1 ⛔ THE CONSTRAINT THAT KEEPS IT HONEST — present always, priority *sometimes*
+
+**The spine must be able to YIELD, and if it cannot, this frame is wrong for every race athlete.**
+
+Twelve weeks out from a marathon the long run is the immovable object and the lifting bends around it.
+Inside a Strength Focus block the opposite is true (`ENGINE-STATE` banner: *"endurance absolutes are
+immovable; strength builds around them"* — that rule was written FOR the strength block and does not
+generalise). So:
+
+- **presence** is constant — every plan carries the block
+- **priority** is the tuning — who yields to whom is set by the goal, and it inverts
+
+Build it as "the four lifting days are fixed" and it can never taper. **Priority is a parameter of the
+spine, not a property of it.**
+
+### 0.2 THE SECOND OPEN PROBLEM — two rhythms that do not yet agree
+
+5/3/1 deloads **every fourth week** on its own clock (`strength-primary-plan.ts:424`,
+`weekInCycle === WEEKS_PER_CYCLE`). A race plan waves on a **different** clock — base / build / peak /
+taper. Nothing currently makes the two line up, and the composer proves it: endurance rows are emitted
+**identically every week**, deload or not (`:455-465`). On the week the bar drops, the running does not
+notice.
+
+Today that is benign — endurance is at maintenance and low either way, and Michael's own read is that
+absorbing the window *or* holding endurance steady are both acceptable. **It stops being benign the moment
+a race plan hosts the block at a real endurance dose.** This is the genuine design work of the frame, and
+it is OPEN.
+
+### 0.3 THE SURVEY — four places author sessions; one of them is the original
+
+Run 2026-07-25 late, by reading, in answer to *"it's been built — where, and which one does it best?"*
+
+| where | what it is | verdict |
+|---|---|---|
+| **`generate-combined-plan/session-factory.ts`** | **42 exported constructors** — `sweetSpotRun:401`, `tempoRun:415`, `vo2Run:432`, `intervalRun:449`, `thresholdBike:584`, `vo2Bike:597`, `sweetSpotBike:610`, `tempoBike:689`, plus every swim + brick. Each emits session + description + `steps_preset` + tags. | ⭐ **THE ORIGINAL.** Only one that covers the bike. Only one where a session type has exactly one birthplace. |
+| `generate-triathlon-plan/generators/tri-generator.ts` | No factory. `steps_preset` arrays typed **inline** inside the week logic (`:621`). | cover version — longhand, correct, invisible |
+| `generate-run-plan/generators/base-generator.ts` | Its own small factory (`createSession:475` + easy / long / marathon-pace / strides). **No intervals at all. Run only.** | cover version — narrower |
+| `generate-plan/index.ts` | **71 lines, dated 2024, validation-only stub.** | **DEAD — delete** |
+
+**And the spine itself makes one token by hand.** `strength-primary-plan.ts:272` `runIntensityToken()`
+builds `run_easy_${min}min` / `longrun_${min}min_easypace`, with a comment stating its vocabulary matches
+the race path *"at the substring level."* **A shared vocabulary held together by memory is the tripwire.**
+
+### 0.4 TARGET — one catalogue, and plans get thin
+
+**One session catalogue, owned by the spine. Every plan orders from it; no plan knows what a session *is*.**
+
+A generator decides **which** sessions and **which days**. It never decides what a tempo run is. Today
+`tri-generator` knows how to build one from scratch — that is the violation, and it is the same disease
+`CONSTITUTION` Law 1 names (one source of truth per claim).
+
+**Migration discipline — the part that has failed every previous time.** Every prior session made the
+reasonable call to leave the other copies alone, which is *how there came to be four*. So: designate the
+catalogue, migrate the consumers in the same effort, and where a consumer cannot be migrated yet, **fence
+it with a test that fails the build if another session is authored longhand inside it.** Never designate a
+single source and leave live alternatives beside it.
+
+**And the way to touch a working generator safely is not to avoid it — the Constitution already says so.**
+**Law 6: every load-bearing change ships behind a behavior-unchanged proof.** Build the same plan before
+and after, diff the output, require byte-identical. Then the change is *known* safe, not hoped safe. This
+was nearly re-invented from scratch tonight; it was already law.
+
+### 0.5 CONFIRMED BY TRACE — what is already wired (do NOT rebuild)
+
+| capability | status | evidence |
+|---|---|---|
+| Spine emits tokens; rows flow through the same expander as race plans | **BUILT** | `strength-primary-plan.ts:300` `steps_preset: [runIntensityToken(...)]` |
+| Interval → steps, paced off LIVE baselines | **BUILT** | `materialize-plan/index.ts` — `run_vo2_*:1467` (5K pace −12 s/mi), `cruise_*_threshold:1487` (5K **+20 s/mi**), `bike_ss_*:1643`, `bike_thr_*:1657`, `bike_vo2_*:1660` (110–120% FTP) |
+| Sweet spot at **88–94% FTP** | **BUILT** | `session-factory.ts:615` |
+| Structured workout → Garmin | **BUILT + WIRED** | `send-workout-to-garmin` (1347 lines), called from `StructuredPlannedView.tsx:634`, `TodaysEffort.tsx:341` |
+| **Apple Watch push** | **NOT BUILT, and not the same road** | HealthKit is an **import** (`services/healthkit`, `Connections.tsx:74+`). Do not promise it. |
+
+⚠️ **The bike is FENCED, deliberately.** `strength-primary-plan.ts:299` — *"Q-126: RUN-only token
+injection. Bike/ride is fenced to its own pass (Gap A-bike)."* Bike quality on the spine means **opening a
+gate someone closed on purpose** — its own named pass, never smuggled in behind a run change.
+
+### 0.6 ⛔ THE PREREQUISITE — three placement authorities, and they must become one
+
+Nothing above is safe to build until this is settled. Today, "what day does X go on" has **three** claimants:
+
+1. `_shared/week-optimizer.ts` — **declared sole authority** by `SCHEDULING-RULES.md`. The spine does not route through it.
+2. `shared/strength-system/place-week.ts` — built, 12 tests, **imported by nothing.**
+3. `strength-primary-plan.ts` — a hardcoded Mon/Tue/Thu/Fri grid that wins today by default.
+
+They mostly agree now, which is why it has not bitten. **Adding a hard conditioning day that must dodge a
+heavy squat is exactly the case where they stop agreeing** — and it will work for a week and then fail in a
+way with no traceable owner. One authority first; feed it second.
+
+*(Related and cheap: `create-goal-and-materialize-plan:~2465` forwards only `long_run` to the strength
+composer, so `quality_run` / `quality_bike` reach the goal and stop. Same wire.)*
+
 ---
 
 ## 1. What exists today

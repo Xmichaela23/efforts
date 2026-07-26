@@ -4,7 +4,30 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
-> **2026-07-24 status:** active work is the **State screen → 100%** track, now moving from *read* into *steer* (roadmap: State → plan builder → intro flow → freeballer). **2026-07-24** made the **load/strain verdict multi-sport** (D-317 total-load + phase-aware; D-318 de-run-brained the reconciler's RIR + HR-drift strain signals) — a strength week now reads "balanced", not "pull back"; DEVICE-VERIFIED. The **"adapt a plan" strength track (D-315)** and the **State-as-hub three-tab design (D-316)** are in; **NEXT = build the Adjust tab** (re-home the logger's swap/add/weight onto the State strength row). Still owed: device-verify the D-315 logger UI. Earlier State work: RUN row + FITNESS craft/charts (D-307 → D-311, 2026-07-22), name-split fix + strength/bike charts + layout (D-312 → D-314, 2026-07-23); open chart threads Q-200 (bike efficiency), tap-to-expand, PMC-parity. See the ENGINE-STATE banner. The phase list below (the 2026-07-13 continuity plan) is still valid but is not what's currently being worked.
+> **2026-07-25/26 status — THE PLAN BUILDER IS THE ACTIVE TRACK, and it moved off the State screen.**
+> The roadmap order was State → **plan builder** → intro flow → freeballer. The State screen work paused
+> at "Adjust tab next"; **the plan builder is now what's being built**, because Strength Focus V1 shipped
+> (D-324) and the front door is the thing an athlete meets first.
+>
+> **2026-07-25 (late) — SPEC-HEAVY SESSION, CLIENT WORK UNCOMMITTED.** Intake rebuilt one screen per
+> discipline; hard conditioning days collected per discipline; bar-speed doctrine + the per-set difficulty
+> tap (D-326 layer 1) built in the logger. **Nothing pushed, nothing deployed, no plan built end to end.**
+> Two large specs written and NOT built: **D-325** (session cost ledger + penalty scheduler — this also
+> resolves the three-placement-authorities problem) and **D-326** (the strength gauge is near-blind for 8
+> of 12 weeks; three failures, three fixes, only layer 1 built).
+>
+> ⛔ **AND THE ARCHITECTURE FRAME CHANGED — `ARCH-strength-spine.md` §0.** The barbell block is the BODY
+> and a goal is a TUNING of it; the four plan generators are cover versions of one original
+> (`generate-combined-plan/session-factory.ts`). Read §0 before any structural call.
+>
+> **NEXT (Michael, at close): finish the flow, lock in quality options, wire the bike** — then build ONE
+> plan end to end. See the ENGINE-STATE banner.
+>
+> Earlier State work stands and is not being re-litigated: load/strain multi-sport (D-317/D-318,
+> device-verified), the "adapt a plan" strength track (D-315), the State-as-hub three-tab design (D-316,
+> **Adjust tab still unbuilt**), RUN row + charts (D-307 → D-314). Open chart threads: Q-200, tap-to-expand,
+> PMC-parity. The phase list below (the 2026-07-13 continuity plan) is still valid but is not what's
+> currently being worked.
 
 ---
 

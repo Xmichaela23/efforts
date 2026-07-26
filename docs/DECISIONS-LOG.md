@@ -1144,6 +1144,20 @@ Inherits the anchor's accuracy: the chart is relative to a TRUE 1RM, so a stale 
 
 ## D-324 — Strength Focus V1: Wendler 5/3/1 replaces the ATR block, per-set weights reach the phone, RIR scoped off, and volume is a trade rather than a cap (2026-07-25, PUSHED + DEPLOYED, **not device-seen**)
 
+> **↪ AMENDED SAME DAY — see D-326. Scoping RIR off left a hole this entry did not know about, and the
+> hole is bigger than the bug that was fixed.**
+>
+> Killing RIR was right: it was **auto-filled** and fed `brzycki1RM`, so a suggested value on a
+> deliberately submaximal opener read back as a much heavier lift. **But `effectiveReps = reps + rir`
+> means that with RIR gone, e1RM on a LEADER week is `weight × 1.125` — a pure function of the
+> prescription.** It climbs every cycle because the plan raises the bar, not because the athlete did
+> anything. Combined with §2's own finding that AMRAPs fire **only in the anchor cycle** (`wendler-531.ts:61`
+> — weeks 9/10/11 of twelve), **the strength gauge is near-blind for weeks 1–8 and nothing said so.**
+>
+> **D-326 is the replacement signal, not a reversal of this entry.** Per-set difficulty in three words,
+> feeding the body read, never the 1RM maths. §3's "RIR is OFF for `strength_primary`" **still stands and
+> must not be undone.** Everything below is unchanged and correct.
+
 **Folds in `docs/SPEC-get-stronger.md` §1 as built.** Twelve commits, `eb7db0df` → `90c48ee5`. Deployed: `generate-strength-plan` v34, `create-goal-and-materialize-plan` v250, `materialize-plan` v218, `coach` v398, `analyze-strength-workout` v137, `compute-snapshot` v99, `adapt-plan` v33.
 
 ### 1. The protocol is replaced, not tuned
@@ -1240,3 +1254,305 @@ One goal card (the other five were placeholders); strength assumed and endurance
 `resolveProfile()` returns `durability` for any unrecognised key, so a missing entry and a deliberate choice are **indistinguishable at every call site**, with three hand-maintained lists agreeing by hand. Filed **Q-192 (2026-07-19)**, hit again in D-322, root-fixed neither time. **The source spec has no reason to cover this** — it is engine bookkeeping, not a training protocol, and it is the one place to use judgement rather than the spec. **One test asserting the three lists agree + a fallback log line.** Adding an entry ends the instance; the test ends the class.
 
 > **↩ Related:** **D-315** (consent-first weights + swap/add — upheld; the omakase boundary is drawn around it) · **D-322** (the strength-numbers audit this scope sits on top of) · **D-285** (no silent weight writes) · **Q-202** (the working ledger — report line by line, never by topic) · **Q-192** (the registry hole, twice found) · **D-316** (State-as-hub — unrelated; do not confuse the citation, D-322 mis-stamped 23 comments with it).
+
+---
+
+## D-325 — The Session Cost Ledger + Penalty Scheduler: three ordinal axes, ceilings from emphasis, placement by penalty score, and the ledger is SUBORDINATE to the reconciler (2026-07-25, SPEC — not built)
+
+**Michael's spec, verbatim in structure. This entry is the contract; deviations need a new D-NNN.**
+
+> ⛔ **Numbered D-325, not D-268.** The spec arrived labelled D-268 — **already taken** (*"Plan-primary is a
+> SYSTEM invariant"*, 2026-07-09, with its own design doc `DESIGN-D268-plan-aware-everywhere.md`). Caught
+> before writing. The log was at D-324.
+
+### Why it exists
+
+Placement in the strength block is decided by **three claimants that have never been reconciled** — the
+hardcoded Mon/Tue/Thu/Fri grid in `strength-primary-plan.ts` (wins today by default), `place-week.ts`
+(built, 12 tests, **imported by nothing**), and `_shared/week-optimizer.ts` (which `SCHEDULING-RULES.md`
+*declares* the sole authority, and which the strength path does not route through). They agree today only
+because nothing has stressed them. **A hard conditioning day that must dodge a heavy squat is exactly the
+case where they diverge** — and it would work for a week, then fail with no traceable owner.
+
+D-325 is the resolution: **one scheduler that prices sessions and places them by score.** It is not a
+fifth opinion — it *absorbs* two of the three.
+
+### 1. Session cost vector — three ordinal values, 0–3, hardcoded
+
+| session | mech | cardio | cns |
+|---|---|---|---|
+| 5/3/1 lower, top set | 3 | 0 | 2 |
+| 5/3/1 upper, top set | 1 | 0 | 1 |
+| Run VO2 | 3 | 3 | 3 |
+| Run threshold | 2 | 2 | 1 |
+| Long run ≤ 90 min | 2 | 2 | 1 |
+| Long run > 90 min | 3 | 2 | 2 |
+| Bike VO2 | 0 | 3 | 2 |
+| Bike sweet spot | 0 | 2 | 1 |
+| Zone 2 run | 1 | 1 | 0 |
+| Zone 2 bike | 0 | 1 | 0 |
+| Swim | 0 | 1 | 0 |
+
+**No formula, no scalar collapse, no exchange rate between axes.** Same shape as the existing
+role-weighted exercise table: a visible editorial choice, not a fake measurement. Nothing to defend that
+is not on the page.
+
+**Rows are valid only at their spec'd duration.** Quality sessions are fixed-duration — threshold run
+45 min, sweet-spot ride 90 min. **Duration must not float**, or the row stops meaning what it says.
+
+### 2. Emphasis ceilings — weekly sum per axis
+
+| emphasis | mech | cardio | cns |
+|---|---|---|---|
+| strength_led | **14** | 8 | 9 |
+| balanced | 10 | 11 | 9 |
+| endurance_led | 8 | 15 | 8 |
+
+Ceilings derive from the **active emphasis state only**. No user-configurable ceiling, no slider anywhere.
+
+> **The strength_led mech ceiling was 12 and is 14, and the reason is the method.** Summing the composer's
+> ACTUAL default week — 2 lower (6) + 2 upper (2) + long run (3) + 2 easy runs (2) — gave **13 against a
+> ceiling of 12**: a known-good week breaching before the athlete adds anything. Michael's call: *"the
+> model is wrong, not the week."* Two fixes: the long-run row split by duration (mechanical load scales
+> with foot strikes — one row for a 70-min maintenance run and a 2:30 build run was always wrong), and the
+> ceiling to 14. Default now lands **mech 12/14, cardio 4/8, cns 7/9** — two units of headroom: a
+> threshold run lands exactly at the ceiling, a run VO2 breaches by 1 and says so. **That gradient is the
+> intended behaviour.**
+
+⚠️ **`balanced` and `endurance_led` are UNVALIDATED** — neither has been summed against its own default
+week the way `strength_led` was. **Pending calibration.** Do not trust them until that sum is done.
+
+### 3. Reconciler deltas — applied uniformly to all three axes
+
+| reconciler state | ceiling delta |
+|---|---|
+| `under` | +2 |
+| `on_target` | 0 |
+| `productive` | 0 |
+| `elevated` | −2 |
+| `high` | −4 |
+
+**Bound to the five states `reconcileLoadStatus` actually emits** (`load-status-reconcile.ts:42`).
+⛔ **The spec originally said amber/red. THOSE STATES DO NOT EXIST.** Do not invent them or any
+intermediate. `under` grants headroom because it is real capacity — but it can never *cause* a session to
+be added; it only stops a normal week being called over-budget.
+
+### 4. Ledger ↔ reconciler boundary — THE LAW is unchanged
+
+- `reconcileLoadStatus` remains **sole authority** on athlete load state (D-260).
+- The ledger is **scheduling-scope only**. It reads reconciler output, **never writes load claims, never
+  emits a status string.**
+- **No ledger output may be surfaced as a load verdict.** Two governments is the failure this app has
+  spent a month removing.
+
+### 5. Penalty scheduler — score every candidate week, take the minimum, never return empty
+
+| adjacency / conflict | penalty |
+|---|---|
+| Run VO2 adjacent to lower-body 5/3/1 | +6 |
+| Long run adjacent to lower-body 5/3/1 | +3 |
+| Run threshold adjacent to lower-body 5/3/1 | +2 |
+| Bike VO2 adjacent to lower-body 5/3/1 | +1 |
+| Bike sweet spot adjacent to lower-body | 0 |
+| Same-day double under 6h apart | +4 |
+| Same-day double, non-emphasis quality first | +2 |
+| Two consecutive days at cns ≥ 2 | +2 |
+
+Non-zero total is **allowed and surfaced**. Within a same-day double, **the quality matching the active
+emphasis goes first**.
+
+> **Placement is pin-first, and that is Michael's framing:** *"we need to get out of days-of-the-week
+> headspace — we move the strength to accommodate long runs / rides and social groups."* Endurance
+> absolutes and other people's sessions are the fixed points; the lifting is what moves.
+
+### 6. Consolidation — what this retires
+
+- **`place-week.ts`'s hard adjacency rules are RETIRED and re-expressed as the penalty table above.** Same
+  intents, costs instead of walls. Walls are why it could return nothing; costs are what makes
+  "never empty" achievable. Its 12 tests re-point accordingly.
+- **The hardcoded Mon/Tue/Thu/Fri grid stops deciding placement.** The scheduler owns it.
+- ⛔ **Race plans retain `week-optimizer.ts`. THIS IS A DEFERRAL, NOT A DESIGN.** Recorded explicitly at
+  Michael's instruction, because *"otherwise it reads as intentional in six months and nobody merges it."*
+  **Direction of travel: race plans converge on the same scorer.** Two schedulers with a written direction
+  is acceptable; three with no owner was not.
+
+### 7. Breach behaviour — states cost, never refuses
+
+- **Ceilings are budgets, not gates.** The solver runs regardless, places the week, and reports the
+  overdraft per axis.
+- Breach output names **the axis, the overage, and the largest contributing sessions on that axis**.
+  Shape: *"Mech 15 of 14 — the long run and both lower lifts are 11 of it."*
+- **Breach affects placement, not admission**: penalty weights increase on the breaching axis so the
+  arrangement degrades gracefully instead of the week being rejected.
+- **Never silently remove or shrink a session to fit.** The athlete added it; the app says what it costs.
+
+> **This is the same call as every retired cap.** D-222's ceiling was retired for refusing; the volume band
+> replaced it by stating the trade. *"A cap that refuses is a cap. A number that states the cost is a
+> trade."*
+
+### 8. Composer posture — regulated; overrides libertarian
+
+- The composer **will not auto-generate a breaching week.** The athlete may force it with an explicit
+  confirm **that shows the axis arithmetic before acceptance.**
+- **Manual overrides and logged actuals are never blocked** — priced and placed, always.
+- **The prohibited list is exactly two rules. No more:**
+  1. Run VO2 within 24h of a lower-body 5/3/1 session at reconciler state `high`
+  2. Any quality session at reconciler state `high` where the default week already breaches
+- Opting into **both** a quality run and a quality ride on a `strength_led` block must surface that the
+  week has **zero remaining headroom on all three axes BEFORE acceptance**, not after.
+
+### 9. Reconcile against actuals
+
+- Ingest **recomputes the vector from what was executed, not what was planned.**
+- A Zone 2 run that drifted to threshold recosts **1/1/0 → 2/2/1**.
+- Overdraft **debits the remaining days' ceilings** for that week.
+- ⛔ **Never retroactively flag a completed session as invalid.**
+
+⚠️ **KNOWN RISK, and it fails quiet.** The recost depends on `time_in_zone` / `hr_drift_pct`, which are
+exactly the fields the **documented ingest race** can drop (`compute-facts` is awaited but reads
+`workouts.computed`, written by two fire-and-forget calls — see `CLAUDE.md` Topology). When the race is
+lost, a drifted Z2 run recosts as 1/1/0 and the overdraft never happens. **The failure is silent and
+always in the same direction: under-costing.**
+
+### 10. Out of scope for D-325
+
+- **Personal calibration of cost weights.** Ship the fixed table. Months of clean data are needed, and
+  *"you can't distinguish 'this athlete tolerates load' from 'this athlete under-reported.'"*
+- Any scalar / weighted-sum collapse of the three axes.
+- Merging the race-plan scheduler (§6 — deferral, direction recorded).
+
+> **↩ Related:** **D-260** (THE LAW — the reconciler is the sole verdict authority; §4 is subordination to
+> it) · **D-222** (the retired volume cap — §7 is the same call) · **D-324** (Strength Focus V1, the block
+> being scheduled) · **D-317/D-318** (multi-sport load + strain, which is what `elevated`/`high` now mean)
+> · **`ARCH-strength-spine.md` §0.6** (the three-authorities problem this resolves).
+
+---
+
+## D-326 — Per-set difficulty replaces the RIR prompt on the barbell block: three words on the complete tap, feeding the BODY read and never the 1RM estimate (2026-07-25, SPEC — not built)
+
+### The hole this fills, and it was found by tracing not guessing
+
+Michael asked whether AMRAP sets give the app enough of a read on strength to keep an eye on the athlete.
+**They do not, and the reason is worse than expected.**
+
+- **`wendler-531.ts:61` — `amrap: kind === 'anchor' && !isDeload && i === 2`.** AMRAPs exist **only in the
+  anchor cycle, and not on its deload.** In a 12-week leader/leader/anchor block that is **weeks 9, 10 and
+  11. Nothing in weeks 1–8.**
+- **And e1RM on a leader week is the plan quoting itself.** `brzycki1RM(weight, reps, rir)` is
+  `effectiveReps = reps + rir` (`compute-facts/index.ts:124`). With RIR scoped off by D-324, an athlete
+  who does the prescribed 5 reps at the prescribed weight yields `weight × 1.125` — **a pure function of
+  the prescription.** It rises every cycle because the plan raises the bar, whether they are thriving or
+  barely holding on. **It carries athlete information only when they MISS.**
+- The trend itself is session-to-session with a 2.5 lb dead band (`analyze-strength-workout.ts:688-727`) —
+  no multi-point fit, and under 5/3/1's weekly percentage changes it swings by design.
+
+**So for eight of twelve weeks the strength gauge is close to blind, and nothing said so.**
+
+### The decision
+
+**The top set completes with one of three words instead of a tick.** Label: *"Select difficulty to mark
+done."*
+
+> **Moved well · Worked for it · Grind**
+
+- **Top set only.** Asking how a 65% opener felt is information-free — the athlete was told to leave reps
+  in the tank, so the answer is always "easy". **Four taps a session**, two on the lower-body days that
+  carry the real cost.
+- **It replaces a two-step flow with one.** Today completing a set opens a RIR prompt, then a confirm
+  (`StrengthLogger.tsx:3505-3535`). Michael: *"we have a two-step process now — forced RIR pick and then
+  hit done. This is smoother."* **The tap the athlete was already making becomes the answer.**
+
+### Why words, not a number — and this is field practice, not preference
+
+Numbers (RPE 6–10 in half points, RIR 0–4) are standard **where the answer drives load** — Juggernaut,
+Hevy, Strong. That precision exists because the number sets next week's weight. **It does not here: 5/3/1
+already dictates the weight.** The apps that optimised for people actually answering moved to plain
+language — **RP's app runs the most aggressive auto-regulation in the industry and asks in words**
+(none / low / moderate / high), because a lifter mid-set does not reliably separate an 8 from an 8.5.
+
+Ten points of scale to detect *"this is trending wrong"* is precision we cannot use and cannot defend.
+And **"RIR" is jargon by `COPY-VOICE.md` rule 9.**
+
+### ⛔ THE THREE RULES THAT KEEP IT FROM BECOMING THE BUG D-324 REMOVED
+
+1. **It NEVER feeds `brzycki1RM`.** D-324 killed RIR because it was **auto-filled** and then entered the
+   1RM maths — a suggested number on a deliberately submaximal opener came back out as a much heavier
+   lift. **The bug was never "asking how it felt." It was a guess entering the arithmetic.**
+2. **Never auto-filled. Blank is a legal answer.** No value the athlete did not choose.
+3. **Stored as a plain ordinal, never rendered back as a number.**
+
+### Where it lives — no migration required
+
+- Sets already persist as **JSON** on the workout (`workouts.strength_exercises`, carrying reps/weight/rir
+  per set), so `difficulty` rides alongside. **No new column.**
+- The aggregate lands in `strength_facts` (a `Record<string, any>` in `compute-facts`) — **also JSON, also
+  no column.**
+- **The consumer already exists and is idle:** the reconciler watches `BodyTrends.strength`
+  (`load-status-reconcile.ts:55-60`), which reads the RIR trend and is deliberately excluded for
+  strength-primary (D-318 — declining RIR in a strength block is the *intent*, not strain). **Difficulty
+  replaces it as that input.** The wiring has been sitting there unfed.
+
+### ⛔ THREE FAILURES, THREE FIXES — and shipping the tap does NOT close the other two
+
+**The single most likely misreading of this entry**, and Michael named it before a line of logger code
+was written: *"it'd be easy to ship the tap and feel like the blindness got solved."* It would not be.
+
+| # | failure | fix | status |
+|---|---|---|---|
+| 1 | **No continuous signal.** Weeks 1-8 have no measured input at all. | **The tap** (this entry) — a weekly athlete-sourced reading from week one. | D-326 |
+| 2 | **The number issues itself.** `workingNumberForCycle:112` advances by cycle index, unconditionally. The plan raises the bar, then reports the bar back as fitness. | **Wire `verdictFrom95Set`** into the advance path (`wendler-531.ts:160-200` — written, correct, **called by nothing**). Five at 95% or the number comes down 10%. | NOT BUILT |
+| 3 | **The number hides its age.** Even once earned, between gates it is rendered as current with no fresh measurement behind it. | **Provenance on the surface** — *earned at week 3, unmeasured since* is true; a bare `325` is not. | NOT BUILT |
+
+**They are not interchangeable and they do not substitute for each other.**
+
+- The tap makes the mirror **higher-resolution**. It does not make it a gauge.
+- The verdict makes the number **earned**. It does not make it **fresh**.
+- Both can ship and the screen can still read `325` flat with nothing indicating it is five weeks old.
+
+**#3 is Laws 2 and 3, by name** — *measured and inferred never wear the same clothes*, and *confidence
+travels with every inference, all the way to the surface*. ⚠️ **And it is a pattern this app already
+owns on the run side** — learned vs entered baselines are rendered differently, with suggest-and-confirm
+rather than a silent overwrite (`AthleticRecordPage.tsx` `SuggestionLine`, D-303's noise-guarded verdict).
+**Reuse that rendering. Do not invent a second provenance vocabulary.**
+
+⛔ **Do not mark the strength-gauge blindness closed until all three have shipped.**
+
+### ⚠️ THE SERVER HALF IS NOT A PORT — the plumbing exists but is shaped around RIR
+
+**Michael, 2026-07-25 (deferred): *"we have to plug it into state — the plumbing is there, it's tuned
+to RIR so we will have to finesse. Not tonight's work."*** Read this before starting it; the naive wiring
+is wrong in three separate ways.
+
+**1. The existing signal is ACTUAL-vs-PRESCRIBED, and difficulty has no prescription.**
+`longitudinal-signals.ts:540-570` builds a map of *prescribed* RIR per lift (`buildPrescribedRirByName`)
+and flags when logged `avg_rir` sits ≥0.9 below it. **5/3/1 prescribes a weight and a rep count. It does
+not prescribe a feel.** There is nothing to compare a difficulty against, so the whole comparison model
+has to be replaced, not re-pointed.
+
+**2. Difficulty RISING inside a cycle is the program, not a warning.** Percentages climb 65 → 95 across
+weeks 1-3 and reset on week 4 (`PCT_BY_WEEK`). A raw slope would flag **every athlete, every cycle,
+forever** — the same shape as the false "pull back" D-318 removed, where declining RIR in a strength
+block was read as strain when it was the intent.
+
+**⛔ The comparison must be LIKE-FOR-LIKE: same week-in-cycle, across cycles.** Week 3 of cycle 2 against
+week 3 of cycle 1 is the same *relative* load at a heavier absolute weight — which is precisely the
+question worth asking, *is the working number still honest*. **And it lands on the same set as Wendler's
+95% gate**, so the two signals corroborate rather than compete.
+
+**3. The consumer is one boolean.** `coach/index.ts:5727` —
+`strength: { declining: weeklyResponseModel.strength.overall.trend === 'declining' }`. That feeds
+`BodyTrends.strength`, which `computeDecliningSignals` currently **excludes** for strength-primary
+(D-318). Re-including it is a one-line change **and must not happen until 1 and 2 are solved** — it would
+reinstate the exact false-strain bug D-318 fixed, on a different input.
+
+### What it makes possible
+
+The question Michael actually asked — *when do we tell someone to drop a quality session?* — needs **two
+independent observers agreeing**: missed reps on a lower-body lift **and** the reconciler at `elevated` or
+`high`. Either alone is a Tuesday. Difficulty gives the first observer a weekly voice from **week one**
+instead of week nine.
+
+> **↩ Related:** **D-324** (scoped RIR off — this is the replacement signal, not a reversal; see the
+> back-annotation there) · **D-318** (why the strength body-trend is excluded for strength-primary) ·
+> **D-315** (consent-first: nothing is written the athlete did not choose) · **D-325** (the ledger that
+> consumes reconciler state).
