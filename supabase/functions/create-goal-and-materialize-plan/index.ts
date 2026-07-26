@@ -16,6 +16,7 @@ import {
   type TrainingTransition,
 } from '../_shared/planning-context.ts';
 import { normalizeGoalDistanceKey, projectRaceSplits } from '../_shared/race-projections.ts';
+import { LIFT_LABEL, missingBarbellLifts, readBarbellMaxes } from '../shared/strength-system/barbell-maxes.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { buildSwimCutoffPressureV1, type SwimCutoffPressureV1 } from '../_shared/swim-cutoff-pressure.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
@@ -2411,18 +2412,13 @@ Deno.serve(async (req: Request) => {
             //     (Lower = squat + deadlift, Upper = bench + press, Full Body = all four), which ramps
             //     from the empty bar to a 3–6 rep set rather than a max attempt.
             // Refuse and NAME the missing lift so the client can send them to the right test.
-            const gsPN = (gsBaseline?.performance_numbers ?? {}) as Record<string, any>;
-            const num = (...keys: string[]): number => {
-              for (const k of keys) { const v = Number(gsPN[k]); if (Number.isFinite(v) && v > 0) return v; }
-              return 0;
-            };
-            const gsRequiredLifts: Array<{ label: string; value: number }> = [
-              { label: 'Squat', value: num('squat', 'squat1RM', 'squat_1rm') },
-              { label: 'Bench Press', value: num('bench', 'bench_press', 'benchPress') },
-              { label: 'Deadlift', value: num('deadlift', 'dead_lift') },
-              { label: 'Overhead Press', value: num('overheadPress1RM', 'ohp', 'overhead_press', 'overhead') },
-            ];
-            const gsMissing = gsRequiredLifts.filter((l) => !(l.value > 0)).map((l) => l.label);
+            // ONE reader for the four maxes (`shared/strength-system/barbell-maxes.ts`) — the same one
+            // `generate-strength-plan` uses to build the working numbers. The key aliases used to be
+            // written out here inline, which meant this gate and the composer each carried their own
+            // list: a key one accepted and the other didn't would let an athlete past the gate into a
+            // plan with no weight on a lifting day.
+            const gsMaxes = readBarbellMaxes((gsBaseline?.performance_numbers ?? {}) as Record<string, unknown>);
+            const gsMissing = missingBarbellLifts(gsMaxes).map((l) => LIFT_LABEL[l]);
             if (gsMissing.length > 0) {
               const list = gsMissing.length === 1
                 ? gsMissing[0]
@@ -2433,9 +2429,6 @@ Deno.serve(async (req: Request) => {
                 409,
               );
             }
-            // Dead once the gate above exists — every athlete reaching here has all four. Kept at
-            // `false` until the composer's `baselineTestWeek` path is removed in the protocol rebuild.
-            const gsNeedsBaseline = false;
             const gsSport = gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null;
             // Maintenance-endurance band (run only): the athlete's typed weekly miles + their learned easy
             // pace → the composer clamps to the science band. sec/km → min/mi = ×1.609344 ÷ 60. Absent
@@ -2450,19 +2443,22 @@ Deno.serve(async (req: Request) => {
             const gsTargetWeeklyMiles = Number(gsTp.target_weekly_miles) > 0 ? Number(gsTp.target_weekly_miles) : undefined;
             const gsBody: Record<string, any> = {
               user_id,
+              // The composer rounds this DOWN to a whole number of four-week cycles (12 → 12, 10 → 8).
               duration_weeks: Number((resolvedGoal as any)?.target_weeks) || 12,
-              strength_frequency: 4,            // the full 4-day U/L/U/L arc (barbell)
-              strength_tier: 'strength_power',
               endurance_sport: gsSport,         // sport-agnostic maintenance (run / bike / none)
               // run frequency from intake (2/3/4); engine spreads miles + stacks extras onto upper lift days
               endurance_frequency: Number(gsTp.run_days) >= 2 && Number(gsTp.run_days) <= 4 ? Number(gsTp.run_days) : 2,
-              needs_baseline: gsNeedsBaseline,  // NO-path → week 1 = baseline test
-              goal_name: String(resolvedGoal?.name || 'Get Stronger'),
+              goal_name: String(resolvedGoal?.name || 'Strength Focus'),
               ...(gsTargetWeeklyMiles ? { target_weekly_miles: gsTargetWeeklyMiles } : {}),
               ...(gsEasyPaceMinPerMile ? { easy_pace_min_per_mile: gsEasyPaceMinPerMile } : {}),
-              // Accessory-bias add-on (glute | hyrox) from the builder's training_prefs; else omitted (plain plan).
-              ...(gsTp.accessory_bias === 'glute' || gsTp.accessory_bias === 'hyrox' ? { accessory_bias: gsTp.accessory_bias } : {}),
-              // Long-run day from intake (composer constrains to Sat/Sun); the Hyrox combo follows it.
+              // ⛔ NO accessory_bias. Glute / Hyrox add-ons are OUT of this flow (D-323) and re-home to
+              // the Adjust tab, where they REPLACE one of the session's three assistance slots rather
+              // than stacking on top of the block.
+              // The athlete's three assistance picks from the build flow. Absent → the composer's
+              // bodyweight defaults, so skipping that card still yields a complete block.
+              ...(gsTp.assistance_picks && typeof gsTp.assistance_picks === 'object'
+                ? { assistance_picks: gsTp.assistance_picks } : {}),
+              // Long-run day from intake (composer constrains to Sat/Sun).
               ...((gsTp.preferred_days as Record<string, unknown> | undefined)?.long_run ? { long_run_day: (gsTp.preferred_days as Record<string, string>).long_run } : {}),
               ...(plan_start_date ? { start_date: plan_start_date } : {}),
               ...(bodyPreview ? { preview: true } : {}),

@@ -1,34 +1,29 @@
 /**
- * Q-126 (Gap A) fixture — the non-race Get Strong generator now emits a duration-native
- * run intensity token from enduranceSession(), so run workload_planned reflects the easy/
- * long prescription (0.65 via the Gap-B matcher) instead of the 0.75 per-type default.
+ * Q-126 (Gap A) — the Strength Focus generator emits a duration-native run intensity token from
+ * enduranceSession(), so run workload_planned reflects the easy/long prescription (0.65 via the
+ * Gap-B matcher) instead of the 0.75 per-type default.
  *
- * THE SPINE-SAFETY GATE: the change adds a `steps_preset` field to RUN sessions only. The
- * strength-session subset must stay BYTE-IDENTICAL — this test asserts it against a golden
- * captured BEFORE the change (strength-primary-plan.q126-golden.ts). A diff here means the
- * run-token pass perturbed the strength spine: STOP AND REPORT, do not regenerate blindly.
+ * Guards: run rows carry the right token (long-run day → longrun_*, else run_easy_*), tokens
+ * resolve to the honest 0.65 easy intensity, strength never leaks one, and BIKE stays untouched
+ * (Gap A-bike is fenced to its own pass — rides must remain steps_preset-free).
  *
- * Also guards: run rows carry the right token (long-run day → longrun_*, else run_easy_*),
- * tokens resolve to the honest 0.65 easy intensity, and BIKE stays untouched (Gap A-bike
- * is fenced to its own pass — rides must remain steps_preset-free).
+ * ⚠️ THE BYTE-IDENTICAL GOLDEN IS GONE, deliberately. It pinned the ATR block's strength sessions
+ * (`strength-primary-plan.q126-golden.ts`), and the 5/3/1 rewrite changes every one of them BY
+ * DESIGN — a golden that must be regenerated is not a gate. What it actually protected is the
+ * type fence below: the run-token pass must never touch a strength row. That is asserted directly
+ * now, on the property rather than on a snapshot of the output.
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
-import { GOLDEN_STRENGTH_SUBSET } from './strength-primary-plan.q126-golden.ts';
 import { getStepsIntensity, calculateDurationWorkload } from '../../_shared/workload.ts';
 
-// The EXACT config the golden was captured with — exercises baseline week, work weeks,
-// deload, retest, run distribution, and the Hyrox long-run combo.
 const RUN_ARGS = {
   durationWeeks: 12,
-  strengthFrequency: 4 as const,
-  tier: 'barbell' as const,
+  oneRepMaxes: { bench: 225, squat: 315, deadlift: 405, overheadPress: 135 },
   enduranceSport: 'run' as const,
   enduranceFrequency: 2,
-  needsBaseline: true,
   targetWeeklyMiles: 25,
   easyPaceMinPerMile: 9,
-  accessoryBias: 'hyrox' as const,
   longRunDay: 'sunday',
 };
 
@@ -37,12 +32,6 @@ function flatSessions(plan: { sessions_by_week: Record<string, any[]> }) {
     .sort((a, b) => Number(a[0]) - Number(b[0]))
     .flatMap(([wk, sessions]) => sessions.map((s: any) => ({ wk, ...s })));
 }
-
-Deno.test('Q-126 SPINE GATE: strength subset is byte-identical to the pre-change golden', () => {
-  const all = flatSessions(composeStrengthPrimaryPlan(RUN_ARGS));
-  const strength = all.filter((s) => s.type === 'strength');
-  assertEquals(JSON.stringify(strength), JSON.stringify(GOLDEN_STRENGTH_SUBSET));
-});
 
 Deno.test('Q-126: no strength session ever carries a steps_preset (type gate held)', () => {
   const all = flatSessions(composeStrengthPrimaryPlan(RUN_ARGS));
@@ -83,7 +72,7 @@ Deno.test('Q-126: run tokens resolve to the honest 0.65 easy intensity + matchin
 });
 
 Deno.test('Q-126 BIKE FENCE: rides stay steps_preset-free (Gap A-bike is its own pass)', () => {
-  const bikePlan = composeStrengthPrimaryPlan({ ...RUN_ARGS, enduranceSport: 'bike', accessoryBias: null, targetWeeklyMiles: undefined, longRunDay: undefined });
+  const bikePlan = composeStrengthPrimaryPlan({ ...RUN_ARGS, enduranceSport: 'bike', targetWeeklyMiles: undefined, longRunDay: undefined });
   const all = flatSessions(bikePlan);
   const rides = all.filter((s) => s.type === 'ride');
   assertEquals(rides.length > 0, true, 'expected ride sessions in a bike plan');
