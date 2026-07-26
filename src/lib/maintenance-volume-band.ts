@@ -36,6 +36,60 @@ export const FALLBACK_EASY_MIN_PER_MILE = 10;
 export type VolumeState = 'above' | 'below' | 'in_band';
 
 /**
+ * ⛔ THE BAND IS THE ATHLETE'S OWN VOLUME, WHEN THEY GIVE IT.
+ *
+ * The absolute band below (60-180 min/wk) is the SAME for every athlete, and that is its flaw: 12
+ * miles reads as "a maintenance dose" whether they normally run 40 or normally run 10. For the first
+ * that is a deep cut; for the second it is more than they have ever done. Same sentence, opposite
+ * truth — an absolute band wearing the language of a personal one.
+ *
+ * SPEC-get-stronger §2 already says what it should be: endurance at **roughly two-thirds of normal**
+ * [Hickson — cut duration to ⅓ or ⅔ and VO2max holds 15 weeks; cut INTENSITY and it is lost]. That
+ * is per-athlete by construction and needs no new number.
+ *
+ * So when the athlete tells us their usual volume, the band is a fraction of THAT. The absolute band
+ * is the fallback for when they do not.
+ */
+export const MAINTENANCE_FRACTION = 2 / 3;
+
+/** Tolerance around two-thirds before it reads as above or below. Ours, and deliberately wide: the
+ *  evidence supports the direction, not a precise split, and a narrow band would manufacture a
+ *  verdict the science cannot carry. */
+const BAND_TOLERANCE = 0.25;
+
+/** Where typed mileage sits against the athlete's OWN usual volume. Null when they gave no usual. */
+export function volumeStateVsUsual(weeklyMiles: number, usualWeeklyMiles: number): VolumeState | null {
+  const miles = Number(weeklyMiles);
+  const usual = Number(usualWeeklyMiles);
+  if (!Number.isFinite(miles) || miles <= 0 || !Number.isFinite(usual) || usual <= 0) return null;
+  const target = usual * MAINTENANCE_FRACTION;
+  if (miles > target * (1 + BAND_TOLERANCE)) return 'above';
+  if (miles < target * (1 - BAND_TOLERANCE)) return 'below';
+  return 'in_band';
+}
+
+/** The maintenance dose for an athlete who told us their usual — what the app suggests, not enforces. */
+export function maintenanceDoseFor(usualWeeklyMiles: number): number | null {
+  const usual = Number(usualWeeklyMiles);
+  if (!Number.isFinite(usual) || usual <= 0) return null;
+  return Math.round(usual * MAINTENANCE_FRACTION);
+}
+
+/** Personal version of the line. Names THEIR number, which is the whole point of asking for it. */
+export function volumeStateLineVsUsual(state: VolumeState | null, usualWeeklyMiles: number, unit = 'mi'): string | null {
+  const dose = maintenanceDoseFor(usualWeeklyMiles);
+  if (!state || dose == null) return null;
+  switch (state) {
+    case 'above':
+      return `Above the ~${dose} ${unit} that holds your usual ${Math.round(Number(usualWeeklyMiles))}. It still holds — the strength gain settles toward the low end of the range.`;
+    case 'below':
+      return `Below the ~${dose} ${unit} that holds your usual ${Math.round(Number(usualWeeklyMiles))}. The base drifts at this volume, and comes back when the running does.`;
+    case 'in_band':
+      return `About the ~${dose} ${unit} that holds your usual ${Math.round(Number(usualWeeklyMiles))}. Held, not built.`;
+  }
+}
+
+/**
  * Where typed weekly mileage sits against the band.
  *
  * ⚠️ The INTAKE calls this with the fallback pace, because the client does not resolve the athlete's

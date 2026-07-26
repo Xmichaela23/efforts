@@ -7,7 +7,7 @@ import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor } from '@/lib/context-utils';
 // ONE band, shared with the composer — what the athlete is told while typing and what the plan
 // records cannot disagree. A REFERENCE, never a cap (D-222's ceiling was retired on purpose).
-import { volumeStateForMiles, volumeStateLine } from '@/lib/maintenance-volume-band';
+import { maintenanceDoseFor, volumeStateForMiles, volumeStateLine, volumeStateLineVsUsual, volumeStateVsUsual } from '@/lib/maintenance-volume-band';
 // ONE source for the block's own words — the composer writes the same sentences onto the plan.
 import { strengthFocusSections, STRENGTH_FOCUS_WEEKS } from '@/lib/strength-focus-copy';
 // ONE menu, shared with the composer that authors the block (`assistance-menu.ts`). A name this
@@ -111,6 +111,9 @@ type NonRaceState = {
   longRideDay: DayName | '';
   anchorDiscipline: 'run' | 'bike' | null;
   anchorDay: DayName | '';
+  /** What they NORMALLY run, in their display unit. The band is a fraction of THIS — an absolute
+   *  band tells a 40-mile runner and a 10-mile runner the same thing, and it is only true for one. */
+  usualMiles: number | '';
   targetMiles: number | ''; // Get Strong: typed maintenance mileage, in the user's display unit; canonicalized to miles at confirm
   runDays: number; // Get Strong: how many days to run (2/3/4) — engine spreads the miles + stacks extras onto upper lift days
   /** Strength Focus: the athlete's pick for each of the three assistance slots. Empty = the engine's
@@ -226,7 +229,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', startDate: nextMondayISO(),
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', usualMiles: '', targetMiles: '', runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', startDate: nextMondayISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -608,7 +611,35 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             {state.posture?.strength === 'develop' && posturePresent('run') && (
               <div className="space-y-4">
                 <div>
-                  <p className="text-white/55 text-sm mb-2">Weekly running to hold <span className="text-white/35">(maintenance)</span></p>
+                  {/* ⛔ THEIR OWN NUMBER FIRST. Michael, 2026-07-25: *"they need to know, they need
+                      to slug it in."* Without it the band is absolute and says the same thing to a
+                      40-mile runner and a 10-mile runner. With it, the maintenance dose is ~2/3 of
+                      their usual [Hickson: cut duration to ⅔ and VO2max holds; cut intensity and it
+                      is lost] — per-athlete by construction, SPEC §2, and no new number invented. */}
+                  <p className="text-white/70 text-sm mb-2">What do you normally run?</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <input
+                      type="number" inputMode="decimal" min={0}
+                      value={state.usualMiles === '' ? '' : state.usualMiles}
+                      onChange={(e) => setState((st) => {
+                        const usual = e.target.value === '' ? '' : Number(e.target.value);
+                        const dose = typeof usual === 'number' ? maintenanceDoseFor(usual) : null;
+                        // Seed the hold with the maintenance dose — a suggestion they can overtype,
+                        // never a clamp. Only while they have not typed one themselves.
+                        return { ...st, usualMiles: usual, targetMiles: st.targetMiles === '' && dose ? dose : st.targetMiles };
+                      })}
+                      placeholder="e.g. 20"
+                      className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                      style={{ fontSize: '16px' }}
+                    />
+                    <span className="text-white/60 text-sm">{unit}/wk</span>
+                  </div>
+                  <p className="text-white/55 text-sm mb-4 leading-relaxed">
+                    {typeof state.usualMiles === 'number' && state.usualMiles > 0
+                      ? `This block holds about ${maintenanceDoseFor(state.usualMiles)} ${unit} — two-thirds of normal keeps the aerobic base while strength leads.`
+                      : 'Your usual week, before this block. The holding dose comes off it.'}
+                  </p>
+                  <p className="text-white/70 text-sm mb-2">Weekly running to hold <span className="text-white/45">(maintenance)</span></p>
                   <div className="flex items-center gap-2">
                     <input
                       type="number" inputMode="numeric" min={0}
@@ -633,7 +664,9 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                       old version had no "below", and a runner dropping under a maintenance dose was
                       told nothing at all. */}
                   <p className="text-white/70 text-sm mt-2 leading-relaxed">
-                    {volumeStateLine(volumeStateForMiles(Number(state.targetMiles)))
+                    {(typeof state.usualMiles === 'number' && state.usualMiles > 0
+                      ? volumeStateLineVsUsual(volumeStateVsUsual(Number(state.targetMiles), state.usualMiles), state.usualMiles, unit)
+                      : volumeStateLine(volumeStateForMiles(Number(state.targetMiles))))
                       ?? `Run what you'll actually do — it's all easy, strength leads. Low weeks aren't penalized (more recovery for the lifts).`}
                   </p>
                 </div>
