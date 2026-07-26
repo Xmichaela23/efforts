@@ -42,6 +42,15 @@ import {
   workingNumberForCycle,
   workingNumberFrom1RM,
 } from './loading/wendler-531.ts';
+// ⛔ Placement is NOT this file's job any more. `place-week.ts` owns "what day does the bar go on",
+// reading its clearances from `_shared/schedule-session-constraints.ts` — the same law the race-side
+// optimizer reads. This file states the lifts and the endurance underneath; the solver states the days.
+import {
+  type DayName,
+  DAYS as PLACEMENT_DAYS,
+  type EndurancePin,
+  placeLiftingWeek,
+} from './place-week.ts';
 
 /** The four lifts, in lb. **All four are required** — the entry gate gets this far only
  *  when every one is on file (SPEC §0). Missing one leaves a lifting day with no weight. */
@@ -66,6 +75,30 @@ export type StrengthPrimaryArgs = {
   easyPaceMinPerMile?: number;
   /** Preferred long-run day from intake. CONSTRAINED to Sat/Sun (heavy lower is Tue/Fri). */
   longRunDay?: string;
+  /**
+   * The athlete's ONE hard aerobic day, and the discipline it belongs to (D-327 — a strength-led
+   * block carries exactly one; the intake greys the second).
+   *
+   * ⛔ COLLECTED SINCE 2026-07-25 AND DROPPED UNTIL NOW. `create-goal-and-materialize-plan` forwarded
+   * only `long_run` out of `preferred_days`, so this reached the goal row and stopped. The composer
+   * has never seen it.
+   *
+   * ⚠️ ARRIVING IS NOT THE SAME AS BEING HONOURED. Placement today is the hardcoded Mon/Tue/Thu/Fri
+   * grid below; this pin is carried so `place-week.ts` can be handed BOTH pins in the same shape it
+   * already expects (day + kind + label + canSplitDay) when the grid is replaced. Until then it is
+   * available and unused — deliberately, and that is the next change, not an oversight.
+   *
+   * The doctrine's two pins are this and `longRunDay`; everything else moves around them.
+   * See docs/DOCTRINE-aerobic-maintenance.md §6 and ARCH-strength-spine.md §0.6.
+   */
+  hardDay?: { day: string; discipline: 'run' | 'bike' };
+  /**
+   * Weekly bike hours from intake (D-323 §6 — hours, never miles: the engine turns hours into
+   * sessions and has never learned a ride speed).
+   * ⛔ Same drop as `hardDay`: written at NonRaceBuilder.tsx:319, stored on the goal, ZERO readers
+   * under supabase/functions until this wire. Carried now so the bike pass has it to consume.
+   */
+  targetWeeklyRideHours?: number;
   /** The athlete's three assistance picks. Absent → the menu's bodyweight defaults, so skipping the
    *  card still produces a complete block. See `src/lib/assistance-menu.ts`. */
   assistancePicks?: AssistancePicks | null;
@@ -362,7 +395,54 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     overheadPress: workingNumberFrom1RM(oneRepMaxes.overheadPress),
   };
 
-  const strengthDays = MAIN_LIFTS.map((l) => l.day);
+  // ── PLACEMENT: the athlete's days are fixed, the bar moves around them ───────────────────────
+  //
+  // ⛔ THIS REPLACES THE HARDCODED Mon/Tue/Thu/Fri GRID. The grid was the last placement authority
+  // that read none of the law, and it is why `longRunDay` was CONSTRAINED to Sat/Sun — the day was
+  // constrained because the LIFTING was fixed, which is the wrong way round. An athlete who picked
+  // Wednesday silently got Saturday, with no compromise line and no explanation.
+  //
+  // The contract (Michael, 2026-07-26): *"he gets what he ordered as long as what he orders fits
+  // into our lift rules."* So: the pins stand, the bar fills the gaps, and every clearance that
+  // could not be honoured is NAMED. Never a silent move, never a refusal.
+  //
+  // ⚠️ WHY THESE PINS AND NOT MORE. A club night is not the athlete's day — other people own it —
+  // and the intake's hard-day copy says exactly that ("a club night, track repeats, a hard tempo —
+  // yours or someone else's"). So the hard day IS the club day; there is no separate input to
+  // collect. Long run and long ride are the other immovables.
+  //
+  // ⚠️ `canSplitDay` is deliberately NOT set. Undefined is not "yes" (see MIN_STACK_GAP_H): a pin
+  // may only carry a lift when the athlete has SAID they can split that day, and the intake does
+  // not ask yet. Until it does, no day is treated as splittable — the conservative direction, and
+  // the one Robineau's 0h arm makes expensive to get wrong.
+  const pins: EndurancePin[] = [];
+  const asDay = (v: unknown): DayName | null => {
+    const s = String(v ?? '').trim().toLowerCase();
+    return (PLACEMENT_DAYS as readonly string[]).find((d) => d.toLowerCase() === s) as DayName ?? null;
+  };
+  const longRunPin = enduranceSport === 'run' ? asDay(args.longRunDay) : null;
+  if (longRunPin) pins.push({ day: longRunPin, kind: 'long_run', label: 'your long run' });
+  const hardPin = asDay(args.hardDay?.day);
+  if (hardPin && !pins.some((p) => p.day === hardPin)) {
+    pins.push({
+      day: hardPin,
+      kind: args.hardDay!.discipline === 'bike' ? 'quality_bike' : 'quality_run',
+      label: args.hardDay!.discipline === 'bike' ? 'your hard ride' : 'your hard run',
+    });
+  }
+
+  const placedWeek = placeLiftingWeek(
+    MAIN_LIFTS.map((l) => ({ lift: l.name, isLower: l.isLower })),
+    pins,
+  );
+  // Lift name → the day the solver gave it. Falls back to the lift's legacy grid day only if the
+  // solver somehow omitted it, so a placement bug degrades to the old behaviour rather than to no day.
+  const dayForLift = new Map(placedWeek.slots.map((s) => [s.lift, s.day as string]));
+  const liftDay = (l: typeof MAIN_LIFTS[number]): string => dayForLift.get(l.name) ?? l.day;
+  const strengthDays = MAIN_LIFTS.map(liftDay);
+  // ⛔ Surfaced, never swallowed. `place-week` states which clearance it had to break; the plan
+  // carries those words to the athlete verbatim.
+  const placementCompromises: string[] = placedWeek.compromises;
   const assistance = assistanceRows(args.assistancePicks);
 
   // ── Endurance underneath (unchanged from the previous composer) ────────────
@@ -374,14 +454,33 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const runFreq = enduranceSport === 'run'
     ? Math.max(ENDURANCE_DAYS.length, Math.min(4, Math.round(Number(args.enduranceFrequency) || ENDURANCE_DAYS.length)))
     : ENDURANCE_DAYS.length;
-  const upperLiftDays = MAIN_LIFTS.filter((l) => !l.isLower).map((l) => l.day); // Mon, Thu
-  // Long-run day = user pick CONSTRAINED to Sat/Sun. Heavy lower is Tue (squat) + Fri (deadlift);
-  // only the weekend clears the 24h-pre / 48h-post windows.
-  const gridLongDefault = ENDURANCE_DAYS[ENDURANCE_DAYS.length - 1]; // 'Saturday'
-  const pickedLong = String(args.longRunDay ?? '').trim().toLowerCase() === 'sunday' ? 'Sunday' : gridLongDefault;
-  const enduranceDays = pickedLong === gridLongDefault
-    ? ENDURANCE_DAYS
-    : ENDURANCE_DAYS.map((d) => (d === gridLongDefault ? pickedLong : d));
+  const upperLiftDays = MAIN_LIFTS.filter((l) => !l.isLower).map(liftDay);
+  // ⛔ THE Sat/Sun COERCION IS GONE (2026-07-26). It read:
+  //     pickedLong = longRunDay === 'sunday' ? 'Sunday' : 'Saturday'
+  // — so every day except Sunday silently became Saturday. The athlete picked from seven and got
+  // one of two. That existed only because the lifting grid was fixed; with the solver placing the
+  // bar around the pins, ANY day is answerable and the long run day is whatever they said.
+  const pickedLong = longRunPin ?? ENDURANCE_DAYS[ENDURANCE_DAYS.length - 1];
+  // ⛔ ONE FULL REST DAY IS RESERVED BEFORE ANY EASY RUN IS PLACED, and this is not a detail.
+  //
+  // `placedWeek.freeDays` means "carries neither a lift nor a pin" — it is NOT "spare". An earlier
+  // version of this line filled every free day with an easy run, which the composer's own tests
+  // caught immediately: with a long-run pin the week came out as 4 lifts + the pin + easy runs on
+  // both remaining days = SEVEN active days and no rest at all. The old fixed grid never had this
+  // bug because it hardcoded two endurance days and stacked any extras onto upper-lift days.
+  //
+  // `place-week` asserts the same rule itself (MAX_ACTIVE_DAYS = 6, "six days of work, one full
+  // rest day") — it simply cannot enforce it here, because it has no idea how many easy runs this
+  // composer is about to add. Reserving the day is THIS file's job.
+  //
+  // Sunday is preferred as the rest day when it is free — convention, and it matches what the grid
+  // used to guarantee. Otherwise the last free day is held back.
+  const restReserved = placedWeek.freeDays.includes('Sunday' as DayName)
+    ? ('Sunday' as DayName)
+    : placedWeek.freeDays[placedWeek.freeDays.length - 1];
+  const easyDayPool = placedWeek.freeDays.filter((d) => d !== restReserved && d !== pickedLong);
+  // Long-run day first (it is a pin, so it is not in `freeDays`), then whatever room is left.
+  const enduranceDays: string[] = [pickedLong, ...easyDayPool];
   const runDayList: string[] = [...enduranceDays];
   for (const d of upperLiftDays) {
     if (runDayList.length >= runFreq) break;
@@ -435,7 +534,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // version of the same session [Bosquet 2007, Wang 2023: cut volume, hold intensity].
       const ex: StrengthExercise[] = isDeload ? [main] : [JUMPS, main, ...assistance];
       weekSessions.push({
-        day: lift.day,
+        // ⛔ The SOLVER's day, not the grid's. `liftDay()` falls back to `lift.day` only if
+        // place-week omitted this lift, so a placement failure degrades to the old fixed week
+        // rather than to a session with no day.
+        day: liftDay(lift),
         type: 'strength',
         name: `Strength — ${lift.name}`,
         // The assistance guidance rides with the session, once, on the weeks that carry assistance.

@@ -34,6 +34,10 @@ Deno.serve(async (req: Request) => {
       user_id, duration_weeks,
       endurance_sport, endurance_frequency, goal_name, start_date, preview,
       target_weekly_miles, easy_pace_min_per_mile, long_run_day, assistance_picks, swim_days,
+      // Added 2026-07-26 — the doctrine's second pin and the bike volume. Both were collected at
+      // intake, stored on the goal, and dropped at `create-goal-and-materialize-plan` before this
+      // function ever saw them.
+      hard_day, target_weekly_ride_hours,
     } = body as Record<string, unknown>;
 
     if (!user_id) return json({ success: false, error: 'user_id is required' }, 400);
@@ -97,6 +101,18 @@ Deno.serve(async (req: Request) => {
       targetWeeklyMiles: Number(target_weekly_miles) > 0 ? Number(target_weekly_miles) : undefined,
       easyPaceMinPerMile: easyPaceMin,
       longRunDay: typeof long_run_day === 'string' ? long_run_day : undefined,
+      // D-327 — the ONE hard aerobic day and its discipline. Collected since 2026-07-25 and dropped
+      // at the caller until now. Validated here rather than trusted: an unknown discipline is
+      // treated as absent, because a pin the composer cannot place is worse than no pin.
+      hardDay: hard_day && typeof hard_day === 'object'
+        && typeof (hard_day as Record<string, unknown>).day === 'string'
+        && ((hard_day as Record<string, unknown>).discipline === 'run'
+          || (hard_day as Record<string, unknown>).discipline === 'bike')
+        ? hard_day as { day: string; discipline: 'run' | 'bike' }
+        : undefined,
+      // Bike hours (D-323 §6) — hours, never miles. Carried for the bike pass; unused today.
+      targetWeeklyRideHours: Number(target_weekly_ride_hours) > 0
+        ? Number(target_weekly_ride_hours) : undefined,
       // The athlete's three assistance picks. Validated inside the composer against the shared
       // menu, so an unknown name falls back to the default rather than reaching a session.
       assistancePicks: assistance_picks && typeof assistance_picks === 'object'

@@ -114,17 +114,48 @@ Deno.test('percent_1rm is the fraction of the REAL max, and stays buffered by th
 
 // ── The session (SPEC §1) ───────────────────────────────────────────────────
 
-Deno.test('four lifting days, one main lift each, same day every week', () => {
+// ⛔ REWRITTEN 2026-07-26 — this used to assert the exact days ['Monday','Tuesday','Thursday','Friday'].
+// That was the hardcoded grid, and the grid is gone: `place-week.ts` now places the bar around the
+// athlete's pins, so the days are an OUTPUT and pinning them would pin the bug we just removed.
+// What survives is the contract, and it is asserted harder than the day list ever did.
+Deno.test('four lifting days, one main lift each, the same days every week', () => {
+  const week1 = sessionsFor(1).filter((s) => s.type === 'strength').map((s) => s.day);
+  assertEquals(week1.length, 4);
+  assertEquals(new Set(week1).size, 4, 'two main lifts landed on the same day');
   for (let week = 1; week <= 12; week++) {
     const strength = sessionsFor(week).filter((s) => s.type === 'strength');
     assertEquals(strength.length, 4, `week ${week}`);
-    assertEquals(strength.map((s) => s.day), ['Monday', 'Tuesday', 'Thursday', 'Friday']);
+    // Same days every week — 5/3/1 is a fixed weekly shape, only the loading moves.
+    assertEquals(strength.map((s) => s.day), week1, `week ${week} moved a lifting day`);
   }
-  assertEquals(sessionsFor(1).find((s) => s.day === 'Tuesday' && s.type === 'strength')!.name, 'Strength — Back Squat');
+  // All four lifts present exactly once.
+  assertEquals(
+    sessionsFor(1).filter((s) => s.type === 'strength').map((s) => s.name).sort(),
+    ['Strength — Back Squat', 'Strength — Bench Press', 'Strength — Deadlift', 'Strength — Overhead Press'],
+  );
+});
+
+// ⛔ THE PROPERTY THE OLD DAY-LIST WAS REALLY PROTECTING, now stated directly.
+// The grid gave Tue/Fri — 72h between heavy leg days. When placement moved to the solver this
+// silently became 48h (legal, minimum, worse), because the proximity penalty flattens at 48 and the
+// tiebreak took the earliest day. `place-week` now breaks that tie on maximum spread. This test is
+// what stops it regressing again.
+Deno.test('heavy leg days are held apart — 48h is the floor, and the solver must beat it', () => {
+  const ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const lowerDays = sessionsFor(1)
+    .filter((s) => s.type === 'strength' && /Back Squat|Deadlift/.test(s.name))
+    .map((s) => ORDER.indexOf(s.day))
+    .sort((a, b) => a - b);
+  assertEquals(lowerDays.length, 2);
+  const gapDays = Math.min(lowerDays[1] - lowerDays[0], 7 - (lowerDays[1] - lowerDays[0]));
+  assert(gapDays >= 2, `heavy leg days only ${gapDays * 24}h apart — the clearance is 48h`);
+  assert(gapDays >= 3, `heavy leg days ${gapDays * 24}h apart; with no pins the week has room for 72h`);
 });
 
 Deno.test('a work session is jumps → main lift → 25 reps each of push / pull / single-leg-core', () => {
-  const rows = sessionsFor(1).find((s) => s.type === 'strength')!.strength_exercises!;
+  // Was `.find(s => s.type === 'strength')` — the FIRST strength session, which assumed the grid
+  // put Bench on Monday. Days are the solver's now, so name the lift instead of trusting the order.
+  const rows = sessionsFor(1).find((s) => s.name === 'Strength — Bench Press')!.strength_exercises!;
   // Defaults, because this plan was built with no picks — skipping the card still yields a block.
   assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Bench Press', 'Push Up', 'Pull Up', 'Reverse Lunge']);
   assertEquals(JUMPS.sets * (JUMPS.reps as number), 15); // 10–15 jumps or throws
@@ -136,18 +167,17 @@ Deno.test('the athlete’s picks reach the block, and an unknown name falls back
     durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0,
     assistancePicks: { push: 'Dips', pull: 'Dumbbell Row', single_leg_core: 'Hanging Leg Raise' },
   });
-  const rows = picked.sessions_by_week['1'][0].strength_exercises!.map((r: any) => r.name);
-  assertEquals(rows, ['Box Jump', 'Bench Press', 'Dips', 'Dumbbell Row', 'Hanging Leg Raise']);
+  // Named, not indexed — `[0]` assumed Bench was the first session, which was the grid's doing.
+  const benchOf = (p: any) => p.sessions_by_week['1']
+    .find((s: any) => s.name === 'Strength — Bench Press')!.strength_exercises!.map((r: any) => r.name);
+  assertEquals(benchOf(picked), ['Box Jump', 'Bench Press', 'Dips', 'Dumbbell Row', 'Hanging Leg Raise']);
 
   // A name that is no longer on the menu must not strand an existing goal.
   const stale = composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0,
     assistancePicks: { push: 'Bench Press Machine', pull: '', single_leg_core: undefined },
   });
-  assertEquals(
-    stale.sessions_by_week['1'][0].strength_exercises!.map((r: any) => r.name),
-    ['Box Jump', 'Bench Press', 'Push Up', 'Pull Up', 'Reverse Lunge'],
-  );
+  assertEquals(benchOf(stale), ['Box Jump', 'Bench Press', 'Push Up', 'Pull Up', 'Reverse Lunge']);
 });
 
 Deno.test('⛔ ASSISTANCE CARRIES NO PRESCRIBED LOAD — including the loaded options', () => {
@@ -227,7 +257,16 @@ Deno.test('endurance is easy-only, and the long run takes the biggest share', ()
 });
 
 Deno.test('a stacked lift + run day puts the lift first', () => {
-  assertEquals(sessionsFor(1).filter((s) => s.day === 'Monday').map((s) => s.type), ['strength', 'run']);
+  // Was hardcoded to Monday. Which day carries both is the solver's call now, so find it — the
+  // ORDER is the contract (Eddens 2018: resistance-first when sessions cannot be separated),
+  // not the weekday.
+  const byDay = new Map<string, string[]>();
+  for (const s of sessionsFor(1)) byDay.set(s.day, [...(byDay.get(s.day) ?? []), s.type]);
+  const stacked = [...byDay.entries()].filter(([, t]) => t.includes('strength') && t.includes('run'));
+  assert(stacked.length > 0, 'expected at least one lift + run day in this fixture');
+  for (const [day, types] of stacked) {
+    assertEquals(types.indexOf('strength') < types.indexOf('run'), true, `${day} put the run first`);
+  }
 });
 
 Deno.test('Sunday is the one full rest day', () => {

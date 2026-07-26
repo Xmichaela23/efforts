@@ -2463,6 +2463,26 @@ Deno.serve(async (req: Request) => {
                 ? { assistance_picks: gsTp.assistance_picks } : {}),
               // Long-run day from intake (composer constrains to Sat/Sun).
               ...((gsTp.preferred_days as Record<string, unknown> | undefined)?.long_run ? { long_run_day: (gsTp.preferred_days as Record<string, string>).long_run } : {}),
+              // ⛔ THE SECOND PIN. Added 2026-07-26 — until now this block forwarded ONLY `long_run`
+              // out of `preferred_days`, so the hard day the athlete picked reached the goal row and
+              // stopped dead. The composer had never seen it, which is why the intake's promise that
+              // "the lifting is placed around it" was true for the long run and silent for this one.
+              //
+              // D-327 makes the two mutually exclusive at intake, so at most one of these is present
+              // and `quality_run` wins if both somehow arrive (defensive — the gate should prevent it).
+              // The doctrine's two pins are the long run and this; everything else moves around them.
+              ...(((): Record<string, unknown> => {
+                const pd = gsTp.preferred_days as Record<string, string> | undefined;
+                const run = pd?.quality_run;
+                const bike = pd?.quality_bike;
+                if (run) return { hard_day: { day: run, discipline: 'run' } };
+                if (bike) return { hard_day: { day: bike, discipline: 'bike' } };
+                return {};
+              })()),
+              // Bike volume in HOURS (D-323 §6). Written at NonRaceBuilder.tsx:319, stored on the
+              // goal, and read by NOTHING under supabase/functions until this line.
+              ...(Number(gsTp.target_weekly_ride_hours) > 0
+                ? { target_weekly_ride_hours: Number(gsTp.target_weekly_ride_hours) } : {}),
               ...(plan_start_date ? { start_date: plan_start_date } : {}),
               ...(bodyPreview ? { preview: true } : {}),
             };

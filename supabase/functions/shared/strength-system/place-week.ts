@@ -277,8 +277,26 @@ export function placeLiftingWeek(
           (acc, other) => acc + Math.max(0, 48 - gapDays(d, other) * 24),
           0,
         ),
+        /**
+         * ⛔ MORE THAN THE MINIMUM IS BETTER, AND THE PENALTY ALONE CANNOT SAY SO.
+         *
+         * `max(0, 48 - gap)` goes to zero at 48h and stays there — so 48h and 72h TIE, and the
+         * `dayIndex` tiebreak below then picks the earlier day. With no pins that produced lower
+         * days on Monday and Wednesday: legal, minimum, and worse than the hardcoded grid it
+         * replaced, which gave Tuesday/Friday at 72h.
+         *
+         * The solver was not wrong — it was obedient. It was told "at least 48" and it delivered
+         * exactly 48. Wanting daylight past the floor has to be said out loud.
+         *
+         * Ranked AFTER `penalty`, so this never buys spread by breaking a real clearance: it only
+         * decides between arrangements the rules already accept. Same shape as the upper-day
+         * placement below, which has always maximised spread.
+         */
+        spread: lowerDays.length === 0
+          ? 0
+          : Math.min(...lowerDays.map((other) => gapDays(d, other))),
       }))
-      .sort((a, b) => a.penalty - b.penalty || dayIndex(a.day) - dayIndex(b.day));
+      .sort((a, b) => a.penalty - b.penalty || b.spread - a.spread || dayIndex(a.day) - dayIndex(b.day));
     if (ranked.length === 0) break;
     lowerDays.push(ranked[0].day);
   }
