@@ -294,7 +294,14 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
         >
           <div className="space-y-2">
             {GOAL_ORDER.map((g) => (
-              <button key={g} type="button" className={optBtn(state.goal === g)} onClick={() => reseed(g, undefined)}>
+              <button
+                key={g} type="button" className={optBtn(state.goal === g)}
+                // Picking IS the answer — no second tap to confirm it. The card is the only thing on
+                // the screen and Continue was pure ceremony. Goals that still need a discipline pick
+                // (build_endurance / build_speed / starting_over) stay on the step so that question
+                // can be asked; none of them are offered today, but auto-advancing them would skip it.
+                onClick={() => { reseed(g, undefined); if (!GOALS_NEEDING_DISCIPLINE.includes(g)) next(); }}
+              >
                 <span className="block">{g === 'get_stronger' ? 'Strength Focus' : GOAL_LABELS[g]}</span>
                 {g === 'get_stronger' && (
                   <>
