@@ -724,6 +724,25 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false
   },
+  // Added 2026-07-25 for the Strength Focus assistance menu (`src/lib/assistance-menu.ts`). It was
+  // OFFERED before it was DEFINED, and a name with no entry here does not fail loudly — it falls
+  // through to the legacy weight path and gets priced off whichever 1RM the fallback picks. That is
+  // exactly how a pull-up came to be prescribed at 110 lb off the athlete's bench (D-322).
+  // Bodyweight, no reference lift, no ratio: the movement carries no external load.
+  'hanging leg raise': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'hanging leg raises': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
   'side plank': {
     pattern: 'core',
     primaryRef: null,

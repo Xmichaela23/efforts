@@ -5,6 +5,10 @@ import { StepLayout } from '@/components/wizard/StepLayout';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor } from '@/lib/context-utils';
+// ONE menu, shared with the composer that authors the block (`assistance-menu.ts`). A name this
+// picker offers that the composer does not recognise would fall back to the default — the athlete
+// would pick something and silently get something else.
+import { ASSISTANCE_DEFAULTS, ASSISTANCE_GUIDANCE, ASSISTANCE_MENU, type AssistancePicks } from '@/lib/assistance-menu';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import {
   seedFromGoal,
@@ -94,7 +98,11 @@ type NonRaceState = {
   anchorDay: DayName | '';
   targetMiles: number | ''; // Get Strong: typed maintenance mileage, in the user's display unit; canonicalized to miles at confirm
   runDays: number; // Get Strong: how many days to run (2/3/4) — engine spreads the miles + stacks extras onto upper lift days
-  accessoryBias: 'glute' | 'hyrox' | null; // Get Strong add-on: one posterior-chain accessory slot (glute) or the Hyrox station rotation
+  /** Strength Focus: the athlete's pick for each of the three assistance slots. Empty = the engine's
+   *  bodyweight default, so skipping this is a valid answer that still yields a complete block.
+   *  (Replaced `accessoryBias` — the Glutes/Hyrox add-ons move to the Adjust tab, D-323, where they
+   *  REPLACE a slot rather than stacking on top of the block.) */
+  assistancePicks: AssistancePicks;
   startDate: string; // Week 1 start (YYYY-MM-DD); plans are Monday-based so this snaps to that week server-side
 };
 
@@ -142,7 +150,10 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
           ...(shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {}),
           ...(typeof targetWeeklyMiles === 'number' && targetWeeklyMiles > 0 ? { target_weekly_miles: targetWeeklyMiles } : {}), // Get Strong maintenance mileage (canonical miles); engine guardrails it to the band
           ...(state.posture?.strength === 'develop' && state.runDays >= 2 ? { run_days: state.runDays } : {}), // Get Strong run frequency (2/3/4); engine spreads miles + stacks extras onto upper lift days
-          ...(state.posture?.strength === 'develop' && (state.accessoryBias === 'glute' || state.accessoryBias === 'hyrox') ? { accessory_bias: state.accessoryBias } : {}), // Get Strong add-on: one accessory-bias slot (engine injects on Upper A)
+          // Strength Focus: the three assistance picks. The composer validates each name against the
+          // shared menu, so a stale one falls back to the default rather than reaching a session.
+          ...(state.posture?.strength === 'develop' && Object.keys(state.assistancePicks).length > 0
+            ? { assistance_picks: state.assistancePicks } : {}),
         },
       },
     ],
@@ -173,7 +184,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3, accessoryBias: null, startDate: nextMondayISO(),
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', targetMiles: '', runDays: 3, assistancePicks: {}, startDate: nextMondayISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -386,24 +397,46 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 ))}
               </div>
             </div>
-            {/* Add-on focus ABOVE the mileage input — a numeric input buries anything below it on mobile
-                (keyboard + Continue eclipse it), which locked users out of this toggle. */}
+            {/* The assistance slots, ABOVE the mileage input — a numeric input buries anything below it
+                on mobile (keyboard + Continue eclipse it), which locked users out of the control that
+                used to sit here. */}
             {state.posture?.strength === 'develop' && (
               <div>
-                <p className="text-white/55 text-sm mb-2">Add-on focus (optional)</p>
-                <div className="grid grid-cols-3 gap-1.5 max-w-[300px]">
-                  {([['None', null], ['Glutes', 'glute'], ['Hyrox', 'hyrox']] as const).map(([label, val]) => (
-                    <button
-                      key={label} type="button" onClick={() => setState((s) => ({ ...s, accessoryBias: val }))}
-                      className={`py-2 rounded-lg text-sm border ${state.accessoryBias === val ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
-                    >{label}</button>
-                  ))}
-                </div>
-                <p className="text-white/35 text-xs mt-1.5">
-                  {state.accessoryBias === 'glute' ? 'One posterior-chain slot on your upper day — stronger, more durable hips (not a speed promise).'
-                    : state.accessoryBias === 'hyrox' ? 'Adds one station accessory during the week, plus a run→station combo on your long-run day — back-to-back, on tired legs. Adds volume; this is the Hyrox opt-in.'
-                    : 'Just the strength block — no add-on.'}
+                <p className="text-white/55 text-sm mb-1">Accessory work</p>
+                <p className="text-white/35 text-xs mb-3">
+                  Every session ends with three short slots. The lifting itself is set — these are yours to pick.
                 </p>
+                <div className="space-y-3">
+                  {ASSISTANCE_MENU.map((menu) => {
+                    const picked = state.assistancePicks[menu.slot] ?? ASSISTANCE_DEFAULTS[menu.slot];
+                    const targets = menu.options.find((o) => o.name === picked)?.targets ?? '';
+                    return (
+                      <div key={menu.slot}>
+                        <div className="flex items-baseline justify-between gap-2 mb-1">
+                          <span className="text-white/70 text-sm">{menu.label}</span>
+                          <span className="text-white/35 text-xs tabular-nums">{menu.totalReps} reps</span>
+                        </div>
+                        <select
+                          value={picked}
+                          onChange={(e) => setState((st) => ({
+                            ...st,
+                            assistancePicks: { ...st.assistancePicks, [menu.slot]: e.target.value },
+                          }))}
+                          className="w-full py-2 px-3 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
+                          style={{ fontSize: '16px' }}
+                          aria-label={`${menu.label} exercise`}
+                        >
+                          {menu.options.map((o) => (
+                            <option key={o.name} value={o.name} className="bg-neutral-900">{o.name}</option>
+                          ))}
+                        </select>
+                        {/* The whole point of the dropdown: the athlete sees what the choice trains. */}
+                        {targets && <p className="text-white/35 text-xs mt-1">{targets}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-white/35 text-xs mt-3 leading-relaxed">{ASSISTANCE_GUIDANCE}</p>
               </div>
             )}
             {posturePresent('run') && (
