@@ -75,6 +75,11 @@ export type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
 export type ScheduleInput = {
   longRunDay?: string;
   longRideDay?: string;
+  /** The kept hard session PER DISCIPLINE — a club run AND a chaingang can both be true of one
+   *  athlete. `preferred_days` always had room for both (`quality_run` + `quality_bike`); the old
+   *  single `anchorDiscipline` + `anchorDay` was the narrower shape and forced a choice the data
+   *  model never required. Both forms are accepted; this one wins where they overlap. */
+  qualityDays?: Partial<Record<'run' | 'bike', string>>;
   anchorDiscipline?: 'run' | 'bike' | null;
   anchorDay?: string;
 };
@@ -86,8 +91,14 @@ export function buildPreferredDays(
   const present = (d: Discipline) => posture[d] != null && posture[d] !== 'out';
   if (present('run')) out.long_run = sched.longRunDay || 'sunday';
   if (present('bike')) out.long_ride = sched.longRideDay || 'saturday';
+  // The kept club session = a hard day. Posture-gated both ways: a quality day for a discipline the
+  // athlete dropped is not a day, it is a leftover.
   if (sched.anchorDiscipline && sched.anchorDay && present(sched.anchorDiscipline)) {
-    out[`quality_${sched.anchorDiscipline}`] = sched.anchorDay; // the kept club session = a hard day
+    out[`quality_${sched.anchorDiscipline}`] = sched.anchorDay;
+  }
+  for (const d of ['run', 'bike'] as const) {
+    const day = sched.qualityDays?.[d];
+    if (day && present(d)) out[`quality_${d}`] = day;
   }
   // Develop (Get Strong) = the 4-day U/L/U/L arc — match the engine grid so the intake header doesn't
   // contradict the plan (Mon/Tue/Thu/Fri). Maintain/support strength stays the 2-day concurrent slot.

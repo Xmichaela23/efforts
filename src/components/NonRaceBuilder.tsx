@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, Bike, Waves, Dumbbell } from 'lucide-react';
 import { StepLayout } from '@/components/wizard/StepLayout';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor } from '@/lib/context-utils';
@@ -73,11 +74,94 @@ function DayPicker({ value, onChange, allowed }: { value: DayName | ''; onChange
       {days.map((d) => (
         <button
           key={d} type="button" onClick={() => onChange(d)}
-          className={`${allowed ? 'flex-1 ' : ''}py-2 rounded-lg text-xs ${value === d ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/60 border border-white/12'}`}
+          className={`${allowed ? 'flex-1 ' : ''}py-2 rounded-lg text-xs ${value === d ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
         >
           {DAY_SHORT[d]}
         </button>
       ))}
+    </div>
+  );
+}
+
+// ⛔ THE HARD DAY THE ATHLETE ALREADY OWNS — asked ON the discipline's own card, never as a separate
+// "Fixed sessions" screen. Michael, 2026-07-25: *"run club hard conditioning day needs to be in
+// here."* A club run is a RUN fact; splitting it out asked the athlete to hold their running in their
+// head across two screens.
+//
+// It is not the same question as the long day, and the difference is the whole reason it is asked.
+// The long run is volume — steady, aerobic, the engine. A club night, track repeats, a chaingang, a
+// sled session is a HARD day, and it draws on the same recovery a heavy squat or deadlift does. The
+// app does not remove it and does not warn about it: it takes the day, calls it hard, and books the
+// lifting around it.
+//
+// ⚠️ WHAT THE COPY MAY NOT SAY YET: that the lifting moves for it. `place-week.ts` is the solver that
+// makes that true and it is UNWIRED — and `create-goal-and-materialize-plan:2465` forwards only
+// `long_run` from `preferred_days` to `generate-strength-plan`, so `quality_run` / `quality_bike`
+// reach the GOAL and stop there. So the line states what the session IS (a hard day, same recovery
+// bank), not what the engine will do with it. Promote the copy the day the pin arrives.
+// The line shown once BOTH hard days are taken — the ledger, not a warning. Nothing is refused.
+const TWO_HARD_DAYS_LINE =
+  'Two hard days alongside four lifting days is the ceiling. Hard intervals and heavy bar work draw '
+  + 'on the same recovery, so at this level strength holds rather than climbs.';
+
+// ⛔ THE MULHOLLAND DIALOG — and it is deliberate, so do not "clean it up" into house voice.
+// Michael, 2026-07-25: *"we can hand them the keys to the Porsche, but it's up to them how they
+// handle the curves on Mulholland… it's smart and funny, maybe unnecessarily sexy, but it gets the
+// message across and it's language you would never see on a training app."*
+//
+// ⚠️ IT BENDS TWO RULES ON PURPOSE, both argued and both accepted:
+//  1. `COPY-VOICE.md` rule 10 bans idiom and metaphor. That rule exists to kill EMPTY filler
+//     ("trust the taper", "move the needle") — sentences that cost nothing and say nothing. This
+//     metaphor carries the actual message: the capability is real and the consequence is yours.
+//     Metaphor doing work, not metaphor doing decoration.
+//  2. *"Gate it, don't warn it — no accept-the-risk button."* Held by CONSTRUCTION, not by wording:
+//     the day is ALREADY SET before this opens, the dialog asks for nothing, and dismissing it
+//     changes no state. There is no checkbox, no "I understand", and no path that refuses the
+//     choice. It is the app being frank, not the app covering itself. **If a future change makes
+//     this dialog decide anything, it has become the button this was not, and it must come out.**
+//
+// Fires ONCE PER BUILD, on the transition to two — not on every tap, and not again if they fiddle.
+// A new block a year later is a new decision and gets it again.
+function MulhollandDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="bg-zinc-950 border-white/12 text-white max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-white text-left text-lg">Two hard days</DialogTitle>
+        </DialogHeader>
+        <p className="text-white/90 text-[15px] leading-relaxed">
+          We can hand you the keys to the Porsche. How you take the curves on Mulholland is up to you.
+        </p>
+        <p className="text-white/70 text-sm leading-relaxed">{TWO_HARD_DAYS_LINE}</p>
+        <button
+          type="button" onClick={onClose}
+          className="w-full min-h-[48px] mt-1 rounded-xl bg-teal-500 text-white font-semibold text-base"
+        >Got it</button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function QualityDayPicker({
+  label, hint, atCeiling, value, onChange,
+}: {
+  label: string; hint: string; atCeiling?: boolean;
+  value: DayName | ''; onChange: (d: DayName | '') => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2 mb-2">
+        <p className="text-white/85 text-sm">{label}</p>
+        {value && (
+          <button
+            type="button" onClick={() => onChange('')}
+            className="text-white/65 text-sm underline underline-offset-2"
+          >Clear</button>
+        )}
+      </div>
+      <DayPicker value={value} onChange={onChange} />
+      <p className="text-white/70 text-sm mt-1.5 leading-relaxed">{hint}</p>
+      {atCeiling && <p className="text-white/85 text-sm mt-2 leading-relaxed">{TWO_HARD_DAYS_LINE}</p>}
     </div>
   );
 }
@@ -109,8 +193,11 @@ type NonRaceState = {
   daysPerWeek: number;
   longRunDay: DayName | '';
   longRideDay: DayName | '';
-  anchorDiscipline: 'run' | 'bike' | null;
-  anchorDay: DayName | '';
+  /** The hard day the athlete already owns — a club run, a track night, a chaingang — PER DISCIPLINE.
+   *  Was a single `anchorDiscipline` + `anchorDay`, which forced a runner who also rides to pick one
+   *  and lose the other. `preferred_days` has always had room for both (`quality_run`, `quality_bike`),
+   *  so the single-anchor shape was the narrower thing, not the safer one. */
+  qualityDays: Partial<Record<'run' | 'bike', DayName>>;
   /** What they NORMALLY run, in their display unit. The band is a fraction of THIS — an absolute
    *  band tells a 40-mile runner and a 10-mile runner the same thing, and it is only true for one. */
   usualMiles: number | '';
@@ -129,7 +216,36 @@ type NonRaceState = {
   startDate: string; // Week 1 start (YYYY-MM-DD); plans are Monday-based so this snaps to that week server-side
 };
 
-type StepKey = 'goal' | 'posture' | 'commitment' | 'length' | 'schedule' | 'confirm';
+type StepKey =
+  | 'goal' | 'posture' | 'commitment' | 'length'
+  // The old single `schedule` step, split one card per screen (below).
+  | 'days' | 'accessory' | 'run' | 'bike' | 'swim'
+  | 'confirm';
+
+// ⛔ ONE DISCIPLINE, ONE SCREEN. Michael, 2026-07-25: *"everything should have its own card, no
+// scroll"* — then, having walked it: *"run can all sit on the same card, as with bike and swim, each
+// just has one card where you work it out."*
+//
+// The schedule step used to stack Strength / Run / Bike / Fixed / Swim in one scrolling column, so a
+// triathlete met a form long enough that the controls below the fold read as absent. Each is now its
+// own step, and the flow is built from what the athlete KEPT — someone who dropped the bike never
+// sees a bike screen. The unit is the DISCIPLINE, not the question: run holds its day and its volume
+// together, because deciding one without seeing the other is deciding half of it.
+// This is grouping, not new logic: every control here was already gated on posture.
+function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean): StepKey[] {
+  const kept = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
+  const strengthDevelop = state.posture?.strength === 'develop';
+  const out: StepKey[] = [];
+  // ⛔ NOT ON THE STRENGTH PATH. Lifting is four days fixed by the protocol and the endurance days
+  // are typed per discipline, so a total would only contradict both. *"how many days is redundant."*
+  if (!isStrengthFocus) out.push('days');
+  if (strengthDevelop) out.push('accessory');
+  if (kept('run')) out.push('run');
+  if (kept('bike')) out.push('bike');
+  // Swim sits last — booked, not coached. It is the slot we merely hold, so it follows the work.
+  if (strengthDevelop && state.posture?.swim === 'maintain') out.push('swim');
+  return out;
+}
 
 function getSteps(state: NonRaceState): StepKey[] {
   // ⛔ STRENGTH FOCUS SKIPS "What can you sustain?". That step converts a Light/Moderate/Committed
@@ -138,18 +254,20 @@ function getSteps(state: NonRaceState): StepKey[] {
   // swims). So the tier decides nothing and its only effect was a stale "≈ 6 h/wk" on the confirm
   // screen. Michael, 2026-07-25: *"not necessary, user enters these."* Every other goal keeps it —
   // there the tier really does set the volume.
-  const base: StepKey[] = ['goal', 'posture', 'commitment', 'length', 'schedule', 'confirm'];
   // ⚠️ On step 1 no goal has been chosen yet, so this returned the FULL six-step flow and the
   // progress bar read "1 of 6" — then jumped to "2 of 4" the moment the athlete tapped. With one
   // goal offered, the flow it produces is knowable before it is picked. Count that.
   const effective = state.goal ?? (GOAL_ORDER.length === 1 ? GOAL_ORDER[0] : null);
-  if (effective === 'get_stronger') return base.filter((k) => k !== 'commitment' && k !== 'length');
-  // ⛔ AND NO LENGTH SLIDER. Twelve weeks is not a preference — Wendler's ratios are 2:1, 3:2 and
-  // 2:2 over four-week cycles, so 12 is the only length that runs leader-leader-anchor as designed.
-  // The slider offered 8-52 while the composer rounds DOWN to whole cycles, so 10 silently became 8
-  // and 14 became 12: the athlete picked a number the engine never built. 8 ships later as the
-  // short, off-ratio option, labelled as such.
-  return base;
+  const isStrengthFocus = effective === 'get_stronger';
+  // ⛔ AND NO LENGTH SLIDER on this path. Twelve weeks is not a preference — Wendler's ratios are
+  // 2:1, 3:2 and 2:2 over four-week cycles, so 12 is the only length that runs leader-leader-anchor
+  // as designed. The slider offered 8-52 while the composer rounds DOWN to whole cycles, so 10
+  // silently became 8 and 14 became 12: the athlete picked a number the engine never built. 8 ships
+  // later as the short, off-ratio option, labelled as such.
+  const head: StepKey[] = isStrengthFocus
+    ? ['goal', 'posture']
+    : ['goal', 'posture', 'commitment', 'length'];
+  return [...head, ...scheduleSteps(state, isStrengthFocus), 'confirm'];
 }
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -185,7 +303,7 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
           per_discipline_posture: state.posture,
           preferred_days: buildPreferredDays(state.posture, {
             longRunDay: state.longRunDay, longRideDay: state.longRideDay,
-            anchorDiscipline: state.anchorDiscipline, anchorDay: state.anchorDay,
+            qualityDays: state.qualityDays,
           }),
           ...(shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {}),
           ...(typeof targetWeeklyMiles === 'number' && targetWeeklyMiles > 0 ? { target_weekly_miles: targetWeeklyMiles } : {}), // Get Strong maintenance mileage (canonical miles); engine guardrails it to the band
@@ -229,11 +347,20 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', anchorDiscipline: null, anchorDay: '', usualMiles: '', targetMiles: '', runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', startDate: nextMondayISO(),
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', startDate: nextMondayISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
-  const steps = getSteps(state);
+  // ⚠️ The schedule screens are built from the POSTURE, which is only seeded when the goal is tapped
+  // — so on step 1 the flow would count itself with no disciplines kept ("1 of 3") and then jump.
+  // With one goal offered, the posture it seeds is knowable in advance. Count off that.
+  const seededPosture = useMemo(
+    () => (GOAL_ORDER.length === 1
+      ? seedFromGoal(GOAL_ORDER[0], undefined, athleteDisciplines, equipmentTier).per_discipline_posture
+      : {}),
+    [athleteDisciplines, equipmentTier],
+  );
+  const steps = getSteps(state.goal ? state : { ...state, posture: seededPosture });
   const currentStep = steps[stepIdx] ?? 'confirm';
   const next = () => setStepIdx((i) => Math.min(i + 1, steps.length - 1));
   // ⚠️ Step numbers were HARDCODED (step={5} on the schedule screen) while `steps` is now shorter on
@@ -286,7 +413,32 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   // as no answer.
   const isStrengthFocus = state.goal === 'get_stronger';
   const posturePresent = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
-  const anchorChoices = (['run', 'bike'] as const).filter((d) => posturePresent(d));
+  // ⛔ TWO HARD DAYS IS THE CEILING, AND THE SHAPE ENFORCES IT — one per discipline, run and bike, so
+  // there is no third to gate. Michael, 2026-07-25: *"two hard days pushes the recovery system to its
+  // absolute limit on a 4-day strength block… you can do it, but you're paying full price for it."*
+  // Field practice, not invented: even trained endurance athletes hold 2-3 genuinely hard sessions a
+  // week, and four heavy lifting days are already drawing on that same account.
+  //
+  // The line appears only at TWO. One hard day is unremarkable and says nothing; a ledger that talks
+  // at one is noise by the time it matters. Gate-don't-warn holds — nothing here is refused, and
+  // there is no "accept the risk" button. The cost is stated and the athlete owns it.
+  const hardDayCount = (['run', 'bike'] as const).filter((d) => state.qualityDays[d]).length;
+  // Fires on the TRANSITION to two, once per build. `seen` is a ref, not state: re-rendering must
+  // never re-open it, and toggling a day off and back on is fiddling, not a new decision.
+  const [mulhollandOpen, setMulhollandOpen] = useState(false);
+  const mulhollandSeen = useRef(false);
+  const setQualityDay = (d: 'run' | 'bike', day: DayName | '') => setState((s) => {
+    const next = { ...s.qualityDays };
+    if (day) next[d] = day; else delete next[d];
+    // ⛔ THE DAY IS SET FIRST, ALWAYS. The dialog reports a choice already made — it does not stand
+    // between the athlete and the choice. That ordering is what keeps it from being a consent gate.
+    const count = (['run', 'bike'] as const).filter((k) => next[k]).length;
+    if (count === 2 && !mulhollandSeen.current) {
+      mulhollandSeen.current = true;
+      setMulhollandOpen(true);
+    }
+    return { ...s, qualityDays: next };
+  });
   const strengthDeveloperLabel = (id?: string) => (id ? STRENGTH_PROTOCOL_LABELS[id] ?? id : id);
 
   const handleConfirm = () => {
@@ -305,6 +457,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     // h-full (not 100dvh) so it fills GoalsScreen's content area and keeps the app nav/banner when
     // embedded; standalone route still fills its container.
     <div className="h-full bg-zinc-950 text-white flex flex-col">
+      <MulhollandDialog open={mulhollandOpen} onClose={() => setMulhollandOpen(false)} />
       {currentStep === 'goal' && (
         <StepLayout
           step={stepNo('goal')} totalSteps={steps.length} title="What's the goal?"
@@ -328,7 +481,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     {/* The card states what it NEEDS and who it is FOR. The app cannot tell a
                         beginner from an experienced lifter, and the scope cut governs what we build,
                         not who gets in (SPEC §4). */}
-                    <span className="block text-white/70 text-sm mt-1.5 leading-relaxed">
+                    <span className="block text-white/85 text-sm mt-1.5 leading-relaxed">
                       12 weeks of Wendler's 5/3/1, four lifting days. For someone who already lifts and
                       is months from a race. Needs a barbell, a rack and a bench — and your squat,
                       bench, deadlift and overhead press maxes on file.
@@ -350,13 +503,13 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           </div>
           {/* Strength is not a mode you switch into — it is in every plan, and only the dose changes.
               Saying so here is what makes ONE strength card make sense rather than look like a gap. */}
-          <p className="text-white/60 text-sm mt-5 leading-relaxed">
+          <p className="text-white/75 text-sm mt-5 leading-relaxed">
             Every plan has a strength component built on the same 5/3/1 principle. The load adjusts to
             the goal — a race build holds it at maintenance, this one develops it.
           </p>
           {needsDiscipline && (
             <div className="mt-4 space-y-2">
-              <p className="text-white/55 text-sm">Which discipline?</p>
+              <p className="text-white/70 text-sm">Which discipline?</p>
               {enduranceChoices.map((d) => (
                 <button key={d} type="button" className={optBtn(state.discipline === d)} onClick={() => reseed(state.goal!, d)}>
                   {DISCIPLINE_LABEL[d]}
@@ -397,12 +550,12 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4 space-y-3.5">
               {strengthFocusSections({}).map((sec) => (
                 <div key={sec.heading}>
-                  <p className="text-white/85 text-sm font-medium mb-0.5">{sec.heading}</p>
-                  <p className="text-white/65 text-sm leading-relaxed">{sec.body}</p>
+                  <p className="text-white/90 text-sm font-medium mb-0.5">{sec.heading}</p>
+                  <p className="text-white/75 text-sm leading-relaxed">{sec.body}</p>
                 </div>
               ))}
             </div>
-            <p className="text-white/70 text-sm pt-1">Which endurance are you keeping?</p>
+            <p className="text-white/85 text-sm pt-1">Which endurance are you keeping?</p>
             {(['run', 'bike', 'swim'] as const).map((d) => {
               const color = getDisciplineColor(d);
               const Icon = DISCIPLINE_ICONS[d];
@@ -419,13 +572,13 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                       {DISCIPLINE_LABEL[d]}
                     </span>
                   </span>
-                  <span className={`text-sm ${keeping ? 'text-white/70' : 'text-white/30'}`}>
+                  <span className={`text-sm ${keeping ? 'text-white/85' : 'text-white/45'}`}>
                     {keeping ? 'Keeping' : 'Not this block'}
                   </span>
                 </button>
               );
             })}
-            <p className="text-white/35 text-xs">
+            <p className="text-white/50 text-xs">
               Held at maintenance — easy sessions, enough to hold the aerobic base. Speed and threshold
               are not maintained by this block.
             </p>
@@ -457,7 +610,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                       return (
                         <button
                           key={p} type="button" disabled={disabled} onClick={() => setPosture(d, p)}
-                          className={`px-2 py-2 rounded-lg text-sm border ${active ? 'border-transparent text-zinc-950 font-semibold' : 'border-white/12 text-white/70'} ${disabled ? 'opacity-30' : ''}`}
+                          className={`px-2 py-2 rounded-lg text-sm border ${active ? 'border-transparent text-zinc-950 font-semibold' : 'border-white/12 text-white/85'} ${disabled ? 'opacity-30' : ''}`}
                           style={active ? { background: color } : undefined}
                         >
                           {p === 'develop' ? 'Develop' : p === 'maintain' ? 'Maintain' : 'Out'}
@@ -467,13 +620,13 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   </div>
                   {d === 'strength' && cur === 'develop' && (
                     <div className="mt-3 space-y-1.5">
-                      <p className="text-white/55 text-xs">Strength protocol</p>
+                      <p className="text-white/70 text-xs">Strength protocol</p>
                       <div className="grid grid-cols-3 gap-1.5">
                         {strengthDevelopersFor(equipmentTier).map((sp) => (
                           <button
                             key={sp.id} type="button"
                             onClick={() => setState((s) => ({ ...s, strengthProtocol: sp.id }))}
-                            className={`px-2 py-2 rounded-lg text-xs border ${state.strengthProtocol === sp.id ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
+                            className={`px-2 py-2 rounded-lg text-xs border ${state.strengthProtocol === sp.id ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/75'}`}
                           >
                             {sp.label}
                           </button>
@@ -485,7 +638,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               );
             })}
             {developCount(state.posture) >= TWO_BUILD_CEILING && (
-              <p className="text-white/45 text-xs">
+              <p className="text-white/60 text-xs">
                 At most 2 disciplines develop together — the interference ceiling. Set one to maintain to develop another.
               </p>
             )}
@@ -507,9 +660,9 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{t.label}</span>
-                  <span className="text-white/45 text-sm tabular-nums">≈ {hoursForTier(t.id)} h/wk</span>
+                  <span className="text-white/60 text-sm tabular-nums">≈ {hoursForTier(t.id)} h/wk</span>
                 </div>
-                <p className="text-white/50 text-sm mt-0.5">{t.blurb}</p>
+                <p className="text-white/65 text-sm mt-0.5">{t.blurb}</p>
               </button>
             ))}
           </div>
@@ -531,276 +684,289 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 onChange={(e) => setState((s) => ({ ...s, targetWeeks: Number(e.target.value) }))}
                 className="w-full accent-teal-500"
               />
-              <p className="text-white/45 text-sm">{floor}–52 weeks. Shorter than {floor} wouldn't show in a retest.</p>
+              <p className="text-white/60 text-sm">{floor}–52 weeks. Shorter than {floor} wouldn't show in a retest.</p>
             </div>
           </StepLayout>
         );
       })()}
 
-      {currentStep === 'schedule' && (
+      {/* ⛔ NOT ON THE STRENGTH PATH. Lifting is four days fixed by the protocol, and the endurance
+          days are typed per discipline. A total that contradicts both is a number the engine cannot
+          honour. Michael, 2026-07-25: *"how many days is redundant."* */}
+      {currentStep === 'days' && (
         <StepLayout
-          step={stepNo('schedule')} totalSteps={steps.length} title="When can you train?"
-          subtitle="Only what you kept shows here."
+          step={stepNo('days')} totalSteps={steps.length} title="How many days can you train?"
           onBack={back} onContinue={next} canContinue={state.daysPerWeek >= 4 && state.daysPerWeek <= 7}
         >
+          <div className="grid grid-cols-4 gap-1.5">
+            {[4, 5, 6, 7].map((n) => (
+              <button
+                key={n} type="button" onClick={() => setState((s) => ({ ...s, daysPerWeek: n }))}
+                className={`py-2 rounded-lg text-sm ${state.daysPerWeek === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+              >{n}</button>
+            ))}
+          </div>
+        </StepLayout>
+      )}
+
+      {/* THE ACCESSORY SLOTS — and the screen has to say why they exist. Endurance pounds the body in
+          one plane and leaves the same imbalances behind it; the main lifts do not saturate the joints
+          that takes. So these are armour, and they are the one part of the block the athlete DIRECTS:
+          push/pull for the posture that collapses over handlebars and late in a stride, single-leg or
+          core for unilateral stability without adding spinal load that would cost recovery.
+          Michael, 2026-07-25 — the title is "Accessory work", not "When can you train?" (that heading
+          belonged to the old stacked step and described none of this). */}
+      {currentStep === 'accessory' && (
+        <StepLayout
+          step={stepNo('accessory')} totalSteps={steps.length} title="Accessory work"
+          subtitle="Every session ends with three short slots. The main lifting is set — these are yours to direct."
+          onBack={back} onContinue={next} canContinue
+        >
           <div className="space-y-5">
-            {/* ⛔ NOT ON THE STRENGTH PATH. Lifting is four days fixed by the protocol, and the
-                endurance days are typed below (run days, swims). A total that contradicts both is a
-                number the engine cannot honour. Michael, 2026-07-25: *"how many days is redundant."* */}
-            <div className={isStrengthFocus ? 'hidden' : undefined}>
-              <p className="text-white/70 text-sm mb-2">Days per week</p>
-              <div className="grid grid-cols-4 gap-1.5">
-                {[4, 5, 6, 7].map((n) => (
+            {/* WHY THESE SLOTS EXIST, said before they are picked. Without it the screen reads as
+                three arbitrary dropdowns and the athlete has no basis for a choice the app is
+                deliberately handing them.
+                ⛔ AND IT SAYS "ARMOR" — the hedged version of this paragraph was rewritten OUT.
+                Michael, 2026-07-25: *"unless it's an unreasonable claim I think it's fair, not sure
+                why we got gun shy."* The claims here are the uncontested ones (repetitive
+                single-plane loading; four heavy central lifts leaving gaps) and NO number is stated,
+                so there is no invented threshold to defend — the caution that killed a numeric
+                volume cap does not apply to a plain mechanical fact. The trailing clause is the
+                consequence, not an instruction (COPY-VOICE rule 7). */}
+            <div className="space-y-2">
+              <p className="text-white/75 text-sm leading-relaxed">
+                Endurance moves you forward in one plane, over and over — the same joints take the
+                same load, and tight hips and rounded shoulders follow it. The four main lifts are
+                heavy and central; they leave gaps. These three slots are where the joints get armor.
+              </p>
+              <p className="text-white/75 text-sm leading-relaxed">
+                Push and pull sit against the posture that collapses over a handlebar and late in a
+                stride. Single-leg and core work builds balance one side at a time, without loading
+                the spine — the knees and hips get the work at no cost to the next main lift.
+              </p>
+            </div>
+            <div className="space-y-3">
+              {ASSISTANCE_MENU.map((menu) => {
+                const picked = state.assistancePicks[menu.slot] ?? ASSISTANCE_DEFAULTS[menu.slot];
+                const targets = menu.options.find((o) => o.name === picked)?.targets ?? '';
+                return (
+                  <div key={menu.slot}>
+                    <div className="flex items-baseline justify-between gap-2 mb-1">
+                      <span className="text-white/85 text-sm">{menu.label}</span>
+                      <span className="text-white/70 text-sm tabular-nums">{menu.totalReps} reps</span>
+                    </div>
+                    <select
+                      value={picked}
+                      onChange={(e) => setState((st) => ({
+                        ...st,
+                        assistancePicks: { ...st.assistancePicks, [menu.slot]: e.target.value },
+                      }))}
+                      className="w-full py-2 px-3 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
+                      style={{ fontSize: '16px' }}
+                      aria-label={`${menu.label} exercise`}
+                    >
+                      {menu.options.map((o) => (
+                        <option key={o.name} value={o.name} className="bg-neutral-900">{o.name}</option>
+                      ))}
+                    </select>
+                    {/* The whole point of the dropdown: the athlete sees what the choice trains. */}
+                    {targets && <p className="text-white/70 text-sm mt-1">{targets}</p>}
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-white/70 text-sm leading-relaxed">{ASSISTANCE_GUIDANCE}</p>
+          </div>
+        </StepLayout>
+      )}
+
+      {currentStep === 'run' && (
+        <StepLayout
+          step={stepNo('run')} totalSteps={steps.length} title="Running"
+          subtitle="All of it conversational — strength leads this block."
+          onBack={back} onContinue={next} canContinue
+        >
+          <div className="space-y-5">
+            {/* ⛔ THE DAY PICKER SITS ABOVE THE NUMBERS. A numeric input pushes everything below it
+                behind the keyboard and the Continue bar on a phone — the same trap that once hid the
+                accessory slots. Taps before typing. */}
+            <div>
+              <p className="text-white/85 text-sm mb-2">Long run day</p>
+              {/* ⛔ ALL SEVEN DAYS. This was restricted to Sat/Sun with the note "your heavy lower
+                  days (Tue/Fri) need clear space" — a rule from the hardcoded grid the 5/3/1 rebuild
+                  replaced. The long run is now an ABSOLUTE the lifting is solved around
+                  (`place-week.ts`), not a session squeezed into what the grid left over. Telling the
+                  athlete their long run must be a weekend, because of lifting days the engine no
+                  longer fixes, is the tail wagging the dog. */}
+              <DayPicker value={state.longRunDay} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))} />
+              {state.posture?.strength === 'develop' && (
+                <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
+                  Whichever day you actually run long. The lifting is placed around it — heavy legs
+                  stay clear of it by two days.
+                </p>
+              )}
+            </div>
+            {/* The volume questions belong to the STRENGTH path — elsewhere the mileage comes from
+                the commitment tier, so asking here would be asking twice. */}
+            {state.posture?.strength === 'develop' && (
+              <>
+            <div>
+              {/* ⛔ THEIR OWN NUMBER FIRST. Michael, 2026-07-25: *"they need to know, they need
+                  to slug it in."* Without it the band is absolute and says the same thing to a
+                  40-mile runner and a 10-mile runner. With it, the maintenance dose is ~2/3 of
+                  their usual [Hickson: cut duration to ⅔ and VO2max holds; cut intensity and it
+                  is lost] — per-athlete by construction, SPEC §2, and no new number invented. */}
+              <p className="text-white/85 text-sm mb-2">What do you normally run?</p>
+              <div className="flex items-center gap-2 mb-1">
+                <input
+                  type="number" inputMode="decimal" min={0}
+                  value={state.usualMiles === '' ? '' : state.usualMiles}
+                  onChange={(e) => setState((st) => {
+                    const usual = e.target.value === '' ? '' : Number(e.target.value);
+                    const dose = typeof usual === 'number' ? maintenanceDoseFor(usual) : null;
+                    // Seed the hold with the maintenance dose — a suggestion they can overtype,
+                    // never a clamp. Only while they have not typed one themselves.
+                    return { ...st, usualMiles: usual, targetMiles: st.targetMiles === '' && dose ? dose : st.targetMiles };
+                  })}
+                  placeholder="e.g. 20"
+                  className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                  style={{ fontSize: '16px' }}
+                />
+                <span className="text-white/75 text-sm">{unit}/wk</span>
+                {/* ⛔ "I DON'T KNOW" IS A VALID ANSWER. Making someone compute a historical
+                    baseline before a screen unlocks is a data-entry exam, not an intake. They
+                    start at the band's floor — the ~2-sessions-a-week maintenance dose, not a new
+                    number — and the app learns them from what they log. Worst case an
+                    experienced athlete is under-asked for a few weeks and raises it; never that
+                    someone is handed a volume they cannot carry with four lifting days. */}
+                <button
+                  type="button"
+                  onClick={() => setState((st) => ({ ...st, usualMiles: '', targetMiles: startLightMiles() }))}
+                  className="text-white/65 text-sm underline underline-offset-2 ml-1"
+                >Not sure</button>
+              </div>
+              <p className="text-white/70 text-sm mb-4 leading-relaxed">
+                {typeof state.usualMiles === 'number' && state.usualMiles > 0
+                  ? `This block holds about ${maintenanceDoseFor(state.usualMiles)} ${unit} — two-thirds of normal keeps the aerobic base while strength leads.`
+                  : `Your usual week, before this block — the holding dose comes off it. Not sure is fine: it starts light and grows as the app learns your weeks. New to running, small is the right answer — every session here is conversational.`}
+              </p>
+              <p className="text-white/85 text-sm mb-2">Weekly running to hold <span className="text-white/60">(maintenance)</span></p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number" inputMode="numeric" min={0}
+                  value={state.targetMiles === '' ? '' : state.targetMiles}
+                  onChange={(e) => setState((s) => ({ ...s, targetMiles: e.target.value === '' ? '' : Number(e.target.value) }))}
+                  placeholder={`e.g. ${Math.max(4, capDisplay - 4)}`}
+                  className="w-24 py-2 px-3 rounded-lg bg-white/[0.04] text-white border border-white/12 text-sm"
+                />
+                <span className="text-white/60 text-sm">{unit}/wk</span>
+              </div>
+              {/* ⛔ THE TRADE, SAID OUT LOUD — and the number stands either way. This is what
+                  replaces a cap: a ceiling would have to name a threshold, and this repo's own
+                  science doc says any numeric threshold the app states would be invented
+                  (Wilson found the volume correlation; Schumann, with more studies, found no
+                  frequency moderation). So the athlete types what they carry, reads what it
+                  costs, and owns it.
+
+                  Was a LOCAL two-state check against its own `capDisplay`, citing "[Wilson 2012]"
+                  for a number Wilson never gives — the exact invented-threshold trap. Now the
+                  SHARED band (`maintenance-volume-band.ts`), which the composer also reads, so
+                  what is said here and what the plan records cannot disagree. Three states: the
+                  old version had no "below", and a runner dropping under a maintenance dose was
+                  told nothing at all. */}
+              <p className="text-white/85 text-sm mt-2 leading-relaxed">
+                {(typeof state.usualMiles === 'number' && state.usualMiles > 0
+                  ? volumeStateLineVsUsual(volumeStateVsUsual(Number(state.targetMiles), state.usualMiles), state.usualMiles, unit)
+                  : volumeStateLine(volumeStateForMiles(Number(state.targetMiles))))
+                  ?? `Run what you'll actually do — it's all easy, strength leads. Low weeks aren't penalized (more recovery for the lifts).`}
+              </p>
+            </div>
+            <div>
+              <p className="text-white/85 text-sm mb-2">How many days to run</p>
+              <div className="grid grid-cols-3 gap-1.5 max-w-[220px]">
+                {[2, 3, 4].map((n) => (
                   <button
-                    key={n} type="button" onClick={() => setState((s) => ({ ...s, daysPerWeek: n }))}
-                    className={`py-2 rounded-lg text-sm ${state.daysPerWeek === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/60 border border-white/12'}`}
+                    key={n} type="button" onClick={() => setState((s) => ({ ...s, runDays: n }))}
+                    className={`py-2 rounded-lg text-sm ${state.runDays === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
                   >{n}</button>
                 ))}
               </div>
+              <p className="text-white/70 text-sm mt-1.5 leading-relaxed">We spread your miles across these — a longer run plus easy fill, not the same run twice.</p>
             </div>
-            {/* The assistance slots, ABOVE the mileage input — a numeric input buries anything below it
-                on mobile (keyboard + Continue eclipse it), which locked users out of the control that
-                used to sit here. */}
-            {/* ⛔ ONE CARD PER DISCIPLINE, AND A DISCIPLINE THEY DID NOT KEEP RENDERS NOTHING.
-                Michael, 2026-07-25: *"it's too busy — can we make the cards blind to what the user
-                doesn't select?"* Every control here was already gated on posture, so the fix is not
-                logic, it is GROUPING: the screen was one undifferentiated column of headings, so a
-                triathlete's run, ride, swim and accessory questions all ran together and read as one
-                impossibly long form. Boxed per discipline, an athlete keeping only the run sees two
-                cards. */}
-            {state.posture?.strength === 'develop' && (
-              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4">
-                <p className="text-white/85 text-sm font-medium mb-3">Strength</p>
-                <p className="text-white/70 text-sm mb-1">Accessory work</p>
-                <p className="text-white/55 text-sm mb-3 leading-relaxed">
-                  Every session ends with three short slots. The main lifting is set — these are yours to
-                  direct. Use them to shore up imbalances, protect your joints from the road, and target
-                  where you want extra attention.
-                </p>
-                <div className="space-y-3">
-                  {ASSISTANCE_MENU.map((menu) => {
-                    const picked = state.assistancePicks[menu.slot] ?? ASSISTANCE_DEFAULTS[menu.slot];
-                    const targets = menu.options.find((o) => o.name === picked)?.targets ?? '';
-                    return (
-                      <div key={menu.slot}>
-                        <div className="flex items-baseline justify-between gap-2 mb-1">
-                          <span className="text-white/70 text-sm">{menu.label}</span>
-                          <span className="text-white/55 text-sm tabular-nums">{menu.totalReps} reps</span>
-                        </div>
-                        <select
-                          value={picked}
-                          onChange={(e) => setState((st) => ({
-                            ...st,
-                            assistancePicks: { ...st.assistancePicks, [menu.slot]: e.target.value },
-                          }))}
-                          className="w-full py-2 px-3 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
-                          style={{ fontSize: '16px' }}
-                          aria-label={`${menu.label} exercise`}
-                        >
-                          {menu.options.map((o) => (
-                            <option key={o.name} value={o.name} className="bg-neutral-900">{o.name}</option>
-                          ))}
-                        </select>
-                        {/* The whole point of the dropdown: the athlete sees what the choice trains. */}
-                        {targets && <p className="text-white/55 text-sm mt-1">{targets}</p>}
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="text-white/55 text-sm mt-3 leading-relaxed">{ASSISTANCE_GUIDANCE}</p>
-              </div>
+              </>
             )}
-            {posturePresent('run') && (
-              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4 space-y-4">
-                <p className="text-white/85 text-sm font-medium mb-3">Run</p>
-                <div>
-                <p className="text-white/70 text-sm mb-2">Long run day</p>
-                {/* ⛔ ALL SEVEN DAYS. This was restricted to Sat/Sun with the note "your heavy lower
-                    days (Tue/Fri) need clear space" — a rule from the hardcoded grid the 5/3/1
-                    rebuild replaced. The long run is now an ABSOLUTE the lifting is solved around
-                    (`place-week.ts`), not a session squeezed into what the grid left over. Telling
-                    the athlete their long run must be a weekend, because of lifting days the engine
-                    no longer fixes, is the tail wagging the dog. Michael, 2026-07-25. */}
-                <DayPicker value={state.longRunDay} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))} />
-                {state.posture?.strength === 'develop' && (
-                  <p className="text-white/55 text-sm mt-1.5 leading-relaxed">
-                    Whichever day you actually run long. The lifting is placed around it — heavy legs
-                    stay clear of it by two days.
-                  </p>
-                )}
-                </div>
-              </div>
-            )}
-            {state.posture?.strength === 'develop' && posturePresent('run') && (
-              <div className={`${'rounded-xl border border-white/12 bg-white/[0.03] p-4'} space-y-4`}>
-                <div>
-                  {/* ⛔ THEIR OWN NUMBER FIRST. Michael, 2026-07-25: *"they need to know, they need
-                      to slug it in."* Without it the band is absolute and says the same thing to a
-                      40-mile runner and a 10-mile runner. With it, the maintenance dose is ~2/3 of
-                      their usual [Hickson: cut duration to ⅔ and VO2max holds; cut intensity and it
-                      is lost] — per-athlete by construction, SPEC §2, and no new number invented. */}
-                  <p className="text-white/70 text-sm mb-2">What do you normally run?</p>
-                  <div className="flex items-center gap-2 mb-1">
-                    <input
-                      type="number" inputMode="decimal" min={0}
-                      value={state.usualMiles === '' ? '' : state.usualMiles}
-                      onChange={(e) => setState((st) => {
-                        const usual = e.target.value === '' ? '' : Number(e.target.value);
-                        const dose = typeof usual === 'number' ? maintenanceDoseFor(usual) : null;
-                        // Seed the hold with the maintenance dose — a suggestion they can overtype,
-                        // never a clamp. Only while they have not typed one themselves.
-                        return { ...st, usualMiles: usual, targetMiles: st.targetMiles === '' && dose ? dose : st.targetMiles };
-                      })}
-                      placeholder="e.g. 20"
-                      className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
-                      style={{ fontSize: '16px' }}
-                    />
-                    <span className="text-white/60 text-sm">{unit}/wk</span>
-                    {/* ⛔ "I DON'T KNOW" IS A VALID ANSWER. Making someone compute a historical
-                        baseline before a screen unlocks is a data-entry exam, not an intake. They
-                        start at the band's floor — the ~2-sessions-a-week maintenance dose, not a new
-                        number — and the app learns them from what they log. Worst case an
-                        experienced athlete is under-asked for a few weeks and raises it; never that
-                        someone is handed a volume they cannot carry with four lifting days. */}
-                    <button
-                      type="button"
-                      onClick={() => setState((st) => ({ ...st, usualMiles: '', targetMiles: startLightMiles() }))}
-                      className="text-white/50 text-sm underline underline-offset-2 ml-1"
-                    >Not sure</button>
-                  </div>
-                  <p className="text-white/55 text-sm mb-4 leading-relaxed">
-                    {typeof state.usualMiles === 'number' && state.usualMiles > 0
-                      ? `This block holds about ${maintenanceDoseFor(state.usualMiles)} ${unit} — two-thirds of normal keeps the aerobic base while strength leads.`
-                      : `Your usual week, before this block — the holding dose comes off it. Not sure is fine: it starts light and grows as the app learns your weeks. New to running, small is the right answer — every session here is conversational.`}
-                  </p>
-                  <p className="text-white/70 text-sm mb-2">Weekly running to hold <span className="text-white/45">(maintenance)</span></p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number" inputMode="numeric" min={0}
-                      value={state.targetMiles === '' ? '' : state.targetMiles}
-                      onChange={(e) => setState((s) => ({ ...s, targetMiles: e.target.value === '' ? '' : Number(e.target.value) }))}
-                      placeholder={`e.g. ${Math.max(4, capDisplay - 4)}`}
-                      className="w-24 py-2 px-3 rounded-lg bg-white/[0.04] text-white border border-white/12 text-sm"
-                    />
-                    <span className="text-white/45 text-sm">{unit}/wk</span>
-                  </div>
-                  {/* ⛔ THE TRADE, SAID OUT LOUD — and the number stands either way. This is what
-                      replaces a cap: a ceiling would have to name a threshold, and this repo's own
-                      science doc says any numeric threshold the app states would be invented
-                      (Wilson found the volume correlation; Schumann, with more studies, found no
-                      frequency moderation). So the athlete types what they carry, reads what it
-                      costs, and owns it.
+            <QualityDayPicker
+              label="Hard run day"
+              hint="A club night, track repeats, a hard tempo — yours or someone else's. The day it lands, if you have one. It is kept, and it counts as a hard day: intervals draw on the same recovery a heavy squat does."
+              atCeiling={hardDayCount === 2}
+              value={state.qualityDays.run ?? ''}
+              onChange={(d) => setQualityDay('run', d)}
+            />
+          </div>
+        </StepLayout>
+      )}
 
-                      Was a LOCAL two-state check against its own `capDisplay`, citing "[Wilson 2012]"
-                      for a number Wilson never gives — the exact invented-threshold trap. Now the
-                      SHARED band (`maintenance-volume-band.ts`), which the composer also reads, so
-                      what is said here and what the plan records cannot disagree. Three states: the
-                      old version had no "below", and a runner dropping under a maintenance dose was
-                      told nothing at all. */}
-                  <p className="text-white/70 text-sm mt-2 leading-relaxed">
-                    {(typeof state.usualMiles === 'number' && state.usualMiles > 0
-                      ? volumeStateLineVsUsual(volumeStateVsUsual(Number(state.targetMiles), state.usualMiles), state.usualMiles, unit)
-                      : volumeStateLine(volumeStateForMiles(Number(state.targetMiles))))
-                      ?? `Run what you'll actually do — it's all easy, strength leads. Low weeks aren't penalized (more recovery for the lifts).`}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-white/70 text-sm mb-2">How many days to run</p>
-                  <div className="grid grid-cols-3 gap-1.5 max-w-[220px]">
-                    {[2, 3, 4].map((n) => (
-                      <button
-                        key={n} type="button" onClick={() => setState((s) => ({ ...s, runDays: n }))}
-                        className={`py-2 rounded-lg text-sm ${state.runDays === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/60 border border-white/12'}`}
-                      >{n}</button>
-                    ))}
-                  </div>
-                  <p className="text-white/55 text-sm mt-1.5 leading-relaxed">We spread your miles across these — a longer run plus easy fill, not the same run twice.</p>
-                </div>
+      {/* ⛔ BIKE IS ASKED IN HOURS, NEVER MILES (D-323 §6, researched not picked). ~99% of riders
+          train on time — terrain and wind distort distance badly — and this app learns ride HR and
+          FTP but NO ride speed, so bike miles cannot become a session length without guessing: 20
+          miles is 65 minutes flat and over two hours in hills. People TALK in miles and TRAIN in
+          hours, so: ask hours, show miles later once a ride speed is learnable. */}
+      {currentStep === 'bike' && (
+        <StepLayout
+          step={stepNo('bike')} totalSteps={steps.length} title="How much will you ride?"
+          subtitle="Hours, not miles — terrain makes distance a poor measure of a ride, and it is all easy here."
+          onBack={back} onContinue={next} canContinue
+        >
+          <div className="space-y-5">
+            <div>
+              <p className="text-white/85 text-sm mb-2">Weekly riding to hold <span className="text-white/60">(maintenance)</span></p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number" inputMode="decimal" min={0} step={0.5}
+                  value={state.rideHours === '' ? '' : state.rideHours}
+                  onChange={(e) => setState((st) => ({ ...st, rideHours: e.target.value === '' ? '' : Number(e.target.value) }))}
+                  placeholder="e.g. 4"
+                  className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                  style={{ fontSize: '16px' }}
+                />
+                <span className="text-white/75 text-sm">h/wk</span>
               </div>
-            )}
-            {posturePresent('bike') && (
-              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4">
-                <p className="text-white/85 text-sm font-medium mb-3">Bike</p>
-                {/* ⛔ BIKE IS ASKED IN HOURS, NEVER MILES (D-323 §6, researched not picked). ~99% of
-                    riders train on time — terrain and wind distort distance badly — and this app
-                    learns ride HR and FTP but NO ride speed, so bike miles cannot become a session
-                    length without guessing: 20 miles is 65 minutes flat and over two hours in hills.
-                    People TALK in miles and TRAIN in hours, so: ask hours, show miles later once a
-                    ride speed is learnable. */}
-                <p className="text-white/70 text-sm mb-2">Weekly riding to hold <span className="text-white/45">(maintenance)</span></p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number" inputMode="decimal" min={0} step={0.5}
-                    value={state.rideHours === '' ? '' : state.rideHours}
-                    onChange={(e) => setState((st) => ({ ...st, rideHours: e.target.value === '' ? '' : Number(e.target.value) }))}
-                    placeholder="e.g. 4"
-                    className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
-                    style={{ fontSize: '16px' }}
-                  />
-                  <span className="text-white/60 text-sm">h/wk</span>
-                </div>
-                <p className="text-white/55 text-sm mt-1.5 leading-relaxed">
-                  Hours, not miles — terrain makes distance a poor measure of a ride, and it is all easy here.
-                </p>
-                <p className="text-white/70 text-sm mb-2 mt-4">Long ride day</p>
-                <DayPicker value={state.longRideDay} onChange={(d) => setState((s) => ({ ...s, longRideDay: d }))} />
-              </div>
-            )}
-            {anchorChoices.length > 0 && (
-              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4">
-                <p className="text-white/85 text-sm font-medium mb-3">Fixed sessions</p>
-                <p className="text-white/70 text-sm mb-2">Keep a fixed hard session? (e.g. a club run or ride)</p>
-                <div className="grid grid-cols-2 gap-1.5 mb-2">
-                  <button
-                    type="button" onClick={() => setState((s) => ({ ...s, anchorDiscipline: null, anchorDay: '' }))}
-                    className={`py-2 rounded-lg text-sm border ${state.anchorDiscipline === null ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
-                  >No</button>
-                  <button
-                    type="button" onClick={() => setState((s) => ({ ...s, anchorDiscipline: s.anchorDiscipline ?? anchorChoices[0] }))}
-                    className={`py-2 rounded-lg text-sm border ${state.anchorDiscipline !== null ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
-                  >Yes</button>
-                </div>
-                {state.anchorDiscipline !== null && (
-                  <div className="space-y-2">
-                    {anchorChoices.length > 1 && (
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {anchorChoices.map((d) => (
-                          <button
-                            key={d} type="button" onClick={() => setState((s) => ({ ...s, anchorDiscipline: d }))}
-                            className={`py-2 rounded-lg text-sm border ${state.anchorDiscipline === d ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
-                          >{DISCIPLINE_LABEL[d]}</button>
-                        ))}
-                      </div>
-                    )}
-                    <DayPicker value={state.anchorDay} onChange={(d) => setState((s) => ({ ...s, anchorDay: d }))} />
-                  </div>
-                )}
-              </div>
-            )}
-            {/* ⬇ SWIM SITS LAST. It is a courtesy — booked, not coached — and it was rendering
-                above the lifting and the running it is subordinate to. Order on this screen is the
-                order of what matters: the work first, the slots we merely hold at the end. */}
-            {/* Swim is BOOKED, not coached. The app learns no swim pace and grades no swim, so it
-                holds the time and says so. Only asked when swim was kept — one control, no yardage,
-                no sets. It exists for the triathlete who wants the slots on the calendar. */}
-            {state.posture?.strength === 'develop' && state.posture?.swim === 'maintain' && (
-              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4">
-                <p className="text-white/85 text-sm font-medium mb-3">Swim</p>
-                <p className="text-white/70 text-sm mb-2">Swims per week</p>
-                <div className="flex gap-1.5 max-w-[240px]">
-                  {[1, 2, 3].map((n) => (
-                    <button
-                      key={n} type="button" onClick={() => setState((st) => ({ ...st, swimDays: n }))}
-                      className={`flex-1 py-2 rounded-lg text-sm border ${state.swimDays === n ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/60'}`}
-                    >{n}</button>
-                  ))}
-                </div>
-                <p className="text-white/55 text-sm mt-1.5 leading-relaxed">
-                  About an hour each, on days nothing else is booked. Held on the calendar, not coached —
-                  no set, no target.
-                </p>
-              </div>
-            )}
+            </div>
+            <div>
+              <p className="text-white/85 text-sm mb-2">Long ride day</p>
+              <DayPicker value={state.longRideDay} onChange={(d) => setState((s) => ({ ...s, longRideDay: d }))} />
+            </div>
+            <QualityDayPicker
+              label="Hard ride day"
+              hint="A chaingang, a club ride, a threshold turbo — yours or someone else's. The day it lands, if you have one. It is kept, and it counts as a hard day rather than easy hours."
+              atCeiling={hardDayCount === 2}
+              value={state.qualityDays.bike ?? ''}
+              onChange={(d) => setQualityDay('bike', d)}
+            />
+          </div>
+        </StepLayout>
+      )}
+
+      {/* ⬇ SWIM SITS LAST. It is a courtesy — booked, not coached — so it follows the work rather
+          than sitting above the lifting and the running it is subordinate to. The app learns no swim
+          pace and grades no swim, so it holds the time and says so: one control, no yardage, no sets.
+          It exists for the triathlete who wants the slots on the calendar. */}
+      {currentStep === 'swim' && (
+        <StepLayout
+          step={stepNo('swim')} totalSteps={steps.length} title="Swims"
+          subtitle="About an hour each, on days nothing else is booked. Held on the calendar, not coached — no set, no target."
+          onBack={back} onContinue={next} canContinue
+        >
+          <div>
+            <p className="text-white/85 text-sm mb-2">Swims per week</p>
+            <div className="flex gap-1.5 max-w-[240px]">
+              {[1, 2, 3].map((n) => (
+                <button
+                  key={n} type="button" onClick={() => setState((st) => ({ ...st, swimDays: n }))}
+                  className={`flex-1 py-2 rounded-lg text-sm border ${state.swimDays === n ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/75'}`}
+                >{n}</button>
+              ))}
+            </div>
           </div>
         </StepLayout>
       )}
@@ -831,13 +997,13 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     <span className="flex items-center gap-2" style={{ color }}>
                       <Icon className="h-4 w-4" /> {DISCIPLINE_LABEL[d]}
                     </span>
-                    <span className="text-white/60">{label}{proto}</span>
+                    <span className="text-white/75">{label}{proto}</span>
                   </div>
                 );
               })}
             </div>
             <div>
-              <p className="text-white/55 text-sm mb-2">Start the week of</p>
+              <p className="text-white/70 text-sm mb-2">Start the week of</p>
               <input
                 type="date"
                 value={state.startDate}
@@ -845,7 +1011,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 onChange={(e) => setState((s) => ({ ...s, startDate: e.target.value }))}
                 className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 focus:outline-none focus:border-teal-500/50"
               />
-              <p className="text-white/35 text-xs mt-1.5">Week 1 begins this week — plans run Monday to Sunday.</p>
+              <p className="text-white/50 text-xs mt-1.5">Week 1 begins this week — plans run Monday to Sunday.</p>
             </div>
             {/* ⛔ TWO FALSEHOODS ON THIS LINE, both created when the engine changed under it.
                 • "ending in a retest" — Strength Focus has NO retest week. The last set of every
@@ -855,14 +1021,14 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   and nothing reads it. Reporting a number the athlete never gave, that changes
                   nothing, is the shape of bug this file keeps producing.
                 Also fixed the article: "An 12-week" read wrong for every length that is not 8. */}
-            <p className="text-white/60 text-sm">
+            <p className="text-white/75 text-sm">
               {isStrengthFocus ? (
                 <>A {state.targetWeeks}-week block. The last set of every third week is the
                 measurement — there is no separate retest.</>
               ) : (
                 <>{state.targetWeeks === 8 || state.targetWeeks === 11 || state.targetWeeks === 18 ? 'An' : 'A'} {state.targetWeeks}-week
                 block from your current fitness (≈ {hoursForTier(state.commitment)} h/wk),
-                ending in a <span className="text-white/80">retest</span>.</>
+                ending in a <span className="text-white/90">retest</span>.</>
               )}
             </p>
           </div>

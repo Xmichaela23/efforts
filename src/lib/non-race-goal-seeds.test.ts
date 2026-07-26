@@ -138,6 +138,28 @@ Deno.test('buildPreferredDays — posture-gated; out → no long day; anchor →
   assertEquals(buildPreferredDays({ run: 'develop', strength: 'out' }, {}).strength, undefined);
 });
 
+Deno.test('buildPreferredDays — qualityDays: BOTH a club run and a hard ride survive; out disciplines do not', () => {
+  // The single-anchor shape made this athlete choose. They do not have to: the club run is Tuesday
+  // AND the chaingang is Wednesday, and `preferred_days` has always had a slot for each.
+  const tri = { swim: 'maintain', bike: 'maintain', run: 'maintain', strength: 'develop' };
+  const pd = buildPreferredDays(tri, {
+    longRunDay: 'sunday', longRideDay: 'saturday',
+    qualityDays: { run: 'tuesday', bike: 'wednesday' },
+  });
+  assertEquals(pd.quality_run, 'tuesday');
+  assertEquals(pd.quality_bike, 'wednesday');
+  assertEquals(pd.strength, ['monday', 'tuesday', 'thursday', 'friday']); // develop = the 4-day arc
+
+  // Posture still gates it — a hard ride for someone who dropped the bike is a leftover, not a day.
+  const runOnly = { swim: 'out', bike: 'out', run: 'maintain', strength: 'develop' };
+  const pd2 = buildPreferredDays(runOnly, { qualityDays: { run: 'thursday', bike: 'wednesday' } });
+  assertEquals(pd2.quality_run, 'thursday');
+  assertEquals(pd2.quality_bike, undefined);
+
+  // Empty/absent → no quality_* at all (the planner places them).
+  assertEquals(buildPreferredDays(tri, { qualityDays: {} }).quality_run, undefined);
+});
+
 Deno.test('hoursForTier — tier → weekly-hours band (hours as OUTPUT); light is the low default, monotonic', () => {
   assertEquals(hoursForTier('light'), 6);
   assertEquals(hoursForTier('moderate'), 9);
