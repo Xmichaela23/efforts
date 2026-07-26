@@ -674,9 +674,18 @@ for (const { label, anchors } of GEOMETRIES) {
       for (const t of concurrentTradeOffs) {
         const s = String(t);
         // Must cite at least one research source.
+        // ⛔ ALLOW-LIST NARROWED 2026-07-26. Petré 2021 and Coffey & Hawley 2017 were REMOVED as
+        // acceptable citations for a spacing claim: Petré is a strength-development meta by training
+        // status and Coffey & Hawley is a molecular-mechanism review — neither addresses session
+        // spacing. This test previously passed on either of them, so it pinned a wrong citation in
+        // place. Robineau 2016 and Schumann 2022 are what actually carry the ≥24h/48h rules.
+        // ⚠️ Wilson et al 2012 is retained only because legacy strings still carry it; it is a
+        // plausible mechanism, not settled (Schumann found no modality moderation, Sabag 2018 the
+        // reverse). Do NOT re-add a source here without checking it supports a SPACING claim.
+        // See docs/DOCTRINE-aerobic-maintenance.md §3.
         const citesResearch =
           /Hickson 1980/.test(s) || /Wilson et al 2012/.test(s) ||
-          /Petré et al 2021/.test(s) || /Coffey & Hawley 2017/.test(s);
+          /Robineau et al 2016/.test(s) || /Schumann et al 2022/.test(s);
         assert(citesResearch, `${label}: §4.21 trade-off must cite research; got "${s}"`);
         // Must name a real placed session. Extract day name + session label from the message and
         // confirm that day in `days` actually has that session.

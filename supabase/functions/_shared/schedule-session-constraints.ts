@@ -24,9 +24,23 @@ export type SessionFatigueId = keyof typeof SESSION_FATIGUE;
  * Prime-mover taxonomy (docs/SCHEDULING-RULES.md §4.7).
  *
  * Drives concurrent-training spacing: leg-loaded sessions must respect 24h/48h gaps from
- * lower-body strength in both directions per Hickson 1980, Wilson et al 2012, Robineau et al
- * 2016, Coffey & Hawley 2017, Petré et al 2021. Replaces enumerative session-name lists in the
+ * lower-body strength in both directions. Replaces enumerative session-name lists in the
  * scheduler — adding a new SessionKind only requires assigning a group here.
+ *
+ * ⛔ CITATIONS CORRECTED 2026-07-26. The gaps are UNCHANGED. Two of the five sources cited here did
+ * not support the rule they were attached to:
+ *   • Petré et al 2021 — a strength-development meta BY TRAINING STATUS; nothing on clearance windows.
+ *   • Coffey & Hawley 2017 — a genuine interference-MECHANISM review (J Physiol 595:2883); it does
+ *     not address session spacing, recovery windows, or hours between sessions.
+ * WHAT CARRIES THE 24h/48h GAPS: Robineau 2016 (0h worst, 6h suboptimal, 24h best on the aerobic
+ * axis) · Schumann 2022 (attenuation especially SAME-SESSION, n.s. at ≥3h) · exercise-induced muscle
+ * damage peaking 24-48h with the largest strength/speed/agility deficits at 48h.
+ * Hickson 1980 stands as the origin of the interference question — note it is the INTERFERENCE paper,
+ * NOT the Hickson 1981/82/85 maintenance trilogy; a bare "Hickson" in this repo is ambiguous.
+ * ⚠️ Wilson 2012's modality split is a plausible mechanism only — Schumann 2022 found no modality
+ * moderation, Sabag 2018 found the reverse. Do not build a new claim on it.
+ * ⛔ THIS FILE IS THE SINGLE LAW (D-325 §5). Cost/penalty tables are RENDERINGS of it, never a second
+ * ranking. Full record: docs/DOCTRINE-aerobic-maintenance.md §3.
  *
  * - `leg`     — quads / glutes / hamstrings / calves are primary movers. Volume alone can
  *               create fatigue accumulation; intensity matters for the constraint severity

@@ -456,8 +456,18 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // Endurance = maintenance, underneath.
     if (enduranceSport === 'run') {
       runDayList.forEach((day) => {
+        // ⛔ CITATION REMOVED 2026-07-26. This read "...back-to-back is fine [Petré 2021]." Petré 2021
+        // is a strength-development meta-analysis BY TRAINING STATUS — it says nothing about session
+        // spacing, so it never supported this line. The line is now stated as the reasoning it always
+        // was, with no source attached.
+        // ⚠️ The CLAIM is also narrower than it looked. Robineau 2016's 0h arm was the WORST of three
+        // (half-squat 1RM +16.8% at 0h vs +31.2% at 6h) — but that arm stacked lifting with HARD
+        // endurance. This is a lift plus an EASY run, which is not the tested condition, and
+        // resistance-first is the correct order when sessions cannot be separated (Eddens 2018:
+        // +6.91% lower-body strength for RT-first). So the guidance is sound and UNSOURCED.
+        // ⛔ Do not attach a citation here without one that tested lifting + easy running same-day.
         const note = (week === 1 && day === firstStackedRunDay)
-          ? ` On a lift + run day the lift comes first — the run is easy, so back-to-back is fine [Petré 2021].`
+          ? ` On a lift + run day the lift comes first — the run is easy, so back-to-back is fine.`
           : undefined;
         weekSessions.push(enduranceSession('run', day, runMinutesByDay[day], note, day === longRunDay ? 'long' : 'easy'));
       });

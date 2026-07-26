@@ -480,11 +480,26 @@ function sequentialOk(
     if (kind !== 'long_ride' && isHigh(kind)) return false;
   }
 
-  // §4.7 concurrent-training spacing (Hickson 1980, Wilson 2012, Robineau 2016, Coffey & Hawley
-  // 2017, Petré 2021): leg-dominant strength must be ≥24h from leg-dominant quality endurance
-  // (quality_bike, quality_run) and ≥48h from long_ride/long_run, in BOTH directions, ALL intents.
-  // No performance-intent relaxation — Petré 2021 meta-analysis shows the AMPK/mTOR interference
-  // is *stronger* in trained individuals.
+  // §4.7 concurrent-training spacing: leg-dominant strength must be ≥24h from leg-dominant quality
+  // endurance (quality_bike, quality_run) and ≥48h from long_ride/long_run, in BOTH directions,
+  // ALL intents. No performance-intent relaxation.
+  //
+  // ⛔ CITATIONS CORRECTED 2026-07-26 — the RULE is unchanged; two of the sources cited for it did
+  // not support it, and one supported a claim this repo had already struck.
+  //  • REMOVED Petré 2021 — a strength-development meta-analysis BY TRAINING STATUS. It contains
+  //    nothing on clearance windows, and the "AMPK/mTOR interference is stronger in trained
+  //    individuals" line attributed to it restated the chronic AMPK/mTOR claim STRUCK by D-324.
+  //  • REMOVED Coffey & Hawley 2017 (J Physiol 595:2883) — a real and relevant interference-mechanism
+  //    review, but it addresses molecular mechanism, not session spacing, recovery windows or hours
+  //    between sessions.
+  //  • WHAT ACTUALLY CARRIES IT: Robineau 2016 (0h separation worst; 6h suboptimal; 24h best on the
+  //    aerobic axis) · Schumann 2022 (attenuation especially SAME-SESSION, n.s. at ≥3h) ·
+  //    exercise-induced muscle damage peaking 24-48h, with the largest strength/speed/agility
+  //    deficits at 48h — which is the first real receipt under the 48h rule.
+  //  • Wilson 2012's modality split is retained ONLY as a plausible mechanism: Schumann 2022 found
+  //    no modality moderation and Sabag 2018 found the reverse. Do not build a new claim on it.
+  //  ⚠️ The rule errs safe and is unchanged. Never weaken a placement because its citation was bad.
+  //  See docs/DOCTRINE-aerobic-maintenance.md §3 (evidence sweep) for the full record.
 
   // §4.7 tier-aware lower-vs-leg-quality adjacency. When relax flags are set, individual
   // adjacency blocks are skipped per the tier ladder above (allow_lower_adj_one_sided →
@@ -654,7 +669,7 @@ function emitConcurrentSpacingTradeOff(
         `${tfDay(dayBefore(lowerDay))} and ${legQualityLabel(nextLegQ)} on ` +
         `${tfDay(dayAfter(lowerDay))} — for heavy training blocks (Strength Build, Maintenance + ` +
         `Power, Rebuild) concurrent-training research recommends ≥24h separation from leg-dominant ` +
-        `quality endurance (Hickson 1980; Wilson et al 2012; Petré et al 2021). Hypertrophy and ` +
+        `quality endurance (Hickson 1980; Robineau et al 2016; Schumann et al 2022). Hypertrophy and ` +
         `Deload loads (60-72% 1RM) don't drive significant interference at this adjacency (§6.1 ` +
         `cycling/running asymmetry). Your anchors leave no cleaner placement during heavy weeks. ` +
         `To improve: free a day for strength (move a long-day anchor, trim a quality session, ` +
@@ -681,7 +696,7 @@ function emitConcurrentSpacingTradeOff(
           `Strength lower on ${tfDay(lowerDay)} sits 24h from ${legQualityLabel(adjK)} on ` +
             `${tfDay(adjDay)} — for heavy training blocks (Strength Build, Maintenance + Power, ` +
             `Rebuild) concurrent-training research recommends ≥24h separation in both directions ` +
-            `(Hickson 1980; Coffey & Hawley 2017). Hypertrophy and Deload loads don't drive ` +
+            `(Hickson 1980; Robineau et al 2016). Hypertrophy and Deload loads don't drive ` +
             `significant interference at this adjacency. Tight spacing is acceptable in heavy ` +
             `weeks but may slightly compromise both sessions; consider freeing an adjacent day ` +
             `if recovery suffers.`,

@@ -66,9 +66,19 @@ export type EndurancePin = {
  * ⛔ SIX HOURS, AND THE REASON IS THE WHOLE SAFEGUARD.
  *
  * Robineau 2016 (n=58, 7 weeks) is the only trial that tested this directly. **Zero hours between
- * lifting and endurance produced lower strength gains. Six hours and twenty-four hours performed the
- * same as each other.** So a stacked day is safe *because of the gap* — and a stacked day without
- * one is not a compromise, it is the single worst arm of the only study on the question.
+ * lifting and endurance produced lower strength gains** (half-squat 1RM +16.8% at 0h vs +31.2% at 6h
+ * and +25.9% at 24h). So a stacked day is safe *because of the gap* — and a stacked day without one
+ * is not a compromise, it is the single worst arm of the only study on the question.
+ *
+ * ⛔ CORRECTED 2026-07-26 — this comment said "six hours and twenty-four hours performed the same as
+ * each other." That is true for the STRENGTH outcome and FALSE for the aerobic one. **VO2peak change
+ * was higher at 24h than at both 0h and 6h**, and the authors call 0h — and to a lesser extent
+ * twice-daily 6h training — not optimal for neuromuscular AND aerobic improvement.
+ * ⛔ SO: 24h IS THE TARGET. 6h IS THE FALLBACK. They are not equivalent.
+ * ⚠️ MIN_STACK_GAP_H STAYS AT 6 — it is the floor that makes a stacked day survivable when the
+ * athlete cannot split any further, not the arrangement to aim for. A scheduler that treats 6h as
+ * equal to 24h will stack by preference and quietly cost the aerobic side.
+ * (Schumann 2022 agrees on the strength axis: attenuation p=0.043 same-session, n.s. at ≥3h.)
  *
  * Which is why the intake has to ASK whether the day can be split, rather than infer it from the
  * fact that the athlete accepted a stack. Most people cannot split a weekday. Offering the stack
