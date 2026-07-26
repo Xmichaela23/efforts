@@ -249,6 +249,11 @@ Deno.test('strength-only: no endurance sessions, block otherwise unchanged', () 
 Deno.test('the description states the 85% buffer ONCE and never apologises for week one', () => {
   const d = PLAN.description;
   assertEquals((d.match(/85%/g) ?? []).length, 1);
+  // ⛔ THE DEBT. The description promises the app will unlock speed and distance blocks when this
+  // cycle closes. Neither exists, and there is no week-12 hand-off. Michael reinstated the line
+  // knowingly, so it is a commitment rather than a claim to hedge — this assertion exists to keep
+  // it visible until the hand-off ships, not to police the copy.
+  assertEquals(/unlock speed and distance/i.test(d), true, 'the unlock promise moved — the hand-off still owes it');
   for (const banned of ["don't worry", 'ease you in', 'easing you in', 'gets harder', 'trust the']) {
     assertEquals(d.toLowerCase().includes(banned), false, `description carries "${banned}"`);
   }
