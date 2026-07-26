@@ -7,7 +7,7 @@ import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor } from '@/lib/context-utils';
 // ONE band, shared with the composer — what the athlete is told while typing and what the plan
 // records cannot disagree. A REFERENCE, never a cap (D-222's ceiling was retired on purpose).
-import { maintenanceDoseFor, volumeStateForMiles, volumeStateLine, volumeStateLineVsUsual, volumeStateVsUsual } from '@/lib/maintenance-volume-band';
+import { maintenanceDoseFor, startLightMiles, volumeStateForMiles, volumeStateLine, volumeStateLineVsUsual, volumeStateVsUsual } from '@/lib/maintenance-volume-band';
 // ONE source for the block's own words — the composer writes the same sentences onto the plan.
 import { strengthFocusSections, STRENGTH_FOCUS_WEEKS } from '@/lib/strength-focus-copy';
 // ONE menu, shared with the composer that authors the block (`assistance-menu.ts`). A name this
@@ -340,8 +340,8 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                           who cannot name their usual week is being asked a question they cannot
                           answer, and finding that out on step three is worse than knowing at the
                           door. Michael, 2026-07-25. */}
-                      It also assumes you know your current weekly volume in whichever discipline
-                      you're holding — the block maintains that base rather than building it.
+                      Your usual weekly volume helps, but is not required — it starts light and adapts
+                      if you don't know it.
                     </span>
                   </>
                 )}
@@ -643,11 +643,22 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                       style={{ fontSize: '16px' }}
                     />
                     <span className="text-white/60 text-sm">{unit}/wk</span>
+                    {/* ⛔ "I DON'T KNOW" IS A VALID ANSWER. Making someone compute a historical
+                        baseline before a screen unlocks is a data-entry exam, not an intake. They
+                        start at the band's floor — the ~2-sessions-a-week maintenance dose, not a new
+                        number — and the app learns them from what they log. Worst case an
+                        experienced athlete is under-asked for a few weeks and raises it; never that
+                        someone is handed a volume they cannot carry with four lifting days. */}
+                    <button
+                      type="button"
+                      onClick={() => setState((st) => ({ ...st, usualMiles: '', targetMiles: startLightMiles() }))}
+                      className="text-white/50 text-sm underline underline-offset-2 ml-1"
+                    >Not sure</button>
                   </div>
                   <p className="text-white/55 text-sm mb-4 leading-relaxed">
                     {typeof state.usualMiles === 'number' && state.usualMiles > 0
                       ? `This block holds about ${maintenanceDoseFor(state.usualMiles)} ${unit} — two-thirds of normal keeps the aerobic base while strength leads.`
-                      : 'Your usual week, before this block. The holding dose comes off it.'}
+                      : `Your usual week, before this block — the holding dose comes off it. Not sure is fine: it starts light and grows as the app learns your weeks.`}
                   </p>
                   <p className="text-white/70 text-sm mb-2">Weekly running to hold <span className="text-white/45">(maintenance)</span></p>
                   <div className="flex items-center gap-2">

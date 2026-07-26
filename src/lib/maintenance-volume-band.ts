@@ -36,6 +36,27 @@ export const FALLBACK_EASY_MIN_PER_MILE = 10;
 export type VolumeState = 'above' | 'below' | 'in_band';
 
 /**
+ * ⛔ PRECISE IF YOU KNOW, VIBE IF YOU DON'T.
+ *
+ * Michael, 2026-07-25: *"'I don't know' — they just know they want to ride or run X days. We
+ * encourage them to start light, and we monitor and allow them to grow."*
+ *
+ * Forcing an athlete to compute a historical baseline before a screen unlocks is a data-entry exam,
+ * not an intake. Someone who can name their usual week gets the personal band; someone who cannot
+ * picks their days, starts at the conservative floor, and the app learns them from what they
+ * actually log. Both are honest — one is just more specific.
+ *
+ * The starting dose is the band's own FLOOR, not a new number: ~2 sessions a week is the maintenance
+ * dose the aerobic base holds on [Hickson 1981, Spiering 2021]. Starting there means the worst case
+ * is that an experienced athlete is under-asked for a few weeks and raises it — never that a
+ * beginner is handed a volume they cannot carry alongside four lifting days.
+ */
+export function startLightMiles(easyPaceMinPerMile = FALLBACK_EASY_MIN_PER_MILE): number {
+  const pace = Number(easyPaceMinPerMile) > 0 ? Number(easyPaceMinPerMile) : FALLBACK_EASY_MIN_PER_MILE;
+  return Math.max(1, Math.round(MAINTENANCE_FLOOR_MIN / pace));
+}
+
+/**
  * ⛔ THE BAND IS THE ATHLETE'S OWN VOLUME, WHEN THEY GIVE IT.
  *
  * The absolute band below (60-180 min/wk) is the SAME for every athlete, and that is its flaw: 12
