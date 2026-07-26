@@ -329,15 +329,15 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 they are buying before answering a single question about it. Same sentences the plan
                 itself carries (`strength-focus-copy.ts`), so what was promised and what was built
                 cannot drift. */}
-            <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-2.5">
+            <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4 space-y-3.5">
               {strengthFocusSections({}).map((sec) => (
                 <div key={sec.heading}>
-                  <p className="text-white/70 text-xs font-medium">{sec.heading}</p>
-                  <p className="text-white/45 text-xs leading-relaxed">{sec.body}</p>
+                  <p className="text-white/85 text-sm font-medium mb-0.5">{sec.heading}</p>
+                  <p className="text-white/65 text-sm leading-relaxed">{sec.body}</p>
                 </div>
               ))}
             </div>
-            <p className="text-white/55 text-sm pt-1">Which endurance are you keeping?</p>
+            <p className="text-white/70 text-sm pt-1">Which endurance are you keeping?</p>
             {(['run', 'bike', 'swim'] as const).map((d) => {
               const color = getDisciplineColor(d);
               const Icon = DISCIPLINE_ICONS[d];
