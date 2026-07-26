@@ -332,6 +332,16 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                       12 weeks of Wendler's 5/3/1, four lifting days. For someone who already lifts and
                       is months from a race. Needs a barbell, a rack and a bench — and your squat,
                       bench, deadlift and overhead press maxes on file.
+                      {' '}
+                      {/* ⛔ THE PRECONDITION, SAID AT THE DOOR. The block holds an aerobic base at
+                          two-thirds of normal — so it assumes there IS a normal, and that the athlete
+                          knows what it is. The intake asks for it outright ("what do you normally
+                          run?") and the whole volume verdict is computed off that answer. Someone
+                          who cannot name their usual week is being asked a question they cannot
+                          answer, and finding that out on step three is worse than knowing at the
+                          door. Michael, 2026-07-25. */}
+                      It also assumes you know your current weekly volume in whichever discipline
+                      you're holding — the block maintains that base rather than building it.
                     </span>
                   </>
                 )}
