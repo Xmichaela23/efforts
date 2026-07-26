@@ -224,6 +224,10 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   const steps = getSteps(state);
   const currentStep = steps[stepIdx] ?? 'confirm';
   const next = () => setStepIdx((i) => Math.min(i + 1, steps.length - 1));
+  // ⚠️ Step numbers were HARDCODED (step={5} on the schedule screen) while `steps` is now shorter on
+  // the Strength Focus path — so the bar read "5 of 4". Derive the position from the flow that is
+  // actually running; a screen cannot know its own number in a flow that varies.
+  const stepNo = (k: StepKey) => steps.indexOf(k) + 1;
   // Embedded in GoalsScreen → step-0 back closes the builder view (onClose); standalone route falls
   // back to history navigation.
   const back = () => {
@@ -291,7 +295,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     <div className="h-full bg-zinc-950 text-white flex flex-col">
       {currentStep === 'goal' && (
         <StepLayout
-          step={1} totalSteps={steps.length} title="What's the goal?"
+          step={stepNo('goal')} totalSteps={steps.length} title="What's the goal?"
           subtitle="Every plan carries strength. This one puts it in front."
           onBack={back} onContinue={next} canContinue={goalCanContinue}
           hideContinue
@@ -359,7 +363,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           develop them."* Every other goal keeps the full screen underneath. */}
       {currentStep === 'posture' && isStrengthFocus && (
         <StepLayout
-          step={2} totalSteps={steps.length} title={`Strength Focus · ${STRENGTH_FOCUS_WEEKS} weeks`}
+          step={stepNo('posture')} totalSteps={steps.length} title={`Strength Focus · ${STRENGTH_FOCUS_WEEKS} weeks`}
           subtitle="What you're buying, before you commit to it."
           onBack={back} onContinue={next} canContinue={postureCanContinue}
         >
@@ -409,7 +413,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
       {currentStep === 'posture' && !isStrengthFocus && (
         <StepLayout
-          step={2} totalSteps={steps.length} title="Per-discipline focus"
+          step={stepNo('posture')} totalSteps={steps.length} title="Per-discipline focus"
           subtitle="Seeded from your goal — adjust as you like. At most 2 disciplines develop at once."
           onBack={back} onContinue={next} canContinue={postureCanContinue}
         >
@@ -469,7 +473,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
       {currentStep === 'commitment' && (
         <StepLayout
-          step={3} totalSteps={steps.length} title="What can you sustain?"
+          step={stepNo('commitment')} totalSteps={steps.length} title="What can you sustain?"
           subtitle="Not how many hours — what fits your life right now. We set the volume to match."
           onBack={back} onContinue={next} canContinue={true}
         >
@@ -494,7 +498,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
         const floor = floorForGoal(state.goal); // §13.2 — the minimum where the adaptation shows in a retest
         return (
           <StepLayout
-            step={4} totalSteps={steps.length} title="How long is this block?"
+            step={stepNo('length')} totalSteps={steps.length} title="How long is this block?"
             subtitle={`At least ${floor} weeks for ${state.goal ? GOAL_LABELS[state.goal] : 'this goal'} — that's where the change shows in a retest.`}
             onBack={back} onContinue={next} canContinue={state.targetWeeks >= floor && state.targetWeeks <= 52}
           >
@@ -513,13 +517,16 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
       {currentStep === 'schedule' && (
         <StepLayout
-          step={5} totalSteps={steps.length} title="When can you train?"
+          step={stepNo('schedule')} totalSteps={steps.length} title="When can you train?"
           subtitle="Days per week, your long days, and any fixed club session to keep."
           onBack={back} onContinue={next} canContinue={state.daysPerWeek >= 4 && state.daysPerWeek <= 7}
         >
           <div className="space-y-5">
-            <div>
-              <p className="text-white/55 text-sm mb-2">Days per week</p>
+            {/* ⛔ NOT ON THE STRENGTH PATH. Lifting is four days fixed by the protocol, and the
+                endurance days are typed below (run days, swims). A total that contradicts both is a
+                number the engine cannot honour. Michael, 2026-07-25: *"how many days is redundant."* */}
+            <div className={isStrengthFocus ? 'hidden' : undefined}>
+              <p className="text-white/70 text-sm mb-2">Days per week</p>
               <div className="grid grid-cols-4 gap-1.5">
                 {[4, 5, 6, 7].map((n) => (
                   <button
@@ -537,7 +544,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 no sets. It exists for the triathlete who wants the slots on the calendar. */}
             {state.posture?.strength === 'develop' && state.posture?.swim === 'maintain' && (
               <div>
-                <p className="text-white/55 text-sm mb-2">Swims per week</p>
+                <p className="text-white/70 text-sm mb-2">Swims per week</p>
                 <div className="flex gap-1.5 max-w-[240px]">
                   {[1, 2, 3].map((n) => (
                     <button
@@ -546,7 +553,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     >{n}</button>
                   ))}
                 </div>
-                <p className="text-white/35 text-xs mt-1.5">
+                <p className="text-white/55 text-sm mt-1.5 leading-relaxed">
                   About an hour each, on days nothing else is booked. Held on the calendar, not coached —
                   no set, no target.
                 </p>
@@ -554,8 +561,8 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             )}
             {state.posture?.strength === 'develop' && (
               <div>
-                <p className="text-white/55 text-sm mb-1">Accessory work</p>
-                <p className="text-white/35 text-xs mb-3">
+                <p className="text-white/70 text-sm mb-1">Accessory work</p>
+                <p className="text-white/55 text-sm mb-3 leading-relaxed">
                   Every session ends with three short slots. The lifting itself is set — these are yours to pick.
                 </p>
                 <div className="space-y-3">
@@ -566,7 +573,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                       <div key={menu.slot}>
                         <div className="flex items-baseline justify-between gap-2 mb-1">
                           <span className="text-white/70 text-sm">{menu.label}</span>
-                          <span className="text-white/35 text-xs tabular-nums">{menu.totalReps} reps</span>
+                          <span className="text-white/55 text-sm tabular-nums">{menu.totalReps} reps</span>
                         </div>
                         <select
                           value={picked}
@@ -583,21 +590,29 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                           ))}
                         </select>
                         {/* The whole point of the dropdown: the athlete sees what the choice trains. */}
-                        {targets && <p className="text-white/35 text-xs mt-1">{targets}</p>}
+                        {targets && <p className="text-white/55 text-sm mt-1">{targets}</p>}
                       </div>
                     );
                   })}
                 </div>
-                <p className="text-white/35 text-xs mt-3 leading-relaxed">{ASSISTANCE_GUIDANCE}</p>
+                <p className="text-white/55 text-sm mt-3 leading-relaxed">{ASSISTANCE_GUIDANCE}</p>
               </div>
             )}
             {posturePresent('run') && (
               <div>
-                <p className="text-white/55 text-sm mb-2">Long run day</p>
-                <DayPicker value={state.longRunDay} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))}
-                  allowed={state.posture?.strength === 'develop' ? (['saturday', 'sunday'] as DayName[]) : undefined} />
+                <p className="text-white/70 text-sm mb-2">Long run day</p>
+                {/* ⛔ ALL SEVEN DAYS. This was restricted to Sat/Sun with the note "your heavy lower
+                    days (Tue/Fri) need clear space" — a rule from the hardcoded grid the 5/3/1
+                    rebuild replaced. The long run is now an ABSOLUTE the lifting is solved around
+                    (`place-week.ts`), not a session squeezed into what the grid left over. Telling
+                    the athlete their long run must be a weekend, because of lifting days the engine
+                    no longer fixes, is the tail wagging the dog. Michael, 2026-07-25. */}
+                <DayPicker value={state.longRunDay} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))} />
                 {state.posture?.strength === 'develop' && (
-                  <p className="text-white/35 text-xs mt-1.5">Sat or Sun — your heavy lower days (Tue/Fri) need clear space around them.</p>
+                  <p className="text-white/55 text-sm mt-1.5 leading-relaxed">
+                    Whichever day you actually run long. The lifting is placed around it — heavy legs
+                    stay clear of it by two days.
+                  </p>
                 )}
               </div>
             )}
@@ -625,7 +640,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   </p>
                 </div>
                 <div>
-                  <p className="text-white/55 text-sm mb-2">How many days to run</p>
+                  <p className="text-white/70 text-sm mb-2">How many days to run</p>
                   <div className="grid grid-cols-3 gap-1.5 max-w-[220px]">
                     {[2, 3, 4].map((n) => (
                       <button
@@ -634,13 +649,13 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                       >{n}</button>
                     ))}
                   </div>
-                  <p className="text-white/35 text-xs mt-1.5">We spread your miles across these — a longer run plus easy fill, not the same run twice.</p>
+                  <p className="text-white/55 text-sm mt-1.5 leading-relaxed">We spread your miles across these — a longer run plus easy fill, not the same run twice.</p>
                 </div>
               </div>
             )}
             {posturePresent('bike') && (
               <div>
-                <p className="text-white/55 text-sm mb-2">Long ride day</p>
+                <p className="text-white/70 text-sm mb-2">Long ride day</p>
                 <DayPicker value={state.longRideDay} onChange={(d) => setState((s) => ({ ...s, longRideDay: d }))} />
               </div>
             )}
@@ -680,7 +695,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
       {currentStep === 'confirm' && (
         <StepLayout
-          step={6} totalSteps={steps.length} title="Build this plan?"
+          step={stepNo('confirm')} totalSteps={steps.length} title="Build this plan?"
           subtitle={`${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — an ${state.targetWeeks}-week block.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
