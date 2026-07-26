@@ -56,22 +56,24 @@ export function strengthFocusSections(opts: {
     },
     {
       heading: 'The architecture',
+      // ⛔ NO DAY NAMES. This used to read "bench Monday, squat Tuesday, overhead press Thursday,
+      // deadlift Friday" — the hardcoded grid the rebuild replaced. The four lifting days are now
+      // placed around the athlete's endurance absolutes (`place-week.ts`), so the days differ per
+      // athlete and naming them here would promise a week the engine may not build.
       body:
-        `This block uses sub-maximal loading (Wendler's 5/3/1) to manage fatigue, making it the most ` +
-        `sustainable approach to build structural strength while maintaining an aerobic base. Four ` +
-        `lifting days: bench Monday, squat Tuesday, overhead press Thursday, deadlift Friday. ` +
-        `${leaders} building cycle${leaders === 1 ? '' : 's'}, then one measuring cycle from week ` +
-        `${anchorStart}, each ending in a deload week.`,
+        `Sub-maximal loading (Wendler's 5/3/1) keeps fatigue manageable. Four lifting days, placed ` +
+        `around your endurance. ${leaders} building cycle${leaders === 1 ? '' : 's'}, then one ` +
+        `measuring cycle from week ${anchorStart}. Each ends in a deload.`,
     },
     {
       heading: 'The reality check',
       body:
-        `Training provides the stimulus, but adaptation happens during recovery. Prioritize how you ` +
-        `feel; the math only works if you honor your rest.`,
+        `Training provides the stimulus. Adaptation happens during recovery. Prioritize how you feel — ` +
+        `the math only works if you honor your rest.`,
     },
     {
       heading: "What's next",
-      body: `The app will unlock speed and distance blocks once this cycle closes.`,
+      body: `Speed and distance blocks unlock when this cycle closes.`,
     },
   ];
 }
