@@ -101,9 +101,13 @@ Deno.test('two stacks are assigned when two are required', () => {
 
 // ── The clearances, and that they come from the shared law ──────────────────
 
-Deno.test('clearances match SCHEDULING-RULES: 48h long, 24h quality, 0h easy and upper', () => {
+Deno.test('clearances match SCHEDULING-RULES: 48h long run, 24h quality, 0h long ride, easy and upper', () => {
   assertEquals(requiredClearanceHours('long_run'), 48);
-  assertEquals(requiredClearanceHours('long_ride'), 48);
+  // 2026-07-27: long_ride dropped from 48h to 0h. The matrix has said `lower_body_strength ×
+  // long_ride = ✓` since 2026-05-12 (STRENGTH-PROTOCOL §6.1.2 — bike first, 6h gap, no shared
+  // eccentric load), and a 48h clearance on a session the law lets you do SAME DAY was a
+  // contradiction, not a stricter rule. Long run keeps 48h; that one is eccentric.
+  assertEquals(requiredClearanceHours('long_ride'), 0);
   assertEquals(requiredClearanceHours('quality_run'), 24);
   assertEquals(requiredClearanceHours('quality_bike'), 24);
   assertEquals(requiredClearanceHours('easy_run'), 0);
@@ -121,9 +125,22 @@ Deno.test('heavy legs are held clear of the long days, and apart from each other
 });
 
 Deno.test('a forced clearance breach is NAMED, with both numbers', () => {
-  // Tuesday + weekend pins leave nowhere clean for a second lower day. The engine places it and says
-  // what it cost — silently producing a worse week is how a scheduler loses trust.
-  const week = placeLiftingWeek(LIFTS, [...LONG_DAYS, pin('Tuesday', 'quality_run', 'club run', false)]);
+  // Four pins leave Monday, Friday and Saturday open, and only Friday clears the Sunday long run by
+  // 48h. The second heavy day has to breach. The engine places it and says what it cost — silently
+  // producing a worse week is how a scheduler loses trust.
+  //
+  // This used to be a Saturday-long-ride week. It stopped forcing anything on 2026-07-27 when
+  // long_ride's clearance went to 0h, which is the correct answer — a long ride no longer costs the
+  // lifting week a day. The breach mechanism still needs a case, so the long RUN provides it.
+  const week = placeLiftingWeek(
+    [{ lift: 'Back Squat', isLower: true }, { lift: 'Deadlift', isLower: true }],
+    [
+      pin('Sunday', 'long_run', 'long run', false),
+      pin('Tuesday', 'quality_run', 'club run', false),
+      pin('Wednesday', 'quality_bike', 'club ride', false),
+      pin('Thursday', 'easy_run', 'shakeout', false),
+    ],
+  );
   const breach = week.compromises.find((c) => c.includes('heavy lower-body work'));
   assert(breach, 'a forced breach was swallowed');
   assert(/\d+h from/.test(breach!) && /clearance for that is \d+h/.test(breach!),
