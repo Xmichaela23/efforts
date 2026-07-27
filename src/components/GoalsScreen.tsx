@@ -637,7 +637,15 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           .eq('user_id', userId)
           .order('week_start', { ascending: false })
           .limit(4),
-        supabase.from('athlete_memory').select('derived_rules,provenance').eq('user_id', userId).maybeSingle(),
+        // ⛔ `provenance` REMOVED — the column does not exist, and asking for it 400'd the whole query.
+        // It appeared exactly once in the codebase: here. Nothing writes it (`recompute-athlete-memory`
+        // selects id, derived_rules, rule_confidence, data_sufficiency, peak_vo2_recorded,
+        // max_weekly_volume_minutes, injury_flags, efficiency_delta, confidence_score — no provenance),
+        // no migration defines it, and nothing read it back off this result.
+        // ⚠️ The cost was not the 400 itself: PostgREST fails the WHOLE select, so `derived_rules`
+        // never arrived either — and that IS used, for the run efficiency and strength rules above.
+        // A silent, permanent null dressed up as "no data yet".
+        supabase.from('athlete_memory').select('derived_rules').eq('user_id', userId).maybeSingle(),
       ]);
       setCurrentBaselines(bl);
       setCurrentSnapshot(snaps?.[0] ?? null);

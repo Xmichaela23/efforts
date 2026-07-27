@@ -23,7 +23,13 @@ const ENDURANCE: Discipline[] = ['swim', 'bike', 'run'];
 export const GOAL_LABELS: Record<NonRaceGoalId, string> = {
   build_endurance: 'Build endurance',
   build_speed: 'Build speed',
-  get_stronger: 'Get stronger',
+  // ⛔ THE ATHLETE-FACING NAME IS "STRENGTH FOCUS". The id stays `get_stronger` — routing, specs and
+  // every doc key off it — but the label the athlete reads is this one, in ONE place.
+  // It said 'Get stronger', and `NonRaceBuilder` special-cased the goal CARD to display
+  // "Strength Focus" while this value still flowed into the goal name, the block summary and the
+  // duration copy. So the athlete picked "Strength Focus" and was handed a plan called
+  // "Get stronger". Fixed here rather than by adding a second special case.
+  get_stronger: 'Strength Focus',
   build_muscle: 'Build muscle + train',
   maintain: 'Maintain',
   starting_over: 'Starting over',

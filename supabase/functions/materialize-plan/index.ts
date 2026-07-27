@@ -1576,6 +1576,11 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
       const gradeHi = parseInt(m[5], 10);
       const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
       const gradeLabel = `${gradeLo}-${gradeHi}% grade`;
+      // ⛔ WARM-UP AND COOL-DOWN. Without these the session was 21 minutes that opened with a maximal
+      // uphill rep from cold — the athlete walks out the door and straight into it. Helgerud's own
+      // protocol brackets the work with ~10 min either side, and it is the difference between a 21-min
+      // session and the ~35-40 min this doctrine specifies (run-only companion §5).
+      out.push({ id: uid(), kind: 'warmup', duration_s: 600, pace_sec_per_mi: easyPace, label: 'Warm-up' });
       for (let i = 0; i < reps; i++) {
         out.push({
           id: uid(),
@@ -1595,6 +1600,7 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
           });
         }
       }
+      out.push({ id: uid(), kind: 'cooldown', duration_s: 480, pace_sec_per_mi: easyPace, label: 'Cool-down' });
       return out;
     }
   }

@@ -910,6 +910,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } catch { return false; }
   };
 
+  /**
+   * Bodyweight movements that are normally BAND-ASSISTED rather than loaded — the assistance is the
+   * dial, and walking it down is the progression (Wendler: use band or machine assistance, reduce
+   * tension until you can do clean reps at bodyweight).
+   *
+   * ⚠️ Deliberately narrower than `isBodyweightMove`. A push-up or a plank has no standard assisted
+   * form, so it stays blank; these three do, and a blank row loses the only thing that moves.
+   */
+  const isAssistCapableMove = (raw?: string): boolean => {
+    try {
+      const n = String(raw || '').toLowerCase().replace(/[\s-]/g, '');
+      return /dip|chinup|pullup/.test(n);
+    } catch { return false; }
+  };
+
   // Helper: detect duration-based exercises by name (planks, holds, carries)
   // Q-180: a LOADED duration exercise — duration-based, but the LOAD IS THE EXERCISE.
   //
@@ -3988,14 +4003,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return (
       <div 
         className="min-h-screen"
+        // ⛔ ONE `backgroundImage`, NO `background` SHORTHAND. Both were set here, and React warns on
+        // EVERY rerender when a shorthand and its longhand conflict — 18,000+ console errors in a single
+        // session, which buries every real error underneath them.
+        // The shorthand was also being overwritten by the longhand on the very next line, so the base
+        // gradient never rendered anyway; it is now the last layer in the stack, where it belongs
+        // (CSS paints background-image layers front to back).
         style={{
-          background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
           backgroundImage: `
             radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
             radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
             radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
             linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
-            linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%)
+            linear-gradient(225deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+            linear-gradient(to bottom, #27272a, #18181b, #000000)
           `,
           backgroundAttachment: 'fixed'
         }}
@@ -4877,7 +4898,79 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           return null;
                         }
 
-                        // Bodyweight exercises don't need weight input (e.g., Nordic Curls, pull-ups, push-ups)
+                        // ⛔ ASSIST-CAPABLE BODYWEIGHT: the band IS the load, so the row cannot be blank.
+                        //
+                        // Dips, chin-ups and pull-ups are bodyweight movements most people cannot do
+                        // unassisted for the prescribed total — Michael, reading his own plan: "25 chin
+                        // ups? lol i can do 5." Wendler's own answer is explicit: if you can't get the
+                        // reps, use band or machine assistance and work the tension DOWN over the block.
+                        // So assistance is the progression, and a row with nowhere to record it throws
+                        // away the only thing that changes.
+                        //
+                        // ⚠️ THREE LEVELS, PHRASED AS HELP — not four, and not band nomenclature. Band
+                        // colours are not standardised across manufacturers, and "heavy band" means MORE
+                        // help, i.e. an EASIER set: the inversion is the trap. Labelling the help removes
+                        // it. The fourth state is "none", which is the graduation and the point.
+                        // (Same granularity as the difficulty tap — nobody separates heavy from very
+                        // heavy consistently, exactly as nobody separates an RPE 8 from an 8.5.)
+                        //
+                        // Stored on the existing `resistance_level` field rather than a new one: a band
+                        // on a pull-up is only ever assistance, so the exercise already disambiguates it,
+                        // and the field is already persisted end to end.
+                        if (isAssistCapableMove(exercise.name)) {
+                          const assist = set.resistance_level || 'None';
+                          const added = typeof set.weight === 'number' && set.weight > 0 ? set.weight : null;
+                          return (
+                            // ⛔ BOTH DIRECTIONS ON ONE DIAL, and they are mutually exclusive by construction.
+                            // A dip can be band-assisted OR loaded; nobody does both in the same set. So
+                            // choosing help clears the added weight and entering weight clears the help —
+                            // otherwise the row can record a state that did not happen.
+                            // ⛔ BOTH SLOTS VISIBLE. The first build hid the weight behind an "add weight"
+                            // link and swapped the control — Michael: "we should have a weight slot for
+                            // dips and chin ups." A slot you have to discover is a slot that does not
+                            // exist. Band and weight both sit on the row; the athlete uses whichever
+                            // applies and leaves the other alone.
+                            <>
+                              <div className="flex-[4] flex flex-col items-center gap-0.5">
+                                <Select
+                                  value={assist}
+                                  // Mutually exclusive by construction: nobody assists AND loads the same
+                                  // set, so picking help clears the added weight and vice versa. Otherwise
+                                  // the row can record a set that did not happen.
+                                  onValueChange={(value) => updateSet(exercise.id, setIndex, { resistance_level: value, weight: 0 })}
+                                >
+                                  <SelectTrigger className="h-9 w-full text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 focus:ring-0 focus:border-white/30 focus:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+                                    <SelectValue placeholder="Assist" />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
+                                    <SelectItem value="None" className="hover:bg-white/[0.15]">No band</SelectItem>
+                                    <SelectItem value="Light" className="hover:bg-white/[0.15]">Light help</SelectItem>
+                                    <SelectItem value="Moderate" className="hover:bg-white/[0.15]">Moderate help</SelectItem>
+                                    <SelectItem value="Heavy" className="hover:bg-white/[0.15]">Heavy help</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <span className="text-[9px] text-white/50 font-medium">Band</span>
+                              </div>
+                              <div className="flex-[4] flex flex-col items-center gap-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => openKeypadForSet({
+                                    exerciseId: exercise.id, setIndex, field: 'weight', title: 'Added weight',
+                                    initialValue: added == null ? '' : String(added), allowDecimal: true,
+                                  })}
+                                  className="relative h-9 w-full text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
+                                  style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
+                                >
+                                  <span>{added == null ? '' : `+${added}`}</span>
+                                  <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
+                                </button>
+                                <span className="text-[9px] text-white/50 font-medium">Added</span>
+                              </div>
+                            </>
+                          );
+                        }
+
+                        // Bodyweight exercises don't need weight input (e.g., Nordic Curls, push-ups)
                         if (isBodyweightMove(exercise.name)) {
                           return null;
                         }

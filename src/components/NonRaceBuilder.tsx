@@ -474,7 +474,10 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 // can be asked; none of them are offered today, but auto-advancing them would skip it.
                 onClick={() => { reseed(g, undefined); if (!GOALS_NEEDING_DISCIPLINE.includes(g)) next(); }}
               >
-                <span className="block">{g === 'get_stronger' ? 'Strength Focus' : GOAL_LABELS[g]}</span>
+                {/* The special case that used to force "Strength Focus" here is gone — GOAL_LABELS
+                    now carries it, so the card, the goal name, the block summary and the duration
+                    copy all read from one place instead of the card disagreeing with the plan. */}
+                <span className="block">{GOAL_LABELS[g]}</span>
                 {g === 'get_stronger' && (
                   <>
                     {/* The card states what it NEEDS and who it is FOR. The app cannot tell a

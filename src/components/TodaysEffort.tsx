@@ -764,7 +764,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       return 1;
     };
     const sortByTiming = (arr: any[]): any[] => [...arr].sort((a, b) => rank(a) - rank(b));
-    setDisplayWorkouts([...sortByTiming(activated), ...sortByTiming(optionals)]);
+    const next = [...sortByTiming(activated), ...sortByTiming(optionals)];
+    // ⛔ ONLY WRITE WHEN THE ORDER ACTUALLY CHANGED. This used to call setDisplayWorkouts
+    // unconditionally with a fresh array, so EVERY run of this effect set state → rerender → and if
+    // any dep re-reffed (they are memos over objects), the effect ran again. Forever.
+    //
+    // "Maximum update depth exceeded" was firing in the thousands per page load — 18,000+ in one
+    // session — which is also what buried every other console error underneath it.
+    //
+    // ⚠️ Identity comparison, not deep equality: the elements are the same workout objects either
+    // way, so the only thing this effect can legitimately change is their ORDER. If the same objects
+    // come back in the same order there is nothing to write.
+    // (The comment above records this exact disease being fixed once already, at 813 pending fetches.
+    // Guarding the write is the fix that does not depend on every upstream memo staying stable.)
+    setDisplayWorkouts((prev: any[]) => {
+      if (Array.isArray(prev) && prev.length === next.length && prev.every((w, i) => w === next[i])) {
+        return prev;
+      }
+      return next;
+    });
   }, [dateWorkoutsMemo, activeDate, orderingPref]);
   // Helper to clean authored codes from text (mirrors PlannedWorkoutView)
   const stripCodes = (text?: string) => String(text || '')
