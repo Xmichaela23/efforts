@@ -623,9 +623,27 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // REFERENCE, not a cap: the D-222 ceiling was retired on purpose and must not return.
   const FALLBACK_EASY_MIN_PER_MILE = FALLBACK_EASY_MIN_PER_MILE_SHARED;
 
-  const runFreq = enduranceSport === 'run'
+  // ⛔ THE HARD DAY IS ONE OF THE RUN DAYS, NOT AN EXTRA ONE.
+  //
+  // `runFreq` counted only the EASY runs and the hill session was pushed on top, so an athlete who
+  // asked for three run days got four: three easy runs plus hills. It also over-spent the mileage —
+  // the typed weekly miles were distributed across all three easy runs and then a fourth running
+  // session was added outside the budget entirely.
+  //
+  // Michael, counting his own week: *"one of the runs is the hill session."* It is. A hard run is a
+  // run. The block carries ONE hard aerobic session (D-327), so when it is a run it consumes one of
+  // the days the athlete asked for rather than arriving beside them.
+  //
+  // ⚠️ Floor of 1 easy run: even at runFreq 2 with a hard day, the long run survives. The doctrine's
+  // precondition is easy volume (parent §4) — a week of nothing but the hard session is the one
+  // shape it explicitly rules out.
+  const askedRunDays = enduranceSport === 'run'
     ? Math.max(ENDURANCE_DAYS.length, Math.min(4, Math.round(Number(args.enduranceFrequency) || ENDURANCE_DAYS.length)))
     : ENDURANCE_DAYS.length;
+  const hardDayIsRun = !!args.hardDay && args.hardDay.discipline === 'run';
+  const runFreq = hardDayIsRun && enduranceSport === 'run'
+    ? Math.max(1, askedRunDays - 1)
+    : askedRunDays;
   const upperLiftDays = MAIN_LIFTS.filter((l) => !l.isLower).map(liftDay);
   // ⛔ THE Sat/Sun COERCION IS GONE (2026-07-26). It read:
   //     pickedLong = longRunDay === 'sunday' ? 'Sunday' : 'Saturday'
