@@ -10,9 +10,11 @@ import {
   blockWeeks,
   buildBlockPhases,
   composeStrengthPrimaryPlan,
+  descentIsJogged,
   isBodyweightName,
   JUMPS,
 } from './strength-primary-plan.ts';
+import { placeLiftingWeek } from './place-week.ts';
 import { ASSISTANCE_MENU } from '../../../../src/lib/assistance-menu.ts';
 import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 
@@ -260,8 +262,15 @@ Deno.test('8 weeks is one leader and one anchor', () => {
 Deno.test('endurance is easy-only, and the long run takes the biggest share', () => {
   const runs = sessionsFor(1).filter((s) => s.type === 'run');
   assertEquals(runs.length, 3); // Wed + Sat, plus one stacked onto an upper-body lift day
+  // ⚠️ ASSERTS THE SHARE, NOT THE WEEKDAY. This used to pin `longest.day === 'Saturday'`, and no
+  // fixture ever asked for Saturday — it is the composer's DERIVED default. A test that pins a
+  // derived day is defending current behaviour, and it goes red the moment placement legitimately
+  // improves. The contract is that one run is the long one.
   const longest = runs.reduce((m, r) => (r.duration > m.duration ? r : m));
-  assertEquals(longest.day, 'Saturday');
+  const others = runs.filter((r) => r !== longest);
+  for (const r of others) {
+    assert(longest.duration > r.duration, `the long run is not the longest: ${longest.day} vs ${r.day}`);
+  }
   for (const r of runs) assertEquals(r.tags.includes('easy'), true);
 });
 
@@ -278,9 +287,16 @@ Deno.test('a stacked lift + run day puts the lift first', () => {
   }
 });
 
-Deno.test('Sunday is the one full rest day', () => {
+Deno.test('there is exactly ONE full rest day, every week of the block', () => {
+  // ⚠️ WAS 'Sunday is the one full rest day'. Sunday is a derived convention, not a contract — the
+  // composer reserves it when free and takes the last free day otherwise, and the placement audit
+  // flagged that convention as unexplained. Pinning the weekday made the test agree with the code
+  // instead of with the rule. MAX_ACTIVE_DAYS = 6 is the rule.
+  const ALL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   for (let week = 1; week <= 12; week++) {
-    assertEquals(sessionsFor(week).some((s) => s.day === 'Sunday'), false, `week ${week} put work on Sunday`);
+    const worked = new Set(sessionsFor(week).map((s) => s.day));
+    const rest = ALL.filter((d) => !worked.has(d));
+    assertEquals(rest.length, 1, `week ${week} has ${rest.length} rest days (${rest.join(', ') || 'none'})`);
   }
 });
 
@@ -305,4 +321,56 @@ Deno.test('the description states the 85% buffer ONCE and never apologises for w
   for (const banned of ["don't worry", 'ease you in', 'easing you in', 'gets harder', 'trust the']) {
     assertEquals(d.toLowerCase().includes(banned), false, `description carries "${banned}"`);
   }
+});
+
+// ── The hill descent: derived from placement, and an INVARIANT at four lifts ────────────────────
+
+Deno.test('the descent asks the 48h eccentric cell, not quality_run 24h', () => {
+  // Jogging the descent converts the hill session into eccentric work, so it does not get to claim
+  // the cheaper clearance for a load it is CHOOSING to add. At 24h these would all jog, including a
+  // hill day sitting adjacent to heavy legs at the exact floor with no buffer.
+  assertEquals(descentIsJogged('Wednesday', ['Tuesday']), false, 'adjacent to heavy legs must walk');
+  assertEquals(descentIsJogged('Thursday', ['Tuesday']), true, '48h clear may jog');
+  // The week wraps: Saturday to Monday is 48h, so it clears. Sunday to Monday would not.
+  assertEquals(descentIsJogged('Monday', ['Saturday']), true, 'the week must wrap');
+  assertEquals(descentIsJogged('Monday', ['Sunday']), false, 'Sunday to Monday is 24h');
+});
+
+Deno.test('⛔ at four lifts the descent is ALWAYS walked — an invariant, not an evaluation', () => {
+  // ⚠️ THIS ENUMERATES THROUGH THE PLACER, NOT THROUGH HAND-PICKED HEAVY PAIRS. The first version of
+  // this test listed heavy-day pairs by hand and failed on `Monday+Wednesday`, which `place-week`
+  // never produces for a Friday hill day. A test that asserts against combinations the engine cannot
+  // reach is testing an assumption, not the engine.
+  //
+  // Two heavy days sit >=48h apart, which leaves exactly one day clearing BOTH by 48h, and a long-day
+  // anchor always occupies it. If this ever fails, the copy that states "walk the descents" as a fact
+  // has become a claim the engine no longer guarantees — fix the copy, not the test.
+  const LIFTS4 = [
+    { lift: 'Bench Press', isLower: false }, { lift: 'Back Squat', isLower: true },
+    { lift: 'Overhead Press', isLower: false }, { lift: 'Deadlift', isLower: true },
+  ];
+  let checked = 0;
+  for (const longRide of ['Saturday', 'Sunday'] as const) {
+    const longRun = longRide === 'Saturday' ? 'Sunday' : 'Saturday';
+    for (const hill of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const) {
+      const week = placeLiftingWeek(LIFTS4, [
+        { day: longRide, kind: 'long_ride', label: 'long ride' },
+        { day: longRun, kind: 'long_run', label: 'long run' },
+        { day: hill, kind: 'quality_run', label: 'hard run' },
+      ] as any);
+      const heavy = week.slots.filter((s) => s.isLower).map((s) => s.day as string);
+      assertEquals(
+        descentIsJogged(hill, heavy), false,
+        `ride ${longRide} / run ${longRun} / hill ${hill} placed heavy on ${heavy.join('+')} and jogged`,
+      );
+      checked++;
+    }
+  }
+  assertEquals(checked, 10, 'the enumeration itself must not silently shrink');
+});
+
+Deno.test('at a maintenance dose the branch is live — one heavy day can clear', () => {
+  assertEquals(descentIsJogged('Thursday', ['Tuesday']), true);
+  assertEquals(descentIsJogged('Friday', ['Tuesday']), true);
+  assertEquals(descentIsJogged('Wednesday', ['Tuesday']), false);
 });

@@ -496,8 +496,19 @@ function bikeQualitySession(day: string): PlanSession {
  * ⚠️ NOT KEYED ON HOW MUCH THE ATHLETE LIFTS. A light squat day and a heavy one both occupy the
  * window; the rule is about proximity, not about anyone's numbers. Both clearances are read from
  * `requiredAdjacencyHours`, so if the law moves this moves with it.
+ *
+ * ⛔ AT FOUR LIFTS THE ANSWER IS ALWAYS WALK, AND THAT IS AN INVARIANT — NOT A COINCIDENCE.
+ * Verified by exhaustive enumeration 2026-07-27: every long-day arrangement × every legal hill day,
+ * ten of ten, returns false. Two heavy days must sit ≥48h apart, which leaves exactly one day in the
+ * week that clears BOTH by 48h, and the long-day anchors always occupy it. **So do not read a live
+ * evaluation into this for a Get Stronger block, and do not "fix" this function when you notice it
+ * never returns true there.**
+ *
+ * The branch is real and it is not dead: at a maintenance dose — one heavy day instead of two, which
+ * is how race plans reach this protocol — it jogs on five of the same ten weeks. Pinned by
+ * `strength-primary-plan.test.ts` so the invariant cannot drift silently in either direction.
  */
-function descentIsJogged(hillDay: string, lowerDays: string[]): boolean {
+export function descentIsJogged(hillDay: string, lowerDays: string[]): boolean {
   const required = requiredAdjacencyHours('long_run', 'lower_body_strength');
   const idx = (d: string) => PLACEMENT_DAYS.indexOf(d as DayName);
   return lowerDays.every((d) => {

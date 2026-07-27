@@ -36,6 +36,26 @@ that is all
 that, the model is being over-elaborated and the extra is almost certainly a preference wearing a
 constraint's clothes.
 
+### 0a.2 ⛔ A SESSION IS PRICED ON THE LOAD IT CHOOSES TO ADD, NOT ON ITS NAME
+
+**Added 2026-07-27, generalised from the hill descent.** When a session has a discretionary component
+— something the engine decides rather than something the session inherently is — **the clearance is
+the one that governs the load being added, not the one attached to the session's label.**
+
+**The worked case.** A hill session is quality running and takes `quality_run`'s 24h. Jogging the
+descents adds eccentric work, and eccentric work takes 48h. So a hill session *with jogged descents*
+is priced at 48h. Asking the 24h cell — because the session is called a hard run — returned "jog" for
+every week including one sitting at the exact floor with no buffer. **The session does not get to
+claim the cheaper clearance for a load it is choosing to add.**
+
+⚠️ **THIS IS NOT ABOUT DESCENTS.** It reaches every discretionary addition the expanders make:
+surges inside an easy run, strides on the end of one, an extended cool-down, a jogged versus walked
+recovery anywhere. Each adds load the session's name does not account for. Either price it, or do not
+add it — **the one thing that is not allowed is adding it under the label's cheaper number.**
+
+✅ Cheap test for whether a rule is in scope: *if the engine could equally have chosen not to add this,
+it is discretionary, and it must be priced on what it is rather than on what it is attached to.*
+
 ### 0a.1 ⛔ DAYS PER WEEK IS AN OUTPUT. It is never an input, and the solver never receives one.
 
 **Decided 2026-07-27.** `days_per_week` is not a sixth constraint. It is a **consequence** of the five
