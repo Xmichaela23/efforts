@@ -1174,3 +1174,55 @@ are wrong until summed the same way.**
 confirm the stock week sits *under* its ceiling with roughly the same headroom gradient `strength_led`
 now has — one quality addition tight, the wrong quality addition over by a little. **Adjust the ceiling,
 not the week** — Michael's rule from the first sum: *"the model is wrong, not the week."*
+
+---
+
+## Q-206 — `days_per_week` is asserted and never enforced, so 4-to-6-day plans silently lose their quality sessions (2026-07-27, VERIFIED, superseded by design — do NOT fix in place)
+
+**Status:** verified by trace + probe. **Deliberately NOT fixed.** Superseded by SPEC-week-solver §0a.1.
+
+**The symptom.** An athlete on a 4-day-per-week budget gets a plan with no quality bike, no quality
+run and no heavy leg day. What ships is the long ride, the long run, and easy work.
+
+**The chain, link by link.** Steps 1–4 were run; 5–7 are a code read.
+
+1. `create-goal-and-materialize-plan:1319` → `deriveRestDaysForBudget(dpw, …)` returns exactly
+   `7 − daysPerWeek` days.
+2. `reconcile-athlete-state-week-optimizer.ts:189` passes them to the optimizer as
+   `preferences.rest_days`.
+3. `week-optimizer` consults `restDaySet` in the **strength and swim** loops only. The `quality_bike`,
+   `quality_run`, `easy_run` and `easy_bike` loops never consult it, so sessions land on rest days.
+   *(The D-064/D-066 comment at :1117 says the filter "belongs at every preference-driven placement
+   loop." It reached six of ten.)*
+4. The rest-day reclaim pass at `week-optimizer.ts:~1991` is gated on
+   `if (restDays.size < restNeeded)`. **Pre-filled with exactly the needed count, this is false and
+   the entire reclaim-and-displace block never runs.** The days are output as rest with sessions
+   still on them, and **silently** — the 4-day case emits no trade-off and no conflict.
+5. `reconcile…:290` overwrites the plan's `rest_days` with that output.
+6. `week-builder.ts:786` → `makeGrid` marks those days `isRest`.
+7. Emission is guarded by `!slot?.isRest` at :1432 (quality bike), :1538 (quality run), :1779 (easy
+   run) and :1870 (strength). **Those sessions are never emitted.**
+
+**The probe that isolates the cause** — identical 4-day week, only difference is whether `rest_days`
+arrives pre-filled:
+
+```
+pre-filled (the real path)    rest [mon, tue, thu] — all three holding sessions, 7 active days
+empty (optimizer derives)     rest [wed]           — clean
+```
+
+**Two independent defects.** Either one alone would prevent this: the missing `restDaySet` filter on
+four endurance loops, and the reclaim pass gated on a count the caller always satisfies. Fixing one
+leaves it broken.
+
+**Reach:** any plan built with `days_per_week` 4–6. Below 4 the deriver returns empty and the
+optimizer derives its own clean set; at 7 there are no rest days.
+
+⛔ **WHY THIS IS NOT BEING FIXED.** Michael's call, 2026-07-27: pre-launch, single user, no live plans
+to protect, and the enforcement lives in a path being deleted. **`days_per_week` becomes an OUTPUT**
+(SPEC-week-solver §0a.1) — count the picks, stack what stacks, report the number. A derived number
+cannot contradict the session list, so there is nothing to enforce and nothing to leak. **Fixing
+enforcement here would be repairing a mechanism the derivation removes.**
+
+⚠️ If you are here because you found the same symptom: do not add the four missing filters. Read
+§0a.1 first, and note `place-week.resolveStacking()` already computes the derivation for Get Stronger.

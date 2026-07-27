@@ -36,6 +36,42 @@ that is all
 that, the model is being over-elaborated and the extra is almost certainly a preference wearing a
 constraint's clothes.
 
+### 0a.1 ⛔ DAYS PER WEEK IS AN OUTPUT. It is never an input, and the solver never receives one.
+
+**Decided 2026-07-27.** `days_per_week` is not a sixth constraint. It is a **consequence** of the five
+above, and asking for it creates a number that can contradict the athlete's own picks.
+
+```
+sessions   = anchors (long run, long ride, hard day) + lifts (4)
+stacks     = easy aerobic and upper lifts folded onto days that already have one
+daysNeeded = sessions − stacks
+```
+
+Four lifts, a long run, a long ride and a hard day is **seven sessions**. Stacking is what compresses
+that into five or six calendar days. It cannot go lower without **deleting something the athlete
+chose**, and deleting a chosen session is never the solver's decision to make quietly.
+
+**So the flow inverts.** Do not ask for a number and then try to honour it. Count the picks, stack
+what stacks, and **report the number back**: *"this needs 6 days."* If the athlete wants five, they
+drop a session — their call, made visibly, before the plan is built rather than silently during it.
+
+⚠️ **THIS IS NOT A PREFERENCE ABOUT UX. It deletes a bug class.** Full trace in the ledger below; the
+short version is that `days_per_week` currently contradicts the session list on every 4-to-6-day plan,
+and the engine resolves the contradiction by **silently discarding the quality bike, the quality run
+and the heavy leg day** — the three most important sessions in the week. A derived number cannot
+contradict anything. There is nothing to enforce, so there is nothing to leak.
+
+✅ **HALF OF THIS IS ALREADY BUILT — do not write it twice.** `place-week.resolveStacking()` is exactly
+this arithmetic: `activeSessions = pins + lifts`, `stacksRequired = max(0, activeSessions − 6)`, plus
+an `unresolvable` flag when there are not enough splittable days to absorb the stacks. It has served
+Get Stronger since it shipped. **The combined path asks for a number instead.** The work is
+generalising that function and deleting `days_per_week` from the input surface — not inventing a
+calculation.
+
+⛔ **DO NOT "FIX" `days_per_week` ENFORCEMENT.** It is enforcement in a path that is being deleted.
+The stopgap was considered and explicitly declined on 2026-07-27: pre-launch, single user, no live
+plans to protect, so there is no reason to repair a mechanism that the derivation removes.
+
 ---
 
 ## 0. Why rules, not templates — and why rules alone are not enough
@@ -179,11 +215,37 @@ Rank legal weeks by, in order:
 3. **Spread between the two lower days** — ⛔ *more than the minimum is better.* The 48h-vs-72h bug was
    the absence of this line
 4. **Quality on clean legs** — the hard day not preceded by an eccentric anchor
-5. **Preferred days honoured**
-6. **Budgets respected** — hours, miles, session counts
+5. **Week shape — back-loaded weeks score worse** (see 5.0a)
+6. **Preferred days honoured**
+7. **Budgets respected** — hours, miles, session counts
 
 ⚠️ **A shortfall on any of these is REPORTED, never absorbed.** `place-week` already emits
 `compromises[]` and its contract says they must never be silently swallowed.
+
+### 5.0a ⛔ CONSECUTIVE ANCHORS ARE A SHAPE, AND ONLY THE SCORE CAN SEE THEM
+
+**Added 2026-07-27.** §8.2's table is **pairwise by construction** and a pairwise table cannot express
+"these two anchors are adjacent, so the whole week is back-loaded." It never will — that is the
+correct limit of a clearance table, not a gap in it.
+
+**The worked case.** Long ride Saturday, long run Sunday. The 48h clearance blocks Monday and Tuesday
+for heavy legs, so they land Wednesday — **and that answer comes from the long RUN alone.** The long
+ride's whole row is zero, so it contributes nothing to the decision. The pairwise maths happens to
+produce a sane week, and nothing anywhere perceives that it is looking at a heavy weekend.
+
+**So the score carries it.** Anchors landing on consecutive days is a real cost — the back half of the
+week is loaded, the front is thin, and the athlete gets less recovery than the same three anchors
+spread would give them.
+
+⛔ **AND THE COMPROMISE LINE MUST NAME THE CAUSE.** A cramped week produced by the athlete's own two
+picks is a *consequence of their choice*, not the engine being clumsy — and saying so is more useful
+than silently producing the cramped week. **The line points at the anchors, not at the outcome.**
+
+> *"Your long ride and long run are back to back, so the week is loaded at the end. Heavy legs land
+> Wednesday because that is the first day clear of Sunday."*
+
+⚠️ Report it, do not correct it. Anchors are hard constraints (§0a, §2.3) — the solver does not move
+one to improve shape, and it does not argue. It states what the choice cost.
 
 ### 5.1 ⛔ DETERMINISM — and the tie-break is SPECIFIED, not merely "stable"
 
