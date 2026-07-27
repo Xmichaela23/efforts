@@ -591,6 +591,59 @@ this section exists so the rest did not have to.
 seeing the athlete's day preferences OR the law.** That is a larger surface than the strength
 placement everyone has been looking at.
 
+### 6b-3 ⛔ THE `place-week` INVENTORY — every arithmetic decision, before the file dies
+
+**Michael, 2026-07-27:** *"`place-week` was corrected against real weeks over months; the spec was
+derived. So it holds knowledge the spec never captured… Deleting it while it's still the more
+corrected of the two is the one irreversible move in the collapse."*
+
+**Three finds came out opportunistically** — each one surfaced because something broke and pointed at
+it. That is not a search, so this is the search: every arithmetic and scoring decision in the file,
+each one either **present** in the solver or **rejected with a reason**.
+
+| # | `place-week` decision | status |
+|---|---|---|
+| 1 | `MIN_STACK_GAP_H = 6` (Robineau) | ✅ present — `stackNeedsRecoveryGap` + the reported gap |
+| 2 | `MAX_ACTIVE_DAYS = 6` | ✅ present — `MAX_ACTIVE_DAYS_DEFAULT` |
+| 3 | `stacksRequired = pins + lifts − 6` | ✅ present — **gated** in the leaf, not scored *(find 1)* |
+| 4 | eligible hosts = matrix-legal | ✅ present, and per-pair rather than per-list |
+| 5 | `unresolvable = stacksRequired > min(eligible, upperCount)` | ✅ present — `NO_ROOM` uses the same capacity |
+| 6 | `stackGapHours` per pair | ✅ present |
+| 7 | stack target sort: **long-day last**, then clearance-hours, then `dayIndex` | ✅ long-day term present *(find 2)*. ⛔ **clearance-hours REJECTED** — that is the day-size proxy that inverted on 2026-07-27 when `long_ride` went to 0h. Day size is stated directly |
+| 8 | `requiredClearanceHours` | ✅ present — reads the table directly |
+| 9 | `clearanceHours` with week wraparound | ✅ present — `gapDays` |
+| 10 | `lowerDayPenalty += (required − actual)` | ✅ present — breach **magnitude** *(find 3)* |
+| 11 | lower↔lower `max(0, 48 − gap)` | ✅ present as a **hard** constraint at strict tier, relaxable to a priced breach — stricter than the original, deliberately |
+| 12 | lower spread = **`Math.min(...)`**, the closest other heavy day | ⛔ **WAS MISSING — find 4.** The solver summed pair gaps. Summing hides the thing that matters: 24/24/96 sums better than 48/48/48 while containing a back-to-back pair. Identical at two lower days, which is why five sweeps missed it. **Fixed** |
+| 13 | upper days ranked by distance from every placed lifting day | ⛔ **WAS MISSING ENTIRELY — find 5.** The solver had **no term for upper placement at all**, so it fell through to the tie-break. **Fixed** |
+| 14 | `dayIndex` final tie-break | ✅ superseded — canonical-order vector (§5.1), which is order-independent where `dayIndex` was not |
+| 15 | on overflow, reopen all days so lifts may double up | ⛔ **REJECTED.** That is §5.2b — quietly producing a worse week. The solver refuses and names the arithmetic |
+| 16 | compromise when no rest day survives | ✅ present |
+| 17 | output sorted by day | n/a — presentation |
+
+⛔ **THE SYSTEMATIC PASS FOUND TWO MORE (12 and 13), AND NEITHER WOULD HAVE ANNOUNCED ITSELF.**
+Find 12 is invisible at two lower days and only appears at three. Find 13 produced legal weeks that
+simply wasted the layout — an upper day sitting next to another lift day for no reason. **39 weeks in
+the standard sweep change once both are in.** Five earlier sweeps had passed over both.
+
+✅ **The file may be deleted once its callers move.** This table is what it knew.
+
+### 6b-4 The objective function: SUM, and it was tested rather than inherited
+
+**Question (Michael, 2026-07-27):** total breach is linear and physiology is not — one pair 24h short
+is plausibly worse than two pairs 12h short, so is minimising the *worst* breach right?
+
+**Tested, not argued.** Worst-breach-first was implemented alongside sum-first and both were run
+across the full load × arrangement sweep. **Zero weeks differ.** Multi-breach weeks do exist (14 of
+84 compromised), but no reachable week offers a choice between one deep breach and two shallow ones
+at equal sum — clearances come in 24h steps on a 7-day grid, so the trade the objective would arbitrate
+never arises.
+
+✅ **Decision: keep the sum.** Not because linear is right in principle — **because nothing
+distinguishes them, and the simpler arithmetic wins a tie.** If a future rule makes the harm curve
+bend (a clearance that is not a multiple of 24h, or a third lower day at higher frequency), it is a
+one-line change and the comparison harness is in the commit.
+
 ### 6b-2 ⛔ `placement/` IS PRESUMED OVER-BROAD. Nothing from it is inherited unchecked.
 
 **Two independent constraints. Two different axes. The same error.**

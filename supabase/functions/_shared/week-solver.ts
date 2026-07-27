@@ -241,14 +241,33 @@ function scoreKey(
   //    when it had to violate something. The size of the miss is the whole information.
   const breachPenalty = breachMagnitude;
 
-  // 3. spread between the two lower days — more than the minimum is better (§5 line 3)
+  // 4. ⛔ SPREAD IS THE TIGHTEST PAIR, NOT THE SUM OF PAIRS. Mined from `place-week:344`, which
+  //    ranks on `Math.min(...)` — the closest other heavy day — not on a total. This solver summed,
+  //    and summing hides the thing that matters: three heavy days at 24/24/96 sum better than
+  //    48/48/48 while containing a back-to-back pair. With exactly two lower days the two agree,
+  //    which is why it survived the first sweeps unnoticed. It bites at three.
   const lowerIdx = assignment.filter((_, i) => lifts[i].isLower);
-  let spreadPenalty = 0;
+  let tightestLower = 7;
   for (let i = 0; i < lowerIdx.length; i++) {
     for (let j = i + 1; j < lowerIdx.length; j++) {
-      spreadPenalty -= gapDays(lowerIdx[i], lowerIdx[j]);
+      tightestLower = Math.min(tightestLower, gapDays(lowerIdx[i], lowerIdx[j]));
     }
   }
+  const spreadPenalty = lowerIdx.length > 1 ? -tightestLower : 0;
+
+  // 4b. ⛔ UPPER DAYS ARE SPREAD TOO — the solver had NO term for them at all, so upper placement
+  //     fell entirely through to the tie-break. `place-week:370` ranks each upper day by its
+  //     distance from every already-placed lifting day and maximises it. Pressing carries no
+  //     clearance, but clumping two upper days together still wastes the week's recovery shape.
+  const upperIdx = assignment.filter((_, i) => !lifts[i].isLower);
+  let tightestUpper = 7;
+  for (const u of upperIdx) {
+    for (const other of assignment) {
+      if (other === u) continue;
+      tightestUpper = Math.min(tightestUpper, gapDays(u, other));
+    }
+  }
+  const upperSpreadPenalty = upperIdx.length > 0 && assignment.length > 1 ? -tightestUpper : 0;
 
   // 4. §5.0a — anchors landing on consecutive days is a real cost, and it is the athlete's own
   //    two picks that caused it. Scored, never corrected: anchors are hard (§2.3).
@@ -274,8 +293,8 @@ function scoreKey(
   // anchors, same lifts listed differently would score differently and re-materialize to a
   // different week. Canonical order is (lower before upper, then name) — a property of the lifts
   // themselves, not of how they arrived.
-  return [restShortfall, breachPenalty, stackPenalty, spreadPenalty, shapePenalty, orderPenalty,
-    stackHostPenalty, ...canonicalAssignment];
+  return [restShortfall, breachPenalty, stackPenalty, spreadPenalty, upperSpreadPenalty,
+    shapePenalty, orderPenalty, stackHostPenalty, ...canonicalAssignment];
 }
 
 function lexLess(a: number[], b: number[]): boolean {
