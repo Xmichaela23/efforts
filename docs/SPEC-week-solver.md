@@ -350,6 +350,9 @@ contract says they must never be silently swallowed.
 
 ## 7. Build order
 
+-1. ⛔ **RESOLVE THE LAW'S SELF-CONTRADICTION** (§8.4) — `long_ride` requires 48h from lower body AND
+   may share a day with it. One cell, and it changes the shape of every week. **Nothing can be built
+   on a rule set that disagrees with itself.**
 0. ⛔ **COLLAPSE THE THREE AUTHORITIES** (§6b) — this is the point of the whole document. Everything
    below is wasted if three engines still decide placement afterwards.
 1. ⛔ **ANCHOR VALIDATION AT PICK TIME, IN THE WIZARD** (§2.3, §5.2). Five hard constraints over seven
@@ -357,16 +360,112 @@ contract says they must never be silently swallowed.
    Detect arrangements that cannot house four lifting days and surface it **at selection, not at
    generation.** Telling someone their week is impossible after they press Build is the silence this
    whole document exists to remove.
-2. **Anchor-to-anchor conflict detection in the solver** (§2) — upstream of lift placement and absent today
-3. **Eccentric ratings per session and per anchor** (§2.1, §3)
-4. **The scorer** (§5) — filter already exists in `place-week`; the ranking is what is missing
-5. **`canSplitDay` in the intake** (§4.1) — one question, and the field is already there waiting
-6. **Preferred STRENGTH days from hard to scored** (§4.2) — the anchors stay hard
+2. **FILL THE ADJACENCY TABLE** (§8.2) — the stacking table already exists and is complete; adjacency
+   is two lists relative to lower body only, and every other pair is an empty cell.
+3. **Anchor-to-anchor conflict detection in the solver** (§2) — upstream of lift placement and absent today
+4. **Eccentric ratings per session and per anchor** (§2.1, §3)
+5. **The scorer** (§5) — filter already exists in `place-week`; the ranking is what is missing
+6. **`canSplitDay` in the intake** (§4.1) — one question, and the field is already there waiting
+7. **Preferred STRENGTH days from hard to scored** (§4.2) — the anchors stay hard
 
-7. **Point relayout at the solver** — its trigger and idempotency guard survive; only the engine
+8. **Point relayout at the solver** — its trigger and idempotency guard survive; only the engine
    behind them changes (§6b).
-8. **Then** the banner and the telemetry, which need §6c's compromise list to say anything true.
+9. **Then** the banner and the telemetry, which need §6c's compromise list to say anything true.
 
 ⚠️ **Nothing here is built. `place-week` today does §5 step 1 and 2 and stops.**
 ⛔ **And the largest single risk is that `placement/` runs at plan CREATION for every run plan, not
 just at relayout — so collapsing it is a creation-path change with a real blast radius.**
+
+---
+
+## 8. ⛔ THE TWO TABLES — the rule surface, closed by construction
+
+**Michael, 2026-07-27:** *"The leaks aren't random. They're empty cells in a table you haven't drawn.
+Prose rules have no edges — you can always discover another one. A filled table has exactly N cells
+and then it's done."*
+
+Every rule found in conversation so far — *"squat can't follow a long run"*, *"easy ride stacks on a
+lift day"* — is **one cell**. Two tables close the surface.
+
+### 8.1 STACKING — ⛔ ALREADY EXISTS AND IS COMPLETE. Do not redraw it.
+
+`_shared/schedule-session-constraints.ts` → `ROWS`, a filled 10×10 (swim is a row, so 100 cells, not
+81). **Read it, do not re-derive it.** Notable cells, all already correct:
+
+| pair | law | note |
+|---|---|---|
+| `lower_body_strength` × `long_ride` | ✅ **may share** | ⛔ The eccentric asymmetry §2.1 argued from first principles is ALREADY ENCODED. A long ride is not a leg-cost day |
+| `lower_body_strength` × `long_run` | ❌ | Correct |
+| `lower_body_strength` × `easy_run` | ✅ **may share** | Flipped to legal 2026-05-12, citing STRENGTH-PROTOCOL §6.2 |
+| `upper_body_strength` × `easy_run` | ❌ **may NOT share** | ⚠️ **See 8.3 — the composer does this every week** |
+
+⚠️ **What the table does NOT encode is ORDER.** It answers *may these share a day*, never *in which
+sequence*. Order is Eddens: **resistance first when they cannot be separated** (+6.91%, lower-body
+dynamic strength, and only for those who cannot separate — §6). That is a third dimension the
+existing matrix has no room for and the solver must carry.
+
+### 8.2 ADJACENCY — ⛔ THE TABLE THAT DOES NOT EXIST
+
+What exists is not a grid. It is two lists, and both are relative to `lower_body_strength` only:
+
+- `LEG_QUALITY_KINDS` (`quality_bike`, `quality_run`) → **≥24h** from lower body, both directions
+- `LEG_LONG_KINDS` (`long_ride`, `long_run`) → **≥48h** from lower body, both directions
+
+⛔ **Every other pair is undefined.** Long run → hard day, hard day → long ride, lower → upper, easy
+run → long run: none of these has a rule anywhere. **They are the empty cells.** The solver needs the
+full grid; anything absent will be discovered later as another "leak."
+
+⚠️ **`upper_body_strength` and swim are `neutral`/`upper` prime movers and constrain nothing** — those
+rows and columns are trivially permissive. **The real grid is the six leg-loaded types**, which is 36
+cells and readable on one screen:
+
+|  ↓ before / after → | Squat | Deadlift | Long run | Hard day | Long ride | Easy run |
+|---|---|---|---|---|---|---|
+| **Squat** | ≥48h | ≥48h | ≥48h | ≥24h | ⚠️ §8.4 | OK |
+| **Deadlift** | ≥48h | ≥48h | ≥48h | ≥24h | ⚠️ §8.4 | OK |
+| **Long run** | ≥48h | ≥48h | — | **penalty — both eccentric (§2.2)** | OK, order matters | OK |
+| **Hard day** | ≥24h | ≥24h | **penalty (§2.2)** | — | OK | OK |
+| **Long ride** | ⚠️ §8.4 | ⚠️ §8.4 | **OK — ride before run, never after** | OK | — | OK |
+| **Easy run** | OK | OK | OK | OK | OK | OK |
+
+**Cells marked OK are the majority and that is expected — most pairs are trivially legal.** The value
+of drawing it is that the handful which are not are now enumerated rather than discovered.
+
+### 8.3 ⛔ THE COMPOSER CONTRADICTS THE STACKING TABLE, ON EVERY WEEK IT HAS BUILT
+
+`upper_body_strength × easy_run = 0` — may not share a day. **The Get Stronger composer stacks easy
+runs onto UPPER lift days deliberately** (`upperLiftDays`), which is what Thursday and Friday are in
+every plan it has produced.
+
+Meanwhile `lower_body_strength × easy_run = 1` — the stack it is permitted to make is the one it
+avoids.
+
+⛔ **It never asks.** The composer imports the clearance helpers from
+`schedule-session-constraints.ts` and never the same-day matrix. **Backwards, and unchecked, because
+nothing connects the two.**
+
+⚠️ **Do not "fix" the composer before the collapse** — resolve it in the solver, which will consult
+one table. But someone must decide which is right: an upper lift and an easy run share no prime
+movers, so the `0` is the suspicious cell, not the composer's behaviour.
+
+### 8.4 ⛔ AND THE LAW CONTRADICTS ITSELF — long ride vs lower body
+
+**Two shipped rules, mutually exclusive:**
+
+- `LEG_LONG_KINDS` includes `long_ride` → **≥48h from `lower_body_strength`, both directions**
+- `ROWS` says `lower_body_strength × long_ride = 1` → **they may share a day (0h apart)**
+
+**Zero hours and forty-eight hours cannot both be the rule.** `place-week` reads the first (via
+`requiredClearanceHours`), the optimizer reads the second, and the two have never been run against
+each other.
+
+⛔ **THE SOLVER CANNOT BE BUILT UNTIL THIS IS DECIDED.** It is the one cell where the answer changes
+the shape of every week: §2.1 and the same-day matrix both say a long ride is eccentrically cheap, so
+**the 48h clearance is the suspect** — `long_ride` is probably in `LEG_LONG_KINDS` because it sits
+next to `long_run` in a list, not because anyone rated it.
+
+### 8.5 The score card stays short
+
+**Three or four weights, separate from the tables** (§5). Tables say what is *legal*; the score says
+which legal week is *best*. ⛔ **If the score card grows past four lines, a preference has been
+promoted to a rule.**
