@@ -86,9 +86,7 @@ has reintroduced itself.
 
 ## ⛔ 0d. A TEST THAT HAS NEVER FAILED IS NOT EVIDENCE
 
-**The fourth member of the family, and the one that guards the other three.** Alongside §0c
-(currency), §5.2b (silent subtraction) and §4.1a (unowned strictness) — all four are checkable
-rather than vigilance-dependent, which is the only reason they will survive.
+**The fourth member of the family** — see §0e for the fifth and for all five in one table.
 
 ⛔ **A GREEN TEST PROVES THE SUITE RAN. IT DOES NOT PROVE THE TEST CAN FAIL.** This project has now
 shipped both failure modes in one day:
@@ -111,6 +109,37 @@ invariant, **reintroduce the defect and watch it fail.** Then restore and watch 
 
 ⚠️ **The tell that you need this:** a test written *after* the code, asserting what the code already
 does. It cannot fail on the day it is written, so nothing has ever established that it could.
+
+## ⛔ 0e. A CHECK WHOSE METRIC CANNOT MOVE IS NOT A CHECK
+
+**The fifth member of the family, and it generalises past testing.** §0d says a test that has never
+failed is not evidence. This is the same defect one level up: **the verification ran, the number came
+back, and the number was incapable of showing the thing being looked for.**
+
+**The instance, 2026-07-27.** Two scoring terms were added (§6b-3 finds 12 and 13) and checked by
+measuring tightest-heavy-day-gap and upper-adjacency across a sweep. **Both metrics were unchanged,
+and both terms were real** — the sweep used three lower lifts on five free days, where adjacency is
+*forced* and the metric is pinned regardless of the score. A full output diff showed **39 weeks
+changed.** Stopping at the metric would have been a false negative, and it would have looked like
+diligence.
+
+⚠️ **THE TELL:** a metric that is bounded by the fixture rather than by the code. If the arrangement
+forces the value, the value cannot testify about the change.
+
+✅ **THE DISCIPLINE:** prefer a **full output diff** over a summary statistic when asking "did this
+change anything." Diff the whole result set; count the differences; look at examples. A statistic is
+for describing a change already known to exist, not for detecting one.
+
+⛔ **The five, together — and all five are checkable rather than remembered, which is the only reason
+they will outlive this session:**
+
+| § | principle |
+|---|---|
+| **0c** | the law's currency is hours between named sessions, never forbidden weekdays |
+| **0d** | a test that has never failed is not evidence |
+| **0e** | a check whose metric cannot move is not a check |
+| **4.1a** | strictness beyond the law needs an owner and a reason |
+| **5.2b** | never subtract silently — refuse, and name the options |
 
 ## 0a. ⛔ THE FIVE HARD CONSTRAINTS, AND THE WHOLE SEARCH
 
@@ -621,12 +650,52 @@ each one either **present** in the solver or **rejected with a reason**.
 | 16 | compromise when no rest day survives | ✅ present |
 | 17 | output sorted by day | n/a — presentation |
 
+**THE COUNT, because "systematic" without one is a memory rather than a record — and the delete is
+the irreversible step:**
+
+| | |
+|---|---|
+| **17** | decisions inventoried — the complete set in the file |
+| **14** | present in the solver (2 of them added *by* this pass — rows 12 and 13) |
+| **2** | rejected with a stated reason (the clearance-hours proxy in row 7; the reopen-all-days overflow in row 15) |
+| **1** | presentational, not a decision (row 17) |
+
+✅ **17 = 14 + 2 + 1. Nothing is unaccounted for.** That is what makes the deletion auditable rather
+than remembered.
+
 ⛔ **THE SYSTEMATIC PASS FOUND TWO MORE (12 and 13), AND NEITHER WOULD HAVE ANNOUNCED ITSELF.**
 Find 12 is invisible at two lower days and only appears at three. Find 13 produced legal weeks that
 simply wasted the layout — an upper day sitting next to another lift day for no reason. **39 weeks in
 the standard sweep change once both are in.** Five earlier sweeps had passed over both.
 
 ✅ **The file may be deleted once its callers move.** This table is what it knew.
+
+### 6b-3a ⛔ EVERY REMAINING MODULE GETS AN INVENTORY BEFORE IT DIES. NOT JUST THIS ONE.
+
+**The reason the `place-week` pass paid off twice is a property, not luck.** That file was
+**corrected against real weeks over months**; this spec was **derived**. Corrected code holds
+knowledge derived code never captured, and the only way to get it out is to enumerate.
+
+⛔ **`week-optimizer` HAS THE SAME PROPERTY, AND THERE IS DOCUMENTED PROOF.** The May 2026 24h-pre
+relaxation (§4.21) is a deliberate production correction with a written rationale — someone found a
+real week it got wrong and fixed it with a reason attached. **A module that carries that kind of scar
+is exactly the kind that holds unwritten knowledge**, and deleting it opportunistically repeats the
+mistake the systematic pass just caught twice in one file.
+
+**So, as a standing requirement for the rest of the collapse:**
+
+| module | inventory |
+|---|---|
+| `place-week` | ✅ done — §6b-3, 17 entries, 14 present / 2 rejected / 1 n/a |
+| `week-optimizer` | ⛔ **required before deletion.** The largest and most-corrected of the five |
+| `placement/` surviving parts | ⛔ required — and note §6b-2: presumed over-broad, so expect more rejections than adoptions |
+| `base-generator` | ⛔ required — a fixed grid still encodes decisions about what a run week looks like |
+| `tri-generator` | ⛔ required |
+
+⚠️ **Expect the ratio to differ per module and do not read that as failure.** `place-week` came out
+14-present / 2-rejected because it reads the law. `placement/` will come out the other way round
+because it does not. **A rejection with a stated reason is as much a completed inventory entry as an
+adoption** — the point is that nothing leaves unexamined.
 
 ### 6b-4 The objective function: SUM, and it was tested rather than inherited
 
@@ -640,9 +709,18 @@ at equal sum — clearances come in 24h steps on a 7-day grid, so the trade the 
 never arises.
 
 ✅ **Decision: keep the sum.** Not because linear is right in principle — **because nothing
-distinguishes them, and the simpler arithmetic wins a tie.** If a future rule makes the harm curve
-bend (a clearance that is not a multiple of 24h, or a third lower day at higher frequency), it is a
-one-line change and the comparison harness is in the commit.
+distinguishes them, and the simpler arithmetic wins a tie.**
+
+⛔ **THE CONDITION, WHICH MATTERS MORE THAN THE CONCLUSION.** Sum and worst-breach are
+indistinguishable **because clearances are 24h steps on a 7-day grid.** Every breach is therefore a
+multiple of 24, and no arrangement offers one-deep-against-two-shallow at equal sum. **That is
+structural, not permanent.**
+
+⚠️ **THE DECISION REOPENS THE MOMENT GRANULARITY GOES SUB-DAY** — an AM/PM split modelled as real
+hours, a 6h stack gap priced as adjacency rather than same-day, or any clearance that is not a
+multiple of 24. At that point breaches stop landing on a coarse lattice, the trade appears, and the
+harm curve's shape starts to matter. The comparison harness is in commit `a76d10b9`; re-run it
+before assuming the answer still holds.
 
 ### 6b-2 ⛔ `placement/` IS PRESUMED OVER-BROAD. Nothing from it is inherited unchecked.
 
