@@ -203,6 +203,42 @@ Deno.test('⛔ EVERY LIFT KEEPS A DAY. The solver never returns fewer than it wa
 // DETERMINISM (§5.1)
 // ════════════════════════════════════════════════════════════════════════════
 
+Deno.test('⛔ INPUT ORDER MUST NOT LEAK: the same lifts listed differently give the same week', () => {
+  // ⛔ THE FAILURE THIS CATCHES IS INVISIBLE OTHERWISE. §5.1's tie-break is a lexicographic key over
+  // day indices, and the first draft built that vector in INPUT order — so the same athlete with the
+  // same anchors, whose lift list arrived in a different order, scored differently and got a
+  // different week. Re-materialize and regeneration both rebuild that list, so this is exactly the
+  // "plan reshuffles for no reason and nothing can explain it" failure §5.1 exists to prevent.
+  const shuffles: Lift[][] = [
+    [FOUR[0], FOUR[1], FOUR[2], FOUR[3]],
+    [FOUR[3], FOUR[2], FOUR[1], FOUR[0]],
+    [FOUR[1], FOUR[3], FOUR[0], FOUR[2]],
+    [FOUR[2], FOUR[0], FOUR[3], FOUR[1]],
+  ];
+  for (const runD of SOLVER_DAYS) {
+    for (const rideD of SOLVER_DAYS) {
+      if (rideD === runD) continue;
+      const anchors = [anchor(runD, 'long_run', 'long run'), anchor(rideD, 'long_ride', 'long ride')];
+      // Compare lift→day as a SET, since the output list follows input order by design.
+      const dayFor = (ls: Lift[]) => {
+        const r = solve({ anchors, lifts: ls });
+        if (r.status === 'unsolvable') return `unsolvable:${r.code}`;
+        return r.week.lifts
+          .map((l) => `${l.lift}=${l.day}`)
+          .sort()
+          .join(',') + `|rest:${r.week.restDays.join('/')}`;
+      };
+      const first = dayFor(shuffles[0]);
+      for (let i = 1; i < shuffles.length; i++) {
+        assertEquals(
+          dayFor(shuffles[i]), first,
+          `${runD}/${rideD}: shuffling the lift list changed the week — input order leaked into the key`,
+        );
+      }
+    }
+  }
+});
+
 Deno.test('⛔ SAME INPUT, SAME WEEK — every arrangement, ten runs each', () => {
   for (const runD of SOLVER_DAYS) {
     for (const rideD of SOLVER_DAYS) {

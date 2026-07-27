@@ -193,7 +193,8 @@ function scoreKey(
   anchors: Placement[],
   breachCount: number,
   restDayCount: number,
-  stackCount: number,
+  stackCost: number,
+  canonicalAssignment: number[],
 ): number[] {
   // 1. ⛔ ONE FULL REST DAY, PROTECTED — not "rest days maximised". Corrected during the build.
   //    The first draft scored `-restDayCount`, and the test sweep caught it immediately: with upper
@@ -204,8 +205,16 @@ function scoreKey(
   //    lose its one rest day — it does not mean accumulate more.
   const restShortfall = Math.max(0, 1 - restDayCount);
 
-  // 2. stacks are a cost, paid only when the arithmetic demands one (place-week's rule, kept).
-  const stackPenalty = stackCount;
+  // 2. ⛔ STACK COST COMES FROM THE PAIR, NOT FROM A COUNTER. Corrected during the build.
+  //    A flat `stackCount` prices an easy ride on a lift day the same as a squat beside a long
+  //    ride, and those are not the same thing: pressing shares no prime movers with riding, so
+  //    that stack is the cheapest addition in the system — a deliberate finding, not an accident
+  //    of the matrix. `stackNeedsRecoveryGap` is the law's own answer to "do these two compete",
+  //    so the score asks it per stacked pair instead of counting.
+  //    ⚠️ HOW MANY stacks is not scored at all — it is GATED by arithmetic in the leaf, exactly as
+  //    `place-week.resolveStacking` does it. Scoring the count was what let the solver stack
+  //    everything to manufacture rest days it was never asked for.
+  const stackPenalty = stackCost;
 
   // 3. primary lifts clear of eccentric anchors
   const breachPenalty = breachCount;
@@ -238,7 +247,13 @@ function scoreKey(
     }
   }
 
-  return [restShortfall, breachPenalty, stackPenalty, spreadPenalty, shapePenalty, orderPenalty, ...assignment];
+  // ⛔ THE TIE-BREAK VECTOR IS IN CANONICAL LIFT ORDER, NOT INPUT ORDER (§5.1). Using the input
+  // order would let the CALLER's array ordering leak into the answer: the same athlete, same
+  // anchors, same lifts listed differently would score differently and re-materialize to a
+  // different week. Canonical order is (lower before upper, then name) — a property of the lifts
+  // themselves, not of how they arrived.
+  return [restShortfall, breachPenalty, stackPenalty, spreadPenalty, shapePenalty, orderPenalty,
+    ...canonicalAssignment];
 }
 
 function lexLess(a: number[], b: number[]): boolean {
@@ -307,6 +322,13 @@ export function solve(input: SolverInput): SolverResult {
     };
   }
 
+  // Canonical lift order for the tie-break vector (§5.1): a property of the lifts, never of the
+  // order the caller happened to list them in.
+  const canonicalOrder = lifts
+    .map((l, i) => ({ i, k: `${l.isLower ? '0' : '1'}:${l.name}` }))
+    .sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : 0))
+    .map((x) => x.i);
+
   // ── Enumerate, filter, score, at each relaxation tier in order ─────────────────────────────
   for (const relax of RELAXATION_ORDER) {
     let best: { key: number[]; assignment: number[]; breaches: string[] } | null = null;
@@ -333,8 +355,27 @@ export function solve(input: SolverInput): SolverResult {
         }
         if (breaches.length > 0 && relax !== 'clearance_as_penalty') return;
 
-        const stackCount = assignment.filter((d) => anchorDays.has(d)).length;
-        const key = scoreKey(assignment, lifts, anchorPlacements, breaches.length, restCount, stackCount);
+        // ⛔ ARITHMETIC GATE ON HOW MANY STACKS, not a score term. `place-week.resolveStacking`:
+        // stacksRequired = sessions − MAX_ACTIVE_DAYS. Stacking beyond that is not an improvement,
+        // it is consolidating the athlete's week without being asked.
+        const stackedIdx = assignment
+          .map((d, i) => (anchorDays.has(d) ? i : -1))
+          .filter((i) => i >= 0);
+        const stacksRequired = Math.max(0, anchors.length + lifts.length - maxActive);
+        if (stackedIdx.length > stacksRequired) return;
+
+        // Per-pair cost: does this stack actually compete? (the law's own question)
+        let stackCost = 0;
+        for (const i of stackedIdx) {
+          const liftKind: MatrixSessionKind = lifts[i].isLower
+            ? 'lower_body_strength' : 'upper_body_strength';
+          const a = anchorPlacements.find((p) => p.dayIndex === assignment[i])!;
+          if (stackNeedsRecoveryGap(a.kind, liftKind)) stackCost += 1;
+        }
+
+        const canonicalAssignment = canonicalOrder.map((i) => assignment[i]);
+        const key = scoreKey(assignment, lifts, anchorPlacements, breaches.length, restCount,
+          stackCost, canonicalAssignment);
         if (!best || lexLess(key, best.key)) {
           best = { key, assignment: [...assignment], breaches };
         }
