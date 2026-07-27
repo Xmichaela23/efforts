@@ -78,11 +78,28 @@ export function strengthFocusSections(opts: {
   ];
 }
 
-/** The "say once" line (SPEC §4). Flat, once, never repeated and never apologised for. */
+/**
+ * The "say once" line (SPEC §4). Flat, once, never repeated and never apologised for.
+ *
+ * ⛔ CORRECTED 2026-07-27 — this said "the last set of EVERY THIRD WEEK is worth measuring" and that
+ * is not what the block prescribes. `wendler-531.ts:61` is explicit:
+ *     amrap: kind === 'anchor' && !isDeload && i === 2
+ * The open set exists ONLY in the anchor cycle — weeks 9, 10 and 11 of twelve. Weeks 1-8 carry
+ * plain fives with no open set, so there is nothing to measure in two thirds of the block.
+ *
+ * The athlete could check this: their own week 3 and week 7 top sets read `×5`, and the first `+`
+ * appears in week 9. So the narrative promised a measurement the plan does not contain, and the
+ * plan is the thing that is right.
+ *
+ * ⚠️ This is D-326's blind-gauge finding surfacing in the COPY. That entry records the same fact —
+ * the strength gauge is near-blind for eight of twelve weeks — and closing it needs the three
+ * layers named there. This line stops the app claiming otherwise in the meantime; it does not fix
+ * the blindness.
+ */
 export function strengthFocusBufferLine(enduranceNote = ''): string {
   return (
-    `Weights come off 85% of your max, and that buffer is what makes the last set of every third ` +
-    `week worth measuring. Week one sits well inside you by design.${enduranceNote}`
+    `Weights come off 85% of your max, and that buffer is what makes the last set of the final ` +
+    `cycle worth measuring. Week one sits well inside you by design.${enduranceNote}`
   );
 }
 

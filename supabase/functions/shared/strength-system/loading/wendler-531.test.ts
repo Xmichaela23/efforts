@@ -8,6 +8,7 @@ import {
   cyclesForBlock,
   cycleForWeek,
   verdictFrom95Set,
+  workingNumberForCycles,
   applyVerdict,
   VALIDITY_CHECK_PCT,
 } from './wendler-531.ts';
@@ -140,4 +141,46 @@ Deno.test('a fewer-bonus-reps week is NOT a reset — only missing the prescribe
   // prescribed reps and get no bonus, and must not have their weights reset for it.
   assertEquals(verdictFrom95Set(5), 'advance');
   assertEquals(verdictFrom95Set(6), 'advance'); // fewer than last time, still a pass
+});
+
+// ── The earnable advance (D-326 layer 2) ─────────────────────────────────────
+//
+// `workingNumberForCycle` stepped by CALENDAR and read nothing: miss every rep and the bar still
+// climbed, then the AMRAP measured that bar and wrote it back as the athlete's 1RM. Wendler's own
+// gate — five at 95% or drop 10% — was written, correct, and called by nothing.
+
+Deno.test('no verdicts = the old calendar behaviour, exactly', () => {
+  // The behaviour-unchanged proof (Constitution Law 6). If this drifts, the seam changed something.
+  for (const isLower of [true, false]) {
+    for (let cycle = 1; cycle <= 4; cycle += 1) {
+      assertEquals(
+        workingNumberForCycles(200, cycle, isLower),
+        workingNumberForCycle(200, cycle, isLower),
+        `cycle ${cycle} ${isLower ? 'lower' : 'upper'}`,
+      );
+    }
+  }
+});
+
+Deno.test('a missed 95% set costs the next cycle 10% instead of gaining +10', () => {
+  // Squat, working number 200. Cycle 1 earns a reset (four reps at 95%, not five).
+  const earned = verdictFrom95Set(4);
+  assertEquals(earned, 'reset');
+  // Calendar-only would hand cycle 2 a 210. The gate hands it 180.
+  assertEquals(workingNumberForCycle(200, 2, true), 210);
+  assertEquals(workingNumberForCycles(200, 2, true, [earned]), 180);
+});
+
+Deno.test('a skipped session HOLDS — no evidence is not the same as failure', () => {
+  assertEquals(verdictFrom95Set(null), 'hold');
+  assertEquals(workingNumberForCycles(200, 2, true, ['hold']), 200);
+  // And it does not compound: cycle 3 advances off the held number once a set is done.
+  assertEquals(workingNumberForCycles(200, 3, true, ['hold', 'advance']), 210);
+});
+
+Deno.test('verdicts apply in order, and only the cycles before this one count', () => {
+  // advance then reset: 200 → 210 → 185 (10% of 210 = 21, rounded down to the 5lb grid).
+  assertEquals(workingNumberForCycles(200, 3, true, ['advance', 'reset']), 185);
+  // Cycle 1 never reads a verdict — nothing has been earned yet.
+  assertEquals(workingNumberForCycles(200, 1, true, ['reset']), 200);
 });

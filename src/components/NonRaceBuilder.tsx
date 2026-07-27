@@ -1186,8 +1186,12 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 Also fixed the article: "An 12-week" read wrong for every length that is not 8. */}
             <p className="text-white/75 text-sm">
               {isStrengthFocus ? (
-                <>A {state.targetWeeks}-week block. The last set of every third week is the
-                measurement — there is no separate retest.</>
+                /* ⛔ "every third week" was false — the open set exists ONLY in the anchor cycle
+                   (`wendler-531.ts:61`: amrap = anchor && !deload && last set), so weeks 9-11 of
+                   twelve. Weeks 1-8 are plain fives with nothing to measure. Same correction as
+                   `strengthFocusBufferLine`; the two must not drift, because the athlete reads both. */
+                <>A {state.targetWeeks}-week block. Two cycles build, the third measures — the last
+                set of that cycle is the test, so there is no separate retest week.</>
               ) : (
                 <>{state.targetWeeks === 8 || state.targetWeeks === 11 || state.targetWeeks === 18 ? 'An' : 'A'} {state.targetWeeks}-week
                 block from your current fitness (≈ {hoursForTier(state.commitment)} h/wk),

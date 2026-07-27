@@ -18,7 +18,10 @@
 // a 72→94% ramp, and a separate retest week). That protocol assembled a block from five
 // sources and produced ~8 unmarked invented numbers. Wendler publishes a complete
 // parameter set for this athlete with none. The frozen-retest-weight problem deleted
-// itself with the retest week: under 5/3/1 the last set of every third week IS the test.
+// itself with the retest week: under 5/3/1 the last set of the ANCHOR cycle IS the test.
+// ⚠️ Corrected 2026-07-27 — this read "every third week", which the code contradicts:
+// `wendler-531.ts:61` fires the open set only when `kind === 'anchor' && !isDeload`, so weeks 9-11
+// of twelve. Weeks 1-8 carry plain fives. See D-326 (the gauge is near-blind for eight of twelve).
 // ============================================================================
 
 import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
@@ -39,8 +42,9 @@ import {
   weightForSet,
   WEEKS_PER_CYCLE,
   type WendlerSet,
-  workingNumberForCycle,
+  workingNumberForCycles,
   workingNumberFrom1RM,
+  type WorkingNumberVerdict,
 } from './loading/wendler-531.ts';
 // ⛔ Placement is NOT this file's job any more. `place-week.ts` owns "what day does the bar go on",
 // reading its clearances from `_shared/schedule-session-constraints.ts` — the same law the race-side
@@ -138,6 +142,17 @@ export type StrengthPrimaryArgs = {
   /** ⛔ SWIM IS A COURTESY, NOT A PRESCRIPTION (D-323 item 5). Number of swims to BOOK per week;
    *  0 or absent → none. See `swimSessions` for what the app is and is not claiming here. */
   swimDays?: number;
+  /**
+   * ⛔ WHAT EACH CYCLE EARNED, per lift — Wendler's 95% validity check, finally reachable.
+   *
+   * `verdicts[i]` is earned in cycle i+1 and decides what cycle i+2 carries: `advance` (+5/+10),
+   * `reset` (−10%), `hold` (unchanged — the session was not done, so there is nothing to advance on).
+   *
+   * ⚠️ ABSENT MEANS ADVANCE, which is byte-identical to the old calendar-only behaviour. This is the
+   * seam; the reader that computes verdicts from LOGGED reps cannot live here, because this composer
+   * authors all twelve weeks before a single set has been performed.
+   */
+  cycleVerdicts?: Partial<Record<keyof OneRepMaxes, readonly WorkingNumberVerdict[]>>;
 };
 
 /** ONE prescribed set. `weight` is absolute lb — resolved at authoring off the stored working
@@ -685,7 +700,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     const weekSessions: PlanSession[] = [];
 
     for (const lift of MAIN_LIFTS) {
-      const wn = workingNumberForCycle(training_max[lift.ref], slot.index, lift.isLower);
+      // ⛔ THE ADVANCE IS NOW EARNABLE. `workingNumberForCycle` steps +5 upper / +10 lower by CYCLE
+      // INDEX and reads nothing else — miss every rep in cycle one and the bar still climbs in cycle
+      // two, and again in the next block. That is what makes the strength gauge circular: the plan
+      // raises the bar by calendar, the AMRAP measures the bar it just raised, and that number is
+      // written back as the athlete's 1RM (D-326 layer 2).
+      //
+      // Wendler's own rule is `verdictFrom95Set` — five reps at 95% or the number comes down 10% —
+      // written, correct, and called by NOTHING until now.
+      //
+      // ⚠️ BEHAVIOUR IS UNCHANGED WITHOUT VERDICTS. With none supplied every cycle resolves to
+      // `advance`, which is exactly `workingNumberForCycle`. This is the seam (Constitution Law 6:
+      // a load-bearing change ships behind a behaviour-unchanged proof), not the reader — the reader
+      // needs LOGGED reps, so it cannot live in a composer that authors all twelve weeks up front.
+      const wn = workingNumberForCycles(
+        training_max[lift.ref], slot.index, lift.isLower, args.cycleVerdicts?.[lift.ref],
+      );
       const main = mainLiftRow(lift, wn, oneRepMaxes[lift.ref], setsForWeek(slot.kind, weekInCycle));
       // Jumps and assistance are dropped on the deload — the deload is a volume cut, not a lighter
       // version of the same session [Bosquet 2007, Wang 2023: cut volume, hold intensity].

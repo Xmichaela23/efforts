@@ -199,3 +199,36 @@ export function applyVerdict(
   if (verdict === 'reset') return roundDownToIncrement(workingNumber * (1 - RESET_FRACTION));
   return workingNumber;
 }
+
+/**
+ * ⛔ THE EARNABLE ADVANCE — `workingNumberForCycle` with the verdicts applied in order.
+ *
+ * `workingNumberForCycle(base, cycleIndex, isLowerBody)` takes no performance input at all: it steps
+ * +5 upper / +10 lower per cycle and nothing can stop it. Miss the reps and the bar climbs anyway,
+ * then the AMRAP measures that bar and writes it back as the athlete's 1RM. The plan grades its own
+ * homework (D-326 layer 2).
+ *
+ * This walks the cycles instead, applying each cycle's verdict to decide what the NEXT one carries:
+ *   advance → +5 / +10 (Wendler's step, and what an absent verdict means)
+ *   reset   → −10%, the same mechanism as a stall
+ *   hold    → unchanged; the session was not done, so there is no evidence to advance on
+ *
+ * ⚠️ `verdicts[i]` is the verdict EARNED IN CYCLE i+1, deciding what cycle i+2 gets. A 12-week block
+ * has three cycles and therefore at most two verdicts that matter — the third cycle's is the next
+ * block's problem.
+ *
+ * ⚠️ BEHAVIOUR-UNCHANGED with no verdicts: every cycle resolves to `advance`, which is arithmetically
+ * identical to `workingNumberForCycle`. Asserted in the tests.
+ */
+export function workingNumberForCycles(
+  baseWorkingNumber: number,
+  cycleIndex: number,
+  isLowerBody: boolean,
+  verdicts?: readonly WorkingNumberVerdict[],
+): number {
+  let wn = baseWorkingNumber;
+  for (let step = 0; step < Math.max(0, cycleIndex - 1); step += 1) {
+    wn = applyVerdict(wn, verdicts?.[step] ?? 'advance', isLowerBody);
+  }
+  return wn;
+}
