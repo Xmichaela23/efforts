@@ -102,72 +102,20 @@ function DayPicker({ value, onChange, allowed }: { value: DayName | ''; onChange
 // They stated a ceiling of TWO hard aerobic days. `DOCTRINE-aerobic-maintenance.md` §6 makes it ONE,
 // so the line was wrong, not merely dead, and the dialog fired on a transition that can no longer
 // happen. Michael's call, explicitly: *"it was a late night fun thing, not necessary."*
-// The rule now lives in `QualityDayPicker.blockedBy` — the second hard day is greyed, with the swap
-// one tap away. Do not reinstate a warning here; the gate replaced it.
+// The rule now lives on its own `hardday` card — one question, options limited to the disciplines
+// they kept. Do not reinstate a warning here, and do not re-add a per-discipline picker.
 
-// ⛔ D-327 — ONE HARD AEROBIC DAY. THE SECOND ONE IS GREYED, NOT WARNED.
+// ⛔ D-327 — ONE HARD AEROBIC DAY, and it is now asked ONCE on its own card (`hardday` step).
 //
-// The doctrine (`docs/DOCTRINE-aerobic-maintenance.md` §6) allows a strength-led block exactly ONE hard
-// aerobic session: bike if they have one, hill repeats if not. **"Both" means a choice, not two.**
+// This used to be a `QualityDayPicker` on the run card and another on the bike card, with whichever
+// came second GREYED and a swap offered. That worked, but it was one question wearing two costumes:
+// the block carries exactly one hard aerobic day, so offering two slots and then refusing the second
+// meant the athlete picked a hard run and was told on the next screen it was the worse choice.
+// Framing the ride as a correction rather than the default.
 //
-// So this is a real gate — the first in this flow that refuses a state rather than pricing it. It is
-// refusable BECAUSE the swap is always one tap away: the athlete is never stuck, they are steered.
-// Nothing is lost, the other day is cleared for them, and they never have to back out to change it.
-//
-// ⚠️ SYMMETRIC ON PURPOSE, though the spec only named step 5. Running (step 4) comes before Bike
-// (step 5), so forward-only greying looks sufficient — until someone taps Back from the bike card and
-// sets a second hard day from the run side, which is the one path a forward-only gate cannot see.
-// The gate belongs to the pair, not to the screen.
-function QualityDayPicker({
-  label, hint, value, onChange, blockedBy,
-}: {
-  label: string; hint: string;
-  value: DayName | ''; onChange: (d: DayName | '') => void;
-  /** The hard day already taken on the OTHER discipline. Present → this section is greyed.
-   *  `onSwap` sets this discipline's day and clears the other one, in a single action. */
-  blockedBy?: { day: DayName; note: string; cta: string; onSwap: (d: DayName) => void } | null;
-}) {
-  // Local, not lifted: revealing the chips is a UI step, not a decision. Nothing is committed until a
-  // day is tapped, and backing out of the reveal must leave the athlete exactly where they were.
-  const [revealed, setRevealed] = useState(false);
-  const blocked = !!blockedBy && !value;
-
-  return (
-    <div className={blocked && !revealed ? 'opacity-60' : undefined}>
-      <div className="flex items-baseline justify-between gap-2 mb-2">
-        <p className="text-white/85 text-sm">{label}</p>
-        {value && (
-          <button
-            type="button" onClick={() => onChange('')}
-            className="text-white/65 text-sm underline underline-offset-2"
-          >Clear</button>
-        )}
-      </div>
-
-      {blocked && !revealed ? (
-        <>
-          <p className="text-white/70 text-sm leading-relaxed">{blockedBy!.note}</p>
-          <button
-            type="button"
-            onClick={() => setRevealed(true)}
-            className="mt-2 min-h-[44px] px-4 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
-          >{blockedBy!.cta}</button>
-        </>
-      ) : (
-        <>
-          {/* The swap is ONE action — take this day, clear the other. Never two taps, and never a
-              state where both are set even for a render. */}
-          <DayPicker
-            value={value}
-            onChange={(d) => (blocked && d ? blockedBy!.onSwap(d) : onChange(d))}
-          />
-          <p className="text-white/70 text-sm mt-1.5 leading-relaxed">{hint}</p>
-        </>
-      )}
-    </div>
-  );
-}
-
+// One card, one question, options limited to the disciplines they kept — so there is no second slot
+// to refuse, no greying, and the doctrine's reason gets stated once instead of split across two
+// sections most athletes only ever see one of.
 // Mirror ArcSetupWizard's chip→tier derivation (:2103-2109): barbell present → full_barbell; else DB
 // present → dumbbell_based; else bodyweight_bands. Drives the equipment-aware strength developer default
 // (5×5 needs loadable resistance; a bodyweight/bands athlete falls back to durability).
@@ -230,6 +178,13 @@ type StepKey =
   | 'goal' | 'posture' | 'commitment' | 'length'
   // The old single `schedule` step, split one card per screen (below).
   | 'days' | 'accessory' | 'run' | 'bike' | 'swim'
+  // ⛔ THE ONE HARD SESSION, asked ONCE. It used to be asked per-discipline — a "Hard run day" on
+  // the run card and a "Hard ride day" on the bike card — with D-327 then greying whichever came
+  // second. That is one question wearing two costumes: the block carries exactly ONE hard aerobic
+  // day, so offering two slots and refusing the second was working around a shape that no longer
+  // fits. Its own card, after the disciplines (the options are whatever they kept) and before swim
+  // (which is booked, not coached).
+  | 'hardday'
   | 'confirm';
 
 // ⛔ ONE DISCIPLINE, ONE SCREEN. Michael, 2026-07-25: *"everything should have its own card, no
@@ -252,6 +207,9 @@ function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean): StepKey[]
   if (strengthDevelop) out.push('accessory');
   if (kept('run')) out.push('run');
   if (kept('bike')) out.push('bike');
+  // ⛔ AFTER the disciplines, because the options ARE the disciplines they kept — asking earlier
+  // means offering a hard ride to someone who drops the bike two taps later.
+  if (isStrengthFocus && (kept('run') || kept('bike'))) out.push('hardday');
   // Swim sits last — booked, not coached. It is the slot we merely hold, so it follows the work.
   if (strengthDevelop && state.posture?.swim === 'maintain') out.push('swim');
   return out;
@@ -426,7 +384,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   // as no answer.
   const isStrengthFocus = state.goal === 'get_stronger';
   const posturePresent = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
-  // ⛔ ONE HARD AEROBIC DAY — D-327, and the PAIR enforces it (`QualityDayPicker.blockedBy`).
+  // ⛔ ONE HARD AEROBIC DAY — D-327, enforced by the SHAPE of the `hardday` card (one slot).
   //
   // History, so nobody re-derives it: this was TWO hard days, priced-not-refused, with a one-shot
   // "Mulholland" dialog on the transition to the second. `DOCTRINE-aerobic-maintenance.md` §6 replaced
@@ -434,12 +392,6 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   // dialog and the two-day ceiling line were DELETED at Michael's call, not left dead: the state they
   // fired on cannot occur, and a rule nobody can reach is one somebody tunes later assuming it fires.
   //
-  // D-327 — take this discipline's hard day and release the other's, in one state write. The athlete
-  // taps a day; they never tap "clear" first, and there is no render where both are set.
-  const swapQualityDay = (d: 'run' | 'bike', day: DayName) => setState((s) => ({
-    ...s,
-    qualityDays: { [d]: day } as Partial<Record<'run' | 'bike', DayName>>,
-  }));
   const setQualityDay = (d: 'run' | 'bike', day: DayName | '') => setState((s) => {
     const next = { ...s.qualityDays };
     if (day) next[d] = day; else delete next[d];
@@ -908,21 +860,6 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             </div>
               </>
             )}
-            <QualityDayPicker
-              label="Hard run day"
-              hint="A club night, track repeats, a hard tempo — yours or someone else's. The day it lands, if you have one. It is kept, and it counts as a hard day: intervals draw on the same recovery a heavy squat does."
-              blockedBy={state.qualityDays.bike ? {
-                day: state.qualityDays.bike,
-                // Reached only by tapping Back from the bike card. Stated as fact, then the trade —
-                // and it does NOT offer to swap the bike out on the doctrine's own reasoning: hard
-                // riding costs the legs less than hard running, so the ride is the one to keep.
-                note: `You've got a hard ride ${state.qualityDays.bike}. One hard day a week — hard riding costs your legs less than hard running does, so the ride is the one worth keeping.`,
-                cta: 'Pick a hard run day instead',
-                onSwap: (d) => swapQualityDay('run', d),
-              } : null}
-              value={state.qualityDays.run ?? ''}
-              onChange={(d) => setQualityDay('run', d)}
-            />
           </div>
         </StepLayout>
       )}
@@ -986,23 +923,83 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               <p className="text-white/85 text-sm mb-2">Long ride day</p>
               <DayPicker value={state.longRideDay} onChange={(d) => setState((s) => ({ ...s, longRideDay: d }))} />
             </div>
-            <QualityDayPicker
-              label="Hard ride day"
-              hint="A chaingang, a club ride, a threshold turbo — yours or someone else's. The day it lands, if you have one. It is kept, and it counts as a hard day rather than easy hours."
-              blockedBy={state.qualityDays.run ? {
-                day: state.qualityDays.run,
-                // ⛔ D-327's primary case — step 5 following step 4. The offer to swap is not neutral:
-                // the doctrine says the bike WINS when the athlete has both, so this states why.
-                note: `You've got a hard run ${state.qualityDays.run}. One hard day a week — and hard riding costs your legs less than hard running does, so the ride is the better one to keep. Pick a ride and we'll clear the run.`,
-                cta: 'Pick a hard ride day',
-                onSwap: (d) => swapQualityDay('bike', d),
-              } : null}
-              value={state.qualityDays.bike ?? ''}
-              onChange={(d) => setQualityDay('bike', d)}
-            />
           </div>
         </StepLayout>
       )}
+
+      {/* ⛔ THE ONE HARD SESSION. Asked ONCE, after the disciplines, because the options ARE the
+          disciplines they kept.
+          The doctrine (`DOCTRINE-aerobic-maintenance.md` §6): a strength-led block carries exactly
+          one hard aerobic session, and if the athlete has a bike it is the bike — hard riding costs
+          the legs less than hard running does, which is a TISSUE claim and survives even though the
+          adaptation-interference version is contested. So the bike is pre-selected when they kept
+          one; it is a steer with the reason attached, never an override.
+          ⚠️ "None" is a real answer and its cost is stated. Intensity is the protective variable
+          (Hickson): easy volume alone does not hold the engine. */}
+      {currentStep === 'hardday' && (() => {
+        const kept = (['bike', 'run'] as const).filter((d) => posturePresent(d));
+        const chosen = (['run', 'bike'] as const).find((d) => state.qualityDays[d]) ?? null;
+        // Bike first in the list AND pre-selected — the doctrine's recommendation, shown as the default.
+        const active: 'run' | 'bike' | null = chosen ?? null;
+        const pick = (d: 'run' | 'bike' | null, day?: DayName) => setState((s) => ({
+          ...s,
+          // ⛔ ONE ENTRY, EVER. The map shape is kept because `buildPreferredDays` and everything
+          // downstream reads it, but only one discipline can hold a day now — the card has one slot,
+          // so there is no second to refuse.
+          qualityDays: d && day ? ({ [d]: day } as Partial<Record<'run' | 'bike', DayName>>) : {},
+        }));
+        return (
+          <StepLayout
+            step={stepNo('hardday')} totalSteps={steps.length} title="Your one hard day"
+            subtitle="One hard aerobic session a week. Everything else stays easy — that is what keeps the lifting intact."
+            onBack={back} onContinue={next} canContinue
+          >
+            <div className="space-y-5">
+              <div className="space-y-2">
+                {kept.map((d) => (
+                  <button
+                    key={d} type="button"
+                    onClick={() => pick(d, (state.qualityDays[d] as DayName) || 'tuesday')}
+                    className={`w-full text-left px-4 py-3 rounded-xl border ${
+                      active === d ? 'border-teal-400/70 bg-teal-500/10' : 'border-white/12 bg-white/[0.04]'
+                    }`}
+                  >
+                    <span className="block text-white/90 text-sm">{d === 'bike' ? 'Hard ride' : 'Hard run'}</span>
+                    <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
+                      {d === 'bike'
+                        ? 'Intervals, a chaingang, a threshold turbo. Hard riding costs your legs less than hard running does, so more of the week is left for the bar.'
+                        : 'Hill repeats, a club night, track. Uphill keeps the load down, but it still costs more in the legs than a ride would.'}
+                    </span>
+                  </button>
+                ))}
+                <button
+                  type="button" onClick={() => pick(null)}
+                  className={`w-full text-left px-4 py-3 rounded-xl border ${
+                    active === null ? 'border-teal-400/70 bg-teal-500/10' : 'border-white/12 bg-white/[0.04]'
+                  }`}
+                >
+                  <span className="block text-white/90 text-sm">None</span>
+                  <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
+                    All your endurance stays easy. The aerobic base drifts over these weeks and comes back when the intensity does.
+                  </span>
+                </button>
+              </div>
+              {active && (
+                <div>
+                  <p className="text-white/85 text-sm mb-2">Which day</p>
+                  <DayPicker
+                    value={(state.qualityDays[active] as DayName) || ''}
+                    onChange={(d) => pick(active, d)}
+                  />
+                  <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
+                    Whichever day it actually lands — yours or someone else's. The lifting is placed around it.
+                  </p>
+                </div>
+              )}
+            </div>
+          </StepLayout>
+        );
+      })()}
 
       {/* ⬇ SWIM SITS LAST. It is a courtesy — booked, not coached — so it follows the work rather
           than sitting above the lifting and the running it is subordinate to. The app learns no swim
