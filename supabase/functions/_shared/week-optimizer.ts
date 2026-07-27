@@ -715,8 +715,18 @@ function emitConcurrentSpacingTradeOff(
  * Only the long-day calendar slots themselves remain blocked here; sequential / 48h-POST rules
  * live in `sequentialOk`.
  */
-function lowerBodyBlockedDays(longRide: DayName, longRun: DayName): Set<DayName> {
-  return new Set<DayName>([longRide, longRun]);
+function lowerBodyBlockedDays(_longRide: DayName, longRun: DayName): Set<DayName> {
+  // 2026-07-27: `longRide` removed. The matrix has said `lower_body_strength × long_ride = ✓`
+  // since 2026-05-12 (STRENGTH-PROTOCOL §6.1.2 — ride first, 6h gap, no shared eccentric load),
+  // and `attachSameDayPairingMetadata` already emits the AM/PM split for that pair. This set was
+  // forbidding the one pairing the law was deliberately changed to permit.
+  //
+  // The long RUN stays. That one is eccentric, and it is the single cell §8.2 says actually
+  // matters: heavy lower work may not share or follow the long run inside 24h.
+  //
+  // Placement is now decided by `canPlaceWithModifier` (the matrix) rather than by this
+  // pre-filter, which is the point — one law, consulted, not shadowed by a hardcoded list.
+  return new Set<DayName>([longRun]);
 }
 
 // ── Post-placement load + layout balancer (§6.2 soft-move ordering) ─────────
@@ -1489,7 +1499,10 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     let thirdDay: DayName | undefined;
     for (const c of ALL_DAYS) {
       if (strengthDays.includes(c)) continue;
-      if (c === longRide || c === longRun) continue;
+      if (c === longRun) continue;
+      // Only lower body is cleared onto the long-ride day (matrix ✓ + AM/PM split). Upper stays
+      // off it — not a law, just untouched by the 2026-07-27 change.
+      if (c === longRide && thirdKind !== 'lower_body_strength') continue;
       if (thirdKind === 'lower_body_strength' && noLowerBody.has(c)) continue;
       if (!canPlace(days, c, thirdKind)) continue;
       if (!sequentialOk(days, c, thirdKind, inputs.athlete)) continue;
@@ -1601,7 +1614,9 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
 
             for (const lc of lowerCandidatesBase) {
               if (lc === uc) continue;
-              if (lc === longRide || lc === longRun) continue;
+              // longRide is NOT excluded here — see `lowerBodyBlockedDays`. The matrix permits
+              // lower + long ride same day; `canPlaceWithModifier` below is the gate.
+              if (lc === longRun) continue;
               if (noLowerBody.has(lc)) continue;
               if (days[lc].length >= 2) continue;
               if (!canPlaceWithModifier(trial, lc, 'lower_body_strength', inputs.athlete)) continue;
@@ -1761,7 +1776,8 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           for (const c of lowerCandidates) {
             if (restrictTo && c !== restrictTo) continue;
             if (upperDay && c === upperDay) continue;
-            if (c === longRide || c === longRun) continue;
+            // longRide is NOT excluded here — see `lowerBodyBlockedDays`.
+            if (c === longRun) continue;
             if (noLowerBody.has(c)) continue;
             if (days[c].length >= 2) continue;
             if (!canPlaceWithModifier(days, c, 'lower_body_strength', inputs.athlete)) continue;
@@ -2027,7 +2043,9 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     const thirdKind: SessionKind = upperCount > lowerCount ? 'lower_body_strength' : 'upper_body_strength';
     for (const c of ALL_DAYS) {
       if (sd.includes(c)) continue;
-      if (c === longRide || c === longRun) continue;
+      if (c === longRun) continue;
+      // See the sibling block above — lower body only.
+      if (c === longRide && thirdKind !== 'lower_body_strength') continue;
       if (thirdKind === 'lower_body_strength' && noLowerBody.has(c)) continue;
       if (trial[c].some((s) => s.kind === 'quality_bike' || s.kind === 'quality_run')) continue;
       if (!canPlace(trial, c, thirdKind)) continue;
