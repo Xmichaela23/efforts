@@ -113,7 +113,11 @@ type PlannedSet = { weight: number; reps: number; amrap?: boolean };
 
 type StrengthExercise = {
   name: string;
-  sets: number;
+  /** ⛔ OPTIONAL, because an assistance row genuinely has no set count — it carries a REP TOTAL the
+   *  athlete splits however they like. It was `1`, which rendered as "1×25" and asserted a single
+   *  set of twenty-five that the prescription never asked for. Absent is the honest value; a main
+   *  lift still carries its three. */
+  sets?: number;
   reps: number | string;
   weight: string | number;
   /** True fraction of the athlete's 1RM (0–1) for the top set. Feeds the RIR chart (D-322).
@@ -189,8 +193,18 @@ export const JUMPS: StrengthExercise = { name: 'Box Jump', sets: 3, reps: 5, wei
 function assistanceRows(picks: AssistancePicks | null | undefined): StrengthExercise[] {
   return resolveAssistance(picks).map((a) => ({
     name: a.name,
-    sets: 1,
-    reps: a.totalReps,
+    // ⛔ `sets: 1` RENDERED AS "1×25" AND THAT IS A LIE ABOUT THE PRESCRIPTION.
+    //
+    // 25 is a TOTAL, to be broken up however the athlete likes that day — 5×5, 2×12, whatever.
+    // `ASSISTANCE_GUIDANCE` says exactly that and rides in the session description, but the row
+    // shouted "1×25" over the top of it. Michael, reading his own plan: *"25 chin ups? lol i can
+    // do 5."* He can do five. The prescription never asked for twenty-five in a row.
+    //
+    // `sets: undefined` so no consumer can render a set count that was never prescribed, and the rep
+    // field carries the unit in words. The number is unchanged — only the claim about how it is
+    // performed. ⚠️ `reps` is typed `number | string` precisely for this kind of qualitative row.
+    sets: undefined,
+    reps: `${a.totalReps} total`,
     weight: 'By feel',
     load_prescribed: false,
   }));

@@ -158,8 +158,17 @@ Deno.test('a work session is jumps → main lift → 25 reps each of push / pull
   const rows = sessionsFor(1).find((s) => s.name === 'Strength — Bench Press')!.strength_exercises!;
   // Defaults, because this plan was built with no picks — skipping the card still yields a block.
   assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Bench Press', 'Push Up', 'Pull Up', 'Reverse Lunge']);
-  assertEquals(JUMPS.sets * (JUMPS.reps as number), 15); // 10–15 jumps or throws
-  for (const r of rows.slice(2) as any[]) assertEquals(r.reps, 25);
+  // `sets` is optional on the type now (assistance rows carry a rep TOTAL and no set count), but the
+  // jump row always has one — 3×5 = 15, the top of Wendler's 10–15 jumps or throws.
+  assertEquals(JUMPS.sets! * (JUMPS.reps as number), 15);
+  // ⛔ A REP TOTAL, NOT A SET. Was `assertEquals(r.reps, 25)` alongside `sets: 1`, which rendered as
+  // "1×25" and asserted a single set of twenty-five the prescription never asked for. The number is
+  // unchanged; what is asserted now is that the row makes no claim about how it is performed.
+  for (const r of rows.slice(2) as any[]) {
+    assertEquals(r.reps, '25 total');
+    assertEquals(r.sets, undefined, `${r.name} carries a set count it was never prescribed`);
+    assertEquals(r.load_prescribed, false, `${r.name} must carry no prescribed load`);
+  }
 });
 
 Deno.test('the athlete’s picks reach the block, and an unknown name falls back rather than failing', () => {

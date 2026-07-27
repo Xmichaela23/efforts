@@ -1933,8 +1933,36 @@ function expandTokensForRow(
                   : null);
           const isPreResolvedNumeric = preResolvedNum != null && preResolvedNum > 0;
 
+          // ⛔ THE COMPOSER CAN SAY "THIS ROW CARRIES NO PRESCRIBED LOAD", AND UNTIL NOW NOTHING LISTENED.
+          //
+          // `load_prescribed: false` is set on every assistance row the Get Stronger composer authors
+          // (D-324). It appeared in exactly TWO files — the composer that sets it and the composer's
+          // test — and no consumer had ever read it. So this branch chain priced them anyway, off
+          // `exerciseConfig.ratio`, and the athlete was handed `Dips: 1×25 @ 95 lb` and
+          // `Single Leg Hip Thrust: 1×25 @ 95 lb` (0.90 × deadlift × ~70%; identical numbers only
+          // because that athlete's bench and deadlift both happened to be 150).
+          //
+          // `assistance-menu.ts` is explicit about why this must not happen, and names the trap: the
+          // ratios for these movements are KNOWN-WRONG (Single Leg Hip Thrust carries the TWO-LEGGED
+          // 0.9× deadlift ratio; Dumbbell Overhead Press resolves to the barbell entry) — harmless
+          // ONLY because nothing on that menu is ever supposed to be priced.
+          // ⛔ Its own words: "Do not 'fix' this by deriving a weight — the absence is the design."
+          //
+          // Assistance is auto-regulated on purpose: the app states the MOVEMENT and a REP TOTAL, and
+          // the athlete picks a load that feels about 7/10. A derived number replaces that judgement
+          // with a wrong one, and 25 reps at a fabricated load turns an assistance slot into the
+          // session's hardest work.
+          if ((ex as any)?.load_prescribed === false) {
+            weightDisplay = undefined;
+            prescribed = undefined;
+            percent_1rm = undefined;
+            resolved_from = undefined;
+            // ⚠️ NOT a missing baseline. There is nothing to look up and nothing for the athlete to
+            // enter — flagging it would invite the resolver to ask for a number that must not exist.
+            baselineMissing = false;
+            requiredBaseline = undefined;
           // If the prescription is qualitative (e.g., "Light"), preserve it as display text.
-          if (!isSlotSwapped && isQualitativeStrengthWeight((ex as any)?.weight)) {
+          } else if (!isSlotSwapped && isQualitativeStrengthWeight((ex as any)?.weight)) {
             weightDisplay = qualitativeWeightDisplay((ex as any)?.weight);
             baselineMissing = false;
             requiredBaseline = undefined;
@@ -2187,8 +2215,36 @@ function expandTokensForRow(
                   : null);
           const isPreResolvedNumeric2 = preResolvedNum2 != null && preResolvedNum2 > 0;
 
+          // ⛔ THE COMPOSER CAN SAY "THIS ROW CARRIES NO PRESCRIBED LOAD", AND UNTIL NOW NOTHING LISTENED.
+          //
+          // `load_prescribed: false` is set on every assistance row the Get Stronger composer authors
+          // (D-324). It appeared in exactly TWO files — the composer that sets it and the composer's
+          // test — and no consumer had ever read it. So this branch chain priced them anyway, off
+          // `exerciseConfig.ratio`, and the athlete was handed `Dips: 1×25 @ 95 lb` and
+          // `Single Leg Hip Thrust: 1×25 @ 95 lb` (0.90 × deadlift × ~70%; identical numbers only
+          // because that athlete's bench and deadlift both happened to be 150).
+          //
+          // `assistance-menu.ts` is explicit about why this must not happen, and names the trap: the
+          // ratios for these movements are KNOWN-WRONG (Single Leg Hip Thrust carries the TWO-LEGGED
+          // 0.9× deadlift ratio; Dumbbell Overhead Press resolves to the barbell entry) — harmless
+          // ONLY because nothing on that menu is ever supposed to be priced.
+          // ⛔ Its own words: "Do not 'fix' this by deriving a weight — the absence is the design."
+          //
+          // Assistance is auto-regulated on purpose: the app states the MOVEMENT and a REP TOTAL, and
+          // the athlete picks a load that feels about 7/10. A derived number replaces that judgement
+          // with a wrong one, and 25 reps at a fabricated load turns an assistance slot into the
+          // session's hardest work.
+          if ((ex as any)?.load_prescribed === false) {
+            weightDisplay = undefined;
+            prescribed = undefined;
+            percent_1rm = undefined;
+            resolved_from = undefined;
+            // ⚠️ NOT a missing baseline. There is nothing to look up and nothing for the athlete to
+            // enter — flagging it would invite the resolver to ask for a number that must not exist.
+            baselineMissing = false;
+            requiredBaseline = undefined;
           // If the prescription is qualitative (e.g., "Light"), preserve it as display text.
-          if (!isSlotSwapped && isQualitativeStrengthWeight((ex as any)?.weight)) {
+          } else if (!isSlotSwapped && isQualitativeStrengthWeight((ex as any)?.weight)) {
             weightDisplay = qualitativeWeightDisplay((ex as any)?.weight);
             baselineMissing = false;
             requiredBaseline = undefined;
