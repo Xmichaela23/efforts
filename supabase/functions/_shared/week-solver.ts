@@ -119,8 +119,16 @@ export type PlacedLift = {
   lift: string;
   isLower: boolean;
   day: SolverDay;
-  /** Set when this lift shares its day with an anchor. */
-  stackedWith?: { label: string; gapHours: number };
+  /**
+   * Set when this lift shares its day with an anchor.
+   *
+   * ⛔ `order` WAS MISSING UNTIL THE REVERSE INVENTORY. §4.1 says a stacked day is ONE BUCKET,
+   * ORDERED — and the solver emitted the pairing without ever saying which comes first. Eddens is
+   * the whole reason the stack is safe: resistance BEFORE endurance, +6.91% lower-body dynamic
+   * strength, in exactly the "must train concurrently with minimal relief" case this is. A stack
+   * with no stated order is the finding discarded at the output boundary.
+   */
+  stackedWith?: { label: string; gapHours: number; order: 'lift_first' };
 };
 
 export type SolvedWeek = {
@@ -281,12 +289,25 @@ function scoreKey(
   }
   const upperSpreadPenalty = upperIdx.length > 0 && assignment.length > 1 ? -tightestUpper : 0;
 
-  // 4. §5.0a — anchors landing on consecutive days is a real cost, and it is the athlete's own
-  //    two picks that caused it. Scored, never corrected: anchors are hard (§2.3).
+  // 4. §5.0a + §2.2 — anchors landing on consecutive days is a real cost, and it is the athlete's
+  //    own two picks that caused it. Scored, never corrected: anchors are hard (§2.3).
+  //
+  //    ⛔ THE PAIR MATTERS, NOT JUST THE ADJACENCY. Found by the reverse inventory: this counted
+  //    every adjacent anchor pair as +1, so a hard run beside the long run — which §2.2 calls
+  //    **THE REAL CONFLICT**, both eccentric — priced identically to an easy swim beside a long
+  //    ride, which costs nothing. §5 line 4 ("quality on clean legs — the hard day not preceded by
+  //    an eccentric anchor") had no term at all. The law already knows which pairs are expensive:
+  //    `adjacencyPenaltyReason` is exactly that list, and it was only ever consulted for
+  //    anchor→LIFT pairs, never anchor→anchor.
   let shapePenalty = 0;
   for (let i = 0; i < anchors.length; i++) {
     for (let j = i + 1; j < anchors.length; j++) {
-      if (gapDays(anchors[i].dayIndex, anchors[j].dayIndex) === 1) shapePenalty += 1;
+      if (gapDays(anchors[i].dayIndex, anchors[j].dayIndex) !== 1) continue;
+      shapePenalty += 1;
+      // Which one is "before" depends on the calendar order of the two days.
+      const [first, second] = anchors[i].dayIndex === (anchors[j].dayIndex + 1) % 7
+        ? [anchors[j], anchors[i]] : [anchors[i], anchors[j]];
+      if (adjacencyPenaltyReason(first.kind, second.kind)) shapePenalty += 3;
     }
   }
 
@@ -502,6 +523,8 @@ export function solve(input: SolverInput): SolverResult {
                   stackedWith: {
                     label: anchorHere.label,
                     gapHours: stackNeedsRecoveryGap(anchorHere.kind, kind) ? 6 : 0,
+                    // §4.1 / Eddens — always, and it is not a courtesy. It is why the stack is safe.
+                    order: 'lift_first' as const,
                   },
                 }
               : {}),

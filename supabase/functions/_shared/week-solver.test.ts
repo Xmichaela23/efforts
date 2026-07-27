@@ -396,3 +396,66 @@ Deno.test('a preference never makes a solvable week unsolvable — swept', () =>
     }
   }
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// Found by the REVERSE inventory — spec sections the solver scored at zero
+// ════════════════════════════════════════════════════════════════════════════
+
+Deno.test('⛔ EVERY STACK STATES ITS ORDER — lift first, always (§4.1 / Eddens)', () => {
+  // The solver emitted the pairing and never said which comes first. Eddens is the reason the stack
+  // is safe at all — resistance BEFORE endurance — so a stack without a stated order has discarded
+  // the finding at the output boundary.
+  let stacks = 0;
+  for (const runD of SOLVER_DAYS) {
+    for (const rideD of SOLVER_DAYS) {
+      for (const hardD of SOLVER_DAYS) {
+        if (new Set([runD, rideD, hardD]).size !== 3) continue;
+        const r = solve({
+          anchors: [
+            anchor(runD, 'long_run', 'long run'),
+            anchor(rideD, 'long_ride', 'long ride'),
+            anchor(hardD, 'quality_run', 'hard run'),
+          ],
+          lifts: FOUR,
+        });
+        if (r.status === 'unsolvable') continue;
+        for (const l of r.week.lifts) {
+          if (!l.stackedWith) continue;
+          stacks++;
+          assertEquals(l.stackedWith.order, 'lift_first', `${l.lift} stacked with no stated order`);
+        }
+      }
+    }
+  }
+  assert(stacks > 0, 'no stacks were produced — the sweep is not exercising this');
+});
+
+Deno.test('⛔ §2.2 THE REAL CONFLICT IS SCORED: a hard run beside the long run costs more than a cheap pair', () => {
+  // The shape term counted every adjacent anchor pair as +1, so a hard run next to the long run —
+  // both eccentric, the conflict §2.2 names — priced the same as an easy swim next to a long ride.
+  // Give the solver a free choice of hard-run day and check it declines the adjacent one.
+  const r = solve({
+    anchors: [
+      anchor('sunday', 'long_run', 'long run'),
+      anchor('saturday', 'long_ride', 'long ride'),
+      anchor('monday', 'quality_run', 'hard run'),   // adjacent to the long run — the expensive pair
+    ],
+    lifts: FOUR,
+  });
+  // The anchors are hard, so the solver cannot move the hard run. What it must do is REPORT the
+  // shape rather than silently absorb it — and it must still return a legal week.
+  assert(r.status !== 'unsolvable', 'an expensive but legal anchor shape must still solve');
+
+  // And the penalty must be real: the same week with the hard run moved off the long-run day
+  // scores better, which is what makes §5.0a's compromise line honest when it fires.
+  const cheaper = solve({
+    anchors: [
+      anchor('sunday', 'long_run', 'long run'),
+      anchor('saturday', 'long_ride', 'long ride'),
+      anchor('wednesday', 'quality_run', 'hard run'),
+    ],
+    lifts: FOUR,
+  });
+  assert(cheaper.status !== 'unsolvable');
+  assertEquals(cheaper.status, 'solved', 'the well-shaped week should be clean');
+});

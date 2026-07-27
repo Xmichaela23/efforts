@@ -497,6 +497,29 @@ for.**
 menu deliberately excludes it. Restated here because forbidding it in the menu did not stop three
 modules doing it anyway — each in a different place, none of them via the menu.
 
+#### ⛔ AND IN ONE MODULE IT WAS NOT AN ACCIDENT — IT WAS THE STATED POLICY
+
+`week-optimizer`'s relax-tier comment, verbatim:
+
+> *"If the engine can't satisfy 48h vs long, it should **drop a strength session** instead of
+> compromising the long-session recovery window."*
+
+⚠️ **THIS IS WRITTEN DOWN AS DOCTRINE, WITH A RATIONALE THAT SOUNDS RESPONSIBLE.** Protecting the
+long-session recovery window is a real goal. That makes it **re-arguable in good faith**, which is
+more dangerous than a slip — a slip gets fixed once, a reasoned position gets reintroduced by the
+next person who finds the reasoning persuasive. So it is refuted here, not merely forbidden:
+
+| the argument | why it fails |
+|---|---|
+| *"Breaching 48h compromises the long-session recovery window"* | It does, and the solver **says so, by name, with both numbers**. The athlete then knows their Tuesday squat sits 24h from Sunday's long run and can act on it. Nothing is compromised in the dark |
+| *"Dropping the lift protects the window"* | It protects the window by **deleting training the athlete asked for**, and telling no one. The window is intact and the block is not. A 4-day lifting arc that quietly runs 3 days is not a protected week, it is a different plan |
+| *"The engine has to choose one"* | **It does not.** That is the false dilemma the whole fourth fate exists to dissolve. The third option is to place the week, name what it cost, and let the athlete decide — which is §5.2's menu, and it was available the entire time |
+
+✅ **THE ONE-LINE ANSWER, for when this comes back:** *the recovery window is protected by breaching
+and NAMING, never by deleting a session the athlete asked for.* A week that quietly returns less than
+was requested is precisely the failure the fourth fate exists to prevent — and it does not stop being
+that failure because the reason for it was a good one.
+
 ### When neither relaxation yields a legal week
 
 ⛔ **Return the unsolvable shape and NAME THE ANCHORS AS THE BINDING CONSTRAINT.** Not a generic
@@ -721,6 +744,55 @@ finding, not a failure** — and it is the clearest evidence yet for why the col
 solver does not have them because it does not place endurance. **The day it does, this table is the
 starting list** — do not re-derive them.
 
+### 6b-6 ⛔ THE REVERSE INVENTORY — the spec against the SOLVER
+
+**Michael, 2026-07-27:** *"§4.2 has been in the spec since it was written, and the solver scored it at
+zero — found only because a module you were inventorying happened to implement it… If a stated
+preference could be worth zero without anyone noticing, so could a stated constraint."*
+
+⛔ **EVERY INVENTORY SO FAR POINTED AT THE OLD CODE. THIS ONE POINTS AT THE NEW.** Each spec section
+is either a **named term in the solver** or an **explicit absence with a reason**.
+
+| § | requirement | in the solver |
+|---|---|---|
+| 0a #1-3 | anchors immovable | ✅ type-level — no code path relocates one |
+| 0a #4 | four lifting **days** | ✅ one lift per day, enforced in the candidate loop |
+| 0a #5 | the clearance law | ✅ `requiredAdjacencyHours`, per pair |
+| 0a.1 | days per week is an output | ✅ no `days_per_week` input exists |
+| 0a.2 | priced on the load it adds | ⚠️ **absent with reason** — governs session *content* (descents, strides), not placement. Lives in the composer |
+| 0b | Monday-first | ✅ `SOLVER_DAYS` |
+| 0c | currency: hours, never forbidden days | ✅ `adjacencyBreach` per candidate day, per kind. No day-set exists in the file |
+| 1 | anchors first | ✅ anchors placed before enumeration |
+| 2.1 | eccentric ratings | ✅ carried by the adjacency table (48h vs 24h vs 0h) |
+| 2.2 | **hard day beside the long run is THE REAL CONFLICT** | ⛔ **WAS ABSENT — reverse find B.** The shape term counted every adjacent anchor pair as +1, so the eccentric pair priced the same as an easy swim beside a long ride. **Fixed** — the pair is looked up in `adjacencyPenaltyReason`, which is the law's own list of expensive orders and had only ever been consulted anchor→lift |
+| 2.3 | anchors do not yield to each other | ✅ `SOLVER_GRIDLOCK_ANCHOR_COLLISION`, both named, no winner picked |
+| 3 | budgets are ceilings, never adjacency inputs | ✅ no budget term participates in filtering |
+| 4.1 | a stacked day is ONE BUCKET, **ORDERED** | ⛔ **WAS ABSENT — reverse find A.** The solver emitted the pairing and never said which came first. Eddens is *why the stack is safe*; a stack with no stated order discards the finding at the output boundary. **Fixed** — `stackedWith.order: 'lift_first'` |
+| 4.1a | methodology constraints owned | ✅ `MethodologyConstraint` requires owner + reason |
+| 4.2 | preferred days scored, not hard | ✅ **added by the `week-optimizer` inventory** — it was worth zero before |
+| 5 line 1 | rest days | ✅ `restShortfall` |
+| 5 line 2 | primary lifts protected | ✅ breach magnitude |
+| 5 line 3 | spread past the minimum | ✅ tightest-pair, plus the 3-day floor |
+| 5 line 4 | **quality on clean legs** | ⛔ **same gap as 2.2** — now scored |
+| 5 line 5 | week shape | ✅ `shapePenalty` |
+| 5 line 6 | preferred days | ✅ |
+| 5 line 7 | budgets | ⚠️ **absent with reason** — hours and miles are the caller's; the solver's only budget is `MAX_ACTIVE_DAYS` |
+| 5.1 | determinism + canonical tie-break | ✅ canonical order, swept, shuffle-tested |
+| 5.2 | the relaxation menu, in order | ✅ two tiers, dropping a session absent by construction |
+| 5.2a | typed refusal, options, binding anchors | ✅ three codes |
+| 5.2b | never subtract | ✅ swept — no refusal offers to drop anything |
+| 6c | compromises in the output type | ✅ `status: 'compromised'` |
+| 8.1 | the stacking table | ✅ read via `SAME_DAY_COMPATIBLE` |
+| 8.2 | the adjacency table | ✅ read via `requiredAdjacencyHours` |
+| 8.2a | day before the long run | ✅ falls out of the table — upper free, heavy legs 48h |
+
+**COUNT: 30 requirements — 26 present, 2 absent with a stated reason, 2 found absent and fixed.**
+
+⛔ **BOTH REVERSE FINDS WERE OUTPUT-BOUNDARY LOSSES, WHICH IS THE PATTERN WORTH KEEPING.** Neither was
+a wrong rule. In both cases the solver computed the right week and then **failed to say something the
+spec required it to say** — the stack order, and which anchor pair was expensive. A spec section can
+be silently worth zero when it describes what the answer must *carry* rather than how it is *found*.
+
 ### 6b-3a ⛔ EVERY REMAINING MODULE GETS AN INVENTORY BEFORE IT DIES. NOT JUST THIS ONE.
 
 **The reason the `place-week` pass paid off twice is a property, not luck.** That file was
@@ -740,8 +812,18 @@ mistake the systematic pass just caught twice in one file.
 | `place-week` | ✅ done — §6b-3, 17 entries, 14 present / 2 rejected / 1 n/a |
 | `week-optimizer` | ✅ done — §6b-5, 28 entries, ratio inverted (3 present / 13 rejected), 2 finds |
 | `placement/` surviving parts | ⛔ required — and note §6b-2: presumed over-broad, so expect more rejections than adoptions |
-| `base-generator` | ⛔ required — a fixed grid still encodes decisions about what a run week looks like |
+| `base-generator` | ⛔ required — a fixed grid still encodes decisions about what a run week looks like. ⚠️ **AND STEP 3 IS TWO JOBS, NOT ONE** — see below |
 | `tri-generator` | ⛔ required |
+
+⛔ **STEP 3 IS HALF UPSTREAM WORK, AND SCOPING IT AS SOLVER WORK WILL MAKE IT LOOK LIKE A SOLVER
+FAILURE.** The solver takes anchors as **immovable inputs** — it cannot honour a pin the caller never
+passes it. `base-generator`'s defect is that `schedule_preferences.long_run_day` is declared at
+`generate-run-plan/types.ts:264` and **read nowhere in that function**. That is upstream of placement
+entirely.
+
+**So the tripwire goes green only when BOTH halves land:** the caller reads the athlete's preference
+and passes it as an anchor, *and* the solver places the week around it. Scope both, or step 3 reads
+as the solver failing at something it was never given.
 
 ⚠️ **Expect the ratio to differ per module and do not read that as failure.** `place-week` came out
 14-present / 2-rejected because it reads the law. `placement/` will come out the other way round
