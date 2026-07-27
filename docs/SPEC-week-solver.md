@@ -397,6 +397,52 @@ isn't a better algorithm — it's collapsing three into one."*
 
 **That is the root cause of the layout problems, not any one engine being wrong.**
 
+> ### ⛔ UPDATED 2026-07-27 — IT WAS SIX, IT IS NOW FIVE, AND THE DISAGREEMENTS ARE ENUMERATED IN §6b-1.
+> The three named below are the three that were *known*. The placement audit found three more:
+> `_shared/resolve-schedule-collisions.ts` (**deleted** — dead, three sweeps, zero effect),
+> `generate-run-plan/generators/base-generator.ts` (a fixed grid behind six run generators), and
+> `generate-triathlon-plan/generators/tri-generator.ts` (a full hardcoded week).
+> **Read §6b-1 before writing solver code** — it is the union of what all five actually decide, and
+> every place they contradict each other.
+
+### 6b-1 ⛔ THE UNION OF LIVE PLACEMENT BEHAVIOUR — every disagreement, enumerated
+
+**Built 2026-07-27, by reading all five.** C4 (the day before the long run) surfaced *by accident*;
+this section exists so the rest did not have to.
+
+**The five live deciders**
+
+| # | module | decides for | consults the law? |
+|---|---|---|---|
+| A | `_shared/week-optimizer.ts` | combined + tri plans | ✅ matrix + `sequentialOk` |
+| B | `shared/strength-system/place-week.ts` | Get Stronger (4 lifts) | ✅ matrix + adjacency table (since 2026-07-27) |
+| C | `shared/strength-system/placement/` | run-plan strength + adapt-plan relayout | ⛔ **never** — its own role/slot model |
+| D | `generate-run-plan/generators/base-generator.ts` | the endurance week for **six** run generators | ⛔ never — literal weekdays |
+| E | `generate-triathlon-plan/generators/tri-generator.ts` | standalone tri week | ⛔ never — literal weekdays |
+
+**THE DISAGREEMENTS**
+
+| # | question | the split |
+|---|---|---|
+| **X1** | **the long-run day** | A and B take it as an athlete anchor. E defaults Sunday but honours `preferred_days`. ⛔ **D HARDCODES SUNDAY AND CANNOT BE TOLD OTHERWISE** — `schedule_preferences.long_run_day` exists in `generate-run-plan/types.ts:264` and is **read nowhere in that function**. A run-plan athlete who says Saturday gets Sunday, silently |
+| **X2** | **Saturday** | ⛔ **D makes Saturday a hard rest day, always.** A, B and E all treat it as a working day — it is E's and A's default long-*ride* day. Two modules cannot both be right about the same weekday |
+| **X3** | **quality days** | D hardcodes Tue/Thu. E hardcodes quality_bike Tue + quality_run Wed. A derives them. ⚠️ And E derives `quality_run` from **`preferred_days.swim[1]`** when no run pin exists — a run day taken from a swim preference |
+| **X4** | **heavy legs vs long run** | **Resolved — see §8.2a.** The table says 48h and upper is free; A says 48h-post/24h-pre; C forbids *all* strength the day before. Neither module is right |
+| **X5** | **heavy legs vs quality** | ⛔ **NEW, and the same shape as X4.** C's `lowerBufferQuality` forbids lower the day before **any** quality day. The table says 24h — which an adjacent day already satisfies. **C is over-broad on the quality axis exactly as it is on the long-run axis** |
+| **X6** | **strength frequency** | A's type is `1\|2\|3` and *cannot represent* a 4-lift week. B is exactly 4. C handles 2/3/4. ⛔ And `adapt-plan`'s relayout gate fires **only at 2 or 3**, so a Q-088 freq-4 week is never relaid out — silently |
+| **X7** | **where upper goes** | C treats `day_after_long` as a **semantic role** — upper belongs after the long run. B treats upper as filler that stacks onto endurance days. A treats it as a spacing problem only. Three different theories of the same session |
+| **X8** | **the rest day** | B guarantees exactly one (`MAX_ACTIVE_DAYS = 6`). A derives `7 − training_days` and **does not enforce it** (Q-206). C at freq ≥ 4 *deliberately consumes* rest days (`allowNonRunDays`). D fixes it to Saturday |
+| **X9** | **tie-breaking** | Four different answers. B: spread desc → `dayIndex`. A: fixed vectors `[mon,thu,tue,fri,wed,sun,sat]`. C: `distLong + 0.8·distQuality` → Sunday-first ring. D/E: literal. ⚠️ Plus **two week-start conventions** — Mon-first in B and D, Sun-first in A and C |
+| **X10** | **the same-day matrix** | A and B read it. ⛔ **C, D and E have never read it.** Three of five deciders have no access to the law at all |
+
+⛔ **X1, X2 and X10 together are the headline: the six run generators place a whole week without ever
+seeing the athlete's day preferences OR the law.** That is a larger surface than the strength
+placement everyone has been looking at.
+
+✅ **What they agree on, and it is worth stating** — every module keeps the long run and the long ride
+apart from heavy legs in *some* form, and every module reserves *some* rest. The disagreements are
+about how much and measured how, never about whether.
+
 | authority | owns | entry points |
 |---|---|---|
 | **`placement/`** (`simple.ts`, `strategy.ts`) | Run-plan strength | ⛔ **TWO — plan CREATION (`generate-run-plan` → `strength-overlay`) and RELAYOUT (`adapt-plan` → `buildStrengthSessionsForPlanWeek`)** |
