@@ -404,32 +404,44 @@ sequence*. Order is Eddens: **resistance first when they cannot be separated** (
 dynamic strength, and only for those who cannot separate — §6). That is a third dimension the
 existing matrix has no room for and the solver must carry.
 
-### 8.2 ADJACENCY — ⛔ THE TABLE THAT DOES NOT EXIST
+### 8.2 ADJACENCY — ✅ BUILT 2026-07-27
 
-What exists is not a grid. It is two lists, and both are relative to `lower_body_strength` only:
+**The table is in code.** `_shared/schedule-session-constraints.ts` → `ADJACENCY_HOURS` (hours,
+symmetric, asserted at module load) + `ADJACENCY_PENALTIES` (legal-but-costly, directional), read via
+`requiredAdjacencyHours(a, b)` and `adjacencyPenaltyReason(before, after)`. Pinned by
+`_shared/adjacency-table.test.ts`, 11 tests.
 
-- `LEG_QUALITY_KINDS` (`quality_bike`, `quality_run`) → **≥24h** from lower body, both directions
-- `LEG_LONG_KINDS` (`long_ride`, `long_run`) → **≥48h** from lower body, both directions
+**What it replaced.** Two lists — `LEG_QUALITY_KINDS` and `LEG_LONG_KINDS` — both relative to
+`lower_body_strength` only, so every pair NOT involving a lift was undefined. Long run beside a hard
+run, hard run beside a long ride, easy run beside anything: no rule anywhere. Those were not
+permissive decisions, they were **empty cells**, and each one surfaced later as a "leak" in a
+generated week. Both lists and `isLegLoadedAtIntensity` are now **deleted** — they were the table's
+`lower_body_strength` row and nothing more, and `place-week.requiredClearanceHours` reads that row
+out of the table so there is one authority instead of two that can drift.
 
-⛔ **Every other pair is undefined.** Long run → hard day, hard day → long ride, lower → upper, easy
-run → long run: none of these has a rule anywhere. **They are the empty cells.** The solver needs the
-full grid; anything absent will be discovered later as another "leak."
-
-⚠️ **`upper_body_strength` and swim are `neutral`/`upper` prime movers and constrain nothing** — those
-rows and columns are trivially permissive. **The real grid is the six leg-loaded types**, which is 36
-cells and readable on one screen:
+⚠️ **`upper_body_strength` and both swims have no row, on purpose.** `SESSION_PRIME_MOVER` rates them
+`upper`/`neutral`; giving them an all-zero row would imply a constraint exists to be tuned.
+**The grid is the seven leg-loaded kinds** (the six below, plus `easy_bike`, which the original
+sketch omitted):
 
 |  ↓ before / after → | Squat | Deadlift | Long run | Hard day | Long ride | Easy run |
 |---|---|---|---|---|---|---|
-| **Squat** | ≥48h | ≥48h | ≥48h | ≥24h | ⚠️ §8.4 | OK |
-| **Deadlift** | ≥48h | ≥48h | ≥48h | ≥24h | ⚠️ §8.4 | OK |
-| **Long run** | ≥48h | ≥48h | — | **penalty — both eccentric (§2.2)** | OK, order matters | OK |
-| **Hard day** | ≥24h | ≥24h | **penalty (§2.2)** | — | OK | OK |
-| **Long ride** | ⚠️ §8.4 | ⚠️ §8.4 | **OK — ride before run, never after** | OK | — | OK |
+| **Squat** | ≥48h | ≥48h | **≥48h** | ≥24h | **0h — §8.4 resolved** | OK |
+| **Deadlift** | ≥48h | ≥48h | **≥48h** | ≥24h | **0h — §8.4 resolved** | OK |
+| **Long run** | ≥48h | ≥48h | — | penalty — both eccentric (§2.2) | penalty — ride first | OK |
+| **Hard day** | ≥24h | ≥24h | penalty (§2.2) | — | OK | OK |
+| **Long ride** | **0h** | **0h** | OK — ride before run, never after | OK | — | OK |
 | **Easy run** | OK | OK | OK | OK | OK | OK |
 
 **Cells marked OK are the majority and that is expected — most pairs are trivially legal.** The value
 of drawing it is that the handful which are not are now enumerated rather than discovered.
+
+⛔ **Two ratings deliberately withheld, so the solver does not acquire a second opinion:**
+- `quality_run` × `quality_bike` — two hard days back to back is a hard/easy question, already owned
+  by `sequentialOk` and `enforceHardEasy`. Adding it here would be a second ranking of one fact,
+  which §5 forbids.
+- `long_run` × `quality_bike` — **not penalised.** The §2.2 conflict is between two *running*
+  sessions. The bike carries no eccentric load; "hard day" in the sketch above meant the hard RUN.
 
 ### 8.3 ⛔ THE COMPOSER CONTRADICTS THE STACKING TABLE, ON EVERY WEEK IT HAS BUILT
 

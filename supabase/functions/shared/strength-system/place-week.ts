@@ -29,9 +29,8 @@
 // ============================================================================
 
 import {
-  LEG_LONG_KINDS,
-  LEG_QUALITY_KINDS,
   type MatrixSessionKind,
+  requiredAdjacencyHours,
 } from '../../_shared/schedule-session-constraints.ts';
 
 export type DayName =
@@ -161,9 +160,11 @@ function gapDays(a: DayName, b: DayName): number {
  * that is free. Say so in the copy — the athlete should know why it is safe.
  */
 export function requiredClearanceHours(kind: MatrixSessionKind): number {
-  if ((LEG_LONG_KINDS as ReadonlyArray<MatrixSessionKind>).includes(kind)) return 48;
-  if ((LEG_QUALITY_KINDS as ReadonlyArray<MatrixSessionKind>).includes(kind)) return 24;
-  return 0;
+  // 2026-07-27: was two `includes` checks against LEG_LONG_KINDS / LEG_QUALITY_KINDS. Those lists
+  // are LOWER-BODY-RELATIVE BY ACCIDENT — they only ever answered "how far from a lift", which is
+  // the one row of a grid that has seven. This now reads that row OUT of the adjacency table, so
+  // there is one authority instead of a list that can drift from it. Same answers, one source.
+  return requiredAdjacencyHours('lower_body_strength', kind);
 }
 
 function clearanceHours(liftDay: DayName, pin: EndurancePin): number {

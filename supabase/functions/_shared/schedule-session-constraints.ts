@@ -62,43 +62,186 @@ export const SESSION_PRIME_MOVER: Record<MatrixSessionKind, 'leg' | 'upper' | 'n
 } as const;
 
 /**
- * Leg-dominant QUALITY sessions — must be ≥24h from lower_body_strength in both directions.
- * Same prime movers loaded at intensity within 24h compromise both endurance quality (legs
- * pre-fatigued) and strength adaptation (AMPK/mTOR signaling interference). All intents.
+ * ⛔ `LEG_QUALITY_KINDS`, `LEG_LONG_KINDS` and `isLegLoadedAtIntensity` were DELETED 2026-07-27.
+ * They are the adjacency table's `lower_body_strength` row and nothing more — read it there.
+ * Verified zero importers at deletion; `place-week`'s `requiredClearanceHours` now reads the table.
+ *
+ * The two facts worth keeping from them:
+ *   • `long_ride` was dropped from the 48h list because THIS FILE CONTRADICTED ITSELF — `ROWS` said
+ *     `lower_body_strength × long_ride = 1` (may share a day, zero hours) while the list demanded
+ *     ≥48h. Both shipped for two months; `place-week` read the list, the optimizer read the matrix,
+ *     and the two were never run against each other. The matrix won on physiology, not seniority: a
+ *     long ride is near-zero ECCENTRIC load, which is why the same-day cell was set to 1 to begin with.
+ *   • It was almost certainly in that list because it sits beside `long_run` in a sentence, not
+ *     because anyone rated it. Glycogen depletion is real on a long ride; muscle damage is not, and
+ *     that list was a DAMAGE clearance.
+ * ⛔ Do not re-introduce a list beside the table. See docs/SPEC-week-solver.md §8.2 and §8.4.
  */
-export const LEG_QUALITY_KINDS: ReadonlyArray<MatrixSessionKind> = [
-  'quality_bike',
+
+/**
+ * ── THE ADJACENCY TABLE (docs/SPEC-week-solver.md §8.2) ─────────────────────────────────────────
+ *
+ * ⛔ WHAT THIS REPLACES. Until 2026-07-27 adjacency was TWO LISTS (`LEG_QUALITY_KINDS`,
+ * `LEG_LONG_KINDS`) and both were relative to `lower_body_strength` only. Every other pair —
+ * long run beside a hard run, hard run beside a long ride, easy run beside anything — had no rule
+ * anywhere in the codebase. Those were not permissive decisions. They were EMPTY CELLS, and each one
+ * got discovered later as a "leak" in a generated week. The grid is drawn so that the handful of
+ * genuinely constrained pairs are enumerated rather than found.
+ *
+ * ⚠️ `upper_body_strength`, `easy_swim` and `quality_swim` are absent ON PURPOSE. `SESSION_PRIME_MOVER`
+ * rates them 'upper' and 'neutral' — they share no prime movers with anything here, so their rows
+ * would be all-zero and would imply a constraint exists to be tuned. It does not.
+ *
+ * The seven leg-loaded kinds. Values are the MINIMUM HOURS between the two sessions, and 0 means
+ * consecutive days are fine — whether they may share ONE day is `SAME_DAY_COMPATIBLE`'s question,
+ * not this table's.
+ *
+ * Hours are symmetric: muscle damage does not care which session came first. ORDER is expressed
+ * separately, in `ADJACENCY_PENALTIES` — legal but costly, scored rather than blocked.
+ *
+ * WHAT CARRIES EACH NON-ZERO CELL:
+ *   48h — eccentric damage. EIMD peaks 24-48h with the largest strength/speed/agility deficits at
+ *         48h. Applies to `long_run` (impact transients, decelerating every stride) and to heavy
+ *         lower work against itself.
+ *   24h — shared prime movers loaded at intensity, without the damage load. Robineau 2016 (0h worst,
+ *         6h suboptimal, 24h best) and Schumann 2022 (attenuation concentrated in same-session work,
+ *         n.s. at ≥3h).
+ *    0h — no shared prime mover, or no eccentric component, or both.
+ *
+ * ⛔ THE ONE CELL THAT DOES THE WORK is `lower_body_strength ↔ long_run` at 48h. Everything else is
+ * either 24h signalling or genuinely free. Do not read the zeros as gaps — they were rated.
+ */
+export const LEG_LOADED_KINDS = [
+  'lower_body_strength',
+  'long_run',
+  'long_ride',
   'quality_run',
+  'quality_bike',
+  'easy_run',
+  'easy_bike',
+] as const;
+
+export type LegLoadedKind = (typeof LEG_LOADED_KINDS)[number];
+
+/**
+ * Minimum hours between two leg-loaded sessions on DIFFERENT days. Symmetric by construction —
+ * the builder below asserts it, because a half-filled asymmetric grid is exactly how the two lists
+ * drifted apart from the same-day matrix in the first place.
+ */
+const ADJACENCY_HOURS_ROWS: Record<LegLoadedKind, Record<LegLoadedKind, number>> = {
+  // Heavy legs. 48h from itself (a second heavy day needs the damage window) and from the long run.
+  // 24h from quality, which loads the same movers without the damage. Nothing from the long ride —
+  // near-zero eccentric, and the same-day matrix already permits them to SHARE a day (§8.4).
+  lower_body_strength: {
+    lower_body_strength: 48, long_run: 48, long_ride: 0, quality_run: 24,
+    quality_bike: 24, easy_run: 0, easy_bike: 0,
+  },
+  // The long run is the only endurance session with a real eccentric cost. It constrains heavy legs
+  // and nothing else — its conflict with a hard run is a PENALTY, not a clearance, because two hard
+  // running days in a row is a training-quality problem before it is a tissue problem.
+  long_run: {
+    lower_body_strength: 48, long_run: 0, long_ride: 0, quality_run: 0,
+    quality_bike: 0, easy_run: 0, easy_bike: 0,
+  },
+  // Concentric, no impact transient. Long in DURATION, not in damage. This row being all zeros is
+  // the §8.4 finding stated as a table: a long ride does not cost the week a leg day.
+  long_ride: {
+    lower_body_strength: 0, long_run: 0, long_ride: 0, quality_run: 0,
+    quality_bike: 0, easy_run: 0, easy_bike: 0,
+  },
+  quality_run: {
+    lower_body_strength: 24, long_run: 0, long_ride: 0, quality_run: 0,
+    quality_bike: 0, easy_run: 0, easy_bike: 0,
+  },
+  quality_bike: {
+    lower_body_strength: 24, long_run: 0, long_ride: 0, quality_run: 0,
+    quality_bike: 0, easy_run: 0, easy_bike: 0,
+  },
+  // Easy rows are free by definition. An easy run is the recovery flush, not a second stimulus.
+  easy_run: {
+    lower_body_strength: 0, long_run: 0, long_ride: 0, quality_run: 0,
+    quality_bike: 0, easy_run: 0, easy_bike: 0,
+  },
+  easy_bike: {
+    lower_body_strength: 0, long_run: 0, long_ride: 0, quality_run: 0,
+    quality_bike: 0, easy_bike: 0, easy_run: 0,
+  },
+};
+
+/**
+ * Ordered pairs that are LEGAL but carry a cost the solver should score. `[before, after]`.
+ *
+ * ⚠️ These are the cells where the honest answer is "allowed, but you gave something up" — encoding
+ * them as clearances would forbid weeks that athletes really do train, and encoding them as nothing
+ * would let the solver pick them for free.
+ */
+export const ADJACENCY_PENALTIES: ReadonlyArray<{
+  before: LegLoadedKind;
+  after: LegLoadedKind;
+  reason: string;
+}> = [
+  {
+    before: 'long_run',
+    after: 'quality_run',
+    reason: 'a hard run the day after the long run runs on damaged legs — both sessions are eccentric',
+  },
+  {
+    before: 'quality_run',
+    after: 'long_run',
+    reason: 'the long run arrives on legs still carrying the hard session — the distance gets done, the quality does not',
+  },
+  {
+    before: 'long_run',
+    after: 'long_ride',
+    reason: 'ride before run, never after — a long ride on run-damaged legs is the expensive order of the two',
+  },
 ];
 
 /**
- * Leg-dominant LONG sessions — must be ≥48h from lower_body_strength in both directions.
- * Long sessions add glycogen depletion + muscle damage on top of the interference window,
- * compounding the recovery requirement. All intents.
- *
- * ⛔ `long_ride` REMOVED 2026-07-27, because THIS FILE CONTRADICTED ITSELF.
- * `ROWS` says `lower_body_strength × long_ride = 1` — they may SHARE A DAY, zero hours apart — while
- * this list demanded ≥48h between them. Both shipped. `place-week` read this list via
- * `requiredClearanceHours`; the optimizer read the matrix; the two were never run against each other.
- *
- * The matrix wins, and the reason is physiological rather than procedural: **a long ride is
- * near-zero ECCENTRIC load.** Concentric-dominant, no impact transient, no muscle damage to compound
- * with — which is exactly why the same-day cell was set to 1 in the first place. There is no reason
- * to keep a squat 48h away from it.
- *
- * ⚠️ `long_ride` was almost certainly in this list because it sits beside `long_run` in a sentence,
- * not because anyone rated it. Glycogen depletion is real on a long ride; muscle damage is not, and
- * this list is a DAMAGE clearance.
- * ⛔ Do not re-add it. See docs/SPEC-week-solver.md §8.4 and §2.1.
+ * ⚠️ `quality_run ↔ quality_bike` is deliberately NOT penalised here. Two hard days back to back is a
+ * hard/easy question, already owned by `sequentialOk` and `enforceHardEasy`; adding it here would be
+ * a second ranking of the same fact, which D-325 §5 forbids. And `long_run ↔ quality_bike` is not
+ * penalised because the bike carries no eccentric load — the §2.2 conflict is between two RUNNING
+ * sessions, not between any two hard ones.
  */
-export const LEG_LONG_KINDS: ReadonlyArray<MatrixSessionKind> = [
-  'long_run',
-];
+function buildAdjacencyHours(): Record<LegLoadedKind, Record<LegLoadedKind, number>> {
+  for (const a of LEG_LOADED_KINDS) {
+    for (const b of LEG_LOADED_KINDS) {
+      const ab = ADJACENCY_HOURS_ROWS[a][b];
+      const ba = ADJACENCY_HOURS_ROWS[b][a];
+      if (ab !== ba) {
+        throw new Error(
+          `adjacency table is asymmetric: ${a}->${b}=${ab} but ${b}->${a}=${ba}. ` +
+          `Hours are symmetric by design; express order in ADJACENCY_PENALTIES.`,
+        );
+      }
+    }
+  }
+  return ADJACENCY_HOURS_ROWS;
+}
 
-/** True if the session loads legs at intensity (quality or long). Easy leg sessions excluded. */
-export function isLegLoadedAtIntensity(k: MatrixSessionKind): boolean {
-  return (LEG_QUALITY_KINDS as ReadonlyArray<MatrixSessionKind>).includes(k) ||
-    (LEG_LONG_KINDS as ReadonlyArray<MatrixSessionKind>).includes(k);
+export const ADJACENCY_HOURS = buildAdjacencyHours();
+
+/** True if this kind has a row in the adjacency table (i.e. it loads legs). */
+export function isLegLoadedKind(k: MatrixSessionKind): k is LegLoadedKind {
+  return (LEG_LOADED_KINDS as ReadonlyArray<string>).includes(k);
+}
+
+/**
+ * Minimum hours required between two sessions placed on different days.
+ * Anything not leg-loaded (upper body, either swim) returns 0 — it constrains nothing.
+ */
+export function requiredAdjacencyHours(a: MatrixSessionKind, b: MatrixSessionKind): number {
+  if (!isLegLoadedKind(a) || !isLegLoadedKind(b)) return 0;
+  return ADJACENCY_HOURS[a][b];
+}
+
+/** The reason this ORDER is discouraged, or undefined if the order is free. */
+export function adjacencyPenaltyReason(
+  before: MatrixSessionKind,
+  after: MatrixSessionKind,
+): string | undefined {
+  return ADJACENCY_PENALTIES.find((p) => p.before === before && p.after === after)?.reason;
 }
 
 /** Matrix session roles (10×10): `quality_swim` is its own row — not aliased to `easy_swim`. */
