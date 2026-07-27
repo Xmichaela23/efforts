@@ -56,6 +56,14 @@ import {
   placeLiftingWeek,
 } from './place-week.ts';
 import { requiredAdjacencyHours } from '../../_shared/schedule-session-constraints.ts';
+// ⛔ STEP 1 OF THE COLLAPSE (SPEC-week-solver §7). Placement now comes from the ONE solver rather
+// than from `place-week`'s filter-and-take-first-legal-answer. `place-week` still owns the
+// arithmetic screens the intake shows; only the PLACEMENT half moved.
+import {
+  type Anchor as SolverAnchor,
+  solve as solveWeek,
+  type SolverDay,
+} from '../../_shared/week-solver.ts';
 
 /** The four lifts, in lb. **All four are required** — the entry gate gets this far only
  *  when every one is on file (SPEC §0). Missing one leaves a lifting day with no weight. */
@@ -656,20 +664,81 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     });
   }
 
-  const placedWeek = placeLiftingWeek(
-    MAIN_LIFTS.map((l) => ({ lift: l.name, isLower: l.isLower })),
-    pins,
-  );
+  // ── THE SOLVER TAKES OVER (step 1) ──────────────────────────────────────────────────────────
+  //
+  // ⛔ WEEKS WILL CHANGE, AND THAT IS THE POINT. `place-week` filtered and took the first legal
+  // answer; the solver enumerates and scores. Known differences, all deliberate:
+  //   • The stack lands on the SMALLEST day rather than the earliest legal one, so a bench press
+  //     goes onto the hard-run day rather than the long-ride day when both are free (§6b-3 find 2).
+  //   • Upper days are now spread rather than left to a tie-break, and upper↔lower has a 3-day
+  //     preferred floor (§6b-5 find 1).
+  //   • Heavy-day spread is the tightest pair rather than the sum, which only differs at 3+ lowers.
+  //   • Breaches are ranked by SIZE, so a forced week takes the smaller violation.
+  //
+  // ⚠️ `canSplitDay` is not passed and does not need to be: the solver asks the matrix which pairs
+  // may share a day and `stackNeedsRecoveryGap` which of those actually compete. A bench beside a
+  // ride needs no permission because it needs no gap.
+  const solverAnchors: SolverAnchor[] = pins.map((p) => ({
+    day: p.day.toLowerCase() as SolverDay,
+    kind: p.kind,
+    label: p.label,
+  }));
+  const solved = solveWeek({
+    anchors: solverAnchors,
+    lifts: MAIN_LIFTS.map((l) => ({ name: l.name, isLower: l.isLower })),
+  });
+
+  // ⛔ A REFUSAL IS NOT A CRASH AND IT IS NOT A SILENT FALLBACK (§5.2). The solver names the anchors
+  // that bound it and what would free them; those words go to the athlete. The block is still built
+  // — on `place-week`'s answer — so the athlete is never left with nothing while being told why.
+  const cap = (d: string) => d.charAt(0).toUpperCase() + d.slice(1);
+  const placedWeek = solved.status === 'unsolvable'
+    ? placeLiftingWeek(MAIN_LIFTS.map((l) => ({ lift: l.name, isLower: l.isLower })), pins)
+    : {
+        slots: solved.week.lifts.map((l) => ({
+          lift: l.lift,
+          isLower: l.isLower,
+          day: cap(l.day) as DayName,
+          ...(l.stackedWith ? { stackedWith: l.stackedWith } : {}),
+        })),
+        freeDays: solved.week.restDays.map((d) => cap(d) as DayName),
+        restDays: solved.week.restDays.map((d) => cap(d) as DayName),
+        compromises: solved.status === 'compromised' ? solved.compromises : [],
+      };
+  const solverRefusal = solved.status === 'unsolvable'
+    ? [`${solved.message} ${solved.options.join(' ')}`]
+    : [];
   // Lift name → the day the solver gave it. Falls back to the lift's legacy grid day only if the
   // solver somehow omitted it, so a placement bug degrades to the old behaviour rather than to no day.
   const dayForLift = new Map(placedWeek.slots.map((s) => [s.lift, s.day as string]));
   // Where the heavy legs actually landed — the hill session's descent is prescribed off this.
   const heavyLowerDays: string[] = placedWeek.slots.filter((s) => s.isLower).map((s) => s.day as string);
   const liftDay = (l: typeof MAIN_LIFTS[number]): string => dayForLift.get(l.name) ?? l.day;
+
+  /**
+   * ⛔ THE STACK HAS TO REACH THE ATHLETE, NOT JUST THE DATA STRUCTURE (§0f).
+   *
+   * `stackedWith` — label, gap hours, and order — had **zero consumers**. The composer read `slots`
+   * for days and dropped the rest, so an athlete stacking a bench press onto their long-ride day was
+   * told nothing at all. **Eddens is the entire reason that stack is safe** (+6.91% lower-body
+   * dynamic strength, resistance FIRST, in exactly the minimal-relief case this is) — so an athlete
+   * who rides first has an unsafe day that renders as a legal one.
+   *
+   * ⚠️ STATED AS A REASON, NOT AN INSTRUCTION. The house voice is a quant who trains, not a coach
+   * who encourages: say what the order buys and let the athlete act on it.
+   */
+  const stackNoteFor = (l: typeof MAIN_LIFTS[number]): string => {
+    const st = placedWeek.slots.find((sl) => sl.lift === l.name)?.stackedWith;
+    if (!st) return '';
+    const gap = st.gapHours > 0
+      ? ` Leave ${st.gapHours}h between them — they compete for the same legs.`
+      : ` They share no prime movers, so back to back is fine.`;
+    return ` Shares the day with ${st.label}: the lift goes first.${gap}`;
+  };
   const strengthDays = MAIN_LIFTS.map(liftDay);
   // ⛔ Surfaced, never swallowed. `place-week` states which clearance it had to break; the plan
   // carries those words to the athlete verbatim.
-  const placementCompromises: string[] = placedWeek.compromises;
+  const placementCompromises: string[] = [...solverRefusal, ...placedWeek.compromises];
   const assistance = assistanceRows(args.assistancePicks);
 
   // ── Endurance underneath (unchanged from the previous composer) ────────────
@@ -802,7 +871,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         name: `Strength — ${lift.name}`,
         // The assistance guidance rides with the session, once, on the weeks that carry assistance.
         // Without it "25 reps" reads as a target to chase, and chasing it costs the next main lift.
-        description: `${ex.map(exerciseLabel).join(' · ')}.${isDeload ? '' : ` ${ASSISTANCE_GUIDANCE}`}`,
+        description: `${ex.map(exerciseLabel).join(' · ')}.${isDeload ? '' : ` ${ASSISTANCE_GUIDANCE}`}${stackNoteFor(lift)}`,
         duration: isDeload ? 35 : 60,
         strength_exercises: ex,
         // ⛔ NO `1rm_test` TAG, and that is deliberate. The tag makes the logger DISCARD the planned

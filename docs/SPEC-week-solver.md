@@ -130,14 +130,42 @@ forces the value, the value cannot testify about the change.
 change anything." Diff the whole result set; count the differences; look at examples. A statistic is
 for describing a change already known to exist, not for detecting one.
 
-⛔ **The five, together — and all five are checkable rather than remembered, which is the only reason
-they will outlive this session:**
+## ⛔ 0f. OUTPUT-BOUNDARY LOSS — a correct answer that fails to say what the spec requires
+
+**The sixth principle, and the subtlest.** The other five catch **wrong answers**. This one catches
+**right answers that do not carry something the spec requires them to carry** — and no sweep can see
+it, because the week *is* correct.
+
+**Three instances, all found by reverse inventory (§6b-6), none by any sweep:**
+
+| requirement | what was lost | how it surfaced |
+|---|---|---|
+| §4.2 preferred days | scored at **zero** — a stated preference was worth nothing | only because `week-optimizer` implemented it and an inventory read that module |
+| §4.1 the stack is **ordered** | the pairing was emitted with no "lift first" | reading the spec against the output |
+| §2.2 the expensive anchor pair | every adjacent pair priced the same | same |
+
+⛔ **AND A FOURTH, LIVE IN PRODUCTION RIGHT NOW:** `place-week`'s `stackedWith` — label, gap hours,
+and order — has **zero consumers**. The composer reads `slots` for days and discards the rest. An
+athlete stacking a bench press onto their long-ride day is told **nothing** about order or gap.
+Eddens is the reason that stack is safe; an athlete who rides first has an unsafe day **that renders
+as a legal one.**
+
+⚠️ **THE STANDING BLIND SPOT:** any requirement describing what the answer must **say** — rather than
+how it is **found** — is invisible to every correctness test, and stays invisible until someone reads
+the spec against the output. It is not a phase that ends.
+
+✅ **THE CHECK:** for each spec requirement, ask *"which field of the output carries this, and who
+reads that field?"* A requirement with no field, or a field with no reader, is already lost.
+
+⛔ **The six, together — all checkable rather than remembered, which is the only reason they will
+outlive this session:**
 
 | § | principle |
 |---|---|
 | **0c** | the law's currency is hours between named sessions, never forbidden weekdays |
 | **0d** | a test that has never failed is not evidence |
 | **0e** | a check whose metric cannot move is not a check |
+| **0f** | a correct answer that fails to say what the spec requires is still a failure |
 | **4.1a** | strictness beyond the law needs an owner and a reason |
 | **5.2b** | never subtract silently — refuse, and name the options |
 
