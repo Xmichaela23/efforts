@@ -191,9 +191,10 @@ function scoreKey(
   assignment: number[],
   lifts: Lift[],
   anchors: Placement[],
-  breachCount: number,
+  breachMagnitude: number,
   restDayCount: number,
   stackCost: number,
+  longHostedStacks: number,
   canonicalAssignment: number[],
 ): number[] {
   // 1. ⛔ ONE FULL REST DAY, PROTECTED — not "rest days maximised". Corrected during the build.
@@ -216,8 +217,29 @@ function scoreKey(
   //    everything to manufacture rest days it was never asked for.
   const stackPenalty = stackCost;
 
-  // 3. primary lifts clear of eccentric anchors
-  const breachPenalty = breachCount;
+  // 2b. ⛔ WHICH DAY HOSTS THE STACK IS A DECISION, NOT A TIE-BREAK. Added after a probe showed the
+  //     solver was choosing the host by DAY INDEX: with the long ride on Tuesday and the hard run on
+  //     Friday it stacked onto Tuesday, and with both late it stacked onto the earlier one. The
+  //     answer looked doctrinally right in the common Sat/Sun/Wed week purely because Wednesday has
+  //     a smaller index than Saturday. **Doctrine arriving by accident is doctrine that will move
+  //     the moment an athlete picks different days.**
+  //
+  //     The rule, MINED FROM `place-week` (which has had it in production and had it right):
+  //     stack onto the SMALLEST day. A long session is already the longest day of the week, and
+  //     adding a lift to it spends duration the day does not have; a hard-but-short session leaves
+  //     room. This is a BUDGET consideration (§3 — a ceiling, never an adjacency input), so it sits
+  //     below every clearance term and above the tie-break, which is exactly where a preference goes.
+  //
+  //     ⚠️ It also happens to be consolidation: grouping the lift onto an already-hard SHORT day
+  //     keeps the easy days genuinely easy, rather than turning the long day into a bigger one.
+  const stackHostPenalty = longHostedStacks;
+
+  // 3. ⛔ BREACHES ARE MEASURED, NOT COUNTED. Mined from `place-week:196` — `penalty +=
+  //    (required - actual)` — which is the THIRD piece of arithmetic that file had right and this
+  //    solver first reinvented worse. Counting breaches prices a week that is 24h short exactly the
+  //    same as one that is 48h short, so the solver had no reason to prefer the smaller violation
+  //    when it had to violate something. The size of the miss is the whole information.
+  const breachPenalty = breachMagnitude;
 
   // 3. spread between the two lower days — more than the minimum is better (§5 line 3)
   const lowerIdx = assignment.filter((_, i) => lifts[i].isLower);
@@ -253,7 +275,7 @@ function scoreKey(
   // different week. Canonical order is (lower before upper, then name) — a property of the lifts
   // themselves, not of how they arrived.
   return [restShortfall, breachPenalty, stackPenalty, spreadPenalty, shapePenalty, orderPenalty,
-    ...canonicalAssignment];
+    stackHostPenalty, ...canonicalAssignment];
 }
 
 function lexLess(a: number[], b: number[]): boolean {
@@ -342,11 +364,13 @@ export function solve(input: SolverInput): SolverResult {
         if (relax === 'strict' && activeSet.size > maxActive) return;
 
         const breaches: string[] = [];
+        let breachMagnitude = 0;
         for (let i = 0; i < lifts.length; i++) {
           const kind: MatrixSessionKind = lifts[i].isLower ? 'lower_body_strength' : 'upper_body_strength';
           const others = placed.filter((_, k) => k !== anchorPlacements.length + i);
           const b = adjacencyBreach(kind, assignment[i], others);
           if (b) {
+            breachMagnitude += b.required - b.actual;
             breaches.push(
               `${SOLVER_DAYS[assignment[i]]}'s ${lifts[i].name} sits ${b.actual}h from ` +
               `${b.against.label} (${SOLVER_DAYS[b.against.dayIndex]}); the clearance for that is ${b.required}h.`,
@@ -366,16 +390,18 @@ export function solve(input: SolverInput): SolverResult {
 
         // Per-pair cost: does this stack actually compete? (the law's own question)
         let stackCost = 0;
+        let longHostedStacks = 0;
         for (const i of stackedIdx) {
           const liftKind: MatrixSessionKind = lifts[i].isLower
             ? 'lower_body_strength' : 'upper_body_strength';
           const a = anchorPlacements.find((p) => p.dayIndex === assignment[i])!;
           if (stackNeedsRecoveryGap(a.kind, liftKind)) stackCost += 1;
+          if (a.kind === 'long_run' || a.kind === 'long_ride') longHostedStacks += 1;
         }
 
         const canonicalAssignment = canonicalOrder.map((i) => assignment[i]);
-        const key = scoreKey(assignment, lifts, anchorPlacements, breaches.length, restCount,
-          stackCost, canonicalAssignment);
+        const key = scoreKey(assignment, lifts, anchorPlacements, breachMagnitude, restCount,
+          stackCost, longHostedStacks, canonicalAssignment);
         if (!best || lexLess(key, best.key)) {
           best = { key, assignment: [...assignment], breaches };
         }

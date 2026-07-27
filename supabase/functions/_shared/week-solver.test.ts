@@ -199,6 +199,63 @@ Deno.test('⛔ EVERY LIFT KEEPS A DAY. The solver never returns fewer than it wa
   }
 });
 
+Deno.test('⛔ THE OTHER AXIS: session COUNT past capacity — seven come back as seven, or a refusal', () => {
+  // ⛔ THE FIRST SWEEPS ONLY VARIED ANCHOR ARRANGEMENT AT FIXED LOAD, so the only refusal reachable
+  // was ANCHOR_COLLISION — an impossible input. `NO_ROOM` and the compromise menu fire on session
+  // COUNT exceeding capacity, and nothing exercised that. This is the second tripwire's shape:
+  // sessions asked for vs days available, and the answer must be all of them or a named refusal.
+  const ANCHOR_POOL: Array<[SolverDay, string, string]> = [
+    ['sunday', 'long_run', 'long run'],
+    ['saturday', 'long_ride', 'long ride'],
+    ['wednesday', 'quality_run', 'hard run'],
+    ['tuesday', 'quality_bike', 'club ride'],
+    ['monday', 'easy_swim', 'masters swim'],
+    ['thursday', 'quality_swim', 'squad swim'],
+    ['friday', 'easy_run', 'shakeout'],
+  ];
+  const LIFT_POOL: Lift[] = [
+    { name: 'Back Squat', isLower: true },
+    { name: 'Bench Press', isLower: false },
+    { name: 'Deadlift', isLower: true },
+    { name: 'Overhead Press', isLower: false },
+    { name: 'Front Squat', isLower: true },
+    { name: 'Incline Press', isLower: false },
+  ];
+
+  let solved = 0, compromised = 0, refused = 0;
+  for (let nAnchors = 1; nAnchors <= ANCHOR_POOL.length; nAnchors++) {
+    for (let nLifts = 1; nLifts <= LIFT_POOL.length; nLifts++) {
+      const anchors = ANCHOR_POOL.slice(0, nAnchors).map(([d, k, l]) => anchor(d, k, l));
+      const lifts = LIFT_POOL.slice(0, nLifts);
+      const r = solve({ anchors, lifts });
+
+      if (r.status === 'unsolvable') {
+        refused++;
+        assert(r.options.length > 0, `${nAnchors}+${nLifts}: refused with no options`);
+        for (const o of r.options) {
+          assert(!/drop|remove|delete/i.test(o), `${nAnchors}+${nLifts} offered to subtract: "${o}"`);
+        }
+        continue;
+      }
+      r.status === 'solved' ? solved++ : compromised++;
+
+      // ⛔ §5.2b — the whole point. Every lift asked for comes back, on its own day, at every load.
+      assertEquals(r.week.lifts.length, nLifts, `${nAnchors} anchors + ${nLifts} lifts returned fewer lifts`);
+      assertEquals(
+        new Set(r.week.lifts.map((l) => l.day)).size, nLifts,
+        `${nAnchors}+${nLifts}: two lifts share a day`,
+      );
+      // And every anchor day is still in the week, unmoved.
+      for (const a of anchors) {
+        assert(r.week.activeDays.includes(a.day), `${nAnchors}+${nLifts}: lost the ${a.label} day`);
+      }
+    }
+  }
+  // The sweep has to reach all three fates or it is not exercising the boundary.
+  assert(solved > 0 && compromised > 0 && refused > 0,
+    `the load sweep did not reach all three fates: ${solved} solved, ${compromised} compromised, ${refused} refused`);
+});
+
 // ════════════════════════════════════════════════════════════════════════════
 // DETERMINISM (§5.1)
 // ════════════════════════════════════════════════════════════════════════════

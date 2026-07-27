@@ -84,6 +84,34 @@ has reintroduced itself.
 
 ---
 
+## ⛔ 0d. A TEST THAT HAS NEVER FAILED IS NOT EVIDENCE
+
+**The fourth member of the family, and the one that guards the other three.** Alongside §0c
+(currency), §5.2b (silent subtraction) and §4.1a (unowned strictness) — all four are checkable
+rather than vigilance-dependent, which is the only reason they will survive.
+
+⛔ **A GREEN TEST PROVES THE SUITE RAN. IT DOES NOT PROVE THE TEST CAN FAIL.** This project has now
+shipped both failure modes in one day:
+
+| | what happened |
+|---|---|
+| **The test was defending the bug** | three `place-week` tests encoded `canSplitDay` as a gate. Green all day, and every "1341 passing" included them. Rewriting the rule made them red — which is the only reason anyone looked |
+| **The test could not have caught it** | the solver's determinism test passed before the tie-break was made order-independent, because it never shuffled the input |
+
+✅ **THE DISCIPLINE, and it is cheap: RED-GREEN-RED.** Before trusting a test that guards an
+invariant, **reintroduce the defect and watch it fail.** Then restore and watch it pass. Two commands.
+
+**Verified this way so far — each one changed a number, so each one is real:**
+
+| test | broken deliberately | result |
+|---|---|---|
+| tie-break order-independence | rebuilt the key in input order | **red**, restored **green** |
+| stack host preference | removed the host term | short-day hosting **84 → 0** |
+| breach grading | counted breaches instead of measuring | total breach **288h → 312h** |
+
+⚠️ **The tell that you need this:** a test written *after* the code, asserting what the code already
+does. It cannot fail on the day it is written, so nothing has ever established that it could.
+
 ## 0a. ⛔ THE FIVE HARD CONSTRAINTS, AND THE WHOLE SEARCH
 
 **Amended 2026-07-27.** These are not scored. They are not negotiable. Nothing relaxes them.
