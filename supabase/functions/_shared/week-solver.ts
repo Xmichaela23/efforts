@@ -138,8 +138,8 @@ export type SolvedWeek = {
 };
 
 export type SolverResult =
-  | { status: 'solved'; week: SolvedWeek; compromises: [] }
-  | { status: 'compromised'; week: SolvedWeek; compromises: string[] }
+  | { status: 'solved'; week: SolvedWeek; compromises: []; notes: string[] }
+  | { status: 'compromised'; week: SolvedWeek; compromises: string[]; notes: string[] }
   | {
       status: 'unsolvable';
       code: SolverRefusalCode;
@@ -541,6 +541,43 @@ export function solve(input: SolverInput): SolverResult {
         restDays: SOLVER_DAYS.filter((_, i) => !activeSet.has(i)),
       };
 
+      // ⛔ NOTES ARE STATED COSTS, NOT RULE BREACHES — and they do NOT change `status`.
+      //
+      // A Saturday-ride/Sunday-run week is not "compromised": it breaks no rule. But it IS shaped by
+      // the athlete's own two picks, and §5.0a says the cause must be named rather than the cramped
+      // result silently produced. Likewise a clearance met EXACTLY — 24h where 24h is owed — is
+      // legal with no buffer, and passing it in silence is the §0f loss: the week is right and fails
+      // to say what it cost.
+      const notes: string[] = [];
+      for (let i = 0; i < anchorPlacements.length; i++) {
+        for (let j = i + 1; j < anchorPlacements.length; j++) {
+          const A = anchorPlacements[i], B = anchorPlacements[j];
+          if (gapDays(A.dayIndex, B.dayIndex) !== 1) continue;
+          const [first, second] = A.dayIndex === (B.dayIndex + 1) % 7 ? [B, A] : [A, B];
+          const reason = adjacencyPenaltyReason(first.kind, second.kind);
+          notes.push(
+            `${first.label} and ${second.label} are back to back (${SOLVER_DAYS[first.dayIndex]}, ` +
+            `${SOLVER_DAYS[second.dayIndex]}), so the week is loaded around them.` +
+            (reason ? ` ${reason.charAt(0).toUpperCase()}${reason.slice(1)}.` : '') +
+            ` Both are your days, so the engine placed everything else around them rather than moving one.`,
+          );
+        }
+      }
+      // At-the-floor: legal, no buffer, and worth saying so.
+      for (let i = 0; i < lifts.length; i++) {
+        const kind: MatrixSessionKind = lifts[i].isLower ? 'lower_body_strength' : 'upper_body_strength';
+        for (const a of anchorPlacements) {
+          const required = requiredAdjacencyHours(kind, a.kind);
+          if (required === 0) continue;
+          const actual = gapHours(b.assignment[i], a.dayIndex);
+          if (actual !== required) continue;
+          notes.push(
+            `${lifts[i].name} on ${SOLVER_DAYS[b.assignment[i]]} sits exactly ${actual}h from ` +
+            `${a.label} — the clearance, with nothing spare. Legal, and the tightest arrangement the rule allows.`,
+          );
+        }
+      }
+
       const compromises: string[] = [...b.breaches];
       if (relax !== 'strict' && week.restDays.length === 0) {
         compromises.push(
@@ -551,9 +588,12 @@ export function solve(input: SolverInput): SolverResult {
       if (input.methodology && compromises.length === 0) {
         // The methodology bound but did not cost anything nameable — nothing to report.
       }
+      // ⚠️ `notes` deliberately do NOT promote a week to `compromised`. Status reports RULE
+      // COMPLIANCE; notes report what the shape cost. Conflating them would mark every ordinary
+      // weekend-anchored week as compromised and drain the word of meaning.
       return compromises.length === 0
-        ? { status: 'solved', week, compromises: [] }
-        : { status: 'compromised', week, compromises };
+        ? { status: 'solved', week, compromises: [], notes }
+        : { status: 'compromised', week, compromises, notes };
     }
   }
 

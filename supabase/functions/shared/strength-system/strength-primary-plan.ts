@@ -724,7 +724,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       };
   const solverRefusal = solved.status === 'unsolvable'
     ? [`${solved.message} ${solved.options.join(' ')}`]
-    : [];
+    // ⛔ NOTES MUST REACH THE ATHLETE OR THEY ARE THE §0f LOSS AGAIN — a cost computed and never
+    // said. They are not rule breaches, so they do not make the week "compromised"; they ride the
+    // same channel because that channel is the one the plan already surfaces.
+    : solved.notes;
   // Lift name → the day the solver gave it. Falls back to the lift's legacy grid day only if the
   // solver somehow omitted it, so a placement bug degrades to the old behaviour rather than to no day.
   const dayForLift = new Map(placedWeek.slots.map((s) => [s.lift, s.day as string]));

@@ -110,6 +110,20 @@ invariant, **reintroduce the defect and watch it fail.** Then restore and watch 
 ⚠️ **The tell that you need this:** a test written *after* the code, asserting what the code already
 does. It cannot fail on the day it is written, so nothing has ever established that it could.
 
+⛔ **AND AGE IS A RISK FACTOR, NOT REASSURANCE.** The instinct is that a long-green test is
+well-established. The opposite is true: **the longer a test has been green, the longer it has had to
+be wrong without anyone looking.** Four tests were found defending bugs in a single day, and every
+one of them had been green for months:
+
+| test | defended |
+|---|---|
+| three `place-week` tests | `canSplitDay` as a gate — a rule that made solvable weeks unsolvable |
+| `workload-run-tokens`: *"long run still matches easypace (0.65), unaffected by the new keys"* | the long-run coefficient that had **never matched anything, in any generator** |
+| `q126`: every run token resolves to 0.65 | the same defect, from the other side |
+
+✅ **So when a change makes an old test go red, the first question is which of the two is wrong** —
+and on this evidence it is not automatically the change.
+
 ## ⛔ 0e. A CHECK WHOSE METRIC CANNOT MOVE IS NOT A CHECK
 
 **The fifth member of the family, and it generalises past testing.** §0d says a test that has never

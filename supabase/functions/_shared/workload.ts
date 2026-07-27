@@ -32,10 +32,14 @@ export const INTENSITY_FACTORS: Record<string, Record<string, number>> = {
     // 2026-07-27 — surfaced by the new unmatched-token warning, which is the point of making the
     // fallback loud. Both families were silently taking the 0.75 per-type default.
     //   • `run_vo2_6x3min` → VO2 intervals. Priced with the table's own `interval` row.
-    //   • `run_hills_4x180s_r180s_g5_8_dwalk` → the hard aerobic session for the run-only athlete.
-    //     ⚠️ Uphill at matched effort costs LESS mechanically than flat at the same intensity
-    //     (iso-efficiency: 4-8% grade lowers loading rate and peak vertical GRF), which is the whole
-    //     reason the doctrine chose hills. So it is priced BELOW flat VO2, not at it.
+    //   • `run_hills_...` → the hard aerobic session for the run-only athlete.
+    //     ⚠️⚠️ **0.90 IS PROVISIONAL AND IT IS MINE, NOT THE FIELD'S.** The DIRECTION is sourced —
+    //     uphill at matched metabolic cost lowers loading rate and peak vertical GRF by 4-8%
+    //     (J Biomech 2020 iso-efficiency), which is the whole reason the doctrine chose hills over
+    //     flat intervals. But nothing measured says the WORKLOAD factor is 0.90 rather than 0.88 or
+    //     0.92; it is `run_vo2` minus a gap I chose to express "cheaper than flat, still hard".
+    //     ⛔ Do not cite this number as derived. Either replace it with a measured one or leave the
+    //     marker — an unmarked invented coefficient is how the ATR block accumulated eight of them.
     run_vo2: 0.95, run_hills: 0.90,
   },
   ride: {
