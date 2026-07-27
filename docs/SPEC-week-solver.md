@@ -11,6 +11,33 @@ the first legal answer.
 
 ---
 
+## 0a. ⛔ THE FIVE HARD CONSTRAINTS, AND THE WHOLE SEARCH
+
+**Amended 2026-07-27.** These are not scored. They are not negotiable. Nothing relaxes them.
+
+| # | constraint | why it is hard |
+|---|---|---|
+| 1 | **Long run day** | User-picked anchor. **Immovable** |
+| 2 | **Long ride day** | User-picked anchor. **Immovable** |
+| 3 | **Hard day** | User-picked anchor. **Immovable** |
+| 4 | **Four lifting days** | ⛔ **A FIXED COUNT. Lift frequency is not negotiable.** Wendler publishes 2- and 3-day templates; this block is the four-day arc and does not fall back to them |
+| 5 | *(the clearance law)* | `_shared/schedule-session-constraints.ts` — the only one that may be downgraded to a penalty, and only per §5.2 |
+
+### The entire search, in four lines
+
+```
+anchors PIN their days
+four lifts place into the days that remain
+easy aerobic STACKS onto lift days — lift first, one bucket, ordered
+that is all
+```
+
+⛔ **KEEP THE RULE SET AND THE SCORE CARD SHORT ENOUGH TO READ ON ONE SCREEN.** If either grows past
+that, the model is being over-elaborated and the extra is almost certainly a preference wearing a
+constraint's clothes.
+
+---
+
 ## 0. Why rules, not templates — and why rules alone are not enough
 
 **Templates fail on combinatorics and on honesty.** One entry per lift-frequency × run-days ×
@@ -85,12 +112,17 @@ pushes the bar into a corner.
 | Hard day (bike) adjacent to long run | Legal, near-free |
 | Three anchors on consecutive days | **Legal input, bad week.** ⛔ The solver MUST detect and SAY so rather than produce something and stay quiet |
 
-### 2.3 Precedence when anchors collide
+### 2.3 ⛔ ANCHORS DO NOT YIELD TO EACH OTHER — collision is a VALIDATION failure, not a precedence question
 
-**By eccentric cost, highest first: hard day > long run > long ride.** The most expensive anchor keeps
-its day; the cheaper one moves and the move is stated.
+**Amended 2026-07-27.** An earlier draft ranked anchors by eccentric cost so the cheaper one could
+move. **That is wrong: all three are hard (§0a). None of them moves.**
 
-⚠️ **Or user-declared.** A club night is not a preference — other people own it. See §4.
+So a bad anchor arrangement is not something the solver resolves — it is something the WIZARD must
+catch at pick time. See §7 step 1: detect anchor sets that cannot admit four lifting days and surface
+it **at selection, not at generation.**
+
+⚠️ The eccentric ratings in §2.1 still matter — they drive the SCORE and the adjacency penalties.
+They no longer decide which anchor gives way, because none does.
 
 ---
 
@@ -153,6 +185,69 @@ Rank legal weeks by, in order:
 ⚠️ **A shortfall on any of these is REPORTED, never absorbed.** `place-week` already emits
 `compromises[]` and its contract says they must never be silently swallowed.
 
+### 5.1 ⛔ DETERMINISM — and the tie-break is SPECIFIED, not merely "stable"
+
+**Same athlete, same inputs, same week — across re-materialize, relayout AND regeneration.** Not just
+within one run.
+
+⛔ **If two weeks score identically the solver must pick the same one every time.** Otherwise a plan
+that re-materializes produces a different-but-equal week, the athlete's days shuffle for no reason,
+and nothing can explain it because nothing changed. That is the failure mode that looks exactly like
+a bug and cannot be reproduced.
+
+**The tie-break key, exactly:**
+
+1. A **fixed lexicographic key derived from the LAYOUT ITSELF** — the day index (0–6) of each session,
+   read in a **canonical discipline order** (a fixed list, e.g. squat, deadlift, bench, press, long
+   run, long ride, hard day, easy sessions). Lowest key wins.
+2. ⛔ **NOT enumeration order.** That is an artefact of how the loop happens to be written and it
+   changes the day someone reorders a `for`.
+3. ⛔ **NOT a hash of plan state.** Michael: *"otherwise it gets implemented as a hash and the shuffle
+   comes back the first time an unrelated field changes."* A hash over plan state re-shuffles when a
+   goal name is edited. **The key must depend on the LAYOUT and nothing else.**
+
+⚠️ **Enumeration order must be deterministic too, or the tie-break is sitting on sand.** Iterate days
+and sessions in a fixed declared order; never over a `Set`, a `Map` built from athlete input, or
+object key order.
+
+### 5.2 ⛔ THE FOURTH FATE: OVER-CONSTRAINED — zero legal weeks
+
+**Michael, 2026-07-27:** *"Anchors plus preferred days plus budgets can admit zero legal weeks. Not
+one preference gated — no solution at all."*
+
+⛔ **Without a stated relaxation order, "gated" and "unsolvable" collapse into the same empty return,
+and the app is silent at exactly the moment it most needs to speak.**
+
+⛔ **THE MENU IS TWO OPTIONS. Amended 2026-07-27 — it was five.**
+
+| # | relax | applied |
+|---|---|---|
+| 1 | **The full rest day** — accept 7 active days | ✅ **By the solver, and stated.** `place-week` already does exactly this: *"either one lifting day comes out, or the week runs with no full rest day"* |
+| 2 | **A clearance minimum becomes a penalty** — accept 24h where 48h is wanted | ✅ **By the solver, and stated**, naming the clearance and the gap |
+
+**Three options were removed, and all three for the same reason — they are hard constraints (§0a):**
+
+- ⛔ *Drop an easy aerobic session* — removed. D-325 §7 forbids silently removing a session, and it is
+  not the solver's to offer.
+- ⛔ *Move an anchor* — removed. **Anchors are immovable.** A club night is not a preference; other
+  people own it.
+- ⛔ *Drop to a 2- or 3-day lifting week* — removed. **Four lifting days is a fixed count.** It read as
+  the most powerful lever precisely because it broke the constraint that makes this block what it is.
+
+### When neither relaxation yields a legal week
+
+⛔ **Return the unsolvable shape and NAME THE ANCHORS AS THE BINDING CONSTRAINT.** Not a generic
+failure — the athlete's three picked days are what left no legal home for four lifts, and that is a
+sentence they can act on.
+
+⚠️ **This is a LIVE PATH, not an edge case.** Five hard constraints across seven days means an
+ordinary anchor arrangement can admit zero legal weeks. Which is why it must be caught earlier — see
+§7 step 1.
+
+⛔ **The return type must distinguish the three outcomes** — a solved week, a solved week with
+compromises, and unsolvable-with-options. Collapsing the third into an empty array is the silence
+this section exists to prevent.
+
 ---
 
 ## 6. Receipts
@@ -204,10 +299,13 @@ contract in code: strength re-solves when the fixed endurance points move. **The
 Get Stronger is FOUR. The block this spec exists for has NO relayout path at all — nothing fires,
 so there is nothing to fix there yet.**
 
-⚠️ **The gate has no recorded reason.** It arrived in `0057400c` (2026-03-30) in the same commit that
-created relayout, with nothing in the message about the frequency choice — and the four-day develop
-arc did not exist then. **Treat it as UNEXPLAINED, not leftover, until four-day relayout is confirmed
-safe.** If a real constraint sits behind it, the solver inherits it.
+✅ **RESOLVED 2026-07-27 — the solver does NOT inherit this gate.** Four lifting days is a hard
+constraint (§0a), so a frequency check that admits only 2 and 3 cannot describe anything the solver
+does. **The gate is scoped to the LEGACY RELAYOUT PATH only** and dies with `placement/` at step 0.
+
+*(For the record: it arrived in `0057400c`, 2026-03-30, in the same commit that created relayout,
+with nothing in the message about the frequency choice — and the four-day arc did not exist yet. The
+question of whether something real sat behind it is now moot.)*
 
 ### Sequencing
 
@@ -227,7 +325,10 @@ field."*
 The solver returns the week **and the reasons**, together, from the same call:
 
 ```
-solve(anchors, lifts, budgets) → { week, compromises: string[] }
+solve(anchors, lifts, budgets) →
+  | { status: 'solved';       week, compromises: [] }
+  | { status: 'compromised';  week, compromises: string[] }   // both relaxations applied and named
+  | { status: 'unsolvable';   bindingAnchors: Anchor[] }      // anchors named as the cause (§5.2)
 ```
 
 **The reason must be emitted at DECISION TIME.** A sig-to-sig diff cannot reconstruct it afterwards —
@@ -251,15 +352,20 @@ contract says they must never be silently swallowed.
 
 0. ⛔ **COLLAPSE THE THREE AUTHORITIES** (§6b) — this is the point of the whole document. Everything
    below is wasted if three engines still decide placement afterwards.
-1. **Anchor conflict detection** (§2) — it is upstream of everything and does not exist at all today
-2. **Eccentric ratings per session and per anchor** (§2.1, §3)
-3. **The scorer** (§5) — filter already exists in `place-week`; the ranking is what is missing
-4. **`canSplitDay` in the intake** (§4.1) — one question, and the field is already there waiting
-5. **Preferred days from hard to scored** (§4.2)
+1. ⛔ **ANCHOR VALIDATION AT PICK TIME, IN THE WIZARD** (§2.3, §5.2). Five hard constraints over seven
+   days means a user-picked anchor set can admit ZERO legal weeks — **a live path, not an edge case.**
+   Detect arrangements that cannot house four lifting days and surface it **at selection, not at
+   generation.** Telling someone their week is impossible after they press Build is the silence this
+   whole document exists to remove.
+2. **Anchor-to-anchor conflict detection in the solver** (§2) — upstream of lift placement and absent today
+3. **Eccentric ratings per session and per anchor** (§2.1, §3)
+4. **The scorer** (§5) — filter already exists in `place-week`; the ranking is what is missing
+5. **`canSplitDay` in the intake** (§4.1) — one question, and the field is already there waiting
+6. **Preferred STRENGTH days from hard to scored** (§4.2) — the anchors stay hard
 
-6. **Point relayout at the solver** — its trigger and idempotency guard survive; only the engine
+7. **Point relayout at the solver** — its trigger and idempotency guard survive; only the engine
    behind them changes (§6b).
-7. **Then** the banner and the telemetry, which need §6c's compromise list to say anything true.
+8. **Then** the banner and the telemetry, which need §6c's compromise list to say anything true.
 
 ⚠️ **Nothing here is built. `place-week` today does §5 step 1 and 2 and stops.**
 ⛔ **And the largest single risk is that `placement/` runs at plan CREATION for every run plan, not
