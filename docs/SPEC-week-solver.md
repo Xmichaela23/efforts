@@ -22,7 +22,7 @@ just need the arithmetic stated once — which is the adjacency table (§8.2) an
 ⚠️ Read that as the constraint it is: **if a proposed solver rule cannot be expressed as "how much" or
 "measured how", it is a new theory, and it does not belong here.**
 
-## ⛔ 0. THE WEEK STARTS ON MONDAY. ONE CONVENTION, NO EXCEPTIONS.
+## ⛔ 0b. THE WEEK STARTS ON MONDAY. ONE CONVENTION, NO EXCEPTIONS.
 
 **Declared 2026-07-27, before any solver code, because two conventions are live right now:**
 
@@ -45,6 +45,42 @@ training week is conventionally read Monday to Sunday with the long day at the e
 **Everything that survives the collapse conforms.** Storage that is Sun-first converts **at the
 boundary, once, on the way in** — never by scattering `(x + 6) % 7` through the solver, which is the
 current state at roughly ten call sites and is exactly how the two conventions got established.
+
+⚠️ Those ten sites convert **as part of the collapse, not before it.** They die with their modules;
+touching them first would be repairing code scheduled for deletion.
+
+## ⛔ 0c. THE LAW'S CURRENCY: HOURS BETWEEN TWO NAMED SESSIONS. NEVER FORBIDDEN WEEKDAYS.
+
+**Promoted to a principle 2026-07-27**, because it turned out to be the single defect behind three
+separate bugs in `placement/`, and one grep found the third.
+
+**The law says:** *"`lower_body_strength` and `long_run` need 48 hours between them."*
+**It never says:** *"Thursday is unavailable."*
+
+⛔ **A SET OF FORBIDDEN DAYS IS ALWAYS A CONVERSION ERROR**, and it is lossy in exactly two places —
+which are the two questions the law asks and a weekday cannot answer:
+
+| the law asks | a forbidden-day set loses |
+|---|---|
+| **WHICH session?** | `upper` shares no prime movers with running. Forbidding *the day* forbids the bench press too |
+| **HOW MUCH?** | 24h is already satisfied by being one day apart. Forbidding *the day before* spends a clearance that was never owed |
+
+**Worked instances, all three the same error, all three in one module:**
+
+| # | code | over-broad on |
+|---|---|---|
+| 1 | `excludeDayBeforeLong` | bans **all** strength before the long run — upper is free |
+| 2 | `lowerBufferQuality` | bans heavy legs before **any** quality day — 24h is already met |
+| 3 | `buildEasyDays` | drops the long-run day and all quality days for **all** strength, upper included |
+
+✅ **THIS IS GREP-ABLE, AND THAT IS THE POINT.** Search for a `Set<Weekday>` named `forbidden`,
+`blocked`, `excluded`, or a candidate loop that `continue`s on a bare day comparison. Number three was
+found with one command after numbers one and two were each found by accident.
+
+⛔ **IT APPLIES FORWARD. THE SOLVER MAY NEVER BUILD ONE.** Candidate filtering asks
+`requiredAdjacencyHours(kindA, kindB)` against the *placed* sessions, per candidate day, per session
+kind. The moment a day is excluded without naming which session it was excluded for, this entire arc
+has reintroduced itself.
 
 ---
 
@@ -248,6 +284,31 @@ and order always applies.
 field exists and the intake has never asked. Until it does, no day is splittable: the conservative
 direction, and the one Robineau makes expensive to get wrong.
 
+### 4.1a ⛔ METHODOLOGY TEMPLATES ARE INPUTS. THEY DESCRIBE ANCHORS; THEY DO NOT PLACE THE BAR.
+
+**Decided 2026-07-27.** Higdon and Daniels survive the collapse — as **declared constraints entering
+the solver**, never as placement engines. A template says *what the week is shaped like*; the solver
+says *what day each session lands on*. Those are different jobs and `placement/` conflated them.
+
+**The worked case, and it is the one that justifies the category.** `getDanielsStrategy` stamps every
+quality day as `'none'` for strength, and says why:
+
+> *"a hard polarisation rule, not masking a failed resolve"*
+
+⚠️ **THAT ONE SURVIVES SCRUTINY** — Daniels' whole method is polarisation, so Tue/Thu being untouchable
+is the methodology, not a clearance. It enters the solver as a **declared constraint carrying its own
+reason, scoped to Daniels**, and it is legitimately stricter than the law: the law permits
+`upper × quality_run`, and Daniels declines to use that permission on purpose.
+
+⛔ **AND THE CONTRAST IS THE WHOLE LESSON.** `buildEasyDays` applies the *same* exclusion to **Higdon**,
+where nothing states it and no reason exists. Same code, same effect, one is a decision and one is a
+default — **and the module cannot tell them apart.** That is the failure underneath every §6b-2
+instance: it does not distinguish a rule it reasoned about from one it inherited.
+
+✅ **THE TEST FOR THE SOLVER:** a constraint stricter than the law is admissible **only when it names
+the methodology it belongs to and carries its reason.** Anything stricter than the law without an
+owner is not a template rule — it is §0c's conversion error wearing one.
+
 ### 4.2 Preferred days are SCORED, not hard. Anchors OUTRANK them.
 
 **Hard constraints are the ones that are physiologically unsafe or contractually impossible.** A
@@ -352,6 +413,32 @@ and the app is silent at exactly the moment it most needs to speak.**
   people own it.
 - ⛔ *Drop to a 2- or 3-day lifting week* — removed. **Four lifting days is a fixed count.** It read as
   the most powerful lever precisely because it broke the constraint that makes this block what it is.
+
+### 5.2b ⛔ THE FAILURE CLASS THIS SECTION EXISTS TO KILL: SILENT SUBTRACTION
+
+**Named 2026-07-27, after the third instance.** When a week cannot fit, this codebase's habit is to
+**quietly return fewer sessions than were asked for**. Not an error, not a trade-off, not a
+compromise line — the session is simply not in the output, and nothing anywhere knows it was dropped.
+
+| # | where | what disappears |
+|---|---|---|
+| 1 | **Q-206** — derived rest days are asserted and never enforced, then `week-builder`'s `!slot?.isRest` guards refuse to emit | the quality bike, the quality run and the heavy leg day, on any 4-to-6-day plan |
+| 2 | `week-builder:473` — the matrix-conflict repair loop **deletes a strength session** until the grid validates, up to 32 passes | a lifting day, unremarked |
+| 3 | `base-generator` — Saturday is hardcoded shut, so a seven-session week has six days to place into | whichever session ran out of days. Found by the §6b-1 X2 tripwire, which was written to test something else |
+
+⛔ **ALL THREE ARE THE SAME DEFECT, AND IT IS NOT A PLACEMENT BUG.** It is a module choosing to
+subtract rather than to refuse. The week that comes back is *legal* — that is what makes it
+dangerous. It validates, it renders, it looks like a plan, and the athlete's missing session leaves
+no trace to find.
+
+✅ **THE FOURTH FATE IS THE ANSWER, AND IT IS ALREADY WRITTEN ABOVE.** An over-constrained week
+returns **named options** — *drop the full rest day*, *downgrade a clearance to a penalty* — and a
+typed refusal when neither is taken (§5.2a). **It never returns six sessions when seven were asked
+for.**
+
+⛔ **THE SOLVER MAY NOT REMOVE A SESSION. EVER.** D-325 §7 already forbids it and §5.2's relaxation
+menu deliberately excludes it. Restated here because forbidding it in the menu did not stop three
+modules doing it anyway — each in a different place, none of them via the menu.
 
 ### When neither relaxation yields a legal week
 
