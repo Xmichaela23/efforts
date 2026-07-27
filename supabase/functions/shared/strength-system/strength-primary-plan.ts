@@ -55,6 +55,7 @@ import {
   type EndurancePin,
   placeLiftingWeek,
 } from './place-week.ts';
+import { requiredAdjacencyHours } from '../../_shared/schedule-session-constraints.ts';
 
 /** The four lifts, in lb. **All four are required** — the entry gate gets this far only
  *  when every one is on file (SPEC §0). Missing one leaves a lifting day with no weight. */
@@ -469,7 +470,43 @@ function bikeQualitySession(day: string): PlanSession {
   };
 }
 
-function hillSession(day: string): PlanSession {
+/**
+ * ⛔ THE DESCENT IS DECIDED BY THE WEEK, NOT BY THE SESSION.
+ *
+ * Uphill is concentrically biased and that is the entire reason this protocol chose hills — it buys
+ * a hard aerobic session that does not tax the legs the lifting needs. **The way back down undoes
+ * that.** Downhill running is the established laboratory model for inducing exercise-induced muscle
+ * damage, so a jogged descent is where the eccentric cost of this session actually lives, and it is
+ * the part that arrives the next morning.
+ *
+ * So it is prescribed off placement:
+ *   • a heavy lower day within the ECCENTRIC clearance of the hill day → **WALK.** Keep the session
+ *     concentric, which is the only reason hills were chosen over flat intervals.
+ *   • the hill day clear of heavy lower work by that much → **JOG.** Nothing to protect, and the
+ *     descent is free aerobic time.
+ *
+ * ⛔ IT ASKS THE 48h CELL, NOT THE 24h ONE, AND THAT IS THE WHOLE RULE. A walked hill session is
+ * quality running and takes `quality_run`'s 24h. **Jogging the descent converts it into an eccentric
+ * session**, so the clearance that governs it is the one the law gives eccentric work — the long
+ * run's 48h. Asking the 24h cell was the first version of this function and it returned JOG for every
+ * week, including a Tuesday-squat/Wednesday-hills week sitting at exactly the floor with no buffer,
+ * which is the peak of the damage curve. The session does not get to pick the cheaper clearance for
+ * a load it is choosing to add.
+ *
+ * ⚠️ NOT KEYED ON HOW MUCH THE ATHLETE LIFTS. A light squat day and a heavy one both occupy the
+ * window; the rule is about proximity, not about anyone's numbers. Both clearances are read from
+ * `requiredAdjacencyHours`, so if the law moves this moves with it.
+ */
+function descentIsJogged(hillDay: string, lowerDays: string[]): boolean {
+  const required = requiredAdjacencyHours('long_run', 'lower_body_strength');
+  const idx = (d: string) => PLACEMENT_DAYS.indexOf(d as DayName);
+  return lowerDays.every((d) => {
+    const raw = Math.abs(idx(hillDay) - idx(d));
+    return Math.min(raw, 7 - raw) * 24 >= required;
+  });
+}
+
+function hillSession(day: string, lowerDays: string[] = []): PlanSession {
   // §5, run-only VO2 defence: 4 x 3min hard / 3min easy at 5-8%. Working time 12 min; ~35-40 min
   // with warm-up and cool-down. The token carries the grade because the cost row is not "run VO2" —
   // it is "run VO2 AT grade" (D-325 §1), and a token that cannot carry the constraint cannot be priced.
@@ -477,7 +514,8 @@ function hillSession(day: string): PlanSession {
   // ⚠️ 12 min, not the meta's "high volume" >=15 min (which would be 5 x 3). Deliberate: this is a
   // MAINTENANCE dose, not a gains dose — one hard session a week HOLDS the engine and does not build
   // it (parent doctrine §5.0). Structure from the evidence, volume from the maintenance context.
-  const token = 'run_hills_4x180s_r180s_g5_8';
+  const jogged = descentIsJogged(day, lowerDays);
+  const token = `run_hills_4x180s_r180s_g5_8_d${jogged ? 'jog' : 'walk'}`;
   return {
     day,
     type: 'run',
@@ -485,9 +523,13 @@ function hillSession(day: string): PlanSession {
     // ⛔ NO PACE, ANYWHERE IN THIS COPY. The pace-effort relationship changes with gradient, so a
     // pace target here is false precision (§2.2). Effort and grade only.
     description:
-      '4 × 3 min hard uphill, 3 min easy back down, on a 5-8% grade. Hard means hard — you should '
-      + 'not be able to hold a sentence. No pace target: on a hill the number would be wrong. '
-      + 'The climb is what keeps this cheap on your legs, so the lifting still gets what it needs.',
+      `4 × 3 min hard uphill, 3 min ${jogged ? 'easy jog' : 'walk'} back down, on a 5-8% grade. `
+      + 'Hard means hard — you should not be able to hold a sentence. No pace target: on a hill the '
+      + 'number would be wrong. The climb is what keeps this cheap on your legs, so the lifting '
+      + 'still gets what it needs.'
+      + (jogged
+        ? ''
+        : ' Walk the descents — running down is the part that would reach your next heavy day.'),
     duration: 35,
     steps_preset: [token],
     tags: ['quality', 'hills', 'aerobic'],
@@ -610,6 +652,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // Lift name → the day the solver gave it. Falls back to the lift's legacy grid day only if the
   // solver somehow omitted it, so a placement bug degrades to the old behaviour rather than to no day.
   const dayForLift = new Map(placedWeek.slots.map((s) => [s.lift, s.day as string]));
+  // Where the heavy legs actually landed — the hill session's descent is prescribed off this.
+  const heavyLowerDays: string[] = placedWeek.slots.filter((s) => s.isLower).map((s) => s.day as string);
   const liftDay = (l: typeof MAIN_LIFTS[number]): string => dayForLift.get(l.name) ?? l.day;
   const strengthDays = MAIN_LIFTS.map(liftDay);
   // ⛔ Surfaced, never swallowed. `place-week` states which clearance it had to break; the plan
@@ -789,7 +833,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // ⛔ Do NOT emit hills as a substitute for the ride: that spends mechanical budget the
       // doctrine spent the whole day protecting.
       if (hardPin && args.hardDay?.discipline === 'run') {
-        weekSessions.push(hillSession(hardPin));
+        weekSessions.push(hillSession(hardPin, heavyLowerDays));
       }
     } else if (enduranceSport) {
       enduranceDays.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day)));

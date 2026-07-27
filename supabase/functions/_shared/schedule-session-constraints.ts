@@ -236,6 +236,23 @@ export function requiredAdjacencyHours(a: MatrixSessionKind, b: MatrixSessionKin
   return ADJACENCY_HOURS[a][b];
 }
 
+/**
+ * ⛔ DOES A SAME-DAY PAIR ACTUALLY COMPETE? The question `canSplitDay` was standing in for.
+ *
+ * Robineau 2016 measured LIFTING AGAINST ENDURANCE IN THE SAME LEGS, and that is the only pair its
+ * six-hour floor governs. Two sessions that share no prime movers do not interfere no matter how
+ * close together they sit — a bench press after a bike ride is one session block, ordered, and it
+ * costs nothing.
+ *
+ * ⚠️ This is the same argument that makes the stacked lift always an UPPER lift. It was being applied
+ * to justify the stack and then ignored when deciding whether the stack needed a gap.
+ *
+ * True only when BOTH sides are leg-loaded (`SESSION_PRIME_MOVER === 'leg'`).
+ */
+export function stackNeedsRecoveryGap(a: MatrixSessionKind, b: MatrixSessionKind): boolean {
+  return SESSION_PRIME_MOVER[a] === 'leg' && SESSION_PRIME_MOVER[b] === 'leg';
+}
+
 /** The reason this ORDER is discouraged, or undefined if the order is free. */
 export function adjacencyPenaltyReason(
   before: MatrixSessionKind,
@@ -292,6 +309,22 @@ export type MatrixSessionKind = (typeof SESSION_KINDS)[number];
  * (`lower_body_strength × easy_run` = ✓ since May), and nothing enforced either.
  * Fixed the CELL, not the composer. See docs/SPEC-week-solver.md §8.3.
  *
+ * 2026-07-27 (same day, third instance): `upper_body_strength × long_ride` AND
+ * `upper_body_strength × long_run` both flipped to ✓ (all four cells, symmetric).
+ * ⛔ THE MATRIX FORBADE THE EXACT STACK THE ENGINE MANDATES. `place-week` stacks an UPPER lift onto an
+ * endurance day — deliberately, because pressing shares no prime movers with running or riding, so it
+ * is the only lift that costs nothing there. The matrix said bench on the long-ride day was FORBIDDEN
+ * while squat on the long-ride day was PERMITTED. Backwards, and `place-week` never noticed because it
+ * imports the clearance helpers from this file and not the same-day matrix (§8.3 again).
+ * ⚠️ Every other `upper_body_strength` cell was already permissive — quality run ✓, quality bike ✓,
+ * easy run ✓. Only the two LONG rows inverted it, which is the tell: they were written as a pair with
+ * `lower_body_strength` in mind and the upper column came along for the ride.
+ * ⛔ `long_run` flipped too, on the SAME logic and deliberately, though it feels less obviously right.
+ * The only argument for holding it back is that a long-run day is already long — and that is a
+ * DURATION BUDGET, which §3 says is a ceiling and never an adjacency input. Flipping one cell on
+ * prime-mover logic while holding the other on how the day feels would reintroduce exactly the
+ * contamination the spec forbids, and leave an inconsistency for the next person to relitigate.
+ *
  * 2026-05-12 (§6.1 cycling/running asymmetry refinement): `lower_body_strength × long_ride`
  * flipped to ✓ (both cells, symmetric). STRENGTH-PROTOCOL.md §6.1.2 permits same-day Heavy
  * Lower + Long Ride with 6h+ gap and BIKE FIRST mandatory ordering. The prior ✗ blocked the
@@ -308,10 +341,10 @@ const ROWS: Record<MatrixSessionKind, number[]> = {
   quality_swim:         [1, 1, 1, 1, 1, 0, 0, 0, 1, 1],
   quality_bike:         [0, 0, 1, 1, 0, 0, 0, 0, 0, 1],
   quality_run:          [1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
-  long_ride:            [0, 0, 0, 0, 0, 0, 1, 0, 1, 0],
-  long_run:             [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+  long_ride:            [0, 0, 0, 0, 0, 0, 1, 0, 1, 1],
+  long_run:             [0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
   lower_body_strength:  [1, 1, 1, 1, 0, 0, 1, 0, 0, 1],
-  upper_body_strength:  [1, 1, 1, 1, 1, 1, 0, 0, 1, 1],
+  upper_body_strength:  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 };
 
 function buildSameDayMatrix(): Record<MatrixSessionKind, Record<MatrixSessionKind, boolean>> {

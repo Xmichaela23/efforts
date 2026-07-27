@@ -1566,14 +1566,24 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
   // ⛔ Grade travels IN the token because the cost row is not "run VO2" — it is "run VO2 at 4-8%"
   // (D-325 §1). A token that cannot carry the constraint has an unverifiable cost, and the athlete
   // gets a session the engine cannot price.
-  if (/^run_hills_\d+x\d+s_r\d+s_g\d+_\d+$/.test(lower)) {
-    const m = lower.match(/^run_hills_(\d+)x(\d+)s_r(\d+)s_g(\d+)_(\d+)$/);
+  // ⛔ THE DESCENT TRAVELS IN THE TOKEN TOO, AND FOR THE SAME REASON AS THE GRADE.
+  // Uphill is concentric; the way back down is where the eccentric load in this session actually is,
+  // and it is the part that reaches tomorrow. So whether the athlete jogs or walks it is NOT a
+  // property of the hill session — it is a property of WHERE THE SESSION LANDED. A hill day sitting
+  // 24h from a heavy lower day has no eccentric budget left and must walk; a hill day 48h clear of
+  // one can jog and bank the aerobic time. Only the composer knows the placed week, so the composer
+  // decides and stamps it here.
+  // ⚠️ Suffix is OPTIONAL and absent means WALK. An unstamped token is one whose week we cannot see,
+  // and the conservative arm is the one that adds no damage.
+  if (/^run_hills_\d+x\d+s_r\d+s_g\d+_\d+(?:_d(?:walk|jog))?$/.test(lower)) {
+    const m = lower.match(/^run_hills_(\d+)x(\d+)s_r(\d+)s_g(\d+)_(\d+)(?:_d(walk|jog))?$/);
     if (m) {
       const reps = parseInt(m[1], 10);
       const work_s = parseInt(m[2], 10);
       const rest_s = parseInt(m[3], 10);
       const gradeLo = parseInt(m[4], 10);
       const gradeHi = parseInt(m[5], 10);
+      const descentJogged = m[6] === 'jog';
       const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
       const gradeLabel = `${gradeLo}-${gradeHi}% grade`;
       // ⛔ WARM-UP AND COOL-DOWN. Without these the session was 21 minutes that opened with a maximal
@@ -1590,13 +1600,18 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
           label: `Hill · ${gradeLabel}`,
         });
         if (i < reps - 1) {
-          // Easy jog down. Paced, because the recovery IS flat-ish and easy pace is honest there.
+          // ⛔ A JOGGED DESCENT IS THE ECCENTRIC LOAD IN THIS SESSION. Downhill running is the
+          // standard laboratory model for inducing muscle damage; uphill is not. Walking it removes
+          // essentially all of that at the cost of nothing the session is for — the stimulus is the
+          // climb. So the descent is prescribed, never assumed.
+          // ⚠️ A WALKED DESCENT CARRIES NO PACE. Pacing a walk is the same false precision the
+          // uphill reps refuse; and if the athlete is walking, the recovery duration is the target.
           out.push({
             id: uid(),
             kind: 'recovery',
             duration_s: rest_s,
-            pace_sec_per_mi: easyPace,
-            label: 'Jog down',
+            ...(descentJogged ? { pace_sec_per_mi: easyPace } : {}),
+            label: descentJogged ? 'Jog down' : 'Walk down',
           });
         }
       }

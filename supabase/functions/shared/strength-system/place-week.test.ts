@@ -2,11 +2,12 @@
  * PLACING THE LIFTING WEEK AROUND THE ENDURANCE ABSOLUTES.
  *
  * The two rules these pin, because both were arrived at by correcting an earlier wrong answer:
- *   1. A stack is only offered on a day the athlete SAID they can split. Robineau 2016 found zero
- *      hours between lifting and endurance produced lower strength gains, while six and twenty-four
- *      performed the same. A stack without the gap is the worst arm of the only study on it.
- *   2. The stacked lift is always UPPER. Not a courtesy — pressing does not share prime movers with
+ *   1. The stacked lift is always UPPER. Not a courtesy — pressing does not share prime movers with
  *      running legs, so it is the only lift that costs nothing beside a hard endurance session.
+ *   2. Because of (1), the stack needs NO GAP and NO PERMISSION. Robineau 2016's six-hour floor came
+ *      from loading the same legs twice, and it governs that pair only. ⛔ Applying it to a bench
+ *      press beside a bike ride made the engine declare solvable weeks unsolvable — corrected
+ *      2026-07-27. The floor survives, scoped, for stacks that genuinely compete.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
@@ -16,7 +17,9 @@ import {
   placeLiftingWeek,
   requiredClearanceHours,
   resolveStacking,
+  stackGapHours,
 } from './place-week.ts';
+import { stackNeedsRecoveryGap } from '../../_shared/schedule-session-constraints.ts';
 
 const LIFTS = [
   { lift: 'Bench Press', isLower: false },
@@ -51,25 +54,51 @@ Deno.test('two pins: a rest day already exists, so nothing is asked and nothing 
 
 // ── The AM/PM safeguard ─────────────────────────────────────────────────────
 
-Deno.test('⛔ an unanswered split question is NOT consent — no stack is offered', () => {
-  // `canSplitDay` undefined must behave exactly like false. Inferring "yes" from the athlete having
-  // accepted a stack is how the app would end up prescribing back-to-back lifting and cardio.
+Deno.test('a free stack is NOT gated on the split question — it lands at 0h, one block, lift first', () => {
+  // ⛔ REVERSED 2026-07-27. This test used to assert the opposite: no canSplitDay, no stack, week
+  // unresolvable. That was Robineau's six-hour floor applied to a pair Robineau never tested. He
+  // loaded THE SAME LEGS twice; a bench press beside a bike ride shares no prime movers, which is the
+  // identical argument this module already makes for why the stacked lift is always upper. The gate
+  // was refusing weeks that fit.
   const pins = [...LONG_DAYS, pin('Tuesday', 'quality_run', 'club run')]; // no canSplitDay
   const week = placeLiftingWeek(LIFTS, pins);
-  assertEquals(week.resolution.eligiblePins.length, 0);
+  assertEquals(week.resolution.unresolvable, false);
+  const stacked = week.slots.filter((s) => s.stackedWith);
+  assertEquals(stacked.length, 1, 'the stack that buys the rest day back must still be offered');
+  assertEquals(stacked[0].isLower, false, 'only an upper lift may ever stack');
+  assertEquals(stacked[0].stackedWith!.gapHours, 0, 'no gap is needed when nothing competes');
+  assertEquals(week.restDays.length, 1);
+});
+
+Deno.test('the arithmetic choice still fires when there are not enough UPPER lifts to absorb the stacks', () => {
+  // The ceiling moved. It used to be "how many days can you split"; it is now "how many upper lifts
+  // are there", because only an upper lift may stack. Five pins and four lifts is nine sessions —
+  // three stacks needed, two uppers available. That is a real refusal and the athlete owns it.
+  const week = placeLiftingWeek(LIFTS, [
+    ...LONG_DAYS,
+    pin('Tuesday', 'quality_run', 'club run'),
+    pin('Wednesday', 'quality_bike', 'club ride'),
+    pin('Thursday', 'easy_swim', 'masters swim'),
+  ]);
   assertEquals(week.resolution.unresolvable, true);
-  assertEquals(week.slots.some((s) => s.stackedWith), false);
-});
-
-Deno.test('cannot split → the honest arithmetic choice, not an override button', () => {
-  const week = placeLiftingWeek(LIFTS, [...LONG_DAYS, pin('Tuesday', 'quality_run', 'club run', false)]);
   const said = week.compromises.join(' ');
-  assert(said.includes('7 active days'), 'the arithmetic is not stated');
+  assert(said.includes('9 active days'), `the arithmetic is not stated: ${said}`);
   assert(said.includes('one lifting day comes out'), 'the choice is not named');
-  assert(said.includes(`${MIN_STACK_GAP_H}h apart`), 'the gap requirement is not stated');
 });
 
-Deno.test('can split → the stack lands, and it records the six-hour gap', () => {
+Deno.test('a COMPETING stack still demands the six hours — the safeguard is scoped, not deleted', () => {
+  // Lower body beside a leg-loaded endurance session is exactly what Robineau tested, and it keeps
+  // the floor. This asserts the law directly, because place-week only ever stacks upper lifts.
+  assertEquals(stackNeedsRecoveryGap('long_ride', 'lower_body_strength'), true);
+  assertEquals(stackNeedsRecoveryGap('quality_run', 'lower_body_strength'), true);
+  assertEquals(stackNeedsRecoveryGap('long_ride', 'upper_body_strength'), false);
+  assertEquals(stackNeedsRecoveryGap('easy_swim', 'lower_body_strength'), false);
+  // And the gap the engine would report for each.
+  assertEquals(stackGapHours(pin('Saturday', 'long_ride', 'long ride'), true), MIN_STACK_GAP_H);
+  assertEquals(stackGapHours(pin('Saturday', 'long_ride', 'long ride'), false), 0);
+});
+
+Deno.test('can split → the stack is UPGRADED to a real six-hour gap', () => {
   const week = placeLiftingWeek(LIFTS, [...LONG_DAYS, pin('Tuesday', 'quality_run', 'club run', true)]);
   assertEquals(week.resolution.unresolvable, false);
   const stacked = week.slots.filter((s) => s.stackedWith);

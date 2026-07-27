@@ -31,6 +31,8 @@
 import {
   type MatrixSessionKind,
   requiredAdjacencyHours,
+  SAME_DAY_COMPATIBLE,
+  stackNeedsRecoveryGap,
 } from '../../_shared/schedule-session-constraints.ts';
 
 export type DayName =
@@ -42,8 +44,6 @@ export const DAYS: DayName[] = [
 
 /**
  * An endurance session the athlete does not move.
- *
- * `canSplitDay` is the load-bearing field and it must be ASKED, never assumed. See `MIN_STACK_GAP_H`.
  */
 export type EndurancePin = {
   day: DayName;
@@ -52,11 +52,21 @@ export type EndurancePin = {
   /** Athlete-facing label, so the plan can name what it placed around. */
   label: string;
   /**
-   * ⛔ Can the athlete run this day as AM and PM sessions at least six hours apart?
+   * Can the athlete run this day as AM and PM sessions at least six hours apart?
    *
-   * **Undefined is NOT "yes".** A pin is only eligible to carry a lifting session when this is
-   * explicitly true — see `MIN_STACK_GAP_H` for why assuming it is the one thing the evidence says
-   * makes the athlete weaker.
+   * ⛔ REDEFINED 2026-07-27. This was a GATE — no pin could carry a lift unless it was explicitly
+   * true. That was wrong, and it was wrong in a way that made the engine refuse weeks that fit.
+   *
+   * `MIN_STACK_GAP_H` exists because Robineau tested LIFTING AGAINST ENDURANCE IN THE SAME LEGS. A
+   * bench press beside a bike ride is not that. It shares no prime movers — which is the identical
+   * argument this file already makes for why the stacked lift is always an upper one. So the engine
+   * was gating a FREE stack behind a question most athletes answer no to, and then reporting a
+   * solvable week as unsolvable.
+   *
+   * It is now an UPGRADE, not a gate: `true` means the athlete genuinely trains twice, so the stack
+   * is reported with a real six-hour gap. Anything else means one session block, ordered, lift first
+   * — which costs nothing when the two do not compete. Whether they compete is
+   * `stackNeedsRecoveryGap`, not this field.
    */
   canSplitDay?: boolean;
 };
@@ -79,10 +89,15 @@ export type EndurancePin = {
  * equal to 24h will stack by preference and quietly cost the aerobic side.
  * (Schumann 2022 agrees on the strength axis: attenuation p=0.043 same-session, n.s. at ≥3h.)
  *
- * Which is why the intake has to ASK whether the day can be split, rather than infer it from the
- * fact that the athlete accepted a stack. Most people cannot split a weekday. Offering the stack
- * without the gap would be worse than not offering it, because the app would appear to have
- * sanctioned it.
+ * ⛔ SCOPED 2026-07-27 — THIS GOVERNS COMPETING PAIRS ONLY. Robineau loaded the SAME LEGS twice; the
+ * finding does not reach a pair that shares no prime movers. A bench press after a bike ride needs no
+ * gap, and demanding one made the engine call solvable weeks unsolvable. `stackNeedsRecoveryGap` in
+ * the law file decides which pairs this applies to; `stackGapHours` applies it.
+ *
+ * Where it DOES apply — a lower lift beside a leg-loaded endurance session — the intake must still
+ * ASK whether the day can be split rather than infer it from the athlete accepting a stack. Most
+ * people cannot split a weekday, and offering that stack without the gap would be worse than not
+ * offering it, because the app would appear to have sanctioned it.
  *
  * (History: an earlier version of this project's docs carried 24h as a hard rule. That was wrong —
  * 24h was Wendler's recommendation before *important* sessions, not Robineau's floor. The tighter
@@ -115,9 +130,9 @@ export type StackResolution = {
   activeSessions: number;
   /** How many lifting sessions must share a day to protect one full rest day. 0 = nothing to ask. */
   stacksRequired: number;
-  /** Pins the athlete said they can split. Only these can carry a lift. */
+  /** Pins the same-day matrix permits to carry a lift. ⛔ The LAW's answer, not the athlete's. */
   eligiblePins: EndurancePin[];
-  /** True when `stacksRequired` exceeds the pins they can actually split. */
+  /** True when `stacksRequired` exceeds the pins that can legally carry a lift. */
   unresolvable: boolean;
 };
 
@@ -194,17 +209,42 @@ function lowerDayPenalty(candidate: DayName, pins: EndurancePin[]): number {
 export function resolveStacking(
   pins: EndurancePin[],
   liftCount: number,
+  /**
+   * How many of those lifts are UPPER. ⛔ THE REAL CEILING once the matrix stopped gating on
+   * `canSplitDay`: only an upper lift may be stacked, so two upper lifts is at most two stacks no
+   * matter how many endurance days are legal hosts. Defaults to `liftCount` for callers that do not
+   * know the split; `placeLiftingWeek` always passes the true count.
+   */
+  upperLiftCount: number = liftCount,
 ): StackResolution {
   const activeSessions = pins.length + liftCount;
   const stacksRequired = Math.max(0, activeSessions - MAX_ACTIVE_DAYS);
-  // Only a day the athlete said they can split may carry a lift. Undefined is not consent.
-  const eligiblePins = pins.filter((p) => p.canSplitDay === true);
+  // ⛔ ELIGIBILITY IS THE LAW'S ANSWER, NOT THE ATHLETE'S. Rewritten 2026-07-27: this used to be
+  // `p.canSplitDay === true`, which gated a free stack behind a question most people answer no to and
+  // then declared solvable weeks unsolvable. The real question is whether the same-day pair is legal,
+  // and that is the matrix — the one source this module was stacking without ever consulting.
+  //
+  // The stacked lift is always UPPER (see `placeLiftingWeek` step 2), so upper is what we ask about.
+  const eligiblePins = pins.filter((p) => SAME_DAY_COMPATIBLE[p.kind]?.upper_body_strength === true);
   return {
     activeSessions,
     stacksRequired,
     eligiblePins,
-    unresolvable: stacksRequired > eligiblePins.length,
+    unresolvable: stacksRequired > Math.min(eligiblePins.length, upperLiftCount),
   };
+}
+
+/**
+ * Hours between the endurance session and the lift stacked onto it.
+ *
+ * Six only when they genuinely compete, per `stackNeedsRecoveryGap`. Otherwise zero — one session
+ * block, lift first. `canSplitDay` upgrades a non-competing stack to a real gap for the athlete who
+ * does train twice; it never blocks one.
+ */
+export function stackGapHours(pin: EndurancePin, liftIsLower: boolean): number {
+  const liftKind: MatrixSessionKind = liftIsLower ? 'lower_body_strength' : 'upper_body_strength';
+  if (stackNeedsRecoveryGap(pin.kind, liftKind)) return MIN_STACK_GAP_H;
+  return pin.canSplitDay === true ? MIN_STACK_GAP_H : 0;
 }
 
 /**
@@ -227,17 +267,25 @@ export function placeLiftingWeek(
   pins: EndurancePin[],
 ): PlacedWeek {
   const compromises: string[] = [];
-  const resolution = resolveStacking(pins, lifts.length);
-  const pinnedDays = new Set(pins.map((p) => p.day));
-
-  // ── 2. Stacks: upper lifts onto splittable pinned days ───────────────────────────────────────
   const upperLifts = lifts.filter((l) => !l.isLower);
   const lowerLifts = lifts.filter((l) => l.isLower);
+  const resolution = resolveStacking(pins, lifts.length, upperLifts.length);
+  const pinnedDays = new Set(pins.map((p) => p.day));
+
+  // ── 2. Stacks: upper lifts onto matrix-legal pinned days ────────────────────────────────────
   const stackCount = Math.min(resolution.stacksRequired, resolution.eligiblePins.length, upperLifts.length);
-  // Cheapest first: the lightest pin carries the lift. A quality session is a smaller day than a long
+  // Cheapest first: the SMALLEST day carries the lift. A quality session is a shorter day than a long
   // one, so stacking onto it costs the athlete less than stacking onto their long run.
+  //
+  // ⛔ This used to sort by `requiredClearanceHours`, using leg-clearance as a proxy for day size.
+  // That broke on 2026-07-27 when long_ride's clearance went to 0 — the LONGEST day in the week
+  // suddenly sorted as the cheapest. Day size is a DURATION question and it now says so directly.
+  const isLongDay = (k: MatrixSessionKind) => k === 'long_run' || k === 'long_ride';
   const stackTargets = [...resolution.eligiblePins]
-    .sort((a, b) => requiredClearanceHours(a.kind) - requiredClearanceHours(b.kind))
+    .sort((a, b) =>
+      Number(isLongDay(a.kind)) - Number(isLongDay(b.kind)) ||
+      requiredClearanceHours(a.kind) - requiredClearanceHours(b.kind) ||
+      dayIndex(a.day) - dayIndex(b.day))
     .slice(0, stackCount);
 
   const stackedByLift = new Map<string, EndurancePin>();
@@ -251,7 +299,7 @@ export function placeLiftingWeek(
     compromises.push(
       `${pins.length} fixed endurance days and ${lifts.length} lifting days is ${resolution.activeSessions} active days. ` +
       `Protecting one full rest day needs ${resolution.stacksRequired} stacked day${resolution.stacksRequired === 1 ? '' : 's'}, ` +
-      `and ${resolution.eligiblePins.length} of the fixed days can be split into AM and PM at least ${MIN_STACK_GAP_H}h apart. ` +
+      `and ${resolution.eligiblePins.length} of the fixed days can legally carry a lift. ` +
       `Either one lifting day comes out, or the week runs with no full rest day.`,
     );
   }
@@ -340,7 +388,7 @@ export function placeLiftingWeek(
         lift: l.lift,
         isLower: l.isLower,
         day: stacked.day,
-        stackedWith: { label: stacked.label, gapHours: MIN_STACK_GAP_H },
+        stackedWith: { label: stacked.label, gapHours: stackGapHours(stacked, l.isLower) },
       };
     }
     return {
