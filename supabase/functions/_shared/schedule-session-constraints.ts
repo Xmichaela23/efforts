@@ -73,11 +73,25 @@ export const LEG_QUALITY_KINDS: ReadonlyArray<MatrixSessionKind> = [
 
 /**
  * Leg-dominant LONG sessions — must be ≥48h from lower_body_strength in both directions.
- * Long sessions add glycogen depletion + muscle damage on top of the AMPK interference window,
+ * Long sessions add glycogen depletion + muscle damage on top of the interference window,
  * compounding the recovery requirement. All intents.
+ *
+ * ⛔ `long_ride` REMOVED 2026-07-27, because THIS FILE CONTRADICTED ITSELF.
+ * `ROWS` says `lower_body_strength × long_ride = 1` — they may SHARE A DAY, zero hours apart — while
+ * this list demanded ≥48h between them. Both shipped. `place-week` read this list via
+ * `requiredClearanceHours`; the optimizer read the matrix; the two were never run against each other.
+ *
+ * The matrix wins, and the reason is physiological rather than procedural: **a long ride is
+ * near-zero ECCENTRIC load.** Concentric-dominant, no impact transient, no muscle damage to compound
+ * with — which is exactly why the same-day cell was set to 1 in the first place. There is no reason
+ * to keep a squat 48h away from it.
+ *
+ * ⚠️ `long_ride` was almost certainly in this list because it sits beside `long_run` in a sentence,
+ * not because anyone rated it. Glycogen depletion is real on a long ride; muscle damage is not, and
+ * this list is a DAMAGE clearance.
+ * ⛔ Do not re-add it. See docs/SPEC-week-solver.md §8.4 and §2.1.
  */
 export const LEG_LONG_KINDS: ReadonlyArray<MatrixSessionKind> = [
-  'long_ride',
   'long_run',
 ];
 
@@ -125,6 +139,16 @@ export type MatrixSessionKind = (typeof SESSION_KINDS)[number];
  * blocked race-week Taper Priming sessions for the same reason. The §6.2 ordering metadata
  * attached in week-builder.ts:attachSameDayPairingMetadata handles the AM/PM split.
  *
+ * 2026-07-27: `upper_body_strength × easy_run` flipped to ✓ (both cells, symmetric).
+ * ⛔ THE MATRIX WAS WRONG AND THE COMPOSER WAS RIGHT. A bench or overhead-press day and an easy run
+ * share NO prime movers — `SESSION_PRIME_MOVER` says so twelve lines up: upper_body_strength is
+ * 'upper', and "concurrent constraint does not apply". The ✗ had no mechanism behind it.
+ * ⚠️ And it was already being ignored: the Get Stronger composer stacks easy runs onto UPPER lift
+ * days on every week it has ever built, because it imports the clearance helpers from this file and
+ * never the same-day matrix. So the rule forbade the harmless stack, permitted the loaded one
+ * (`lower_body_strength × easy_run` = ✓ since May), and nothing enforced either.
+ * Fixed the CELL, not the composer. See docs/SPEC-week-solver.md §8.3.
+ *
  * 2026-05-12 (§6.1 cycling/running asymmetry refinement): `lower_body_strength × long_ride`
  * flipped to ✓ (both cells, symmetric). STRENGTH-PROTOCOL.md §6.1.2 permits same-day Heavy
  * Lower + Long Ride with 6h+ gap and BIKE FIRST mandatory ordering. The prior ✗ blocked the
@@ -136,7 +160,7 @@ export type MatrixSessionKind = (typeof SESSION_KINDS)[number];
  */
 const ROWS: Record<MatrixSessionKind, number[]> = {
   easy_bike:            [1, 0, 1, 1, 0, 1, 0, 0, 1, 1],
-  easy_run:             [0, 1, 1, 1, 0, 0, 0, 0, 1, 0],
+  easy_run:             [0, 1, 1, 1, 0, 0, 0, 0, 1, 1],
   easy_swim:            [1, 1, 1, 1, 1, 1, 0, 0, 1, 1],
   quality_swim:         [1, 1, 1, 1, 1, 0, 0, 0, 1, 1],
   quality_bike:         [0, 0, 1, 1, 0, 0, 0, 0, 0, 1],
@@ -144,7 +168,7 @@ const ROWS: Record<MatrixSessionKind, number[]> = {
   long_ride:            [0, 0, 0, 0, 0, 0, 1, 0, 1, 0],
   long_run:             [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
   lower_body_strength:  [1, 1, 1, 1, 0, 0, 1, 0, 0, 1],
-  upper_body_strength:  [1, 0, 1, 1, 1, 1, 0, 0, 1, 1],
+  upper_body_strength:  [1, 1, 1, 1, 1, 1, 0, 0, 1, 1],
 };
 
 function buildSameDayMatrix(): Record<MatrixSessionKind, Record<MatrixSessionKind, boolean>> {
