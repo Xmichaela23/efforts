@@ -74,7 +74,7 @@ function assignSessions(
   primarySchedule: { longSessionDays: string[]; qualitySessionDays: string[]; easySessionDays: string[] },
   guardrails: GuardrailResult[],
   placementContext?: {
-    methodology?: 'hal_higdon_complete' | 'jack_daniels_performance' | 'triathlon';
+    methodology?: 'hal_higdon_complete' | 'jack_daniels_performance';
     protocol?: string;
     strengthFrequency?: number;
     noDoubles?: boolean;
@@ -113,7 +113,7 @@ function assignSessionsWithStrategy(
   primarySchedule: { longSessionDays: string[]; qualitySessionDays: string[]; easySessionDays: string[] },
   guardrails: GuardrailResult[],
   placementContext: {
-    methodology: 'hal_higdon_complete' | 'jack_daniels_performance' | 'triathlon';
+    methodology: 'hal_higdon_complete' | 'jack_daniels_performance';
     protocol?: string;
     strengthFrequency?: number;
     noDoubles?: boolean;

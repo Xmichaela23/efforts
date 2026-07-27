@@ -330,6 +330,45 @@ ordinary anchor arrangement can admit zero legal weeks. Which is why it must be 
 compromises, and unsolvable-with-options. Collapsing the third into an empty array is the silence
 this section exists to prevent.
 
+### 5.2a ⛔ THE ONLY IMPLEMENTATION OF THIS EVER WRITTEN — preserved here because the code is gone
+
+`_shared/resolve-schedule-collisions.ts` was **deleted 2026-07-27** as a dead second placement
+authority (three sweeps, zero effect — see the deletion commit). But it contained the **only place in
+this codebase that ever refused a week instead of quietly producing a worse one**, and that shape is
+this section. It is written down here because there is now no implementation to copy from.
+
+```ts
+export type ScheduleCollisionCode =
+  | 'SCHEDULE_GRIDLOCK_QUALITY_COLLISION'   // no day left to separate the hard run from the hard ride
+  | 'SCHEDULE_GRIDLOCK_LOWER_BODY'          // no day left that clears heavy legs of the hard days
+  | 'SCHEDULE_GRIDLOCK_LONG_COLLISION';     // long ride and long run cannot be split at this distance
+
+/** Thrown when the rules cannot produce a safe week. UI/Arc catch by instanceof or `code`. */
+export class ScheduleCollisionError extends Error {
+  readonly code: ScheduleCollisionCode;
+}
+```
+
+**Four properties worth inheriting, and each was earned:**
+
+1. **A TYPED CODE, NOT A MESSAGE.** Three named failures, each identifying *which constraint bound*.
+   That is what §5.2 means by naming the binding constraint — the caller can branch, and the copy can
+   differ per code. A boolean or a null cannot do this.
+2. **IT THREW.** Not a silent fallback, not a first-fit last resort, not a dropped session. The
+   surrounding code had to handle it or crash, which is the correct pressure — every silent
+   last-resort path in the audit exists because someone chose the other option.
+3. **ONE RETRY, THEN THE THROW.** Its caller retried exactly once after dropping a single easy swim,
+   and stated it in a trade-off. That is §5.2's relaxation menu in miniature: a bounded retry with a
+   named cost, and a refusal after.
+   ⚠️ **The solver must NOT inherit the retry AS WRITTEN** — dropping a session is forbidden by
+   D-325 §7 and by §5.2's own removed options. Inherit the *bounded-retry-then-refuse* shape and give
+   it a legal relaxation to spend.
+4. **THE ERROR WAS PART OF THE EXPORTED CONTRACT.** The type was importable, so callers could catch
+   it by `code` rather than by string-matching a message.
+
+⛔ **When the solver returns `status: 'unsolvable'`, these three codes are the starting vocabulary.**
+Do not invent a fresh set, and do not regress to an empty array.
+
 ---
 
 ## 6. Receipts

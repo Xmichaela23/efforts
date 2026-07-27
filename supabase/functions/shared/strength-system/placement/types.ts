@@ -4,7 +4,11 @@
 // Types for methodology-aware strength placement strategies
 // ============================================================================
 
-export type MethodologyId = 'hal_higdon_complete' | 'jack_daniels_performance' | 'triathlon';
+// ⛔ `'triathlon'` REMOVED 2026-07-27 with `getTriathlonStrategy`. A type that admits a value no
+// dispatch handles is a trap: it type-checks at every call site and falls through to Daniels at
+// runtime. (Note `StrengthProtocolId` below KEEPS its `'triathlon'` — that is a protocol, a
+// different axis, and it is live.)
+export type MethodologyId = 'hal_higdon_complete' | 'jack_daniels_performance';
 export type StrengthProtocolId =
   | 'durability'
   | 'neural_speed'
