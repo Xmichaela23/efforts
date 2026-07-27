@@ -2429,7 +2429,20 @@ Deno.serve(async (req: Request) => {
                 409,
               );
             }
+            // ⛔ RUN NO LONGER SWALLOWS THE BIKE. This line used to be the whole story, and an athlete
+            // who set BOTH to `maintain` got run and silently lost the bike — posture, long-ride day
+            // and weekly ride hours all collected at intake and then discarded, producing twelve
+            // weeks with an empty Saturday and not one ride in the block.
+            // `enduranceSport` stays the PRIMARY (it drives the run volume band and the frequency
+            // spread); the bike now travels beside it instead of competing for the same slot.
             const gsSport = gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null;
+            const gsBikeKept = gsPosture?.bike === 'maintain' && gsSport !== 'bike';
+            const gsRideHours = Number(gsTp.target_weekly_ride_hours) > 0
+              ? Number(gsTp.target_weekly_ride_hours) : undefined;
+            const gsLongRide = (gsTp.preferred_days as Record<string, string> | undefined)?.long_ride;
+            // How many days the ride hours spread across. Absent → the composer's own default.
+            const gsRideDays = Number(gsTp.ride_days) >= 1 && Number(gsTp.ride_days) <= 3
+              ? Number(gsTp.ride_days) : undefined;
             // Maintenance-endurance band (run only): the athlete's typed weekly miles + their learned easy
             // pace → the composer clamps to the science band. sec/km → min/mi = ×1.609344 ÷ 60. Absent
             // either → the composer falls to its fixed default (no band, no friction).
@@ -2479,10 +2492,17 @@ Deno.serve(async (req: Request) => {
                 if (bike) return { hard_day: { day: bike, discipline: 'bike' } };
                 return {};
               })()),
-              // Bike volume in HOURS (D-323 §6). Written at NonRaceBuilder.tsx:319, stored on the
-              // goal, and read by NOTHING under supabase/functions until this line.
-              ...(Number(gsTp.target_weekly_ride_hours) > 0
-                ? { target_weekly_ride_hours: Number(gsTp.target_weekly_ride_hours) } : {}),
+              // ⛔ THE BIKE, travelling beside the primary sport rather than losing to it. Carries the
+              // two things the athlete actually chose: how many hours, and which day is the long one.
+              // Both were written to the goal and read by NOTHING under supabase/functions until now.
+              // ⚠️ Hours, never miles (D-323 §6) — the engine turns hours into sessions and has never
+              // learned a ride speed.
+              ...(gsBikeKept
+                ? { bike: { ...(gsRideHours ? { hours: gsRideHours } : {}), ...(gsRideDays ? { days: gsRideDays } : {}), ...(gsLongRide ? { long_ride_day: gsLongRide } : {}) } }
+                : {}),
+              // Retained for the bike-PRIMARY path (run out, bike maintained), where `enduranceSport`
+              // is already 'bike' and the block above deliberately does not fire.
+              ...(gsRideHours ? { target_weekly_ride_hours: gsRideHours } : {}),
               ...(plan_start_date ? { start_date: plan_start_date } : {}),
               ...(bodyPreview ? { preview: true } : {}),
             };

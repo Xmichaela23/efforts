@@ -220,6 +220,9 @@ type NonRaceState = {
   swimDays: number;
   /** Weekly riding to hold, in HOURS (D-323 §6 — never miles; the app learns no ride speed). */
   rideHours: number | '';
+  /** How many days the weekly ride hours spread across. The run has always asked this; the bike
+   *  did not, so the composer had a total with nothing to divide it by. */
+  rideDays: number;
   startDate: string; // Week 1 start (YYYY-MM-DD); plans are Monday-based so this snaps to that week server-side
 };
 
@@ -324,6 +327,9 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
           // it cannot turn miles into anything, having never learned a ride speed.
           ...(state.posture?.bike === 'maintain' && Number(state.rideHours) > 0
             ? { target_weekly_ride_hours: Number(state.rideHours) } : {}),
+          // How many days those hours spread across (1/2/3). Without it the engine guessed.
+          ...(state.posture?.bike === 'maintain' && state.rideDays > 0
+            ? { ride_days: state.rideDays } : {}),
         },
       },
     ],
@@ -354,7 +360,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', startDate: nextMondayISO(),
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 2, startDate: nextMondayISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -946,6 +952,35 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 />
                 <span className="text-white/75 text-sm">h/wk</span>
               </div>
+            </div>
+            {/* ⛔ HOURS NEED A NUMBER OF DAYS TO SPREAD ACROSS — the run has always asked this and the
+                bike never did, so the composer had a weekly total and nothing to divide it by. It
+                invented a split, and a 20-hour week came out as ONE 1,200-minute ride.
+                ⚠️ It also catches the unit slip: hours-not-miles is right (D-323 §6) and the subtitle
+                says so, but 20 is plausible in BOTH units — Michael entered 20 meaning miles on his
+                own field. Dividing by days puts the per-ride length on screen, where 20h reads as
+                "6h40 each" and the mistake is obvious in a way the label alone was not. */}
+            <div>
+              <p className="text-white/85 text-sm mb-2">How many days to ride</p>
+              <div className="grid grid-cols-3 gap-1.5 max-w-[220px]">
+                {[1, 2, 3].map((n) => (
+                  <button
+                    key={n} type="button" onClick={() => setState((s) => ({ ...s, rideDays: n }))}
+                    className={`py-2 rounded-lg text-sm ${state.rideDays === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                  >{n}</button>
+                ))}
+              </div>
+              <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
+                {Number(state.rideHours) > 0
+                  ? `We spread your hours across these — the long ride takes the bigger share. About ${
+                      (() => {
+                        const per = Number(state.rideHours) / Math.max(1, state.rideDays);
+                        const h = Math.floor(per); const m = Math.round((per - h) * 60);
+                        return h > 0 ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`;
+                      })()
+                    } a ride.`
+                  : 'We spread your hours across these — the long ride takes the bigger share.'}
+              </p>
             </div>
             <div>
               <p className="text-white/85 text-sm mb-2">Long ride day</p>

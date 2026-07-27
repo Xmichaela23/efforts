@@ -65,8 +65,41 @@ export type StrengthPrimaryArgs = {
   durationWeeks: number;
   /** The athlete's four barbell maxes. Required — there is no path in without them. */
   oneRepMaxes: OneRepMaxes;
-  /** The athlete's maintained endurance discipline (sport-agnostic). null = strength-only. */
+  /**
+   * ⛔ THE PRIMARY maintained endurance discipline. null = strength-only.
+   *
+   * ⚠️ SINGULAR, AND THAT WAS THE BUG. An athlete who sets BOTH run and bike to `maintain` got run
+   * and lost the bike entirely — `create-goal-and-materialize-plan:2432` read
+   * `run === 'maintain' ? 'run' : bike === 'maintain' ? 'bike' : null`, so the bike posture, the
+   * long-ride day and the weekly ride hours were all collected and then discarded. Twelve weeks with
+   * an empty Saturday and no ride in the block.
+   *
+   * Kept as the primary because it drives the RUN volume band and the run-frequency spread. The bike
+   * now rides alongside it in `bike` below rather than competing for this slot.
+   */
   enduranceSport: 'run' | 'bike' | null;
+  /**
+   * The bike, when the athlete maintains one. Independent of `enduranceSport` — both can be present,
+   * which is the case this whole field exists to stop losing.
+   *
+   * ⛔ `hours` is HOURS, never miles (D-323 §6): the engine turns hours into sessions and has never
+   * learned a ride speed, so miles would be a number it cannot honour.
+   */
+  bike?: {
+    /** Weekly ride hours from intake. */
+    hours?: number;
+    /**
+     * How many days those hours spread across (1-3), from intake.
+     *
+     * ⛔ THE RUN HAS ALWAYS ASKED THIS AND THE BIKE DID NOT, so the composer held a weekly total with
+     * nothing to divide it by and invented a split — a 20-hour week came out as ONE 1,200-minute
+     * ride. Absent → 2, and that default is the only number here that is still a choice rather than
+     * the athlete's answer.
+     */
+    days?: number;
+    /** Long-ride day from intake. Becomes a `long_ride` pin, so the bar is placed around it. */
+    longRideDay?: string;
+  } | null;
   enduranceFrequency: number;
   goalName?: string;
   /** Get Stronger maintenance-endurance band (run only). Typed weekly miles + the athlete's easy
@@ -386,6 +419,41 @@ function enduranceSession(
  * ⚠️ Strides (§6) are a SEPARATE quality and do not substitute for this — they defend flat-ground
  * turnover, ten seconds at a time. Hills for the engine, strides for the legs.
  */
+/**
+ * ⛔ THE BIKE'S HARD SESSION — and per the doctrine this is the one the athlete SHOULD be doing.
+ *
+ * `DOCTRINE-aerobic-maintenance.md` §6: one hard aerobic session, and **if they have a bike it is
+ * the bike**. Hard riding costs the legs less than hard running does — that is a TISSUE claim
+ * (concentric-dominant, no impact transient, no eccentric loading), not the contested
+ * adaptation-interference one, and it is what makes this the cheaper way to hold the engine.
+ *
+ * ⛔ 4 × 4 min IS HELGERUD'S PROTOCOL — 90-95% HRmax, 3 min active recovery, ~7% VO2max in 8 weeks
+ * across 40 trained men, superior to continuous work and to threshold. The most replicated interval
+ * prescription in endurance science, and the reason the run's hill session was rebuilt to 4 × 3 min
+ * to match its shape: a run-only athlete should not get a third of the dose.
+ *
+ * ⚠️ CADENCE IS A CUE, NOT A NUMBER (§5.2, revised). "Spin it, don't grind it." There is no source
+ * for a 90 rpm threshold, most riders cannot measure cadence without a sensor, and a number they
+ * cannot follow teaches them to ignore the rest of the session. But the intent is load-bearing:
+ * low-cadence grinding at high power is quad-dominant torque work, which is the most plausible
+ * mechanism behind Sabag 2018's finding that cycling HIIT attenuates lower-body strength. So the
+ * cue is the mitigation, and it belongs in the copy where every athlete can act on it.
+ */
+function bikeQualitySession(day: string): PlanSession {
+  return {
+    day,
+    type: 'ride',
+    name: 'Bike Intervals',
+    description:
+      '4 × 4 min hard, 4 min easy between. Hard means hard — you should not be able to hold a '
+      + 'sentence. Spin it, do not grind it: a fast, easy spin keeps this in your lungs instead of '
+      + 'your legs, which is what leaves the lifting intact.',
+    duration: 45,
+    steps_preset: ['bike_vo2_4x4min_R4min'],
+    tags: ['quality', 'bike', 'aerobic'],
+  };
+}
+
 function hillSession(day: string): PlanSession {
   // §5, run-only VO2 defence: 4 x 3min hard / 3min easy at 5-8%. Working time 12 min; ~35-40 min
   // with warm-up and cool-down. The token carries the grade because the cost row is not "run VO2" —
@@ -459,6 +527,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   training_max: OneRepMaxes;
   volume_notes: string | null;
   volume_state: 'above' | 'below' | 'in_band' | null;
+  /** Every clearance the week could not honour, in `place-week`'s own words. Absent = nothing broke.
+   *  ⛔ Surfacing only — the week is still built (D-325 §7: state the cost, never refuse). */
+  placement_compromises?: string[];
 } {
   const { enduranceSport, oneRepMaxes } = args;
   const weeks = blockWeeks(args.durationWeeks);
@@ -497,8 +568,17 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     const s = String(v ?? '').trim().toLowerCase();
     return (PLACEMENT_DAYS as readonly string[]).find((d) => d.toLowerCase() === s) as DayName ?? null;
   };
+  const hasBike = !!args.bike;
   const longRunPin = enduranceSport === 'run' ? asDay(args.longRunDay) : null;
   if (longRunPin) pins.push({ day: longRunPin, kind: 'long_run', label: 'your long run' });
+  // ⛔ THE LONG RIDE PINS TOO. It is a leg-dominant LONG session, so the law gives it the same 48h
+  // clearance from heavy lower-body work as the long run (`schedule-session-constraints.ts`). Until
+  // now it was collected at intake, written to the goal, and never forwarded — so the bar was placed
+  // as though the athlete's biggest ride of the week did not exist.
+  const longRidePin = hasBike ? asDay(args.bike?.longRideDay) : null;
+  if (longRidePin && !pins.some((p) => p.day === longRidePin)) {
+    pins.push({ day: longRidePin, kind: 'long_ride', label: 'your long ride' });
+  }
   const hardPin = asDay(args.hardDay?.day);
   if (hardPin && !pins.some((p) => p.day === hardPin)) {
     pins.push({
@@ -667,6 +747,86 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       enduranceDays.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day)));
     }
 
+    // ── The bike, when the athlete keeps one ────────────────────────────────────────────────────
+    //
+    // ⛔ THIS RUNS ALONGSIDE THE RUN, NOT INSTEAD OF IT. `enduranceSport` is singular and used to be
+    // the whole story: an athlete with run AND bike on `maintain` got run and silently lost the
+    // bike — posture, long-ride day and weekly hours all collected and discarded, twelve weeks with
+    // an empty Saturday. Everything the intake asks for now reaches a session or is not asked.
+    if (hasBike) {
+      // ⛔ Days that already carry ENDURANCE, not days that carry anything. `weekSessions` holds the
+      // four lifts by this point, so testing "has a session" marked every upper day taken and killed
+      // all stacking. An upper lift + an easy ride is the stacked day we WANT; an upper lift + a run
+      // + a ride is the 196-minute Thursday we do not.
+      const taken = new Set(
+        weekSessions.filter((s) => s.type === 'run' || s.type === 'ride').map((s) => s.day),
+      );
+      // Hours → sessions. ⛔ HOURS, never miles (D-323 §6): the engine has never learned a ride
+      // speed, so miles is a number it cannot turn into time. Two rides is the nominal shape; the
+      // long ride takes the larger share because that is what a long ride is.
+      const rideHours = Number(args.bike?.hours) > 0 ? Number(args.bike!.hours) : 2;
+      // ⛔ THE ATHLETE'S ANSWER, not a guess. Asking "how many days to ride" is what the run step has
+      // always done and the bike never did — without it this code held a weekly total and split it
+      // by an invented ratio, so 20 hours produced ONE 1,200-minute ride.
+      const wantDays = Math.max(1, Math.min(3, Math.round(Number(args.bike?.days) || 2)));
+      const rideDays: string[] = [];
+      if (longRidePin) rideDays.push(longRidePin);
+      for (const d of placedWeek.freeDays) {
+        if (rideDays.length >= wantDays) break;
+        if (d === restReserved || rideDays.includes(d) || taken.has(d)) continue;
+        rideDays.push(d);
+      }
+      // ⛔ THEN STACK ONTO UPPER-LIFT DAYS, exactly as the run already does. With four lifts and
+      // three pins the week has NO free days left, so without this an athlete who asked for two or
+      // three rides silently got one — their answer collected and ignored, which is the disease this
+      // whole pass exists to remove.
+      // ⚠️ UPPER days only. An easy ride shares no prime movers with a bench or a press; putting one
+      // on a squat or deadlift day is the leg-on-leg stacking the clearance law exists to prevent.
+      for (const d of upperLiftDays) {
+        if (rideDays.length >= wantDays) break;
+        if (d === restReserved || rideDays.includes(d)) continue;
+        // ⛔ NEVER A THIRD SESSION ON ONE DAY. An upper-lift day that already carries an easy run is
+        // full: stacking a ride on top produced a Thursday of bench + 40 min run + 96 min ride —
+        // 196 minutes, on a block whose entire premise is manageable fatigue. Two sessions is a
+        // stacked day; three is a training camp.
+        // ⚠️ When this leaves fewer rides than the athlete asked for, that is REPORTED below rather
+        // than absorbed. The week being full is a fact they own, not one to hide by overfilling a day.
+        if (taken.has(d)) continue;
+        rideDays.push(d);
+      }
+      // ⚠️ If nothing is free the long ride still lands — an athlete who named a day gets that day.
+      if (rideDays.length === 0 && longRidePin) rideDays.push(longRidePin);
+      // ⛔ AND IF THE WEEK STILL CANNOT HOLD WHAT THEY ASKED FOR, SAY SO. Never silently fewer.
+      // ⚠️ ONCE, not twelve times. This block runs inside the week loop, so an unguarded push
+      // repeated the same sentence for every week in the block — the shape is identical every week,
+      // so the compromise is a property of the WEEK, not of week 7.
+      const rideShortfallNote = rideDays.length < wantDays
+        ? `You asked for ${wantDays} ride days; the week had room for ${rideDays.length} once the lifting and your fixed days were placed.`
+        : null;
+      if (rideShortfallNote && !placementCompromises.includes(rideShortfallNote)) {
+        placementCompromises.push(rideShortfallNote);
+      }
+      const totalMins = Math.max(30, Math.round(rideHours * 60));
+      // ⛔ EVEN SPLIT, then the long day takes what the others give up. `LONG_RIDE_SHARE` is the one
+      // authored number left in this block and it is marked as such: a long ride that is the same
+      // length as the others is not a long ride, and 1.5× is the smallest multiplier that reads as
+      // one. It is a product decision, not a finding — do not dress it up as physiology.
+      const LONG_RIDE_SHARE = 1.5;
+      const others = Math.max(0, rideDays.length - 1);
+      const unitMins = totalMins / (others + (longRidePin && rideDays.includes(longRidePin) ? LONG_RIDE_SHARE : 1));
+      rideDays.forEach((day) => {
+        const isLong = day === longRidePin;
+        const mins = Math.max(20, Math.round(unitMins * (isLong ? LONG_RIDE_SHARE : 1)));
+        weekSessions.push(enduranceSession('bike', day, mins, undefined, isLong ? 'long' : 'easy'));
+      });
+      // ⛔ AND THE HARD DAY, IF THEY CHOSE THE BIKE FOR IT. Same fix as the run's: the pin already
+      // reserved this day, so without this the week visibly loses one. D-327 makes run and bike
+      // mutually exclusive at intake, so at most one of these two branches ever fires.
+      if (hardPin && args.hardDay?.discipline === 'bike') {
+        weekSessions.push(bikeQualitySession(hardPin));
+      }
+    }
+
     // Swim last, so it only takes days nothing else wanted.
     if ((args.swimDays ?? 0) > 0) {
       const taken = new Set(weekSessions.map((x) => x.day));
@@ -705,5 +865,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     training_max,
     volume_notes,
     volume_state,
+    /**
+     * ⛔ WHAT THE WEEK COULD NOT HONOUR, IN THE SOLVER'S OWN WORDS. Never empty-by-silence: an
+     * absent array means nothing was broken, not that nobody looked.
+     *
+     * `place-week.ts` has always produced these and, until now, nothing carried them out of the
+     * composer — the contract in that file says a clearance it cannot honour must be named in plain
+     * words and ⛔ NEVER SILENTLY SWALLOWED, and we were swallowing them.
+     *
+     * They are not edge cases. An athlete who keeps run AND bike and takes a hard day has SEVEN
+     * commitments in seven days — four lifts, a long run, a long ride, a quality session — and the
+     * solver says so exactly: *"Either one lifting day comes out, or the week runs with no full rest
+     * day."* That is a real trade the athlete owns, and handing them the week without the sentence
+     * is the app making the choice for them and pretending it didn't.
+     *
+     * ⚠️ Surfacing only. D-325 §7: state the cost, never refuse — the week is still built.
+     */
+    placement_compromises: placementCompromises.length ? placementCompromises : undefined,
   };
 }

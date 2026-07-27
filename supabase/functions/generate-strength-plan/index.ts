@@ -38,6 +38,8 @@ Deno.serve(async (req: Request) => {
       // intake, stored on the goal, and dropped at `create-goal-and-materialize-plan` before this
       // function ever saw them.
       hard_day, target_weekly_ride_hours,
+      // The bike, travelling beside the primary sport (2026-07-27). `{ hours, long_ride_day }`.
+      bike,
     } = body as Record<string, unknown>;
 
     if (!user_id) return json({ success: false, error: 'user_id is required' }, 400);
@@ -110,9 +112,21 @@ Deno.serve(async (req: Request) => {
           || (hard_day as Record<string, unknown>).discipline === 'bike')
         ? hard_day as { day: string; discipline: 'run' | 'bike' }
         : undefined,
-      // Bike hours (D-323 §6) — hours, never miles. Carried for the bike pass; unused today.
+      // Bike hours (D-323 §6) — hours, never miles. Used on the bike-PRIMARY path.
       targetWeeklyRideHours: Number(target_weekly_ride_hours) > 0
         ? Number(target_weekly_ride_hours) : undefined,
+      // ⛔ THE BIKE ALONGSIDE THE RUN. Validated here rather than trusted: a malformed block is
+      // treated as absent, because a bike the composer cannot place is worse than no bike.
+      bike: bike && typeof bike === 'object'
+        ? {
+            hours: Number((bike as Record<string, unknown>).hours) > 0
+              ? Number((bike as Record<string, unknown>).hours) : undefined,
+            longRideDay: typeof (bike as Record<string, unknown>).long_ride_day === 'string'
+              ? (bike as Record<string, unknown>).long_ride_day as string : undefined,
+            days: Number((bike as Record<string, unknown>).days) >= 1
+              ? Math.min(3, Math.round(Number((bike as Record<string, unknown>).days))) : undefined,
+          }
+        : null,
       // The athlete's three assistance picks. Validated inside the composer against the shared
       // menu, so an unknown name falls back to the default rather than reaching a session.
       assistancePicks: assistance_picks && typeof assistance_picks === 'object'
