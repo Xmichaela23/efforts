@@ -9,6 +9,43 @@ the first legal answer.
 > let's lock in the rules."* This document is that lock. Nothing in the engine may place a session by
 > reasoning about it; it places sessions by running the rules below.
 
+## ⛔ WHY ONE SOLVER IS POSSIBLE AT ALL
+
+**All five live deciders agree on WHETHER to separate. They disagree only on HOW MUCH, and MEASURED
+HOW.** Every one of them holds the long sessions apart from heavy legs in some form; every one
+reserves some rest. Not one of them disputes the principle.
+
+**That is what makes this a collapse and not a negotiation.** Five engines with five different
+theories of training would have to be reconciled. Five engines with one theory and five arithmetics
+just need the arithmetic stated once — which is the adjacency table (§8.2) and the score (§5).
+
+⚠️ Read that as the constraint it is: **if a proposed solver rule cannot be expressed as "how much" or
+"measured how", it is a new theory, and it does not belong here.**
+
+## ⛔ 0. THE WEEK STARTS ON MONDAY. ONE CONVENTION, NO EXCEPTIONS.
+
+**Declared 2026-07-27, before any solver code, because two conventions are live right now:**
+
+| convention | where |
+|---|---|
+| **Mon-first, 0-6** | `place-week.DAYS`, `science.ts DAYS_OF_WEEK`, `base-generator.dayOffsets` |
+| Sun-first, 0-6 | `week-optimizer.ALL_DAYS`, `strength-slot-resolver.SUN_RING`, `combined-schedule-prefs` |
+| Mon-first, **1-7** | `validate-reschedule/index.ts:641`, `AllPlansInterface.tsx:658` |
+
+⛔ **THIS IS NOT A STYLE SPLIT — IT BREAKS DETERMINISM.** §5.1's tie-break is a **lexicographic key
+built from day indices in canonical discipline order.** If "day index" means two different things in
+two modules, the key is not a key: the same week scores differently depending on which module built
+it, and the guarantee that a re-materialised plan reproduces the same days quietly fails. §5.1 cannot
+be satisfied by a solver alone; it requires everything the solver talks to to count days the same way.
+
+✅ **THE CONVENTION IS MONDAY-FIRST, ZERO-INDEXED.** `0 = Monday … 6 = Sunday`. Chosen because it is
+what the two modules that already read the law use (`place-week`, `science.ts`), and because a
+training week is conventionally read Monday to Sunday with the long day at the end.
+
+**Everything that survives the collapse conforms.** Storage that is Sun-first converts **at the
+boundary, once, on the way in** — never by scattering `(x + 6) % 7` through the solver, which is the
+current state at roughly ten call sites and is exactly how the two conventions got established.
+
 ---
 
 ## 0a. ⛔ THE FIVE HARD CONSTRAINTS, AND THE WHOLE SEARCH
@@ -438,6 +475,50 @@ this section exists so the rest did not have to.
 ⛔ **X1, X2 and X10 together are the headline: the six run generators place a whole week without ever
 seeing the athlete's day preferences OR the law.** That is a larger surface than the strength
 placement everyone has been looking at.
+
+### 6b-2 ⛔ `placement/` IS PRESUMED OVER-BROAD. Nothing from it is inherited unchecked.
+
+**Two independent constraints. Two different axes. The same error.**
+
+| constraint | axis | the law says | it says |
+|---|---|---|---|
+| `excludeDayBeforeLong` | long run | upper is free; heavy legs need 48h | **no strength at all**, day before |
+| `lowerBufferQuality` | quality | 24h — which an adjacent day satisfies | **no heavy legs**, day before |
+
+⛔ **That is a REASONING PATTERN, not two bugs.** The module converts "there is a constraint near this
+day" into "forbid the day," without asking the two questions the law asks: *which session* (upper
+shares no prime movers) and *how much* (24h is already met by being a day apart). Both were written
+before the adjacency table existed, so there was nothing to ask — but that explains the error, it
+does not bound it.
+
+**Therefore, as a standing rule for the collapse:**
+
+1. **No rule from `placement/` is carried into the solver without being checked against §8.2 first.**
+   Not spot-checked — checked. The two found so far were found by two different accidents.
+2. **Assume a third instance exists.** Two-for-two on the constraints anyone happened to look at is
+   not a sample that suggests the rest are fine.
+3. ⚠️ **The tell to search for:** anywhere the module builds a `forbidden` set of DAYS. The law never
+   forbids a day; it states hours between two named sessions. A set of forbidden weekdays is the
+   translation step where "which session" and "how much" both get discarded.
+
+✅ **THE TELL WORKED IMMEDIATELY. Third instance, found by applying it:**
+`strength-slot-resolver.ts:77 buildEasyDays` drops **the long-run day and every quality day** from the
+candidate pool — for *all* strength, upper included:
+
+```ts
+if (d === long) continue;
+if (qual.has(d)) continue;
+```
+
+Against the matrix: `lower_body_strength × quality_run` is ✗, so excluding quality days for **lower**
+is right. But `upper_body_strength × quality_run` is ✓, and `upper_body_strength × long_run` is ✓ as
+of 2026-07-27. **Both exclusions are correct for heavy legs and over-broad for pressing** — the same
+"which session" question, discarded for the third time, in the third function.
+
+⚠️ Note `getDanielsStrategy` stamps quality days `'none'` deliberately and says why — *"a hard
+polarisation rule, not masking a failed resolve."* That one is a stated intent and survives scrutiny.
+`buildEasyDays` applies the same exclusion to **Higdon as well**, where nothing states it. **Three
+instances, one pattern; assume it is the module's default move rather than an exception.**
 
 ✅ **What they agree on, and it is worth stating** — every module keeps the long run and the long ride
 apart from heavy legs in *some* form, and every module reserves *some* rest. The disagreements are
