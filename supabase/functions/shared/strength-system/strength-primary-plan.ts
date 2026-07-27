@@ -622,7 +622,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   volume_state: 'above' | 'below' | 'in_band' | null;
   /** Every clearance the week could not honour, in `place-week`'s own words. Absent = nothing broke.
    *  ⛔ Surfacing only — the week is still built (D-325 §7: state the cost, never refuse). */
-  placement_compromises?: string[];
+  /**
+   * ⛔ TAGGED BY KIND. `breach` = a rule was broken and the week is compromised. `cost` = no rule
+   * was broken; the shape the athlete chose cost something and they should be told. One channel,
+   * two meanings, and the reader must not have to guess which — see `SolverNote`.
+   */
+  placement_compromises?: Array<{ kind: 'breach' | 'cost'; text: string }>;
 } {
   const { enduranceSport, oneRepMaxes } = args;
   const weeks = blockWeeks(args.durationWeeks);
@@ -722,12 +727,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         restDays: solved.week.restDays.map((d) => cap(d) as DayName),
         compromises: solved.status === 'compromised' ? solved.compromises : [],
       };
-  const solverRefusal = solved.status === 'unsolvable'
-    ? [`${solved.message} ${solved.options.join(' ')}`]
+  const solverRefusal: Array<{ kind: 'breach' | 'cost'; text: string }> = solved.status === 'unsolvable'
+    ? [{ kind: 'breach', text: `${solved.message} ${solved.options.join(' ')}` }]
     // ⛔ NOTES MUST REACH THE ATHLETE OR THEY ARE THE §0f LOSS AGAIN — a cost computed and never
     // said. They are not rule breaches, so they do not make the week "compromised"; they ride the
     // same channel because that channel is the one the plan already surfaces.
-    : solved.notes;
+    : solved.notes;   // already tagged by the solver
   // Lift name → the day the solver gave it. Falls back to the lift's legacy grid day only if the
   // solver somehow omitted it, so a placement bug degrades to the old behaviour rather than to no day.
   const dayForLift = new Map(placedWeek.slots.map((s) => [s.lift, s.day as string]));
@@ -758,7 +763,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const strengthDays = MAIN_LIFTS.map(liftDay);
   // ⛔ Surfaced, never swallowed. `place-week` states which clearance it had to break; the plan
   // carries those words to the athlete verbatim.
-  const placementCompromises: string[] = [...solverRefusal, ...placedWeek.compromises];
+  const placementCompromises: Array<{ kind: 'breach' | 'cost'; text: string }> = [
+    ...solverRefusal,
+    ...placedWeek.compromises.map((text) => ({ kind: 'breach' as const, text })),
+  ];
   const assistance = assistanceRows(args.assistancePicks);
 
   // ── Endurance underneath (unchanged from the previous composer) ────────────
@@ -1005,8 +1013,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       const rideShortfallNote = rideDays.length < wantDays
         ? `You asked for ${wantDays} ride days; the week had room for ${rideDays.length} once the lifting and your fixed days were placed.`
         : null;
-      if (rideShortfallNote && !placementCompromises.includes(rideShortfallNote)) {
-        placementCompromises.push(rideShortfallNote);
+      // A ride day the week had no room for is a COST, not a broken rule — nothing in the law was
+      // violated, the athlete simply asked for more days than the week held once the pins landed.
+      if (rideShortfallNote && !placementCompromises.some((c) => c.text === rideShortfallNote)) {
+        placementCompromises.push({ kind: 'cost', text: rideShortfallNote });
       }
       const totalMins = Math.max(30, Math.round(rideHours * 60));
       // ⛔ EVEN SPLIT, then the long day takes what the others give up. `LONG_RIDE_SHARE` is the one

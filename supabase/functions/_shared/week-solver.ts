@@ -137,9 +137,26 @@ export type SolvedWeek = {
   restDays: SolverDay[];
 };
 
+/**
+ * ⛔ THE DISCRIMINATOR, AND IT IS NOT DECORATION.
+ *
+ * `compromises` and `notes` share one channel by the time they reach the plan, and the distinction
+ * — status reports RULE COMPLIANCE, notes report what the shape COST — lived only in the `status`
+ * field. Anything downstream reading "the channel is non-empty" as "this week is compromised"
+ * collapses the two straight back, which is §0f inverted: the output carries the information and the
+ * reader cannot tell which kind it is holding. So each entry says what it is.
+ */
+export type NoteKind =
+  /** A rule was broken. This is what makes a week `compromised`. */
+  | 'breach'
+  /** No rule was broken. The week's shape cost something and the athlete should know. */
+  | 'cost';
+
+export type SolverNote = { kind: NoteKind; text: string };
+
 export type SolverResult =
-  | { status: 'solved'; week: SolvedWeek; compromises: []; notes: string[] }
-  | { status: 'compromised'; week: SolvedWeek; compromises: string[]; notes: string[] }
+  | { status: 'solved'; week: SolvedWeek; compromises: []; notes: SolverNote[] }
+  | { status: 'compromised'; week: SolvedWeek; compromises: string[]; notes: SolverNote[] }
   | {
       status: 'unsolvable';
       code: SolverRefusalCode;
@@ -548,19 +565,23 @@ export function solve(input: SolverInput): SolverResult {
       // result silently produced. Likewise a clearance met EXACTLY — 24h where 24h is owed — is
       // legal with no buffer, and passing it in silence is the §0f loss: the week is right and fails
       // to say what it cost.
-      const notes: string[] = [];
+      const CAP = (d: number) => SOLVER_DAYS[d].charAt(0).toUpperCase() + SOLVER_DAYS[d].slice(1);
+      const notes: SolverNote[] = [];
       for (let i = 0; i < anchorPlacements.length; i++) {
         for (let j = i + 1; j < anchorPlacements.length; j++) {
           const A = anchorPlacements[i], B = anchorPlacements[j];
           if (gapDays(A.dayIndex, B.dayIndex) !== 1) continue;
           const [first, second] = A.dayIndex === (B.dayIndex + 1) % 7 ? [B, A] : [A, B];
           const reason = adjacencyPenaltyReason(first.kind, second.kind);
-          notes.push(
-            `${first.label} and ${second.label} are back to back (${SOLVER_DAYS[first.dayIndex]}, ` +
-            `${SOLVER_DAYS[second.dayIndex]}), so the week is loaded around them.` +
-            (reason ? ` ${reason.charAt(0).toUpperCase()}${reason.slice(1)}.` : '') +
-            ` Both are your days, so the engine placed everything else around them rather than moving one.`,
-          );
+          notes.push({
+            kind: 'cost',
+            text:
+              `Your ${first.label.replace(/^your\s+/i, '')} and ${second.label} are back to back — ` +
+              `${CAP(first.dayIndex)} into ` +
+              `${CAP(second.dayIndex)} — so the rest of the week is built around that pair.` +
+              (reason ? ` ${reason.charAt(0).toUpperCase()}${reason.slice(1)}.` : '') +
+              ` Both are your days, so nothing was moved to make it easier.`,
+          });
         }
       }
       // At-the-floor: legal, no buffer, and worth saying so.
@@ -571,10 +592,17 @@ export function solve(input: SolverInput): SolverResult {
           if (required === 0) continue;
           const actual = gapHours(b.assignment[i], a.dayIndex);
           if (actual !== required) continue;
-          notes.push(
-            `${lifts[i].name} on ${SOLVER_DAYS[b.assignment[i]]} sits exactly ${actual}h from ` +
-            `${a.label} — the clearance, with nothing spare. Legal, and the tightest arrangement the rule allows.`,
-          );
+          // ⚠️ "the day before/after" is only true at a ONE-day gap. At 48h it is two days, and
+          //    saying "the day before" there is simply wrong — the note has to describe the real
+          //    calendar distance or it is a confident lie in athlete-facing copy.
+          const days = gapDays(b.assignment[i], a.dayIndex);
+          const anchorFollows = (b.assignment[i] + 1) % 7 === a.dayIndex;
+          const text = days === 1
+            ? `Your ${a.label.replace(/^your\s+/i, '')} is the day ${anchorFollows ? 'after' : 'before'} ` +
+              `${lifts[i].name} — ${actual} hours, the minimum the rule allows, with nothing spare.`
+            : `${lifts[i].name} sits ${days} days from your ${a.label.replace(/^your\s+/i, '')} — ` +
+              `${actual} hours, the minimum the rule allows, with nothing spare.`;
+          notes.push({ kind: 'cost', text });
         }
       }
 

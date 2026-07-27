@@ -470,10 +470,12 @@ Deno.test('§5.0a consecutive anchors are NAMED, and named as the athlete\'s own
     lifts: FOUR,
   });
   if (r.status === 'unsolvable') throw new Error('the classic week should solve');
-  const line = r.notes.find((n) => n.includes('back to back'));
+  const line = r.notes.find((n) => n.text.includes('back to back'))?.text;
   assert(line, `a back-to-back weekend produced no note: ${JSON.stringify(r.notes)}`);
   assert(line!.includes('long ride') && line!.includes('long run'), 'the note does not name both anchors');
   assert(/your days/.test(line!), 'the note does not attribute the shape to the athlete\'s choice');
+  // ⛔ TAGGED, so a downstream reader never has to infer whether this is a broken rule.
+  assertEquals(r.notes.every((n) => n.kind === 'cost'), true, 'a cost was tagged as a breach');
   // ⛔ And it does NOT promote the week to compromised — it breaks no rule.
   assertEquals(r.status, 'solved', 'a stated cost is not a rule breach');
 });
@@ -488,14 +490,18 @@ Deno.test('at-the-floor placement is stated, not passed in silence', () => {
     lifts: FOUR,
   });
   if (r.status === 'unsolvable') throw new Error('fixture should solve');
-  const floor = r.notes.find((n) => n.includes('nothing spare'));
+  const floor = r.notes.find((n) => n.text.includes('nothing spare'))?.text;
   assert(floor, `an exactly-at-clearance placement said nothing: ${JSON.stringify(r.notes)}`);
-  assert(/exactly \d+h/.test(floor!), 'the note does not state the hours');
+  assert(/\d+ hours/.test(floor!), 'the note does not state the hours');
+  // ⚠️ "the day before/after" may only appear at a genuine one-day gap.
+  for (const n of r.notes.filter((x) => x.text.includes('the day '))) {
+    assert(/24 hours/.test(n.text), `"${n.text}" claims adjacency at a gap that is not 24h`);
+  }
 });
 
 Deno.test('a week with room to spare says nothing about clearances — notes are earned, not boilerplate', () => {
   // One anchor, four lifts, five free days: no adjacency, nothing at a floor.
   const r = solve({ anchors: [anchor('sunday', 'long_run', 'long run')], lifts: FOUR });
   if (r.status === 'unsolvable') throw new Error('fixture should solve');
-  assert(!r.notes.some((n) => n.includes('back to back')), 'a single anchor cannot be back to back');
+  assert(!r.notes.some((n) => n.text.includes('back to back')), 'a single anchor cannot be back to back');
 });

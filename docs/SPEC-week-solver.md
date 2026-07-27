@@ -853,7 +853,7 @@ mistake the systematic pass just caught twice in one file.
 |---|---|
 | `place-week` | ✅ done — §6b-3, 17 entries, 14 present / 2 rejected / 1 n/a |
 | `week-optimizer` | ✅ done — §6b-5, 28 entries, ratio inverted (3 present / 13 rejected), 2 finds |
-| `placement/` surviving parts | ⛔ required — and note §6b-2: presumed over-broad, so expect more rejections than adoptions |
+| `placement/` surviving parts | ⛔ required — and note §6b-2: presumed over-broad, so expect more rejections than adoptions. ⛔ **PLUS the coverage gate below** |
 | `base-generator` | ⛔ required — a fixed grid still encodes decisions about what a run week looks like. ⚠️ **AND STEP 3 IS TWO JOBS, NOT ONE** — see below |
 | `tri-generator` | ⛔ required |
 
@@ -896,6 +896,34 @@ hours, a 6h stack gap priced as adjacency rather than same-day, or any clearance
 multiple of 24. At that point breaches stop landing on a coarse lattice, the trade appears, and the
 harm curve's shape starts to matter. The comparison harness is in commit `a76d10b9`; re-run it
 before assuming the answer still holds.
+
+### 6b-2a ⛔ THE COVERAGE GATE — over-broad must not become ABSENT
+
+**Michael, 2026-07-27:** *"Over-broad still catches the real case. When the module dies, the narrower
+correct rule has to already exist in the solver, or you've traded a rule that was too strict for no
+rule at all."*
+
+⚠️ **AND THE SECOND ERROR IS THE SILENT ONE.** Too-strict shows up as a week that refuses something
+reasonable — annoying, visible, reported. Too-loose shows up as a heavy squat day the morning after a
+long run, in a plan that renders as legal. **Deleting an over-broad rule without its replacement
+trades a loud error for a quiet one.**
+
+✅ **VERIFIED 2026-07-27, BEFORE ANY DELETION. All nine cells covered:**
+
+| the over-broad rule | the real case it caught | the law's answer |
+|---|---|---|
+| `excludeDayBeforeLong` | heavy legs before the long run | **48h** ✅ + same-day blocked |
+| | *(its over-reach: upper before the long run)* | 0h ✅ — correctly free |
+| `lowerBufferQuality` | heavy legs before a quality run | **24h** ✅ |
+| | heavy legs before a quality bike | **24h** ✅ |
+| | heavy legs **on** a quality day | same-day **blocked** ✅ |
+| `buildEasyDays` | heavy legs on the long-run day | **48h** ✅ + same-day blocked |
+| | heavy legs on a quality-bike day | **24h** ✅ + same-day blocked |
+| | *(its over-reach: upper on a quality day)* | 0h ✅ — correctly free |
+
+⛔ **`placement/` may be deleted.** Every real case it caught survives in the law, narrower and
+per-pair; only the over-reach dies. Re-run the coverage check if the adjacency table changes before
+the deletion lands.
 
 ### 6b-2 ⛔ `placement/` IS PRESUMED OVER-BROAD. Nothing from it is inherited unchecked.
 

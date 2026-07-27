@@ -321,7 +321,9 @@ type PreviewSession = { day: string; name: string; duration?: number };
 type PreviewPlan = {
   sessions_by_week?: Record<string, PreviewSession[]>;
   /** `place-week`'s own words for every clearance the week could not honour. */
-  placement_compromises?: string[];
+  /** ⛔ TAGGED: `breach` = a rule was broken; `cost` = the shape the athlete chose cost something.
+   *  One channel, two meanings — the reader must not have to infer which. */
+  placement_compromises?: Array<{ kind: 'breach' | 'cost'; text: string }>;
 };
 
 export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {}) {
@@ -463,7 +465,12 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     const plan = (await preview(payloadNow())) as PreviewPlan | null;
     const wk1 = plan?.sessions_by_week?.['1'];
     setPreviewWeek(Array.isArray(wk1) ? wk1 : []);
-    setPreviewNotes(Array.isArray(plan?.placement_compromises) ? plan!.placement_compromises! : []);
+    setPreviewNotes(
+      Array.isArray(plan?.placement_compromises)
+        // Tolerate the old flat-string shape while any cached plan still carries it.
+        ? plan!.placement_compromises!.map((c: any) => (typeof c === 'string' ? c : c?.text)).filter(Boolean)
+        : [],
+    );
     setPreviewing(false);
   };
 
