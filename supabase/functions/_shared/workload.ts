@@ -16,6 +16,9 @@ export const INTENSITY_FACTORS: Record<string, Record<string, number>> = {
   run: {
     easypace: 0.65, warmup_run_easy: 0.65, cooldown_easy: 0.65,
     longrun_easypace: 0.70,
+    // The MP-finish long run: harder than an easy long run, and it was falling to the generic
+    // per-type default (0.75) because no key matched `longrun_18mi_mp_finish` at all.
+    longrun_mp_finish: 0.82,
     '5kpace_plus1:00': 0.85, '5kpace_plus0:50': 0.87,
     '5kpace_plus0:45': 0.88, '5kpace_plus0:35': 0.90,
     '5kpace': 0.95, '10kpace': 0.90, marathon_pace: 0.82,
@@ -26,6 +29,14 @@ export const INTENSITY_FACTORS: Record<string, Record<string, number>> = {
     // a prescribed easy run (0.65). Added as substring keys; checked AFTER the specific
     // keys above so quality/long-run tokens still win the max. run_easy→easypace parity.
     run_easy: 0.65, warmup_run_quality: 0.65, run_mp: 0.82,
+    // 2026-07-27 — surfaced by the new unmatched-token warning, which is the point of making the
+    // fallback loud. Both families were silently taking the 0.75 per-type default.
+    //   • `run_vo2_6x3min` → VO2 intervals. Priced with the table's own `interval` row.
+    //   • `run_hills_4x180s_r180s_g5_8_dwalk` → the hard aerobic session for the run-only athlete.
+    //     ⚠️ Uphill at matched effort costs LESS mechanically than flat at the same intensity
+    //     (iso-efficiency: 4-8% grade lowers loading rate and peak vertical GRF), which is the whole
+    //     reason the doctrine chose hills. So it is priced BELOW flat VO2, not at it.
+    run_vo2: 0.95, run_hills: 0.90,
   },
   ride: {
     Z1: 0.55, recovery: 0.55, Z2: 0.70, endurance: 0.70,
@@ -68,20 +79,62 @@ export function getDefaultIntensityForType(type: string): number {
 // Steps-preset intensity
 // ---------------------------------------------------------------------------
 
+/**
+ * ⛔ STRIP THE INTERPOLATED PARTS BEFORE MATCHING. Added 2026-07-27.
+ *
+ * Tokens carry their quantity in the MIDDLE — `longrun_18mi_easypace`, `longrun_108min_easypace`,
+ * `run_easy_72min` — so a key naming the FAMILY (`longrun_easypace`) can never appear as a
+ * contiguous substring of a real token. That is why `longrun_easypace: 0.70` matched nothing in any
+ * generator for the life of the table. Normalising removes the whole class: any future
+ * `family_<quantity>_qualifier` shape resolves to `family_qualifier` without another fix.
+ *
+ * `18mi` → dropped · `108min` → dropped · `4x180s` → dropped · `g5_8` → dropped.
+ */
+export function normalizeIntensityToken(token: string): string {
+  return String(token)
+    .toLowerCase()
+    .split('_')
+    // Drop any segment CONTAINING a digit — `18mi`, `108min`, `4x180s`, `r180s`, `g5`. Safe because
+    // `getStepsIntensity` also tests the RAW token, so a legitimately numeric key like `5kpace`
+    // still matches even though normalisation removes that segment.
+    .filter((seg) => seg.length > 0 && !/\d/.test(seg))
+    .join('_');
+}
+
 export function getStepsIntensity(steps: string[], type: string): number {
   const factors = INTENSITY_FACTORS[type];
   if (!factors || !Array.isArray(steps) || steps.length === 0) {
     return getDefaultIntensityForType(type);
   }
+  // ⛔ MOST SPECIFIC KEY WINS, NOT THE FIRST DECLARED. The old loop `break`s on the first key that
+  // matches in object-literal order, and `easypace` is declared above `longrun_easypace` — so even a
+  // literal `longrun_easypace` token would have taken 0.65 and stopped. The table's own comment
+  // claimed specific keys "still win the max"; the `break` made that false. Sorting by key length
+  // makes specificity the rule instead of declaration order.
+  const keysBySpecificity = Object.entries(factors)
+    .sort((a, b) => b[0].length - a[0].length);
+
   const intensities: number[] = [];
+  const unmatched: string[] = [];
   for (const token of steps) {
-    const tokenLower = String(token).toLowerCase();
-    for (const [key, value] of Object.entries(factors)) {
-      if (tokenLower.includes(key.toLowerCase())) {
-        intensities.push(value);
-        break;
-      }
-    }
+    const raw = String(token).toLowerCase();
+    const normalized = normalizeIntensityToken(raw);
+    const hit = keysBySpecificity.find(([key]) => {
+      const k = key.toLowerCase();
+      return normalized.includes(k) || raw.includes(k);
+    });
+    if (hit) intensities.push(hit[1]);
+    else unmatched.push(raw);
+  }
+
+  // ⛔ AN UNRECOGNISED TOKEN IS LOUD NOW. It used to fall to the per-type default silently, which is
+  // how a whole token family can be mispriced for months with no test failing and no signal anywhere.
+  if (unmatched.length > 0) {
+    console.warn(
+      `[workload] unmatched intensity token(s) for type=${type}: ${unmatched.join(', ')} — ` +
+      `falling back to the ${type} default (${getDefaultIntensityForType(type)}). ` +
+      `Add a key to INTENSITY_FACTORS rather than leaving the default to absorb it.`,
+    );
   }
   return intensities.length > 0 ? Math.max(...intensities) : getDefaultIntensityForType(type);
 }

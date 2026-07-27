@@ -13,7 +13,7 @@
  * type fence below: the run-token pass must never touch a strength row. That is asserted directly
  * now, on the property rather than on a snapshot of the output.
  */
-import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 import { getStepsIntensity, calculateDurationWorkload } from '../../_shared/workload.ts';
 
@@ -59,16 +59,24 @@ Deno.test('Q-126: every run carries exactly one token — long-run day → longr
   }
 });
 
-Deno.test('Q-126: run tokens resolve to the honest 0.65 easy intensity + matching workload', () => {
+Deno.test('Q-126: run tokens resolve honestly — easy 0.65, and the LONG RUN 0.70', () => {
+  // ⛔ THIS ASSERTED 0.65 FOR EVERY RUN INCLUDING THE LONG ONE, and passed, because
+  // `longrun_easypace: 0.70` never matched any real token (see workload-run-tokens.test.ts).
+  // The long run is not an easy run: it is the biggest single session of the week and the table
+  // has always said 0.70. Corrected 2026-07-27.
   const all = flatSessions(composeStrengthPrimaryPlan(RUN_ARGS));
+  let longRuns = 0;
   for (const r of all.filter((s) => s.type === 'run')) {
+    const token = String(r.steps_preset?.[0] ?? '');
+    const isLong = token.startsWith('longrun_');
+    const want = isLong ? 0.70 : 0.65;
+    if (isLong) longRuns++;
     const intensity = getStepsIntensity(r.steps_preset, 'run');
-    assertEquals(intensity, 0.65, `run wk ${r.wk} "${r.steps_preset[0]}" resolved to ${intensity}, not 0.65`);
-    // honest load = duration × 0.65² × 100 — NOT the old 0.75 default
-    const expected = calculateDurationWorkload(r.duration, 0.65);
-    const oldDefault = calculateDurationWorkload(r.duration, 0.75);
-    assertEquals(getStepsIntensity(r.steps_preset, 'run') === 0.65 && expected < oldDefault, true);
+    assertEquals(intensity, want, `run wk ${r.wk} "${token}" resolved to ${intensity}, not ${want}`);
+    // Still honest against the old silent default either way.
+    assert(calculateDurationWorkload(r.duration, want) < calculateDurationWorkload(r.duration, 0.75));
   }
+  assert(longRuns > 0, 'no long runs in the fixture — this test would pass vacuously');
 });
 
 Deno.test('Q-126 BIKE FENCE: rides stay steps_preset-free (Gap A-bike is its own pass)', () => {

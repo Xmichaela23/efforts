@@ -17,6 +17,7 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   getStepsIntensity,
   getDefaultIntensityForType,
+  normalizeIntensityToken,
   calculateDurationWorkload,
 } from './workload.ts';
 
@@ -59,8 +60,29 @@ Deno.test('tempo session = 0.88 (the specific 5kpace_plus0:45 pace key wins over
   assertEquals(getStepsIntensity(['warmup_run_quality_12min', 'tempo_5mi_5kpace_plus0:45', 'cooldown_easy_10min'], 'run'), 0.88);
 });
 
-Deno.test('long run still matches easypace (0.65), unaffected by the new keys', () => {
-  assertEquals(getStepsIntensity(['longrun_90min_easypace_last10steady'], 'run'), 0.65);
+Deno.test('⛔ the long run is 0.70, NOT easypace — the key finally matches', () => {
+  // ⛔ THIS TEST ASSERTED 0.65 AND WAS GREEN FOR MONTHS. It pinned the bug: `longrun_easypace: 0.70`
+  // could never match, because every real token interposes the quantity
+  // (`longrun_90min_easypace`) and the matcher looked for a contiguous substring — and even a
+  // literal `longrun_easypace` would have lost, because the loop broke on the first key in
+  // declaration order and `easypace` is declared above it.
+  //
+  // So every long run in every generator was priced as an easy run. §0d: a test that has never
+  // failed is not evidence — this one was actively defending the defect.
+  assertEquals(getStepsIntensity(['longrun_90min_easypace_last10steady'], 'run'), 0.70);
+  assertEquals(getStepsIntensity(['longrun_18mi_easypace'], 'run'), 0.70);
+  assertEquals(getStepsIntensity(['longrun_108min_easypace'], 'run'), 0.70);
+  // And the MP-finish long run stops falling to the generic per-type default.
+  assertEquals(getStepsIntensity(['longrun_18mi_mp_finish'], 'run'), 0.82);
+});
+
+Deno.test('an interpolated quantity never hides the family again — the normaliser is the fix', () => {
+  // The bug class, not the instance: any `family_<quantity>_qualifier` token resolves to its family.
+  assertEquals(normalizeIntensityToken('longrun_18mi_easypace'), 'longrun_easypace');
+  assertEquals(normalizeIntensityToken('run_hills_4x180s_r180s_g5_8_dwalk'), 'run_hills_dwalk');
+  // ⚠️ And a legitimately numeric KEY still matches, because the raw token is tested too.
+  assertEquals(getStepsIntensity(['tempo_5mi_5kpace_plus0:45'], 'run'), 0.88);
+  assertEquals(getStepsIntensity(['main_squat_@pct85'], 'strength'), 0.95);
 });
 
 // --- no over-reach: a genuinely unknown token still hits the honest default ---
