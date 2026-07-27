@@ -81,8 +81,6 @@ import {
   type SameDayCompatContext,
 } from '../_shared/schedule-session-constraints.ts';
 import { blockForWeek } from './phase-structure.ts';
-import { tryApplyScheduleCollisionsToGrid } from './apply-schedule-collisions.ts';
-import { normalizeGoalDistanceToTriCollisionDistance } from '../_shared/resolve-schedule-collisions.ts';
 
 /**
  * Timeline rows are one week each (`pushBlockRange`: startWeek === endWeek). Using
@@ -2218,21 +2216,20 @@ export function buildWeek(
     }
   }
 
-  // ── Coarse pillar collision pass (optimizer doctrine); mutates session days in grid ──
   const mergedTradeOffs = [
     ...swimVolTradeOffs,
     ...week8020TradeOffs,
     ...qrLbTradeOffStrings,
     ...strengthReducedTradeOffs,
   ];
-  tryApplyScheduleCollisionsToGrid(grid, {
-    weekNum,
-    conflictEvents,
-    weekTradeOffs: mergedTradeOffs,
-    triDistance: normalizeGoalDistanceToTriCollisionDistance(primaryGoal?.distance),
-    // §5.2 perf+coeq consolidated hard-day exception — see resolve-schedule-collisions RULE 2.
-    isPerformanceCoequal,
-  });
+
+  // ⛔ THE COARSE PILLAR COLLISION PASS WAS DELETED 2026-07-27, not replaced.
+  // It ran LAST and rewrote `.day` on sessions the optimizer had already placed, using its own
+  // day-ranking (`100 − 20·weightBearing − 10·sessionCount`) and its own Monday-first first-fit —
+  // a second placement authority downstream of the one that is supposed to decide.
+  // ⚠️ It was also INERT. 192 optimizer weeks were swept through it — four race distances × four
+  // long-day arrangements × both strength intents × three swim counts × two strength frequencies —
+  // and it changed nothing on any of them. Deleting beats porting.
 
   // ── Steps 6 & 7: TSS + ramp rate validation handled in validator.ts ───────
 

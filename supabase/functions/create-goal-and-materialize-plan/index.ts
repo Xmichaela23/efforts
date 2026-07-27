@@ -54,11 +54,9 @@ import {
   type PreferredDaysOut,
   type WeekOptimizerInputs,
 } from '../_shared/week-optimizer.ts';
-import {
-  validateCombinedSchedulePrefsCollision,
-  validateTrainingPrefsScheduleCollision,
-} from '../_shared/prefs-to-collision-model.ts';
-import { normalizeGoalDistanceToTriCollisionDistance } from '../_shared/resolve-schedule-collisions.ts';
+// ⛔ The schedule-collision validators were DELETED 2026-07-27. Both gates below were behind
+// `strict_schedule_prefs`, a request flag nothing has ever set — no client, no function, no script.
+// So the validation never ran. See the deletion commit for the three sweeps.
 import {
   hasCableMachine,
   hasGHD,
@@ -115,7 +113,6 @@ interface CreateGoalRequest {
    * When true on triathlon saves/builds: reject with `error_code` from coarse schedule collision
    * resolver (`SCHEDULE_GRIDLOCK_*`) if anchors cannot satisfy invariants — opt-in for Arc/wizard hard saves.
    */
-  strict_schedule_prefs?: boolean;
 }
 
 class AppError extends Error {
@@ -1157,8 +1154,6 @@ async function buildCombinedPlan(
   explicit_plan_start_date?: string | null,
   /** Dry-run combined generation: no DB plan, no prefs writes, no activate-plan. */
   planPreview?: boolean,
-  /** Reject merged combined skeleton before plan gen when coarse collision rules fail. */
-  strictSchedulePrefs?: boolean,
 ): Promise<
   | { plan_id: string; preview: false; schedule_signals: ScheduleSignals }
   | { preview: true; combined_preview: Record<string, unknown>; schedule_signals: ScheduleSignals }
@@ -1304,15 +1299,6 @@ async function buildCombinedPlan(
     newGoal.training_prefs as Record<string, unknown>,
     primaryGoalPrefs as Record<string, unknown>,
   );
-  if (strictSchedulePrefs) {
-    const vc = validateCombinedSchedulePrefsCollision(
-      combinedSchedulePrefs,
-      normalizeGoalDistanceToTriCollisionDistance(newGoal.distance),
-    );
-    if (!vc.ok) {
-      throw new AppError(vc.code, vc.message, 409);
-    }
-  }
   const dpwCombined =
     readDaysPerWeekFromPrefs(newGoal.training_prefs as Record<string, unknown>) ??
     readDaysPerWeekFromPrefs(primaryGoalPrefs as Record<string, unknown>);
@@ -2118,7 +2104,6 @@ Deno.serve(async (req: Request) => {
       !Array.isArray(raw.ephemeral_conflict_preferences)
         ? (raw.ephemeral_conflict_preferences as Record<string, string>)
         : null;
-    const strictSchedulePrefs = raw.strict_schedule_prefs === true;
 
     if (!user_id) throw new AppError('missing_user_id', 'user_id required');
 
@@ -2252,15 +2237,6 @@ Deno.serve(async (req: Request) => {
       );
       const sportForBackfill = String(resolvedGoal.sport || '').toLowerCase();
       if (sportForBackfill === 'triathlon' || sportForBackfill === 'tri') {
-        if (strictSchedulePrefs) {
-          const vc = validateTrainingPrefsScheduleCollision(
-            mergedPrefs,
-            normalizeGoalDistanceToTriCollisionDistance(resolvedGoal?.distance),
-          );
-          if (!vc.ok) {
-            throw new AppError(vc.code, vc.message, 409);
-          }
-        }
         const { notes, optimizer_snapshot } = backfillTriTrainingPrefsDefenseInDepth(mergedPrefs, arcForPlanning);
         standaloneTriOptimizerSnapshot = optimizer_snapshot;
         if (notes.length > 0) {
@@ -2648,7 +2624,7 @@ Deno.serve(async (req: Request) => {
 
       const combinedResult = createdGoalId ? await buildCombinedPlan(
         supabase, functionsBaseUrl, serviceKey, user_id, createdGoalId, resolvedGoal!, fitness,
-        combinedTransitionFromPostRace(postRaceRecovery), plan_start_date ?? null, bodyPreview, strictSchedulePrefs,
+        combinedTransitionFromPostRace(postRaceRecovery), plan_start_date ?? null, bodyPreview,
       ) : null;
       if (combinedResult) {
         if (combinedResult.preview) {
@@ -2740,7 +2716,6 @@ Deno.serve(async (req: Request) => {
           combinedTransitionFromPostRace(postRaceRecovery),
           plan_start_date ?? null,
           bodyPreview,
-          strictSchedulePrefs,
         );
         if (combinedResult) {
           if (combinedResult.preview) {
@@ -3196,7 +3171,6 @@ Deno.serve(async (req: Request) => {
         combinedTransitionFromPostRace(postRaceRecovery),
         plan_start_date ?? null,
         bodyPreview,
-        strictSchedulePrefs,
       );
       if (combinedResult) {
         if (combinedResult.preview) {
