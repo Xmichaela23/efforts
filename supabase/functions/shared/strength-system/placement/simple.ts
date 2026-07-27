@@ -101,8 +101,16 @@ function assignSessions(
     );
   }
   
-  // Fallback to legacy run-centric placement (for backward compatibility)
-  return assignSessionsLegacy(intentSessions, primarySchedule, guardrails);
+  // ⛔ NO FALLBACK. A missing methodology is a caller bug, not a week to guess at — see the deleted
+  // `assignSessionsLegacy` note below. Both live callers always supply one, so reaching here means an
+  // invariant broke upstream, and the honest move is to say so rather than quietly emit a hardcoded
+  // Mon/Wed/Fri week that nobody asked for. (Same shape as the SCHEDULE_GRIDLOCK_* throws the
+  // collision resolver used to carry — SPEC-week-solver §5.2a.)
+  throw new Error(
+    'PLACEMENT_NO_METHODOLOGY: strength placement was called without a methodology. ' +
+    'generate-run-plan derives one from `approach` (400s on anything unrecognised) and adapt-plan ' +
+    'sets one unconditionally — so this is an upstream invariant break, not a case to default.',
+  );
 }
 
 /**
@@ -313,163 +321,16 @@ function assignSessionsWithStrategy(
   return placed;
 }
 
-/**
- * Legacy run-centric placement (backward compatibility)
- */
-function assignSessionsLegacy(
-  intentSessions: IntentSession[],
-  primarySchedule: { longSessionDays: string[]; qualitySessionDays: string[]; easySessionDays: string[] },
-  guardrails: GuardrailResult[]
-): PlacedSession[] {
-  const placed: PlacedSession[] = [];
-  
-  // Run-centric template: Mon=Upper, Wed=Lower, Fri=Optional
-  const UPPER_DAY = 'Monday';
-  const LOWER_DAY = 'Wednesday';
-  const OPTIONAL_DAY = 'Friday';
-  
-  // Guardrail: Never schedule heavy lower (neural/power) on Monday or Friday
-  const heavyLowerIntents = ['LOWER_NEURAL', 'LOWER_POWER'];
-  
-  // Separate sessions by intent and priority
-  const upperSessions: Array<{ session: IntentSession; index: number; guardrailResult?: GuardrailResult }> = [];
-  const lowerSessions: Array<{ session: IntentSession; index: number; guardrailResult?: GuardrailResult }> = [];
-  const fullBodySessions: Array<{ session: IntentSession; index: number; guardrailResult?: GuardrailResult }> = [];
-  const otherSessions: Array<{ session: IntentSession; index: number; guardrailResult?: GuardrailResult }> = [];
-  
-  const processedIndices = new Set<number>();
-  
-  for (let i = 0; i < intentSessions.length; i++) {
-    const session = intentSessions[i];
-    const guardrailResult = guardrails.find(g => g.sessionIndex === i);
-    
-    if (guardrailResult?.finalAction === 'skip') {
-      processedIndices.add(i);
-      continue;
-    }
-    
-    if (isFullBodyIntent(session.intent)) {
-      fullBodySessions.push({ session, index: i, guardrailResult });
-    } else if (isUpperIntent(session.intent)) {
-      upperSessions.push({ session, index: i, guardrailResult });
-    } else if (isLowerIntent(session.intent)) {
-      lowerSessions.push({ session, index: i, guardrailResult });
-    } else {
-      otherSessions.push({ session, index: i, guardrailResult });
-    }
-  }
-  
-  const heavyLowerSessions = lowerSessions.filter(({ session }) =>
-    heavyLowerIntents.includes(session.intent)
-  );
-  const lightLowerSessions = lowerSessions.filter(({ session }) =>
-    !heavyLowerIntents.includes(session.intent)
-  );
-  
-  // 1. Assign first upper session to Monday
-  if (upperSessions.length > 0) {
-    const { session, index, guardrailResult } = upperSessions[0];
-    const finalSession = guardrailResult?.modifiedSession || session;
-    
-    const warnings = guardrailResult?.guardrails?.filter(g => g.severity === 'warn').map(g => g.message) || [];
-    const modifications = guardrailResult?.guardrails?.filter(g => g.severity === 'modify').map(g => g.message) || [];
-    
-    placed.push({
-      ...finalSession,
-      day: UPPER_DAY,
-      isOptional: session.priority === 'optional',
-      guardrailWarnings: warnings.length > 0 ? warnings : undefined,
-      guardrailModifications: modifications.length > 0 ? modifications : undefined,
-    });
-    processedIndices.add(index);
-  }
-  
-  // 2. Assign first lower session to Wednesday
-  if (lowerSessions.length > 0) {
-    const lowerToUse = lightLowerSessions.length > 0
-      ? lightLowerSessions[0]
-      : lowerSessions[0];
-    
-    const { session, index, guardrailResult } = lowerToUse;
-    const finalSession = guardrailResult?.modifiedSession || session;
-    
-    const warnings = guardrailResult?.guardrails?.filter(g => g.severity === 'warn').map(g => g.message) || [];
-    const modifications = guardrailResult?.guardrails?.filter(g => g.severity === 'modify').map(g => g.message) || [];
-    
-    placed.push({
-      ...finalSession,
-      day: LOWER_DAY,
-      isOptional: session.priority === 'optional',
-      guardrailWarnings: warnings.length > 0 ? warnings : undefined,
-      guardrailModifications: modifications.length > 0 ? modifications : undefined,
-    });
-    processedIndices.add(index);
-  }
-  
-  // 3. Assign third session to Friday
-  const fridayEligibleSessions = [
-    ...upperSessions.slice(1).map(({ session, index, guardrailResult }) => ({ session, index, guardrailResult, type: 'upper' })),
-    ...lightLowerSessions.slice(1).map(({ session, index, guardrailResult }) => ({ session, index, guardrailResult, type: 'lower' })),
-    ...fullBodySessions.map(({ session, index, guardrailResult }) => ({ session, index, guardrailResult, type: 'fullbody' })),
-    ...otherSessions.map(({ session, index, guardrailResult }) => ({ session, index, guardrailResult, type: 'other' })),
-  ].filter(({ index }) => !processedIndices.has(index))
-    .filter(({ session }) => {
-      if (isLowerIntent(session.intent) && heavyLowerIntents.includes(session.intent)) {
-        return false;
-      }
-      return true;
-    });
-  
-  if (fridayEligibleSessions.length > 0) {
-    const { session, index, guardrailResult } = fridayEligibleSessions[0];
-    const finalSession = guardrailResult?.modifiedSession || session;
-    
-    const warnings = guardrailResult?.guardrails?.filter(g => g.severity === 'warn').map(g => g.message) || [];
-    const modifications = guardrailResult?.guardrails?.filter(g => g.severity === 'modify').map(g => g.message) || [];
-    
-    placed.push({
-      ...finalSession,
-      day: OPTIONAL_DAY,
-      isOptional: session.priority === 'optional' || true,
-      guardrailWarnings: warnings.length > 0 ? warnings : undefined,
-      guardrailModifications: modifications.length > 0 ? modifications : undefined,
-    });
-    processedIndices.add(index);
-  }
-  
-  // Process remaining sessions
-  for (let i = 0; i < intentSessions.length; i++) {
-    if (processedIndices.has(i)) continue;
-    
-    const session = intentSessions[i];
-    const guardrailResult = guardrails.find(g => g.sessionIndex === i);
-    
-    if (guardrailResult?.finalAction === 'skip') continue;
-    
-    const finalSession = guardrailResult?.modifiedSession || session;
-    
-    let day: string;
-    if (placed.filter(p => p.day === UPPER_DAY).length === 0) {
-      day = UPPER_DAY;
-    } else if (placed.filter(p => p.day === LOWER_DAY).length === 0) {
-      day = LOWER_DAY;
-    } else if (placed.filter(p => p.day === OPTIONAL_DAY).length === 0) {
-      day = OPTIONAL_DAY;
-    } else {
-      day = LOWER_DAY;
-    }
-    
-    const warnings = guardrailResult?.guardrails?.filter(g => g.severity === 'warn').map(g => g.message) || [];
-    const modifications = guardrailResult?.guardrails?.filter(g => g.severity === 'modify').map(g => g.message) || [];
-    
-    placed.push({
-      ...finalSession,
-      day,
-      isOptional: session.priority === 'optional',
-      guardrailWarnings: warnings.length > 0 ? warnings : undefined,
-      guardrailModifications: modifications.length > 0 ? modifications : undefined,
-    });
-  }
-  
-  return placed;
-}
+// ⛔ `assignSessionsLegacy` DELETED 2026-07-27 — a hardcoded Mon-upper / Wed-lower / Fri-optional
+// grid, labelled "legacy run-centric placement (backward compatibility)".
+//
+// It was UNREACHABLE, and the guard that makes it so is three files away: `generate-run-plan`
+// rejects any unrecognised `approach` with a 400 (`index.ts:236` switch, default branch) BEFORE
+// methodology is computed, so `mapApproachToMethodology` always returns one of the two real
+// methodologies; `adapt-plan` sets methodology unconditionally from a ternary with a default. The
+// falsy-methodology case this fallback existed for cannot occur.
+//
+// ⛔ DELETED RATHER THAN LEFT, and the reason is not maintenance cost. A hardcoded weekday grid
+// sitting inside a module scheduled for replacement is a PORTING TRAP: the next person wiring the
+// solver finds a function labelled "fallback" and carries it across as one. The backward-compatibility
+// label was doing the damage — it was BC for a caller shape the 400 guard makes impossible.

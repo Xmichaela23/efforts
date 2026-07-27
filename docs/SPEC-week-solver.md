@@ -564,6 +564,31 @@ of drawing it is that the handful which are not are now enumerated rather than d
 - `long_run` × `quality_bike` — **not penalised.** The §2.2 conflict is between two *running*
   sessions. The bike carries no eccentric load; "hard day" in the sketch above meant the hard RUN.
 
+### 8.2a ⛔ THE DAY BEFORE THE LONG RUN — RESOLVED, AND NEITHER LIVE ENGINE WAS RIGHT
+
+**Recorded 2026-07-27.** Two shipped modules give opposite answers to "may strength sit the day
+before the long run," and this surfaced *by accident* while auditing something else. **The adjacency
+table already decided it, and it agrees with neither.**
+
+| | says | verdict |
+|---|---|---|
+| `placement/strength-slot-resolver.ts` `excludeDayBeforeLong` | **NO strength at all** the day before the long run, unconditionally | ⛔ **OVER-BROAD.** It bans upper body, which shares no prime movers with running. Those cells were flipped to ✓ on 2026-07-27 on exactly that logic (§8.3, and the `upper × long_run` flip). A bench press the night before a long run costs nothing |
+| `week-optimizer` §4.21 | relaxed to **24h-pre** in May, citing Friday-lift/Saturday-long-ride as standard practice | ⛔ **TOO LOOSE.** It applies to heavy legs, and the table says `lower_body_strength ↔ long_run` is **48h**. The May relaxation was reasoned about the long RIDE — which is correct and is now 0h — and quietly carried the long RUN with it |
+
+**The table's answer, which is neither:**
+
+- `upper_body_strength` the day before a long run — **legal, no penalty.** Prime-mover logic.
+- `lower_body_strength` the day before a long run — **48h, so no.** Eccentric, and it is the one cell
+  §8.2 says actually constrains a week.
+
+⛔ **THE SOLVER READS THE TABLE. It does not inherit either module's answer as a starting point**, and
+it does not split the difference. Both were written before the table existed; neither is a second
+opinion worth preserving.
+
+⚠️ Left in place deliberately — fixing `excludeDayBeforeLong` inside `placement/` would be repairing a
+module scheduled for replacement. It resolves when the solver takes its callers, not before. **This
+entry exists so the answer is not re-derived from whichever module gets read first.**
+
 ### 8.3 ⛔ THE COMPOSER CONTRADICTS THE STACKING TABLE, ON EVERY WEEK IT HAS BUILT
 
 `upper_body_strength × easy_run = 0` — may not share a day. **The Get Stronger composer stacks easy
