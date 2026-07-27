@@ -387,7 +387,20 @@ function enduranceSession(
   kind: 'easy' | 'long' = 'easy',
 ): PlanSession {
   const mins = overrideMins ?? (sport === 'bike' ? 45 : 35);
-  const label = sport === 'bike' ? 'Easy Ride' : 'Easy Run';
+  // ⛔ NAME AND TAGS DERIVE FROM `kind`, THE SAME SOURCE AS THE TOKEN. Fixed 2026-07-27.
+  //
+  // They used to be hardcoded — `'Easy Run'` and `['easy', …]` — while `runIntensityToken(kind)`
+  // was derived. So ONE SESSION OBJECT DISAGREED WITH ITSELF: the token said
+  // `longrun_108min_easypace`, the name said "Easy Run", the tags said `easy`. Anything reading
+  // tags saw three easy runs and no long run in the block.
+  //
+  // ⚠️ FIXING THE LABEL ALONE WOULD HAVE LEFT THE TAGS LYING, and the next session kind added here
+  // would have arrived with the same defect. This is §0c one layer down: identity taken from a
+  // default instead of from the thing itself. One source, three renderings.
+  const isLong = kind === 'long';
+  const label = sport === 'bike'
+    ? (isLong ? 'Long Ride' : 'Easy Ride')
+    : (isLong ? 'Long Run' : 'Easy Run');
   const base: PlanSession = {
     day,
     type: sport === 'bike' ? 'ride' : 'run',
@@ -398,7 +411,11 @@ function enduranceSession(
     // mileage safe — a high-volume EASY week is not the interference case, a high-volume hard one is.
     description: `~${mins} min easy, all conversational — you could hold a sentence throughout. Held underneath the lifting, not trained.${extraNote ?? ''}`,
     duration: mins,
-    tags: ['easy', 'maintenance', 'aerobic'],
+    // `easy` still rides along on the long session: it IS run at easy effort (the description says
+    // conversational throughout). The `long` tag says WHICH session it is; `easy` says how hard.
+    tags: isLong
+      ? [sport === 'bike' ? 'long_ride' : 'long_run', 'long', 'easy', 'maintenance', 'aerobic']
+      : ['easy', 'maintenance', 'aerobic'],
   };
   // Q-126: RUN-only token injection. Bike/ride is fenced to its own pass (Gap A-bike).
   if (sport === 'run') return { ...base, steps_preset: [runIntensityToken(kind, mins)] };
@@ -796,8 +813,18 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // Long-run day first (it is a pin, so it is not in `freeDays`), then whatever room is left.
   const enduranceDays: string[] = [pickedLong, ...easyDayPool];
   const runDayList: string[] = [...enduranceDays];
+  // ⛔ THE HARD DAY IS ALREADY A RUN. Fixed 2026-07-27, surfaced the moment the solver started
+  // stacking onto the hard-run day: an upper lift landed on Tuesday, Tuesday was therefore an
+  // "upper lift day", and an easy run was added to it — on top of the hill session already there.
+  // Two running sessions on one day, one of them the week's only hard one.
+  //
+  // ⚠️ The bug was always here; it needed a week where an upper lift and the hard pin shared a day
+  // to become reachable, and `place-week` never produced one because it stacked onto the earliest
+  // legal day instead of the smallest.
+  const hardPinDay = hardPin ? String(hardPin) : null;
   for (const d of upperLiftDays) {
     if (runDayList.length >= runFreq) break;
+    if (d === hardPinDay) continue;
     if (!runDayList.includes(d)) runDayList.push(d);
   }
   const longRunDay = pickedLong;

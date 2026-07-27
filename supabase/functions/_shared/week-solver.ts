@@ -346,8 +346,15 @@ function scoreKey(
   // anchors, same lifts listed differently would score differently and re-materialize to a
   // different week. Canonical order is (lower before upper, then name) — a property of the lifts
   // themselves, not of how they arrived.
-  return [restShortfall, breachPenalty, stackPenalty, spreadPenalty, upperSpreadPenalty,
-    upperLowerShortfall, shapePenalty, orderPenalty, preferredMissPenalty, stackHostPenalty,
+  // ⛔ ORDER CORRECTED 2026-07-27. `stackHostPenalty` used to sit BELOW `upperLowerShortfall`, and
+  // the consequence showed up on a week an athlete would really ask for: Thursday long run of 108
+  // minutes, receiving an overhead press, because the 3-day upper↔lower floor outranked the
+  // smallest-day rule. Smallest-day was mined from `place-week` precisely to stop that.
+  //
+  // The principle: **day size GATES which hosts are acceptable; spacing OPTIMISES among them.**
+  // Spacing choosing the host is spacing making a day-size decision it has no information about.
+  return [restShortfall, breachPenalty, stackPenalty, stackHostPenalty, spreadPenalty,
+    upperSpreadPenalty, upperLowerShortfall, shapePenalty, orderPenalty, preferredMissPenalty,
     ...canonicalAssignment];
 }
 
