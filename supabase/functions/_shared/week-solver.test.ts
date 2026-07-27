@@ -354,3 +354,45 @@ Deno.test('the classic hybrid week: Sat ride, Sun run, four lifts, one rest day'
   const lower = r.week.lifts.filter((l) => l.isLower).map((l) => idx(l.day));
   assert(gapDays(lower[0], lower[1]) * 24 >= 48, 'heavy legs are not held apart');
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// §4.2 — preferred days are SCORED, and anchors outrank them
+// ════════════════════════════════════════════════════════════════════════════
+
+Deno.test('a preferred day is honoured when it costs nothing', () => {
+  // Found by the week-optimizer inventory: the solver had no preferred-day term at all, so a stated
+  // preference was worth exactly zero. §4.2 says scored, not hard — this is the "scored" half.
+  const anchors = [anchor('saturday', 'long_ride', 'long ride'), anchor('sunday', 'long_run', 'long run')];
+  const withOut = solve({ anchors, lifts: FOUR });
+  if (withOut.status === 'unsolvable') throw new Error('fixture should solve');
+  const freeDay = (['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as SolverDay[])
+    .find((d) => !withOut.week.lifts.some((l) => l.day === d))!;
+  const r = solve({ anchors, lifts: FOUR, preferredDays: { 'Bench Press': freeDay } });
+  if (r.status === 'unsolvable') throw new Error('adding a preference must not make a week unsolvable');
+  const bench = r.week.lifts.find((l) => l.lift === 'Bench Press')!;
+  assertEquals(bench.day, freeDay, 'a free preference was ignored');
+});
+
+Deno.test('⛔ A PREFERENCE NEVER BREAKS A CLEARANCE — anchors and the law outrank it (§4.2)', () => {
+  // Ask for the heaviest lift on the day the law forbids most: the day after the long run.
+  const anchors = [anchor('sunday', 'long_run', 'long run'), anchor('saturday', 'long_ride', 'long ride')];
+  const r = solve({ anchors, lifts: FOUR, preferredDays: { 'Back Squat': 'monday' } });
+  if (r.status === 'unsolvable') throw new Error('fixture should solve');
+  const squat = r.week.lifts.find((l) => l.lift === 'Back Squat')!;
+  assert(squat.day !== 'monday', 'a preference bought its way through the 48h clearance');
+  assertEquals(r.status, 'solved', 'overruling a preference is not a compromise — the law is not a cost');
+});
+
+Deno.test('a preference never makes a solvable week unsolvable — swept', () => {
+  for (const runD of SOLVER_DAYS) {
+    for (const want of SOLVER_DAYS) {
+      const anchors = [anchor(runD, 'long_run', 'long run')];
+      const base = solve({ anchors, lifts: FOUR });
+      const withPref = solve({ anchors, lifts: FOUR, preferredDays: { 'Deadlift': want } });
+      if (base.status !== 'unsolvable') {
+        assert(withPref.status !== 'unsolvable',
+          `long run ${runD}: preferring ${want} turned a solvable week unsolvable`);
+      }
+    }
+  }
+});

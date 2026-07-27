@@ -88,6 +88,17 @@ export type MethodologyConstraint = {
 export type SolverInput = {
   anchors: Anchor[];
   lifts: Lift[];
+  /**
+   * ⛔ §4.2 — PREFERRED DAYS ARE SCORED, NOT HARD, AND ANCHORS OUTRANK THEM.
+   *
+   * Found by the `week-optimizer` inventory (§6b-5): that module has
+   * `biasOrderForPreferredDay` — the athlete's stated day is tried FIRST but may be overruled with a
+   * logged trade-off — and this solver had **no preferred-day term at all**, so a stated preference
+   * was worth exactly nothing. The spec had the section; the code did not.
+   *
+   * Keyed by lift name. Absent → no preference, which costs nothing.
+   */
+  preferredDays?: Record<string, SolverDay>;
   /** §0a.1 — days per week is an OUTPUT. This is the ceiling on active days, not a target. */
   maxActiveDays?: number;
   methodology?: MethodologyConstraint;
@@ -196,6 +207,7 @@ function scoreKey(
   stackCost: number,
   longHostedStacks: number,
   canonicalAssignment: number[],
+  preferred?: Record<string, SolverDay>,
 ): number[] {
   // 1. ⛔ ONE FULL REST DAY, PROTECTED — not "rest days maximised". Corrected during the build.
   //    The first draft scored `-restDayCount`, and the test sweep caught it immediately: with upper
@@ -278,6 +290,26 @@ function scoreKey(
     }
   }
 
+  // 4c. ⛔ UPPER↔LOWER SPACING HAS A PREFERRED FLOOR, not just "spread". Mined from
+  //     `week-optimizer:1638` — `findStrengthPair(3)` then `(2)`: three days between an upper and a
+  //     lower day is preferred, two is the floor it drops to before relaxing anything else. A pure
+  //     spread term maximises without knowing where "good enough" is, so it trades a real clearance
+  //     for a day of separation it did not need. This prices the SHORTFALL below three.
+  let upperLowerShortfall = 0;
+  for (let i = 0; i < assignment.length; i++) {
+    for (let j = i + 1; j < assignment.length; j++) {
+      if (lifts[i].isLower === lifts[j].isLower) continue;
+      upperLowerShortfall += Math.max(0, 3 - gapDays(assignment[i], assignment[j]));
+    }
+  }
+
+  // 4d. §4.2 — the athlete's stated day, honoured when it costs nothing and overruled when it does.
+  let preferredMissPenalty = 0;
+  for (let i = 0; i < assignment.length; i++) {
+    const want = preferred?.[lifts[i].name];
+    if (want && SOLVER_DAYS.indexOf(want) !== assignment[i]) preferredMissPenalty += 1;
+  }
+
   // 5. directional penalties the law prices but does not forbid
   let orderPenalty = 0;
   for (let i = 0; i < assignment.length; i++) {
@@ -294,7 +326,8 @@ function scoreKey(
   // different week. Canonical order is (lower before upper, then name) — a property of the lifts
   // themselves, not of how they arrived.
   return [restShortfall, breachPenalty, stackPenalty, spreadPenalty, upperSpreadPenalty,
-    shapePenalty, orderPenalty, stackHostPenalty, ...canonicalAssignment];
+    upperLowerShortfall, shapePenalty, orderPenalty, preferredMissPenalty, stackHostPenalty,
+    ...canonicalAssignment];
 }
 
 function lexLess(a: number[], b: number[]): boolean {
@@ -420,7 +453,7 @@ export function solve(input: SolverInput): SolverResult {
 
         const canonicalAssignment = canonicalOrder.map((i) => assignment[i]);
         const key = scoreKey(assignment, lifts, anchorPlacements, breachMagnitude, restCount,
-          stackCost, longHostedStacks, canonicalAssignment);
+          stackCost, longHostedStacks, canonicalAssignment, input.preferredDays);
         if (!best || lexLess(key, best.key)) {
           best = { key, assignment: [...assignment], breaches };
         }

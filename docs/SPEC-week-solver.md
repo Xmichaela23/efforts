@@ -670,6 +670,57 @@ the standard sweep change once both are in.** Five earlier sweeps had passed ove
 
 ✅ **The file may be deleted once its callers move.** This table is what it knew.
 
+### 6b-5 ⛔ THE `week-optimizer` INVENTORY — 28 entries
+
+**The largest of the five, and the one carrying a documented production correction.** It held three
+things. Same shape as §6b-3: every arithmetic and scoring decision, present or rejected with a reason.
+
+**⛔ THE HEADLINE IS A DOCTRINAL CONFLICT, NOT A NUMBER.** `week-optimizer`'s own relax-tier comment
+states its policy when the 48h-vs-long clearance cannot be met:
+
+> *"If the engine can't satisfy 48h vs long, it should **drop a strength session** instead of
+> compromising the long-session recovery window."*
+
+That is §5.2b written down as doctrine — **the silent-subtraction class, stated as the intended
+behaviour** rather than arrived at by accident. It is REJECTED. D-325 §7 forbids removing a session,
+§5.2's menu excludes it, and the solver breaches-and-names instead. Worth knowing that the habit
+found in three modules was *policy* in at least one.
+
+| # | decision | status |
+|---|---|---|
+| 1 | `DAY_INDEX` Sun-first 0-6 | ⛔ rejected — §0b is Monday-first; convert at the boundary |
+| 2-4 | balancer weights (HIGH 3 / MOD 2 / LOW 1), thresholds (5 / 1), `MAX_ITER = 48` | ⛔ rejected — the balancer is a **second ranking** after placement (D-325 §5). The solver scores the whole week at once |
+| 5-6 | `ADJ_SAME_SPORT_EDGE = 4`, `ADJ_EASY_BIKE_BEFORE_QUALITY_BIKE = 3` | ⛔ rejected with the balancer |
+| 7 | `easyRunAnchorAdjacencyPenalty += 4` | ⚠️ out of scope — the solver places lifts, not easy runs |
+| 8 | swim spread ≥2 days on the ring | ⚠️ out of scope — same |
+| 9 | day-order vectors `[mon,thu,tue,fri,wed,sun,sat]` | ⛔ rejected — enumeration-order preference; §5.1 uses a canonical key |
+| 10 | **upper↔lower spacing: 3 days preferred, 2 the floor** | ⛔ **WAS MISSING — find 1.** The solver had spread but no notion of *good enough*, so it traded clearance for separation it did not need. **Fixed** — prices the shortfall below 3. **52 weeks change** |
+| 11-16 | `sequentialOk` blocks: post-long HIGH, easy-run-after-long, §4.5 QR-after-QB, §4.7 lower↔leg-quality 24h, sandwich, 48h-never-relaxes | ⚠️ **out of scope, and the reason matters:** these govern *endurance-vs-endurance* placement. The solver receives anchors as immovable inputs and places only lifts. ⛔ **If the solver is ever given endurance to place, these come back** — they are not rejected, they are unreached |
+| 17 | `SequentialRelax` 3-tier ladder (strict → one-sided → sandwich) | ⛔ rejected — **magnitude grading subsumes it.** The solver prices breaches by size (§6b-3 find 3), so it prefers the smaller violation without needing named tiers |
+| 18-19 | `canPlaceWithModifier`, §6.1.5 consolidated mode | ✅ present — as `MethodologyConstraint` (§4.1a), which requires an owner and a reason |
+| 20 | `concurrentSpacingTier` + `emitConcurrentSpacingTradeOff` | ✅ present — `compromises[]` |
+| 21 | `lowerBodyBlockedDays` | ⛔ **rejected, and it is §0c's error in a second module** — a `Set<DayName>` of forbidden days. Superseded by per-pair adjacency |
+| 22 | **`biasOrderForPreferredDay`** | ⛔ **WAS MISSING — find 2.** §4.2 exists in this spec and the solver implemented **none of it**, so a stated preference was worth exactly zero. **Fixed** — scored, and it can never break a clearance or make a solvable week unsolvable (both swept) |
+| 23 | rest-day claim: empty days, then displace LOW-only | ⚠️ partial — the shortfall term is present; **displacing a placed session is rejected** (§5.2b) |
+| 24 | balancer relocatable kinds | ⛔ rejected with the balancer |
+| 25 | `deriveOptimalWeekWithCoEqualRecovery` — retry at 1× strength | ⛔ rejected — §0a #4, lift count is fixed and is not a relaxation |
+| 26 | `validatePreferredDays` | ⚠️ boundary concern, not solver |
+| 27 | `strength_frequency: 1\|2\|3` type | ⛔ rejected — the ceiling that made `place-week` necessary. The solver takes any count |
+| 28 | **"drop a strength session rather than breach 48h"** | ⛔ **REJECTED — see the headline above** |
+
+**THE COUNT:** **28** = **3 present** + **13 rejected with a stated reason** + **8 out of scope
+(endurance placement / boundary)** + **2 fixed by this pass (finds 1 and 2)** + **2 partial with the
+adopted half named**.
+
+⚠️ **THE RATIO INVERTED EXACTLY AS PREDICTED (§6b-3a).** `place-week` came out 14-present /
+2-rejected because it reads the law. `week-optimizer` comes out 3-present / 13-rejected because most
+of its arithmetic is a *second ranking* built beside the law rather than from it. **That is the
+finding, not a failure** — and it is the clearest evidence yet for why the collapse is worth doing.
+
+⛔ **THE 8 OUT-OF-SCOPE ENTRIES ARE THE REAL DEBT.** They are the endurance-placement rules, and the
+solver does not have them because it does not place endurance. **The day it does, this table is the
+starting list** — do not re-derive them.
+
 ### 6b-3a ⛔ EVERY REMAINING MODULE GETS AN INVENTORY BEFORE IT DIES. NOT JUST THIS ONE.
 
 **The reason the `place-week` pass paid off twice is a property, not luck.** That file was
@@ -687,7 +738,7 @@ mistake the systematic pass just caught twice in one file.
 | module | inventory |
 |---|---|
 | `place-week` | ✅ done — §6b-3, 17 entries, 14 present / 2 rejected / 1 n/a |
-| `week-optimizer` | ⛔ **required before deletion.** The largest and most-corrected of the five |
+| `week-optimizer` | ✅ done — §6b-5, 28 entries, ratio inverted (3 present / 13 rejected), 2 finds |
 | `placement/` surviving parts | ⛔ required — and note §6b-2: presumed over-broad, so expect more rejections than adoptions |
 | `base-generator` | ⛔ required — a fixed grid still encodes decisions about what a run week looks like |
 | `tri-generator` | ⛔ required |
