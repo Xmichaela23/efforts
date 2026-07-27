@@ -2345,7 +2345,18 @@ Deno.serve(async (req: Request) => {
     // what is already in scope here — so nothing the combine path needs is skipped. Covers create +
     // build_existing. Events (resolvedIsNonRace=false) are unaffected → byte-identical.
     if (resolvedIsNonRace) {
-      if (mode === 'create') {
+      // ⛔ A PREVIEW MUST NOT WRITE. This `mode === 'create'` branch inserted a real
+      // `status: 'active'` goal row unconditionally — `bodyPreview` was only consulted 150 lines
+      // later, where it skips linking and activation and returns the built plan.
+      //
+      // So "show me the week before I commit" created the goal, showed the week, and left the row
+      // behind when the athlete backed out. Four looks at four start dates is four active goals, and
+      // every one of them looks exactly like a real commitment to anything reading the table.
+      //
+      // ⚠️ The plan side was already correct — that is what makes this easy to miss: the preview
+      // return genuinely does not persist a plan. Only the goal leaked.
+      // The preview still gets a `goal_id` in its response; it is now a synthetic marker, not a row.
+      if (mode === 'create' && !bodyPreview) {
         const newGoalPriority = action === 'keep' && existing_goal_id ? 'B' : 'A';
         const { data: createdGoal, error: goalInsertErr } = await supabase
           .from('goals')

@@ -97,6 +97,41 @@ export function useArcSetupComplete() {
     return hadFailure;
   }, []);
 
+  /**
+   * ⛔ BUILD THE WEEK WITHOUT COMMITTING TO IT — and without writing anything, anywhere.
+   *
+   * `complete()` cannot be reused for this: it calls `persistArcSetup` FIRST, which writes the goal
+   * rows client-side before the edge function is ever invoked. A preview that went through it would
+   * leave a goal behind every time someone looked at their week and backed out.
+   *
+   * So this calls `create-goal-and-materialize-plan` directly with the goal INLINE (`raw.goal`) and
+   * `preview: true`. The function composes the plan, returns it, and persists nothing — the plan
+   * side was already correct, and the goal-insert leak on that path was closed in the same change.
+   *
+   * ⚠️ Returns the plan or null. Never navigates, never dispatches invalidation events, never
+   * touches wizard state — a preview is a read.
+   */
+  const preview = useCallback(
+    async (payload: ArcSetupPayload): Promise<Record<string, unknown> | null> => {
+      const userId = getStoredUserId();
+      const goal = Array.isArray(payload.goals) ? payload.goals[0] : null;
+      if (!userId || !goal) return null;
+      const { data, error: err } = await invokeFunction<Record<string, unknown>>(
+        'create-goal-and-materialize-plan',
+        {
+          user_id: userId,
+          mode: 'create',
+          goal,
+          preview: true,
+          ...(payload.plan_start_date ? { plan_start_date: payload.plan_start_date } : {}),
+        },
+      );
+      if (err || !data || (data as { success?: boolean }).success === false) return null;
+      return (data as { plan?: Record<string, unknown> }).plan ?? null;
+    },
+    [],
+  );
+
   const complete = useCallback(
     async (payload: ArcSetupPayload) => {
       setSaving(true);
@@ -213,5 +248,5 @@ export function useArcSetupComplete() {
     [navigate, startLoop, rollbackInsertedGoals],
   );
 
-  return { complete, saving, error, saveBanner, conflictOverlay, handleConflictChoice };
+  return { complete, preview, saving, error, saveBanner, conflictOverlay, handleConflictChoice };
 }

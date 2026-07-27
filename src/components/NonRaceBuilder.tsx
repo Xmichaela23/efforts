@@ -265,9 +265,29 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
         training_prefs: {
           training_intent: 'completion',
           fitness: 'intermediate',
-          days_per_week: state.daysPerWeek,
+          // ⛔ NOT SENT ON THE STRENGTH PATH — because they are never ASKED on it.
+          //
+          // `getSteps` skips both the `days` and `commitment` screens for Strength Focus (the lifting
+          // is four days fixed by the protocol; the endurance volume is typed per discipline). But
+          // this payload sent them anyway, so they went out as INITIAL STATE: `daysPerWeek: 5` and
+          // `commitment: 'light'` → 6 hours.
+          //
+          // The plan then printed "Days Per Week: 5" and "Weekly Hours Available: 6" as though the
+          // athlete had chosen them, next to a week carrying seven days and ~10.4 hours. Two numbers
+          // from nowhere, displayed as constraints, and read later as if they were answers.
+          // Michael: *"we don't ask any more — 4 days of strength, the user must assume their miles
+          // and hours will go somewhere."*
+          //
+          // ⚠️ The comment on the skipped step already noted the tier "decides nothing and its only
+          // effect was a stale ≈6 h/wk on the confirm screen." That was half-fixed: the screen
+          // stopped showing it and the payload kept sending it.
+          // ⚠️ Safe to omit — the one downstream reader (`create-goal:2549`) is the RUN-plan branch
+          // and already falls back to '4-5'.
+          ...(goal === 'get_stronger' ? {} : {
+            days_per_week: state.daysPerWeek,
+            weekly_hours_available: hoursForTier(state.commitment),
+          }),
           strength_frequency: state.posture?.strength === 'develop' ? 4 : 2, // Get Strong = the 4-day develop arc; don't offer 2×/week the engine overrides
-          weekly_hours_available: hoursForTier(state.commitment),
           per_discipline_posture: state.posture,
           preferred_days: buildPreferredDays(state.posture, {
             longRunDay: state.longRunDay, longRideDay: state.longRideDay,
@@ -296,9 +316,22 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
   };
 }
 
+/** Just what the confirm-screen preview renders — the plan carries far more. */
+type PreviewSession = { day: string; name: string; duration?: number };
+type PreviewPlan = {
+  sessions_by_week?: Record<string, PreviewSession[]>;
+  /** `place-week`'s own words for every clearance the week could not honour. */
+  placement_compromises?: string[];
+};
+
 export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {}) {
   const navigate = useNavigate();
-  const { complete, saving } = useArcSetupComplete();
+  const { complete, preview, saving } = useArcSetupComplete();
+  // ⛔ THE WEEK, BEFORE IT IS ACCEPTED. Nothing here writes: `preview()` calls the composer with the
+  // goal inline and persists neither a goal nor a plan.
+  const [previewWeek, setPreviewWeek] = React.useState<PreviewSession[] | null>(null);
+  const [previewNotes, setPreviewNotes] = React.useState<string[]>([]);
+  const [previewing, setPreviewing] = React.useState(false);
   const { arc } = useArcSetupContext();
 
   // Don't gate: every athlete is OFFERED all four disciplines (matches the ungated matrix). The seed
@@ -399,13 +432,39 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   });
   const strengthDeveloperLabel = (id?: string) => (id ? STRENGTH_PROTOCOL_LABELS[id] ?? id : id);
 
-  const handleConfirm = () => {
-    if (!state.goal) return;
+  // One place builds the payload, so the week previewed and the week built cannot disagree.
+  const payloadNow = () => {
     // canonicalize the typed mileage (display unit → miles) before it leaves the client
     const canonMiles = typeof state.targetMiles === 'number' && state.targetMiles > 0
       ? (unit === 'km' ? Math.round(state.targetMiles / 1.609344) : state.targetMiles)
       : undefined;
-    void complete(assemblePayload(state, equipmentTier, canonMiles));
+    return assemblePayload(state, equipmentTier, canonMiles);
+  };
+
+  const handleConfirm = () => {
+    if (!state.goal) return;
+    void complete(payloadNow());
+  };
+
+  /**
+   * ⛔ SHOW THE WEEK BEFORE IT IS ACCEPTED, AND SHOW WHAT IT COULD NOT HONOUR.
+   *
+   * The athlete answers four lifting days (fixed by the protocol), three run days and two ride days
+   * and never sees that it adds to seven days with no rest — because nobody adds it up in front of
+   * them. Michael: *"we still don't see a general week before it's accepted."*
+   *
+   * ⚠️ `placement_compromises` is the part that matters. `place-week` has always named every
+   * clearance it could not honour and nothing rendered them, so the week arrived silently short a
+   * ride and silently short a rest day. Those sentences are the honest half of the preview.
+   */
+  const runPreview = async () => {
+    if (!state.goal || previewing) return;
+    setPreviewing(true);
+    const plan = (await preview(payloadNow())) as PreviewPlan | null;
+    const wk1 = plan?.sessions_by_week?.['1'];
+    setPreviewWeek(Array.isArray(wk1) ? wk1 : []);
+    setPreviewNotes(Array.isArray(plan?.placement_compromises) ? plan!.placement_compromises! : []);
+    setPreviewing(false);
   };
 
   const optBtn = (active: boolean) =>
@@ -1066,6 +1125,56 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 focus:outline-none focus:border-teal-500/50"
               />
               <p className="text-white/50 text-xs mt-1.5">Week 1 begins this week — plans run Monday to Sunday.</p>
+            </div>
+
+            {/* ⛔ THE WEEK, BEFORE COMMITTING. Building it here writes nothing — no goal, no plan. */}
+            <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3">
+              {previewWeek === null ? (
+                <button
+                  type="button" onClick={() => { void runPreview(); }} disabled={previewing}
+                  className="w-full min-h-[44px] rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
+                >{previewing ? 'Building your week…' : 'Show me a week first'}</button>
+              ) : (
+                <div className="space-y-2">
+                  {(() => {
+                    const ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+                    const active = new Set(previewWeek.map((s) => s.day));
+                    const rest = ORDER.filter((d) => !active.has(d));
+                    const mins = previewWeek.reduce((a, s) => a + (Number(s.duration) || 0), 0);
+                    return (
+                      <>
+                        {/* The sum nobody was doing. Four lifts + the runs + the rides, added up. */}
+                        <p className="text-white/85 text-sm">
+                          {active.size} training {active.size === 1 ? 'day' : 'days'}, {rest.length} rest
+                          {' · '}about {Math.floor(mins / 60)}h{mins % 60 ? String(mins % 60).padStart(2, '0') : ''} a week
+                        </p>
+                        <div className="space-y-1">
+                          {ORDER.map((d) => {
+                            const on = previewWeek.filter((s) => s.day === d);
+                            return (
+                              <div key={d} className="flex items-baseline gap-2 text-sm">
+                                <span className="text-white/45 w-10 shrink-0">{d.slice(0, 3)}</span>
+                                <span className={on.length ? 'text-white/80' : 'text-white/35'}>
+                                  {on.length ? on.map((s) => s.name).join(' · ') : 'Rest'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* ⛔ WHAT IT COULD NOT HONOUR, in the solver's own words. Never hidden — a week
+                            that had to break a clearance says which one. */}
+                        {previewNotes.length > 0 && (
+                          <div className="pt-2 mt-1 border-t border-white/10 space-y-1.5">
+                            {previewNotes.map((n, i) => (
+                              <p key={i} className="text-white/60 text-sm leading-relaxed">{n}</p>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
             {/* ⛔ TWO FALSEHOODS ON THIS LINE, both created when the engine changed under it.
                 • "ending in a retest" — Strength Focus has NO retest week. The last set of every

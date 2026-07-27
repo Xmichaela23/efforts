@@ -1810,7 +1810,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 weightStr = ' @ [Setup 1RM]';
               }
               
-              lines.push(`    - ${name}: ${sets}×${reps}${weightStr}${notes}`);
+              // ⛔ A ROW WITH NO SET COUNT IS A REP TOTAL, NOT "0 SETS". `sets || 0` turned the
+              // absent set count on an assistance row into a literal zero — "Dips: 0×25 total" —
+              // which reads as a prescription for nothing. Assistance carries a TOTAL the athlete
+              // splits however they like (the composer's own description says "25 total reps"); the
+              // sets field is deliberately absent there, and this exporter is the only place that
+              // insisted on printing it.
+              const setsPrefix = sets ? `${sets}×` : '';
+              lines.push(`    - ${name}: ${setsPrefix}${reps}${weightStr}${notes}`);
             }
           }
         }
