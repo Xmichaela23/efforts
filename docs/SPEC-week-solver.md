@@ -171,7 +171,7 @@ the spec against the output. It is not a phase that ends.
 ✅ **THE CHECK:** for each spec requirement, ask *"which field of the output carries this, and who
 reads that field?"* A requirement with no field, or a field with no reader, is already lost.
 
-⛔ **The nine, together — all checkable rather than remembered, which is the only reason they will
+⛔ **The ten, together — all checkable rather than remembered, which is the only reason they will
 outlive this session:**
 
 | § | principle |
@@ -183,6 +183,7 @@ outlive this session:**
 | **0g** | a field named for athlete intent may only be written by athlete input |
 | **0h** | a missing signal is not a verdict — hold, stay distinguishable from zero, fail open |
 | **0i** | stated intent may WITHHOLD dose, never ADD it — intent is not evidence of capacity |
+| **0j** | a placement rule carries its reason as a FIELD, and "ignores posture" is a stated answer, never a silence |
 | **4.1a** | strictness beyond the law needs an owner and a reason |
 | **5.2b** | never subtract silently — refuse, and name the options |
 
@@ -314,6 +315,73 @@ prescribes fifty reps of each category *per training day*, which would be a wild
 enough to write *"Wendler says"* — if the primary is ever checked, record it here. *(Michael, retracting his own brief: "'volume should come
 down' was mine and it was wrong … a floor with only an upward lever is the model working, not
 failing.")*
+
+## ⛔ 0j. A PLACEMENT RULE DECLARES ITS RELATIONSHIP TO INTENT — the reason TRAVELS, and "ignores posture" is a STATED answer
+
+**Named 2026-07-28 by Michael, as a REQUIREMENT on the rematerializer, not a nice-to-have.** §0f is the
+output failing to carry what the spec requires. §0i is intent read wrongly. **This is the pair of them
+aimed at the schedule: the same glass-box rule already applied to verdicts, applied to placement.**
+
+> Michael: *"The version that fails is the one where posture gets added as a parameter and half the
+> rules quietly keep their old behavior. Then you have a system that claims to react to intent and
+> mostly doesn't, which is worse than one that never claimed to."*
+
+### 0j.1 — the reason is a FIELD ON THE DECISION, not a comment in the source
+
+**Every placement decision carries why it was made, in the output, in the athlete's terms.** *"Squat
+day kept clear because strength posture is develop."* The next session reads **why**, not **what**, and
+does not have to reconstruct the rule from the arrangement it produced.
+
+⛔ **A COMMENT IN THE SOURCE DOES NOT SATISFY THIS**, for the reason §0g already proved on a different
+field: *"a comment explaining the rule is what was already there, and it is what did not work."*
+
+⚠️ **THE GAP, TODAY.** `PlacedLift` (`_shared/week-solver.ts:118`) carries `day` and `stackedWith` and
+**no reason field**. `placement_compromises` carries **costs and breaches only** — what was given up,
+and only when something was. **A day kept clear for a good reason that cost nothing is invisible**,
+which is the majority of the decisions the solver makes.
+
+### 0j.2 — a rule that IGNORES posture must SAY SO
+
+**Posture-independent by design is a VALID answer. It is not a valid silence.**
+
+⛔ **THE DANGEROUS CASE IS NOT A RULE WITH THE WRONG BRANCH — IT IS A CONSTANT THAT LOOKS DERIVED.**
+Every finding of 2026-07-28 was that shape: the leader/anchor ratio, the accessory volume, the block
+narrative, the TM ceiling. Four fixed numbers sitting in a system that reads as though it computed
+them. A rule that never consults posture, in a solver advertised as posture-aware, is the same object.
+
+✅ So the recorded answer is the deliverable: **"this rule is posture-independent, because X"** costs one
+line and stops the next session spending a day rediscovering it — and, more importantly, makes the
+half-migrated state **visible instead of indistinguishable from the finished one.**
+
+### ⚠️ THE STARTING POSITION IS THE WORST CASE, AND IT IS MEASURABLE RIGHT NOW
+
+| fact | evidence |
+|---|---|
+| **Posture never reaches the solver at all** | `week-solver.ts` contains **zero** occurrences of `posture`. `SolverInput` (`:88`) has no posture field |
+| **It reaches LOADING, and stops there** | `wendler-531.ts:297` — `(inputs?.strengthPosture ?? 'develop') !== 'develop'` |
+
+**So every placement rule is posture-independent today — by ABSENCE, not by decision.** The migration
+§0j guards against is not hypothetical; it is the next piece of work. ⛔ **The conversion is not
+"add the parameter and update the rules that need it." It is: every rule ends the change with a
+recorded answer, including the ones that do not change.**
+
+### ✅ THE PRECEDENT EXISTS — copy `MethodologyConstraint`, do not invent a shape
+
+`_shared/week-solver.ts:79` already does exactly this for methodology strictness, and its own comment
+states the principle: **`owner` and `reason` are both REQUIRED, "and that is the point."** Daniels
+declining a legal pairing is legitimate; `buildEasyDays` applying the identical exclusion with no owner
+is a bug — **and the type is what tells them apart** (§4.1a).
+
+§0j is that requirement generalised from methodology to posture. And per §0g's closing rule: **if the
+type can make the unowned shape unrepresentable, it should.** Convention had already failed three times
+on `preferred_days.strength`; a required field is what finally held.
+
+### ✅ THE CHECK — two questions per placement rule, both answerable from the output
+
+1. **Which output field carries this rule's reason, and who reads that field?** (§0f's check, unchanged.
+   A reason with no field, or a field with no reader, is already lost.)
+2. **Does it read posture — yes, no, or no-by-design?** ⛔ **A rule answering "no" without a recorded
+   "by design" is UNCONVERTED, not exempt.** That distinction is the whole principle.
 
 ## 0a. ⛔ THE FIVE HARD CONSTRAINTS, AND THE WHOLE SEARCH
 

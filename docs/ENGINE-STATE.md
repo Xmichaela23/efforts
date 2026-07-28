@@ -56,6 +56,33 @@ CHAIN. Check that against `session_detail_v1` (`_shared/session-detail/types.ts`
 reads it, and whether `exercise_log`'s e1RM trend is reachable from the plan generator. Agreed rules:
 e1RM from anchor top sets only, reps ≤ 8, ratchet UP only, applied at block boundaries.
 
+### ⛔ TWO REQUIREMENTS ON THIS WORK — Michael, 2026-07-28. REQUIREMENTS, not nice-to-haves
+
+**Both are written up in full as `SPEC-week-solver.md` §0j. Read it before touching a placement rule.**
+
+1. **PLACEMENT RULES CARRY THEIR REASON — a field on the decision, not a comment in the source.**
+   *"Squat day kept clear because strength posture is develop."* The glass-box rule already applied to
+   verdicts, applied to the schedule. The next session reads **why**, not **what**.
+   ⚠️ `PlacedLift` (`_shared/week-solver.ts:118`) has no reason field, and `placement_compromises`
+   carries costs and breaches only — **a day kept clear for a good reason that cost nothing is
+   invisible today.**
+2. **A RULE THAT IGNORES POSTURE MUST SAY SO.** Posture-independent by design is a valid answer; it is
+   not a valid silence. ⛔ **The dangerous case is not a rule with the wrong branch — it is a constant
+   that LOOKS derived**, which is the shape of all four of today's findings.
+
+⛔ **THE FAILURE THIS EXISTS TO PREVENT, in Michael's words:** *"posture gets added as a parameter and
+half the rules quietly keep their old behavior. Then you have a system that claims to react to intent
+and mostly doesn't, which is worse than one that never claimed to."*
+
+⚠️ **AND THE STARTING POSITION IS THE WORST CASE — verified, not assumed.** `week-solver.ts` contains
+**zero** occurrences of `posture`; `SolverInput:88` has no posture field. Posture reaches LOADING
+(`wendler-531.ts:297`) and stops there. **Every placement rule is posture-independent today by absence,
+not by decision** — so this is the migration in front of you, not a hypothetical one.
+
+✅ **DO NOT INVENT A SHAPE — `MethodologyConstraint` (`week-solver.ts:79`) already is this**, with
+`owner` and `reason` both required and a comment saying that is the point. §0j generalises it from
+methodology to posture.
+
 ### ⛔ WHAT SHIPPED TODAY — do NOT re-litigate any of it
 
 | | what | where |
