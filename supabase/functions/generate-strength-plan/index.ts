@@ -185,7 +185,12 @@ Deno.serve(async (req: Request) => {
       console.error('[strength-plan] insert failed:', error?.message);
       return json({ success: false, error: error?.message || 'Failed to save strength plan' }, 500);
     }
-    return json({ success: true, plan_id: inserted.id, sport: 'strength', combined: false }, 200);
+    // ⛔ RETURN THE DAYS THE SOLVER USED so the caller can record what actually happened rather than
+    // the seed's guess. See `strength_days` on the composer's return type.
+    return json({
+      success: true, plan_id: inserted.id, sport: 'strength', combined: false,
+      strength_days: plan.strength_days,
+    }, 200);
   } catch (e) {
     console.error('[strength-plan] error:', (e as Error)?.message);
     return json({ success: false, error: (e as Error)?.message || 'strength plan generation failed' }, 500);

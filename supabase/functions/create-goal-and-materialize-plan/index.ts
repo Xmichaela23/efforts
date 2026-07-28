@@ -2535,6 +2535,31 @@ Deno.serve(async (req: Request) => {
             const { error: gsLinkErr } = await supabase
               .from('plans').update({ goal_id: createdGoalId, plan_mode: 'rolling' }).eq('id', gsPlanId).eq('user_id', user_id);
             if (gsLinkErr) throw new AppError('plan_link_failed', gsLinkErr.message);
+
+            // ⛔ THE GOAL RECORDS WHAT WAS PLACED, NOT WHAT WAS SEEDED.
+            //
+            // `non-race-goal-seeds.ts:113` seeds `preferred_days.strength` to Mon/Tue/Thu/Fri, with
+            // the comment "match the engine grid so the intake header doesn't contradict the plan".
+            // That WAS the engine grid — the hardcoded `MAIN_LIFTS` days that `place-week` replaced.
+            // The solver places dynamically now, so the seed states a schedule the plan does not
+            // have: an athlete's summary read Mon/Tue/Thu/Fri while the block ran Mon/Tue/Wed/Fri.
+            //
+            // ⚠️ AND IT IS NOT ONLY A HEADER. `adapt-plan` and the optimizer read
+            // `preferred_days.strength`; a stale value there is a wrong picture of the week, not a
+            // cosmetic one.
+            const placedStrengthDays = Array.isArray(gsGen?.strength_days) ? gsGen.strength_days : null;
+            if (placedStrengthDays?.length && createdGoalId) {
+              const { data: goalRow } = await supabase
+                .from('goals').select('training_prefs').eq('id', createdGoalId).eq('user_id', user_id).single();
+              const prefs = (goalRow?.training_prefs ?? {}) as Record<string, unknown>;
+              const pd = { ...((prefs.preferred_days ?? {}) as Record<string, unknown>), strength: placedStrengthDays };
+              const { error: pdErr } = await supabase
+                .from('goals')
+                .update({ training_prefs: { ...prefs, preferred_days: pd } })
+                .eq('id', createdGoalId).eq('user_id', user_id);
+              if (pdErr) console.warn('[create-goal] could not write placed strength days:', pdErr.message);
+              else console.log(`[create-goal] goal strength days set from the plan: ${placedStrengthDays.join(', ')}`);
+            }
             await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: gsPlanId });
             await retireCompetingActivePlans(supabase, user_id, gsPlanId, { mode, existing_goal_id, replace_plan_id });
             await bustTrainingCachesAfterPlanChange('strength_plan');

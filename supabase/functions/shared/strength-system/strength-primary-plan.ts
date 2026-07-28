@@ -628,6 +628,15 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * two meanings, and the reader must not have to guess which — see `SolverNote`.
    */
   placement_compromises?: Array<{ kind: 'breach' | 'cost'; text: string }>;
+  /**
+   * ⛔ THE DAYS THE SOLVER ACTUALLY USED, lowercase, so the goal row can record what happened
+   * instead of what someone guessed. `non-race-goal-seeds.ts:113` seeds
+   * `preferred_days.strength = ['monday','tuesday','thursday','friday']` with the comment "match the
+   * engine grid so the intake header doesn't contradict the plan" — and that WAS the engine grid,
+   * back when `MAIN_LIFTS` was hardcoded to Mon/Tue/Thu/Fri. The solver places dynamically now, so
+   * the seed's stated purpose is exactly what it fails at: it contradicts the plan it describes.
+   */
+  strength_days?: string[];
 } {
   const { enduranceSport, oneRepMaxes } = args;
   const weeks = blockWeeks(args.durationWeeks);
@@ -1094,5 +1103,6 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
      * ⚠️ Surfacing only. D-325 §7: state the cost, never refuse — the week is still built.
      */
     placement_compromises: placementCompromises.length ? placementCompromises : undefined,
+    strength_days: strengthDays.map((d) => String(d).toLowerCase()),
   };
 }
