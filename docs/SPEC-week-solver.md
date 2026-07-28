@@ -497,6 +497,49 @@ instance: it does not distinguish a rule it reasoned about from one it inherited
 the methodology it belongs to and carries its reason.** Anything stricter than the law without an
 owner is not a template rule — it is §0c's conversion error wearing one.
 
+#### ⛔ AND THE SHARPER FAILURE: A FALSE CITATION OF THE LAW IS NOT AN OWNER
+
+**Michael, 2026-07-27:** *"Unowned strictness at least declares itself unowned. This attributes itself
+to an authority that says the opposite."*
+
+⛔ **IT IS AUDIT-PROOF, WHICH IS WHY IT MATTERS MORE.** An unowned rule reads as a preference and
+invites the question. A rule that cites the law reads as settled — **it was quoted back to Michael as
+fact within this session, from the comment rather than the matrix.** Nobody re-reads a cell that a
+comment has already explained.
+
+**Found 2026-07-27, in the Get Stronger composer. Both narrow the week, and both contributed to an
+athlete asking for two rides and getting one:**
+
+| rule | what it says | what the cell says |
+|---|---|---|
+| rides go on **upper lift days only** | *"putting one on a squat or deadlift day is the leg-on-leg stacking **the clearance law exists to prevent**"* | ⛔ **`easy_bike × lower_body_strength` is ✓.** The law says the pair needs the **6h gap**, not that it is banned. "Needs a gap" was flattened into "forbidden" and the ban attributed to a law that does not contain it |
+| easy runs stack on **upper lift days only** | *(no reason stated)* | ⛔ **`easy_run × lower_body_strength` is ✓**, and `STRENGTH-PROTOCOL §6.2` **recommends** it — lower first, 6h gap, the easy run as a recovery flush. The cell was deliberately flipped to ✓ in May 2026 for exactly this |
+
+✅ **THE RULE, EXTENDED:**
+
+1. A constraint stricter than the law names **its owner** and **its reason** (§4.1a).
+2. ⛔ **A citation of the law is not a reason — it is a claim, and it must be checked against the
+   cell.** If the law permitted it, the constraint is still admissible, but it must be re-justified on
+   its own terms and stop citing an authority that disagrees.
+3. ⚠️ **"The law forbids X" and "the law requires a gap before X" are different statements.** The
+   second is what the matrix usually says, and collapsing it into the first removes a legal week.
+
+⚠️ **GREP FOR IT:** `clearance law`, `the law forbids`, `the matrix forbids`, `never share`,
+`cannot share` — then read the actual cell. Two of two checked were wrong.
+
+⛔ **THREE DECISIONS FALL OUT OF THIS AND NONE ARE THE ENGINE'S** (open, 2026-07-27, Michael's):
+- May an easy ride share a heavy-leg day at the 6h gap? The law permits it; whether it is wise is a
+  training call.
+- Is a third session on one day ever allowed? Today it never is, with a stated reason (a 196-minute
+  Thursday) and no law behind it.
+- Do ride days become **pins**?
+
+⛔ **AND ON THE THIRD — DO NOT MERGE THE TWO FRAMINGS.** Michael: *"they solve different problems."*
+**Making a day an OUTPUT** is §0a.1 — honest and derived, *"3 hours fits on 1 day, here's why."*
+**Making it a PIN** is control — the athlete names the day and the solver builds around it. **The pin
+is the better answer for a day the athlete cares about; output is right for anything they do not.**
+Scope them separately.
+
 ### 4.2 Preferred days are SCORED, not hard. Anchors OUTRANK them.
 
 **Hard constraints are the ones that are physiologically unsafe or contractually impossible.** A
