@@ -1048,7 +1048,13 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     <span className="block text-white/90 text-sm">{d === 'bike' ? 'Hard ride' : 'Hard run'}</span>
                     <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
                       {d === 'bike'
-                        ? 'Intervals, a chaingang, a threshold turbo. Hard riding costs your legs less than hard running does, so more of the week is left for the bar.'
+                        // ⛔ THE CLUB HAS TO BE NAMED ON BOTH SIDES. The run option reads "a club
+                        // night" and the ride option read "a chaingang" — which IS the club ride,
+                        // but only a cyclist reads it that way. The whole reason this screen exists
+                        // is that the hard day is usually someone else's day: the club sets it, and
+                        // the engine builds around it rather than moving it. If only one option says
+                        // so, the other looks like a session the athlete invents.
+                        ? 'Intervals, the club ride, a chaingang, a threshold turbo. Hard riding costs your legs less than hard running does, so more of the week is left for the bar.'
                         : 'Hill repeats, a club night, track. Uphill keeps the load down, but it still costs more in the legs than a ride would.'}
                     </span>
                   </button>
