@@ -1226,3 +1226,32 @@ enforcement here would be repairing a mechanism the derivation removes.**
 
 ⚠️ If you are here because you found the same symptom: do not add the four missing filters. Read
 §0a.1 first, and note `place-week.resolveStacking()` already computes the derivation for Get Stronger.
+
+---
+
+### Q-161
+
+**Assistance does not know what the main lift is — four pushing exposures inside 24 hours.**
+
+**Status:** unverified *(the interference is reasoned from the exposure count, not measured)*
+
+**Found:** 2026-07-28, reading a generated Strength Focus block. Michael: *"25 dips on bench day and 25 more on press day the next morning is four pushing exposures in 24 hours."*
+
+**What happens.** `assistancePicks` is ONE pick per slot for the whole block, and `assistanceRows` applies all three slots to every lifting session identically. The push slot runs the same movement whether the day's main lift is a bench press, a squat or a deadlift. On the four-day template bench and overhead press land on consecutive days, so an athlete who picks Dips gets:
+
+| | main lift | push assistance |
+|---|---|---|
+| Monday | Bench Press (horizontal push) | 25 dips |
+| Tuesday | Overhead Press (vertical push) | 25 dips |
+
+Two heavy pressing sessions and 50 reps of dips across roughly 24 hours, none of it visible as a pattern to the engine, because nothing joins the assistance slot to the main lift.
+
+⚠️ **THIS IS THE SAME CLASS AS EVERYTHING ELSE FIXED TODAY — a constant that should derive.** The leader/anchor ratio, the accessory volume and the block narrative were all fixed numbers that the block already had the information to compute. This is the fourth instance, and Michael's note on it is the one that distinguishes it: *"it's the one that showed up as an actual training decision rather than a copy defect."* Volume being flat is a dosing question. Four pressing exposures in a day is a placement question with a fatigue cost.
+
+⚠️ **AND WENDLER'S OWN TEMPLATES DERIVE THIS.** Assistance in 5/3/1 is conventionally chosen *against* the day's main lift — pull and leg work on a pressing day, pressing on a pull day — precisely so the assistance does not stack onto what the main lift just loaded. The 25/25/25-on-every-day shape is a simplification this block made, not something the protocol prescribes.
+
+**Why it is not fixed here.** It belongs with the accessory model (`src/lib/assistance-menu.ts` + `assistanceRows`), NOT with the rematerializer, and the accessory work this session deliberately stopped at volume. Changing which movement runs on which day is a different decision from how many reps of it.
+
+**What would settle the interference claim.** The exposure count is arithmetic and certain; the training cost is not. The honest version is that it is a known 5/3/1 convention being departed from without a stated reason — which is §4.1a's test (*strictness, or laxity, beyond the protocol needs an owner and a reason*), and there is no owner on record for the departure.
+
+**Related:** the accessory volume model (2026-07-28, `assistanceTotalReps`), §0i in `docs/SPEC-week-solver.md`.
