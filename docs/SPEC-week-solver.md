@@ -525,7 +525,41 @@ athlete asking for two rides and getting one:**
    second is what the matrix usually says, and collapsing it into the first removes a legal week.
 
 ⚠️ **GREP FOR IT:** `clearance law`, `the law forbids`, `the matrix forbids`, `never share`,
-`cannot share` — then read the actual cell. Two of two checked were wrong.
+`cannot share` — then read the actual cell.
+
+⛔ **BUT THE GREP IS NOT THE SEARCH, AND THE SILENT ONES ARE WORSE.** A false citation can be found by
+its text. **An exclusion with no comment cannot** — there is no claim to grep for. The real search is
+*every place the composer excludes a pairing*, then each one against the cell.
+
+**Done for the Get Stronger composer, 2026-07-27 — SEVEN exclusions, THREE narrow the law:**
+
+| exclusion | how it justifies itself | the cell |
+|---|---|---|
+| rides → upper lift days only | ⛔ **cites the law, falsely** | `easy_bike × lower_body_strength` **✓ (6h)** |
+| easy runs → upper lift days only | ⚠️ **nothing at all** | `easy_run × lower_body_strength` **✓ (6h)**, and §6.2 *recommends* it |
+| no ride on the hard-run day | ⚠️ **emergent** — the `taken` set marks a day full if it holds any run or ride | `easy_bike × quality_run` **✓ (6h)** |
+| no ride / no 2nd run on the long-run day | taken-set | forbidden ✅ agrees |
+| no easy run on the hard day | stated | forbidden ✅ agrees |
+| no easy run on the long-ride day | free-days-only | forbidden ✅ agrees |
+
+⚠️ **The third one's own comment records this bug being found and fixed — FOR LIFTS.** *"Testing 'has
+a session' marked every upper day taken and killed all stacking."* The fix never reached rides. **A
+repaired instance is not a repaired class.**
+
+#### ⛔ A CORRECT CELL ONLY TAKES EFFECT IF NOTHING BETWEEN IT AND THE OUTPUT NARROWS IT
+
+**Michael, 2026-07-27, on the §6.2 case:** *"That cell was deliberately flipped in May so an easy run
+could be a recovery flush after lower body — a decision someone made with a reason, in the law,
+correctly. The composer has been silently overriding it ever since."*
+
+⛔ **SO THE LAW BEING RIGHT IS NOT SUFFICIENT.** A cell is a permission, and a permission is only
+worth what the narrowest filter downstream of it allows. Every consumer between the matrix and the
+plan can quietly undo a decision that was made correctly, with a reason, in the right place —
+**and nothing about the law's own correctness will reveal it.**
+
+✅ **THE CHECK, and it is the mirror of §0f's:** §0f asks *"which output field carries this
+requirement, and who reads it?"* This asks **"which filters sit between this cell and the plan, and
+does any of them narrow it?"** A permission with a narrowing consumer is already lost.
 
 ⛔ **THREE DECISIONS FALL OUT OF THIS AND NONE ARE THE ENGINE'S** (open, 2026-07-27, Michael's):
 - May an easy ride share a heavy-leg day at the 6h gap? The law permits it; whether it is wise is a
