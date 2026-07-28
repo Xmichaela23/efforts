@@ -211,13 +211,27 @@ six ways.
 | engine choices | a channel whose NAME says the engine chose it (`strength_optimizer_slots`) |
 | engine DEFAULTS that seed a preference | ⚠️ neither of the above — see the open item below |
 
-⛔ **OPEN, FOUND BY THE SWEEP 2026-07-27 AND NOT YET RESOLVED.** After the `develop` seed was removed,
-`non-race-goal-seeds.ts` still writes `preferred_days.strength = ['monday','thursday']` for
-maintain/support postures. **That is the same fabrication, one branch over** — posture-derived, never
-asked. It is not simply deletable: `combined-schedule-prefs` reads that key back as
-`strength_preferred_days`, so it is doing real work as an engine DEFAULT feeding the optimizer's
-preferred-day bias. **A default is legitimate; presenting it as the athlete's choice is not.** It
-needs a defaults channel, and that is a combined-path change rather than a strength-path one.
+✅ **CLOSED 2026-07-27 — AND NO NEW CHANNEL WAS BUILT.** The maintain/support default
+(`['monday','thursday']`) was the same fabrication one branch over. It is not deletable — the
+optimizer's preferred-day bias genuinely consumes it — so **the value stayed and the field changed**:
+it now travels as `strength_optimizer_slots`, the channel #131 already built and the export already
+labels "scheduled by app". Third caller, same channel. `combined-schedule-prefs` reads the labelled
+key alongside the legacy position, so existing goals keep working.
+
+⛔ **AND THE RULE IS ENFORCED BY A TYPE, NOT A CONVENTION.** `AthletePreferredDays` declares
+`strength?: never`, so writing an engine value into an athlete-intent field is a **compile error**:
+
+```
+error TS2322: Type 'string[]' is not assignable to type 'never'.
+```
+
+**Convention had already failed three times** — three branches wrote this independently, one of them
+*after* #131 fixed it with the reason written down. Verified red-green-red: reintroducing the field
+fails the build, removing it passes.
+
+⚠️ **The general form, for the next field like this:** if a channel's NAME makes a claim about
+provenance, the type should make the wrong provenance unrepresentable. A comment explaining the rule
+is what was already there, and it is what did not work.
 
 ## 0a. ⛔ THE FIVE HARD CONSTRAINTS, AND THE WHOLE SEARCH
 

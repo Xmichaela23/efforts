@@ -24,6 +24,7 @@ import {
   hoursForTier,
   COMMITMENT_TIERS,
   buildPreferredDays,
+  buildStrengthDefaultSlots,
   GOAL_LABELS,
   GOALS_NEEDING_DISCIPLINE,
   strengthDevelopersFor,
@@ -308,6 +309,10 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
             longRunDay: state.longRunDay, longRideDay: state.longRideDay,
             qualityDays: state.qualityDays,
           }),
+          // §0g — the engine's strength-day default travels in the channel NAMED for engine choices,
+          // never inside `preferred_days`. Absent for Strength Focus: the solver places those days
+          // and `create-goal` writes the real ones back once the plan exists.
+          ...(buildStrengthDefaultSlots(state.posture) ? { strength_optimizer_slots: buildStrengthDefaultSlots(state.posture)! } : {}),
           ...(shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {}),
           ...(typeof targetWeeklyMiles === 'number' && targetWeeklyMiles > 0 ? { target_weekly_miles: targetWeeklyMiles } : {}), // Get Strong maintenance mileage (canonical miles); engine guardrails it to the band
           ...(state.posture?.strength === 'develop' && state.runDays >= 2 ? { run_days: state.runDays } : {}), // Get Strong run frequency (2/3/4); engine spreads miles + stacks extras onto upper lift days

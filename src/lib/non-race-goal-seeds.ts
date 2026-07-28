@@ -89,11 +89,28 @@ export type ScheduleInput = {
   anchorDiscipline?: 'run' | 'bike' | null;
   anchorDay?: string;
 };
+/**
+ * ⛔ THE TYPE IS THE ENFORCEMENT (§0g). `strength` is banned at the type level, not by convention.
+ *
+ * Three separate branches wrote an engine-chosen value into `preferred_days.strength` independently
+ * — #131 fixed it on the combined path with the reason written down, and the strength path
+ * reintroduced it months later anyway. **Convention already failed, three times.** So the shape a
+ * builder can return no longer has room for the field: adding it back is a compile error, not a
+ * review catch.
+ *
+ * Engine choices go to `strength_optimizer_slots` (see `buildStrengthDefaultSlots`).
+ */
+export type AthletePreferredDays = {
+  [k: string]: string | string[] | undefined;
+  /** ⛔ NEVER. `preferred_days` means "the athlete chose this" and nothing asks for strength days. */
+  strength?: never;
+};
+
 export function buildPreferredDays(
   posture: Partial<Record<Discipline, Posture>>,
   sched: ScheduleInput,
-): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+): AthletePreferredDays {
+  const out: AthletePreferredDays = {};
   const present = (d: Discipline) => posture[d] != null && posture[d] !== 'out';
   if (present('run')) out.long_run = sched.longRunDay || 'sunday';
   if (present('bike')) out.long_ride = sched.longRideDay || 'saturday';
@@ -120,10 +137,33 @@ export function buildPreferredDays(
   //
   // The placed days are written back by `create-goal` after the plan exists — as engine output,
   // under a key that says so.
-  if (present('strength') && posture.strength !== 'develop') {
-    out.strength = ['monday', 'thursday'];
+  // ⛔ NOTHING WRITES `preferred_days.strength` ANY MORE — see §0g. The maintain/support default
+  // (Mon/Thu) is a legitimate ENGINE DEFAULT that seeds the optimizer's preferred-day bias, and the
+  // value is fine; the FIELD was the lie. `preferred_days` means "the athlete chose this", and no
+  // path on this screen asks for strength days.
+  //
+  // It moves to `strength_optimizer_slots`, which #131 already built and the export already labels
+  // "scheduled by app" — the third caller to use it rather than a third channel. Emitted by
+  // `buildStrengthDefaultSlots` below so the caller places it beside `preferred_days`, not inside it.
+  if (false) {
   }
   return out;
+}
+
+/**
+ * ⛔ THE ENGINE'S STRENGTH-DAY DEFAULT, in the channel that says the engine chose it (§0g).
+ *
+ * Returns `null` for `develop` (Strength Focus): the solver places those four days from the
+ * athlete's own anchors, and `create-goal` writes the PLACED days back after the plan exists. A
+ * guess here would be overwritten anyway, and would be wrong in the meantime.
+ */
+export function buildStrengthDefaultSlots(
+  posture: Partial<Record<Discipline, Posture>>,
+): string[] | null {
+  const p = posture.strength;
+  if (!p || p === 'out') return null;
+  if (p === 'develop') return null;
+  return ['monday', 'thursday'];
 }
 
 // sport from the endurance disciplines that are present (not out): all 3 → triathlon; else run>bike>swim.

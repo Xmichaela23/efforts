@@ -177,7 +177,15 @@ export function parsePreferredDaysPatch(
       swim_third_day: patch.swim_third_day,
     });
   }
-  const strRaw = o.strength ?? o.strength_days;
+  // ⛔ `o.strength` is the LEGACY position and nothing writes it any more (§0g): a strength-day value
+  // inside `preferred_days` claimed the athlete chose it, and no path ever asked. Engine defaults and
+  // engine placements both arrive as `strength_optimizer_slots`, the channel #131 built and the
+  // export labels "scheduled by app". Read here so the optimizer's preferred-day bias keeps its
+  // input while the field stops lying about where the input came from.
+  // ⚠️ Legacy goals still carry `o.strength`; it is read, not written.
+  // ⚠️ SCOPE MATTERS: `strength_optimizer_slots` is a SIBLING of `preferred_days`, not a member of
+  // it — that is the whole point of the separate channel. Read from `src`, not `o`.
+  const strRaw = o.strength ?? o.strength_days ?? (src as Record<string, unknown>).strength_optimizer_slots;
   if (Array.isArray(strRaw) && strRaw.length > 0) {
     patch.strength_preferred_days = strRaw.map((x) => {
       if (typeof x === 'object' && x !== null && 'day' in x) {
