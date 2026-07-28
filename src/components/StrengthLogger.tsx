@@ -1571,7 +1571,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // overflow set index, no "last: —" placeholder on a history-less exercise).
   // Handles: weight × reps @ RIR; duration sets (last: 0:45); bands
   // (resistance_level in place of weight); missing RIR (drop "@ RIR" cleanly).
-  const formatLastSet = (p?: LoggedSet): string | null => {
+  const formatLastSet = (p?: LoggedSet, rirTracked?: boolean): string | null => {
     if (!p) return null;
     if (typeof p.duration_seconds === 'number' && p.duration_seconds > 0) {
       return `last: ${formatSeconds(p.duration_seconds)}`;
@@ -1585,7 +1585,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (load && hasReps) s += `${load} × ${p.reps}`;
     else if (load) s += `${load}`;
     else s += `${p.reps} reps`;
-    if (typeof p.rir === 'number') s += ` @ RIR ${p.rir >= 5 ? '5+' : p.rir}`;
+    // ⛔ NO RIR ON A PROTOCOL THAT KILLED IT. D-324 removed RIR from Strength Focus — not shown, not
+    // asked for, not stored — because it was auto-filled and then entered the 1RM maths. The "last:"
+    // anchor kept printing it anyway, from historical sets logged when it WAS tracked, so a 5/3/1
+    // session showed "last: 120 × 5 @ RIR 3" under a protocol whose whole point is that the weight
+    // and the reps are fixed in advance and no reserve estimate decides anything.
+    // ⚠️ The number is real history, which is exactly why it survived: it is not FALSE, it is
+    // IRRELEVANT — and on a card that shows nothing else about reserve it reads as a target.
+    if (rirTracked !== false && typeof p.rir === 'number') s += ` @ RIR ${p.rir >= 5 ? '5+' : p.rir}`;
     return s;
   };
 
@@ -5145,7 +5152,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // the clean, feel-based test cards. Tests don't anchor to training history mid-test.
                         if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
                         const priorSets = previousSessionByName[normalizeExerciseName(exercise.name)];
-                        const txt = priorSets ? formatLastSet(priorSets[setIndex]) : null;
+                        const txt = priorSets ? formatLastSet(priorSets[setIndex], exercise.rir_tracked) : null;
                         if (!txt) return null;
                         return (
                           <div className="flex items-start gap-2 mt-1">
