@@ -52,9 +52,44 @@ this is not a nice-to-have. Michael agreed and named the reasoning as the right 
 CHAIN. Check that against `session_detail_v1` (`_shared/session-detail/types.ts`, built by
 `workout-detail/index.ts:598`) **before** committing to it.
 
-**Ticket 2, the report that was deferred rather than skipped** — where the signup 1RM is stored, what
-reads it, and whether `exercise_log`'s e1RM trend is reachable from the plan generator. Agreed rules:
-e1RM from anchor top sets only, reps ≤ 8, ratchet UP only, applied at block boundaries.
+**Ticket 2, the report that was deferred rather than skipped** — REPORTED 2026-07-28, see below.
+Agreed rules: e1RM from anchor top sets only, reps ≤ 8, ratchet UP only, applied at block boundaries.
+
+### ⛔ TICKET 2 IS NOT A ONE-FIELD READ. IT LOOKS LIKE ONE AND IT IS NOT
+
+**`value` sits in the object the generator already destructures**, which is exactly why this reads as a
+one-line change. `generate-strength-plan/index.ts:99-105` reads `last_logged` and `sample_count` off
+`learned_fitness.strength_1rms` for the continuity tier and never reads `value`; the maxes come from
+`performance_numbers` one line up at `:60`. ⛔ **Reading `value` today would violate two of the four
+agreed rules on the first block.**
+
+| the rule | why the field cannot satisfy it yet |
+|---|---|
+| **anchor top sets only** | `exercise_log.estimated_1rm` is computed over the HEAVIEST COMPLETED SET of the exercise in that session (`compute-facts/index.ts:1322`) — it can come from an accessory. **Nothing records which set it came from** |
+| **reps ≤ 8** | same line — `bestReps` is whatever the heaviest set carried, and RIR is FOLDED INTO REPS by `brzycki1RM` (`:124`). There is no rep filter and no field to filter on |
+| **ratchet UP only** | ⛔ `strength_1rms` is a **rolling 12-week MAX**, so it FALLS as sessions age out of the window. Ratchet-up must be enforced AT THE WRITE — it is not inherited from the aggregate |
+| **at block boundaries** | the only open one; a generation-time concern, not a data one |
+
+✅ **SO `compute-facts` CHANGES FIRST.** The generator read is the last step, not the first.
+
+⚠️ **AND AN ADOPT PATH ALREADY EXISTS, ATHLETE-DRIVEN.** `AthleticRecordPage:398` → `suggestBaselineUpdate`
+(`_shared/state-trend/reconcile.ts:46`), gated at ≥3 samples, ≥medium confidence, ≤42 days, ≥5%
+divergence — all Michael-approved constants. Decide whether block-boundary auto-apply REUSES those gates
+or competes with them.
+
+### ⛔ ONE TICKET GOES AHEAD OF THE REMATERIALIZER — Q-208, and it is live in production
+
+**`plans.status = 'active'` is used as an IDENTITY filter on historical reads.** A workout attached to an
+`ended` plan gets NULL plan context and fails to a `console.warn` the athlete never sees
+(`_shared/plan-context.ts:189`, consumed at `workout-detail/index.ts:585-600`). **Anyone who has already
+used plan replacement has this today.** It does not depend on supersede shipping, and supersede makes it
+worse — the chain turns "only if you replaced a plan" into "every rematerialization."
+
+⛔ **AND Q-209 IS A PRECONDITION ON THE SUPERSEDE DESIGN, NOT A FOLLOW-UP.** After a supersede the
+adherence `planned_id` match MISSES and a `date::discipline` fallback silently rescues it
+(`_shared/adherence-plan.ts:118`, `:124-141`) — a wrong-but-plausible match feeding `matchConfidence`
+with nothing naming why. That is §0h: a fallback making a broken state indistinguishable from a healthy
+one, sitting on the exact link supersede-not-rewrite was chosen to protect.
 
 ### ⛔ TWO REQUIREMENTS ON THIS WORK — Michael, 2026-07-28. REQUIREMENTS, not nice-to-haves
 
@@ -137,7 +172,9 @@ are all still live. Read it before touching scheduling, workload, or Wendler loa
 
 ### STILL OPEN, NOT TOUCHED
 
-- **Q-161 — assistance does not know what the main lift is.** 25 dips on bench day and 25 more on press
+- **Q-212 — assistance does not know what the main lift is.** *(Renumbered 2026-07-28 from a duplicate
+  Q-161 — the 2026-07-11 Q-161 is the decoupling band, cited by D-276 and four source files.)*
+  25 dips on bench day and 25 more on press
   day = four pushing exposures in 24h. ⛔ **Belongs with the accessory model, NOT the rematerializer.**
   Michael: *"it's the one that showed up as an actual training decision rather than a copy defect."*
 - Session duration hardcoded `isDeload ? 35 : 60`

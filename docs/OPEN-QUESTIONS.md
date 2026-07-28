@@ -154,7 +154,7 @@ Found while building the State source map. All four verified in code; none block
 
 ---
 
-### Q-130 — GAP artifact on flat routes: ~18s/mi GAP-vs-raw on a flat loop → false `gap_terrain_bias='downhill'` (RESOLVED 2026-07-05, DEPLOYED)
+## Q-130 — GAP artifact on flat routes: ~18s/mi GAP-vs-raw on a flat loop → false `gap_terrain_bias='downhill'` (RESOLVED 2026-07-05, DEPLOYED)
 
 **ROOT CAUSE + FIX (shipped `291a7228`, deployed `compute-workout-analysis`):** it was NOT a grade/elevation bug — it was an **aggregation-method mismatch**. `overall.avg_gap_s_per_mi` was computed as `gapSum/gapCount` — an **arithmetic mean of per-sample GAP pace** — while raw `avg_pace` is `total_time/total_distance` (harmonic/distance-weighted). `AM ≥ HM` by the variance of pace, so GAP read ~15s/mi slower than raw on ANY pace-varying run **regardless of grade**. Reproduced on the real 2709-sample track: arithmetic-mean-of-RAW-pace alone = 769 vs true 754 (15s/mi from aggregation, zero grade). Fix: pure `aggregateGapPace()` in `gap.ts` (total flat-equivalent time / total distance) → on a flat run GAP ≈ raw exactly; real grades still adjust. Fixture `gap.test.ts` (4). **Verified 7/5:** avg_gap 772→757, `gap_terrain_bias` downhill→flat, narrative drops "net downhill" (3/3 recomputes). **Two smaller siblings deferred:** the per-split GAP fallback (`compute-workout-analysis:1883`) + `compute-workout-summary.gap_pace_s_per_mi` weight differently (time-weighted / separate field) — reconcile later; neither fed the false-downhill symptom. The eyes-open reproduction stopped two wrong fixes (elevation smoothing → only 3s/mi; the terrain narrative guard → papering over a bad number).
 
@@ -174,7 +174,7 @@ Found while building the State source map. All four verified in code; none block
 
 **DELIVERABLE:** GAP should net ≈ raw on a flat loop (`|GAP − raw|` within noise, not 18s/mi). Fixture: a known flat loop → `|GAP − raw| < threshold`.
 
-### Q-131 — Familiar Routes: honest, heat-adjusted per-route performance-over-time (design filed 2026-07-06, NOT built — fresh-session build)
+## Q-131 — Familiar Routes: honest, heat-adjusted per-route performance-over-time (design filed 2026-07-06, NOT built — fresh-session build)
 
 > **STATUS 2026-07-06 (later): SUPERSEDED by Q-132 / D-250.** This route-trend approach was BUILT + deployed, then proved structurally unsound (path-overlap route identity over-merges distances / fragments trailheads / double-matches → verdicts flip-flop). The honest version is the **segment model** (`DESIGN-segments.md`). Kept for institutional memory; do not build the route-trend version.
 
@@ -186,7 +186,7 @@ Found while building the State source map. All four verified in code; none block
 
 *(The OTHER fresh-session build is the fatigue / `training_reaction` NUMBER — Q-127 heavy-legs two-witness + `CANON-arc-inference-model.md`. Both are separate fresh sessions.)*
 
-### Q-132 — Segment model (the commercial-grade route-performance rebuild) — BUILT + LIVE (2026-07-07)
+## Q-132 — Segment model (the commercial-grade route-performance rebuild) — BUILT + LIVE (2026-07-07)
 
 > **STATUS 2026-07-07: BUILT + LIVE on real data (steps 0–6; D-256/D-257).** Effort extraction (`core-effort.ts`, `metric_source` per-slice), verdict on the spine (`core-verdict.ts` + `compute-core-verdict` → `core_verdicts`, N≥8 floor + 6-month window + CI gate + the still_building/still_learning split), server surface (`workout-detail` → `session_detail_v1.segment_verdicts[]`, PLURAL), client (`RouteDoorway.tsx`, flag-driven), all registered at the 2 chokepoints (`compute-facts` + `compute-snapshot`, `dry_run` verified reaching each leaf). Match corridor tuned 30→50m on real GPS (D-257) → 23 efforts (21 in window); live verdict `still_learning`, −1.4%, CI [−11.7, 8.9], stable across recomputes. Card polish shipped (HR tap detail, brighter dots, working touch tap, legibility). **Segment is now the SECONDARY lens — Best Efforts is primary (D-258 / Q-135).** ⚠ iOS bundle NOT rebuilt (card web-only until `npm run ios`). ⚠ Q-133 peel-back now trivial (see Q-133).
 
@@ -195,7 +195,7 @@ Found while building the State source map. All four verified in code; none block
 
 The Familiar Routes route-trend (Q-131) was built + deployed then found **structurally unsound** (D-250 — route identity over-merges distances, fragments trailheads, double-matches; verdict flip-flops on real data). The honest path forward is the **SEGMENT model** (Strava/Garmin precedent): compare a fixed sub-path every run covers, not a variable-length route. Full spec: **`docs/DESIGN-segments.md`** — 8 steps, 3 hard geospatial primitives (ordered path-match, segment detection, segment-effort extraction), reuses the read engine (`routeHeadline`/`routeTrend`) + `RouteDoorway` shell. **5 forks need Michael's ruling** (§8): (1) auto-detect "spine" vs user-defined segments [rec **auto**]; (2) reverse direction = separate segment [rec **yes**]; (3) confidence floor N≥8 [confirm]; (4) DB constraint audit + add migrations for the route tables [**none exist** in-repo]; (5) keep per-route "run N×" as the doorway [rec **yes**]. **Verification bar:** STABLE on his real data across recomputes (fixtures-green ≠ correct — the route saga proved it, §9 of the design). Build in a FRESH session (heavy, novel geospatial code; clean context beats this muddy one). Michael's primary run = out-and-back at VARIABLE lengths from a few trailheads (dry climate; heat parked, D-251).
 
-### Q-133 — The route-trend feature is DEPLOYED but SUPERSEDED — leave or peel back? (2026-07-06, decision owed, defer to the segment build)
+## Q-133 — The route-trend feature is DEPLOYED but SUPERSEDED — leave or peel back? (2026-07-06, decision owed, defer to the segment build)
 
 > **STATUS 2026-07-07: route-trend read-path is now DEAD DATA — peel-back is now TRIVIAL (still owed).** The segment build's step-5/6 (D-256) switched the client from `terrain.route`/`buildRouteReadout` to the new `session_detail_v1.segment_verdicts[]` (`SessionNarrative.tsx` consumer flipped). So the superseded route-trend readout is now **emitted-but-unread** — there is no consumer left to migrate; peel-back = delete the dead `buildRouteReadout` + `terrain.route` emission in `session-detail/build.ts`. Low-risk cleanup, do it when the segment dust settles; nothing depends on it now.
 
@@ -204,15 +204,15 @@ The Familiar Routes route-trend (Q-131) was built + deployed then found **struct
 
 This session **deployed the route-trend / temp-correction / 365-day-history / server-readout work to prod** on user 45d122e7's account (`compute-facts`, `analyze-running-workout`, `workout-detail`). D-250 supersedes the approach (→ segments). The deployed feature is mostly harmless (shows familiarity + a flip-floppy trend behind the doorway) but it's LIVE. **Decision owed** (defer to the segment build): leave it until segments replace it, or peel the read-path back to familiarity-only now. The client `RouteDoorway` UI is committed but **LOCAL-only** (not pushed to web/Netlify, iOS not rebuilt) — the trend UI is only on Michael's local dev, not on device. Note also: widened route history 90d→365d in `fact-packet/build.ts` is live and affects the AI-summary route context too.
 
-### Q-134 — Governance lint/CI gate for Laws 1/4/5 (FILED, not built) (2026-07-06)
+## Q-134 — Governance lint/CI gate for Laws 1/4/5 (FILED, not built) (2026-07-06)
 
 The durable answer to "can the constitution actually govern, or is it a friendly dictator?" Today Laws 1/4/5 (one source of truth / surfaces render / born on the spine) are enforced by **human audit, after the fact** — which is why the route-trend could mint its verdict in `build.ts` and *ship*, caught only post-deploy. Law 6 (fixtures) is the one law with real machinery. **The fix is to convert the constitution from a document into a compiler:** a CI check that (a) greps surface files (`session-detail/build.ts`, `src/components/**`) for verdict-minting signatures; (b) asserts client payload contract types carry no raw-metric fields (the D-253 payload-keys guard, generalized); (c) fails when a new read-limb bypasses the spine. This is the provenance-guard pattern already used for data-fabrication, generalized to **verdict-governance**. **Open design question owed:** what is the *detectable signature* of "minting a verdict"? (a computed comparison/threshold reaching a user-facing string in a surface file? a type carrying `ci`/`slope`/raw arrays across the client seam?) That question is real work with its own answers — **deferred to its own session**; the segment build (Q-132 / D-250) ships under governance-by-construction (D-253) in the meantime, which disarms *this* feature's surfaces without the general gate. When built, this gate is what makes the writ run without depending on a well-behaved developer.
 
-### Q-135 — Best Efforts as the PRIMARY (cross-sport) fitness lens; segments demoted to secondary (2026-07-07, DIRECTION SET + spec written, NOT built)
+## Q-135 — Best Efforts as the PRIMARY (cross-sport) fitness lens; segments demoted to secondary (2026-07-07, DIRECTION SET + spec written, NOT built)
 
 The pivot from the segment feature (D-258): the fixed-route segment is correct but narrow (fires only on true route repeats), and the primary user runs an AREA, not routes — so the incumbent answer for variable running (Strava/Garmin **Best Efforts**: fastest pace at benchmark distances / power at durations within any run) becomes the PRIMARY lens; segments stay secondary. Metric = PACE / SPEED — GAP-adjusted for hills, **NO efficiency/HR** (ruled 2026-07-07; same-effort is murky on a peak effort — control effort by reading the PR frontier instead). Two lenses: raw Pace + GAP pace. **Cross-sport, one engine per-sport metric:** run/swim = best pace at distance (run GAP'd); bike = best power at duration (no GAP — power is terrain-proof). Two of three hard bricks already exist (`calculateBestRunEfforts` finder + GAP physics; `calculatePowerCurve` + `w20`/CTL/ATL/TSB on the spine); the missing brick (spine aggregation/trend) mirrors the just-built `compute-core-verdict`. **Full spec: `docs/DESIGN-best-efforts.md`** (self-contained fresh-session hand-off). **§4 forks owed Michael's rulings BEFORE building** — metric (GAP+HR), per-sport distances/durations, window, source-of-truth, UI hierarchy, and **which sport first (rec: bike — cleanest/most-built)**. NOT started — build in a fresh session. Also banked: the three aerobic dimensions (peak output = best efforts; economy = efficiency/same-effort, already in State + segment; durability = decoupling, already State's run verdict); efficiency-as-its-own-trend is a candidate third lens but must pin to a fixed distance to control the heat/effort confound.
 
-### Q-136 — coach reads `weekIntent` from `plan_contract_v1.phase_by_week`, which combined plans never write → Gate 2 is INERT for ALL multi-sport athletes (2026-07-07 FILED; 2026-07-08 DIAGNOSED — read-time fix owed)
+## Q-136 — coach reads `weekIntent` from `plan_contract_v1.phase_by_week`, which combined plans never write → Gate 2 is INERT for ALL multi-sport athletes (2026-07-07 FILED; 2026-07-08 DIAGNOSED — read-time fix owed)
 
 > ✅ **CLOSED — FIXED BY D-261, the same day it was diagnosed. This header was never updated.**
 > `coach/index.ts:652-665` — `weekIntentFromContract` now calls `resolvePlanPhaseDetailed(planConfig, weekIndex)`, and the comment at `:654` cites "(Q-136 Drop A)" by name. The three-path resolver (`phase_by_week` → `config.phases` → `config.phase_structure.phases`) is live. **Gate 2 is no longer inert.** Everything below is history. *(Back-annotated 2026-07-13.)*
@@ -225,7 +225,7 @@ The pivot from the segment feature (D-258): the fixed-route segment is correct b
 
 **Maturity/weight orthogonality (per the receipt's "learning — 5 sessions" on rides/swims):** the ride's `0.6` fatigue weight ("notable running impact") is a STATIC constant — it is not "in a learning phase." What's "learning" is the discipline *profile's* maturity (enough 28-day history for its OWN per-discipline ACWR to be trustworthy) — a separate axis. Neither Gate 1 (`runNotOverPlan`, reads only `runLoadPct`) nor Gate 2 (reads `weekIntent`/total ACWR/readiness/body signals) touches per-discipline maturity or the fatigue weights — **fully orthogonal.** Maturity interacts with exactly one OTHER reconciler branch, the cross-training→'high' escalation (`crossTrainingEstablished`, which excludes only `'building'`, so `'learning'` counts) — and that branch was **moot for this receipt** (gated off by `running_acwr 1.52 ≥ 1.1`). The composition-blindness of interest lives in the static weight (load-system extension), not the maturity flag. See [Drop B → Q-138] for the separate dead-stub column.
 
-### Q-137 — `'rest now'` (ACWR > 1.5) is an unconditional PRESCRIPTION from a composition-blind subsystem, contradicting the reconciled classifier (2026-07-08, FILED — direction set, do NOT patch the gauge; expected closed by the intensity-binned load work)
+## Q-137 — `'rest now'` (ACWR > 1.5) is an unconditional PRESCRIPTION from a composition-blind subsystem, contradicting the reconciled classifier (2026-07-08, FILED — direction set, do NOT patch the gauge; expected closed by the intensity-binned load work)
 
 > ✅ **CLOSED for the CLIENT surface by D-301 (2026-07-18).** The last live spot that rendered the raw-ratio prescription — `CoachWeekTab.SnapshotLoadBar`, which emitted `back off`/`rest now` off the bare ACWR — now reads the reconciled verdict (`statusVolumeLabel`): `elevated` → "a bit high", only corroborated `high` → "pull back". The dead `acwrVolumeLabel`/`acwrZone`/`getACWRStatus` copies were deleted. The gauge no longer prescribes anywhere a user sees. (The deeper server-side intensity-binned load work Q-137 anticipated is a separate, still-open track — this closed the client symptom, not that.) Everything below is history.
 
@@ -233,14 +233,14 @@ Observed live on user 45d122e7 (WK1, 2026-07-08): the raw gauge showed `ACWR 1.6
 
 **Direction (ruled 2026-07-08):** the **gauge shows the NUMBER + the band WORD only** (honest raw ACWR — the Option-b dual read stays); **prescription language comes ONLY from the reconciled classifier** (the one surface that sees composition + readiness + body signals). Do NOT extend the redline with its own composition/thin-base leniency (rejected — that builds composition-awareness twice). **Expected to be CLOSED by the load-system extension** (intensity-binned per-domain load feeding the reconciler as the sole verdict authority — doc owed by Michael, D-259 is the reconciler foundation it builds on). **Also note:** the thin-base WK1 inflation is partly self-resolving — as the chronic base accumulates past the early-block ramp, the same absolute week stops reading as a spike. Verification when the load-system work lands: this exact WK1 snapshot should read a non-redline prescription while the gauge still honestly prints the raw ratio.
 
-### Q-138 — `compute-snapshot.plan_phase` is a dead stub: written `null`, never reassigned, and no live consumer reads it (2026-07-08, FILED — low-priority cleanup, decide populate-or-remove later)
+## Q-138 — `compute-snapshot.plan_phase` is a dead stub: written `null`, never reassigned, and no live consumer reads it (2026-07-08, FILED — low-priority cleanup, decide populate-or-remove later)
 
 > ✅ **CLOSED — the "populate-or-remove" decision was MADE and SHIPPED (D-261): populate.**
 > `compute-snapshot/index.ts:557-562` — the comment reads "D-261 / Q-138: populate plan_phase from the single resolver (was a dead…)", and `planPhase = resolvePlanPhase(planRow?.config ?? null, planWeekNumber)`. Persisted at `:806`. **It is not a stub any more.** *(Back-annotated 2026-07-13.)*
 
 Drop B from the Q-136 trace, logged separately because it's a distinct cleanup with its own lifecycle. `compute-snapshot/index.ts:539` declares `let planPhase: string | null = null` and persists it at `:783` (`plan_phase: planPhase`), but **it is never reassigned** — so `athlete_snapshot.plan_phase` is `null` on every row (matches the `09-db-schema.md` §4 audit finding). Critically, this is **NOT** the cause of Gate 2 being inert: coach does not read this column — it re-derives `weekIntent` live from the plan config (see [[Q-136]] Drop A). So Drop B has no current functional impact on the load-status path; it's a latent trap only for any future consumer that trusts the column. **Decision owed (later, low priority):** either populate it in `compute-snapshot` (mirror the arc-context `config.phases` resolution so the persisted column matches coach's live `weekIntent`) OR drop the column to remove the trap. No urgency; revisit alongside the Q-136 read-time fix so both phase-resolution paths use one shared resolver rather than diverging again.
 
-### Q-139 — Strength-led blocks resolve a phase but route lossily through an endurance intent model; strength progression may need its own load tolerance (2026-07-08, FILED — two-problem seam, partially touched by Item 2)
+## Q-139 — Strength-led blocks resolve a phase but route lossily through an endurance intent model; strength progression may need its own load tolerance (2026-07-08, FILED — two-problem seam, partially touched by Item 2)
 
 Surfaced wiring D-261: the primary user's `Get stronger` (`strength_primary_v1`) plan resolves its phase correctly now (`Base`/`Power`/`Deload`/`Peak`/`Retest` via `config.phase_structure.phases`), but those names route through `phaseNameToWeekIntent`, which is endurance-shaped. **This is really TWO problems — flagging the seam so later work doesn't conflate them:**
 
@@ -252,37 +252,37 @@ Surfaced wiring D-261: the primary user's `Get stronger` (`strength_primary_v1`)
 
 **Addendum (2026-07-08, demonstrated live) — plan-type-blind adherence, a THIRD facet:** the active plan is `strength_primary_v1` — **4 strength / 3 runs**, and the plan's own description says "*This is a strength plan — you won't want to marathon-train on it.*" Yet the off-plan branch graded the skipped Monday run with **run-plan severity** ("get back on schedule") while the plan's **primary objective** (strength: 3 sessions, volume up, e1RM improving) was being fully executed. The adherence logic is phase-aware (post-D-261) but **plan-TYPE-blind**: a skipped run on `strength_primary_v1` is a different-severity event than a skipped run on a marathon build, and the system can't tell them apart. **Item 2/3's verdicts need plan-type as a FRAME, not just phase** — the plan's session ratio and primary discipline should set the *weight* of any adherence fact (a run miss on a strength plan is minor; on a run plan it's the point). This is a third facet of Q-139's root (endurance-shaped reasoning on a non-endurance athlete), alongside the phase-name mapping (facet 1) and the borrowed tolerance band (facet 2). **(Item 4 copy note for someday):** the honest banner for this exact week was *"aerobic load holding via bike/swim; run-specific load at zero for N days"* — facts about what's held and what's deferred, **no inferred rationale, no prescription**. D-262 removed the contradictory prescription; the plan-type frame is what would let the *fact itself* be weighted correctly. Root fix: Item 2/3.
 
-### Q-140 — `load_status` is run-centric: a deliberate discipline substitution reads as BOTH overload and deficit — the false-*under* mirror of D-259's false-*over* (2026-07-08, FILED — interim guard D-262, root fix Item 2)
+## Q-140 — `load_status` is run-centric: a deliberate discipline substitution reads as BOTH overload and deficit — the false-*under* mirror of D-259's false-*over* (2026-07-08, FILED — interim guard D-262, root fix Item 2)
 
 `load_status` is computed primarily from `run_only_week_load_pct` (running actual vs planned running). So when a hybrid/strength athlete deliberately swaps planned runs for cross-training (bike/swim), the SAME week reads as: (1) **overload** — the all-discipline gauge spikes (ACWR 1.58 · "rest now") because the cross-training load is real; and (2) **deficit** — `load_status = under` → "off plan, add more" because running is −100% vs plan. Two opposite verdicts from one week. This is the **exact mirror of D-259**: Gate 1 killed the false-*over* ("you're overloaded" from a swap); this is the false-*under* ("you're under-training" from the same swap). **Same root, opposite sign** — endurance/run-shaped reasoning applied to an athlete who substituted disciplines.
 
 **Interim:** D-262 coherence guard stops the contradictory "add more" prescription (no add-more while ACWR high) — but that's a guard against the *symptom*, not the cause. **Root fix: Item 2 (intensity-binned per-domain load)** — when the reconciler sees "running behind plan BUT total/cross-training load carried," it produces ONE coherent verdict ("you swapped running for cross-training — running's behind, but you're carrying the load") instead of two opposite ones, and `load_status` stops being run-myopic. Closes when Item 2's per-domain ratios feed the reconciler.
 
-### Q-141 — Entire cardio pipeline routes through Strava despite live Garmin OAuth: single-vendor dependency on the load system's input layer (2026-07-08, FILED — assess Garmin as primary/redundant)
+## Q-141 — Entire cardio pipeline routes through Strava despite live Garmin OAuth: single-vendor dependency on the load system's input layer (2026-07-08, FILED — assess Garmin as primary/redundant)
 
 The Item 2 HR audit (user 45d122e7) found ALL cardio — run/ride/swim, 35 sessions over 8 weeks — ingests via `source = 'strava'`, even though the app runs a live **Garmin OAuth** proxy (`npm run dev` port 8080). So the load system's entire input layer (HR, power, pace, time-series) depends on a **single vendor**. Risk: Strava API approval is still **pending** (applied Apr 2026), and Strava's ToS **constrains raw-data flow** (retention / redistribution limits). If Strava access lapses or tightens, the load system loses its substrate — right as Items 1–3 make that substrate load-bearing. **Assess Garmin as a primary or redundant source:** the OAuth already exists and `ingest-activity` already handles `provider = 'garmin'` (separate write path, lines ~810–1040), so the plumbing is partly there. Log only — not Item 2's scope, but it's the input layer every load-system item builds on, so it's a standing risk to the whole arc, not a feature gap.
 
-### Q-142 — ACWR NUMBER is single-source, but the ratio→BAND-LABEL mapping is duplicated 3× (client + server), synced by a comment — a D-264 gap (2026-07-08, FILED — collapse to one server-minted band)
+## Q-142 — ACWR NUMBER is single-source, but the ratio→BAND-LABEL mapping is duplicated 3× (client + server), synced by a comment — a D-264 gap (2026-07-08, FILED — collapse to one server-minted band)
 
 SSoT verification (D-264) on the LOAD/ACWR metric across screens: **the number is clean** — State (`StateTab`) and Home (`WorkoutCalendar → LoadBar`) both read `weekly_state_v1.load.acwr` from the shared coach payload; neither re-computes the ratio. Performance/readiness trends are likewise server-computed and read by both tabs. **But the ratio→band classification is re-implemented in ≥3 places** with the same `0.8/1.3/1.5` boundaries: `src/lib/load-headline.ts` (`build more/balanced/back off/rest now`), `src/components/ui/charts.tsx:228` (`Under-reached/Optimal/Overreaching/Danger` — usage unclear, possibly dead, but a latent duplicate), and server `_shared/acwr-state.ts` `getAcwrStatus` (plan-aware). They're kept aligned **by a hand-written comment** (`load-headline.ts:48`: "Boundaries MUST match…") — the exact drift risk D-264 forbids. Per THE LAW (D-260), the band/verdict is minted ONCE (server) and read; the client should consume a server-minted band label, not re-derive it. **Fix direction:** server emits the band word alongside `load.acwr` in the payload; client renders it; the two client mappings (`load-headline` band words, `charts.tsx` zone) collapse onto it (or are deleted if dead). Not Item 2 scope, but Item 2 (per-domain bands) must NOT add a 4th mapping — it emits its bands server-side from day one. Log + collapse.
 
-### Q-143 — `hr_quality` is re-derived from full HR series on every coach call: compute once at ingest, store, consume (2026-07-08, FILED — D-264-consistent optimization)
+## Q-143 — `hr_quality` is re-derived from full HR series on every coach call: compute once at ingest, store, consume (2026-07-08, FILED — D-264-consistent optimization)
 
 D-263 bs3 wiring adds `sensor_data` (full HR time-series) to coach's 28-day rolling fetch (~35 sessions/call) so `computePerDomainLoad` → `assessHrQuality` can derive dropout% per session. That's **re-derivation per request** — the same series parsed on every coach load, for a value that never changes once the workout is ingested. **Direction (D-264):** compute `hr_quality` (or just `dropout_pct` + `valid_points`) ONCE at ingest / compute-facts, store it on the workout (or `workout_facts`), and have coach consume the stored value — then the heavy `sensor_data` column drops out of the coach fetch entirely. One canonical calculation, computed at write time, read cheaply. **Fine as-is for now** (correctness first; the cost is a per-call parse, not wrong output); log so the optimization isn't lost. Ties to Item 1 (TRIMP also wants clean per-session HR at ingest).
 
-### Q-145 — The easy/hard binning SEAM (`CARDIO_HARD_EASY_IF` 0.80) clips genuinely-easy high-Z2 runs into `hard_cardio` — a threshold-PLACEMENT problem, not anchor calibration (2026-07-08 filed; 2026-07-09 CORRECTED by Michael)
+## Q-145 — The easy/hard binning SEAM (`CARDIO_HARD_EASY_IF` 0.80) clips genuinely-easy high-Z2 runs into `hard_cardio` — a threshold-PLACEMENT problem, not anchor calibration (2026-07-08 filed; 2026-07-09 CORRECTED by Michael)
 
 **CORRECTION (2026-07-09) — the anchor is NOT wrong.** Baselines screen: **LTHR 151** (learned), **Max HR 174**. The primary user's easy runs at 135–138 bpm are **78–79% of LTHR 151 = high-Z2 aerobic on his own zones** (Z2 = 128–136). So LTHR-151 is correctly calibrated; the earlier "anchor miscalibrated" framing was wrong. **The real problem is the SEAM placement:** `inferIntensityFromPerformance` maps 138/151 = 0.91 → IF 0.88, and `CARDIO_HARD_EASY_IF = 0.80` calls IF ≥ 0.80 hard — so a genuinely-easy run living at the *top of Z2* crosses the easy/hard seam and lands in `hard_cardio`. A 138 bpm easy run sitting right on the 0.80 seam is the exhibit. **Fix direction (Item 2 follow-up):** raise/re-place the easy/hard seam so high-Z2 aerobic stays easy — the seam should sit at the aerobic|threshold boundary (~tempo, Z3), not clip the top of Z2. Consider anchoring the seam to the athlete's zone model (%LTHR or %maxHR) rather than the D-238 IF ladder's absolute 0.80. **Also note the anchor-confidence angle survives (see Q-146):** several anchors are thin/manual, and a downstream bin/verdict should carry that confidence — but that's provenance, distinct from this seam-placement bug. Live impact: `hard_cardio` acute 58 (his Sunday run) in the D-263 receipt; only 15% share so it didn't break attribution, but it's a wrong bin.
 
-### Q-146 — Anchor-confidence provenance: several intensity anchors are thin/manual; Key-2 verdicts (Item 3) must carry the anchor's confidence — ship-low-earn-up applied to anchors (2026-07-09, FILED — design constraint for Item 3)
+## Q-146 — Anchor-confidence provenance: several intensity anchors are thin/manual; Key-2 verdicts (Item 3) must carry the anchor's confidence — ship-low-earn-up applied to anchors (2026-07-09, FILED — design constraint for Item 3)
 
 The intensity anchors that Key-2 (decoupling) and Item-2 binning normalise to are **not uniformly trustworthy** on the primary user's Training Baselines: run **threshold pace 10:05 "learned from 3 runs"** (thin), **swim CSS 2:30/100 entered MANUALLY** (unvalidated by data), **FTP 176 manual = auto** (agrees, higher confidence), **LTHR 151 learned** (Q-145: correctly placed). A decoupling verdict built on a thin anchor (e.g. run decoupling vs a 3-run threshold pace) is itself low-confidence, and **must say so** — a confident-looking Pa:Hr number resting on a shaky reference is the D-242 "score that lies" one level up. **Design constraint for Item 3:** every Key-2 verdict carries the confidence of the anchor(s) it used; a low-confidence anchor caps the verdict's confidence and widens/softens its band. Ship-low-earn-up, applied to anchors — an anchor earns higher confidence as observed data validates it. Provenance the Item-4 ⓘ surfaces ("this read leans on a swim pace you set by hand, not measured"). Related but distinct from Q-145 (seam placement) — this is about the anchor's *confidence*, not its *value*.
 
-### Q-147 — Swim CSS anchor EXISTS (`swimPace100 = "2:30"`) — Item 2's "swim unanchored → always easy" (amendment 2) was based on a false premise; swim IS pace-classifiable (2026-07-09, FILED — Item 2 follow-up)
+## Q-147 — Swim CSS anchor EXISTS (`swimPace100 = "2:30"`) — Item 2's "swim unanchored → always easy" (amendment 2) was based on a false premise; swim IS pace-classifiable (2026-07-09, FILED — Item 2 follow-up)
 
 Correction to D-263 Item 2: the swim easy/hard binning was set to "always `easy_cardio`, `bin_signal: pace_unanchored`" on the belief that no swim threshold/CSS reference existed. **It does** — `performance_numbers.swimPace100 = "2:30"` (per-100), confirmed on the Training Baselines screen and in `09-db-schema.md §3`. So swims CAN classify hard/easy by pace against the 2:30 CSS, exactly like run→LTHR and ride→FTP. **Caveat (ties to Q-146):** the 2:30 CSS is **manually entered**, low-confidence — so a swim hard/easy bin off it should carry that anchor confidence, and (per Q-145's lesson) the swim easy/hard seam needs careful placement too. **Follow-up:** revisit the swim slice — replace the `pace_unanchored → always easy` fallback with CSS-based classification (2:30 anchor), gated on anchor confidence. Not urgent (swims were landing in `easy_cardio` anyway, which is usually right for his training), but the premise is now known-false and shouldn't calcify.
 
-### Q-148 — Full readiness-model rework: apply the D-266 weighted doctrine at the SOURCE, de-collinear the decoupling family, and purge the residual ACWR/demoted nudges on the DESCRIBE band (2026-07-09, FILED — deferred by explicit scope call, NOT missed)
+## Q-148 — Full readiness-model rework: apply the D-266 weighted doctrine at the SOURCE, de-collinear the decoupling family, and purge the residual ACWR/demoted nudges on the DESCRIBE band (2026-07-09, FILED — deferred by explicit scope call, NOT missed)
 
 D-266 closed the **prescriptive** ('high' / "back off") leak completely — the two-key cap backstops every uncorroborated 'high'. It did so with two surgical edits (`absorption.ts` gate + `computeSafetyFloor`), deliberately NOT touching the readiness tree (`coach/index.ts:2668-2703`) or the response-model assessment (`_shared/response-model/weekly.ts:347-413`). Three known-and-deferred residuals live in those untouched surfaces:
 
@@ -292,7 +292,7 @@ D-266 closed the **prescriptive** ('high' / "back off") leak completely — the 
 
 **Also folds in the D-266 parked tuning call:** a lone declining RPE trend currently DESCRIBES but does not floor-escalate (conservative "one witness isn't agreement"); revisit whether it should solo-escalate once **universal per-session RPE** lands (the #1 sRPE-capture dependency) — with RPE captured on every session the primary leg is always available, which also removes the "goes quiet on strength-only weeks" cost D-266 accepts. **Big blast radius** (the readiness tree is inside the 5k-line `@ts-nocheck` coach file); deferred deliberately, not urgent.
 
-### Q-149 — D-268 Phase 4: `generate-training-context` is still plan-blind (run-only), + the `arc-context` `discipline` re-derivation — deferred to a fresh session (2026-07-09, FILED — the remaining plan-awareness surface)
+## Q-149 — D-268 Phase 4: `generate-training-context` is still plan-blind (run-only), + the `arc-context` `discipline` re-derivation — deferred to a fresh session (2026-07-09, FILED — the remaining plan-awareness surface)
 
 D-268 (plan-primary is a system invariant) shipped Phases 1-3 + 5 — the entire **visible State card** now reads the plan, not running. **Phase 4 is the one remaining surface and is deferred to a fresh session** (this one was long; Phase 4 is a big separate function and rushing it risks the race/goal logic). It is fully specified in `docs/DESIGN-D268-plan-aware-everywhere.md` §3 (surface #5) + §5 (Phase 4) + the handoff doc `docs/HANDOFF-2026-07-09-load-plan-awareness.md`.
 
@@ -300,7 +300,7 @@ D-268 (plan-primary is a system invariant) shipped Phases 1-3 + 5 — the entire
 
 **Also in scope (D-268 §7 cleanup):** `arc-context.ts:683` re-derives its own `discipline` (`config.discipline || config.sport || plan_type`) independently of `resolvePlanPrimary` — a second, divergent notion of "what discipline is this plan" (D-264 single-source concern). Collapse to one.
 
-### Q-150 — Foundation-readiness: scale + security + ops hardening backlog (2026-07-10, FILED — umbrella; blockers B1/B4 gate a 2nd paying user)
+## Q-150 — Foundation-readiness: scale + security + ops hardening backlog (2026-07-10, FILED — umbrella; blockers B1/B4 gate a 2nd paying user)
 
 A 3-way architecture audit found the domain logic + target pattern (run + `session_detail_v1`) solid, but the layer around them not commercial-ready. Full severity-ranked list + evidence: **`docs/FOUNDATION-READINESS.md`**. Pre-launch / one user → nothing on fire today; do NOT over-alarm. Tracked items:
 - **BLOCKERS (before a 2nd paying account):** B1 — ~47 edge fns take `user_id` from the request body under service-role (~24 `verify_jwt=false`) → cross-user data exposure; the JWT-derived pattern exists (`save-location`) in only ~26 of ~90 fns. B4 — no error sink/monitoring; a broken user compute is invisible.
@@ -308,7 +308,7 @@ A 3-way architecture audit found the domain logic + target pattern (run + `sessi
 - **Serious/cleanup:** B2 hardcoded anon key; B3 silent sync death + Strava token-rotation bug; B6 workload `??0` score-that-lies; B7 failure illegible to user; B8–B13 (rate-limit, Garmin token-in-URL, `weekly_workload` RLS, migrations dir, `backfill-facts` unguarded).
 Cross-ref (already tracked): Q-105/Q-106 (strength fork), Q-141 (single-vendor), D-186/D-194 (dumb-client), D-140–143 (readiness dual-write), Q-054/Q-057 (route_progress data).
 
-### Q-151 — Intentional exercise substitution is read as skip + unplanned (a "score-that-lies" + a customization gap) (2026-07-10, FILED — design not built; Michael wants first-class swap/customization)
+## Q-151 — Intentional exercise substitution is read as skip + unplanned (a "score-that-lies" + a customization gap) (2026-07-10, FILED — design not built; Michael wants first-class swap/customization)
 
 **Repro (Michael, on device 2026-07-10):** he intentionally swapped the planned **3× Front Squat** (5 reps @ 65 lb, planned vol 975) for **5× Hip Thrust** (5 reps @ 95–110 lb, +1,700 vol). The workout detail shows Front Squat as **−975 lb red "skipped"** AND Hip Thrust as **+1,700 unplanned** — two contradictory stories for one deliberate choice. Lower-Body execution still reads 93% (the hip-thrust volume IS credited — banner: "Skipped Front Squat — counts in full"), but the red "skipped" reads as a failure at something he chose to replace. That is the score-that-lies in miniature (CANON §0 / D-242 class): a deliberate substitution presented as a miss + a bonus.
 
@@ -321,7 +321,7 @@ Cross-ref (already tracked): Q-105/Q-106 (strength fork), Q-141 (single-vendor),
 
 **Cross-ref:** D-270 (per-lift trend — a swap must not fake a squat decline), `session_detail_v1` execution/adherence (`build.ts` — where "skipped" vs "substituted" is decided), `WORKORDER-deviation-reason.md`, TARGET-ARCHITECTURE steerable plans (recurring swap → plan edit), CANON §0 (score-that-lies) + Law 2 (declared vs inferred). Repro screenshots in this session.
 
-### Q-152 — `resolveCurrentFtp` has no freshness guard: a stale confident learned FTP beats a FRESH typed value (2026-07-10, FILED — resolver gap surfaced during FTP fracture #2 cleanup)
+## Q-152 — `resolveCurrentFtp` has no freshness guard: a stale confident learned FTP beats a FRESH typed value (2026-07-10, FILED — resolver gap surfaced during FTP fracture #2 cleanup)
 
 `resolveCurrentFtp` (`src/lib/resolve-current-ftp.ts:62-82`) is learned-first: `learned (≥medium conf) > manual > learned-low`. Its ONLY guard is the confidence tier — **no freshness/recency check.** So if an athlete does an actual FTP test today and TYPES the new number, but the app holds an old medium/high `ride_ftp_estimated` from months ago, the resolver **ignores the fresh typed value** and every surface uses the stale learned one. A freshly *measured* number should beat a stale *estimated* one.
 
@@ -331,7 +331,7 @@ Cross-ref (already tracked): Q-105/Q-106 (strength fork), Q-141 (single-vendor),
 
 **Cross-ref:** D-231 (strength typed-wins — the mirror), TARGET-ARCHITECTURE living baselines, TRUTH-MAP fracture #2 (the FTP convergence this surfaced during), `resolve-current-ftp.ts` + its 8 tests (freshness case not yet covered).
 
-### Q-153 — Residual FTP display-label bypasses: normalizer + get-week still read typed FTP raw (2026-07-10, FILED — deferred, disproportionate to value)
+## Q-153 — Residual FTP display-label bypasses: normalizer + get-week still read typed FTP raw (2026-07-10, FILED — deferred, disproportionate to value)
 
 FTP fracture #2 is closed for everything that computes a verdict or bakes a real watt target (analyzer, compute-facts, coach, Baselines, Athletic Record, materialize-plan, AllPlansInterface). Two **display-label** sites still read `performance_numbers.ftp` raw — deferred because the fix is disproportionate to the value (cosmetic, learned-FTP-only drift; the executed watts are already resolver-correct via materialize-plan):
 
@@ -342,7 +342,7 @@ FTP fracture #2 is closed for everything that computes a verdict or bakes a real
 
 **Cross-ref:** TRUTH-MAP fracture #2, `resolveCurrentFtp` (8 tests), the closed sites (this session's FTP commits). Do these when the surrounding files are touched for another reason.
 
-### Q-154 — Import dates a workout off the PROVIDER's local time, not the USER's — an activity can land on the adjacent local day (2026-07-10, REAL BUG, root-caused, NOT fixed)
+## Q-154 — Import dates a workout off the PROVIDER's local time, not the USER's — an activity can land on the adjacent local day (2026-07-10, REAL BUG, root-caused, NOT fixed)
 
 **Symptom (user-confirmed, cost hours this session):** a ride that happened on the user's local **7/7** was filed on **7/8**. Not a display artifact — the stored `workouts.date` is wrong for where/when the user actually rode.
 
@@ -354,21 +354,21 @@ FTP fracture #2 is closed for everything that computes a verdict or bakes a real
 
 **Cross-ref:** the delete/reimport skip guard (`import-strava-history:761`); ENGINE-STATE "Known broken."
 
-### Q-155 — `adapt-plan` may be largely non-functional — verify it does anything, then fix-or-remove (2026-07-10, FILED)
+## Q-155 — `adapt-plan` may be largely non-functional — verify it does anything, then fix-or-remove (2026-07-10, FILED)
 
 Michael flagged that `adapt-plan` "never really worked." It runs on ingest (`action=auto`, safe-as-no-op per CLAUDE.md), on client accept/dismiss, and on cron `auto_batch`. Open question: does it actually produce useful suggestions / progressions on real data, or is it effectively inert? Verify end-to-end, then decide fix-or-remove rather than let it ride along forever. **Note:** the B1 pass (D-271) changed only its *auth*, not its behavior — this is a separate feature-quality question. **GATED (Michael, 2026-07-10):** do NOT touch adapt-plan until the app does everything it currently promises with total continuity + every number trustworthy. It resurfaced by accident during the B1 sweep; it is not the mission.
 
-### Q-156 — Per-domain load is NOT calibrated across disciplines (the composition bar exposes it) (2026-07-11, DESIGN GAP, filed)
+## Q-156 — Per-domain load is NOT calibrated across disciplines (the composition bar exposes it) (2026-07-11, DESIGN GAP, filed)
 
 The State composition bar (Ride/Strength/Run/Swim %, added 2026-07-09, `LoadBar.tsx:72-88` ← coach `daily_load_7d.by_type`) is the first surface to put cardio and strength load side-by-side as percentages — and they are **not on a common scale**. Cardio load = `(minutes/60) × IF² × 100` (`_shared/workload.ts:324`); strength load = `max(tonnage/10000, 0.1) × IF² × 100` (`workload.ts:189`). The `/10000` is a hand-picked constant, **never calibrated against `duration/60`** — so strength/swim shares swing with a formula constant, and a heavy lifting week can flip the whole bar. **Traced verdict:** RUN is *not* over-counted (a 45-min run is scored like the rides, slightly less per minute); the imbalance is strength/swim being uncalibrated-small in a given window. Presenting an uncalibrated cross-sport % as if exact is mildly a "score that lies". Real fix = the per-domain-load calibration (a design task; opens with an HR-data audit, not design — see `DESIGN-load-system-extension.md`). Not a bug to bandaid.
 
-### Q-157 — Run efficiency chart label: a competing verdict the workout shouldn't stamp (MOOT 2026-07-11 — the sparkline is already dead)
+## Q-157 — Run efficiency chart label: a competing verdict the workout shouldn't stamp (MOOT 2026-07-11 — the sparkline is already dead)
 
 **MOOT — verified by code trace 2026-07-11.** The competing sparkline can't render: the server hardcodes `trend: null` (`session-detail/build.ts:898`, the only assignment — the pace-at-HR classifier isn't emitted), and the client `TrendSparkline` that would color `pace_at_hr_direction` is **defined but never mounted** (removed when macro trends moved to State — `SessionNarrative.tsx:597-600`; zero `<TrendSparkline` JSX uses). What actually renders on the workout screen is `discipline_trend`, read straight from the cached spine (`state_trends_v1`) — the same source State reads. So there is no live competing verdict; the fracture this Q described was already retired. Optional cleanup: delete the dead `TrendSparkline` + the server `pace_at_hr_direction` plumbing so it can't be re-wired. No behavior change. Same disposition applies to Q-025's shipped sparkline (surface retired). Original text below.
 
 State owns run aerobic-efficiency direction via `efficiency_index` trend (`state-trend/run.ts:86`, ±3%, staleness-gated, 30–70min duration filter). The run-detail **`SessionNarrative` sparkline** labels its own direction (green/red) via `pace_at_hr_direction` — a percentile classifier (`fact-packet/pace-at-hr-direction.ts`) with **no staleness gate**, which can contradict State. Note the session-detail contract *already documents* that this read should be "State's canonical `efficiency_index` metric… a per-session ZOOM-IN on State's number, **never a competing verdict**" (`session-detail/types.ts:447`) — the chart just doesn't honor its own rule. (The AI-*prose* aerobic-efficiency claim reads the weekly spine signal `run_easy_pace_at_hr_trend`, currently retired/null — so no prose fork.) **Fix (client change, needs a visual eyeball):** feed the sparkline State's verdict, or drop the competing improving/declining color and let State own it. Low-stakes tail; deferred so it lands clean, not rushed. *(Note: the earlier fork-sweep report mis-cited `session-detail/build.ts:38` here — that line is the route readout, a different feature.)*
 
-### Q-158 — Run HR-drift "normal for X min" uses a phase/weather-BLIND band (RESOLVED + DEPLOYED 2026-07-11)
+## Q-158 — Run HR-drift "normal for X min" uses a phase/weather-BLIND band (RESOLVED + DEPLOYED 2026-07-11)
 
 **RESOLVED — the phase-blind band is gone, and the whole drift/decoupling room got consolidated.** Shipped this session (commits `4b77bc84` Q-158 · `552e4de2` decoupling activation · `c4e69460` drift-band collapse · `dd575492` confound guard; each fixtured, all deployed `analyze-running-workout` + `workout-detail`):
 - **Q-158 itself:** dropped the duration-only "normal for X min" verdict from `session-detail/build.ts`. The bpm "Heart rate" line is now measured description + own-baseline comparison only; the phase/weather-aware verdict is owned by the analyzer's read.
@@ -381,11 +381,11 @@ Original text below.
 
 The workout Details HR-drift row (`session-detail/build.ts:1531`) states "normal for X min" from RAW duration bands `{8,12,15,20}` with no phase/weather adjustment, while the AI-insights drift read uses the phase/weather-AWARE band (`analyze-running-workout/lib/heart-rate/interpretation.ts` `getExpectedDrift(dur, conditionsSeverity)` + `assessDriftBand`). They diverge only on build/peak/taper/hot runs → the "normal for X min" clause disappears while the AI says "within expected range". Workout-internal, LATENT/edge, not on State. **Fix (server-side, small):** drop the phase-blind "normal for X min" verdict and let the phase-aware read own "is this normal" (or thread the adjusted range into the detail contract). Deferred with Q-157.
 
-### Q-159 — Strength design: exercise-substitution recognition + does prescribed RIR progress down a block (2026-07-11, DESIGN, filed — ground in top apps)
+## Q-159 — Strength design: exercise-substitution recognition + does prescribed RIR progress down a block (2026-07-11, DESIGN, filed — ground in top apps)
 
 Two related strength-design questions Michael raised (parked, NOT continuity): **(a) Substitution** — he swapped front barbell squats for hip thrusts intentionally; A) does the app recognize the movements, B) can it read a swap as a legit substitution and NOT dock the session, C) eventually swap it in the plan itself. Industry-standard (RP / Fitbod / Boostcamp track by movement pattern / muscle group and never penalize a swap) — a real feature (needs an exercise DB + movement-pattern map). **(b) Prescribed-RIR progression** — the logger greys out a suggested RIR; should it DECREASE as load climbs across a block? YES per RP (a mesocycle runs 3–4 RIR → 0–1 RIR over a 4–6wk wave, then deload) — verify our plan actually progresses it; if the target is static, the RIR verdict (D-272) is judging against a wrong reference. Frame: Performance = receipt, State = e1RM trend (Hevy/Strong Epley); ground any build in RP/Hevy/Strong. User-agnostic — never tune to Michael.
 
-### Q-160 — Cleanup cluster: small honesty/hygiene items filed 2026-07-10/11 (filed)
+## Q-160 — Cleanup cluster: small honesty/hygiene items filed 2026-07-10/11 (filed)
 
 Low-severity, noticed-and-deferred: **(1)** tri athlete missing bodyweight → nudge "add your weight for a bike-limiter read" instead of the honest-but-blank 'none' (D-272 limiter follow-up). **(2)** `DEFAULT_SWIM_PER100_SEC = 120` (`services/plans/normalizer.ts:49`) feeds a swim's *displayed planned duration* with no "~/est" tag when no swim baseline (the same file already suppresses the analogous strength placeholder — inconsistent with its own bar). **(3)** `run_easy_pace_at_hr` is retired/null but one reader still consumes `run_facts.pace_at_easy_hr` (`recompute-athlete-memory/index.ts:372,389`) — D-239's dead read-path isn't fully dead. **(4)** `athlete_snapshot.workload_total` carries no measured/estimated provenance stamp (`compute-snapshot:759`) — LATENT (never rendered as a measured number; only feeds LLM coaching prose alongside ACWR). **(5)** 3 stale cycling trend tests in `cycling-v1/ai-summary.test.ts` were already red before this session (they test the removed `npTrend`-fallback trend API) — update to the current spine-verdict API or delete.
 
@@ -1229,7 +1229,7 @@ enforcement here would be repairing a mechanism the derivation removes.**
 
 ---
 
-### Q-161
+## Q-212 — Assistance does not know what the main lift is: four pushing exposures inside 24 hours (2026-07-28, UNVERIFIED — renumbered from a duplicate Q-161)
 
 **Assistance does not know what the main lift is — four pushing exposures inside 24 hours.**
 
@@ -1258,7 +1258,7 @@ Two heavy pressing sessions and 50 reps of dips across roughly 24 hours, none of
 
 ---
 
-### Q-162
+## Q-207 — The emphasis markers have stopped carrying information — ten principles, nearly every line marked (2026-07-28, intentional-for-now)
 
 **The emphasis markers have stopped carrying information — `SPEC-week-solver.md` has ten principles and nearly every line is marked.**
 
@@ -1271,3 +1271,117 @@ Two heavy pressing sessions and 50 reps of dips across roughly 24 hours, none of
 ⚠️ **The work is the demotion, not the rule.** Applying it means going back through the existing ten principles and unmarking most of them. That is why this is filed rather than done.
 
 **Related:** §0j in `docs/SPEC-week-solver.md` — same defect one level down (a marker that looks derived from severity and is not).
+
+---
+
+## Q-208 — `plans.status = 'active'` is an IDENTITY filter on historical reads — null plan context on ended plans (2026-07-28, VERIFIED, LIVE IN PRODUCTION — ahead of the rematerializer)
+
+**`plans.status = 'active'` is used as an IDENTITY filter on historical reads, so a workout attached to an ended plan loses its plan context — live in production today.**
+
+**Status:** VERIFIED by code trace *(not device-verified)*. ⛔ **A LIVE BUG, NOT A REMATERIALIZER CONCERN. File and fix ahead of supersede — it does not depend on supersede shipping, and supersede makes it worse.**
+
+**Found:** 2026-07-28, tracing the chain-vs-row question for the rematerializer. Michael: *"That's broken in production today."*
+
+**What happens.** `fetchPlanContextForWorkout` (`_shared/plan-context.ts:189`, duplicated at `analyze-running-workout/lib/plan-context.ts:35`) is passed an explicit `planId` and *still* requires `.eq('status','active').single()`. The plan is already identified by id — `status` adds nothing but a filter that fails once the plan is no longer current.
+
+So a workout whose `training_plan_id` points at an `ended` plan resolves to **null plan context**. The fallback `fetchPlanRaceMetaForWorkout` (`:104`) carries the same `.eq('status','active')` and also returns null. The caller (`workout-detail/index.ts:585-600`) logs `[session_detail_v1] plan context fetch failed` and moves on. **The athlete sees a session detail quietly missing its plan context and is told nothing.**
+
+**Who is affected today.** Anyone who has used plan replacement. `create-goal-and-materialize-plan/index.ts:453` sets the replaced plan to `status: 'ended'` while deliberately KEEPING its past planned rows (it deletes only `.gte('date', weekStart)`) — so the rows survive precisely so history stays answerable, and then the reader refuses to read them.
+
+**Why supersede makes it worse.** Supersede-not-rewrite turns "the plan" into a chain, so the number of workouts pointing at a non-active plan goes from *"only if you replaced a plan"* to *"every rematerialization, for everything before it."*
+
+**Related.** `fetchActivePlanId` (`plan-context.ts:87`) uses `.maybeSingle()` on `status='active'` — two active plans makes that query ERROR, the `catch` swallows it, and it returns null, indistinguishable from "no plan." That is §0h/§0g's silent fallback and it is the failure mode if a supersede half-completes. `fitness_baselines` (`20260716120000`) solves the same problem with a **partial unique index** (`WHERE superseded_at IS NULL`) rather than a convention.
+
+---
+
+## Q-209 — Adherence's `planned_id` match misses under supersede and a `date::discipline` fallback silently rescues it (2026-07-28, VERIFIED — precondition on the supersede design)
+
+**Under supersede, the adherence `planned_id` match misses and a `date::discipline` fallback silently rescues it — a wrong-but-plausible match feeds `matchConfidence` with nothing naming why.**
+
+**Status:** VERIFIED by code trace. ⛔ **ANY SUPERSEDE DESIGN MUST ANSWER THIS EXPLICITLY. It is a precondition on the rematerializer, not a follow-up.**
+
+**Found:** 2026-07-28. Michael: *"'Still answers, but for the wrong reason' is worse than failing."*
+
+**What happens.** `_shared/adherence-plan.ts:118` builds `completedByPlannedId` from the week's completed workouts and matches each planned row by exact id. `:124-141` then falls back to a `${date}::${discipline}` key when the id match misses.
+
+After a supersede the new plan mints NEW `planned_workouts` rows with NEW ids, while an already-logged session still carries the OLD `planned_id`:
+
+| case | what the reader sees |
+|---|---|
+| the session stays on the same day, same sport | id match MISSES, date/discipline fallback matches. **Looks correct, matched for the wrong reason** |
+| the rematerialization MOVED the session | counts as one planned-not-done AND one done-not-planned; `matchConfidence` falls with nothing naming the cause |
+
+⚠️ **THIS IS §0h.** A fallback that makes a broken state indistinguishable from a healthy one. The id link is the thing that answers *"did they do what they were told"* — the whole reason supersede-not-rewrite was chosen — and the fallback is what hides its failure.
+
+**The likely shape of the answer** *(not a decision — the decision is owed)*: the fallback should be DISTINGUISHABLE rather than silent. A match that came from date/discipline rather than from `planned_id` should say so, so `matchConfidence` can report *how* it matched and not only *how much*.
+
+**Related:** Q-208 (the same "the link survives, the reader refuses it" shape one layer up), §0h in `docs/SPEC-week-solver.md`.
+
+---
+
+## Q-210 — The seven triathlon conformance failures are stale MATCHERS, not a coverage gap — and a live muscle-group mis-filing (2026-07-28, VERIFIED)
+
+**The seven triathlon conformance failures are stale MATCHERS, not a coverage gap — and the fix is a canonical naming rule, NOT a wider regex.**
+
+**Status:** VERIFIED by code trace — reproduced at `174 passed / 7 failed`, matching the standing baseline exactly.
+
+**Found:** 2026-07-28, triaging the seven before building on the suite.
+
+**The cause is a hyphen.** All seven live in `shared/strength-system/protocols/triathlon_performance.conformance.test.ts` and come from two regexes:
+
+| regex | failures | the code emits |
+|---|---|---|
+| `/Pull-?ups\|Pull-?Down/i` | 5 (S-003 ×2, W-001 ×2, P-005) | `'Pull ups'` (`triathlon_performance.ts:747, 796, 994, 1038`), `'Lat Pull Down'` (`:739`) |
+| `/Pull-Aparts/i` | 2 (S-004 ×2) | `'Band Pull Aparts'` (`:821, 1072, 1389, 1465`) |
+
+`Pull-?ups` matches `Pullups` and `Pull-ups` — never a space. The failure messages indict themselves: *"missing vertical pull — got [… **Lat Pull Down**, Face Pulls, **Band Pull Aparts** …]"*. The exercise named as missing is in the list the assertion prints.
+
+✅ **THE CONFIRMING DETAIL:** power/peak emit `'Pull-ups (Explosive)'` WITH the hyphen (`:1342, 1366`) and those tests PASS. The tests pass exactly where the spelling happens to match the regex. That rules out a real coverage gap.
+
+⛔ **DO NOT WIDEN THE REGEX.** Michael: *"It makes seven tests green and re-arms the trap for the next rename."*
+
+✅ **THE FIX — one canonical spelling, no hyphens** (`Pull ups`, `Band Pull Aparts`, `Pull ups (Explosive)`), applied to the code AND to `docs/STRENGTH-PROTOCOL.md §3.8`, which spells them hyphenated. ⚠️ **Spec and test agree with each other today and both disagree with the code — fixing only one side moves the disagreement rather than ending it.**
+
+⚠️ **AND IT NEEDS ENFORCEMENT OR IT IS CONVENTION**, which has already failed three times on `preferred_days.strength` (§0g). Options are reported separately; the scope is **148 distinct name literals across ~10 protocol files, all free strings**.
+
+⚠️ **SCOPE CAVEAT: "no hyphens" cannot be blanket.** Legitimate hyphens live in qualifiers and compound modifiers — `'Single-Leg RDL (Heavy DB)'`, `'Inverted Ring Row or Band Row (Chest-Supported)'`, `'Bodyweight Squat (3-2-X tempo)'`. The rule holds for the MOVEMENT NAME; it cannot be a global strip.
+
+⛔ **THE PATTERN FIELD STAYS ON THE LIST, AND IT IS THE REAL FIX.** `StrengthExercise` (`protocols/types.ts:153`) has `name, sets, reps, weight, target_rir, notes` and **no movement-pattern field**, so a test asserting PATTERN COVERAGE can only regex a DISPLAY STRING. Michael: *"the naming rule makes these tests correct; it doesn't stop a legitimate rename from breaking them again"* — `Chin ups` for `Pull ups` is a real possibility and would break them a second time.
+
+⚠️ **THIS IS §0f WITH A WORKED EXAMPLE, AND A BETTER ONE THAN THE PLACEMENT CASE, BECAUSE HERE THE PROXY HAS ALREADY FAILED.** A requirement with no field to carry it gets proxied, and the proxy is what breaks. Seven pattern-coverage assertions went red from a cosmetic spelling difference without one prescription changing.
+
+⛔ **A WRONG NUMBER IN PRODUCTION, FOUND ON THE WAY — NOT A NAMING ISSUE.** `'Lat Pull Down'`
+(`triathlon_performance.ts:739`) misses `_shared/canonicalize.ts`'s curated `'lat pulldown'` key, so it
+slugifies to `'lat_pull_down'`. `MUSCLE_GROUP` (`:212`) knows `lat_pulldown` and not `lat_pull_down`, and
+`muscleGroup()` (`:223`) falls to `'other'`. **That exercise's volume has been landing outside `back` in
+`workout_facts.muscle_volume`** — quietly, for as long as the name has been spelled that way. Michael:
+*"it's a wrong number in production, not just a naming issue."* ⚠️ Scope not measured: how many of the
+148 name literals miss the curated map is exactly what the option-C lint would report.
+
+⚠️ **AND THE SPELLING DRIFT ALREADY COSTS MORE THAN THE TESTS.** `_shared/canonicalize.ts` maps `'lat pulldown' → 'lat_pulldown'`; the protocol emits `'Lat Pull Down'`, which misses the curated map and slugifies to `'lat_pull_down'`. `MUSCLE_GROUP` (`:212`) knows `lat_pulldown` and not `lat_pull_down`, and `muscleGroup()` (`:223`) falls to `'other'` — so that exercise's volume lands outside `back` in `workout_facts.muscle_volume`. The tests are the visible symptom of a drift that is already mis-filing data.
+
+---
+
+## Q-211 — Computed correctly, then thrown away — five instances, and it is the house disease (2026-07-28, pattern named)
+
+**COMPUTED CORRECTLY, THEN THROWN AWAY — five instances, and it is the house disease rather than five unrelated bugs.**
+
+**Status:** pattern named 2026-07-28. Two instances FIXED, three OPEN.
+
+**Found:** Michael, on the fifth instance surfacing in one day: *"That's the fifth thing found today that's computed properly and thrown away — worth naming as a pattern rather than four unrelated bugs."*
+
+| # | what is computed | where it dies | state |
+|---|---|---|---|
+| 1 | `stackedWith` — label, gap hours, `order: 'lift_first'` | zero consumers; the composer reads `slots` and discards the rest | ⛔ **OPEN.** §0f's fourth instance |
+| 2 | `placement_compromises` | written, then discarded before render | ✅ fixed 2026-07-28 |
+| 3 | the reason a preview FAILED | swallowed by the catch | ✅ fixed 2026-07-28 |
+| 4 | `learned_fitness.strength_1rms[lift].value` | `generate-strength-plan/index.ts:99-105` reads `last_logged` and `sample_count` off the same object and never `value`; maxes come from `performance_numbers` one line up at `:60` | ⛔ **OPEN** — this is Ticket 2 |
+| 5 | the client e1RM on EVERY 5/3/1 AMRAP | `isAmrapBaseline` (`StrengthLogger.tsx:3394`) fires on `set.amrap === true` and computes into `baselineTestResults`; the only writer is a button gated on `isBaselineTestWorkout` (`:5457`), and the block deliberately carries no `1rm_test` tag. Discarded on unmount | ⛔ **OPEN** |
+
+⚠️ **THE DISTINCTION FROM A STARVED SYSTEM** (`CLAUDE.md`'s opening law): a starved system never runs because its INPUTS are null. These all RUN, correctly, and produce a right answer with no reader. **Starved is a plumbing job upstream; this is a plumbing job downstream.** Both look like "the feature does not exist."
+
+⚠️ **AND #5 IS THE ONE THAT SHOULD CHANGE HOW THIS IS SEARCHED FOR.** It is not a missing field or an unread column — it is a correct value living in React state that is discarded when the component unmounts. Grepping for unread fields would never have found it.
+
+✅ **THE CHECK IS ALREADY WRITTEN — §0f:** *for each requirement, which field carries this, and who reads that field?* This entry is the evidence that the check needs running as a SWEEP rather than case by case.
+
+**Related:** §0f in `docs/SPEC-week-solver.md`, Q-208 (a reader refusing a link that survived).
