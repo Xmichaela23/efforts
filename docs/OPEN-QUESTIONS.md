@@ -1255,3 +1255,19 @@ Two heavy pressing sessions and 50 reps of dips across roughly 24 hours, none of
 **What would settle the interference claim.** The exposure count is arithmetic and certain; the training cost is not. The honest version is that it is a known 5/3/1 convention being departed from without a stated reason — which is §4.1a's test (*strictness, or laxity, beyond the protocol needs an owner and a reason*), and there is no owner on record for the departure.
 
 **Related:** the accessory volume model (2026-07-28, `assistanceTotalReps`), §0i in `docs/SPEC-week-solver.md`.
+
+---
+
+### Q-162
+
+**The emphasis markers have stopped carrying information — `SPEC-week-solver.md` has ten principles and nearly every line is marked.**
+
+**Status:** intentional-for-now *(noticed and left; the fix is a demotion pass, not a defect)*
+
+**Found:** 2026-07-28, immediately after §0j was added — which made it worse by one stop sign, two triangles and three checkmarks. Michael, offered lightly: *"When everything is marked critical, the marking stops carrying information — which is the same failure §0j is about, one level up."*
+
+**The proposed rule, for the record.** Stop sign reserved for things that have **actually cost a session**. Triangle for **unverified claims**. Nothing else marked at all. It is checkable by counting, which is the only kind of rule that has survived in this project.
+
+⚠️ **The work is the demotion, not the rule.** Applying it means going back through the existing ten principles and unmarking most of them. That is why this is filed rather than done.
+
+**Related:** §0j in `docs/SPEC-week-solver.md` — same defect one level down (a marker that looks derived from severity and is not).
