@@ -145,6 +145,66 @@ export function verdictsForCycles(
  * cycle — so it yields no verdict and the cycle holds. That is the same "absent stays absent" rule:
  * an ad-hoc session the engine cannot place is not evidence about a prescribed one.
  */
+/**
+ * ⛔ THE JOIN'S OUTPUT SHAPE, AND THE SEAM THIS ARC KEEPS FINDING THINGS IN.
+ *
+ * One row per completed strength workout, joined to the plan week it belongs to. Kept as a pure
+ * function over already-fetched rows so the grouping is testable without a database — the query is
+ * one line, the grouping is where a mistake hides.
+ */
+export type JoinedStrengthRow = {
+  /** `planned_workouts.week_number` via `workouts.planned_id`. Null when unattached. */
+  week_number?: number | null;
+  strength_exercises?: LoggedExercise[] | null;
+};
+
+export function groupSessionsByCycle(
+  rows: readonly JoinedStrengthRow[],
+  cycles: ReadonlyArray<{ index: number; startWeek: number; endWeek: number }>,
+): CycleSession[][] {
+  const byCycle: CycleSession[][] = cycles.map(() => []);
+  for (const r of rows ?? []) {
+    const placed = cycleSessionFor(r?.week_number, cycles, { strength_exercises: r?.strength_exercises });
+    if (!placed) continue;   // unattached, or a week outside the block — contributes nothing
+    const slot = byCycle[placed.cycleIndex - 1];
+    if (slot) slot.push(placed.session);
+  }
+  return byCycle;
+}
+
+/**
+ * ⛔ ONE REGENERATION SPANS BOTH REGIMES, SO THE SWITCH IS PER CYCLE — NOT PER CALL.
+ *
+ * Michael, 2026-07-27: *"Get that wrong in either direction and you either flatten the forward
+ * projection or launder a real miss into an advance."*
+ *
+ *   • A cycle that has FINISHED reads its verdict, and an absent one means `hold` — nothing was
+ *     logged, and a missing signal is not evidence of progress.
+ *   • A cycle that has NOT happened yet is a forecast. No verdict can exist for it, and holding
+ *     would show identical weights across the projected cycles — the reason the composer has an
+ *     `advance` exception in the first place.
+ *
+ * The boundary is the current plan week. Emitting explicit verdicts for BOTH regimes means
+ * `workingNumberForCycles` never has to know where the boundary is: its `unknownMeans` default stays
+ * `hold`, and nothing in this array is unknown.
+ *
+ * ⚠️ `verdicts[i]` is earned in cycle `i+1` and decides what cycle `i+2` carries, so the LAST cycle's
+ * verdict is never needed here — it belongs to the next block.
+ */
+export function verdictsForBlock(
+  cycles: ReadonlyArray<{ index: number; startWeek: number; endWeek: number }>,
+  sessionsByCycle: ReadonlyArray<readonly CycleSession[]>,
+  liftName: string,
+  /** The plan week the athlete is currently in (1-based). */
+  currentWeek: number,
+): WorkingNumberVerdict[] {
+  return cycles.slice(0, Math.max(0, cycles.length - 1)).map((c, i) => {
+    const finished = c.endWeek < currentWeek;
+    // Not finished → forecast. Finished → the evidence, and `hold` when there is none.
+    return finished ? verdictForCycle(sessionsByCycle[i] ?? [], liftName) : 'advance';
+  });
+}
+
 export function cycleSessionFor(
   weekNumber: number | null | undefined,
   cycles: ReadonlyArray<{ index: number; startWeek: number; endWeek: number }>,

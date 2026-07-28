@@ -10,7 +10,9 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   amrapRepsForLift,
   cycleSessionFor,
+  groupSessionsByCycle,
   verdictForCycle,
+  verdictsForBlock,
   verdictsForCycles,
 } from './cycle-verdicts.ts';
 import { cyclesForBlock } from './wendler-531.ts';
@@ -136,4 +138,61 @@ Deno.test('⛔ AN UNATTACHED WORKOUT CONTRIBUTES NOTHING — no plan week, no cy
   assertEquals(cycleSessionFor(null, cycles, w), null);
   assertEquals(cycleSessionFor(undefined, cycles, w), null);
   assertEquals(cycleSessionFor(99, cycles, w), null, 'a week outside the block');
+});
+
+// ── The join, covered directly ──────────────────────────────────────────────
+//
+// ⛔ THIS IS THE UNTESTED SEAM. Everything above is pure over hand-built objects; the grouping is
+// where the DB's shape meets the engine's, and it is the place this arc has repeatedly found things.
+
+Deno.test('⛔ THE JOIN GROUPS BY PLAN WEEK, and drops what it cannot place', () => {
+  const cycles = cyclesForBlock(12);
+  const ex = (name: string, reps: number) => [{ name, sets: [set({ weight: 125, reps, amrap: true })] }];
+  const grouped = groupSessionsByCycle([
+    { week_number: 3,  strength_exercises: ex('Back Squat', 6) },   // cycle 1, week-in-cycle 3
+    { week_number: 7,  strength_exercises: ex('Back Squat', 2) },   // cycle 2, week-in-cycle 3
+    { week_number: 1,  strength_exercises: ex('Back Squat', 9) },   // cycle 1, week-in-cycle 1
+    { week_number: null, strength_exercises: ex('Back Squat', 9) }, // unattached — dropped
+    { week_number: 99, strength_exercises: ex('Back Squat', 9) },   // outside the block — dropped
+  ], cycles);
+
+  assertEquals(grouped.length, 3, 'one bucket per cycle');
+  assertEquals(grouped[0].map((s) => s.weekInCycle).sort(), [1, 3]);
+  assertEquals(grouped[1].map((s) => s.weekInCycle), [3]);
+  assertEquals(grouped[2], [], 'cycle 3 has nothing logged');
+  // And the week-1 session must not be mistaken for the validity check.
+  assertEquals(verdictForCycle(grouped[0], 'Back Squat'), 'advance', 'six reps at the 95% week');
+  assertEquals(verdictForCycle(grouped[1], 'Back Squat'), 'reset', 'two reps at the 95% week');
+});
+
+// ── The regime boundary ─────────────────────────────────────────────────────
+
+Deno.test('⛔ ONE REGENERATION SPANS BOTH REGIMES — finished cycles read evidence, future ones forecast', () => {
+  const cycles = cyclesForBlock(12);   // 1-4, 5-8, 9-12
+  const hit = [{ weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 7, amrap: true }]) }];
+  const nothing: typeof hit = [];
+
+  // Week 2: nothing has finished. Both verdicts are forecast, or the projected weeks show identical
+  // loads in cycles 1, 2 and 3.
+  assertEquals(verdictsForBlock(cycles, [nothing, nothing, nothing], 'Back Squat', 2),
+    ['advance', 'advance']);
+
+  // Week 6: cycle 1 is done and was logged; cycle 2 is still running, so it forecasts.
+  assertEquals(verdictsForBlock(cycles, [hit, nothing, nothing], 'Back Squat', 6),
+    ['advance', 'advance']);
+
+  // ⛔ Week 9: cycle 1 done and logged, cycle 2 done and NOT logged. The second must HOLD — this is
+  // the direction that would otherwise launder a missed cycle into an advance.
+  assertEquals(verdictsForBlock(cycles, [hit, nothing, nothing], 'Back Squat', 9),
+    ['advance', 'hold']);
+
+  // And a finished cycle with a real miss resets rather than holding.
+  const miss = [{ weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 2, amrap: true }]) }];
+  assertEquals(verdictsForBlock(cycles, [miss, nothing, nothing], 'Back Squat', 9),
+    ['reset', 'hold']);
+});
+
+Deno.test('the last cycle never yields a verdict — it belongs to the next block', () => {
+  const cycles = cyclesForBlock(12);
+  assertEquals(verdictsForBlock(cycles, [[], [], []], 'Back Squat', 13).length, 2);
 });
