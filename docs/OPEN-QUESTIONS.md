@@ -1307,6 +1307,56 @@ to find a *good substitute* — its own comment reads *"a horizontal push is rep
 horizontal push."* Q-212 needs the INVERSE: a movement whose pattern must NOT match. **Same field, same
 vocabulary, negated predicate.** No new taxonomy is owed.
 
+### ✅ STEPS 1 AND 2 SHIPPED 2026-07-28 — order set by Michael: dead site, family, pool
+
+| step | | |
+|---|---|---|
+| **1. the dead site** | `strength-primary-plan.ts:804` DELETED — zero consumers, confirmed by identifier scan. Baseline `shared` 174/7 unchanged, which is the proof it was inert | ✅ |
+| **2. the family** | `MovementFamily` + `movementFamilyOfPattern` / `getMovementFamily` / `sharesMovementFamily` in `exercise-config.ts`, 6 fixtures, verified red-green-red by collapsing hip into knee | ✅ |
+| **3. the pool** | needs new movements and new copy — decisions below, not built | ⛔ |
+
+⚠️ **STEP 2 HAS NO CONSUMER UNTIL STEP 3, AND THAT IS STATED IN THE CODE.** It is pinned by fixtures so
+it is a derivation under test rather than dead code — ⛔ **but if step 3 is abandoned, delete it**, or
+it becomes Q-211's seventh instance in the file that was scoping Q-211's sixth.
+
+⚠️ **AND A THIRD GROUPING WAS NEARLY MINTED.** `MovementGroup` (`lower | upper | core`, D-315) already
+existed. It is orthogonal — it calls a bench press and a pull-up both `upper`, which is right for
+placement and blind for collision, and those two are the pair the new axis exists to tell apart. Both
+now sit together with a note saying so. **Third time this week the answer was already in the codebase.**
+
+### ⛔ THE POOL — MICHAEL'S DESIGN CALL, 2026-07-28 (recorded so step 3 is not blocked)
+
+**The slot does not get a WEAKER version of the same pattern. It gets the BALANCING work.**
+
+> Michael: *"A push slot on a press day should hold horizontal_pull work — face pulls, rear delt, band
+> pull-aparts. Not because they're a substitute for pushing, but because the press day is already
+> pushing-heavy and the balancing work is what's missing."*
+
+| the day's main lift | what the slot holds |
+|---|---|
+| a press (`push` family) | **pull** work — face pulls, rear delt, band pull-aparts |
+| a pull (`pull` family) | push work, by the same logic |
+| `hip_dominant` (deadlift) | **knee-dominant** single-leg work |
+| `knee_dominant` (back squat) | **hip-dominant** work |
+
+⛔ **SO BULGARIAN SPLIT SQUAT AND HIP THRUST STOP BEING INTERCHANGEABLE PICKS AND BECOME DAY-DEPENDENT.**
+That is the lower-body half, and it is the half a push-day special case would have left broken forever.
+
+### ⛔ TWO CONSEQUENCES TO SHIP WITH IT, NOT AFTER IT
+
+**1. THE SLOT'S NAME BECOMES WRONG.** Michael: *"It isn't 'the push slot', it's the antagonist/balance
+slot — filled with whatever complements the day's main lift. That's the honest name for what it
+becomes, and it should probably say so in the athlete-facing copy too."* `AssistanceSlot`'s
+`'push' | 'pull' | 'single_leg_core'` and each menu's `purpose` sentence both describe a fixed
+category that will no longer be fixed.
+
+**2. THE ATHLETE'S PICK CHANGES MEANING, AND THE COPY MUST CHANGE WITH IT.** Michael: *"the athlete's
+wizard pick stops being 'your push accessory' and becomes 'your preference, where it fits.' That's a
+real change to what the pick means, and the wizard copy has to change with it or the pick will read as
+ignored."* ⚠️ **This is §0g's neighbourhood** — an athlete-facing field whose stated meaning and actual
+behaviour diverge. A pick that silently does not apply on half the days is the same defect as a
+preference the engine invented, seen from the other side.
+
 ### ⛔ SO THE COST IS NOT THE FIELD. THREE THINGS ARE ACTUALLY OWED
 
 **1. A FAMILY GROUPING OVER THE NINE.** The rule is *"no pushing in the push slot on a press day,"* and

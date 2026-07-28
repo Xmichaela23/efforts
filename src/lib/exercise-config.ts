@@ -1331,6 +1331,66 @@ export function getMovementGroup(exerciseName: string): MovementGroup {
   return movementGroupOfPattern(getExerciseConfig(exerciseName)?.pattern ?? null);
 }
 
+/**
+ * THE COLLISION AXIS (Q-212) — coarser than `MovementPattern`, finer than `MovementGroup`.
+ *
+ * ⛔ IT IS NOT A DUPLICATE OF `MovementGroup` ABOVE, AND THE DIFFERENCE IS THE ENTIRE POINT.
+ * `MovementGroup` answers *"does this belong on an upper or a lower day"* — it calls a bench press
+ * and a pull-up both `upper`, which is correct for placement and useless here, because those two
+ * are the pair this axis exists to tell apart. **Two groupings over one vocabulary, orthogonal
+ * questions.** ⚠️ If a third is ever wanted, check both of these first.
+ *
+ * ⛔ WHY PUSH AND PULL COLLAPSE AND NOTHING ELSE DOES (§4.1a — owner: Michael, 2026-07-28).
+ * A press day is `horizontal_push` OR `vertical_push`; bench and overhead press land on consecutive
+ * days on the four-day template. Comparing exact patterns alone would let Dips (`horizontal_push`)
+ * sit on an Overhead Press (`vertical_push`) day — **the precise case in the block that raised
+ * Q-212** — so the two pushes must answer as one.
+ *
+ * ⛔ AND KNEE AND HIP MUST **NOT** COLLAPSE. They are the COMPLEMENT PAIR the rule pairs on purpose:
+ * *"on a hip-dominant day, the single-leg slot gets knee-dominant work; on a knee-dominant day,
+ * hip-dominant."* Folding them into one `legs` family would make them collide with each other and
+ * invert the rule — it would forbid exactly the pairing that is wanted. Same for `core`,
+ * `plyometric` and `calf`, which collide with nothing and stay themselves.
+ *
+ * ⚠️ NO CONSUMER YET, AND THAT IS DELIBERATE RATHER THAN AN OVERSIGHT. This is step 2 of 3; the rule
+ * that reads it ships with the assistance pool (step 3). It is pinned by fixtures so it is a
+ * derivation under test rather than dead code — but if step 3 is abandoned, **delete this**, because
+ * an unread export is Q-211's whole disease.
+ */
+export type MovementFamily = 'push' | 'pull' | 'knee' | 'hip' | 'core' | 'plyometric' | 'calf' | null;
+
+export function movementFamilyOfPattern(pattern: MovementPattern | null | undefined): MovementFamily {
+  if (pattern == null) return null;
+  switch (pattern) {
+    case 'horizontal_push':
+    case 'vertical_push':
+      return 'push';
+    case 'horizontal_pull':
+    case 'vertical_pull':
+      return 'pull';
+    case 'knee_dominant': return 'knee';
+    case 'hip_dominant': return 'hip';
+    case 'core': return 'core';
+    case 'plyometric': return 'plyometric';
+    case 'calf': return 'calf';
+  }
+}
+
+/** The collision family of an exercise by NAME. ⛔ Reads the TYPED pattern, never the description. */
+export function getMovementFamily(exerciseName: string): MovementFamily {
+  return movementFamilyOfPattern(getExerciseConfig(exerciseName)?.pattern ?? null);
+}
+
+/**
+ * Do these two movements load the same thing? ⛔ The question a slot asks about the day's main lift.
+ * Absent on either side answers `false` — a missing pattern is not evidence of a clash (§0h).
+ */
+export function sharesMovementFamily(a: string, b: string): boolean {
+  const fa = getMovementFamily(a);
+  const fb = getMovementFamily(b);
+  return fa != null && fb != null && fa === fb;
+}
+
 function firstPositiveBaseline(...vals: unknown[]): number | null {
   for (const v of vals) {
     const n = Number(v);

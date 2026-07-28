@@ -801,7 +801,17 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     ...solverRefusal,
     ...placedWeek.compromises.map((text) => ({ kind: 'breach' as const, text })),
   ];
-  const assistance = assistanceRows(args.assistancePicks);
+  // ⛔ A BLOCK-LEVEL `assistanceRows(args.assistancePicks)` STOOD HERE AND NOTHING READ IT.
+  // Deleted 2026-07-28. Zero consumers, confirmed by identifier scan — the live assistance is
+  // rebuilt PER CYCLE at the session loop below (`cycleAssistance`), because the anchor holds the
+  // volume floor while the leaders may scale, and a block-level value cannot express that.
+  //
+  // ⚠️ IT SURVIVED BECAUSE `noUnusedLocals` IS OFF (`CLAUDE.md` conventions), so nothing warned.
+  // Left in place, the next change to assistance placement would have landed here — the path
+  // nobody reads — and passed its own tests while the athlete's plan was unchanged.
+  //
+  // ⚠️ Q-211's SIXTH INSTANCE, and it was found while scoping something else: computed correctly,
+  // then discarded. Michael: *"Not a new bug class — a detection problem."*
 
   // ── Endurance underneath (unchanged from the previous composer) ────────────
   // ⛔ The band lives in `src/lib/maintenance-volume-band.ts` — the INTAKE reads the same numbers, so
