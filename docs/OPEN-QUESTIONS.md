@@ -1421,6 +1421,18 @@ precondition."*
 | **The lint** | `_shared/exercise-name-lint.test.ts` — every emitted name must resolve, or sit on an explicit `UNRESOLVED_ALLOWLIST` that **may only shrink** |
 | **Result** | names resolving to a curated movement **34 → 53**; `muscleGroup() === 'other'` **78 → 59** |
 
+✅ **THE GENERAL RULE, AND IT IS THE REUSABLE PART OF THIS TICKET — ASK THE MODULE, DO NOT RE-DERIVE
+ITS ANSWER.** When a caller needs to know something a module already decides, the answer is an exported
+predicate, not a local reimplementation of the module's logic. Michael: *"Recomputing the lookup
+caller-side would have been this ticket's own defect one level up."*
+
+⚠️ **AND THE TELL IS THAT THE RE-DERIVED VERSION LOOKS RIGHT.** *"Is the result different from the
+slug?"* is a perfectly reasonable local check that is WRONG for every name whose curated value equals
+its own slug — `Pallof Press` → `pallof_press`. It would have passed review, silently under-reported
+coverage, and put the false positive inside the very lint written to catch this class. **The conformance
+tests are the same shape one level up (§0f): a caller proxying a decision the owner should have been
+asked for.** A proxy fails quietly; the owner cannot.
+
 ⚠️ **THE PREDICATE IS EXPORTED ON PURPOSE.** The lint asks `isCuratedName()` rather than recomputing
 the lookup, because the obvious local version — *"is the result different from the slug?"* — FALSE
 POSITIVES on every name whose curated value equals its own slug (`Pallof Press` → `pallof_press`).
@@ -1431,6 +1443,14 @@ the over-merge guard was broken deliberately with a containment-based merge and 
 was fed a fake `'Nonexistent Widget Press'` in `minimum-dose.ts` and went **red, naming the file**.
 Baselines after: `_shared` **1353**/0 (was 1348 — the five new tests) · `shared` 174/7 ·
 `generate-run-plan` 33/2 · `generate-combined-plan` 438/3. **The other three are unchanged.**
+
+⛔ **IMPROVED, NOT SOLVED — 59 NAMES STILL LAND IN `other`, AND 34 → 53 MUST NOT READ AS DONE.** Just
+over half the emitted vocabulary now resolves. The remaining 59 earn no e1RM trend and file their volume
+outside any real muscle group. ⚠️ **The only reason this is not urgent is that the field has no live
+reader** — `workout_facts.strength_facts.muscle_groups` is consumed solely by
+`strengthSessionLegPosteriorRelevant`, and `buildCoachingContext` has zero call sites. **That is a
+reprieve, not a resolution**, and it expires the moment that reader is wired. ⛔ The lint is what keeps
+the number honest: it cannot silently grow, and the allowlist can only shrink.
 
 ⛔ **TWO THINGS ARE OWED BEFORE THIS COUNTS AS DONE, AND BOTH ARE THE WAY Q-197 HALF-LANDED.**
 
