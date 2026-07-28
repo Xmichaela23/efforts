@@ -66,6 +66,11 @@ const CANONICAL: Record<string, string> = {
   'chinup':                  'chinup',
   'chinups':                 'chinup',
   'lat pulldown':            'lat_pulldown',
+  // Q-210: the protocols emit "Lat Pull Down" — two words. That is a genuine MAP GAP, not a
+  // separator case: the curated key spells "pulldown" as one word, so no amount of hyphen
+  // normalization reaches it. It is the row that has been mis-filing since it was written.
+  'lat pull down':           'lat_pulldown',
+  'lat pull-down':           'lat_pulldown',
 
   // --- Push ---
   'push up':                 'pushup',
@@ -122,17 +127,74 @@ const CANONICAL: Record<string, string> = {
  * Derive a stable canonical name for trend tracking.
  * Known names resolve to curated keys; unknown names get slugified.
  */
+/**
+ * The map lookup plus the Q-197 plural fallback, against ONE already-normalized key.
+ * Returns null on a miss so the caller can try the next candidate form.
+ *
+ * Plural fallback (Q-197): a trailing-s name whose singular is a known lift folds into
+ * that lift — "bulgarian split squats" -> bulgarian_split_squat. Only fires when the
+ * de-pluralized form is EXPLICITLY mapped, so it can never over-merge a genuinely
+ * distinct exercise into another.
+ */
+function lookupCurated(key: string): string | null {
+  if (CANONICAL[key]) return CANONICAL[key];
+  if (key.endsWith('s') && CANONICAL[key.slice(0, -1)]) return CANONICAL[key.slice(0, -1)];
+  return null;
+}
+
 export function canonicalize(raw: string): string {
   if (!raw) return 'unknown';
   const key = raw.toLowerCase().trim();
-  if (CANONICAL[key]) return CANONICAL[key];
-  // Plural fallback (Q-197): a trailing-s name whose singular is a known lift folds into
-  // that lift — "bulgarian split squats" -> bulgarian_split_squat, "goblet squats" ->
-  // goblet_squat. Only fires when the de-pluralized form is explicitly mapped, so it can
-  // never over-merge a genuinely distinct exercise into another. Exact matches (e.g.
-  // "pushups", "hip thrusts", already in the map) resolve above this and are untouched.
-  if (key.endsWith('s') && CANONICAL[key.slice(0, -1)]) return CANONICAL[key.slice(0, -1)];
+
+  // Q-210 — THE THIRD DECORATION CLASS. Q-197 fixed two ways a real name can be dressed up
+  // and miss the map: SYNONYMS ("Barbell Back Squat") and PLURALS ("Bulgarian Split Squats").
+  // It did not reach the general case. A name can also carry a trailing PARENTHETICAL, or a
+  // HYPHEN where the map has a space, and it slugs into a lone bucket just the same.
+  //
+  // ⛔ THE ONE THAT MATTERS: "Hip Thrusts" resolves to `hip_thrust`, which IS in
+  // STRENGTH_ANCHORS, so it earns an e1RM, a trend and a State verdict. "Hip Thrusts (Fast
+  // Concentric)" slugged to `hip_thrusts_fast_concentric`, was not an anchor, and was dropped
+  // from `learned_fitness.strength_1rms` — the same lift, in the same block, tracked or
+  // invisible depending on a parenthetical.
+  //
+  // ⛔ TWO PROPERTIES THIS MUST NOT BREAK, both load-bearing:
+  //  1. NEVER OVER-MERGE. Every candidate below must land on an EXPLICIT curated entry to
+  //     win. Containment is not identity — "Jump Squats" contains "squat" and is NOT a squat
+  //     for 1RM purposes. Pinned by the over-merge fixture in `canonicalize.test.ts`.
+  //  2. NEVER CHURN AN UNMAPPED SLUG. If no candidate hits, the fallback slugifies the
+  //     ORIGINAL name, byte for byte as before. Stripping a qualifier off a name that misses
+  //     anyway would rename its bucket and split its own history — "External Rotation
+  //     (Side-Lying or Band)" keeps `external_rotation_side_lying_or_band`.
+  const hit = resolveCurated(key);
+  if (hit) return hit;
+
   return key.replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+/** The candidate ladder. Returns a curated key, or null when nothing explicit matched. */
+function resolveCurated(key: string): string | null {
+  const stripQualifier = (s: string) => s.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const spaceOut = (s: string) => s.replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
+  for (const cand of [key, stripQualifier(key), spaceOut(key), spaceOut(stripQualifier(key))]) {
+    if (!cand) continue;
+    const hit = lookupCurated(cand);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * Did this name resolve to a CURATED movement, or did it fall through to the slug fallback?
+ *
+ * ⛔ EXPORTED FOR THE LINT (`exercise-name-lint.test.ts`, Q-210), and it exists because the
+ * obvious test — "is the result different from the slug?" — gives a FALSE POSITIVE on every
+ * name whose curated value happens to equal its own slug ("Pallof Press" -> `pallof_press`).
+ * The lint asking the module is the point: reimplementing the lookup on the caller's side is
+ * the same proxy defect that broke the seven conformance tests (§0f).
+ */
+export function isCuratedName(raw: string): boolean {
+  if (!raw) return false;
+  return resolveCurated(raw.toLowerCase().trim()) !== null;
 }
 
 /**

@@ -882,6 +882,13 @@ So a declared, honest swap is read as **two separate failures**:
 
 ## Q-197 — Squat e1RM is split across TWO canonical names (data bug) (2026-07-22, UNVERIFIED-cause / CONFIRMED-symptom)
 
+> **↪ THE SAME BUG RETURNED 2026-07-28 IN A THIRD FORM — see Q-210.** This close was SOUND, not
+> premature: it shipped, deployed and was verified in the DB. But it covered SYNONYMS and PLURALS,
+> and a real name can also be decorated with a trailing QUALIFIER or an internal separator —
+> `Hip Thrusts` earned an e1RM while `Hip Thrusts (Fast Concentric)` was dropped from
+> `STRENGTH_ANCHORS` entirely. ⛔ **A future occurrence is a FOURTH decoration class, not a new bug.
+> File it against this lineage.** Everything below is history.
+>
 > **CLOSED 2026-07-23 (commit `3f983bc8`, DEPLOYED, VERIFIED-in-DB).** Confirmed a canonicalizer miss, and it hit THREE anchors + one non-anchor, not just squat:
 > - `barbell_back_squat` (3 sessions), `conventional_deadlift` (5), `standing_barbell_overhead_press` (2) all slugged to lone buckets and were dropped from `STRENGTH_ANCHORS` — so squat/deadlift/OHP verdicts each ran on partial history.
 > - Plural class: `bulgarian_split_squats`, `walking_lunges` split off their singulars.
@@ -1383,6 +1390,62 @@ entirely**. The same lift, in the same block, is tracked or invisible depending 
 appended a qualifier — and `strength_1rms` is the exact field Ticket 2 wants to read.
 ⚠️ **This is Q-197's shape recurring** (*"Squat e1RM is split across TWO canonical names"*), which was
 filed 2026-07-22 and mostly closed. A fix that lives in one branch is not a fix.
+
+⛔ **Q-197 RECURRED SIX DAYS AFTER IT WAS CLOSED, AND THE VERDICT IS: THE CLOSE WAS SOUND, THE FIX
+DID NOT REACH THE GENERAL CASE.** Not premature — Q-197 shipped `3f983bc8`, was DEPLOYED, was
+VERIFIED-in-DB (squat went 4→7 sessions in the 12-week window), and carried 7 fixtures. It did
+everything it claimed. **What it claimed was two of three decoration classes.**
+
+| how a real name misses the map | fixed by |
+|---|---|
+| **SYNONYM** — `Barbell Back Squat`, `Conventional Deadlift` | Q-197, 2026-07-23 |
+| **PLURAL** — `Bulgarian Split Squats` | Q-197, 2026-07-23 |
+| **QUALIFIER / SEPARATOR** — `Hip Thrusts (Fast Concentric)`, `Single-Leg RDL (Heavy DB)` | ⛔ never in scope → **this entry, 2026-07-28** |
+
+✅ **SO THE NEXT OCCURRENCE IS NOT NEW — it is a fourth decoration class, and it should be filed
+against this lineage.** The lesson is the one §0g already records in different words: a fix aimed at
+the INSTANCES that were found does not cover the SHAPE. Q-197 enumerated the names it had seen;
+nothing asked "what else can decorate a name?" until the count was measured.
+
+### ✅ WHAT SHIPPED 2026-07-28 — the qualifier strip and its enforcement
+
+⛔ **Ordered AHEAD of Ticket 2 by Michael**, because `learned_fitness.strength_1rms` is the field
+Ticket 2 reads and the anchor-drop corrupts it: *"That's not a data-hygiene issue, it's a correctness
+precondition."*
+
+| | |
+|---|---|
+| **The strip** | `canonicalize()` now tries a candidate ladder — as-given, qualifier stripped, hyphens spaced, both — and **only ever wins on an EXPLICIT curated entry** |
+| **One map gap** | `'lat pull down'` / `'lat pull-down'` added. ⚠️ Not a separator case: the curated key spells `pulldown` as ONE WORD, so no normalization reaches it. It needed a row |
+| **Two properties pinned** | ⛔ never over-merge (`Jump Squats` stays its own bucket) · ⛔ never churn an unmapped slug (a name that misses anyway keeps today's key, so its history does not split) |
+| **The lint** | `_shared/exercise-name-lint.test.ts` — every emitted name must resolve, or sit on an explicit `UNRESOLVED_ALLOWLIST` that **may only shrink** |
+| **Result** | names resolving to a curated movement **34 → 53**; `muscleGroup() === 'other'` **78 → 59** |
+
+⚠️ **THE PREDICATE IS EXPORTED ON PURPOSE.** The lint asks `isCuratedName()` rather than recomputing
+the lookup, because the obvious local version — *"is the result different from the slug?"* — FALSE
+POSITIVES on every name whose curated value equals its own slug (`Pallof Press` → `pallof_press`).
+Recomputing it on the caller's side would have been this entry's own defect, one level up.
+
+✅ **VERIFIED RED-GREEN-RED, both halves** (§0d — these were new tests, so neither had ever failed):
+the over-merge guard was broken deliberately with a containment-based merge and went **red**; the lint
+was fed a fake `'Nonexistent Widget Press'` in `minimum-dose.ts` and went **red, naming the file**.
+Baselines after: `_shared` **1353**/0 (was 1348 — the five new tests) · `shared` 174/7 ·
+`generate-run-plan` 33/2 · `generate-combined-plan` 438/3. **The other three are unchanged.**
+
+⛔ **TWO THINGS ARE OWED BEFORE THIS COUNTS AS DONE, AND BOTH ARE THE WAY Q-197 HALF-LANDED.**
+
+1. **DEPLOY — `canonicalize.ts` is a `_shared` file, so 22 edge functions carry their own frozen
+   copy** (`adapt-plan`, `analyze-*`, `coach`, `compute-facts`, `compute-snapshot`,
+   `create-goal-and-materialize-plan`, `generate-*`, `workout-detail`, …). ⚠️ **Until every one is
+   redeployed the strip changes NOTHING in production**, and there is no error that says so.
+2. **BACKFILL — the strip fixes FUTURE writes only.** Existing `exercise_log` rows keep the
+   `canonical_name` they were written with, so a lift already split across
+   `hip_thrust` / `hip_thrusts_fast_concentric` stays split until those workouts are recomputed.
+   Q-197 closed this loop with `recompute-workout` over the 13 affected workouts and verified the
+   buckets collapsed — **the same step is owed here and has not been run.** ⛔ Not a direct DB write.
+
+⚠️ **THE 26 CONTAINMENT CASES WERE LEFT ALONE DELIBERATELY** and sit on the allowlist. Michael:
+*"Leave them until someone can rule on them one at a time."*
 
 ⚠️ **CORRECTION TO THIS ENTRY'S FIRST VERSION — I OVERSTATED THE MUSCLE-GROUP CONSEQUENCE.** All 78
 misses do land in `muscleGroup() === 'other'`, and `'Lat Pull Down'` genuinely files outside `back`. But
