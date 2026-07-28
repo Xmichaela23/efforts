@@ -992,6 +992,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       const ex: StrengthExercise[] = isDeload
         ? [main]
         : [...(lift.isLower ? [JUMPS] : []), main, ...assistance];
+        // ⛔ THE ANCHOR TOP SET IS A REP-OUT, AND THE PRESCRIPTION READS LIKE A TARGET.
+      //
+      // Week 11 prescribes `125×1+`. The number after the plus is the entire point — but "1+"
+      // invites stopping at two, and the validity gate reads the reps at 95% to decide the next
+      // cycle: five or more advances, fewer RESETS the training max by 10%. An athlete who
+      // benched 120×5 three weeks earlier has a 4-6 rep set in front of them, follows the card as
+      // written, stops at 2, and the engine cuts their bar for it.
+      //
+      // ⚠️ THE COPY IS THE BUG, NOT THE LOAD. The percentages are exactly Wendler's and the ramp
+      // is correct. What was missing is that the "+" is a floor, not a ceiling, and that the reps
+      // are the measurement the cycle exists for. Same for week 10's `3+`, which only reads as
+      // less than week 7's five because the plus renders as a target.
+      const amrapNote = (!isDeload && slot.kind === 'anchor')
+        ? ` The last set is an all-out set: the number before the plus is the MINIMUM, not the target. ` +
+          `Take it to a hard stop with a rep left, and log every rep — what you get here is what sets the next cycle's weights.`
+        : '';
       weekSessions.push({
         // ⛔ The SOLVER's day, not the grid's. `liftDay()` falls back to `lift.day` only if
         // place-week omitted this lift, so a placement failure degrades to the old fixed week
@@ -1001,7 +1017,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         name: `Strength — ${lift.name}`,
         // The assistance guidance rides with the session, once, on the weeks that carry assistance.
         // Without it "25 reps" reads as a target to chase, and chasing it costs the next main lift.
-        description: `${ex.map(exerciseLabel).join(' · ')}.${isDeload ? '' : ` ${ASSISTANCE_GUIDANCE}`}${stackNoteFor(lift)}`,
+        description: `${ex.map(exerciseLabel).join(' · ')}.${isDeload ? '' : ` ${ASSISTANCE_GUIDANCE}`}${amrapNote}${stackNoteFor(lift)}`,
         duration: isDeload ? 35 : 60,
         strength_exercises: ex,
         // ⛔ NO `1rm_test` TAG, and that is deliberate. The tag makes the logger DISCARD the planned
