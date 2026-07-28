@@ -1037,11 +1037,16 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // `stackNeedsRecoveryGap` is true, and the law asks for six hours. Telling an athlete that
         // back-to-back is fine on their deadlift day is the kind of confident-and-wrong sentence
         // this whole day has been about.
+        // ⛔ SAME RULE AS THE RIDE, AND THE WEEK-1 GATE IS GONE. The order line used to appear on the
+        // first stacked run day of WEEK ONE only, so weeks 2-12 carried the same stack with nothing
+        // said. A rule that matters in week 1 matters in week 6; showing it once is a tutorial, and
+        // this is a prescription.
         const runOnHeavyLegDay = heavyLowerDays.includes(day);
+        const runStackedWithLift = strengthDays.includes(day);
         const note = runOnHeavyLegDay
           ? ` Shares the day with heavy legs: the lift goes first, and leave ${MIN_STACK_GAP_H}h before the run — they load the same legs.`
-          : ((week === 1 && day === firstStackedRunDay)
-            ? ` On a lift + run day the lift comes first — the run is easy, so back-to-back is fine.`
+          : (runStackedWithLift
+            ? ` Shares the day with the lift: the lift goes first. The run is easy, so back to back is fine.`
             : undefined);
         weekSessions.push(enduranceSession('run', day, runMinutesByDay[day], note, day === longRunDay ? 'long' : 'easy'));
       });
@@ -1150,10 +1155,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // the GAP, and a permission delivered without its condition is the §0f loss: the engine
         // honours the rule and the athlete never hears it. `easy_bike × lower_body_strength` is the
         // one ride pairing where `stackNeedsRecoveryGap` is true.
+        // ⛔ EVERY STACKED DAY STATES THE ORDER. The gap is conditional; the ORDER is not.
+        //
+        // Until now the ride only spoke on a heavy-leg day, so Monday's ride beside a bench press
+        // said nothing at all — while Tuesday's lift and Friday's run both stated theirs. One of
+        // three stacks silent, and `lift_first` sitting in the data the whole time (§0f).
+        //
+        // ⚠️ Eddens is why the order matters and it does NOT depend on the pairing: resistance
+        // before endurance, +6.91% lower-body dynamic strength, in exactly the minimal-relief case
+        // this is. The 6h GAP is the part that depends on the pairing — only when both load the legs.
         const onHeavyLegDay = heavyLowerDays.includes(day);
+        const stackedWithLift = strengthDays.includes(day);
         const rideNote = onHeavyLegDay
           ? ` Shares the day with heavy legs: the lift goes first, and leave ${MIN_STACK_GAP_H}h before the ride — they load the same legs.`
-          : undefined;
+          : (stackedWithLift
+            ? ` Shares the day with the lift: the lift goes first. They share no prime movers, so back to back is fine.`
+            : undefined);
         weekSessions.push(enduranceSession('bike', day, mins, rideNote, isLong ? 'long' : 'easy'));
       });
       // ⛔ AND THE HARD DAY, IF THEY CHOSE THE BIKE FOR IT. Same fix as the run's: the pin already
@@ -1219,6 +1236,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
      * ⚠️ Surfacing only. D-325 §7: state the cost, never refuse — the week is still built.
      */
     placement_compromises: placementCompromises.length ? placementCompromises : undefined,
-    strength_days: strengthDays.map((d) => String(d).toLowerCase()),
+    // ⚠️ SORTED BY DAY, not by lift. `strengthDays` is built in MAIN_LIFTS order (bench, squat, OHP,
+    // deadlift), so it printed "monday, wednesday, tuesday, friday" — correct data in an order that
+    // reads like a mistake.
+    strength_days: [...strengthDays]
+      .sort((a, b) => PLACEMENT_DAYS.indexOf(a as DayName) - PLACEMENT_DAYS.indexOf(b as DayName))
+      .map((d) => String(d).toLowerCase()),
   };
 }
