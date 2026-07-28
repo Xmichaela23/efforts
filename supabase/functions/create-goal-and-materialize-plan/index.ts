@@ -388,6 +388,28 @@ function normalizeDateOnlyYmd(raw: unknown): string | null {
 }
 
 /** Monday of the server's *local calendar* week — use local getters, not toISOString() (UTC). */
+/**
+ * ⛔ SNAP ANY DATE TO THE MONDAY OF ITS WEEK. Added 2026-07-27, after a real plan came back starting
+ * on a FRIDAY.
+ *
+ * The builder's field is labelled **"Start the week of"** and its helper says **"plans run Monday to
+ * Sunday"** — but it is a free `<input type="date">`, and the server took whatever came through
+ * verbatim. So a non-Monday pick produced a plan whose week 1 began mid-week and contained only the
+ * days from that pick onward. `NonRaceBuilder.tsx:174` even says *"plans are Monday-based so this
+ * snaps to that week server-side"* — the comment described a snap that did not exist.
+ *
+ * ⚠️ SNAPPING BACK, NOT FORWARD. "The week of Aug 28" is the week CONTAINING Aug 28, which starts
+ * Monday Aug 24. Rounding forward would silently delay the block by up to six days, which is the
+ * same silent-shift class the plan-start bug already is.
+ */
+function mondayOfWeekISO(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
+  const day = dt.getUTCDay();                  // 0=Sun … 6=Sat
+  dt.setUTCDate(dt.getUTCDate() + (day === 0 ? -6 : 1 - day));
+  return dt.toISOString().slice(0, 10);
+}
+
 function currentWeekMondayISO(): string {
   const d = new Date();
   const day = d.getDay(); // 0=Sun ... 6=Sat
@@ -1480,8 +1502,10 @@ async function buildCombinedPlan(
     bike_quality_placement: freshCombinedPrefs.bike_quality_placement,
   }));
 
-  const combinedPlanStartDate =
-    normalizeDateOnlyYmd(explicit_plan_start_date) ?? currentWeekMondayISO();
+  const explicitMonday = normalizeDateOnlyYmd(explicit_plan_start_date);
+  const combinedPlanStartDate = explicitMonday
+    ? mondayOfWeekISO(explicitMonday)   // the week CONTAINING the pick — see mondayOfWeekISO
+    : currentWeekMondayISO();
 
   let swim_cutoff_pressure_v1: SwimCutoffPressureV1 | null = null;
   const primarySportLc = String(primaryGoal?.sport || '').toLowerCase();
@@ -2096,7 +2120,11 @@ Deno.serve(async (req: Request) => {
     const replace_plan_id = trimId(raw.replace_plan_id);
     const plan_id = trimId(raw.plan_id);
     const goal = raw.goal;
-    const plan_start_date = raw.plan_start_date;
+    // ⛔ SNAPPED ONCE, HERE, so every downstream path gets a Monday — the strength plan, the goal
+    // row, and the combined builder alike. Previously each read `raw.plan_start_date` directly and
+    // none of them snapped.
+    const rawStart = normalizeDateOnlyYmd(raw.plan_start_date);
+    const plan_start_date = rawStart ? mondayOfWeekISO(rawStart) : raw.plan_start_date;
     const bodyPreview = raw.preview === true;
     const ephemeralConflictPrefs =
       raw.ephemeral_conflict_preferences &&

@@ -241,11 +241,26 @@ function getSteps(state: NonRaceState): StepKey[] {
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
 // from the EDITED posture (derivePlanShape), not from seedFromGoal. Generic scheduling prefs kept.
 // Default Week-1 start = the upcoming Monday (plans are Monday-based; the server snaps to the week anyway).
-function nextMondayISO(): string {
+/**
+ * ⛔ THE START OF THE PLAN WEEK — today when today IS Monday, otherwise the next one.
+ *
+ * Was `nextMondayISO()`, and it ALWAYS SKIPPED A WEEK when run on a Monday: `(8 - 1) % 7` is 0, and
+ * `|| 7` turned that into a full seven days. So an athlete setting up on a Monday — the one day the
+ * answer should obviously be "today" — was pushed to the following week, while the helper text below
+ * the field said *"Week 1 begins this week."*
+ *
+ * ⚠️ Local date parts, never `toISOString()`. The old version built the string in UTC, so anyone
+ * west of Greenwich got tomorrow's date after ~17:00 local — a second silent shift on top of the first.
+ */
+function planWeekStartISO(): string {
   const d = new Date();
-  const delta = (8 - d.getDay()) % 7 || 7; // days until next Monday (getDay: Sun=0…Sat=6)
+  const day = d.getDay();                       // 0=Sun … 6=Sat
+  const delta = day === 1 ? 0 : (8 - day) % 7;  // Monday → today; anything else → the next Monday
   d.setDate(d.getDate() + delta);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
 }
 
 function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeeklyMiles?: number): ArcSetupPayload {
@@ -353,7 +368,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 2, startDate: nextMondayISO(),
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 2, startDate: planWeekStartISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -1131,7 +1146,11 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 onChange={(e) => setState((s) => ({ ...s, startDate: e.target.value }))}
                 className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 focus:outline-none focus:border-teal-500/50"
               />
-              <p className="text-white/50 text-xs mt-1.5">Week 1 begins this week — plans run Monday to Sunday.</p>
+              {/* ⛔ SAY WHAT ACTUALLY HAPPENS. The old line promised "Week 1 begins this week" while
+                  the default skipped to next week and the server took any weekday verbatim. */}
+              <p className="text-white/50 text-xs mt-1.5">
+                Plans run Monday to Sunday. Any day you pick starts the block on that week&apos;s Monday.
+              </p>
             </div>
 
             {/* ⛔ THE WEEK, BEFORE COMMITTING. Building it here writes nothing — no goal, no plan. */}
