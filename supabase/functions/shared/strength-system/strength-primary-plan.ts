@@ -1027,9 +1027,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // resistance-first is the correct order when sessions cannot be separated (Eddens 2018:
         // +6.91% lower-body strength for RT-first). So the guidance is sound and UNSOURCED.
         // ⛔ Do not attach a citation here without one that tested lifting + easy running same-day.
-        const note = (week === 1 && day === firstStackedRunDay)
-          ? ` On a lift + run day the lift comes first — the run is easy, so back-to-back is fine.`
-          : undefined;
+        // ⛔ THE NOTE HAS TO KNOW WHICH LIFT IT IS SHARING WITH. Corrected 2026-07-28, within the
+        // hour of opening heavy-leg days to easy runs — and it is the box-jump failure exactly:
+        // copy that was TRUE when runs could only land on bench and press days, printed unchanged
+        // on a day where it is now FALSE.
+        //
+        // "back-to-back is fine" holds for an upper lift — pressing shares no prime movers with
+        // running. On a squat or deadlift day it does not: both load the legs,
+        // `stackNeedsRecoveryGap` is true, and the law asks for six hours. Telling an athlete that
+        // back-to-back is fine on their deadlift day is the kind of confident-and-wrong sentence
+        // this whole day has been about.
+        const runOnHeavyLegDay = heavyLowerDays.includes(day);
+        const note = runOnHeavyLegDay
+          ? ` Shares the day with heavy legs: the lift goes first, and leave ${MIN_STACK_GAP_H}h before the run — they load the same legs.`
+          : ((week === 1 && day === firstStackedRunDay)
+            ? ` On a lift + run day the lift comes first — the run is easy, so back-to-back is fine.`
+            : undefined);
         weekSessions.push(enduranceSession('run', day, runMinutesByDay[day], note, day === longRunDay ? 'long' : 'easy'));
       });
       // ⛔ THE HARD DAY GETS FILLED. Until now the pin reserved a day and nothing was authored for
