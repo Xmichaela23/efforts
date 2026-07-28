@@ -38,8 +38,6 @@ const liftRow = (week: number, lift: string) => {
   const s = sessionsFor(week).find((x) => x.type === 'strength' && x.name.includes(lift));
   return s?.strength_exercises?.find((e: any) => e.name === lift);
 };
-const ramp = (week: number, lift: string) =>
-  ((liftRow(week, lift)?.set_plan ?? []) as any[]).map((p) => `${p.weight}x${p.reps}${p.amrap ? '+' : ''}`).join(' ');
 
 // ── The shape ───────────────────────────────────────────────────────────────
 

@@ -32,10 +32,9 @@ import {
 import { isLowerIntent, isUpperIntent, isFullBodyIntent } from '../protocols/intent-taxonomy.ts';
 import {
   getPlacementStrategy,
-  mapApproachToMethodology,
   normalizeWeekday,
 } from './strategy.ts';
-import type { Weekday, Slot, PlacementContext } from './types.ts';
+import type { Weekday, PlacementContext } from './types.ts';
 
 const SUN_RING: Weekday[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
@@ -83,8 +82,6 @@ function assignSessions(
     hardEnduranceDays?: string[];
   }
 ): PlacedSession[] {
-  const placed: PlacedSession[] = [];
-  
   // If placement context is provided, use methodology-aware strategy
   if (placementContext?.methodology) {
     return assignSessionsWithStrategy(

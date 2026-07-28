@@ -8,9 +8,7 @@ import {
   PlacementContext,
   PlacementStrategy,
   MethodologyId,
-  StrengthProtocolId,
   Weekday,
-  Slot,
 } from './types.ts';
 import {
   resolveStrengthRoleSlots,

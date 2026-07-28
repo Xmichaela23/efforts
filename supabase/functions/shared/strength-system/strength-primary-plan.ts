@@ -910,9 +910,6 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     runDayList.push(c.day);
   }
   const longRunDay = pickedLong;
-  const firstStackedRunDay = runDayList
-    .filter((d) => strengthDays.includes(d))
-    .sort((a, b) => DAYS.indexOf(a as typeof DAYS[number]) - DAYS.indexOf(b as typeof DAYS[number]))[0];
 
   const runMinutesByDay: Record<string, number> = {};
   let volume_notes: string | null = null;

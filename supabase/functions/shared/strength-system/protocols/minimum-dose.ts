@@ -16,11 +16,6 @@ import {
   StrengthExercise,
   StrengthPhase,
 } from './types.ts';
-import {
-  StrengthIntent,
-  IntentPriority,
-  RepProfile,
-} from './intent-taxonomy.ts';
 
 // ============================================================================
 // PROTOCOL DEFINITION
