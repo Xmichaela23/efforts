@@ -2213,7 +2213,25 @@ Deno.serve(async (req: Request) => {
       const createIsNonRace = isNonRaceGoalType(goal?.goal_type);
       if (!goal?.name || !goal?.sport || (!goal?.target_date && !createIsNonRace)) throw new AppError('missing_goal_fields', 'goal name, target_date, and sport are required');
       if (createIsNonRace && !(Number((goal as any)?.target_weeks) >= 4 && Number((goal as any)?.target_weeks) <= 52)) throw new AppError('missing_target_weeks', 'A non-race goal needs target_weeks (4–52).');
-      if (!action || !['keep', 'replace'].includes(action)) throw new AppError('invalid_action', 'action must be keep or replace');
+      // ⛔ THE ACTION GATE IS A WRITE GATE, AND A PREVIEW IS A READ (§4.1a).
+      //
+      // `action` answers exactly one question — what happens to the athlete's EXISTING goal when
+      // this one is persisted. Every consumer is a write decision: the new goal's priority
+      // (:2379, :2813, :3281) and the keep/replace of the prior goal (:3062, :3172, :3477).
+      //
+      // A preview persists NOTHING — no goal row (its `goal_id` is a synthetic marker, see :2375),
+      // no plan row, no activate. So requiring an answer here demanded a decision with no
+      // consequence, and refused the whole request when the client did not supply one. That is
+      // strictness applied where its reason does not hold, which is §4.1a's test.
+      //
+      // ⚠️ THIS IS THE PREVIEW FAILURE THAT SURVIVED A WHOLE SESSION UNDIAGNOSED. It only became
+      // findable once the client stopped swallowing the reason — the response said
+      // `action must be keep or replace` all along and nothing ever read it. The fix belongs
+      // HERE rather than in the client: teaching the caller to send `action: 'keep'` on a preview
+      // would be answering a meaningless question to satisfy a gate that should not be asking.
+      if (!bodyPreview && (!action || !['keep', 'replace'].includes(action))) {
+        throw new AppError('invalid_action', 'action must be keep or replace');
+      }
       if (String(goal.sport || '').toLowerCase() === 'run' && !goal.distance && !createIsNonRace) {
         throw new AppError('missing_distance', 'Select a race distance to build a plan.');
       }
