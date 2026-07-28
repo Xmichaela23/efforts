@@ -352,6 +352,8 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   // ⛔ THE WEEK, BEFORE IT IS ACCEPTED. Nothing here writes: `preview()` calls the composer with the
   // goal inline and persists neither a goal nor a plan.
   const [previewWeek, setPreviewWeek] = React.useState<PreviewSession[] | null>(null);
+  /** ⛔ Distinguishes "the preview could not be built" from "the week is empty". They are not the same. */
+  const [previewFailed, setPreviewFailed] = React.useState(false);
   const [previewNotes, setPreviewNotes] = React.useState<string[]>([]);
   const [previewing, setPreviewing] = React.useState(false);
   const { arc } = useArcSetupContext();
@@ -484,6 +486,11 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     setPreviewing(true);
     const plan = (await preview(payloadNow())) as PreviewPlan | null;
     const wk1 = plan?.sessions_by_week?.['1'];
+    // ⛔ A FAILED PREVIEW IS NOT AN EMPTY WEEK. This used to coerce anything unusable to `[]`, which
+    // the card below then rendered as "0 training days, 7 rest · about 0h a week" — a confident,
+    // completely false answer, presented in the same shape as a real one. §0h: an absence is not a
+    // result, and the athlete cannot tell the difference.
+    setPreviewFailed(!Array.isArray(wk1) || wk1.length === 0);
     setPreviewWeek(Array.isArray(wk1) ? wk1 : []);
     setPreviewNotes(
       Array.isArray(plan?.placement_compromises)
@@ -1120,7 +1127,8 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
       {currentStep === 'confirm' && (
         <StepLayout
           step={stepNo('confirm')} totalSteps={steps.length} title="Build this plan?"
-          subtitle={`${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — an ${state.targetWeeks}-week block.`}
+          // "an 12-week" — the article was hardcoded for a number that varies. 8, 12 and 16 all take "a".
+          subtitle={`${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — a ${state.targetWeeks}-week block.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
         >
@@ -1175,6 +1183,18 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 <div className="space-y-2">
                   {(() => {
                     const ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+                    if (previewFailed) {
+                      return (
+                        <div className="text-white/80 text-sm">
+                          <p className="text-white/90">The week could not be built.</p>
+                          <p className="text-white/55 text-xs mt-1.5">
+                            This is a fault on our side, not a problem with your answers — nothing about
+                            your setup produces an empty week. Building the plan may still work; if it
+                            does not, the answers are saved and can be retried.
+                          </p>
+                        </div>
+                      );
+                    }
                     const active = new Set(previewWeek.map((s) => s.day));
                     const rest = ORDER.filter((d) => !active.has(d));
                     const mins = previewWeek.reduce((a, s) => a + (Number(s.duration) || 0), 0);
