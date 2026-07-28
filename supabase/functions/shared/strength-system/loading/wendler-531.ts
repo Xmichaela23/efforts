@@ -149,24 +149,50 @@ export function cappedCycleIncrementLb(workingNumber: number, isLowerBody: boole
  * clean advances walked straight past it. This is the hard stop, checked every cycle **regardless of
  * verdict**.
  *
- * ⚠️ A BREACH IS A GATED FATE, NOT A SILENT CLAMP (§5.2b's family). When an advance would cross the
- * ceiling the working number HOLDS and the reason is reported — the athlete is told their training
- * max has caught up with the max on file and the block needs a new one. Quietly clipping the number
- * would produce a plan that stops progressing for no stated reason.
+ * ⚠️ A BREACH TRUNCATES THE STEP; ONLY A STEP TRUNCATED TO NOTHING IS A GATED FATE (§5.2b's family).
+ * An advance that would cross the ceiling lands ON the ceiling instead — the athlete still progresses,
+ * by less. When even that is no movement, the working number holds and the reason is reported: the
+ * training max has caught up with the max on file and the block needs a new one.
  */
 /**
- * ⛔ 100%: THE TRAINING MAX MAY NEVER EXCEED THE 1RM. Michael, 2026-07-27.
+ * ⛔ 90%, AND THE STEP IS TRUNCATED RATHER THAN SKIPPED. Michael, 2026-07-28.
  *
- * ⚠️ A FIRST DRAFT USED 90% AND BOUND IN CYCLE 3 FOR EVERY ATHLETE. The working number STARTS at 85%
- * of the 1RM, so 90% leaves only five points of headroom while three cycles of Wendler's own
- * increments spend about seven — a 315 lb squat held at 275 instead of reaching 285, which stops the
- * standard block advancing in its measuring cycle. That is a far broader change than the drift the
- * ceiling exists to bound.
+ * ⛔ THIS SUPERSEDES THE 100%-AND-HOLD DECISION OF 2026-07-27, WHICH IS TWENTY-FOUR HOURS OLD.
+ * Everything in the block comment above about 100% is history; read this instead.
  *
- * At 100% the CAP does the work and the ceiling is the backstop: it fires only where the capped step
- * would still carry the bar past the max it was derived from.
+ * **What changed is the evidence, not the taste.** The 100% ceiling was chosen because 90% "bound in
+ * cycle 3 for every athlete" — a 315 lb squat HELD at 275 instead of reaching 285. That objection was
+ * correct about *holding* and wrong about *the ceiling*. Truncating dissolves it: the squat reaches
+ * 280 rather than being frozen at 275, so the block still advances in its measuring cycle and the
+ * invariant still holds. The rejected thing was the stall, not the number.
+ *
+ * ⛔ AND THE 6% CAP TURNED OUT TO BE THE ASYMPTOTE, NOT THE RAIL. Michael, 2026-07-28: *"It doesn't
+ * protect the ratio — it DEFINES the worst case."* Two advances of +6% off an 85% start is
+ * `0.85 × 1.06 × 1.06 = 95.5%`, and **any lifter light enough for the cap to bind converges on exactly
+ * that regardless of their numbers.** Measured on the composer before this change: a 200 lb squat
+ * reached **94.7%** of 1RM by cycle 3, a 315 lb squat **90.2%**. Heavy lifters drift less only because
+ * +10 is a smaller fraction of a big training max. Nothing in the system was aiming at the ratio —
+ * the constraint sat on step SIZE, which we now know does not control it.
+ *
+ * ⚠️ WHY 90% AND NOT SOMETHING DERIVED. It is the top of 5/3/1's own stated training-max band
+ * (85-90% of true max) — the band that makes the AMRAP a MEASUREMENT rather than a max attempt. The
+ * block starts at 85% deliberately; 90% is the published edge of the same range, so the ceiling and
+ * the starting point come from one source instead of two.
+ *
+ * ⚠️ THE DRIFT WAS ALREADY SELF-CORRECTING, so this is a bound and not a rescue. `verdictFrom95Set`
+ * resets the working number 10% on a missed 95% set, so an athlete who drifts too high fails the gate
+ * and comes down — they oscillate rather than park. The guard exists so the correction does not have
+ * to be purchased with a failed near-max attempt.
+ *
+ * ⛔ THE ONE THIS DOES NOT FIX, AND IT IS UPSTREAM OF ALL OF IT: `oneRM` IS A SIGNUP NUMBER THAT NEVER
+ * UPDATES. Every ratio here is computed against a value the athlete typed once and may never have
+ * tested. If it was aspirational the real ratio is worse than this ceiling believes, and **the
+ * assertions still pass** — they are measuring against the same stale number. Michael raised it
+ * 2026-07-28; it is not addressed here, and a guard on a number nobody verified is a guard with a
+ * hypothesis inside it. `exercise_log`'s e1RM trend is the obvious candidate for a tested max and is
+ * NOT wired to this.
  */
-export const TM_CEILING_PCT_OF_1RM = 1.00;
+export const TM_CEILING_PCT_OF_1RM = 0.90;
 
 export function tmCeilingLb(oneRM: number): number {
   if (!Number.isFinite(oneRM) || oneRM <= 0) return Number.POSITIVE_INFINITY;
@@ -352,10 +378,16 @@ export function applyVerdict(
 
   const stepped = workingNumber + cappedCycleIncrementLb(workingNumber, isLowerBody);
   const ceiling = oneRM == null ? Number.POSITIVE_INFINITY : tmCeilingLb(oneRM);
-  // ⛔ HOLD AT THE CEILING, do not clip to it. Clipping produces a number nobody asked for; holding
-  // is the same "no advance" the verdict system already expresses, and it carries a reason out.
-  if (stepped > ceiling) return { workingNumber, ceilingHit: true };
-  return { workingNumber: stepped, ceilingHit: false };
+  if (stepped <= ceiling) return { workingNumber: stepped, ceilingHit: false };
+
+  // ⛔ TRUNCATE TO THE CEILING RATHER THAN SKIP THE STEP (2026-07-28, superseding hold-at-the-ceiling).
+  // Holding made the ceiling a stall, which is the entire reason a 90% bound was rejected a day
+  // earlier. Landing ON it keeps the block advancing while the invariant binds.
+  //
+  // ⚠️ Only when the truncated step is NO MOVEMENT is this a fate worth reporting — then the athlete
+  // is genuinely stuck against a max on file that has stopped being true.
+  if (ceiling > workingNumber) return { workingNumber: ceiling, ceilingHit: false };
+  return { workingNumber, ceilingHit: true };
 }
 
 /**

@@ -69,11 +69,14 @@ Deno.test('the working number steps BETWEEN cycles, never inside one — capped,
   // Bench (1RM 225): TM 190 → 195 → 200. Ceiling is 90% of 225 = 200, so cycle 3 lands exactly on it.
   assertEquals(ramp(5, 'Bench Press'), '125x5 145x5 165x5');
   assertEquals(ramp(9, 'Bench Press'), '130x5 150x5 170x5+');
-  // ⛔ AND THE STANDARD BLOCK IS UNCHANGED BY THE CAP AND THE CEILING. Squat 1RM 315: TM 265 → 275 →
-  // 285, every step Wendler's +10 (6% of 265 is 15.9, so his number wins), and 285 is under the
-  // 315 ceiling. 65% of 285 = 185.25 → 185. An earlier draft used 4% and a 90% ceiling and this
-  // came out 175 — the numbers were bounding loads they were never meant to reach.
-  assertEquals(ramp(9, 'Back Squat').split(' ')[0], '185x5');
+  // ⛔ THE SQUAT IS WHERE THE 90% CEILING BINDS, AND TRUNCATION IS WHY THAT IS FINE (2026-07-28).
+  // Squat 1RM 315: TM 265 → 275 → wants 285, ceiling is 90% of 315 = 283.5 → 280, so cycle 3 lands
+  // ON 280 rather than being frozen at 275. 65% of 280 = 182 → 180.
+  //
+  // ⚠️ THIS NUMBER MOVED FROM 185, and the move is the point. Under the superseded 100% ceiling the
+  // third cycle reached 285 — 90.5% of the athlete's true max, outside 5/3/1's own 85-90% training-max
+  // band, which is what makes the anchor AMRAP a measurement rather than a max attempt.
+  assertEquals(ramp(9, 'Back Squat').split(' ')[0], '180x5');
 });
 
 Deno.test('ANCHOR cycle: 5/3/1 proper, and the all-out set is the LAST set only', () => {

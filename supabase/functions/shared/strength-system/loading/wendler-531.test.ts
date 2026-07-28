@@ -151,21 +151,40 @@ Deno.test('⛔ THE INCREMENT IS CAPPED AT 4% — Wendler\'s +10 is out of range 
   assertEquals(cappedCycleIncrementLb(120, false), 5);   // upper is already +5
 });
 
-Deno.test('⛔ THE TRAINING MAX MAY NEVER EXCEED THE 1RM — and it HOLDS rather than clipping', () => {
-  // Three clean advances used to walk a 106 lb squat's TM from 90 to 110 — past the max it came
-  // from — and the anchor AMRAP then measured that bar and wrote it back. Nothing knew that was
-  // impossible.
-  // ⚠️ 105, not 106: the ceiling is the largest LOADABLE weight at or under the max, so it rounds
+Deno.test('⛔ THE TRAINING MAX MAY NEVER EXCEED 90% OF THE 1RM — and the step TRUNCATES', () => {
+  // ⛔ SUPERSEDES the 100%-and-HOLD version of this test (2026-07-27), which asserted
+  // `tmCeilingLb(106) === 105` and a hold at the ceiling. Both are now wrong on purpose.
+  //
+  // The 100% ceiling was chosen because 90% "bound in cycle 3 for every athlete" — a 315 squat HELD
+  // at 275 instead of reaching 285. That objection was right about HOLDING and wrong about the
+  // ceiling, and truncation dissolves it (see the standard-block case at the bottom).
+  //
+  // ⚠️ 95, not 95.4: the ceiling is the largest LOADABLE weight at or under the bound, so it rounds
   // down to the plate grid like every other prescribed number here.
-  assertEquals(tmCeilingLb(106), 105);
-  // At the ceiling the number HOLDS rather than clipping to some in-between value.
-  const at = applyVerdict(105, 'advance', true, 106);
-  assertEquals(at.workingNumber, 105, 'the number must HOLD, not clip');
-  assertEquals(at.ceilingHit, true, 'a ceiling hold must be reportable, not silent');
-  // ⛔ AND THE STANDARD BLOCK IS UNTOUCHED. A 315 squat runs its three cycles clear of the ceiling —
-  // the CAP does the work, the ceiling is only the backstop.
-  assertEquals(applyVerdict(275, 'advance', true, 315).ceilingHit, false);
-  assertEquals(applyVerdict(85, 'advance', true, 106).ceilingHit, false);
+  assertEquals(tmCeilingLb(106), 95);
+
+  // ⛔ A BREACHING STEP LANDS ON THE CEILING. 90 + 10 = 100 would cross 95, so it becomes 95 — the
+  // athlete still advances, by less. This is the whole change: the old code returned 90 here.
+  const truncated = applyVerdict(90, 'advance', true, 106);
+  assertEquals(truncated.workingNumber, 95, 'the step must truncate to the ceiling, not be skipped');
+  assertEquals(truncated.ceilingHit, false, 'a truncated advance is still an advance, not a fate');
+
+  // ⚠️ ONLY NO-MOVEMENT IS A REPORTABLE FATE. Already at the ceiling, there is nothing to truncate to.
+  const stuck = applyVerdict(95, 'advance', true, 106);
+  assertEquals(stuck.workingNumber, 95, 'the number holds');
+  assertEquals(stuck.ceilingHit, true, 'and that must be reportable, not silent');
+
+  // ⛔ AND THE OBJECTION THAT KILLED 90% A DAY EARLIER, ANSWERED. A 315 squat's third cycle wanted
+  // 285 against a 280 ceiling. Under hold-at-the-ceiling it froze at 275 — the block stopped
+  // advancing in its measuring cycle, which is why 90% was rejected. It now reaches 280.
+  const standard = applyVerdict(275, 'advance', true, 315);
+  assertEquals(standard.workingNumber, 280, 'the standard block still advances into cycle 3');
+  assertEquals(standard.ceilingHit, false);
+
+  // A step clear of the ceiling is untouched by any of this. ⚠️ +5, not +10: at a training max of 85
+  // the 6% relative cap binds (85 × 0.06 = 5.1 → 5), which is the cap doing its own job independently
+  // of the ceiling. 90 is well clear of this athlete's 180.
+  assertEquals(applyVerdict(85, 'advance', true, 200).workingNumber, 90);
 });
 
 Deno.test('a fewer-bonus-reps week is NOT a reset — only missing the prescribed reps is', () => {

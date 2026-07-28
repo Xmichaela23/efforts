@@ -119,7 +119,7 @@ const tmRatio = (plan: any, week: number, lift: string, oneRM: number) => {
   return (sets.at(-1)!.weight / 0.95) / oneRM;
 };
 
-Deno.test('⛔ TWO BLIND ADVANCES WALK THE TRAINING MAX UP THE TRUE MAX — the AAA-only drift', () => {
+Deno.test('⛔ THE 90% CEILING BOUNDS THE AAA DRIFT — the band is closed, not just narrower', () => {
   // ⚠️ THE ADVANCE IS FIXED IN SIZE AND GATED IN OCCURRENCE. `workingNumberForCycle` documents it:
   // *"Do NOT recompute this from an AMRAP result … the reps are FEEDBACK, not an input."* The step is
   // +5/+10 capped at 6%. What the AMRAP decides is WHETHER it happens, not how big it is.
@@ -127,9 +127,13 @@ Deno.test('⛔ TWO BLIND ADVANCES WALK THE TRAINING MAX UP THE TRUE MAX — the 
   // In a forecast — which is what a freshly generated block is, since no cycle has been logged — every
   // verdict is `advance`. So a generated AAA block shows two advances taken on no evidence.
 
-  // A HEAVY lifter: the ratio stays inside Wendler's band.
+  // ⛔ AND THE 6% CAP WAS THE ASYMPTOTE, NOT THE RAIL. Michael, 2026-07-28: *"It doesn't protect the
+  // ratio — it DEFINES the worst case."* Two advances of +6% off an 85% start is
+  // 0.85 × 1.06 × 1.06 = 95.5%, and ANY lifter light enough for the cap to bind converges on exactly
+  // that whatever their numbers are. Measured before the ceiling change: 200 lb squat → 94.7%,
+  // 315 lb squat → 90.2%. The constraint sat on step SIZE, which does not control the ratio.
   const heavy = tmRatio(PLAN, 11, 'Back Squat', MAXES.squat)!;
-  assert(heavy < 0.95, `heavy squat TM reached ${(heavy * 100).toFixed(1)}% of 1RM`);
+  assert(heavy <= 0.90, `heavy squat TM reached ${(heavy * 100).toFixed(1)}% of 1RM`);
 
   // ⛔ A LIGHT LIFTER IS THE CASE THAT BINDS, and it is worse. The 6% relative cap never engages on a
   // small bar, so +10 on a 170 lb training max is a 5.9% step — twice — and the 100% ceiling never
@@ -141,21 +145,25 @@ Deno.test('⛔ TWO BLIND ADVANCES WALK THE TRAINING MAX UP THE TRUE MAX — the 
   });
   const lightRatio = tmRatio(light, 11, 'Back Squat', 200)!;
 
-  // This is the finding, pinned as a fact rather than a pass: an AAA block's last cycle sits at this
-  // ratio for a light lifter. The `>=` half of the assertion is what makes it a REPORT — if a future
-  // change improves the drift, this fails and someone reads why.
+  // ⛔ THE LIGHT LIFTER IS NOW BOUNDED AT THE SAME PLACE AS THE HEAVY ONE. This was 94.7% before the
+  // ceiling moved to 90% with truncation — the whole band 90-95.5% collapsed onto its own top edge.
   assert(
-    lightRatio >= 0.93 && lightRatio <= 0.96,
-    `light squat TM reached ${(lightRatio * 100).toFixed(1)}% of 1RM in cycle 3 — expected ~95%`,
+    lightRatio <= 0.90,
+    `light squat TM reached ${(lightRatio * 100).toFixed(1)}% of 1RM in cycle 3 — the ceiling should bind`,
   );
 
-  // ⚠️ AND THE CONSEQUENCE, STATED: at that ratio the "95% × 1+" set is ~90% of the athlete's TRUE
-  // max. Wendler asks for 1+ there, so completing it as written is fine — but `verdictFrom95Set`
-  // wants FIVE reps to advance, and five at 90% of a true max is not a rep-out, it is a max attempt.
-  // The gate self-corrects (a miss resets −10%), so the system does not run away. It self-corrects by
-  // making the athlete FAIL first, which is the part worth knowing.
+  // ⚠️ AND THE CONSEQUENCE THAT MOTIVATED IT: the "95% × 1+" set is now ~85% of the athlete's TRUE
+  // max rather than ~90%. Wendler asks for 1+ there so either was completable, but
+  // `verdictFrom95Set` wants FIVE reps to ADVANCE — and five at 90% of a true max is a max attempt,
+  // not a rep-out. At 85% it is a rep-out again, which is what makes the gate a measurement.
   const light95 = tmRatio(light, 11, 'Back Squat', 200)! * 0.95;
-  assert(light95 > 0.88, `the 95% set is ${(light95 * 100).toFixed(1)}% of true max`);
+  assert(light95 <= 0.86, `the 95% set is ${(light95 * 100).toFixed(1)}% of true max`);
+
+  // ⛔ THE ONE THIS DOES NOT CLOSE. Every ratio above is computed against `oneRM` — a signup number
+  // the athlete typed once and that never updates. If it was aspirational the true ratio is worse
+  // than this assertion believes, AND THIS TEST STILL PASSES, because it measures against the same
+  // stale number. Michael, 2026-07-28. Not addressed here; `exercise_log`'s e1RM trend is the
+  // candidate for a tested max and is not wired to this.
 });
 
 Deno.test('AAA measures three times where LLA measures once — the offsetting half', () => {
