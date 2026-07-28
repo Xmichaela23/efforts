@@ -24,66 +24,108 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-07-26 — **the 2026-07-25 late work is PUSHED and client-DEPLOYED, and NOT device-verified.** NEXT = **finish the flow, lock in quality options, wire the bike** — then build ONE plan end to end. ⛔ **D-325 was AMENDED 2026-07-26 — eight changes, read the amendment block before building the ledger**)
+## 🧭 NEXT SESSION — START HERE (2026-07-27 — **the placement collapse is at STEP 1 of 4.** The solver is BUILT, WIRED to Get Stronger, and DEPLOYED. NEXT = **step 2, `placement/`** — its coverage gate already passed, so it can be deleted. ⛔ **The law changed in five places today. Read §THE LAW CHANGED before touching scheduling, workload, or Wendler loading.**)
 
-### ⛔ FIRST: THE WORK EXISTS AND IT IS ON `main`. Do not start by rebuilding it.
+### ⛔ FIRST, AND IT IS THE THING A FRESH SESSION WILL GET WRONG
 
-**Corrected 2026-07-26.** *This section previously said the work was sitting uncommitted in the tree and
-that nothing was pushed. It was written before the commit and was stale within the hour. Both claims are
-now false — and a next session that ran `git status`, found a clean tree, and concluded the work did not
-exist is exactly how this codebase grew four plan generators.*
+**Today's commit log reads like the collapse introduced problems. It did not.** The box jumps on upper
+days, the fabricated `preferred_days.strength`, the unconditional training-max advance, the long-run
+workload coefficient that never matched, the plan starting mid-week — **every one of those was
+pre-existing and shipped**. They surfaced because the solver made the engine state its reasoning out
+loud, and a system that explains itself exposes what it was already doing.
 
-**It is in `784db4ae` — "feat(strength): one card per discipline, the hard days, and the tap that ends
-the set."** Six files, client only: `NonRaceBuilder.tsx`, `StrengthLogger.tsx`, `strength-focus-copy.ts`,
-`non-race-goal-seeds.ts` + its test, and a new `src/lib/bar-speed-copy.test.ts`. **All of it builds clean
-and 11 + 16 tests pass.** ⛔ **Read the commit before you touch anything in those files.**
+⛔ **Do not "revert to before the solver" to fix any of them.** Before the solver they were invisible,
+not absent.
 
-**Where it actually stands, in the three states:**
+### ⚠️ THIS SESSION WAS COMPACTED — the spec is the durable copy
 
-| state | true? | detail |
+The architecture conversation ran long enough to be summarised mid-flight. **Anything decided before
+the collapse — the aerobic-maintenance doctrine, the interference reasoning, the citation
+corrections — survives as SUMMARY in that chat's memory, not verbatim.** The durable copies are
+`docs/SPEC-week-solver.md`, `docs/DOCTRINE-aerobic-maintenance*.md`, and the D-NNN entries.
+
+⛔ **If a claim about training science matters, read the doc, not the conversation.** A summarised
+rationale is exactly the kind of thing that gets confidently misremembered.
+
+### ⛔ THE LAW CHANGED TODAY — five places, all deployed
+
+| what | where | why it matters to you |
 |---|---|---|
-| **PUSHED** | ✅ yes | `main` is at `b375de17`, tracking `origin/main`, nothing ahead. |
-| **DEPLOYED** | ✅ client — nothing else was in scope | Netlify auto-deploys the client from `main` (repo deploy policy). **`784db4ae` touched ZERO edge functions**, so there is nothing pending on the Supabase side. |
-| **VERIFIED** | ❌ **no** | **Nothing has been on a device.** |
+| **`lower_body_strength × long_ride` clearance 48h → 0h** | `_shared/schedule-session-constraints.ts` | The matrix always said they could share a day; a 48h clearance beside it was a contradiction. A squat may now sit next to a long ride |
+| **`upper_body_strength × long_ride` and `× long_run` → ✓** | same | The matrix forbade the exact stack the engine mandates. Bench on a long day is legal, and it is the free pair |
+| **The adjacency table exists** | same — `ADJACENCY_HOURS` | Replaces `LEG_QUALITY_KINDS`/`LEG_LONG_KINDS`, both **deleted**. Symmetric, asserted at module load. ⛔ Do not add a list beside it |
+| **The long-run workload factor never matched** | `_shared/workload.ts` | `longrun_easypace: 0.70` could not match any real token, so **every long run in every generator was priced as an easy run**. Fixed at the matching, not the number. Unmatched tokens now warn |
+| **Wendler: 6% increment cap + TM ≤ 100% of 1RM** | `loading/wendler-531.ts` | +10 is out of range on a small bar (11%/cycle at TM 90). Both numbers are derived, not picked — read the block comments before changing either |
 
-⚠️ **NOT device-verified, and that is still the single biggest open risk.** Michael's own words at close:
-*"we can't see it because we haven't finished a plan to materialize it."* **No plan has been built end to
-end with any of this work.** Deployed and unverified is the state that has burned this project before —
-see the three-state table in `CLAUDE.md`.
+### WHERE THE COLLAPSE STANDS — step 1 of 4
 
----
-
-### YOUR JOB, IN ORDER — Michael set these three at close
-
-**1. FINISH THE FLOW.** ⛔ **Corrected 2026-07-26 — the earlier version of this job named a key that does
-not exist and sent you after a value that is already working.** Traced, so you don't have to:
-
-| value | where it goes | status |
+| # | module | state |
 |---|---|---|
-| `target_weekly_miles` | written at `NonRaceBuilder.tsx:309`, **read by the composer at `create-goal-and-materialize-plan:2452`** | ✅ **WORKING — leave it alone.** |
-| `usualMiles` | `NonRaceBuilder.tsx:203/350/823` — local state only; derives the maintenance dose and the volume-vs-usual copy, **never enters the payload** | ⚠️ **Not a drop.** It is client-side scratch that feeds `targetMiles`, which does get through. **There is no `usual_weekly_miles` key anywhere in this codebase** — the previous banner invented it. Decide whether the engine ever needs the athlete's *usual* volume as distinct from the *target*; today it does not. |
-| `target_weekly_ride_hours` | written at `NonRaceBuilder.tsx:319`, stored on the goal | ⛔ **GENUINELY DROPPED. Zero readers anywhere under `supabase/functions/`.** This is the real one. |
-| `quality_run` / `quality_bike` pins | collected per discipline, stored on the goal | ⛔ **GENUINELY DROPPED.** `create-goal-and-materialize-plan:~2465` forwards **only** `long_run` from `preferred_days`. |
+| 0 | `_shared/resolve-schedule-collisions.ts` | ✅ **DELETED.** Three sweeps proved it inert — 192 optimizer weeks, zero changes |
+| 1 | `place-week`'s caller | ✅ **DONE + DEPLOYED.** `strength-primary-plan` runs on `_shared/week-solver.ts` |
+| 2 | `placement/` | ⚠️ **NEXT. Cleared to delete** — the coverage gate (SPEC §6b-2a) verified all nine cells survive in the law |
+| 3 | `base-generator`'s grid | ⛔ **HALF UPSTREAM.** Turns the tripwires green — see below |
+| 4 | `tri-generator`'s week | not started |
 
-**So the fix is two values, not two-plus-pins: the ride hours and the hard-day pins. Same wire.**
+⛔ **Inventory each module before deleting it** (SPEC §6b-3a). `place-week` gave up **5 finds** in
+17 entries; `week-optimizer` gave 2 in 28. Opportunistic reading missed most of them.
 
-**2. LOCK IN QUALITY OPTIONS.** The intake now collects a hard day per discipline (§ below). The composer
-has **never emitted a quality session token in its life** — `strength-primary-plan.ts:456-465` knows only
-easy and long. ⛔ **DO NOT BUILD AN INTERVAL ENGINE. IT EXISTS.** `materialize-plan` already expands
-`run_vo2_*` (`:1467`, 5K pace −12 s/mi), `cruise_*_threshold` (`:1487`, 5K +20 s/mi), `bike_ss_*`
-(`:1643`), `bike_thr_*` (`:1657`), `bike_vo2_*` (`:1660`, 110–120% FTP) — all off LIVE baselines. Sweet
-spot is documented at 88–94% FTP in `session-factory.ts:615`. **`send-workout-to-garmin` is built (1347
-lines) and already wired** from `StructuredPlannedView.tsx:634` and `TodaysEffort.tsx:341`. The job is
-emitting the token, not authoring the session. Full trace: **`ARCH-strength-spine.md` §0.5.**
+### ⛔ TWO TESTS ARE RED ON PURPOSE — `generate-run-plan` 33 passed / 2 failed
 
-**3. WIRE THE BIKE.** ⚠️ It is FENCED ON PURPOSE — `strength-primary-plan.ts:299`: *"Q-126: RUN-only
-token injection. Bike/ride is fenced to its own pass (Gap A-bike)."* Michael: *"we jammed out a strength
-plan with run only and said we'll fuck with the bike later. Well, it's later."* **Do it as its own named
-pass**, not smuggled in behind the run change.
+`anchor-honoured.red.test.ts`. **Do not fix them, do not skip them.** They assert that an athlete who
+asks for a Saturday long run gets Saturday, and that Saturday is a training day rather than a
+hardcoded rest day. They stay red until **step 3**.
 
-**4. THEN BUILD ONE PLAN END TO END AND READ A REAL SESSION.** Still the highest-value hour available.
+⛔ **AND STEP 3 IS TWO JOBS.** The solver takes anchors as immovable INPUTS — it cannot honour a pin
+the caller never passes. `schedule_preferences.long_run_day` is declared at
+`generate-run-plan/types.ts:264` and **read nowhere in that function**. The tripwire goes green only
+when the caller reads the preference *and* the solver places around it. Scope both, or step 3 reads
+as the solver failing at something it was never given.
 
----
+### BASELINES — these numbers are the contract
+
+```
+_shared                 1348 passed / 0 failed
+shared                   160 passed / 7 failed   ← the 7 are pre-existing triathlon conformance
+generate-run-plan         33 passed / 2 failed   ← the 2 are the tripwires, red by design
+generate-combined-plan   438 passed / 3 failed   ← the 3 are pre-existing D-031 convergence
+```
+
+### ⛔ WHAT IS UNVERIFIED, AND WHAT WOULD SETTLE IT
+
+| claim | status | what closes it |
+|---|---|---|
+| The whole day's work on a device | ⛔ **NOT VERIFIED.** Deployed ≠ verified | Michael builds a block and reads it on the phone |
+| The verdict supplier ever fires | ⛔ **UNPROVEN** — see the boxed warning below | a REBUILD after a cycle has finished |
+| The 6% cap is visible | ⚠️ plausible, unwatched | A fresh block should run squat TM 90 → 95 → 100 and never approach a 106 max |
+| `placement/` is safe to delete | ✅ **verified** — all nine cells covered | Re-run the coverage check only if the adjacency table moves first |
+
+⛔ **HOW TO PROVE THE VERDICT SUPPLIER — AND HOW NOT TO.**
+
+**The wrong test will look like a failure.** A FRESH block authors twelve weeks before anything is
+logged, so every cycle is a forecast and the weights climb exactly as they always did. Verify on a
+fresh block, see climbing weights, and you will conclude the wire is dead. **It isn't — there is
+nothing for it to read.**
+
+**The right test:** rebuild a block that is already running, after at least one cycle has finished.
+
+- the week-3 AMRAP (**95% × 1+** — the validity check, not weeks 1 or 2) logged at **≥5 reps** →
+  the next cycle **advances**
+- that week **skipped or unlogged** → the next cycle **holds** where it used to climb
+
+⚠️ And it fails OPEN by design: if the query errors it logs a warning and falls back to the forecast.
+So "weights climbed" can mean *forecast*, *earned advance*, or *the fetch broke* — **check the
+`[create-goal] verdicts from N logged sessions` log line** to tell them apart.
+
+### THE PRINCIPLES — eight now, all in `docs/SPEC-week-solver.md`, all checkable
+
+`§0c` currency · `§0d` a test that never failed is not evidence · `§0e` a check whose metric cannot
+move · `§0f` output-boundary loss · `§0g` athlete-intent fields are athlete-write-only *(enforced by a
+type)* · `§0h` a missing signal is not a verdict · `§4.1a` unowned strictness · `§5.2b` never subtract
+silently.
+
+⚠️ **Ten tests were found defending bugs today.** Every one had been green for months. When a change
+turns an old test red, the first question is which of the two is wrong.
 
 ## ⛔ READ `ARCH-strength-spine.md` §0 BEFORE ANY ARCHITECTURE CALL — it was rewritten last night
 
@@ -107,6 +149,14 @@ Focus are the same body at three settings, not three programs that happen to inc
 ---
 
 ## WHAT SHIPPED LAST NIGHT — client only, uncommitted, do NOT re-litigate
+
+> ⛔ **SUPERSEDED 2026-07-27 — THE TITLE IS FALSE TWICE OVER AND THAT IS THE DANGEROUS PART.**
+> This work is **committed** (`784db4ae`) and **deployed**. "Uncommitted" reads as CURRENT STATUS, so
+> a session trusting it would go looking for uncommitted work, find a clean tree, and conclude the
+> work does not exist — which is precisely how this codebase grew four plan generators.
+> **Everything below is history.** Several of these files were changed again on 2026-07-27
+> (`NonRaceBuilder.tsx`, `non-race-goal-seeds.ts`, `strength-primary-plan.ts`) — read the banner at
+> the top of this file before touching any of them.
 
 **Intake (`NonRaceBuilder.tsx`):**
 - **One screen per discipline.** The stacked "When can you train?" step is gone. Flow: goal → disciplines →
@@ -134,6 +184,11 @@ Focus are the same body at three settings, not three programs that happen to inc
 
 ## ⛔ THE SPEC WRITTEN LAST NIGHT — D-325 and D-326. Read them before designing anything adjacent.
 
+> ⚠️ **STILL ACCURATE, WITH ONE ADDITION (2026-07-27).** D-325 and D-326 stand. **D-326 layer 2 — the
+> earned advance — is now BUILT AND DEPLOYED**: `loading/cycle-verdicts.ts` supplies the verdicts and
+> `create-goal` fetches them on a rebuild. It had zero suppliers when this section was written, which
+> was the whole point of the finding. See the banner for what proves it fired.
+
 - **D-325 — Session Cost Ledger + Penalty Scheduler** (`DECISIONS-LOG.md:1260`). Three ordinal axes 0–3,
   ceilings from emphasis, placement by penalty score, **breach states cost and never refuses**, ledger
   **subordinate** to the reconciler. ⚠️ **Arrived labelled D-268 — that number was taken since 2026-07-09.**
@@ -146,6 +201,12 @@ Focus are the same body at three settings, not three programs that happen to inc
 ---
 
 ## ⚠️ THE FINDING THAT MATTERS MOST — the strength gauge is near-blind for 8 of 12 weeks
+
+> ⚠️ **STILL TRUE, AND NOW HALF-ADDRESSED (2026-07-27).** The AMRAP is still weeks 9–11 only, so the
+> gauge is still blind for eight of twelve. What changed is that the engine no longer ADVANCES through
+> that blindness: the training max holds without evidence rather than climbing on the calendar, and it
+> can never exceed the 1RM it came from. The gauge is as blind as it was; the bar no longer moves on
+> nothing. See the banner, §THE LAW CHANGED.
 
 Found by tracing, not guessing, and **nothing in the app says it:**
 
