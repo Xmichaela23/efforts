@@ -89,6 +89,34 @@ Deno.serve(async (req: Request) => {
     const sport: 'run' | 'bike' | null =
       endurance_sport === 'bike' || endurance_sport === 'run' ? endurance_sport : null;
 
+    // ⛔ CONTINUITY, FROM DATA THAT WAS ALREADY THERE. `compute-facts` writes
+    // `learned_fitness.strength_1rms[lift]` with `last_logged` and `sample_count` over a 12-week
+    // window. This function already selected `learned_fitness` — for maxes and pace — and never read
+    // either field. The block shape needed no new signal, only a reader.
+    //
+    // ⚠️ ABSENT IS NOT DETRAINED. No history at all is a COLD START, and `sample_count: 0` reads
+    // identically to "has not lifted in a year" while being a different person entirely. `weeksSince:
+    // null` routes to `unknown`, which resolves to today's 2+1 — so an athlete with no lifting
+    // history sees no change and this ships as a pure addition.
+    const lf = ((ub as any)?.learned_fitness ?? {}) as Record<string, any>;
+    const s1 = (lf.strength_1rms ?? {}) as Record<string, { last_logged?: string; sample_count?: number }>;
+    const entries = Object.values(s1).filter(Boolean);
+    let weeksSince: number | null = null;
+    let logs = 0;
+    for (const e of entries) {
+      logs += Number(e?.sample_count) || 0;
+      const t = e?.last_logged ? Date.parse(String(e.last_logged)) : NaN;
+      if (!Number.isFinite(t)) continue;
+      const w = Math.floor((Date.now() - t) / (7 * 24 * 3600 * 1000));
+      weeksSince = weeksSince == null ? w : Math.min(weeksSince, w);   // the MOST RECENT lift wins
+    }
+    const gsPosture = (body as Record<string, unknown>).strength_posture;
+    const blockShape = {
+      continuity: { weeksSince, logs },
+      strengthPosture: typeof gsPosture === 'string' ? gsPosture : 'develop',
+    };
+    console.log(`[strength-plan] continuity: weeksSince=${weeksSince ?? 'never'} logs=${logs}`);
+
     const plan = composeStrengthPrimaryPlan({
       durationWeeks: Number(duration_weeks) > 0 ? Number(duration_weeks) : 12,
       oneRepMaxes: {
@@ -103,6 +131,8 @@ Deno.serve(async (req: Request) => {
       targetWeeklyMiles: Number(target_weekly_miles) > 0 ? Number(target_weekly_miles) : undefined,
       easyPaceMinPerMile: easyPaceMin,
       longRunDay: typeof long_run_day === 'string' ? long_run_day : undefined,
+      blockShape,
+      pullupMaxReps: Number(((ub as any)?.performance_numbers)?.pullupMaxReps) || undefined,
       // ⛔ D-326 layer 2 — the earned advance. Absent on a fresh block (nothing is logged yet), and
       // present on a REBUILD, where the finished cycles carry real evidence. Validated rather than
       // trusted: an unrecognised verdict is dropped, because a bad value here moves the bar.

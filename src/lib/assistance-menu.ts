@@ -59,6 +59,80 @@ export type AssistanceSlotMenu = {
   options: AssistanceOption[];
 };
 
+/**
+ * ⛔ 25 IS THE FLOOR AND IT STAYS. Decided 2026-07-28, Michael's call.
+ *
+ * It is not a picked number — it is the documented bottom of Wendler's published 25-50 range, with a
+ * stated reason (Van Hooren: an endurance athlete keeps assistance volume low or builds size they
+ * did not ask for). So the fix is not to replace it. **The fix is to derive POSITION WITHIN the
+ * range**, which is the part that was never scaled to anything.
+ *
+ * ⚠️ AND THE DERIVATION IS UNEVEN ON PURPOSE. `pullupMaxReps` exists on `performance_numbers`; there
+ * is no push or single-leg equivalent. Rather than wait for all three, each slot scales on whatever
+ * it actually has and **the copy says which** — "scaled to your tested N reps" versus "the default
+ * floor, no capacity on file". Same rule as everywhere else: cite the evidence you have, stay silent
+ * where you do not. Adding a push capacity later upgrades one slot without touching the model.
+ */
+export const ASSISTANCE_TOTAL_REPS_FLOOR = 25;
+export const ASSISTANCE_TOTAL_REPS_CEILING = 50;
+
+export type AssistanceScaleInputs = {
+  /** `performance_numbers.pullupMaxReps` — clean reps, 0 is valid. Absent → the floor. */
+  pullupMaxReps?: number | null;
+  /** `develop` earns more than `maintain`. */
+  strengthPosture?: string | null;
+  /** ⛔ VOLUME COMES DOWN WHEN THE BAR GOES UP. Anchor cycles hold the floor. */
+  cycleKind?: 'leader' | 'anchor' | null;
+};
+
+/**
+ * Total reps for one slot: the floor, plus whatever the evidence earns, capped at the ceiling.
+ *
+ * ⚠️ ACCESSORIES ARE INSURANCE, NOT STIMULUS. This returns a FLOOR the athlete may stop at, not a
+ * target to chase — the copy that ships with it says so, and nothing here should ever read as a
+ * number to beat.
+ */
+export function assistanceTotalReps(
+  slot: AssistanceSlot,
+  inputs?: AssistanceScaleInputs,
+): { totalReps: number; basis: 'capacity' | 'posture' | 'floor' } {
+  // ⛔ THE ANCHOR HOLDS THE FLOOR, whatever else is true. The main lifts are at 95% with a rep-out;
+  // that is the week accessory volume must not compete with.
+  if (inputs?.cycleKind === 'anchor') return { totalReps: ASSISTANCE_TOTAL_REPS_FLOOR, basis: 'floor' };
+
+  const developing = (inputs?.strengthPosture ?? 'develop') === 'develop';
+
+  // Pull is the one slot with a tested capacity. A 25-rep session against an 8-rep max is a
+  // different exercise from the same session against a 25-rep max.
+  if (slot === 'pull' && typeof inputs?.pullupMaxReps === 'number' && inputs.pullupMaxReps > 0) {
+    const cap = inputs.pullupMaxReps;
+    // 8 reps sits at the floor; capacity above that walks toward the ceiling, three reps of session
+    // volume per rep of capacity. Deliberately shallow — this is insurance.
+    const earned = ASSISTANCE_TOTAL_REPS_FLOOR + Math.max(0, cap - 8) * 3;
+    const capped = Math.min(ASSISTANCE_TOTAL_REPS_CEILING, Math.round(earned / 5) * 5);
+    return { totalReps: developing ? capped : ASSISTANCE_TOTAL_REPS_FLOOR, basis: 'capacity' };
+  }
+
+  // ⛔ NO CAPACITY SIGNAL → THE FLOOR. A first draft gave `develop` posture floor+5, and that
+  // violated the brief's own constraint: *"total per-session accessory volume should come down from
+  // where it sits now, not up."* Posture is not evidence of capacity — it is evidence of INTENT, and
+  // raising someone's volume on intent alone is the guess this whole model exists to remove.
+  //
+  // ⚠️ So posture can only ever WITHHOLD here, never add. `maintain` and `develop` both land on the
+  // floor when nothing is tested; the difference between them shows up on the slot that HAS a
+  // capacity, where maintain declines to spend it.
+  return { totalReps: ASSISTANCE_TOTAL_REPS_FLOOR, basis: developing ? 'posture' : 'floor' };
+}
+
+/** The sentence that names the evidence — or its absence. Never a target, always a floor. */
+export function assistanceBasisNote(basis: 'capacity' | 'posture' | 'floor', cap?: number | null): string {
+  if (basis === 'capacity' && typeof cap === 'number') {
+    return `Scaled to your tested ${cap} clean reps.`;
+  }
+  if (basis === 'posture') return 'No tested capacity on file for this movement, so this is the default floor.';
+  return 'The floor — the main lifts are heavy this cycle and this is here to maintain, not to add.';
+}
+
 export const ASSISTANCE_MENU: AssistanceSlotMenu[] = [
   {
     slot: 'push',

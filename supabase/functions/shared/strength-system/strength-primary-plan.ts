@@ -32,10 +32,13 @@ import {
 } from '../../../../src/lib/maintenance-volume-band.ts';
 import {
   type AssistancePicks,
+  type AssistanceScaleInputs,
   ASSISTANCE_GUIDANCE,
+  assistanceTotalReps,
   resolveAssistance,
 } from '../../../../src/lib/assistance-menu.ts';
 import {
+  type BlockShapeInputs,
   cycleForWeek,
   cyclesForBlock,
   setsForWeek,
@@ -166,6 +169,14 @@ export type StrengthPrimaryArgs = {
    * authors all twelve weeks before a single set has been performed.
    */
   cycleVerdicts?: Partial<Record<keyof OneRepMaxes, readonly WorkingNumberVerdict[]>>;
+  /**
+   * ⛔ HOW MANY CYCLES BUILD BEFORE THE ONES THAT MEASURE (2026-07-28). Continuity across the four
+   * main lifts, plus the overrides. Absent → `unknown` → 2 leaders + 1 anchor, which is exactly the
+   * shape this block had before the input existed. A pure addition.
+   */
+  blockShape?: BlockShapeInputs;
+  /** `performance_numbers.pullupMaxReps` — the one tested accessory capacity that exists. */
+  pullupMaxReps?: number;
 };
 
 /** ONE prescribed set. `weight` is absolute lb — resolved at authoring off the stored working
@@ -251,7 +262,15 @@ export const JUMPS: StrengthExercise = { name: 'Box Jump', sets: 3, reps: 5, wei
  * These three slots are also the Adjust-tab holes — a glute focus loads single-leg/core, a pull-up
  * focus loads pull. An add-on REPLACES the pick in a slot; it never adds a fourth.
  */
-function assistanceRows(picks: AssistancePicks | null | undefined): StrengthExercise[] {
+function assistanceRows(
+  picks: AssistancePicks | null | undefined,
+  // ⛔ THE VOLUME IS DERIVED PER SLOT AND PER CYCLE (2026-07-28). 25 stays the floor — it is the
+  // documented bottom of Wendler's 25-50 range with a cited reason — and what is derived is the
+  // POSITION within it. Only a TESTED capacity moves a slot up; posture alone never does, because
+  // posture is evidence of intent rather than of capacity. Anchor cycles hold the floor: the main
+  // lifts are at 95% with a rep-out, and that is the week accessory volume must not compete with.
+  scale?: AssistanceScaleInputs,
+): StrengthExercise[] {
   return resolveAssistance(picks).map((a) => ({
     name: a.name,
     // ⛔ `sets: 1` RENDERED AS "1×25" AND THAT IS A LIE ABOUT THE PRESCRIPTION.
@@ -265,7 +284,7 @@ function assistanceRows(picks: AssistancePicks | null | undefined): StrengthExer
     // field carries the unit in words. The number is unchanged — only the claim about how it is
     // performed. ⚠️ `reps` is typed `number | string` precisely for this kind of qualitative row.
     sets: undefined,
-    reps: `${a.totalReps} total`,
+    reps: `${assistanceTotalReps(a.slot, scale).totalReps} total`,
     weight: 'By feel',
     load_prescribed: false,
   }));
@@ -279,10 +298,10 @@ function assistanceRows(picks: AssistancePicks | null | undefined): StrengthExer
  * `leader` and `anchor` alongside this change — an unrecognised name resolves to a silent default,
  * which is the shape of Q-192.
  */
-export function buildBlockPhases(weeks: number): { phases: ArcPhase[]; recovery_weeks: number[] } {
+export function buildBlockPhases(weeks: number, shape?: BlockShapeInputs): { phases: ArcPhase[]; recovery_weeks: number[] } {
   const phases: ArcPhase[] = [];
   const recovery_weeks: number[] = [];
-  for (const c of cyclesForBlock(weeks)) {
+  for (const c of cyclesForBlock(weeks, shape)) {
     const workEnd = c.endWeek - 1; // week 4 of every cycle is the deload
     phases.push({
       name: c.kind === 'anchor' ? 'Anchor' : 'Leader',
@@ -644,7 +663,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
 } {
   const { enduranceSport, oneRepMaxes } = args;
   const weeks = blockWeeks(args.durationWeeks);
-  const phaseStructure = buildBlockPhases(weeks);
+  const phaseStructure = buildBlockPhases(weeks, args.blockShape);
 
   // The working number, per lift, set once here (SPEC §1).
   const training_max: OneRepMaxes = {
@@ -909,7 +928,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const sessions_by_week: Record<string, PlanSession[]> = {};
 
   for (let week = 1; week <= weeks; week++) {
-    const placed = cycleForWeek(weeks, week);
+    const placed = cycleForWeek(weeks, week, args.blockShape);
     if (!placed) continue;
     const { slot, weekInCycle } = placed;
     const isDeload = weekInCycle === WEEKS_PER_CYCLE;
@@ -989,9 +1008,16 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // upper sessions without their primer. That is a deliberate omission, not an oversight: a
       // throw needs a medicine ball and a wall, and the intake has never asked for either. Flagged
       // rather than assumed.
+      // ⚠️ REBUILT PER CYCLE, not once per block — the anchor holds the floor while the leaders may
+      // scale. Deload still excludes assistance structurally, by not being in the array at all.
+      const cycleAssistance = assistanceRows(args.assistancePicks, {
+        pullupMaxReps: args.pullupMaxReps,
+        strengthPosture: args.blockShape?.strengthPosture,
+        cycleKind: slot.kind,
+      });
       const ex: StrengthExercise[] = isDeload
         ? [main]
-        : [...(lift.isLower ? [JUMPS] : []), main, ...assistance];
+        : [...(lift.isLower ? [JUMPS] : []), main, ...cycleAssistance];
         // ⛔ THE ANCHOR TOP SET IS A REP-OUT, AND THE PRESCRIPTION READS LIKE A TARGET.
       //
       // Week 11 prescribes `125×1+`. The number after the plus is the entire point — but "1+"
@@ -1214,7 +1240,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     sessions_by_week[String(week)] = weekSessions;
   }
 
-  const cycles = cyclesForBlock(weeks);
+  const cycles = cyclesForBlock(weeks, args.blockShape);
   const leaders = cycles.filter((c) => c.kind === 'leader').length;
   const anchorStart = cycles[cycles.length - 1].startWeek;
   const enduranceNote = enduranceSport

@@ -211,22 +211,98 @@ export const WEEKS_PER_CYCLE = 4;
  *
  * The anchor always comes LAST: leaders build, the anchor expresses and measures.
  */
-export function cyclesForBlock(weeks: number): CycleSlot[] {
+/**
+ * ⛔ HOW MANY CYCLES BUILD BEFORE THE ONES THAT MEASURE. Decided 2026-07-28, Michael's call.
+ *
+ * The block was always 2 leaders + 1 anchor — the LEAST heavy configuration available, on the block
+ * whose stated purpose is heavy work. Nothing chose that; it was the only configuration.
+ *
+ * The split now derives from training continuity across the four main lifts:
+ *
+ * | tier       | test                                  | leaders | anchors |
+ * |------------|---------------------------------------|---------|---------|
+ * | continuous | weeks_since ≤ 2 AND logs ≥ 24         | 0       | all     |
+ * | returning  | anything between                      | 1       | rest    |
+ * | detrained  | weeks_since ≥ 6 OR logs < 8           | 2       | rest    |
+ * | unknown    | no `last_logged` at all               | 2       | rest    |
+ *
+ * ⚠️ DETRAINED IS THE **LEAST** ANCHOR-WEIGHTED, WHICH IS THE OPPOSITE OF THE FIRST DRAFT.
+ * Michael: *"Leaders exist to build a base; detrained is the state where that base is missing.
+ * Sending someone to two 95%-and-AMRAP cycles when their connective tissue is nine weeks behind
+ * their nervous system is the one configuration that can hurt somebody."* Fewer anchors for the
+ * detrained, not more.
+ *
+ * ⚠️ AND UNKNOWN IS NOT DETRAINED. A cold start has no `exercise_log` at all, so `sample_count: 0`
+ * reads identically to "has not lifted in a year" — and those are different people. It gets its own
+ * branch, and it resolves to 2+1, which is exactly today's behaviour. **So this ships as a pure
+ * addition: every athlete without lifting history sees no change.**
+ */
+export type ContinuityTier = 'continuous' | 'returning' | 'detrained' | 'unknown';
+
+export type ContinuitySignal = {
+  /** Weeks since the most recent log across all four main lifts. Null = never logged. */
+  weeksSince: number | null;
+  /** Summed `sample_count` across the four lifts, 12-week window. */
+  logs: number;
+};
+
+export function continuityTier(sig: ContinuitySignal | null | undefined): ContinuityTier {
+  if (!sig || sig.weeksSince == null) return 'unknown';
+  if (sig.weeksSince >= 6 || sig.logs < 8) return 'detrained';
+  if (sig.weeksSince <= 2 && sig.logs >= 24) return 'continuous';
+  return 'returning';
+}
+
+export type BlockShapeInputs = {
+  continuity?: ContinuitySignal | null;
+  /** `develop` is the only posture that earns an anchor-weighted block. */
+  strengthPosture?: string | null;
+  /** ⚠️ OVERRIDES TO 2+1 REGARDLESS OF TIER: a long block, or heavy aerobic load underneath. */
+  highAerobicLoad?: boolean;
+};
+
+/** How many LEADER cycles a block of `count` cycles carries. */
+export function leaderCount(count: number, weeks: number, inputs?: BlockShapeInputs): number {
+  const fallback = Math.max(0, count - 1);   // today's shape: everything but the last is a leader
+  if (count <= 1) return 0;
+  // ⛔ THE OVERRIDES COME FIRST AND THEY ARE NOT TIER-SENSITIVE. Maintain posture is not asking for a
+  // heavy block; a 16-week block has room to build; high aerobic load is already spending the
+  // recovery an anchor cycle needs.
+  if ((inputs?.strengthPosture ?? 'develop') !== 'develop') return fallback;
+  if (weeks >= 16) return fallback;
+  if (inputs?.highAerobicLoad) return fallback;
+
+  switch (continuityTier(inputs?.continuity)) {
+    case 'continuous': return 0;               // every cycle measures
+    case 'returning':  return Math.min(1, fallback);
+    case 'detrained':  return Math.min(2, fallback);
+    case 'unknown':    return fallback;        // = today, exactly
+  }
+}
+
+export function cyclesForBlock(weeks: number, inputs?: BlockShapeInputs): CycleSlot[] {
   const count = Math.max(1, Math.floor(weeks / WEEKS_PER_CYCLE));
+  const leaders = leaderCount(count, weeks, inputs);
   return Array.from({ length: count }, (_, i) => {
     const index = i + 1;
     return {
       index,
-      // Exactly one anchor, and it is last. 12wk → leader, leader, anchor.
-      kind: index === count ? 'anchor' : 'leader',
+      // ⛔ LEADERS FIRST, ANCHORS LAST, ALWAYS. The COUNT varies; the order never does — leaders
+      // build and anchors express, so an anchor before a leader is not a different ratio, it is a
+      // different programme.
+      kind: index <= leaders ? 'leader' : 'anchor',
       startWeek: i * WEEKS_PER_CYCLE + 1,
       endWeek: (i + 1) * WEEKS_PER_CYCLE,
     } as CycleSlot;
   });
 }
 
-export function cycleForWeek(weeks: number, week: number): { slot: CycleSlot; weekInCycle: number } | null {
-  const slot = cyclesForBlock(weeks).find((c) => week >= c.startWeek && week <= c.endWeek);
+export function cycleForWeek(
+  weeks: number,
+  week: number,
+  inputs?: BlockShapeInputs,
+): { slot: CycleSlot; weekInCycle: number } | null {
+  const slot = cyclesForBlock(weeks, inputs).find((c) => week >= c.startWeek && week <= c.endWeek);
   if (!slot) return null;
   return { slot, weekInCycle: week - slot.startWeek + 1 };
 }

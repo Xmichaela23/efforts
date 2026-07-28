@@ -2597,6 +2597,9 @@ Deno.serve(async (req: Request) => {
               ...(gsRideHours ? { target_weekly_ride_hours: gsRideHours } : {}),
               ...(plan_start_date ? { start_date: plan_start_date } : {}),
               ...(gsVerdicts ? { cycle_verdicts: gsVerdicts } : {}),
+              // The posture the block was built under — `develop` is the only one that earns an
+              // anchor-weighted shape (2026-07-28).
+              ...(gsPosture?.strength ? { strength_posture: gsPosture.strength } : {}),
               ...(bodyPreview ? { preview: true } : {}),
             };
             console.log(`[create-goal] Get Strong → strength-primary: sport=${gsSport ?? 'strength-only'} weeks=${gsBody.duration_weeks}`);
