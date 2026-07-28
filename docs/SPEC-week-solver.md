@@ -561,12 +561,37 @@ plan can quietly undo a decision that was made correctly, with a reason, in the 
 requirement, and who reads it?"* This asks **"which filters sit between this cell and the plan, and
 does any of them narrow it?"** A permission with a narrowing consumer is already lost.
 
-⛔ **THREE DECISIONS FALL OUT OF THIS AND NONE ARE THE ENGINE'S** (open, 2026-07-27, Michael's):
-- May an easy ride share a heavy-leg day at the 6h gap? The law permits it; whether it is wise is a
-  training call.
+### ✅ DECIDED 2026-07-28 — LIFT THE UPPER-DAYS-ONLY EXCLUSION
+
+⛔ **IT WAS NEVER TWO QUESTIONS.** "May an easy ride share a heavy-leg day" and "may an easy run" are
+**one unowned rule** — easy work restricted to upper lift days — closing Wednesday and Friday from
+both ends. It produced both symptoms in the same week:
+
+- **one ride instead of two**, because the only permitted days already held a run
+- **runs on Sunday, Monday and Tuesday**, three consecutive days, because Monday was the easy run's
+  only remaining slot
+
+⚠️ **AND MONDAY IS THE WORST DAY IN THE WEEK BY THE ENGINE'S OWN MEASURE.**
+`week-optimizer.easyRunAnchorAdjacencyPenalty` prices **+4** for an easy run adjacent to the quality
+run and **+4** for adjacent to the long run. Monday was both. **+8, and the composer never asked.**
+
+✅ **MICHAEL'S CALL: LIFT IT.** Easy runs and easy rides may share a heavy-leg day **at the 6h gap**,
+which is what the law already says. It restores the recovery-flush use `STRENGTH-PROTOCOL §6.2`
+describes and the cell was deliberately flipped for in May 2026, and it opens Wednesday and Friday —
+where both the second ride and a sane run spread live.
+
+⛔ **AND THE SPREAD TERM MOVES WITH IT — opening days is not enough.** The composer places runs
+first-available with **no spacing term at all**: the lifts got a solver, the runs did not. Without
+spread, Friday opening changes nothing.
+
+✅ **USE `easyRunAnchorAdjacencyPenalty`, DO NOT INVENT ONE.** It already exists, already prices this
+exact adjacency, and is already reasoned. **Same shape as everything else in this document — the
+right rule existing and not being consulted.**
+
+⛔ **STILL OPEN** (2026-07-27, Michael's):
 - Is a third session on one day ever allowed? Today it never is, with a stated reason (a 196-minute
   Thursday) and no law behind it.
-- Do ride days become **pins**?
+- Do ride days become **pins**? ⚠️ See the output-vs-pin note below — do not merge the framings.
 
 ⛔ **AND ON THE THIRD — DO NOT MERGE THE TWO FRAMINGS.** Michael: *"they solve different problems."*
 **Making a day an OUTPUT** is §0a.1 — honest and derived, *"3 hours fits on 1 day, here's why."*
