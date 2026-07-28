@@ -117,7 +117,20 @@ export function cycleIncrementLb(isLowerBody: boolean): number {
  * athlete Wendler wrote for (at TM 340, 4% is 13.6 — the +10 wins) and it binds exactly where the
  * absolute number stops being proportionate.
  */
-export const MAX_CYCLE_STEP_PCT = 0.04;
+/**
+ * ⛔ 6%, AND IT IS DERIVED RATHER THAN PICKED. Michael, 2026-07-27.
+ *
+ * It is the largest relative step Wendler's own absolute increments produce inside the range he
+ * wrote for: +10 on a 170 lb training max (a ~200 lb squat, his lightest realistic case) is 5.9%.
+ * So the cap bounds **only what he never anticipated** — a bar small enough that +10 is a double-digit
+ * percentage — and is a no-op for every load he did.
+ *
+ * ⚠️ A FIRST DRAFT USED 4% AND OVERREACHED. With 5 lb plate granularity, 4% only reaches +10 at a
+ * 250 training max, so every lower-body max from 125 to 249 stepped +5 where Wendler says +10 — a
+ * 235 lb squat included. The intent was to bound the out-of-range case, not to slow the lifters the
+ * absolute numbers were written for.
+ */
+export const MAX_CYCLE_STEP_PCT = 0.06;
 export const MIN_PLATE_STEP_LB = 5;
 
 export function cappedCycleIncrementLb(workingNumber: number, isLowerBody: boolean): number {
@@ -141,7 +154,19 @@ export function cappedCycleIncrementLb(workingNumber: number, isLowerBody: boole
  * max has caught up with the max on file and the block needs a new one. Quietly clipping the number
  * would produce a plan that stops progressing for no stated reason.
  */
-export const TM_CEILING_PCT_OF_1RM = 0.90;
+/**
+ * ⛔ 100%: THE TRAINING MAX MAY NEVER EXCEED THE 1RM. Michael, 2026-07-27.
+ *
+ * ⚠️ A FIRST DRAFT USED 90% AND BOUND IN CYCLE 3 FOR EVERY ATHLETE. The working number STARTS at 85%
+ * of the 1RM, so 90% leaves only five points of headroom while three cycles of Wendler's own
+ * increments spend about seven — a 315 lb squat held at 275 instead of reaching 285, which stops the
+ * standard block advancing in its measuring cycle. That is a far broader change than the drift the
+ * ceiling exists to bound.
+ *
+ * At 100% the CAP does the work and the ceiling is the backstop: it fires only where the capped step
+ * would still carry the bar past the max it was derived from.
+ */
+export const TM_CEILING_PCT_OF_1RM = 1.00;
 
 export function tmCeilingLb(oneRM: number): number {
   if (!Number.isFinite(oneRM) || oneRM <= 0) return Number.POSITIVE_INFINITY;

@@ -69,11 +69,11 @@ Deno.test('the working number steps BETWEEN cycles, never inside one — capped,
   // Bench (1RM 225): TM 190 → 195 → 200. Ceiling is 90% of 225 = 200, so cycle 3 lands exactly on it.
   assertEquals(ramp(5, 'Bench Press'), '125x5 145x5 165x5');
   assertEquals(ramp(9, 'Bench Press'), '130x5 150x5 170x5+');
-  // ⛔ SQUAT STOPS AT THE CEILING, and this is the assertion that changed. TM 265 → 275, and cycle 3
-  // would be 285 against a ceiling of 90% × 315 = 280 — so it HOLDS at 275 and says so.
-  // Was `185x5` (65% of an uncapped 285). The training max no longer climbs past what the entered
-  // max can test.
-  assertEquals(ramp(9, 'Back Squat').split(' ')[0], '175x5');
+  // ⛔ AND THE STANDARD BLOCK IS UNCHANGED BY THE CAP AND THE CEILING. Squat 1RM 315: TM 265 → 275 →
+  // 285, every step Wendler's +10 (6% of 265 is 15.9, so his number wins), and 285 is under the
+  // 315 ceiling. 65% of 285 = 185.25 → 185. An earlier draft used 4% and a 90% ceiling and this
+  // came out 175 — the numbers were bounding loads they were never meant to reach.
+  assertEquals(ramp(9, 'Back Squat').split(' ')[0], '185x5');
 });
 
 Deno.test('ANCHOR cycle: 5/3/1 proper, and the all-out set is the LAST set only', () => {
