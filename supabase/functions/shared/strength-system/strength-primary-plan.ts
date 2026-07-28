@@ -908,7 +908,36 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       const main = mainLiftRow(lift, wn, oneRepMaxes[lift.ref], setsForWeek(slot.kind, weekInCycle));
       // Jumps and assistance are dropped on the deload — the deload is a volume cut, not a lighter
       // version of the same session [Bosquet 2007, Wang 2023: cut volume, hold intensity].
-      const ex: StrengthExercise[] = isDeload ? [main] : [JUMPS, main, ...assistance];
+      // ⛔ JUMPS ARE LOWER-BODY WORK AND ONLY GO ON LOWER DAYS. Fixed 2026-07-27.
+      //
+      // `Box Jump 3×5` was added to EVERY lifting session, bench and overhead press included — a
+      // lower-body plyometric, the highest loading-rate item in the block, on days the engine
+      // classifies as `upper`. And `upper` is not a label here, it is a LOAD CLAIM that five
+      // separate things read:
+      //   1. the solver's 48h heavy↔heavy clock and its 48h/24h clocks against the long run and
+      //      hard day — all computed as if these days carry no leg load
+      //   2. `heavyLowerDays`, which decides whether the hill session's descents are walked
+      //   3. `upperLiftDays`, which decides where easy runs may stack
+      //   4. `stackNeedsRecoveryGap`, which produced the line "they share no prime movers, so back
+      //      to back is fine" — printed on a day carrying fifteen jump landings before hill repeats.
+      //      **False as printed.**
+      //   5. the session's own `upper`/`lower` tag
+      //
+      // Same shape as the long-run label: identity read off a NAME (the main lift) instead of
+      // derived from what the session actually contains. The fix makes the claim true rather than
+      // re-classifying the day — legs are free on upper days because nothing leg-loaded is there.
+      //
+      // ⚠️ HIP THRUSTS STAY. Concentric-dominant, no landing, no eccentric transient — they do not
+      // reach the next day and they are not the same question.
+      //
+      // ⚠️ WENDLER PRESCRIBES A PRIMER BEFORE EVERY SESSION — jumps on lower days, medicine-ball
+      // THROWS on upper days. Dropping jumps from upper days without substituting throws leaves the
+      // upper sessions without their primer. That is a deliberate omission, not an oversight: a
+      // throw needs a medicine ball and a wall, and the intake has never asked for either. Flagged
+      // rather than assumed.
+      const ex: StrengthExercise[] = isDeload
+        ? [main]
+        : [...(lift.isLower ? [JUMPS] : []), main, ...assistance];
       weekSessions.push({
         // ⛔ The SOLVER's day, not the grid's. `liftDay()` falls back to `lift.day` only if
         // place-week omitted this lift, so a placement failure degrades to the old fixed week

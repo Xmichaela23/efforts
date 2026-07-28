@@ -2552,13 +2552,24 @@ Deno.serve(async (req: Request) => {
               const { data: goalRow } = await supabase
                 .from('goals').select('training_prefs').eq('id', createdGoalId).eq('user_id', user_id).single();
               const prefs = (goalRow?.training_prefs ?? {}) as Record<string, unknown>;
-              const pd = { ...((prefs.preferred_days ?? {}) as Record<string, unknown>), strength: placedStrengthDays };
+              // ⛔ NOT `preferred_days.strength`. That key means "the athlete chose this", and on this
+              // path nothing asks them — writing engine output there is the fabricated-preference bug
+              // #131 fixed on the combined side. Engine days travel under the key that says so, the
+              // same convention `strength_optimizer_slots` already uses in the export.
+              const pd = { ...((prefs.preferred_days ?? {}) as Record<string, unknown>) };
+              delete (pd as Record<string, unknown>).strength;
               const { error: pdErr } = await supabase
                 .from('goals')
-                .update({ training_prefs: { ...prefs, preferred_days: pd } })
+                .update({
+                  training_prefs: {
+                    ...prefs,
+                    preferred_days: pd,
+                    strength_optimizer_slots: placedStrengthDays,
+                  },
+                })
                 .eq('id', createdGoalId).eq('user_id', user_id);
               if (pdErr) console.warn('[create-goal] could not write placed strength days:', pdErr.message);
-              else console.log(`[create-goal] goal strength days set from the plan: ${placedStrengthDays.join(', ')}`);
+              else console.log(`[create-goal] strength_optimizer_slots set from the plan: ${placedStrengthDays.join(', ')}`);
             }
             await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: gsPlanId });
             await retireCompetingActivePlans(supabase, user_id, gsPlanId, { mode, existing_goal_id, replace_plan_id });

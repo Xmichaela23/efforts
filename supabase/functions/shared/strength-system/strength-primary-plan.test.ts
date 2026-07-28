@@ -154,12 +154,26 @@ Deno.test('heavy leg days are held apart — 48h is the floor, and the solver mu
   assert(gapDays >= 3, `heavy leg days ${gapDays * 24}h apart; with no pins the week has room for 72h`);
 });
 
+Deno.test('⛔ JUMPS ARE ON LOWER DAYS ONLY — an upper day means legs are free', () => {
+  // ⛔ THIS TEST ASSERTED `Box Jump` ON THE BENCH SESSION and was green from the day it was written.
+  // A box jump is the highest loading-rate item in the block, and `upper` is not a label — it is a
+  // LOAD CLAIM read by the solver's 48h clocks, the descent rule, easy-run stacking, the
+  // "share no prime movers" stack copy, and the session tag. With jumps on every day the claim was
+  // false on all five.
+  const upper = sessionsFor(1).find((s) => s.name === 'Strength — Overhead Press')!.strength_exercises!;
+  assertEquals(upper.some((r: any) => r.name === 'Box Jump'), false, 'a jump landed on an upper day');
+  const lower = sessionsFor(1).find((s) => s.name === 'Strength — Back Squat')!.strength_exercises!;
+  assertEquals(lower[0].name, 'Box Jump', 'the lower day lost its primer');
+});
+
 Deno.test('a work session is jumps → main lift → 25 reps each of push / pull / single-leg-core', () => {
   // Was `.find(s => s.type === 'strength')` — the FIRST strength session, which assumed the grid
   // put Bench on Monday. Days are the solver's now, so name the lift instead of trusting the order.
-  const rows = sessionsFor(1).find((s) => s.name === 'Strength — Bench Press')!.strength_exercises!;
+  // ⚠️ Named off the SQUAT session now: jumps are lower-day only (see the test above), so the
+  // full jumps → main → assistance shape only exists on a lower day.
+  const rows = sessionsFor(1).find((s) => s.name === 'Strength — Back Squat')!.strength_exercises!;
   // Defaults, because this plan was built with no picks — skipping the card still yields a block.
-  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Bench Press', 'Push Up', 'Pull Up', 'Reverse Lunge']);
+  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Push Up', 'Pull Up', 'Reverse Lunge']);
   // `sets` is optional on the type now (assistance rows carry a rep TOTAL and no set count), but the
   // jump row always has one — 3×5 = 15, the top of Wendler's 10–15 jumps or throws.
   assertEquals(JUMPS.sets! * (JUMPS.reps as number), 15);
@@ -181,14 +195,15 @@ Deno.test('the athlete’s picks reach the block, and an unknown name falls back
   // Named, not indexed — `[0]` assumed Bench was the first session, which was the grid's doing.
   const benchOf = (p: any) => p.sessions_by_week['1']
     .find((s: any) => s.name === 'Strength — Bench Press')!.strength_exercises!.map((r: any) => r.name);
-  assertEquals(benchOf(picked), ['Box Jump', 'Bench Press', 'Dips', 'Dumbbell Row', 'Hanging Leg Raise']);
+  // ⚠️ No Box Jump — bench is an upper day, and the picks still reach it.
+  assertEquals(benchOf(picked), ['Bench Press', 'Dips', 'Dumbbell Row', 'Hanging Leg Raise']);
 
   // A name that is no longer on the menu must not strand an existing goal.
   const stale = composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0,
     assistancePicks: { push: 'Bench Press Machine', pull: '', single_leg_core: undefined },
   });
-  assertEquals(benchOf(stale), ['Box Jump', 'Bench Press', 'Push Up', 'Pull Up', 'Reverse Lunge']);
+  assertEquals(benchOf(stale), ['Bench Press', 'Push Up', 'Pull Up', 'Reverse Lunge']);
 });
 
 Deno.test('⛔ ASSISTANCE CARRIES NO PRESCRIBED LOAD — including the loaded options', () => {

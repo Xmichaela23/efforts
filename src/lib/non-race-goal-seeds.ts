@@ -106,12 +106,22 @@ export function buildPreferredDays(
     const day = sched.qualityDays?.[d];
     if (day && present(d)) out[`quality_${d}`] = day;
   }
-  // Develop (Get Strong) = the 4-day U/L/U/L arc — match the engine grid so the intake header doesn't
-  // contradict the plan (Mon/Tue/Thu/Fri). Maintain/support strength stays the 2-day concurrent slot.
-  if (present('strength')) {
-    out.strength = posture.strength === 'develop'
-      ? ['monday', 'tuesday', 'thursday', 'friday']
-      : ['monday', 'thursday'];
+  // ⛔ THE `develop` SEED WAS DELETED 2026-07-27. It set Mon/Tue/Thu/Fri "to match the engine grid so
+  // the intake header doesn't contradict the plan" — and that WAS the grid, back when `MAIN_LIFTS`
+  // was hardcoded to those days. The solver places dynamically now, so the seed asserted a schedule
+  // the plan did not have: a real block ran Mon/Tue/Wed/Fri under a summary reading Mon/Tue/Thu/Fri.
+  //
+  // ⛔ AND NOTHING ASKS THE ATHLETE FOR STRENGTH DAYS ON THIS PATH. `preferred_days` means "the
+  // athlete's choice", so a value derived from POSTURE and presented there is a fabricated
+  // preference — attributing to the athlete a decision the engine made. That is the exact bug
+  // #131 fixed on the combined path (`create-goal:1042`: *"Persisting it in `preferred_days` made
+  // engine defaults surface as Athlete preference"*), which routes engine days through
+  // `strength_optimizer_slots`, labelled "scheduled by app". This path reintroduced it.
+  //
+  // The placed days are written back by `create-goal` after the plan exists — as engine output,
+  // under a key that says so.
+  if (present('strength') && posture.strength !== 'develop') {
+    out.strength = ['monday', 'thursday'];
   }
   return out;
 }
