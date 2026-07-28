@@ -3,7 +3,7 @@
 // Run: ~/.deno/bin/deno test --no-check src/lib/exercise-config.movement-family.test.ts
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/assert_equals.ts';
-import { getMovementFamily, movementFamilyOfPattern, sharesMovementFamily, getMovementGroup } from './exercise-config.ts';
+import { getExerciseConfig, getMovementFamily, movementFamilyOfPattern, sharesMovementFamily, getMovementGroup } from './exercise-config.ts';
 
 Deno.test('the two pushes answer as ONE family — the Overhead-Press-and-Dips case', () => {
   assertEquals(movementFamilyOfPattern('horizontal_push'), 'push');
@@ -47,4 +47,43 @@ Deno.test('an absent pattern is not evidence of a clash (§0h)', () => {
   assertEquals(getMovementFamily('Nonexistent Widget Press'), null);
   assertEquals(sharesMovementFamily('Nonexistent Widget Press', 'Bench Press'), false);
   assertEquals(sharesMovementFamily('Nonexistent Widget Press', 'Another Nonexistent Thing'), false);
+});
+
+// ── Q-212 step 3: the balance pool ────────────────────────────────────────────
+// Before these entries the push slot on a press day had NOTHING to substitute to — every option
+// on that menu was itself pushing. These pin that the pool resolves and that it actually answers
+// the query, which is the only reason it exists.
+
+Deno.test('the balance pool resolves — including the hyphenated spellings (Q-210)', () => {
+  for (const n of [
+    'Face Pull', 'Face Pulls',
+    'Band Pull Apart', 'Band Pull Aparts', 'Band Pull-Aparts',
+    'Rear Delt Fly', 'Rear Delt Flyes',
+    'Chest Supported Row', 'Chest-Supported Row',
+  ]) {
+    assertEquals(getMovementFamily(n), 'pull', `"${n}" should resolve to the pull family`);
+  }
+});
+
+Deno.test('⛔ THE QUERY IS ANSWERABLE ON A PRESS DAY — the point of the pool', () => {
+  // Both presses, against every pool option: none of them collides.
+  for (const main of ['Bench Press', 'Overhead Press']) {
+    for (const opt of ['Face Pull', 'Band Pull Apart', 'Rear Delt Fly', 'Chest Supported Row']) {
+      assertEquals(sharesMovementFamily(main, opt), false, `${main} + ${opt} should NOT collide`);
+    }
+    // And the control: the pick that raised Q-212 still collides, or the rule proves nothing.
+    assertEquals(sharesMovementFamily(main, 'Dips'), true, `${main} + Dips SHOULD collide`);
+  }
+});
+
+Deno.test('the pool spans a load range rather than one movement three ways', () => {
+  // Michael: "Face Pull variants aren't it — Chest Supported Row would be the one that adds range."
+  // The light work prescribes no load; the row carries a real reference so a swap into it can be
+  // priced (D-322). If this flips to ratio 0, the pool has collapsed back to three of the same.
+  for (const light of ['Face Pull', 'Band Pull Apart', 'Rear Delt Fly']) {
+    assertEquals(getExerciseConfig(light)?.ratio, 0.0, `${light} should prescribe no load`);
+    assertEquals(getExerciseConfig(light)?.primaryRef, null, `${light} should have no load reference`);
+  }
+  assertEquals(getExerciseConfig('Chest Supported Row')?.primaryRef, 'bench');
+  assertEquals(getExerciseConfig('Chest Supported Row')?.confidence, 'medium');
 });

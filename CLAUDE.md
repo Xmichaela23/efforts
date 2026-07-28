@@ -21,6 +21,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 If you are about to say "the app needs X" — you are probably about to rebuild X.
 
+**AND THE SECOND FORM, WHICH THE GREP ABOVE DOES NOT CATCH: the derivation slot usually exists, and the AXIS is what's new.** Before adding a field, ask whether an existing field is being asked a question it was never built for. Three times in one week (2026-07-28) the answer was already in the codebase, and each time the near-miss was a *second vocabulary beside the first*:
+
+- `MovementPattern` existed (Q-181, nine values, 134 entries) when a "missing movement-pattern field" was about to be scoped from scratch.
+- `MovementGroup` existed (D-315) when a collision axis was needed — but it calls a bench press and a pull-up both `upper`, which is **correct for placement and blind for collision**. Same data, different question. The fix was a second *grouping*, not a second *taxonomy*.
+- `canonicalize()` already owned name resolution when a lint was about to re-derive it caller-side.
+
+**So the tell is not "does this concept exist" but "does something already hold this data, and am I about to ask it a new question?"** If yes, the deliverable is a new accessor over the existing vocabulary — and it belongs *next to* the old one, with a note saying which question each answers, or the next session adds a third.
+
 ---
 
 ## STOP — this app is BUILT. The job is wiring, not features.

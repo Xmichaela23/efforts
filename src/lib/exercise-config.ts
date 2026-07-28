@@ -530,7 +530,75 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'band',
     isUnilateral: false
   },
-  
+
+  // ── Q-212 THE BALANCE POOL — what a slot reaches for on a day the main lift already covers ──
+  //
+  // ⛔ THESE EXIST TO MAKE A QUERY ANSWERABLE. Before them, the push slot on a press day had
+  // NOTHING to substitute to: every option on that menu was itself pushing. Michael's call, and it
+  // is not "a weaker version of the same pattern" — *"the press day is already pushing-heavy and the
+  // balancing work is what's missing."* So all three are `horizontal_pull`.
+  //
+  // ⚠️ THREE IS NOT A RICH POOL AND IS NOT CLAIMED TO BE. It is enough to answer the query on a
+  // press day, which a slot with zero options cannot.
+  //
+  // ⚠️ `ratio: 0.0` + `primaryRef: null` on the two light ones is DELIBERATE, not a gap: assistance
+  // rows carry `load_prescribed: false`, so nothing should derive a weight for them. A ratio here
+  // would be a number invented to fill a field.
+  'band pull apart': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false
+  },
+  'band pull aparts': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false
+  },
+  'rear delt fly': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false
+  },
+  'rear delt flyes': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false
+  },
+  // ⛔ THE ONE THAT ADDS RANGE RATHER THAN MORE OF THE SAME (Michael: *"Face Pull variants aren't
+  // it — Chest Supported Row would be the one"*). Face pulls and pull-aparts are both light,
+  // high-rep rear-delt work; this is a loaded row, so the pool spans a real load range instead of
+  // offering the same movement three ways.
+  //
+  // ⚠️ THE RATIO IS INHERITED, NOT INVENTED, AND IT IS THE ONE JUDGEMENT CALL HERE. `dumbbell row`
+  // is `bench × 0.45` at `confidence: 'high'`; a chest-supported row is the same movement with the
+  // torso braced, which removes the lower-back and cheat-rowing component rather than changing what
+  // the arms do. Same reference, same ratio, **`confidence: 'medium'`** because that inheritance is
+  // reasoned rather than measured — ±15% instead of ±10%.
+  'chest supported row': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'bench',
+    ratio: 0.45,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+    confidence: 'medium'
+  },
+  'chest supported rows': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'bench',
+    ratio: 0.45,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+    confidence: 'medium'
+  },
+
   // ============================================================================
   // SHOULDERS (Overhead Press Reference)
   // ============================================================================
