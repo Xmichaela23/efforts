@@ -38,6 +38,8 @@ export function useArcSetupComplete() {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Why the preview failed, so the copy can say it instead of shrugging. */
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [saveBanner, setSaveBanner] = useState<string | null>(null);
   const [conflictOverlay, setConflictOverlay] = useState<ConflictOverlay | null>(null);
 
@@ -126,7 +128,29 @@ export function useArcSetupComplete() {
           ...(payload.plan_start_date ? { plan_start_date: payload.plan_start_date } : {}),
         },
       );
-      if (err || !data || (data as { success?: boolean }).success === false) return null;
+      // ⛔ DO NOT SWALLOW THE REASON. This line used to read `if (err || !data || success === false)
+      // return null`, capturing `err` and never reading it. Three unrelated failures — a transport
+      // error, an empty response, and the server explicitly saying `success: false` with a message —
+      // all collapsed into one indistinguishable `null`, and the UI rendered "The week could not be
+      // built" for every one of them.
+      //
+      // ⚠️ THE COST WAS A WHOLE SESSION. The response body was the one thing needed to diagnose this
+      // and the client HAD it, then threw it away before anyone could look. §0h's family: a failure
+      // that cannot say what failed is not a diagnosis, it is a shrug.
+      if (err) {
+        const detail = (err as { message?: string })?.message || String(err);
+        console.error('[arc-preview] invoke failed:', detail, err);
+        setPreviewError(detail);
+        return null;
+      }
+      const fail = data as { success?: boolean; error?: string; message?: string } | null;
+      if (!data || fail?.success === false) {
+        const detail = fail?.error || fail?.message || 'the function returned no plan';
+        console.error('[arc-preview] server refused:', detail, data);
+        setPreviewError(detail);
+        return null;
+      }
+      setPreviewError(null);
       return (data as { plan?: Record<string, unknown> }).plan ?? null;
     },
     [],
@@ -248,5 +272,5 @@ export function useArcSetupComplete() {
     [navigate, startLoop, rollbackInsertedGoals],
   );
 
-  return { complete, preview, saving, error, saveBanner, conflictOverlay, handleConflictChoice };
+  return { complete, preview, saving, error, previewError, saveBanner, conflictOverlay, handleConflictChoice };
 }
