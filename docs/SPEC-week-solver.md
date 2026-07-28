@@ -180,8 +180,44 @@ outlive this session:**
 | **0d** | a test that has never failed is not evidence |
 | **0e** | a check whose metric cannot move is not a check |
 | **0f** | a correct answer that fails to say what the spec requires is still a failure |
+| **0g** | a field named for athlete intent may only be written by athlete input |
 | **4.1a** | strictness beyond the law needs an owner and a reason |
 | **5.2b** | never subtract silently — refuse, and name the options |
+
+## ⛔ 0g. A FIELD NAMED FOR ATHLETE INTENT MAY ONLY BE WRITTEN BY ATHLETE INPUT
+
+**The seventh principle, and it is §0f's inverse.** §0f is the output failing to say something the
+spec requires. This is the output **asserting something the athlete never said** — attributing a
+choice to them that the engine made.
+
+**The instance.** `preferred_days.strength` was seeded from POSTURE, and nothing on that path ever
+asks the athlete for strength days. A block ran Mon/Tue/Wed/Fri under a summary headed *"Athlete
+preferences"* reading Mon/Tue/Thu/Fri. **The engine's placement was correct; the summary invented the
+expectation it appeared to violate.**
+
+⛔ **AND THE REINTRODUCTION IS THE FINDING, NOT THE BUG.** `create-goal:1042` records the identical
+defect fixed on the combined path under #131 — *"Persisting it in `preferred_days` made engine
+defaults surface as Athlete preference"* — with the correct pattern already established: engine days
+travel via `strength_optimizer_slots`, labelled "scheduled by app". **The strength path reintroduced
+it independently, months later.** A fix that lives in one branch is not a fix; it is a local repair of
+a problem that exists everywhere — the same shape as six placement authorities solving one problem
+six ways.
+
+✅ **THE RULE:**
+
+| channel | may be written by |
+|---|---|
+| `preferred_days.*`, and any field an export labels "athlete preference" | **athlete input only** |
+| engine choices | a channel whose NAME says the engine chose it (`strength_optimizer_slots`) |
+| engine DEFAULTS that seed a preference | ⚠️ neither of the above — see the open item below |
+
+⛔ **OPEN, FOUND BY THE SWEEP 2026-07-27 AND NOT YET RESOLVED.** After the `develop` seed was removed,
+`non-race-goal-seeds.ts` still writes `preferred_days.strength = ['monday','thursday']` for
+maintain/support postures. **That is the same fabrication, one branch over** — posture-derived, never
+asked. It is not simply deletable: `combined-schedule-prefs` reads that key back as
+`strength_preferred_days`, so it is doing real work as an engine DEFAULT feeding the optimizer's
+preferred-day bias. **A default is legitimate; presenting it as the athlete's choice is not.** It
+needs a defaults channel, and that is a combined-path change rather than a strength-path one.
 
 ## 0a. ⛔ THE FIVE HARD CONSTRAINTS, AND THE WHOLE SEARCH
 
