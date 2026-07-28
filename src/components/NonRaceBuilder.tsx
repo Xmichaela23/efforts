@@ -348,7 +348,7 @@ type PreviewPlan = {
 
 export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {}) {
   const navigate = useNavigate();
-  const { complete, preview, saving } = useArcSetupComplete();
+  const { complete, preview, saving, previewError } = useArcSetupComplete();
   // ⛔ THE WEEK, BEFORE IT IS ACCEPTED. Nothing here writes: `preview()` calls the composer with the
   // goal inline and persists neither a goal nor a plan.
   const [previewWeek, setPreviewWeek] = React.useState<PreviewSession[] | null>(null);
@@ -1192,6 +1192,11 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                             your setup produces an empty week. Building the plan may still work; if it
                             does not, the answers are saved and can be retried.
                           </p>
+                          {/* ⛔ NAME THE FAILURE. The reason existed on every one of these and was
+                              discarded in the hook, so this panel could only ever shrug. */}
+                          {previewError ? (
+                            <p className="text-white/40 text-[11px] mt-2 font-mono break-words">{previewError}</p>
+                          ) : null}
                         </div>
                       );
                     }

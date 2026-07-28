@@ -44,11 +44,14 @@ export function strengthFocusSections(opts: {
   weeks?: number;
   leaderCycles?: number;
   anchorStartWeek?: number;
+  /** How many cycles carry the open set. Derived from the block, not assumed to be one. */
+  anchorCycles?: number;
   enduranceNote?: string;
 }): StrengthFocusSection[] {
   const weeks = opts.weeks ?? STRENGTH_FOCUS_WEEKS;
   const leaders = opts.leaderCycles ?? Math.max(1, Math.floor(weeks / 4) - 1);
   const anchorStart = opts.anchorStartWeek ?? weeks - 3;
+  const anchors = opts.anchorCycles ?? Math.max(1, Math.floor(weeks / 4) - leaders);
   return [
     {
       heading: 'The trade-off',
@@ -60,10 +63,23 @@ export function strengthFocusSections(opts: {
       // deadlift Friday" — the hardcoded grid the rebuild replaced. The four lifting days are now
       // placed around the athlete's endurance absolutes (`place-week.ts`), so the days differ per
       // athlete and naming them here would promise a week the engine may not build.
+      // ⛔ THE SHAPE IS DERIVED, NOT ASSUMED (2026-07-28). This sentence hardcoded "N building
+      // cycles, then ONE measuring cycle from week X" — written when every block ended in exactly one
+      // anchor. The continuity-derived ratio made the shape variable, and the first anchor-weighted
+      // block printed *"0 building cycles, then one measuring cycle from week 9"* over a plan whose
+      // every cycle was a measuring cycle. Both halves false, and "0" as a word in prose.
+      //
+      // ⚠️ §0f: the block knew its own shape and the narration did not follow it.
       body:
         `Sub-maximal loading (Wendler's 5/3/1) keeps fatigue manageable. Four lifting days, placed ` +
-        `around your endurance. ${leaders} building cycle${leaders === 1 ? '' : 's'}, then one ` +
-        `measuring cycle from week ${anchorStart}. Each ends in a deload.`,
+        `around your endurance. ` +
+        (leaders === 0
+          ? `All ${anchors} cycles are measuring cycles, each carrying an open set and ending in a deload.`
+          : `${leaders} building cycle${leaders === 1 ? '' : 's'}, then ` +
+            (anchors === 1
+              ? `one measuring cycle from week ${anchorStart}. `
+              : `${anchors} measuring cycles from week ${anchorStart}. `) +
+            `Each ends in a deload.`),
     },
     {
       heading: 'The reality check',
@@ -96,10 +112,50 @@ export function strengthFocusSections(opts: {
  * layers named there. This line stops the app claiming otherwise in the meantime; it does not fix
  * the blindness.
  */
-export function strengthFocusBufferLine(enduranceNote = ''): string {
+export function strengthFocusBufferLine(enduranceNote = '', anchorCycles = 1): string {
+  // ⛔ "THE FINAL CYCLE" IS ONLY TRUE WHEN THERE IS ONE ANCHOR (2026-07-28). In an anchor-weighted
+  // block every cycle carries the open set, so naming the last one tells the athlete the other two
+  // measurements do not count — and they are what the working number advances on.
+  //
+  // ⚠️ AND "weights come off 85% of your max" READ AS A CONTRADICTION against the ramp printed below
+  // it, which shows three different percentages. It was never describing the SETS: 85% is where the
+  // WORKING NUMBER starts. Said plainly now, because the athlete can see both numbers at once.
+  const measured = anchorCycles > 1 ? `each cycle` : `the final cycle`;
   return (
-    `Weights come off 85% of your max, and that buffer is what makes the last set of the final ` +
-    `cycle worth measuring. Week one sits well inside you by design.${enduranceNote}`
+    `Your working number starts at 85% of your max and every set comes off that, which is the buffer ` +
+    `that makes the last set of ${measured} worth measuring. Week one sits well inside you by ` +
+    `design.${enduranceNote}`
+  );
+}
+
+/**
+ * ⛔ THE CEILING IS EVIDENCE THE MAX ON FILE IS STALE — it is not the athlete's limit.
+ *
+ * When the working number reaches its ceiling the lift stops climbing, and a block that says nothing
+ * has told the athlete *"what you get here is what sets the next cycle's weights"* on a lift where
+ * that is false. Twelve reps on the open set and the next cycle is identical.
+ *
+ * ⚠️ THE FRAMING IS THE WHOLE POINT. Michael, 2026-07-28: *"Not 'you've maxed out' — 'the max on file
+ * has stopped being true.'"* The ceiling is 90% of a number typed at signup that nothing updates, so
+ * hitting it is far more likely to mean the record is out of date than that the athlete has stopped
+ * progressing. Read the other way it tells someone mid-progress that they have plateaued.
+ *
+ * ⚠️ NO IMPERATIVE (COPY-VOICE). States the fact and the conditional consequence; it does not
+ * instruct. Returns '' when nothing hit the ceiling, so the sentence never appears without cause.
+ */
+export function strengthFocusCeilingLine(liftNames: readonly string[]): string {
+  const names = Array.from(new Set(liftNames.filter(Boolean)));
+  if (names.length === 0) return '';
+  const list = names.length === 1
+    ? names[0]
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  const plural = names.length > 1;
+  return (
+    `One thing before you start. ${list} reach${plural ? '' : 'es'} the top of the range the working ` +
+    `number is allowed to occupy, so ${plural ? 'those lifts hold' : 'that lift holds'} rather than ` +
+    `climbing for the rest of the block. That is usually the max on file being out of date rather ` +
+    `than a limit — a fresh test on ${plural ? 'them' : 'it'} before the block starts would let ` +
+    `${plural ? 'those numbers' : 'that number'} keep moving.`
   );
 }
 
@@ -108,12 +164,35 @@ export function strengthFocusDescription(opts: {
   weeks: number;
   leaderCycles: number;
   anchorStartWeek: number;
+  anchorCycles?: number;
   enduranceNote?: string;
+  /** Lifts whose working number hits its ceiling inside this block. Empty → the line is omitted. */
+  ceilingLifts?: readonly string[];
+  /**
+   * ⛔ THE COMPROMISES THE SOLVER MADE, RENDERED (2026-07-28). `placement_compromises` was written on
+   * every plan and read by nothing — the second correctness-relevant message in this block found
+   * being composed and discarded. A cost the athlete is paying and cannot see is not a cost that was
+   * disclosed.
+   */
+  compromises?: ReadonlyArray<{ kind: 'breach' | 'cost'; text: string }>;
 }): string {
   const sections = strengthFocusSections(opts);
   const body = sections.slice(0, 3).map((s) => `${s.heading}. ${s.body}`).join('\n\n');
   const whatsNext = sections[3];
-  return `${body}\n\n${strengthFocusBufferLine(opts.enduranceNote ?? '')}\n\n${whatsNext.heading}. ${whatsNext.body}`;
+  const ceiling = strengthFocusCeilingLine(opts.ceilingLifts ?? []);
+  // ⚠️ The ceiling line already says the ceiling thing, so its own compromise entries are dropped
+  // here rather than printed twice in different words.
+  const rest = (opts.compromises ?? [])
+    .filter((c) => c?.text && !/training max|working number reaches/i.test(c.text))
+    .map((c) => c.text);
+  const parts = [
+    body,
+    strengthFocusBufferLine(opts.enduranceNote ?? '', opts.anchorCycles ?? 1),
+    ceiling,
+    rest.length ? `What this week costs. ${rest.join(' ')}` : '',
+    `${whatsNext.heading}. ${whatsNext.body}`,
+  ].filter(Boolean);
+  return parts.join('\n\n');
 }
 
 // ─── BAR SPEED — the block's in-session doctrine ────────────────────────────────────────────────

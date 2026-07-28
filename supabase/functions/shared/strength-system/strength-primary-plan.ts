@@ -795,6 +795,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const strengthDays = MAIN_LIFTS.map(liftDay);
   // ⛔ Surfaced, never swallowed. `place-week` states which clearance it had to break; the plan
   // carries those words to the athlete verbatim.
+  /** Lifts pinned at the ceiling — named in the block header so the flat weeks have a stated reason. */
+  const ceilingLifts = new Set<string>();
   const placementCompromises: Array<{ kind: 'breach' | 'cost'; text: string }> = [
     ...solverRefusal,
     ...placedWeek.compromises.map((text) => ({ kind: 'breach' as const, text })),
@@ -970,10 +972,16 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // so the block stops advancing that lift — the athlete needs to know why rather than watch a
       // number quietly stop moving.
       if (wnResult.ceilingHitAtCycle !== null) {
+        ceilingLifts.add(lift.name);
+        // ⛔ REFRAMED 2026-07-28: THE CEILING IS EVIDENCE OF A STALE MAX, NOT A LIMIT REACHED.
+        // The old wording — "a training max above the max it came from cannot be tested" — is true
+        // and reads as *you have maxed out*. The 1RM it measures against is a signup number nothing
+        // updates, so hitting the ceiling almost always means the RECORD is out of date.
         const line =
-          `${lift.name}: the training max reaches ${Math.round(TM_CEILING_PCT_OF_1RM * 100)}% of your ` +
-          `${oneRepMaxes[lift.ref]} lb max at cycle ${wnResult.ceilingHitAtCycle}, so it holds there ` +
-          `for the rest of the block. A training max above the max it came from cannot be tested.`;
+          `${lift.name}: the working number reaches ${Math.round(TM_CEILING_PCT_OF_1RM * 100)}% of the ` +
+          `${oneRepMaxes[lift.ref]} lb max on file at cycle ${wnResult.ceilingHitAtCycle} and holds ` +
+          `there for the rest of the block. That is usually the number on file being out of date ` +
+          `rather than a limit — a fresh test would let it keep climbing.`;
         if (!placementCompromises.some((c) => c.text === line)) {
           placementCompromises.push({ kind: 'cost', text: line });
         }
@@ -1254,7 +1262,15 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // reads so the athlete is shown the same words before committing that the plan carries after.
       // Provenance for every line (what is biology, what is product voice, what is a debt) lives in
       // that file's header. Do not re-word it here; there would then be two.
-      strengthFocusDescription({ weeks, leaderCycles: leaders, anchorStartWeek: anchorStart, enduranceNote }),
+      strengthFocusDescription({
+        weeks,
+        leaderCycles: leaders,
+        anchorStartWeek: anchorStart,
+        anchorCycles: cycles.length - leaders,
+        enduranceNote,
+        ceilingLifts: [...ceilingLifts],
+        compromises: placementCompromises,
+      }),
     duration_weeks: weeks,
     sessions_by_week,
     phaseStructure,
