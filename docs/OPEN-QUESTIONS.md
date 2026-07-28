@@ -1350,13 +1350,50 @@ After a supersede the new plan mints NEW `planned_workouts` rows with NEW ids, w
 
 ⚠️ **THIS IS §0f WITH A WORKED EXAMPLE, AND A BETTER ONE THAN THE PLACEMENT CASE, BECAUSE HERE THE PROXY HAS ALREADY FAILED.** A requirement with no field to carry it gets proxied, and the proxy is what breaks. Seven pattern-coverage assertions went red from a cosmetic spelling difference without one prescription changing.
 
-⛔ **A WRONG NUMBER IN PRODUCTION, FOUND ON THE WAY — NOT A NAMING ISSUE.** `'Lat Pull Down'`
-(`triathlon_performance.ts:739`) misses `_shared/canonicalize.ts`'s curated `'lat pulldown'` key, so it
-slugifies to `'lat_pull_down'`. `MUSCLE_GROUP` (`:212`) knows `lat_pulldown` and not `lat_pull_down`, and
-`muscleGroup()` (`:223`) falls to `'other'`. **That exercise's volume has been landing outside `back` in
-`workout_facts.muscle_volume`** — quietly, for as long as the name has been spelled that way. Michael:
-*"it's a wrong number in production, not just a naming issue."* ⚠️ Scope not measured: how many of the
-148 name literals miss the curated map is exactly what the option-C lint would report.
+⛔ **MEASURED 2026-07-28 — the scan is the lint minus the enforcement, so the count and a working
+detector came out of one pass.** Every `name:` literal sitting next to `sets`/`reps`/`weight` across
+`shared/strength-system/**` + `src/lib/assistance-menu.ts`, run through the REAL `canonicalize()`
+(imported, not reimplemented — reimplementing the lookup would be the same proxy defect being measured).
+
+| | count |
+|---|---|
+| distinct exercise names emitted | **111** |
+| HIT the curated map | 33 |
+| **MISS → slugify fallback** | **78** |
+| of the misses: a curated key for the SAME movement already exists | **19** |
+| of the misses: name CONTAINS a curated movement (leading modifier) | 26 — ⚠️ upper bound, needs a call per row |
+| of the misses: no curated movement anywhere in the name | 33 |
+
+✅ **SO C IS SMALL AT ITS CORE AND THE TAIL IS A JUDGEMENT CALL.** 19 rows are unambiguous map gaps —
+`Lat Pull Down` → `lat pulldown`, four spellings of `Single-Leg RDL`, three of `Push-ups`. Another 26
+contain a curated movement but need a human decision, because containment is not identity: `Jump Squats`
+contains `squat` and **is not a squat for 1RM purposes**. The remaining 33 are genuinely outside the
+vocabulary (`Foot Doming`, `Tibialis Raises`, `Skater Hops`) and `other` may be the right answer for them.
+
+⚠️ **THE QUALIFIER SPLIT IS REAL AND IT IS THE BIGGER HALF OF THE 19.** 13 of the 19 differ from a
+curated key ONLY by a trailing parenthetical — `Goblet Squat (Heavy)`, `Hip Thrusts (Fast Concentric)`,
+`Bodyweight Squat (3-2-X tempo)`. Those do not want new map entries; they want the canonicaliser to strip
+the qualifier before lookup. **A different fix from a missing row, exactly as Michael predicted.**
+
+⛔ **AND THE LIVE CONSEQUENCE IS ON TICKET 2'S PATH, NOT THE MUSCLE MAP.** `'Hip Thrusts'` canonicalises
+to `hip_thrust`, which **is in `STRENGTH_ANCHORS`** (`compute-facts/index.ts:869`) — so it earns an e1RM,
+a trend and a State verdict. `'Hip Thrusts (Fast Concentric)'` slugifies to
+`hip_thrusts_fast_concentric`, is **not** an anchor, and is **excluded from `learned_fitness.strength_1rms`
+entirely**. The same lift, in the same block, is tracked or invisible depending on whether the protocol
+appended a qualifier — and `strength_1rms` is the exact field Ticket 2 wants to read.
+⚠️ **This is Q-197's shape recurring** (*"Squat e1RM is split across TWO canonical names"*), which was
+filed 2026-07-22 and mostly closed. A fix that lives in one branch is not a fix.
+
+⚠️ **CORRECTION TO THIS ENTRY'S FIRST VERSION — I OVERSTATED THE MUSCLE-GROUP CONSEQUENCE.** All 78
+misses do land in `muscleGroup() === 'other'`, and `'Lat Pull Down'` genuinely files outside `back`. But
+`workout_facts.strength_facts.muscle_groups` has **exactly one reader** —
+`strengthSessionLegPosteriorRelevant` (`_shared/build-coaching-context.ts:29`) — and
+`buildCoachingContext` has **zero call sites in the repo**. So the data is wrong where it is stored and
+**nothing reads it today**. Wrong-and-unread, not wrong-and-surfaced.
+⚠️ It is still worth fixing before that reader is ever wired, because the failure would be silent when it
+lands: the ratio is `legs+posterior / total`, and an inflated `other` bucket sits in the DENOMINATOR — so
+a mis-filed name **suppresses** a leg-day signal rather than erroring. ⛔ **And note the shape: computed,
+stored, no live reader — that is Q-211 again, with the value wrong on top.**
 
 ⚠️ **AND THE SPELLING DRIFT ALREADY COSTS MORE THAN THE TESTS.** `_shared/canonicalize.ts` maps `'lat pulldown' → 'lat_pulldown'`; the protocol emits `'Lat Pull Down'`, which misses the curated map and slugifies to `'lat_pull_down'`. `MUSCLE_GROUP` (`:212`) knows `lat_pulldown` and not `lat_pull_down`, and `muscleGroup()` (`:223`) falls to `'other'` — so that exercise's volume lands outside `back` in `workout_facts.muscle_volume`. The tests are the visible symptom of a drift that is already mis-filing data.
 
