@@ -1267,6 +1267,75 @@ Two heavy pressing sessions and 50 reps of dips across roughly 24 hours, none of
 ✅ **AND SHAPE 2 GENERALISES, WHICH IS THE REAL ARGUMENT.** The same rule catches a pull-dominant main
 lift colliding with the pull slot — **which nothing in the current build would catch either.**
 
+### ⛔ SCOPE, 2026-07-28 — THE TAXONOMY ALREADY EXISTS. DO NOT BUILD ONE.
+
+⚠️ **THIS CORRECTS THIS ENTRY'S OWN CROSS-LINK, WRITTEN AN HOUR EARLIER**, which said the rule was
+blocked on a field that had to be added. `StrengthExercise` and `AssistanceOption` do lack the field —
+that part stands. **But the taxonomy and the per-exercise mapping have been in `src/lib/exercise-config.ts`
+since Q-181**, and both sides' names already resolve through it. A session reading only the earlier
+version would build a second vocabulary beside this one, which is `CLAUDE.md`'s opening failure mode.
+
+| what exists | where |
+|---|---|
+| `MovementPattern` — a NINE-value typed union: `knee_dominant` · `hip_dominant` · `horizontal_push` · `horizontal_pull` · `vertical_push` · `vertical_pull` · `core` · `plyometric` · `calf` | `src/lib/exercise-config.ts:45` |
+| the mapping — **134 of 135 entries carry a pattern** | same file |
+| reachability from the edge function | the composer already imports `src/lib/assistance-menu.ts` by relative path; this is the same hop |
+| ⛔ **it is ONE vocabulary already**, which is the property Michael required | `MovementPattern` is not per-consumer |
+
+✅ **MEASURED, NOT REASONED — every name run through the real `getExerciseConfig()`.** All four main
+lifts and all twelve menu options resolve today:
+
+| main lift | pattern | | slot pick | pattern |
+|---|---|---|---|---|
+| Bench Press | `horizontal_push` | | Push Up · Dips · DB Bench | `horizontal_push` |
+| Overhead Press | `vertical_push` | | DB Shoulder Press | `vertical_push` |
+| Back Squat | `knee_dominant` | | Pull Up · Chin Up | `vertical_pull` |
+| Deadlift | `hip_dominant` | | Inverted Row · DB Row | `horizontal_pull` |
+| | | | Reverse Lunge · Bulgarian Split Squat | `knee_dominant` |
+| | | | Single Leg Hip Thrust | `hip_dominant` |
+| | | | Hanging Leg Raise | `core` |
+
+⛔ **AND THAT TABLE CONFIRMS BOTH COLLISIONS WITH REAL VALUES, INCLUDING THE LIVE ONE.**
+`Deadlift` = `hip_dominant` and `Single Leg Hip Thrust` = `hip_dominant` — **an exact pattern match, in
+the block Michael is holding.** Michael: *"a push-day special case would have left it there
+permanently. That's the argument for pattern-keyed slots, and it's better than mine because it's a
+second instance rather than a hypothetical generalisation."* `Back Squat` / `Bulgarian Split Squat` is
+the third, latent on the athlete's pick.
+
+⚠️ **THE FIELD WAS BUILT FOR THE OPPOSITE QUESTION, AND THAT IS THE WHOLE DESIGN NOTE.** Q-181 added it
+to find a *good substitute* — its own comment reads *"a horizontal push is replaced by another
+horizontal push."* Q-212 needs the INVERSE: a movement whose pattern must NOT match. **Same field, same
+vocabulary, negated predicate.** No new taxonomy is owed.
+
+### ⛔ SO THE COST IS NOT THE FIELD. THREE THINGS ARE ACTUALLY OWED
+
+**1. A FAMILY GROUPING OVER THE NINE.** The rule is *"no pushing in the push slot on a press day,"* and
+a press day is `horizontal_push` OR `vertical_push`. Exact-pattern comparison alone would let Dips
+(`horizontal_push`) sit on an Overhead Press (`vertical_push`) day — the exact case in the block that
+raised this. Needs `{horizontal,vertical}_push → push`, `…_pull → pull`, `knee_dominant`/`hip_dominant`
+as their own families. ⚠️ Nine values, four or five families — small, but it is a NEW derivation and it
+needs an owner (§4.1a).
+
+**2. THE POOL — AND THIS IS THE REAL COST.** Slots stop being fixed lists and become QUERIES, which only
+means something if there is something to query. ⛔ Measured against the real resolver: `Face Pull`
+resolves (`horizontal_pull`), but **`Band Pull Apart` and `Rear Delt Fly` do not resolve at all.** The
+menu's push slot currently offers four pushing options and nothing else, so on a press day a
+substitution rule has **nothing to substitute to**. The deliverable is a taxonomy query PLUS enough
+movements to make it answerable — new `exercise-config` entries, new menu options, and a decision about
+what a slot's `purpose` sentence says once the slot no longer names one pattern.
+
+**3. THE DEAD CALL SITE, FIRST.** ⛔ `strength-primary-plan.ts:804` — `const assistance =
+assistanceRows(args.assistancePicks)` — is **declared and never read. Zero consumers**, confirmed by
+identifier scan. The live path is the per-cycle rebuild at `:1021`. `noUnusedLocals` is off
+(`CLAUDE.md`), which is why it never surfaced. **Delete it before touching either, or a fix lands in
+the path nobody reads.** ⚠️ And note the shape — computed correctly, thrown away: **Q-211's sixth
+instance**, found while scoping something else.
+
+✅ **`targets` MUST NOT BE THE KEY, AND NOW IT DOES NOT HAVE TO BE.** It is prose (*"Chest, front
+shoulders, triceps"*) and keying off it would be the string proxy that broke the seven conformance
+tests. The typed field already exists; the rule reads `getExerciseConfig(name).pattern`, never the
+description.
+
 ⛔ **BLOCKED ON Q-210'S MISSING FIELD, AND THIS IS THE CONNECTION WORTH KEEPING.** `StrengthExercise`
 (`protocols/types.ts:153`) has no movement-pattern field, and neither does `AssistanceOption`
 (`src/lib/assistance-menu.ts:42` — `name`, `targets`, `requires`). A rule that says *"do not fill the
@@ -1370,6 +1439,12 @@ After a supersede the new plan mints NEW `planned_workouts` rows with NEW ids, w
 ⚠️ **AND IT NEEDS ENFORCEMENT OR IT IS CONVENTION**, which has already failed three times on `preferred_days.strength` (§0g). Options are reported separately; the scope is **148 distinct name literals across ~10 protocol files, all free strings**.
 
 ⚠️ **SCOPE CAVEAT: "no hyphens" cannot be blanket.** Legitimate hyphens live in qualifiers and compound modifiers — `'Single-Leg RDL (Heavy DB)'`, `'Inverted Ring Row or Band Row (Chest-Supported)'`, `'Bodyweight Squat (3-2-X tempo)'`. The rule holds for the MOVEMENT NAME; it cannot be a global strip.
+
+⚠️ **CORRECTION 2026-07-28 — A TYPED `MovementPattern` ALREADY EXISTS** (`src/lib/exercise-config.ts:45`,
+nine values, 134 of 135 entries mapped, added under Q-181). What is missing is the field on
+`StrengthExercise` (`protocols/types.ts:153`) — **not the vocabulary.** ⛔ The conformance fix is
+therefore to carry the EXISTING pattern onto the emitted row, never to mint a second taxonomy. See
+Q-212's scope section for the measured coverage.
 
 ⛔ **AND Q-212 IS THE REASON THE FIELD IS WORTH ADDING BEYOND FIXING TESTS.** Arrived at from the
 opposite direction on 2026-07-28: Q-212's fix — substitute the assistance MOVEMENT when it collides
