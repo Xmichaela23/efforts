@@ -7,7 +7,16 @@
  *      that means reset — and a skipped session must not drop the athlete's working number 10%.
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { amrapRepsForLift, verdictForCycle, verdictsForCycles } from './cycle-verdicts.ts';
+import {
+  amrapRepsForLift,
+  cycleSessionFor,
+  verdictForCycle,
+  verdictsForCycles,
+} from './cycle-verdicts.ts';
+import { cyclesForBlock } from './wendler-531.ts';
+
+/** A session at the 95% week — the one the validity check reads. */
+const wk3 = (w: any) => ({ weekInCycle: 3, workout: w });
 
 const set = (o: Record<string, unknown>) => ({ completed: true, ...o });
 const session = (name: string, sets: Record<string, unknown>[]) =>
@@ -26,7 +35,7 @@ Deno.test('⛔ A HEAVY SINGLE AFTER THE AMRAP IS NOT THE MEASUREMENT', () => {
     { weight: 135, reps: 1 },                // a joker single — heavier, not the measurement
   ]);
   assertEquals(amrapRepsForLift(w, 'Back Squat'), 8);
-  assertEquals(verdictForCycle([w], 'Back Squat'), 'advance');
+  assertEquals(verdictForCycle([wk3(w)], 'Back Squat'), 'advance');
 });
 
 Deno.test('the AMRAP is found by its flag wherever it sits in the set list', () => {
@@ -35,20 +44,20 @@ Deno.test('the AMRAP is found by its flag wherever it sits in the set list', () 
     { weight: 100, reps: 10 },   // a backoff set with more reps
   ]);
   assertEquals(amrapRepsForLift(w, 'Bench Press'), 3);
-  assertEquals(verdictForCycle([w], 'Bench Press'), 'reset', 'three reps at 95% is a miss');
+  assertEquals(verdictForCycle([wk3(w)], 'Bench Press'), 'reset', 'three reps at 95% is a miss');
 });
 
 Deno.test('a session with no AMRAP flag at all yields no reps, not the top set', () => {
   const w = session('Deadlift', [{ weight: 200, reps: 5 }, { weight: 225, reps: 5 }]);
   assertEquals(amrapRepsForLift(w, 'Deadlift'), null);
-  assertEquals(verdictForCycle([w], 'Deadlift'), 'hold');
+  assertEquals(verdictForCycle([wk3(w)], 'Deadlift'), 'hold');
 });
 
 // ── Constraint 2: absent is not zero ─────────────────────────────────────────
 
 Deno.test('⛔ NOTHING LOGGED IS `hold`, NOT `reset` — a skipped session must not cost 10%', () => {
   assertEquals(verdictForCycle([], 'Back Squat'), 'hold', 'an empty cycle');
-  assertEquals(verdictForCycle([session('Bench Press', [{ weight: 100, reps: 5, amrap: true }])], 'Back Squat'),
+  assertEquals(verdictForCycle([wk3(session('Bench Press', [{ weight: 100, reps: 5, amrap: true }]))], 'Back Squat'),
     'hold', 'the cycle happened but this lift was never done');
   assertEquals(amrapRepsForLift(null, 'Back Squat'), null);
   assertEquals(amrapRepsForLift({ strength_exercises: null }, 'Back Squat'), null);
@@ -58,7 +67,7 @@ Deno.test('⛔ A LOGGED ZERO IS STILL A RESET — the distinction runs both ways
   // Absent must not become 0, and a real 0 must not become absent. It is evidence of a miss.
   const w = session('Back Squat', [{ weight: 125, reps: 0, amrap: true }]);
   assertEquals(amrapRepsForLift(w, 'Back Squat'), 0);
-  assertEquals(verdictForCycle([w], 'Back Squat'), 'reset');
+  assertEquals(verdictForCycle([wk3(w)], 'Back Squat'), 'reset');
 });
 
 Deno.test('⛔ A PREFILLED AMRAP IS THE PRESCRIPTION, NOT A RESULT (D-204)', () => {
@@ -68,7 +77,7 @@ Deno.test('⛔ A PREFILLED AMRAP IS THE PRESCRIPTION, NOT A RESULT (D-204)', () 
     { weight: 125, reps: 5, amrap: true, prefilled: true, completed: false },
   ] }] };
   assertEquals(amrapRepsForLift(untouched, 'Back Squat'), null);
-  assertEquals(verdictForCycle([untouched], 'Back Squat'), 'hold');
+  assertEquals(verdictForCycle([wk3(untouched)], 'Back Squat'), 'hold');
 
   // Once the athlete marks it done, the prefill flag no longer suppresses it.
   const done = { strength_exercises: [{ name: 'Back Squat', sets: [
@@ -79,14 +88,52 @@ Deno.test('⛔ A PREFILLED AMRAP IS THE PRESCRIPTION, NOT A RESULT (D-204)', () 
 
 // ── Ordering ─────────────────────────────────────────────────────────────────
 
-Deno.test('the most recent performed AMRAP in a cycle wins', () => {
-  const first = session('Back Squat', [{ weight: 125, reps: 3, amrap: true }]);
-  const redo = session('Back Squat', [{ weight: 125, reps: 6, amrap: true }]);
+// ── Which AMRAP: the 95% week, not the latest ───────────────────────────────
+
+Deno.test('⛔ THE VERDICT READS THE 95% WEEK, NOT THE LATEST AMRAP', () => {
+  // The anchor carries three AMRAPs at three loads: 85%×5+, 90%×3+, 95%×1+. Only the last is the
+  // validity check. Reading "the latest logged" would grade whichever week happened to be done last.
+  const wk1 = { weekInCycle: 1, workout: session('Back Squat', [{ weight: 110, reps: 5, amrap: true }]) };
+  const wk2 = { weekInCycle: 2, workout: session('Back Squat', [{ weight: 120, reps: 3, amrap: true }]) };
+  const wk3s = { weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 7, amrap: true }]) };
+  assertEquals(verdictForCycle([wk1, wk2, wk3s], 'Back Squat'), 'advance', 'seven at 95% is a pass');
+
+  // ⛔ AND THE CASE THAT MAKES "LATEST" DANGEROUS: the 5/3/1 week is missed. "Latest" would grade the
+  // 90% × 3+ set — three reps, a pass by prescription — against a ≥5 bar and RESET the athlete for
+  // completing the session as written.
+  assertEquals(verdictForCycle([wk1, wk2], 'Back Squat'), 'hold',
+    'no 95% week logged means no evidence, not a miss');
+});
+
+Deno.test('a repeated 95% session is the only place recency decides', () => {
+  const first = { weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 3, amrap: true }]) };
+  const redo = { weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 6, amrap: true }]) };
   assertEquals(verdictForCycle([first, redo], 'Back Squat'), 'advance');
 });
 
 Deno.test('verdicts come back one per cycle, in order', () => {
-  const hit = session('Back Squat', [{ weight: 125, reps: 6, amrap: true }]);
-  const miss = session('Back Squat', [{ weight: 125, reps: 2, amrap: true }]);
+  const hit = wk3(session('Back Squat', [{ weight: 125, reps: 6, amrap: true }]));
+  const miss = wk3(session('Back Squat', [{ weight: 125, reps: 2, amrap: true }]));
   assertEquals(verdictsForCycles([[hit], [miss], []], 'Back Squat'), ['advance', 'reset', 'hold']);
+});
+
+// ── Cycle grouping: the plan's week number, never the date ──────────────────
+
+Deno.test('⛔ A SESSION FINDS ITS CYCLE BY PLAN WEEK, and week-in-cycle falls out of it', () => {
+  const cycles = cyclesForBlock(12);   // 1-4, 5-8, 9-12
+  const w = session('Back Squat', [{ weight: 125, reps: 6, amrap: true }]);
+  assertEquals(cycleSessionFor(11, cycles, w)?.cycleIndex, 3);
+  assertEquals(cycleSessionFor(11, cycles, w)?.session.weekInCycle, 3, 'week 11 is the 95% week');
+  assertEquals(cycleSessionFor(1, cycles, w)?.cycleIndex, 1);
+  assertEquals(cycleSessionFor(8, cycles, w)?.session.weekInCycle, 4, 'week 8 is a deload');
+});
+
+Deno.test('⛔ AN UNATTACHED WORKOUT CONTRIBUTES NOTHING — no plan week, no cycle', () => {
+  // No `planned_id` means no `week_number`. An ad-hoc session the engine cannot place is not
+  // evidence about a prescribed one, so it yields nothing and the cycle holds.
+  const cycles = cyclesForBlock(12);
+  const w = session('Back Squat', [{ weight: 125, reps: 6, amrap: true }]);
+  assertEquals(cycleSessionFor(null, cycles, w), null);
+  assertEquals(cycleSessionFor(undefined, cycles, w), null);
+  assertEquals(cycleSessionFor(99, cycles, w), null, 'a week outside the block');
 });
