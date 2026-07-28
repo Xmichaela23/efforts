@@ -1257,6 +1257,24 @@ Two heavy pressing sessions and 50 reps of dips across roughly 24 hours, none of
 
 ⚠️ **AND WENDLER'S OWN TEMPLATES DERIVE THIS.** Assistance in 5/3/1 is conventionally chosen *against* the day's main lift — pull and leg work on a pressing day, pressing on a pull day — precisely so the assistance does not stack onto what the main lift just loaded. The 25/25/25-on-every-day shape is a simplification this block made, not something the protocol prescribes.
 
+### ⛔ THE FIX HAS TWO SHAPES, AND MICHAEL TOOK THE SECOND (2026-07-28)
+
+| | shape | verdict |
+|---|---|---|
+| 1 | **Reduce the dose** when the main lift covers the pattern | ⛔ rejected — *"the problem isn't volume, it's pattern collision."* Dips at 12 on a press day still puts the same muscles under load |
+| 2 | **Substitute the MOVEMENT** — a press day gets antagonist or postural work in the push slot (face pulls, band pull-aparts, rear delt) rather than more pressing at a lower dose | ✅ **chosen** — it BALANCES the pressing instead of adding to it, and it is what 5/3/1 assistance templates conventionally put on a press day |
+
+✅ **AND SHAPE 2 GENERALISES, WHICH IS THE REAL ARGUMENT.** The same rule catches a pull-dominant main
+lift colliding with the pull slot — **which nothing in the current build would catch either.**
+
+⛔ **BLOCKED ON Q-210'S MISSING FIELD, AND THIS IS THE CONNECTION WORTH KEEPING.** `StrengthExercise`
+(`protocols/types.ts:153`) has no movement-pattern field, and neither does `AssistanceOption`
+(`src/lib/assistance-menu.ts:42` — `name`, `targets`, `requires`). A rule that says *"do not fill the
+push slot with pushing on a press day"* has to know both are pushing. ⚠️ **Today the only signal is a
+display string, and `targets` is prose** (*"Chest, front shoulders, triceps"*) — keying off it would be
+the identical proxy that broke the seven conformance tests. **Build this downstream of the pattern
+field, or build it on sand.**
+
 **Why it is not fixed here.** It belongs with the accessory model (`src/lib/assistance-menu.ts` + `assistanceRows`), NOT with the rematerializer, and the accessory work this session deliberately stopped at volume. Changing which movement runs on which day is a different decision from how many reps of it.
 
 **What would settle the interference claim.** The exposure count is arithmetic and certain; the training cost is not. The honest version is that it is a known 5/3/1 convention being departed from without a stated reason — which is §4.1a's test (*strictness, or laxity, beyond the protocol needs an owner and a reason*), and there is no owner on record for the departure.
@@ -1352,6 +1370,13 @@ After a supersede the new plan mints NEW `planned_workouts` rows with NEW ids, w
 ⚠️ **AND IT NEEDS ENFORCEMENT OR IT IS CONVENTION**, which has already failed three times on `preferred_days.strength` (§0g). Options are reported separately; the scope is **148 distinct name literals across ~10 protocol files, all free strings**.
 
 ⚠️ **SCOPE CAVEAT: "no hyphens" cannot be blanket.** Legitimate hyphens live in qualifiers and compound modifiers — `'Single-Leg RDL (Heavy DB)'`, `'Inverted Ring Row or Band Row (Chest-Supported)'`, `'Bodyweight Squat (3-2-X tempo)'`. The rule holds for the MOVEMENT NAME; it cannot be a global strip.
+
+⛔ **AND Q-212 IS THE REASON THE FIELD IS WORTH ADDING BEYOND FIXING TESTS.** Arrived at from the
+opposite direction on 2026-07-28: Q-212's fix — substitute the assistance MOVEMENT when it collides
+with the day's main lift — needs a rule that knows a bench press and a dip are both pushing. The only
+thing available today is the display name. ⚠️ **So Q-212 is unbuildable cleanly until this field
+exists, or it gets built on the same string proxy that just cost seven conformance tests.** A missing
+field that only breaks tests is a hygiene item; one that blocks a training decision is not.
 
 ⛔ **THE PATTERN FIELD STAYS ON THE LIST, AND IT IS THE REAL FIX.** `StrengthExercise` (`protocols/types.ts:153`) has `name, sets, reps, weight, target_rir, notes` and **no movement-pattern field**, so a test asserting PATTERN COVERAGE can only regex a DISPLAY STRING. Michael: *"the naming rule makes these tests correct; it doesn't stop a legitimate rename from breaking them again"* — `Chin ups` for `Pull ups` is a real possibility and would break them a second time.
 
