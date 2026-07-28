@@ -8,6 +8,8 @@ import {
   cyclesForBlock,
   cycleForWeek,
   verdictFrom95Set,
+  cappedCycleIncrementLb,
+  tmCeilingLb,
   workingNumberForCycles,
   applyVerdict,
   VALIDITY_CHECK_PCT,
@@ -129,10 +131,35 @@ Deno.test('the 95% verdict: 5+ advances, fewer resets, no data holds', () => {
 });
 
 Deno.test('applying the verdict: advance steps, reset drops 10%, hold does nothing', () => {
-  assertEquals(applyVerdict(210, 'advance', true), 220);
-  assertEquals(applyVerdict(150, 'advance', false), 155);
-  assertEquals(applyVerdict(210, 'reset', true), 185);   // 189 → 185, rounded down
-  assertEquals(applyVerdict(210, 'hold', true), 210);
+  // ⚠️ Returns `{ workingNumber, ceilingHit }` now — the ceiling has to travel with the number so a
+  // hold at the ceiling can be REPORTED rather than looking like an arbitrary stall.
+  // ⚠️ 215, not 220 — the 4% cap binds at a 210 training max (4% = 8.4, one plate step = 5).
+  assertEquals(applyVerdict(210, 'advance', true).workingNumber, 215);
+  assertEquals(applyVerdict(150, 'advance', false).workingNumber, 155);
+  assertEquals(applyVerdict(210, 'reset', true).workingNumber, 185);   // 189 → 185, rounded down
+  assertEquals(applyVerdict(210, 'hold', true).workingNumber, 210);
+});
+
+Deno.test('⛔ THE INCREMENT IS CAPPED AT 4% — Wendler\'s +10 is out of range on a small bar', () => {
+  // +10 on a 90 lb training max is 11.1% per cycle. It is not that Wendler is wrong; the absolute
+  // number is calibrated to a squat where 10 lb is ~3%, and below that it stops being proportionate.
+  assertEquals(cappedCycleIncrementLb(90, true), 5);     // 4% of 90 = 3.6 → floored to one plate step
+  assertEquals(cappedCycleIncrementLb(265, true), 10);   // 4% of 265 = 10.6 → Wendler's +10 wins
+  assertEquals(cappedCycleIncrementLb(340, true), 10);   // a no-op for the athlete he wrote for
+  assertEquals(cappedCycleIncrementLb(120, false), 5);   // upper is already +5
+});
+
+Deno.test('⛔ THE TRAINING MAX MAY NEVER EXCEED 90% OF THE 1RM — and it HOLDS rather than clipping', () => {
+  // Three clean advances used to walk a 106 lb squat's TM from 90 to 110 — past the max it came
+  // from — and the anchor AMRAP then measured that bar and wrote it back. Nothing knew that was
+  // impossible.
+  const ceiling = tmCeilingLb(106);
+  assertEquals(ceiling, 95);
+  const at = applyVerdict(95, 'advance', true, 106);
+  assertEquals(at.workingNumber, 95, 'the number must HOLD, not clip to some in-between value');
+  assertEquals(at.ceilingHit, true, 'a ceiling hold must be reportable, not silent');
+  // Below the ceiling it advances normally.
+  assertEquals(applyVerdict(85, 'advance', true, 106).ceilingHit, false);
 });
 
 Deno.test('a fewer-bonus-reps week is NOT a reset — only missing the prescribed reps is', () => {
@@ -149,13 +176,34 @@ Deno.test('a fewer-bonus-reps week is NOT a reset — only missing the prescribe
 // climbed, then the AMRAP measured that bar and wrote it back as the athlete's 1RM. Wendler's own
 // gate — five at 95% or drop 10% — was written, correct, and called by nothing.
 
-Deno.test('no verdicts = the old calendar behaviour, exactly', () => {
-  // The behaviour-unchanged proof (Constitution Law 6). If this drifts, the seam changed something.
+Deno.test('⛔ NO VERDICTS NOW MEANS HOLD — a missing signal is not evidence of progress', () => {
+  // ⛔ THIS TEST ASSERTED THE OPPOSITE and was the behaviour-unchanged proof for the seam. It was
+  // right at the time: the seam had to ship inert. But `cycleVerdicts` then went months with ZERO
+  // SUPPLIERS, so "absent = advance" meant a complete, tested, correct advancement mechanism
+  // advanced unconditionally while appearing to have earned it. The failure looked like normal
+  // operation — silent subtraction's cousin.
+  for (const isLower of [true, false]) {
+    for (let cycle = 2; cycle <= 4; cycle += 1) {
+      assertEquals(
+        workingNumberForCycles(200, cycle, isLower).workingNumber, 200,
+        `cycle ${cycle} ${isLower ? 'lower' : 'upper'} advanced with no evidence`,
+      );
+    }
+  }
+});
+
+Deno.test('the FORECAST is the one caller allowed to advance without evidence, and it must say so', () => {
+  // A fresh block projects three cycles into weeks that have not happened. No verdict CAN exist, and
+  // holding would show identical weights in cycles 1, 2 and 3. The caller declares it explicitly.
+  // ⚠️ Compared against a CAPPED expectation, not `workingNumberForCycle`. That function is the
+  // uncapped calendar stepper and now has no production callers — the forecast advances, but it
+  // advances by the capped step like everything else.
   for (const isLower of [true, false]) {
     for (let cycle = 1; cycle <= 4; cycle += 1) {
+      const expected = 200 + Math.max(0, cycle - 1) * cappedCycleIncrementLb(200, isLower);
       assertEquals(
-        workingNumberForCycles(200, cycle, isLower),
-        workingNumberForCycle(200, cycle, isLower),
+        workingNumberForCycles(200, cycle, isLower, undefined, { unknownMeans: 'advance' }).workingNumber,
+        expected,
         `cycle ${cycle} ${isLower ? 'lower' : 'upper'}`,
       );
     }
@@ -167,20 +215,20 @@ Deno.test('a missed 95% set costs the next cycle 10% instead of gaining +10', ()
   const earned = verdictFrom95Set(4);
   assertEquals(earned, 'reset');
   // Calendar-only would hand cycle 2 a 210. The gate hands it 180.
-  assertEquals(workingNumberForCycle(200, 2, true), 210);
-  assertEquals(workingNumberForCycles(200, 2, true, [earned]), 180);
+  assertEquals(workingNumberForCycle(200, 2, true), 210);   // the uncapped legacy stepper
+  assertEquals(workingNumberForCycles(200, 2, true, [earned]).workingNumber, 180);
 });
 
 Deno.test('a skipped session HOLDS — no evidence is not the same as failure', () => {
   assertEquals(verdictFrom95Set(null), 'hold');
-  assertEquals(workingNumberForCycles(200, 2, true, ['hold']), 200);
+  assertEquals(workingNumberForCycles(200, 2, true, ['hold']).workingNumber, 200);
   // And it does not compound: cycle 3 advances off the held number once a set is done.
-  assertEquals(workingNumberForCycles(200, 3, true, ['hold', 'advance']), 210);
+  assertEquals(workingNumberForCycles(200, 3, true, ['hold', 'advance']).workingNumber, 205);
 });
 
 Deno.test('verdicts apply in order, and only the cycles before this one count', () => {
-  // advance then reset: 200 → 210 → 185 (10% of 210 = 21, rounded down to the 5lb grid).
-  assertEquals(workingNumberForCycles(200, 3, true, ['advance', 'reset']), 185);
+  // advance then reset: 200 → 205 (capped step) → 184 → 180 on the 5 lb grid.
+  assertEquals(workingNumberForCycles(200, 3, true, ['advance', 'reset']).workingNumber, 180);
   // Cycle 1 never reads a verdict — nothing has been earned yet.
-  assertEquals(workingNumberForCycles(200, 1, true, ['reset']), 200);
+  assertEquals(workingNumberForCycles(200, 1, true, ['reset']).workingNumber, 200);
 });

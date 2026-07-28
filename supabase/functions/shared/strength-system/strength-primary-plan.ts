@@ -42,6 +42,7 @@ import {
   weightForSet,
   WEEKS_PER_CYCLE,
   type WendlerSet,
+  TM_CEILING_PCT_OF_1RM,
   workingNumberForCycles,
   workingNumberFrom1RM,
   type WorkingNumberVerdict,
@@ -902,9 +903,32 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // `advance`, which is exactly `workingNumberForCycle`. This is the seam (Constitution Law 6:
       // a load-bearing change ships behind a behaviour-unchanged proof), not the reader — the reader
       // needs LOGGED reps, so it cannot live in a composer that authors all twelve weeks up front.
-      const wn = workingNumberForCycles(
+      const wnResult = workingNumberForCycles(
         training_max[lift.ref], slot.index, lift.isLower, args.cycleVerdicts?.[lift.ref],
+        {
+          // ⛔ THE CEILING NEEDS THE REAL MAX. Without it a training max can pass the 1RM it was
+          // derived from, and the anchor AMRAP then measures that bar and writes it back.
+          oneRM: oneRepMaxes[lift.ref],
+          // ⛔ FORECAST, AND THIS IS THE ONLY PLACE ALLOWED TO SAY SO. Building a block projects
+          // three cycles into weeks that have not happened, so no verdict CAN exist for them and
+          // `hold` would show identical weights in cycles 1, 2 and 3. Regeneration and adaptation
+          // must not pass this — there, an absent verdict means nothing was logged.
+          unknownMeans: 'advance' as const,
+        },
       );
+      const wn = wnResult.workingNumber;
+      // ⛔ A CEILING HIT IS REPORTED, NOT ABSORBED. The training max caught up with the 1RM on file,
+      // so the block stops advancing that lift — the athlete needs to know why rather than watch a
+      // number quietly stop moving.
+      if (wnResult.ceilingHitAtCycle !== null) {
+        const line =
+          `${lift.name}: the training max reaches ${Math.round(TM_CEILING_PCT_OF_1RM * 100)}% of your ` +
+          `${oneRepMaxes[lift.ref]} lb max at cycle ${wnResult.ceilingHitAtCycle}, so it holds there ` +
+          `for the rest of the block. A training max above the max it came from cannot be tested.`;
+        if (!placementCompromises.some((c) => c.text === line)) {
+          placementCompromises.push({ kind: 'cost', text: line });
+        }
+      }
       const main = mainLiftRow(lift, wn, oneRepMaxes[lift.ref], setsForWeek(slot.kind, weekInCycle));
       // Jumps and assistance are dropped on the deload — the deload is a volume cut, not a lighter
       // version of the same session [Bosquet 2007, Wang 2023: cut volume, hold intensity].

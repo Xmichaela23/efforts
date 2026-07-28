@@ -65,12 +65,15 @@ Deno.test('deload is week 4 of every cycle: 40/50/60%, no jumps, no assistance',
   assertEquals(PLAN.phaseStructure.recovery_weeks, [4, 8, 12]);
 });
 
-Deno.test('the working number steps +5 upper / +10 lower BETWEEN cycles, never inside one', () => {
-  // Bench: cycle 1 at 190, cycle 2 at 195, cycle 3 at 200. Week 1 vs week 5 top set: 160 → 165.
+Deno.test('the working number steps BETWEEN cycles, never inside one — capped, and under the ceiling', () => {
+  // Bench (1RM 225): TM 190 → 195 → 200. Ceiling is 90% of 225 = 200, so cycle 3 lands exactly on it.
   assertEquals(ramp(5, 'Bench Press'), '125x5 145x5 165x5');
   assertEquals(ramp(9, 'Bench Press'), '130x5 150x5 170x5+');
-  // Squat is LOWER body, so +10: 265 → 275 → 285. Week 9 opener is 65% of 285 = 185.25 → 185.
-  assertEquals(ramp(9, 'Back Squat').split(' ')[0], '185x5');
+  // ⛔ SQUAT STOPS AT THE CEILING, and this is the assertion that changed. TM 265 → 275, and cycle 3
+  // would be 285 against a ceiling of 90% × 315 = 280 — so it HOLDS at 275 and says so.
+  // Was `185x5` (65% of an uncapped 285). The training max no longer climbs past what the entered
+  // max can test.
+  assertEquals(ramp(9, 'Back Squat').split(' ')[0], '175x5');
 });
 
 Deno.test('ANCHOR cycle: 5/3/1 proper, and the all-out set is the LAST set only', () => {

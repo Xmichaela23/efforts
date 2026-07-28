@@ -102,6 +102,53 @@ export function cycleIncrementLb(isLowerBody: boolean): number {
 }
 
 /**
+ * ⛔ THE INCREMENT IS CAPPED IN PERCENTAGE TERMS. Michael, 2026-07-27.
+ *
+ * Wendler's +5/+10 is calibrated to a barbell where 10 lb is roughly 3% of the training max — a
+ * squat in the 300s. It is not wrong; it is OUT OF RANGE below that. On a 90 lb training max, +10 is
+ * **11.1% per cycle**, and three cycles walk the training max from 90 to 110 against an entered 1RM
+ * of 106. The bar passes the athlete's own max and the anchor AMRAP then measures it and writes it
+ * back as the new max.
+ *
+ * So the step is the SMALLER of Wendler's absolute number and `MAX_CYCLE_STEP_PCT` of the current
+ * working number, rounded down to plate granularity, floored at one increment of the bar.
+ *
+ * ⚠️ NOT TUNED TO ANYONE'S NUMBERS. The cap is relative by construction, so it is a no-op for the
+ * athlete Wendler wrote for (at TM 340, 4% is 13.6 — the +10 wins) and it binds exactly where the
+ * absolute number stops being proportionate.
+ */
+export const MAX_CYCLE_STEP_PCT = 0.04;
+export const MIN_PLATE_STEP_LB = 5;
+
+export function cappedCycleIncrementLb(workingNumber: number, isLowerBody: boolean): number {
+  const absolute = cycleIncrementLb(isLowerBody);
+  if (!Number.isFinite(workingNumber) || workingNumber <= 0) return absolute;
+  const relative = roundDownToIncrement(workingNumber * MAX_CYCLE_STEP_PCT);
+  return Math.max(MIN_PLATE_STEP_LB, Math.min(absolute, relative));
+}
+
+/**
+ * ⛔ THE INVARIANT THE INCREMENT CAP DOES NOT GIVE YOU: THE TRAINING MAX MAY NEVER EXCEED 90% OF THE
+ * CURRENT 1RM. Michael, 2026-07-27: *"the increment cap slows drift, the ceiling bounds it."*
+ *
+ * The working number starts at 85% of the 1RM precisely so the last set of the anchor is worth
+ * measuring. Nothing in the system knew that a training max above the max is impossible — three
+ * clean advances walked straight past it. This is the hard stop, checked every cycle **regardless of
+ * verdict**.
+ *
+ * ⚠️ A BREACH IS A GATED FATE, NOT A SILENT CLAMP (§5.2b's family). When an advance would cross the
+ * ceiling the working number HOLDS and the reason is reported — the athlete is told their training
+ * max has caught up with the max on file and the block needs a new one. Quietly clipping the number
+ * would produce a plan that stops progressing for no stated reason.
+ */
+export const TM_CEILING_PCT_OF_1RM = 0.90;
+
+export function tmCeilingLb(oneRM: number): number {
+  if (!Number.isFinite(oneRM) || oneRM <= 0) return Number.POSITIVE_INFINITY;
+  return roundDownToIncrement(oneRM * TM_CEILING_PCT_OF_1RM);
+}
+
+/**
  * The working number for a given cycle. Cycle 1 uses the base; every cycle after adds one
  * increment.
  *
@@ -194,10 +241,20 @@ export function applyVerdict(
   workingNumber: number,
   verdict: WorkingNumberVerdict,
   isLowerBody: boolean,
-): number {
-  if (verdict === 'advance') return workingNumber + cycleIncrementLb(isLowerBody);
-  if (verdict === 'reset') return roundDownToIncrement(workingNumber * (1 - RESET_FRACTION));
-  return workingNumber;
+  /** The athlete's 1RM for this lift. Omitted → no ceiling is enforced (legacy callers). */
+  oneRM?: number,
+): { workingNumber: number; ceilingHit: boolean } {
+  if (verdict === 'reset') {
+    return { workingNumber: roundDownToIncrement(workingNumber * (1 - RESET_FRACTION)), ceilingHit: false };
+  }
+  if (verdict !== 'advance') return { workingNumber, ceilingHit: false };
+
+  const stepped = workingNumber + cappedCycleIncrementLb(workingNumber, isLowerBody);
+  const ceiling = oneRM == null ? Number.POSITIVE_INFINITY : tmCeilingLb(oneRM);
+  // ⛔ HOLD AT THE CEILING, do not clip to it. Clipping produces a number nobody asked for; holding
+  // is the same "no advance" the verdict system already expresses, and it carries a reason out.
+  if (stepped > ceiling) return { workingNumber, ceilingHit: true };
+  return { workingNumber: stepped, ceilingHit: false };
 }
 
 /**
@@ -225,10 +282,33 @@ export function workingNumberForCycles(
   cycleIndex: number,
   isLowerBody: boolean,
   verdicts?: readonly WorkingNumberVerdict[],
-): number {
+  opts?: {
+    /** The athlete's 1RM, so the ceiling can be enforced. Omitted → no ceiling. */
+    oneRM?: number;
+    /**
+     * ⛔ WHAT A MISSING VERDICT MEANS, AND IT DEFAULTS TO `hold`. Michael, 2026-07-27:
+     * *"A missing signal is not evidence of progress."*
+     *
+     * It used to default to `advance`, which meant a complete, tested, correct advancement mechanism
+     * with **zero suppliers** advanced unconditionally while appearing to have earned it — the
+     * failure looked exactly like normal operation. Silent subtraction's cousin.
+     *
+     * ⚠️ `'advance'` IS STILL CORRECT IN ONE CASE AND ONE ONLY: **forecasting a block that has not
+     * been trained yet.** A fresh 12-week plan projects three cycles into the future; no evidence can
+     * exist for them, and flattening the projection would show the athlete identical weights in
+     * cycles 1, 2 and 3. That is a FORECAST, and the caller must say so explicitly.
+     * ⛔ Regeneration and adaptation must NOT pass it — there, absent means nothing was logged.
+     */
+    unknownMeans?: WorkingNumberVerdict;
+  },
+): { workingNumber: number; ceilingHitAtCycle: number | null } {
+  const unknown = opts?.unknownMeans ?? 'hold';
   let wn = baseWorkingNumber;
+  let ceilingHitAtCycle: number | null = null;
   for (let step = 0; step < Math.max(0, cycleIndex - 1); step += 1) {
-    wn = applyVerdict(wn, verdicts?.[step] ?? 'advance', isLowerBody);
+    const r = applyVerdict(wn, verdicts?.[step] ?? unknown, isLowerBody, opts?.oneRM);
+    wn = r.workingNumber;
+    if (r.ceilingHit && ceilingHitAtCycle === null) ceilingHitAtCycle = step + 2;
   }
-  return wn;
+  return { workingNumber: wn, ceilingHitAtCycle };
 }
