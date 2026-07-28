@@ -233,6 +233,18 @@ fails the build, removing it passes.
 provenance, the type should make the wrong provenance unrepresentable. A comment explaining the rule
 is what was already there, and it is what did not work.
 
+⛔ **AND A SECOND LESSON FROM DOING IT: A SILENT FALLBACK ACROSS CHANNELS MAKES A WRONG READ LOOK
+LIKE AN EMPTY ONE.** The first version of the reader looked for `strength_optimizer_slots` INSIDE
+`preferred_days` — the wrong scope, since the whole point of the channel is that it is a sibling. It
+found nothing, the `??` chain moved on, and the result was indistinguishable from an athlete who
+simply had no strength days. **Same shape as `longrun_easypace`, which never matched and fell to the
+easy-run factor in silence for the life of the table.**
+
+✅ Separate channels are right. **Silent fallbacks between them are not.** Where a chain spans
+channels, a miss on every branch should be LOUD — the `[workload] unmatched intensity token` warning
+is the pattern. A quiet default turns a lookup bug into a data-absence story, and nobody debugs an
+absence.
+
 ## 0a. ⛔ THE FIVE HARD CONSTRAINTS, AND THE WHOLE SEARCH
 
 **Amended 2026-07-27.** These are not scored. They are not negotiable. Nothing relaxes them.
