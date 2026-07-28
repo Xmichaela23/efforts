@@ -102,7 +102,10 @@ function violatesMinimumSwimSpread(candidate: DayName, existingSwimDays: DayName
 }
 
 /** Penalize easy_run on calendar days touching quality_run or long_run (hard quality / long stimulus neighbors). */
-function easyRunAnchorAdjacencyPenalty(
+// ⛔ EXPORTED 2026-07-28. The Get Stronger composer placed easy runs first-available with no spacing
+// term at all, and put one on the single worst day this function scores (+8: the day after the long
+// run AND the day before the hard run). The rule existed and nothing outside this file could ask it.
+export function easyRunAnchorAdjacencyPenalty(
   d: DayName,
   qualityRunDay: DayName | undefined,
   longRun: DayName,

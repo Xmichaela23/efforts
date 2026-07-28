@@ -54,9 +54,12 @@ import {
   type DayName,
   DAYS as PLACEMENT_DAYS,
   type EndurancePin,
+  MIN_STACK_GAP_H,
   placeLiftingWeek,
 } from './place-week.ts';
 import { requiredAdjacencyHours } from '../../_shared/schedule-session-constraints.ts';
+// ⛔ THE OPTIMIZER'S OWN SPACING MEASURE, not a second one. See the run-day ranking below.
+import { easyRunAnchorAdjacencyPenalty } from '../../_shared/week-optimizer.ts';
 // ⛔ STEP 1 OF THE COLLAPSE (SPEC-week-solver §7). Placement now comes from the ONE solver rather
 // than from `place-week`'s filter-and-take-first-legal-answer. `place-week` still owns the
 // arithmetic screens the intake shows; only the PLACEMENT half moved.
@@ -843,10 +846,37 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // to become reachable, and `place-week` never produced one because it stacked onto the earliest
   // legal day instead of the smallest.
   const hardPinDay = hardPin ? String(hardPin) : null;
-  for (const d of upperLiftDays) {
+
+  // ⛔ EVERY LIFT DAY IS A CANDIDATE, NOT ONLY THE UPPER ONES. Changed 2026-07-28, Michael's call.
+  //
+  // Easy work was restricted to upper lift days with NO stated reason, and that one rule closed
+  // Wednesday and Friday from both ends: an athlete asking for two rides got one, and the easy run
+  // was forced onto Monday — the day after the long run AND the day before the hard run.
+  //
+  // The law permits it: `easy_run × lower_body_strength` is ✓, and `STRENGTH-PROTOCOL §6.2` RECOMMENDS
+  // it — lower first, 6h gap, the easy run as a recovery flush. The cell was deliberately flipped to
+  // ✓ in May 2026 for exactly that use, and this exclusion had been silently overriding it since.
+  //
+  // ⚠️ RANKED, NOT FIRST-AVAILABLE. Opening the days is only half of it: the composer had no spacing
+  // term, so it would simply take the earliest newly-legal day. `easyRunAnchorAdjacencyPenalty` is
+  // the optimizer's own measure — +4 beside the quality run, +4 beside the long run — and it is used
+  // rather than reinvented, because a second ranking beside the law is the thing this whole arc has
+  // been removing.
+  const runCandidates = [...upperLiftDays, ...MAIN_LIFTS.filter((l) => l.isLower).map(liftDay)]
+    .filter((d) => d !== hardPinDay && !runDayList.includes(d))
+    .map((d) => ({
+      day: d,
+      penalty: easyRunAnchorAdjacencyPenalty(
+        d.toLowerCase() as never,
+        hardDayIsRun && hardPinDay ? (hardPinDay.toLowerCase() as never) : undefined,
+        String(pickedLong).toLowerCase() as never,
+      ),
+    }))
+    .sort((a, b) => a.penalty - b.penalty || DAYS.indexOf(a.day as never) - DAYS.indexOf(b.day as never));
+
+  for (const c of runCandidates) {
     if (runDayList.length >= runFreq) break;
-    if (d === hardPinDay) continue;
-    if (!runDayList.includes(d)) runDayList.push(d);
+    runDayList.push(c.day);
   }
   const longRunDay = pickedLong;
   const firstStackedRunDay = runDayList
@@ -1048,19 +1078,30 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         if (d === restReserved || rideDays.includes(d) || taken.has(d)) continue;
         rideDays.push(d);
       }
-      // ⛔ THEN STACK ONTO UPPER-LIFT DAYS, exactly as the run already does. With four lifts and
-      // three pins the week has NO free days left, so without this an athlete who asked for two or
-      // three rides silently got one — their answer collected and ignored, which is the disease this
-      // whole pass exists to remove.
-      // ⚠️ UPPER days only. An easy ride shares no prime movers with a bench or a press; putting one
-      // on a squat or deadlift day is the leg-on-leg stacking the clearance law exists to prevent.
-      for (const d of upperLiftDays) {
+      // ⛔ THEN STACK ONTO ANY LIFT DAY. With four lifts and three pins the week has NO free days
+      // left, so without this an athlete who asked for two or three rides silently got one — their
+      // answer collected and ignored, which is the disease this whole pass exists to remove.
+      //
+      // ⛔ "UPPER DAYS ONLY" WAS REMOVED 2026-07-28, AND ITS JUSTIFICATION WAS FALSE. It read:
+      // *"putting one on a squat or deadlift day is the leg-on-leg stacking the clearance law exists
+      // to prevent."* **The law permits it.** `easy_bike × lower_body_strength` is ✓; what the law
+      // asks for is the 6h GAP, not a ban. "Needs a gap" had been flattened into "forbidden" and the
+      // ban attributed to an authority that says the opposite — which is why it survived: a rule that
+      // cites the law reads as settled and nobody re-reads the cell.
+      //
+      // ⚠️ THE GAP IS REAL AND IT IS THE ATHLETE'S TO HONOUR. Both are leg-loaded, so
+      // `stackNeedsRecoveryGap` is true for this pair: lift first, ride later, six hours apart.
+      const rideCandidates = [...upperLiftDays, ...MAIN_LIFTS.filter((l) => l.isLower).map(liftDay)];
+      for (const d of rideCandidates) {
         if (rideDays.length >= wantDays) break;
         if (d === restReserved || rideDays.includes(d)) continue;
-        // ⛔ NEVER A THIRD SESSION ON ONE DAY. An upper-lift day that already carries an easy run is
-        // full: stacking a ride on top produced a Thursday of bench + 40 min run + 96 min ride —
-        // 196 minutes, on a block whose entire premise is manageable fatigue. Two sessions is a
-        // stacked day; three is a training camp.
+        // ⛔ NEVER A THIRD SESSION ON ONE DAY. A lift day that already carries an easy run is full:
+        // stacking a ride on top produced a Thursday of bench + 40 min run + 96 min ride — 196
+        // minutes, on a block whose entire premise is manageable fatigue. Two sessions is a stacked
+        // day; three is a training camp.
+        // ⚠️ This is a COMPOSER rule with a stated reason and no law behind it (§4.1a) — the matrix
+        // has no opinion on session count. It stands until Michael decides otherwise; the point is
+        // that it declares itself rather than borrowing the law's authority.
         // ⚠️ When this leaves fewer rides than the athlete asked for, that is REPORTED below rather
         // than absorbed. The week being full is a fact they own, not one to hide by overfilling a day.
         if (taken.has(d)) continue;
@@ -1091,7 +1132,16 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       rideDays.forEach((day) => {
         const isLong = day === longRidePin;
         const mins = Math.max(20, Math.round(unitMins * (isLong ? LONG_RIDE_SHARE : 1)));
-        weekSessions.push(enduranceSession('bike', day, mins, undefined, isLong ? 'long' : 'easy'));
+        // ⛔ IF THE RIDE LANDED ON A HEAVY-LEG DAY, THE 6h GAP HAS TO BE SAID. Opening those days
+        // (2026-07-28) was correct — the law permits the pair — but what the law actually asks for is
+        // the GAP, and a permission delivered without its condition is the §0f loss: the engine
+        // honours the rule and the athlete never hears it. `easy_bike × lower_body_strength` is the
+        // one ride pairing where `stackNeedsRecoveryGap` is true.
+        const onHeavyLegDay = heavyLowerDays.includes(day);
+        const rideNote = onHeavyLegDay
+          ? ` Shares the day with heavy legs: the lift goes first, and leave ${MIN_STACK_GAP_H}h before the ride — they load the same legs.`
+          : undefined;
+        weekSessions.push(enduranceSession('bike', day, mins, rideNote, isLong ? 'long' : 'easy'));
       });
       // ⛔ AND THE HARD DAY, IF THEY CHOSE THE BIKE FOR IT. Same fix as the run's: the pin already
       // reserved this day, so without this the week visibly loses one. D-327 makes run and bike
