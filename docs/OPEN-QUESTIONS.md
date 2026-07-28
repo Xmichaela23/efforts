@@ -1655,3 +1655,15 @@ stored, no live reader — that is Q-211 again, with the value wrong on top.**
 ✅ **THE CHECK IS ALREADY WRITTEN — §0f:** *for each requirement, which field carries this, and who reads that field?* This entry is the evidence that the check needs running as a SWEEP rather than case by case.
 
 **Related:** §0f in `docs/SPEC-week-solver.md`, Q-208 (a reader refusing a link that survived).
+
+---
+
+## Q-213 — `no-unused-vars` on `strength-system`: measured, and deliberately NOT enabled (2026-07-28, DECIDED — do not re-measure)
+
+**Measured:** `deno lint`'s `no-unused-vars` reports **38** across `supabase/functions/shared/strength-system`. **28 of them are unused function PARAMETERS, not locals** — so enabling the rule would require `_` prefixes across four protocol files, and `_hasCable` asserts "deliberately ignored," which is a claim nobody has made. ⛔ Deleting them instead is worse: parameters are positional, so removing one shifts every later argument at every call site — `createSMSession(tier, hasCable, limiter, …)` would start reading `limiter` as `hasCable`, silently.
+
+**Decision: not enabling it, and not clearing them.** The honest fix is narrowing the signatures and their call sites, which is a refactor rather than lint hygiene. The 10 genuinely-dead declarations were removed by hand (commit `86bb2a76`) after each was checked for side effects; the linter's output was the lead, never the authority.
+
+⚠️ **AND THE OBVIOUS HYPOTHESIS ABOUT THE IGNORED EQUIPMENT FLAGS IS WRONG — CHECKED, NOT ASSUMED.** Seeing `hasCable` / `hasBox` / `hasBench` accepted and never read, the natural read is that the protocol prescribes equipment work without gating on it. It does not: **`triathlon.ts` emits ZERO cable or box exercises.** They are vestigial signature width — threaded in, never needed. This is **unrelated to F-5** in `docs/BUILDER-SWEEP-FINDINGS.md`, which is the reverse problem (band exercises with no `hasBands` flag at all). A future session will form the same hypothesis; it has already been tested.
+
+**Client side, for completeness:** `noUnusedLocals` on `tsconfig.app.json` yields **424** errors against a baseline that is already **319** with the flag off. Not a toggle either.
