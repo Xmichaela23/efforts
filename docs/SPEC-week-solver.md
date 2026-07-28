@@ -181,6 +181,7 @@ outlive this session:**
 | **0e** | a check whose metric cannot move is not a check |
 | **0f** | a correct answer that fails to say what the spec requires is still a failure |
 | **0g** | a field named for athlete intent may only be written by athlete input |
+| **0h** | a missing signal is not a verdict — hold, stay distinguishable from zero, fail open |
 | **4.1a** | strictness beyond the law needs an owner and a reason |
 | **5.2b** | never subtract silently — refuse, and name the options |
 
@@ -244,6 +245,32 @@ easy-run factor in silence for the life of the table.**
 channels, a miss on every branch should be LOUD — the `[workload] unmatched intensity token` warning
 is the pattern. A quiet default turns a lookup bug into a data-absence story, and nobody debugs an
 absence.
+
+## ⛔ 0h. A MISSING SIGNAL IS NOT A VERDICT
+
+**Named 2026-07-27, after the shape turned up in a third place.** Michael: *"No evidence must not
+become no progress."* And its mirror: no evidence must not become evidence of failure either. **An
+absence is not a reading in either direction.**
+
+| # | where | the wrong reading | what it does |
+|---|---|---|---|
+| 1 | `cycleVerdicts` absent | absent → `advance` | a gate with zero suppliers advanced unconditionally while appearing to have earned it |
+| 2 | the supplier returning `0` for "nothing logged" | absent → `reset` | a skipped session drops the athlete's working number 10% |
+| 3 | the verdict fetch failing | failure → `hold` | a query timeout flattens a whole block's progression |
+
+✅ **THE RULE, and note it points DIFFERENT WAYS in each case, which is why it needs stating rather
+than a blanket default:**
+
+- **Absent means hold** where the signal decides whether to *advance* — no evidence, no progress.
+- **Absent must stay distinguishable from zero** where zero is itself a result — a skipped session and
+  a failed one are not the same event.
+- **A reader that cannot read fails OPEN, loudly** — falling back to the behaviour that existed
+  before the reader, never to the reader's most conservative answer. Failing closed lets an
+  infrastructure problem masquerade as an athlete's performance.
+
+⚠️ **The tell:** any `??`, `|| 0`, or `catch` that turns "I don't know" into a number the engine will
+act on. See also §0g's silent-fallback note — a lookup miss that degrades quietly is the same defect
+one layer down.
 
 ## 0a. ⛔ THE FIVE HARD CONSTRAINTS, AND THE WHOLE SEARCH
 
