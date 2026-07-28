@@ -171,7 +171,7 @@ the spec against the output. It is not a phase that ends.
 ✅ **THE CHECK:** for each spec requirement, ask *"which field of the output carries this, and who
 reads that field?"* A requirement with no field, or a field with no reader, is already lost.
 
-⛔ **The six, together — all checkable rather than remembered, which is the only reason they will
+⛔ **The nine, together — all checkable rather than remembered, which is the only reason they will
 outlive this session:**
 
 | § | principle |
@@ -182,6 +182,7 @@ outlive this session:**
 | **0f** | a correct answer that fails to say what the spec requires is still a failure |
 | **0g** | a field named for athlete intent may only be written by athlete input |
 | **0h** | a missing signal is not a verdict — hold, stay distinguishable from zero, fail open |
+| **0i** | stated intent may WITHHOLD dose, never ADD it — intent is not evidence of capacity |
 | **4.1a** | strictness beyond the law needs an owner and a reason |
 | **5.2b** | never subtract silently — refuse, and name the options |
 
@@ -271,6 +272,48 @@ than a blanket default:**
 ⚠️ **The tell:** any `??`, `|| 0`, or `catch` that turns "I don't know" into a number the engine will
 act on. See also §0g's silent-fallback note — a lookup miss that degrades quietly is the same defect
 one layer down.
+
+## ⛔ 0i. STATED INTENT MAY WITHHOLD DOSE, NEVER ADD IT
+
+**Named 2026-07-28, out of the accessory-volume model. §0g's sibling, one layer in.** §0g is about
+*writing* to a field named for athlete intent. This is about *reading* one: what an athlete says they
+want is a real signal, and it is a signal about **priority**, never about **capacity**.
+
+**The instance.** A first draft of `assistanceTotalReps` gave `develop` posture the floor plus five
+reps on every slot. Nothing was measured. The athlete had picked a word on an intake screen, and the
+engine turned that word into five more reps of work per slot per session — **a dose inferred from a
+preference.** The reverse, `maintain` declining to spend a capacity that *was* measured, is fine:
+that is an athlete choosing to do less of something they demonstrably could do.
+
+✅ **THE RULE:**
+
+- **Capacity must be MEASURED to raise a prescription.** A tested number, a logged set, a completed
+  AMRAP. `pullupMaxReps` may move the pull slot because it is a test result.
+- **Intent may only LOWER it, or leave it alone.** `maintain` withholds; `develop` unlocks nothing on
+  its own. An unmeasured slot sits at its floor under every posture.
+- **So the derivation will be UNEVEN across peers, and the copy must say which is which.** Pull says
+  *"Scaled to your tested 8 clean reps"*; push says *"No tested capacity on file for this movement,
+  so this is the default floor."* Uneven is honest. Symmetry here would mean guessing on the slots
+  that have no test, purely so the three read alike.
+
+⚠️ **The tell:** any prescription whose size moves when the only thing that changed was a dropdown.
+If posture, goal type, or a self-rated experience level appears on the *up* side of an arithmetic
+expression that produces sets, reps, weight or minutes, it is this defect.
+
+⛔ **AND THE FLOOR ITSELF NEEDS A CITATION, NOT A CONVICTION.** The 25 under this model is the bottom
+of Wendler's published 25-50 per-category range.
+
+⚠️ **THE CITATION'S OWN STRENGTH, STATED HONESTLY — three secondary sources concur, PRIMARY
+UNVERIFIED.** The question checked on 2026-07-28 was whether that range is **per session** or **per
+week**, because it decides whether four lifting days at 25 sits at the bottom of the guidance or at
+four times over it. Three third-party sources (a forum thread, two training guides) all read it as
+per session, per category; none read it as weekly. **None of them is 5/3/1 Forever itself.** The
+strongest part of the evidence is structural rather than quoted: the widely-used **50/50/50** template
+prescribes fifty reps of each category *per training day*, which would be a wild outlier against a
+25-50 WEEKLY range and is unremarkable against a per-session one. Good enough to build on, not good
+enough to write *"Wendler says"* — if the primary is ever checked, record it here. *(Michael, retracting his own brief: "'volume should come
+down' was mine and it was wrong … a floor with only an upward lever is the model working, not
+failing.")*
 
 ## 0a. ⛔ THE FIVE HARD CONSTRAINTS, AND THE WHOLE SEARCH
 
