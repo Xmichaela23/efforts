@@ -1,4 +1,11 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+// D-326 layer 2 — the verdict supplier. Pure grouping + selection; the query in the strength branch
+// is the only database part.
+import {
+  groupSessionsByCycle,
+  verdictsForBlock,
+} from '../shared/strength-system/loading/cycle-verdicts.ts';
+import { cyclesForBlock } from '../shared/strength-system/loading/wendler-531.ts';
 import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
 import {
   getLatestAthleteMemory,
@@ -382,6 +389,14 @@ function isMarathonDistance(distance: string | null | undefined): boolean {
 }
 
 /** YYYY-MM-DD when valid; avoids UTC drift from Date.toISOString(). */
+/** The composer's four lifts, keyed the way `OneRepMaxes` is. Names must match the LOGGED row names. */
+const STRENGTH_LIFT_NAMES = {
+  bench: 'Bench Press',
+  squat: 'Back Squat',
+  deadlift: 'Deadlift',
+  overheadPress: 'Overhead Press',
+} as const;
+
 function normalizeDateOnlyYmd(raw: unknown): string | null {
   const t = String(raw ?? '').trim().slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null;
@@ -2469,6 +2484,68 @@ Deno.serve(async (req: Request) => {
             const gsEasy = resolveCurrentRunEasyPace(gsBaseline as any);
             const gsEasyPaceMinPerMile = gsEasy.sec_per_mi != null ? gsEasy.sec_per_mi / 60 : undefined;
             const gsTargetWeeklyMiles = Number(gsTp.target_weekly_miles) > 0 ? Number(gsTp.target_weekly_miles) : undefined;
+            // ── THE VERDICT SUPPLIER (D-326 layer 2) ─────────────────────────────────────────
+            //
+            // ⛔ ONLY MEANINGFUL ON A REBUILD. `create-goal` is the sole caller of
+            // `generate-strength-plan`, and a fresh block authors twelve weeks before anything is
+            // logged — every cycle is a forecast. Verdicts matter when an athlete REBUILDS a block
+            // that is already running (`replace_plan_id` / `build_existing`): the cycles that have
+            // finished carry real evidence, and the ones ahead are still a forecast.
+            //
+            // ⚠️ If this fetch fails or finds nothing, verdicts stay absent and the composer's
+            // forecast exception applies — the same block it builds today. A supplier that cannot
+            // read must not silently reset anyone's bar.
+            const gsPriorPlanId = replace_plan_id ?? null;
+            let gsVerdicts: Record<string, string[]> | undefined;
+            if (gsPriorPlanId) {
+              try {
+                const gsWeeks = Number((resolvedGoal as any)?.target_weeks) || 12;
+                const { data: plannedRows } = await supabase
+                  .from('planned_workouts')
+                  .select('id, week_number, date')
+                  .eq('training_plan_id', gsPriorPlanId)
+                  .eq('user_id', user_id);
+                const weekById = new Map<string, number>();
+                let currentWeek = 1;
+                const todayIso = new Date().toISOString().slice(0, 10);
+                for (const r of plannedRows ?? []) {
+                  if (r?.id && typeof r.week_number === 'number') weekById.set(String(r.id), r.week_number);
+                  // The current week is the highest week whose date has already started.
+                  if (typeof r?.week_number === 'number' && String(r?.date ?? '') <= todayIso) {
+                    currentWeek = Math.max(currentWeek, r.week_number);
+                  }
+                }
+                const plannedIds = [...weekById.keys()];
+                if (plannedIds.length > 0) {
+                  const { data: doneRows } = await supabase
+                    .from('workouts')
+                    .select('planned_id, strength_exercises')
+                    .eq('user_id', user_id)
+                    .eq('type', 'strength')
+                    .in('planned_id', plannedIds);
+                  const joined = (doneRows ?? []).map((w: any) => ({
+                    week_number: weekById.get(String(w?.planned_id)) ?? null,
+                    strength_exercises: w?.strength_exercises ?? null,
+                  }));
+                  const cycles = cyclesForBlock(gsWeeks);
+                  const grouped = groupSessionsByCycle(joined, cycles);
+                  gsVerdicts = {};
+                  for (const [ref, name] of Object.entries(STRENGTH_LIFT_NAMES)) {
+                    gsVerdicts[ref] = verdictsForBlock(cycles, grouped, name, currentWeek);
+                  }
+                  console.log(
+                    `[create-goal] verdicts from ${joined.length} logged sessions, current week ${currentWeek}:`,
+                    JSON.stringify(gsVerdicts),
+                  );
+                }
+              } catch (e) {
+                // ⛔ LOUD, AND NON-FATAL. A supplier that cannot read falls back to the forecast —
+                // it must never quietly hand back `hold` for everything and flatten the block.
+                console.warn('[create-goal] verdict supplier failed; falling back to forecast:', e);
+                gsVerdicts = undefined;
+              }
+            }
+
             const gsBody: Record<string, any> = {
               user_id,
               // The composer rounds this DOWN to a whole number of four-week cycles (12 → 12, 10 → 8).
@@ -2519,6 +2596,7 @@ Deno.serve(async (req: Request) => {
               // is already 'bike' and the block above deliberately does not fire.
               ...(gsRideHours ? { target_weekly_ride_hours: gsRideHours } : {}),
               ...(plan_start_date ? { start_date: plan_start_date } : {}),
+              ...(gsVerdicts ? { cycle_verdicts: gsVerdicts } : {}),
               ...(bodyPreview ? { preview: true } : {}),
             };
             console.log(`[create-goal] Get Strong → strength-primary: sport=${gsSport ?? 'strength-only'} weeks=${gsBody.duration_weeks}`);

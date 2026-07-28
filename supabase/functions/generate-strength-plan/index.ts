@@ -103,6 +103,21 @@ Deno.serve(async (req: Request) => {
       targetWeeklyMiles: Number(target_weekly_miles) > 0 ? Number(target_weekly_miles) : undefined,
       easyPaceMinPerMile: easyPaceMin,
       longRunDay: typeof long_run_day === 'string' ? long_run_day : undefined,
+      // ⛔ D-326 layer 2 — the earned advance. Absent on a fresh block (nothing is logged yet), and
+      // present on a REBUILD, where the finished cycles carry real evidence. Validated rather than
+      // trusted: an unrecognised verdict is dropped, because a bad value here moves the bar.
+      cycleVerdicts: (() => {
+        const raw = (body as Record<string, unknown>).cycle_verdicts;
+        if (!raw || typeof raw !== 'object') return undefined;
+        const ok = new Set(['advance', 'reset', 'hold']);
+        const out: Record<string, string[]> = {};
+        for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+          if (!Array.isArray(v)) continue;
+          const clean = v.filter((x) => typeof x === 'string' && ok.has(x)) as string[];
+          if (clean.length === v.length) out[k] = clean;
+        }
+        return Object.keys(out).length > 0 ? (out as any) : undefined;
+      })(),
       // D-327 — the ONE hard aerobic day and its discipline. Collected since 2026-07-25 and dropped
       // at the caller until now. Validated here rather than trusted: an unknown discipline is
       // treated as absent, because a pin the composer cannot place is worse than no pin.
