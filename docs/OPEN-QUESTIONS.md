@@ -1989,6 +1989,8 @@ A throwaway athlete with **resistance bands and no cable** — the exact branch 
 
 ## Q-220 — The reset threshold cuts a training max for a session the book calls a pass (2026-07-28, VERIFIED against the primary, LIVE IN CODE)
 
+> ✅ **RE-VERIFIED 2026-07-29 AGAINST THE BOOK ITSELF, by this session.** The 2nd-edition PDF was searched directly: the phrase *"always be able"* does not occur anywhere in the text, and no five-rep rule at 95% appears. Every prescription reads `95% x 1 or more reps`. ⚠️ **The earlier claim that "the full 134-page 2nd edition was searched" could not be reproduced** — no copy of the text had ever been in the repo, so that search was unverifiable until Michael supplied the PDF. The conclusion was right; the evidence for it was inherited. See D-337, which also found the OPPOSITE error in our own draft: Wendler DOES carry an estimated max, and it is Epley.
+
 ⛔ **`verdictFrom95Set` resets anything under five reps**, and there is no middle:
 
 ```
@@ -2050,3 +2052,48 @@ Not proposing a number without a decision. The shape the primary supports:
 > **↩ Related:** **D-330** (the scheduler screen where the pick is made) · the *"at 10 mi over 3 run
 > days the long run is the same length as the easy run"* oddity in the ENGINE-STATE banner, which is
 > the same arithmetic failing at the other end.
+
+---
+
+## Q-222 — Our stall reset lands ~18 points lower than Wendler's, because the buffer is charged twice (2026-07-29, MEASURED against the primary — NOT changed, needs a decision)
+
+Found while verifying D-337 against the book.
+
+| | mechanism | lands at |
+|---|---|---|
+| **Wendler** | on a stall, take a **fresh rep max**, estimate from it, use **90% of that** as the new training max | ~90% of 1RM |
+| **Ours** | `RESET_FRACTION = 0.10` applied to the existing working number | ~**72%** of 1RM |
+
+The gap is not rounding. Our working number **starts** at `WORKING_NUMBER_PCT_OF_1RM = 0.85` — a deliberate buffer for concurrent athletes, documented at `wendler-531.ts:86` as *"the least aggressive deviation from standard that still buys the buffer."* A reset then cuts a further 10% off that. **0.9 × 0.85 ≈ 0.72.**
+
+**So the buffer bought the safety once and the reset charges for it again.** Every subsequent cycle climbs from the lower number.
+
+⚠️ **TWO REASONS THIS MIGHT STILL BE RIGHT.** Conservative is the house position, and Wendler's re-estimate assumes an athlete who will actually go and take a fresh rep max — which this app cannot assume. ⚠️ **AND ONE REASON IT MIGHT NOT.** His reset **re-anchors on a performance**; ours just cuts a number, which is the calendar-not-evidence pattern the whole strength gauge is trying to leave behind.
+
+⛔ **DO NOT PATCH THIS.** It changes prescribed weight for real athletes. It needs a `D-NNN` with a stated position on whether the 85% buffer and the 10% reset are answering the same question twice.
+
+⚠️ Coupled to the fact that the reset path **only fires on a rebuild** — see Q-223. On a first block nothing resets at all.
+
+---
+
+## Q-223 — The earned advance only runs on a rebuild, so a first block climbs on the calendar (2026-07-29, KNOWN — now DISCLOSED in the partner doc rather than fixed)
+
+`strength-primary-plan.ts` authors all twelve weeks **before a single set is performed**, so no logged evidence can exist for a fresh block. It passes `unknownMeans: 'advance'`, and every cycle resolves to a calendar step.
+
+**This falsified a sentence in the partner-facing protocol** — *"Week 3 is the measurement... it is what decides whether the working number advances."* True of a rebuild, false of a first block, and it was in the positioning section rather than a footnote. The doc now says a first block carries a **projected** progression that a rebuild corrects.
+
+⚠️ **NOT A BUG, AND NOT NOTHING.** The verdict machinery is built and correct (`computeCycleVerdicts` → `verdictFrom95Set` → `applyVerdict`, D-326 layer 2 / D-335). What is missing is a trigger: nothing recomputes mid-block off logged week-3 sets. The honest close is either a mid-block recompute, or the disclosure that now stands.
+
+⛔ **The disclosure is load-bearing while this is open.** If the sentence goes back to claiming the AMRAP decides the advance, it is false again for every athlete's first block — which is every athlete, once.
+
+---
+
+## Q-224 — The run half of the deposit claim has no source (2026-07-29, SEARCHED — nothing found)
+
+D-336 sourced the deposit claim to Llanos-Lagos et al. 2026 (*Eur J Appl Physiol* 126(1):193-222). That review is **endurance cyclists only**.
+
+`DOCTRINE-aerobic-maintenance.md` had claimed it *"improves run and bike performance after prolonged submaximal work."* **The run half is not in that paper and no source for it was located.** Both docs now state the deposit for cyclists.
+
+⚠️ **THIS MATTERS COMMERCIALLY, not academically.** The deposit is the strongest claim the product has and the one the positioning doc says to lead with — and the primary athlete on this path is a **runner**. Stating it to a runner is generalising past the evidence.
+
+**What would close it:** a meta-analysis or review of heavy strength training on running economy or running performance with the same shape. Berryman et al. and Rønnestad & Mujika are the obvious places to look; neither has been read. ⛔ **Do not cite either from memory** — this is exactly how the 262-participant number ended up graded "STRONG" with no author for weeks.

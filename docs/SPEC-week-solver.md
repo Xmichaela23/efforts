@@ -411,7 +411,7 @@ on `preferred_days.strength`; a required field is what finally held.
 | 1 | **Long run day** | User-picked anchor. **Immovable** |
 | 2 | **Long ride day** | User-picked anchor. **Immovable** |
 | 3 | **Hard day** | User-picked anchor. **Immovable** |
-| 4 | **Four lifting days** | ⛔ **A FIXED COUNT. Lift frequency is not negotiable.** Wendler publishes 2- and 3-day templates; this block is the four-day arc and does not fall back to them |
+| 4 | ~~**Four lifting days**~~ ⛔ **SUPERSEDED 2026-07-29 → D-332. It is now a DEFAULT of 4, with 3 offered.** | The old text read *"a fixed count, lift frequency is not negotiable."* **It is negotiable, and an intake card negotiates it.** At 3 the two upper lifts share a day and week 3 splits back onto four so the measurement is never taken fatigued. ⚠️ **THE CONSTRAINT THE SOLVER ENFORCES IS UNCHANGED** — one lift per day still holds, because the composer hands it ONE paired upper slot rather than relaxing the rule (`week-solver.ts:527`, whose own comment predicted this block shape). Read D-332 before touching the day count |
 | 5 | *(the clearance law)* | `_shared/schedule-session-constraints.ts` — the only one that may be downgraded to a penalty, and only per §5.2 |
 
 ### The entire search, in four lines
@@ -831,8 +831,12 @@ and the app is silent at exactly the moment it most needs to speak.**
   not the solver's to offer.
 - ⛔ *Move an anchor* — removed. **Anchors are immovable.** A club night is not a preference; other
   people own it.
-- ⛔ *Drop to a 2- or 3-day lifting week* — removed. **Four lifting days is a fixed count.** It read as
-  the most powerful lever precisely because it broke the constraint that makes this block what it is.
+- ⛔ ~~*Drop to a 2- or 3-day lifting week* — removed. **Four lifting days is a fixed count.**~~
+  **SUPERSEDED 2026-07-29 → D-332.** Three days is now an ATHLETE CHOICE made at intake, which is a
+  different thing from a lever the solver may pull to escape a tight week — **and that distinction is
+  why the entry was right when it was written.** The solver still may not drop a lifting day to make a
+  week fit; what changed is that the athlete may ask for three from the start. ⛔ Do not read this
+  supersede as licence for the solver to subtract.
 
 ### 5.2b ⛔ THE FAILURE CLASS THIS SECTION EXISTS TO KILL: SILENT SUBTRACTION
 

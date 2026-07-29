@@ -8,24 +8,46 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## ⛔ AWAITING MICHAEL — deployed-or-pushed, nobody has seen it work (2026-07-29)
+## ⛔ AWAITING MICHAEL — pushed, nothing seen working (2026-07-30)
 
-- [ ] **DEPLOY FIRST, then look at a press day.** Five functions are pushed and NOT deployed:
-  `generate-strength-plan`, `materialize-plan`, `create-goal-and-materialize-plan`,
-  `generate-combined-plan`, `generate-triathlon-plan`. ⚠️ **`week-solver.ts` also changed — re-derive
-  the importer list; it is now larger.** **What to look for:** on an Overhead Press day the pull slot
-  must read **Inverted Row**, not Pull Up. It reads Pull Up today. *(D-328)*
-- [ ] **The compromise notes should now read as one sentence per fact.** Two lifts at the same floor
-  share a line; two lifts at the ceiling share a line. **What to look for:** no two paragraphs that
-  differ only by a lift name. *(D-331)*
-- [ ] **A default nobody approved.** `NonRaceBuilder.tsx:428` seeds `longRunDay: 'sunday'` and
-  `longRideDay: 'thursday'` so the scheduler draws a week on arrival instead of an empty box. Sunday
-  is convention; **Thursday is Claude's pick, from a sweep.** Saturday is what most athletes expect
-  and costs one extra note (the two long days land back to back). **Michael's call — revert or keep.**
-- [ ] **The AAA acceptance check is still outstanding**, and Michael has said in terms it is **not**
-  met by a markdown export. Generate a Strength Focus block on a device: the header must say *"All 3
-  cycles are measuring cycles"* and carry the *"One thing before you start"* paragraph naming the
-  pinned lifts.
+- [ ] **DEPLOY, AND THE LIST IS NOW SEVEN.** `strength-primary-plan.ts` changed, so every function that
+  bundles it needs redeploying: `generate-strength-plan`, `create-goal-and-materialize-plan`,
+  `generate-combined-plan`, `generate-run-plan`, `generate-triathlon-plan`, `materialize-plan`, **`coach`**.
+  ⚠️ **`coach` is the one that gets missed** — it reaches the strength system via
+  `_shared/insights/strength-protocol-read.ts`. Re-derive with
+  `grep -rln "shared/strength-system" supabase/functions` rather than trusting this list.
+
+- [ ] **Then look at four things on a phone.** Three of them appear in one generated block:
+  - **Overhead Press day shows `Inverted Row`, not `Pull Up`** *(D-328, carried from 2026-07-29)*
+  - **A three-day block:** weeks 1/2/4 show `Bench + Press` on one day; **week 3 shows FOUR lifting days**
+    with the press on its own *(D-332)*
+  - **A 40-mile runner's long run reads ~12 mi, not 16** *(D-333)*
+  - **A bike-only athlete asking 6 h gets 6 h** — it built 1.5 h before *(D-334)*
+
+- [ ] **Q-222 — the reset percentage needs your call, not a patch.** Our stall reset lands near **72%** of
+  1RM (an 85% working number, then a further 10% cut); Wendler's lands near **90%**. The concurrent buffer
+  bought that safety once and the reset charges for it again. ⛔ **It moves prescribed weight for real
+  athletes** — it needs a decision on whether the two are answering the same question twice.
+
+- [ ] **Q-224 — the deposit claim's run half has no source, and your primary athlete is a runner.** The
+  meta-analysis (Llanos-Lagos 2026) is cyclists only and the authors rate certainty LOW. Both docs now say
+  cyclists. ⛔ **Do not let anyone cite Berryman or Rønnestad from memory** to fill the gap — that is
+  exactly how 262 participants sat graded "STRONG" with no author.
+
+- [ ] **The partner doc is ready to send once the above is device-verified.**
+  `docs/PROTOCOL-strength-focus-overview.md`. Two placeholders left for you: **authorship/review** and
+  **version/date**. ⚠️ Its "Open, and not papered over" section is the credibility — do not let a future
+  session tidy it away.
+
+- [ ] **The AAA acceptance check is still outstanding**, and it is **not** met by a markdown export.
+  Generate a Strength Focus block on a device: the header must say *"All 3 cycles are measuring cycles"*
+  and carry the *"One thing before you start"* paragraph naming the pinned lifts.
+
+- [ ] **`ios/debug.xcconfig` has been modified since before 2026-07-29 and is still uncommitted.** Left
+  alone deliberately across two sessions. Decide whether it matters.
+
+- [x] ~~The Thursday long-ride default nobody approved~~ — **resolved 2026-07-29.** All prefilled days
+  removed; the athlete picks or leaves blank.
 
 ---
 

@@ -2032,7 +2032,9 @@ Michael: *"its cleaner two and they can see the whole thing needs days of the we
 
 ---
 
-## D-331 — Compromise notes group by FACT, not by lift: one sentence per (anchor, distance), one per ceiling (2026-07-29, **UNCOMMITTED at time of writing**)
+## D-331 — Compromise notes group by FACT, not by lift: one sentence per (anchor, distance), one per ceiling (2026-07-29, PUSHED `2b73a612`)
+
+> ⚠️ **THE STATUS IN THIS TITLE WAS WRONG WITHIN THE HOUR.** It read *"UNCOMMITTED at time of writing"*, which is a CURRENT-STATUS claim in a permanent record — a later session would go looking for uncommitted work, find a clean tree, and conclude this does not exist. It is committed and pushed as `2b73a612`. **Still not deployed.** Never write a transient state into a title; put it in the body with a date.
 
 Michael, reading a real generated block: *"does this copy actualy refect and plan concessions or does it just never change, its dense i cant read it."*
 
@@ -2049,3 +2051,171 @@ Michael, reading a real generated block: *"does this copy actualy refect and pla
 - ⚠️ **One test was wrong, not the code** — I keyed duplicates on anchor+distance, which called "the day *before* squat" and "the day *after* deadlift" a duplicate. They are different facts. And a first draft hardcoded the floors instead of asking `requiredAdjacencyHours` — *a test that invents the rule it checks tests the invention.*
 
 > **↩ Does NOT close Q-217.** The ceiling sentence still says the max is "usually out of date" — untrue for an athlete who never logged a lift, where it was never *tested*. Grouping made that sentence shorter, not correct.
+
+---
+
+## D-332 — Lifting days is 3 OR 4, and the test week always runs on four (2026-07-29, PUSHED `ff1ea583` · **NOT DEPLOYED**)
+
+Michael: *"can we offer 3 stregnth trainingdays for anyone who is schedele dependent?"* — then, on why 4 stays the default, *"i see the single lift focus gives you the amrap test."*
+
+**Four lifting days was a HARD CONSTANT** (`SPEC-week-solver.md` §0a constraint 4: *"a fixed count, lift frequency is not negotiable"*). `ENGINE-STATE` called making it a real number the single biggest unlock left in this subsystem. It is now a **default**.
+
+### ⛔ WHY 4 WAS RIGHT, AND NOBODY HAD WRITTEN IT DOWN
+
+Not tradition, and not frequency. **5/3/1 is a MEASUREMENT.** The top set is an AMRAP and week 3's 95% set is the programme's validity check — it is what reads whether the working number has been earned. One lift a day means every lift is trained FIRST, so every top set is a clean read. **Stacking does not merely cost load on the second lift; it corrupts the gauge.**
+
+### WHY 3 IS STILL LEGITIMATE
+
+Frequency is not the mechanism. Grgic et al.'s volume-equated meta-analysis found **no significant effect of training frequency on strength gain** — 1 d/wk and 3+ d/wk produce similar results when weekly volume matches. What costs is **exercise order**: the movement performed first adapts most, and the later one gives up load and reps.
+
+⚠️ **The three-day setting does not fully equate volume**, by that same order effect. So the literature BOUNDS the option; it does not license it. The protocol doc states the trade rather than claiming it away.
+
+### THE SHAPE
+
+```
+most weeks   Squat · Deadlift · Bench + Press
+week 3       Squat · Deadlift · Bench · Press
+```
+
+- The **upper lifts pair** because they have least to give up — lighter and far less systemically taxing than a squat or deadlift.
+- The **heavy lower lifts keep their own days**, where the AMRAP matters most and fatigue costs most.
+- **Bench goes first** and the session says so. The order IS the cost.
+- **Week 3 splits back onto four days.** Fatigue status is a named standardisation variable in 1RM testing, and test-retest reliability holds (ICC ≥ 0.90) only when the protocol is standardised — hence EVERY test week, not some of them.
+
+### ⛔ THE SOLVER NEEDED NO CHANGE, AND ITS OWN COMMENT SAID SO
+
+`week-solver.ts:527` refuses two lifts on a day, with the comment: *"the matrix permits `upper_body_strength × lower_body_strength` to share a day and that permission is real, but it belongs to a different block shape."* **This is that shape.** So it gets ONE paired upper slot rather than a relaxed rule — one lift per day still holds, the clearance maths is identical (an upper day is an upper day whether it holds one press or two), and the composer expands the slot afterwards. The test week is simply solved a second time.
+
+### WHAT IS OURS
+
+Nobody has trialled *"train three, test on a fourth."* The components are measured; the join is a **scheduling choice made to protect a measurement**, not a claim about the body. Wendler does not write it either: at three days HE rotates the four lifts and lets the cycle run past four weeks; at two days he stacks two lifts per session and keeps the calendar. **We are using his two-day trade one day up, and keeping his calendar.**
+
+### PLUMBING
+
+`liftingDays?: 3 | 4` on the composer · `lifting_days` through `generate-strength-plan` and `create-goal` · its own intake card before accessory. ⚠️ **NOT `strength_frequency`** — that is the retired D-323 dial and branches downstream still clamp it to 2; a distinct key is the point. Only a literal 3 does anything; absent is 4, pinned by a test asserting byte-identical `sessions_by_week`.
+
+⚠️ **`SPEC-week-solver.md` §0a constraint 4 now contradicts the code and needs superseding.**
+
+---
+
+## D-333 — Above 25 miles a week the engine stops shaping the run week (2026-07-29, PUSHED `aa2ac29c` · **NOT DEPLOYED**)
+
+Michael: *"do peple run 16 miles on maintence"* — then *"i think anone that runs more than 25 miles a week can self regulate"* and *"we dont do the math."*
+
+### THE DEFECT, MEASURED
+
+`distributeRunMiles` weights the **easy budget**, and `runDayList` **excludes the hard day**. So a "4 run day" week was really a 3-way split at 1.5/1.0/0.85 and the long run took **45% of the budget** — 16 miles, **40% of the week**. At 3 run days it is a 2-way split at 1.4/1.0: **21 miles, 3h09**.
+
+The field cap is **25–30% of weekly mileage** (Daniels; the Hansons guidance rests on the same work) with a **2:30–3:00 time limit** beside it. Strength-led hybrid programmes run the long session **60–90 minutes**. The weights were roughly double any published number and the denominator was wrong underneath them.
+
+### THE FIX IS NOT A CAP
+
+At or above 25 mi/wk the share is **EVEN** and the athlete places their own miles. The engine still names WHICH day is long — that is their pick, and the solver needs the kind to place the lifting around it. **Below 25 the weighting stands**: a 12-mile-a-week runner getting four equal jogs is a worse answer, and 45% of a small budget is not the same defect.
+
+40 miles over 4 run days: the long run goes **16 → 12**. Thirty percent.
+
+⛔ **25 IS A PRODUCT DECISION.** No literature exists on the volume at which a runner can self-regulate. ⛔ **AND IT IS NOT A CEILING** — typed mileage is honoured in full, which is D-222's retirement (`maintenance-volume-band.ts` carries the standing warning that a cap was built once and must never return).
+
+### THE NOTE, AND THE NUMBER THAT WAS DROPPED FROM IT
+
+Michael proposed *"you can hold your run for 15 weeks at 63% of volume."* **63% is arithmetic off the 40-mile example (25 of 40), not Hickson's number** — his duration arms were 40 min → 26 and → 13, two-thirds and one-third, and both held VO2max for 15 weeks. Two further corrections folded in: he cut **duration** in one experiment and **frequency** in another, so "volume" merges them; and what held was **top-end fitness, not the run wholesale** — the one-third arm lost ~10% of long-duration endurance.
+
+**Copy:** the above-band line now carries their own dose named (the suggestion, no imperative), all of it conversational, and what the extra volume costs. *"conversational"* not *"zone two"* — COPY-VOICE rule 9, and the Running screen already says conversational.
+
+---
+
+## D-334 — Ride hours are the hours the athlete asked for (2026-07-29, PUSHED `eb4a5fb6` · **NOT DEPLOYED**)
+
+Found by running every intake combo through the composer and reading what came back. Three faults, all the run side's own history one discipline over.
+
+### ⛔ THE SEVERE ONE, AND IT WAS EVERY BIKE-ONLY ATHLETE
+
+`create-goal:2487` sets `gsBikeKept = bike maintain && gsSport !== 'bike'`, so a bike-**ONLY** athlete never gets a `bike{}` object — their hours arrive as `target_weekly_ride_hours` alone. `hasBike` tested `!!args.bike`, so the pass that turns hours into rides **never ran**, and the generic fallback handed them two fixed 45-minute rides. **6h asked, 1.5h built.** Not an edge case: it is the only path that athlete takes.
+
+### THE OTHER TWO
+
+- **`targetWeeklyRideHours` had ZERO readers.** Its own doc comment said it was carried *"so the bike pass has it to consume."* It never did. Same collected-and-dropped shape as `hardDay` and `quality_run` before it.
+- **Two emitters, nothing subtracting.** Where a `bike{}` object DID arrive, the generic fallback fired as well as the bike pass. The pass built the ask exactly (6h → 103 + 154 + 103 = 360 min); the fallback added its own two 45-minute rides. **6h → 7.5h.** ⛔ **And it scaled with FREE DAYS rather than the ask** — at three lifting days the same 6h became 8.3h over six rides. *A volume that moves when the LIFTING moves is not a volume.*
+- **The hard ride sat outside the budget** — the hill-session defect fixed on the run side 2026-07-28, unfixed here. **6h → 6.8h.** Michael rejected the run version at 27%. It does NOT shrink to fit: intensity is paid first at its full 45 and the easy hours flex. `BIKE_QUALITY_MIN` now owns that number so the subtraction and the session cannot drift.
+
+⚠️ **NOT FIXED, BECAUSE NOT REACHABLE:** a bike-primary athlete with run volume gets no runs. `gsSport` is run-if-kept, so bike-primary implies run is out. A hand-built fixture produced that combo; intake cannot. **Reported as a bug first and retracted** — the fixture was wrong, not the engine.
+
+---
+
+## D-335 — A big 95% set advances the bar and marks the ESTIMATE untrusted (2026-07-29, PUSHED `8a9ea796` · **NOT DEPLOYED**)
+
+Found by writing the partner-facing protocol: the doc asserted the engine flagged a double-digit 95% set instead of advancing. **It did not.** `verdictFrom95Set` was `reps >= 1 ? 'advance' : 'reset'` with no upper bound, so a 12-rep set and a 2-rep set returned the same verdict.
+
+### ⛔ AND THE FIRST FIX WAS THE WRONG BEHAVIOUR
+
+Michael, catching it: *"A 12-rep set at 95% means the athlete is genuinely much stronger than the TM says. Withholding the advance punishes them for it."*
+
+| | says | so |
+|---|---|---|
+| **Physiologically** | big set → stronger than the training max, and that is Wendler's own read | **advance** |
+| **Measurement-wise** | the e1RM off that set is above the range the equation holds in | **do not trust THIS number** |
+
+Two questions, opposite answers, and **only the measurement one is in doubt.** Hence `advance_untrusted`: the bar climbs exactly as on a plain advance, and the estimate is marked so the next standardised read **supersedes** rather than compounds.
+
+⚠️ `applyVerdict`'s guard was `verdict !== 'advance'` — it would have swallowed the new verdict and held the bar, the exact defect the verdict exists to avoid. The **1RM ceiling still binds**: a set outside the reliable range must not become a route around it.
+
+### DEADLIFT GETS LESS ROPE, AND THE ERROR IS DIRECTIONAL
+
+**LeSuer et al. 1997** (*JSCR* 11(4):211-213) tested seven equations across bench, squat and deadlift: correlations uniformly high (r > 0.95) and **every equation significantly UNDERESTIMATED the deadlift.** That is a bias with a direction, not scatter — and it **compounds with Brzycki's own downward bias**, so a deadlift e1RM is systematically low rather than merely uncertain. Trusted to **5 reps** rather than 8; 5 is where **Reynolds et al. 2006** found prediction strongest (R² = 0.993 bench). `trustedMaxRepsFor` matches on the lift name so *"Trap Bar Deadlift"* cannot slip through, and an unrecognised lift gets the **tighter** general ceiling.
+
+⚠️ **8 AND 5 ARE BOTH OURS.** The literature gives a degradation zone, not a line.
+
+⚠️ The allowlist in `generate-strength-plan` had to learn the verdict or it would be dropped at the door and fall to `unknownMeans: 'advance'` — the bar would still have climbed and **nothing would have looked broken** while the provenance flag went missing.
+
+### ⛔ AND A JUSTIFICATION IN `compute-facts` MAY HAVE BEEN BACKWARDS
+
+It read: *"Brzycki is more accurate than Epley at the low rep ranges (2-5)."* At that exact range some work puts **Epley and Wathen CLOSER** to a tested 1RM. Rewritten; **formula unchanged.** Brzycki underestimates and Epley overestimates, and for a number that sets an athlete's next working load with nobody watching, **erring low is the defensible direction.** That is a product decision about which way to be wrong, not an accuracy claim. Switching it needs its own entry.
+
+---
+
+## D-336 — The deposit claim has a paper, and it is narrower than the doctrine said (2026-07-29, PUSHED `17301cdf`)
+
+*"17 studies, 262 participants"* sat in `DOCTRINE-aerobic-maintenance.md` in **four places**, graded **"Literature, STRONG"**, with **no author anywhere**. The count was right and the citation was absent — which is the same fault as a wrong attribution, and it was the doc's own instruction to *"lead with it."*
+
+**It is:** Llanos-Lagos C, Ramirez-Campillo R, Sáez de Villarreal E (2026). *Heavy strength training effects on physiological determinants of endurance cyclist performance: a systematic review with meta-analysis.* **Eur J Appl Physiol 126(1):193-222.** DOI 10.1007/s00421-025-05883-2. 17 studies, 262 participants (60 female), 5-25 weeks at 1-3 sessions/wk.
+
+| outcome | effect size | p |
+|---|---|---|
+| Cycling performance (TTE / TT) | 0.463 | 0.016 |
+| Cycling efficiency | 0.353 | 0.012 |
+| Anaerobic power | 0.560 | 0.024 |
+| **VO2max** | **no significant effect** | **≥ 0.263** |
+
+### TWO CORRECTIONS, BOTH NARROWING
+
+- ⛔ **NOT "STRONG."** The authors rate the certainty of evidence **LOW**. The register row now carries the authors' grade, not ours.
+- ⛔ **CYCLING ONLY.** The doctrine's *"improves run and bike performance after prolonged submaximal work"* half is **not in this review**, and no source for it has been located. Stated for cyclists now, not for every athlete. **Anywhere the product states the deposit to a runner, it is generalising past the source.**
+
+Still the best-evidenced claim in the domain, and still the one to lead with — for the athlete it was measured on.
+
+---
+
+## D-337 — Wendler HAS an estimated max, it is Epley, and our Brzycki is a stated deviation (2026-07-29, PUSHED `17301cdf` — VERIFIED AGAINST THE PRIMARY)
+
+⛔ **A CLAIM IN OUR OWN DRAFT, STRUCK BEFORE PUBLICATION.** The protocol doc asserted *"5/3/1 has no estimated max of its own"* — that our whole e1RM layer filled a gap Wendler left. **It is wrong.** The 2nd-edition text was searched directly (Michael supplied the PDF; no copy had ever been in the repo, so the previous session's search could not be reproduced).
+
+**He carries a rep-max calculator**, in three places — comparing rep maxes (p33), resetting after a stall (p31), and setting a training max for band or chain work (p99):
+
+```
+Weight × Reps × .0333 + Weight = Estimated 1RM
+```
+
+⛔ **THAT IS EPLEY.** `.0333` is 1/30. **We use Brzycki**, so our conversion is a **deviation from the source programme**, not a gap we filled — and the doc states it as one. The reason stands: Epley overestimates, Brzycki underestimates, and for a number that sets an athlete's next working load with nobody watching, we take the conservative direction.
+
+✅ **AND HE HEDGES IT HIMSELF**, which backs the trust ceiling better than any paper does: *"This formula is not necessarily an accurate predictor of your 1RM, but it affords you a good general way to gauge your progress."* The programme this block derives from does not treat the estimate as a measurement either.
+
+### THE OTHER TWO ATTRIBUTIONS, NOW ON PRIMARY EVIDENCE
+
+- **"Always be able to hit five reps at 95%"** — the phrase *"always be able"* **does not occur in the text**, and no five-rep rule at 95% appears anywhere. Every prescription reads `95% x 1 or more reps`. **Q-220's strike stands, now verified rather than inherited.**
+- **The stall trigger** is failing to hit the prescribed sets and reps. Confirmed.
+
+### ⛔ AND A DIVERGENCE WE DID NOT KNOW WE HAD
+
+His stall reset **re-estimates from a fresh rep max and takes 90% of that.** Ours cuts the existing working number by 10% — and our working number starts at **85%** of 1RM (`WORKING_NUMBER_PCT_OF_1RM`, the concurrent-athlete buffer), so a reset lands near **72% of 1RM** where his lands near **90%**.
+
+**The buffer bought that safety once and the reset charges for it again.** Not changed: it moves prescribed weight for real people. Filed as Q-222.
