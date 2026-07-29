@@ -28,52 +28,15 @@ export const isEnduranceSession = (s: WeekSession): boolean =>
   s.type != null && s.type !== 'strength';
 
 /**
- * ⛔ DERIVED, NOT A CONSTANT — it moves with lifting frequency, which is the whole point.
+ * ⛔ THE BUDGET FUNCTIONS WERE DELETED 2026-07-29, NOT LEFT UNREAD.
  *
- * Clean ground = days carrying no lift, plus days carrying an UPPER lift. Pressing shares no prime
- * movers with running or riding, so those stack for free and the law asks no gap for the pair.
- * Heavy-leg days are excluded: an easy session there is the same legs twice, and while the law
- * permits it at six hours, six hours is the FALLBACK and not the arrangement to aim for
- * (Robineau 2016 — half-squat 1RM +16.8% at 0h vs +31.2% at 6h vs +25.9% at 24h).
+ * `cleanEnduranceSlots`, `cleanSlotsForLiftingDays` and `heavyLegCollisionDay` existed to drive a
+ * card that told the athlete an endurance session had landed on a heavy-leg day. That card is gone:
+ * the citation behind it was out of condition (Robineau's 0h arm was lifting + HARD endurance, not
+ * an easy ride) and stacking is what Wendler's own concurrent template prescribes — same session,
+ * zero gap, p87.
  *
- * One day is held back as rest before any of it counts.
- *
- * Four lifts → 2 free days + 2 upper days = 4. Three lifts → 3 free + 2 upper = 5.
+ * ⚠️ They are removed rather than kept "in case" precisely because this codebase's most common
+ * defect is a correct value with no reader. If the budget comes back, it comes back with a claim
+ * that survives its own citation.
  */
-export function cleanEnduranceSlots(sessions: WeekSession[]): number {
-  const lifts = sessions.filter((s) => s.type === 'strength');
-  const liftDays = new Set(lifts.map((s) => s.day));
-  const heavyDays = new Set(lifts.filter((s) => HEAVY_LEG.test(s.name)).map((s) => s.day));
-  const upperDays = [...liftDays].filter((d) => !heavyDays.has(d)).length;
-  const REST_RESERVED = 1;
-  const freeDays = Math.max(0, WEEK_DAYS.length - liftDays.size - REST_RESERVED);
-  return freeDays + upperDays;
-}
-
-/** The day an endurance session shares with heavy legs, if any — where the overage actually lands. */
-export function heavyLegCollisionDay(sessions: WeekSession[]): string | null {
-  for (const d of WEEK_DAYS) {
-    const on = sessions.filter((s) => s.day === d);
-    const heavy = on.some((s) => s.type === 'strength' && HEAVY_LEG.test(s.name));
-    if (heavy && on.some(isEnduranceSession)) return d;
-  }
-  return null;
-}
-
-/**
- * The same budget, before a week exists — for the intake card, where the athlete is still choosing
- * and there is nothing to render yet.
- *
- * ⛔ NO SERVER CALL. The count is arithmetic: of N lifting days, half carry heavy legs (squat and
- * deadlift) and half carry a press. Presses stack for free; heavy legs do not. So clean ground is
- * the lift-free days, minus the reserved rest day, plus the upper-lift days.
- *
- * ⚠️ It must agree with `cleanEnduranceSlots` above, which counts the same thing from a real week.
- * Pinned by a fixture that runs both against a four-lift block.
- */
-export function cleanSlotsForLiftingDays(liftingDays: number): number {
-  const REST_RESERVED = 1;
-  const upperDays = Math.ceil(liftingDays / 2);        // 4 lifts -> 2 presses; 3 -> 2
-  const freeDays = Math.max(0, WEEK_DAYS.length - liftingDays - REST_RESERVED);
-  return freeDays + upperDays;
-}

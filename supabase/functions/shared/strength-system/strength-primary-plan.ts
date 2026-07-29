@@ -957,18 +957,29 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // The session copy has said so for weeks ("they share no prime movers" vs "leave 6h"); only the
   // CHOICE of day was blind to it.
   //
-  // ⚠️ AND SIX HOURS IS THE FALLBACK, NOT THE TARGET. Robineau 2016 measured half-squat 1RM at
-  // +16.8% (0h) vs +31.2% (6h) vs +25.9% (24h) — the gap is what makes a stacked day survivable when
-  // the athlete cannot split further, not an arrangement to reach for. `place-week.ts:87` warned in
-  // as many words that a scheduler treating 6h as equal to 24h "will stack by preference and quietly
-  // cost the aerobic side." This is that warning, paid.
+  // ⚠️ CORRECTED 2026-07-29 — THE MAGNITUDE WAS JUSTIFIED BY A NUMBER THAT DOES NOT APPLY HERE.
   //
-  // ⛔ THE MAGNITUDE IS DERIVED, NOT PICKED. The anchor term's ceiling is 8 — +4 beside the quality
-  // run and +4 beside the long run, both at once. Setting the leg cost ABOVE that ceiling makes the
-  // ordering categorical: in a block where strength is the goal and running is held at maintenance,
-  // protecting the developing lift outranks every easy-run spacing consideration. It does not forbid
-  // a heavy-leg day — when nothing else is free, it is still chosen, and the 6h note rides with it.
-  const HEAVY_LEG_STACK_PENALTY = 9;
+  // It was set ABOVE the anchor term's ceiling, making the ordering categorical, and the reason
+  // given was Robineau 2016 (+16.8% at 0h vs +31.2% at 6h). ⛔ But Robineau's 0h arm stacked lifting
+  // with HARD endurance. This is an EASY run. The comment at the stack note in this same file says
+  // so in terms and says not to attach that citation without a trial that tested lifting + easy
+  // work on one day — and there isn't one.
+  //
+  // ⛔ AND STACKING IS NORMAL, NOT A COMPROMISE. Wendler's concurrent template is main lift ->
+  // assistance -> conditioning IN THE SAME SESSION, zero gap (p87), and p75 says he does not care
+  // whether conditioning lands on a lifting day. A categorical penalty was the engine avoiding
+  // something the protocol prescribes.
+  //
+  // ✅ WHAT SURVIVES IS THE DIRECTION, NOT THE SIZE. All else equal an easy run on a press day
+  // competes with nothing, and on a squat day it shares the legs — `stackNeedsRecoveryGap` is the
+  // law's own answer to which pairs compete. So it stays a PREFERENCE, weighted the same as one
+  // anchor adjacency rather than above every one of them: it breaks a tie, it does not override.
+  //
+  // ⚠️ Modality does not rescue it either way. Wilson 2012 says cycling is free, Schumann 2022
+  // (larger, better controlled) finds no modality moderation at all, and Sabag 2018 points the other
+  // way for lower-body strength specifically. The register's standing instruction is not to build a
+  // new claim on that split.
+  const HEAVY_LEG_STACK_PENALTY = 4;   // one anchor adjacency — a tiebreak, not an override
   const runCandidates = [...upperLiftDays, ...MAIN_LIFTS.filter((l) => l.isLower).map(liftDay)]
     .filter((d) => d !== hardPinDay && !runDayList.includes(d))
     .map((d) => ({
