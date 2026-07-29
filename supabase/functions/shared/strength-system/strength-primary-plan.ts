@@ -1042,6 +1042,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       const ex: StrengthExercise[] = isDeload
         ? [main]
         : [...(lift.isLower ? [JUMPS] : []), main, ...cycleAssistance.rows];
+      // What the PROSE may name: the work this stage prescribes and no later stage rewrites.
+      const prescribedLabels = isDeload ? [main] : [...(lift.isLower ? [JUMPS] : []), main];
         // ⛔ THE ANCHOR TOP SET IS A REP-OUT, AND THE PRESCRIPTION READS LIKE A TARGET.
       //
       // Week 11 prescribes `125×1+`. The number after the plus is the entire point — but "1+"
@@ -1071,7 +1073,31 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // omitted entirely rather than printed as a no-op, the same rule the ceiling paragraph
         // follows. And it NAMES the pick, because "something else is here" reads as the app
         // ignoring the athlete's choice rather than reading it.
-        description: `${ex.map(exerciseLabel).join(' · ')}.${isDeload ? '' : ` ${ASSISTANCE_GUIDANCE}`}${
+        //
+        // ⛔ THE PROSE NAMES THE PRESCRIBED WORK ONLY — jumps and the main lift. It does NOT name the
+        // assistance movements, and that is the fix for a real defect rather than a style choice.
+        //
+        // `materialize-plan:1109` substitutes assistance by EQUIPMENT — a face pull becomes
+        // `Band Face Pulls` for an athlete with bands and no cable — and it rewrites the exercise
+        // ROWS while this description, authored a stage earlier, keeps the pre-substitution name.
+        // The athlete then reads `Face Pull` in the sentence and `Band Face Pulls` in the list of
+        // the same session. One movement, two names, one card.
+        //
+        // ⚠️ THE DEFECT IS OLDER THAN THE COLLISION RULE BUT THE COLLISION RULE IS WHY IT BITES.
+        // The substitution triggers on `face pull` / `dumbbell` / `db ` / `cable` / `leg curl`;
+        // before Q-212 you had to pick a dumbbell option while owning no dumbbells to reach it.
+        // Routing the push slot to a face pull put it on EVERY press day.
+        //
+        // ✅ ONE SOURCE PER CLAIM: `strength_exercises` is the owner of what the movements are, and
+        // it is already what Garmin builds its steps from (`send-workout-to-garmin:770`) and what
+        // the exercise list renders. The prose was a second copy that a later stage could not reach.
+        // ⚠️ The collision note is UNAFFECTED and stays — it names the athlete's PICK, not the
+        // replacement, so no later stage rewrites it.
+        //
+        // ⛔ THE CLASS IS NOT FIXED, ONLY THIS INSTANCE. The invariant is *no stage rewrites a name
+        // another stage has already rendered*. Today the main lifts are safe only because none of
+        // them matches that trigger list — by coincidence of the list, not by design. See Q-216.
+        description: `${prescribedLabels.map(exerciseLabel).join(' · ')}.${isDeload ? '' : ` ${ASSISTANCE_GUIDANCE}`}${
           isDeload || !cycleAssistance.note ? '' : ` ${cycleAssistance.note}`}${amrapNote}${stackNoteFor(lift)}`,
         duration: isDeload ? 35 : 60,
         strength_exercises: ex,

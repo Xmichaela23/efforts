@@ -1825,3 +1825,21 @@ The session note nevertheless reads *"leave 6h before the run"* as a flat instru
 ⛔ **24h IS THE TARGET, 6h IS THE FALLBACK. They are not equivalent**, and the aerobic side is where the difference shows.
 
 **Related:** Q-214 (the same "term that cannot see it" shape, on lift placement), §0e and §0j in `docs/SPEC-week-solver.md`.
+
+---
+
+## Q-216 — The invariant: no stage rewrites a name another stage has already rendered (2026-07-28, class named, PARTIALLY closed)
+
+**Raised by Michael while closing the `Face Pull` / `Band Face Pulls` instance:** *"The class isn't fixed by B, only this instance. The real defect is that materialize rewrites rows an earlier stage already described in prose."*
+
+**The instance.** `materialize-plan:1109` substitutes assistance by equipment — a face pull becomes `Band Face Pulls` for an athlete with bands and no cable — and rewrites the exercise ROWS. The session description was authored a stage earlier and kept the old name, so one session card showed one movement under two names.
+
+✅ **CLOSED FOR ASSISTANCE (option B, 2026-07-28).** The prose now names only the prescribed work — jumps and the main lift — and `strength_exercises` is the single owner of what the movements are. Garmin already built its steps from the rows (`send-workout-to-garmin:770`), so the prose was a second copy nothing downstream depended on.
+
+⛔ **NOT CLOSED AS A CLASS, AND HERE IS THE EXPOSURE.** The substitution triggers on `face pull`, `dumbbell`, `db `, `cable`, `leg curl`, `lateral raise`, `farmers carry`, `sandbag lunge`, `sled push`, `sled pull`, `barbell hip thrust`, `band`. **None of the four main lifts matches that list — so main-lift names in prose are safe by COINCIDENCE OF THE LIST, not by design.** Add one trigger that matches a main lift and every strength description in the app goes stale silently.
+
+⚠️ **AND THE INVARIANT IS ALREADY VIOLATED IN THE OTHER DIRECTION.** `materialize-plan:3432` rewrites `description` and `rendered_description` to correct a race-day pace. So the codebase already accepts that a later stage may edit prose an earlier stage wrote — which means the rule cannot be *"prose is immutable"*. The honest form is the one Michael stated: **no stage rewrites a name another stage has already rendered** — either the later stage updates every rendering, or the earlier stage does not render what the later stage may change.
+
+**What would close it.** Either (a) the substitution layer becomes the single place movement names are resolved, before any prose is authored, or (b) every rewrite carries a matching prose update the way the race-day pace path already does. ⚠️ (b) is what exists and it has been applied exactly once, for one field, which is why this recurred.
+
+**Related:** Q-212 (routed a face pull into the push slot, which is why this became reachable on every press day), Q-210 (the same "two spellings of one movement" family, one layer down).

@@ -91,3 +91,44 @@ Deno.test('the note carries the voice — no imperative, no encouragement, one c
   // It states what happened and why, and it names both the pick and the day's lift.
   assertEquals(note.includes('Single Leg Hip Thrust') && note.includes('Deadlift'), true);
 });
+
+// ── the prose no longer names assistance (option B) ───────────────────────────
+//
+// `materialize-plan:1109` substitutes assistance by EQUIPMENT and rewrites the exercise ROWS.
+// The description is authored a stage earlier, so any movement name in it can go stale — the
+// athlete read `Face Pull` in the sentence and `Band Face Pulls` in the list of the same session.
+// One source per claim: the rows own what the movements are.
+
+import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
+
+const PLAN = composeStrengthPrimaryPlan({
+  durationWeeks: 12, oneRepMaxes: { bench: 135, squat: 185, deadlift: 225, overheadPress: 95 },
+  enduranceSport: null, enduranceFrequency: 0,
+  assistancePicks: { push: 'Dips', pull: 'Chin Up', single_leg_core: 'Single Leg Hip Thrust' },
+});
+const strengthSessions = (wk: string) =>
+  (PLAN.sessions_by_week[wk] as any[]).filter((s) => s.type === 'strength');
+
+Deno.test('⛔ NO ASSISTANCE MOVEMENT IS NAMED IN THE PROSE — a later stage may rename it', () => {
+  const ASSISTANCE = ['Dips', 'Chin Up', 'Single Leg Hip Thrust', 'Reverse Lunge', 'Face Pull', 'Push Up', 'Pull Up'];
+  for (const wk of ['1', '5', '9']) {
+    for (const s of strengthSessions(wk)) {
+      // The collision note is the ONE allowed mention, and it names the athlete's PICK rather than
+      // the replacement — nothing downstream rewrites a pick, so it cannot go stale.
+      const prose = String(s.description).replace(/You picked [^.]*\./g, '');
+      for (const m of ASSISTANCE) {
+        assertEquals(prose.includes(m), false, `week ${wk} ${s.name}: prose names "${m}"`);
+      }
+    }
+  }
+});
+
+Deno.test('the prose still names the PRESCRIBED work, and the rows still carry everything', () => {
+  const squat = strengthSessions('1').find((s) => s.name === 'Strength — Back Squat')!;
+  assertEquals(String(squat.description).startsWith('Box Jump 3×5 · Back Squat '), true);
+  // The rows are unchanged — this moved a name out of the prose, it did not drop a movement.
+  assertEquals(
+    squat.strength_exercises.map((r: any) => r.name),
+    ['Box Jump', 'Back Squat', 'Dips', 'Chin Up', 'Single Leg Hip Thrust'],
+  );
+});
