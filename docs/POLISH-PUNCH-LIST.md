@@ -18,12 +18,15 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
   `grep -rln "shared/strength-system" supabase/functions` rather than trusting this list.
 
 - [ ] **Then look at four things on a phone.** Three of them appear in one generated block:
-  - [x] ~~**Overhead Press day shows `Inverted Row`, not `Pull Up`**~~ ✅ **DEVICE-VERIFIED 2026-07-29.**
-    Michael's screenshot: Monday's Bench Press day carries `Chin Up`, Thursday's Overhead Press day
-    carries `Inverted Row`. The complement rule is live. *(D-328)*
-  - [x] ~~**Compromise notes read as one sentence per fact**~~ ✅ **DEVICE-VERIFIED 2026-07-29.**
-    *"Back Squat and Deadlift sit 2 days from your long run"* — one line, two lifts. The ceiling
-    paragraph names both lifts once instead of repeating itself. *(D-331)*
+  - [~] **Overhead Press day shows `Inverted Row`, not `Pull Up`** — ⚠️ **SEEN WORKING LOCALLY, NOT
+    ON THE DEPLOYED BUNDLE.** Michael's screenshot: Monday's Bench Press day carries `Chin Up`,
+    Thursday's Overhead Press day carries `Inverted Row`. ✅ **What this DOES prove:** the rule is
+    correct through the real client and the real composer, not only through fixtures. ⛔ **What it does
+    NOT prove:** that production does it — the functions are still not deployed, and the phone runs
+    whatever bundle is live. **Re-check this exact tell after deploying.** *(D-328)*
+  - [~] **Compromise notes read as one sentence per fact** — ⚠️ **LOCAL ONLY, same caveat.** *"Back
+    Squat and Deadlift sit 2 days from your long run"* — one line, two lifts; the ceiling paragraph
+    names both lifts once instead of repeating itself. *(D-331)*
   - **A three-day block:** weeks 1/2/4 show `Bench + Press` on one day; **week 3 shows FOUR lifting days**
     with the press on its own *(D-332)*
   - **A 40-mile runner's long run reads ~12 mi, not 16** *(D-333)*
