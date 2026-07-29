@@ -124,6 +124,25 @@ one of them had been green for months:
 ✅ **So when a change makes an old test go red, the first question is which of the two is wrong** —
 and on this evidence it is not automatically the change.
 
+### 0d.1 — test the RULE over its input space, not the CASES that raised it
+
+**Added 2026-07-28, out of Q-212.** §0d asks whether a test *can* fail. This asks whether it was
+ever *pointed at* the thing that would fail.
+
+The ticket named two collisions: dips on a bench day, and a hip thrust on a deadlift day. A fixture
+written to those two cases would have passed and shipped. The fixture written instead asserts the
+INVARIANT — *nothing in a session repeats the main lift's pattern* — looped over every slot against
+every main lift, and it immediately failed on a third case nobody had named: `Reverse Lunge` is the
+single-leg **default** and is knee-dominant, so on a **Back Squat** day it repeated the day's own
+pattern. **Every athlete who never touched the card had it.**
+
+Michael: *"That's the difference between testing the fix and testing the rule."*
+
+✅ **The check:** when a rule has a small finite input space — slots × lifts, phases × tiers, postures
+× disciplines — loop the invariant over the whole product. It is usually a handful of lines, and it
+finds the cases the ticket author did not know existed. A fixture that only encodes the reported
+symptoms can only ever confirm the report.
+
 ## ⛔ 0e. A CHECK WHOSE METRIC CANNOT MOVE IS NOT A CHECK
 
 **The fifth member of the family, and it generalises past testing.** §0d says a test that has never
