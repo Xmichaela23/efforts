@@ -1938,3 +1938,41 @@ A throwaway athlete with **resistance bands and no cable** — the exact branch 
 | `goal_type` | `'capacity'` (any discipline developing) |
 | protocol | `strength_protocol: 'five_by_five'` inside `training_prefs` |
 | shape | `{ user_id, mode: 'create', action: 'keep', plan_start_date, goal: { name, goal_type, target_weeks, sport, priority, training_prefs } }` |
+
+---
+
+## Q-220 — The reset threshold cuts a training max for a session the book calls a pass (2026-07-28, VERIFIED against the primary, LIVE IN CODE)
+
+⛔ **`verdictFrom95Set` resets anything under five reps**, and there is no middle:
+
+```
+return repsAchieved >= VALIDITY_CHECK_MIN_REPS ? 'advance' : 'reset';   // MIN_REPS = 5
+```
+
+A reset drops the working number **10%** (`RESET_FRACTION`).
+
+⛔ **THE BOOK PRESCRIBES 95% × 1+.** *5/3/1* 2nd ed **p23**: week three is `75% x 5 · 85% x 3 · 95% x 1 or more reps`. **One rep at 95% is the prescription being met.** An athlete who grinds out four reps has done four times the stated minimum — and we cut their training max by 10% for it.
+
+⚠️ **AND THE RULE WE CITE FOR THE THRESHOLD IS NOT IN THE BOOK.** `SPEC-get-stronger` §1 states it as Wendler's own: *"You should always be able to hit at least five reps at 95% of your working number."* Searched the full 134-page 2nd edition — **that sentence, and any five-reps-at-95% rule, is absent.** The phrase *"always be able"* does not occur.
+
+**What the book actually says the trigger is** (**p30**): *"You keep on increasing the max you're working from every four weeks **until you can no longer hit the prescribed sets and reps**."* The prescribed rep at 95% is one. So the honest trigger is **missing the prescribed minimum**, not falling short of an invented one.
+
+### Why this matters more than it looks
+
+- It is the **only** advancement gate. There is no `hold` band between advance and reset — every logged week-3 session either climbs or drops 10%.
+- It fires on the athlete's own logged work, so it is the one place the engine acts on performance. Getting the threshold wrong here is worse than having no gate.
+- ⚠️ **Not currently harming anyone** — it only fires on a rebuild with logged sessions, and there are none yet. But it is wired and deployed.
+
+### What it probably should be
+
+Not proposing a number without a decision. The shape the primary supports:
+
+| reps at 95% | verdict |
+|---|---|
+| **0** — logged, failed the lift | reset |
+| **1–4** | ⚠️ the prescription was met. `advance` or `hold`, **not** `reset` |
+| **5+** | advance |
+
+⚠️ `Forever` may well carry a five-rep rule — it is where leader/anchor and the 25–50 assistance range come from, neither of which is in the 2nd edition either. ⛔ **Until someone reads it, the threshold cannot be attributed to Wendler and should not behave as though it were.**
+
+**Related:** Q-217 (the ceiling — same family: an invented guard standing in for the book's own performance test), `SPEC-get-stronger.md` §T2b.

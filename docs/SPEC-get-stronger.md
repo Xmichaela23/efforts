@@ -394,36 +394,52 @@ contradicts its own citation is worse than an unsourced one.
 | Protein 1.6–2.0 g/kg/day | Morton 2018 (49 studies, n=1863) · ISSN 2017 position stand |
 | Keep volume low to avoid unwanted mass; heavy lifting alone blunts rate of force development, add plyometrics | Van Hooren 2024 — *review, not a trial* |
 
-### T2 — named method, established practice, untested on this population
+### T2 — Wendler. ✅ VERIFIED AGAINST THE PRIMARY 2026-07-28
 
-| call | lineage |
+⛔ **THE BOOK WAS READ.** *5/3/1: The Simplest and Most Effective Training System for Raw Strength*, 2nd
+edition, 134pp. Page numbers below are that edition. ⚠️ **`5/3/1 Forever` and `Beyond 5/3/1` are still
+NOT read** — anything attributed to those remains secondary, and is listed separately in T2b.
+
+⛔ **The PDF is Michael's licensed copy and every page carries his email and transaction number. It is
+NOT in this repo and must not be committed.**
+
+| call | page | status |
+|---|---|---|
+| Training max = **90% of the estimated 1RM** | **p21, p22** — *"make the commitment to starting your training program at 90% of your max"* | ✅ verbatim |
+| Estimated 1RM = `weight × reps × 0.0333 + weight` (**Epley**) | **p21** | ✅ verbatim. ⚠️ We use **Brzycki** in `compute-facts` |
+| Cycle percentages 65/75/85 · 70/80/90 · 75/85/95 | **p23** (option one; an option two exists and he recommends option one) | ✅ verbatim |
+| Deload week 4 = 40/50/60, 3×5, every fourth week | **p10, p11, p23** | ✅ verbatim |
+| Increment **+5 upper / +10 lower** per cycle | **p29** | ✅ verbatim |
+| **Smaller increments are explicitly permitted** — 2.5 upper / 5 lower if you have the plates | **p29** | ✅ verbatim. ⚠️ Unused by us, and it is the honest answer for light bars |
+| Top set is a rep-out — *"5 or more"*, *"3 or more"*, *"1 or more"* | **p23, p24** | ✅ verbatim |
+| The rep-out is **not to failure** | **p24** — *"not to failure so you're dead and can't train the rest of the week"* | ✅ verbatim |
+| Assistance is chosen for **balance** — *"if you train your chest, train your back… try to achieve balance"* | **p46** | ✅ verbatim. ⛔ **This is Q-212's owner.** The collision rule was filed as reasoned-with-no-owner; it has one |
+| *"Start too light"* / progress slowly | **p24** | ✅ verbatim — supports our conservatism |
+| The basic week is **4 days** | **p11** | ✅ verbatim |
+
+### ⛔ T2a — WHAT THE BOOK SAYS THAT WE DO NOT DO
+
+| the book | us |
 |---|---|
-| **The entire cycle** — 65/75/85, 70/80/90, 75/85/95, deload 40/50/60, +5/+10 per cycle | Wendler 5/3/1. **Strong** — identical across many independent sources that cross-check each other. |
-| Working number at 90% of true max (the standard) | Wendler. **Strong** — same. |
-| 10–15 jumps or throws before every session | Wendler, **quoted directly** in a thread he posts in. **Strong.** |
-| Assistance: 25–50 reps each of push / pull / single-leg-core | Wendler. **Strong** — multiple consistent sources. |
-| Leader / Anchor periodisation (not used in V1) | Wendler 5/3/1 Forever. **Strong.** |
-| **Working number at 80–85%** | **UPGRADED 2026-07-25 — was marked thin, now better attributed.** It is Wendler's own **general** guidance, not a running-specific workaround: manipulate the working number by current goals and recovery, lower it when recovery or technique is uncertain, and he has gone lower still for athletes he coaches. **⚠️ But it is prescribed TOGETHER WITH programmed fives and no all-out set.** Pairing the lower number with AMRAP top sets is not his — see §1, which resolves it via Leader/Anchor. |
-| ⚠️ **Hard conditioning on the lower-body days** | **THIN — a gym website's paraphrase.** |
-| ⚠️ **2–3 conditioning sessions per week on off days** | **THIN — same gym website.** |
+| ⛔ **THERE IS NO CEILING.** *"You keep on increasing the max you're working from every four weeks **until you can no longer hit the prescribed sets and reps**"* (**p30**) | We cap the working number at **90% of a stored 1RM that never updates**. That cap is ours and it is not in the protocol |
+| ⛔ **THE STALL RULE IS A RESET FROM THE CURRENT MAX.** *"When this happens, I simply take 90% of my max (**either a 1RM or a rep max**) and start all over again"* (**p30**) | We hold the 1RM fixed forever, so there is nothing to re-derive from. ⚠️ *"or a rep max"* is the AMRAP — the primary explicitly permits resetting off logged reps |
 
-> ### ⚠️ NONE OF THE WENDLER MATERIAL IS FROM HIS BOOKS
->
-> `5/3/1 Forever` and `Beyond 5/3/1` were not read. Everything above is secondary — guides, forum
-> summaries, coaching sites.
->
-> **For the core cycle that barely matters** — it is documented so widely and so consistently that the
-> sources cross-check each other. **For the three ⚠️ endurance-athlete lines it matters more**, because
-> that is exactly where one site's paraphrase can drift.
->
-> **And be specific about the risk:** two of those three come from the *same page* that produced
-> *"5/3/1 combines with running better because the main work is submaximal"* — a claim struck from this
-> spec as **not Wendler's and unfalsifiable**. One claim from that page was thrown out and two were kept.
->
-> **Neither is load-bearing, so V1 can build on them:** 80–85% is conservative in the safe direction
-> either way, and the conditioning placement now stands on this spec's own scoped-override reasoning
-> (§2) rather than on Wendler's authority. **But do not promote them to "Wendler says" until someone
-> reads the book.**
+✅ **So the governor is PERFORMANCE, not arithmetic** — confirmed at origin, not inferred. Q-217's ceiling
+problem and Michael's *"is this paperclip maximizer shit"* are the same observation, and the book agrees.
+
+### ⛔ T2b — ATTRIBUTED TO WENDLER, NOT IN THE 2ND EDITION
+
+**Each of these may be correct from `Forever` / `Beyond`. None can be cited to the book we hold.**
+
+| call | status |
+|---|---|
+| ⛔ **Working number at 80–85%** | **NOT IN THIS EDITION, and the number we may have been reading means something else.** p21's 80/85% is the **weight used to TEST a rep max in order to estimate the 1RM** — not a lowered training max. The book says 90%. If our 85% came from a secondary paraphrase of p21, it is a mis-citation |
+| ⛔ **"Always able to hit five reps at 95% of the working number"** | **NOT IN THIS EDITION, and the book prescribes 95% × 1+.** See Q-220 — this drives a live reset threshold |
+| 10–15 jumps or throws before every session | not in this edition |
+| Assistance 25–50 reps per category | not in this edition *(p45's "sets of 25-50" is an ab exercise)* |
+| Leader / Anchor periodisation | not in this edition — `Forever` |
+| Conditioning 2–3×/week on off days · hard conditioning on lower days | not in this edition. Previously marked THIN; still thin |
+
 | AMRAP top set → estimated max; formula accuracy | Wendler · LeSuer 1997 |
 | Stall → drop 5–10% after missing twice | Starting Strength / Texas Method |
 | Phase sequence: Anatomical Adaptation → **Maximum Strength** → Conversion to Power → Maintenance | Bompa · Friel |
