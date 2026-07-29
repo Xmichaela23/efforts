@@ -205,7 +205,15 @@ This is the institutional-memory backbone. The next session reads what this sess
 - **`adapt-plan` action=auto** — fire-and-forget
 - `post-import-athlete-pipeline` — awaited, but **Garmin-only and milestone-gated**
 
-⚠️ **`adapt-plan` action=auto is NOT a no-op.** (This file claimed it was, and that claim was false.) It auto-progresses/deloads strength loads off the `exercise_log` e1RM trend, writes `plan_adjustments`, and invokes `materialize-plan`, which rewrites `computed.steps` on the plan's future rows. **The athlete is never asked.** The adjustment is stamped `applies_from: today`, so the past is safe — but the auto path **skips the Arc fatigue/taper/adherence gate** that the `suggest` path applies. See `docs/LIFECYCLE.md`.
+⚠️ **`adapt-plan` action=auto DOES NOT CHANGE STRENGTH WEIGHTS. Corrected 2026-07-29 — this paragraph has now been wrong in BOTH directions.**
+
+It first said the auto path was a no-op; that was false, so it was rewritten to say the path auto-progresses and auto-deloads strength loads off the `exercise_log` e1RM trend with the athlete never asked. **That block has since been deliberately DELETED, and this file kept describing it.** Read the comment at `adapt-plan/index.ts:~1094` — it is explicit: the silent auto-progression and auto-deload writes are gone, because they raised or dropped prescribed weight on every ingest with no prompt, no consent, and (unlike `suggest`) no Arc fatigue/taper gate. *"The athlete opened the logger to a number they never agreed to."*
+
+**What the auto path still does:** a strength **re-layout** of the current week (`maybeRelayoutStrengthForCurrentWeek`) plus the other ingest adaptations. It is not a no-op and it does not move load.
+
+**Where the load change lives now:** the same computation runs on the athlete-gated **`suggest`** path (`strength_progression` / `strength_deload`), and the State strength row surfaces the per-lift verdict and suggested weight with an adjust modal that writes it **on the athlete's tap.** Consent-first.
+
+⛔ **THE LESSON, SINCE THIS IS THE THIRD VERSION OF THIS PARAGRAPH:** a behaviour description in `CLAUDE.md` is a CACHE of the code, and this one went stale twice. **Trace `adapt-plan/index.ts` before relying on any sentence here about what it writes.** See `docs/LIFECYCLE.md`, and Q-226 — the rematerializer's design depends on this being right.
 
 ⚠️ **There is a RACE.** `compute-facts` is *awaited* but reads `workouts.computed`, which is written by the two *fire-and-forget* calls above. When it loses, `time_in_zone`, `intervals_hit/total`, `hr_drift_pct` and `execution_score` are silently absent from that workout.
 
