@@ -144,9 +144,13 @@ export function strengthFocusBufferLine(enduranceNote = '', anchorCycles = 1): s
   // WORKING NUMBER starts. Said plainly now, because the athlete can see both numbers at once.
   const measured = anchorCycles > 1 ? `each cycle` : `the final cycle`;
   return (
+    // ⛔ "Week one sits well inside you by design" WAS GARBLED (2026-07-29). Read in a real block it
+    // is not a sentence — "inside you" is missing its object. It means the loads in week one are
+    // below what the athlete can already lift, which is the whole point of the 85% buffer, so it now
+    // says that.
     `Your working number starts at 85% of your max and every set comes off that, which is the buffer ` +
-    `that makes the last set of ${measured} worth measuring. Week one sits well inside you by ` +
-    `design.${enduranceNote}`
+    `that makes the last set of ${measured} worth measuring. Week one sits below what you can already ` +
+    `lift, by design.${enduranceNote}`
   );
 }
 
@@ -196,16 +200,25 @@ export function strengthFocusDescription(opts: {
    * being composed and discarded. A cost the athlete is paying and cannot see is not a cost that was
    * disclosed.
    */
-  compromises?: ReadonlyArray<{ kind: 'breach' | 'cost'; text: string }>;
+  compromises?: ReadonlyArray<{ kind: 'breach' | 'cost' | 'ceiling'; text: string }>;
 }): string {
   const sections = strengthFocusSections(opts);
   const body = sections.slice(0, 3).map((s) => `${s.heading}. ${s.body}`).join('\n\n');
   const whatsNext = sections[3];
   const ceiling = strengthFocusCeilingLine(opts.ceilingLifts ?? []);
-  // ⚠️ The ceiling line already says the ceiling thing, so its own compromise entries are dropped
-  // here rather than printed twice in different words.
+  // ⛔ DROPPED BY `kind`, NEVER BY REGEX ON THE PROSE (fixed 2026-07-29).
+  //
+  // The ceiling paragraph above already states this fact, so the compromise entry is dropped here to
+  // avoid saying it twice in different words. It used to be identified by
+  // `/training max|working number reaches/` — and when that sentence was tightened the same day, the
+  // words "working number reaches" disappeared, the filter stopped matching, and a real twelve-week
+  // block printed the ceiling fact in two consecutive paragraphs.
+  //
+  // ⚠️ THE LESSON IS THE COUPLING. A dedup keyed on wording means any copy edit, in any file, can
+  // silently re-break it with nothing failing. `kind: 'ceiling'` cannot be paraphrased. If a future
+  // entry needs suppressing here, give it a kind — do not add a phrase to a regex.
   const rest = (opts.compromises ?? [])
-    .filter((c) => c?.text && !/training max|working number reaches/i.test(c.text))
+    .filter((c) => c?.text && c.kind !== 'ceiling')
     .map((c) => c.text);
   const parts = [
     body,

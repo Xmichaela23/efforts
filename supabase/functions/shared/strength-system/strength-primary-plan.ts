@@ -740,7 +740,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * was broken; the shape the athlete chose cost something and they should be told. One channel,
    * two meanings, and the reader must not have to guess which — see `SolverNote`.
    */
-  placement_compromises?: Array<{ kind: 'breach' | 'cost'; text: string }>;
+  /** ⚠️ `ceiling` is a THIRD kind, not a flavour of `cost` — `strengthFocusDescription` drops it
+   *  because the plan's own ceiling paragraph already carries that fact. It used to identify the
+   *  entry by regex on the prose, which broke the moment the prose was tightened. */
+  placement_compromises?: Array<{ kind: 'breach' | 'cost' | 'ceiling'; text: string }>;
   /**
    * ⛔ THE DAYS THE SOLVER ACTUALLY USED, lowercase, so the goal row can record what happened
    * instead of what someone guessed. `non-race-goal-seeds.ts:113` seeds
@@ -1016,7 +1019,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * here and emitted once after the session loop, because the loop cannot know it is the last lift.
    */
   const ceilingHits: Array<{ name: string; cycle: number; oneRM: number }> = [];
-  const placementCompromises: Array<{ kind: 'breach' | 'cost'; text: string }> = [
+  const placementCompromises: Array<{ kind: 'breach' | 'cost' | 'ceiling'; text: string }> = [
     ...solverRefusal,
     ...placedWeek.compromises.map((text) => ({ kind: 'breach' as const, text })),
   ];
@@ -1652,7 +1655,18 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     const sameCycle = ceilingHits.every((h) => h.cycle === ceilingHits[0].cycle);
     const when = sameCycle ? ` at cycle ${ceilingHits[0].cycle}` : '';
     placementCompromises.push({
-      kind: 'cost',
+      // ⛔ `ceiling`, NOT `cost`, AND THE REASON IS A REGRESSION I SHIPPED TODAY (2026-07-29).
+      //
+      // `strengthFocusDescription` drops this entry because the plan's own "One thing before you
+      // start" paragraph already says it — and it identified the entry by REGEX ON THE PROSE:
+      // `/training max|working number reaches/`. Tightening this sentence earlier today removed the
+      // words "working number reaches", so the filter stopped matching and a real block printed the
+      // ceiling fact TWICE in different words. Michael caught it in the markdown export.
+      //
+      // ⚠️ THE BUG IS THE COUPLING, NOT THE WORDING. Prose-matching means any future copy edit can
+      // silently re-break a dedup two files away, with nothing failing. A `kind` cannot be
+      // paraphrased. Filter on this, never on the text.
+      kind: 'ceiling',
       // ⛔ TIGHTENED 2026-07-29. Michael, on the confirm screen: *"a bit dense and cofusing."* This was
       // the longest block on it at 53 words, and two of its clauses were doing no work: *"the working
       // number reaches N% of the max on file AND HOLDS THERE"* restates "stop climbing", and *"rather
