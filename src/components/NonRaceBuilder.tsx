@@ -896,16 +896,21 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           <div className="space-y-6">
             {posturePresent('run') && (
               <div>
+                {/* ⛔ THE ATHLETE'S OWN UNIT. `unit` comes off their baselines and the payload
+                    canonicalises back to miles on the way out — a metric athlete typing 22 means
+                    22 km, and showing them "mi/wk" would silently take it as 22 miles. */}
                 <p className="text-white/85 text-sm mb-2">Weekly running to hold</p>
                 <div className="flex items-center gap-2">
                   <input
-                    type="number" inputMode="numeric" min={0} placeholder="e.g. 14"
+                    type="number" inputMode="numeric" min={0} placeholder={unit === 'km' ? 'e.g. 22' : 'e.g. 14'}
                     value={state.targetMiles === '' ? '' : String(state.targetMiles)}
                     onChange={(e) => setState((st) => ({ ...st, targetMiles: e.target.value === '' ? '' : Number(e.target.value), targetTouched: true }))}
                     className="w-28 py-2 px-3 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white"
                     style={{ fontSize: '16px' }}
                   />
-                  <span className="text-white/70 text-sm">mi/wk</span>
+                  <span className="px-2.5 py-1 rounded-md bg-white/[0.08] text-white/85 text-sm font-medium">
+                    {unit === 'km' ? 'km' : 'miles'} / week
+                  </span>
                 </div>
                 {/* ⛔ ASK FOR THE FLOOR, NOT THE AVERAGE. "What do you run?" gets their good week —
                     the number they would tell a friend. For a MAINTENANCE dose the floor is the
@@ -927,10 +932,27 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     className="w-28 py-2 px-3 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white"
                     style={{ fontSize: '16px' }}
                   />
-                  <span className="text-white/70 text-sm">hr/wk</span>
+                  <span className="px-2.5 py-1 rounded-md bg-teal-500/20 text-teal-200 text-sm font-medium">
+                    hours / week
+                  </span>
                 </div>
-                {/* Hours, never miles (D-323 §6) — the app learns ride HR and FTP but no ride speed. */}
-                <p className="text-white/70 text-sm mt-1.5 leading-relaxed">Hours, not miles — terrain and wind make ride distance a poor measure.</p>
+                {/* ⛔ THE UNIT SLIP IS THE REAL RISK AND A LABEL DOES NOT CATCH IT. 20 is plausible as
+                    both hours and miles, and Michael entered 20 meaning MILES on his own field. The
+                    label was already there and it did not help. What helps is showing the CONSEQUENCE:
+                    at 20 the line below reads "about 6h40 a ride", and the mistake becomes obvious in
+                    a way "hr/wk" never was.
+                    ⚠️ Hours never miles is D-323 §6 — the app learns ride HR and FTP but no ride
+                    speed, so bike miles cannot become a session length without guessing. */}
+                <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
+                  {Number(state.rideHours) > 0
+                    ? (() => {
+                        const per = Number(state.rideHours) / Math.max(1, state.rideDays);
+                        const h = Math.floor(per); const m = Math.round((per - h) * 60);
+                        const len = h > 0 ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`;
+                        return `About ${len} a ride across ${state.rideDays} ride${state.rideDays === 1 ? '' : 's'}.`;
+                      })()
+                    : 'Hours, not distance — terrain and wind make ride distance a poor measure.'}
+                </p>
               </div>
             )}
           </div>
