@@ -2097,3 +2097,29 @@ D-336 sourced the deposit claim to Llanos-Lagos et al. 2026 (*Eur J Appl Physiol
 ⚠️ **THIS MATTERS COMMERCIALLY, not academically.** The deposit is the strongest claim the product has and the one the positioning doc says to lead with — and the primary athlete on this path is a **runner**. Stating it to a runner is generalising past the evidence.
 
 **What would close it:** a meta-analysis or review of heavy strength training on running economy or running performance with the same shape. Berryman et al. and Rønnestad & Mujika are the obvious places to look; neither has been read. ⛔ **Do not cite either from memory** — this is exactly how the 262-participant number ended up graded "STRONG" with no author for weeks.
+
+---
+
+## Q-225 — A four-day athlete should be able to condense to three mid-block (2026-07-29, Michael's ask — NOT built, deliberately deferred)
+
+Michael, on shipping the lifting-days card: *"we can add later if you need to condense your week the 4 day guy can always 3 day it."*
+
+**The intake choice is currently a BLOCK-LIFETIME decision.** `liftingDays` is read once by the composer, which authors all twelve weeks from it. An athlete whose life changes in week 5 — a job, a newborn, a travel stretch — has no way to fold their week down without rebuilding the whole block.
+
+⛔ **AND IT SHOULD BE CHEAPER THAN IT SOUNDS, WHICH IS EXACTLY WHY IT NEEDS CHECKING BEFORE ANYONE BUILDS IT.** The pieces exist:
+
+- The composer already handles both shapes and solves the test week separately (D-332).
+- `create-goal` already passes `cycle_verdicts` on a **rebuild**, and a rebuild is what would re-author the remaining weeks.
+- `adapt-plan` already rewrites `computed.steps` on future rows and already invokes `materialize-plan`.
+
+**So this is probably a rebuild with a changed `lifting_days`, not new composition logic.** ⚠️ *Probably.* Trace it before proposing — `cycleVerdicts` indexing differs between rebuild-mid-block and fresh-block, which is the same reason the block-boundary training-max handoff was deferred (see ENGINE-STATE, "the block boundary discards the training max").
+
+### ⛔ THREE THINGS THAT MUST HOLD, AND THEY ARE THE DESIGN
+
+1. **The completed weeks are history and do not move.** Whatever shape they ran in, they ran in.
+2. **The max-test week survives the fold.** The whole reason three days is defensible is that week 3 goes back to four (D-332). A condense that quietly drops that turns the option into the thing it was built to avoid — and nothing would look broken.
+3. **It is a CONDENSE, not a subtraction.** All four lifts stay. §5.2b: this codebase's habit under pressure is to silently return fewer sessions than were asked for.
+
+⚠️ **DIRECTION MATTERS TOO.** Three → four is the easier case and probably worth having in the same change: an athlete whose week opens up should be able to spread back out.
+
+⚠️ **AND IT IS AN ADJUST-TAB FEATURE, NOT AN INTAKE ONE** (`ARCH-strength-spine.md` §3.5: build time is omakase, Adjust is à la carte, and each item states its cost). The cost here is already written — it is the copy on the intake card.
