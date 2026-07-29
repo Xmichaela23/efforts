@@ -121,11 +121,15 @@ Deno.test('worked example — squat 225, week 1 and the week 11 gate', () => {
   assertEquals(top.amrap, true);
 });
 
-Deno.test('the 95% verdict: 5+ advances, fewer resets, no data holds', () => {
+Deno.test('the 95% verdict: the prescribed rep advances, a logged zero resets, no data holds', () => {
+  // ⛔ THRESHOLD CORRECTED 2026-07-28 (Q-220). The book prescribes 95% x 1+ (p23), so any
+  // completed rep is the prescription MET. A logged ZERO is the miss. These fixtures used to
+  // encode a five-rep rule that is not in the 2nd edition.
   assertEquals(verdictFrom95Set(8), 'advance');
   assertEquals(verdictFrom95Set(5), 'advance');
-  assertEquals(verdictFrom95Set(4), 'reset');
-  assertEquals(verdictFrom95Set(0), 'reset');
+  assertEquals(verdictFrom95Set(4), 'advance', 'four reps is four times the prescribed minimum');
+  assertEquals(verdictFrom95Set(1), 'advance', 'one rep AT 95% IS the prescription (p23)');
+  assertEquals(verdictFrom95Set(0), 'reset', 'logged, and the prescribed single was not completed');
   assertEquals(verdictFrom95Set(null), 'hold');       // skipped — no evidence to advance on
   assertEquals(verdictFrom95Set(undefined), 'hold');
 });
@@ -236,8 +240,9 @@ Deno.test('the FORECAST is the one caller allowed to advance without evidence, a
 });
 
 Deno.test('a missed 95% set costs the next cycle 10% instead of gaining +10', () => {
-  // Squat, working number 200. Cycle 1 earns a reset (four reps at 95%, not five).
-  const earned = verdictFrom95Set(4);
+  // Squat, working number 200. Cycle 1 earns a reset — the athlete logged the set and could not
+  // complete the prescribed single. ⛔ Was `verdictFrom95Set(4)`, which the book calls a pass.
+  const earned = verdictFrom95Set(0);
   assertEquals(earned, 'reset');
   // Calendar-only would hand cycle 2 a 210. The gate hands it 180.
   assertEquals(workingNumberForCycle(200, 2, true), 210);   // the uncapped legacy stepper

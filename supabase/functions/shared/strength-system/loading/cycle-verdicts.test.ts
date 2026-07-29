@@ -42,11 +42,12 @@ Deno.test('⛔ A HEAVY SINGLE AFTER THE AMRAP IS NOT THE MEASUREMENT', () => {
 
 Deno.test('the AMRAP is found by its flag wherever it sits in the set list', () => {
   const w = session('Bench Press', [
-    { weight: 120, reps: 3, amrap: true },
+    { weight: 120, reps: 0, amrap: true },
     { weight: 100, reps: 10 },   // a backoff set with more reps
   ]);
-  assertEquals(amrapRepsForLift(w, 'Bench Press'), 3);
-  assertEquals(verdictForCycle([wk3(w)], 'Bench Press'), 'reset', 'three reps at 95% is a miss');
+  assertEquals(amrapRepsForLift(w, 'Bench Press'), 0);
+  // ⛔ Q-220: was "three reps at 95% is a miss" — it is not, p23 prescribes 1+. A logged ZERO is.
+  assertEquals(verdictForCycle([wk3(w)], 'Bench Press'), 'reset', 'zero reps at 95% is the miss');
 });
 
 Deno.test('a session with no AMRAP flag at all yields no reps, not the top set', () => {
@@ -108,14 +109,14 @@ Deno.test('⛔ THE VERDICT READS THE 95% WEEK, NOT THE LATEST AMRAP', () => {
 });
 
 Deno.test('a repeated 95% session is the only place recency decides', () => {
-  const first = { weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 3, amrap: true }]) };
+  const first = { weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 0, amrap: true }]) };
   const redo = { weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 6, amrap: true }]) };
   assertEquals(verdictForCycle([first, redo], 'Back Squat'), 'advance');
 });
 
 Deno.test('verdicts come back one per cycle, in order', () => {
   const hit = wk3(session('Back Squat', [{ weight: 125, reps: 6, amrap: true }]));
-  const miss = wk3(session('Back Squat', [{ weight: 125, reps: 2, amrap: true }]));
+  const miss = wk3(session('Back Squat', [{ weight: 125, reps: 0, amrap: true }]));   // Q-220: a logged zero
   assertEquals(verdictsForCycles([[hit], [miss], []], 'Back Squat'), ['advance', 'reset', 'hold']);
 });
 
@@ -150,7 +151,7 @@ Deno.test('⛔ THE JOIN GROUPS BY PLAN WEEK, and drops what it cannot place', ()
   const ex = (name: string, reps: number) => [{ name, sets: [set({ weight: 125, reps, amrap: true })] }];
   const grouped = groupSessionsByCycle([
     { week_number: 3,  strength_exercises: ex('Back Squat', 6) },   // cycle 1, week-in-cycle 3
-    { week_number: 7,  strength_exercises: ex('Back Squat', 2) },   // cycle 2, week-in-cycle 3
+    { week_number: 7,  strength_exercises: ex('Back Squat', 0) },   // cycle 2, week-in-cycle 3 — a logged MISS
     { week_number: 1,  strength_exercises: ex('Back Squat', 9) },   // cycle 1, week-in-cycle 1
     { week_number: null, strength_exercises: ex('Back Squat', 9) }, // unattached — dropped
     { week_number: 99, strength_exercises: ex('Back Squat', 9) },   // outside the block — dropped
@@ -162,7 +163,8 @@ Deno.test('⛔ THE JOIN GROUPS BY PLAN WEEK, and drops what it cannot place', ()
   assertEquals(grouped[2], [], 'cycle 3 has nothing logged');
   // And the week-1 session must not be mistaken for the validity check.
   assertEquals(verdictForCycle(grouped[0], 'Back Squat'), 'advance', 'six reps at the 95% week');
-  assertEquals(verdictForCycle(grouped[1], 'Back Squat'), 'reset', 'two reps at the 95% week');
+  // ⛔ Q-220: was "two reps at the 95% week", which p23 calls a pass. A logged ZERO is the miss.
+  assertEquals(verdictForCycle(grouped[1], 'Back Squat'), 'reset', 'zero reps at the 95% week');
 });
 
 // ── The regime boundary ─────────────────────────────────────────────────────
@@ -187,7 +189,8 @@ Deno.test('⛔ ONE REGENERATION SPANS BOTH REGIMES — finished cycles read evid
     ['advance', 'hold']);
 
   // And a finished cycle with a real miss resets rather than holding.
-  const miss = [{ weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 2, amrap: true }]) }];
+  // ⛔ Q-220: the miss is a logged ZERO. Two reps at 95% is twice the prescribed minimum (p23).
+  const miss = [{ weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 0, amrap: true }]) }];
   assertEquals(verdictsForBlock(cycles, [miss, nothing, nothing], 'Back Squat', 9),
     ['reset', 'hold']);
 });

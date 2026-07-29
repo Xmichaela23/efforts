@@ -336,25 +336,50 @@ export function cycleForWeek(
 // ── The 95% validity check ───────────────────────────────────────────────────
 
 /**
- * Wendler: **you should always be able to hit at least five reps at 95% of the working
- * number. If you can't, the number is too high — reset it.** His reasoning: on your worst
- * day you can still complete the minimum.
+ * ⛔ CORRECTED 2026-07-28 AGAINST THE PRIMARY. This block used to read: *"Wendler: you should
+ * always be able to hit at least five reps at 95% of the working number."* **That sentence is not
+ * in the book.** The full 134-page 2nd edition was searched — no five-reps-at-95% rule, and the
+ * phrase "always be able" does not occur. It came in through a secondary source.
  *
- * That check already sits inside the block — **week 3 of every cycle is the 95% set.** So
- * weeks 3 and 7 are stall triggers and week 11 is the block-to-block transition gate.
+ * ⛔ WHAT THE BOOK PRESCRIBES AT 95% IS ONE REP. p23: week three is
+ * `75% x 5 · 85% x 3 · 95% x 1 or more reps`. **One rep at 95% IS the prescription being met.**
+ * The old threshold reset an athlete who got four — four times the stated minimum — and dropped
+ * their working number 10% for it.
  *
- * ⛔ **This replaces an adherence threshold, and is better than one.** An athlete can
- * attend every session and still be carrying a working number that is too heavy;
- * attendance cannot detect that, the rep count can. Do not add an attendance percentage.
+ * ⛔ AND THE BOOK'S ACTUAL TRIGGER IS FAILING THE PRESCRIPTION, NOT FALLING SHORT OF A TARGET.
+ * p30: *"You keep on increasing the max you're working from every four weeks **until you can no
+ * longer hit the prescribed sets and reps**."* So advancement is the default and a MISS is the
+ * event — which is also why an absent verdict must not be a reset (§0h).
+ *
+ * The 95% set is still the right place to ask: week 3 of every cycle is it, so weeks 3 and 7 are
+ * stall triggers and week 11 is the block-to-block transition gate.
+ *
+ * ⛔ **This replaces an adherence threshold, and is better than one.** An athlete can attend every
+ * session and still be carrying a working number that is too heavy; attendance cannot detect that,
+ * the rep count can. Do not add an attendance percentage.
+ *
+ * ⚠️ `5/3/1 Forever` may well carry a five-rep rule — it is where leader/anchor and the 25-50
+ * assistance range come from, neither of which is in this edition either. **Until someone reads it,
+ * a five-rep threshold cannot be attributed to Wendler and must not behave as though it were.**
+ * See Q-220.
  */
 export const VALIDITY_CHECK_PCT = 0.95;
-export const VALIDITY_CHECK_MIN_REPS = 5;
+/** The PRESCRIBED minimum at 95% — `1+`, from p23. Meeting it is a pass. */
+export const VALIDITY_CHECK_MIN_REPS = 1;
 
 export type WorkingNumberVerdict = 'advance' | 'reset' | 'hold';
 
 /**
  * What happens to the working number, given the reps achieved on the 95% set.
- * `null` reps = the session was not done: no evidence to advance on, so hold.
+ *
+ * | reps | verdict | why |
+ * |---|---|---|
+ * | `null` | `hold` | the session was not done — no evidence either way (§0h) |
+ * | `0` | `reset` | logged, and the prescribed single was NOT completed. This is the book's trigger |
+ * | `>= 1` | `advance` | p23 prescribes `95% x 1 or more`. One rep IS the prescription met |
+ *
+ * ⛔ The middle band is gone deliberately. It used to reset everything under five, which cut the
+ * working number 10% for a session the book calls a pass.
  */
 export function verdictFrom95Set(repsAchieved: number | null | undefined): WorkingNumberVerdict {
   if (repsAchieved == null || !Number.isFinite(repsAchieved)) return 'hold';
