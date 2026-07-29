@@ -551,6 +551,25 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     setPreviewing(false);
   };
 
+  /**
+   * ⛔ THE WEEK, LIVE, WHILE THEY PICK. Restored 2026-07-29 — it was deleted by accident when the
+   * budget card came out, and the scheduler then rendered an empty space where the answer goes with
+   * nothing saying why.
+   *
+   * ⚠️ DEBOUNCED, AND ONLY ON THIS STEP. `preview()` composes all twelve weeks server-side; firing
+   * per tap would queue a round trip behind every button.
+   *
+   * ⚠️ IT PLACES NOTHING CLIENT-SIDE. The grid renders what the solver returned.
+   */
+  React.useEffect(() => {
+    if (currentStep !== 'schedule') return;
+    if (!state.longRunDay && !state.longRideDay) return;   // nothing to solve around yet
+    const t = setTimeout(() => { void runPreview(); }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
+      state.qualityDays, state.targetMiles, state.rideHours]);
+
   const optBtn = (active: boolean) =>
     `w-full text-left px-4 py-3 rounded-xl border ${active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'} text-white`;
 
@@ -971,11 +990,24 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           <div className="space-y-4">
             {/* ⛔ THE WEEK FIRST, ABOVE THE CONTROLS. It is the answer, and it has to stay on screen
                 while they tap — a result below the fold is a result they never see change. */}
-            {previewWeek && previewWeek.length > 0 && (
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                <WeekGrid sessions={previewWeek} notes={[]} compact />
-              </div>
-            )}
+            {/* ⛔ NEVER A SILENT EMPTY SPACE. This rendered nothing at all while the preview was
+                running, had failed, or had never been asked for — three different states that all
+                looked identical to the athlete, which is the same §0h defect the confirm card was
+                fixed for. Each says which it is. */}
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[9rem]">
+              {previewWeek && previewWeek.length > 0 ? (
+                <WeekGrid sessions={previewWeek} notes={[]} />
+              ) : previewing ? (
+                <p className="text-white/50 text-sm">Building your week…</p>
+              ) : previewFailed ? (
+                <p className="text-white/60 text-sm leading-relaxed">
+                  The week could not be built — that is a fault on our side, not your answers.
+                  {previewError ? <span className="block text-white/35 text-xs mt-1 font-mono break-words">{previewError}</span> : null}
+                </p>
+              ) : (
+                <p className="text-white/45 text-sm">Pick your days and the week appears here.</p>
+              )}
+            </div>
 
             {/* ── the one hard day ─────────────────────────────────────────── */}
             <div className="space-y-2">
@@ -1418,7 +1450,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     // line, same compromise sentences, so the athlete learns it once. It also owns
                     // the endurance budget, which is DERIVED from the lifting frequency rather than
                     // hardcoded, so it stays true if the block ever runs 3 lifting days.
-                    return <WeekGrid sessions={previewWeek} notes={previewNotes} compact />;
+                    return <WeekGrid sessions={previewWeek} notes={previewNotes} />;
                   })()}
                 </div>
               )}
