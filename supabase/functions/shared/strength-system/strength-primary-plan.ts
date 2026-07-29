@@ -902,6 +902,32 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // the optimizer's own measure — +4 beside the quality run, +4 beside the long run — and it is used
   // rather than reinvented, because a second ranking beside the law is the thing this whole arc has
   // been removing.
+  // ⛔ A HEAVY-LEG DAY IS THE LAST RESORT, NOT A COIN FLIP WITH AN UPPER DAY (2026-07-28).
+  //
+  // `easyRunAnchorAdjacencyPenalty` takes three arguments and ALL THREE ARE RUNS — the day, the
+  // quality run, the long run. It prices run-to-run spacing and knows nothing about lifts. So the
+  // overflow run was landing on whichever lift day sat furthest from the two run pins, which in a
+  // Sun-long / Thu-hard week is the SQUAT day: Tuesday scores 0, Monday scores 4 for sitting beside
+  // the long run. The engine put an easy run on the developing lift to buy a day of run spacing.
+  //
+  // ⛔ THE LAW ALREADY DRAWS THIS LINE. `stackNeedsRecoveryGap` is true only when both sessions have
+  // `leg` prime movers — an easy run beside a BENCH shares nothing and the matrix asks for no gap at
+  // all, while an easy run beside a SQUAT is the same legs twice and the law asks for six hours.
+  // The session copy has said so for weeks ("they share no prime movers" vs "leave 6h"); only the
+  // CHOICE of day was blind to it.
+  //
+  // ⚠️ AND SIX HOURS IS THE FALLBACK, NOT THE TARGET. Robineau 2016 measured half-squat 1RM at
+  // +16.8% (0h) vs +31.2% (6h) vs +25.9% (24h) — the gap is what makes a stacked day survivable when
+  // the athlete cannot split further, not an arrangement to reach for. `place-week.ts:87` warned in
+  // as many words that a scheduler treating 6h as equal to 24h "will stack by preference and quietly
+  // cost the aerobic side." This is that warning, paid.
+  //
+  // ⛔ THE MAGNITUDE IS DERIVED, NOT PICKED. The anchor term's ceiling is 8 — +4 beside the quality
+  // run and +4 beside the long run, both at once. Setting the leg cost ABOVE that ceiling makes the
+  // ordering categorical: in a block where strength is the goal and running is held at maintenance,
+  // protecting the developing lift outranks every easy-run spacing consideration. It does not forbid
+  // a heavy-leg day — when nothing else is free, it is still chosen, and the 6h note rides with it.
+  const HEAVY_LEG_STACK_PENALTY = 9;
   const runCandidates = [...upperLiftDays, ...MAIN_LIFTS.filter((l) => l.isLower).map(liftDay)]
     .filter((d) => d !== hardPinDay && !runDayList.includes(d))
     .map((d) => ({
@@ -910,7 +936,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         d.toLowerCase() as never,
         hardDayIsRun && hardPinDay ? (hardPinDay.toLowerCase() as never) : undefined,
         String(pickedLong).toLowerCase() as never,
-      ),
+      ) + (heavyLowerDays.includes(d) ? HEAVY_LEG_STACK_PENALTY : 0),
     }))
     .sort((a, b) => a.penalty - b.penalty || DAYS.indexOf(a.day as never) - DAYS.indexOf(b.day as never));
 

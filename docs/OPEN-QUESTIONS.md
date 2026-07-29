@@ -1783,6 +1783,40 @@ Two days later the composer stacked a 57-minute easy run onto the **Back Squat**
 
 ⚠️ **NOTHING REGRESSED, AND THE RULE WAS NEVER SQUAT-SPECIFIC.** The upper-days-only exclusion covered **both runs and rides** and closed **both squat and deadlift** days. It was lifted deliberately 2026-07-28 (`67a62bb4`, Michael's call) because it produced one ride instead of two and runs on three consecutive days. ⛔ Do not "restore" it — read that decision first.
 
+### ⛔ CORRECTION 2026-07-28 — FINDING 1 BELOW IS WRONG. Free days ARE used first.
+
+**Retracted before it was built on.** `strength-primary-plan.ts:874` consumes every free day for easy
+runs and **reserves exactly one as the rest day** (Sunday preferred, else the last free day). The
+lift-day candidate list is the **OVERFLOW** path, not the primary. In the week that raised this there
+was one free day — Wednesday — and it was deliberately held as rest. A commented history sits right
+there: an earlier version filled every free day and produced **seven active days with no rest**, and
+the composer's own tests caught it.
+
+⛔ **So "the search space excludes the best answer by construction" was false**, and the fix it implied
+would have spent the athlete's rest day. Finding 2 is the real one and is fixed below.
+
+### ✅ FIXED 2026-07-28 — the overflow ranking now knows what a lift is
+
+`easyRunAnchorAdjacencyPenalty` takes three arguments and **all three are runs**. It priced distance
+from the quality run and the long run, so in a Sun-long / Thu-hard week it chose the **squat** day
+(score 0) over the **bench** day (score 4, for sitting beside the long run) — an easy run on the
+developing lift, bought with a day of run spacing.
+
+✅ **The law already draws the line and is now consulted.** `stackNeedsRecoveryGap` is true only when
+both sessions have `leg` prime movers: an easy run beside a bench shares nothing and the matrix asks
+for no gap; beside a squat it is the same legs twice and the law asks for six hours. **The session copy
+has said so for weeks; only the choice of day was blind to it.**
+
+⛔ **The magnitude is derived, not picked.** The anchor term's ceiling is 8 (+4 beside each run pin, both
+at once). The leg cost sits **above** that ceiling, which makes the ordering categorical: in a block
+where strength is the goal and running is held at maintenance, protecting the developing lift outranks
+every easy-run spacing consideration. ⚠️ It does not FORBID a heavy-leg day — when nothing else is
+free it is still chosen, and the 6h note rides with it.
+
+**Verified:** the easy run moved from Tuesday (Back Squat) to Monday (Bench Press) on the week that
+raised this. Wednesday is still the rest day. Three fixtures in `run-placement.test.ts`, red-green-red
+by zeroing the penalty.
+
 ### 1. ⛔ THE SEARCH SPACE EXCLUDES THE BEST ANSWER BY CONSTRUCTION
 
 `strength-primary-plan.ts:905` builds `runCandidates` from **lift days only**:
