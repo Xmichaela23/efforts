@@ -829,19 +829,25 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 so there is no invented threshold to defend — the caution that killed a numeric
                 volume cap does not apply to a plain mechanical fact. The trailing clause is the
                 consequence, not an instruction (COPY-VOICE rule 7). */}
+            {/* ⛔ TWO LINES, NOT TWO PARAGRAPHS. The old copy explained WHY accessory work exists —
+                single-plane endurance loading, four central lifts leaving gaps — over twelve lines,
+                which pushed the third slot below the fold on a phone. The athlete came here to
+                choose three movements, not to read the rationale for having them.
+                ⚠️ The "why" is not deleted, it is relocated: the plan's own description carries it,
+                where there is room and where they are reading rather than choosing.
+                ⛔ AND IT NOW STATES THE SUBSTITUTION, WHICH IT ONLY GESTURED AT. Michael: *"we should
+                mention alts that might happen sometimes."* The picks genuinely do not appear on every
+                day — the rule is live, and an athlete who chose Chin Up and meets an Inverted Row on
+                press day should have been told that here, not discover it in week one. */}
             <div className="space-y-2">
               <p className="text-white/75 text-sm leading-relaxed">
-                Endurance moves you forward in one plane, over and over — the same joints take the
-                same load, and tight hips and rounded shoulders follow it. The four main lifts are
-                heavy and central; they leave gaps. These three slots are where the joints get armor.
+                Three short slots after the main lift — push, pull, single-leg or core. They cover
+                what four heavy barbell lifts and one-plane endurance leave out.
               </p>
-              <p className="text-white/75 text-sm leading-relaxed">
-                Push and pull sit against the posture that collapses over a handlebar and late in a
-                stride. Single-leg and core work builds balance one side at a time, without loading
-                the spine — the knees and hips get the work at no cost to the next main lift.
-                {' '}These are your preferences, applied where they fit: on a day whose main lift
-                already works the same muscles, that slot takes balancing work instead and the
-                session says which pick it stood in for.
+              <p className="text-white/70 text-sm leading-relaxed">
+                Your picks apply where they fit. On a day whose main lift already works the same
+                pattern the slot swaps — chin-ups on bench day, rows on press day — and the session
+                names the pick it stood in for.
               </p>
             </div>
             <div className="space-y-3">
