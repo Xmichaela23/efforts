@@ -95,6 +95,28 @@ export function strengthFocusSections(opts: {
 }
 
 /**
+ * THE PRE-COMMIT VERSION — three lines, for the card the athlete reads BEFORE answering anything.
+ *
+ * ⛔ NOT A SECOND COPY OF THE PLAN'S SENTENCES. `strengthFocusSections` is the document: four
+ * headed sections, the cycle structure, the recovery note. On the intake card that ran to a full
+ * screen and pushed the discipline picker below the fold — the athlete had to scroll past the
+ * explanation to reach the question it was explaining.
+ *
+ * ⚠️ SO THIS SAYS ONLY WHAT DECIDES THE PURCHASE: how long, what leads, what happens to the rest,
+ * and what comes after. The cycle shape and the recovery note stay in the plan, where there is room
+ * for them and where the athlete is reading rather than choosing.
+ *
+ * ⛔ It is derived from the same numbers, so the card and the plan cannot promise different blocks.
+ */
+export function strengthFocusBrief(opts: { weeks?: number } = {}): string {
+  const weeks = opts.weeks ?? STRENGTH_FOCUS_WEEKS;
+  return (
+    `Strength leads for ${weeks} weeks. Four lifting days, placed around the endurance you keep — ` +
+    `held easy, enough to hold your base. Speed and distance blocks unlock when this one closes.`
+  );
+}
+
+/**
  * The "say once" line (SPEC §4). Flat, once, never repeated and never apologised for.
  *
  * ⛔ CORRECTED 2026-07-27 — this said "the last set of EVERY THIRD WEEK is worth measuring" and that

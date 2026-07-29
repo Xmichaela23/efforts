@@ -9,7 +9,7 @@ import { getDisciplineColor } from '@/lib/context-utils';
 // records cannot disagree. A REFERENCE, never a cap (D-222's ceiling was retired on purpose).
 import { maintenanceDoseFor, startLightMiles, volumeStateForMiles, volumeStateLine, volumeStateLineVsUsual, volumeStateVsUsual } from '@/lib/maintenance-volume-band';
 // ONE source for the block's own words — the composer writes the same sentences onto the plan.
-import { strengthFocusSections, STRENGTH_FOCUS_WEEKS } from '@/lib/strength-focus-copy';
+import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS } from '@/lib/strength-focus-copy';
 // ONE menu, shared with the composer that authors the block (`assistance-menu.ts`). A name this
 // picker offers that the composer does not recognise would fall back to the default — the athlete
 // would pick something and silently get something else.
@@ -646,18 +646,11 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           onBack={back} onContinue={next} canContinue={postureCanContinue}
         >
           <div className="space-y-3">
-            {/* ⛔ THE BLOCK OPENS WITH WHAT IT IS. Michael, 2026-07-25 — the athlete should read what
-                they are buying before answering a single question about it. Same sentences the plan
-                itself carries (`strength-focus-copy.ts`), so what was promised and what was built
-                cannot drift. */}
-            <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4 space-y-3.5">
-              {strengthFocusSections({}).map((sec) => (
-                <div key={sec.heading}>
-                  <p className="text-white/90 text-sm font-medium mb-0.5">{sec.heading}</p>
-                  <p className="text-white/75 text-sm leading-relaxed">{sec.body}</p>
-                </div>
-              ))}
-            </div>
+            {/* ⛔ THE BLOCK OPENS WITH WHAT IT IS — but in three lines, not four sections. The full
+                version is the PLAN's, where the athlete is reading; here they are choosing, and the
+                explanation was pushing the question it explains below the fold. Same source numbers,
+                so the card and the plan cannot promise different blocks. */}
+            <p className="text-white/75 text-sm leading-relaxed">{strengthFocusBrief({})}</p>
             <p className="text-white/85 text-sm pt-1">Which endurance are you keeping?</p>
             {(['run', 'bike', 'swim'] as const).map((d) => {
               const color = getDisciplineColor(d);
@@ -681,10 +674,10 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 </button>
               );
             })}
-            <p className="text-white/50 text-xs">
-              Held at maintenance — easy sessions, enough to hold the aerobic base. Speed and threshold
-              are not maintained by this block.
-            </p>
+            {/* ⛔ KEEP THE CAVEAT, DROP THE REPEAT. The brief above already says the endurance is
+                held easy; what it does not say is what this block will NOT hold, and that is the
+                half an athlete needs before choosing. */}
+            <p className="text-white/50 text-xs">Speed and threshold are not maintained by this block.</p>
           </div>
         </StepLayout>
       )}
