@@ -1236,7 +1236,19 @@ enforcement here would be repairing a mechanism the derivation removes.**
 
 ---
 
-## Q-212 — Assistance does not know what the main lift is: four pushing exposures inside 24 hours (2026-07-28, UNVERIFIED — renumbered from a duplicate Q-161)
+## Q-212 — Assistance does not know what the main lift is: four pushing exposures inside 24 hours (2026-07-28, **CLOSED 2026-07-29**)
+
+> ✅ **CLOSED by D-328 (`b245f79b`, `5eddff64`) — PUSHED, NOT YET DEPLOYED.** `resolveAssistance()` now
+> takes the day's main lift. A colliding pick is substituted and NAMED (`substitutedFor`, §5.2b), and
+> a non-colliding pick on the wrong side of the plane is rebalanced and named separately
+> (`balancedFor`) — chins on bench day, rows on press day.
+>
+> ⚠️ **The citation in the first version was WRONG and the correction is the durable part.** Four of
+> Wendler's five templates put SAME-pattern volume on the main lift's day deliberately; only p86, the
+> concurrent chapter, crosses. See D-328.
+>
+> ⚠️ **NOT DEPLOYED.** The rule is correct in the repo and absent on the phone — a press day still
+> shows Pull Up. Everything below is history.
 
 **Assistance does not know what the main lift is — four pushing exposures inside 24 hours.**
 
@@ -2010,3 +2022,31 @@ Not proposing a number without a decision. The shape the primary supports:
 ⚠️ `Forever` may well carry a five-rep rule — it is where leader/anchor and the 25–50 assistance range come from, neither of which is in the 2nd edition either. ⛔ **Until someone reads it, the threshold cannot be attributed to Wendler and should not behave as though it were.**
 
 **Related:** Q-217 (the ceiling — same family: an invented guard standing in for the book's own performance test), `SPEC-get-stronger.md` §T2b.
+
+
+---
+
+## Q-221 — Cutting to 2 run days does not save a day, it inflates the long run past every coaching ceiling (2026-07-29, MEASURED — Michael DECLINED the warning, do not build it unasked)
+
+**Measured on a 20 mi/wk athlete — an ordinary base, not an edge case:**
+
+| shape | sessions | long run as share of the week |
+|---|---|---|
+| 3 runs | Hill 3.7 · Easy 7.1 · Long 9.1 mi | **45%** |
+| 2 runs | Hill 3.7 · Long 16.0 mi | **80%** |
+
+- **The day is not saved.** Every shape — 2, 3 or 4 run days, 1, 2 or 3 rides — lands on **6 training
+  days, 1 rest**. Four lifting days plus the fixed endurance pins already fill the week, and the
+  endurance stacks onto lift days. **Dropping an endurance day only redistributes volume.**
+- **The field's ceiling** is a long run at roughly a third of weekly volume, half at the outside. 80%
+  is not a maintenance long run, it is a weekly race. Michael: *"no one is running a 16 run once a
+  week."*
+- ⛔ **HE DECLINED THE WARNING.** A "your long run is N% of your week" flag was offered and turned
+  down. **Do not build it because this entry exists** — this is a LEAD, and the reason it is written
+  down is so the measurement is not redone. *(`CLAUDE.md`: a Q-entry is a lead, not a verdict.)*
+- **Where it would go if ever wanted:** the `volume` step of `NonRaceBuilder`, computed off
+  `targetMiles ÷ runDays`, not in the composer — it is an intake-time consequence of a pick.
+
+> **↩ Related:** **D-330** (the scheduler screen where the pick is made) · the *"at 10 mi over 3 run
+> days the long run is the same length as the easy run"* oddity in the ENGINE-STATE banner, which is
+> the same arithmetic failing at the other end.

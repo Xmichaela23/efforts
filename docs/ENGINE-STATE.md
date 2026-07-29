@@ -23,123 +23,94 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
+## 🧭 NEXT SESSION — START HERE (2026-07-29 — **the REMATERIALIZER IS OFF. Your job is the intake flow and the strength block behind it, until 4 of 5 hybrid coaches would sign the plan.**)
 
-## 🧭 NEXT SESSION — START HERE (2026-07-28 — **your job is the REMATERIALIZER, and Ticket 2 rides with it.** Everything decided today lands at plan GENERATION because generation is the only writable moment. ⛔ **Four separate fixes today were the same defect: a constant that should derive.**)
+### ⛔ THE FIRST THING: THE LAST BANNER WAS WRONG, AND IT WAS WRONG FOR A DAY
 
-### ⛔ THE ONE SENTENCE THAT ORGANISES THIS WHOLE SESSION
+It told you *"your job is the REMATERIALIZER."* **Michael cancelled that mid-session:**
 
-Michael, closing 2026-07-28: *"Everything decided today lands at generation because generation is the
-only writable moment. Ratio, accessories, ceiling copy, and now the 1RM update. That's not four
-separate design choices — it's one constraint showing up four times. **The rematerializer is what
-removes it.**"*
+> *"lets let go of materilizer... i would rather get all the juggle math figured out and dieals all
+> the acceroy dialed and make sure this plan is 100% sound for 4 out of 5 hybrid coaches."*
 
-**Read that before you scope anything.** Four fixes shipped today and each one is a constant that the
-block already had the information to compute. They were fixed at generation because there is nowhere
-else to fix them. The plan is generate-once-and-frozen.
+**That sentence is the bar for everything below.** Not "does it run" — *would a hybrid coach sign it.*
+The rematerializer is not dead, it is DEFERRED behind getting the block itself right.
 
 ### YOUR JOB
 
-**The rematerializer, with the 1RM-learning ticket folded in.** They are the same subsystem: the 1RM
-update is *what* gets learned, the rematerializer is *when it can be applied*.
+**The intake flow, screen by screen, and the strength decisions each screen exposes.** Michael drives
+this with screenshots; he is reading the SCREEN, not the code. Two things learned the hard way today:
 
-⛔ **ONE DESIGN CALL IS ALREADY MADE — supersede, do not rewrite.** Rematerializing generates a NEW
-plan and marks the old one superseded. It does NOT rewrite in place. The reason is load-bearing: every
-logged session points at a `planned_id`, and if that row's content changes underneath it you lose the
-ability to answer *"did they do what they were told."* Adherence is an input to half the verdicts, so
-this is not a nice-to-have. Michael agreed and named the reasoning as the right reasoning.
+- ⛔ **When he points at a screen, he means the screen.** Told *"we shouldnt default to 5 days if 4 is
+  the prefrered,"* I read it as a training-dose question and spent a long stretch sweeping 210 day
+  combinations through the composer. He meant **what is highlighted when the screen opens** — optics.
+  *"theres no wall! ... its fucking optics."* **Ask the cheap question before running the fixture.**
+- ⛔ **He asked twice for a rebuild and got an increment twice.** *"you burnt out?"* When he says
+  *"this is a rebilt one simple scheuler"* — rebuild it.
 
-⚠️ **THE COST IS REAL AND IT IS THE FIRST THING TO CHECK:** "the plan" stops being a row and becomes a
-CHAIN. Check that against `session_detail_v1` (`_shared/session-detail/types.ts`, built by
-`workout-detail/index.ts:598`) **before** committing to it.
+### ⛔ THE ONE UNSHIPPED THING, AND IT IS THE FIRST THING TO DO
 
-**Ticket 2, the report that was deferred rather than skipped** — REPORTED 2026-07-28, see below.
-Agreed rules: e1RM from anchor top sets only, reps ≤ 8, ratchet UP only, applied at block boundaries.
+**Five edge functions are PUSHED BUT NOT DEPLOYED, so a rule that is correct in the repo is absent on
+the phone.** The tell is visible in Michael's own screenshots: on an Overhead Press day the pull slot
+still shows **Pull Up** where the code returns **Inverted Row**.
 
-### ⛔ TICKET 2 IS NOT A ONE-FIELD READ. IT LOOKS LIKE ONE AND IT IS NOT
+```
+generate-strength-plan  materialize-plan  create-goal-and-materialize-plan
+generate-combined-plan  generate-triathlon-plan
+```
 
-**`value` sits in the object the generator already destructures**, which is exactly why this reads as a
-one-line change. `generate-strength-plan/index.ts:99-105` reads `last_logged` and `sample_count` off
-`learned_fitness.strength_1rms` for the continuity tier and never reads `value`; the maxes come from
-`performance_numbers` one line up at `:60`. ⛔ **Reading `value` today would violate two of the four
-agreed rules on the first block.**
+⚠️ The last two reach it only through `triathlon_performance.ts`, but they carry their own frozen copy
+of `exercise-config` — leaving them out is exactly how `_shared` goes stale in half the app. **And
+`week-solver.ts` changed today, so re-derive the importer list before deploying; it is now larger.**
 
-| the rule | why the field cannot satisfy it yet |
-|---|---|
-| **anchor top sets only** | `exercise_log.estimated_1rm` is computed over the HEAVIEST COMPLETED SET of the exercise in that session (`compute-facts/index.ts:1322`) — it can come from an accessory. **Nothing records which set it came from** |
-| **reps ≤ 8** | same line — `bestReps` is whatever the heaviest set carried, and RIR is FOLDED INTO REPS by `brzycki1RM` (`:124`). There is no rep filter and no field to filter on |
-| **ratchet UP only** | ⛔ `strength_1rms` is a **rolling 12-week MAX**, so it FALLS as sessions age out of the window. Ratchet-up must be enforced AT THE WRITE — it is not inherited from the aggregate |
-| **at block boundaries** | the only open one; a generation-time concern, not a data one |
+### ⛔ ONE TICKET IS STILL LIVE IN PRODUCTION — Q-208, unchanged from yesterday
 
-✅ **SO `compute-facts` CHANGES FIRST.** The generator read is the last step, not the first.
+**`plans.status = 'active'` is used as an IDENTITY filter on historical reads.** A workout attached to
+an older plan reads as unattached. Ahead of anything new.
 
-⚠️ **AND AN ADOPT PATH ALREADY EXISTS, ATHLETE-DRIVEN.** `AthleticRecordPage:398` → `suggestBaselineUpdate`
-(`_shared/state-trend/reconcile.ts:46`), gated at ≥3 samples, ≥medium confidence, ≤42 days, ≥5%
-divergence — all Michael-approved constants. Decide whether block-boundary auto-apply REUSES those gates
-or competes with them.
+### ⛔ WHAT SHIPPED — do NOT re-litigate
 
-### ⛔ ONE TICKET GOES AHEAD OF THE REMATERIALIZER — Q-208, and it is live in production
-
-**`plans.status = 'active'` is used as an IDENTITY filter on historical reads.** A workout attached to an
-`ended` plan gets NULL plan context and fails to a `console.warn` the athlete never sees
-(`_shared/plan-context.ts:189`, consumed at `workout-detail/index.ts:585-600`). **Anyone who has already
-used plan replacement has this today.** It does not depend on supersede shipping, and supersede makes it
-worse — the chain turns "only if you replaced a plan" into "every rematerialization."
-
-⛔ **AND Q-209 IS A PRECONDITION ON THE SUPERSEDE DESIGN, NOT A FOLLOW-UP.** After a supersede the
-adherence `planned_id` match MISSES and a `date::discipline` fallback silently rescues it
-(`_shared/adherence-plan.ts:118`, `:124-141`) — a wrong-but-plausible match feeding `matchConfidence`
-with nothing naming why. That is §0h: a fallback making a broken state indistinguishable from a healthy
-one, sitting on the exact link supersede-not-rewrite was chosen to protect.
-
-### ⛔ TWO REQUIREMENTS ON THIS WORK — Michael, 2026-07-28. REQUIREMENTS, not nice-to-haves
-
-**Both are written up in full as `SPEC-week-solver.md` §0j. Read it before touching a placement rule.**
-
-1. **PLACEMENT RULES CARRY THEIR REASON — a field on the decision, not a comment in the source.**
-   *"Squat day kept clear because strength posture is develop."* The glass-box rule already applied to
-   verdicts, applied to the schedule. The next session reads **why**, not **what**.
-   ⚠️ `PlacedLift` (`_shared/week-solver.ts:118`) has no reason field, and `placement_compromises`
-   carries costs and breaches only — **a day kept clear for a good reason that cost nothing is
-   invisible today.**
-2. **A RULE THAT IGNORES POSTURE MUST SAY SO.** Posture-independent by design is a valid answer; it is
-   not a valid silence. ⛔ **The dangerous case is not a rule with the wrong branch — it is a constant
-   that LOOKS derived**, which is the shape of all four of today's findings.
-
-⛔ **THE FAILURE THIS EXISTS TO PREVENT, in Michael's words:** *"posture gets added as a parameter and
-half the rules quietly keep their old behavior. Then you have a system that claims to react to intent
-and mostly doesn't, which is worse than one that never claimed to."*
-
-⚠️ **AND THE STARTING POSITION IS THE WORST CASE — verified, not assumed.** `week-solver.ts` contains
-**zero** occurrences of `posture`; `SolverInput:88` has no posture field. Posture reaches LOADING
-(`wendler-531.ts:297`) and stops there. **Every placement rule is posture-independent today by absence,
-not by decision** — so this is the migration in front of you, not a hypothetical one.
-
-✅ **DO NOT INVENT A SHAPE — `MethodologyConstraint` (`week-solver.ts:79`) already is this**, with
-`owner` and `reason` both required and a comment saying that is the point. §0j generalises it from
-methodology to posture.
-
-### ⛔ WHAT SHIPPED TODAY — do NOT re-litigate any of it
-
-| | what | where |
+| what | where | state |
 |---|---|---|
-| **Leader/anchor ratio** | derived from training continuity, not fixed at N-1. `continuous` → AAA, `returning` → LAA, `detrained` → LLA, `unknown` → LLA (= today, unchanged) | `wendler-531.ts` `continuityTier`/`leaderCount` |
-| **Accessory volume** | derived per slot within Wendler's 25-50. Only a TESTED capacity raises it | `assistance-menu.ts` `assistanceTotalReps` |
-| **§0i** | *stated intent may WITHHOLD dose, never ADD it* | `SPEC-week-solver.md` |
-| **TM ceiling** | 90% of 1RM, step TRUNCATES rather than skipping | `wendler-531.ts` `TM_CEILING_PCT_OF_1RM` |
-| **Block narrative** | branches on the real cycle shape | `strength-focus-copy.ts` |
-| **`placement_compromises`** | rendered, was written and discarded | `strengthFocusDescription` |
-| **Preview errors** | no longer swallowed | `useArcSetupComplete.ts` |
+| **Assistance crosses the plane** — chins on bench day, rows on press day | D-328 | PUSHED, **not deployed** |
+| **The Wendler citation was wrong twice** — narrowed to p86, the concurrent template | D-328 | pushed |
+| **The interference warning is gone** — the citation was out of condition | D-329 | pushed |
+| **One scheduler screen** — three cards became one, the week draws live under the controls | D-330 | pushed |
+| **Compromise notes group by fact, not by lift** | D-331 | **uncommitted at close** |
+| **The reset threshold was not Wendler's** (Q-220), **hard run is inside the mileage budget**, **easy run stops landing on the developing lift** (Q-215) | — | pushed |
 
-⛔ **DETRAINED GETS THE FEWEST ANCHORS, NOT THE MOST.** This inverts the obvious guess and it is
-deliberate: leaders exist to BUILD A BASE, and detrained is the state where the base is missing. Two
-95%-and-AMRAP cycles on connective tissue nine weeks behind the nervous system is the one configuration
-that can hurt somebody. **And `unknown` is NOT `detrained`** — a cold start has no history at all, and
-`sample_count: 0` reads identically to "hasn't lifted in a year" while being a different person.
+### ⛔ WHAT IS UNVERIFIED, AND WHAT WOULD SETTLE IT
 
-⛔ **THE 90% CEILING SUPERSEDES THE 100%-AND-HOLD DECISION OF 2026-07-27, WHICH WAS ONE DAY OLD.** 90%
-was rejected then because it "bound in cycle 3 for every athlete" — a 315 squat HELD at 275. That
-objection was right about HOLDING and wrong about the CEILING; truncating dissolves it (the squat
-reaches 280). Do not revert it back without reading that reasoning.
+1. **NOTHING THIS SESSION WAS SEEN ON A DEVICE DOING THE RIGHT THING.** Michael saw the screens; the
+   complement rule he could not see, because it is not deployed. Deploy, then look at a press day.
+2. **THE CEILING GUARD HAS A HYPOTHESIS INSIDE IT.** It bounds the training max against `oneRM` — a
+   **signup number that never updates**. If it was aspirational the guard pins an athlete to a load
+   they have outgrown, **and the tests cannot see it, because they measure against the same stale
+   value.** *(This is what Ticket 2 / the 1RM-learning work is upstream of. Still deferred.)*
+3. **The ceiling rounds down to the plate grid**, so a 110 lb max gives 95 — **86.4%, not 90%**. Light
+   bars get a stricter ceiling than advertised. Not wrong; not stated anywhere the athlete sees.
+4. **The AAA branch has never run on a device.** Fixture-verified only. ⚠️ Acceptance check
+   outstanding: generate a block — the header must say *"All 3 cycles are measuring cycles"* and carry
+   the *"One thing before you start"* paragraph naming the pinned lifts. **Michael has said in terms
+   that this is NOT met by a markdown export.**
+5. **A default I chose, not one he approved.** `NonRaceBuilder.tsx:428` now seeds
+   `longRunDay: 'sunday'` and `longRideDay: 'thursday'`, so the scheduler draws a week on arrival
+   instead of an empty box. **Sunday is convention; THURSDAY IS MY PICK** — it came out of a sweep as
+   the cleanest pairing with a Tuesday hard day. Saturday is what most people would expect and costs
+   one extra note (the two long days land back to back). **His call, not settled.**
+
+### ⛔ THE FINDING HE DECLINED, AND WHY IT IS STILL WORTH KNOWING
+
+Measured at 20 mi/wk — a completely ordinary base:
+
+```
+3 runs   Hill 3.7 · Easy 7.1 · Long 9.1 mi      long run = 45% of the week
+2 runs   Hill 3.7 ·            Long 16.0 mi     long run = 80% of the week
+```
+
+**Cutting to 2 run days does not save a day** — every shape lands on 6 training days, 1 rest, because 4
+lifting days plus the fixed pins already fill the week. All it does is inflate the long run past every
+coaching ceiling there is (a third of weekly volume; half at the outside). Michael: *"no one is running
+a 16 run once a week."* **He declined a warning for it. Filed as Q-221 so it is not re-discovered.**
 
 ### ⛔ THE LAW, AS IT STANDS — carried from 2026-07-27, with today's one supersede applied
 
@@ -154,44 +125,24 @@ are all still live. Read it before touching scheduling, workload, or Wendler loa
 | **The long-run workload factor never matched** | `_shared/workload.ts` | `longrun_easypace: 0.70` could not match any real token, so **every long run in every generator was priced as an easy run**. Fixed at the matching, not the number. Unmatched tokens now warn |
 | ~~**Wendler: TM ≤ 100% of 1RM**~~ ⛔ **SUPERSEDED 2026-07-28 → TM ≤ 90%, and the step TRUNCATES** | `loading/wendler-531.ts` | The 6% increment cap STANDS and is still derived. But the cap turned out to be the ASYMPTOTE, not the rail: two advances of +6% off an 85% start converge on 95.5% for any lifter light enough for it to bind. The constraint now sits on the RATIO. Read the block comment before changing either number |
 
-### ⛔ WHAT IS UNVERIFIED, AND WHAT WOULD SETTLE IT
-
-1. **THE CEILING GUARD HAS A HYPOTHESIS INSIDE IT.** It bounds the training max against `oneRM` — a
-   SIGNUP NUMBER THAT NEVER UPDATES. If it was aspirational the guard pins an athlete to a load they
-   have outgrown, **and the tests cannot see it because they measure against the same stale value.**
-   *This is exactly why Ticket 2 is upstream of trusting the guard at all.*
-2. **The ceiling rounds down to the plate grid**, so a 110 lb max gives 95 — **86.4%, not 90%**. Light
-   bars get a stricter ceiling than the number advertises, and the stall bites a cycle earlier than the
-   stated bound implies. Not wrong; not stated anywhere the athlete sees.
-3. **The AAA branch has never run on a device.** Verified by fixture only
-   (`strength-primary-plan.continuity.test.ts`, `.ceiling-stall.test.ts`). ⚠️ Acceptance check
-   outstanding: generate a Strength Focus block — the header must say *"All 3 cycles are measuring
-   cycles"* and carry the *"One thing before you start"* paragraph naming the pinned lifts.
-4. **Preview still fails while Build works.** Not diagnosed. The reason is no longer discarded, so a
-   retry now PRINTS the cause — that is the next datapoint, and it did not exist before today.
-
 ### STILL OPEN, NOT TOUCHED
 
-- **Q-212 — assistance does not know what the main lift is.** *(Renumbered 2026-07-28 from a duplicate
-  Q-161 — the 2026-07-11 Q-161 is the decoupling band, cited by D-276 and four source files.)*
-  25 dips on bench day and 25 more on press
-  day = four pushing exposures in 24h. ⛔ **Belongs with the accessory model, NOT the rematerializer.**
-  Michael: *"it's the one that showed up as an actual training decision rather than a copy defect."*
-- Session duration hardcoded `isDeload ? 35 : 60`
-- Header says running is "all easy" over twelve weeks of hill repeats
-- 13-mile target against ~18 miles of actual running
-- **7 triathlon conformance failures in `shared`** — in the baseline a long time, accumulating a reason
-  to be explained
-- Placement collapse steps 2-4 (`placement/`, `base-generator`, `tri-generator`) — **step 2's coverage
-  gate already passed**, so it can be deleted
-- Supplemental is unwritten and UPSTREAM of the ratio. If leaders get FSL, "2 leaders" stops meaning
-  two thin cycles and the thresholds may want to move.
-
-### BASELINES AT CLOSE
-
-`_shared` 1348/0 · `shared` 174/7 · `generate-run-plan` 33/2 · `generate-combined-plan` 438/3.
-The failures are pre-existing and were unchanged by every commit today — that is how you tell whether
-you broke something.
+- **Lifting days is a HARD CONSTANT of 4.** This blocks Wendler's own 3-day and 2-day templates, the
+  10-day rolling week, and the *"3 lifting days"* trade-off option. Michael has raised 5-vs-4 twice.
+  **Making it a real number is the single biggest unlock left in this subsystem.**
+- **The block boundary discards the training max.** `plans.config.training_max` is written and has
+  **zero readers**; the composer half shipped (`ddff1c16`), the generator half was deliberately
+  deferred because `cycleVerdicts` indexing differs between rebuild-mid-block and fresh-block.
+- **Q-217** — the ceiling paragraph says the max is *"usually out of date"*, which is untrue for an
+  athlete who never logged a lift, where it was never **tested**. D-331 made that sentence shorter,
+  not correct.
+- **Q-218** (equipment substitution is path-dependent) · **Q-219** (three names, `five_by_five` is
+  factually wrong) · **Q-214** (main-lift region adjacency is never priced).
+- **The ride placer picks by array order, with no leg awareness.**
+- **At 10 mi over 3 run days the long run comes out the same length as the easy run.** A long run that
+  is not longer is not a long run. Noticed while measuring something else; not chased.
+- ⚠️ **`DECISIONS-LOG.md` is 316KB — past the ~150KB cap in `CLAUDE.md`.** Move closed/superseded
+  entries to its `-ARCHIVE.md`. It was 812KB once and had to be split by hand; this is that again.
 
 ## ⛔ READ `ARCH-strength-spine.md` §0 BEFORE ANY ARCHITECTURE CALL — it was rewritten last night
 

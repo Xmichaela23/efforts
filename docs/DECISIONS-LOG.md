@@ -1144,6 +1144,13 @@ Inherits the anchor's accuracy: the chart is relative to a TRUE 1RM, so a stale 
 
 ## D-324 — Strength Focus V1: Wendler 5/3/1 replaces the ATR block, per-set weights reach the phone, RIR scoped off, and volume is a trade rather than a cap (2026-07-25, PUSHED + DEPLOYED, **not device-seen**)
 
+> ⚠️ **The ASSISTANCE half is superseded by D-328 (2026-07-29).** The three slots here are day-blind:
+> the athlete's pick stood on every lifting day, so push-ups followed a bench press and chin-ups ran
+> four days a week. Assistance is now resolved **against the day's main lift** — collisions are
+> substituted, and a pick on the wrong side of the plane is rebalanced. Everything else below stands.
+> ⛔ **The citation D-324 would have implied is also wrong** — see D-328; four of Wendler's five
+> templates do the opposite of crossing, and only the concurrent template (p86) supports this.
+
 > **↪ AMENDED SAME DAY — see D-326. Scoping RIR off left a hole this entry did not know about, and the
 > hole is bigger than the bug that was fixed.**
 >
@@ -1973,3 +1980,72 @@ reach is the thing that gets tuned in six months by someone who assumes it fires
 > **`DOCTRINE-aerobic-maintenance-run-only.md`** (what the no-bike athlete's one session is) ·
 > **D-325 §2/§7/§8** (the ledger clauses this makes unreachable on `strength_led`) · **D-315**
 > (consent-first — the swap is the athlete's tap, never a silent rewrite).
+
+---
+
+## D-328 — Assistance CROSSES THE PLANE on a lifting day — and the citation behind it was wrong twice before it was right (2026-07-28/29, PUSHED `b245f79b`+`87b2b068` · **NOT DEPLOYED — see the banner**)
+
+**Extends Q-212 past collision.** Q-212 fixed the case where the athlete's pick loaded the *same* thing as the day's main lift (push-ups after bench). This is the case Q-212 leaves alone and should not: a **chin-up does not collide with an overhead press** — one pulls, one pushes — so the slot stood, and an athlete whose clean max is six reps got chin-ups on all four lifting days. **100 reps a week of one movement.**
+
+- **The rule.** On a day with no collision, the slot still checks the *plane*. Bench (horizontal push) → the pull slot wants a **vertical** pull (chin-up). Press (vertical push) → it wants a **horizontal** pull (row). `complementFor()` in `exercise-config.ts`; applied in `resolveAssistance()`, `src/lib/assistance-menu.ts`.
+- **It needs no new movements.** The pull slot already carries both planes (Pull Up / Chin Up vertical; Inverted Row / Dumbbell Row horizontal). Where a slot has nothing in the complementary plane the pick **stands** — a preference is not overridden to satisfy a rule that has no answer.
+- **Named, never silent (§5.2b).** A plane swap sets `balancedFor`, distinct from `substitutedFor`, because the reasons differ and the copy says which.
+
+### ⛔ THE CITATION WAS WRONG TWICE, AND THIS IS THE DURABLE PART OF THE ENTRY
+
+Michael: *"the code has to be evidence based keep runing them get it right."* Both wrong versions read as authoritative when written.
+
+1. **First I cited "Wendler's assistance principle" generally.** Reading the primary (`531_2nd_Edition`) killed it: **four of five templates do the OPPOSITE.** Boring But Big — bench, then 5×10 bench (p47). The Triumvirate — press, then dips (p48). The Periodization Bible — squat, then leg press (p51). Same-pattern volume on the main lift's day **is the hypertrophy dose**, deliberately.
+2. **The one template that crosses is p86 — the CONCURRENT chapter**, and only there: one assistance movement, conditioning to follow, no room for volume, so the slot buys **balance** instead. Bench → chin-ups; press → bent-over rows. *That is our athlete exactly.*
+
+**So the rule is right HERE and would be wrong in a general strength block.** The narrowing is the finding — a rule that is correct only inside its condition, with the four contradicting templates listed beside it in the source so the next session cannot re-widen it by accident.
+
+> **↩ Supersedes** the assistance framing in **D-324** (Strength Focus V1), which knew nothing of the day's main lift. **Closes the extension half of Q-212.**
+
+---
+
+## D-329 — The week grid carries NO interference warning: the citation behind it was OUT OF CONDITION (2026-07-29, PUSHED `e34db3a8`)
+
+A warning fired when an endurance session landed on a heavy-leg day, citing **Robineau 2016**. It came out entirely, and the adjacency penalty was re-weighted **9 → 4** ("one anchor adjacency — a tiebreak, not an override").
+
+- **The citation did not test this.** Robineau's 0h arm stacked lifting with **hard** endurance. The session that triggered the warning is an **easy ride**. `strength-primary-plan.ts:1095` already said so in terms — *"Do not attach a citation here without one that tested lifting + easy running same-day"* — and I attached one anyway, **twice**, on two different features.
+- **And stacking is NORMAL.** Wendler's own concurrent template is main lift → assistance → conditioning, **same session, zero gap** (p87), and he explicitly does not care whether conditioning lands on a lifting day (p75). Michael: *"plenty of programs stack and i believe riding is the most forgiving."*
+- **What survives is the sound part:** lift first, leave time if you can. That rides on the session itself, where the law computes the real pair — not on a grid that only renders.
+
+⛔ **THE CLASS: a citation out of condition is worse than no citation.** It launders a guess as evidence, and it is unfalsifiable to a reader who does not fetch the paper. When a source is attached, the **condition it tested** must be stated next to it.
+
+---
+
+## D-330 — ONE scheduler screen: three cards become one, and the week draws live underneath (2026-07-28/29, PUSHED — `bcd0e6d7` and follow-ups)
+
+Michael: *"its cleaner two and they can see the whole thing needs days of the wee do— long runs rides etc"*, then *"no no dont try and fix what there, this is a rebilt one simple scheuler."*
+
+- **What it replaces:** separate `run`, `bike` and `hardday` steps, each asking for days in isolation, so the athlete never saw the week their answers produced until after the plan was built.
+- **What it is:** `volume` (how much) and `schedule` (which days) — deciding WHEN while looking at HOW MUCH is what made the old card scroll past the fold. `WeekGrid` renders the solver's returned week under the controls, debounced 400 ms.
+- ⛔ **`WeekGrid` PLACES NOTHING.** It prints the solver's own compromise strings **verbatim**, never paraphrased. It is standalone on purpose: the same component is meant to serve rescheduling on the State screen, so the athlete learns one picture. *A second placement authority on the client is the disease this codebase spent weeks removing.*
+- **Also:** the confirm step's posture card was deleted (four rows restating answers in the engine's vocabulary; the week says it in days), and the protocol name moved to the subtitle because it was the one fact the grid cannot show.
+
+### The two process failures worth keeping
+
+- **I built the smallest edit twice instead of what was described.** Michael: *"you burnt out?"* It was not fatigue — it was hedging on a rebuild he had asked for plainly.
+- **`npm run build` does not typecheck.** A removed prop stayed at its call sites and the build went green. **Run `npx tsc --noEmit -p tsconfig.app.json`** — and read only your own files out of it, because the repo has pre-existing errors elsewhere.
+
+---
+
+## D-331 — Compromise notes group by FACT, not by lift: one sentence per (anchor, distance), one per ceiling (2026-07-29, **UNCOMMITTED at time of writing**)
+
+Michael, reading a real generated block: *"does this copy actualy refect and plan concessions or does it just never change, its dense i cant read it."*
+
+**The copy was fully computed and always had been** — real lift names, real cycle index, the athlete's own maxes, and a week with room to spare says nothing at all. **The density was a REPORTING bug:** two generators each emitted one paragraph *per lift*, so two lifts wrote the same sentence twice with a name and number swapped.
+
+- `week-solver.ts` — at-the-floor notes group on **(anchor, distance, side)**. ⚠️ Not on anchor alone: two lifts can sit at the floor against the same anchor at *different* distances, and merging those prints a distance that is wrong for one of them.
+- `strength-primary-plan.ts` — ceiling hits collect and emit **once**. ⚠️ The cycle is stated **only when the lifts agree**; two lifts pinning at different cycles drop the clause rather than pick a number that lies about one of them (§0f).
+- **The ceiling sentence also lost its hardcoded "25 reps"** — `assistanceTotalReps()` scales to 50 on a tested capacity, so that number was wrong for exactly the athletes it scaled for.
+
+⛔ **THE DANGEROUS HALF IS THE FIX, NOT THE BUG.** Grouping is a **subtraction at the output boundary** — §5.2b and §0f both live there. A merge that quietly drops a lift is far worse than the density it cures: the athlete then has no idea that lift is at its floor. So the load-bearing fixture is *"grouping never drops a lift"*, which recomputes at-the-floor membership **from the matrix**, independently of the note builder.
+
+- **Swept, not spot-checked (§0d.1).** The screenshot was one arrangement; both tests enumerate every arrangement the solver accepts.
+- **Red-green-red, both directions.** Disabling grouping failed the duplicate test; making the merge drop trailing lifts failed the §5.2b test. Restored: 22 pass.
+- ⚠️ **One test was wrong, not the code** — I keyed duplicates on anchor+distance, which called "the day *before* squat" and "the day *after* deadlift" a duplicate. They are different facts. And a first draft hardcoded the floors instead of asking `requiredAdjacencyHours` — *a test that invents the rule it checks tests the invention.*
+
+> **↩ Does NOT close Q-217.** The ceiling sentence still says the max is "usually out of date" — untrue for an athlete who never logged a lift, where it was never *tested*. Grouping made that sentence shorter, not correct.

@@ -23,6 +23,21 @@
 > **NEXT (Michael, at close): finish the flow, lock in quality options, wire the bike** — then build ONE
 > plan end to end. See the ENGINE-STATE banner.
 >
+> **2026-07-29 — THE FLOW IS BUILT AND THE BAR MOVED. The rematerializer is OFF.**
+> The scheduler is one screen (D-330), the week draws live under the controls, and the confirm step
+> shows the week rather than a card restating the athlete's answers. Michael's bar for what comes next
+> is no longer "does it run":
+>
+> > *"i would rather get all the juggle math figured out and dieals all the acceroy dialed and make
+> > sure this plan is 100% sound for 4 out of 5 hybrid coaches."*
+>
+> ⛔ **The rematerializer and the 1RM-learning ticket are DEFERRED, not dropped.** The previous banner
+> named them as the job; they are behind getting the block itself defensible.
+>
+> **The single biggest unlock left: lifting days is a HARD CONSTANT of 4.** It blocks Wendler's 3-day
+> and 2-day templates, the 10-day rolling week, and the "3 lifting days" trade-off. Michael has raised
+> 5-vs-4 twice without it being actionable.
+>
 > Earlier State work stands and is not being re-litigated: load/strain multi-sport (D-317/D-318,
 > device-verified), the "adapt a plan" strength track (D-315), the State-as-hub three-tab design (D-316,
 > **Adjust tab still unbuilt**), RUN row + charts (D-307 → D-314). Open chart threads: Q-200, tap-to-expand,

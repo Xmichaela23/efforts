@@ -8,6 +8,27 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⛔ AWAITING MICHAEL — deployed-or-pushed, nobody has seen it work (2026-07-29)
+
+- [ ] **DEPLOY FIRST, then look at a press day.** Five functions are pushed and NOT deployed:
+  `generate-strength-plan`, `materialize-plan`, `create-goal-and-materialize-plan`,
+  `generate-combined-plan`, `generate-triathlon-plan`. ⚠️ **`week-solver.ts` also changed — re-derive
+  the importer list; it is now larger.** **What to look for:** on an Overhead Press day the pull slot
+  must read **Inverted Row**, not Pull Up. It reads Pull Up today. *(D-328)*
+- [ ] **The compromise notes should now read as one sentence per fact.** Two lifts at the same floor
+  share a line; two lifts at the ceiling share a line. **What to look for:** no two paragraphs that
+  differ only by a lift name. *(D-331)*
+- [ ] **A default nobody approved.** `NonRaceBuilder.tsx:428` seeds `longRunDay: 'sunday'` and
+  `longRideDay: 'thursday'` so the scheduler draws a week on arrival instead of an empty box. Sunday
+  is convention; **Thursday is Claude's pick, from a sweep.** Saturday is what most athletes expect
+  and costs one extra note (the two long days land back to back). **Michael's call — revert or keep.**
+- [ ] **The AAA acceptance check is still outstanding**, and Michael has said in terms it is **not**
+  met by a markdown export. Generate a Strength Focus block on a device: the header must say *"All 3
+  cycles are measuring cycles"* and carry the *"One thing before you start"* paragraph naming the
+  pinned lifts.
+
+---
+
 ### ⛔ CITATION CORRECTIONS — found by the 2026-07-26 evidence sweep. Comments and athlete-facing strings; the RULES do not change.
 - [ ] **Petré 2021 is cited for a clearance rule it says nothing about.** It is a strength-development meta by training status. **Five sites:** `_shared/schedule-session-constraints.ts:28` (the single law), `_shared/week-optimizer.ts:484`, `:486` (⛔ cites it for *"the AMPK/mTOR interference"* — a claim **D-324 already STRUCK**), `:657` (⚠️ **athlete-facing narration**), `shared/strength-system/strength-primary-plan.ts:460` (⚠️ **athlete-facing**). Replace with Robineau 2016 + Schumann 2022 same-session. ⛔ **`week-optimizer.anchor-contract.test.ts:679` PINS these strings and will fail until updated — that is the guardrail working.** ⚠️ **Two sites are on the RACE path; this is not strength-only.**
 - [ ] **`place-week.ts:64-82` says 6h and 24h "performed the same as each other."** True for the strength outcome, **false for the aerobic one** — Robineau's VO2peak was higher at 24h than at 0h *or* 6h. ⛔ **`MIN_STACK_GAP_H = 6` does NOT change**; the comment does. **24h is the target, 6h is the fallback.**
