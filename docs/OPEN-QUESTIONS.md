@@ -1843,3 +1843,38 @@ The session note nevertheless reads *"leave 6h before the run"* as a flat instru
 **What would close it.** Either (a) the substitution layer becomes the single place movement names are resolved, before any prose is authored, or (b) every rewrite carries a matching prose update the way the race-day pace path already does. ⚠️ (b) is what exists and it has been applied exactly once, for one field, which is why this recurred.
 
 **Related:** Q-212 (routed a face pull into the push slot, which is why this became reachable on every press day), Q-210 (the same "two spellings of one movement" family, one layer down).
+
+---
+
+## Q-217 — The ceiling paragraph is written as an exception and fires as a rule (2026-07-28, DESIGN, measured across four athletes)
+
+**Found by generating four DIFFERENT athlete profiles rather than one.** Michael: *"That's the coverage gap I flagged earlier — every decision calibrated against one profile with unusual numbers."*
+
+| athlete | maxes | lifts pinned |
+|---|---|---|
+| A — cold start, ordinary intermediate | 155 / 205 / 245 / 105 | **3 of 4** (bench, squat, OHP) at cycle 3 |
+| B — strong, trains continuously | 225 / 315 / 405 / 110 | 1 of 4 (OHP) |
+| C — detrained | 135 / 175 / 215 / 85 | 2 of 4 |
+| D — light bars | 95 / 110 / 135 / 65 | **3 of 4**, one at cycle **2** |
+
+**It is arithmetic, not an edge case.** The training max starts at 85% of the 1RM, the cap is 90%, and a 12-week block runs two or three increments. For anyone whose bars are not large enough for +5/+10 to be a small percentage, the gap closes inside the block. ⛔ **Most athletes will hit this.**
+
+### ⚠️ THE PROBLEM IS THE COPY, NOT THE CAP — Michael's read, and it is the cheaper of the two
+
+> *"Copy written as an exception, firing as a rule, is a different kind of dishonest — it tells the athlete something unusual happened when nothing did."*
+
+The paragraph (`strength-primary-plan.ts:996`) says: *"That is usually the number on file being out of date rather than a limit — a fresh test would let it keep climbing."*
+
+⛔ **FOR SOMEONE WHO JUST ENTERED ACCURATE MAXES AT SIGNUP, THAT SENTENCE IS FALSE.** They are pinned because 85% plus three increments reaches 90%, not because their record is stale. The engine cannot currently tell a stale max from an accurate one, so it asserts the more flattering of the two for everybody.
+
+✅ **The honest version says what actually happened:** this block takes these lifts to the top of their allowed range, and re-testing before the next block is how they keep moving. **That is true for everyone it fires on.** The stale-max framing is true only for people who have outgrown their file.
+
+### ✅ AND THIS RAISES TICKET 2'S VALUE
+
+Michael: *"Once the 1RM learns from AMRAPs, the pinning resolves itself for the people who've actually gotten stronger, and the paragraph only fires on people who genuinely hit their ceiling."*
+
+⛔ **So the two are ordered:** rewrite the copy now to something true for everyone, and Ticket 2 is what later makes the *stale-max* reading earnable — because only a learned 1RM can distinguish the two populations. Until then, asserting it is a guess wearing a diagnosis.
+
+⚠️ **NOT PROPOSING TO MOVE THE CAP.** The 90% ceiling with truncation is D-326's decision, one day old, and it superseded a 100%-and-hold that was wrong for stated reasons. If pinning is the expected outcome then the cap is the design, not a guard — but that is a separate call and it needs the same evidence base the cap itself got.
+
+**Related:** Ticket 2 (the 1RM-learning ticket — see the ENGINE-STATE banner), Q-211 (the client already computes the e1RM that would settle this and discards it).
