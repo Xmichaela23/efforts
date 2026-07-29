@@ -10,12 +10,17 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ## ⛔ AWAITING MICHAEL — pushed, nothing seen working (2026-07-30)
 
-- [ ] **DEPLOY, AND THE LIST IS NOW SEVEN.** `strength-primary-plan.ts` changed, so every function that
-  bundles it needs redeploying: `generate-strength-plan`, `create-goal-and-materialize-plan`,
-  `generate-combined-plan`, `generate-run-plan`, `generate-triathlon-plan`, `materialize-plan`, **`coach`**.
-  ⚠️ **`coach` is the one that gets missed** — it reaches the strength system via
-  `_shared/insights/strength-protocol-read.ts`. Re-derive with
-  `grep -rln "shared/strength-system" supabase/functions` rather than trusting this list.
+- [x] ~~**DEPLOY, AND THE LIST IS NOW SEVEN.**~~ ✅ **DEPLOYED 2026-07-29 22:44 UTC.** All seven
+  bumped a version: `generate-strength-plan` v64, `create-goal-and-materialize-plan` v283,
+  `generate-combined-plan` v295, `generate-run-plan` v161, `generate-triathlon-plan` v75,
+  `materialize-plan` v231, `coach` v402. Verified against `supabase functions list`, not assumed.
+  ⚠️ The importer list was RE-DERIVED before deploying rather than trusted — `week-solver.ts` had
+  changed too, and it is reached through `strength-primary-plan.ts` and
+  `schedule-session-constraints.ts`, both already inside the six. `coach` is the seventh, via
+  `_shared/insights/coach-week-insights.ts` → `strength-protocol-read.ts`.
+  ⚠️ **Six of these had gone up at 11:13 UTC the same morning** — before any of the day's work — which
+  is exactly the trap that stranded 17 functions for a month: a recent timestamp is not evidence that
+  YOUR change is live.
 
 - [ ] **Then look at four things on a phone.** Three of them appear in one generated block:
   - [~] **Overhead Press day shows `Inverted Row`, not `Pull Up`** — ⚠️ **SEEN WORKING LOCALLY, NOT
