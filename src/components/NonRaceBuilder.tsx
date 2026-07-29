@@ -14,6 +14,7 @@ import { strengthFocusSections, STRENGTH_FOCUS_WEEKS } from '@/lib/strength-focu
 // picker offers that the composer does not recognise would fall back to the default — the athlete
 // would pick something and silently get something else.
 import { ASSISTANCE_DEFAULTS, ASSISTANCE_GUIDANCE, ASSISTANCE_MENU, type AssistancePicks } from '@/lib/assistance-menu';
+import WeekGrid from '@/components/WeekGrid';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import {
   seedFromGoal,
@@ -337,7 +338,15 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
 }
 
 /** Just what the confirm-screen preview renders — the plan carries far more. */
-type PreviewSession = { day: string; name: string; duration?: number };
+type PreviewSession = {
+  day: string;
+  name: string;
+  duration?: number;
+  /** ⛔ CARRIED NOW. Without it the grid cannot tell a lift from a run, and the endurance budget —
+   *  the whole point of the card — cannot be counted. The composer has always emitted it; this
+   *  type simply dropped it on the way in. */
+  type?: string;
+};
 type PreviewPlan = {
   sessions_by_week?: Record<string, PreviewSession[]>;
   /** `place-week`'s own words for every clearance the week could not honour. */
@@ -1203,40 +1212,12 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                         </div>
                       );
                     }
-                    const active = new Set(previewWeek.map((s) => s.day));
-                    const rest = ORDER.filter((d) => !active.has(d));
-                    const mins = previewWeek.reduce((a, s) => a + (Number(s.duration) || 0), 0);
-                    return (
-                      <>
-                        {/* The sum nobody was doing. Four lifts + the runs + the rides, added up. */}
-                        <p className="text-white/85 text-sm">
-                          {active.size} training {active.size === 1 ? 'day' : 'days'}, {rest.length} rest
-                          {' · '}about {Math.floor(mins / 60)}h{mins % 60 ? String(mins % 60).padStart(2, '0') : ''} a week
-                        </p>
-                        <div className="space-y-1">
-                          {ORDER.map((d) => {
-                            const on = previewWeek.filter((s) => s.day === d);
-                            return (
-                              <div key={d} className="flex items-baseline gap-2 text-sm">
-                                <span className="text-white/45 w-10 shrink-0">{d.slice(0, 3)}</span>
-                                <span className={on.length ? 'text-white/80' : 'text-white/35'}>
-                                  {on.length ? on.map((s) => s.name).join(' · ') : 'Rest'}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {/* ⛔ WHAT IT COULD NOT HONOUR, in the solver's own words. Never hidden — a week
-                            that had to break a clearance says which one. */}
-                        {previewNotes.length > 0 && (
-                          <div className="pt-2 mt-1 border-t border-white/10 space-y-1.5">
-                            {previewNotes.map((n, i) => (
-                              <p key={i} className="text-white/60 text-sm leading-relaxed">{n}</p>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    );
+                    // ⛔ ONE COMPONENT, TWO SURFACES. `WeekGrid` renders the week here and is meant
+                    // to render the rescheduler on the State screen later — same grid, same budget
+                    // line, same compromise sentences, so the athlete learns it once. It also owns
+                    // the endurance budget, which is DERIVED from the lifting frequency rather than
+                    // hardcoded, so it stays true if the block ever runs 3 lifting days.
+                    return <WeekGrid sessions={previewWeek} notes={previewNotes} />;
                   })()}
                 </div>
               )}
