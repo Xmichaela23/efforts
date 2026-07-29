@@ -574,6 +574,11 @@ function enduranceSession(
  * mechanism behind Sabag 2018's finding that cycling HIIT attenuates lower-body strength. So the
  * cue is the mitigation, and it belongs in the copy where every athlete can act on it.
  */
+/** ⛔ ONE OWNER FOR THE HARD RIDE'S LENGTH. The ride budget subtracts this before splitting the easy
+ *  hours, so a literal 45 in two places would drift and the week would silently overshoot the ask —
+ *  which is exactly the defect that subtraction was added to fix. Mirrors `HILL_SESSION_MIN`. */
+const BIKE_QUALITY_MIN = 45;
+
 function bikeQualitySession(day: string): PlanSession {
   return {
     day,
@@ -583,7 +588,7 @@ function bikeQualitySession(day: string): PlanSession {
       '4 × 4 min hard, 4 min easy between. Hard means hard — you should not be able to hold a '
       + 'sentence. Spin it, do not grind it: a fast, easy spin keeps this in your lungs instead of '
       + 'your legs, which is what leaves the lifting intact.',
-    duration: 45,
+    duration: BIKE_QUALITY_MIN,
     steps_preset: ['bike_vo2_4x4min_R4min'],
     tags: ['quality', 'bike', 'aerobic'],
   };
@@ -799,7 +804,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     const s = String(v ?? '').trim().toLowerCase();
     return (PLACEMENT_DAYS as readonly string[]).find((d) => d.toLowerCase() === s) as DayName ?? null;
   };
-  const hasBike = !!args.bike;
+  // ⛔ HOURS FROM EITHER SOURCE COUNT AS "HAS A BIKE" (2026-07-29). A bike-primary athlete whose
+  // hours arrived as `targetWeeklyRideHours` with no `bike{}` object failed this test, so the pass
+  // that turns hours into rides never ran and the fallback emitter handed them 2×45min — 1.5h
+  // against a 6h ask. The gate asked whether an OBJECT was present; the question is whether the
+  // athlete gave us hours.
+  const hasBike = !!args.bike || Number(args.targetWeeklyRideHours) > 0;
   const longRunPin = enduranceSport === 'run' ? asDay(args.longRunDay) : null;
   if (longRunPin) pins.push({ day: longRunPin, kind: 'long_run', label: 'your long run' });
   // ⛔ THE LONG RIDE PINS TOO. It is a leg-dominant LONG session, so the law gives it the same 48h
@@ -1451,7 +1461,23 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       if (hardPin && args.hardDay?.discipline === 'run') {
         weekSessions.push(hillSession(hardPin, heavyLowerDays));
       }
-    } else if (enduranceSport) {
+    } else if (enduranceSport && !(enduranceSport === 'bike' && hasBike)) {
+      // ⛔ TWO EMITTERS WERE AUTHORING RIDES AND NOTHING SUBTRACTED (found 2026-07-29 by the combo
+      // sweep). For a bike-primary athlete this fallback fired AND the `hasBike` pass below fired.
+      // The pass built the hours correctly — 6h asked came out as 103 + 154 + 103 minutes, exactly
+      // 360 — and then this line added its own two fixed 45-minute rides on top. Measured: 6h asked
+      // → 7.5h built, 8h → 9.5h. Twenty-five percent over, on the discipline a maintenance block
+      // exists to hold STEADY.
+      //
+      // ⚠️ AND IT SCALED WITH FREE DAYS, not with the ask. `enduranceDays` fills whatever the week
+      // has spare, so dropping to three lifting days freed a day and the same 6h ask became 8.3h
+      // across six rides. A volume that moves when the LIFTING changes is not a volume.
+      //
+      // ⛔ THIS IS THE SAME DEFECT THE RUN SIDE FIXED ON 2026-07-28 — the hill session counted toward
+      // the run-day COUNT and not the MILES, so every plan built the typed number and added the hard
+      // session after. Michael rejected that at 27%. Same class, same answer: one owner per volume.
+      // When the athlete gave bike hours, the `hasBike` pass owns every ride and this fallback is
+      // silent. It still fires for a bike athlete who gave no hours, where it is the only emitter.
       enduranceDays.forEach((day) => weekSessions.push(enduranceSession(enduranceSport, day)));
     }
 
@@ -1472,7 +1498,14 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // Hours → sessions. ⛔ HOURS, never miles (D-323 §6): the engine has never learned a ride
       // speed, so miles is a number it cannot turn into time. Two rides is the nominal shape; the
       // long ride takes the larger share because that is what a long ride is.
-      const rideHours = Number(args.bike?.hours) > 0 ? Number(args.bike!.hours) : 2;
+      // ⛔ `targetWeeklyRideHours` HAD ZERO READERS (found 2026-07-29). Its own doc comment said it
+      // was "carried now so the bike pass has it to consume" — and the pass never consumed it, so a
+      // bike athlete who gave hours on the primary path got the fixed 2×45min default instead.
+      // Measured: 6h asked, 1.5h built. Collected and dropped, the same shape as `hardDay` and
+      // `quality_run` before it. `bike.hours` still wins; this is the fallback, not a second owner.
+      const rideHours = Number(args.bike?.hours) > 0
+        ? Number(args.bike!.hours)
+        : (Number(args.targetWeeklyRideHours) > 0 ? Number(args.targetWeeklyRideHours) : 2);
       // ⛔ THE ATHLETE'S ANSWER, not a guess. Asking "how many days to ride" is what the run step has
       // always done and the bike never did — without it this code held a weekly total and split it
       // by an invented ratio, so 20 hours produced ONE 1,200-minute ride.
@@ -1527,7 +1560,18 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       if (rideShortfallNote && !placementCompromises.some((c) => c.text === rideShortfallNote)) {
         placementCompromises.push({ kind: 'cost', text: rideShortfallNote });
       }
-      const totalMins = Math.max(30, Math.round(rideHours * 60));
+      // ⛔ THE HARD RIDE IS INSIDE THE WEEK'S HOURS, NOT AN EXTRA ON TOP (2026-07-29).
+      //
+      // This is the run side's 2026-07-28 defect, one discipline over, and it was still here: the
+      // interval session is a RIDE, it counted toward nothing, and the easy hours were built to the
+      // full ask beside it. Measured 6h asked → 6.8h built, on every bike athlete who picked the
+      // bike for their hard day. Michael rejected the run version of this at 27%.
+      //
+      // ⛔ AND THE INTERVALS DO NOT SHRINK TO FIT — same yield order the run uses. Hickson: intensity
+      // holds top-end fitness and duration is the expendable variable, so the hard session is paid
+      // first at its full 45 minutes and the easy hours flex around it.
+      const hardRideMins = hardPin && args.hardDay?.discipline === 'bike' ? BIKE_QUALITY_MIN : 0;
+      const totalMins = Math.max(30, Math.round(rideHours * 60) - hardRideMins);
       // ⛔ EVEN SPLIT, then the long day takes what the others give up. `LONG_RIDE_SHARE` is the one
       // authored number left in this block and it is marked as such: a long ride that is the same
       // length as the others is not a long ride, and 1.5× is the smallest multiplier that reads as
