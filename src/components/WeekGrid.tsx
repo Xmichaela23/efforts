@@ -47,6 +47,13 @@ export default function WeekGrid({
   const over = enduranceCount > clean;
   const collisionDay = heavyLegCollisionDay(sessions);
 
+  // Two upper lifts on consecutive days — worth a word, because it looks like an oversight.
+  const UPPER = /Bench Press|Overhead Press/;
+  const upperIdx = ORDER
+    .map((d, i) => (sessions.some((s) => s.day === d && s.type === 'strength' && UPPER.test(s.name)) ? i : -1))
+    .filter((i) => i >= 0);
+  const adjacentPressDays = upperIdx.length === 2 && Math.abs(upperIdx[0] - upperIdx[1]) === 1;
+
   const activeDays = new Set(sessions.map((s) => s.day)).size;
   const mins = sessions.reduce((a, s) => a + (Number(s.duration) || 0), 0);
 
@@ -86,6 +93,18 @@ export default function WeekGrid({
         <p className={`text-sm ${over ? 'text-amber-300/90' : 'text-white/70'}`}>
           {enduranceCount} endurance {enduranceCount === 1 ? 'session' : 'sessions'} · {clean} fit clean
         </p>
+        {/* ⛔ SAY WHY THE PRESSES ARE ADJACENT. The week puts bench and press on consecutive days
+            and reads like an accident. It is not: `upper x upper` needs ZERO clearance in the law —
+            pressing on Tuesday does not touch what pressing on Monday loaded — whereas moving one
+            of them onto a heavy-leg day is Robineau's 0h arm, the most expensive arrangement we
+            know of. The engine chose right and never said so, which is the same defect as any other
+            unexplained output. */}
+        {adjacentPressDays && (
+          <p className="text-white/55 text-xs leading-relaxed">
+            Your two press days sit together on purpose — pressing twice needs no recovery gap, and
+            the alternative is moving one onto a heavy-leg day, which costs far more.
+          </p>
+        )}
         {over && !compact && (
           <p className="text-white/70 text-sm leading-relaxed">
             {collisionDay ? `One lands on ${collisionDay}, a heavy-leg day. ` : ''}

@@ -85,6 +85,35 @@ function DayPicker({ value, onChange, allowed }: { value: DayName | ''; onChange
   );
 }
 
+/**
+ * ⛔ ONE LINE, NOT SEVEN BUTTONS. The scheduler carries THREE day questions — hard day, long run,
+ * long ride — and as button grids they took three rows of seven and pushed the week itself below
+ * the fold. Michael: *"you need to be able to click and see everything without scrolling."* The
+ * whole value of the card is watching the week change as you tap, which does not survive the week
+ * being off screen.
+ *
+ * ⚠️ `DayPicker` above is unchanged and still used by every other card, where the screen is not
+ * competing with a live result.
+ */
+function DaySelect({ label, value, onChange }: { label: string; value: DayName | ''; onChange: (d: DayName) => void }) {
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <span className="text-white/70 whitespace-nowrap">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as DayName)}
+        className="flex-1 min-w-0 py-1.5 px-2 rounded-lg bg-white/[0.06] border border-white/12 text-white appearance-none"
+        style={{ fontSize: '16px' }}
+      >
+        <option value="" className="bg-neutral-900">Pick a day</option>
+        {DAYS.map((d) => (
+          <option key={d} value={d} className="bg-neutral-900">{DAY_SHORT[d]}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 // ⛔ THE HARD DAY THE ATHLETE ALREADY OWNS — asked ON the discipline's own card, never as a separate
 // "Fixed sessions" screen. Michael, 2026-07-25: *"run club hard conditioning day needs to be in
 // here."* A club run is a RUN fact; splitting it out asked the athlete to hold their running in their
@@ -975,89 +1004,81 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           subtitle="Pick the days that are actually yours. The lifting is placed around them."
           onBack={back} onContinue={next} canContinue
         >
-          <div className="space-y-6">
+          <div className="space-y-4">
+            {/* ⛔ THE WEEK FIRST, ABOVE THE CONTROLS. It is the answer, and it has to stay on screen
+                while they tap — a result below the fold is a result they never see change. */}
+            {previewWeek && previewWeek.length > 0 && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                <WeekGrid sessions={previewWeek} notes={[]} compact />
+              </div>
+            )}
+
             {/* ── the one hard day ─────────────────────────────────────────── */}
-            <div>
-              <p className="text-white/85 text-sm mb-2">Your one hard day</p>
-              <div className="flex gap-1.5 mb-2">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-white/85 text-sm whitespace-nowrap">Hard day</span>
                 {(['run', 'bike'] as const).filter((d) => posturePresent(d)).map((d) => {
                   const on = !!state.qualityDays[d];
                   return (
                     <button
                       key={d} type="button"
                       onClick={() => setState((st) => ({ ...st, qualityDays: { [d]: (st.qualityDays[d] as DayName) || 'tuesday' } }))}
-                      className={`px-4 py-2 rounded-lg text-sm ${on ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                      className={`px-3 py-1.5 rounded-lg text-sm ${on ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
                     >{d === 'run' ? 'Run' : 'Ride'}</button>
                   );
                 })}
+                {(['run', 'bike'] as const).filter((d) => state.qualityDays[d]).map((d) => (
+                  <select
+                    key={d}
+                    value={(state.qualityDays[d] as DayName) ?? ''}
+                    onChange={(e) => setState((st) => ({ ...st, qualityDays: { [d]: e.target.value as DayName } }))}
+                    className="flex-1 min-w-0 py-1.5 px-2 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
+                    style={{ fontSize: '16px' }}
+                  >
+                    {DAYS.map((dd) => <option key={dd} value={dd} className="bg-neutral-900">{DAY_SHORT[dd]}</option>)}
+                  </select>
+                ))}
               </div>
-              {(['run', 'bike'] as const).filter((d) => state.qualityDays[d]).map((d) => (
-                <DayPicker
-                  key={d}
-                  value={(state.qualityDays[d] as DayName) ?? ''}
-                  onChange={(day) => setState((st) => ({ ...st, qualityDays: { [d]: day } }))}
-                />
-              ))}
-              {/* ⛔ THE PROTECTED SESSION, AND THE CARD SAYS SO. Intensity is what holds aerobic
-                  fitness — Hickson cut frequency and duration without losing VO2max, and lost it the
-                  moment intensity came down. So this is the one endurance session that never yields. */}
-              <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
-                The one session that stays whatever else changes — intensity is what holds your
-                aerobic fitness. Everything else this block is easy.
+              {/* Hickson: intensity is the protective variable — cut frequency and duration and
+                  VO2max holds; cut intensity and it goes. So this is the session that never yields. */}
+              <p className="text-white/55 text-xs leading-relaxed">
+                The session that never yields — intensity is what holds your aerobic fitness.
               </p>
             </div>
 
             {/* ── runs ─────────────────────────────────────────────────────── */}
             {posturePresent('run') && (
-              <div>
-                <div className="flex items-baseline justify-between mb-2">
-                  <p className="text-white/85 text-sm">Runs a week</p>
-                  <span className="text-white/50 text-sm">including the hard one</span>
-                </div>
-                <div className="grid grid-cols-3 gap-1.5 max-w-[220px] mb-2">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-white/85 text-sm whitespace-nowrap w-14">Runs</span>
                   {[2, 3, 4].map((n) => (
                     <button
                       key={n} type="button" onClick={() => setState((st) => ({ ...st, runDays: n }))}
-                      className={`py-2 rounded-lg text-sm ${state.runDays === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                      className={`w-10 py-1.5 rounded-lg text-sm ${state.runDays === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
                     >{n}</button>
                   ))}
                 </div>
-                <p className="text-white/70 text-sm mb-1.5">Long run day</p>
-                <DayPicker value={state.longRunDay} onChange={(d) => setState((st) => ({ ...st, longRunDay: d }))} />
+                <DaySelect label="Long run" value={state.longRunDay} onChange={(d) => setState((st) => ({ ...st, longRunDay: d }))} />
               </div>
             )}
 
             {/* ── rides ────────────────────────────────────────────────────── */}
             {state.posture?.bike === 'maintain' && (
-              <div>
-                <p className="text-white/85 text-sm mb-2">Rides a week</p>
-                <div className="grid grid-cols-3 gap-1.5 max-w-[220px] mb-2">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-white/85 text-sm whitespace-nowrap w-14">Rides</span>
                   {[1, 2, 3].map((n) => (
                     <button
                       key={n} type="button" onClick={() => setState((st) => ({ ...st, rideDays: n }))}
-                      className={`py-2 rounded-lg text-sm ${state.rideDays === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                      className={`w-10 py-1.5 rounded-lg text-sm ${state.rideDays === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
                     >{n}</button>
                   ))}
                 </div>
-                <p className="text-white/70 text-sm mb-1.5">Long ride day</p>
-                <DayPicker value={state.longRideDay} onChange={(d) => setState((st) => ({ ...st, longRideDay: d }))} />
+                <DaySelect label="Long ride" value={state.longRideDay} onChange={(d) => setState((st) => ({ ...st, longRideDay: d }))} />
               </div>
             )}
 
-            {/* ⛔ THE BUDGET, LIVE, WHERE THE CHOICE IS. Arithmetic off the lifting frequency — no
-                server call, so it moves on the tap rather than after a round trip. */}
             <EnduranceBudget />
-
-            {/* ⛔ AND THE WEEK IT PRODUCES. Same component the confirm card and, later, the State
-                screen's rescheduler use — the athlete learns one object. */}
-            {previewWeek && previewWeek.length > 0 && (
-              <div className="pt-4 border-t border-white/10">
-                <p className="text-white/85 text-sm mb-2">
-                  Your week{previewing ? ' · updating…' : ''}
-                </p>
-                <WeekGrid sessions={previewWeek} notes={previewNotes} compact />
-              </div>
-            )}
           </div>
         </StepLayout>
       )}
