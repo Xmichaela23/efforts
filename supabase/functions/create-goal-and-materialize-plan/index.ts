@@ -2602,6 +2602,15 @@ Deno.serve(async (req: Request) => {
                 if (bike) return { hard_day: { day: bike, discipline: 'bike' } };
                 return {};
               })()),
+              // ⛔ THE BLOCK SHAPE — 4 lifting days or 3 (2026-07-29). Read straight off the goal's
+              // training prefs, where the intake card writes it. Absent → 4, so every goal created
+              // before today builds exactly the block it built yesterday.
+              //
+              // ⚠️ NOT `strength_frequency`. That field is the retired D-323 dial and several
+              // branches on this path still clamp it to 2; reusing the name would put this behind a
+              // clamp meant for something else. A distinct key is the point.
+              ...(Number((gsTp as Record<string, unknown>).lifting_days) === 3
+                ? { lifting_days: 3 } : {}),
               // ⛔ THE BIKE, travelling beside the primary sport rather than losing to it. Carries the
               // two things the athlete actually chose: how many hours, and which day is the long one.
               // Both were written to the goal and read by NOTHING under supabase/functions until now.
