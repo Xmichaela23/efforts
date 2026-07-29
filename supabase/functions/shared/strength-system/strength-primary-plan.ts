@@ -585,6 +585,20 @@ export function descentIsJogged(hillDay: string, lowerDays: string[]): boolean {
   });
 }
 
+/**
+ * ⛔ THE HILL SESSION'S DURATION IS FIXED AND THE BUDGET MUST SUBTRACT IT (2026-07-28).
+ *
+ * 4 × 3 min work + 4 × 3 min recovery + warm-up and cool-down. It does NOT scale with the athlete's
+ * weekly mileage, because it is the protected INTENSITY — Hickson's finding is that intensity is
+ * what holds VO2max while frequency and duration are the expendable variables. Shrinking it to fit
+ * a small mileage budget would cut the one thing the block exists to preserve.
+ *
+ * ⚠️ Which is exactly why the budget has to account for it. It used to be added AFTER the miles were
+ * distributed, so every plan ran the athlete's typed mileage PLUS 3.5 miles — measured at +3.5 on a
+ * 13-mile ask, a 20-mile ask and a 30-mile ask alike.
+ */
+export const HILL_SESSION_MIN = 35;
+
 function hillSession(day: string, lowerDays: string[] = []): PlanSession {
   // §5, run-only VO2 defence: 4 x 3min hard / 3min easy at 5-8%. Working time 12 min; ~35-40 min
   // with warm-up and cool-down. The token carries the grade because the cost row is not "run VO2" —
@@ -609,7 +623,7 @@ function hillSession(day: string, lowerDays: string[] = []): PlanSession {
       + (jogged
         ? ''
         : ' Walk the descents — running down is the part that would reach your next heavy day.'),
-    duration: 35,
+    duration: HILL_SESSION_MIN,
     steps_preset: [token],
     tags: ['quality', 'hills', 'aerobic'],
   };
@@ -987,7 +1001,25 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     if (!paceKnown) {
       volume_notes = `Run durations estimated at ${FALLBACK_EASY_MIN_PER_MILE}:00/mi until we learn your easy pace — they re-map once you log a few easy runs.`;
     }
-    const perMile = distributeRunMiles(held, runDayList.length);
+    // ⛔ THE HARD SESSION IS PART OF THE WEEK'S MILEAGE, NOT AN EXTRA ON TOP (2026-07-28).
+    //
+    // The hill session is a RUN. It counted toward the athlete's run-day COUNT and not toward their
+    // MILES, so every plan built their typed number and then added the hills after — measured at
+    // exactly +3.5 miles on a 13-mile ask, a 20-mile ask and a 30-mile ask alike. An athlete asking
+    // to hold 13 miles was handed 16.5, which is a 27% overage on the discipline this block is
+    // supposed to be holding STEADY while strength leads.
+    //
+    // ⚠️ AND IT COMPOUNDED. The remaining miles were then split across `runDayList`, which excludes
+    // the hard day — so the same 13 miles landed on fewer runs. At 2 run days that produced a single
+    // 130-minute, 13-mile long run: the entire week in one session, in a maintenance block.
+    //
+    // ⛔ THE HILLS DO NOT SHRINK TO FIT. Its duration is fixed because it is the protected intensity
+    // (Hickson: intensity holds VO2max, frequency and duration are the expendable variables). So the
+    // budget subtracts it and distributes what remains — the hard session is paid first, and the
+    // easy volume flexes around it, which is the yield order the doctrine already states.
+    const hardRunMiles = hardDayIsRun && hardPinDay ? HILL_SESSION_MIN / pace : 0;
+    const easyBudget = Math.max(1, held - hardRunMiles);
+    const perMile = distributeRunMiles(easyBudget, runDayList.length);
     const daysLongFirst = [longRunDay, ...runDayList.filter((d) => d !== longRunDay)];
     daysLongFirst.forEach((day, i) => {
       const mi = perMile[i] ?? perMile[perMile.length - 1];
