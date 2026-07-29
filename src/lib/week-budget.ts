@@ -59,3 +59,21 @@ export function heavyLegCollisionDay(sessions: WeekSession[]): string | null {
   }
   return null;
 }
+
+/**
+ * The same budget, before a week exists — for the intake card, where the athlete is still choosing
+ * and there is nothing to render yet.
+ *
+ * ⛔ NO SERVER CALL. The count is arithmetic: of N lifting days, half carry heavy legs (squat and
+ * deadlift) and half carry a press. Presses stack for free; heavy legs do not. So clean ground is
+ * the lift-free days, minus the reserved rest day, plus the upper-lift days.
+ *
+ * ⚠️ It must agree with `cleanEnduranceSlots` above, which counts the same thing from a real week.
+ * Pinned by a fixture that runs both against a four-lift block.
+ */
+export function cleanSlotsForLiftingDays(liftingDays: number): number {
+  const REST_RESERVED = 1;
+  const upperDays = Math.ceil(liftingDays / 2);        // 4 lifts -> 2 presses; 3 -> 2
+  const freeDays = Math.max(0, WEEK_DAYS.length - liftingDays - REST_RESERVED);
+  return freeDays + upperDays;
+}

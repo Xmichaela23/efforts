@@ -28,11 +28,19 @@ export default function WeekGrid({
   sessions,
   notes = [],
   className = '',
+  compact = false,
 }: {
   sessions: WeekGridSession[];
   /** The solver's own words for what it could not honour. Printed verbatim, never paraphrased. */
   notes?: string[];
   className?: string;
+  /**
+   * ⛔ DROP THE EXPLANATION, KEEP THE FACT. On the confirm card the athlete has already seen the
+   * trade under the picker that caused it — repeating the citation there made the last screen a
+   * wall of text. Michael: *"much too dense."* The budget line still shows, because the number is
+   * the fact; the paragraph belongs where the choice is still changeable.
+   */
+  compact?: boolean;
 }) {
   const enduranceCount = sessions.filter(isEnduranceSession).length;
   const clean = cleanEnduranceSlots(sessions);
@@ -78,7 +86,7 @@ export default function WeekGrid({
         <p className={`text-sm ${over ? 'text-amber-300/90' : 'text-white/70'}`}>
           {enduranceCount} endurance {enduranceCount === 1 ? 'session' : 'sessions'} · {clean} fit clean
         </p>
-        {over && (
+        {over && !compact && (
           <p className="text-white/70 text-sm leading-relaxed">
             {collisionDay ? `One lands on ${collisionDay}, a heavy-leg day. ` : ''}
             Lifting and running the same legs on the same day cost about half the strength gain in the
@@ -87,7 +95,7 @@ export default function WeekGrid({
             volume is.
           </p>
         )}
-        {!over && enduranceCount > 0 && (
+        {!over && enduranceCount > 0 && !compact && (
           <p className="text-white/60 text-sm leading-relaxed">
             Every heavy day gets its own ground. Dropping an easy session costs less than it feels —
             trained athletes held VO2max for fifteen weeks on two sessions a week, as long as the hard

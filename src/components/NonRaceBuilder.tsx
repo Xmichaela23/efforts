@@ -15,6 +15,7 @@ import { strengthFocusSections, STRENGTH_FOCUS_WEEKS } from '@/lib/strength-focu
 // would pick something and silently get something else.
 import { ASSISTANCE_DEFAULTS, ASSISTANCE_GUIDANCE, ASSISTANCE_MENU, type AssistancePicks } from '@/lib/assistance-menu';
 import WeekGrid from '@/components/WeekGrid';
+import { cleanSlotsForLiftingDays } from '@/lib/week-budget';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import {
   seedFromGoal,
@@ -510,6 +511,42 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     setPreviewing(false);
   };
 
+  /**
+   * ⛔ THE TRADE, WHERE THE CHOICE IS MADE — not three screens later on the confirm card.
+   *
+   * A warning on the last screen is useless: every decision it refers to has already been taken,
+   * and the athlete has to walk backwards to act on it. This renders under the run and bike counts
+   * so the number moves as they tap.
+   *
+   * ⚠️ NO SERVER CALL. The budget is arithmetic off the lifting frequency — `cleanSlotsForLiftingDays`
+   * — and it is pinned against the grid's own count so the two surfaces cannot drift.
+   *
+   * ⚠️ The reassurance is not padding. Dropping an easy session FEELS expensive and mostly is not;
+   * that is the thing an athlete cannot know on their own, and it is why this is a choice rather
+   * than a scold. It never blocks.
+   */
+  const EnduranceBudget = () => {
+    const runs = state.posture?.run && state.posture.run !== 'out' ? state.runDays : 0;
+    const rides = state.posture?.bike === 'maintain' ? state.rideDays : 0;
+    const picked = runs + rides;
+    if (picked === 0) return null;
+    const liftingDays = state.posture?.strength === 'develop' ? 4 : 2;
+    const clean = cleanSlotsForLiftingDays(liftingDays);
+    const over = picked > clean;
+    return (
+      <div className="mt-3 pt-3 border-t border-white/10">
+        <p className={`text-sm ${over ? 'text-amber-300/90' : 'text-white/70'}`}>
+          {picked} endurance {picked === 1 ? 'session' : 'sessions'} · {clean} fit clean
+        </p>
+        <p className="text-white/60 text-sm mt-1 leading-relaxed">
+          {over
+            ? 'One lands on a heavy-leg day. Same-day leg work cost about half the strength gain in the only trial that tested it. Your hard day and long days stay — the easy volume is what moves.'
+            : 'Every heavy day gets its own ground.'}
+        </p>
+      </div>
+    );
+  };
+
   const optBtn = (active: boolean) =>
     `w-full text-left px-4 py-3 rounded-xl border ${active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'} text-white`;
 
@@ -962,6 +999,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 ))}
               </div>
               <p className="text-white/70 text-sm mt-1.5 leading-relaxed">We spread your miles across these — a longer run plus easy fill, not the same run twice.</p>
+              <EnduranceBudget />
             </div>
               </>
             )}
@@ -1023,6 +1061,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     } a ride.`
                   : 'We spread your hours across these — the long ride takes the bigger share.'}
               </p>
+              <EnduranceBudget />
             </div>
             <div>
               <p className="text-white/85 text-sm mb-2">Long ride day</p>
@@ -1217,7 +1256,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     // line, same compromise sentences, so the athlete learns it once. It also owns
                     // the endurance budget, which is DERIVED from the lifting frequency rather than
                     // hardcoded, so it stays true if the block ever runs 3 lifting days.
-                    return <WeekGrid sessions={previewWeek} notes={previewNotes} />;
+                    return <WeekGrid sessions={previewWeek} notes={previewNotes} compact />;
                   })()}
                 </div>
               )}

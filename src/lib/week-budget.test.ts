@@ -1,6 +1,6 @@
 // Run: ~/.deno/bin/deno test --no-check src/lib/week-budget.test.ts
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { cleanEnduranceSlots, heavyLegCollisionDay, type WeekSession } from './week-budget.ts';
+import { cleanEnduranceSlots, cleanSlotsForLiftingDays, heavyLegCollisionDay, type WeekSession } from './week-budget.ts';
 
 const lift = (day: string, name: string): WeekSession => ({ day, name, type: 'strength' });
 const run = (day: string): WeekSession => ({ day, name: 'Easy Run', type: 'run' });
@@ -32,4 +32,13 @@ Deno.test('heavy-leg days are not clean ground; upper days are', () => {
 Deno.test('the collision names the day it actually lands on', () => {
   assertEquals(heavyLegCollisionDay([...FOUR, run('Monday')]), null, 'bench day is free ground');
   assertEquals(heavyLegCollisionDay([...FOUR, run('Wednesday')]), 'Wednesday', 'squat day is not');
+});
+
+Deno.test('⛔ THE INTAKE COUNT AND THE RENDERED COUNT MUST AGREE', () => {
+  // The card computes the budget before a week exists; the grid computes it from a real one. Two
+  // numbers for one claim is how surfaces start disagreeing.
+  assertEquals(cleanSlotsForLiftingDays(4), cleanEnduranceSlots(FOUR));
+  assertEquals(cleanSlotsForLiftingDays(4), 4);
+  assertEquals(cleanSlotsForLiftingDays(3), 5);
+  assertEquals(cleanSlotsForLiftingDays(2), 5);
 });
