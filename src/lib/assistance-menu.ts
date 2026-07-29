@@ -280,10 +280,16 @@ export function resolveAssistance(
     // So the rule above leaves it alone and the athlete gets chin-ups on all four lifting days —
     // 100 reps a week of one movement for someone whose clean max is six.
     //
-    // Wendler pairs assistance to the day's lift and the pairing CROSSES THE PLANE (p86):
+    // ⛔ THE CITATION IS p86 — THE CONCURRENT TEMPLATE — AND NOT THE ASSISTANCE CHAPTER. Checked
+    // against all five of his templates: Boring But Big, the Triumvirate and the Periodization
+    // Bible all put a SAME-PATTERN movement on the main lift's day on purpose (bench then 5x10
+    // bench; press then dips; squat then leg press). That is the hypertrophy dose.
+    //
+    // ✅ p86 is the ONE that crosses, and it is the concurrent chapter — one assistance movement,
+    // conditioning to follow, no room for volume, so the slot buys BALANCE instead:
     //   Bench (horizontal push) -> Chin-ups (vertical pull)
     //   Press (vertical push)   -> Bent Over Rows (horizontal pull)
-    // So on a press day the pull slot should row, and on a bench day it should chin.
+    // That is our athlete exactly. The rule is right here and would be wrong in a general block.
     //
     // ⚠️ ONLY WHEN THE SLOT ACTUALLY OFFERS THE COMPLEMENT. The pull slot carries both planes
     // already (Pull Up / Chin Up are vertical; Inverted Row / Dumbbell Row are horizontal), so this

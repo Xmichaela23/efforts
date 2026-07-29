@@ -1447,33 +1447,39 @@ export function movementFamilyOfPattern(pattern: MovementPattern | null | undefi
 /**
  * THE COMPLEMENT — what Wendler pairs a main lift with, and it CROSSES THE PLANE.
  *
- * ⚠️ FOUR PAIRINGS FROM THE BOOK, GENERALISED INTO A MAP — and the generalisation is MINE, not his.
- * *5/3/1* 2nd ed. p86 gives these four directly:
+ * ⛔ NARROWED 2026-07-28 AFTER READING ALL FIVE ASSISTANCE TEMPLATES. My first version cited this
+ * as Wendler's assistance principle. **It is not. Four of his five templates do the OPPOSITE**, and
+ * they do it on purpose:
  *
- *   Bench Press (horizontal push)  ->  Chin-ups      (vertical pull)
- *   Press       (vertical push)    ->  Bent Over Rows (horizontal pull)
- *   Deadlift    (hip dominant)     ->  Front Squat    (knee dominant)
- *   Squat       (knee dominant)    ->  Good Morning   (hip dominant)
+ *   Boring But Big (p47)      Bench 5/3/1 -> Bench 5x10  + DB Row      SAME pattern, then balance
+ *   Triumvirate (p48)         Press 5/3/1 -> Dips        + Chin-ups    SAME family, then balance
+ *   Triumvirate (p48)         Squat 5/3/1 -> Leg Press   + Leg Curl    SAME pattern, then balance
+ *   Periodization Bible (p51) Bench 5/3/1 -> Chest/Shoulders + Lats + Triceps
  *
- * So the complement is not merely "the antagonist" — it is the antagonist IN THE OTHER PLANE. A
- * vertical push is balanced by a horizontal pull, not by another vertical movement. p46 is the
- * principle (*"if you train your chest, train your back… try to achieve balance"*); p86 is the
- * specific pairing that principle produces.
+ * The same-pattern movement is the HYPERTROPHY dose. p46's "if you train your chest, train your
+ * back" means include both across the session — it does not mean exclude the one you just trained.
  *
- * ⚠️ This is STRONGER than `sharesMovementFamily`. A chin-up does not COLLIDE with an overhead
- * press — one pulls, one pushes, no shared prime movers — so the collision rule leaves it alone and
- * the athlete gets chin-ups on all four lifting days. The complement rule is what makes the pull
- * work actually vary.
+ * ✅ **THE ONE TEMPLATE THAT CROSSES IS THE CONCURRENT ONE, AND THAT IS OURS.** p86 — the chapter on
+ * combining 5/3/1 with heavy conditioning — gives ONE assistance movement per lift, before the
+ * conditioning work, and every one of the four is the antagonist:
  *
- * `core`, `plyometric` and `calf` have no complement: nothing in the book pairs against them.
+ *   Bench Press (horizontal push) -> Chin-ups       (vertical pull)
+ *   Press       (vertical push)   -> Bent Over Rows (horizontal pull)
+ *   Deadlift    (hip dominant)    -> Front Squat    (knee dominant)
+ *   Squat       (knee dominant)   -> Good Morning   (hip dominant)
  *
- * ⚠️ WHAT IS INFERRED, STATED PLAINLY: he gives four pairings and I turned them into a symmetric
- * rule — *assistance does not sit in the same plane as the main lift*. Both of his upper pairings
- * cross the plane and both of his lower ones cross the region, so the shape is consistent across
- * all four. But four examples is the whole evidence base, and the reverse directions
- * (`horizontal_pull -> vertical_push`, `vertical_pull -> horizontal_push`) are extrapolation — he
- * never shows a pull as the MAIN lift. Do not present this as "Wendler says" beyond the four rows
- * above.
+ * With one slot and conditioning to follow, there is no room for hypertrophy volume — so the slot
+ * buys balance instead. That is exactly our athlete, and it is why this rule is right HERE and
+ * would be wrong in a general strength block.
+ *
+ * ⛔ SO DO NOT "FIX" THIS BY COPYING BORING BUT BIG. Someone reading the other templates will
+ * reasonably conclude the engine has it backwards. It does not — it is scoped to the concurrent
+ * case, and the citation is p86, not p46 and not the assistance chapter generally.
+ *
+ * ⚠️ AND THE MAP IS STILL MINE. Four pairings, generalised into a symmetric rule. The reverse
+ * directions (`horizontal_pull -> vertical_push`, `vertical_pull -> horizontal_push`) are pure
+ * extrapolation — p86 never shows a pull as the MAIN lift, because 5/3/1 has no pulling main lift.
+ * They exist so the map is total; nothing in the book supports them.
  */
 const COMPLEMENT: Partial<Record<MovementPattern, MovementPattern>> = {
   horizontal_push: 'vertical_pull',
@@ -1484,7 +1490,7 @@ const COMPLEMENT: Partial<Record<MovementPattern, MovementPattern>> = {
   hip_dominant: 'knee_dominant',
 };
 
-/** The pattern that balances this one, or null where the book pairs nothing against it. */
+/** The pattern that balances this one, or null where p86 pairs nothing against it. */
 export function complementOfPattern(p: MovementPattern | null | undefined): MovementPattern | null {
   return p == null ? null : (COMPLEMENT[p] ?? null);
 }
