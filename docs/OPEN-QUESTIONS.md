@@ -1728,4 +1728,12 @@ stored, no live reader — that is Q-211 again, with the value wrong on top.**
 
 The current arrangement is defensible — it wins a real term against every press-separated alternative. **But nothing weighed the presses.** Michael: *"a defensible outcome for a reason never evaluated"* — §0j's shape, one subsystem over. ⛔ The fix is a scored region-spacing term that breaks ties when nothing more important is at stake, gets overruled when something is, **and records which happened**, so the next session reads why rather than reconstructing it from the arrangement.
 
+### ✅ DECIDED — where the new term ranks, and the rename shipped
+
+⛔ **THE TRADE IS REAL AND NAMING IT IS THE DESIGN.** The current arrangement wins `upperLowerShortfall` 3 vs 6 against every press-separated alternative, so a press-spacing term is not free — it has to rank somewhere in the vector.
+
+**Michael's call: BELOW `upperLowerShortfall`, ABOVE `shapePenalty`.** *"Upper↔lower spacing came from a stated floor and has an owner; press adjacency is a real cost but a softer one. Ranking it under means it only moves the arrangement when upper↔lower is already tied — which, given 24 of 40 legal arrangements both separate the presses and keep a rest day, it often will be. That's the tie-break behaviour I wanted, not an override."*
+
+✅ **THE RENAME SHIPPED SEPARATELY (2026-07-28), because it is a defect whether or not the new term is ever built.** `upperSpreadPenalty` → **`upperToNearestLiftPenalty`**, which is what it measures. Michael: *"Rename it to what it measures, or the next session reads it as covering presses exactly as I did."* The block comment now states the measurement, the −1-across-four-arrangements evidence, and that press-to-press remains unpriced.
+
 **Related:** Q-212 (the symptom), §0e and §0j in `docs/SPEC-week-solver.md`.

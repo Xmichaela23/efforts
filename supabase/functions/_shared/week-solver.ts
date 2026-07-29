@@ -292,19 +292,33 @@ function scoreKey(
   }
   const spreadPenalty = lowerIdx.length > 1 ? -tightestLower : 0;
 
-  // 4b. ⛔ UPPER DAYS ARE SPREAD TOO — the solver had NO term for them at all, so upper placement
-  //     fell entirely through to the tie-break. `place-week:370` ranks each upper day by its
-  //     distance from every already-placed lifting day and maximises it. Pressing carries no
-  //     clearance, but clumping two upper days together still wastes the week's recovery shape.
+  // 4b. ⛔ UPPER DAYS ARE SPREAD FROM THE REST OF THE WEEK — the solver had NO term for them at
+  //     all, so upper placement fell entirely through to the tie-break. `place-week:370` ranks each
+  //     upper day by its distance from every already-placed lifting day and maximises it.
+  //
+  //     ⛔ RENAMED 2026-07-28 (Q-214) BECAUSE THE OLD NAME WAS A CLAIM IT DOES NOT MEET. It was
+  //     `upperSpreadPenalty`, which reads as "the presses are spread apart". It is NOT: the inner
+  //     loop runs over EVERY assignment, so this is upper→NEAREST-LIFT-OF-ANY-KIND, and an upper
+  //     lift sitting next to a LOWER one pins it just as hard as another press does.
+  //
+  //     ⚠️ MEASURED, ON ONE REAL WEEK: it returns −1 for four legal arrangements whose press gaps
+  //     are 1, 2, 3 and 3. **It cannot tell them apart** (§0e — a check whose metric cannot move).
+  //     Note the asymmetry that gives it away: `spreadPenalty` above DOES compare lower↔lower.
+  //     The lower region has a spacing term; the upper region has one that cannot see itself.
+  //
+  //     ⛔ SO PRESS-TO-PRESS ADJACENCY IS STILL UNPRICED. Q-214 holds the design — a region term
+  //     ranked BELOW `upperLowerShortfall` and ABOVE `shapePenalty`. Do not read this term as
+  //     covering it; that misreading is exactly what Q-214 was raised from.
   const upperIdx = assignment.filter((_, i) => !lifts[i].isLower);
-  let tightestUpper = 7;
+  let tightestUpperToAnyLift = 7;
   for (const u of upperIdx) {
     for (const other of assignment) {
       if (other === u) continue;
-      tightestUpper = Math.min(tightestUpper, gapDays(u, other));
+      tightestUpperToAnyLift = Math.min(tightestUpperToAnyLift, gapDays(u, other));
     }
   }
-  const upperSpreadPenalty = upperIdx.length > 0 && assignment.length > 1 ? -tightestUpper : 0;
+  const upperToNearestLiftPenalty = upperIdx.length > 0 && assignment.length > 1
+    ? -tightestUpperToAnyLift : 0;
 
   // 4. §5.0a + §2.2 — anchors landing on consecutive days is a real cost, and it is the athlete's
   //    own two picks that caused it. Scored, never corrected: anchors are hard (§2.3).
@@ -371,8 +385,8 @@ function scoreKey(
   // The principle: **day size GATES which hosts are acceptable; spacing OPTIMISES among them.**
   // Spacing choosing the host is spacing making a day-size decision it has no information about.
   return [restShortfall, breachPenalty, stackPenalty, stackHostPenalty, spreadPenalty,
-    upperSpreadPenalty, upperLowerShortfall, shapePenalty, orderPenalty, preferredMissPenalty,
-    ...canonicalAssignment];
+    upperToNearestLiftPenalty, upperLowerShortfall, shapePenalty, orderPenalty,
+    preferredMissPenalty, ...canonicalAssignment];
 }
 
 function lexLess(a: number[], b: number[]): boolean {
