@@ -1342,6 +1342,27 @@ now sit together with a note saying so. **Third time this week the answer was al
 ⛔ **SO BULGARIAN SPLIT SQUAT AND HIP THRUST STOP BEING INTERCHANGEABLE PICKS AND BECOME DAY-DEPENDENT.**
 That is the lower-body half, and it is the half a push-day special case would have left broken forever.
 
+### ✅ THE LAST DECISION — the substitution is NAMED, not silent (Michael, 2026-07-28)
+
+§5.2b, exactly on point: *never subtract silently*. The athlete picked Dips, the plan shows Face
+Pulls, and with no line saying why **the app looks like it ignored them**.
+
+**Register: state what happened and why, in one clause.** Michael's own wording as the model —
+
+> *"You picked Dips — on press days it lands on the same muscles as the main lift, so this slot
+> balances instead."*
+
+**Two constraints on it:**
+
+1. **It appears ONLY on collision days.** On squat and deadlift days the pick stands and there is
+   nothing to say. Same rule as the ceiling paragraph — omitted entirely when it does not fire, never
+   printed as a no-op.
+2. **It NAMES the pick.** *"Something else is here"* is worse than nothing: the athlete needs to see
+   their choice was READ, not overridden blind. ⛔ This is the difference between a substitution and
+   an override, and it is the whole reason the line exists.
+
+⚠️ This closes the last open decision in Q-212. Every remaining item is implementation.
+
 ### ⛔ TWO CONSEQUENCES TO SHIP WITH IT, NOT AFTER IT
 
 **1. THE SLOT'S NAME BECOMES WRONG.** Michael: *"It isn't 'the push slot', it's the antagonist/balance
