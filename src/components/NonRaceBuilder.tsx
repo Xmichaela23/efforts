@@ -796,6 +796,9 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 Push and pull sit against the posture that collapses over a handlebar and late in a
                 stride. Single-leg and core work builds balance one side at a time, without loading
                 the spine — the knees and hips get the work at no cost to the next main lift.
+                {' '}These are your preferences, applied where they fit: on a day whose main lift
+                already works the same muscles, that slot takes balancing work instead and the
+                session says which pick it stood in for.
               </p>
             </div>
             <div className="space-y-3">

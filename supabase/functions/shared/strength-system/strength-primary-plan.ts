@@ -36,6 +36,7 @@ import {
   ASSISTANCE_GUIDANCE,
   assistanceTotalReps,
   resolveAssistance,
+  assistanceSubstitutionNote,
 } from '../../../../src/lib/assistance-menu.ts';
 import {
   type BlockShapeInputs,
@@ -270,8 +271,15 @@ function assistanceRows(
   // posture is evidence of intent rather than of capacity. Anchor cycles hold the floor: the main
   // lifts are at 95% with a rep-out, and that is the week accessory volume must not compete with.
   scale?: AssistanceScaleInputs,
-): StrengthExercise[] {
-  return resolveAssistance(picks).map((a) => ({
+  // ⛔ THE DAY'S MAIN LIFT MAKES THE SLOTS DAY-DEPENDENT (Q-212). The athlete's pick stands
+  // wherever it fits; on a day whose main lift already loads the same pattern it is replaced with
+  // balancing work, and the caller prints WHY. Absent → every pick stands, which is exactly the
+  // pre-Q-212 behaviour, so a caller that does not know its main lift degrades to the old shape
+  // rather than to a wrong one (§0h).
+  mainLiftName?: string | null,
+): { rows: StrengthExercise[]; note: string | null } {
+  const resolved = resolveAssistance(picks, mainLiftName);
+  const rows = resolved.map((a) => ({
     name: a.name,
     // ⛔ `sets: 1` RENDERED AS "1×25" AND THAT IS A LIE ABOUT THE PRESCRIPTION.
     //
@@ -288,6 +296,7 @@ function assistanceRows(
     weight: 'By feel',
     load_prescribed: false,
   }));
+  return { rows, note: mainLiftName ? assistanceSubstitutionNote(resolved, mainLiftName) : null };
 }
 
 /**
@@ -1029,10 +1038,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         pullupMaxReps: args.pullupMaxReps,
         strengthPosture: args.blockShape?.strengthPosture,
         cycleKind: slot.kind,
-      });
+      }, lift.name);
       const ex: StrengthExercise[] = isDeload
         ? [main]
-        : [...(lift.isLower ? [JUMPS] : []), main, ...cycleAssistance];
+        : [...(lift.isLower ? [JUMPS] : []), main, ...cycleAssistance.rows];
         // ⛔ THE ANCHOR TOP SET IS A REP-OUT, AND THE PRESCRIPTION READS LIKE A TARGET.
       //
       // Week 11 prescribes `125×1+`. The number after the plus is the entire point — but "1+"
@@ -1058,7 +1067,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         name: `Strength — ${lift.name}`,
         // The assistance guidance rides with the session, once, on the weeks that carry assistance.
         // Without it "25 reps" reads as a target to chase, and chasing it costs the next main lift.
-        description: `${ex.map(exerciseLabel).join(' · ')}.${isDeload ? '' : ` ${ASSISTANCE_GUIDANCE}`}${amrapNote}${stackNoteFor(lift)}`,
+        // ⛔ THE SUBSTITUTION IS NAMED, NEVER SILENT (§5.2b). Absent on days nothing was replaced —
+        // omitted entirely rather than printed as a no-op, the same rule the ceiling paragraph
+        // follows. And it NAMES the pick, because "something else is here" reads as the app
+        // ignoring the athlete's choice rather than reading it.
+        description: `${ex.map(exerciseLabel).join(' · ')}.${isDeload ? '' : ` ${ASSISTANCE_GUIDANCE}`}${
+          isDeload || !cycleAssistance.note ? '' : ` ${cycleAssistance.note}`}${amrapNote}${stackNoteFor(lift)}`,
         duration: isDeload ? 35 : 60,
         strength_exercises: ex,
         // ⛔ NO `1rm_test` TAG, and that is deliberate. The tag makes the logger DISCARD the planned

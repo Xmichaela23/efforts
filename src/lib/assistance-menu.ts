@@ -34,9 +34,22 @@
  * actually grabbed, so next week they remember. That is a log, not a prescription.
  */
 
+// ⚠️ THE FIRST SIBLING IMPORT INSIDE `src/lib` THAT DENO MUST ALSO RESOLVE. Every other file
+// here that an edge function pulls in is a leaf. The `.ts` extension is required for Deno and
+// is resolved fine by Vite; both toolchains are checked (deno test + npm run build).
+// It earns the edge: the collision rule and the menu it applies to are one claim, and
+// splitting them would put the rule where the next person editing the menu cannot see it.
+import { getMovementFamily, sharesMovementFamily } from './exercise-config.ts';
+
 /** The three slots Wendler's assistance prescription defines. These are also the Adjust-tab holes —
  *  a glute focus loads `single_leg_core`, a pull-up focus loads `pull`. An add-on REPLACES the
- *  athlete's pick in a slot; it never adds a fourth. */
+ *  athlete's pick in a slot; it never adds a fourth.
+ *
+ *  ⛔ THESE KEYS ARE STORAGE AND DO NOT FOLLOW THE COPY (Q-212). Since the slot became
+ *  day-dependent, `'push'` no longer names what always appears there — it names the preference the
+ *  athlete expressed. The athlete-facing `purpose` says so; the KEY cannot change, because it is
+ *  persisted on `goals.training_prefs.assistance_picks` and renaming it would strand every existing
+ *  goal. A key is not a label, and this is the one place that distinction is load-bearing. */
 export type AssistanceSlot = 'push' | 'pull' | 'single_leg_core';
 
 export type AssistanceOption = {
@@ -137,7 +150,7 @@ export const ASSISTANCE_MENU: AssistanceSlotMenu[] = [
   {
     slot: 'push',
     label: 'Push',
-    purpose: 'Chest, shoulders and triceps. Bodyweight or dumbbells keep the nervous-system cost low.',
+    purpose: 'Chest, shoulders and triceps. Bodyweight or dumbbells keep the nervous-system cost low. On bench and press days this slot balances the pressing instead.',
     totalReps: 25,
     options: [
       { name: 'Push Up', targets: 'Chest, front shoulders, triceps', requires: null },
@@ -153,7 +166,7 @@ export const ASSISTANCE_MENU: AssistanceSlotMenu[] = [
   {
     slot: 'pull',
     label: 'Pull',
-    purpose: 'Upper back and lats — the balance against the heavy pressing in the main lifts.',
+    purpose: 'Upper back and lats — the balance against the heavy pressing in the main lifts. On a day whose main lift is itself a pull, this slot presses instead.',
     totalReps: 25,
     options: [
       { name: 'Pull Up', targets: 'Lats, upper back, biceps', requires: 'bar' },
@@ -165,7 +178,7 @@ export const ASSISTANCE_MENU: AssistanceSlotMenu[] = [
   {
     slot: 'single_leg_core',
     label: 'Single-leg or core',
-    purpose: 'One leg at a time, or the trunk. Balance and stability the barbell lifts do not train.',
+    purpose: 'One leg at a time, or the trunk. Balance and stability the barbell lifts do not train. On squat days it hinges and on deadlift days it bends the knee, so it never repeats the day.',
     totalReps: 25,
     options: [
       { name: 'Reverse Lunge', targets: 'Quads, glutes, single-leg balance', requires: null },
@@ -191,19 +204,108 @@ export type AssistancePicks = Partial<Record<AssistanceSlot, string>>;
  * default rather than failing — skipping the card must still produce a complete block, and a name
  * that is no longer on the menu (a later edit) must not strand an existing goal.
  */
-export function resolveAssistance(picks: AssistancePicks | null | undefined): Array<{
+/**
+ * ⛔ THE BALANCE POOL (Q-212) — what a slot reaches for when the athlete's pick loads the same
+ * thing the day's main lift already loaded.
+ *
+ * ⚠️ IT IS NOT A WEAKER VERSION OF THE SAME MOVEMENT. Michael: *"the press day is already
+ * pushing-heavy and the balancing work is what's missing."* Reducing dips to 12 on a press day
+ * still puts the same muscles under load; the answer is to stop pushing, not to push less.
+ *
+ * Ordered by availability — `Face Pull` first because a band or a cable is the commonest way to
+ * own this movement. ⚠️ **Equipment is NOT gated here**, and that is inherited rather than
+ * introduced: `resolveAssistance` has never filtered on `requires`, and bands specifically have no
+ * flag at all to filter on (F-5 in `docs/BUILDER-SWEEP-FINDINGS.md`). Gating the pool while the
+ * menu itself stays ungated would be a half-rule.
+ */
+const BALANCE_POOL: Record<'push' | 'pull' | 'knee' | 'hip', string[]> = {
+  // The day pressed, so the slot pulls.
+  push: ['Face Pull', 'Band Pull Apart', 'Rear Delt Fly', 'Chest Supported Row'],
+  // The day pulled, so the slot presses.
+  pull: ['Push Up', 'Dumbbell Bench Press'],
+  // The day was knee-dominant, so the slot hinges — and the reverse. These two are each other's
+  // answer, which is exactly why `MovementFamily` keeps `knee` and `hip` apart.
+  knee: ['Single Leg Hip Thrust'],
+  hip: ['Reverse Lunge', 'Bulgarian Split Squat'],
+};
+
+export type ResolvedAssistance = {
   slot: AssistanceSlot;
   name: string;
   totalReps: number;
-}> {
+  /**
+   * The athlete's pick, present ONLY when it collided with the day's main lift and was replaced.
+   * ⛔ §5.2b — never subtract silently. This is what lets the copy NAME the pick instead of
+   * quietly showing something else, which would read as the app ignoring their choice.
+   */
+  substitutedFor?: string;
+};
+
+/**
+ * Resolve the three movements for a session. An absent, empty or unrecognised pick falls back to the
+ * default rather than failing — skipping the card must still produce a complete block, and a name
+ * that is no longer on the menu (a later edit) must not strand an existing goal.
+ *
+ * ⛔ `mainLiftName` MAKES THE SLOTS DAY-DEPENDENT (Q-212). The pick stands wherever it fits; on a
+ * day whose main lift already loads the same pattern, the slot takes balancing work instead. Absent
+ * → every pick stands, which is the pre-Q-212 behaviour exactly, so any caller that does not know
+ * its main lift is unchanged rather than silently degraded (§0h).
+ */
+export function resolveAssistance(
+  picks: AssistancePicks | null | undefined,
+  mainLiftName?: string | null,
+): ResolvedAssistance[] {
+  const mainFamily = mainLiftName ? getMovementFamily(mainLiftName) : null;
+
   return ASSISTANCE_MENU.map((menu) => {
     const picked = String(picks?.[menu.slot] ?? '').trim();
     const valid = menu.options.some((o) => o.name.toLowerCase() === picked.toLowerCase());
     const name = valid
       ? menu.options.find((o) => o.name.toLowerCase() === picked.toLowerCase())!.name
       : ASSISTANCE_DEFAULTS[menu.slot];
-    return { slot: menu.slot, name, totalReps: menu.totalReps };
+
+    // No main lift, or no pattern for it, or no clash → the pick stands. An unknown movement is
+    // not evidence of a clash (§0h), so it is left alone rather than replaced on a guess.
+    if (!mainFamily || !mainLiftName || !sharesMovementFamily(mainLiftName, name)) {
+      return { slot: menu.slot, name, totalReps: menu.totalReps };
+    }
+
+    // ⛔ THE SLOT'S OWN MENU FIRST. On a deadlift day the single-leg slot already holds two
+    // knee-dominant options, so the athlete stays inside the list they chose from. The pool is the
+    // fallback for the case the pool was built for: every push option is itself a push.
+    const fromMenu = menu.options.find((o) => !sharesMovementFamily(mainLiftName, o.name));
+    const replacement = fromMenu?.name
+      ?? (mainFamily === 'push' || mainFamily === 'pull' || mainFamily === 'knee' || mainFamily === 'hip'
+        ? BALANCE_POOL[mainFamily].find((n) => !sharesMovementFamily(mainLiftName, n))
+        : undefined);
+
+    // Nothing non-colliding anywhere → keep the pick rather than invent one. Showing the athlete's
+    // own choice is better than showing a movement no rule chose.
+    if (!replacement) return { slot: menu.slot, name, totalReps: menu.totalReps };
+
+    return { slot: menu.slot, name: replacement, totalReps: menu.totalReps, substitutedFor: name };
   });
+}
+
+/**
+ * The line that says a pick was replaced, and why. ⛔ Returns null when nothing was substituted —
+ * omitted entirely rather than printed as a no-op, the same rule the ceiling paragraph follows.
+ *
+ * ⚠️ IT NAMES THE PICK. *"Something else is here"* is worse than nothing: the athlete needs to see
+ * their choice was READ, not overridden blind. That is the difference between a substitution and an
+ * override, and it is the whole reason the line exists (§5.2b).
+ */
+export function assistanceSubstitutionNote(
+  rows: ResolvedAssistance[],
+  mainLiftName: string,
+): string | null {
+  const swapped = rows.filter((r) => r.substitutedFor);
+  if (swapped.length === 0) return null;
+  return swapped
+    .map((r) =>
+      `You picked ${r.substitutedFor} — on ${mainLiftName} days it lands on the same muscles as the ` +
+      `main lift, so this slot balances instead.`)
+    .join(' ');
 }
 
 /**

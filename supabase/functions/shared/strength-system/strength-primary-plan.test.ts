@@ -179,7 +179,11 @@ Deno.test('a work session is jumps → main lift → 25 reps each of push / pull
   // full jumps → main → assistance shape only exists on a lower day.
   const rows = sessionsFor(1).find((s) => s.name === 'Strength — Back Squat')!.strength_exercises!;
   // Defaults, because this plan was built with no picks — skipping the card still yields a block.
-  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Push Up', 'Pull Up', 'Reverse Lunge']);
+  // ⛔ UPDATED FOR Q-212, AND THE TEST WAS PINNING THE DEFECT. It asserted `Reverse Lunge` in the
+  // single-leg slot on a BACK SQUAT day — both `knee_dominant`, so the slot repeated the pattern the
+  // main lift had just loaded. The default pick collided with the default day, which is why nobody
+  // had to choose anything unusual to hit it. It now takes balancing work and the description says so.
+  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Push Up', 'Pull Up', 'Single Leg Hip Thrust']);
   // `sets` is optional on the type now (assistance rows carry a rep TOTAL and no set count), but the
   // jump row always has one — 3×5 = 15, the top of Wendler's 10–15 jumps or throws.
   assertEquals(JUMPS.sets! * (JUMPS.reps as number), 15);
@@ -202,14 +206,20 @@ Deno.test('the athlete’s picks reach the block, and an unknown name falls back
   const benchOf = (p: any) => p.sessions_by_week['1']
     .find((s: any) => s.name === 'Strength — Bench Press')!.strength_exercises!.map((r: any) => r.name);
   // ⚠️ No Box Jump — bench is an upper day, and the picks still reach it.
-  assertEquals(benchOf(picked), ['Bench Press', 'Dips', 'Dumbbell Row', 'Hanging Leg Raise']);
+  // ⛔ EXCEPT THE ONE THAT COLLIDES (Q-212). `Dips` and `Bench Press` are both `horizontal_push`, so
+  // the push slot balances instead — this is the exact case Michael raised, where dips on bench day
+  // and dips again on press day made four pushing exposures inside 24 hours. The pull and single-leg
+  // picks are untouched, because they do not clash: the rule replaces a slot, never the card.
+  assertEquals(benchOf(picked), ['Bench Press', 'Face Pull', 'Dumbbell Row', 'Hanging Leg Raise']);
 
   // A name that is no longer on the menu must not strand an existing goal.
   const stale = composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0,
     assistancePicks: { push: 'Bench Press Machine', pull: '', single_leg_core: undefined },
   });
-  assertEquals(benchOf(stale), ['Bench Press', 'Push Up', 'Pull Up', 'Reverse Lunge']);
+  // `Push Up` is the push default and also collides with Bench Press, so the fallback path lands in
+  // the balance pool too — the substitution is a property of the DAY, not of how the pick arrived.
+  assertEquals(benchOf(stale), ['Bench Press', 'Face Pull', 'Pull Up', 'Reverse Lunge']);
 });
 
 Deno.test('⛔ ASSISTANCE CARRIES NO PRESCRIBED LOAD — including the loaded options', () => {

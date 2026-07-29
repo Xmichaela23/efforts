@@ -1363,6 +1363,39 @@ Pulls, and with no line saying why **the app looks like it ignored them**.
 
 ⚠️ This closes the last open decision in Q-212. Every remaining item is implementation.
 
+### ✅ BUILT 2026-07-28 — the rule, the copy, and a third collision nobody had named
+
+| | |
+|---|---|
+| the rule | `resolveAssistance(picks, mainLiftName)` — the slot's OWN menu is tried first, the balance pool is the fallback |
+| the note | `assistanceSubstitutionNote()`, in the session description, collision days only |
+| composer | `assistanceRows(..., lift.name)` returns `{ rows, note }`; the note is appended only when it fired |
+| copy | slot `purpose` sentences now state the day-dependence; the wizard card says the picks are *"your preferences, applied where they fit"* |
+
+⛔ **A THIRD COLLISION WAS LIVE AND UNNAMED, AND THE DEFAULTS HIT IT.** `Reverse Lunge` is the
+single-leg DEFAULT and is `knee_dominant`; on a **Back Squat** day it repeated the day's own pattern.
+Nobody had to pick anything unusual to trigger it — the default pick collided with the default day.
+Found only because the invariant test runs every slot against every main lift rather than the two
+cases the ticket named.
+
+⚠️ **AND TWO EXISTING TESTS WERE PINNING THE DEFECT** (§0d — when a change turns an old test red,
+ask which of the two is wrong). Both asserted assistance reaching every session unchanged. Updated,
+with the reason written at the assertion.
+
+⛔ **THE STORAGE KEYS DID NOT FOLLOW THE COPY.** `AssistanceSlot` stays `'push' | 'pull' |
+'single_leg_core'` because those keys are persisted on `goals.training_prefs.assistance_picks` and
+renaming them would strand every existing goal. The key names the PREFERENCE, the copy explains WHEN
+it applies. A key is not a label.
+
+✅ **Verified red-green-red** (§0d): disabling the collision branch turns 5 of the 8 new fixtures red.
+Baselines: `_shared` 1353/0 · `shared` **182**/7 (was 174 — the 8 new) · `generate-run-plan` 33/2 ·
+`generate-combined-plan` 438/3 · `npm run build` clean.
+
+⚠️ **ONE NEW STRUCTURAL EDGE:** `assistance-menu.ts` now imports `exercise-config.ts`, the first
+sibling import inside `src/lib` that Deno must also resolve — every other file there that an edge
+function pulls in is a leaf. It uses the `.ts` extension Deno needs, and BOTH toolchains are checked.
+It earns the edge: the collision rule and the menu it applies to are one claim.
+
 ### ⛔ TWO CONSEQUENCES TO SHIP WITH IT, NOT AFTER IT
 
 **1. THE SLOT'S NAME BECOMES WRONG.** Michael: *"It isn't 'the push slot', it's the antagonist/balance
