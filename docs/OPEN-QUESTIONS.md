@@ -2162,3 +2162,38 @@ So this is not two features. **It is one mechanism whose first customer turns a 
 5. **The athlete is told what moved and why.** Customer 2 is an explicit request, so it may act; customer 1 fires on ingest, and D-326's whole argument is that the gauge must not grade its own homework silently.
 
 ⚠️ Michael cancelled the rematerializer on 2026-07-29 to get the block sound first. That reason has now largely been spent (D-332 → D-337). **This is the next real piece of work on this subsystem.**
+
+---
+
+## Q-227 — The strength GAIN signal reads one input, gated on a field nobody fills any more (2026-07-29, TRACED — this is the read plumbing Michael is auditing next)
+
+Michael: *"this is how it reads the lifts to output gains — it was running on RIR and we do amraps now and 'how hard did it feel'."* Traced the same day so the audit does not start from zero. ⛔ **Nothing here was changed. This is a map, not a fix.**
+
+### WHAT THE SIGNAL ACTUALLY IS TODAY
+
+`_shared/state-trend/strength.ts` builds a per-lift dated series where `value = exercise_log.estimated_1rm` — Brzycki over whatever the session's top set was — and reports `latestE1rm` / `bestE1rm` plus a verdict. **That is the whole gain signal.** One input.
+
+### ⛔ FOUR THINGS IT CANNOT SEE
+
+1. **RIR IS STILL THE CONFIDENCE GATE, AND RIR IS NO LONGER COLLECTED.** `compute-facts/index.ts:~929-939` buckets each lift's e1RM by `avg_rir`: sessions at RIR ≥5 are "far from failure" and demoted to a low-confidence fallback (D-118 / Q-039 / Q-040). The barbell block's logger **no longer asks for RIR** (`strength-profiles.ts` `usesRir` — dropped because `brzycki(weight, reps + rir)` added phantom reps to a sub-maximal set). So the field arrives null, null falls into `preferred`, and **the gate is a no-op.** ⚠️ It fails SAFE — nothing is wrongly demoted — but it is a built system starved of its input, and anyone reading the code will believe a confidence check is running.
+
+2. **THE DIFFICULTY TAP WRITES AND NOTHING READS.** D-326 layer 1 persists the three words into `strength_exercises` (no migration, `topSetIndex`, 11 tests). `strength_facts` still carries `avg_rir` and has **no difficulty field**. So *"how hard did it feel"* reaches the database and stops.
+
+3. **THE SERIES CANNOT TELL A MEASUREMENT FROM AN ORDINARY DAY.** Week 3's all-out set at 95% and a week-1 top set are the same kind of point on the trend. The one number in the block that IS a measurement gets averaged in with the rest. ⛔ **This is the blocker under the other three** — like-for-like comparison, provenance, and trusted-vs-not all need this distinction to exist first, and nothing carries it.
+
+4. **`advance_untrusted` HAS NO READER.** Shipped 2026-07-29 (D-335): above 8 reps — 5 on deadlift — the bar advances and the estimate is flagged as taken outside the range the equation holds in. The State strength row cannot say so, so a shaky number renders identically to a clean one.
+
+### ⛔ THE THREE TRAPS, ALREADY NAMED — do not re-derive them
+
+From D-326's *"the server half is not a port"*:
+- **Difficulty has no prescription**, so the existing actual-vs-prescribed machinery does not apply to it.
+- **A raw slope flags everyone every cycle.** It has to compare like-for-like — week 3 against week 3.
+- **Re-including `BodyTrends.strength` before those two are solved reinstates the D-318 false-strain bug** on a new input.
+
+### WHERE I WOULD START, AND WHY
+
+**Mark the week-3 AMRAP points in the series.** It is the smallest change that unblocks the other three, and every one of them is impossible without it.
+
+⚠️ **AND ONE BLOCKER THAT IS NOT ABOUT STRENGTH AT ALL: Q-208.** `plans.status = 'active'` is used as an IDENTITY filter on historical reads, so a workout attached to an older plan reads as unattached. A Performance screen showing history across blocks is exactly where that surfaces. It has been live for three days.
+
+⚠️ **AND WHAT THE NUMBERS MEAN IS Q-223.** The State strength row already shows a per-lift verdict and a suggested weight with an adjust modal — but on a first block the working number advanced on the calendar, not on evidence. Wiring a screen to it makes the screen inherit that.

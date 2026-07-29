@@ -8,59 +8,35 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## ⛔ AWAITING MICHAEL — pushed, nothing seen working (2026-07-30)
+## ▶ NEXT UP — THE STRENGTH READ PLUMBING (2026-07-30, Michael's pick)
 
-- [x] ~~**DEPLOY, AND THE LIST IS NOW SEVEN.**~~ ✅ **DEPLOYED 2026-07-29 22:44 UTC.** All seven
-  bumped a version: `generate-strength-plan` v64, `create-goal-and-materialize-plan` v283,
-  `generate-combined-plan` v295, `generate-run-plan` v161, `generate-triathlon-plan` v75,
-  `materialize-plan` v231, `coach` v402. Verified against `supabase functions list`, not assumed.
-  ⚠️ The importer list was RE-DERIVED before deploying rather than trusted — `week-solver.ts` had
-  changed too, and it is reached through `strength-primary-plan.ts` and
-  `schedule-session-constraints.ts`, both already inside the six. `coach` is the seventh, via
-  `_shared/insights/coach-week-insights.ts` → `strength-protocol-read.ts`.
-  ⚠️ **Six of these had gone up at 11:13 UTC the same morning** — before any of the day's work — which
-  is exactly the trap that stranded 17 functions for a month: a recent timestamp is not evidence that
-  YOUR change is live.
+**Wire the protocol into State and Performance.** Michael is bringing an audit of the read path; **read `Q-227` alongside it** — the same ground is already mapped from code so you do not start from zero.
 
-- [ ] **Then look at four things on a phone.** Three of them appear in one generated block:
-  - [~] **Overhead Press day shows `Inverted Row`, not `Pull Up`** — ⚠️ **SEEN WORKING LOCALLY, NOT
-    ON THE DEPLOYED BUNDLE.** Michael's screenshot: Monday's Bench Press day carries `Chin Up`,
-    Thursday's Overhead Press day carries `Inverted Row`. ✅ **What this DOES prove:** the rule is
-    correct through the real client and the real composer, not only through fixtures. ⛔ **What it does
-    NOT prove:** that production does it — the functions are still not deployed, and the phone runs
-    whatever bundle is live. **Re-check this exact tell after deploying.** *(D-328)*
-  - [~] **Compromise notes read as one sentence per fact** — ⚠️ **LOCAL ONLY, same caveat.** *"Back
-    Squat and Deadlift sit 2 days from your long run"* — one line, two lifts; the ceiling paragraph
-    names both lifts once instead of repeating itself. *(D-331)*
-  - **A three-day block:** weeks 1/2/4 show `Bench + Press` on one day; **week 3 shows FOUR lifting days**
-    with the press on its own *(D-332)*
+- [ ] ⛔ **START HERE: mark the week-3 AMRAP points in the per-lift series.** `state-trend/strength.ts` cannot currently tell a measurement from an ordinary day — the 95% all-out set and a week-1 top set are the same kind of point. **Every other item below is impossible until this distinction exists.**
+- [ ] **The RIR confidence gate is starved.** `compute-facts:~929-939` buckets each lift's e1RM by `avg_rir`; the barbell logger stopped asking for RIR. Fails safe, but the check is a no-op and reads as live. Decide: feed it, retire it, or replace it with difficulty.
+- [ ] **The difficulty tap writes and nothing reads it.** D-326 layer 1 persists the three words; `strength_facts` has no difficulty field. ⚠️ Do not re-derive D-326's three traps — difficulty has no prescription, a raw slope flags everyone every cycle, and re-including `BodyTrends.strength` early reinstates D-318.
+- [ ] **`advance_untrusted` has no reader** (D-335). The State row shows a shaky estimate identically to a clean one. Smallest visible win on this list.
+- [ ] **D-326 layer 3 — render e1RM provenance.** *"earned at week 3, unmeasured since"*, never a bare number. `StatePerformanceSection.tsx` has none today.
+- [ ] ⛔ **Q-208 FIRST IF YOU RENDER HISTORY.** `plans.status = 'active'` used as an identity filter: a workout on an older plan reads as unattached. **Live in production four days.** A Performance screen crossing blocks is exactly where it surfaces.
+- [ ] ⚠️ **Q-223 decides whether the numbers mean anything.** On a first block the working number advanced on the calendar, not on evidence. A screen wired to it inherits that.
+
+---
+
+## ⛔ AWAITING MICHAEL — DEPLOYED, seen on nothing (2026-07-30)
+
+**All seven functions deployed 2026-07-29 23:24 UTC** — `generate-strength-plan` v65, `create-goal-and-materialize-plan` v284, `generate-combined-plan` v296, `generate-run-plan` v162, `generate-triathlon-plan` v76, `materialize-plan` v232, `coach` v403. Client built and synced to iOS.
+
+- [ ] **Four things to look at on the phone.** Three appear in one generated block:
+  - **A three-day block:** weeks 1/2/4 pair `Bench + Press`; **week 3 runs FOUR lifting days** *(D-332)*
   - **A 40-mile runner's long run reads ~12 mi, not 16** *(D-333)*
   - **A bike-only athlete asking 6 h gets 6 h** — it built 1.5 h before *(D-334)*
-
-- [ ] **Q-222 — the reset percentage needs your call, not a patch.** Our stall reset lands near **72%** of
-  1RM (an 85% working number, then a further 10% cut); Wendler's lands near **90%**. The concurrent buffer
-  bought that safety once and the reset charges for it again. ⛔ **It moves prescribed weight for real
-  athletes** — it needs a decision on whether the two are answering the same question twice.
-
-- [ ] **Q-224 — the deposit claim's run half has no source, and your primary athlete is a runner.** The
-  meta-analysis (Llanos-Lagos 2026) is cyclists only and the authors rate certainty LOW. Both docs now say
-  cyclists. ⛔ **Do not let anyone cite Berryman or Rønnestad from memory** to fill the gap — that is
-  exactly how 262 participants sat graded "STRONG" with no author.
-
-- [ ] **The partner doc is ready to send once the above is device-verified.**
-  `docs/PROTOCOL-strength-focus-overview.md`. Two placeholders left for you: **authorship/review** and
-  **version/date**. ⚠️ Its "Open, and not papered over" section is the credibility — do not let a future
-  session tidy it away.
-
-- [ ] **The AAA acceptance check is still outstanding**, and it is **not** met by a markdown export.
-  Generate a Strength Focus block on a device: the header must say *"All 3 cycles are measuring cycles"*
-  and carry the *"One thing before you start"* paragraph naming the pinned lifts.
-
-- [ ] **`ios/debug.xcconfig` has been modified since before 2026-07-29 and is still uncommitted.** Left
-  alone deliberately across two sessions. Decide whether it matters.
-
-- [x] ~~The Thursday long-ride default nobody approved~~ — **resolved 2026-07-29.** All prefilled days
-  removed; the athlete picks or leaves blank.
+  - **The ceiling warning appears ONCE**, in "One thing before you start", and not again under "What this week costs"
+- [ ] **Re-check on the phone what was only seen locally:** `Inverted Row` on the Overhead Press day, and the grouped compromise notes. ⚠️ Both were verified against LOCAL functions before the deploy — local is not production.
+- [ ] **Q-222 — the reset percentage is your call, not a patch.** Ours lands near 72% of 1RM (85% working number, then a further 10% cut); Wendler's lands near 90%. The concurrent buffer bought that safety once and the reset charges again. ⛔ It moves prescribed weight.
+- [ ] **Q-224 — the deposit claim's run half has no source, and your primary athlete is a runner.** ⛔ Do not let anyone fill the gap by citing Berryman or Rønnestad from memory.
+- [ ] **The partner doc is ready to send.** `docs/PROTOCOL-strength-focus-overview.md`, stamped *Efforts — v1, 29 July 2026*. ⚠️ Its "Open, and not papered over" section is the credibility — do not let a future session tidy it away.
+- [ ] **The AAA acceptance check is still outstanding**, and it is **not** met by a markdown export. Generate a Strength Focus block on a device: the header must say *"All 3 cycles are measuring cycles"* and carry the *"One thing before you start"* paragraph naming the pinned lifts.
+- [ ] **`ios/debug.xcconfig` has been uncommitted for three sessions.** Left alone deliberately. Decide whether it matters.
 
 ---
 

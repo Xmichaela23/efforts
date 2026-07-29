@@ -23,113 +23,91 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-07-30 — **the block is SOUND and CITED. Your job is to get it onto a device, because nothing from two sessions has been seen working.**)
+## 🧭 NEXT SESSION — START HERE (2026-07-30 — **the block is built, cited and DEPLOYED. Your job is the strength READ plumbing: how logged lifts become the gain signal on State and Performance.**)
 
-### ⛔ THE FIRST THING: SEVEN FUNCTIONS ARE PUSHED AND NOT DEPLOYED, AND THAT LIST GREW
+### YOUR JOB, AND MICHAEL IS BRINGING YOU AN AUDIT
 
-Everything below is on `main` and running nowhere. **`strength-primary-plan.ts` changed, so the list is
-every function that bundles it — not just the two that were edited.**
+**Wire the protocol into the State and Performance screens.** Michael: *"id like to focus on wiring this protocol up with state and perfomace screens"* — and he is handing you **an audit of the strength read plumbing**. Read that audit, then read **Q-227**, which maps the same ground from code so you do not start from zero.
 
-```
-generate-strength-plan   create-goal-and-materialize-plan
-generate-combined-plan   generate-run-plan
-generate-triathlon-plan  materialize-plan
-coach
-```
+⛔ **THIS IS NOT THE REMATERIALIZER.** He parked that explicitly: *"materilzer is parked."* This is the READ path — logged lifts → gain signal → screen. See Q-226 for where the rematerializer sits and why it is a different job.
 
-⚠️ **`coach` is the one that gets missed.** It reaches the strength system through
-`_shared/insights/strength-protocol-read.ts` → `coach-week-insights.ts`. Re-derive rather than trusting
-this list; `grep -rln "shared/strength-system" supabase/functions`.
+### ⛔ THE ONE-PARAGRAPH VERSION OF Q-227, BECAUSE IT IS THE WHOLE JOB
 
-### YOUR JOB
+The gain signal is **one input**: `state-trend/strength.ts` builds a per-lift series off `exercise_log.estimated_1rm` (Brzycki over the session's top set). It cannot see four things:
 
-**Deploy, then look at four things on a phone.** Michael reads the SCREEN. Nothing in the last two
-sessions has been device-verified, and three of these are visible in one generated block:
+1. **RIR is still the confidence gate and RIR is no longer collected** (`compute-facts:~929-939` buckets by `avg_rir`; the barbell logger stopped asking). Fails safe, but the check is a no-op — a built system starved of its input.
+2. **The difficulty tap writes and nothing reads it.** D-326 layer 1 persists the three words; `strength_facts` has no difficulty field.
+3. **The series cannot tell a measurement from an ordinary day.** Week 3's all-out 95% set and a week-1 top set are the same kind of point.
+4. **`advance_untrusted` has no reader** (D-335, shipped today).
 
-1. **An Overhead Press day must show `Inverted Row`, not `Pull Up`** (D-328, carried from yesterday).
-2. **A three-day block**: weeks 1/2/4 show `Bench + Press` sharing a day; **week 3 shows four lifting
-   days** with the press on its own (D-332).
-3. **A 40-mile runner's long run is ~12 mi, not 16** (D-333).
-4. **A bike-only athlete asking 6 h gets 6 h** — it built 1.5 h before (D-334).
+⛔ **START AT (3).** It is the blocker under the other three — like-for-like comparison, provenance and trusted-vs-not are all impossible until the series knows which points are the tests.
 
-### ⛔ WHAT SHIPPED — do NOT re-litigate
+⚠️ **Do not re-derive D-326's three traps:** difficulty has no prescription so actual-vs-prescribed does not apply; a raw slope flags everyone every cycle so it must compare week-3-to-week-3; and re-including `BodyTrends.strength` before both are solved reinstates the D-318 false-strain bug on a new input.
+
+### ⛔ TWO THINGS WILL CORRUPT THIS WORK IF YOU IGNORE THEM
+
+- **Q-208 — live in production, four days now.** `plans.status = 'active'` used as an IDENTITY filter on historical reads: a workout on an older plan reads as unattached. **A Performance screen showing history across blocks is exactly where this surfaces.** Fix it before you trust anything you render.
+- **Q-223 — on a first block the working number advanced on the CALENDAR, not on evidence.** The State strength row already shows a per-lift verdict and a suggested weight with an adjust modal. Wire a screen to that and the screen inherits it. The partner doc discloses this; **if that disclosure is ever removed the doc is lying.**
+
+### ⛔ DEPLOYED TODAY — verify these before building on them
+
+**All seven functions deployed 2026-07-29 23:24 UTC** (`generate-strength-plan` v65, `create-goal-and-materialize-plan` v284, `generate-combined-plan` v296, `generate-run-plan` v162, `generate-triathlon-plan` v76, `materialize-plan` v232, `coach` v403). Client built and synced to iOS.
+
+⚠️ **A RECENT TIMESTAMP IS NOT EVIDENCE YOUR CHANGE IS LIVE.** Six of these showed a same-day 11:13 UTC stamp from the previous session, before any of the day's work. Compare versions before and after, every time.
 
 | what | where | state |
 |---|---|---|
-| **Three lifting days**, upper lifts paired, test week on four | D-332 | PUSHED `ff1ea583`, **not deployed** |
-| **25+ mi/wk self-regulates** — long run 16 → 12 at 40 mi | D-333 | PUSHED `aa2ac29c`, **not deployed** |
-| **Bike-only held 1.5 h against a 6 h ask** | D-334 | PUSHED `eb4a5fb6`, **not deployed** |
-| **`advance_untrusted`** + deadlift trusted to 5 reps not 8 | D-335 | PUSHED `8a9ea796`, **not deployed** |
-| **No prefilled days**, Continue gated, hard-day copy + (i) | — | PUSHED `749fb81c` (client) |
-| **The deposit claim has a paper** — and it is cycling-only, low certainty | D-336 | PUSHED `17301cdf` |
-| **Wendler HAS an estimated max, and it is Epley** | D-337 | PUSHED `17301cdf` |
-| Assistance crosses the plane · interference warning gone · one scheduler screen · note grouping | D-328/329/330/331 | pushed, **not deployed** |
+| **Three lifting days**, upper lifts paired, test week on four | D-332 | DEPLOYED, **not device-verified** |
+| **25+ mi/wk self-regulates** — the 40-mile long run went 16 → 12 | D-333 | DEPLOYED, **not verified** |
+| **Bike-only held 1.5 h against a 6 h ask** | D-334 | DEPLOYED, **not verified** |
+| **`advance_untrusted`** + deadlift trusted to 5 reps not 8 | D-335 | DEPLOYED, **nothing reads it** |
+| **The deposit claim has a paper** — cycling-only, low certainty | D-336 | pushed |
+| **Wendler HAS an estimated max, and it is Epley** | D-337 | pushed |
+| No prefilled days · Continue gated · hard-day (i) · confirm notes tightened | — | DEPLOYED |
+| Assistance crosses the plane · no interference warning · one scheduler · note grouping | D-328/329/330/331 | DEPLOYED |
 
-### ⛔ THE PARTNER DOC IS THE NEW ARTEFACT, AND IT IS WHY HALF THE ABOVE EXISTS
+### ⛔ WHAT MICHAEL HAS SEEN, AND WHAT HE HAS NOT
 
-**`docs/PROTOCOL-strength-focus-overview.md`** — two pages, showable to Garmin. Written by Michael,
-every evidence row traced to a primary source.
+**Seen working (locally, before the deploy):** the complement rule (`Chin Up` on bench day, `Inverted Row` on press day) and the grouped compromise notes. ⚠️ **Local is not production** — he was running against local functions, so re-check both on the phone.
 
-**Writing it falsified three things we believed, and that is the point of it.** A claim that cannot be
-written down with a receipt is a claim we do not have:
+**Never seen:** a three-day block's week-3 four-day split · a 40-mile runner's ~12 mi long run · a bike-only athlete's hours · the AAA acceptance header.
 
-1. *"Week 3 decides whether the number advances"* — **false on a first block** (Q-223).
-2. *"The engine treats deadlift e1RM as least trustworthy"* — **no such handling existed.** Now it does.
-3. *"5/3/1 has no estimated max of its own"* — **wrong.** He has one and it is Epley (D-337).
+### ⛔ TWO BUGS I SHIPPED TODAY AND THE PATTERN THEY SHARE
 
-⛔ **KEEP THE DOC HONEST OR DELETE IT.** If a claim in it stops matching the code, the doc is the thing
-that is wrong, not the code. It carries an "Open, and not papered over" section — **that section is the
-credibility, not a blemish.**
+Both were caught by Michael reading OUTPUT, not by tests.
 
-### ⛔ WHAT IS UNVERIFIED, AND WHAT WOULD SETTLE IT
+1. **The ceiling fact printed twice** in a real twelve-week block. The dedup identified the entry by regex on the prose (`/training max|working number reaches/`); tightening that sentence the same afternoon removed those words. **Fixed structurally** — the entry now carries `kind: 'ceiling'` and the filter reads the kind.
+2. **The test that should have caught it passed straight through.** `src/lib/strength-focus-copy.shape.test.ts`'s FIXTURE contained the phrase the real copy had lost, so it exercised a string the product no longer emitted.
 
-1. **NOTHING FROM TWO SESSIONS HAS BEEN SEEN ON A DEVICE.** 133 tests pass. A green suite proves the
-   code is right, not that it is running.
-2. **The three-day block is fixture-verified only.** Deploy, generate one, look at week 3.
-3. **`ios/debug.xcconfig` has been modified since before this session and is still uncommitted.** Not
-   touched deliberately — find out whether it matters.
-
-### ⛔ THREE THINGS RECORDED AS OPEN, AND ONE OF THEM MOVES WEIGHT
-
-- **Q-222 — our stall reset lands ~72% of 1RM where Wendler's lands ~90%.** The working number starts at
-  **85%** (the concurrent buffer) and a reset cuts a further 10%. **The buffer bought that safety once
-  and the reset charges for it again.** ⛔ Do not patch it: it changes prescribed weight. It needs a
-  `D-NNN` with a position on whether the two are answering the same question twice.
-- **Q-223 — the earned advance only fires on a REBUILD.** A first block authors twelve weeks with the
-  bar climbing on the calendar. The machinery is built and correct; what is missing is a trigger. The
-  partner doc discloses this — **if that disclosure is ever removed, the doc is lying again.**
-- **Q-224 — the run half of the deposit claim has no source.** The meta-analysis is cyclists only, and
-  the primary athlete on this path is a runner. ⛔ Do not cite Berryman or Rønnestad from memory; that
-  is precisely how 262 participants ended up graded "STRONG" with no author.
+⛔ **THE PATTERN: A CHECK KEYED ON WORDING IS NOT A CHECK.** And ⛔ **RUN EVERY `*.test.ts` UNDER `src` AND `supabase`, not just the subsystem you touched** — I pushed and deployed on a green subsystem suite while `src/lib` was red.
 
 ### ⛔ FOUR THRESHOLDS ARE OURS AND MUST KEEP SAYING SO
 
-**25 mi/wk** (self-regulation) · **8 reps** (estimate trusted) · **5 reps** (deadlift) · **12 weeks**.
-No literature names any of them. The papers give directions and degradation zones; the lines are product
-decisions. ⚠️ The same is true of `LONG_RIDE_SHARE = 1.5` and every D-325 ceiling.
+**25 mi/wk** (self-regulation) · **8 reps** (estimate trusted) · **5 reps** (deadlift) · **12 weeks**. No literature names any of them. Same for `LONG_RIDE_SHARE = 1.5` and every D-325 ceiling.
 
-### ⛔ ONE TICKET STILL LIVE IN PRODUCTION — Q-208, unchanged for three days
-
-**`plans.status = 'active'` is used as an IDENTITY filter on historical reads.** A workout attached to
-an older plan reads as unattached. Ahead of anything new.
+⚠️ **AND ONE RULE I HAD BACKWARDS, VERIFIED AGAINST THE BOOK:** *"increase squat and deadlift no more than 10 lb"* is a **CEILING, not a target.** Asked directly whether to use 5 or 10, Wendler answered *"the smaller the jumps you can make, the better… you can even make 2.5 pound jumps."* Our 6% cap stepping a light bar +5 is **inside his rule and in the direction he recommends** — do not "fix" it to +10. The book PDF is at `/Users/michaelambp/Downloads/531_2nd_Edition_Hard_Copy.pdf`; **no copy is in the repo**, so ask him for it before claiming the book says anything.
 
 ### STILL OPEN, NOT TOUCHED
 
-- **`DECISIONS-LOG.md` is past 320KB** — the ~150KB cap in `CLAUDE.md`. Move closed/superseded entries to
-  its `-ARCHIVE.md`. It was 812KB once and had to be split by hand; this is that again, and it is now
-  the third session in a row this line has been carried forward.
-- **The AAA acceptance check has never run on a device.** Not met by a markdown export.
-- **Q-217** (the ceiling paragraph says "usually out of date", untrue for a never-tested lift) ·
-  **Q-218** (equipment substitution is path-dependent) · **Q-219** (`five_by_five` is factually wrong) ·
-  **Q-214** (main-lift region adjacency never priced) · **Q-221** (2 run days, declined).
+- **Q-222** — our stall reset lands ~72% of 1RM where Wendler's lands ~90% (85% start, then a further 10% cut). The buffer is charged twice. ⛔ Do not patch: it moves prescribed weight. Needs a `D-NNN`.
+- **Q-224** — the run half of the deposit claim has no source, and the primary athlete here is a runner. ⛔ Do not cite Berryman or Rønnestad from memory.
+- **Q-225** — a four-day athlete should be able to condense to three mid-block. Belongs on the rematerializer, **not** as a lifting-days control, or it becomes the fourth plan-mutation path.
+- **Q-217** · **Q-218** · **Q-219** · **Q-214** · **Q-221**.
+- **The AAA acceptance check** has never run on a device. Not met by a markdown export.
+- **The Petré 2021 citation corrections** — five sites, two athlete-facing, two on the RACE path.
 - **The ride placer picks by array order, with no leg awareness.**
-- **The citation corrections in the punch list are still open** — Petré 2021 at five sites, two of them
-  athlete-facing and two on the RACE path.
+- ⚠️ **`DECISIONS-LOG.md` is past 330KB** against the ~150KB cap. **Fourth session carrying this line.** It was 812KB once and had to be split by hand.
+- ⚠️ **`ios/debug.xcconfig` has been uncommitted since before 2026-07-29.** Left alone deliberately, three sessions running. Decide whether it matters.
+
+### ⛔ HOW TO TALK TO MICHAEL — read this before your first reply
+
+He said it six times in one session: *"in simple terms"*, *"in english?"*, *"you talk way too much"*, and finally **"when will you realize i dont know what anything means."**
+
+⛔ **He does not know what ANY engineering word means, and he should not have to.** Not "fixture", "regex", "dedup", "producer", "coupling", "byte-identical". A sentence with one in it is a sentence he skips. **Describe what he would SEE**, never what the code does. After a fix, three short lines: what was wrong, what it does now, what he needs to do. The reasoning goes in the commit message, where it is going anyway.
 
 ### ⛔ THE LAW, AS IT STANDS — carried from 2026-07-27, still live
 
-**This section has now survived two banner rolls. Read it before touching scheduling, workload, or
-Wendler loading.**
+**This section has survived three banner rolls. Read it before touching scheduling, workload, or Wendler loading.**
 
 | what | where | why it matters to you |
 |---|---|---|
@@ -137,8 +115,9 @@ Wendler loading.**
 | **`upper_body_strength × long_ride` and `× long_run` → ✓** | same | The matrix forbade the exact stack the engine mandates. Bench on a long day is legal, and it is the free pair |
 | **The adjacency table exists** | same — `ADJACENCY_HOURS` | Replaces `LEG_QUALITY_KINDS`/`LEG_LONG_KINDS`, both **deleted**. Symmetric, asserted at module load. ⛔ Do not add a list beside it |
 | **The long-run workload factor never matched** | `_shared/workload.ts` | `longrun_easypace: 0.70` matched no real token, so **every long run was priced as an easy run**. Fixed at the matching. Unmatched tokens now warn |
-| **Wendler: TM ≤ 90% of 1RM, and the step TRUNCATES** | `loading/wendler-531.ts` | The 6% increment cap STANDS and is derived. The cap is the ASYMPTOTE, not the rail. The constraint sits on the RATIO. ⚠️ **And the START is 85%, not 90% — see Q-222** |
-| ⛔ **NEW: one lift per day is still enforced** | `week-solver.ts:527` | D-332 did NOT relax it. Three-day weeks pass ONE paired upper slot. **Do not "fix" the solver to allow two lifts on a day** |
+| **Wendler: TM ≤ 90% of 1RM, and the step TRUNCATES** | `loading/wendler-531.ts` | The 6% increment cap STANDS and is derived. The cap is the ASYMPTOTE, not the rail. ⚠️ The START is 85%, not 90% — see Q-222 |
+| **One lift per day is still enforced** | `week-solver.ts:527` | D-332 did NOT relax it. Three-day weeks pass ONE paired upper slot. **Do not "fix" the solver to allow two lifts on a day** |
+| ⛔ **NEW: the ceiling compromise is `kind: 'ceiling'`** | `strength-primary-plan.ts` → `strength-focus-copy.ts` | The plan description drops it because the ceiling paragraph already says it. **Filter on the kind, never on the text** — a prose filter is how it double-printed |
 
 ## ⛔ READ `ARCH-strength-spine.md` §0 BEFORE ANY ARCHITECTURE CALL — it was rewritten last night
 
