@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Bike, Waves, Dumbbell } from 'lucide-react';
+import { Activity, Bike, Waves, Dumbbell, Info } from 'lucide-react';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
@@ -9,7 +9,7 @@ import { getDisciplineColor } from '@/lib/context-utils';
 // records cannot disagree. A REFERENCE, never a cap (D-222's ceiling was retired on purpose).
 import { maintenanceDoseFor, startLightMiles, volumeStateForMiles, volumeStateLine, volumeStateLineVsUsual, volumeStateVsUsual } from '@/lib/maintenance-volume-band';
 // ONE source for the block's own words — the composer writes the same sentences onto the plan.
-import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS } from '@/lib/strength-focus-copy';
+import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS, HARD_DAY_WHY } from '@/lib/strength-focus-copy';
 // ONE menu, shared with the composer that authors the block (`assistance-menu.ts`). A name this
 // picker offers that the composer does not recognise would fall back to the default — the athlete
 // would pick something and silently get something else.
@@ -177,7 +177,16 @@ type NonRaceState = {
    *  Was a single `anchorDiscipline` + `anchorDay`, which forced a runner who also rides to pick one
    *  and lose the other. `preferred_days` has always had room for both (`quality_run`, `quality_bike`),
    *  so the single-anchor shape was the narrower thing, not the safer one. */
-  qualityDays: Partial<Record<'run' | 'bike', DayName>>;
+  // ⛔ THE DAY MAY BE EMPTY WHILE THE DISCIPLINE IS CHOSEN (2026-07-29). Tapping Run or Ride used to
+  // seed 'tuesday' so the select had a value — an arbitrary day, not a derived one: the doctrine
+  // steers the DISCIPLINE (bike over run, on tissue cost) and has never had a view on which day.
+  // Michael: *"leave it empty unless there is an ideal."* Nothing derives an ideal — the solver takes
+  // the hard day as a fixed anchor and places lifting around it — so empty it is.
+  // ⚠️ PRESENCE, NOT TRUTHINESS, is now what "this discipline is picked" means. Read with
+  // `d in qualityDays`; `!!qualityDays[d]` is false for a chosen discipline awaiting its day.
+  qualityDays: Partial<Record<'run' | 'bike', DayName | ''>>;
+  /** 4 (Wendler's own shape) or 3 (the two upper lifts share a day; the test week still runs four). */
+  liftingDays: 3 | 4;
   /** What they NORMALLY run, in their display unit. The band is a fraction of THIS — an absolute
    *  band tells a 40-mile runner and a 10-mile runner the same thing, and it is only true for one. */
   usualMiles: number | '';
@@ -223,6 +232,12 @@ type StepKey =
   // fits. Its own card, after the disciplines (the options are whatever they kept) and before swim
   // (which is booked, not coached).
   | 'hardday'
+  // ⛔ THE BLOCK SHAPE — four lifting days or three (2026-07-29). Its own card because it is not a
+  // scheduling preference, it is which programme the athlete is running: at four, every lift is
+  // trained first and every top set is a clean measurement; at three, two lifts share a day and one
+  // of them is read under fatigue on the weeks that are not the test week. That trade has to be
+  // stated, not buried in a stepper. Michael: *"its its own card and it explains the structure."*
+  | 'lifting'
   | 'confirm';
 
 // ⛔ ONE DISCIPLINE, ONE SCREEN. Michael, 2026-07-25: *"everything should have its own card, no
@@ -242,6 +257,9 @@ function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean): StepKey[]
   // ⛔ NOT ON THE STRENGTH PATH. Lifting is four days fixed by the protocol and the endurance days
   // are typed per discipline, so a total would only contradict both. *"how many days is redundant."*
   if (!isStrengthFocus) out.push('days');
+  // ⛔ THE SHAPE BEFORE THE SCHEDULE. How many days the lifting occupies decides the week the
+  // scheduler then draws, so asking it after would mean drawing a week and immediately redrawing it.
+  if (strengthDevelop) out.push('lifting');
   if (strengthDevelop) out.push('accessory');
   // ⛔ ONE SCHEDULER ON THE STRENGTH PATH. Every other goal keeps the per-discipline cards, because
   // there the endurance IS the plan and there is no lifting frequency to fit it around.
@@ -345,6 +363,11 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
             weekly_hours_available: hoursForTier(state.commitment),
           }),
           strength_frequency: state.posture?.strength === 'develop' ? 4 : 2, // Get Strong = the 4-day develop arc; don't offer 2×/week the engine overrides
+          // ⛔ THE BLOCK SHAPE, and it is a SEPARATE FIELD from `strength_frequency` above on purpose
+          // (2026-07-29). That one is the retired D-323 dial and branches downstream still clamp it
+          // to 2; this one says how many DAYS the four lifts occupy. Sent only when the athlete picks
+          // 3, so an untouched flow is byte-identical to yesterday's.
+          ...(state.liftingDays === 3 ? { lifting_days: 3 } : {}),
           per_discipline_posture: state.posture,
           preferred_days: buildPreferredDays(state.posture, {
             longRunDay: state.longRunDay, longRideDay: state.longRideDay,
@@ -423,9 +446,33 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   const capMiles = Math.round(180 / paceMinPerMile);
   const capDisplay = unit === 'km' ? Math.round(capMiles * 1.609344) : capMiles; // ceiling in the athlete's unit
 
+  // ⛔ THE CARD KEEPS ONE LINE; THE RECEIPT LIVES BEHIND A TAP. Default closed — the week above is
+  // what the athlete came to see, and an expanded science block would push it off the fold, which is
+  // the trade this card has lost twice already.
+  const [showHardDayWhy, setShowHardDayWhy] = useState(false);
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: 'sunday', longRideDay: 'thursday', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 2, startDate: planWeekStartISO(),
+    // ⛔ NO PREFILLED DAYS (2026-07-29). These seeded 'sunday' / 'thursday' so the week drew on
+    // arrival instead of an empty box. Michael: *"no prefill let them chose."* A long run is
+    // conditional — an athlete may not have one — and a seeded day answers that question for them
+    // and then shows them a week built on an answer they never gave. Thursday was never even a
+    // convention; it came out of a sweep. Empty is the honest state, and the card already has copy
+    // for it ("Pick your days and the week appears here").
+    // ⛔ AND THE COUNTS ARE UNSET TOO (2026-07-29, second pass). Michael, on the screenshot after the
+    // day fields went empty: *"still preselcted"* — Runs sat on 3 and Rides on 2, highlighted, which
+    // is the same defect one control to the left. A pill that arrives lit is an answer, not a
+    // question, and an athlete who agrees with it has told the engine nothing.
+    //
+    // ⚠️ 0 IS ALREADY THE LEGAL UNSET HERE, which is why this needs no type change: the payload
+    // builder at :359 sends `run_days` only when `runDays >= 2`, and :370 sends `ride_days` only
+    // when `rideDays > 0`. Never picking one omits the field and the engine keeps its own default,
+    // rather than being handed a number the athlete never chose.
+    // ⚠️ 4 IS SEEDED AND THAT IS DELIBERATE, against the no-prefill rule one field up. This is not a
+    // blank question — it is the block's default shape, and 4 is what every block built before today
+    // ran. An unlit pair here would read as "the app has no opinion", and the app does: four days is
+    // Wendler's own, and it is the only shape where every lift is trained first and every top set is
+    // a clean measurement. The card states that rather than hiding it behind an empty control.
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -491,6 +538,49 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   // as no answer.
   const isStrengthFocus = state.goal === 'get_stronger';
   const posturePresent = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
+
+  /**
+   * ⛔ THE SCHEDULER GATE (2026-07-29). Michael: *"all that needs to be gated."*
+   *
+   * Nothing on this card is prefilled any more, so Continue had to stop being unconditional — an
+   * ungated card plus empty controls means an athlete walks past having answered nothing, and the
+   * engine builds twelve weeks on defaults they never saw. The prefill used to hide that; removing it
+   * exposed it.
+   *
+   * ⛔ AND IT GATES THE COUNTS ONLY. A first pass also required a long day per kept discipline;
+   * Michael struck it — *"technically they dont need long days or hard days."* He is right, and the
+   * engine agrees: `week-solver.ts` takes long runs, long rides and hard days as OPTIONAL anchors,
+   * and a week with none of them solves fine. Requiring a pin the solver does not require would
+   * invent a wall — the §5.2b failure in reverse, refusing a week that fits.
+   *
+   * ⚠️ SO WHAT IS LEFT IS THE HALF-ANSWER, which is the only genuinely incoherent state:
+   * - A kept discipline with no session count. Nothing downstream can read "runs, an unstated
+   *   number of times".
+   * - A hard-day discipline toggled on with no day. Not "a hard day is required" — declining one
+   *   entirely stays legal (`ae7e061c`: None is a real answer with a stated cost). It is that
+   *   starting the answer and not finishing it cannot be forwarded.
+   * - ⛔ AND THE LONG DAY COMES BACK CONDITIONALLY. Michael: *"unless their hour and mile count
+   *   calls for them."* The engine's own split decides this, not a preference:
+   *   `distributeRunMiles` weights the week 1.4/1.0 at two runs and 1.5/1.0/0.85 at three, so the
+   *   moment a volume is typed across two or more sessions, ONE OF THEM IS THE LONG ONE whether the
+   *   athlete named it or not. Leaving it blank then does not mean "no long run" — it means the
+   *   engine picks the day for the longest session of their week. At one session, or with no volume
+   *   typed, there is no split and nothing to ask about.
+   *
+   * ⚠️ THE COUNT AND THE VOLUME ARE BOTH REQUIRED FOR THAT TEST, and only the count is asked on
+   * this card — the volume comes from the discipline screens before it. So an athlete who skipped
+   * those is not blocked here for a number they were never shown.
+   */
+  const longDayCalledFor = (d: 'run' | 'bike') => (d === 'run'
+    ? state.runDays >= 2 && Number(state.targetMiles) > 0
+    : state.rideDays >= 2 && Number(state.rideHours) > 0);
+
+  const scheduleCanContinue = (['run', 'bike'] as const).every((d) => {
+    if (!posturePresent(d)) return true;
+    if ((d === 'run' ? state.runDays : state.rideDays) <= 0) return false;
+    if (!longDayCalledFor(d)) return true;
+    return !!(d === 'run' ? state.longRunDay : state.longRideDay);
+  }) && (['run', 'bike'] as const).every((d) => !(d in state.qualityDays) || !!state.qualityDays[d]);
   // ⛔ ONE HARD AEROBIC DAY — D-327, enforced by the SHAPE of the `hardday` card (one slot).
   //
   // History, so nobody re-derives it: this was TWO hard days, priced-not-refused, with a one-shot
@@ -842,6 +932,88 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
         </StepLayout>
       )}
 
+      {/* ⛔ THE BLOCK SHAPE — and the card's job is to state a TRADE, not to offer a preference.
+          Michael: *"its its own card and it explains the structure."*
+
+          ── What each line is sourced to ────────────────────────────────────────────────────────
+          - *"Four days is Wendler's own"* — his standard template is one main lift per day.
+          - *"Three days still builds strength"* — the volume-equated meta-analysis (Grgic et al.,
+            Sports Medicine Open) found NO significant effect of training frequency on strength gain;
+            one day a week and three-plus produce similar results when weekly volume matches. So the
+            three-day option is not a lesser programme, and the card must not imply it is.
+          - *"the second lift gives up load and reps"* — exercise-order effects: the movement done
+            first is the one that adapts most, and later lifts lose weight and reps to fatigue.
+          - *"week 3 splits them"* — muscular fatigue status is a named standardisation variable in
+            the 1RM-testing literature, and %1RM prescriptions rest on testing done in a fatigue-free
+            state. Test-retest reliability is good-to-excellent (ICC ≥ 0.90) CONDITIONAL on
+            standardisation — which is why every test week is four days rather than some of them.
+
+          ⚠️ WHAT IS OURS AND SAYS SO: nobody has trialled "train three, test on a fourth." The parts
+          are measured; the join is reasoned, and it is a scheduling choice made to protect a
+          measurement rather than a claim about the body. Wendler does not write it either — at three
+          days HE rotates the four lifts and lets the cycle run past four weeks; at two days he stacks
+          two lifts per session and keeps the calendar. This is his two-day trade one day up.
+
+          ⚠️ FOUR IS PRESELECTED, against the no-prefill rule the day fields now follow. That was a
+          deliberate exception: this is not a blank question, it is the block's default shape and the
+          one every previous block ran. See the `liftingDays: 4` seed. */}
+      {currentStep === 'lifting' && (
+        <StepLayout
+          step={stepNo('lifting')} totalSteps={steps.length} title="Lifting days"
+          subtitle="Four lifts either way. This is how many days they sit on."
+          onBack={back} onContinue={next} canContinue
+        >
+          <div className="space-y-3">
+            <button
+              type="button" onClick={() => setState((s) => ({ ...s, liftingDays: 4 }))}
+              className={optBtn(state.liftingDays === 4)}
+            >
+              <span className="block text-white/90 text-sm">Four days</span>
+              <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
+                One lift a day. Every lift is trained first, so every top set is a clean read of what
+                that lift can do. This is Wendler's own shape.
+              </span>
+            </button>
+            <button
+              type="button" onClick={() => setState((s) => ({ ...s, liftingDays: 3 }))}
+              className={optBtn(state.liftingDays === 3)}
+            >
+              <span className="block text-white/90 text-sm">Three days</span>
+              <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
+                Bench and press share a day. Same four lifts, same weekly work — with volume matched,
+                strength gain does not track how many days it is spread over.
+              </span>
+            </button>
+
+            {state.liftingDays === 3 && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-2.5">
+                <div>
+                  <p className="text-white/70 text-xs font-medium mb-1">Most weeks</p>
+                  <p className="text-white/50 text-xs leading-relaxed">
+                    Squat · Deadlift · Bench + Press
+                  </p>
+                </div>
+                <div>
+                  <p className="text-white/70 text-xs font-medium mb-1">Week 3 of each cycle</p>
+                  <p className="text-white/50 text-xs leading-relaxed">
+                    Squat · Deadlift · Bench · Press — four days
+                  </p>
+                </div>
+                <p className="text-white/45 text-xs leading-snug">
+                  Bench goes first on the shared day. The second lift of a session is done fatigued,
+                  so it gives up load and reps. Week 3 is the set that sets the next cycle's weights,
+                  so nothing shares a day that week and every lift is read rested.
+                </p>
+                <p className="text-white/35 text-xs leading-snug">
+                  The three-day week is Wendler's. Testing on a fourth day is ours — it comes from how
+                  strength tests are standardised, not from the book.
+                </p>
+              </div>
+            )}
+          </div>
+        </StepLayout>
+      )}
+
       {/* THE ACCESSORY SLOTS — and the screen has to say why they exist. Endurance pounds the body in
           one plane and leaves the same imbalances behind it; the main lifts do not saturate the joints
           that takes. So these are armour, and they are the one part of the block the athlete DIRECTS:
@@ -997,10 +1169,15 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     a way "hr/wk" never was.
                     ⚠️ Hours never miles is D-323 §6 — the app learns ride HR and FTP but no ride
                     speed, so bike miles cannot become a session length without guessing. */}
+                {/* ⚠️ THE SPLIT NEEDS A DIVISOR THE ATHLETE ACTUALLY GAVE (2026-07-29). Ride days now
+                    start at 0, and this line divided by `Math.max(1, rideDays)` — so before a count
+                    was picked it read "About 20h a ride across 0 rides", which is a wrong number and
+                    a broken sentence in one go. It waits for the count now; the unit-slip warning
+                    this line exists for still fires the moment both are in. */}
                 <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
-                  {Number(state.rideHours) > 0
+                  {Number(state.rideHours) > 0 && state.rideDays > 0
                     ? (() => {
-                        const per = Number(state.rideHours) / Math.max(1, state.rideDays);
+                        const per = Number(state.rideHours) / state.rideDays;
                         const h = Math.floor(per); const m = Math.round((per - h) * 60);
                         const len = h > 0 ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`;
                         return `About ${len} a ride across ${state.rideDays} ride${state.rideDays === 1 ? '' : 's'}.`;
@@ -1020,7 +1197,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
         <StepLayout
           step={stepNo('schedule')} totalSteps={steps.length} title="Your week"
           subtitle="Your days. The lifting is placed around them."
-          onBack={back} onContinue={next} canContinue
+          onBack={back} onContinue={next} canContinue={scheduleCanContinue}
         >
           <div className="space-y-4">
             {/* ⛔ THE WEEK FIRST, ABOVE THE CONTROLS. It is the answer, and it has to stay on screen
@@ -1048,32 +1225,97 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className="text-white/85 text-sm whitespace-nowrap">Hard day</span>
+                {/* ⚠️ `d in qualityDays`, NOT `!!qualityDays[d]` — the discipline is chosen the moment
+                    it is tapped, and its day arrives after. Truthiness would unlight the button the
+                    athlete just pressed. Tapping again clears the discipline entirely. */}
                 {(['run', 'bike'] as const).filter((d) => posturePresent(d)).map((d) => {
-                  const on = !!state.qualityDays[d];
+                  const on = d in state.qualityDays;
                   return (
                     <button
                       key={d} type="button"
-                      onClick={() => setState((st) => ({ ...st, qualityDays: { [d]: (st.qualityDays[d] as DayName) || 'tuesday' } }))}
+                      onClick={() => setState((st) => {
+                        const next = { ...st.qualityDays };
+                        if (d in next) delete next[d]; else next[d] = '';
+                        return { ...st, qualityDays: next };
+                      })}
                       className={`px-3 py-1.5 rounded-lg text-sm ${on ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
                     >{d === 'run' ? 'Run' : 'Ride'}</button>
                   );
                 })}
-                {(['run', 'bike'] as const).filter((d) => state.qualityDays[d]).map((d) => (
+                {(['run', 'bike'] as const).filter((d) => d in state.qualityDays).map((d) => (
                   <select
                     key={d}
-                    value={(state.qualityDays[d] as DayName) ?? ''}
+                    value={state.qualityDays[d] ?? ''}
                     onChange={(e) => setState((st) => ({ ...st, qualityDays: { [d]: e.target.value as DayName } }))}
                     className="flex-1 min-w-0 py-1.5 px-2 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
                     style={{ fontSize: '16px' }}
                   >
+                    <option value="" className="bg-neutral-900">Pick a day</option>
                     {DAYS.map((dd) => <option key={dd} value={dd} className="bg-neutral-900">{DAY_SHORT[dd]}</option>)}
                   </select>
                 ))}
               </div>
-              {/* ⛔ ONE LINE. Hickson: intensity is the protective variable, so this is the session
-                  that never yields — but the card is competing with the week above it for the fold,
-                  and the week is the thing they came to see. */}
-              <p className="text-white/45 text-xs leading-snug">Never yields — intensity holds your aerobic fitness.</p>
+              {/* ⛔ IT HAS TO SAY WHAT THE SESSION IS FOR (2026-07-29). "Never yields — intensity
+                  holds your aerobic fitness" stated the RULE and not the PURPOSE, so an athlete read
+                  a protected slot with no idea what it buys or why they would want one. Michael:
+                  *"hard run/ride should ad its purpose: maintain vo2 max not speed or if you have a
+                  run or ride club."*
+
+                  ⛔ THE FIRST DRAFT SAID "not speed" AND IT WAS NOT SOURCED. That clause borrowed
+                  Schumann's −0.28 explosive-strength effect, which is a claim about the WHOLE BLOCK
+                  ("this block builds strength, not explosive speed", punch list / DOCTRINE §5.0.3)
+                  — not about this session. Attaching a real citation to the wrong sentence is
+                  exactly what D-328 and D-329 were both corrections for. Removed.
+
+                  ✅ WHAT IS ACTUALLY SOURCED — `DOCTRINE-aerobic-maintenance.md` §3 and §5.0:
+                  - It HOLDS. Hickson's maintenance trilogy (1981 frequency / 1982 duration / 1985
+                    intensity) cut frequency 6→2 d/wk and duration 40→13 min with VO2max held for 15
+                    weeks; only the intensity cut lost it. Intensity is the protective variable.
+                  - It does NOT build. §5.0, sourced 2026-07-26: one interval session a week is
+                    BELOW the improvement threshold for trained athletes — 2–3/wk is the range where
+                    gains happen, while roughly one every 1–2 weeks preserves. *"The block does not
+                    build the engine. It holds it. Any copy promising aerobic improvement during a
+                    strength-led block is unsupported."* So "holds, does not build" is the honest
+                    pair, and it is the sentence the doctrine asks for by name.
+
+                  ⚠️ "top-end aerobic fitness", not "VO2 max" — COPY-VOICE rule 9 bans the metric
+                  name the same way it bans "aerobic base" and "Z2".
+
+                  ⚠️ NOT SAID, DELIBERATELY: that a hard RIDE costs less than a hard RUN. §5's
+                  modality split is Wilson 2012, and Schumann 2022 (43 studies) found no modality
+                  moderation at all — the doctrine's standing instruction is do not build a new
+                  claim on it. The Run/Ride buttons stay neutral.
+
+                  ✅ THE CITATIONS ARE BEHIND THE (i), NOT ON THE CARD. Michael: *"maybe thats an (i)
+                  with that and the citations?"* The card carries the claim in one line and the
+                  receipt sits one tap away in `HARD_DAY_WHY` — which is where the Hickson years, the
+                  one-session-a-week threshold, and the reasons two other claims were CUT are all
+                  written down. The pattern is the one `TrainingBaselines.tsx:1581` already uses. */}
+              <div className="flex items-start gap-1.5">
+                <p className="text-white/45 text-xs leading-snug">
+                  One hard session a week holds top-end aerobic fitness. It does not build it. A run
+                  or ride club goes here.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowHardDayWhy((v) => !v)}
+                  aria-expanded={showHardDayWhy}
+                  aria-label="What the hard day is for"
+                  className="shrink-0 mt-px text-white/40 hover:text-white/70 transition-colors"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {showHardDayWhy && (
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5 space-y-2">
+                  {HARD_DAY_WHY.map((s) => (
+                    <div key={s.heading}>
+                      <p className="text-white/70 text-xs font-medium">{s.heading}</p>
+                      <p className="text-white/45 text-xs leading-snug">{s.body}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* ── runs ─────────────────────────────────────────────────────── */}
@@ -1279,11 +1521,14 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   >{n}</button>
                 ))}
               </div>
+              {/* ⚠️ SAME DIVISOR GUARD as the scheduler card. `Math.max(1, rideDays)` quietly divided
+                  by one before a count was picked, so 20 hours read as "About 20h a ride" — the exact
+                  unit-slip this line was written to CATCH, printed as though it were the answer. */}
               <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
-                {Number(state.rideHours) > 0
+                {Number(state.rideHours) > 0 && state.rideDays > 0
                   ? `We spread your hours across these — the long ride takes the bigger share. About ${
                       (() => {
-                        const per = Number(state.rideHours) / Math.max(1, state.rideDays);
+                        const per = Number(state.rideHours) / state.rideDays;
                         const h = Math.floor(per); const m = Math.round((per - h) * 60);
                         return h > 0 ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`;
                       })()
@@ -1310,28 +1555,33 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           (Hickson): easy volume alone does not hold the engine. */}
       {currentStep === 'hardday' && (() => {
         const kept = (['bike', 'run'] as const).filter((d) => posturePresent(d));
-        const chosen = (['run', 'bike'] as const).find((d) => state.qualityDays[d]) ?? null;
+        // ⚠️ PRESENCE, not truthiness — a discipline is chosen before its day is. See the
+        // `qualityDays` type note.
+        const chosen = (['run', 'bike'] as const).find((d) => d in state.qualityDays) ?? null;
         // Bike first in the list AND pre-selected — the doctrine's recommendation, shown as the default.
         const active: 'run' | 'bike' | null = chosen ?? null;
-        const pick = (d: 'run' | 'bike' | null, day?: DayName) => setState((s) => ({
+        const pick = (d: 'run' | 'bike' | null, day?: DayName | '') => setState((s) => ({
           ...s,
           // ⛔ ONE ENTRY, EVER. The map shape is kept because `buildPreferredDays` and everything
           // downstream reads it, but only one discipline can hold a day now — the card has one slot,
           // so there is no second to refuse.
-          qualityDays: d && day ? ({ [d]: day } as Partial<Record<'run' | 'bike', DayName>>) : {},
+          qualityDays: d ? ({ [d]: day ?? '' } as Partial<Record<'run' | 'bike', DayName | ''>>) : {},
         }));
         return (
           <StepLayout
             step={stepNo('hardday')} totalSteps={steps.length} title="Your one hard day"
             subtitle="One hard aerobic session a week. Everything else stays easy — that is what keeps the lifting intact."
-            onBack={back} onContinue={next} canContinue
+            // ⚠️ "None" passes; a discipline with no day does not. Since the tap stopped seeding
+            // 'tuesday' (see the `qualityDays` type note), a half-answer is now reachable and this is
+            // what catches it. Declining the hard day entirely stays legal.
+            onBack={back} onContinue={next} canContinue={!active || !!state.qualityDays[active]}
           >
             <div className="space-y-5">
               <div className="space-y-2">
                 {kept.map((d) => (
                   <button
                     key={d} type="button"
-                    onClick={() => pick(d, (state.qualityDays[d] as DayName) || 'tuesday')}
+                    onClick={() => pick(d, state.qualityDays[d] ?? '')}
                     className={`w-full text-left px-4 py-3 rounded-xl border ${
                       active === d ? 'border-teal-400/70 bg-teal-500/10' : 'border-white/12 bg-white/[0.04]'
                     }`}
