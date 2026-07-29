@@ -2133,3 +2133,32 @@ Michael, same day: *"thats why im down streaming it — we will ad a rematerialz
 ⚠️ **THE REMATERIALIZER WAS CANCELLED MID-SESSION ON 2026-07-29 AND IS DEFERRED, NOT DEAD.** Michael: *"lets let go of materilizer... i would rather get all the juggle math figured out and dieals all the acceroy dialed and make sure this plan is 100% sound for 4 out of 5 hybrid coaches."* That work is now largely done (D-332 through D-337), so the reason for the deferral has mostly been spent.
 
 ⛔ **BUILDING THIS AS A LIFTING-DAYS CONTROL WOULD BE THE FOURTH PLAN-MUTATION PATH IN THIS CODEBASE.** There are already three placement authorities (`ARCH-strength-spine.md` §0.6) and four plan generators, both from exactly this move — solving one instance of a general problem in its own file. Wait for the general surface.
+
+---
+
+## Q-226 — The rematerializer has TWO customers, and one of them closes Q-223 (2026-07-29, Michael's scoping — NOT built)
+
+Michael: *"so the rematerializer has two customers: 1rm change during plan and state sceen for any adjustments."*
+
+| customer | trigger | what it re-authors |
+|---|---|---|
+| **1. A max changes mid-plan** | the athlete tests, or a week-3 AMRAP is logged | the remaining weeks' working numbers |
+| **2. The State screen** | the athlete asks | loads, endurance volume, lifting days (Q-225) |
+
+### ⛔ CUSTOMER 1 IS THE MISSING TRIGGER IN Q-223, AND THAT MAKES IT THE LOAD-BEARING ONE
+
+Q-223 records that the earned advance **only fires on a rebuild**: a fresh block passes `unknownMeans: 'advance'` and authors twelve weeks with the bar climbing on the calendar. The verdict machinery is built and correct — `computeCycleVerdicts` → `verdictFrom95Set` → `applyVerdict` (D-326 layer 2, D-335). **What is missing is something that runs it mid-block. That thing is customer 1.**
+
+So this is not two features. **It is one mechanism whose first customer turns a disclosed limitation into a closed loop** — the difference between *"week 3 is the measurement"* being true and being a sentence the partner doc has to hedge.
+
+⚠️ **AND THE 1RM SIDE IS ALREADY HALF-WIRED.** `adapt-plan action=auto` fires on every ingest, already auto-progresses strength loads off the `exercise_log` e1RM trend, writes `plan_adjustments`, and invokes `materialize-plan`. ⛔ **Trace that before designing anything** — the risk here is building a second thing next to it rather than feeding it. It also **skips the Arc fatigue/taper/adherence gate** that the `suggest` path applies, and **the athlete is never asked**, both of which matter more once a max change can move the bar.
+
+### ⛔ WHAT MUST HOLD FOR BOTH CUSTOMERS
+
+1. **Completed weeks are history.** `applies_from: today` — the past is never rewritten.
+2. **The max-test week survives** every re-author (D-332). A rematerialize that drops it breaks the only reason three days is defensible, and nothing would look broken.
+3. **All four lifts survive.** §5.2b — silent subtraction is this codebase's habit under pressure.
+4. **An untrusted estimate does not compound.** D-335: `advance_untrusted` means the next standardised read SUPERSEDES that number. A rematerializer that treats every e1RM as equal quality undoes that distinction.
+5. **The athlete is told what moved and why.** Customer 2 is an explicit request, so it may act; customer 1 fires on ingest, and D-326's whole argument is that the gauge must not grade its own homework silently.
+
+⚠️ Michael cancelled the rematerializer on 2026-07-29 to get the block sound first. That reason has now largely been spent (D-332 → D-337). **This is the next real piece of work on this subsystem.**
