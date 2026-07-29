@@ -15,6 +15,8 @@ export type WeekSession = {
   /** `strength` | `run` | `ride` | `swim` — the composer's own tag. */
   type?: string;
   duration?: number;
+  /** The session's rows. The grid shows the accessory names so the swaps are visible at intake. */
+  strength_exercises?: Array<{ name: string }>;
 };
 
 export const WEEK_DAYS = [

@@ -383,10 +383,11 @@ type PreviewSession = {
   day: string;
   name: string;
   duration?: number;
-  /** ⛔ CARRIED NOW. Without it the grid cannot tell a lift from a run, and the endurance budget —
-   *  the whole point of the card — cannot be counted. The composer has always emitted it; this
-   *  type simply dropped it on the way in. */
+  /** ⛔ CARRIED NOW. Without it the grid cannot tell a lift from a run. The composer has always
+   *  emitted it; this type simply dropped it on the way in. */
   type?: string;
+  /** The session's rows — the grid shows the accessory names so the swaps are visible at intake. */
+  strength_exercises?: Array<{ name: string }>;
 };
 type PreviewPlan = {
   sessions_by_week?: Record<string, PreviewSession[]>;
@@ -1010,7 +1011,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             </div>
 
             {/* ── the one hard day ─────────────────────────────────────────── */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className="text-white/85 text-sm whitespace-nowrap">Hard day</span>
                 {(['run', 'bike'] as const).filter((d) => posturePresent(d)).map((d) => {
@@ -1035,16 +1036,15 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   </select>
                 ))}
               </div>
-              {/* Hickson: intensity is the protective variable — cut frequency and duration and
-                  VO2max holds; cut intensity and it goes. So this is the session that never yields. */}
-              <p className="text-white/55 text-xs leading-relaxed">
-                The session that never yields — intensity is what holds your aerobic fitness.
-              </p>
+              {/* ⛔ ONE LINE. Hickson: intensity is the protective variable, so this is the session
+                  that never yields — but the card is competing with the week above it for the fold,
+                  and the week is the thing they came to see. */}
+              <p className="text-white/45 text-xs leading-snug">Never yields — intensity holds your aerobic fitness.</p>
             </div>
 
             {/* ── runs ─────────────────────────────────────────────────────── */}
             {posturePresent('run') && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <span className="text-white/85 text-sm whitespace-nowrap w-14">Runs</span>
                   {[2, 3, 4].map((n) => (
@@ -1060,7 +1060,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
             {/* ── rides ────────────────────────────────────────────────────── */}
             {state.posture?.bike === 'maintain' && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <span className="text-white/85 text-sm whitespace-nowrap w-14">Rides</span>
                   {[1, 2, 3].map((n) => (
