@@ -83,17 +83,40 @@ Deno.test('⛔ `placement_compromises` REACHES THE ATHLETE', () => {
   });
   assert(/ride hours land short/.test(withCost), `the cost was dropped:\n${withCost}`);
 
-  // ⚠️ And the ceiling entries are NOT printed twice — the header line already says it in words the
-  // athlete can act on, so the raw engine note is filtered out of the cost list.
+  // ⚠️ And the ceiling entry is NOT printed twice — the header line already says it in words the
+  // athlete can act on, so the engine's own entry is filtered out of the cost list.
+  //
+  // ⛔ THIS TEST USED TO TAG THE ENTRY `cost` AND RELY ON A PROSE FILTER, AND THAT IS EXACTLY THE BUG
+  // IT FAILED TO CATCH (2026-07-29). The filter matched `/training max|working number reaches/`. The
+  // ceiling sentence was tightened the same day, the words "working number reaches" disappeared from
+  // the real composer output, and a shipped twelve-week block printed the fact twice — while this
+  // test kept passing, because its FIXTURE still contained the phrase the real copy had lost.
+  //
+  // ⚠️ A FIXTURE THAT CARRIES THE THING UNDER TEST TESTS ITSELF. The entry now carries
+  // `kind: 'ceiling'`, which cannot be paraphrased, and this test tags it the way the composer does.
+  // The "no other entry states the ceiling fact" half of the contract is asserted at the PRODUCER —
+  // `shared/strength-system/ceiling-dedup.test.ts` — because that is where it can be guaranteed.
   const both = strengthFocusDescription({
     weeks: 12,
     leaderCycles: 0,
     anchorCycles: 3,
     anchorStartWeek: 1,
     ceilingLifts: ['Back Squat'],
-    compromises: [{ kind: 'cost', text: 'Back Squat: the working number reaches 90% of the 110 lb max on file.' }],
+    compromises: [{ kind: 'ceiling', text: 'Back Squat (110 lb) reaches 90% of the max on file and stops climbing.' }],
   });
   assertEquals(both.match(/Back Squat/g)?.length, 1, `said twice:\n${both}`);
+
+  // ⛔ AND A `cost` ENTRY IS NEVER SUPPRESSED, whatever it happens to say. The old prose filter would
+  // have swallowed this one — it contains "training max" — which is the mirror failure: a real cost
+  // silently dropped because its wording collided with a regex.
+  const costMentioningTm = strengthFocusDescription({
+    weeks: 12,
+    leaderCycles: 0,
+    anchorCycles: 3,
+    anchorStartWeek: 1,
+    compromises: [{ kind: 'cost', text: 'Your training max for Back Squat came from a lift logged eight weeks ago.' }],
+  });
+  assert(/logged eight weeks ago/.test(costMentioningTm), `a real cost was dropped:\n${costMentioningTm}`);
 
   // No compromises → no cost paragraph at all.
   const clean = strengthFocusDescription({ weeks: 12, leaderCycles: 2, anchorCycles: 1, anchorStartWeek: 9 });
