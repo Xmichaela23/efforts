@@ -1878,3 +1878,63 @@ Michael: *"Once the 1RM learns from AMRAPs, the pinning resolves itself for the 
 ⚠️ **NOT PROPOSING TO MOVE THE CAP.** The 90% ceiling with truncation is D-326's decision, one day old, and it superseded a 100%-and-hold that was wrong for stated reasons. If pinning is the expected outcome then the cap is the design, not a guard — but that is a separate call and it needs the same evidence base the cap itself got.
 
 **Related:** Ticket 2 (the 1RM-learning ticket — see the ENGINE-STATE banner), Q-211 (the client already computes the e1RM that would settle this and discards it).
+
+---
+
+## Q-218 — Equipment substitution reaches some plans and not others, and absent equipment is read as "bodyweight only" (2026-07-28, VERIFIED on a throwaway user)
+
+**Found by running a throwaway account through the real edge-function chain** — the first time materialize's output has been looked at directly rather than inferred.
+
+### The inconsistency
+
+A throwaway athlete with **resistance bands and no cable** — the exact branch at `materialize-plan:1109` — generated a Strength Focus block whose stored rows read **`Face Pull`**, with no rename and no `light-medium resistance` note. **Michael's own block, same movement, same layer, reads `Band Face Pulls`.**
+
+⛔ **THREE CANDIDATES WERE CHECKED AND TWO ARE RULED OUT:**
+
+| candidate | verdict |
+|---|---|
+| the synthetic baselines were the wrong shape | ⛔ **ruled out** — the intake writes `equipment: { strength: [...] }` (`TrainingBaselines.tsx:991`), which is exactly what the script wrote |
+| materialize never ran | ⛔ **ruled out** — `create-goal:2640` invokes `activate-plan`, which calls `materialize-plan` |
+| a per-row guard skips assistance | ⛔ **ruled out** — `substituteExerciseForEquipment` is called for every entry in `exs`, with no `load_prescribed` check |
+
+✅ **So the substitution BLOCK is not reached for these rows.** Note there are already **two** copies of the same setup (`:1878` and `:2172`) — two paths through row processing — and the strength-primary plan evidently takes a third, or an earlier return.
+
+⚠️ **THIS IS DIRECTLY UPSTREAM OF Q-216.** That ticket assumes a later stage rewrites names an earlier stage rendered. If the rewrite fires on some plans and not others, the invariant cannot be reasoned about until this is settled — *"the same movement gets renamed on one plan and not another"* is the thing to fix first.
+
+### ⚠️ AND A SECOND FINDING, §0h — absent equipment is indistinguishable from "I own nothing"
+
+`materialize-plan:1878` reads `Array.isArray(baselines?.equipment?.strength) ? … : []`, and `:1103` sets `bodyweightOnly = equipment.includes('Bodyweight only') || equipment.length === 0`.
+
+⛔ **So a MISSING equipment record and an athlete who explicitly answered "bodyweight only" produce the identical prescription.** An intake that was never completed silently downgrades every substitutable movement to its bodyweight variant — a real training decision made from the absence of a signal, with nothing saying so.
+
+*(Michael predicted this shape and guessed it would SKIP substitution; it does the opposite and substitutes toward bodyweight. Same principle, opposite direction.)*
+
+**Related:** Q-216 (the rename invariant this is upstream of), F-5 in `docs/BUILDER-SWEEP-FINDINGS.md` (band exercises with no `hasBands` flag — the reverse gap).
+
+---
+
+## Q-219 — Three names for one plan, and one of them is factually wrong (2026-07-28, Michael's, small)
+
+**Michael:** *"Is part of the problem that we are calling Strength Focus Get Stronger, the old name 5x5 the old name?"* — raised after a session burned four failed attempts guessing the payload shape.
+
+| name | where | status |
+|---|---|---|
+| **Strength Focus** | the plan header, the athlete-facing label | current |
+| **Get Stronger** / `get_stronger` | the goal id and the routing path | old display name, id still load-bearing |
+| **`strength_protocol: 'five_by_five'`** | stored on the goal | ⛔ **factually wrong — the protocol is 5/3/1** |
+
+⛔ **THE THIRD IS THE ACTUAL PROBLEM.** Michael: *"`five_by_five` isn't a stale label, it's a lie about what the plan does. Anyone reading that field — or writing a rule that branches on it — would build against a protocol that isn't there."*
+
+⛔ **DO NOT RENAME THE STORED VALUE.** Same reasoning as `AssistanceSlot` keeping `'push'` (Q-212): it is persisted on existing goals and renaming strands them. What it needs is a comment saying what it actually means and when it stopped being true, or a mapping layer that reads it correctly.
+
+✅ **The display names are worth converging.** *"Strength Focus"* and *"Get Stronger"* for one path reads as two features to anyone who sees both.
+
+### ✅ THE PAYLOAD RECIPE — keep this, it is what the four failed attempts bought
+
+| | |
+|---|---|
+| auth | ⛔ a **service-role** call is REFUSED (`requireUserIdFromRequest`). Sign in as the user and send that access token |
+| `sport` | **`'run'`**, not `'strength'` — `sportFromPosture` reads the ENDURANCE postures, and Strength Focus keeps run and bike at `maintain` |
+| `goal_type` | `'capacity'` (any discipline developing) |
+| protocol | `strength_protocol: 'five_by_five'` inside `training_prefs` |
+| shape | `{ user_id, mode: 'create', action: 'keep', plan_start_date, goal: { name, goal_type, target_weeks, sport, priority, training_prefs } }` |
