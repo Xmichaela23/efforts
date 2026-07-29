@@ -210,7 +210,11 @@ Deno.test('the athlete’s picks reach the block, and an unknown name falls back
   // the push slot balances instead — this is the exact case Michael raised, where dips on bench day
   // and dips again on press day made four pushing exposures inside 24 hours. The pull and single-leg
   // picks are untouched, because they do not clash: the rule replaces a slot, never the card.
-  assertEquals(benchOf(picked), ['Bench Press', 'Face Pull', 'Dumbbell Row', 'Hanging Leg Raise']);
+  // ⛔ AND THE PULL SLOT CROSSES THE PLANE (p86). `Dumbbell Row` is a HORIZONTAL pull and the bench
+  // press is a HORIZONTAL push — same plane. Wendler pairs bench with chin-ups and press with rows,
+  // so a bench day takes the vertical pull. The athlete's preference decides WHICH vertical pull
+  // they meet on the days that want one; it does not decide the plane.
+  assertEquals(benchOf(picked), ['Bench Press', 'Face Pull', 'Pull Up', 'Hanging Leg Raise']);
 
   // A name that is no longer on the menu must not strand an existing goal.
   const stale = composeStrengthPrimaryPlan({

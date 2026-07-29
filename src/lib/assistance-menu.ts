@@ -39,7 +39,8 @@
 // is resolved fine by Vite; both toolchains are checked (deno test + npm run build).
 // It earns the edge: the collision rule and the menu it applies to are one claim, and
 // splitting them would put the rule where the next person editing the menu cannot see it.
-import { getMovementFamily, sharesMovementFamily } from './exercise-config.ts';
+import { complementFor, getMovementFamily, sharesMovementFamily } from './exercise-config.ts';
+import { getExerciseConfig } from './exercise-config.ts';
 
 /** The three slots Wendler's assistance prescription defines. These are also the Adjust-tab holes —
  *  a glute focus loads `single_leg_core`, a pull-up focus loads `pull`. An add-on REPLACES the
@@ -239,6 +240,11 @@ export type ResolvedAssistance = {
    * quietly showing something else, which would read as the app ignoring their choice.
    */
   substitutedFor?: string;
+  /**
+   * The athlete's pick, present when it did NOT collide but sat on the wrong side of the plane —
+   * a chin-up on a press day. A different reason from `substitutedFor`, and the copy says so.
+   */
+  balancedFor?: string;
 };
 
 /**
@@ -264,9 +270,34 @@ export function resolveAssistance(
       ? menu.options.find((o) => o.name.toLowerCase() === picked.toLowerCase())!.name
       : ASSISTANCE_DEFAULTS[menu.slot];
 
-    // No main lift, or no pattern for it, or no clash → the pick stands. An unknown movement is
-    // not evidence of a clash (§0h), so it is left alone rather than replaced on a guess.
-    if (!mainFamily || !mainLiftName || !sharesMovementFamily(mainLiftName, name)) {
+    // No main lift at all → every pick stands, exactly as before this rule existed (§0h).
+    if (!mainFamily || !mainLiftName) return { slot: menu.slot, name, totalReps: menu.totalReps };
+    const collides = sharesMovementFamily(mainLiftName, name);
+
+    // ⛔ NO CLASH — BUT THE SLOT CAN STILL BE THE WRONG SIDE OF THE PLANE (2026-07-28, p86).
+    //
+    // A chin-up does not COLLIDE with an overhead press: one pulls, one pushes, nothing is shared.
+    // So the rule above leaves it alone and the athlete gets chin-ups on all four lifting days —
+    // 100 reps a week of one movement for someone whose clean max is six.
+    //
+    // Wendler pairs assistance to the day's lift and the pairing CROSSES THE PLANE (p86):
+    //   Bench (horizontal push) -> Chin-ups (vertical pull)
+    //   Press (vertical push)   -> Bent Over Rows (horizontal pull)
+    // So on a press day the pull slot should row, and on a bench day it should chin.
+    //
+    // ⚠️ ONLY WHEN THE SLOT ACTUALLY OFFERS THE COMPLEMENT. The pull slot carries both planes
+    // already (Pull Up / Chin Up are vertical; Inverted Row / Dumbbell Row are horizontal), so this
+    // needs no new movements. Where a slot has nothing in the complementary plane, the pick stands —
+    // a preference is not overridden to satisfy a rule that has no answer.
+    if (!collides) {
+      const want = complementFor(mainLiftName);
+      const picked = getExerciseConfig(name)?.pattern ?? null;
+      if (want && picked !== want) {
+        const better = menu.options.find((o) => getExerciseConfig(o.name)?.pattern === want);
+        if (better && better.name !== name) {
+          return { slot: menu.slot, name: better.name, totalReps: menu.totalReps, balancedFor: name };
+        }
+      }
       return { slot: menu.slot, name, totalReps: menu.totalReps };
     }
 
@@ -299,13 +330,21 @@ export function assistanceSubstitutionNote(
   rows: ResolvedAssistance[],
   mainLiftName: string,
 ): string | null {
-  const swapped = rows.filter((r) => r.substitutedFor);
-  if (swapped.length === 0) return null;
-  return swapped
-    .map((r) =>
-      `You picked ${r.substitutedFor} — on ${mainLiftName} days it lands on the same muscles as the ` +
-      `main lift, so this slot balances instead.`)
-    .join(' ');
+  const lines: string[] = [];
+  for (const r of rows) {
+    if (r.substitutedFor) {
+      lines.push(
+        `You picked ${r.substitutedFor} — on ${mainLiftName} days it lands on the same muscles as the ` +
+        `main lift, so this slot balances instead.`);
+    } else if (r.balancedFor) {
+      // Not a clash — a plane. p86: a vertical push is balanced by a horizontal pull, not by another
+      // vertical movement.
+      lines.push(
+        `You picked ${r.balancedFor} — ${mainLiftName} works the same plane, so this slot uses ` +
+        `${r.name} instead. Opposite direction and opposite plane is the pairing that balances it.`);
+    }
+  }
+  return lines.length ? lines.join(' ') : null;
 }
 
 /**

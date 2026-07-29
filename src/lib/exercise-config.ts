@@ -1444,6 +1444,56 @@ export function movementFamilyOfPattern(pattern: MovementPattern | null | undefi
   }
 }
 
+/**
+ * THE COMPLEMENT — what Wendler pairs a main lift with, and it CROSSES THE PLANE.
+ *
+ * ⚠️ FOUR PAIRINGS FROM THE BOOK, GENERALISED INTO A MAP — and the generalisation is MINE, not his.
+ * *5/3/1* 2nd ed. p86 gives these four directly:
+ *
+ *   Bench Press (horizontal push)  ->  Chin-ups      (vertical pull)
+ *   Press       (vertical push)    ->  Bent Over Rows (horizontal pull)
+ *   Deadlift    (hip dominant)     ->  Front Squat    (knee dominant)
+ *   Squat       (knee dominant)    ->  Good Morning   (hip dominant)
+ *
+ * So the complement is not merely "the antagonist" — it is the antagonist IN THE OTHER PLANE. A
+ * vertical push is balanced by a horizontal pull, not by another vertical movement. p46 is the
+ * principle (*"if you train your chest, train your back… try to achieve balance"*); p86 is the
+ * specific pairing that principle produces.
+ *
+ * ⚠️ This is STRONGER than `sharesMovementFamily`. A chin-up does not COLLIDE with an overhead
+ * press — one pulls, one pushes, no shared prime movers — so the collision rule leaves it alone and
+ * the athlete gets chin-ups on all four lifting days. The complement rule is what makes the pull
+ * work actually vary.
+ *
+ * `core`, `plyometric` and `calf` have no complement: nothing in the book pairs against them.
+ *
+ * ⚠️ WHAT IS INFERRED, STATED PLAINLY: he gives four pairings and I turned them into a symmetric
+ * rule — *assistance does not sit in the same plane as the main lift*. Both of his upper pairings
+ * cross the plane and both of his lower ones cross the region, so the shape is consistent across
+ * all four. But four examples is the whole evidence base, and the reverse directions
+ * (`horizontal_pull -> vertical_push`, `vertical_pull -> horizontal_push`) are extrapolation — he
+ * never shows a pull as the MAIN lift. Do not present this as "Wendler says" beyond the four rows
+ * above.
+ */
+const COMPLEMENT: Partial<Record<MovementPattern, MovementPattern>> = {
+  horizontal_push: 'vertical_pull',
+  vertical_push: 'horizontal_pull',
+  horizontal_pull: 'vertical_push',
+  vertical_pull: 'horizontal_push',
+  knee_dominant: 'hip_dominant',
+  hip_dominant: 'knee_dominant',
+};
+
+/** The pattern that balances this one, or null where the book pairs nothing against it. */
+export function complementOfPattern(p: MovementPattern | null | undefined): MovementPattern | null {
+  return p == null ? null : (COMPLEMENT[p] ?? null);
+}
+
+/** The pattern that balances this exercise, by NAME. */
+export function complementFor(exerciseName: string): MovementPattern | null {
+  return complementOfPattern(getExerciseConfig(exerciseName)?.pattern ?? null);
+}
+
 /** The collision family of an exercise by NAME. ⛔ Reads the TYPED pattern, never the description. */
 export function getMovementFamily(exerciseName: string): MovementFamily {
   return movementFamilyOfPattern(getExerciseConfig(exerciseName)?.pattern ?? null);

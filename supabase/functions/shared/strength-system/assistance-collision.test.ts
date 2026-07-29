@@ -132,3 +132,39 @@ Deno.test('the prose still names the PRESCRIBED work, and the rows still carry e
     ['Box Jump', 'Back Squat', 'Dips', 'Chin Up', 'Single Leg Hip Thrust'],
   );
 });
+
+// ── the complement rule (p86) ─────────────────────────────────────────────────
+//
+// ⛔ STRONGER THAN THE COLLISION RULE, AND IT HAD TO BE. A chin-up does not COLLIDE with an overhead
+// press — one pulls, one pushes, nothing shared — so the rule above leaves it alone and the athlete
+// gets chin-ups on every lifting day. Wendler pairs assistance to the day's lift and the pairing
+// CROSSES THE PLANE (5/3/1 2nd ed. p86): bench -> chins (vertical pull), press -> rows (horizontal).
+
+Deno.test('⛔ A CHIN-UP ON A PRESS DAY BECOMES A ROW — same slot, opposite plane', () => {
+  assertEquals(nameFor('Bench Press', 'pull'), 'Chin Up', 'horizontal push is balanced by a VERTICAL pull');
+  assertEquals(nameFor('Overhead Press', 'pull'), 'Inverted Row', 'vertical push is balanced by a HORIZONTAL pull');
+});
+
+Deno.test('the note gives the plane reason, not the collision reason', () => {
+  const note = assistanceSubstitutionNote(resolveAssistance(PICKS, 'Overhead Press'), 'Overhead Press')!;
+  assertEquals(note.includes('same plane'), true, `expected the plane wording: ${note}`);
+  assertEquals(note.includes('Chin Up'), true, 'it still names the pick');
+});
+
+Deno.test('⛔ A PREFERENCE IS NOT OVERRIDDEN WHERE THE SLOT HAS NO ANSWER', () => {
+  // Squat's complement is hip-dominant and deadlift's is knee-dominant; the PULL slot offers
+  // neither, so the athlete's pick stands rather than being swapped to satisfy a rule that has no
+  // candidate. ⚠️ Which is why chin-ups still run on the two leg days — see the volume note below.
+  assertEquals(nameFor('Back Squat', 'pull'), 'Chin Up');
+  assertEquals(nameFor('Deadlift', 'pull'), 'Chin Up');
+});
+
+Deno.test('the chin-up week drops from four days to three', () => {
+  // ⚠️ MEASURED, not assumed: 3 x 25 = 75 reps, not the 50 a bench/press split alone would give.
+  // Our model puts all three slots on every day; Wendler's p86 template gives ONE assistance per
+  // lift, so his squat day would carry a good morning rather than a chin-up. That gap is why this
+  // is 75 and not 50, and it is the next thing to close.
+  const days = ['Bench Press', 'Overhead Press', 'Back Squat', 'Deadlift'];
+  const chinDays = days.filter((m) => nameFor(m, 'pull') === 'Chin Up').length;
+  assertEquals(chinDays, 3);
+});
