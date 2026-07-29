@@ -1688,3 +1688,44 @@ stored, no live reader — that is Q-211 again, with the value wrong on top.**
 ⚠️ **AND THE OBVIOUS HYPOTHESIS ABOUT THE IGNORED EQUIPMENT FLAGS IS WRONG — CHECKED, NOT ASSUMED.** Seeing `hasCable` / `hasBox` / `hasBench` accepted and never read, the natural read is that the protocol prescribes equipment work without gating on it. It does not: **`triathlon.ts` emits ZERO cable or box exercises.** They are vestigial signature width — threaded in, never needed. This is **unrelated to F-5** in `docs/BUILDER-SWEEP-FINDINGS.md`, which is the reverse problem (band exercises with no `hasBands` flag at all). A future session will form the same hypothesis; it has already been tested.
 
 **Client side, for completeness:** `noUnusedLocals` on `tsconfig.app.json` yields **424** errors against a baseline that is already **319** with the flag off. Not a toggle either.
+
+---
+
+## Q-214 — Main-lift REGION adjacency is not an input to placement: two pressing days in a row are never priced (2026-07-28, VERIFIED by enumeration, NOT built)
+
+**Parent of Q-212.** Q-212 is assistance colliding with the day's main lift; this is **main lifts colliding with each other**. Michael: *"Two consecutive pressing days is what makes the dips collision hit twice instead of once. Fixing the assistance while the main-lift adjacency stays is treating the symptom."*
+
+### Where the assignment happens, and what it scores on
+
+`_shared/week-solver.ts` `solve()` (`:388`). It is a **SEARCH, not a sequence of hard rules** — exhaustive recursion over all 7 days per lift (`:470`), pruned by the hard law, keeping the lexicographically smallest score vector. ✅ **So a new scored term is a genuine addition to an existing mechanism, not a restructuring.** The vector (`scoreKey:226`), in order:
+
+`restShortfall · breachPenalty · stackPenalty · stackHostPenalty · spreadPenalty(lower↔lower) · upperSpreadPenalty · upperLowerShortfall · shapePenalty · orderPenalty · preferredMissPenalty · canonicalAssignment`
+
+### ⛔ THE FINDING: there is a term that LOOKS like it covers this, and it cannot move
+
+`upperSpreadPenalty` (`:295`) measures the tightest gap from each upper day **to any other lifting day** — not upper-to-upper. Measured across four legal arrangements of Michael's own week:
+
+| arrangement | `upperSpread` | press gap |
+|---|---|---|
+| **picked** — Bench mon · OHP tue · Squat wed · DL fri | **−1** | 1 |
+| Bench tue · OHP thu · Squat wed · DL fri | **−1** | 2 |
+| Bench tue · OHP sat · Squat wed · DL fri | **−1** | 3 |
+| Bench mon · OHP thu · Squat wed · DL fri | **−1** | 3 |
+
+**Identical for every one.** ⚠️ **This is §0e exactly — a check whose metric cannot move is not a check.** And the asymmetry is the tell: `spreadPenalty` *does* compare lower↔lower specifically. The lower region has a spacing term; the upper region has one that cannot see itself.
+
+⛔ **AND THE LAW AFFIRMATIVELY PERMITS IT:** `upper_body_strength × upper_body_strength = 0h`. So a region-spacing term is a **preference above the law**, which is §4.1a's territory — it needs an owner and a stated reason, and Michael's proposed shape (scored, never hard) is what §4.1a asks for.
+
+### ⚠️ TWO CORRECTIONS TO THE TICKET AS RAISED — both found by enumerating instead of reasoning
+
+**1. The proposed alternative is ILLEGAL, not unevaluated.** *"Mon Squat, Tue OHP, Thu Bench, Fri Deadlift"* puts a lower lift 24h after the Sunday long run, and `long_run × lower_body_strength = 48h`. The solver pruned it under the hard law with a stated reason. ⛔ **For that specific week the engine did evaluate and reject it** — the "never generated the alternative" framing does not hold there.
+
+⚠️ **The lower lifts are in fact FORCED to Wednesday and Friday** by that 48h rule plus lower↔lower 48h plus the Tuesday quality run. There is no lower-body choice to make in this week at all.
+
+**2. The cost is not what the ticket estimates.** The stated cost was the squat moving to 24h after a long run. It isn't: of **40 legal arrangements, 36 keep a rest day and 24 both separate the presses AND keep one.** The real cost sits in `upperLowerShortfall` — picked = **3**, the nearest press-separated alternative = **6**. The solver is optimising upper↔lower spacing (mined from `week-optimizer:1638`'s preferred 3-day floor) and paying for it in press adjacency it cannot see.
+
+### ✅ SO THE CONCLUSION STANDS, AND FOR A BETTER REASON THAN THE ONE PROPOSED
+
+The current arrangement is defensible — it wins a real term against every press-separated alternative. **But nothing weighed the presses.** Michael: *"a defensible outcome for a reason never evaluated"* — §0j's shape, one subsystem over. ⛔ The fix is a scored region-spacing term that breaks ties when nothing more important is at stake, gets overruled when something is, **and records which happened**, so the next session reads why rather than reconstructing it from the arrangement.
+
+**Related:** Q-212 (the symptom), §0e and §0j in `docs/SPEC-week-solver.md`.
