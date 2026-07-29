@@ -59,7 +59,7 @@ Both halves must appear together anywhere this is surfaced.
 > **The best-supported claim in the entire domain is one the app barely makes: heavy strength training
 > IMPROVES endurance performance.** Cycling TTE and time-trial performance improve via efficiency and
 > anaerobic power **with no VO2max change**; run and bike performance improve after prolonged submaximal
-> work. **17 studies, 262 participants.**
+> work. **17 studies, 262 participants** — Llanos-Lagos, Ramirez-Campillo & Sáez de Villarreal 2026, *Eur J Appl Physiol* 126(1):193-222 (DOI 10.1007/s00421-025-05883-2). ⚠️ **CYCLISTS ONLY, and the authors rate the certainty of evidence LOW.**
 >
 > ⛔ **This is better evidence than ANYTHING the app currently says about interference — and the app leads
 > with interference.** The block is currently sold **defensively** (*here is what you will not lose*) when
@@ -202,7 +202,7 @@ Three reasons, in order of strength.
 >
 > **A strength block is a deposit, not a debt.** Heavy strength training improves cycling TTE and time-trial
 > performance via efficiency and anaerobic power **with no VO2max change**, and improves both run and bike
-> performance after prolonged submaximal work. **17 studies, 262 participants.**
+> performance after prolonged submaximal work. **17 studies, 262 participants** — Llanos-Lagos, Ramirez-Campillo & Sáez de Villarreal 2026, *Eur J Appl Physiol* 126(1):193-222 (DOI 10.1007/s00421-025-05883-2). ⚠️ **CYCLISTS ONLY, and the authors rate the certainty of evidence LOW.**
 >
 > ⛔ **This is better supported than anything the app currently says about interference. Lead with it.**
 >
@@ -349,7 +349,7 @@ strength-led block is unsupported** — and the athlete will not feel it, which 
 1. **The bar.** It is a strength block. That is the gain, and it is the point.
 2. **Economy and efficiency, which show up as ENDURANCE PERFORMANCE with VO2max unchanged.** Heavy strength
    training improves cycling TTE and time-trial performance, and improves run and bike performance after
-   prolonged submaximal work — **17 studies, 262 participants, VO2max flat throughout.**
+   prolonged submaximal work — VO2max flat throughout. **17 studies, 262 participants** — Llanos-Lagos, Ramirez-Campillo & Sáez de Villarreal 2026, *Eur J Appl Physiol* 126(1):193-222 (DOI 10.1007/s00421-025-05883-2). ⚠️ **CYCLISTS ONLY, and the authors rate the certainty of evidence LOW.**
 
 ⛔ **That is the honest product sentence, and it is well evidenced: the engine holds, the bar goes up, and
 the endurance performance gain arrives through efficiency rather than through VO2max.** ⚠️ **"No VO2max
@@ -799,7 +799,7 @@ For a block intending to preserve aerobic fitness, quality is the load-bearing e
 | Separate the sessions rather than stacking | Literature — Schumann 2022 *(explosive strength attenuated **especially same-session**)* · Robineau 2016 *(0h worst, 6h suboptimal)*. ⚠️ **Moderate, and explosive-strength specific — 5/3/1 is maximal-strength work.** The rule now rests on **session quality**, not adaptation blunting |
 | **24h target, 6h fallback** *(not 6h ≈ 24h)* | Literature — Robineau 2016, **VO2peak higher at 24h than at 0h or 6h.** ⚠️ Moderate: n=58 amateur rugby, 7 weeks. ⛔ **`place-week.ts:64-82` still states 6h and 24h as equivalent** |
 | Ride before lift, not after | ⛔ **WEAK, AND THE CODEBASE'S CITATION IS WRONG.** *"Cycling power impaired 24–48h post-heavy-lower"* was attributed to **Petré 2021, which is a strength-development meta by training status and says nothing about clearance windows.** The surviving support is soreness from strength training impairing endurance performance up to 72h. **See the §3 sweep box — the miscitation is in five places, two of them athlete-facing** |
-| **Strength block is a deposit, not a debt** | ✅ **Literature, STRONG — 17 studies, 262 participants.** Heavy strength training improves cycling TTE and TT via efficiency and anaerobic power **with no VO2max change**; improves run and bike performance after prolonged submaximal work. **The best-supported claim available — lead with it** |
+| **Strength block is a deposit, not a debt** | ⚠️ **SOURCED 2026-07-29, AND THE GRADE CAME DOWN.** This read *"Literature, STRONG"* for a number with no paper under it — the count was right and the citation was missing, which is the same fault as a wrong attribution. It is Llanos-Lagos, Ramirez-Campillo & Sáez de Villarreal 2026, *Eur J Appl Physiol* 126(1):193-222 (17 studies, 262 participants, 60 female; 5-25 weeks at 1-3 sessions/wk). Cycling performance ES 0.463 (p=0.016), efficiency ES 0.353 (p=0.012), anaerobic power ES 0.560 (p=0.024), **VO2max no effect (p>=0.263)**. ⛔ **NOT "STRONG": the authors rate certainty LOW.** ⛔ **AND IT IS CYCLING ONLY** — the *"improves run and bike performance"* half of the old wording is not in this review and has no located source. Still the best-evidenced claim here, and it must be stated for cyclists rather than for every athlete |
 | Cadence ≥90 rpm requirement | ⛔ **CONTESTED, searched 2026-07-26.** Force-per-stroke half is supported; **the "easier on the legs" conclusion is contradicted — 60 rpm induces LESS neuromuscular fatigue than 90/120 rpm.** Keep the rule (standard practice, errs safe); **do not assert it protects the legs.** See §3 sweep |
 | Uphill reduces load at equal metabolic cost | ✅ **Literature — Gottschall & Kram 2005** (impact peaks smaller uphill, **absent at +9°**) + 2024 slope study (**same metabolic stimulus, lower peak vertical GRF**). ⚠️ Muscle activation is *higher* uphill |
 | **Strides ~10 sec, passive recovery** | ✅ **Literature — ATP-PCr powers max effort 8–10 sec**; under ~20 sec produces little lactate. ⛔ **Recovery must be PASSIVE — active recovery delays PCr resynthesis and shifts the work glycolytic**, which turns strides into a session |
