@@ -162,5 +162,4 @@ In all three the rule survived and the attribution did not. The register exists 
 
 ---
 
-*Authorship and review: [to complete]*
-*Version / date: [to complete]*
+*Efforts — v1, 29 July 2026*
