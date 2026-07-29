@@ -181,6 +181,14 @@ type StepKey =
   | 'goal' | 'posture' | 'commitment' | 'length'
   // The old single `schedule` step, split one card per screen (below).
   | 'days' | 'accessory' | 'run' | 'bike' | 'swim'
+  // ⛔ THE SCHEDULER — one screen, rebuilt 2026-07-28, replacing `run` + `bike` + `hardday` on the
+  // strength path. Those three asked the same question in three places and none of them could show
+  // the answer: how many endurance sessions fit around four lifting days, and where the one that
+  // does not fit lands. Michael: *"this is a rebuild, one simple scheduler."*
+  //
+  // ⚠️ VOLUME STAYS SEPARATE. Miles and hours are HOW MUCH; this card is WHEN. Deciding the second
+  // while looking at the first is what made the old run card scroll past the fold.
+  | 'schedule' | 'volume'
   // ⛔ THE ONE HARD SESSION, asked ONCE. It used to be asked per-discipline — a "Hard run day" on
   // the run card and a "Hard ride day" on the bike card — with D-327 then greying whichever came
   // second. That is one question wearing two costumes: the block carries exactly ONE hard aerobic
@@ -208,11 +216,15 @@ function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean): StepKey[]
   // are typed per discipline, so a total would only contradict both. *"how many days is redundant."*
   if (!isStrengthFocus) out.push('days');
   if (strengthDevelop) out.push('accessory');
-  if (kept('run')) out.push('run');
-  if (kept('bike')) out.push('bike');
-  // ⛔ AFTER the disciplines, because the options ARE the disciplines they kept — asking earlier
-  // means offering a hard ride to someone who drops the bike two taps later.
-  if (isStrengthFocus && (kept('run') || kept('bike'))) out.push('hardday');
+  // ⛔ ONE SCHEDULER ON THE STRENGTH PATH. Every other goal keeps the per-discipline cards, because
+  // there the endurance IS the plan and there is no lifting frequency to fit it around.
+  if (isStrengthFocus && (kept('run') || kept('bike'))) {
+    out.push('volume');
+    out.push('schedule');
+  } else {
+    if (kept('run')) out.push('run');
+    if (kept('bike')) out.push('bike');
+  }
   // Swim sits last — booked, not coached. It is the slot we merely hold, so it follows the work.
   if (strengthDevelop && state.posture?.swim === 'maintain') out.push('swim');
   return out;
@@ -547,6 +559,26 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     );
   };
 
+  /**
+   * ⛔ THE WEEK, LIVE, WHILE THEY PICK. The whole value of the scheduler is watching the squat move
+   * when Tuesday changes — a grid they have to ask for is just the confirm card again.
+   *
+   * ⚠️ DEBOUNCED, AND ONLY ON THIS STEP. `preview()` composes all twelve weeks server-side; firing
+   * it per tap would queue a round trip behind every button. 500ms after the last change, and only
+   * while the scheduler is the current step.
+   *
+   * ⚠️ IT PLACES NOTHING CLIENT-SIDE. The grid renders what the solver returned. A second placement
+   * authority on the client is the disease this codebase spent weeks removing.
+   */
+  React.useEffect(() => {
+    if (currentStep !== 'schedule') return;
+    if (!state.longRunDay && !state.longRideDay) return;   // nothing to solve around yet
+    const t = setTimeout(() => { void runPreview(); }, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
+      state.qualityDays, state.targetMiles, state.rideHours]);
+
   const optBtn = (active: boolean) =>
     `w-full text-left px-4 py-3 rounded-xl border ${active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'} text-white`;
 
@@ -878,6 +910,154 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               })}
             </div>
             <p className="text-white/70 text-sm leading-relaxed">{ASSISTANCE_GUIDANCE}</p>
+          </div>
+        </StepLayout>
+      )}
+
+      {/* ⛔ HOW MUCH — the volume card. Separated from the scheduler on purpose: deciding WHEN while
+          looking at HOW MUCH is what made the old run card scroll past the fold on a phone. */}
+      {currentStep === 'volume' && (
+        <StepLayout
+          step={stepNo('volume')} totalSteps={steps.length} title="How much"
+          subtitle="Your holding dose while strength leads. All of it conversational."
+          onBack={back} onContinue={next} canContinue
+        >
+          <div className="space-y-6">
+            {posturePresent('run') && (
+              <div>
+                <p className="text-white/85 text-sm mb-2">Weekly running to hold</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" inputMode="numeric" min={0} placeholder="e.g. 14"
+                    value={state.targetMiles === '' ? '' : String(state.targetMiles)}
+                    onChange={(e) => setState((st) => ({ ...st, targetMiles: e.target.value === '' ? '' : Number(e.target.value), targetTouched: true }))}
+                    className="w-28 py-2 px-3 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white"
+                    style={{ fontSize: '16px' }}
+                  />
+                  <span className="text-white/70 text-sm">mi/wk</span>
+                </div>
+                {/* ⛔ ASK FOR THE FLOOR, NOT THE AVERAGE. "What do you run?" gets their good week —
+                    the number they would tell a friend. For a MAINTENANCE dose the floor is the
+                    correct input anyway, so the honest answer and the useful one are the same. */}
+                <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
+                  A week you can hit even when work is bad — not your best one. This is what the plan
+                  builds around, and the sessions will not shrink to meet you.
+                </p>
+              </div>
+            )}
+            {state.posture?.bike === 'maintain' && (
+              <div>
+                <p className="text-white/85 text-sm mb-2">Weekly riding to hold</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" inputMode="numeric" min={0} placeholder="e.g. 3"
+                    value={state.rideHours === '' ? '' : String(state.rideHours)}
+                    onChange={(e) => setState((st) => ({ ...st, rideHours: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    className="w-28 py-2 px-3 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white"
+                    style={{ fontSize: '16px' }}
+                  />
+                  <span className="text-white/70 text-sm">hr/wk</span>
+                </div>
+                {/* Hours, never miles (D-323 §6) — the app learns ride HR and FTP but no ride speed. */}
+                <p className="text-white/70 text-sm mt-1.5 leading-relaxed">Hours, not miles — terrain and wind make ride distance a poor measure.</p>
+              </div>
+            )}
+          </div>
+        </StepLayout>
+      )}
+
+      {/* ⛔ THE SCHEDULER — one screen for every WHEN question, and the week underneath it.
+          Replaces the run, bike and hard-day cards, which asked the same question in three places
+          and none of which could show the answer. */}
+      {currentStep === 'schedule' && (
+        <StepLayout
+          step={stepNo('schedule')} totalSteps={steps.length} title="Your week"
+          subtitle="Pick the days that are actually yours. The lifting is placed around them."
+          onBack={back} onContinue={next} canContinue
+        >
+          <div className="space-y-6">
+            {/* ── the one hard day ─────────────────────────────────────────── */}
+            <div>
+              <p className="text-white/85 text-sm mb-2">Your one hard day</p>
+              <div className="flex gap-1.5 mb-2">
+                {(['run', 'bike'] as const).filter((d) => posturePresent(d)).map((d) => {
+                  const on = !!state.qualityDays[d];
+                  return (
+                    <button
+                      key={d} type="button"
+                      onClick={() => setState((st) => ({ ...st, qualityDays: { [d]: (st.qualityDays[d] as DayName) || 'tuesday' } }))}
+                      className={`px-4 py-2 rounded-lg text-sm ${on ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                    >{d === 'run' ? 'Run' : 'Ride'}</button>
+                  );
+                })}
+              </div>
+              {(['run', 'bike'] as const).filter((d) => state.qualityDays[d]).map((d) => (
+                <DayPicker
+                  key={d}
+                  value={(state.qualityDays[d] as DayName) ?? ''}
+                  onChange={(day) => setState((st) => ({ ...st, qualityDays: { [d]: day } }))}
+                />
+              ))}
+              {/* ⛔ THE PROTECTED SESSION, AND THE CARD SAYS SO. Intensity is what holds aerobic
+                  fitness — Hickson cut frequency and duration without losing VO2max, and lost it the
+                  moment intensity came down. So this is the one endurance session that never yields. */}
+              <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
+                The one session that stays whatever else changes — intensity is what holds your
+                aerobic fitness. Everything else this block is easy.
+              </p>
+            </div>
+
+            {/* ── runs ─────────────────────────────────────────────────────── */}
+            {posturePresent('run') && (
+              <div>
+                <div className="flex items-baseline justify-between mb-2">
+                  <p className="text-white/85 text-sm">Runs a week</p>
+                  <span className="text-white/50 text-sm">including the hard one</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 max-w-[220px] mb-2">
+                  {[2, 3, 4].map((n) => (
+                    <button
+                      key={n} type="button" onClick={() => setState((st) => ({ ...st, runDays: n }))}
+                      className={`py-2 rounded-lg text-sm ${state.runDays === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                    >{n}</button>
+                  ))}
+                </div>
+                <p className="text-white/70 text-sm mb-1.5">Long run day</p>
+                <DayPicker value={state.longRunDay} onChange={(d) => setState((st) => ({ ...st, longRunDay: d }))} />
+              </div>
+            )}
+
+            {/* ── rides ────────────────────────────────────────────────────── */}
+            {state.posture?.bike === 'maintain' && (
+              <div>
+                <p className="text-white/85 text-sm mb-2">Rides a week</p>
+                <div className="grid grid-cols-3 gap-1.5 max-w-[220px] mb-2">
+                  {[1, 2, 3].map((n) => (
+                    <button
+                      key={n} type="button" onClick={() => setState((st) => ({ ...st, rideDays: n }))}
+                      className={`py-2 rounded-lg text-sm ${state.rideDays === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                    >{n}</button>
+                  ))}
+                </div>
+                <p className="text-white/70 text-sm mb-1.5">Long ride day</p>
+                <DayPicker value={state.longRideDay} onChange={(d) => setState((st) => ({ ...st, longRideDay: d }))} />
+              </div>
+            )}
+
+            {/* ⛔ THE BUDGET, LIVE, WHERE THE CHOICE IS. Arithmetic off the lifting frequency — no
+                server call, so it moves on the tap rather than after a round trip. */}
+            <EnduranceBudget />
+
+            {/* ⛔ AND THE WEEK IT PRODUCES. Same component the confirm card and, later, the State
+                screen's rescheduler use — the athlete learns one object. */}
+            {previewWeek && previewWeek.length > 0 && (
+              <div className="pt-4 border-t border-white/10">
+                <p className="text-white/85 text-sm mb-2">
+                  Your week{previewing ? ' · updating…' : ''}
+                </p>
+                <WeekGrid sessions={previewWeek} notes={previewNotes} compact />
+              </div>
+            )}
           </div>
         </StepLayout>
       )}
