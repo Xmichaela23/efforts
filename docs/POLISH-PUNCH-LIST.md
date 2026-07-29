@@ -18,7 +18,12 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
   `grep -rln "shared/strength-system" supabase/functions` rather than trusting this list.
 
 - [ ] **Then look at four things on a phone.** Three of them appear in one generated block:
-  - **Overhead Press day shows `Inverted Row`, not `Pull Up`** *(D-328, carried from 2026-07-29)*
+  - [x] ~~**Overhead Press day shows `Inverted Row`, not `Pull Up`**~~ ✅ **DEVICE-VERIFIED 2026-07-29.**
+    Michael's screenshot: Monday's Bench Press day carries `Chin Up`, Thursday's Overhead Press day
+    carries `Inverted Row`. The complement rule is live. *(D-328)*
+  - [x] ~~**Compromise notes read as one sentence per fact**~~ ✅ **DEVICE-VERIFIED 2026-07-29.**
+    *"Back Squat and Deadlift sit 2 days from your long run"* — one line, two lifts. The ceiling
+    paragraph names both lifts once instead of repeating itself. *(D-331)*
   - **A three-day block:** weeks 1/2/4 show `Bench + Press` on one day; **week 3 shows FOUR lifting days**
     with the press on its own *(D-332)*
   - **A 40-mile runner's long run reads ~12 mi, not 16** *(D-333)*
