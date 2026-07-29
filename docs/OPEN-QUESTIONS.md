@@ -2123,3 +2123,13 @@ Michael, on shipping the lifting-days card: *"we can add later if you need to co
 ⚠️ **DIRECTION MATTERS TOO.** Three → four is the easier case and probably worth having in the same change: an athlete whose week opens up should be able to spread back out.
 
 ⚠️ **AND IT IS AN ADJUST-TAB FEATURE, NOT AN INTAKE ONE** (`ARCH-strength-spine.md` §3.5: build time is omakase, Adjust is à la carte, and each item states its cost). The cost here is already written — it is the copy on the intake card.
+
+### ⛔ THIS IS A REMATERIALIZER FEATURE. DO NOT BUILD IT STANDALONE.
+
+Michael, same day: *"thats why im down streaming it — we will ad a rematerialze option on the state screen to adjust your loads or endurance work."*
+
+**So the home for this is the rematerializer on the State screen**, not a one-off control on the lifting card. Condensing four days to three is ONE instance of a general capability — re-author the remaining weeks of a live block from a changed input — and the same surface is meant to carry **load adjustment** and **endurance-volume adjustment** too.
+
+⚠️ **THE REMATERIALIZER WAS CANCELLED MID-SESSION ON 2026-07-29 AND IS DEFERRED, NOT DEAD.** Michael: *"lets let go of materilizer... i would rather get all the juggle math figured out and dieals all the acceroy dialed and make sure this plan is 100% sound for 4 out of 5 hybrid coaches."* That work is now largely done (D-332 through D-337), so the reason for the deferral has mostly been spent.
+
+⛔ **BUILDING THIS AS A LIFTING-DAYS CONTROL WOULD BE THE FOURTH PLAN-MUTATION PATH IN THIS CODEBASE.** There are already three placement authorities (`ARCH-strength-spine.md` §0.6) and four plan generators, both from exactly this move — solving one instance of a general problem in its own file. Wait for the general surface.
