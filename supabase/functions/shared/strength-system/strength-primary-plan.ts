@@ -178,6 +178,17 @@ export type StrengthPrimaryArgs = {
   blockShape?: BlockShapeInputs;
   /** `performance_numbers.pullupMaxReps` — the one tested accessory capacity that exists. */
   pullupMaxReps?: number;
+  /**
+   * ⛔ WHERE THE PREVIOUS BLOCK ENDED — per lift, absolute lb. Present on a SECOND or later block.
+   *
+   * Absent → derive from the 1RM, which is the first-block path and stays byte-identical. A missing
+   * prior is a new athlete, not a signal (§0h).
+   *
+   * ⚠️ This is the END of the previous block, not its start. `plans.config.training_max` stores the
+   * START, so the caller replays the cycle progression to find where it finished — the same function
+   * the block itself used, so the two cannot drift.
+   */
+  priorTrainingMax?: Partial<OneRepMaxes> | null;
 };
 
 /** ONE prescribed set. `weight` is absolute lb — resolved at authoring off the stored working
@@ -675,11 +686,27 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const phaseStructure = buildBlockPhases(weeks, args.blockShape);
 
   // The working number, per lift, set once here (SPEC §1).
+  //
+  // ⛔ A SECOND BLOCK STARTS WHERE THE FIRST ONE ENDED. Before this, every block recomputed 85% of
+  // `performance_numbers` — a number typed at signup that nothing ever updates — so an athlete who
+  // finished twelve weeks and built a new block began again at exactly the weights of week one.
+  // Twelve weeks of progression discarded at the boundary, silently.
+  //
+  // ⚠️ THE VALUE WAS ALREADY BEING SAVED. `generate-strength-plan` writes `plan.training_max` to
+  // `plans.config.training_max` with a comment explaining why it is stored rather than re-derived —
+  // and nothing on the other end read it. A wire written at one end and never connected.
+  //
+  // Both Wendler and the wider practice carry the number: cycles are continuous and you keep adding
+  // until you can no longer hit the prescribed reps (5/3/1 2nd ed. p30). The boundary is a place to
+  // CHECK progress, not to throw it away.
+  //
+  // ⛔ ABSENT MEANS FIRST BLOCK, and it must keep deriving from the 1RM (§0h). A missing prior is not
+  // evidence of anything — it is a new athlete.
   const training_max: OneRepMaxes = {
-    bench: workingNumberFrom1RM(oneRepMaxes.bench),
-    squat: workingNumberFrom1RM(oneRepMaxes.squat),
-    deadlift: workingNumberFrom1RM(oneRepMaxes.deadlift),
-    overheadPress: workingNumberFrom1RM(oneRepMaxes.overheadPress),
+    bench: args.priorTrainingMax?.bench || workingNumberFrom1RM(oneRepMaxes.bench),
+    squat: args.priorTrainingMax?.squat || workingNumberFrom1RM(oneRepMaxes.squat),
+    deadlift: args.priorTrainingMax?.deadlift || workingNumberFrom1RM(oneRepMaxes.deadlift),
+    overheadPress: args.priorTrainingMax?.overheadPress || workingNumberFrom1RM(oneRepMaxes.overheadPress),
   };
 
   // ── PLACEMENT: the athlete's days are fixed, the bar moves around them ───────────────────────
