@@ -367,7 +367,70 @@ export const VALIDITY_CHECK_PCT = 0.95;
 /** The PRESCRIBED minimum at 95% — `1+`, from p23. Meeting it is a pass. */
 export const VALIDITY_CHECK_MIN_REPS = 1;
 
-export type WorkingNumberVerdict = 'advance' | 'reset' | 'hold';
+/**
+ * ⛔ THE REP COUNT ABOVE WHICH THE ESTIMATE IS NOT TRUSTED — and it does NOT withhold the advance.
+ *
+ * Two facts point in opposite directions on a big set, and collapsing them is the mistake this
+ * constant exists to prevent:
+ *
+ * - **Physiologically the athlete is stronger than the training max says.** Twelve reps at 95% means
+ *   the number is too conservative, and that is Wendler's own read. Withholding the advance would
+ *   punish an athlete for outperforming the prescription.
+ * - **But the e1RM computed off that set is in the range where the equation degrades.** Brzycki's
+ *   accuracy is best at 3-5 reps and falls away above ~10: LeSuer et al. 1997 found accuracy improved
+ *   markedly when restricted to 2-10 rep sets; Reynolds et al. 2006 found 5RM the best predictor with
+ *   substantial degradation higher; Mayhew et al. 2008 put the boundary under 10 reps.
+ *
+ * So the number ADVANCES and the estimate is MARKED. See `advance_untrusted`.
+ *
+ * ⚠️ 8 IS OURS. The literature gives a degradation zone, not a line — best accuracy 3-5, clear
+ * degradation above 10. Eight sits inside the defensible band with a margin, and it must be stated
+ * as a product decision wherever it is published rather than attributed to any of the papers above.
+ */
+export const ESTIMATE_TRUSTED_MAX_REPS = 8;
+
+/**
+ * ⛔ DEADLIFT GETS LESS ROPE, AND THE ERROR IS DIRECTIONAL NOT RANDOM.
+ *
+ * LeSuer et al. 1997 (*JSCR* 11(4):211-213) tested seven equations across bench, squat and deadlift.
+ * Correlations were uniformly high (r > 0.95) — and **every equation significantly UNDERESTIMATED the
+ * deadlift.** That is a bias with a direction, not scatter.
+ *
+ * ⚠️ AND IT COMPOUNDS WITH OURS. Brzycki already tends to underestimate. Both push the same way, so a
+ * deadlift e1RM is systematically low rather than merely uncertain. Five reps is the range Reynolds
+ * et al. 2006 found best (R² = 0.993 bench), so trusting the estimate only that far is where the
+ * evidence is strongest — for the one lift that needs it most.
+ *
+ * ⚠️ 5 IS OURS, like the 8 above. The literature gives the direction and the degradation zone; it does
+ * not name a line for any individual lift.
+ */
+export const ESTIMATE_TRUSTED_MAX_REPS_DEADLIFT = 5;
+
+/**
+ * The rep count above which this lift's estimate stops being trusted.
+ *
+ * ⚠️ MATCHED ON THE LIFT NAME, deliberately kept to a substring test so it survives "Deadlift",
+ * "Conventional Deadlift" and "Trap Bar Deadlift" alike. A lift that does not match gets the general
+ * ceiling, which is the safe direction: a new lift added later is trusted no MORE than the others.
+ */
+export function trustedMaxRepsFor(liftName?: string | null): number {
+  return /deadlift/i.test(String(liftName ?? ''))
+    ? ESTIMATE_TRUSTED_MAX_REPS_DEADLIFT
+    : ESTIMATE_TRUSTED_MAX_REPS;
+}
+
+/**
+ * `advance_untrusted` — the number goes up, the estimate does not get to compound.
+ *
+ * ⛔ IT IS NOT A THIRD KIND OF ADVANCE, IT IS AN ADVANCE PLUS A PROVENANCE FLAG. `applyVerdict`
+ * treats it exactly as `advance`; what changes is that the e1RM read off that set is outside the
+ * reliable range, so the next standardised read SUPERSEDES it rather than building on it.
+ *
+ * ⚠️ ANY NEW CONSUMER MUST HANDLE IT. It was added to a union that had three members and is deliberately
+ * NOT a member of `advance` — a `verdict === 'advance'` check will now silently miss these sets.
+ * Search the union before adding a fourth.
+ */
+export type WorkingNumberVerdict = 'advance' | 'advance_untrusted' | 'reset' | 'hold';
 
 /**
  * What happens to the working number, given the reps achieved on the 95% set.
@@ -376,14 +439,26 @@ export type WorkingNumberVerdict = 'advance' | 'reset' | 'hold';
  * |---|---|---|
  * | `null` | `hold` | the session was not done — no evidence either way (§0h) |
  * | `0` | `reset` | logged, and the prescribed single was NOT completed. This is the book's trigger |
- * | `>= 1` | `advance` | p23 prescribes `95% x 1 or more`. One rep IS the prescription met |
+ * | `1`–`8` | `advance` | p23 prescribes `95% x 1 or more`. One rep IS the prescription met |
+ * | `> 8` | `advance_untrusted` | the prescription is met and then some — the bar still climbs. What is not trusted is the e1RM off this set, which sits above the range where Brzycki holds |
  *
  * ⛔ The middle band is gone deliberately. It used to reset everything under five, which cut the
  * working number 10% for a session the book calls a pass.
+ *
+ * ⛔ AND THE TOP BAND DOES NOT WITHHOLD ANYTHING. An earlier draft of this rule was going to flag a
+ * big set INSTEAD of advancing — Michael caught it: *"A 12-rep set at 95% means the athlete is
+ * genuinely much stronger than the TM says. Withholding the advance punishes them for it."* The
+ * measurement concern and the training concern are separate questions with opposite answers, and
+ * only the measurement one is in doubt. See `ESTIMATE_TRUSTED_MAX_REPS`.
  */
-export function verdictFrom95Set(repsAchieved: number | null | undefined): WorkingNumberVerdict {
+export function verdictFrom95Set(
+  repsAchieved: number | null | undefined,
+  /** ⚠️ Optional so every existing caller is unchanged. Absent → the general 8-rep ceiling. */
+  liftName?: string | null,
+): WorkingNumberVerdict {
   if (repsAchieved == null || !Number.isFinite(repsAchieved)) return 'hold';
-  return repsAchieved >= VALIDITY_CHECK_MIN_REPS ? 'advance' : 'reset';
+  if (repsAchieved < VALIDITY_CHECK_MIN_REPS) return 'reset';
+  return repsAchieved > trustedMaxRepsFor(liftName) ? 'advance_untrusted' : 'advance';
 }
 
 /** A reset drops the working number 10% — the same mechanism as a stall. */
@@ -399,7 +474,13 @@ export function applyVerdict(
   if (verdict === 'reset') {
     return { workingNumber: roundDownToIncrement(workingNumber * (1 - RESET_FRACTION)), ceilingHit: false };
   }
-  if (verdict !== 'advance') return { workingNumber, ceilingHit: false };
+  // ⛔ `advance_untrusted` ADVANCES. This guard used to be `verdict !== 'advance'`, which would have
+  // silently swallowed the new verdict and held the bar — the exact behaviour the verdict exists to
+  // avoid. The distrust is about the ESTIMATE, never about the load: a set that beats the
+  // prescription earns its step whether or not we believe the number computed off it.
+  if (verdict !== 'advance' && verdict !== 'advance_untrusted') {
+    return { workingNumber, ceilingHit: false };
+  }
 
   const stepped = workingNumber + cappedCycleIncrementLb(workingNumber, isLowerBody);
   const ceiling = oneRM == null ? Number.POSITIVE_INFINITY : tmCeilingLb(oneRM);

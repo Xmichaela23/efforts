@@ -13,6 +13,7 @@ import {
   workingNumberForCycles,
   applyVerdict,
   VALIDITY_CHECK_PCT,
+  ESTIMATE_TRUSTED_MAX_REPS,
 } from './wendler-531.ts';
 
 // =============================================================================
@@ -261,4 +262,60 @@ Deno.test('verdicts apply in order, and only the cycles before this one count', 
   assertEquals(workingNumberForCycles(200, 3, true, ['advance', 'reset']).workingNumber, 185);
   // Cycle 1 never reads a verdict — nothing has been earned yet.
   assertEquals(workingNumberForCycles(200, 1, true, ['reset']).workingNumber, 200);
+});
+
+// ── `advance_untrusted` — the bar climbs, the estimate is marked ─────────────────────────────────
+//
+// ⛔ THE MISTAKE THIS PINS AGAINST. A first draft of this rule was going to FLAG a big set instead of
+// advancing it. Michael: "A 12-rep set at 95% means the athlete is genuinely much stronger than the
+// TM says. Withholding the advance punishes them for it." Two questions, opposite answers, and only
+// the measurement one is in doubt:
+//   physiologically  big set → stronger than the TM → advance, which is Wendler's own read
+//   measurement-wise big set → the e1RM off it is above the range where Brzycki holds → don't trust
+//                              THIS number (LeSuer 1997 2-10 reps; Reynolds 2006 best at 5RM;
+//                              Mayhew 2008 under 10)
+//
+// ⚠️ 8 reps is OURS — the literature gives a degradation zone, not a line.
+
+Deno.test('⛔ A BIG 95% SET STILL ADVANCES THE BAR — the distrust is about the estimate', () => {
+  const wn = 200;
+  const plain = applyVerdict(wn, 'advance', true, 400);
+  const untrusted = applyVerdict(wn, 'advance_untrusted', true, 400);
+  assertEquals(untrusted.workingNumber, plain.workingNumber,
+    'advance_untrusted moved the bar differently from advance');
+  assertEquals(untrusted.workingNumber > wn, true, 'the bar did not climb at all');
+});
+
+Deno.test('the verdict bands: 0 resets, 1-8 advances, above 8 advances untrusted', () => {
+  assertEquals(verdictFrom95Set(null), 'hold');
+  assertEquals(verdictFrom95Set(0), 'reset');
+  assertEquals(verdictFrom95Set(1), 'advance');
+  assertEquals(verdictFrom95Set(ESTIMATE_TRUSTED_MAX_REPS), 'advance');
+  assertEquals(verdictFrom95Set(ESTIMATE_TRUSTED_MAX_REPS + 1), 'advance_untrusted');
+  assertEquals(verdictFrom95Set(20), 'advance_untrusted');
+});
+
+Deno.test('⛔ THE CEILING STILL BINDS ON AN UNTRUSTED ADVANCE', () => {
+  // A set outside the reliable range must not become a route around the 1RM ceiling — the estimate is
+  // exactly what is least trustworthy there, so the bound matters more, not less.
+  const atCeiling = tmCeilingLb(300);
+  const r = applyVerdict(atCeiling, 'advance_untrusted', true, 300);
+  assertEquals(r.workingNumber <= atCeiling, true,
+    `an untrusted advance passed the ceiling: ${r.workingNumber} > ${atCeiling}`);
+});
+
+Deno.test('⛔ DEADLIFT GETS A TIGHTER TRUST CEILING — the error there is biased, not random', () => {
+  // LeSuer 1997: every equation tested significantly UNDERESTIMATED deadlift. Brzycki already biases
+  // low, so the two compound. 6 reps is trusted on a bench and not on a deadlift.
+  assertEquals(verdictFrom95Set(6, 'Bench Press'), 'advance');
+  assertEquals(verdictFrom95Set(6, 'Deadlift'), 'advance_untrusted');
+  assertEquals(verdictFrom95Set(5, 'Deadlift'), 'advance');
+  // Name variants must all match, or a renamed lift silently gets the loose ceiling.
+  assertEquals(verdictFrom95Set(6, 'Trap Bar Deadlift'), 'advance_untrusted');
+  assertEquals(verdictFrom95Set(6, 'conventional deadlift'), 'advance_untrusted');
+  // ⚠️ An unknown lift gets the GENERAL ceiling, never a looser one.
+  assertEquals(verdictFrom95Set(6, 'Some New Lift'), 'advance');
+  assertEquals(verdictFrom95Set(9, 'Some New Lift'), 'advance_untrusted');
+  // Omitting the name is still legal and unchanged.
+  assertEquals(verdictFrom95Set(6), 'advance');
 });

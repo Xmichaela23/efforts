@@ -118,8 +118,24 @@ function distanceMeters(w: WorkoutRow): number {
  * Brzycki formula with RIR offset.
  * effectiveReps = logged_reps + logged_rir treats "leftover capacity" as
  * completed work, giving a stable 1RM estimate without requiring a failure set.
- * Brzycki is more accurate than Epley at the low rep ranges (2-5) used in
- * neural_speed and performance protocols.
+ *
+ * ⛔ THE JUSTIFICATION THAT USED TO SIT HERE IS CONTESTED AND MAY BE BACKWARDS (checked 2026-07-29).
+ * It read: *"Brzycki is more accurate than Epley at the low rep ranges (2-5)."*
+ *
+ * What the literature actually supports:
+ * - ✅ Brzycki accuracy improves markedly when sets are restricted to ≤10 reps (LeSuer et al. 1997,
+ *   JSCR 11(4):211-213; Mayhew et al. 2008). That part holds and it is why the 95% set exists.
+ * - ⚠️ At the specific 2-5 rep range, some work puts **Epley and Wathen closer to a tested 1RM than
+ *   Brzycki**, which is the opposite of the sentence above. Findings conflict by population and lift.
+ *
+ * ⛔ DO NOT SWITCH THE FORMULA ON THE STRENGTH OF THIS NOTE. Brzycki tends to UNDERESTIMATE and Epley
+ * to OVERESTIMATE, and for a number that sets an athlete's next working load, erring low is the safe
+ * direction. That is the defensible reason to keep Brzycki — a product decision on which way to be
+ * wrong, not a claim that it is the most accurate equation. Changing it is a load-bearing change and
+ * needs its own decision entry.
+ *
+ * ⚠️ AND THE UNDERESTIMATION IS WORST ON DEADLIFT: LeSuer found every equation tested significantly
+ * underestimated deadlift 1RM. Filed in `docs/PROTOCOL-strength-focus-overview.md` as open.
  */
 function brzycki1RM(weight: number, reps: number, rir: number): number {
   if (weight <= 0) return 0;

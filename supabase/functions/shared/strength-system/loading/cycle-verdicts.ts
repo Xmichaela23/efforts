@@ -110,7 +110,10 @@ export function verdictForCycle(
     const r = amrapRepsForLift(s.workout, liftName);
     if (r !== null) reps = r;   // repeated week-3 logs: the most recent wins
   }
-  return verdictFrom95Set(reps);
+  // ⛔ THE LIFT NAME TRAVELS WITH THE REPS. The trust ceiling is per-lift — deadlift estimates are
+  // biased low, not merely noisy (LeSuer 1997) — and omitting the name here would silently give the
+  // deadlift the general 8-rep ceiling, which is the one lift that must not have it.
+  return verdictFrom95Set(reps, liftName);
 }
 
 /**

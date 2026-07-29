@@ -149,7 +149,12 @@ Deno.serve(async (req: Request) => {
       cycleVerdicts: (() => {
         const raw = (body as Record<string, unknown>).cycle_verdicts;
         if (!raw || typeof raw !== 'object') return undefined;
-        const ok = new Set(['advance', 'reset', 'hold']);
+        // ⛔ `advance_untrusted` HAD TO BE ADDED HERE OR IT WOULD BE DROPPED AT THE DOOR. This
+        // allowlist validates rather than trusts, which is correct — but an unlisted verdict is
+        // silently discarded, and a discarded verdict falls to `unknownMeans: 'advance'`. The bar
+        // would still have climbed, so nothing would look broken; the provenance flag on the estimate
+        // is what would have gone missing.
+        const ok = new Set(['advance', 'advance_untrusted', 'reset', 'hold']);
         const out: Record<string, string[]> = {};
         for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
           if (!Array.isArray(v)) continue;
