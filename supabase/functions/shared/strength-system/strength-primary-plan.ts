@@ -847,6 +847,17 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // carries those words to the athlete verbatim.
   /** Lifts pinned at the ceiling — named in the block header so the flat weeks have a stated reason. */
   const ceilingLifts = new Set<string>();
+  /**
+   * ⛔ ONE LINE FOR ALL CEILING LIFTS, NOT ONE PER LIFT (2026-07-29). Michael, reading a real block:
+   * *"its dense i cant read it."* Two lifts at the ceiling produced two paragraphs that differed
+   * only in a name and a number — 60 words to say a thing worth 30. The athlete read the same
+   * sentence twice and learned nothing the second time.
+   *
+   * ⚠️ THE CONTENT IS UNCHANGED AND STILL FULLY COMPUTED — same lifts, same cycle, same maxes off
+   * their own file. This groups the REPORT; it does not soften or drop a single fact. Collected
+   * here and emitted once after the session loop, because the loop cannot know it is the last lift.
+   */
+  const ceilingHits: Array<{ name: string; cycle: number; oneRM: number }> = [];
   const placementCompromises: Array<{ kind: 'breach' | 'cost'; text: string }> = [
     ...solverRefusal,
     ...placedWeek.compromises.map((text) => ({ kind: 'breach' as const, text })),
@@ -1089,13 +1100,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // The old wording — "a training max above the max it came from cannot be tested" — is true
         // and reads as *you have maxed out*. The 1RM it measures against is a signup number nothing
         // updates, so hitting the ceiling almost always means the RECORD is out of date.
-        const line =
-          `${lift.name}: the working number reaches ${Math.round(TM_CEILING_PCT_OF_1RM * 100)}% of the ` +
-          `${oneRepMaxes[lift.ref]} lb max on file at cycle ${wnResult.ceilingHitAtCycle} and holds ` +
-          `there for the rest of the block. That is usually the number on file being out of date ` +
-          `rather than a limit — a fresh test would let it keep climbing.`;
-        if (!placementCompromises.some((c) => c.text === line)) {
-          placementCompromises.push({ kind: 'cost', text: line });
+        // The same lift hits its ceiling once per cycle it is authored in, so record it once.
+        if (!ceilingHits.some((h) => h.name === lift.name)) {
+          ceilingHits.push({
+            name: lift.name,
+            cycle: wnResult.ceilingHitAtCycle,
+            oneRM: oneRepMaxes[lift.ref],
+          });
         }
       }
       const main = mainLiftRow(lift, wn, oneRepMaxes[lift.ref], setsForWeek(slot.kind, weekInCycle));
@@ -1397,6 +1408,29 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const enduranceNote = enduranceSport
     ? ` ${enduranceSport === 'bike' ? 'Riding' : 'Running'} is held underneath at maintenance, all easy.`
     : '';
+
+  // ⛔ THE CEILING, SAID ONCE. Every lift that pinned, in one sentence, with its own number.
+  //
+  // ⚠️ CYCLE IS ONLY STATED WHEN THE LIFTS AGREE. Two lifts pinning at different cycles cannot share
+  // one "at cycle N" clause without lying about one of them, so that case names the lifts and drops
+  // the cycle rather than picking a number that is wrong for somebody. §0f — lose the detail at the
+  // output boundary, never the fact.
+  if (ceilingHits.length > 0) {
+    const pct = Math.round(TM_CEILING_PCT_OF_1RM * 100);
+    const named = ceilingHits.map((h) => `${h.name} (${h.oneRM} lb)`);
+    const list = named.length === 1
+      ? named[0]
+      : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`;
+    const sameCycle = ceilingHits.every((h) => h.cycle === ceilingHits[0].cycle);
+    const when = sameCycle ? ` at cycle ${ceilingHits[0].cycle}` : '';
+    placementCompromises.push({
+      kind: 'cost',
+      text:
+        `${list} stop${named.length === 1 ? 's' : ''} climbing${when} — the working number reaches ` +
+        `${pct}% of the max on file and holds there. That is usually a record that is out of date ` +
+        `rather than a limit; a fresh test lets it keep climbing.`,
+    });
+  }
 
   return {
     name: args.goalName?.trim() || `Strength Focus — ${weeks} Weeks`,

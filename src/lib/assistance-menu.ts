@@ -360,5 +360,9 @@ export function assistanceSubstitutionNote(
  * Kept as data, not baked into a component, because the composer puts it in the session description
  * and the build-flow card shows it too — the same sentence in two places, from one place.
  */
+// ⛔ NO NUMBER IN THIS SENTENCE, and that is a correctness fix as much as a length one. It read
+// "break the 25 reps" while `assistanceTotalReps()` scales the total to 50 on a tested capacity —
+// so on the athletes it scaled for, this line named a rep count the session did not prescribe. The
+// row above it already carries the real total. Shortened 2026-07-29 to fit the card without scroll.
 export const ASSISTANCE_GUIDANCE =
-  'Break the 25 reps into easy sets, in whatever split works that day. Load is by feel — about a 7 out of 10, finishing as though a few more were there. Going to failure here costs the next main lift.';
+  'Split the reps however suits that day. Load by feel — about 7 out of 10, a few reps left. Going to failure costs the next main lift.';

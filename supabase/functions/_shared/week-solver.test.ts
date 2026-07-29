@@ -12,6 +12,7 @@
  * property must hold for all weeks, the test sweeps every anchor arrangement and asks the solver.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { type MatrixSessionKind, requiredAdjacencyHours } from './schedule-session-constraints.ts';
 import {
   type Anchor,
   gapDays,
@@ -504,4 +505,111 @@ Deno.test('a week with room to spare says nothing about clearances — notes are
   const r = solve({ anchors: [anchor('sunday', 'long_run', 'long run')], lifts: FOUR });
   if (r.status === 'unsolvable') throw new Error('fixture should solve');
   assert(!r.notes.some((n) => n.text.includes('back to back')), 'a single anchor cannot be back to back');
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// THE FLOOR NOTES ARE GROUPED — one sentence per (anchor, distance), not per lift
+//
+// ⛔ THE BUG THIS PINS. Michael, reading a real generated block: *"its dense i cant read it."* Two
+// lifts sitting at the floor against the SAME long run emitted two paragraphs identical but for the
+// lift name — "Back Squat sits 2 days from your long run — 48 hours…" followed immediately by
+// "Deadlift sits 2 days from your long run — 48 hours…". The second sentence taught nothing, and
+// the wall of them is why the panel went unread. Unread copy is the same as absent copy.
+//
+// ⛔ AND THE DANGEROUS HALF IS THE FIX, NOT THE BUG. Grouping is a SUBTRACTION at the output
+// boundary, which is where §5.2b and §0f both live: a merge that quietly drops a lift is far worse
+// than the density it cures, because the athlete then has no idea that lift is at its floor. So the
+// second test below is the one that matters — it asserts every at-the-floor lift still appears.
+//
+// ⛔ SWEPT, NOT SPOT-CHECKED (§0d.1). The screenshot that raised this was one anchor arrangement.
+// Testing that arrangement would test the report, not the rule, so both tests enumerate every
+// arrangement the solver can be given and hold the property across all of them.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Every at-the-floor note, with the anchor and distance it is about, parsed back out of the copy. */
+function floorNotes(notes: Array<{ kind: string; text: string }>) {
+  return notes.filter((n) => n.text.includes('the minimum the rule allows'));
+}
+
+Deno.test('⛔ NO TWO FLOOR NOTES REPEAT THE SAME ANCHOR AT THE SAME DISTANCE — swept', () => {
+  let sawMultiLift = 0;
+  for (const runD of SOLVER_DAYS) {
+    for (const rideD of SOLVER_DAYS) {
+      if (runD === rideD) continue;
+      for (const hardD of SOLVER_DAYS) {
+        if (hardD === runD || hardD === rideD) continue;
+        const r = solve({
+          anchors: [
+            anchor(runD, 'long_run', 'long run'),
+            anchor(rideD, 'long_ride', 'long ride'),
+            anchor(hardD, 'quality_run', 'hard run'),
+          ],
+          lifts: FOUR,
+        });
+        if (r.status === 'unsolvable') continue;
+        const seen = new Set<string>();
+        for (const n of floorNotes(r.notes)) {
+          // The identity of a floor note is the anchor it names plus the gap it states. Two notes
+          // sharing both are the duplicate paragraph this grouping exists to remove.
+          const label = /your ([a-z ]+?) (?:is the day|—)/.exec(n.text)?.[1]
+            ?? /from your ([a-z ]+?) —/.exec(n.text)?.[1] ?? '?';
+          const hours = /(\d+) hours/.exec(n.text)?.[1] ?? '?';
+          // ⚠️ THE SIDE IS PART OF THE IDENTITY. A lift the day BEFORE the hard run and another the
+          // day AFTER it both name that anchor at 24h, and they are different facts that cannot
+          // share a sentence. Keying on anchor+distance alone called that legitimate pair a
+          // duplicate — the test was wrong, not the grouping.
+          const side = /the day (before|after)/.exec(n.text)?.[1] ?? 'span';
+          const key = `${label}|${hours}|${side}`;
+          assert(
+            !seen.has(key),
+            `two floor notes for "${label}" at ${hours}h with ${runD}/${rideD}/${hardD}:\n` +
+              floorNotes(r.notes).map((x) => `  ${x.text}`).join('\n'),
+          );
+          seen.add(key);
+          // A grouped note names more than one lift — count them so a fix that silently stopped
+          // grouping (and so trivially passed the uniqueness assert) cannot go unnoticed.
+          if (n.text.includes(' and ')) sawMultiLift++;
+        }
+      }
+    }
+  }
+  // ⚠️ THE GUARD AGAINST A VACUOUS PASS. If grouping broke and every note held one lift, every
+  // assert above would still pass — the duplicates would simply be gone along with the merging.
+  assert(sawMultiLift > 0, 'no arrangement produced a grouped note; grouping is not running');
+});
+
+Deno.test('⛔ GROUPING NEVER DROPS A LIFT (§5.2b) — every at-the-floor lift is still named', () => {
+  for (const runD of SOLVER_DAYS) {
+    for (const rideD of SOLVER_DAYS) {
+      if (runD === rideD) continue;
+      const r = solve({
+        anchors: [anchor(runD, 'long_run', 'long run'), anchor(rideD, 'long_ride', 'long ride')],
+        lifts: FOUR,
+      });
+      if (r.status === 'unsolvable') continue;
+      const said = floorNotes(r.notes).map((n) => n.text).join(' ');
+      // Recompute, independently of the note builder, which lifts genuinely sit at a floor.
+      for (let i = 0; i < FOUR.length; i++) {
+        const placed = r.week.lifts.find((l) => l.lift === FOUR[i].name);
+        if (!placed) continue;
+        const day = idx(placed.day);
+        for (const [a, aKind] of [[runD, 'long_run'], [rideD, 'long_ride']] as const) {
+          // ⚠️ ASK THE MATRIX, DO NOT ASSUME THE FLOOR. A first draft hardcoded "lower = 48h,
+          // upper = 24h" and failed on an upper lift one day from a long run — where the matrix
+          // requires NOTHING, so no note was due and none was missing. A test that invents the rule
+          // it is checking tests the invention. This still does not read the note builder: it reads
+          // the same source the note builder reads.
+          const kind: MatrixSessionKind = FOUR[i].isLower ? 'lower_body_strength' : 'upper_body_strength';
+          const required = requiredAdjacencyHours(kind, aKind);
+          if (required === 0) continue;
+          if (gapDays(day, idx(a)) * 24 !== required) continue;
+          assert(
+            said.includes(FOUR[i].name),
+            `${FOUR[i].name} sits at its floor from the ${a} anchor and no note names it ` +
+              `(${runD}/${rideD}):\n${said || '  <no floor notes at all>'}`,
+          );
+        }
+      }
+    }
+  }
 });

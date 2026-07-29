@@ -31,7 +31,6 @@ import {
   strengthDevelopersFor,
   defaultStrengthDeveloper,
   sportFromPosture,
-  STRENGTH_PROTOCOL_LABELS,
   TWO_BUILD_CEILING,
   type NonRaceGoalId,
   type Discipline,
@@ -426,7 +425,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
 
   const [state, setState] = useState<NonRaceState>({
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 2, startDate: planWeekStartISO(),
+    daysPerWeek: 5, longRunDay: 'sunday', longRideDay: 'thursday', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 3, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 2, startDate: planWeekStartISO(),
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -505,7 +504,6 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     if (day) next[d] = day; else delete next[d];
     return { ...s, qualityDays: next };
   });
-  const strengthDeveloperLabel = (id?: string) => (id ? STRENGTH_PROTOCOL_LABELS[id] ?? id : id);
 
   // One place builds the payload, so the week previewed and the week built cannot disagree.
   const payloadNow = () => {
@@ -570,6 +568,25 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
       state.qualityDays, state.targetMiles, state.rideHours]);
+
+  /**
+   * ⛔ THE CONFIRM SCREEN SHOWS THE WEEK, NOT A BUTTON THAT OFFERS ONE. Michael, 2026-07-29:
+   * *"just the final week and the date you start."* The posture card that used to sit at the top of
+   * this step said Swim/Bike/Run/Strength in words; the week says the same thing in days, and says
+   * it concretely. Asking someone to press "show me a week first" on the last screen before Build
+   * is asking them to opt in to the only thing on the screen worth reading.
+   *
+   * ⚠️ FIRES ONLY WHEN NOTHING IS THERE. Paths with a scheduler step arrive with `previewWeek`
+   * already solved and this is a no-op; paths without one (no strength focus) get it built here.
+   * It also does not retry a FAILED preview — a loop against a failing server is worse than the
+   * panel that explains the failure.
+   */
+  React.useEffect(() => {
+    if (currentStep !== 'confirm') return;
+    if (previewWeek !== null || previewing || previewFailed) return;
+    void runPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
 
   const optBtn = (active: boolean) =>
     `w-full text-left px-4 py-3 rounded-xl border ${active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'} text-white`;
@@ -835,10 +852,10 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
       {currentStep === 'accessory' && (
         <StepLayout
           step={stepNo('accessory')} totalSteps={steps.length} title="Accessory work"
-          subtitle="Every session ends with three short slots. The main lifting is set — these are yours to direct."
+          subtitle="Three short slots after the main lift. Yours to direct."
           onBack={back} onContinue={next} canContinue
         >
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* WHY THESE SLOTS EXIST, said before they are picked. Without it the screen reads as
                 three arbitrary dropdowns and the athlete has no basis for a choice the app is
                 deliberately handing them.
@@ -859,17 +876,34 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 mention alts that might happen sometimes."* The picks genuinely do not appear on every
                 day — the rule is live, and an athlete who chose Chin Up and meets an Inverted Row on
                 press day should have been told that here, not discover it in week one. */}
-            <div className="space-y-2">
-              <p className="text-white/75 text-sm leading-relaxed">
-                Three short slots after the main lift — push, pull, single-leg or core. They cover
-                what four heavy barbell lifts and one-plane endurance leave out.
-              </p>
-              <p className="text-white/70 text-sm leading-relaxed">
-                Your picks apply where they fit. On a day whose main lift already works the same
-                pattern the slot swaps — chin-ups on bench day, rows on press day — and the session
-                names the pick it stood in for.
-              </p>
-            </div>
+            {/* ⛔ ONE LINE, AND THE FIRST PARAGRAPH IS GONE (2026-07-29). It opened "Three short
+                slots after the main lift" — word for word what the SUBTITLE two lines above it
+                already said. The screen was paying four lines to say one thing twice, and the third
+                dropdown fell below the fold as a result. What survives is the only claim the
+                subtitle does not make: that the pick does not appear on every day. */}
+            {/* ⛔ REWRITTEN 2026-07-29 — the short version was broken twice over, and BOTH breaks
+                came from cutting the paragraph above it rather than from the cut being wrong.
+                • "that pattern" had NO ANTECEDENT. The deleted paragraph introduced the word; the
+                  survivor opened by pointing back at a sentence that was no longer on the screen.
+                • The example was FACTUALLY MUDDLED: it read "chin-ups on bench day, rows on press
+                  day" as two instances of the same behaviour. Chin-ups on bench day is the pick
+                  STANDING (`resolveAssistance`: no shared family, and vertical pull already IS the
+                  complement of a horizontal press). Only the press day substitutes. Listing them
+                  together taught the athlete the rule fires everywhere, which it does not.
+                So: one example, and one that is unambiguously a swap. Push Up on bench day collides
+                — both horizontal push — and the slot takes balancing work instead. */}
+            {/* ⛔ THE LAST SENTENCE IS A PROMISE, AND IT WAS CHECKED BEFORE IT WAS WRITTEN.
+                The Swap sheet is D-290, SHIPPED — `StrengthLogger.tsx:4440` renders the button on
+                EVERY exercise row (accessories included, not just the main lifts), and
+                `getInSlotAlternatives` offers substitutes filtered by movement pattern + the
+                athlete's own equipment. `swapRestOfPlan` persists the choice past today.
+                ⚠️ IF THAT BUTTON EVER MOVES OR NARROWS TO MAIN LIFTS ONLY, THIS LINE BECOMES A LIE
+                on the screen where the athlete is deciding whether to care about the picks at all. */}
+            <p className="text-white/70 text-sm leading-relaxed">
+              You&apos;ll get these most days. Where the main lift already covers one — push-ups after
+              bench press — you&apos;ll get the opposite movement instead. Anything can be swapped in
+              the session.
+            </p>
             <div className="space-y-3">
               {ASSISTANCE_MENU.map((menu) => {
                 const picked = state.assistancePicks[menu.slot] ?? ASSISTANCE_DEFAULTS[menu.slot];
@@ -985,7 +1019,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
       {currentStep === 'schedule' && (
         <StepLayout
           step={stepNo('schedule')} totalSteps={steps.length} title="Your week"
-          subtitle="Pick the days that are actually yours. The lifting is placed around them."
+          subtitle="Your days. The lifting is placed around them."
           onBack={back} onContinue={next} canContinue
         >
           <div className="space-y-4">
@@ -1373,34 +1407,18 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
         <StepLayout
           step={stepNo('confirm')} totalSteps={steps.length} title="Build this plan?"
           // "an 12-week" — the article was hardcoded for a number that varies. 8, 12 and 16 all take "a".
-          subtitle={`${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — a ${state.targetWeeks}-week block.`}
+          // ⛔ THE PROTOCOL NAME MOVED HERE when the posture card came out — it was the one fact on
+          // that card the week grid cannot show, and dropping it silently would have lost it.
+          subtitle={`${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — ${state.targetWeeks} weeks${isStrengthFocus ? ' of Wendler 5/3/1' : ''}.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
         >
-          <div className="space-y-4">
-            <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-2">
-              {rows.map((d) => {
-                const p = state.posture[d] ?? 'maintain';
-                const color = getDisciplineColor(d);
-                const Icon = DISCIPLINE_ICONS[d];
-                const label = p === 'develop' ? 'Develop' : p === 'maintain' ? 'Maintain' : 'Out';
-                // ⛔ On the Strength Focus path the protocol label was a LIE. The picker seeds
-                // `strengthProtocol` (5×5 / Upper Aesthetics / Neural Speed), the engine ignores it
-                // entirely and builds Wendler 5/3/1, and this row reported the dead value back to the
-                // athlete as the plan they were about to get. Name what actually gets built.
-                const proto = d !== 'strength' || p !== 'develop' ? ''
-                  : isStrengthFocus ? ' · Wendler 5/3/1'
-                  : state.strengthProtocol ? ` · ${strengthDeveloperLabel(state.strengthProtocol)}` : '';
-                return (
-                  <div key={d} className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2" style={{ color }}>
-                      <Icon className="h-4 w-4" /> {DISCIPLINE_LABEL[d]}
-                    </span>
-                    <span className="text-white/75">{label}{proto}</span>
-                  </div>
-                );
-              })}
-            </div>
+          {/* ⛔ THE POSTURE CARD IS GONE (2026-07-29). It listed Swim Out / Bike Maintain / Run
+              Maintain / Strength Develop — four rows restating answers the athlete gave two screens
+              ago, in the vocabulary of the engine rather than of their week. The grid below says the
+              same thing in days they recognise, and says it specifically. The one fact it carried
+              that the grid cannot — the protocol — moved to the subtitle. */}
+          <div className="space-y-3">
             <div>
               <p className="text-white/70 text-sm mb-2">Start the week of</p>
               <input

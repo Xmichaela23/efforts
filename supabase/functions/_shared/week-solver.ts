@@ -599,6 +599,21 @@ export function solve(input: SolverInput): SolverResult {
         }
       }
       // At-the-floor: legal, no buffer, and worth saying so.
+      //
+      // ⛔ ONE NOTE PER (ANCHOR, DISTANCE), NOT ONE PER LIFT (2026-07-29). Michael, reading a real
+      // block: *"its dense i cant read it."* Two lifts at the floor against the same long run
+      // produced two paragraphs identical but for the lift name — the second taught nothing. The
+      // lifts are now listed inside one sentence.
+      //
+      // ⚠️ GROUPED ON (anchor, days, side), NOT ON ANCHOR ALONE. Two lifts can sit at the floor
+      // against the same anchor at DIFFERENT distances; merging those would print one distance that
+      // is wrong for one of them. The key keeps them apart, so a merged sentence is only ever built
+      // from lifts the sentence is true of.
+      //
+      // ⚠️ THE days === 1 BRANCH STILL READS AS ONE LIFT, and that is not an oversight: two lifts
+      // cannot both sit one day from the same anchor on the same side without being the same day,
+      // so that group always holds exactly one.
+      const floorGroups = new Map<string, { label: string; days: number; actual: number; anchorFollows: boolean; names: string[] }>();
       for (let i = 0; i < lifts.length; i++) {
         const kind: MatrixSessionKind = lifts[i].isLower ? 'lower_body_strength' : 'upper_body_strength';
         for (const a of anchorPlacements) {
@@ -611,13 +626,24 @@ export function solve(input: SolverInput): SolverResult {
           //    calendar distance or it is a confident lie in athlete-facing copy.
           const days = gapDays(b.assignment[i], a.dayIndex);
           const anchorFollows = (b.assignment[i] + 1) % 7 === a.dayIndex;
-          const text = days === 1
-            ? `Your ${a.label.replace(/^your\s+/i, '')} is the day ${anchorFollows ? 'after' : 'before'} ` +
-              `${lifts[i].name} — ${actual} hours, the minimum the rule allows, with nothing spare.`
-            : `${lifts[i].name} sits ${days} days from your ${a.label.replace(/^your\s+/i, '')} — ` +
-              `${actual} hours, the minimum the rule allows, with nothing spare.`;
-          notes.push({ kind: 'cost', text });
+          const key = `${a.dayIndex}|${days}|${anchorFollows}`;
+          const g = floorGroups.get(key);
+          if (g) g.names.push(lifts[i].name);
+          else floorGroups.set(key, {
+            label: a.label.replace(/^your\s+/i, ''), days, actual, anchorFollows, names: [lifts[i].name],
+          });
         }
+      }
+      for (const g of floorGroups.values()) {
+        const list = g.names.length === 1
+          ? g.names[0]
+          : `${g.names.slice(0, -1).join(', ')} and ${g.names[g.names.length - 1]}`;
+        const text = g.days === 1
+          ? `Your ${g.label} is the day ${g.anchorFollows ? 'after' : 'before'} ${list} — ` +
+            `${g.actual} hours, the minimum the rule allows, with nothing spare.`
+          : `${list} sit${g.names.length === 1 ? 's' : ''} ${g.days} days from your ${g.label} — ` +
+            `${g.actual} hours, the minimum the rule allows, with nothing spare.`;
+        notes.push({ kind: 'cost', text });
       }
 
       const compromises: string[] = [...b.breaches];

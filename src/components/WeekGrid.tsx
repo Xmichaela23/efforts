@@ -52,7 +52,7 @@ export default function WeekGrid({
   const mins = sessions.reduce((a, s) => a + (Number(s.duration) || 0), 0);
 
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div className={`space-y-1.5 ${className}`}>
       <p className="text-white/70 text-xs">
         {activeDays} training {activeDays === 1 ? 'day' : 'days'}, {7 - activeDays} rest
         {' · '}about {Math.floor(mins / 60)}h{mins % 60 ? String(mins % 60).padStart(2, '0') : ''} a week
@@ -71,7 +71,7 @@ export default function WeekGrid({
             .map((e) => e.name)
             .filter((n) => n !== lift?.name.replace('Strength — ', '') && n !== 'Box Jump');
           return (
-            <div key={d} className="flex items-baseline gap-2 text-xs py-0.5">
+            <div key={d} className="flex items-baseline gap-2 text-xs leading-tight py-px">
               <span className="text-white/40 w-8 shrink-0">{d.slice(0, 3)}</span>
               <span className="flex-1 min-w-0">
                 <span className={lift ? 'text-white/85' : 'text-white/30'}>
@@ -90,9 +90,7 @@ export default function WeekGrid({
       </div>
 
       {adjacentPressDays && (
-        <p className="text-white/45 text-xs leading-snug">
-          The two press days sit together on purpose — pressing twice needs no recovery gap.
-        </p>
+        <p className="text-white/40 text-xs leading-tight">Press days sit together on purpose — no recovery gap needed.</p>
       )}
 
       {/* What the solver could not honour, in its own words. Never hidden, never reworded. */}
