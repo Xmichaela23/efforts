@@ -968,20 +968,53 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               type="button" onClick={() => setState((s) => ({ ...s, liftingDays: 4 }))}
               className={optBtn(state.liftingDays === 4)}
             >
+              {/* ⛔ THE TWO CARDS ARE ONE COMPARISON AND MUST USE ONE AXIS. Michael's framing, fourth
+                  pass: *"a 4 day week favors staying fresh for every lift, a 3 day week may result in
+                  fatigue in executing the second lift."* So four days says FRESH and three days says
+                  MAY BE FATIGUED — the same variable, once as the upside and once as the risk.
+
+                  ⚠️ "MAY", deliberately. The previous line asserted flatly that the second lift "is
+                  done tired and gives up some load." The direction is sourced (the first movement in a
+                  session adapts most) but the MAGNITUDE for any given athlete is not, and an endurance
+                  athlete's bench and press are not the heaviest thing in their week. Stating a
+                  certainty we do not have is the same fault as citing a paper that says something
+                  else. */}
               <span className="block text-white/90 text-sm">Four days</span>
               <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
-                One lift a day. Every lift is trained first, so every top set is a clean read of what
-                that lift can do. This is Wendler's own shape.
+                One lift a day. Favours staying fresh for every lift, so every top set is a clean read
+                of what that lift can do. This is Wendler's own shape.
               </span>
             </button>
             <button
               type="button" onClick={() => setState((s) => ({ ...s, liftingDays: 3 }))}
               className={optBtn(state.liftingDays === 3)}
             >
+              {/* ⛔ THE OPTION HAS TO CARRY THE TRADE AND THE TEST WEEK (2026-07-29, second pass).
+                  Michael, on the screen: *"3 day copy is a little unlcear should map tradeoffs and
+                  that 1 week willbe 4 to test 1rm."*
+
+                  The first draft read *"same weekly work — with volume matched, strength gain does not
+                  track how many days it is spread over."* That is the volume-equated meta-analysis
+                  paraphrased, and it fails twice on this card: it argues a POSITION instead of naming
+                  what the athlete gives up, and volume is NOT in fact fully matched here — the second
+                  upper lift is trained fatigued, which is the whole reason the pair was chosen. So the
+                  line was defending the option with a study while omitting its cost.
+
+                  ⚠️ AND THE FOUR-DAY WEEK CANNOT BE A SURPRISE. An athlete picks three days because
+                  three is what their week holds; finding out later that one week in four needs a
+                  fourth is exactly the kind of thing that has to be said before they choose, not in a
+                  panel underneath after they have. */}
               <span className="block text-white/90 text-sm">Three days</span>
+              {/* ⛔ SAY THE PURPOSE IN THE FIRST FIVE WORDS. Michael, third pass on this card:
+                  *"CAN YOU JUST SAY CLEARLY THE PURPOSE? TO test your 1rm."* The previous line
+                  described the mechanism — shares a day, done tired, back to four days — and left the
+                  athlete to work out what the fourth day was FOR. "That is the week your next weights
+                  are set from" is a consequence, not a purpose, and it reads as scheduling admin.
+                  It is a MAX TEST. Name it. */}
               <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
-                Bench and press share a day. Same four lifts, same weekly work — with volume matched,
-                strength gain does not track how many days it is spread over.
+                Bench and press share a day, which may leave the second lift fatigued. One week in four
+                goes back to four days to test your max — every lift on its own day, nothing shared, so
+                the number is clean.
               </span>
             </button>
 
@@ -994,15 +1027,18 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   </p>
                 </div>
                 <div>
-                  <p className="text-white/70 text-xs font-medium mb-1">Week 3 of each cycle</p>
+                  {/* ⚠️ THE HEADING NAMES THE PURPOSE TOO, not just the week number. The option copy
+                      above now leads with "to test your max"; a panel that says only "Week 3 of each
+                      cycle" makes the athlete carry the connection across two blocks of text. */}
+                  <p className="text-white/70 text-xs font-medium mb-1">Week 3 of each cycle — the max test</p>
                   <p className="text-white/50 text-xs leading-relaxed">
                     Squat · Deadlift · Bench · Press — four days
                   </p>
                 </div>
                 <p className="text-white/45 text-xs leading-snug">
-                  Bench goes first on the shared day. The second lift of a session is done fatigued,
-                  so it gives up load and reps. Week 3 is the set that sets the next cycle's weights,
-                  so nothing shares a day that week and every lift is read rested.
+                  Bench goes first on the shared day — the second lift of a session may give up load and
+                  reps, so the heavier one goes first. Week 3 sets the next cycle's weights, so nothing
+                  shares a day that week and every lift is read rested.
                 </p>
                 <p className="text-white/35 text-xs leading-snug">
                   The three-day week is Wendler's. Testing on a fourth day is ours — it comes from how
