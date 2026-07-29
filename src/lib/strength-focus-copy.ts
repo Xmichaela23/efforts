@@ -360,3 +360,69 @@ export function topSetIndex(sets: ReadonlyArray<{ weight?: number | null }>): nu
   if (!(max > 0)) return -1;
   return weights.lastIndexOf(max);
 }
+
+// ── The hard day, and what it is honestly for ────────────────────────────────────────────────────
+
+/**
+ * ⛔ THE CARD STATES THE CLAIM; THIS STATES THE RECEIPT. Michael, 2026-07-29, on the one-line
+ * version: *"it needs to be honest about what it achieves so check our citations and how we arrived
+ * there"* — then *"maybe thats an (i) with that and the citations?"*
+ *
+ * ⛔ EVERY SENTENCE HERE IS TRACED TO `docs/DOCTRINE-aerobic-maintenance.md`, AND ONE CLAIM WAS
+ * DROPPED FOR FAILING THAT TRACE:
+ *
+ * - ✅ §3 — Hickson's maintenance trilogy. Same 10-week base build, then 15 weeks with ONE variable
+ *   cut. Frequency 6 d/wk → 4 or 2: VO2max held in both arms. Duration 40 min → 26 or 13: held in
+ *   both arms. Intensity −⅓ or −⅔: NOT held, and worse at −⅔. Hickson & Rosenkoetter 1981
+ *   (frequency), Hickson et al. 1982 (duration), Hickson et al. 1985 (intensity).
+ *
+ * - ⛔ AND THE NAME IS AMBIGUOUS IN THIS REPO, WHICH IS WHY THE YEARS ARE PRINTED. `Hickson 1980` is
+ *   the INTERFERENCE paper and it is what the engine cites (`schedule-session-constraints.ts:27`,
+ *   `week-optimizer.ts:483/657/684`). A bare "Hickson" here would point an athlete at the opposite
+ *   question. §3's box calls this out as the first thing a bibliography has to fix.
+ *
+ * - ✅ §5.0, sourced 2026-07-26 — one interval session a week is BELOW the improvement threshold for
+ *   trained athletes; 2–3/wk is the effective range for gains; roughly one every 1–2 weeks
+ *   preserves. The doctrine's own instruction: *"the block does not build the engine. It holds it.
+ *   Any copy promising aerobic improvement during a strength-led block is unsupported."*
+ *
+ * - ⛔ CUT: the deposit claim. §5.0's *"where the gains actually are"* — endurance performance
+ *   improving through efficiency with VO2max flat, **17 studies, 262 participants** — is the
+ *   best-evidenced statement in the domain and the doctrine says to lead with it. It is NOT here for
+ *   two reasons. (1) **That number has no paper under it anywhere in the doctrine** — §7's unsourced
+ *   sweep never named it, and printing a participant count with no author beside it is a citation
+ *   with the receipt torn off. (2) It is a claim about the BLOCK, not about this session, and
+ *   attaching a block-level citation to a session-level sentence is the exact fault that produced
+ *   D-328 and D-329. It belongs near the goal card, once it has an author.
+ *
+ * - ⛔ ALSO NOT SAID: that a hard ride costs less than a hard run. §5's modality split is Wilson
+ *   2012, and Schumann 2022 (43 studies) found no modality moderation at all. The doctrine carries a
+ *   standing instruction not to build a new claim on it, so the Run/Ride choice stays neutral.
+ *
+ * ⚠️ VOICE — COPY-VOICE rules 1, 7, 9: the subject is the training, never "you"; no imperatives; and
+ * "top-end aerobic fitness" rather than the metric name, which rule 9 bans the same way it bans
+ * "aerobic base" and "Z2". The paper names are citations, not jargon, and they stay.
+ */
+export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
+  {
+    heading: 'What it holds',
+    body:
+      'Cutting how often the training happens, or how long each session runs, leaves top-end aerobic '
+      + 'fitness intact — six days a week down to two, and forty-minute sessions down to thirteen, both '
+      + 'held it for fifteen weeks. Cutting how hard is the one that lost it. '
+      + '(Hickson 1981, 1982, 1985 — the maintenance experiments, not the 1980 interference paper.)',
+  },
+  {
+    heading: 'What it does not do',
+    body:
+      'One hard session a week sits below the level where trained athletes improve. Two to three a week '
+      + 'is where gains happen; roughly one every one to two weeks is enough to preserve. So this block '
+      + 'holds the engine where it already is, and nothing here promises a bigger one at the end of it.',
+  },
+  {
+    heading: 'Why the day is asked for',
+    body:
+      'A fixed group session — a run club, a ride club — lands in this same slot. Naming the day it '
+      + 'falls on is what lets the lifting be placed around it rather than on top of it.',
+  },
+];

@@ -160,6 +160,18 @@ export type StrengthPrimaryArgs = {
    *  0 or absent → none. See `swimSessions` for what the app is and is not claiming here. */
   swimDays?: number;
   /**
+   * ⛔ HOW MANY DAYS THE LIFTING OCCUPIES. 4 (default, and Wendler's own shape) or 3.
+   *
+   * At 3 the two upper lifts share a day and the week-3 test still runs on four — see the block
+   * comment at the `solveWeek` call for the full reasoning and what is sourced versus reasoned.
+   *
+   * ⚠️ ABSENT MEANS 4, so every existing plan is byte-identical. This was a HARD CONSTANT before
+   * (`SPEC-week-solver.md` §0a constraint 4: *"a fixed count, lift frequency is not negotiable"*),
+   * and that constraint is now a DEFAULT rather than a law. The spec entry needs superseding, not
+   * quietly contradicting — a rule reversed in code and left standing in a doc is how this repo rots.
+   */
+  liftingDays?: 3 | 4;
+  /**
    * ⛔ WHAT EACH CYCLE EARNED, per lift — Wendler's 95% validity check, finally reachable.
    *
    * `verdicts[i]` is earned in cycle i+1 and decides what cycle i+2 carries: `advance` (+5/+10),
@@ -394,9 +406,48 @@ function mainLiftRow(
   };
 }
 
+/**
+ * ⛔ THE LINE WHERE THE ENGINE STOPS DOING THE MATH. Michael, 2026-07-29: *"i think anone that runs
+ * more than 25 miles a week can self regulate."*
+ *
+ * ⚠️ A PRODUCT DECISION WITH NO PAPER UNDER IT, and it must keep saying so. There is no literature on
+ * the volume at which a runner can distribute their own week — nobody has studied it. What IS sourced
+ * is everything either side of the choice: the maintenance dose (two-thirds of usual, Hickson), and
+ * the long-run ceiling this mode exists to stop breaking (25–30% of weekly mileage, Daniels).
+ *
+ * ⛔ NOT A CAP. Above this line the athlete's typed mileage is honoured in full — the engine changes
+ * how it SHAPES the week, never how much of it there is. A ceiling was built once (D-222) and retired
+ * 2026-07-01; see the standing warning at the top of `maintenance-volume-band.ts`.
+ */
+const SELF_REGULATED_MILES = 25;
+
+/**
+ * ⛔ EVERY CLAUSE TRACES, AND THE FIRST DRAFT DID NOT.
+ *
+ * Michael proposed: *"you can hold your run for 15 weeks at 63% of volume."* The 63% is arithmetic off
+ * a 40-mile example (25 of 40), not a finding — Hickson's duration arms were 40 min → 26 and → 13,
+ * which is two-thirds and one-third. Printing 63% as his would be a number with no paper under it.
+ *
+ * Two further corrections folded in:
+ * - He cut per-session DURATION in one experiment and FREQUENCY in another. "Volume" merges them, so
+ *   the note names the two manipulations rather than one word covering both.
+ * - What held was VO2max, not the run wholesale. The one-third arm lost ~10% of long-duration
+ *   endurance (Hickson 1982, duration arm) — volume defends durability, and less of it costs some.
+ *
+ * ⚠️ "top-end aerobic fitness", not VO2max — COPY-VOICE rule 9. And the years are printed because a
+ * bare "Hickson" in this repo is ambiguous: 1980 is the INTERFERENCE paper the engine cites, 1981/82/85
+ * is the maintenance trilogy this note rests on.
+ */
+const SELF_REGULATED_NOTE =
+  'The miles are yours to place — the days are set, the distances are not. '
+  + 'Cutting how far or how often holds top-end aerobic fitness: 15 weeks in the trials, at two-thirds '
+  + 'and at one-third of the original (Hickson 1981, 1982, 1985). Cutting how hard is what loses it. '
+  + 'Volume is what defends durability over long efforts, so less of it costs some of that.';
+
 // Spread the weekly maintenance miles across N runs as a LONG-RUN share + easy fill — NOT total÷N
 // (the two-equal-runs bug). Descending: index 0 is the long run. Weights graduate (flatter as N grows:
 // 3d ≈ 9/6/5, 4d ≈ 6/5/5/4), then rounded so the parts sum back to the total.
+// ⚠️ Used BELOW `SELF_REGULATED_MILES` only — above it the share is even and the athlete distributes.
 function distributeRunMiles(total: number, n: number): number[] {
   if (n <= 1) return [Math.max(1, Math.round(total))];
   const WEIGHTS: Record<number, number[]> = {
@@ -787,10 +838,54 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     kind: p.kind,
     label: p.label,
   }));
-  const solved = solveWeek({
-    anchors: solverAnchors,
-    lifts: MAIN_LIFTS.map((l) => ({ name: l.name, isLower: l.isLower })),
-  });
+  /**
+   * ⛔ THREE LIFTING DAYS, AND THE SOLVER NEEDS NO CHANGE TO DO IT (2026-07-29).
+   *
+   * `week-solver.ts:527` refuses two lifts on one day, and its comment says why: *"the matrix permits
+   * `upper_body_strength × lower_body_strength` to share a day and that permission is real, but it
+   * belongs to a different block shape."* This IS that block shape — and the cheap way in is not to
+   * relax the rule but to hand the solver ONE upper slot that carries both upper lifts. One lift per
+   * day still holds, the clearance maths is identical (an upper day is an upper day whether it holds
+   * one press or two), and the composer expands the slot into two sessions afterwards.
+   *
+   * ⛔ WHY BENCH + PRESS AND NOT ANY OTHER PAIR. The second lift in a session is trained fatigued —
+   * the earliest exercise is the one that adapts most, and the later one gives up load and reps. So
+   * the pair has to be the one with least to lose: the two upper lifts are lighter and far less
+   * systemically taxing than a squat or a deadlift, and the heavy lower lifts — where the AMRAP
+   * matters most and fatigue costs most — keep their own days.
+   *
+   * ⛔ AND THE TEST WEEK IS FOUR DAYS. Week 3 of every cycle is Wendler's 95% set, which is what
+   * decides whether the bar goes up. A lift trained second gives a reading taken under fatigue, and
+   * fatigue status is a named standardisation variable in the strength-testing literature — %1RM
+   * prescriptions are built on testing done in a fatigue-free state. 1RM test-retest reliability is
+   * good-to-excellent (ICC ≥ 0.90) CONDITIONAL ON standardisation, which is why every test week is
+   * four days and not some of them. Comparable to each other is the property that matters.
+   *
+   * ⚠️ THE COMBINATION IS OURS. Nobody has trialled "train three, test on a fourth" — the components
+   * are measured (frequency is not the mechanism when volume is equated; test rested; test the same
+   * way every time), the join is reasoned. It is a scheduling choice made to protect a measurement,
+   * not a claim about the body. Wendler never wrote it either: at three days HE rotates the four
+   * lifts and lets the cycle run past four weeks; at two days he stacks two lifts per session and
+   * keeps the calendar. We are using his two-day trade one day up, and keeping his calendar.
+   */
+  const liftingDays = args.liftingDays === 3 ? 3 : 4;
+  const PAIRED_UPPER = MAIN_LIFTS.filter((l) => !l.isLower).map((l) => l.name);
+  const pairedSlotName = PAIRED_UPPER.join(' + ');
+  const solverLifts = liftingDays === 3
+    ? [
+        ...MAIN_LIFTS.filter((l) => l.isLower).map((l) => ({ name: l.name, isLower: true })),
+        { name: pairedSlotName, isLower: false },
+      ]
+    : MAIN_LIFTS.map((l) => ({ name: l.name, isLower: l.isLower }));
+  const solved = solveWeek({ anchors: solverAnchors, lifts: solverLifts });
+  // ⛔ THE TEST WEEK IS SOLVED SEPARATELY, because it is a different week: four lift days, nothing
+  // shared. Only computed in 3-day mode — at four days every week already is the test layout.
+  const solvedTest = liftingDays === 3
+    ? solveWeek({
+        anchors: solverAnchors,
+        lifts: MAIN_LIFTS.map((l) => ({ name: l.name, isLower: l.isLower })),
+      })
+    : solved;
 
   // ⛔ A REFUSAL IS NOT A CRASH AND IT IS NOT A SILENT FALLBACK (§5.2). The solver names the anchors
   // that bound it and what would free them; those words go to the athlete. The block is still built
@@ -817,10 +912,63 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     : solved.notes;   // already tagged by the solver
   // Lift name → the day the solver gave it. Falls back to the lift's legacy grid day only if the
   // solver somehow omitted it, so a placement bug degrades to the old behaviour rather than to no day.
-  const dayForLift = new Map(placedWeek.slots.map((s) => [s.lift, s.day as string]));
+  // ⛔ THE PAIRED SLOT EXPANDS BACK INTO ITS TWO LIFTS. The solver placed one upper day; both upper
+  // lifts read that day off it. Without this every consumer downstream — `liftDay`, `upperLiftDays`,
+  // the run and ride placers — would look up "Bench Press" and find nothing, and the fallback would
+  // silently hand them the legacy Mon/Tue/Thu/Fri grid day. A miss here is not a crash, it is a
+  // wrong week that looks right, which is the failure mode this file keeps having.
+  const expandSlots = (slots: Array<{ lift: string; isLower: boolean; day: DayName }>) => {
+    const out = new Map<string, string>();
+    for (const s of slots) {
+      if (s.lift === pairedSlotName) {
+        for (const n of PAIRED_UPPER) out.set(n, s.day as string);
+      } else {
+        out.set(s.lift, s.day as string);
+      }
+    }
+    return out;
+  };
+  const dayForLift = expandSlots(placedWeek.slots as never);
+  // ⛔ THE TEST WEEK HAS ITS OWN MAP. Week 3 puts every lift on its own day, so the days MOVE between
+  // a normal week and the test week — that is the whole point of the mode, not a bug to reconcile.
+  const dayForLiftTest = liftingDays === 3 && solvedTest.status !== 'unsolvable'
+    ? expandSlots(solvedTest.week.lifts.map((l) => ({
+        lift: l.lift, isLower: l.isLower, day: cap(l.day) as DayName,
+      })))
+    : dayForLift;
   // Where the heavy legs actually landed — the hill session's descent is prescribed off this.
+  // ⚠️ Taken from the NORMAL week: the endurance sessions are authored once for the block, and the
+  // lower days do not move between layouts anyway (only the upper pair splits).
   const heavyLowerDays: string[] = placedWeek.slots.filter((s) => s.isLower).map((s) => s.day as string);
   const liftDay = (l: typeof MAIN_LIFTS[number]): string => dayForLift.get(l.name) ?? l.day;
+  const liftDayIn = (l: typeof MAIN_LIFTS[number], isTestWeek: boolean): string =>
+    (isTestWeek ? dayForLiftTest : dayForLift).get(l.name) ?? liftDay(l);
+
+  /**
+   * ⛔ THE ORDER ON A SHARED DAY IS THE WHOLE COST, SO IT HAS TO BE SAID (§0f).
+   *
+   * The second lift in a session is trained fatigued — the exercise done first is the one that adapts
+   * most, and the later one gives up load and reps. Heaviest first is therefore not a preference, it
+   * is what decides which lift pays. Emitting two sessions on one day and saying nothing would leave
+   * the athlete to guess, and half of them would guess wrong.
+   *
+   * ⚠️ MAIN_LIFTS ORDER IS THE ORDER: bench precedes overhead press in the array, and bench is the
+   * heavier of the two for essentially every athlete. If a future edit reorders that array this note
+   * follows it, which is correct — it names position, not a hardcoded lift.
+   *
+   * ⚠️ SILENT ON THE TEST WEEK because nothing is shared there. Stated as a fact and a consequence,
+   * never as an instruction (COPY-VOICE rule 7).
+   */
+  const pairNoteFor = (l: typeof MAIN_LIFTS[number], isTestWeek: boolean): string => {
+    if (liftingDays !== 3 || isTestWeek || l.isLower) return '';
+    const [first, second] = PAIRED_UPPER;
+    if (l.name === first) {
+      return ` Shares the day with ${second}, and goes first — the second lift of a session is done`
+        + ` fatigued, so it gives up load and reps.`;
+    }
+    return ` Follows ${first} on the same day. Week 3 splits them onto their own days, so the set that`
+      + ` sets the next cycle's weight is read fresh.`;
+  };
 
   /**
    * ⛔ THE STACK HAS TO REACH THE ATHLETE, NOT JUST THE DATA STRUCTURE (§0f).
@@ -1041,12 +1189,43 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // easy volume flexes around it, which is the yield order the doctrine already states.
     const hardRunMiles = hardDayIsRun && hardPinDay ? HILL_SESSION_MIN / pace : 0;
     const easyBudget = Math.max(1, held - hardRunMiles);
-    const perMile = distributeRunMiles(easyBudget, runDayList.length);
+    // ⛔ ABOVE THE SELF-REGULATION LINE THE ENGINE STOPS SHAPING THE WEEK (2026-07-29).
+    //
+    // Michael: *"we dont do the math — you pick your long day, your hard day if you want it, and we
+    // put strength in the right places."*
+    //
+    // ⛔ WHY, AND IT IS A MEASURED DEFECT NOT A PREFERENCE. `distributeRunMiles` weights the EASY
+    // budget, and `runDayList` excludes the hard day — so a "4 run day" week is really a 3-way split
+    // at 1.5/1.0/0.85 and the long run takes 45% of the budget. Measured at 40 miles: a 16-mile long
+    // run, 40% of the week. At 3 run days it is a 2-way split and the long run takes 58% — 21 miles,
+    // 3h09, past both ceilings the field uses. Daniels caps the long run at 25–30% of weekly mileage
+    // with a 2:30–3:00 time limit; strength-led hybrid programmes run the long session 60–90 min.
+    // The weights are roughly double any published guidance, and the denominator is wrong on top.
+    //
+    // ✅ SO ABOVE THE LINE THE SHARE IS EVEN. The engine still names WHICH day is long — that is the
+    // athlete's pick and the solver needs the kind to place the lifting around it — it just stops
+    // deciding how much bigger it is. Below the line the weighting stands: a 12-mile-a-week runner
+    // asking for a long run and getting four equal jogs is a worse answer, and 45% of a small budget
+    // is not the same defect.
+    //
+    // ⚠️ 25 IS A PRODUCT DECISION AND HAS NO PAPER UNDER IT. Nothing in the literature says at what
+    // volume a runner can self-regulate; it is a judgement that somebody holding 25+ miles has a
+    // routine. It is NOT a cap — the athlete's typed miles are still honoured in full, which is D-222's
+    // retirement (`maintenance-volume-band.ts`: a ceiling was built once and must never come back).
+    const selfRegulated = asked >= SELF_REGULATED_MILES;
+    const perMile = selfRegulated
+      ? Array.from({ length: runDayList.length }, () => easyBudget / runDayList.length)
+      : distributeRunMiles(easyBudget, runDayList.length);
     const daysLongFirst = [longRunDay, ...runDayList.filter((d) => d !== longRunDay)];
     daysLongFirst.forEach((day, i) => {
       const mi = perMile[i] ?? perMile[perMile.length - 1];
       runMinutesByDay[day] = Math.max(15, Math.round(mi * pace));
     });
+    // ⛔ THE NOTE IS THE WHOLE POINT OF THE MODE, so it cannot be silently dropped when the pace note
+    // already claimed the channel. Both facts travel.
+    if (selfRegulated) {
+      volume_notes = [volume_notes, SELF_REGULATED_NOTE].filter(Boolean).join(' ');
+    }
   }
 
   // ── The weeks ─────────────────────────────────────────────────────────────
@@ -1057,6 +1236,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     if (!placed) continue;
     const { slot, weekInCycle } = placed;
     const isDeload = weekInCycle === WEEKS_PER_CYCLE;
+    // ⛔ WEEK 3 IS THE MEASUREMENT WEEK — Wendler's 95% set, the one that decides the next cycle's
+    // working number. In 3-day mode it runs on four days so no lift is read under a fatigued state.
+    const isTestWeek = liftingDays === 3 && weekInCycle === 3;
     // Week 3 of every cycle is the 95% set — Wendler's own validity check (SPEC §1). Nothing here
     // marks it: the sets themselves carry it (95% of the working number, and in the anchor the top
     // set is open). The reading of that set is the transition gate's job, not the composer's.
@@ -1171,7 +1353,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // ⛔ The SOLVER's day, not the grid's. `liftDay()` falls back to `lift.day` only if
         // place-week omitted this lift, so a placement failure degrades to the old fixed week
         // rather than to a session with no day.
-        day: liftDay(lift),
+        // ⚠️ AND THE TEST WEEK USES ITS OWN LAYOUT (3-day mode): week 3 of every cycle splits the
+        // paired upper day so every AMRAP is read fresh. Identical to `liftDay` at four days.
+        day: liftDayIn(lift, isTestWeek),
         type: 'strength',
         name: `Strength — ${lift.name}`,
         // The assistance guidance rides with the session, once, on the weeks that carry assistance.
@@ -1205,7 +1389,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // another stage has already rendered*. Today the main lifts are safe only because none of
         // them matches that trigger list — by coincidence of the list, not by design. See Q-216.
         description: `${prescribedLabels.map(exerciseLabel).join(' · ')}.${isDeload ? '' : ` ${ASSISTANCE_GUIDANCE}`}${
-          isDeload || !cycleAssistance.note ? '' : ` ${cycleAssistance.note}`}${amrapNote}${stackNoteFor(lift)}`,
+          isDeload || !cycleAssistance.note ? '' : ` ${cycleAssistance.note}`}${amrapNote}${stackNoteFor(lift)}${pairNoteFor(lift, isTestWeek)}`,
         duration: isDeload ? 35 : 60,
         strength_exercises: ex,
         // ⛔ NO `1rm_test` TAG, and that is deliberate. The tag makes the logger DISCARD the planned

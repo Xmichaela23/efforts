@@ -101,8 +101,19 @@ export function volumeStateLineVsUsual(state: VolumeState | null, usualWeeklyMil
   const dose = maintenanceDoseFor(usualWeeklyMiles);
   if (!state || dose == null) return null;
   switch (state) {
+    // ⛔ THREE FACTS, FOR AN ATHLETE WHO KNOWS WHAT THEY ARE DOING (2026-07-29). Michael, on the
+    // 40-mile runner: *"we suggest they drop some miles and make it clear these are easy zone two
+    // miles but make it clear the focus is strgnth for the next 12 weeks so gains may very based on
+    // how they ahandle their run work."*
+    //
+    // The suggestion IS the number — naming their own dose is the drop, stated without an imperative.
+    // Then the intensity, then what the extra volume costs. It is a trade, priced; never a warning.
+    //
+    // ⚠️ "conversational", NOT "zone two" — COPY-VOICE rule 9 bans the zone vocabulary by name
+    // alongside "aerobic base" and "Z2". The word is already the app's own: the Running step reads
+    // *"All of it conversational — strength leads this block."* One vocabulary, not two.
     case 'above':
-      return `Above the ~${dose} ${unit} that holds your usual ${Math.round(Number(usualWeeklyMiles))}. It still holds — the strength gain settles toward the low end of the range.`;
+      return `Above the ~${dose} ${unit} that holds your usual ${Math.round(Number(usualWeeklyMiles))}. All of it conversational — the one hard day is the only intensity. Strength leads for 12 weeks, and the strength gain tracks how much running sits beside it.`;
     case 'below':
       return `Below the ~${dose} ${unit} that holds your usual ${Math.round(Number(usualWeeklyMiles))}. The base drifts at this volume, and comes back when the running does.`;
     case 'in_band':
@@ -144,8 +155,11 @@ export function volumeStateForMiles(
  */
 export function volumeStateLine(state: VolumeState | null): string | null {
   switch (state) {
+    // ⚠️ THE SAME THREE FACTS as the personal line above, minus their number — this is the fallback
+    // for an athlete who never told us their usual, so it cannot name a dose. Kept parallel on
+    // purpose: two versions of one sentence drifting apart is how the copy in this repo rots.
     case 'above':
-      return 'Above the volume this block is built around. It still holds — the strength gain settles toward the low end of the range.';
+      return 'Above the volume this block is built around. All of it conversational — the one hard day is the only intensity. Strength leads for 12 weeks, and the strength gain tracks how much running sits beside it.';
     case 'below':
       return 'Below the volume that holds an aerobic base. The base drifts at this volume, and comes back when the running does.';
     case 'in_band':

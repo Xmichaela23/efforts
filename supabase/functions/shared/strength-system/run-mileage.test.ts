@@ -50,3 +50,34 @@ Deno.test('⛔ NO SINGLE RUN SWALLOWS THE WEEK', () => {
   const longest = Math.max(...runs.map((s: any) => s.duration)) / PACE;
   assertEquals(longest < miles, true, `one run carried ${longest} of ${miles} miles`);
 });
+
+// ⛔ THE BUG CASE, KEPT: 40 MILES USED TO PUT 16 OF THEM IN ONE DAY.
+//
+// Measured 2026-07-29. `distributeRunMiles` weights the EASY budget and `runDayList` excludes the hard
+// day, so a "4 run day" week was a 3-way split at 1.5/1.0/0.85 and the long run took 45% of it — 16
+// miles, 40% of the week. The field ceiling is 25–30% of weekly mileage (Daniels, with a 2:30–3:00
+// time limit beside it); strength-led hybrid programmes run the long session 60–90 minutes.
+//
+// Above `SELF_REGULATED_MILES` (25) the engine stops shaping the week and the share is even — the
+// athlete places their own miles. This pins that, because the weighting is still correct BELOW the
+// line and a future session re-applying it everywhere would reinstate the 16.
+Deno.test('⛔ 25+ IS SELF-REGULATED — the engine names the long day and stops sizing it', () => {
+  const { runs, miles } = built(40, 4);
+  const easy = runs.filter((s: any) => !/Hill/.test(s.name));
+  const longest = Math.max(...easy.map((s: any) => s.duration)) / PACE;
+  const share = longest / miles;
+  assertEquals(share <= 0.32, true, `long run took ${Math.round(share * 100)}% of the week (was 40%)`);
+  // Even, not weighted: every easy run is the same length above the line.
+  const spread = longest - Math.min(...easy.map((s: any) => s.duration)) / PACE;
+  assertEquals(spread <= 0.5, true, `easy runs still weighted — ${spread} mi apart`);
+});
+
+// ⚠️ AND THE WEIGHTING SURVIVES BELOW THE LINE. A 12-mile-a-week runner asking for a long run and
+// getting four equal jogs is a worse answer, and 45% of a small budget is not the same defect.
+Deno.test('below 25 the long run is still the long run', () => {
+  const { runs } = built(20, 3);
+  const easy = runs.filter((s: any) => !/Hill/.test(s.name));
+  const longest = Math.max(...easy.map((s: any) => s.duration));
+  const shortest = Math.min(...easy.map((s: any) => s.duration));
+  assertEquals(longest > shortest, true, 'the long run stopped being longer below the line');
+});
