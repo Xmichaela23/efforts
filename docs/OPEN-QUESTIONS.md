@@ -1770,3 +1770,58 @@ The current arrangement is defensible — it wins a real term against every pres
 ✅ **THE RENAME SHIPPED SEPARATELY (2026-07-28), because it is a defect whether or not the new term is ever built.** `upperSpreadPenalty` → **`upperToNearestLiftPenalty`**, which is what it measures. Michael: *"Rename it to what it measures, or the next session reads it as covering presses exactly as I did."* The block comment now states the measurement, the −1-across-four-arrangements evidence, and that press-to-press remains unpriced.
 
 **Related:** Q-212 (the symptom), §0e and §0j in `docs/SPEC-week-solver.md`.
+
+---
+
+## Q-215 — The easy-run placer cannot choose a FREE day, cannot see lifts, and asserts a 6h split it never asked about (2026-07-28, VERIFIED by code trace, NOT built)
+
+⛔ **THE CODE PREDICTED THIS EXACT BEHAVIOUR BEFORE IT HAPPENED, AND THAT IS THE STRONGEST EVIDENCE HERE.** `place-week.ts:87`, written 2026-07-26:
+
+> *"MIN_STACK_GAP_H STAYS AT 6 — it is the floor that makes a stacked day survivable when the athlete cannot split any further, **not the arrangement to aim for. A scheduler that treats 6h as equal to 24h will stack by preference and quietly cost the aerobic side.**"*
+
+Two days later the composer stacked a 57-minute easy run onto the **Back Squat** day — the developing lift under `strength: develop` — at the 6h fallback, **while Wednesday sat completely empty.** The warning was authored before the behaviour it describes.
+
+⚠️ **NOTHING REGRESSED, AND THE RULE WAS NEVER SQUAT-SPECIFIC.** The upper-days-only exclusion covered **both runs and rides** and closed **both squat and deadlift** days. It was lifted deliberately 2026-07-28 (`67a62bb4`, Michael's call) because it produced one ride instead of two and runs on three consecutive days. ⛔ Do not "restore" it — read that decision first.
+
+### 1. ⛔ THE SEARCH SPACE EXCLUDES THE BEST ANSWER BY CONSTRUCTION
+
+`strength-primary-plan.ts:905` builds `runCandidates` from **lift days only**:
+
+```
+[...upperLiftDays, ...MAIN_LIFTS.filter((l) => l.isLower).map(liftDay)]
+```
+
+**A day with no session on it cannot be selected.** In the week that raised this, Wednesday was empty — the easy run could have gone there with no stack, no gap and no interference, and it was never on the ballot. Michael: *"That's not a tuning problem, it's a search space that excludes the best answer by construction."*
+
+⚠️ Note the asymmetry with the lifts: the lifts got an exhaustive solver over all seven days (Q-214). The runs are ranked over a hand-built candidate list.
+
+### 2. THE RANKING CANNOT SEE LIFTS AT ALL
+
+`easyRunAnchorAdjacencyPenalty(day, qualityRunDay, longRun)` (`_shared/week-optimizer.ts:108`) takes three arguments and **all three are runs**. It prices +4 beside the quality run and +4 beside the long run. There is no term for a heavy-leg day, and none for which lift is developing.
+
+Tuesday won with **penalty 0** — it is simply far from Thursday and Sunday. The cost of landing on the developing lift's day was never counted. ⚠️ Same shape as `upperToNearestLiftPenalty` (Q-214): a ranking that reads as though it weighed something it structurally cannot see.
+
+### 3. `canSplitDay` IS NEVER POPULATED — and this one reaches the athlete
+
+`place-week.ts:97` states the requirement: *"the intake must still ASK whether the day can be split rather than infer it from the athlete accepting a stack."* **Nothing in the codebase sets it.** `strength-primary-plan.ts:701` says it is deliberately not set, and `stackGapHours()` returns `0` when it is undefined.
+
+The session note nevertheless reads *"leave 6h before the run"* as a flat instruction. ⛔ **An athlete who cannot train twice in a day is being told to do something they cannot do, stated as though it had been checked.**
+
+### 4. ⚠️ THE NOTE'S GUIDANCE IS UNSOURCED, AND THE CODE ALREADY SAYS SO
+
+`strength-primary-plan.ts:1095`: Robineau's 0h arm stacked lifting with **hard** endurance; this is a lift plus an **easy** run, which is not the tested condition. The comment ends: *"⛔ Do not attach a citation here without one that tested lifting + easy running same-day."*
+
+✅ **Recorded here NOT as a reason to remove the note** — resistance-first is still correct when sessions cannot be separated — **but so nobody later attaches a citation that does not test the condition.** The guidance is reasoned; it is not evidenced.
+
+### The evidence base, for whoever builds this
+
+| source | finding |
+|---|---|
+| **Robineau 2016** (n=58, 7 wk) | half-squat 1RM **+16.8% @0h · +31.2% @6h · +25.9% @24h**; VO2peak higher at 24h than at either 0h or 6h |
+| **Schumann 2022** | strength attenuation p=0.043 same-session, n.s. at ≥3h |
+| **Eddens 2018** | +6.91% lower-body strength for resistance-first ordering |
+| `STRENGTH-PROTOCOL §6.2` | easy run as recovery flush — lower first, 6h gap |
+
+⛔ **24h IS THE TARGET, 6h IS THE FALLBACK. They are not equivalent**, and the aerobic side is where the difference shows.
+
+**Related:** Q-214 (the same "term that cannot see it" shape, on lift placement), §0e and §0j in `docs/SPEC-week-solver.md`.
