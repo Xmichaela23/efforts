@@ -1653,10 +1653,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     const when = sameCycle ? ` at cycle ${ceilingHits[0].cycle}` : '';
     placementCompromises.push({
       kind: 'cost',
+      // ⛔ TIGHTENED 2026-07-29. Michael, on the confirm screen: *"a bit dense and cofusing."* This was
+      // the longest block on it at 53 words, and two of its clauses were doing no work: *"the working
+      // number reaches N% of the max on file AND HOLDS THERE"* restates "stop climbing", and *"rather
+      // than a limit"* argues against a reading the athlete has not made yet.
+      //
+      // ⚠️ THE 1RM IS STILL NAMED per lift, because it is the number they would go and re-test and it
+      // is the reason the sentence exists. What went is the padding around it.
+      //
+      // ⚠️ Q-217 IS UNCHANGED AND STILL OPEN: *"usually out of date"* is untrue for an athlete who
+      // never TESTED that lift, where the number was never in date. Shorter, not yet correct.
+      // ⚠️ ORDERED SO THE TWO "at" CLAUSES CANNOT COLLIDE. Shortening it to `stop climbing${when} at
+      // ${pct}%` produced *"stop climbing at cycle 3 at 90% of the max on file"* — `when` already
+      // carries an "at". The percentage leads now, and the cycle rides inside the same clause.
       text:
-        `${list} stop${named.length === 1 ? 's' : ''} climbing${when} — the working number reaches ` +
-        `${pct}% of the max on file and holds there. That is usually a record that is out of date ` +
-        `rather than a limit; a fresh test lets it keep climbing.`,
+        `${list} reach ${pct}% of the max on file${when} and stop climbing. ` +
+        `That usually means the record is out of date — a fresh test lets ${named.length === 1 ? 'it' : 'them'} keep going.`,
     });
   }
 

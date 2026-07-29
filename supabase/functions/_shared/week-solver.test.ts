@@ -493,10 +493,11 @@ Deno.test('at-the-floor placement is stated, not passed in silence', () => {
   if (r.status === 'unsolvable') throw new Error('fixture should solve');
   const floor = r.notes.find((n) => n.text.includes('nothing spare'))?.text;
   assert(floor, `an exactly-at-clearance placement said nothing: ${JSON.stringify(r.notes)}`);
-  assert(/\d+ hours/.test(floor!), 'the note does not state the hours');
-  // ⚠️ "the day before/after" may only appear at a genuine one-day gap.
-  for (const n of r.notes.filter((x) => x.text.includes('the day '))) {
-    assert(/24 hours/.test(n.text), `"${n.text}" claims adjacency at a gap that is not 24h`);
+  assert(/\(\d+h\)/.test(floor!), 'the note does not state the hours');
+  // ⚠️ "the day before/after" may only appear at a genuine one-day gap — asserted per CLAUSE now,
+  //    because one note carries several facts and only some of them are adjacency.
+  for (const c of floorClauses(r.notes).filter((x) => x.includes('the day '))) {
+    assert(/\(24h\)/.test(c), `"${c}" claims adjacency at a gap that is not 24h`);
   }
 });
 
@@ -526,9 +527,27 @@ Deno.test('a week with room to spare says nothing about clearances — notes are
 // arrangement the solver can be given and hold the property across all of them.
 // ════════════════════════════════════════════════════════════════════════════
 
-/** Every at-the-floor note, with the anchor and distance it is about, parsed back out of the copy. */
+/**
+ * The at-the-floor report, parsed back out of the copy.
+ *
+ * ⛔ REWRITTEN 2026-07-29 WHEN THE COPY COLLAPSED TO ONE NOTE. The tail *"hours, the minimum the rule
+ * allows, with nothing spare"* used to be printed once per group, so on a real week two paragraphs
+ * repeated the same fourteen words. It is now said ONCE and the pairings are a list inside it.
+ *
+ * ⚠️ AND THAT ALMOST MADE THE UNIQUENESS TEST VACUOUS. With every fact in one note, "no two notes
+ * repeat the same anchor" is trivially true — the duplicate would now be two CLAUSES rather than two
+ * notes. So the invariant moved down a level with the copy: these helpers return clauses, not notes.
+ */
 function floorNotes(notes: Array<{ kind: string; text: string }>) {
-  return notes.filter((n) => n.text.includes('the minimum the rule allows'));
+  return notes.filter((n) => /at (its|their) minimum with nothing spare/.test(n.text));
+}
+
+/** The individual pairings inside the single floor note — one per (anchor, distance, side) fact. */
+function floorClauses(notes: Array<{ kind: string; text: string }>): string[] {
+  const note = floorNotes(notes)[0];
+  if (!note) return [];
+  const body = note.text.replace(/^[^:]*:\s*/, '').replace(/\.$/, '');
+  return body.split(';').map((c) => c.trim().replace(/^and\s+/, '')).filter(Boolean);
 }
 
 Deno.test('⛔ NO TWO FLOOR NOTES REPEAT THE SAME ANCHOR AT THE SAME DISTANCE — swept', () => {
@@ -548,27 +567,29 @@ Deno.test('⛔ NO TWO FLOOR NOTES REPEAT THE SAME ANCHOR AT THE SAME DISTANCE �
         });
         if (r.status === 'unsolvable') continue;
         const seen = new Set<string>();
-        for (const n of floorNotes(r.notes)) {
-          // The identity of a floor note is the anchor it names plus the gap it states. Two notes
-          // sharing both are the duplicate paragraph this grouping exists to remove.
-          const label = /your ([a-z ]+?) (?:is the day|—)/.exec(n.text)?.[1]
-            ?? /from your ([a-z ]+?) —/.exec(n.text)?.[1] ?? '?';
-          const hours = /(\d+) hours/.exec(n.text)?.[1] ?? '?';
+        // ⚠️ ONE NOTE, MANY CLAUSES. Never more than one floor note now — the duplicate this guards
+        //    against is two CLAUSES stating the same fact, which is what two paragraphs used to be.
+        assert(floorNotes(r.notes).length <= 1,
+          `the floor report split back into paragraphs with ${runD}/${rideD}/${hardD}`);
+        for (const c of floorClauses(r.notes)) {
+          // The identity of a floor fact is the anchor it names plus the gap it states.
+          const label = /your ([a-z ]+?)(?: \(|$| the day)/.exec(c)?.[1]
+            ?? /from your ([a-z ]+?) \(/.exec(c)?.[1] ?? '?';
+          const hours = /\((\d+)h\)/.exec(c)?.[1] ?? '?';
           // ⚠️ THE SIDE IS PART OF THE IDENTITY. A lift the day BEFORE the hard run and another the
           // day AFTER it both name that anchor at 24h, and they are different facts that cannot
-          // share a sentence. Keying on anchor+distance alone called that legitimate pair a
-          // duplicate — the test was wrong, not the grouping.
-          const side = /the day (before|after)/.exec(n.text)?.[1] ?? 'span';
+          // share a clause. Keying on anchor+distance alone called that legitimate pair a duplicate.
+          const side = /the day (before|after)/.exec(c)?.[1] ?? 'span';
           const key = `${label}|${hours}|${side}`;
           assert(
             !seen.has(key),
-            `two floor notes for "${label}" at ${hours}h with ${runD}/${rideD}/${hardD}:\n` +
-              floorNotes(r.notes).map((x) => `  ${x.text}`).join('\n'),
+            `two floor clauses for "${label}" at ${hours}h with ${runD}/${rideD}/${hardD}:\n` +
+              floorClauses(r.notes).map((x) => `  ${x}`).join('\n'),
           );
           seen.add(key);
-          // A grouped note names more than one lift — count them so a fix that silently stopped
+          // A grouped clause names more than one lift — count them so a fix that silently stopped
           // grouping (and so trivially passed the uniqueness assert) cannot go unnoticed.
-          if (n.text.includes(' and ')) sawMultiLift++;
+          if (c.includes(' and ')) sawMultiLift++;
         }
       }
     }

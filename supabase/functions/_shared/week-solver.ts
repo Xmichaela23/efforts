@@ -587,14 +587,24 @@ export function solve(input: SolverInput): SolverResult {
           if (gapDays(A.dayIndex, B.dayIndex) !== 1) continue;
           const [first, second] = A.dayIndex === (B.dayIndex + 1) % 7 ? [B, A] : [A, B];
           const reason = adjacencyPenaltyReason(first.kind, second.kind);
+          // ⛔ TIGHTENED 2026-07-29. Michael, on the confirm screen: *"can we tighten how this copy
+          // works so it all sits on the screen witout scroling its a bit dense and cofusing."*
+          //
+          // Was 44 words carrying two clauses that said nothing the athlete could act on: *"so the
+          // rest of the week is built around that pair"* (the week IS the surrounding grid — they can
+          // see it) and *"nothing was moved to make it easier"* (a promise about the engine's
+          // behaviour, not a fact about their week). What survives is the pairing, the days, and why
+          // it stands: both are theirs.
           notes.push({
             kind: 'cost',
             text:
-              `Your ${first.label.replace(/^your\s+/i, '')} and ${second.label} are back to back — ` +
-              `${CAP(first.dayIndex)} into ` +
-              `${CAP(second.dayIndex)} — so the rest of the week is built around that pair.` +
-              (reason ? ` ${reason.charAt(0).toUpperCase()}${reason.slice(1)}.` : '') +
-              ` Both are your days, so nothing was moved to make it easier.`,
+              // ⚠️ BOTH LABELS ARE STRIPPED. Only the first was, so a real week read "Your long ride
+              // and your long run" — the possessive twice in one clause, which is the kind of thing
+              // that makes copy feel like it was assembled rather than written.
+              `Your ${first.label.replace(/^your\s+/i, '')} and ${second.label.replace(/^your\s+/i, '')} ` +
+              `are back to back — ${CAP(first.dayIndex)} into ${CAP(second.dayIndex)}. Both are your ` +
+              `days, so the week is built around them.` +
+              (reason ? ` ${reason.charAt(0).toUpperCase()}${reason.slice(1)}.` : ''),
           });
         }
       }
@@ -634,16 +644,35 @@ export function solve(input: SolverInput): SolverResult {
           });
         }
       }
-      for (const g of floorGroups.values()) {
+      // ⛔ ONE NOTE FOR ALL AT-THE-FLOOR CLEARANCES, NOT ONE PER GROUP (2026-07-29). D-331 grouped
+      // these by (anchor, distance) so two lifts stopped producing two identical paragraphs. On a real
+      // week that still left TWO paragraphs whose tails were the same fourteen words —
+      // *"hours, the minimum the rule allows, with nothing spare"* — printed twice. Michael: *"its a
+      // bit dense and cofusing."*
+      //
+      // ⚠️ SAME FIX, ONE LEVEL UP: group by the FACT TYPE rather than by the instance. "At its
+      // minimum with nothing spare" is one fact about the week; which pairings it applies to is a
+      // list. The clauses keep their own distances, so nothing is merged that would print a wrong
+      // number for one of them.
+      const floorClauses = [...floorGroups.values()].map((g) => {
         const list = g.names.length === 1
           ? g.names[0]
           : `${g.names.slice(0, -1).join(', ')} and ${g.names[g.names.length - 1]}`;
-        const text = g.days === 1
-          ? `Your ${g.label} is the day ${g.anchorFollows ? 'after' : 'before'} ${list} — ` +
-            `${g.actual} hours, the minimum the rule allows, with nothing spare.`
-          : `${list} sit${g.names.length === 1 ? 's' : ''} ${g.days} days from your ${g.label} — ` +
-            `${g.actual} hours, the minimum the rule allows, with nothing spare.`;
-        notes.push({ kind: 'cost', text });
+        return g.days === 1
+          ? `your ${g.label} the day ${g.anchorFollows ? 'after' : 'before'} ${list} (${g.actual}h)`
+          : `${list} ${g.days} days from your ${g.label} (${g.actual}h)`;
+      });
+      if (floorClauses.length === 1) {
+        notes.push({
+          kind: 'cost',
+          text: `One clearance is at its minimum with nothing spare: ${floorClauses[0]}.`,
+        });
+      } else if (floorClauses.length > 1) {
+        notes.push({
+          kind: 'cost',
+          text: `${floorClauses.length} clearances are at their minimum with nothing spare: `
+            + `${floorClauses.slice(0, -1).join('; ')}; and ${floorClauses[floorClauses.length - 1]}.`,
+        });
       }
 
       const compromises: string[] = [...b.breaches];
