@@ -73,7 +73,10 @@ The verdict is computed ONCE and read by:
 
 ### ⛔ READ THE AUDIT — IT IS THE MAP OF THESE TWO SCREENS AND MOST OF IT IS UNFIXED
 
-**`docs/AUDIT-performance-state-2026-07-29.md`** — a full code trace of how Performance and State analyse a session and a block, with file:line on every claim. F1-F6 were fixed on 2026-07-30. **These were NOT:**
+**`docs/AUDIT-performance-state-2026-07-29.md`** — a full code trace of how Performance and State analyse a session and a block, with file:line on every claim. F1, F2, F5 and F6 were fixed on 2026-07-30. **These were NOT:**
+
+- ⛔ **F3 — STATE STILL DOES NOT KNOW WHICH PROTOCOL YOU ARE ON, and this is the one to do first.** `coach/index.ts` reads `planConfig?.strength_protocol`; a strength-primary plan **never writes that key** (it identifies itself as `config.source = 'strength_primary'`, and `materialize-plan` has the fallback while the coach does not). So `readStrengthProtocol(null)` returns null — the block's own reading never speaks — and `protocolExpectsE1rmToDip(null)` returns **false**, which leaves the generic *"Estimated one-rep maxes have been sliding — the one being built"* un-suppressed on a block whose prescription is the reason they dipped. Same class as Q-166, the false "pull back" that had to be reverted. ⚠️ The D-338 deload fix makes a false sliding verdict much less likely; it does not close this.
+- **F4 — the Cross-training row can still tell him to ease off his running.** It reads the protocol-blind strength verdict as its focus discipline; when that dips while run ACWR climbs it prescribes *"easing the running is the lever"*. Downstream of F3, and the only one of these that tells him to change what he is doing.
 
 - **F7 — a hill session is graded on its warm-up and cool-down.** The pace score counts only steps carrying a pace target; the four hard climbs deliberately carry none, so the score is the jog in and the jog out. The whole session is unscored.
 - **F8 — the per-lift trend floor scales off SESSION cadence.** More lifting days makes each individual lift HARDER to earn a verdict (4 days → 5 sessions needed per lift, 7-day freshness). Backwards.
