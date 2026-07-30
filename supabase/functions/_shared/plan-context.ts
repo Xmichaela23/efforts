@@ -3,6 +3,7 @@
  * Shared between analyzers (running/cycling/etc).
  */
 import { resolvePlanWeekIndex } from './plan-week.ts';
+import { resolveBlockIdentity, type BlockIdentity } from './block-identity.ts';
 
 function planConfigHasTaperPhase(config: Record<string, unknown>): boolean {
   const phases = config.phases;
@@ -342,3 +343,63 @@ export async function fetchPlanContextForWorkout(
   }
 }
 
+
+/**
+ * ⛔ WHAT BLOCK DID THIS SESSION BELONG TO — the same card State reads (Q-230, audit F9/F10).
+ *
+ * The per-session read and the block read used to open the plan through two different doors and
+ * answer "what plan is this?" separately. This is the second door, pointed at the one resolver:
+ * `_shared/block-identity.ts`. Performance and State now agree by construction rather than by luck.
+ *
+ * ⛔ AND IT DOES NOT REQUIRE `status = 'active'` — that is the point of a separate function.
+ * `fetchPlanContextForWorkout` above filters on it, so a session on a FINISHED or REPLACED plan
+ * returns null context: no week index, no phase, no framing (Q-208, audit F10). A Performance screen
+ * showing history across blocks is exactly where that bites — every session from a completed block
+ * reads as though it were never on a plan. Ownership is still enforced (`user_id`), which is what
+ * `status` was never doing; identity is `plans.id`, and a plan does not stop being the plan a session
+ * was done on because the athlete has since moved to another one.
+ *
+ * ⚠️ ONE ROW, NO JOINS — cheap enough to run on the strength fast path, which deliberately skips the
+ * heavier weekly-readiness and full-week-context fetches.
+ */
+export async function fetchBlockIdentityForWorkout(
+  supabase: any,
+  userId: string,
+  planId: string,
+  workoutDate: string,
+): Promise<BlockIdentity | null> {
+  try {
+    const { data: plan } = await supabase
+      .from('plans')
+      .select('id, name, config, duration_weeks, goal_id')
+      .eq('id', planId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (!plan) return null;
+
+    // The goal is optional: it carries the non-race focus (Q-230 Part B) and the race fields. A plan
+    // with no goal row still resolves everything the config can answer.
+    let goal: any = null;
+    if (plan.goal_id) {
+      const { data: g } = await supabase
+        .from('goals')
+        .select('id, name, goal_type, target_date, sport, distance, training_prefs')
+        .eq('id', plan.goal_id)
+        .eq('user_id', userId)
+        .maybeSingle();
+      goal = g ?? null;
+    }
+
+    return resolveBlockIdentity({
+      planId: String(plan.id),
+      planName: plan.name ?? null,
+      planConfig: plan.config ?? null,
+      durationWeeks: plan.duration_weeks ?? null,
+      goal,
+      onDateIso: String(workoutDate).slice(0, 10),
+    });
+  } catch (e) {
+    console.warn('[plan-context] fetchBlockIdentityForWorkout:', e);
+    return null;
+  }
+}

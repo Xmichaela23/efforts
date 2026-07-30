@@ -167,6 +167,33 @@ export type CoachWeekContextResponseV1 = {
     week_intent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
     week_focus_label: string | null;
     week_start_dow: WeekStartDow;
+    /**
+     * ⛔ WHAT THIS BLOCK IS (Q-230 / audit F9). Resolved once by `_shared/block-identity.ts` and
+     * rendered, never re-derived — the slice above (id, name, week number) was everything State was
+     * ever told, which is why it could not tell a 5/3/1 block from a 5×5 one, or chasing speed from
+     * chasing distance.
+     *
+     * ⚠️ Every field is nullable and null MEANS SOMETHING: the plan did not say. Render nothing.
+     */
+    block?: {
+      protocol_id: string | null;
+      /** False = an id this build does not recognise. Treat exactly like null; do not default it. */
+      protocol_known: boolean;
+      /** What the block reads to judge a session: an all-out set, reps-in-reserve, or neither. */
+      effort_read: 'amrap' | 'rir' | 'none';
+      goal_kind: 'race' | 'non_race' | 'unknown';
+      /** Only set when the focus is one this build knows. */
+      goal_focus: string | null;
+      block_weeks: number | null;
+      phase: string | null;
+      cycle_kind: 'leader' | 'anchor' | null;
+      week_in_cycle: number | null;
+      is_deload_week: boolean | null;
+      has_all_out_set: boolean | null;
+      /** The 95% reading — the one that moves the working number. NOT every all-out set. */
+      is_measurement_week: boolean | null;
+      top_set_pct: number | null;
+    };
   };
   metrics: {
     // Workload points

@@ -157,7 +157,7 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
 // LIFT's estimated 1RM, its trend, and a PR flag, referenced to YOUR OWN best — not a typed baseline (which the
 // field doesn't use and which pegged the dot dumb once you passed it). Each lift's direction is already
 // NOISE-GUARDED on the spine (computeStrengthState) so a single session can't fake up/down; the estimate itself
-// is RIR-adjusted + near-failure-weighted (compute-facts brzycki1RM + D-118), which is the science's own caveat.
+// is RIR-adjusted + near-failure-weighted (compute-facts estimated1RM, Wendler's formula per D-339, + D-118), which is the science's own caveat.
 // Receipts kept PER LIFT (sessions · as of). The grinding/RIR fatigue line (D-302) stays below — a distinct
 // fatigue axis, not the number. planWeek/isDevelop/the develop word-map are gone with the rolled-up verdict.
 // The big-4 lifts that get a 12-week e1RM sparkline (Michael 2026-07-23). Matches BIG_4_LIFTS in
@@ -174,13 +174,12 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
     if (l.direction === 'holding')   return { arr: '→', text: 'flat', cls: 'text-white/65' };
     return { arr: '', text: 'new', cls: 'text-white/55' };
   };
-  // PR = a REAL PR — a genuine new ALL-TIME high estimated 1RM (Michael 2026-07-21: "a PR should be a
-  // real PR, basically a new 1RM"). Was best-of-6-weeks, which fired on almost every progressing lift
-  // and even stamped a lift reading "new". Now: the latest must top the athlete's all-history best, and
-  // there must be real history to have beaten (≥3 all-time points). Null all-time data → NEVER a PR.
-  const isPR = (l: (typeof lifts)[number]) =>
-    l.latestE1rm != null && (l as any).allTimeBestE1rm != null && ((l as any).allTimeCount ?? 0) >= 3 &&
-    l.latestE1rm >= (l as any).allTimeBestE1rm - 0.5;
+  // ⛔ READ, NOT DECIDED (2026-07-30). This screen used to hold the PR rule itself — three conditions
+  // over all-time best, all-time count and the latest estimate. Deciding what counts as a personal
+  // record is a verdict, and verdicts are the spine's (Constitution Law 4). It now lives in
+  // `_shared/state-trend/assemble.ts`; the rule is unchanged, only its address.
+  // ⚠️ Absent → false. An older snapshot that predates the field shows no PR rather than a wrong one.
+  const isPR = (l: (typeof lifts)[number]) => (l as any).isPr === true;
   return (
     <Row label="strength">
       {lifts.length === 0 ? (

@@ -340,6 +340,24 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
         training_prefs: {
           training_intent: 'completion',
           fitness: 'intermediate',
+          // ⛔ WHAT THE ATHLETE IS ACTUALLY CHASING, PERSISTED (Q-230 Part B).
+          //
+          // The goal id was the FIRST thing this screen knew and the only thing it never saved.
+          // `derivePlanShape` collapses it to `goal_type: 'capacity' | 'maintenance'` plus a posture,
+          // and everything downstream read those — so chasing SPEED and chasing DISTANCE both arrived
+          // as "run: develop" and were indistinguishable to every surface that tried to reason about
+          // the block. The only surviving trace was `GOAL_LABELS[goal]` in the plan's NAME, which is
+          // display text, not a fact.
+          //
+          // ⛔ IT LIVES ON THE GOAL, NOT ON THE PLAN. The goal owns what the athlete wants; the plan
+          // is one attempt at it, and a block can be rebuilt or replaced without the want changing.
+          // Copying it into `plans.config` would create a second owner that drifts on every rebuild
+          // (Constitution Law 1). `_shared/block-identity.ts` reads it from here.
+          //
+          // ⚠️ EXISTING GOALS DO NOT HAVE IT and are not backfilled — their focus was never recorded,
+          // so inventing one now would be a guess wearing a fact's clothes (Law 2). They read
+          // `unknown`, and every surface stays silent about their goal rather than naming the wrong one.
+          goal_focus: goal,
           // ⛔ NOT SENT ON THE STRENGTH PATH — because they are never ASKED on it.
           //
           // `getSteps` skips both the `days` and `commitment` screens for Strength Focus (the lifting

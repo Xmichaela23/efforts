@@ -28,6 +28,9 @@ import {
   mapRPEToIntensity,
 } from "../_shared/workload.ts";
 import { assessHrPlausibility, resolveMaxHrCeiling } from "../_shared/hr-plausibility.ts";
+// ⛔ ONE FORMULA FOR THE WHOLE APP (D-339). The client's baseline test imports this same module, so
+// the number that SETS the working weights and the number that JUDGES the work now agree.
+import { estimate1RMRounded } from "../../../src/lib/estimate-1rm.ts";
 import { canonicalize, muscleGroup, bigFourLift } from "../_shared/canonicalize.ts";
 // THE SAME top-set rule the logger stamps the difficulty tap with — heaviest set, ties to the last.
 // Imported, not re-derived: if the two ever disagree the word lands on a different set than the one
@@ -119,37 +122,21 @@ function distanceMeters(w: WorkoutRow): number {
 }
 
 /**
- * Brzycki formula with RIR offset.
- * effectiveReps = logged_reps + logged_rir treats "leftover capacity" as
- * completed work, giving a stable 1RM estimate without requiring a failure set.
+ * ⛔ WAS BRZYCKI, NOW WENDLER'S OWN (D-339, 2026-07-30). The formula moved to `src/lib/estimate-1rm.ts`
+ * so this function, the baseline test in `StrengthLogger.tsx`, and the program the athlete is running
+ * all answer the question the same way — they used to give three different answers. The full reasoning,
+ * including why the old "DO NOT SWITCH" note's premise inverts above ten reps, is in that file.
  *
- * ⛔ THE JUSTIFICATION THAT USED TO SIT HERE IS CONTESTED AND MAY BE BACKWARDS (checked 2026-07-29).
- * It read: *"Brzycki is more accurate than Epley at the low rep ranges (2-5)."*
+ * ⚠️ THE RIR OFFSET SURVIVES THE MOVE and still matters for the protocols that collect it. On a
+ * protocol that does not (5/3/1), `avgRir` is null and the offset is zero — see `protocolUsesRir`.
  *
- * What the literature actually supports:
- * - ✅ Brzycki accuracy improves markedly when sets are restricted to ≤10 reps (LeSuer et al. 1997,
- *   JSCR 11(4):211-213; Mayhew et al. 2008). That part holds and it is why the 95% set exists.
- * - ⚠️ At the specific 2-5 rep range, some work puts **Epley and Wathen closer to a tested 1RM than
- *   Brzycki**, which is the opposite of the sentence above. Findings conflict by population and lift.
- *
- * ⛔ DO NOT SWITCH THE FORMULA ON THE STRENGTH OF THIS NOTE. Brzycki tends to UNDERESTIMATE and Epley
- * to OVERESTIMATE, and for a number that sets an athlete's next working load, erring low is the safe
- * direction. That is the defensible reason to keep Brzycki — a product decision on which way to be
- * wrong, not a claim that it is the most accurate equation. Changing it is a load-bearing change and
- * needs its own decision entry.
- *
- * ⚠️ AND THE UNDERESTIMATION IS WORST ON DEADLIFT: LeSuer found every equation tested significantly
- * underestimated deadlift 1RM. Filed in `docs/PROTOCOL-strength-focus-overview.md` as open.
+ * ⚠️ NO REP CAP ANY MORE. The old one existed because Brzycki divides by `37 − reps` and blows up;
+ * Wendler's is linear and cannot. Reliability above ~10 reps is handled as PROVENANCE
+ * (`trustedMaxRepsFor` / `advance_untrusted`), never by quietly rewriting the rep count.
  */
-function brzycki1RM(weight: number, reps: number, rir: number): number {
+function estimated1RM(weight: number, reps: number, rir: number): number {
   if (weight <= 0) return 0;
-  const effectiveReps = Math.max(1, reps + Math.round(rir));
-  if (effectiveReps === 1) return Math.round(weight / 5) * 5 || weight;
-  // Brzycki: weight × (36 / (37 - effectiveReps))
-  // Cap at effectiveReps = 30 to avoid division-by-zero / nonsense at high reps
-  const capped = Math.min(effectiveReps, 30);
-  const raw = weight * (36 / (37 - capped));
-  return Math.round(raw / 5) * 5; // round to nearest 5 lbs
+  return estimate1RMRounded(weight, reps, rir);
 }
 
 function isRunDiscipline(type: string | null | undefined): boolean {
@@ -1357,7 +1344,7 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null): {
       : null;
 
     const est1rm = bestWeight > 0 && bestReps > 0
-      ? brzycki1RM(bestWeight, bestReps, avgRir ?? 0)
+      ? estimated1RM(bestWeight, bestReps, avgRir ?? 0)
       : 0;
 
     // ── The three words + the measuring set (D-338) ─────────────────────────────────────────────

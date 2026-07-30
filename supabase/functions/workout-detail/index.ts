@@ -16,8 +16,14 @@ import {
   fetchPlanContextForWorkout,
   fetchPlanRaceMetaForWorkout,
   type PlanContext,
+  fetchBlockIdentityForWorkout,
+  type BlockIdentity,
 } from '../_shared/plan-context.ts';
 import { trySessionRaceReadinessLlm } from '../_shared/session-detail/race-readiness-llm.ts';
+import { canonicalize } from '../_shared/canonicalize.ts';
+// The app's one 1RM formula (D-339, Wendler's own) + the rep ceiling above which it stops holding.
+import { estimate1RMRounded } from '../../../src/lib/estimate-1rm.ts';
+import { trustedMaxRepsFor } from '../shared/strength-system/loading/wendler-531.ts';
 import { buildReadiness } from '../_shared/readiness.ts';
 import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
 import { generateRaceNarrative } from '../_shared/race-narrative.ts';
@@ -565,6 +571,34 @@ async function runSessionDetailPipelineAndPersist(
           : null,
     } : null;
 
+    // ⛔ THE BLOCK IDENTITY CARD — resolved for EVERY session, including the strength fast path
+    // (Q-230 / audit F9). The fast path skips weekly readiness and full week context because those
+    // are expensive and endurance-shaped; this is one row, and it is the only way a strength session
+    // can know it was week 3 of an anchor cycle at 95%. Same resolver State reads, so the two screens
+    // cannot disagree about what block a session belonged to.
+    // ⚠️ Deliberately NOT gated on `plans.status = 'active'` — see `fetchBlockIdentityForWorkout`.
+    // A session on a finished block keeps its framing instead of reading as unplanned (Q-208 / F10).
+    let blockForSession: BlockIdentity | null = null;
+    try {
+      const blockPlanId =
+        plannedRowRaw?.training_plan_id ??
+        attachPlannedRaw?.training_plan_id ??
+        null;
+      if (userId && blockPlanId && workoutDate) {
+        blockForSession = await fetchBlockIdentityForWorkout(
+          supabase,
+          userId,
+          String(blockPlanId),
+          workoutDate,
+        );
+      }
+    } catch (blockErr: unknown) {
+      console.warn(
+        '[session_detail_v1] block identity fetch failed:',
+        blockErr instanceof Error ? blockErr.message : blockErr,
+      );
+    }
+
     let planCtxForSession: PlanContext | null = null;
     if (!strengthPerfFastPath) {
       try {
@@ -764,18 +798,29 @@ async function runSessionDetailPipelineAndPersist(
     // resolvable from a small recent window without a dedicated index.
     if (sessionDetailV1 && isStrengthLikePerfSession(row) && Array.isArray(compStrengthArr) && compStrengthArr.length > 0) {
       try {
-        const normalizeExerciseName = (raw: string): string =>
-          String(raw || '')
-            .toLowerCase()
-            .replace(/\s*\((?:left|right)\)\s*/gi, '')
-            .replace(/\s+/g, ' ')
-            .trim();
+        // ⛔ THE APP'S ONE EXERCISE VOCABULARY (2026-07-30, audit F5). This was a private matcher —
+        // lowercase, strip (Left)/(Right), collapse spaces — which is EXACT-MATCH only. A plan saying
+        // "Barbell Back Squat" against a logged "Back Squat" missed, so the Previous column went blank
+        // on a lift the athlete had done for months, while the server's own matcher counted the very
+        // same session as done. Same session, two answers.
+        // ⚠️ The client reads these keys back with `canonicalize` too — change one side and the lookup
+        // silently returns nothing, which looks like "no history" rather than a bug.
+        const normalizeExerciseName = (raw: string): string => canonicalize(String(raw || ''));
         const currentNames = new Set<string>(
           compStrengthArr
             .map((ex: any) => normalizeExerciseName(ex?.name || ''))
             .filter((s: string) => s.length > 0),
         );
         if (currentNames.size > 0) {
+          // ⚠️ WIDENED 10 → 40 (2026-07-30) FOR THE REP RECORD, and the Previous column is unaffected
+          // because it keeps only the most recent hit per exercise either way.
+          //
+          // 10 strength sessions is ~2.5 weeks on a four-day block — long enough to answer "what did I
+          // lift last time", far too short to answer "is this my best at this weight". 40 covers ~10
+          // weeks, which spans the anchor cycles a rep record actually lives across.
+          // ⛔ The number is OURS. It is a window, not a claim about all-time — see `rep_record_window_sessions`
+          // on the payload, and do not let a surface narrate it as a lifetime PR.
+          const REP_RECORD_WINDOW_SESSIONS = 40;
           const { data: priorRows } = await supabase
             .from('workouts')
             .select('id,date,strength_exercises')
@@ -784,7 +829,9 @@ async function runSessionDetailPipelineAndPersist(
             .lt('date', workoutDate)
             .neq('id', id)
             .order('date', { ascending: false })
-            .limit(10);
+            .limit(REP_RECORD_WINDOW_SESSIONS);
+          /** Per exercise: the most reps ever done at each weight, inside the window. */
+          const bestRepsAtWeight: Record<string, Record<number, number>> = {};
           const previousByName: Record<string, { date: string; days_ago: number; sets: any[] }> = {};
           const todayMs = new Date(workoutDate + 'T00:00:00Z').getTime();
           for (const pr of (priorRows ?? [])) {
@@ -801,9 +848,18 @@ async function runSessionDetailPipelineAndPersist(
             for (const ex of exercises) {
               const normName = normalizeExerciseName(ex?.name || '');
               if (!normName || !currentNames.has(normName)) continue;
-              if (previousByName[normName]) continue;  // earlier (= more recent) row already won
               const setsArr = Array.isArray(ex?.sets) ? ex.sets : [];
+              // The rep-record scan runs over EVERY prior session, not just the most recent one, so
+              // it must come before the `previousByName` early-out below.
+              for (const st of setsArr) {
+                const w = Number(st?.weight) || 0;
+                const r = Number(st?.reps) || 0;
+                if (!(w > 0) || !(r > 0)) continue;
+                const byW = (bestRepsAtWeight[normName] ??= {});
+                if (!(byW[w] > r)) byW[w] = r;
+              }
               if (setsArr.length === 0) continue;  // skip rows with no per-set data
+              if (previousByName[normName]) continue;  // earlier (= more recent) row already won
               const priorMs = new Date(prDate + 'T00:00:00Z').getTime();
               const daysAgo = Math.max(0, Math.round((todayMs - priorMs) / 86400000));
               previousByName[normName] = {
@@ -817,11 +873,60 @@ async function runSessionDetailPipelineAndPersist(
                 })),
               };
             }
-            if (Object.keys(previousByName).length >= currentNames.size) break;  // all current exercises matched
+            // ⛔ THE EARLY BREAK IS GONE. It stopped as soon as every exercise had a Previous row —
+            // which is usually the FIRST prior session — and that would have capped the rep-record
+            // scan at one session while looking like it searched forty.
           }
           if (Object.keys(previousByName).length > 0) {
             (sessionDetailV1 as any).previous_strength_by_exercise = previousByName;
           }
+
+          // ── THE ALL-OUT SET, READ (2026-07-30) ────────────────────────────────────────────────
+          //
+          // ⛔ THE REP RECORD LEADS, THE ESTIMATE FOLLOWS. Wendler p10: *"If your squat goes from
+          // 225x6 to 225x9, you've gotten stronger… Don't get stuck just trying to increase your one
+          // rep max."* The rep count at a fixed weight is EXACT; the estimate is an equation's guess
+          // about a number nobody measured. So the record is the finding and the estimate is context.
+          //
+          // ⚠️ GROUNDED, NOT REASONED. An earlier version of this showed the estimate only on the 95%
+          // week — coherent from the book, and NOT what the field does: Boostcamp tracks max reps at a
+          // given weight AND an e1RM curve off top sets continuously, flagging PRs as they happen.
+          // Being the only 5/3/1 app that hides the number three weeks in four is an outlier position
+          // taken on instinct. Every anchor week it is.
+          const allOut: Array<Record<string, unknown>> = [];
+          for (const ex of compStrengthArr) {
+            const normName = normalizeExerciseName(ex?.name || '');
+            const setsArr = Array.isArray(ex?.sets) ? ex.sets : [];
+            // `amrap` is stamped on the set from the plan's `set_plan`; the athlete types the reps.
+            const amrapSet = setsArr.find((st: any) => st?.amrap === true && (Number(st?.reps) || 0) > 0);
+            if (!amrapSet || !normName) continue;
+            const weight = Number(amrapSet.weight) || 0;
+            const reps = Number(amrapSet.reps) || 0;
+            if (!(weight > 0) || !(reps > 0)) continue;
+
+            const priorBest = bestRepsAtWeight[normName]?.[weight] ?? null;
+            const trustedMax = trustedMaxRepsFor(ex?.name);
+            allOut.push({
+              name: String(ex?.name || ''),
+              weight,
+              reps,
+              /** The most reps done at THIS weight inside the window. Null = never lifted it here before. */
+              prior_best_reps_at_weight: priorBest,
+              /** ⚠️ Null prior is NOT a record. Nothing to beat yet is not the same as beating something. */
+              is_rep_record: priorBest != null && reps > priorBest,
+              rep_record_window_sessions: REP_RECORD_WINDOW_SESSIONS,
+              estimated_1rm: estimate1RMRounded(weight, reps),
+              /**
+               * ⛔ IS THE ESTIMATE WORTH SHOWING AS A NUMBER? Above 8 reps (5 on deadlift) no equation
+               * holds up [LeSuer et al. 1997], and the all-out set is exactly where reps run long. The
+               * value is still computed honestly — it is LABELLED, never capped, because capping the
+               * rep count would report a 15-rep set as a 10-rep one (D-339).
+               */
+              estimate_trusted: reps <= trustedMax,
+              estimate_trusted_max_reps: trustedMax,
+            });
+          }
+          if (allOut.length > 0) (sessionDetailV1 as any).strength_all_out = allOut;
         }
       } catch (e) {
         console.warn(
@@ -829,6 +934,34 @@ async function runSessionDetailPipelineAndPersist(
           e instanceof Error ? e.message : e,
         );
       }
+    }
+
+    // ⛔ THE CARD RIDES ON THE SESSION CONTRACT. `session_detail_v1` is a pre-formatted display
+    // contract the client renders verbatim (Law 4: surfaces render, they never re-decide), so the
+    // block goes on it as data rather than being re-derived on the phone.
+    // ⚠️ Nulls are honest here: absent means the plan did not say, and the screen shows nothing.
+    if (sessionDetailV1 && blockForSession) {
+      (sessionDetailV1 as Record<string, unknown>).block = {
+        plan_id: blockForSession.planId,
+        plan_name: blockForSession.planName,
+        protocol_id: blockForSession.protocolId,
+        protocol_known: blockForSession.protocolKnown,
+        effort_read: blockForSession.effortRead,
+        goal_kind: blockForSession.goal.kind,
+        goal_focus: blockForSession.goal.kind === 'non_race' && blockForSession.goal.known
+          ? blockForSession.goal.focus : null,
+        week_index: blockForSession.weekIndex,
+        block_weeks: blockForSession.blockWeeks,
+        phase: blockForSession.phase,
+        cycle_kind: blockForSession.cycle?.kind ?? null,
+        week_in_cycle: blockForSession.cycle?.weekInCycle ?? null,
+        is_deload_week: blockForSession.cycle?.isDeload ?? null,
+        has_all_out_set: blockForSession.hasAllOutSet,
+        // ⚠️ The 95% reading — NOT every all-out set. Weeks 1 and 2 of an anchor also end on an open
+        // set; only this one moves the working number.
+        is_measurement_week: blockForSession.isMeasurementWeek,
+        top_set_pct: blockForSession.topSetPct,
+      };
     }
 
     if (sessionDetailV1 && planCtxForSession) {

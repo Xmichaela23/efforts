@@ -29,15 +29,38 @@ export interface StrengthExercise {
   setPlan?: Array<{ weight: number; reps: number; amrap?: boolean }>;
 }
 
+/**
+ * Display-shaped normalization: lowercase, strip (Left)/(Right), collapse spaces. Used for the
+ * BODYWEIGHT regex below and nothing else.
+ *
+ * ⛔ DO NOT REPLACE THIS WITH `canonicalize` — I tried, and it is wrong here. Canonical keys are
+ * snake_case (`chin_ups`, `pullup`), and the bodyweight test matches on hyphen-or-space forms
+ * (`chin\-?ups?`), so a chin-up would silently stop reading as bodyweight and start rendering a
+ * weight column it has no number for.
+ *
+ * ⚠️ THE LOOKUPS ARE A DIFFERENT QUESTION and they DO use `canonicalize` — see `lookupKey`. Same file,
+ * two normalizers, and the note that says which is which is the whole reason this is not a bug.
+ */
 function normalizeName(raw: string): string {
-  // Keep only minimal normalization to avoid merging distinct movements
-  // Also remove (Left)/(Right) suffixes so L/R expanded exercises match their base
   return String(raw || '')
     .toLowerCase()
-    .replace(/\s*\((?:left|right)\)\s*/gi, '') // Remove (Left) or (Right)
+    .replace(/\s*\((?:left|right)\)\s*/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/**
+ * ⛔ THE APP'S ONE EXERCISE VOCABULARY, for anything that has to MATCH (2026-07-30, audit F5).
+ *
+ * The RIR lookup and the Previous-session lookup used the display normalizer, which is exact-match
+ * only — so "Barbell Back Squat" against a logged "Back Squat" found nothing and the Previous column
+ * went blank on a lift done for months, while the server counted the same session as done.
+ *
+ * ⚠️ THE PREVIOUS LOOKUP IS A HANDSHAKE: `workout-detail` builds those keys with `canonicalize` too.
+ * Change one side alone and the lookup returns nothing, which renders as "no history" rather than as
+ * a bug — the quietest possible failure.
+ */
+const lookupKey = (raw: unknown): string => canonicalize(String(raw || ''));
 
 function calcVolume(sets: StrengthSet[]): number {
   return sets.filter(s => (s.reps && s.reps > 0) || (s.duration_seconds && s.duration_seconds > 0))
@@ -191,7 +214,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
   const planId = resolvedPlanId;
 
   const rirSummaryMap = new Map<string, RirSummaryEntry>();
-  (rirSummary || []).forEach(e => rirSummaryMap.set(normalizeName(e.name), e));
+  (rirSummary || []).forEach(e => rirSummaryMap.set(lookupKey(e.name), e));
 
   // ── ONE ROW PER SLOT (D-338 follow-on) ────────────────────────────────────────────────────────
   //
@@ -262,7 +285,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     const rirValues = cSetsArr.filter(s => typeof s.rir === 'number').map(s => s.rir as number);
     const actualRir = rirValues.length > 0 ? rirValues.reduce((a, b) => a + b, 0) / rirValues.length : undefined;
     
-    const serverRir = rirSummaryMap.get(legacyKey);
+    const serverRir = rirSummaryMap.get(lookupKey(displayName));
     const status: 'matched'|'skipped'|'swapped' = p && c ? 'matched' : (p && !c ? 'skipped' : (!p && c ? 'swapped' : 'matched'));
     // Build 1:1 planned vs completed sets.
     // D-094: replicate the aggregate planned values (weight / reps / target RIR / qualitative
@@ -298,8 +321,8 @@ export default function StrengthCompareTable({ planned, completed, completedWork
         });
     const completedSets: StrengthSet[] = cSetsArr;
     // D-095: PREVIOUS column — last session's actual per-set data for this exercise.
-    // Lookup keyed by the same normalizeName used for plannedMap/completedMap.
-    const previousEntry = previousByExercise?.[legacyKey] ?? null;
+    // ⚠️ Keyed by `canonicalize`, matching how `workout-detail` builds the map.
+    const previousEntry = previousByExercise?.[lookupKey(displayName)] ?? null;
     const previousSets: StrengthSet[] = Array.isArray(previousEntry?.sets) ? previousEntry!.sets : [];
     const previousDate = previousEntry?.date ?? null;
     const previousDaysAgo = typeof previousEntry?.days_ago === 'number' ? previousEntry!.days_ago : null;

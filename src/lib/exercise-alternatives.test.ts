@@ -146,3 +146,165 @@ Deno.test('bench: Incline / Close-Grip / DB Bench are DIRECT; Chest Fly + push-u
   assertEquals(tierOf(alts, 'Chest Fly'), 'lighter');
   assertEquals(tierOf(alts, 'Push Up'), 'lighter');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-07-30 — AN ACCESSORY SLOT IS NOT OFFERED A MAIN LIFT
+//
+// Michael: *"we arent offering the right swaps for accessories, reads them as traditional lifts."*
+// The uncurated fallback labelled every loadable same-pattern lift a DIRECT swap, and the
+// heaviest-first sort put the main lifts at the top of the list.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ⚠️ `names` and `FULL_GYM` are already defined at the top of this file — reuse them rather than
+// shadowing, or the module throws before a single test runs.
+const GYM = FULL_GYM;
+const offered = (n: string, tier?: 'direct' | 'lighter') =>
+  getInSlotAlternatives(n, GYM).filter((a) => !tier || a.tier === tier).map((a) => a.name.toLowerCase());
+
+Deno.test('a hip thrust is not offered a deadlift', () => {
+  const all = offered('Hip Thrust');
+  for (const banned of ['deadlift', 'conventional deadlift', 'trap bar deadlift', 'sumo deadlift', 'romanian deadlift']) {
+    assertEquals(all.includes(banned), false, banned);
+  }
+  // ⛔ Same hip-hinge pattern, roughly triple the load, completely different job.
+});
+
+Deno.test('a bulgarian split squat is not offered a back squat', () => {
+  const all = offered('Bulgarian Split Squat');
+  for (const banned of ['squat', 'back squat', 'front squat', 'leg press', 'goblet squat']) {
+    assertEquals(all.includes(banned), false, banned);
+  }
+});
+
+Deno.test('the accessory still gets a real list — this excludes, it does not empty', () => {
+  assertEquals(offered('Hip Thrust').length > 0, true);
+  assertEquals(offered('Bulgarian Split Squat').length > 0, true);
+  assertEquals(offered('Lateral Raise').length > 0, true);
+  // ⚠️ "Offer rather than hide" is this module's standing rule, so an exclusion has to leave a
+  // usable list behind. Measured across all 110 uncurated slots before shipping.
+});
+
+Deno.test('a bulgarian split squat is offered the OTHER single-leg work', () => {
+  const all = offered('Bulgarian Split Squat');
+  assertEquals(all.includes('walking lunge'), true);
+  assertEquals(all.includes('reverse lunge'), true);
+  assertEquals(all.includes('step up'), true);
+});
+
+Deno.test('⛔ ONE-DIRECTIONAL — a main lift still offers accessories', () => {
+  // Swapping DOWN from a squat to a lunge is a legitimate call the athlete may need to make.
+  const squat = getInSlotAlternatives('Back Squat', GYM);
+  assertEquals(squat.length > 0, true);
+  assertEquals(squat.some((a) => a.tier === 'direct'), true);
+  assertEquals(squat.some((a) => a.tier === 'lighter'), true);
+  // And every main lift keeps a populated list.
+  for (const lift of ['Conventional Deadlift', 'Bench Press', 'Overhead Press', 'Barbell Row', 'Pull Up']) {
+    assertEquals(getInSlotAlternatives(lift, GYM).length > 0, true, lift);
+  }
+});
+
+Deno.test('the shorthand aliases are main lifts too', () => {
+  // ⚠️ These were the leaks the first pass left: 'rows' was offered for a Face Pull and
+  // 'shoulder press' for a Lateral Raise, because neither shorthand was listed in its family.
+  assertEquals(offered('Face Pull').includes('rows'), false);
+  assertEquals(offered('Lateral Raise').includes('shoulder press'), false);
+  assertEquals(offered('Face Pull').includes('barbell row'), false);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-07-30 — AN ASSISTANCE ROW GETS THE PLAN'S SHORTLIST, NOT THE LIBRARY
+// Michael: *"we need to work with the framework of the plan… the accessories we offer in the plan."*
+// ─────────────────────────────────────────────────────────────────────────────
+
+const asAssistance = (n: string) =>
+  getInSlotAlternatives(n, FULL_GYM, { assistanceRow: true }).map((a) => a.name);
+
+Deno.test('an assistance row offers the OTHER options in its own slot', () => {
+  assertEquals(asAssistance('Bulgarian Split Squat'), ['Reverse Lunge', 'Single Leg Hip Thrust', 'Hanging Leg Raise']);
+  assertEquals(asAssistance('Push Up'), ['Dips', 'Dumbbell Bench Press', 'Dumbbell Shoulder Press']);
+  assertEquals(asAssistance('Pull Up'), ['Chin Up', 'Inverted Row', 'Dumbbell Row']);
+  // ⛔ These are exactly the lists the build flow offered. Nothing new is invented — the menu is
+  // read back, so the swap sheet and the picker cannot drift apart.
+});
+
+Deno.test('a balancing movement offers the rest of its pool', () => {
+  // A Face Pull lands in the push slot when the day already pressed (Q-212). It is on no menu, so
+  // its peers are the rest of that balance pool.
+  assertEquals(asAssistance('Face Pull'), ['Band Pull Apart', 'Rear Delt Fly', 'Chest Supported Row']);
+});
+
+Deno.test('it never offers the exercise itself', () => {
+  for (const n of ['Bulgarian Split Squat', 'Push Up', 'Pull Up', 'Face Pull']) {
+    assertEquals(asAssistance(n).map((x) => x.toLowerCase()).includes(n.toLowerCase()), false, n);
+  }
+});
+
+Deno.test('⛔ OPT-IN — the same name without the flag keeps the library behaviour', () => {
+  // Four menu movements are also ordinary library exercises. A Pull Up prescribed as a main
+  // vertical pull and a Pull Up filling the `pull` assistance slot are the same name in two
+  // different jobs, and only the ROW knows which. Keying off the name alone broke five tests.
+  const asLibrary = getInSlotAlternatives('Pull Up', FULL_GYM).map((a) => a.name);
+  assertEquals(asLibrary.join(',') !== asAssistance('Pull Up').join(','), true);
+  assertEquals(asLibrary.length > 0, true);
+});
+
+Deno.test('an off-menu name on an assistance row falls through to the library', () => {
+  // The athlete can type anything into the name box. A movement the menu has never heard of gets
+  // the pattern logic rather than an empty list.
+  assertEquals(getInSlotAlternatives('Hip Thrust', FULL_GYM, { assistanceRow: true }).length > 0, true);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-07-30 — AND IT KNOWS WHAT DAY IT IS (Q-212 / Wendler p86)
+// Michael: *"yeah it should be smart, no?"* The block never offers a slot's raw menu — it checks the
+// day's main lift first. Same rule the composer applies, same function, not a second reading of it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const onDay = (row: string, mainLift: string) =>
+  getInSlotAlternatives(row, FULL_GYM, { assistanceRow: true, mainLift }).map((a) => a.name);
+
+Deno.test('⛔ a bench day never offers another push', () => {
+  const offered = onDay('Push Up', 'Bench Press');
+  for (const push of ['Dips', 'Dumbbell Bench Press', 'Dumbbell Shoulder Press']) {
+    assertEquals(offered.includes(push), false, push);
+  }
+  // Every option in the push slot IS a push, so the balance pool answers — the case it exists for.
+  assertEquals(offered.includes('Face Pull'), true);
+  // ⚠️ Without this, the sheet offered a Push Up's peers on a bench day: the exact movements the
+  // builder would have replaced, presented as though the plan endorsed them.
+});
+
+Deno.test('a squat day leaves the push slot alone', () => {
+  // Nothing about squatting collides with pressing, so the athlete's own slot stands.
+  assertEquals(onDay('Push Up', 'Back Squat'), ['Dips', 'Dumbbell Bench Press', 'Dumbbell Shoulder Press']);
+});
+
+Deno.test('a row day turns the pull slot into a push', () => {
+  const offered = onDay('Pull Up', 'Barbell Row');
+  for (const pull of ['Chin Up', 'Inverted Row', 'Dumbbell Row']) {
+    assertEquals(offered.includes(pull), false, pull);
+  }
+  assertEquals(offered.includes('Push Up'), true);
+});
+
+Deno.test('the single-leg slot never repeats the day', () => {
+  // Squat day is knee-dominant → it hinges.
+  assertEquals(onDay('Bulgarian Split Squat', 'Back Squat').includes('Reverse Lunge'), false);
+  assertEquals(onDay('Bulgarian Split Squat', 'Back Squat').includes('Single Leg Hip Thrust'), true);
+  // Deadlift day is hip-dominant → it bends the knee.
+  assertEquals(onDay('Bulgarian Split Squat', 'Conventional Deadlift').includes('Single Leg Hip Thrust'), false);
+  assertEquals(onDay('Bulgarian Split Squat', 'Conventional Deadlift').includes('Reverse Lunge'), true);
+});
+
+Deno.test('no main lift → every option stands, exactly as before', () => {
+  assertEquals(asAssistance('Push Up'), getInSlotAlternatives('Push Up', FULL_GYM, { assistanceRow: true, mainLift: null }).map((a) => a.name));
+  // §0h: a caller that does not know the day degrades to unchanged, never to a guess.
+});
+
+Deno.test('⛔ it never hands back an empty sheet', () => {
+  // The athlete tapped Swap. If no rule can find a clean option, showing the slot's own list beats
+  // showing nothing — the same instinct as `resolveAssistance` keeping the athlete's pick.
+  for (const [row, main] of [['Push Up', 'Bench Press'], ['Pull Up', 'Barbell Row'], ['Bulgarian Split Squat', 'Back Squat'], ['Face Pull', 'Bench Press']] as const) {
+    assertEquals(onDay(row, main).length > 0, true, `${row} on ${main}`);
+  }
+});

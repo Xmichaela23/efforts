@@ -22,6 +22,12 @@ export type StrengthProtocolId =
   | 'strength_primary'
   | 'five_by_five';
 
+/**
+ * What a protocol reads to judge how hard a session was. See `readsEffortAs` below for why this is a
+ * separate axis from `usesRir`.
+ */
+export type EffortReadMode = 'rir' | 'amrap' | 'none';
+
 export type StrengthProtocolProfile = {
   /**
    * ⛔ DOES THIS PROTOCOL AUTO-REGULATE? Default true; false only where the protocol is
@@ -34,7 +40,7 @@ export type StrengthProtocolProfile = {
    * contradict the first, on the exact set where the prescription reads "as many as you can".
    *
    * And it actively degraded the numbers. `updateLearnedStrengthFromExerciseLog` estimates a 1RM as
-   * `brzycki(weight, reps + rir)` — so a recorded reserve ADDS phantom reps. Eight of this block's
+   * `estimate1RM(weight, reps + rir)` — so a recorded reserve ADDS phantom reps. Eight of this block's
    * twelve weeks are deliberately sub-maximal, so a light opener logged at RIR 4 would have been
    * read back as a much heavier lift than it was. With RIR absent the estimate reads what was
    * actually lifted. Dropping it makes the learned max more accurate, not less.
@@ -42,6 +48,28 @@ export type StrengthProtocolProfile = {
    * false → no target is stamped, the logger does not ask, and nothing infers one.
    */
   usesRir?: boolean;
+
+  /**
+   * ⛔ HOW THIS PROTOCOL READS EFFORT — the AXIS, next to `usesRir` above, because they answer two
+   * different questions and a reader that conflates them gets the wrong screen.
+   *
+   *   `usesRir`      — "may I STAMP a target reserve on a planned row?"  (a WRITE-side gate)
+   *   `readsEffortAs` — "what does this protocol read to judge the session?" (a READ-side fact)
+   *
+   * `usesRir: false` says only what NOT to ask for. It does not say what the protocol asks INSTEAD,
+   * so every read surface had to infer that — and each one inferred differently, which is how the
+   * State per-lift verdict ended up keyed on a RIR branch that can never fire on a 5/3/1 block
+   * (audit F3). One flag, one answer, read by all of them.
+   *
+   *   'rir'   — auto-regulated: reps-in-reserve on the working sets is the signal.
+   *   'amrap' — deterministic: an all-out set at a prescribed % is the measurement (Wendler 5/3/1).
+   *   'none'  — the protocol reads neither; a surface asking for either is asking for nothing.
+   *
+   * ⚠️ ABSENT IS NOT 'none'. Absent means "not stated", and it resolves off `usesRir` so every
+   * existing protocol keeps its current behaviour without an entry (see `protocolEffortRead`).
+   * `'none'` is a deliberate statement that there is no effort signal at all.
+   */
+  readsEffortAs?: EffortReadMode;
 
   /** Default target RIR when no exercise-level override exists. Ignored when `usesRir` is false. */
   defaultTargetRir: { lower: number; upper: number };
@@ -131,6 +159,10 @@ export const PROTOCOL_PROFILES: Record<StrengthProtocolId, StrengthProtocolProfi
   // for the new one is no target at all rather than a better one.)
   strength_primary: {
     usesRir: false,
+    // The all-out top set in week 3 of every anchor cycle IS the measurement — `set_plan[].amrap`,
+    // captured as `strength_facts.amrap_reps` / `.measured` (D-338). Stated here so no read surface
+    // has to infer it from `usesRir: false`.
+    readsEffortAs: 'amrap',
     defaultTargetRir: { lower: 2, upper: 2 },
     progression: { minDeviation: 0.25, minGainPct: 0.02 },
     deload:      { maxDeviation: -0.5, minSessions: 2 },
@@ -438,6 +470,26 @@ export function resolvePhaseRule(phaseTag: string | null | undefined): PhaseRule
  */
 export function protocolUsesRir(profile: StrengthProtocolProfile | null | undefined): boolean {
   return profile?.usesRir !== false;
+}
+
+/**
+ * What does this protocol read to judge a session — reps-in-reserve, an all-out set, or nothing?
+ *
+ * ⛔ THE READ-SIDE COMPANION TO `protocolUsesRir`. Ask this before a surface renders an effort
+ * verdict, the way you ask `protocolUsesRir` before stamping a target.
+ *
+ * ⚠️ An ABSENT `readsEffortAs` falls back to `usesRir`, so every protocol that predates this axis
+ * keeps behaving exactly as it does today: auto-regulated → 'rir', deterministic → 'none'. A
+ * protocol that measures some other way declares it explicitly rather than being guessed at.
+ *
+ * ⚠️ A NULL/UNKNOWN PROFILE RETURNS 'none', NOT 'rir'. An unrecognised protocol has said nothing
+ * about how it reads effort, and Law 2 says the app does not fill that gap with a confident answer —
+ * the surface stays silent instead of asking for a signal the block may never produce.
+ */
+export function protocolEffortRead(profile: StrengthProtocolProfile | null | undefined): EffortReadMode {
+  if (!profile) return 'none';
+  if (profile.readsEffortAs) return profile.readsEffortAs;
+  return profile.usesRir === false ? 'none' : 'rir';
 }
 
 /**

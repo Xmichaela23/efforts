@@ -33,6 +33,20 @@ export interface CoachEyeDiscipline {
   actualPerWeek?: number | null;  // for the floor number (e.g. 6)
   targetPerWeek?: number | null;  // for the floor number (e.g. 18)
   unit?: string;                  // 'mile'
+  /**
+   * ⛔ MAY THIS DISCIPLINE'S VERDICT CARRY A PRESCRIPTION? Default true; false only when the caller
+   * knows the block DESIGNED the movement the verdict is reporting (audit F4, 2026-07-30).
+   *
+   * The ceiling clause is the one line on this screen that tells the athlete to change what he is
+   * doing — *"easing the running is the lever."* It fires off a focus discipline that is sliding. On
+   * a strength block that prescribes 40-60% in its deload week, or one that walks the load up until
+   * it stalls, the e1RM estimate drops because the PLAN said so. Prescribing a cut to someone's
+   * running off that is the highest-consequence version of a protocol-blind read.
+   *
+   * ⚠️ THIS DOES NOT SILENCE THE TREND. The number and its direction still render wherever they
+   * rendered before. What an untrusted verdict may no longer do is trigger a prescription.
+   */
+  verdictTrusted?: boolean;
 }
 
 export interface CoachEyeInput {
@@ -106,7 +120,10 @@ export function composeCoachEye(inp: CoachEyeInput): CoachEyeRead | null {
 
   // ── 1. CEILING — focus giving ground WHILE a supplement is pushed. A correlation PROMPT + a lever +
   //    the ⓘ. The goal itself is the thing at risk, so this outranks a slipping secondary. ────────────
-  if ((focus.verdict === 'sliding' || (focus.verdict === 'holding' && inp.readinessDeclining)) && pushed) {
+  // ⚠️ `verdictTrusted === false` blocks the CEILING only — the floor and room clauses below read
+  // declared targets and load, not the focus verdict, so they are unaffected.
+  if (focus.verdictTrusted !== false
+    && (focus.verdict === 'sliding' || (focus.verdict === 'holding' && inp.readinessDeclining)) && pushed) {
     const state = focus.verdict === 'sliding' ? 'is slipping' : 'is flat and your recovery is dipping';
     return {
       headline: `Your ${lab(focus.discipline)} ${state} while your ${lab(pushed.discipline)} climbs.`,

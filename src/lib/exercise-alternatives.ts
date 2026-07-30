@@ -43,6 +43,8 @@
  * and skip it, but they cannot pick something the app never showed them.
  */
 import { EXERCISE_CONFIG, getExerciseConfig, type ExerciseConfig } from './exercise-config.ts';
+// The assistance framework owns its own peer list — see `assistancePeersFor`.
+import { assistancePeersFor } from './assistance-menu.ts';
 
 // DIRECT-SWAP FAMILIES — a small curated map of "the same movement, programmed differently," the way a
 // strength app groups substitutes. Members of the same family are DIRECT swaps for each other (Leg Press
@@ -55,14 +57,50 @@ const DIRECT_FAMILIES: Array<Set<string>> = [
   // Deadlift / bilateral hip-hinge compounds (NOT hip thrust / glute bridge — those are accessories)
   new Set(['conventional deadlift', 'deadlift', 'sumo deadlift', 'trap bar deadlift', 'hex bar deadlift', 'romanian deadlift', 'rdl', 'stiff leg deadlift', 'stiff legged deadlift', 'deficit deadlift', 'rack pull', 'good morning']),
   // Horizontal press
-  new Set(['bench press', 'barbell bench press', 'incline bench press', 'decline bench press', 'close grip bench press', 'dumbbell bench press', 'dumbbell incline press', 'floor press']),
+  // ⚠️ 'bench' is a real config key (a shorthand alias). Without it the alias reads as an accessory.
+  new Set(['bench press', 'bench', 'barbell bench press', 'incline bench press', 'decline bench press', 'close grip bench press', 'dumbbell bench press', 'dumbbell incline press', 'floor press']),
   // Vertical press
-  new Set(['overhead press', 'standing overhead press', 'strict press', 'military press', 'push press', 'seated dumbbell press', 'dumbbell shoulder press', 'arnold press', 'z press']),
+  // ⚠️ 'shoulder press' is a real key, and its absence here is why a Lateral Raise was offered one.
+  new Set(['overhead press', 'shoulder press', 'standing overhead press', 'strict press', 'military press', 'push press', 'seated dumbbell press', 'dumbbell shoulder press', 'arnold press', 'z press']),
   // Horizontal pull (rows)
-  new Set(['barbell row', 'bent over row', 'pendlay row', 'dumbbell row', 't bar row', 'seal row', 'chest supported row', 'cable row', 'seated cable row']),
+  // ⚠️ 'rows' is a real key and is NOT the plural of a key here ('row' does not exist), so the
+  // singularizing rules never collapsed it — which is why a Face Pull was offered "Rows".
+  new Set(['barbell row', 'rows', 'bent over row', 'pendlay row', 'dumbbell row', 't bar row', 'seal row', 'chest supported row', 'cable row', 'seated cable row']),
   // Vertical pull
-  new Set(['pull up', 'chin up', 'lat pulldown', 'pulldown', 'neutral grip pulldown']),
+  // ⚠️ 'pullup' / 'pullups' / 'pull ups' / 'chin ups' are all real keys. The normalizer turns
+  // punctuation into spaces but cannot know 'pullup' is 'pull up', so each had to be listed.
+  new Set(['pull up', 'pull ups', 'pullup', 'pullups', 'chin up', 'chin ups', 'lat pulldown', 'pulldown', 'neutral grip pulldown']),
 ];
+
+/**
+ * ⛔ IS THIS A MAIN LIFT? Membership in a curated family IS the answer (2026-07-30).
+ *
+ * Michael: *"we arent offering the right swaps for accessories, reads them as traditional lifts."*
+ * He is right, and it was reproducible without touching any of his data:
+ *
+ *   Hip Thrust             → DIRECT: Deadlift, Conventional Deadlift, Trap Bar Deadlift, Sumo Deadlift
+ *   Bulgarian Split Squat  → DIRECT: Leg Press, Squat, Back Squat, Front Squat
+ *   Face Pull              → DIRECT: Barbell Row
+ *   Lateral Raise          → DIRECT: Shoulder Press
+ *
+ * THE CAUSE, and it is one line: the uncurated fallback was `loadable ? 'direct' : 'lighter'` — a
+ * SYMMETRIC rule. An accessory belongs to no family, so it fell to that fallback, and every loadable
+ * lift sharing its movement pattern was labelled a direct swap. Sorted heaviest-ratio-first, which put
+ * the main lifts at the TOP of a list headed "Direct swaps."
+ *
+ * ⛔ AND THIS IS NOT THE ROLE FILTER THE HEADER WARNS OFF. That warning is about `roleForExercise`,
+ * whose data genuinely contradicts itself (`barbell row` primary, `bent over row` accessory — the same
+ * movement). This reads DIRECT_FAMILIES, which is curated in this file and internally consistent.
+ *
+ * ⚠️ MEASURED BEFORE SHIPPING, because "offer rather than hide" is this module's standing rule and an
+ * exclusion has to earn itself: across all 110 uncurated slots, excluding main lifts empties **2**
+ * lists — and both are the `pullup`/`pullups` alias gap below, not a real absence. Every other
+ * accessory keeps a full list of same-pattern accessories.
+ */
+function isMainLift(name: string): boolean {
+  const n = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return directFamilyOf(n) != null;
+}
 
 /** The family a lift belongs to (by normalized name, singular-tolerant), or null if uncurated. */
 function directFamilyOf(normName: string): Set<string> | null {
@@ -125,7 +163,50 @@ function titleCase(key: string): string {
 export function getInSlotAlternatives(
   plannedName: string,
   equipment?: string[] | null,
+  /**
+   * ⛔ WHAT JOB IS THIS ROW DOING? `assistanceRow: true` when the planned row is one of the block's
+   * assistance slots — the composer marks those `load_prescribed: false` / `weight: 'By feel'`.
+   * Absent → the generic movement-pattern logic, byte-identical to before this option existed.
+   */
+  opts?: {
+    assistanceRow?: boolean;
+    /** The day's main lift. On an assistance row it removes what the day already loaded. */
+    mainLift?: string | null;
+  },
 ): AlternativeOption[] {
+  // ⛔ THE PLAN'S FRAMEWORK OUTRANKS THE LIBRARY — FOR THE ROWS THE PLAN OWNS (2026-07-30).
+  // Michael: *"we need to work with the framework of the plan… the accessories we offer in the plan."*
+  //
+  // A Strength Focus block does not prescribe "a hip-hinge accessory". It prescribes one of three
+  // assistance SLOTS, each with a curated shortlist the athlete already chose from at build time.
+  // For those rows the right peers are the rest of that slot — not everything in the library that
+  // happens to share a movement pattern.
+  //
+  // ⛔ OPT-IN, VIA THE CALLER, AND THAT IS NOT TIMIDITY. The first cut keyed off the NAME alone and
+  // broke five pinned tests, because four menu movements (Pull Up, Push Up, Dumbbell Row, Bulgarian
+  // Split Squat) are also ordinary library exercises. A Pull Up prescribed as a main vertical pull and
+  // a Pull Up filling the `pull` assistance slot are the same name in two different jobs, and only the
+  // ROW knows which. `load_prescribed: false` is how the composer marks an assistance row.
+  //
+  // ⚠️ `assistancePeersFor` returns null when the exercise is not on the menu or in the balance pool,
+  // so an assistance row carrying something off-menu still falls through to the pattern logic below.
+  // ⚠️ `mainLift` is what makes the list day-aware — see `assistancePeersFor`. Absent → every
+  // option stands, which is the behaviour before this rule existed.
+  const planPeers = opts?.assistanceRow ? assistancePeersFor(plannedName, opts?.mainLift) : null;
+  if (planPeers) {
+    return planPeers.map((name) => {
+      const c = getExerciseConfig(name);
+      return {
+        name,
+        same_pattern: true as const,
+        equipment: c ? equipmentOf(c) : 'unknown',
+        // Every peer is a DIRECT swap: they are interchangeable by construction, which is exactly
+        // what made them one slot. There is no second tier to sort into.
+        tier: 'direct' as const,
+      };
+    });
+  }
+
   const cfg = getExerciseConfig(plannedName);
   // Q-181: filter on PATTERN, not primaryRef. primaryRef is a LOADING reference — a Barbell Row is
   // primaryRef 'bench' ("a row loads at ~80% of your bench"), so filtering on it offered a BENCH PRESS
@@ -180,6 +261,14 @@ export function getInSlotAlternatives(
 
     const need = equipmentOf(c);
     if (!canDo(equipment, need)) continue;                   // they cannot load it
+
+    // ⛔ AN ACCESSORY SLOT IS NOT OFFERED A MAIN LIFT. If the planned exercise belongs to no curated
+    // family it is an accessory, and a deadlift is not a substitute for a glute bridge — same hip-hinge
+    // pattern, different job, and roughly triple the load. The field agrees: Trainerize and Fitbod
+    // substitute within muscle group AND equivalent intensity, never across load tiers.
+    // ⚠️ ONE-DIRECTIONAL. A main-lift slot still offers everything it offered before, accessories
+    // included — swapping DOWN from a squat to a lunge is a legitimate call the athlete may need.
+    if (!slotFamily && isMainLift(key)) continue;
 
     // DIRECT = same curated family; else same-pattern is an ALTERNATIVE. Ranked heaviest-first per tier.
     const ratio = typeof c.ratio === 'number' ? c.ratio : 0;
