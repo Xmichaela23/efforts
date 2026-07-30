@@ -5179,7 +5179,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // reps completed are the only two numbers that mean anything there, so the RIR
                         // column comes off entirely rather than sitting empty. Every other protocol is
                         // unaffected — the flag is absent on all of them.
-                        const showRir = exercise.rir_tracked !== false && !isTestWorkout && loggerMode !== 'mobility' && !isDurationBased && !isPlyometric(exercise.name);
+                        // ⛔ D-338 — A FREESTYLE SESSION GETS THE WORDS, NOT RIR.
+                        // RIR only means something against a TARGET: the plan says "8 reps, leave 2
+                        // in the tank" and reports whether you picked the right weight. With no plan
+                        // there is no target, so the number has nothing to be measured against — and
+                        // the app would be speaking two languages depending on whether you happened
+                        // to open a planned session.
+                        // ⚠️ GATED ON `sourcePlannedId`, NOT on `rir_tracked === undefined`. A plan
+                        // authored before that flag existed also has it undefined, and keying on the
+                        // absent flag would silently strip RIR from every one of those. "Did this
+                        // session come from a plan" is the question actually being asked.
+                        // ⚠️ AGAINST COMMON PRACTICE, DELIBERATELY: Hevy and Trainerize do offer RIR
+                        // on freestyle logging. See D-338 — this is the one recommendation there that
+                        // departs from the field, and it should stay labelled as such.
+                        const isFreestyleSession = !sourcePlannedId;
+                        const showRir = exercise.rir_tracked !== false && !isFreestyleSession && !isTestWorkout && loggerMode !== 'mobility' && !isDurationBased && !isPlyometric(exercise.name);
                         if (!showReps && !showWeight && !showRir) return null;
                         // D-129: buttons are `flex-1` (basis-0) so they GROW to fill the real row
                         // width — comfortable thumb targets on 390–430px phones — while still
@@ -5244,7 +5258,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       //
                       // ⛔ AND THE PLAIN Done BUTTON STILL WORKS. Blank is a legal answer — this
                       // offers a richer way to finish the set, it does not gate finishing it.
-                      if (exercise.rir_tracked !== false) return null;
+                      // D-338: the same two cases that lose RIR gain the words — a deterministic
+                      // protocol (5/3/1, `rir_tracked === false`) and a FREESTYLE session, where
+                      // there is no prescription for RIR to be measured against. One language.
+                      if (exercise.rir_tracked !== false && sourcePlannedId) return null;
                       if (isDurationBased || isBodyweightMove(exercise.name)) return null;
                       if (set.completed) return null;
                       // The top set is the HEAVIEST, not the last — robust to warm-ups being present
