@@ -475,7 +475,12 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                     return `${formatSeconds(s.duration_seconds)}${weightClause}${rirTxt}`;
                   }
                   // Rep-based exercises.
-                  const repsTxt = `${s.reps || 0} reps`;
+                  // ⛔ THE ALL-OUT SET SAYS SO. "5+" is 5/3/1's own notation for "at least five, then
+                  // as many as you can" — and that rep count is the measurement that moves the
+                  // training max (D-338). Printing it as a flat "5 reps" made the one set that
+                  // matters look like every other set, and made a 9-rep effort read as +4 over plan
+                  // rather than as the reading it is.
+                  const repsTxt = (s as any).amrap ? `${s.reps || 0}+ reps` : `${s.reps || 0} reps`;
                   return `${repsTxt}${weightClause}${rirTxt}`;
                 };
                 const isEditing = editingSet?.exerciseName === r.name && editingSet?.setIndex === idx;

@@ -1845,6 +1845,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   //
   // Returns null for any row with no `set_plan`, which is every row that is not a 5/3/1 main lift.
   // Those keep the copy-the-one-weight behaviour exactly as before.
+  // ⛔ THE ALL-OUT SET HAD NO LABEL ON IT. `amrap: true` changed BEHAVIOUR — the reps box opens
+  // blank, Done skips the RIR strip — but nothing on screen said why, so the set looked like every
+  // other set with an empty box. The only visible signal was a "+" inside the plan's own text
+  // ("70×5+"), which is easy to miss and never explained. Michael, 2026-07-30: "they arent showing
+  // up in the logger or in the planned work out are you sure?" — he was right.
+  //
+  // ⚠️ THIS SET IS THE MEASUREMENT. Its rep count is what moves the training max (D-338), so of
+  // every set in the block it is the one that most needs to say what it is. Wording matches the
+  // baseline-test path's hint so the athlete meets one description of an all-out set, not two.
+  const AMRAP_SET_HINT = 'All-out set: as many CLEAN reps as you can at this weight. This count is what moves your training max. Stop on form break — never grind solo.';
+
   const plannedSetsFor = (source: any): Array<{ weight?: number; reps?: number; amrap: boolean }> | null => {
     const sp = Array.isArray(source?.set_plan) ? source.set_plan : null;
     if (!sp || sp.length === 0) return null;
@@ -2478,7 +2489,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               rir: undefined,
               completed: false,
               prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
-              ...(plannedSet?.amrap ? { amrap: true } : null),
+              ...(plannedSet?.amrap ? { amrap: true, setHint: AMRAP_SET_HINT } : null),
             };
 
             // Parse reps - handle strings like "20/side", "8-10", "5 min", "Max reps"
@@ -2628,7 +2639,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       barType: 'standard',
                       rir: undefined,
                       completed: false,
-                      ...(plannedSet?.amrap ? { amrap: true } : null),
+                      ...(plannedSet?.amrap ? { amrap: true, setHint: AMRAP_SET_HINT } : null),
                     };
                     // Parse reps - handle strings like "20/side", "8-10", "5 min"
                     const rawReps = exercise.reps;
@@ -2737,7 +2748,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   rir: undefined,
                   completed: false,
                   prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
-                  ...(plannedSet?.amrap ? { amrap: true } : null),
+                  ...(plannedSet?.amrap ? { amrap: true, setHint: AMRAP_SET_HINT } : null),
                 };
                 // Parse reps - handle strings like "20/side", "8-10", "5 min"
                 const rawReps = exercise.reps;
