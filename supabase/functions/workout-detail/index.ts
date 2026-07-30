@@ -95,7 +95,7 @@ function msFromTimestampField(v: unknown): number | null {
  * Persisted session_detail_v1 is stale → run full snapshot + LLM pipeline.
  * `session_detail_updated_at` is set by merge_session_detail_v1_into_workout_analysis (JSONB on workouts).
  */
-function isSessionDetailStale(workoutRow: { updated_at?: string | null }, analysis: Record<string, unknown>): boolean {
+function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_id?: string | null }, analysis: Record<string, unknown>): boolean {
   const sessionDetail = analysis?.session_detail_v1 as Record<string, unknown> | undefined;
   if (!sessionDetail || typeof sessionDetail !== 'object') return true;
 
@@ -113,6 +113,19 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null }, analys
   const ap = (sessionDetail as any)?.arc_performance;
   const apv = Number(ap?.version);
   if (!Number.isFinite(apv) || apv < ARC_PERFORMANCE_BRIDGE_VERSION) return true;
+
+  // ⛔ SCHEMA UPGRADE — THE BLOCK CARD (2026-07-30). Michael rebuilt, recomputed, and still saw
+  // nothing, because this function has a CACHE FAST PATH: when the stored copy is not stale it is
+  // served verbatim and the pipeline never runs. Every copy written before today lacks `block` and
+  // `strength_all_out`, so the new code was live and unreachable — the exact "built and starved"
+  // failure, one layer up.
+  //
+  // ⚠️ A NEW FIELD ON THIS CONTRACT NEEDS A STALENESS RULE OR IT WILL NEVER APPEAR ON AN EXISTING
+  // SESSION. Deploying is not shipping here.
+  //
+  // Gated on the workout HAVING a plan link, because `block` is only resolvable then — otherwise
+  // every unattached session would refresh forever, chasing a field it can never have.
+  if ((workoutRow as any)?.planned_id && !(sessionDetail as any)?.block) return true;
 
   const writtenMs =
     msFromTimestampField(analysis.session_detail_updated_at) ??
