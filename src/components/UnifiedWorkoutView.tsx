@@ -110,7 +110,34 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   }
 
   // plannedWorkouts context removed; rely on server unified data/routes
-  const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
+  //
+  // ⛔ A STATUS STRING IS A CLAIM, NOT EVIDENCE. This read `workout_status === 'completed'` and
+  // nothing else, so any row that arrived carrying that string was rendered as a session the athlete
+  // had done — Performance tab, compare table, the lot. On 2026-07-30 a PLANNED Back Squat reached
+  // this screen that way and drew its own prescription in the Completed column: "Box Jump 5 reps
+  // completed" for a session that never happened, and a −1,125 lb volume delta. Michael: "it merged
+  // with the other work out but also showed box jumps were completed which they werent."
+  //
+  // So the claim now has to be corroborated by something the athlete actually produced. Deliberately
+  // GENEROUS — any one marker will do — because the failure direction that matters is calling a
+  // planned row done, not being briefly cautious about a real one. A genuine completed session
+  // carries at least one of these; a bare planned row carries none of them.
+  const looksExecuted = (() => {
+    const w: any = workout || {};
+    if (w.executed) return true;                       // unified item's executed block
+    if (w.completedManually === true) return true;     // logger-saved session
+    if (Number(w.distance) > 0 || Number(w.moving_time) > 0 || Number(w.elapsed_time) > 0) return true;
+    if (w.workout_analysis || w.computed?.intervals?.length) return true;
+    // Strength/mobility: a set that was actually performed. A prescription is not a receipt (D-204).
+    for (const field of ['strength_exercises', 'mobility_exercises']) {
+      const raw = w[field];
+      const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+      if (Array.isArray(arr) && arr.some((ex: any) => Array.isArray(ex?.sets) && ex.sets.some((s: any) => (Number(s?.reps) || 0) > 0 || (Number(s?.duration_seconds) || 0) > 0 || (Number(s?.weight) || 0) > 0)))
+        return true;
+    }
+    return false;
+  })();
+  const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed' && looksExecuted;
   // Workout type flags — declared HERE (not later in the body) because the tab-routing effects
   // below reference `isStrengthFamily` in their dependency arrays, which are evaluated at render
   // time. A later `const` would be in the temporal dead zone → "Cannot access before initialization".
