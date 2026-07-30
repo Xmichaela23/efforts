@@ -1,5 +1,9 @@
 import React from 'react';
 import StrengthCompareTable from './StrengthCompareTable';
+// THE app's exercise vocabulary — the same canonical keys exercise_log and the State trend group
+// on. Imported rather than re-implemented so this screen cannot disagree with them about what a
+// lift is called (audit F5: five separate name-matchers, and counting is not the place to add one).
+import { canonicalize } from '@/lib/canonicalize';
 
 interface StrengthPerformanceSummaryProps {
   planned: any | null;
@@ -184,18 +188,36 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
     Record<string, { date: string; days_ago: number; sets: any[] }> | null
     | undefined) ?? null;
 
-  // D-338: how many PLANNED exercises were actually logged. A count, computed from the two lists
-  // already on this screen — deliberately not read from the stored analysis, which is what went
-  // stale and produced 117% on a session with no plan. A fact recomputed from what is on screen
-  // cannot outlive the thing it describes.
+  // ── D-338: HOW MANY OF THE PLAN'S SLOTS YOU FILLED ────────────────────────────────────────────
+  //
+  // The denominator is the plan's own list. The numerator is slots FILLED — and the rule for that
+  // is already law here: **the slot is the unit of adherence, not the exercise name** (Q-181). A
+  // declared swap fills the slot and is never a dock; an undeclared miss is still a miss.
+  //
+  // ⛔ IT USES `canonicalize`, THE APP'S ONE EXERCISE VOCABULARY — the same keys `exercise_log` and
+  // the State trend group on. The first version of this count shipped its own private
+  // name-comparison, which made it the SIXTH in the app (audit F5) and would have read "Barbell
+  // Back Squat" and "Back Squat" as two different lifts, then reported a lift you did as not done.
+  // Michael caught it before it was ever seen: *"are the counts going to be correct?"*
+  //
+  // ⚠️ RECOMPUTED FROM WHAT IS ON SCREEN, never read from the stored analysis. That analysis is
+  // exactly what went stale and produced 117% on a session with no plan attached — a number
+  // recomputed from the live lists cannot outlive the thing it describes.
   const completedOfPlanned = (() => {
-    const norm = (s: string) => String(s || '').toLowerCase().replace(/\s*\((?:left|right)\)\s*/gi, '').replace(/\s+/g, ' ').trim();
-    const done = new Set(
-      completedExercises
-        .filter((c: any) => Array.isArray(c?.setsArray) && c.setsArray.some((s: any) => (Number(s?.reps) || 0) > 0 || (Number(s?.duration_seconds) || 0) > 0))
-        .map((c: any) => norm(c.name)),
-    );
-    return plannedExercises.filter((p: any) => done.has(norm(p.name))).length;
+    const key = (n: unknown) => canonicalize(String(n || ''));
+    // A slot counts as filled by an exercise that was actually performed…
+    const performed = completedExercises.filter((c: any) =>
+      Array.isArray(c?.setsArray) &&
+      c.setsArray.some((s: any) => (Number(s?.reps) || 0) > 0 || (Number(s?.duration_seconds) || 0) > 0));
+    const filled = new Set(performed.map((c: any) => key(c.name)));
+    // …or by one the athlete DECLARED as a replacement for it. `substituted_for` is stamped by the
+    // Swap action and names the planned exercise, so the swap answers to the slot it replaced.
+    for (const c of performed as any[]) {
+      const raw = completedRaw.find((r: any) => key(r?.name) === key(c?.name));
+      const sub = raw?.substituted_for;
+      if (sub) filled.add(key(sub));
+    }
+    return plannedExercises.filter((p: any) => filled.has(key(p.name))).length;
   })();
 
   // D-208: dynamic "what moved it" line, read from the shared component_attribution structure the
