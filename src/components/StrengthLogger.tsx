@@ -4899,8 +4899,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
                             </button>
                             <span className="text-[9px] text-white/50 font-medium">Reps</span>
-                            {exercise.target_reps ? (
-                              <span className="text-[9px] font-medium text-white/45 leading-none">target {exercise.target_reps}</span>
+                            {/* ⛔ THE TARGET IS PER SET, NOT PER EXERCISE. `exercise.target_reps` is
+                                one string for the whole lift — on 5/3/1 that string is "5+", so every
+                                set printed "target 5+" and the athlete could not tell which one was
+                                the all-out set. Michael, 2026-07-30: "so its 3- 5 + ? thats confusing
+                                we need to make it cleaer ... is it the third one?" It was, and nothing
+                                on the set said so.
+                                Sets 1-2 are straight fives. Only the flagged set is open-ended, and it
+                                is the one whose count moves the training max (D-338), so it gets its
+                                own words rather than a shared string with a "+" on the end. */}
+                            {set.amrap ? (
+                              <span className="text-[9px] font-medium text-amber-300/70 leading-none">all-out · {exercise.target_reps ? String(exercise.target_reps).replace(/\+$/, '') : '5'} minimum</span>
+                            ) : exercise.target_reps ? (
+                              <span className="text-[9px] font-medium text-white/45 leading-none">target {String(exercise.target_reps).replace(/\+$/, '')}</span>
                             ) : null}
                           </div>
                         )
