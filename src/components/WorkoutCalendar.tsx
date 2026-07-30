@@ -625,10 +625,12 @@ export default function WorkoutCalendar({
     }
     // Keep raw workout rows even when linked; we will suppress the planned row instead so the completed shows
     const wkCombined = wkDb;
-    // (`completedWorkoutKeys` — a date+type set — was deleted with its only consumer below. It
-    //  suppressed a planned row whenever any completed session of the same sport existed that day.
-    //  ⚠️ `plannedCountByKey` and `completedPlannedKeys` below are ALSO unused, and already were
-    //  before this change — left in place rather than swept up in an unrelated edit.)
+    // Build completed keys for date+type from all workouts in week (unfiltered)
+    const completedWorkoutKeys = new Set(
+      wkDb
+        .filter((w:any)=> String(w?.workout_status||'').toLowerCase()==='completed')
+        .map((w:any)=> `${String(w.date)}|${String(w.type||w.workout_type||'').toLowerCase()}`)
+    );
     // Count how many planned rows exist per date+type (for lightweight suppression heuristic)
     const plannedCountByKey = (() => {
       const m = new Map<string, number>();
@@ -650,33 +652,14 @@ export default function WorkoutCalendar({
     // Do not suppress workouts based on date/type; rely on explicit links and later de-dupe
     const wkCombinedFiltered = [...wkCombined];
     
-    // A PLANNED ROW IS HIDDEN ONLY WHEN SOMETHING IS ACTUALLY LINKED TO IT.
-    //
-    // ⛔ THE DATE+TYPE CLAUSE IS GONE. It read: "never show planned when completed exists for
-    // date+type (handles missing planned_id from auto-attach)" — and that parenthesis is the whole
-    // story. It was COVER FOR A BROKEN ATTACH. When auto-attach silently failed to set a
-    // `planned_id`, the day drew a planned row beside its own completed twin and looked duplicated,
-    // so the calendar suppressed the planned side by day and sport instead.
-    //
-    // The attach is now honest: it DECLINES a session whose lifts don't match the planned day
-    // rather than guessing (see `strengthSessionsShareTheWork`). So an unlinked planned row on a
-    // day you trained is no longer a bookkeeping artefact — it is real, prescribed work you have
-    // not done, and hiding it is the calendar lying about what is left.
-    //
-    // Michael, 2026-07-29, on a Tuesday carrying a logged Overhead Press and a planned Back Squat:
-    // *"it doesnt materialze on 7/28"*. The row was fine — 5 steps, an hour, status `planned`. It
-    // was suppressed here.
-    //
-    // ⚠️ `get-week` ALREADY SENDS BOTH (`get-week/index.ts:1054` — "Add the planned row as a
-    // separate item so UI shows both"). The server was right and the client was overriding it; this
-    // is the client catching up, not a new behaviour.
-    //
-    // ⚠️ WHAT THIS CAN NOW DRAW that it did not before: a completed session and an unlinked planned
-    // session of the same sport on one day. In every case that reaches here — a declined content
-    // match, two planned rows on one day (ambiguous, never guessed), or an ingest where attach never
-    // ran — that IS the truth, and the second row carries an Attach control.
+    // Filter out planned workouts that are linked to completed workouts BEFORE adding them
+    // Also exclude planned when ANY completed exists for same date+type (handles missing planned_id from auto-attach)
     const mappedPlanned = plannedArr
-      .filter((p:any) => !workoutIdByPlannedId.has(String(p?.id)));
+      .filter((p:any) => {
+        const key = `${String(p?.date)}|${String(p?.type||'').toLowerCase()}`;
+        if (completedWorkoutKeys.has(key)) return false; // never show planned when completed exists for date+type
+        return !workoutIdByPlannedId.has(String(p?.id));
+      });
 
     const all = [ ...wkCombinedFiltered, ...mappedPlanned ];
     // Don't filter out optional workouts - show them like Today's Efforts does
