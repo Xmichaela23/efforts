@@ -640,11 +640,26 @@ Deno.serve(async (req) => {
     try {
       console.log('🔗 Starting auto-attachment for plan:', planId);
       
-      // Get all completed workouts for this user in a broader date range
-      // Look back 30 days and forward 1 year to catch workouts from previous plan iterations
-      const lookbackDate = addDaysISO(startDate, -30);
-      const lookforwardDate = addDaysISO(startDate, 365);
-      
+      // ⛔ THE SWEEP IS BOUNDED BY THE PLAN'S OWN DAYS, not by a guess.
+      //
+      // This was `startDate − 30` to `startDate + 365`. A 12-week plan therefore asked the attach
+      // heuristic about every workout in a 13-month span — and since the heuristic's strength arm
+      // matched on date + type alone, a backdated plan hoovered up whatever was logged on those
+      // dates (docs/AUDIT-performance-state-2026-07-29.md F1).
+      //
+      // ⚠️ THE WINDOW WAS NEVER THE REAL BUG — the content check in `auto-attach-planned` is. A
+      // planned row only exists inside the plan's own dates, so anything outside them already came
+      // back `no_candidates`. This narrows the blast radius and the call count to what can
+      // possibly match; it is not the fix.
+      //
+      // Derived from the rows we just inserted rather than from `duration_weeks`, so it is the
+      // dates that ACTUALLY exist — a plan whose first week starts mid-week, or one trimmed by the
+      // `weekNum === 1 && date < startDate` skip above, is bounded correctly with no second
+      // opinion about how long the plan is.
+      const rowDates = rows.map((r: any) => String(r?.date || '')).filter(Boolean).sort();
+      const lookbackDate = rowDates.length ? rowDates[0] : startDate;
+      const lookforwardDate = rowDates.length ? rowDates[rowDates.length - 1] : addDaysISO(startDate, 365);
+
       const { data: completedWorkouts } = await supabase
         .from('workouts')
         .select('id, type, date, user_id')

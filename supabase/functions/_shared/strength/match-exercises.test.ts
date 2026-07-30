@@ -1,5 +1,5 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/assert_equals.ts';
-import { matchExercises, normalizeExerciseName } from './match-exercises.ts';
+import { matchExercises, normalizeExerciseName, strengthSessionsShareTheWork } from './match-exercises.ts';
 
 const ex = (name: string, extra: Record<string, unknown> = {}) => ({ name, sets: [], ...extra });
 const plan = (name: string, sets = 3, reps = 10) => ({ name, sets, reps, weight: 100 });
@@ -130,4 +130,121 @@ Deno.test('legacy: planned flat shape is normalized into sets[]', () => {
 Deno.test('legacy: empty inputs do not throw', () => {
   assertEquals(matchExercises([], []).length, 0);
   assertEquals(matchExercises(null as any, null as any).length, 0);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// THE ATTACH GATE — strengthSessionsShareTheWork
+//
+// The bug it exists for: `auto-attach-planned`'s strength arm matched on DATE + TYPE alone, so
+// activating a backdated plan attached months of unrelated sessions to planned days
+// (docs/AUDIT-performance-state-2026-07-29.md F1). Michael, 2026-07-29: "any strength is auto
+// attaching even if it doesnt match ( inm back dating adding plans)".
+//
+// ⛔ THE FAIL-OPEN CASES ARE THE GUARD. A gate that starts declining Garmin imports (which carry
+// no exercise list at all) would break attaching for every device-logged strength session. If one
+// of those two tests goes red, STOP — do not relax the rule, fix the caller.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+
+const pex = (name: string) => ({ name, sets: 3, reps: 5, weight: 185 });
+const lex = (name: string) => ({ name, sets: [{ reps: 5, weight: 185, completed: true }] });
+
+Deno.test('GATE FAIL-OPEN: no planned exercise list → share (we cannot judge what we cannot see)', () => {
+  const r = strengthSessionsShareTheWork(null, [lex('Back Squat')]);
+  assertEquals(r.share, true);
+  assertEquals(r.basis, 'no_planned_exercises');
+});
+
+Deno.test('GATE FAIL-OPEN: no logged exercise list (a Garmin strength import) → share', () => {
+  const r = strengthSessionsShareTheWork([pex('Back Squat')], []);
+  assertEquals(r.share, true);
+  assertEquals(r.basis, 'no_logged_exercises');
+});
+
+Deno.test('GATE: the planned main lift was done → share, on the anchor basis', () => {
+  const r = strengthSessionsShareTheWork(
+    [pex('Back Squat'), pex('Box Jump'), pex('Push Up')],
+    [lex('Back Squat'), lex('Box Jump')],
+  );
+  assertEquals(r.share, true);
+  assertEquals(r.basis, 'anchor');
+  assertEquals(r.shared, ['squat']);
+});
+
+Deno.test('GATE: canonical aliases count — planned "Back Squat", logged "Barbell Back Squat"', () => {
+  const r = strengthSessionsShareTheWork([pex('Back Squat')], [lex('Barbell Back Squat')]);
+  assertEquals(r.share, true);
+  assertEquals(r.shared, ['squat']);
+});
+
+Deno.test('⛔ GATE: a DIFFERENT main lift on the same day does NOT share (the backdating bug)', () => {
+  // The planned day is Bench; the athlete logged a squat session months before this plan existed.
+  const r = strengthSessionsShareTheWork(
+    [pex('Bench Press'), pex('Box Jump')],
+    [lex('Back Squat'), lex('Romanian Deadlift')],
+  );
+  assertEquals(r.share, false);
+  assertEquals(r.basis, 'anchor');
+  assertEquals(r.planned_anchors, ['bench_press']);
+});
+
+Deno.test('⛔ GATE: a SHARED ASSISTANCE BLOCK is not enough when a main lift was planned', () => {
+  // Every 5/3/1 day carries the same assistance work, so "any exercise in common" would wave
+  // through any session from the same block onto any lifting day.
+  const r = strengthSessionsShareTheWork(
+    [pex('Overhead Press'), pex('Box Jump'), pex('Push Up')],
+    [lex('Box Jump'), lex('Push Up')],
+  );
+  assertEquals(r.share, false);
+  assertEquals(r.basis, 'anchor');
+});
+
+Deno.test('GATE: an accessory-only planned day falls back to any-exercise overlap', () => {
+  const r = strengthSessionsShareTheWork(
+    [pex('Box Jump'), pex('Push Up')],
+    [lex('Push Up'), lex('Plank')],
+  );
+  assertEquals(r.share, true);
+  assertEquals(r.basis, 'any_exercise');
+});
+
+Deno.test('GATE: an accessory-only planned day with nothing in common does NOT share', () => {
+  const r = strengthSessionsShareTheWork([pex('Box Jump')], [lex('Plank')]);
+  assertEquals(r.share, false);
+  assertEquals(r.basis, 'any_exercise');
+});
+
+Deno.test('GATE: a JSON-string strength_exercises column is read, not dropped', () => {
+  const r = strengthSessionsShareTheWork(
+    JSON.stringify([pex('Deadlift')]),
+    JSON.stringify([lex('Deadlift')]),
+  );
+  assertEquals(r.share, true);
+  assertEquals(r.shared, ['deadlift']);
+});
+
+Deno.test('GATE: malformed JSON fails OPEN rather than throwing', () => {
+  const r = strengthSessionsShareTheWork('{not json', [lex('Back Squat')]);
+  assertEquals(r.share, true);
+  assertEquals(r.basis, 'no_planned_exercises');
+});
+
+Deno.test('GATE: a DECLARED swap of the main lift shares (the slot is the unit — Q-181)', () => {
+  // Trap-bar instead of the prescribed deadlift: a different canonical key, and both are anchors.
+  // The athlete declared it, so it filled the slot.
+  const r = strengthSessionsShareTheWork(
+    [pex('Deadlift'), pex('Box Jump')],
+    [{ name: 'Trap Bar Deadlift', substituted_for: 'Deadlift', sets: [{ reps: 5, weight: 225, completed: true }] }],
+  );
+  assertEquals(r.share, true);
+  assertEquals(r.basis, 'anchor');
+  assertEquals(r.shared, ['deadlift']);
+});
+
+Deno.test('⛔ GATE: an UNDECLARED different main lift still does NOT share', () => {
+  // Same two lifts, no declaration. Q-181's law cuts both ways: we never INFER a substitution.
+  const r = strengthSessionsShareTheWork(
+    [pex('Deadlift'), pex('Box Jump')],
+    [{ name: 'Trap Bar Deadlift', sets: [{ reps: 5, weight: 225, completed: true }] }],
+  );
+  assertEquals(r.share, false);
 });

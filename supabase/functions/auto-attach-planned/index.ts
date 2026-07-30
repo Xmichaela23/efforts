@@ -3,6 +3,9 @@
 // Behavior: Attach completed workouts to planned by exact YYYY-MM-DD date + type
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolveUser } from '../_shared/require-user.ts';
+// The attach GATE (not a matcher — see the header on that function). Strength used to attach on
+// date + type alone. docs/AUDIT-performance-state-2026-07-29.md F1.
+import { strengthSessionsShareTheWork } from '../_shared/strength/match-exercises.ts';
 
 function pctDiff(a: number, b: number): number { if (!(a>0) || !(b>0)) return Infinity; return Math.abs(a-b)/a; }
 
@@ -431,13 +434,61 @@ Deno.serve(async (req) => {
         }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       }
 
-      // Single candidate → safe attach.
+      // Single candidate → NOT automatically a safe attach. Two gates below.
       const best = candidates[0];
       console.log('[auto-attach-planned] Selected candidate:', best.id, 'from', candidates.length, 'candidates');
-      
-      // Link the workout
+
+      // ═══ GATE 1: DOES THE LOGGED WORK LOOK LIKE THE PLANNED WORK? ═══════════════════════════
+      // Date + type was the WHOLE rule here, which is why activating a backdated plan attached
+      // whatever happened to be logged on those dates. The gate FAILS OPEN — no exercise list on
+      // either side (a Garmin/Strava strength import) attaches exactly as it does today.
+      // ⚠️ STRENGTH ONLY. Mobility sessions are freeform and their names vary session to session,
+      // so an exercise-overlap rule there would decline honest work. Michael's report was strength;
+      // mobility keeps today's behaviour deliberately.
+      if (finalSport === 'strength') {
+        const share = strengthSessionsShareTheWork((best as any)?.strength_exercises, (w as any)?.strength_exercises);
+        console.log('[auto-attach-planned] content gate:', JSON.stringify(share));
+        if (!share.share) {
+          // Not an error, and not a judgement — it means ATTACH THIS ONE BY HAND. The candidate is
+          // returned so the caller/UI can offer exactly that.
+          return new Response(JSON.stringify({
+            success: true,
+            attached: false,
+            reason: 'content_mismatch',
+            mode: 'date_type_match',
+            basis: share.basis,
+            planned_anchors: share.planned_anchors,
+            candidates: [{ id: best.id, date: (best as any).date, name: (best as any).name, type: (best as any).type, workout_status: (best as any).workout_status }],
+          }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
+      }
+
+      // ═══ GATE 2: NEVER STEAL A LIVE CLAIM ══════════════════════════════════════════════════
+      // This used to null the other workout's `planned_id` unconditionally, so a second strength
+      // session on the same date silently unhooked the first one. A link left behind by a DELETED
+      // workout is stale and may be taken; a link held by a workout that still EXISTS may not.
       const prevCompletedId = (best as any)?.completed_workout_id as string | null | undefined;
       if (prevCompletedId && prevCompletedId !== w.id) {
+        let claimantExists = false;
+        try {
+          const { data: claimant } = await supabase.from('workouts').select('id').eq('id', prevCompletedId).maybeSingle();
+          claimantExists = !!claimant;
+        } catch (e) {
+          // Unknown → treat as LIVE. Declining costs a manual attach; guessing costs the athlete
+          // their first session's link.
+          console.error('[auto-attach-planned] claimant existence check failed, treating as live:', e);
+          claimantExists = true;
+        }
+        if (claimantExists) {
+          return new Response(JSON.stringify({
+            success: true,
+            attached: false,
+            reason: 'already_claimed',
+            mode: 'date_type_match',
+            planned_id: best.id,
+            claimed_by_workout_id: prevCompletedId,
+          }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
         try {
           await supabase.from('workouts').update({ planned_id: null }).eq('id', prevCompletedId);
         } catch {}
