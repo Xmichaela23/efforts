@@ -304,6 +304,24 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
           ))}
         </div>
       )}
+      {/* ⛔ RECOMPUTE LIVES AT THE TOP. It used to be hosted by the narrative header; deleting that
+          header for strength dropped it to the very bottom of a long table, below the fold, where
+          Michael read it as gone. A control the athlete reaches for when the screen looks wrong
+          cannot be the last thing on the screen. */}
+      {onRecompute && (
+        <div className="flex justify-end -mt-1 mb-2">
+          <button
+            onClick={onRecompute}
+            disabled={recomputing}
+            className="px-3 py-1.5 text-xs text-white/45 border border-white/12 rounded-full hover:bg-white/5 hover:text-white/70 transition-colors disabled:opacity-40"
+          >
+            {recomputing ? 'Recomputing…' : 'Recompute analysis'}
+          </button>
+        </div>
+      )}
+      {recomputeError && (
+        <p className="text-xs text-rose-400 mb-2">{recomputeError}</p>
+      )}
       {/* ── THE ALL-OUT SET (2026-07-30) ─────────────────────────────────────────────────────────
           ⛔ THE REP RECORD LEADS. Wendler p10: *"If your squat goes from 225x6 to 225x9, you've
           gotten stronger. Don't get stuck just trying to increase your one rep max."* The rep count
@@ -400,20 +418,6 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
             <div className="text-lg font-semibold text-white">{totals.volume.toLocaleString()}</div>
             <div className="text-xs text-white/50">Volume (lbs)</div>
           </div>
-        </div>
-      )}
-      {onRecompute && (
-        <div className="pt-1">
-          {recomputeError && (
-            <p className="text-xs text-rose-400 mb-2">{recomputeError}</p>
-          )}
-          <button
-            onClick={onRecompute}
-            disabled={recomputing}
-            className="w-full py-2 text-xs text-white/40 border border-white/10 rounded-lg hover:bg-white/5 hover:text-white/60 transition-colors disabled:opacity-40"
-          >
-            {recomputing ? 'Recomputing…' : 'Recompute analysis'}
-          </button>
         </div>
       )}
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
