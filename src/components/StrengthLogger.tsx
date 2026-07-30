@@ -4485,7 +4485,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // athlete picked from at build time. Offering a movement off that list offers one
                   // the block never considered, at a rep total the slot was never scaled for.
                   {
-                    assistanceRow: exercise.load_prescribed === false,
+                    // ⛔ TWO SIGNALS, BECAUSE THE FIRST DOES NOT EXIST ON EXISTING PLANS.
+                    // `load_prescribed: false` is now carried through materialize — but every row
+                    // already written lacks it, including the block Michael is running today. The
+                    // second signal is on every assistance row ever authored: its prescription is a
+                    // rep TOTAL ("25 total"), because assistance states a movement and a total and
+                    // never a weight. A main lift always prescribes a number, never a total.
+                    assistanceRow: exercise.load_prescribed === false
+                      || /total/i.test(String(exercise.target_reps ?? '')),
                     // ⛔ THE DAY'S MAIN LIFT, so the offer follows the block's own day rule: on a
                     // bench day the push slot pulls, on a squat day the single-leg slot hinges
                     // (Q-212 / p86). It is the row the block PRICED — assistance is never priced —

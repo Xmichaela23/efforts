@@ -308,3 +308,14 @@ Deno.test('⛔ it never hands back an empty sheet', () => {
     assertEquals(onDay(row, main).length > 0, true, `${row} on ${main}`);
   }
 });
+
+Deno.test('⛔ the assistance rows Michael actually saw, on his own block', () => {
+  // 2026-07-30, three swap sheets on a live session. Each offered the whole exercise library
+  // because the "this row is assistance" marker never reached the screen — `materialize-plan`
+  // builds its exercise object from a WHITELIST and `load_prescribed` was not on it.
+  assertEquals(asAssistance('Single Leg Hip Thrust'), ['Reverse Lunge', 'Bulgarian Split Squat', 'Hanging Leg Raise']);
+  assertEquals(asAssistance('Inverted Row'), ['Pull Up', 'Chin Up', 'Dumbbell Row']);
+  // What he got instead: Hip Thrust, Glute Bridge, Leg Curl, Single Leg Rdl, Single Leg Romanian
+  // Deadlift, Kettlebell Swing… — the hip-hinge pattern, including the same movement twice under
+  // two names.
+});
