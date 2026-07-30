@@ -893,12 +893,35 @@ async function runSessionDetailPipelineAndPersist(
           // given weight AND an e1RM curve off top sets continuously, flagging PRs as they happen.
           // Being the only 5/3/1 app that hides the number three weeks in four is an outlier position
           // taken on instinct. Every anchor week it is.
+          // The planned rows, for the set_plan fallback below.
+          const plannedExercisesForAllOut: any[] | null = Array.isArray(plannedRowRaw?.strength_exercises)
+            ? plannedRowRaw.strength_exercises
+            : null;
           const allOut: Array<Record<string, unknown>> = [];
           for (const ex of compStrengthArr) {
             const normName = normalizeExerciseName(ex?.name || '');
             const setsArr = Array.isArray(ex?.sets) ? ex.sets : [];
             // `amrap` is stamped on the set from the plan's `set_plan`; the athlete types the reps.
-            const amrapSet = setsArr.find((st: any) => st?.amrap === true && (Number(st?.reps) || 0) > 0);
+            // ⛔ THE PLAN DEFINES WHICH SET IS THE READING — the logged flag is only a convenience.
+            //
+            // First choice: the logger stamped `amrap: true` on the set it copied from the plan.
+            // But that flag only lands when the row was BUILT from a planned session, so a session
+            // logged from a stale bundle, edited by hand, or added on the day carries the right work
+            // and no marker — and the panel would silently show nothing on a set the plan clearly
+            // called all-out. Falling back to the PLAN is not a guess: `set_plan[].amrap` is the
+            // prescription that made it an all-out set in the first place.
+            let amrapSet = setsArr.find((st: any) => st?.amrap === true && (Number(st?.reps) || 0) > 0);
+            if (!amrapSet && normName && Array.isArray(plannedExercisesForAllOut)) {
+              const pEx = plannedExercisesForAllOut.find(
+                (pe: any) => normalizeExerciseName(pe?.name || '') === normName,
+              );
+              const plan = Array.isArray(pEx?.set_plan) ? pEx.set_plan : null;
+              const idx = plan ? plan.findIndex((sp: any) => sp?.amrap === true) : -1;
+              if (idx >= 0) {
+                const candidate = setsArr[idx];
+                if (candidate && (Number(candidate?.reps) || 0) > 0) amrapSet = candidate;
+              }
+            }
             if (!amrapSet || !normName) continue;
             const weight = Number(amrapSet.weight) || 0;
             const reps = Number(amrapSet.reps) || 0;

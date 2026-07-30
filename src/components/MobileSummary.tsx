@@ -179,18 +179,31 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
             2026-07-30 on a session whose every row already said the plan column was empty.
             The narrative is only shown when there is a plan to have been measured against — the same
             law the execution block above it now follows (D-035). */}
-        {planned && (
-          <SessionNarrative
-            sessionDetail={sd}
-            hasSessionDetail={hasSessionDetail}
-            noPlannedCompare={noPlannedCompare}
-            planLinkNote={null}
-            recomputing={recomputing}
-            recomputeError={recomputeError}
-            onRecompute={recomputeAnalysis}
-            hideNextUp
-          />
-        )}
+        {/* ⛔ THE STRENGTH NARRATIVE IS GONE (2026-07-30, Michael: *"we need to lose the narrative…
+            we killed it for strength"*). D-338 gated it on having a plan; the gate was not the
+            problem. The paragraph itself was.
+
+            What it printed on a real, correctly-executed 5/3/1 session:
+              *"No RIR was logged, so effort proximity can't be confirmed… back squat ran about 27%
+               under the prescribed weight… Box jumps haven't appeared in recent logged training and
+               can make the legs feel heavier than expected."*
+
+            Three claims, three faults, and every one is the protocol blindness the rest of today's
+            work was spent closing:
+              1. RIR is not collected on this protocol BY DESIGN (`usesRir: false`), so "can't be
+                 confirmed" states a missing input as a shortcoming of the session.
+              2. "27% under prescribed" compares a 55/65/75 RAMP against the top-set number. The
+                 athlete lifted exactly what was written.
+              3. The soreness line is speculation about tomorrow, dressed as a read of today.
+
+            ⛔ AND IT IS THE WRONG SHAPE FOR THIS SCREEN. Performance answers "what did I just do" —
+            the table, the all-out set, the rep record, all of it exact and server-computed. A block
+            verdict belongs on State, which owns the trend and is protocol-aware. A prose paragraph
+            re-deciding a session next to the facts is a second opinion with no authority
+            (Constitution Law 4).
+
+            ⚠️ SCOPE: strength only. Run, ride and swim keep theirs — they have real per-session
+            signals (pace, HR, decoupling) that no table renders. */}
         <StrengthPerformanceSummary
           planned={planned}
           completed={completed}
