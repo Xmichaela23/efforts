@@ -125,12 +125,17 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_
   //
   // Gated on the workout HAVING a plan link, because `block` is only resolvable then — otherwise
   // every unattached session would refresh forever, chasing a field it can never have.
-  // ⚠️ ONE-SHOT, NOT A LOOP. `block_checked` is written whenever the pipeline runs, so a session
-  // whose card genuinely cannot resolve refreshes ONCE and then stops asking. Keying only on `block`
-  // would re-run the whole pipeline on every open for any session that can never carry one.
-  if ((workoutRow as any)?.planned_id
-      && !(sessionDetail as any)?.block
-      && !(sessionDetail as any)?.block_checked) return true;
+  // ⚠️ VERSIONED, NOT A PRESENCE CHECK — and the first cut of this rule bit me within the hour.
+  //
+  // It was `!block && !block_checked`: refresh once, then stop asking. That is right for a field that
+  // never changes shape, and wrong here — I shipped `strength_all_out_reason` twenty minutes later,
+  // and every copy stamped by the earlier run was now considered fresh, so the new field could never
+  // reach the screen. The guard against an infinite refresh became a guard against the fix.
+  //
+  // ⛔ BUMP `BLOCK_CARD_VERSION` WHENEVER A FIELD IS ADDED TO THE CARD OR TO `strength_all_out`.
+  // A stored copy below the current version refreshes exactly once, then serves from cache.
+  const bcv = Number((sessionDetail as any)?.block_v);
+  if ((workoutRow as any)?.planned_id && (!Number.isFinite(bcv) || bcv < BLOCK_CARD_VERSION)) return true;
 
   const writtenMs =
     msFromTimestampField(analysis.session_detail_updated_at) ??
@@ -161,6 +166,15 @@ function stripResponseOnlySessionDetailFields(sd: Record<string, unknown> | null
   const { stale: _s, stale_reason: _r, ...rest } = sd as Record<string, unknown>;
   return rest as Record<string, unknown>;
 }
+
+/**
+ * ⛔ THE BLOCK CARD'S SCHEMA VERSION. Bump on ANY new field in `block` or `strength_all_out`, or a
+ * stored copy will be served from cache forever and the field will never appear on an existing
+ * session. Deploying is not shipping here.
+ *   1 — block card + strength_all_out (2026-07-30)
+ *   2 — strength_all_out_reason: an empty panel says why (2026-07-30)
+ */
+const BLOCK_CARD_VERSION = 2;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 
@@ -1007,7 +1021,7 @@ async function runSessionDetailPipelineAndPersist(
     // ⚠️ Nulls are honest here: absent means the plan did not say, and the screen shows nothing.
     if (sessionDetailV1) {
       // Stamped whether or not a card resolved — see the staleness note above.
-      (sessionDetailV1 as Record<string, unknown>).block_checked = true;
+      (sessionDetailV1 as Record<string, unknown>).block_v = BLOCK_CARD_VERSION;
     }
     if (sessionDetailV1 && blockForSession) {
       (sessionDetailV1 as Record<string, unknown>).block = {
