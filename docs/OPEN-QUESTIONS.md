@@ -2197,3 +2197,45 @@ From D-326's *"the server half is not a port"*:
 ⚠️ **AND ONE BLOCKER THAT IS NOT ABOUT STRENGTH AT ALL: Q-208.** `plans.status = 'active'` is used as an IDENTITY filter on historical reads, so a workout attached to an older plan reads as unattached. A Performance screen showing history across blocks is exactly where that surfaces. It has been live for three days.
 
 ⚠️ **AND WHAT THE NUMBERS MEAN IS Q-223.** The State strength row already shows a per-lift verdict and a suggested weight with an adjust modal — but on a first block the working number advanced on the calendar, not on evidence. Wiring a screen to it makes the screen inherit that.
+
+---
+
+## Q-228 — A one-week condense for the four-day lifter, as a courtesy (2026-07-30, Michael's idea, unbuilt)
+
+Michael: *"the 4 day person gets a lift a day- if they have a condensed scheuler it sold be great for them to be able to satack upper and lower days"* — then, narrowing it himself: *"this would be for a week this is a courtesty fo rthe 4 day person"*.
+
+### THE ASK
+
+A four-day lifter has a bad week — travel, a short week, whatever — and wants **that week only** condensed to three lifting days by pairing the upper lifts. The block's shape is untouched; next week returns to four.
+
+⚠️ **THIS IS NOT Q-225.** Q-225 is condensing *the block* mid-flight and belongs on the rematerializer. This is one week, reverting on its own, and it is a much smaller and safer thing. Do not merge them.
+
+### MOST OF IT IS ALREADY BUILT
+
+- **The pairing rule exists.** D-332 ships three-lifting-day mode: the composer pairs Bench + Press on one day, and it already knows the cost.
+- **A current-week strength re-layout path exists** — `adapt-plan`'s `maybeRelayoutStrengthForCurrentWeek`. It fires on ingest today and **nobody can ask it to run.** That is the seam: let the athlete ask.
+- Everything else in the week — runs, rides, the long day — stays where the optimizer put it.
+
+### ⛔ THE ONE RULE IT MUST REFUSE
+
+**Never on week 3 of a cycle** (weeks 3, 7, 11 in a twelve-week block). That is the 95% week, the heaviest reading of the cycle, and stacking bench under press there means measuring the second lift fatigued — on the set whose rep count is supposed to set the next cycle's weights. `strength-primary-plan.ts` already refuses this in three-day mode (`isTestWeek`) and splits back to four lifting days; a mid-block condense has to honour the same line.
+
+⚠️ **Michael had the week number backwards** (thought it was the week-4 deload). Worth stating plainly here because the correction matters: **week 4 is the DELOAD** — 40/50/60%, no all-out set, stack it freely. Week 3 is the protected one.
+
+---
+
+## Q-229 — Draggable easy sessions on the calendar (2026-07-30, Michael's idea, unbuilt)
+
+Michael: *"could we make the calnders workouts moveable per day?"* — then, drawing the line himself: *"you cant break rules, but you can move easy rides and runs, little things"*.
+
+### WHY THE LINE HE DREW IS THE WHOLE DESIGN
+
+Free drag-and-drop would hand back a hand-edited week the engine never designed and cannot reason about — the same objection that keeps Q-225 on the rematerializer. **Restricting it to the flexible sessions removes that objection entirely:** the engine keeps every placement the block depends on, and nothing the athlete moves can break the design.
+
+### WHAT EXISTS
+
+- **The validation is done.** `validate-reschedule` + `RescheduleValidationPopup` already move a planned session and check the placement against the block's rules. This is a GESTURE on top of a working reschedule, not new logic.
+- **"Which sessions may move" is already computable.** Sessions carry quality/hard/long classification (`isQualityRow` / `isHardRow`, `intensity_class`, tags) and strength days carry their clearances. Draggable = the easy run, the easy ride, the courtesy swim. Everything else pinned.
+- Because only harmless sessions move, **most drops are legal by construction** — the rules check is for the edge (dropping onto a day already carrying two sessions), not the common case.
+
+⚠️ **The cost is mobile drag on a scrolling list**, which is where this kind of feature normally eats its time — not in the logic.
