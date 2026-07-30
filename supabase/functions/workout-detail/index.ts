@@ -125,7 +125,12 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_
   //
   // Gated on the workout HAVING a plan link, because `block` is only resolvable then — otherwise
   // every unattached session would refresh forever, chasing a field it can never have.
-  if ((workoutRow as any)?.planned_id && !(sessionDetail as any)?.block) return true;
+  // ⚠️ ONE-SHOT, NOT A LOOP. `block_checked` is written whenever the pipeline runs, so a session
+  // whose card genuinely cannot resolve refreshes ONCE and then stops asking. Keying only on `block`
+  // would re-run the whole pipeline on every open for any session that can never carry one.
+  if ((workoutRow as any)?.planned_id
+      && !(sessionDetail as any)?.block
+      && !(sessionDetail as any)?.block_checked) return true;
 
   const writtenMs =
     msFromTimestampField(analysis.session_detail_updated_at) ??
@@ -593,10 +598,18 @@ async function runSessionDetailPipelineAndPersist(
     // A session on a finished block keeps its framing instead of reading as unplanned (Q-208 / F10).
     let blockForSession: BlockIdentity | null = null;
     try {
-      const blockPlanId =
+      let blockPlanId =
         plannedRowRaw?.training_plan_id ??
         attachPlannedRaw?.training_plan_id ??
         null;
+      // ⛔ THE SAME FALLBACK THE PLAN-CONTEXT FETCH ALREADY HAD, AND I DID NOT COPY IT.
+      // A planned row can be linked to the workout and still carry no `training_plan_id` — the code
+      // below logs exactly that case. Without this the card resolved to null on an ATTACHED session,
+      // the panel rendered nothing, and the staleness rule kept asking for a field that could never
+      // arrive. Same shape of miss as the fast-path cache: correct code, unreachable.
+      if (!blockPlanId && userId && (row as any)?.planned_id) {
+        blockPlanId = await fetchActivePlanId(supabase, userId);
+      }
       if (userId && blockPlanId && workoutDate) {
         blockForSession = await fetchBlockIdentityForWorkout(
           supabase,
@@ -976,6 +989,10 @@ async function runSessionDetailPipelineAndPersist(
     // contract the client renders verbatim (Law 4: surfaces render, they never re-decide), so the
     // block goes on it as data rather than being re-derived on the phone.
     // ⚠️ Nulls are honest here: absent means the plan did not say, and the screen shows nothing.
+    if (sessionDetailV1) {
+      // Stamped whether or not a card resolved — see the staleness note above.
+      (sessionDetailV1 as Record<string, unknown>).block_checked = true;
+    }
     if (sessionDetailV1 && blockForSession) {
       (sessionDetailV1 as Record<string, unknown>).block = {
         plan_id: blockForSession.planId,

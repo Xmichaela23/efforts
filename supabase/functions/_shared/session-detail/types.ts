@@ -99,6 +99,8 @@ export type SessionDetailV1 = {
    * ⚠️ Present on sessions from FINISHED blocks too — this deliberately does not require an active
    * plan, so history keeps its framing (Q-208).
    */
+  /** Set whenever the pipeline ran, whether or not a card resolved — stops the refresh rule looping. */
+  block_checked?: boolean;
   block?: {
     plan_id: string | null;
     plan_name: string | null;
