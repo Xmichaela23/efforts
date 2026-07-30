@@ -456,6 +456,9 @@ export type SessionDetailV1 = {
     estimate_trusted_max_reps: number;
   }> | null;
 
+  /** Why `strength_all_out` is empty. Present only when it is — an empty panel must say why. */
+  strength_all_out_reason?: 'no_planned_rows' | 'no_reps_on_all_out_set' | 'session_had_no_all_out_set';
+
   /** Strength only: per-exercise RIR verdict from analyzer. */
   strength_rir_summary?: Array<{
     name: string;

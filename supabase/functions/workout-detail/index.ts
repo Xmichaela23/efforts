@@ -975,7 +975,23 @@ async function runSessionDetailPipelineAndPersist(
               estimate_trusted_max_reps: trustedMax,
             });
           }
-          if (allOut.length > 0) (sessionDetailV1 as any).strength_all_out = allOut;
+          (sessionDetailV1 as any).strength_all_out = allOut;
+          // ⛔ AN EMPTY PANEL MUST SAY WHY (2026-07-30). This shipped three times showing NOTHING —
+          // once because a cache served the old copy, once because the block card resolved null, once
+          // because the plan link was missing — and each time the screen looked identical to "this
+          // session had no all-out set". An invisible failure is indistinguishable from a correct
+          // absence, which is what made it cost four round trips to find.
+          if (allOut.length === 0) {
+            const anyAmrapFlag = compStrengthArr.some((ex: any) =>
+              (Array.isArray(ex?.sets) ? ex.sets : []).some((st: any) => st?.amrap === true));
+            const anyPlannedAmrap = Array.isArray(plannedExercisesForAllOut)
+              && plannedExercisesForAllOut.some((pe: any) =>
+                (Array.isArray(pe?.set_plan) ? pe.set_plan : []).some((sp: any) => sp?.amrap === true));
+            (sessionDetailV1 as any).strength_all_out_reason =
+              !plannedExercisesForAllOut ? 'no_planned_rows'
+              : anyAmrapFlag || anyPlannedAmrap ? 'no_reps_on_all_out_set'
+              : 'session_had_no_all_out_set';
+          }
         }
       } catch (e) {
         console.warn(

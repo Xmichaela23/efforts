@@ -185,6 +185,7 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
   const rirSummary = sessionDetail?.strength_rir_summary ?? null;
   // The all-out set + the block it belonged to — both server-computed, rendered verbatim.
   const allOut = sessionDetail?.strength_all_out ?? null;
+  const allOutReason = sessionDetail?.strength_all_out_reason ?? null;
   const block = sessionDetail?.block ?? null;
   const workoutId = sessionDetail?.workout_id ?? (completed as any)?.id ?? null;
   // D-095: per-exercise prior-session lookup populated by workout-detail.
@@ -316,6 +317,17 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
 
           ⚠️ ABSENT ON A LEADER CYCLE AND EVERY DELOAD WEEK, because those carry no all-out set at
           all. Nothing renders, and that is correct rather than a gap. */}
+      {/* ⚠️ When the panel is empty it SAYS SO. Silence read as "no all-out set here" three times
+          while the real cause was a stale cache, a null plan link and a missing plan row. */}
+      {Array.isArray(allOut) && allOut.length === 0 && allOutReason && (
+        <div className="mt-3 mb-1 text-[12px] text-white/40">
+          {allOutReason === 'session_had_no_all_out_set'
+            ? 'No all-out set on this session.'
+            : allOutReason === 'no_reps_on_all_out_set'
+              ? 'The all-out set has no reps logged.'
+              : 'No planned session to read the all-out set from.'}
+        </div>
+      )}
       {Array.isArray(allOut) && allOut.length > 0 && (
         <div className="mt-3 mb-1 rounded-xl border border-white/12 bg-white/[0.04] p-3">
           <div className="text-[11px] uppercase tracking-wider text-white/45 mb-2">All-out set</div>
