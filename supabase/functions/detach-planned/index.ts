@@ -70,8 +70,37 @@ Deno.serve(async (req) => {
       .eq('id', pid)
       .maybeSingle();
 
-    if (!p || String(p.user_id) !== String(w.user_id)) {
-      return new Response(JSON.stringify({ success: false, detached: false, reason: 'planned_not_found_or_wrong_user', details: pErr }), {
+    // ⛔ A DANGLING LINK IS THE ONE THAT MOST NEEDS DETACHING, AND THIS REFUSED IT.
+    //
+    // `delete-plan` deletes its `planned_workouts` rows and never clears `workouts.planned_id`, so
+    // every session on a deleted plan is left pointing at a row that no longer exists. This guard
+    // then bundled "the row is GONE" together with "the row belongs to someone else" and 404'd both
+    // — so Unattach was a permanent no-op on exactly those sessions. The client swallows the error
+    // and clears its local state, so it LOOKS detached until the next refresh reads the stale
+    // `planned_id` straight back out of the database.
+    //
+    // Michael, 2026-07-29: *"it seems to get locked on and not unnatach"*. Verified on his 7/27
+    // Bench Press and 7/28 Overhead Press — both carried a `planned_id` whose planned row was gone,
+    // with no planned strength row on either date.
+    //
+    // ⚠️ THE TWO CASES ARE NOT THE SAME, and only one is a permission problem:
+    //   · row MISSING  → the link is dangling. Clearing the workout side IS the detach, and there is
+    //     no second side left to clear. We already verified the caller owns the WORKOUT above, which
+    //     is the only entity still in existence — so there is nothing left to authorise against.
+    //   · row EXISTS but belongs to someone else → still a hard 404. Unchanged.
+    if (!p) {
+      await supabase.from('workouts').update({ planned_id: null }).eq('id', w.id).eq('user_id', w.user_id);
+      return new Response(JSON.stringify({
+        success: true,
+        detached: true,
+        reason: 'dangling_link_cleared',
+        workout_id: String(w.id),
+        planned_id: pid,
+      }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
+    if (String(p.user_id) !== String(w.user_id)) {
+      return new Response(JSON.stringify({ success: false, detached: false, reason: 'planned_wrong_user', details: pErr }), {
         status: 404,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
