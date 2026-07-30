@@ -303,7 +303,15 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     const previousSets: StrengthSet[] = Array.isArray(previousEntry?.sets) ? previousEntry!.sets : [];
     const previousDate = previousEntry?.date ?? null;
     const previousDaysAgo = typeof previousEntry?.days_ago === 'number' ? previousEntry!.days_ago : null;
-    const maxLen = Math.max(plannedSets.length, completedSets.length, previousSets.length);
+    // ⛔ THE PREVIOUS SESSION DOES NOT GET TO INVENT SET ROWS. `previousSets.length` was in this
+    // max, so an old session with more sets than today's stretched the table — a 3×5+ press day
+    // drew FIVE numbered rows because the session six days earlier had five sets, and rows 4 and 5
+    // showed a prescription that was never made. Michael, 2026-07-30: "3 are prescibed i think its
+    // locked to the 5 x 5 template?" — it was reading his old 5×5 block.
+    // The row count is THIS session: what was asked for, or what was done, whichever is longer.
+    // Previous still fills the rows that exist and is simply absent past them, which is the honest
+    // shape — there is nothing to compare a set you did not do to.
+    const maxLen = Math.max(plannedSets.length, completedSets.length);
     const pairs = Array.from({ length: maxLen }, (_, i) => ({
       planned: plannedSets[i],
       completed: completedSets[i],
