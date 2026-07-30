@@ -661,12 +661,30 @@ Deno.serve(async (req)=>{
       let plannedSourceRow = null;
       let planned = w.planned_data || null;
       if (!planned) {
-        // prefer attached plan via planned_id; else same-day type
+        // ⛔ NO LINK, NO PLAN. This used to fall back to "any planned row on the same day and
+        // sport" when a workout had no `planned_id` — inventing an attachment the athlete never
+        // made, and the third site in the app running on that same date+type assumption.
+        //
+        // What it cost: a completed session dragged an UNRELATED planned session into its unified
+        // item, which then reached the calendar as a planned row wearing `status: 'completed'`.
+        // Michael, 2026-07-30, on a Tuesday where he pressed and still owed his squats: the squat
+        // chip appeared with a TICK, borrowing the press session's "done". The squat was hidden the
+        // rest of the time for the same reason, so work he genuinely owed was invisible on the one
+        // screen that tells him what is left.
+        //
+        // The guess made sense when attaching silently failed and this was the only way a linked
+        // session ever showed its plan. Auto-attach now DECLINES honestly when the lifts do not
+        // match (strengthSessionsShareTheWork), so filling the gap with a guess is exactly wrong:
+        // a missing link is now information, not a bug to paper over.
+        //
+        // ⚠️ An unlinked workout consequently carries NO planned data — which is the truth. The
+        // planned row still reaches the client as its OWN item (see the unlinked-planned loop
+        // further down), so nothing disappears; it simply stops being welded to a session it has
+        // nothing to do with. Attach by hand and it links properly.
         let p = null;
         if (w.planned_id) {
           p = (Array.isArray(plannedRows) ? plannedRows : []).find((x)=>String(x.id) === String(w.planned_id)) || null;
         }
-        if (!p) p = plannedByKey.get(`${date}|${type}`) || null;
         if (p) {
           plannedSourceRow = p;
           if (debug) console.log('get-week: Processing planned workout:', {
