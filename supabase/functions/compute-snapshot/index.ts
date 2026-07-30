@@ -38,6 +38,9 @@ import {
 } from "../_shared/state-trend/index.ts";
 import { computeAcwr, type LoadRow } from "../_shared/acwr.ts";
 import { resolvePlanPhase } from "../_shared/plan-phase.ts";
+// D-338: the date → plan-week resolver, so a phase can be resolved for any dated point in the
+// series. Same module the coach uses; honours the plan's own week_start rather than assuming Monday.
+import { resolvePlanWeekIndex } from "../_shared/plan-week.ts";
 import { computeEfficiencyIndex } from "../_shared/efficiency-index.ts"; // ONE efficiency formula (grade-adjusted feed)
 import { projectStandardRaces } from "../_shared/race-readiness/index.ts"; // goal-free VDOT 5k/10k/half/marathon
 import { localDateInTz } from "../_shared/local-date.ts";
@@ -835,6 +838,56 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] posture read failed (non-fatal):", e?.message || e);
         }
 
+        // ── D-338: WHAT THE PLAN WAS ASKING FOR ON EACH OF THOSE DAYS ───────────────────────────
+        //
+        // ⛔ THE TREND HAS NEVER KNOWN THIS, AND IT IS WHY IT LIES AFTER A DELOAD. `state-trend/
+        // strength.ts` passes `exclude: isDeloadWeek` into the classifier, `deload.ts` reads
+        // `point.meta.name` — and the points are built `{date, value}` with no meta at all. So the
+        // exclusion has been a no-op since the series was written.
+        //
+        // On 5/3/1 that is not cosmetic. Week 4 is 40/50/60% of the working number, so its estimate
+        // lands ~30% below its neighbours; it drags the recent end of the window and the row reads
+        // "slipping" on a week the athlete followed exactly.
+        //
+        // ⚠️ RESOLVED HERE, ONCE, off the SINGLE plan-phase resolver (`plan-phase.ts`, D-261) — not
+        // by a second phase notion and not from the planned row's tags, which only exist when the
+        // session happens to be attached. A phase is a property of the DATE and the plan, so an
+        // unattached session on a deload week is still a deload week.
+        let phaseByDate: Record<string, string> | null = null;
+        let measuredDates: string[] = [];
+        try {
+          const { data: activePlanRow } = await supabase
+            .from("plans").select("config,duration_weeks")
+            .eq("user_id", userId).eq("status", "active")
+            .order("created_at", { ascending: false }).limit(1).maybeSingle();
+          const cfg = (activePlanRow as any)?.config ?? null;
+          if (cfg) {
+            const dur = Number((activePlanRow as any)?.duration_weeks) || null;
+            const dates = new Set<string>([
+              ...exerciseRows.map((r: any) => String(r.date)),
+              ...strengthVolumeRows.map((r: any) => String(r.date)),
+            ].filter(Boolean));
+            const map: Record<string, string> = {};
+            for (const d of dates) {
+              const wk = resolvePlanWeekIndex(cfg, d, dur);
+              const ph = wk != null ? resolvePlanPhase(cfg, wk) : null;
+              if (ph) map[d] = String(ph).toLowerCase();
+            }
+            if (Object.keys(map).length) phaseByDate = map;
+          }
+        } catch (e: any) {
+          // Non-fatal: no phase → exactly today's behaviour (nothing excluded), never a crash.
+          console.log("[compute-snapshot] D-338 phase resolve failed (non-fatal):", e?.message || e);
+        }
+        // ⛔ WHICH DAYS MEASURED SOMETHING. Written by compute-facts onto `strength_facts.measured`
+        // when an all-out set was actually performed. This is the distinction Q-227 called the
+        // blocker under everything else: without it the series cannot tell a test from a Tuesday.
+        try {
+          measuredDates = (strengthVolR.data ?? [])
+            .filter((f: any) => f?.strength_facts?.measured === true)
+            .map((f: any) => String(f.date));
+        } catch { measuredDates = []; }
+
         // State v3: baseline 1RMs so the strength dot reads current e1RM ÷ baseline (not a 12wk range
         // that pegs right in a build). Typed first, learned fills gaps. Non-fatal → hedged fallback.
         let strengthBaselines: Record<string, number> | null = null;
@@ -951,7 +1004,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, measuredDates });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside

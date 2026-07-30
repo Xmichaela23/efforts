@@ -21,6 +21,9 @@ export interface StrengthExercise {
   weight_display?: string;
   target_rir?: number;
   setsArray?: StrengthSet[]
+  /** D-338: the REAL per-set prescription (5/3/1's three weights). When present it replaces the
+   *  replicate-the-top-weight fallback below — see the comment at `plannedSets`. */
+  setPlan?: Array<{ weight: number; reps: number; amrap?: boolean }>;
 }
 
 function normalizeName(raw: string): string {
@@ -233,17 +236,33 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     // weight label) across all N sets — coaches prescribe at the exercise level, not per-set,
     // so all planned sets render the same target. Carry target_rir as `rir` so fmt() with
     // showRir=true renders "(RIR N)" on the Planned column.
-    const plannedSets: StrengthSet[] = Array.from({ length: Math.max(0, pSets) }, () => {
-      const set: StrengthSet = { weight: pW };
-      if (pWDisplay) set.weight_display = pWDisplay;
-      if (pDuration > 0) {
-        set.duration_seconds = pDuration;
-      } else {
-        set.reps = pReps;
-      }
-      if (typeof targetRir === 'number') set.rir = targetRir;
-      return set;
-    });
+    // ⛔ D-338 — THE AUTHORED RAMP WINS. On 5/3/1 the three sets are three different weights, and
+    // replicating the top weight across all of them made a correct session read as under-plan on its
+    // first two sets and print a negative volume delta. `setPlan` is the composer's own prescription,
+    // carried through materialize; the replicate-the-aggregate path below still serves every other
+    // protocol, where a coach genuinely does prescribe at the exercise level.
+    const authoredPlan = Array.isArray((p as any)?.setPlan) ? (p as any).setPlan as Array<{ weight: number; reps: number; amrap?: boolean }> : null;
+    const plannedSets: StrengthSet[] = authoredPlan?.length
+      ? authoredPlan.map((ap) => {
+          const set: StrengthSet = { weight: Number(ap.weight) || 0 };
+          if (pWDisplay) set.weight_display = pWDisplay;
+          if (Number(ap.reps) > 0) set.reps = Number(ap.reps);
+          if (typeof targetRir === 'number') set.rir = targetRir;
+          // The all-out set is the one that moves the training max — it prints "5+", not "5".
+          if (ap.amrap) (set as any).amrap = true;
+          return set;
+        })
+      : Array.from({ length: Math.max(0, pSets) }, () => {
+          const set: StrengthSet = { weight: pW };
+          if (pWDisplay) set.weight_display = pWDisplay;
+          if (pDuration > 0) {
+            set.duration_seconds = pDuration;
+          } else {
+            set.reps = pReps;
+          }
+          if (typeof targetRir === 'number') set.rir = targetRir;
+          return set;
+        });
     const completedSets: StrengthSet[] = cSetsArr;
     // D-095: PREVIOUS column — last session's actual per-set data for this exercise.
     // Lookup keyed by the same normalizeName used for plannedMap/completedMap.
@@ -257,7 +276,21 @@ export default function StrengthCompareTable({ planned, completed, completedWork
       completed: completedSets[i],
       previous: previousSets[i],
     }));
-    return { name: p?.name || c?.name || k, pSets, pReps, pDuration, pW, pVol, cSets, cRepsAvg, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir, previousDate, previousDaysAgo, hasPrevious: previousSets.length > 0 } as any;
+    // D-338: planned volume off the SETS WE ACTUALLY RENDER, so the delta line can never disagree
+    // with the column above it. Identical to the old `pSets × reps × weight` on the replicated path;
+    // on an authored ramp it is the real 170×5 + 180×5 + 190×5 instead of 190 three times.
+    const pVolFromSets = plannedSets.reduce(
+      (sum, st) => sum + ((Number(st.duration_seconds) || Number(st.reps) || 0) * (Number(st.weight) || 0)), 0,
+    );
+    // The word the athlete tapped on their heaviest set — 5/3/1's replacement for RIR (D-338).
+    const topCompletedIdx = (() => {
+      if (!cSetsArr.length) return -1;
+      const weights = cSetsArr.map((s) => Number(s?.weight) || 0);
+      const max = Math.max(...weights);
+      return max > 0 ? weights.lastIndexOf(max) : -1;
+    })();
+    const difficulty = topCompletedIdx >= 0 ? (cSetsArr[topCompletedIdx] as any)?.difficulty ?? null : null;
+    return { name: p?.name || c?.name || k, pSets, pReps, pDuration, pW, pVol: pVolFromSets, cSets, cRepsAvg, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir, previousDate, previousDaysAgo, hasPrevious: previousSets.length > 0, difficulty } as any;
   });
 
   const totals = rows.reduce((acc, r)=>({ pVol: acc.pVol + r.pVol, cVol: acc.cVol + r.cVol, pSets: acc.pSets + r.pSets, cSets: acc.cSets + r.cSets }), { pVol:0, cVol:0, pSets:0, cSets:0 });
@@ -300,7 +333,26 @@ export default function StrengthCompareTable({ planned, completed, completedWork
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-white">{r.name}</span>
+                {/* ⛔ D-338 — SAY WHICH IT IS. `status` has been computed on every row since this
+                    table was written and rendered NOWHERE, so a lift you skipped and a lift that was
+                    never asked for looked identical: a dash on one side. Michael, on the strength
+                    Performance screen: "the whole thing is a mess". */}
+                {r.status === 'skipped' && (
+                  <span className="text-[11px] text-white/45 uppercase tracking-wide">not logged</span>
+                )}
+                {r.status === 'swapped' && (
+                  <span className="text-[11px] text-white/45 uppercase tracking-wide">not in the plan</span>
+                )}
               </div>
+              {/* THE THREE WORDS — how the top set felt. 5/3/1 dictates the weight, so there is
+                  nothing for reps-in-reserve to decide; this is what replaced it (D-338). Shown as
+                  the athlete's own word, never as a number and never as a score. Blank stays blank —
+                  answering is optional and always was. */}
+              {r.difficulty && (
+                <span className="text-[12px] text-white/60">
+                  {r.difficulty === 'moved_well' ? 'Moved well' : r.difficulty === 'worked_for_it' ? 'Worked for it' : 'Grind'}
+                </span>
+              )}
               {/* RIR comparison - show when both target and actual exist */}
               {r.targetRir != null && r.actualRir != null && (
                 <div className={`flex items-center gap-1 px-2.5 py-1 rounded text-sm ${

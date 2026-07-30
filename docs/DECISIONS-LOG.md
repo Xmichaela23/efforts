@@ -2219,3 +2219,48 @@ Weight × Reps × .0333 + Weight = Estimated 1RM
 His stall reset **re-estimates from a fresh rep max and takes 90% of that.** Ours cuts the existing working number by 10% — and our working number starts at **85%** of 1RM (`WORKING_NUMBER_PCT_OF_1RM`, the concurrent-athlete buffer), so a reset lands near **72% of 1RM** where his lands near **90%**.
 
 **The buffer bought that safety once and the reset charges for it again.** Not changed: it moves prescribed weight for real people. Filed as Q-222.
+
+---
+
+## D-338 — The three words replace RIR, the AMRAP is the measurement, and both finally reach the screens (2026-07-30)
+
+Michael: *"app will adopt this as our language to communicate how user handled load we abadon RIR — moved well worked for it or grind — this is the langauge of other stregnth apps. AMRAP determines whether to pump up beyond 1rm. none of this is seen or understood by performance or state."*
+
+### THE DECISION
+
+**RIR is abandoned for 5/3/1** — not hidden, abandoned. The split is not "reps and load", it is **who picks the weight**: RIR programs prescribe a rep target and leave the load to the athlete, so RIR reports whether they chose right. 5/3/1 sets the load off the training max, so there is nothing for RIR to decide.
+
+**The replacement is `Moved well / Worked for it / Grind`** — one tap, heaviest set, optional (blank stays legal). **The AMRAP rep count is the measurement** that moves the training max, and a training max meeting the 1RM on file is evidence the RECORD is stale, not that the athlete has maxed out.
+
+⚠️ **PER PROTOCOL, NOT UNIVERSAL.** `usesRir` is a profile flag and stays one. An autoregulated block gets RIR back automatically.
+
+### GROUNDED, AND THE DEVIATIONS NAMED
+
+- **Not using RIR on 5/3/1 is field practice.** Boostcamp runs core 5/3/1 purely on percentages and reads the session off the AMRAP; RPE/RIR appear only on autoregulated variants (Beyond 5/3/1). ⚠️ Most trackers (Hevy, Trainerize) DO offer RIR — this is right for THIS protocol, not a claim about the market.
+- **Words instead of a number has a validated precedent:** RISE (Resistance Intensity Scale for Exercise) — easy/low/moderate/hard/maximal, concurrently validated against velocity, load, reps and HR. RP autoregulates volume off categorical feedback.
+- ⛔ **TWO THINGS ARE OURS AND MUST KEEP SAYING SO:** **three** levels, not RISE's five; and a **top-set tap** rather than a post-session rating. RISE's validation was elastic-band squats, so it grounds the APPROACH, never our exact labels. Three was kept deliberately: the two extra levels buy resolution we would not act on, and "low" is not a word anyone says about a top set.
+
+### WHAT WAS ACTUALLY BUILT
+
+⛔ **The gap was total: BOTH signals were written and read by NOTHING.**
+
+1. **`compute-facts`** now writes `difficulty`, `amrap_reps` and `measured` onto `workout_facts.strength_facts` (JSONB — no migration), per exercise plus a session-level `measured`. Difficulty is read off the top set by the SAME `topSetIndex` the logger stamps with — imported, not re-derived, or the word lands on a different set than the one answered about.
+
+2. **The deload exclusion fires for the first time.** `computeStrengthState` has always passed `exclude: isDeloadWeek`, and `deload.ts` has always read `point.meta.name` — while `liftSeriesFromExerciseLog` built its points `{date, value}` with **no meta at all**. Dead since the series was written. `compute-snapshot` now resolves the phase **per date** off the single resolver (`plan-phase.ts`, D-261) and threads it through, so it holds whether or not the session was ever attached. The VOLUME series had the identical dead exclusion; fixed with it.
+   ⚠️ **Why it matters on 5/3/1:** week 4 is 40/50/60% of the working number, so its estimate lands ~30% below its neighbours. Pinned in `strength-deload-exclusion.test.ts`: the week after a deload read **sliding at −14%** on a week followed exactly. Those fixtures are the bug case and stay permanently.
+
+3. **The strength Performance screen stops grading.** Execution % is DELETED for strength (endurance keeps it — compliance against prescribed pace/duration is real there). It was generating three wrongs at once: **117%** on a session with no plan, off analysis left over from a wrong attachment that nothing recomputes on detach; **a fifth of the score given away** (the RIR term scores 100 when absent, on a protocol that never asks); and a paragraph about *"skipped Dips"* for a plan the athlete is not on. Replaced by a recomputed FACT — "Completed 4 of 5 exercises" — plus a per-row **"not logged"** / **"not in the plan"** mark. ⛔ **And nothing at all when there is no plan**, which is D-035's law that strength never obeyed.
+
+4. **The ramp is shown truthfully.** The Planned column read the aggregate `weight` (the TOP set) and replicated it, so a correct 170/180/190 session showed its first two sets as under-plan and printed a **negative volume delta**. It now reads the authored `set_plan` that materialize already carries; planned volume is derived from the rendered sets so the delta can never disagree with the column above it.
+
+5. **The three words render** on the row, as the athlete's own word. Never a number, never a score.
+
+### STILL OPEN — NOT DONE HERE
+
+- **State does not render difficulty yet.** The fact exists; the trend does not read it.
+- **`advance_untrusted` still has no reader** (D-335), and Wendler's `verdictFrom95Set` is still called by nothing — `measured` is the input that unblocks both.
+- **The freestyle default** (three words for a no-plan session instead of RIR) is unbuilt. ⚠️ This is the one recommendation that goes AGAINST common practice — other trackers do offer RIR there — argued on the grounds that RIR needs a target to mean anything.
+- **The five name-matchers** (audit F5) are untouched, so a lift can still appear twice.
+- **The calendar squat-day-not-done** is reverted and parked; the detail screen must stop treating a planned row as completed first.
+
+Audit: `docs/AUDIT-performance-state-2026-07-29.md`. Supersedes the RIR half of D-324/D-326 layer 1 for this protocol.

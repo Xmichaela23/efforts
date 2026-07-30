@@ -29,6 +29,10 @@ import {
 } from "../_shared/workload.ts";
 import { assessHrPlausibility, resolveMaxHrCeiling } from "../_shared/hr-plausibility.ts";
 import { canonicalize, muscleGroup, bigFourLift } from "../_shared/canonicalize.ts";
+// THE SAME top-set rule the logger stamps the difficulty tap with — heaviest set, ties to the last.
+// Imported, not re-derived: if the two ever disagree the word lands on a different set than the one
+// the athlete answered about. (`strength-focus-copy.ts` documents that both runtimes import it.)
+import { topSetIndex, type SetDifficulty } from "../../../src/lib/strength-focus-copy.ts";
 import {
   buildRegistryLookup,
   resolveExerciseId,
@@ -1279,6 +1283,22 @@ interface ExerciseFact {
   planned_sets?: number;
   planned_reps?: number;
   planned_weight?: string;
+  // ── THE THREE WORDS, AND THE MEASURING SET (D-338) ──────────────────────────────────────────
+  // 5/3/1 does not use RIR: the plan dictates the weight, so there is nothing for reps-in-reserve
+  // to decide. The athlete answers "Moved well / Worked for it / Grind" on the TOP set instead, and
+  // the all-out set's rep count is what moves the training max. Both were being written to
+  // `workouts.strength_exercises` and read by NOTHING — the tap reached the database and stopped.
+  //
+  // They land HERE, on the per-workout fact, because that is the one place both screens read from:
+  // Performance renders this session's version, State trends the same field. Neither re-derives.
+  /** The word the athlete tapped on the top set. Null when unanswered — blank is a legal answer. */
+  difficulty: SetDifficulty | null;
+  /** Reps completed on the all-out set. Null when this session had none. */
+  amrap_reps: number | null;
+  /** True when an all-out set was actually performed — i.e. this session MEASURED something.
+   *  ⛔ This is the distinction the strength trend has never had: it cannot currently tell a
+   *  week-3 95% set from an ordinary Tuesday, so both land on the series as the same kind of point. */
+  measured: boolean;
 }
 
 function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null): {
@@ -1340,6 +1360,18 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null): {
       ? brzycki1RM(bestWeight, bestReps, avgRir ?? 0)
       : 0;
 
+    // ── The three words + the measuring set (D-338) ─────────────────────────────────────────────
+    // Difficulty is read off the TOP set by the same rule the logger stamped it with, so the word
+    // is attributed to the set the athlete actually answered about. Read from `completedSets` (not
+    // the raw array) so an untouched prefill can never carry a word.
+    const topIdx = topSetIndex(completedSets);
+    const difficulty = (topIdx >= 0 ? (completedSets[topIdx] as any)?.difficulty : null) ?? null;
+    // The all-out set. `amrap: true` is stamped on the set from the plan's `set_plan` (or by the
+    // baseline-test path), and the athlete types the reps — the logger deliberately opens that one
+    // BLANK, so a rep count here is always theirs and never a prefill.
+    const amrapSet = completedSets.find((s: any) => s?.amrap === true && (Number(s?.reps) || 0) > 0);
+    const amrapReps = amrapSet ? Number(amrapSet.reps) || null : null;
+
     const plannedEx = plannedExMap.get(rawName.toLowerCase());
 
     totalVolume += exVolume;
@@ -1357,6 +1389,9 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null): {
       volume: exVolume,
       estimated_1rm: est1rm,
       muscle_group: mg,
+      difficulty,
+      amrap_reps: amrapReps,
+      measured: amrapReps != null,
       ...(plannedEx ? {
         planned_sets: plannedEx.sets,
         planned_reps: typeof plannedEx.reps === "number" ? plannedEx.reps : parseInt(plannedEx.reps) || undefined,
@@ -1382,12 +1417,21 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null): {
         avg_rir: e.avg_rir,
         volume: e.volume,
         estimated_1rm: e.estimated_1rm,
+        // D-338 — carried onto the fact so BOTH screens read one field. Omitted when absent so an
+        // old row and a new one with nothing to say serialize identically.
+        ...(e.difficulty ? { difficulty: e.difficulty } : {}),
+        ...(e.amrap_reps != null ? { amrap_reps: e.amrap_reps } : {}),
+        ...(e.measured ? { measured: true } : {}),
         ...(e.planned_sets ? { planned_sets: e.planned_sets } : {}),
         ...(e.planned_reps ? { planned_reps: e.planned_reps } : {}),
         ...(e.planned_weight ? { planned_weight: e.planned_weight } : {}),
       })),
       muscle_groups: muscleVolume,
       density_lbs_per_min: density,
+      // ⛔ SESSION-LEVEL: did this session MEASURE anything? The strength trend needs to tell a
+      // week-3 all-out set from an ordinary top set, and this is the flag that lets it. One field,
+      // written once, read by the spine and by the session screen.
+      measured: exercises.some((e) => e.measured),
     },
     exercises,
   };

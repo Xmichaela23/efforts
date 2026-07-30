@@ -49,10 +49,21 @@ export const PRIMARY_LIFTS = new Set([
 
 /** Per-workout strength volume (total_volume_lbs) → {date,value}[] for the volume trend. */
 export interface StrengthVolumeRow { date: string; total_volume_lbs: number | null }
-export function strengthVolumeToSeries(rows: StrengthVolumeRow[] | null | undefined): TrendPoint[] {
+/** D-338: `phaseByDate` carries the plan's own phase per date so the deload exclusion below can
+ *  actually fire. The volume series had the SAME dead exclusion as the e1RM one — and a deload hits
+ *  volume even harder than it hits the estimate (fewer reps AND lighter), so a planned light week
+ *  was reading as "volume down". Absent → no meta → today's behaviour, unchanged. */
+export function strengthVolumeToSeries(
+  rows: StrengthVolumeRow[] | null | undefined,
+  phaseByDate?: Record<string, string> | null,
+): TrendPoint[] {
   if (!Array.isArray(rows)) return [];
   return rows
-    .map((r) => ({ date: r.date, value: Number(r.total_volume_lbs) }))
+    .map((r) => {
+      const phase = phaseByDate?.[r.date] ?? null;
+      const base = { date: r.date, value: Number(r.total_volume_lbs) };
+      return phase ? { ...base, meta: { phase } } : base;
+    })
     .filter((p) => p.date && Number.isFinite(p.value) && p.value > 0);
 }
 

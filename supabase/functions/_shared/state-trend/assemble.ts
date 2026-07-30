@@ -132,7 +132,15 @@ export const disciplineOf = (t: unknown): string | null => {
 // Lift series from raw exercise_log rows — mirrors useExerciseLog's liftTrends derivation exactly
 // (filter e1RM>0, group by canonical, ≥2 sessions, sort by date). Same columns both runtimes read.
 export interface ExerciseLogLite { date: string; canonical_name: string; exercise_name?: string | null; estimated_1rm: number | null }
-export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[]): LiftSeries[] {
+/** D-338 — what the PLAN was asking for on each dated point, resolved once by the caller off the
+ *  single plan-phase resolver. `phaseByDate` carries the raw phase name lowercased ('deload',
+ *  'leader', 'anchor', 'build'…); `measuredDates` are the days an all-out set was actually
+ *  performed. Both optional: absent → points carry no meta → exactly today's behaviour. */
+export interface LiftSeriesContext {
+  phaseByDate?: Record<string, string> | null;
+  measuredDates?: string[] | null;
+}
+export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSeriesContext): LiftSeries[] {
   const byCanonical = new Map<string, ExerciseLogLite[]>();
   for (const e of rows) {
     if ((e.estimated_1rm ?? 0) <= 0) continue;
@@ -140,6 +148,10 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[]): LiftSeries[]
     arr.push(e);
     byCanonical.set(e.canonical_name, arr);
   }
+  // D-338: the plan's own answer for each date. `isDeloadWeek` reads `meta.phase`; without this the
+  // points carried no meta at all, so the exclusion wired into computeStrengthState never once fired.
+  const phaseByDate = ctx?.phaseByDate ?? null;
+  const measured = new Set(ctx?.measuredDates ?? []);
   return [...byCanonical.entries()]
     .filter(([, rs]) => rs.length >= 2)
     .map(([canonical, rs]) => {
@@ -149,7 +161,15 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[]): LiftSeries[]
         // Clean canonical label (not whichever raw name was logged first) — one lift, one name,
         // even when it was logged under several variations. See canonicalDisplayName.
         displayName: canonicalDisplayName(canonical),
-        points: sorted.map((r) => ({ date: r.date, value: r.estimated_1rm! })),
+        points: sorted.map((r) => {
+          const phase = phaseByDate?.[r.date] ?? null;
+          const isMeasured = measured.has(r.date);
+          // Meta is OMITTED entirely when there is nothing to say, so a series built without
+          // context is byte-identical to the one this function returned before.
+          return (phase || isMeasured)
+            ? { date: r.date, value: r.estimated_1rm!, meta: { ...(phase ? { phase } : {}), ...(isMeasured ? { measured: true } : {}) } }
+            : { date: r.date, value: r.estimated_1rm! };
+        }),
       };
     })
     .sort((a, b) => b.points.length - a.points.length);
@@ -180,6 +200,13 @@ export interface StateTrendInputs {
    *  the client cannot flag a PR (we don't invent records from 6 weeks). */
   allTimeBestByLift?: Record<string, { best: number; count: number }> | null;
   strengthBaselines?: Record<string, number> | null;
+  /** D-338: what the PLAN asked for on each dated point (raw phase name, lowercased), so a deload
+   *  week can be excluded from the strength trend. Resolved by the caller off `plan-phase.ts`.
+   *  Absent → no point carries a phase → nothing is excluded → today's behaviour exactly. */
+  phaseByDate?: Record<string, string> | null;
+  /** D-338: the days an all-out set was actually performed (`strength_facts.measured`). The one
+   *  distinction the series has never had — a test week vs an ordinary Tuesday. */
+  measuredDates?: string[] | null;
   /** Active auto/manual fitness baselines (fitness_baselines table), keyed by discipline (run/bike/swim).
    *  Presence → ANCHORED mode + the tick. Absent → the discipline falls to trend_only / facts_only. */
   fitnessBaselines?: Record<string, ActiveFitnessBaseline> | null;
@@ -338,9 +365,12 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // fitness read, session count is the receipt. e1RM is NULL when there's no trend to hold (drop the
   // clause, don't assert "holding"). Volume gives the row a real verdict so it no longer falls to the
   // adherence "needs data · N unplanned" shrug — unplanned demotes to a dim receipt.
-  const liftSeries = liftSeriesFromExerciseLog(inp.exerciseRows);
+  const liftSeries = liftSeriesFromExerciseLog(inp.exerciseRows, {
+    phaseByDate: inp.phaseByDate,
+    measuredDates: inp.measuredDates,
+  });
   const strength = computeStrengthState(liftSeries, asOf, spw.strength);
-  const strengthVolTrend = computeStrengthVolumeState(strengthVolumeToSeries(inp.strengthVolumeRows), asOf, spw.strength);
+  const strengthVolTrend = computeStrengthVolumeState(strengthVolumeToSeries(inp.strengthVolumeRows, inp.phaseByDate), asOf, spw.strength);
   // Per-lift direction the aggregate rolls up FROM — persisted so the coach reads one direction (D-270).
   // points are sorted ascending by date (liftSeriesFromExerciseLog), so the last point is the latest e1RM.
   const liftLatest = new Map(liftSeries.map((s) => [s.canonical, s.points.length ? s.points[s.points.length - 1].value : null]));

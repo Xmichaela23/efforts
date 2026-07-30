@@ -30,8 +30,23 @@ const extractExercisesFromComputed = (workout: any) => {
       })();
       const weight = Number(s?.weight || s?.load || 0);
       const target_rir = typeof s?.target_rir === 'number' ? s.target_rir : undefined;
-      
-      return { name, sets, reps, weight, target_rir };
+      // ⛔ THE RAMP, CARRIED (D-338). 5/3/1 is three sets at THREE weights — 170/180/190 — and
+      // `weight` above deliberately holds only the TOP set so older consumers kept working.
+      // `materialize-plan` carries the real per-set prescription through in `set_plan` and the
+      // logger already opens each set on its own number; this screen was the one place still
+      // replicating the top weight across all three, so a correctly executed session showed its
+      // first two sets as UNDER the plan and printed a negative volume delta.
+      const setPlan = Array.isArray(s?.set_plan)
+        ? s.set_plan
+            .map((p: any) => ({
+              weight: Number(p?.weight) || 0,
+              reps: Number(p?.reps) || 0,
+              amrap: p?.amrap === true,
+            }))
+            .filter((p: any) => p.weight > 0 || p.reps > 0)
+        : undefined;
+
+      return { name, sets, reps, weight, target_rir, ...(setPlan?.length ? { setPlan } : {}) };
     });
   } catch (e) {
     return [];
@@ -169,16 +184,19 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
     Record<string, { date: string; days_ago: number; sets: any[] }> | null
     | undefined) ?? null;
 
-  // Session-level execution score (weight / RIR / set + exercise completion), computed by
-  // analyze-strength-workout and carried on session_detail_v1.execution.execution_score.
-  // Previously never surfaced on the strength Performance screen.
-  const execScore: number | null = (() => {
-    const v = sessionDetail?.execution?.execution_score;
-    return typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null;
+  // D-338: how many PLANNED exercises were actually logged. A count, computed from the two lists
+  // already on this screen — deliberately not read from the stored analysis, which is what went
+  // stale and produced 117% on a session with no plan. A fact recomputed from what is on screen
+  // cannot outlive the thing it describes.
+  const completedOfPlanned = (() => {
+    const norm = (s: string) => String(s || '').toLowerCase().replace(/\s*\((?:left|right)\)\s*/gi, '').replace(/\s+/g, ' ').trim();
+    const done = new Set(
+      completedExercises
+        .filter((c: any) => Array.isArray(c?.setsArray) && c.setsArray.some((s: any) => (Number(s?.reps) || 0) > 0 || (Number(s?.duration_seconds) || 0) > 0))
+        .map((c: any) => norm(c.name)),
+    );
+    return plannedExercises.filter((p: any) => done.has(norm(p.name))).length;
   })();
-  const execLabel = execScore == null ? null
-    : execScore >= 85 ? 'Strong' : execScore >= 70 ? 'Solid' : 'Needs adjustment';
-  const execColor = execScore == null ? '' : execScore >= 85 ? 'text-emerald-400' : execScore >= 70 ? 'text-amber-400' : 'text-rose-400';
 
   // D-208: dynamic "what moved it" line, read from the shared component_attribution structure the
   // analyzer emits. Null when the session is clean (nothing to explain) — then only the static
@@ -194,28 +212,11 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
       .filter((n: string) => n.length > 0);
   })();
 
-  const execWhatMoved: string | null = (() => {
-    const attr: any = (sessionDetail as any)?.execution?.component_attribution;
-    if (!attr || !attr.primary_mover) return null;
-    const skipped: Array<{ name: string; role: string }> = Array.isArray(attr.skipped) ? attr.skipped : [];
-    if (skipped.length > 0) {
-      const names = skipped.map((s) => s.name).join(', ');
-      const allAccessory = skipped.every((s) => s.role === 'accessory');
-      const noneAccessory = skipped.every((s) => s.role !== 'accessory');
-      // Symmetric reasoning: a skipped MAIN lift gets an honest line too — never explain only the
-      // accessory case while a real miss gets silence.
-      const why = allAccessory
-        ? ' — accessory work, so it dings less'
-        : noneAccessory
-          ? ' — main work, counts in full'
-          : ' — main lifts count in full, accessories less';
-      return `Skipped ${names}${why}.`;
-    }
-    if (attr.primary_mover === 'load') return 'Loads landed off the prescribed targets.';
-    if (attr.primary_mover === 'rir') return 'RIR drifted from the target.';
-    if (attr.primary_mover === 'set_completion') return 'Some sets came in short of the plan.';
-    return null;
-  })();
+  // ⛔ `execWhatMoved` DELETED (D-338). It explained which component cost the most points — "Skipped
+  // Dips — main work, counts in full", "RIR drifted from the target" — and it was read off the STORED
+  // analysis, so it kept narrating a plan after the session was detached from one. There are no
+  // components to attribute any more, because there is no score. The "not logged" mark on each row
+  // says what was missed, computed from what is on screen rather than from a saved verdict.
 
   // Session totals footer — ported from the (now-retired for strength) Details tab so killing
   // that tab loses nothing. Same counting rule as the D-205 fix: every set with reps>0 counts
@@ -238,19 +239,33 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
 
   return (
     <div className="space-y-4">
-      {execScore != null && (
+      {/* ═══ D-338 — NO EXECUTION PERCENTAGE ON A STRENGTH SESSION ═══════════════════════════════
+          No strength app scores a session against its program. Adherence is an ENDURANCE idea —
+          TrainingPeaks-style compliance against prescribed pace and duration — and it got borrowed
+          onto this screen where it does not belong. Endurance keeps it; strength does not.
+
+          It was also generating three separate wrongs at once:
+            · 117% on a session with NO PLAN ATTACHED, off analysis left over from when it was
+              wrongly attached and never recomputed on detach;
+            · a fifth of the score handed over for free — the RIR term scores 100 when there is no
+              RIR data, on a protocol that deliberately never asks for it;
+            · a paragraph about "skipped Dips" and "lighter than prescribed" for a plan the athlete
+              is not on.
+          Deleting the question deletes all three. What replaces it is a FACT, not a grade: how much
+          of the plan you got through. The per-row "not logged" marks below say which ones.
+
+          ⛔ AND NOTHING AT ALL WHEN THERE IS NO PLAN. The app already states this law for endurance
+          — "adherence means vs what was prescribed; without a plan link there is nothing to be
+          measured against" (D-035) — strength simply never obeyed it. */}
+      {plannedExercises.length > 0 && (
         <div>
           <div className="flex items-baseline gap-2">
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Execution</span>
-            <span className={`text-lg font-semibold ${execColor}`}>{execScore}%</span>
-            {execLabel && <span className="text-xs text-gray-400">· {execLabel}</span>}
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Completed</span>
+            <span className="text-lg font-semibold text-white">
+              {completedOfPlanned} of {plannedExercises.length}
+            </span>
+            <span className="text-xs text-gray-400">· {plannedExercises.length === 1 ? 'exercise' : 'exercises'}</span>
           </div>
-          <p className="text-xs text-white/40 mt-0.5 leading-snug">
-            How much of the plan you completed, and how closely you hit the prescribed loads and reps-in-reserve.
-          </p>
-          {execWhatMoved && (
-            <p className="text-xs text-white/55 mt-1 leading-snug">{execWhatMoved}</p>
-          )}
           {/* Q-181 — THE SWAP RECEIPT. A declared swap is never a dock: the slot was filled, and the
               slot is the unit of adherence. This is not a penalty and not a scolding — it is the trade,
               named. An IN-SLOT swap carries note:null and renders NOTHING (nothing was missed, so it is
