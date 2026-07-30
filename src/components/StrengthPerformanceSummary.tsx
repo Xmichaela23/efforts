@@ -155,7 +155,9 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
       }
     }
     if (Array.isArray(ex.sets) && ex.sets.length > 0) {
-      return { name: ex.name, setsArray: ex.sets };
+      // `substituted_for` rides through so the table can pair a DECLARED swap with the slot it
+      // replaced instead of drawing it as a miss plus an unplanned extra (Q-181).
+      return { name: ex.name, setsArray: ex.sets, ...(ex.substituted_for ? { substituted_for: ex.substituted_for } : {}) };
     }
     // Legacy compact shape: sets = set count, reps & weight on exercise (same as workout-detail fallback)
     if (typeof ex.sets === 'number' && ex.sets > 0) {

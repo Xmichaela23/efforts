@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+// THE app's exercise vocabulary. Rows pair on this so the table cannot disagree with the count
+// above it, or with the trend on State, about what a lift is called.
+import { canonicalize } from '@/lib/canonicalize';
 
 export interface StrengthSet {
   reps?: number;
@@ -190,20 +193,46 @@ export default function StrengthCompareTable({ planned, completed, completedWork
   const rirSummaryMap = new Map<string, RirSummaryEntry>();
   (rirSummary || []).forEach(e => rirSummaryMap.set(normalizeName(e.name), e));
 
+  // ── ONE ROW PER SLOT (D-338 follow-on) ────────────────────────────────────────────────────────
+  //
+  // ⛔ PAIRED ON `canonicalize`, THE APP'S ONE EXERCISE VOCABULARY — the same keys `exercise_log`
+  // and the State trend group on. This table used to pair on its own local `normalizeName`, which
+  // is exact-match only, so a plan saying "Barbell Back Squat" against a logged "Back Squat" drew
+  // TWO rows — one marked missed, one marked unplanned — while the server's matcher counted the
+  // very same session as done. Same session, two answers (audit F5).
+  //
+  // ⛔ AND A DECLARED SWAP ANSWERS TO THE SLOT IT REPLACED. `substituted_for` is stamped by the
+  // Swap action and names the PLANNED exercise, so the swap keys to that slot and the two collapse
+  // into one row. The slot is the unit of adherence, not the name (Q-181) — the count already read
+  // it that way and the table did not, so the number said done while the table said missed.
+  const keyOf = (n: unknown) => canonicalize(String(n || ''));
   const plannedMap = new Map<string, StrengthExercise>();
-  planned.forEach(p => plannedMap.set(normalizeName(p.name), p));
+  planned.forEach(p => plannedMap.set(keyOf(p.name), p));
   const completedMap = new Map<string, StrengthExercise>();
-  completed.forEach(c => completedMap.set(normalizeName(c.name), c));
+  completed.forEach(c => {
+    // The slot it was declared against wins; otherwise the exercise answers to its own name.
+    const declaredFor = (c as any)?.substituted_for;
+    completedMap.set(keyOf(declaredFor || c.name), c);
+  });
 
   const allKeys = Array.from(new Set([...plannedMap.keys(), ...completedMap.keys()]));
 
   const rows = allKeys.map(k => {
     const p = plannedMap.get(k);
     const c = completedMap.get(k);
+    // What the athlete ACTUALLY did, when it differs from what was asked. Drives the swap receipt
+    // on the row — never a dock, just the trade named.
+    const swappedWith = (c as any)?.substituted_for && c?.name && keyOf(c.name) !== k ? String(c.name) : null;
+    // ⚠️ The row's DISPLAY name, and the legacy key derived from it. `k` is now a canonical slug
+    // ("chin_up"), so anything that used to read the key as prose — the bodyweight regex below, and
+    // the two lookups further down whose maps are still built with `normalizeName` — has to go
+    // through the name instead. Changing the pairing key must not silently change those.
+    const displayName = p?.name || c?.name || k;
+    const legacyKey = normalizeName(displayName);
     // Check if exercise pattern suggests bodyweight, BUT if weight was logged, treat as weighted
     const cSetsArrCheck = (c as any)?.setsArray as StrengthSet[] | undefined;
     const hasLoggedWeight = Array.isArray(cSetsArrCheck) && cSetsArrCheck.some(s => s.weight && s.weight > 0);
-    const isBodyweightPattern = /dip|chin\-?ups?|pull\-?ups?|push\-?ups?|plank/.test(k);
+    const isBodyweightPattern = /dip|chin\-?ups?|pull\-?ups?|push\-?ups?|plank/.test(legacyKey);
     const isBodyweight = isBodyweightPattern && !hasLoggedWeight && !(p?.weight && p.weight > 0);
     const pSets = (p?.sets || 0);
     const pReps = (p?.reps || 0);
@@ -229,7 +258,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     const rirValues = cSetsArr.filter(s => typeof s.rir === 'number').map(s => s.rir as number);
     const actualRir = rirValues.length > 0 ? rirValues.reduce((a, b) => a + b, 0) / rirValues.length : undefined;
     
-    const serverRir = rirSummaryMap.get(k);
+    const serverRir = rirSummaryMap.get(legacyKey);
     const status: 'matched'|'skipped'|'swapped' = p && c ? 'matched' : (p && !c ? 'skipped' : (!p && c ? 'swapped' : 'matched'));
     // Build 1:1 planned vs completed sets.
     // D-094: replicate the aggregate planned values (weight / reps / target RIR / qualitative
@@ -266,7 +295,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     const completedSets: StrengthSet[] = cSetsArr;
     // D-095: PREVIOUS column — last session's actual per-set data for this exercise.
     // Lookup keyed by the same normalizeName used for plannedMap/completedMap.
-    const previousEntry = previousByExercise?.[k] ?? null;
+    const previousEntry = previousByExercise?.[legacyKey] ?? null;
     const previousSets: StrengthSet[] = Array.isArray(previousEntry?.sets) ? previousEntry!.sets : [];
     const previousDate = previousEntry?.date ?? null;
     const previousDaysAgo = typeof previousEntry?.days_ago === 'number' ? previousEntry!.days_ago : null;
@@ -290,7 +319,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
       return max > 0 ? weights.lastIndexOf(max) : -1;
     })();
     const difficulty = topCompletedIdx >= 0 ? (cSetsArr[topCompletedIdx] as any)?.difficulty ?? null : null;
-    return { name: p?.name || c?.name || k, pSets, pReps, pDuration, pW, pVol: pVolFromSets, cSets, cRepsAvg, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir, previousDate, previousDaysAgo, hasPrevious: previousSets.length > 0, difficulty } as any;
+    return { name: displayName, swappedWith, pSets, pReps, pDuration, pW, pVol: pVolFromSets, cSets, cRepsAvg, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir, previousDate, previousDaysAgo, hasPrevious: previousSets.length > 0, difficulty } as any;
   });
 
   const totals = rows.reduce((acc, r)=>({ pVol: acc.pVol + r.pVol, cVol: acc.cVol + r.cVol, pSets: acc.pSets + r.pSets, cSets: acc.cSets + r.cSets }), { pVol:0, cVol:0, pSets:0, cSets:0 });
@@ -337,7 +366,12 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                     table was written and rendered NOWHERE, so a lift you skipped and a lift that was
                     never asked for looked identical: a dash on one side. Michael, on the strength
                     Performance screen: "the whole thing is a mess". */}
-                {r.status === 'skipped' && (
+                {/* A DECLARED swap is never a dock — the slot was filled. It gets the trade named,
+                    on one row, instead of the miss-plus-unplanned pair it used to draw. */}
+                {r.swappedWith && (
+                  <span className="text-[11px] text-white/45">→ {r.swappedWith}</span>
+                )}
+                {r.status === 'skipped' && !r.swappedWith && (
                   <span className="text-[11px] text-white/45 uppercase tracking-wide">not logged</span>
                 )}
                 {r.status === 'swapped' && (
