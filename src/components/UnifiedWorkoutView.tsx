@@ -388,8 +388,22 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     // Performance so an external initialTab='completed' (e.g. AppLayout routing) can't strand the
     // view on a triggerless tab that still renders the old Details content.
     if (isStrengthFamily && desired === 'completed') desired = 'summary';
+    // ⛔ A SESSION THAT HAS NOT HAPPENED HAS ONLY ONE TAB, AND `initialTab` MUST NOT OVERRIDE THAT.
+    // `initialTab` wins over the isCompleted default above, so a planned row opened with a requested
+    // tab (the calendar routes 'summary') landed on Performance — whose TRIGGER is hidden for a
+    // planned row but whose CONTENT still renders. Michael, 2026-07-30, on a planned Back Squat:
+    // "COMPLETED 0 of 5 · Box Jump NOT LOGGED · Vol 975 lb → 0 lb · −975 lb" — a comparison against
+    // a session that never happened, drawn under the Planned tab's own header.
+    // ⚠️ This is EXACTLY the trap the D-207 line above describes, on the other tab. Same fix.
+    if (!isCompleted) desired = 'planned';
     setActiveTab(desired);
   }, [initialTab, isCompleted, workout?.id]);
+
+  // Defense-in-depth, mirroring the D-207 enforcement below: whatever call site moves the tab, a
+  // workout with nothing executed cannot come to rest anywhere but 'planned'.
+  useEffect(() => {
+    if (!isCompleted && activeTab !== 'planned') setActiveTab('planned');
+  }, [isCompleted, activeTab]);
 
   // D-207 enforcement (defense-in-depth for the documented constraint): a strength-family workout
   // must never rest on 'completed'. Catches ANY setActiveTab('completed') from any call site.

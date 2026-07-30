@@ -172,16 +172,25 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
             sport-agnostic (reads sd.narrative_text, sd.summary, etc.) and
             gracefully no-ops the run/ride-specific blocks when their fields are
             absent on strength session_detail_v1. */}
-        <SessionNarrative
-          sessionDetail={sd}
-          hasSessionDetail={hasSessionDetail}
-          noPlannedCompare={noPlannedCompare}
-          planLinkNote={!planned ? 'No plan session linked.' : null}
-          recomputing={recomputing}
-          recomputeError={recomputeError}
-          onRecompute={recomputeAnalysis}
-          hideNextUp
-        />
+        {/* ⛔ D-338 — NO PLAN, NO PLAN NARRATIVE. This paragraph is written against the prescription
+            ("Overhead Press ran lighter than prescribed", "Dips were skipped, leaving one of four
+            planned exercises unfinished") and it is read off the STORED analysis, so it survived the
+            session being detached and kept describing a plan the athlete is not on. Michael saw it
+            2026-07-30 on a session whose every row already said the plan column was empty.
+            The narrative is only shown when there is a plan to have been measured against — the same
+            law the execution block above it now follows (D-035). */}
+        {planned && (
+          <SessionNarrative
+            sessionDetail={sd}
+            hasSessionDetail={hasSessionDetail}
+            noPlannedCompare={noPlannedCompare}
+            planLinkNote={null}
+            recomputing={recomputing}
+            recomputeError={recomputeError}
+            onRecompute={recomputeAnalysis}
+            hideNextUp
+          />
+        )}
         <StrengthPerformanceSummary
           planned={planned}
           completed={completed}

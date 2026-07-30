@@ -215,6 +215,10 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     completedMap.set(keyOf(declaredFor || c.name), c);
   });
 
+  // Is there a prescription to compare against at all? Everything that grades, labels or totals
+  // against the plan hangs off this — with no plan there is nothing to be measured against (D-035).
+  const hasPlan = plannedMap.size > 0;
+
   const allKeys = Array.from(new Set([...plannedMap.keys(), ...completedMap.keys()]));
 
   const rows = allKeys.map(k => {
@@ -374,7 +378,10 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                 {r.status === 'skipped' && !r.swappedWith && (
                   <span className="text-[11px] text-white/45 uppercase tracking-wide">not logged</span>
                 )}
-                {r.status === 'swapped' && (
+                {/* ⚠️ ONLY MEANINGFUL WHEN THERE IS A PLAN. With none attached, EVERY row is
+                    "not in the plan" — which is noise, not information, and it read as an accusation
+                    on a session the athlete simply logged freely. Michael, 2026-07-30. */}
+                {r.status === 'swapped' && hasPlan && (
                   <span className="text-[11px] text-white/45 uppercase tracking-wide">not in the plan</span>
                 )}
               </div>
