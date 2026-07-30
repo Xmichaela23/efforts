@@ -4892,8 +4892,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             >
                               {/* D-097: muted text when value came from previous-session autofill */}
                               <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
-                                {/* Q-097: AMRAP starts empty (open reps), not "—" — the athlete types the count. */}
-                                {set.reps === 0 ? '' : (set.reps ?? ((set.amrap || set.repMaxTest || isBaselineTestWorkout(scheduledWorkout || {})) ? '' : '—'))}
+                                {/* Q-097: AMRAP starts empty (open reps), not "—" — the athlete types the count.
+                                    ⛔ BUT EMPTY SAID NOTHING. An open set and a set someone forgot to fill in
+                                    looked identical, and Michael — who built this — did the session wrong
+                                    because of it, logging 0 reps on the one set that measures. The box now
+                                    carries a greyed "all out" placeholder: the signal sits where his eyes
+                                    already are (the number he is about to type), not in a label underneath. */}
+                                {(() => {
+                                  const shown = set.reps === 0 ? '' : (set.reps ?? ((set.amrap || set.repMaxTest || isBaselineTestWorkout(scheduledWorkout || {})) ? '' : '—'));
+                                  if (shown === '' && set.amrap && !set.completed) {
+                                    return <span className="text-amber-300/45 text-[11px] tracking-wide">all out</span>;
+                                  }
+                                  return shown;
+                                })()}
                               </span>
                               {/* Q-042: subtle tap-to-type affordance */}
                               <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
