@@ -2239,3 +2239,38 @@ Free drag-and-drop would hand back a hand-edited week the engine never designed 
 - Because only harmless sessions move, **most drops are legal by construction** — the rules check is for the edge (dropping onto a day already carrying two sessions), not the common case.
 
 ⚠️ **The cost is mobile drag on a scrolling list**, which is where this kind of feature normally eats its time — not in the logic.
+
+---
+
+## Q-230 — The plan builder has to tell State what the block IS: one protocol answer, and the goal type (2026-07-30, unbuilt)
+
+Michael: *"we will have numerous protocols so it has to be smart and our plan builder needs to know how to communicte sorrectly to it"* — then: *"and state knows the goal? from race to stregnth to vo2 max to speed to distance"*.
+
+**These are ONE job.** Both are the builder failing to hand State a fact about what the block is for, and both end the same way: a surface reasoning about training it cannot identify.
+
+### PART A — WHICH PROTOCOL
+
+Different generators stamp it differently. Run/tri plans write `config.strength_protocol`; a strength-primary plan writes nothing and identifies itself as `config.source = 'strength_primary'`. `materialize-plan` knows both; `coach` knows only the first. **The readers are not wrong — they are being told two different things.**
+
+Consequence, live: `readStrengthProtocol(null)` never speaks, and `protocolExpectsE1rmToDip(null)` returns false, leaving the generic *"Estimated one-rep maxes have been sliding — the one being built"* un-suppressed on a block designed to dip. Audit F3; same class as Q-166.
+
+**Three rules:**
+1. **Every builder stamps it the same way**, once. This is the root — fix the write side, not the readers.
+2. **One resolver reads it**, the way `plan-phase.ts` owns phase (D-261, written after three sites disagreed).
+3. ⛔ **UNKNOWN MEANS SILENT, NEVER A DEFAULT.** An unrecognised protocol says nothing about the block and logs loudly.
+
+⚠️ **NOT A FALLBACK, AND THE WORD MATTERS HERE.** Michael, on hearing it: *"i have fallabck ptsd from early AI builds of this app that were all fallbacks and nothing worked."* He is right, and the code agrees: `resolveProfile()` returns `durability` for ANY unrecognised id, which made a missing entry and a deliberate choice indistinguishable at every call site — and caused the same bug twice (Q-192, then again as `strength_primary` in D-322). `strength-protocol-registry.test.ts` exists to end that class. A silent default is the failure mode; a single resolver that admits ignorance is the fix.
+
+### PART B — WHAT THE GOAL IS
+
+State knows the LEAD DISCIPLINE (`primary_discipline`) and the POSTURE per discipline (develop / maintain / out), and whether a race exists. **It does not know the goal type.**
+
+So chasing speed and chasing distance both arrive as *"run: develop"* — indistinguishable. Same for VO2 max. State can tell strength from running; it cannot tell one running goal from another, and every read it makes about "the one being built" is blind to what is being built toward.
+
+`goal_type` already exists on the goal (`non-race-goal-seeds.ts`: `build_endurance` / `build_speed` / `get_stronger` / `build_muscle` / `maintain` / `starting_over`). It simply never reaches the payload's plan slice (`coach/types.ts:162` — `has_active_plan`, `plan_id`, `plan_name`, `week_index`, `week_intent`, `week_focus_label`, `week_start_dow`).
+
+⛔ **DO NOT SHIP PART B AS A FIELD ALONE.** A `goal_type` written to the payload and read by nothing is the exact disease the 2026-07-30 audit spent a day clearing (the difficulty tap, `advance_untrusted`, the RIR confidence gate — all built, all starved). Land it WITH the first reader that changes behaviour, or not at all.
+
+### RELATED
+
+Audit F9 (`docs/AUDIT-performance-state-2026-07-29.md`) is the same root one level down: the payload carries no protocol, no week-in-cycle and no is-measurement either. Fix the seam once and F9 closes with it.
