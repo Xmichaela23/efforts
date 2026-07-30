@@ -772,9 +772,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [sourcePlannedDate, setSourcePlannedDate] = useState<string | null>(null);
   // Performed date (calendar day the workout should be marked completed on).
   // IMPORTANT: selecting a planned workout should set linkage (planned_id) but must NOT force the performed date.
-  const [performedDate, setPerformedDate] = useState<string>(
-    targetDate || scheduledWorkout?.date || new Date().toLocaleDateString('en-CA')
-  );
+  const [performedDate, setPerformedDate] = useState<string>(() => {
+    const today = new Date().toLocaleDateString('en-CA');
+    // ⛔ THE COMMENT ABOVE WAS RIGHT AND THE CODE DID THE OPPOSITE. Opening a PLANNED session
+    // defaulted the performed date to the day it was PLANNED for, so doing Tuesday's squats on
+    // Thursday filed them on Tuesday — the work lands on a day the athlete did not train, the day
+    // he did train looks empty, and every load and trend that reads by date is off by two days.
+    // Michael, 2026-07-30, two days late on a squat session: "change the date in the logger for
+    // today".
+    // Picking a planned session sets LINKAGE (`planned_id`, which carries across dates just fine).
+    // It does not decide WHEN the work happened — only the calendar can be wrong about that, and
+    // the athlete is standing there knowing the answer. Still editable in the date field.
+    const src: any = scheduledWorkout || {};
+    const isPlannedSource = String(src?.workout_status || '').toLowerCase() === 'planned' || !src?.workout_status;
+    if (isPlannedSource) return today;
+    // Editing an already-COMPLETED session keeps its own date — that one is a record, not a plan.
+    return targetDate || src?.date || today;
+  });
   const [lockManualPrefill, setLockManualPrefill] = useState<boolean>(false);
   type AddonStep = { move: string; time_sec: number };
   type AttachedAddon = { token: string; name: string; duration_min: number; version: string; seconds: number; running: boolean; completed: boolean; sequence: AddonStep[]; expanded?: boolean };
