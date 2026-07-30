@@ -71,6 +71,16 @@ The verdict is computed ONCE and read by:
 
 `Anchor wk1-3 · Deload 4 · Anchor 5-7 · Deload 8 · Anchor 9-11 · Deload 12`. **All-anchor** — continuous training means every cycle measures. All four main lifts carry an all-out top set in every anchor week. ⚠️ **Week 3 is the protected one** (95%, the heaviest reading); week 4 is the deload. Michael had these backwards.
 
+### ⛔ READ THE AUDIT — IT IS THE MAP OF THESE TWO SCREENS AND MOST OF IT IS UNFIXED
+
+**`docs/AUDIT-performance-state-2026-07-29.md`** — a full code trace of how Performance and State analyse a session and a block, with file:line on every claim. F1-F6 were fixed on 2026-07-30. **These were NOT:**
+
+- **F7 — a hill session is graded on its warm-up and cool-down.** The pace score counts only steps carrying a pace target; the four hard climbs deliberately carry none, so the score is the jog in and the jog out. The whole session is unscored.
+- **F8 — the per-lift trend floor scales off SESSION cadence.** More lifting days makes each individual lift HARDER to earn a verdict (4 days → 5 sessions needed per lift, 7-day freshness). Backwards.
+- **F9 — the payload carries no protocol, week-in-cycle or is-measurement.** The root of every plan-blind read; partially addressed by D-338's facts, not closed.
+- **F10 — `analyze-running-workout/lib/plan-context.ts` re-derives the week index off Monday** while `plan-week.ts` honours the plan's own `week_start`. A second lineage, same class as the phase bug D-261 fixed.
+- **F11 — the smaller ones**, including swim postured `out` while the block books swims.
+
 ### ⛔ WHAT IS STILL OPEN
 
 - **`advance_untrusted` (D-335) still has no reader.** A shaky estimate renders like a clean one. `measured` is its input.

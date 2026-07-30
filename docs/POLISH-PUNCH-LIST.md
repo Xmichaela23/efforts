@@ -8,37 +8,33 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## ▶ NEXT UP — THE STRENGTH READ PLUMBING (2026-07-30, Michael's pick)
+## ▶ NEXT UP — MAKE THE ALL-OUT REPS MOVE THE WEIGHT (2026-07-31)
 
-**Wire the protocol into State and Performance.** Michael is bringing an audit of the read path; **read `Q-227` alongside it** — the same ground is already mapped from code so you do not start from zero.
+**The rematerializer (Q-226), now unblocked.** It was parked because its input did not exist; D-338 made the all-out rep count a saved fact. Read the ENGINE-STATE banner first — it names the seam.
 
-- [ ] ⛔ **START HERE: mark the week-3 AMRAP points in the per-lift series.** `state-trend/strength.ts` cannot currently tell a measurement from an ordinary day — the 95% all-out set and a week-1 top set are the same kind of point. **Every other item below is impossible until this distinction exists.**
-- [ ] **The RIR confidence gate is starved.** `compute-facts:~929-939` buckets each lift's e1RM by `avg_rir`; the barbell logger stopped asking for RIR. Fails safe, but the check is a no-op and reads as live. Decide: feed it, retire it, or replace it with difficulty.
-- [ ] **The difficulty tap writes and nothing reads it.** D-326 layer 1 persists the three words; `strength_facts` has no difficulty field. ⚠️ Do not re-derive D-326's three traps — difficulty has no prescription, a raw slope flags everyone every cycle, and re-including `BodyTrends.strength` early reinstates D-318.
-- [ ] **`advance_untrusted` has no reader** (D-335). The State row shows a shaky estimate identically to a clean one. Smallest visible win on this list.
-- [ ] **D-326 layer 3 — render e1RM provenance.** *"earned at week 3, unmeasured since"*, never a bare number. `StatePerformanceSection.tsx` has none today.
-- [ ] ⛔ **Q-208 FIRST IF YOU RENDER HISTORY.** `plans.status = 'active'` used as an identity filter: a workout on an older plan reads as unattached. **Live in production four days.** A Performance screen crossing blocks is exactly where it surfaces.
-- [ ] ⚠️ **Q-223 decides whether the numbers mean anything.** On a first block the working number advanced on the calendar, not on evidence. A screen wired to it inherits that.
+- [ ] ⛔ **`verdictFrom95Set` is written, correct, and called by NOTHING.** Wire it.
+- [ ] **`workingNumberForCycles` ALREADY TAKES the verdicts.** The seam is the parameter and it is already there. No verdicts → `advance` → today's behaviour, so this ships behind a behaviour-unchanged proof.
+- [ ] ⛔ **The reader cannot live in the composer** — it authors twelve weeks up front. Something must go back and rewrite the remaining weeks.
+- [ ] **ONE verdict, THREE customers** (Michael: *"it should be able to handle state as a cumstomer as well"*) — the plan rewrite, State, and the session that earned it. ⚠️ State's per-lift verdict currently keys off a DEAD RIR branch: it reads nothing while looking like it works.
+- [ ] **This closes Q-223** (a first block's numbers advancing on the calendar).
 
 ---
 
-## ⛔ AWAITING MICHAEL — DEPLOYED, seen on nothing (2026-07-30)
+## ⛔ AWAITING MICHAEL — DEPLOYED 2026-07-30, mostly seen (2026-07-31)
 
-**All seven functions deployed 2026-07-29 23:24 UTC** — `generate-strength-plan` v65, `create-goal-and-materialize-plan` v284, `generate-combined-plan` v296, `generate-run-plan` v162, `generate-triathlon-plan` v76, `materialize-plan` v232, `coach` v403. Client built and synced to iOS.
+**Eight functions deployed, every version verified before and after:** `auto-attach-planned` v55, `activate-plan` v68, `analyze-strength-workout` v141, `detach-planned` v19, `compute-facts` v90, `compute-snapshot` v101, `coach` v404, `workout-detail` v287, `get-week` v189. Client pushed (Netlify) and synced to Xcode.
 
-- [ ] **Four things to look at on the phone.** Three appear in one generated block:
-  - **A three-day block:** weeks 1/2/4 pair `Bench + Press`; **week 3 runs FOUR lifting days** *(D-332)*
-  - **A 40-mile runner's long run reads ~12 mi, not 16** *(D-333)*
-  - **A bike-only athlete asking 6 h gets 6 h** — it built 1.5 h before *(D-334)*
-  - **The ceiling warning appears ONCE**, in "One thing before you start", and not again under "What this week costs"
-- [ ] **Re-check on the phone what was only seen locally:** `Inverted Row` on the Overhead Press day, and the grouped compromise notes. ⚠️ Both were verified against LOCAL functions before the deploy — local is not production.
-- [ ] **Q-222 — the reset percentage is your call, not a patch.** Ours lands near 72% of 1RM (85% working number, then a further 10% cut); Wendler's lands near 90%. The concurrent buffer bought that safety once and the reset charges again. ⛔ It moves prescribed weight.
-- [ ] **Q-224 — the deposit claim's run half has no source, and your primary athlete is a runner.** ⛔ Do not let anyone fill the gap by citing Berryman or Rønnestad from memory.
-- [ ] **The partner doc is ready to send.** `docs/PROTOCOL-strength-focus-overview.md`, stamped *Efforts — v1, 29 July 2026*. ⚠️ Its "Open, and not papered over" section is the credibility — do not let a future session tidy it away.
-- [ ] **The AAA acceptance check is still outstanding**, and it is **not** met by a markdown export. Generate a Strength Focus block on a device: the header must say *"All 3 cycles are measuring cycles"* and carry the *"One thing before you start"* paragraph naming the pinned lifts.
-- [ ] **`ios/debug.xcconfig` has been uncommitted for three sessions.** Left alone deliberately. Decide whether it matters.
+- [x] ~~The strength Performance screen~~ — ✅ **SEEN ON SCREEN 2026-07-30.** No 117%; "Completed 3 of 4"; the ramp reads 80/90/105 against 80/90/105 at **+0 lb**; "not logged" on a skipped lift; no plan narrative on an unattached session.
+- [x] ~~The owed squat shows on the calendar~~ — ✅ **SEEN.** Michael: *"great its there"*.
+- [ ] **Log a session and check the all-out set.** Set 3 should read "all out" greyed in the reps box, "all-out · 5 minimum" beneath, and the date should default to TODAY even when the session was planned for an earlier day. ⚠️ Michael did a session wrong because none of this was visible — this is the one that matters.
+- [ ] **The three words and the AMRAP count only land on RECOMPUTED sessions.** Nothing is backfilled (his call). His next logged session picks them up.
+- [ ] **The deload fix shows nothing until week 4** — he is in week 1. Not a failure; there is no deload to exclude yet.
+- [ ] **Q-222 — the reset percentage is still your call.** Ours lands near 72% of 1RM, Wendler's near 90%. ⛔ It moves prescribed weight.
+- [ ] **Q-224 — the deposit claim's run half still has no source.**
+- [ ] **The AAA acceptance check** has never run on a device.
+- [ ] **`ios/debug.xcconfig` uncommitted, four sessions running.**
 
----
+
 
 ### ⛔ CITATION CORRECTIONS — found by the 2026-07-26 evidence sweep. Comments and athlete-facing strings; the RULES do not change.
 - [ ] **Petré 2021 is cited for a clearance rule it says nothing about.** It is a strength-development meta by training status. **Five sites:** `_shared/schedule-session-constraints.ts:28` (the single law), `_shared/week-optimizer.ts:484`, `:486` (⛔ cites it for *"the AMPK/mTOR interference"* — a claim **D-324 already STRUCK**), `:657` (⚠️ **athlete-facing narration**), `shared/strength-system/strength-primary-plan.ts:460` (⚠️ **athlete-facing**). Replace with Robineau 2016 + Schumann 2022 same-session. ⛔ **`week-optimizer.anchor-contract.test.ts:679` PINS these strings and will fail until updated — that is the guardrail working.** ⚠️ **Two sites are on the RACE path; this is not strength-only.**
