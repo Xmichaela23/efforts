@@ -20,8 +20,6 @@ import CoreTimer from '@/components/CoreTimer';
 import { NumericKeypadSheet } from '@/components/ui/numeric-keypad-sheet';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import {
-  SET_DIFFICULTY_OPTIONS,
-  SET_DIFFICULTY_PROMPT,
   topSetIndex,
   type SetDifficulty,
 } from '@/lib/strength-focus-copy';
@@ -5303,53 +5301,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </div>
                         );
                       })()}
-                    {(() => {
-                      // ── D-326 — THE DIFFICULTY TAP ───────────────────────────────────────────
-                      // Three words that MARK THE SET DONE. Michael, 2026-07-25: *"we have a
-                      // two-step process now — forced RIR pick and then hit done. This is
-                      // smoother."* The tap the athlete was already making becomes the answer.
-                      //
-                      // ⛔ TOP SET ONLY. Asking how a 65% opener felt is information-free — the
-                      // athlete was told to leave reps in the tank, so the answer is always "easy".
-                      // Four taps a session, two of them on the lower-body days that carry the cost.
-                      //
-                      // ⛔ SCOPED TO `rir_tracked === false` — i.e. exactly the deterministic
-                      // protocol (5/3/1) that lost RIR in D-324. Every other protocol keeps its RIR
-                      // strip and never sees this. Opt-OUT of RIR, opt-IN to difficulty, one flag.
-                      //
-                      // ⛔ AND THE PLAIN Done BUTTON STILL WORKS. Blank is a legal answer — this
-                      // offers a richer way to finish the set, it does not gate finishing it.
-                      // D-338: the same two cases that lose RIR gain the words — a deterministic
-                      // protocol (5/3/1, `rir_tracked === false`) and a FREESTYLE session, where
-                      // there is no prescription for RIR to be measured against. One language.
-                      if (exercise.rir_tracked !== false && sourcePlannedId) return null;
-                      if (isDurationBased || isBodyweightMove(exercise.name)) return null;
-                      if (set.completed) return null;
-                      // The top set is the HEAVIEST, not the last — robust to warm-ups being present
-                      // and to any future reordering. Ties resolve to the last, which is where 5/3/1
-                      // puts it (three ascending sets, the third is the top).
-                      const topIdx = topSetIndex(exercise.sets);
-                      if (topIdx < 0 || setIndex !== topIdx) return null;
-                      const pick = (value: SetDifficulty) => {
-                        updateSet(exercise.id, setIndex, { difficulty: value, completed: true });
-                        autoStartRestForSet(exercise.id, setIndex);
-                      };
-                      return (
-                        <div className="mt-3">
-                          <p className="text-white/70 text-xs mb-1.5">{SET_DIFFICULTY_PROMPT}</p>
-                          <div className="flex items-center gap-1.5" role="group" aria-label="How the set felt">
-                            {SET_DIFFICULTY_OPTIONS.map((o) => (
-                              <button
-                                key={o.value}
-                                type="button"
-                                onClick={() => pick(o.value)}
-                                className="flex-1 min-w-0 h-11 rounded-lg border border-white/15 bg-white/[0.04] text-white/85 text-sm hover:bg-white/[0.10] active:bg-white/[0.16] transition-colors"
-                              >{o.label}</button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    {/* ⛔ THE THREE WORDS ARE GONE (2026-07-30, Michael: *"lets kill it, i dont
+                        want any useless buttons"*). They shipped ONE DAY EARLIER as D-338's
+                        replacement for RIR, and they were right to replace it — but the verdict that
+                        moves the bar reads the REP COUNT, not the word. Wendler p30: you keep adding
+                        weight until you cannot hit the prescribed sets and reps, and the miss is the
+                        signal. Nothing on that path ever read `difficulty`.
+
+                        So it was a question asked every session whose answer changed nothing — the
+                        exact disease the rest of this day was spent clearing (a built reader with no
+                        input, or here, an input with no reader). Gating the weight on how it felt
+                        would be autoregulation, which belongs to a different programme: Boostcamp
+                        only exposes RPE/RIR on *Beyond 5/3/1* templates, not on core 5/3/1.
+
+                        ⚠️ The plain Done button always finished the set; this only offered a second
+                        way. Removing it takes nothing away.
+                        ⚠️ Sessions that already recorded a word still display it — the data is real,
+                        and deleting the render would erase what was honestly logged. */}
                     {(() => {
                       // Duration-based exercises don't need equipment selection (bodyweight)
                       if (isDurationBased) {
