@@ -403,16 +403,29 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       // beneath a verdict that had just been cleaned of exactly that**. One row, two pools, and the
       // clean number vouching for the dirty one.
       //
-      // ⚠️ Averaged over the last `endpointN` (2) runs of the verdict's own pool, which is what
-      // `recentEfficiencyPaceHr` did — the same convention, now on the right rows.
+      // ⛔ MEDIAN OF THE LAST FIVE, NOT A MEAN OF THE LAST TWO — and the shipped screen proved why.
+      //
+      // The first cut kept `recentEfficiencyPaceHr`'s mean-of-2 convention. Within an hour a 125 bpm
+      // recovery jog synced and the line swung from 12:01/mi @ 134 to 13:04/mi @ 130 — a minute a mile
+      // off ONE session. With n=2 a single outlier owns the number, in either direction: his 146 bpm
+      // hill session drags it the other way just as hard.
+      //
+      // A median over five resists both ends without needing to know which runs were "easy" — and that
+      // matters, because knowing which runs were easy is the exact thing this row could never do. His
+      // runs cluster at 133-135 bpm; the median returns 12:50/mi @ 134 while the mean of the same five
+      // returns 13:08 @ 135, dragged by the hill and the jog it cannot identify.
       // ⚠️ GAP twin is dropped: these paces ARE grade-adjusted, so a raw-vs-GAP toggle has nothing to
       // toggle between. Offering one would imply a distinction that no longer exists.
       ...(runRoute && (inp.runEffHistory?.length ?? 0) > 0 ? (() => {
-        const rows = (inp.runEffHistory ?? []).slice(-2) as Array<Record<string, number>>;
-        const avg = (get: (r: Record<string, number>) => number) =>
-          rows.reduce((sum, r) => sum + Number(get(r) || 0), 0) / rows.length;
-        const pace = avg((r) => r.pace_s_per_km);
-        const hr = avg((r) => r.hr);
+        const rows = (inp.runEffHistory ?? []).slice(-5) as Array<Record<string, number>>;
+        const median = (get: (r: Record<string, number>) => number): number => {
+          const xs = rows.map((r) => Number(get(r) || 0)).filter((n) => n > 0).sort((a, b) => a - b);
+          if (xs.length === 0) return 0;
+          const mid = xs.length / 2;
+          return xs.length % 2 ? xs[(xs.length - 1) / 2] : (xs[mid - 1] + xs[mid]) / 2;
+        };
+        const pace = median((r) => r.pace_s_per_km);
+        const hr = median((r) => r.hr);
         return {
           recentPaceSecPerKm: pace > 0 ? Math.round(pace) : null,
           recentGapPaceSecPerKm: null,
