@@ -4825,7 +4825,24 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ---
 
-## D-239 — RUN State lead = aerobic decoupling (zone-free); Friel bands are a coaching standard, not lab-validated
+## D-239 — SUPERSEDED
+
+> ⛔ **THE RUN STATE ROW NO LONGER LEADS WITH DECOUPLING. Superseded by [D-346] (2026-07-31).** The
+> verdict is now speed-at-heart-rate across every run, grade-adjusted, with a heat coefficient fitted
+> per athlete; decoupling is demoted and currently SILENCED (see [Q-232]).
+>
+> ⚠️ **AND THIS ENTRY CONTAINS THE DECISION THAT CAUSED THE FAULT — read it, it is instructive.** Its
+> gate is *"steady/aerobic `workoutType` + ≥20 min + drop confirmed-raw"*, chosen because the strict
+> path left **3 qualifying runs** and this entry records why: *"that thinness was a classification
+> artifact, not scarcity."* **That diagnosis was exactly right.** The remedy was not: it widened the
+> gate instead of fixing the classifier, onto a field (`heart_rate_summary.workoutType`) that reads
+> `steady_state` on every run ever logged — so the gate excluded NOTHING and hill sessions entered the
+> durability trend as clean steady measurements.
+>
+> ⛔ **The lesson D-346 takes from this: when a classifier is broken, widening the gate that depends on
+> it hides the break instead of removing it.** Everything below is history.
+
+## D-239 (original) — RUN State lead = aerobic decoupling (zone-free); Friel bands are a coaching standard, not lab-validated
 
 The RUN State row leads with within-session **pace:HR decoupling** (`heart_rate_summary.decouplingPct`, D-036 GAP-corrected), NOT `efficiency_index` (whole-run → distance-confounded) and NOT `pace_at_easy_hr` (null on real data — see the dead-code list in ENGINE-STATE). Chosen because decoupling needs **no HR baseline** (this athlete has no reliable `threshold_hr`) and has **no distance confound** (within-run drift, not a whole-run average).
 

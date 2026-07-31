@@ -2531,7 +2531,25 @@ word still display it — deleting the render would erase what was honestly logg
 
 ---
 
-## D-345 — A RUN'S INTENT COMES FROM THE PLAN IT IS ATTACHED TO (2026-07-30, SHIPPED + DEPLOYED)
+## D-345 — SUPERSEDED THE NEXT DAY
+
+> ⛔ **THE FIELD THIS WROTE IS READ BY NOTHING, AND THE PREMISE WAS FALSE. Corrected by [D-346]
+> (2026-07-31).**
+>
+> This entry writes `run_facts.workout_type` and states that the field *"was NEVER WRITTEN, so every
+> run was excluded from the efficiency/decoupling read and the trend sat 16 days stale."* Measured the
+> next day against real data: **the field the gate actually reads is
+> `workout_analysis.heart_rate_summary.workoutType`, and it was populated on all 25 runs — with
+> `steady_state`.** So nothing was ever excluded; the opposite was true, and hill sessions were being
+> counted as steady.
+>
+> ⚠️ `run_facts.workout_type` has no reader. `route_progress_metrics.workout_intent`, written by the
+> same session's follow-up fix, has none on this path either. **Three sessions in three days each wrote
+> a run's intent to a different unread field** — which is the fault [D-346] exists to end.
+>
+> Everything below is history. The classifier itself is sound; it is aimed at nothing.
+
+## D-345 (original) — A RUN'S INTENT COMES FROM THE PLAN IT IS ATTACHED TO (2026-07-30, SHIPPED + DEPLOYED)
 
 **Michael, reading his own State screen:** *"heart rate drifting up? does it see the hill drills and
 not know what?"*
@@ -2558,10 +2576,14 @@ rather than guessed into it — the same failure direction the gate already chos
 
 ---
 
-## D-346 — THE RUN ROW IS ON THE WRONG INSTRUMENT. Decoupling out, speed-at-heart-rate in — and the engine for it is already built (2026-07-31, DECIDED — NOT BUILT)
+## D-346 — THE RUN ROW IS ON THE WRONG INSTRUMENT. Decoupling out, speed-at-heart-rate in (2026-07-31, **SHIPPED + DEPLOYED**)
 
-> ⛔ **NOTHING IN THIS ENTRY IS SHIPPED.** It records a decision and a diagnosis, so the next session
-> does not spend another day rediscovering both. The three small fixes that DID ship are at the end.
+> ✅ **BUILT AND DEPLOYED THE SAME DAY, after this entry was first written as a decision-only record.**
+> Thirteen commits (`de8b486d` … `7ea6170b`), 22 edge functions, coach payload 150 → 154. What shipped
+> is in **§SHIPPED** at the end; the diagnosis and the three rejected approaches above it are unchanged
+> and are the reason the build took the shape it did.
+>
+> ⚠️ **The remaining fault is DURABILITY, and it is not a patch — see [Q-232].**
 
 **Michael, on the State row telling him his heart rate was drifting up:** *"this shits wrong no"* —
 then, after four hours: *"this is the 209th fucking time ive treid to make this wrk, and it keeps
@@ -2653,3 +2675,73 @@ running the analysis pass over an athlete's imported Strava history.
 and removed the same day once its criterion failed on real data. **Keeping it would have made a
 sixteenth implementation of this row.** The decision it was serving is this entry; the code was a
 wrong first attempt at it, and a wrong attempt left on disk is how the next session inherits a fork.
+
+---
+
+### ✅ SHIPPED — what the run row is now, and what it took
+
+**THE VERDICT.** `compute-snapshot` builds `runEffHistory` — every run with a grade-adjusted pace and
+an HR, plus that day's temperature — and `assemble.ts` runs it through `routeTrend`, which fits
+`efficiency ~ heat + time` jointly (Huber-robust, CI-gated). The result **overrides
+`runFitness.efficiency.verdict / pctChange / sampleCount / newestAgeDays`**.
+
+⛔ **THE OVERRIDE LANDS ON `efficiency`, AND THAT PLACEMENT IS THE FIX.** An earlier cut set the
+CARD-level verdict — real, and invisible: `StatePerformanceSection` renders `fitness.efficiency`. **A
+fix landing where nothing reads is the fault this row was rebuilt fifteen times by, and it must not be
+the fix for it.** It shipped that way once and had to be corrected.
+
+**HIS NUMBERS, MEASURED:** −15.2% across 26 runs over 13 weeks, CI clearing zero, heat coefficient
+**−0.28 %/°F** learned from his own runs. Published work puts the cost near −0.22 %/°F — **his data and
+the literature agreed independently, which is the strongest evidence today that the engine is sound.**
+
+**THE HEAT LINE.** *"Heat costs you about 20s a mile per 10°F warmer, measured on your own runs."* The
+regression already computed the coefficient in order to remove it and then threw it away. Garmin
+corrects silently and never states the size; TrainingPeaks says "consider temperature". ⚠️ Rounded to
+5s and hedged (the fit moves ±25% by window), and gated to a NEGATIVE coefficient inside the published
+band — an unstable fit came back POSITIVE in development, which would have told an athlete heat makes
+them faster.
+
+**THE CHART** plots the same rows the verdict read, so the two cannot contradict. Conditions are
+CAPTIONED, never corrected (*"grade-adjusted · 60–85°F across these runs"*) — Intervals.icu's pattern;
+nobody in the field heat-adjusts an efficiency chart.
+
+**THE HEART-RATE ROW** now reads the same number. Its run half was decoupling — the broken filter — so
+it said *"drifting up"* in RED beside the RUN row's *"easing off"* in AMBER, **one number, two
+vocabularies, two severities**. It now states its contributors in the shared trend words
+(*"Running easing off (today) · bike holding (16d ago)"*) and mints no verdict of its own.
+
+**TWO SEPARATE FIXES RODE ALONG:**
+1. The "as of" stamp shows the NEWEST contributor, not the oldest. His run side was one day old and his
+   bike sixteen; the row stamped itself two weeks stale about current data.
+2. `get-weather` backfills the route row's conditions at fetch time — `compute-facts` wrote that row
+   before the analyzer fetched the weather, so 49 of 164 rows stamped null.
+
+### ⛔ THE PATTERN THAT COST THE MOST, AND MICHAEL NAMED IT
+
+> *"the pattern is, you look, say its wrong, fix it, then break it, then see it was right, and then see
+> there is a lot of code happening there."*
+
+It happened repeatedly and it is worth more than any single fix here:
+
+- **Three separate stale LABELS** shipped, each found by him on a screenshot: `over 6wk` (hardcoded 42
+  days), `last 12 weeks` (clamped), `1d ago` (from the replaced pool). ⚠️ **Same cause every time: the
+  data moved and a hardcoded number stayed.** A stale label on fresh data is believed *because*
+  everything around it is right.
+- The pace receipt was fixed onto the verdict's pool, then **broke** — a mean of two runs swung a
+  minute a mile when one recovery jog synced. Now a median of five.
+- A **payload-version bump was forgotten**, so the first copy fix deployed and changed nothing. That
+  file warns about this trap three times in its own notes.
+- The durability gate was "fixed" and **a pinned regression test caught it** — see [Q-232]. That is the
+  system working; it should not have taken a test.
+
+⛔ **THE LESSON: after moving a data source, SWEEP the surface once against the new pool — every label,
+date, unit and claim — instead of shipping and waiting to be told.** The sweep that was finally done
+found three more (the ⓘ still said "steady runs" and "than 6 weeks ago"; a dead GAP toggle; `0d ago`).
+
+### ⚠️ AND ONE FEATURE WAS REMOVED RATHER THAN FIXED
+
+**Projected race times are hidden below 8 threshold readings** (he has 3). They printed a finish time
+to the SECOND off a pace stamped `confidence: high` from three runs. Michael: *"its not a necessary
+featre unless it robust."* ⛔ The floor is the app's OWN — `runDirectionMinRuns` = 8, the same bar State
+already requires to assert a direction — **not a new number picked for this.** A TYPED target never
+qualifies at all: projecting race times off an aspiration is a fabricated number in measured clothes.

@@ -23,61 +23,86 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-01 — **the continuity campaign had its biggest day. Three real bugs are still open on State, all the same family. Your job is those three, then the docs backlog.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-01 — **the run row is fixed and the docs that hid the fault are corrected. Your job is the STRENGTH load bug, which is bigger than it looks.**)
 
 ### YOUR JOB
 
-**Three protocol-blind reads Michael found on his own State screen at the end of 2026-07-30.** All
-three are the same fault the whole day was spent on — *the reader does not know what the session was
-for* — and all three are visible to him right now:
+⛔ **BODYWEIGHT WORK SCORES ZERO LOAD, AND IT IS DISTORTING THE WHOLE SCREEN.** Measured on his real
+week (`scripts/_tonnage.mjs`, still on disk):
 
-1. ⛔ **The per-lift row calls a prescribed dip a decline.** His Bench row reads *"flat"* with a
-   dropping line, because week 1 of 5/3/1 prescribes a much lighter top set than he was lifting
-   before. [D-340] taught the WEEK NARRATIVE to suppress this (audit F3) and did **not** touch the
-   per-lift rows. ⚠️ The docs already name the real fix — *compare week-3 to week-3, not raw slope*
-   ([D-326] layer 2) — but he has one measurement per cycle, which is too sparse for a 6-week trend.
-   **Decide between "show the number, claim no direction" and a measurement-only series before
-   building.**
-2. **The Cross-training floor compares a PARTIAL week to a whole-week target.** *"Running's at 9 of
-   your 18-mile target — under what holds it"*, read on a **Thursday**. Four days of seven is ~10 of
-   18; he was on pace. `_shared/insights/cross-training-read.ts`, the `floorBreach` clause.
-3. **The run narrative guessed the wrong session.** *"your legs are likely still carrying Monday's
-   lower-body session"* — Monday was **Bench Press**. It inferred a body region it could have read.
+| his squat day, 2026-07-30 | |
+|---|---|
+| Box Jump 3 sets | **0 lb** |
+| Back Squat 3 sets | 1,725 lb |
+| Dips 3 sets | **0 lb** |
+| Chin Up 3 sets | **0 lb** |
+| Single Leg Hip Thrust | **0 lb** |
+| **session workload** | **10 points** |
 
-### ⛔ WHAT SHIPPED 2026-07-30 — do NOT re-litigate any of it
+`calculateStrengthWorkload` (`_shared/workload.ts:249`) sums `weight × reps`. A chin-up has weight 0,
+so it contributes nothing — **13 sets scored 10 points, against 61 for a 47-minute easy run.** Result:
+**run 87% / strength 8%** of his load, on a strength-focused block, feeding ACWR, the "balanced"
+verdict and the reconciler.
 
-**Twelve commits, seven decision entries ([D-339] … [D-345]), three questions closed
-([Q-230], [Q-226], [Q-223]).** Read those entries before touching the strength system; the summary:
+⚠️ **NO DECISION ENTRY DEFENDS THIS AND NO COMMENT EXPLAINS IT** — it is mechanical, not chosen. But
+tonnage-only may still be a defensible basis (some platforms use session RPE × duration), so **decide
+before you patch.** Two other facts fell out of the same read: his bench session recorded a **2-minute
+duration**, and strength sessions carry **no session RPE** while every run does, so the intensity term
+falls to a 0.75 default.
+
+⛔ **AND HEED THE PATTERN BEFORE YOU START** — Michael, watching it happen four times yesterday:
+*"the pattern is, you look, say its wrong, fix it, then break it, then see it was right, and then see
+there is a lot of code happening there."* This touches ACWR, load status and the reconciler, each with
+its own history. **Trace all three before changing one line.**
+
+### ⛔ WHAT SHIPPED 2026-07-31 — do NOT re-litigate any of it
+
+**Thirteen commits (`de8b486d` … `7ea6170b`), 22 edge functions, coach payload 150 → 154. One decision
+([D-346]), two questions ([Q-231], [Q-232]).**
 
 | what | state |
 |---|---|
-| **The block identity card** — one place says which protocol / goal / week / cycle / deload / measurement week / how effort is read | DEPLOYED ([D-340]) |
-| Both screens read it — `coach` payload `plan.block`, `session_detail_v1.block` | DEPLOYED |
-| **One 1RM formula, Wendler's own** (`src/lib/estimate-1rm.ts`) — there were THREE | DEPLOYED ([D-339]) |
-| **The all-out reps move the weight** — `rematerialize-strength-block`, proposes then applies | DEPLOYED ([D-341]) |
-| The logger sheet that shows what the set bought, at save | pushed (client) |
-| **No client math** — `save-baseline-test`, `resolve-exercise-weight`, PR verdict, compare-table matchers | DEPLOYED ([D-342]) |
-| Swaps follow the programme: accessories, the plan's shortlist, day-aware | pushed (client) ([D-343]) |
-| The three-word difficulty tap REMOVED; the strength narrative REMOVED | pushed (client) ([D-344]) |
-| **A run's intent comes from the plan it is attached to** | DEPLOYED ([D-345]) |
+| **The run verdict is speed-at-heart-rate**, every run, grade-adjusted, heat coefficient FITTED PER ATHLETE and removed | DEPLOYED ([D-346]) |
+| His read: **−15.2% over 26 runs / 13 weeks**, CI clears zero, heat **−0.28 %/°F** (literature: ~−0.22) | VERIFIED against real data |
+| **"Heat costs you about 20s a mile per 10°F warmer, measured on your own runs."** No competitor states the size | DEPLOYED |
+| The chart plots the SAME rows the verdict read; conditions captioned, never corrected | DEPLOYED |
+| The heart-rate row reads the same number, in the SHARED trend words, amber not red | DEPLOYED |
+| "as of" stamp = NEWEST contributor, not oldest | DEPLOYED |
+| `get-weather` backfills the route row's conditions (49 of 164 were null — a documented race) | DEPLOYED |
+| **Race projections HIDDEN below 8 threshold readings** (he has 3) | DEPLOYED |
+| Durability line SILENCED — see [Q-232], it is a decision not a patch | client |
 
-**Deployed versions verified before and after:** 20 functions on the first push, then `workout-detail`
-v289→v293, `materialize-plan` v234, `compute-facts` v92, plus `rematerialize-strength-block` v1,
-`save-baseline-test` v1, `resolve-exercise-weight` v1.
+### ⛔ FIVE DOCS SAID THIS AREA WAS HEALTHY. THAT IS WHY IT WAS REBUILT FIFTEEN TIMES.
 
-### ⛔ THE LESSON THAT COST FOUR SCREENSHOTS, AND IT WILL COST YOU TOO
+`TRUTH-MAP` called RUN *"CLEAN … the model the others should copy"*. `AUDIT-hr-congruence` marked it
+clean. `CAPABILITY-MAP` said D-345 had fixed the intent. `STATE-SOURCE-MAP` described a substrate that
+had moved ten days earlier. `session-detail/build.ts` claims in a comment that it uses *"the SAME metric
+State uses"* — it does not. **All five corrected, each carrying what it used to claim and why it was
+wrong.** ⛔ A doc that says "clean" about a broken thing does not merely fail to help — it routes every
+future session away from the fault.
 
-The block card shipped, deployed, and showed **nothing**, three times running. Causes in order: a
-session-detail **cache fast path** serving the stored copy; a **missing `training_plan_id` fallback**
-the neighbouring function has had for months; and then my own **one-shot staleness guard**, which
-twenty minutes later marked every copy fresh and blocked the next field.
+### ⛔ THE LESSON THAT COST THE MOST YESTERDAY
 
-⛔ **A NEW FIELD ON `session_detail_v1` NEEDS A STALENESS RULE OR IT NEVER REACHES AN EXISTING
-SESSION.** `BLOCK_CARD_VERSION` in `workout-detail` — **bump it on any addition to `block` or
-`strength_all_out`.** Deploying is not shipping here.
+**After moving a data source, SWEEP the surface once against the new pool — every label, date, unit and
+claim — instead of shipping and waiting to be told.** Three stale labels shipped and were each caught
+by Michael on a screenshot: `over 6wk` (hardcoded 42 days), `last 12 weeks` (clamped), `1d ago` (from
+the replaced pool). Same cause every time: **the data moved and a hardcoded number stayed.** The sweep
+that was finally done found three more in one pass.
 
-⛔ **AND AN EMPTY PANEL MUST SAY WHY.** All three failures looked identical to *"this session had no
-all-out set."* An invisible failure is indistinguishable from a correct absence.
+⚠️ **AND A COPY CHANGE IN `coach/` NEEDS `COACH_PAYLOAD_VERSION` BUMPED** or the cache serves the old
+text for 24h. That file warns about this three times in its own notes; it was walked into anyway.
+
+### ⛔ WHAT IS STILL OPEN
+
+- **The strength load bug above.** That is the job.
+- **[Q-232] — durability.** The gate reads a field that says `steady_state` on every run, so hill
+  sessions count. ⛔ The obvious fix (gate on `decoupling_mixed_effort`) **fails a pinned regression
+  test with its own bug history**, and [D-034] and `state-trend/run.ts` disagree about whether that flag
+  may filter. **A decision, not a patch.** Q-232 lists three resolutions — including dropping decoupling
+  from State entirely, which is where D-346 already pointed the verdict.
+- **[Q-231] — a Strava sync lands runs but no analysis**, so a new athlete starts with no verdict.
+  `bulk-reanalyze-workouts` already does that pass and is not wired to the import.
+- **Two stale failures in `src/lib/non-race-goal-seeds.test.ts`** — fourth session carrying this line.
 
 ### ⛔ THE SELF-AUDIT, AND WHAT IT CORRECTED (late 2026-07-30)
 

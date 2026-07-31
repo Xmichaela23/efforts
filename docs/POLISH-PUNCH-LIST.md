@@ -25,6 +25,15 @@ that shipped that day: the reader does not know what the session was for.**
       ⚠️ It reads as "this whole reading is stale". **Fix the STAMP** — show the newest and let the
       detail line name the stale contributor, which it already does. Do NOT "fix" the data path again.
 
+## ⛔ AWAITING MICHAEL — 2026-07-31 (run row: DEPLOYED + seen on device by Michael during the session)
+- [x] **The RUN row** — verdict, heat line, chart, pace line, labels. Michael reviewed it on screen four
+      times during the build and each round found something; the last screenshot was clean.
+- [ ] **Install the latest iOS build.** `npm run ios` ran at the close; the last three client commits
+      (the ⓘ rewrite, the dead GAP toggle removal, the hidden race projections) are synced but **not
+      installed**. The web build is live via Netlify.
+- [ ] **Look at the BODY section once more.** The heart-rate row now says "Running easing off (today) ·
+      bike holding (16d ago)" in amber, not "drifting up" in red. Confirm the two rows read as one voice.
+
 ## ⛔ AWAITING MICHAEL — 2026-07-30 (a very long day; most of it deployed, the client not re-run)
 - [ ] **Run Xcode.** The last client commits — the weight-change sheet, the swap fixes, the removed
       difficulty tap, Recompute moved to the top — were pushed and synced but not installed.

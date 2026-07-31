@@ -155,6 +155,22 @@ That is the whole diagnosis, and it produces exactly three diseases:
 - [x] **`adapt-plan`: ONE writer, and the athlete gets the choice.** ✅ **DONE 2026-07-23 (D-315).** The silent auto-progression/deload writes were DELETED (not "default-on-overridable" — Michael's ruling went further: *"we shouldn't auto change weights, the user needs to know"*). Weights now change only on the athlete's tap (State adjust modal / accept / swap / add), extending D-285's endurance rule to strength. The `suggest` signal is now phase-aware (matches the stamped target).
 - [ ] **FTP: route the 8 stragglers** — incl. `get-week:436` (week-view watts) and `athlete-snapshot/identity.ts:67` → **the LLM prompt** (so the coach can *speak* a different FTP than the screens show).
 
+### ADDED 2026-07-31 — the RUN row was the DOUBLED disease in its purest form. See [D-346].
+
+> Not two engines narrating one week — **one row whose verdict, chart, pace line, three labels and the
+> BODY row above it each read a DIFFERENT pool**, and five docs saying the area was clean. Fifteen
+> decision entries had accumulated on it.
+
+- [x] **The run verdict, chart and receipts all read ONE pool.** ✅ **SHIPPED + DEPLOYED 2026-07-31
+      ([D-346]).** Speed-at-heart-rate over every run, grade-adjusted, heat coefficient fitted per
+      athlete and removed. The BODY heart-rate row reads the same number in the same words. ⛔ The
+      lesson: **after moving a data source, sweep the surface once** — three stale labels shipped and
+      were each caught by Michael on a screenshot.
+- [x] **Five docs corrected**, each carrying what it used to claim. `TRUTH-MAP` called this row *"the
+      model the others should copy"* while its gate excluded nothing.
+- [ ] **Durability still reads the broken gate** — silenced, not fixed. **[Q-232]**: the obvious fix
+      fails a pinned regression, and [D-034] vs `state-trend/run.ts` disagree. A decision, not a patch.
+
 ### ADDED 2026-07-20 — the DOUBLED disease on STATE. See `AUDIT-state-screen-2026-07-20.md`.
 
 > Phase 4 killed six duplicate ACWR bands and five zone tables — **numbers**. This is the same job on **prose and pictures**, and nobody has done it.
