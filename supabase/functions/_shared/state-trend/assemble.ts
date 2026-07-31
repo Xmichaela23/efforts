@@ -394,9 +394,35 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       sampleCount: runRoute ? runRoute.points : runEfficiency.trend.sampleCount,
       newestAgeDays: runEfficiency.trend.newestAgeDays,
       recentlyFlat: runEfficiency.trend.recentlyFlat,
-      recentPaceSecPerKm: runEffPaceHr.paceSecPerKm,
-      recentGapPaceSecPerKm: runEffPaceHr.gapPaceSecPerKm,
-      recentHrAvg: runEffPaceHr.hrAvg,
+      // ⛔ THE RECEIPT READS THE SAME POOL AS THE VERDICT (D-346, 2026-07-31).
+      //
+      // Michael, from the shipped screen: the row said *"pace ~13:32/mi at 140 bpm"* while his easy runs
+      // sit at 134 — because this line still came from `recentEfficiencyPaceHr`, which gates on
+      // `isSteadyAerobic(workout_type)`, the field that says `steady_state` on every run ever logged.
+      // So his 146 bpm hill session was being averaged into a number describing easy running, **directly
+      // beneath a verdict that had just been cleaned of exactly that**. One row, two pools, and the
+      // clean number vouching for the dirty one.
+      //
+      // ⚠️ Averaged over the last `endpointN` (2) runs of the verdict's own pool, which is what
+      // `recentEfficiencyPaceHr` did — the same convention, now on the right rows.
+      // ⚠️ GAP twin is dropped: these paces ARE grade-adjusted, so a raw-vs-GAP toggle has nothing to
+      // toggle between. Offering one would imply a distinction that no longer exists.
+      ...(runRoute && (inp.runEffHistory?.length ?? 0) > 0 ? (() => {
+        const rows = (inp.runEffHistory ?? []).slice(-2) as Array<Record<string, number>>;
+        const avg = (get: (r: Record<string, number>) => number) =>
+          rows.reduce((sum, r) => sum + Number(get(r) || 0), 0) / rows.length;
+        const pace = avg((r) => r.pace_s_per_km);
+        const hr = avg((r) => r.hr);
+        return {
+          recentPaceSecPerKm: pace > 0 ? Math.round(pace) : null,
+          recentGapPaceSecPerKm: null,
+          recentHrAvg: hr > 0 ? Math.round(hr) : null,
+        };
+      })() : {
+        recentPaceSecPerKm: runEffPaceHr.paceSecPerKm,
+        recentGapPaceSecPerKm: runEffPaceHr.gapPaceSecPerKm,
+        recentHrAvg: runEffPaceHr.hrAvg,
+      }),
       series: effChartSeries,
       /** ⚠️ Present only when the route engine answered — lets the row say WHY it is withholding
        *  ("not enough runs on one route yet") instead of quoting the old steady-run floor. */
