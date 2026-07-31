@@ -79,6 +79,54 @@ SESSION.** `BLOCK_CARD_VERSION` in `workout-detail` — **bump it on any additio
 ⛔ **AND AN EMPTY PANEL MUST SAY WHY.** All three failures looked identical to *"this session had no
 all-out set."* An invisible failure is indistinguishable from a correct absence.
 
+### ⛔ THE SELF-AUDIT, AND WHAT IT CORRECTED (late 2026-07-30)
+
+Michael: *"im worried about the overall quality of your work right now, so whatever you touched deep
+dive into how it works and if you did it right."* Everything below was verified against his REAL
+stored data, not asserted.
+
+**TWO DEFECTS FOUND IN THE DAY'S OWN WORK, both fixed:**
+1. ⛔ `baselineServerResults` was **set and rendered by NOTHING** — the tested 1RM moved to the server
+   (D-342), the athlete was told the number would appear after saving, and it never did. **An input
+   with no reader, introduced by the session that spent all day removing them.** No test can see that
+   a value is never displayed. Now rendered after the save.
+2. Two comments went stale the moment D-339/D-344 shipped (`brzycki(weight, reps + rir)`, the
+   `{rounded1RM}` pull-up shape). A comment that lies is how every doc here rotted.
+
+**⛔ A DIAGNOSIS THAT WAS WRONG TWICE, AND THE CORRECTION MATTERS MORE THAN THE FIXES:**
+The *"Heart-rate response — as of Jul 14"* row is **NOT stale data and was never broken.** It is a
+ROLLUP of run + bike, and `rollupHrResponse` stamps it with `Math.max(...ages)` — **the OLDEST
+contributor, deliberately, so the stamp cannot overstate freshness** (pinned in
+`rollup-hr-response.test.ts`). His run side is 3 days old; his bike is 16 (last ride 2026-07-20).
+⚠️ **Two `compute-facts` fixes were aimed at a non-problem.** The missing `workout_type` was a genuine
+gap — the efficiency series went from frozen to 9 samples, newest 3 days — so the changes are not
+harmful, but they did not cause the symptom he was pointing at. **The real fix is the STAMP**: show
+the newest input and let the detail line name the stale contributor, which it already does.
+
+**VERIFIED CORRECT against his real data:**
+- The rematerializer's cycle reconstruction from `config.phase_structure`: three anchor cycles,
+  weeks 1-4 / 5-8 / 9-12. **Matches his calendar exactly.**
+- Simulated on his real working numbers (squat TM 90 / 1RM 110): all hits `90→95→95`, nothing logged
+  `90→90→90`, a miss `90→80→85`. **The case that must not be wrong holds.**
+- `classifyRunIntent` on his real planned names: Easy Run→easy, Hill Repeats→interval, Long Run→easy,
+  unattached+untitled→null.
+- Client `functions.invoke` + `requireUser` is a proven pair (`detach-planned`), so the three new
+  functions authenticate.
+- No new type errors and no new lint errors in any file touched.
+
+**⚠️ TWO FACTS ABOUT HIS BLOCK THAT THE AUDIT SURFACED:**
+- His stored squat 1RM is **110** (not the ~106 an earlier back-calculation claimed). Working numbers:
+  squat 90, bench 125, deadlift 125, OHP 85.
+- ⛔ **His squat and OHP hit the D-325 ceiling after ONE step** — the ceiling is 90% of the max on
+  file, so squat can only reach 95 and OHP 90. He did 15 reps at 75 lb on 2026-07-30, so the stored
+  max is well behind what he is demonstrating. **The progression will stall in cycle 2 against a
+  stale number** unless the max is retested or raised. Not a bug; the ceiling doing its job on old data.
+
+⚠️ **A PROCESS ERROR WORTH RECORDING:** a mis-quoted `git stash push` silently failed, and the
+following `git stash pop` restored an UNRELATED old stash into the working tree, conflicting
+`auto-attach-planned`. Recovered with `git checkout HEAD --` on the two files; nothing lost and the
+stash is still in the list. **Do not use `git stash` to compare states — use `git show <ref>:<path>`.**
+
 ### ⛔ WHAT IS STILL OPEN
 
 - **The three State reads above.** That is the job.

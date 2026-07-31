@@ -19,6 +19,12 @@ that shipped that day: the reader does not know what the session was for.**
       read on a Thursday. `_shared/insights/cross-training-read.ts`, the `floorBreach` clause.
 - [ ] **The run narrative guessed the wrong session** — "Monday's lower-body session"; Monday was Bench.
 
+## ▶ ALSO NEXT — THE HEART-RATE STAMP (2026-08-01)
+- [ ] **"as of Jul 14" is the OLDEST contributor, by design.** The row rolls up run + bike and stamps
+      `Math.max(...ages)` so it cannot overstate freshness. His run is 3d old, his bike 16d.
+      ⚠️ It reads as "this whole reading is stale". **Fix the STAMP** — show the newest and let the
+      detail line name the stale contributor, which it already does. Do NOT "fix" the data path again.
+
 ## ⛔ AWAITING MICHAEL — 2026-07-30 (a very long day; most of it deployed, the client not re-run)
 - [ ] **Run Xcode.** The last client commits — the weight-change sheet, the swap fixes, the removed
       difficulty tap, Recompute moved to the top — were pushed and synced but not installed.
