@@ -92,6 +92,9 @@ interface PlannedRow {
   training_plan_id: string | null;
   week_number: number | null;
   type: string;
+  name?: string | null;
+  description?: string | null;
+  tags?: string[] | null;
   intervals: any[] | null;
   strength_exercises: any[] | null;
   steps_preset: any[] | null;
@@ -994,7 +997,47 @@ async function updateLearnedStrengthFromExerciseLog(
 // Discipline-specific fact builders
 // ---------------------------------------------------------------------------
 
-function buildRunFacts(w: WorkoutRow, baselines: Baselines | null): Record<string, any> {
+/**
+ * ⛔ WHAT A RUN WAS FOR — the plan first, the data second, silence third.
+ *
+ * The words are the vocabulary `state-trend/run.ts` already filters on (`DECOUPLING_NONSTEADY`), so
+ * this writes into an existing contract rather than inventing a taxonomy beside it.
+ *
+ * ⚠️ ORDER MATTERS. A hill session run slowly still IS a hill session; the plan knows that and the
+ * data does not. Only when there is no plan link do we read structure off the file.
+ * ⚠️ AND `null` IS A REAL ANSWER. An unattached, unstructured run stays excluded from the steady read
+ * rather than being guessed into it — the same failure direction the gate already chose.
+ */
+function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null): string | null {
+  const NONSTEADY = /interval|repeat|hill|tempo|threshold|vo2|speed|track|fartlek|stride|race|surge/i;
+  const STEADY = /easy|long|recovery|base|aerobic|steady|shakeout|conversational/i;
+
+  // 1. THE PLAN. Its own words, in the order they are most likely to name the intent.
+  const planText = [
+    planned?.name,
+    Array.isArray(planned?.tags) ? planned!.tags!.join(' ') : null,
+    planned?.description,
+  ].filter(Boolean).join(' ');
+  if (planText) {
+    if (NONSTEADY.test(planText)) return 'interval';
+    if (STEADY.test(planText)) return 'easy';
+  }
+
+  // 2. THE FILE, when nothing is attached. A structured session with real work intervals is not
+  //    steady, whatever it was called.
+  const ivs = Array.isArray(w.computed?.intervals) ? w.computed!.intervals : [];
+  const work = ivs.filter((i: any) => i?.planned_label && !/(warm|cool|rest|recovery)/i.test(String(i.planned_label)));
+  if (work.length >= 2) return 'interval';
+
+  // 3. The athlete's own name for it, last — it is free text and often just "Morning Run".
+  const own = String((w as any)?.name ?? '');
+  if (NONSTEADY.test(own)) return 'interval';
+  if (STEADY.test(own)) return 'easy';
+
+  return null;
+}
+
+function buildRunFacts(w: WorkoutRow, baselines: Baselines | null, planned?: PlannedRow | null): Record<string, any> {
   const dist = distanceMeters(w);
   const dur = durationMinutes(w);
   const overall = w.computed?.overall ?? {};
@@ -1097,9 +1140,28 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null): Record<strin
   }
 
   // Efficiency index: pace/HR ratio (lower pace number = faster, higher ratio = better)
+  //
+  // ⛔ WHAT WAS THIS RUN FOR? Read from the PLAN it is attached to (2026-07-30).
+  //
+  // `state-trend/run.ts` restricts the efficiency and decoupling reads to STEADY aerobic efforts —
+  // correctly, and it is the field standard: TrainingPeaks requires a sustained steady effort over
+  // 20 minutes, fully aerobic, low variability, or the number is not valid. But its gate is
+  // `isSteadyAerobic(workout_type)`, and `workout_type` was NEVER WRITTEN. `String(null)` is empty,
+  // the gate returns false, and EVERY run was excluded. Michael's heart-rate row sat on a July 14
+  // reading, in red, for sixteen days — a built, cited, tested reader with no input at all.
+  //
+  // ⛔ THE PLAN IS THE SOURCE, NOT THE DATE. Intervals.icu does exactly this: *"When an activity is
+  // paired with a planned workout, any tags from the workout are added to the activity."* Keying off
+  // the LINK rather than the calendar is what makes it survive an athlete moving a session, or a
+  // plan being rebuilt around them — both of which happened to Michael today.
+  //
+  // ⚠️ UNATTACHED RUNS FALL BACK TO THE DATA, and to `null` when even that cannot tell. Null keeps
+  // today's behaviour exactly: excluded from the steady read rather than guessed into it.
   if (facts.pace_avg_s_per_km && facts.hr_avg && facts.hr_avg > 0) {
     facts.efficiency_index = Math.round((1000 / facts.pace_avg_s_per_km) / facts.hr_avg * 10000) / 100;
   }
+
+  facts.workout_type = classifyRunIntent(w, planned);
 
   // Interval adherence from computed.intervals
   if (w.computed?.intervals && Array.isArray(w.computed.intervals)) {
@@ -1595,7 +1657,7 @@ serve(async (req: Request) => {
     if (w.planned_id) {
       const { data: pw } = await supabase
         .from("planned_workouts")
-        .select("id, training_plan_id, week_number, type, intervals, strength_exercises, steps_preset, workload_planned")
+        .select("id, training_plan_id, week_number, type, name, description, tags, intervals, strength_exercises, steps_preset, workload_planned")
         .eq("id", w.planned_id)
         .maybeSingle();
       planned = (pw as PlannedRow | null) ?? null;
@@ -1669,7 +1731,7 @@ serve(async (req: Request) => {
 
     switch (discipline) {
       case "run":
-        runFacts = buildRunFacts(w, baselines);
+        runFacts = buildRunFacts(w, baselines, planned);
         break;
       case "ride":
       case "bike":
