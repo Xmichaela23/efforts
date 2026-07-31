@@ -448,7 +448,10 @@ function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: nu
         <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? `each dot = one ${dotNoun} · ${recentLabel}` : `last 12 weeks · ${recentLabel} · tap to expand`)}</span>
         {/* Range only — the session COUNT lives on the lift's name line (the verdict window); repeating a
             different chart-window count here read as a contradiction (UX pass 2026-07-23). */}
-        <span className="tabular-nums text-white/30">{fmtVal(minV)}–{fmtVal(maxV)}{unit}</span>
+        {/* ⚠️ Suppressed when there is no unit. The run chart plots the efficiency INDEX, so this
+            rendered a bare "1.24–1.90" that means nothing to a reader — the shape is the message.
+            Strength passes a lb unit and keeps its range, where the numbers are self-explanatory. */}
+        {unit ? <span className="tabular-nums text-white/30">{fmtVal(minV)}–{fmtVal(maxV)}{unit}</span> : <span />}
       </span>
       {caption && <span className="text-[10px] text-white/40">{caption}</span>}
     </span>
@@ -504,11 +507,32 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
     return hi - lo >= 8 ? `grade-adjusted · ${lo}–${hi}°F across these runs` : 'grade-adjusted';
   }, [eff.route]);
   const hasTrend = eff.verdict !== 'needs_data' && eff.verdict !== 'withheld';
+  // ⛔ THE WINDOW LABEL DESCRIBES THE POOL THAT WAS ACTUALLY READ (D-346, 2026-07-31).
+  //
+  // It was hardcoded to 42 days. When the verdict moved to the grade-adjusted all-runs pool the data
+  // became ~90 days and the label kept saying "over 6wk" — so the row reported 26 runs over six weeks
+  // when it meant thirteen. Michael caught it on the shipped screen. **A stale label on fresh data is
+  // the same fault as a stale doc: it is believed precisely because everything around it is right.**
   const evidence = eff.sampleCount != null
-    ? trendEvidence({ windowDays: 42, sampleCount: eff.sampleCount, newestAgeDays: eff.newestAgeDays, discipline: 'run' as Discipline })
+    ? trendEvidence({
+        windowDays: eff.route?.spanDays ?? 42,
+        sampleCount: eff.sampleCount,
+        newestAgeDays: eff.newestAgeDays,
+        discipline: 'run' as Discipline,
+      })
     : null;
   // Durability shows as a quiet secondary ONLY when it has a real read (not needs_data/withheld).
-  const durWord = (dur.verdict !== 'needs_data' && dur.verdict !== 'withheld') ? DECOUPLING_BAND[dur.band as DecouplingBand]?.word : null;
+  // ⛔ SILENCED WHILE ITS INPUT IS KNOWN BAD (D-346, 2026-07-31).
+  //
+  // "pace fading on long efforts" is the DECOUPLING band, and decoupling still runs through
+  // `isSteadyAerobic(workout_type)` — the gate that reads `steady_state` on every run ever logged. His
+  // 24.9% hill session is in that pool, which is what pushes the band to `needs_work`. So the sentence
+  // is a claim about long steady efforts computed partly from a hill session.
+  //
+  // ⚠️ It sat directly beneath a verdict that had just been cleaned of exactly that — **the clean
+  // number lending its credibility to the dirty one.** Saying nothing is the honest state until the
+  // decoupling gate is fixed; D-346 carries that as the remaining work.
+  const durWord = null;
   return (
     <Row label="run">
       <span className="basis-full flex items-baseline justify-between gap-2">
