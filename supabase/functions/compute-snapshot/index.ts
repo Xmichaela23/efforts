@@ -1062,7 +1062,24 @@ serve(async (req: Request) => {
             dataSource: projSrc,
             easyRunDecouplingPct: null,
           });
-          if (proj && result?.runFitness) {
+          // ⛔ NOT SHOWN UNLESS IT IS ROBUST (Michael, 2026-07-31: *"it should be built on more, its not
+          // a necessary featre unless it robust"*).
+          //
+          // These print a finish time to the SECOND. His threshold pace was learned from THREE runs and
+          // stamped `confidence: high` — a race prediction to the second off three samples is exactly
+          // the false precision this row has spent the day removing everywhere else.
+          //
+          // ⚠️ THE FLOOR IS THE APP'S OWN, NOT A NEW NUMBER. `runDirectionMinRuns` (8) is already what
+          // State requires before it will assert a run direction, and `MIN_REGRESSION_N` (8) is what the
+          // heat fit requires before it will claim a coefficient. Picking a different bar here would be
+          // hand-picking; 8 is the bar this app already set for "enough to say something out loud".
+          //
+          // ⚠️ AND A TYPED TARGET NEVER QUALIFIES. `plan_targets` is a goal the athlete entered, not a
+          // measurement — projecting race times off an aspiration and printing them to the second is a
+          // fabricated number wearing a measured one's clothes.
+          const projRobust = projSrc === 'observed'
+            && Number.isFinite(Number(projSamples)) && Number(projSamples) >= STATE_TREND_WINDOWS.runDirectionMinRuns;
+          if (proj && result?.runFitness && projRobust) {
             (result.runFitness as any).projections = proj.projections;
             // The receipt: what the estimate rests on. `observed` = a measured threshold pace from N
             // runs; `plan_targets` = the athlete's typed number, which is a goal, not a measurement.

@@ -608,11 +608,9 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
               input does not support, and the last thing on this row without a receipt. Naming the
               source and the sample count lets the reader weight it; it is the same move the verdict
               and the chart already make. */}
-          {(fitness as any).projectionBasis && (
+          {(fitness as any).projectionBasis?.samples && (
             <span className="text-white/40 text-[11px]">
-              {(fitness as any).projectionBasis.source === 'observed'
-                ? `from your measured threshold pace${(fitness as any).projectionBasis.samples ? ` · ${(fitness as any).projectionBasis.samples} runs` : ''}`
-                : 'from your typed target pace — not measured yet'}
+              from your measured threshold pace · {(fitness as any).projectionBasis.samples} runs
             </span>
           )}
           {/* 3-column grid: distance | finish time (right-aligned number column) | pace — so the times
