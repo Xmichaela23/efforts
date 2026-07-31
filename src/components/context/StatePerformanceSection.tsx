@@ -422,7 +422,17 @@ function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: nu
   const dimPoly = pts.map((p, i) => `${x(i)},${y(p.value)}`).join(' ');
   const recentPoly = firstRecent >= 0 ? pts.slice(recentStart).map((p, i) => `${x(recentStart + i)},${y(p.value)}`).join(' ') : '';
   const last = pts[pts.length - 1];
-  const spanWeeks = Math.min(12, Math.max(1, Math.ceil((Date.parse(last.date + 'T12:00:00Z') - Date.parse(pts[0].date + 'T12:00:00Z')) / (7 * 86_400_000))));
+  // ⚠️ THE CAP IS FOR THE "BUILDING" GATE ONLY, NOT FOR THE LABEL (2026-07-31).
+  //
+  // `spanWeeks` was clamped to 12 because the chart was designed as a fixed 12-week canvas that fills
+  // as the athlete trains. The run pool is now ~13 weeks, so the clamp printed "last 12 weeks" two
+  // lines under a row reading "over 13wk" — the same data, two spans, which is the exact class of
+  // stale label this row has now been caught on three times.
+  //
+  // The clamped value still drives `building` (a coverage question about the 12-week canvas); the
+  // LABEL states what was actually drawn.
+  const spanWeeksRaw = Math.max(1, Math.ceil((Date.parse(last.date + 'T12:00:00Z') - Date.parse(pts[0].date + 'T12:00:00Z')) / (7 * 86_400_000)));
+  const spanWeeks = Math.min(12, spanWeeksRaw);
   const building = spanWeeks < 11;
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const fmtD = (iso: string) => { const [, m, d] = iso.split('-'); return `${MON[+m - 1]} ${+d}`; };
@@ -445,7 +455,7 @@ function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: nu
         </span>
       )}
       <span className="text-[10px] text-white/45 flex items-center justify-between">
-        <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? `each dot = one ${dotNoun} · ${recentLabel}` : `last ${spanWeeks} weeks · ${recentLabel} · tap to expand`)}</span>
+        <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? `each dot = one ${dotNoun} · ${recentLabel}` : `last ${spanWeeksRaw} weeks · ${recentLabel} · tap to expand`)}</span>
         {/* Range only — the session COUNT lives on the lift's name line (the verdict window); repeating a
             different chart-window count here read as a contradiction (UX pass 2026-07-23). */}
         {/* ⚠️ Suppressed when there is no unit. The run chart plots the efficiency INDEX, so this
