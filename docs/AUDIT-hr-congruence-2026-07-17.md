@@ -11,7 +11,7 @@ This supersedes the scattered picture. Pairs with `SPEC-lthr-one-anchor.md` (the
 | Layer | State | Congruent? |
 |---|---|---|
 | **Raw measured HR** (the bpm your device logged) | one authority; read null-safely everywhere; never invented | ✅ **CLEAN** |
-| **Run durability** (the "holding steady" read) | one authority (`state_trends_v1.run.decoupling`) | ✅ **CLEAN** |
+| **Run durability** (the "holding steady" read) | one authority (`state_trends_v1.run.decoupling`) — ⛔ **fed by a gate that excludes nothing** | 🔴 **NOT CLEAN — corrected 2026-07-31 ([D-346]).** `isSteadyAerobic(workout_type)` reads a field that is `steady_state` on all 25 runs, so hill sessions counted as steady measurements. The "✅ CLEAN" here is one of the four doc lines that routed fifteen sessions away from this fault |
 | **LTHR anchor** (threshold HR that judges everything) | **4 different resolvers, 2 inverted**; single resolver never built | 🔴 **FRACTURED** |
 | **Max HR** (for %HRmax fallbacks) | 4+ different estimates (`180`, `220−age`, Tanaka, `obsMax/0.95`) | 🟠 **SCATTERED** |
 | **HR zone seams** (where a bpm becomes easy/threshold) | math unified (D-286) but 2 live copies re-seed the old bug + 1 dead copy | 🟠 **MOSTLY, 2 leaks** |

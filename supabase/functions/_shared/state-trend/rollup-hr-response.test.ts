@@ -16,11 +16,20 @@ const v1 = (parts: { run?: D; bike?: D }) => ({
   bike: parts.bike ? { efficiency: parts.bike } : undefined,
 }) as any;
 
-Deno.test('run + bike both holding → holding; stamp = OLDEST contributor (never overstates freshness)', () => {
+Deno.test('⛔ run + bike both holding → holding; stamp = NEWEST contributor (changed 2026-07-31)', () => {
   const r = rollupHrResponse(v1({ run: { verdict: 'holding', newestAgeDays: 14 }, bike: { verdict: 'holding', newestAgeDays: 5 } }));
   assertEquals(r.verdict, 'holding');
   assertEquals(r.contributors.map((c) => c.discipline), ['run', 'bike']);
-  assertEquals(r.asOfAgeDays, 14); // the STALEST input (run 14d), not the fresh bike (5d) — the real bug fix
+  // ⛔ THIS TEST USED TO PIN 14 — the OLDEST — so a combined read could never look fresher than its
+  // stalest half. Sound instinct, dishonest result: Michael's run side was ONE DAY old and his bike
+  // sixteen, so a reading taken off yesterday's run wore a two-week-old date and read as "nothing
+  // here is current". Three sessions went hunting for a data-flow bug that did not exist.
+  //
+  // ⚠️ The stale half is NOT hidden — the provenance line names every contributor with its own age
+  // ("runs holding (14d ago) · bike holding (5d ago)") and the bike-stale nudge fires at 5 days.
+  // ⛔ If that per-contributor line is ever removed, this goes back to the oldest.
+  assertEquals(r.asOfAgeDays, 5);
+  assertEquals(r.stalestAgeDays, 14);
 });
 
 Deno.test('any SOLID contributor sliding → sliding (HR response worsening)', () => {

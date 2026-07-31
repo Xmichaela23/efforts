@@ -2520,7 +2520,11 @@ Deno.serve(async (req) => {
         // method legend + the swim-exclusion line; the nudges carry the meaning. Capitalise the lead.
         const lead = parts.join(' · ');
         const provenance = `${lead ? lead.charAt(0).toUpperCase() + lead.slice(1) + '.' : ''}${excludedRun ? ` ${excludedRun}` : ''}${bikeOpp}${baseSlip}`.trim();
-        // "as of" = the OLDEST contributor, so a combined read never looks fresher than its stalest half.
+        // ⛔ "as of" = the NEWEST contributor (changed 2026-07-31). It was the OLDEST, which stamped a
+        // reading taken off yesterday's run with a sixteen-day-old bike date — the row read "nothing
+        // here is current" about current data, and three sessions chased a data-flow bug that did not
+        // exist. ⚠️ The stale half is still named, in `parts` above: "bike holding (16d ago)", plus the
+        // `bikeOpp` nudge from 5 days. Naming the stale half beats hiding the fresh one behind it.
         const asOf = hrResp.asOfAgeDays != null ? addDaysISO(asOfDate, -hrResp.asOfAgeDays) : null;
         weeklyResponseModel.visible_signals.unshift({
           label: 'Heart-rate response', category: 'endurance',

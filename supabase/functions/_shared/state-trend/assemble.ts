@@ -20,6 +20,9 @@ import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSum
 import { readPosture, postureSentence, disciplineWord, type PerDisciplinePosture } from './posture.ts';
 import { synthesizeHeadline, type Headline } from './headline.ts';
 import { canonicalDisplayName } from '../canonicalize.ts';
+// ⛔ The workout screen's engine. D-346: State reads THIS, it does not mint its own run verdict.
+import { routeTrend, type RouteTrend } from '../heat-adjust.ts';
+import { computeEfficiencyIndex } from '../efficiency-index.ts';
 import { ADHERENCE_WINDOW_DAYS } from './thresholds.ts';
 
 const DAY = 86_400_000;
@@ -181,6 +184,10 @@ export interface StateTrendInputs {
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
   strengthVolumeRows?: StrengthVolumeRow[]; // per-strength-workout total_volume_lbs (the volume trend)
   bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; in_band_s?: number | null; band_hi?: number | null; band_source: string | null; hr_corrupt?: boolean }>;
+  /** Every run with a grade-adjusted pace + HR, oldest first: `{date, pace_s_per_km, hr, temp_f}`.
+   *  TrainingPeaks' Efficiency Factor substrate — terrain normalised by the grade adjustment rather
+   *  than by matching routes. Empty → no verdict, and the old trend stands. */
+  runEffHistory?: Array<Record<string, unknown>>;
   runJoined: Array<{ metric_date: string; effort_adjusted_pace_sec_per_km: number | null; efficiency_index?: number | null; gap_efficiency_index?: number | null; hr_avg?: number | null; decoupling_pct?: number | null; decoupling_basis?: string | null; decoupling_mixed_effort?: boolean | null; decoupling_confounded?: boolean | null; workout_type?: string | null; duration_minutes?: number | null; classified_type: string | null }>;
   swimRows: Array<{ date: string; pace_per_100m: number; rest_fraction?: number | null; distance_m?: number | null }>;
   plannedBy: Record<string, number>; // this-week planned counts per discipline
@@ -313,6 +320,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // keeps the offset number out of the cached state_trends_v1 (coach never sees a bogus run %).
   const run = perfFromTrend(runDecoupling.trend)!; // trend is always present; card verdict = decoupling (lead)
   run.pctChange = null; // null the offset % (decoupling's trend runs on offset values); verdict stays honest
+
   // State v3 dot-and-arrow: WHERE the current value sits in the athlete's own 12wk range (oriented so
   // 1 = best). Decoupling is lower-is-better, so a low value lands at the best edge — the dot shows the
   // LEVEL, the arrow shows the DIRECTION, and "needs work" (level) + "improving" (trend) stop fighting.
@@ -322,6 +330,34 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // the trend series above is untouched.
   const runDecoupBandSeries = runDecoupSeries.filter((p) => p.value >= CROWN_MIN_DECOUPLING);
   const runDecoupRange = positionInRange(runDecoupBandSeries, { higherIsBetter: false });
+  // ⛔ TRAININGPEAKS' EFFICIENCY FACTOR, PLUS A HEAT COEFFICIENT FITTED TO THIS ATHLETE (D-346).
+  //
+  // `routeTrend` fits `efficiency ~ heat + time` JOINTLY (Huber-robust, CI-gated) — so the heat term is
+  // LEARNED from the athlete's own hot-vs-cool runs, never assumed, and it declines to include heat at
+  // all when the temperature spread cannot identify it. ⚠️ `routeHeadline` was used first; it removes
+  // heat with `DEFAULT_HEAT_K`, a self-declared "unvalidated population placeholder". With a real pool
+  // there is no reason to assume a coefficient we can fit.
+  //
+  // ⚠️ Non-fatal — a verdict that cannot be computed must never break the snapshot, and its absence
+  // simply leaves the old trend in place.
+  let runRoute: RouteTrend | null = null;
+  try {
+    const fitted = routeTrend((inp.runEffHistory ?? []) as any);
+    // ⛔ A POPULATION CONSTANT MAY NOT REACH A VERDICT (Michael, 2026-07-31 — Q-231).
+    //
+    // Under `MIN_REGRESSION_N` (8) runs the joint fit cannot run and `heat-adjust` falls back to the
+    // `linear_k` path, which corrects with `DEFAULT_HEAT_K` — self-declared in its own file as an
+    // "UNVALIDATED POPULATION PLACEHOLDER". That is the whole point of fitting per athlete, so a
+    // thin-data athlete gets NO verdict rather than one leaning on a number nobody validated.
+    //
+    // ⚠️ Nothing else is lost: the chart still fills as they train, and the row already has honest
+    // copy for this state. ⛔ [Q-231] closes it properly — run the analysis pass over an imported
+    // Strava history and a new athlete crosses the floor on day one with their OWN coefficient.
+    runRoute = fitted && fitted.method !== 'linear_k' && fitted.method !== 'half_vs_half' ? fitted : null;
+  } catch (e) {
+    console.warn('[state-trend] run efficiency trend failed:', e instanceof Error ? e.message : e);
+  }
+
   const runFitness: RunFitness = {
     decoupling: {
       verdict: runDecoupling.trend.verdict,
@@ -334,15 +370,64 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       provisional: isProvisionalTrend(runDecoupling.trend),
     },
     efficiency: {
-      verdict: runEfficiency.trend.verdict,
-      pctChange: runEfficiency.trend.pctChange,
-      sampleCount: runEfficiency.trend.sampleCount,
+      // ⛔ THE VERDICT IS THE ROUTE ENGINE'S WHEN IT HAS ONE (D-346, 2026-07-31).
+      //
+      // ⚠️ IT IS OVERRIDDEN **HERE**, ON `efficiency`, AND THAT PLACEMENT IS THE WHOLE FIX. An earlier
+      // cut of this change set the card-level verdict instead — which is real, but `StatePerformanceSection`
+      // renders `fitness.efficiency.verdict` and `fitness.efficiency.pctChange`. The row on the athlete's
+      // screen would not have moved. **A fix landing where nothing reads is the fault this row has been
+      // rebuilt fifteen times by; it must not be the fix for it.**
+      //
+      // ⛔ `still_learning` → `withheld`, NEVER `holding`. The engine is saying it cannot support a claim.
+      // "Holding" is a finding; this is the absence of one, and swapping them is how a score starts to lie.
+      // ⚠️ `pctChange` is nulled with it — a percentage beside "too few to read" is a claim in disguise.
+      // ⚠️ NO ROUTE VERDICT → the old trend stands, so a treadmill athlete keeps their row.
+      verdict: runRoute
+        ? (runRoute.direction === 'improving' ? 'improving'
+          : runRoute.direction === 'declining' ? 'sliding'
+          : runRoute.direction === 'holding' ? 'holding'
+          : 'withheld')
+        : runEfficiency.trend.verdict,
+      pctChange: runRoute
+        ? (runRoute.direction === 'still_learning' ? null : runRoute.pct)
+        : runEfficiency.trend.pctChange,
+      sampleCount: runRoute ? runRoute.points : runEfficiency.trend.sampleCount,
       newestAgeDays: runEfficiency.trend.newestAgeDays,
       recentlyFlat: runEfficiency.trend.recentlyFlat,
       recentPaceSecPerKm: runEffPaceHr.paceSecPerKm,
       recentGapPaceSecPerKm: runEffPaceHr.gapPaceSecPerKm,
       recentHrAvg: runEffPaceHr.hrAvg,
       series: effChartSeries,
+      /** ⚠️ Present only when the route engine answered — lets the row say WHY it is withholding
+       *  ("not enough runs on one route yet") instead of quoting the old steady-run floor. */
+      route: runRoute ? {
+        // ⛔ THE CHART PLOTS THE SAME ROWS THE VERDICT READ (D-346, 2026-07-31).
+        //
+        // The old sparkline drew `efficiency_index` from every run the broken gate let through — hill
+        // sessions included — while the verdict came from somewhere else. **Chart and verdict on
+        // different data is how a screen contradicts itself**, and this row has done it for months.
+        //
+        // ⚠️ SAME ROUTE IS WHAT MAKES THE DOTS COMPARABLE. Terrain is held constant because it is
+        // literally the same ground — nothing is modelled away. `tempF` rides along per point so the
+        // conditions can be SHOWN beside the reading rather than corrected out of it: that is
+        // Intervals.icu's pattern, whose own framing is that a weather overlay "helps interpret a poor
+        // data point when there was heat, wind or unusual conditions". ⛔ Nobody in the field corrects
+        // an efficiency chart for heat, and neither do we — we annotate and let the athlete discount it.
+        series: (inp.runEffHistory ?? [])
+          .map((r: any) => ({
+            date: String(r?.date ?? ''),
+            value: computeEfficiencyIndex(Number(r?.pace_s_per_km), Number(r?.hr)),
+            tempF: r?.temp_f == null ? null : Number(r.temp_f),
+          }))
+          .filter((p) => !!p.date && p.value != null)
+          .map((p) => ({ date: p.date, value: p.value as number, tempF: p.tempF, recent: p.date > _verdictStart })),
+        direction: runRoute.direction,
+        points: runRoute.points,
+        ci: runRoute.ci,
+        method: runRoute.method,
+        heatCoefPctPerF: runRoute.heatCoefPctPerF,
+        spanDays: runRoute.spanDays,
+      } : null,
     },
   };
 
@@ -581,7 +666,7 @@ export interface StateTrendsV1 {
    *  ("building aerobic base"), not just the improving/sliding direction the base verdict carries. */
   run: DisciplineTrendCache & {
     decoupling: { verdict: string; band: string | null; recentPct: number | null; provisional: boolean; stale: boolean; newestAgeDays: number | null; sampleCount: number };
-    efficiency: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; recentlyFlat?: boolean; recentPaceSecPerKm?: number | null; recentGapPaceSecPerKm?: number | null; recentHrAvg?: number | null; series?: Array<{ date: string; value: number; recent: boolean }> };
+    efficiency: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; recentlyFlat?: boolean; recentPaceSecPerKm?: number | null; recentGapPaceSecPerKm?: number | null; recentHrAvg?: number | null; series?: Array<{ date: string; value: number; recent: boolean }>; route?: { direction: string; points: number; ci: [number, number] | null; method: string; heatCoefPctPerF: number | null; spanDays: number | null } | null };
   };
   /** D-194: `rest` = the rest-fraction (work:rest) trend, nested like bike's power/efficiency. */
   swim: DisciplineTrendCache & { rest: DisciplineTrendCache };
@@ -659,10 +744,22 @@ export interface HrResponseRollup {
    *  HR drifting up / working harder for the same output; 'improving' = HR settling. */
   verdict: 'improving' | 'holding' | 'sliding' | 'needs_data';
   contributors: Array<{ discipline: 'run' | 'bike'; verdict: string; provisional: boolean; newestAgeDays: number | null }>;
-  /** Age (days) of the OLDEST contributing session — the "as of" stamp uses this so a combined read is
-   *  never shown fresher than its stalest half (a 5-day bike + 14-day run stamps "as of {14d ago}", not
-   *  the fresh bike date). Honesty > recency: don't let a current-looking date mask a 2-week-old input. */
+  /**
+   * ⛔ AGE OF THE NEWEST CONTRIBUTING SESSION (changed 2026-07-31). This was the OLDEST, so that a
+   * combined read could never look fresher than its stalest half — a defensible instinct that produced
+   * a dishonesty of its own: Michael's run side was ONE DAY old and his bike side sixteen, and the row
+   * stamped itself two weeks stale. It read as *"nothing here is current"* about a reading taken off a
+   * run he did yesterday, and that is what sent three sessions hunting for a data-flow bug that did not
+   * exist.
+   *
+   * ⚠️ THE HONESTY IS NOT LOST, IT MOVED — AND IT WAS ALREADY THERE. The provenance line renders every
+   * contributor with its own age (*"runs drifting up (1d ago) · bike holding (16d ago)"*), and the
+   * bike-stale nudge fires at 5 days. Naming the stale half beats hiding the fresh one behind it.
+   * ⛔ If that per-contributor line is ever removed, this must go back to the oldest.
+   */
   asOfAgeDays: number | null;
+  /** Age of the STALEST contributor, kept so nothing has to recompute it from `contributors`. */
+  stalestAgeDays: number | null;
 }
 
 /** Holistic heart-rate response across endurance, read from the SPINE (not re-derived): run = aerobic
@@ -672,14 +769,14 @@ export interface HrResponseRollup {
  *  This replaces the coach's run-only re-derived HR-drift with a single-source read that covers every
  *  discipline whose HR is trustworthy. */
 export function rollupHrResponse(v1: StateTrendsV1 | null | undefined): HrResponseRollup {
-  if (!v1) return { verdict: 'needs_data', contributors: [], asOfAgeDays: null };
+  if (!v1) return { verdict: 'needs_data', contributors: [], asOfAgeDays: null, stalestAgeDays: null };
   const runD = v1.run?.decoupling;
   const bikeE = v1.bike?.efficiency as (StateTrendsV1['bike']['efficiency'] & { newestAgeDays?: number | null }) | undefined;
   const all: Array<{ discipline: 'run' | 'bike'; verdict?: string; provisional: boolean; newestAgeDays: number | null }> = [];
   if (runD) all.push({ discipline: 'run', verdict: runD.verdict, provisional: !!runD.provisional, newestAgeDays: runD.newestAgeDays ?? null });
   if (bikeE) all.push({ discipline: 'bike', verdict: bikeE.verdict, provisional: !!bikeE.provisional, newestAgeDays: bikeE.newestAgeDays ?? null });
   const contributors = all.filter((c) => c.verdict && c.verdict !== 'needs_data' && c.verdict !== 'withheld') as HrResponseRollup['contributors'];
-  if (contributors.length === 0) return { verdict: 'needs_data', contributors: [], asOfAgeDays: null };
+  if (contributors.length === 0) return { verdict: 'needs_data', contributors: [], asOfAgeDays: null, stalestAgeDays: null };
 
   const solid = contributors.filter((c) => !c.provisional);
   const dirOf = (set: HrResponseRollup['contributors']): HrResponseRollup['verdict'] => {
@@ -692,8 +789,11 @@ export function rollupHrResponse(v1: StateTrendsV1 | null | undefined): HrRespon
   };
   const verdict = solid.length > 0 ? dirOf(solid) : 'holding';
   const ages = contributors.map((c) => c.newestAgeDays).filter((a): a is number => a != null);
-  const asOfAgeDays = ages.length ? Math.max(...ages) : null; // OLDEST input → stamp can't overstate freshness
-  return { verdict, contributors, asOfAgeDays };
+  // ⛔ NEWEST, not oldest — see the note on `asOfAgeDays`. A one-day-old run half stamped with a
+  // sixteen-day-old bike half read as "nothing here is current" and cost three sessions.
+  const asOfAgeDays = ages.length ? Math.min(...ages) : null;
+  const stalestAgeDays = ages.length ? Math.max(...ages) : null;
+  return { verdict, contributors, asOfAgeDays, stalestAgeDays };
 }
 
 /**

@@ -386,9 +386,13 @@ const RUN_TREND_MIN_RUNS = 8;
 // no line (can't imply a trend through one dot). Tap to expand. TP charts LOAD; this charts OUTPUT.
 // Generalized 2026-07-23 so the same visual serves run efficiency AND per-lift strength e1RM (Michael's
 // big-4 chart). Props default to the run row's exact look/copy; strength passes color + nouns + a lb formatter.
-function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, recentLabel = 'recent 6 in color' }: {
-  series?: Array<{ date: string; value: number; recent: boolean }>;
+function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, recentLabel = 'recent 6 in color', caption }: {
+  series?: Array<{ date: string; value: number; recent: boolean; tempF?: number | null }>;
   color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number; recentLabel?: string;
+  /** ⛔ CONDITIONS ARE SHOWN, NOT CORRECTED (D-346). Intervals.icu overlays weather so a reader can
+   *  interpret a poor data point; nobody in the field adjusts an efficiency chart for heat, so neither
+   *  do we. One line of context under the chart, and the athlete does the discounting. */
+  caption?: string | null;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const pts = Array.isArray(series) ? series : [];
@@ -446,6 +450,7 @@ function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: nu
             different chart-window count here read as a contradiction (UX pass 2026-07-23). */}
         <span className="tabular-nums text-white/30">{fmtVal(minV)}–{fmtVal(maxV)}{unit}</span>
       </span>
+      {caption && <span className="text-[10px] text-white/40">{caption}</span>}
     </span>
   );
 }
@@ -463,6 +468,41 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
   const canToggleGap = rawPace != null && gapPace != null && Math.abs(gapPace - rawPace) >= 3; // ≥3 s/km = ~5 s/mi
   const shownPace = gapOn && canToggleGap ? gapPace : rawPace;
   const v = verdictLabel(eff.verdict, eff.recentlyFlat);
+  // ⚠️ The conditions line: the temperature SPREAD across the plotted runs. Shown, never corrected —
+  // it is what lets the athlete discount a hot month without the app claiming to have done it for them.
+  // ⛔ WHAT HEAT COSTS YOU, IN SECONDS PER MILE (D-346, 2026-07-31).
+  //
+  // The regression already LEARNED this athlete's heat coefficient to remove it from the verdict —
+  // and then threw the most interesting number in the feature away. Michael: *"help them understand
+  // the costs of heat and other factors."* Garmin corrects silently and never tells you the size of
+  // it; TrainingPeaks says "consider temperature". Nobody hands the athlete their own number.
+  //
+  // ⚠️ ROUNDED TO 5s AND HEDGED, BECAUSE THE FIT MOVES. Measured across his windows the coefficient
+  // ran −0.22 / −0.26 / −0.34 %/°F (90d / 6mo / 12mo) — real, and inside the published band of
+  // 1–3% per 5°C (≈0.11–0.33 %/°F), but ±25% depending on the window. "About 20 seconds" is honest;
+  // "20.4 seconds" would be a precision we do not have.
+  //
+  // ⛔ PLAUSIBILITY GUARD. Only a NEGATIVE coefficient inside the literature band renders. An unstable
+  // fit can come back POSITIVE — hotter reading as faster — which happened on a thin route pool during
+  // development, and shipping that would tell an athlete heat makes them quicker.
+  const heatCost = React.useMemo(() => {
+    const coef = eff.route?.heatCoefPctPerF;
+    const paceKm = eff.recentPaceSecPerKm;
+    if (coef == null || paceKm == null || !(paceKm > 0)) return null;
+    if (!(coef < 0)) return null;                       // wrong sign → unstable fit, say nothing
+    const mag = Math.abs(coef);
+    if (mag < 0.08 || mag > 0.45) return null;          // outside the published band → do not assert
+    const secPerMi = (mag / 100) * (paceKm * 1.60934) * 10;   // per 10°F
+    const rounded = Math.round(secPerMi / 5) * 5;
+    if (rounded < 5) return null;                        // below the rounding floor — nothing to say
+    return `Heat costs you about ${rounded}s a mile per 10°F warmer, measured on your own runs.`;
+  }, [eff.route, eff.recentPaceSecPerKm]);
+  const routeCaption = React.useMemo(() => {
+    const temps = (eff.route?.series ?? []).map((p) => p.tempF).filter((t): t is number => t != null);
+    if (temps.length < 2) return null;
+    const lo = Math.round(Math.min(...temps)), hi = Math.round(Math.max(...temps));
+    return hi - lo >= 8 ? `grade-adjusted · ${lo}–${hi}°F across these runs` : 'grade-adjusted';
+  }, [eff.route]);
   const hasTrend = eff.verdict !== 'needs_data' && eff.verdict !== 'withheld';
   const evidence = eff.sampleCount != null
     ? trendEvidence({ windowDays: 42, sampleCount: eff.sampleCount, newestAgeDays: eff.newestAgeDays, discipline: 'run' as Discipline })
@@ -482,12 +522,37 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
           </span>
         ) : (
           // Honest: efficiency is a TREND, so one run can't read it. Say how close — not a confident dot.
-          <span className="text-white/60 text-[12px]">{eff.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs to read it</span>
+          //
+          // ⛔ TWO DIFFERENT REASONS FOR SILENCE, AND THEY MUST NOT SHARE COPY (D-346, 2026-07-31).
+          // The verdict now comes from the route engine (same route, heat de-confounded, gated on a
+          // confidence interval). When THAT withholds, the athlete has plenty of runs — the interval
+          // simply still straddles zero. Quoting the old "N of 8 steady runs" floor would name a
+          // threshold that no longer decides anything, which is how a screen starts lying quietly.
+          eff.route
+            ? <span className="text-white/60 text-[12px]">
+                reading {eff.route.points} runs — not separated from the noise yet
+              </span>
+            : <span className="text-white/60 text-[12px]">{eff.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs to read it</span>
         )}
       </span>
       {hasTrend && evidence && <span className="basis-full text-white/55 text-[12px]">{evidence}</span>}
-      {/* THE LONG VIEW — 12-week efficiency sparkline (the arc behind the verdict). */}
-      {hasTrend && <TrendSparkline series={eff.series} />}
+      {heatCost && <span className="basis-full text-white/55 text-[12px]">{heatCost}</span>}
+      {/* THE LONG VIEW — the arc behind the verdict.
+          ⛔ WHEN A ROUTE VERDICT EXISTS THE CHART PLOTS **THE ROUTE'S OWN RUNS** (D-346, 2026-07-31).
+          Chart and verdict then read the identical rows and cannot contradict each other — the old
+          sparkline drew every run the broken gate let through, hill sessions included, while the
+          verdict came from elsewhere. Same route also makes the dots comparable without modelling
+          anything away: it is literally the same ground.
+          ⚠️ CONDITIONS ARE CAPTIONED, NOT CORRECTED — Intervals.icu's pattern (weather shown so a
+          reader can interpret a poor point). Nobody in the field heat-adjusts an efficiency chart. */}
+      {(eff.route?.series?.length ?? 0) >= 2 ? (
+        <TrendSparkline
+          series={eff.route!.series}
+          dotNoun="run"
+          recentLabel="recent 6 weeks in color"
+          caption={routeCaption}
+        />
+      ) : hasTrend ? <TrendSparkline series={eff.series} /> : null}
       {/* THE "WHAT" under the index "why" (Michael 2026-07-22) — recent steady-run pace at the HR it took,
           in units the runner feels. RAW by default (matches the watch); a GAP toggle grade-adjusts it. */}
       {hasTrend && shownPace != null && (

@@ -684,7 +684,7 @@ serve(async (req: Request) => {
           // routes table made those runs INVISIBLE to durability (STATE-SOURCE-MAP #3/#4 — "a courtesy
           // feature may never gate a fitness verdict"; found live by scripts/state-data-check.mjs,
           // 2026-07-21). 90d cadence window; classifyTrend windows the trend to runDays internally.
-          supabase.from("workouts").select("id,date,workout_analysis,computed")
+          supabase.from("workouts").select("id,date,workout_analysis,computed,weather_data")
             .eq("user_id", userId).in("type", ["run", "running"]).eq("workout_status", "completed")
             .not("workout_analysis", "is", null)
             .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).order("date"),
@@ -723,13 +723,23 @@ serve(async (req: Request) => {
         const runRows = (runR.data ?? []) as any[];
         const runWids = [...new Set(runRows.map((r) => r.id).filter(Boolean))];
         const routePaceByWid = new Map<string, number>();
-        if (runWids.length) {
-          const { data: rpm } = await supabase.from("route_progress_metrics")
-            .select("workout_id,effort_adjusted_pace_sec_per_km").in("workout_id", runWids);
-          for (const r of (rpm ?? []) as any[]) {
-            if (r.effort_adjusted_pace_sec_per_km != null) routePaceByWid.set(r.workout_id, r.effort_adjusted_pace_sec_per_km);
-          }
-        }
+        // ⛔ THE RUN VERDICT: EVERY RUN, GRADE-ADJUSTED, HEAT LEARNED (D-346, 2026-07-31).
+        //
+        // Michael, after two passes at this: *"i just want to have what trainingpeaks or strava has but
+        // with maybe a little more detail."* This is exactly that. TrainingPeaks' Efficiency Factor is
+        // normalized GRADED pace over heart rate across steady runs — terrain is normalised by the grade
+        // adjustment, not by matching routes. The "little more detail" is the heat coefficient, fitted
+        // from the athlete's own hot-vs-cool runs by `routeTrend`'s joint regression.
+        //
+        // ⛔ SAME-ROUTE WAS TRIED FIRST AND IS TOO THIN. On his history it gave 21 runs and a confidence
+        // interval of −13.7%…+5.3% — permanently "still learning". The grade-adjusted pool gives 127 runs
+        // and an interval that clears zero. **Holding terrain constant by matching routes throws away
+        // five sixths of the evidence to avoid trusting an adjustment the app already computes.**
+        //
+        // ⚠️ THE FITTED COEFFICIENT AGREES WITH THE LITERATURE, which is the reason to trust it: the
+        // regression learns −0.22 to −0.34% per °F across his windows, and published work puts the
+        // performance cost near −0.22%/°F. Data and science landed on the same number independently.
+        const runEffHistory: Array<Record<string, unknown>> = [];
         const runEffIndexByDate = new Map<string, number>();
         const runHrByDate = new Map<string, number>(); // for the GRADE-ADJUSTED efficiency (GAP-pace ÷ HR)
         for (const f of (runFactsR.data ?? []) as any[]) {
@@ -750,6 +760,21 @@ serve(async (req: Request) => {
           const gapPaceSecPerMi = Number(r.computed?.overall?.gap_pace_s_per_mi);
           const gapPaceSecPerKm = Number.isFinite(gapPaceSecPerMi) && gapPaceSecPerMi > 0 ? gapPaceSecPerMi * MI_PER_KM : null;
           const gapEfficiencyIndex = computeEfficiencyIndex(gapPaceSecPerKm, runHrByDate.get(r.date) ?? null);
+          // The efficiency-trend row: GRADE-ADJUSTED pace ÷ HR, with the day's temperature carried so the
+          // regression can fit the heat term and the chart can caption the conditions.
+          {
+            const hrForTrend = runHrByDate.get(r.date) ?? null;
+            const tF = Number((r as any)?.weather_data?.temperature);
+            if (gapPaceSecPerKm != null && gapPaceSecPerKm > 0 && Number(hrForTrend) > 0) {
+              runEffHistory.push({
+                date: r.date,
+                pace_s_per_km: gapPaceSecPerKm,
+                hr: Number(hrForTrend),
+                temp_f: Number.isFinite(tF) ? tF : null,
+                intent: null,
+              });
+            }
+          }
           return {
             metric_date: r.date,
             effort_adjusted_pace_sec_per_km: routePaceByWid.get(r.id) ?? null,
@@ -1004,7 +1029,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, measuredDates });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, measuredDates });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside

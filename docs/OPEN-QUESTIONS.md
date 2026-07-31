@@ -2288,3 +2288,36 @@ So chasing speed and chasing distance both arrive as *"run: develop"* — indist
 ### RELATED
 
 Audit F9 (`docs/AUDIT-performance-state-2026-07-29.md`) is the same root one level down: the payload carries no protocol, no week-in-cycle and no is-measurement either. Fix the seam once and F9 closes with it.
+
+---
+
+## Q-231 — A Strava import lands the runs but not the ANALYSIS, so a new athlete starts on a population constant (2026-07-31, Michael's catch — unbuilt)
+
+**Michael, on the heat coefficient being fitted per athlete:** *"yeah lets learn them its fine but if they sync their strava we should be able to read that too, but maybe thats onboarding."*
+
+### THE GAP
+
+[D-346] fits the heat coefficient from each athlete's own hot-vs-cool runs. Below **8 runs** the regression cannot run and the code falls back to `DEFAULT_HEAT_K` — labelled in `_shared/heat-adjust.ts:43` as an *"UNVALIDATED POPULATION PLACEHOLDER"*. **That is the one place a population number touches a rendered verdict**, and it is exactly where a brand-new athlete lands.
+
+A Strava sync should erase the problem — most runners arrive with months of history. It does not, yet:
+
+| what `import-strava-history` writes | what the verdict needs |
+|---|---|
+| ✅ `avg_heart_rate` + heart-rate stream | ✅ |
+| ✅ altitude stream (so grade-adjusted pace is computable) | ✅ |
+| ⛔ **no `weather_data`** — `get-weather` is never called | needed to fit the heat term |
+| ⛔ **no `workout_analysis` / `run_facts`** — the analyzer and `compute-facts` are never called | needed for the efficiency index and GAP pace |
+
+⚠️ **So imported runs arrive RAW.** They exist, they look complete on the calendar, and they are invisible to the efficiency verdict — the "built but starved" pattern, one layer earlier than usual.
+
+### WHAT IT WOULD TAKE — wiring, not building
+
+- **`bulk-reanalyze-workouts` already does this pass** and is not connected to the import. ⛔ Trace it before writing anything; `CAPABILITY-MAP` also names `recompute-workout` as the correct path for a *single* correct backfill.
+- **Weather backfills fine** — `get-weather` resolves historical conditions from lat/lng + timestamp, so an old run gets its real temperature, not a guess.
+- ⚠️ **Rate limits are the real constraint,** not correctness: Strava's API is throttled (the import already logs `X-RateLimit-*`), and an analysis pass over months of history is a lot of invocations. This wants to be a background job with progress, not a blocking onboarding step.
+
+### WHY IT IS FILED, NOT BUILT
+
+The floor holds without it: under 8 runs the athlete simply gets no verdict, and the chart fills as they train. This removes a placeholder constant and makes day one useful — **it is an onboarding improvement, not a correctness fix.**
+
+⚠️ **AND IT IS WORTH MORE THAN IT LOOKS.** An athlete who syncs Strava and sees a full chart with their own learned heat coefficient on day one has been shown something no competitor gives them. An athlete who syncs and sees an empty row has been shown nothing.

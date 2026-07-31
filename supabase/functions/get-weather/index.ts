@@ -179,6 +179,46 @@ Deno.serve(async (req) => {
         .from('workouts')
         .update({ weather_data: weatherData })
         .eq('id', workout_id);
+
+      // ⛔ BACKFILL THE ROUTE ROW'S CONDITIONS — THE HEAT ENGINE IS STARVED BY A RACE (2026-07-31).
+      //
+      // `compute-facts` writes `route_progress_metrics` (temp_f / humidity_pct / dew_point_f) by
+      // reading `workouts.weather_data` — but the weather is fetched HERE, from
+      // `analyze-running-workout`, which the ingest fan-out fires AND DOES NOT AWAIT. So on a normal
+      // ingest compute-facts reads an empty `weather_data` and stamps null, and the temperature
+      // arrives seconds later with nothing left to write it to.
+      //
+      // ⚠️ MEASURED, NOT ASSUMED: 49 of 164 route rows had a null `temp_f` while the workout beside
+      // them carried a perfectly good `weather_data.temperature` — and it was the RECENT rows, the
+      // ones a trend actually reads. The rows that did have it were the ones later recomputed.
+      //
+      // ⛔ THE HEAT DE-CONFOUND WAS NEVER A STUB. `_shared/heat-adjust.ts` fits the coefficient per
+      // route by regression and refuses when heat and fitness are not separable — it was simply being
+      // handed a third of its temperatures as null. `CAPABILITY-MAP` recorded this ordering bug on
+      // 2026-07-17 and nothing acted on it. This is that fix: the writer of the weather fills the
+      // derived columns, at the moment the value exists.
+      //
+      // ⚠️ Non-fatal and non-blocking. A missing route row is the normal case (treadmill, <1km, no
+      // GPS) — `eq` simply matches nothing. Weather must never fail because a downstream table did.
+      try {
+        const tF = Number((weatherData as any)?.temperature);
+        const rh = Number((weatherData as any)?.humidity);
+        if (Number.isFinite(tF)) {
+          const patch: Record<string, unknown> = { temp_f: tF };
+          if (Number.isFinite(rh) && rh > 0 && rh <= 100) {
+            patch.humidity_pct = rh;
+            // Magnus, same formula `_shared/heat-adjust.ts:dewPointF` uses — kept inline rather than
+            // imported so this function keeps no dependency on the trend layer.
+            const tc = (tF - 32) * (5 / 9);
+            const g = Math.log(rh / 100) + (17.62 * tc) / (243.12 + tc);
+            const dc = (243.12 * g) / (17.62 - g);
+            patch.dew_point_f = Math.round((dc * 9 / 5 + 32) * 10) / 10;
+          }
+          await supabase.from('route_progress_metrics').update(patch).eq('workout_id', workout_id);
+        }
+      } catch (e) {
+        console.warn('[get-weather] route conditions backfill skipped:', e instanceof Error ? e.message : e);
+      }
     }
 
     // Write shared cache with 30-minute TTL (if table exists)

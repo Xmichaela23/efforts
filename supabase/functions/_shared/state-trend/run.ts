@@ -335,6 +335,28 @@ export interface RunFitness {
     recentPaceSecPerKm?: number | null;    // the "what": recent steady-run RAW pace (what the watch showed) — default display
     recentGapPaceSecPerKm?: number | null; // grade-adjusted twin for the GAP toggle; null when any recent run lacks GAP
     recentHrAvg?: number | null;           // …at this heart rate — pace-at-HR in units the runner feels
+    /**
+     * ⛔ THE ROUTE ENGINE'S ANSWER, WHEN IT HAS ONE (D-346, 2026-07-31).
+     *
+     * `verdict` and `pctChange` above are ALREADY the route engine's when this is present — the
+     * override happens on those fields, because `StatePerformanceSection` renders them and an
+     * override anywhere else changes nothing the athlete sees.
+     *
+     * This block is the receipt: which route, how many runs, the confidence interval, and whether the
+     * heat term was identifiable. ⚠️ `direction: 'still_learning'` maps to a `withheld` verdict — the
+     * engine refusing to claim, not a finding of "holding".
+     */
+    route?: {
+      direction: string;
+      points: number;
+      ci: [number, number] | null;
+      method: string;
+      heatCoefPctPerF: number | null;
+      spanDays: number | null;
+      /** One point per run — the same rows the verdict read, so chart and verdict cannot disagree.
+       *  `tempF` rides along so conditions are SHOWN beside the reading as well as fitted. */
+      series?: Array<{ date: string; value: number; tempF: number | null; recent: boolean }>;
+    } | null;
     /** 12-WEEK CHART series — the "long view" (Michael 2026-07-22). Same efficiency points the verdict
      *  reads, over a WIDER 84d window (verdict is 42d), so the chart's recent tail IS the verdict's data —
      *  they can't contradict. `recent` = inside the 42d verdict window (client brightens it). Fills as the

@@ -2555,3 +2555,101 @@ knows that and the data does not.**
 ⚠️ **`null` STAYS A REAL ANSWER.** An unattached, unstructured run is excluded from the steady read
 rather than guessed into it — the same failure direction the gate already chose.
 
+
+---
+
+## D-346 — THE RUN ROW IS ON THE WRONG INSTRUMENT. Decoupling out, speed-at-heart-rate in — and the engine for it is already built (2026-07-31, DECIDED — NOT BUILT)
+
+> ⛔ **NOTHING IN THIS ENTRY IS SHIPPED.** It records a decision and a diagnosis, so the next session
+> does not spend another day rediscovering both. The three small fixes that DID ship are at the end.
+
+**Michael, on the State row telling him his heart rate was drifting up:** *"this shits wrong no"* —
+then, after four hours: *"this is the 209th fucking time ive treid to make this wrk, and it keeps
+coming back."*
+
+### ⛔ WHY IT KEEPS COMING BACK, MEASURED
+
+**Fifteen decision entries touch this one row** — D-036, D-037, D-039, D-040, D-105, D-106, D-107,
+D-239, D-273, D-275, D-276, D-283, D-295, D-311, D-345 — plus two design docs and a spec.
+
+⛔ **AND EVERY DOC A FRESH SESSION READS FIRST SAID THE AREA WAS HEALTHY.** `TRUTH-MAP` called RUN
+*"CLEAN … the model the others should copy."* `AUDIT-hr-congruence` marked run durability ✅ CLEAN.
+`CAPABILITY-MAP` said D-345 had fixed the intent. `STATE-SOURCE-MAP` described a substrate that moved
+ten days earlier. `session-detail/build.ts` claims in a comment that it uses *"the SAME metric State
+uses"* — it does not. **Five false claims, all confident, none with a receipt.**
+
+So each session opens the map, reads "clean", concludes the symptom in front of it must come from
+somewhere new, and builds something new. **A doc that says "clean" about a broken thing does not
+merely fail to help — it routes every future session away from the fault.** All five are corrected.
+
+### ⛔ THE DECISION: THE INSTRUMENT IS WRONG, NOT THE WIRING
+
+| | what it asks | what it needs |
+|---|---|---|
+| **DECOUPLING** (what State reads) | did you fade *within* one run | a pristine steady effort — which most real running is not |
+| **SPEED AT A GIVEN HEART RATE** (Garmin/Firstbeat) | how fast are you at 134 bpm | ordinary running |
+
+Decoupling is a TrainingPeaks per-workout diagnostic; TrainingPeaks does not trend it, and you
+highlight the steady section by hand. Firstbeat mines the reliable segments of any run and reads the
+HR-to-speed relationship — 95% accuracy (MAPE ~5%) across 2,690 freely-performed runs from 79 runners
+(`assets.firstbeat.com/firstbeat/uploads/2017/06/white_paper_VO2max_30.6.2017.pdf`).
+
+⛔ **AND WE ALREADY HAVE GARMIN'S SHAPE.** `_shared/heat-adjust.ts` + `docs/DESIGN-familiar-routes.md`:
+same route (terrain cancels rather than being modelled), a heat coefficient **learned per route by
+regression**, and a confidence-interval gate that returns `still_learning` instead of asserting.
+**It is complete, tested, and wired only to the per-workout screen. State does not call it.**
+
+**THE DECISION: State's run row stops computing its own verdict and reads that engine.** Its own
+first, deliberate change — with the render path included. ⚠️ `StatePerformanceSection` renders
+`fitness.efficiency`, NOT the card-level verdict; a swap that misses that line changes nothing on screen.
+
+### ⛔ THREE APPROACHES TRIED AND REJECTED THE SAME DAY — recorded so they are not retried
+
+1. **Window the run by steady HEART RATE.** Circular: HR drift is what decoupling measures, so
+   filtering for it deletes the signal and every run reads clean.
+2. **Window by pace SCATTER against a fitted threshold.** ⛔ Not universal. Pace scatter scales with
+   speed — at 13:30/mi an ordinary stride wobble is ~18%, the identical wobble at 8:00/mi is ~10%, so
+   it systematically rejects slow runners' easy runs. Michael: *"we shouldnt be tuning to me either …
+   it should be universal."*
+3. **Window by HR↔speed CORRELATION** (dimensionless, so scale-free — the right instinct).
+   ⛔ **Measured on 25 real runs it does not separate:** 0.4–0.9 on hill sessions and dead-flat easy
+   runs alike. Detrending both series first did not fix it. On rolling ground you slow on the climbs
+   and your heart rate rises — that is real coupling at genuinely constant effort.
+
+⚠️ **AND FIRSTBEAT'S RULE IS THE OTHER WAY UP.** They DISCARD low-correlation segments (they need a
+clean HR-to-speed relationship to extrapolate from). Reading it as "discard high correlation" builds a
+filter that throws away exactly what Garmin uses. That inversion survived several hours here.
+
+### ⚠️ FACTS ABOUT THE SUBSTRATE, MEASURED 2026-07-31
+
+- `heart_rate_summary.workoutType` reads `steady_state` on **all 25** of his runs — an 11-minute jog
+  and a hill session included. ⛔ **The `isSteadyAerobic` gate excludes nothing.** Hill drills entered
+  the durability trend at 24.9% and the screen reported declining fitness. **Still unfixed.**
+- **Four fields answer "what kind of run was this"** and the gate reads a fifth. Three sessions in
+  three days each wrote the intent to a different unread field.
+- On 164 `route_progress_metrics` rows: `temp_f` on 115, `decoupling_pct` on 83, and
+  `effort_adjusted_pace_sec_per_km` — the one column that table owns — on **8**.
+- ⚠️ **The heat engine's `still_learning` is NOT caused by the missing temperatures.** Repairing them
+  changed no verdict. It is scatter: on his main loop the CI is −12%…+5% across 14 runs over 200 days
+  with a four-month gap. **An honest "cannot tell yet", and the correct answer.**
+
+### ✅ WHAT ACTUALLY SHIPPED WITH THIS ENTRY (small, verified, unrelated to the build above)
+
+1. **The "as of" stamp shows the NEWEST contributor, not the oldest** (`assemble.ts:695`). His run
+   side was one day old and his bike sixteen; the row stamped itself two weeks stale and read as
+   *"nothing here is current"* about current data. The stale half is still named in the line beneath.
+2. **`get-weather` backfills the route row's conditions at fetch time.** `compute-facts` wrote the
+   route row from `workouts.weather_data` while the weather is fetched by the analyzer, which the
+   ingest fan-out does not await — so a third of rows stamped null. Recorded in CAPABILITY-MAP on
+   2026-07-17; nothing acted on it until now.
+3. **Five false doc claims corrected**, each carrying what it used to say and why it was wrong.
+
+⚠️ **THE ONE PLACE A POPULATION CONSTANT STILL TOUCHES A VERDICT:** below 8 runs the regression cannot
+fit, and `DEFAULT_HEAT_K` (self-declared *"unvalidated population placeholder"*) is used instead. The
+floor holds — under 8 runs no verdict renders at all — and **[Q-231]** covers closing it properly by
+running the analysis pass over an athlete's imported Strava history.
+
+⛔ **AND ONE BUILT-THEN-DELETED, DELIBERATELY.** A steady-window module was written, tested (10 tests)
+and removed the same day once its criterion failed on real data. **Keeping it would have made a
+sixteenth implementation of this row.** The decision it was serving is this entry; the code was a
+wrong first attempt at it, and a wrong attempt left on disk is how the next session inherits a fork.
