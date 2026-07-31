@@ -1163,6 +1163,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [baselineTestResults, setBaselineTestResults] = useState<{
     [exerciseId: string]: { weight: number; reps: number; baselineKey: string }
   }>({});
+  /** The rematerializer's dry run: what the next cycles WOULD become. Null on an ordinary session. */
+  const [pendingRework, setPendingRework] = useState<any | null>(null);
+  const [applyingRework, setApplyingRework] = useState(false);
+
   /** What the server computed and wrote, echoed back for display. Empty until a save returns. */
   const [baselineServerResults, setBaselineServerResults] = useState<
     Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number }>
@@ -3903,6 +3907,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Close notes modal if open
     setShowNotesModal(false);
     
+    // ⛔ THE ALL-OUT SET CHANGED WHAT COMES NEXT — SAY SO HERE (Q-226, 2026-07-30).
+    //
+    // Michael: *"people might not check either, could the logger give you a pop up when its changed?"*
+    // He is right that State and Performance are both places an athlete has to go looking. The moment
+    // the reps are worth something is the moment they are logged.
+    //
+    // ⚠️ DRY RUN. The server returns what WOULD change and writes nothing. Applying is the athlete's
+    // tap — the silent version of this was deleted for moving prescribed weight with no consent.
+    // ⚠️ Silent on an ordinary session: no all-out set, or nothing ahead moves, and no sheet appears.
+    try {
+      const { data: rm } = await supabase.functions.invoke('rematerialize-strength-block', { body: {} });
+      if (rm?.success && Array.isArray(rm.changes) && rm.changes.length > 0) {
+        // ⚠️ Carry the saved row with it — the sheet owns the close, and the navigation callback
+        // needs the workout it is navigating TO. Passing null here dropped the athlete nowhere.
+        setPendingRework({ ...rm, _saved: saved || completedWorkout });
+        return;   // the sheet owns the close from here
+      }
+    } catch { /* graceful: a supplier that cannot read must never block a saved workout */ }
+
     // Auto-close after showing success for 1.5 seconds
     saveTimeoutRef.current = setTimeout(() => {
       // Only proceed if component is still mounted
@@ -5692,6 +5715,75 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       )}
 
       {/* Down-write reconciliation — a test result below the stored 1RM (supersedes D-223's silent hold) */}
+      {/* ── WHAT THE ALL-OUT SET BOUGHT (Q-226, 2026-07-30) ──────────────────────────────────────
+          ⛔ THE FACT IS THE CELEBRATION. Michael: *"my urges are to gamify but i also wanna be the
+          growup in the room."* The number going up IS the reward; "nice work" on top of it makes it
+          smaller, not bigger. No confetti, no streak, no praise word — the app keeps score honestly,
+          which is the only version that stays trustworthy when the number goes DOWN.
+
+          ⛔ AND A RESET IS NOT A PENALTY. Wendler p30: *"You keep on increasing the max you're working
+          from every four weeks until you can no longer hit the prescribed sets and reps."* The miss is
+          the SIGNAL and the reset is the mechanism — same tone, same sheet, no softening and no
+          apology. Naming it as the program working is accurate, not consolation. */}
+      {pendingRework && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-t-2xl border-t border-white/15 bg-[#141414] p-5 pb-8">
+            <p className="text-[11px] uppercase tracking-wider text-white/45 mb-3">Your next cycle changed</p>
+            <div className="space-y-2 mb-4">
+              {pendingRework.changes
+                .filter((c: any, i: number, arr: any[]) =>
+                  // One line per LIFT, not per week — the same step repeats across a cycle's weeks.
+                  arr.findIndex((x: any) => x.lift === c.lift) === i)
+                .map((c: any, i: number) => {
+                  const up = Number(c.to_top_set) > Number(c.from_top_set);
+                  return (
+                    <div key={i} className="text-sm text-white/85">
+                      <span className="text-white/60">{c.lift}</span>{' '}
+                      <span className="tabular-nums">{c.from_top_set} → {c.to_top_set} lb</span>
+                      <span className={`ml-2 text-[12px] ${up ? 'text-emerald-300/80' : 'text-white/45'}`}>
+                        {up ? 'earned the step' : 'resets, and the next cycle builds from there'}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+            <p className="text-[12px] text-white/45 mb-4 leading-snug">
+              Applies to weeks that have not started. Anything you have already done stays as it was.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={applyingRework}
+                onClick={async () => {
+                  setApplyingRework(true);
+                  try {
+                    await supabase.functions.invoke('rematerialize-strength-block', { body: { apply: true } });
+                  } catch { /* the sheet still closes; the plan is simply unchanged */ }
+                  setApplyingRework(false);
+                  setPendingRework(null);
+                  const done = pendingRework?._saved ?? null;
+                  if (onWorkoutSaved && done) onWorkoutSaved(done); else onClose();
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-white/90 text-black text-sm font-medium disabled:opacity-50"
+              >
+                {applyingRework ? 'Applying…' : 'Apply'}
+              </button>
+              <button
+                type="button"
+                disabled={applyingRework}
+                onClick={() => {
+                  setPendingRework(null);
+                  const done = pendingRework?._saved ?? null;
+                  if (onWorkoutSaved && done) onWorkoutSaved(done); else onClose();
+                }}
+                className="flex-1 py-2.5 rounded-xl border border-white/15 text-white/70 text-sm"
+              >
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {downWriteReview && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
           <div
