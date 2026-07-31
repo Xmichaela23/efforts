@@ -28,6 +28,9 @@ import {
   mapRPEToIntensity,
 } from "../_shared/workload.ts";
 import { assessHrPlausibility, resolveMaxHrCeiling } from "../_shared/hr-plausibility.ts";
+// ⛔ ONE FORMULA FOR THE WHOLE APP (D-339). The client's baseline test imports this same module, so
+// the number that SETS the working weights and the number that JUDGES the work now agree.
+import { estimate1RMRounded } from "../../../src/lib/estimate-1rm.ts";
 import { canonicalize, muscleGroup, bigFourLift } from "../_shared/canonicalize.ts";
 // THE SAME top-set rule the logger stamps the difficulty tap with — heaviest set, ties to the last.
 // Imported, not re-derived: if the two ever disagree the word lands on a different set than the one
@@ -89,6 +92,9 @@ interface PlannedRow {
   training_plan_id: string | null;
   week_number: number | null;
   type: string;
+  name?: string | null;
+  description?: string | null;
+  tags?: string[] | null;
   intervals: any[] | null;
   strength_exercises: any[] | null;
   steps_preset: any[] | null;
@@ -119,37 +125,21 @@ function distanceMeters(w: WorkoutRow): number {
 }
 
 /**
- * Brzycki formula with RIR offset.
- * effectiveReps = logged_reps + logged_rir treats "leftover capacity" as
- * completed work, giving a stable 1RM estimate without requiring a failure set.
+ * ⛔ WAS BRZYCKI, NOW WENDLER'S OWN (D-339, 2026-07-30). The formula moved to `src/lib/estimate-1rm.ts`
+ * so this function, the baseline test in `StrengthLogger.tsx`, and the program the athlete is running
+ * all answer the question the same way — they used to give three different answers. The full reasoning,
+ * including why the old "DO NOT SWITCH" note's premise inverts above ten reps, is in that file.
  *
- * ⛔ THE JUSTIFICATION THAT USED TO SIT HERE IS CONTESTED AND MAY BE BACKWARDS (checked 2026-07-29).
- * It read: *"Brzycki is more accurate than Epley at the low rep ranges (2-5)."*
+ * ⚠️ THE RIR OFFSET SURVIVES THE MOVE and still matters for the protocols that collect it. On a
+ * protocol that does not (5/3/1), `avgRir` is null and the offset is zero — see `protocolUsesRir`.
  *
- * What the literature actually supports:
- * - ✅ Brzycki accuracy improves markedly when sets are restricted to ≤10 reps (LeSuer et al. 1997,
- *   JSCR 11(4):211-213; Mayhew et al. 2008). That part holds and it is why the 95% set exists.
- * - ⚠️ At the specific 2-5 rep range, some work puts **Epley and Wathen closer to a tested 1RM than
- *   Brzycki**, which is the opposite of the sentence above. Findings conflict by population and lift.
- *
- * ⛔ DO NOT SWITCH THE FORMULA ON THE STRENGTH OF THIS NOTE. Brzycki tends to UNDERESTIMATE and Epley
- * to OVERESTIMATE, and for a number that sets an athlete's next working load, erring low is the safe
- * direction. That is the defensible reason to keep Brzycki — a product decision on which way to be
- * wrong, not a claim that it is the most accurate equation. Changing it is a load-bearing change and
- * needs its own decision entry.
- *
- * ⚠️ AND THE UNDERESTIMATION IS WORST ON DEADLIFT: LeSuer found every equation tested significantly
- * underestimated deadlift 1RM. Filed in `docs/PROTOCOL-strength-focus-overview.md` as open.
+ * ⚠️ NO REP CAP ANY MORE. The old one existed because Brzycki divides by `37 − reps` and blows up;
+ * Wendler's is linear and cannot. Reliability above ~10 reps is handled as PROVENANCE
+ * (`trustedMaxRepsFor` / `advance_untrusted`), never by quietly rewriting the rep count.
  */
-function brzycki1RM(weight: number, reps: number, rir: number): number {
+function estimated1RM(weight: number, reps: number, rir: number): number {
   if (weight <= 0) return 0;
-  const effectiveReps = Math.max(1, reps + Math.round(rir));
-  if (effectiveReps === 1) return Math.round(weight / 5) * 5 || weight;
-  // Brzycki: weight × (36 / (37 - effectiveReps))
-  // Cap at effectiveReps = 30 to avoid division-by-zero / nonsense at high reps
-  const capped = Math.min(effectiveReps, 30);
-  const raw = weight * (36 / (37 - capped));
-  return Math.round(raw / 5) * 5; // round to nearest 5 lbs
+  return estimate1RMRounded(weight, reps, rir);
 }
 
 function isRunDiscipline(type: string | null | undefined): boolean {
@@ -860,7 +850,20 @@ async function upsertRouteIntelligence(
       route_cluster_id: cluster.id,
       workout_id: w.id,
       metric_date: metricDate,
-      workout_intent: (w.computed as any)?.analysis?.heart_rate?.workout_type ?? null,
+      // ⛔ THE SAME LABEL, WRITTEN WHERE THE DECOUPLING READ ACTUALLY LOOKS (2026-07-30).
+      //
+      // `classifyRunIntent` fixed the EFFICIENCY series by writing `run_facts.workout_type`. The
+      // heart-rate response row reads a different substrate — `route_progress_metrics.workout_intent`
+      // — and this line sourced it from `computed.analysis.heart_rate.workout_type`, which is null on
+      // every run. So the efficiency chart came back to life and the heart-rate row stayed frozen on
+      // a July 14 reading, which is exactly what Michael saw ten minutes after the first fix shipped.
+      //
+      // ⚠️ ONE CLASSIFIER, TWO SUBSTRATES. Do not add a second rule here — if the intent needs to
+      // change, change `classifyRunIntent` and both follow.
+      workout_intent:
+        (w.computed as any)?.analysis?.heart_rate?.workout_type
+        ?? (runFacts as any)?.workout_type
+        ?? null,
       moving_time_s: Math.max(0, Math.round(durationMinutes(w) * 60)),
       elapsed_time_s: Math.max(0, Math.round(durationMinutes(w) * 60)),
       distance_m: features.distance_m,
@@ -1007,7 +1010,47 @@ async function updateLearnedStrengthFromExerciseLog(
 // Discipline-specific fact builders
 // ---------------------------------------------------------------------------
 
-function buildRunFacts(w: WorkoutRow, baselines: Baselines | null): Record<string, any> {
+/**
+ * ⛔ WHAT A RUN WAS FOR — the plan first, the data second, silence third.
+ *
+ * The words are the vocabulary `state-trend/run.ts` already filters on (`DECOUPLING_NONSTEADY`), so
+ * this writes into an existing contract rather than inventing a taxonomy beside it.
+ *
+ * ⚠️ ORDER MATTERS. A hill session run slowly still IS a hill session; the plan knows that and the
+ * data does not. Only when there is no plan link do we read structure off the file.
+ * ⚠️ AND `null` IS A REAL ANSWER. An unattached, unstructured run stays excluded from the steady read
+ * rather than being guessed into it — the same failure direction the gate already chose.
+ */
+function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null): string | null {
+  const NONSTEADY = /interval|repeat|hill|tempo|threshold|vo2|speed|track|fartlek|stride|race|surge/i;
+  const STEADY = /easy|long|recovery|base|aerobic|steady|shakeout|conversational/i;
+
+  // 1. THE PLAN. Its own words, in the order they are most likely to name the intent.
+  const planText = [
+    planned?.name,
+    Array.isArray(planned?.tags) ? planned!.tags!.join(' ') : null,
+    planned?.description,
+  ].filter(Boolean).join(' ');
+  if (planText) {
+    if (NONSTEADY.test(planText)) return 'interval';
+    if (STEADY.test(planText)) return 'easy';
+  }
+
+  // 2. THE FILE, when nothing is attached. A structured session with real work intervals is not
+  //    steady, whatever it was called.
+  const ivs = Array.isArray(w.computed?.intervals) ? w.computed!.intervals : [];
+  const work = ivs.filter((i: any) => i?.planned_label && !/(warm|cool|rest|recovery)/i.test(String(i.planned_label)));
+  if (work.length >= 2) return 'interval';
+
+  // 3. The athlete's own name for it, last — it is free text and often just "Morning Run".
+  const own = String((w as any)?.name ?? '');
+  if (NONSTEADY.test(own)) return 'interval';
+  if (STEADY.test(own)) return 'easy';
+
+  return null;
+}
+
+function buildRunFacts(w: WorkoutRow, baselines: Baselines | null, planned?: PlannedRow | null): Record<string, any> {
   const dist = distanceMeters(w);
   const dur = durationMinutes(w);
   const overall = w.computed?.overall ?? {};
@@ -1110,9 +1153,28 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null): Record<strin
   }
 
   // Efficiency index: pace/HR ratio (lower pace number = faster, higher ratio = better)
+  //
+  // ⛔ WHAT WAS THIS RUN FOR? Read from the PLAN it is attached to (2026-07-30).
+  //
+  // `state-trend/run.ts` restricts the efficiency and decoupling reads to STEADY aerobic efforts —
+  // correctly, and it is the field standard: TrainingPeaks requires a sustained steady effort over
+  // 20 minutes, fully aerobic, low variability, or the number is not valid. But its gate is
+  // `isSteadyAerobic(workout_type)`, and `workout_type` was NEVER WRITTEN. `String(null)` is empty,
+  // the gate returns false, and EVERY run was excluded. Michael's heart-rate row sat on a July 14
+  // reading, in red, for sixteen days — a built, cited, tested reader with no input at all.
+  //
+  // ⛔ THE PLAN IS THE SOURCE, NOT THE DATE. Intervals.icu does exactly this: *"When an activity is
+  // paired with a planned workout, any tags from the workout are added to the activity."* Keying off
+  // the LINK rather than the calendar is what makes it survive an athlete moving a session, or a
+  // plan being rebuilt around them — both of which happened to Michael today.
+  //
+  // ⚠️ UNATTACHED RUNS FALL BACK TO THE DATA, and to `null` when even that cannot tell. Null keeps
+  // today's behaviour exactly: excluded from the steady read rather than guessed into it.
   if (facts.pace_avg_s_per_km && facts.hr_avg && facts.hr_avg > 0) {
     facts.efficiency_index = Math.round((1000 / facts.pace_avg_s_per_km) / facts.hr_avg * 10000) / 100;
   }
+
+  facts.workout_type = classifyRunIntent(w, planned);
 
   // Interval adherence from computed.intervals
   if (w.computed?.intervals && Array.isArray(w.computed.intervals)) {
@@ -1357,7 +1419,7 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null): {
       : null;
 
     const est1rm = bestWeight > 0 && bestReps > 0
-      ? brzycki1RM(bestWeight, bestReps, avgRir ?? 0)
+      ? estimated1RM(bestWeight, bestReps, avgRir ?? 0)
       : 0;
 
     // ── The three words + the measuring set (D-338) ─────────────────────────────────────────────
@@ -1608,7 +1670,7 @@ serve(async (req: Request) => {
     if (w.planned_id) {
       const { data: pw } = await supabase
         .from("planned_workouts")
-        .select("id, training_plan_id, week_number, type, intervals, strength_exercises, steps_preset, workload_planned")
+        .select("id, training_plan_id, week_number, type, name, description, tags, intervals, strength_exercises, steps_preset, workload_planned")
         .eq("id", w.planned_id)
         .maybeSingle();
       planned = (pw as PlannedRow | null) ?? null;
@@ -1682,7 +1744,7 @@ serve(async (req: Request) => {
 
     switch (discipline) {
       case "run":
-        runFacts = buildRunFacts(w, baselines);
+        runFacts = buildRunFacts(w, baselines, planned);
         break;
       case "ride":
       case "bike":

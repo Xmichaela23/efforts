@@ -2144,7 +2144,16 @@ function expandTokensForRow(
               finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
             }
           }
-          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight), rir_tracked: tracksRir } as any;
+          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight), rir_tracked: tracksRir,
+            // ⛔ CARRY THE ASSISTANCE MARKER (2026-07-30). This object is a WHITELIST, and
+            // `load_prescribed: false` — set on every assistance row the composer authors — was not on
+            // it. The flag reached materialize (it is read twenty lines above, to stop a weight being
+            // derived) and then died here, so nothing downstream could tell an assistance slot from a
+            // main lift. The Swap sheet offered the whole exercise library where the block had already
+            // defined a three-option shortlist.
+            // ⚠️ Only ever `false` or absent — never `true`. Absent means "not stated", and a reader
+            // that treats absent as assistance would turn every main lift into one.
+            ...(((ex as any)?.load_prescribed === false) ? { load_prescribed: false } : {}) } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
@@ -2422,7 +2431,16 @@ function expandTokensForRow(
               finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
             }
           }
-          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight), rir_tracked: tracksRir } as any;
+          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight), rir_tracked: tracksRir,
+            // ⛔ CARRY THE ASSISTANCE MARKER (2026-07-30). This object is a WHITELIST, and
+            // `load_prescribed: false` — set on every assistance row the composer authors — was not on
+            // it. The flag reached materialize (it is read twenty lines above, to stop a weight being
+            // derived) and then died here, so nothing downstream could tell an assistance slot from a
+            // main lift. The Swap sheet offered the whole exercise library where the block had already
+            // defined a three-option shortlist.
+            // ⚠️ Only ever `false` or absent — never `true`. Absent means "not stated", and a reader
+            // that treats absent as assistance would turn every main lift into one.
+            ...(((ex as any)?.load_prescribed === false) ? { load_prescribed: false } : {}) } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }

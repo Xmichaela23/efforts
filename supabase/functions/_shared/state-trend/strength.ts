@@ -95,6 +95,17 @@ export interface StrengthPerLift {
    *  the all-history read wasn't supplied — the client then must NOT flag a PR (no false records). */
   allTimeBestE1rm: number | null;
   allTimeCount: number;
+  /**
+   * ⛔ IS THE LATEST LIFT A REAL PR? Decided HERE, on the spine, not on the screen (2026-07-30).
+   *
+   * The three-part rule (all-time best present, at least three all-history points behind it, latest
+   * within half a pound of that best) used to live in `StatePerformanceSection.tsx`. A screen deciding
+   * what counts as a personal record is a surface minting a verdict — Constitution Law 4 — and the
+   * moment a second surface wanted to show a PR it would have had to copy the rule or invent its own.
+   *
+   * ⚠️ FALSE WHENEVER THE ALL-HISTORY READ IS MISSING. No data is not a record.
+   */
+  isPr: boolean;
   sampleCount: number;
   newestAgeDays: number | null;
   provisional: boolean;
@@ -173,7 +184,8 @@ export interface StrengthFitness {
 }
 
 // SIGNAL-VS-NOISE guard for e1RM (2026-07-19). e1RM off working sets scatters ~4-8% session to
-// session — RIR-estimate wobble (the Brzycki offset is only as steady as the logged RIR), best-set
+// session — RIR-estimate wobble (the e1RM offset is only as steady as the logged RIR; D-339 moved the
+// formula itself to Wendler's own, `src/lib/estimate-1rm.ts`), best-set
 // selection, and thin per-lift cadence (often n=3-4 in the 6wk window). Without a guard a lift whose
 // e1RM moved LESS than its own scatter still earns "improving"/"sliding" off the dead-band alone. This
 // is the same gate run decoupling already uses (run.ts, noiseGuardStdev 1.0): a directional verdict must

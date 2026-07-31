@@ -401,6 +401,18 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     // REAL PR frame — all-history best (not 6wk). Null when the all-history read wasn't supplied.
     allTimeBestE1rm: inp.allTimeBestByLift?.[l.canonical]?.best ?? null,
     allTimeCount: inp.allTimeBestByLift?.[l.canonical]?.count ?? 0,
+    // ⛔ THE PR VERDICT, COMPUTED ONCE (2026-07-30). Was three conditions living in
+    // `StatePerformanceSection.tsx`. Rule unchanged, byte for byte — only the address moved.
+    // Michael, 2026-07-21: *"a PR should be a real PR, basically a new 1RM."* It was best-of-6-weeks
+    // once, which fired on nearly every progressing lift and even stamped a lift reading "new".
+    // ⚠️ The 0.5 lb slack absorbs rounding between the stored estimate and the all-history read; it
+    // is not a tolerance on what counts as a record.
+    isPr: (() => {
+      const latest = liftLatest.get(l.canonical) ?? null;
+      const allBest = inp.allTimeBestByLift?.[l.canonical]?.best ?? null;
+      const allCount = inp.allTimeBestByLift?.[l.canonical]?.count ?? 0;
+      return latest != null && allBest != null && allCount >= 3 && latest >= allBest - 0.5;
+    })(),
     sampleCount: l.trend.sampleCount,
     newestAgeDays: l.trend.newestAgeDays,
     provisional: isProvisionalTrend(l.trend),

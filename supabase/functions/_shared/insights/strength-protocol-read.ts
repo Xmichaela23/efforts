@@ -68,6 +68,23 @@ export function readStrengthProtocol(ctx: StrengthProtocolContext | null | undef
       return null; // The ramp is climbing and you are completing it. That is the protocol working.
     }
 
+    // ── WENDLER 5/3/1 (strength_primary): the working number is FIXED at plan creation and the ─────
+    //    prescription deliberately walks 40% → 95% of it across each four-week cycle.
+    // DESIGNED: an e1RM estimate that rises and falls with the week's percentage. Eight of a twelve-week
+    // block's weeks are sub-maximal by prescription, and the deload weeks sit near 60%, so a naive read
+    // of the estimate is mostly reading the calendar. NEVER reported as decay.
+    // SIGNAL: failing the prescribed reps. Wendler p30 — *"You keep on increasing the max you're working
+    // from every four weeks until you can no longer hit the prescribed sets and reps."* Advancement is
+    // the default and a MISS is the event, so a miss is the one thing here worth saying.
+    // ⛔ NO CEILING CLAUSE. 5×5 has a terminal 85% that ends the block; 5/3/1 has no such condition —
+    // it cycles indefinitely. Inventing one would be a claim the protocol does not make.
+    case 'strength_primary': {
+      if (ctx.missedPrescribedReps === true) {
+        return 'Reps came up short at the prescribed load. On this program that miss is the signal — the working number comes down and the cycle restarts from there.';
+      }
+      return null; // The percentages are moving as written and you are completing them.
+    }
+
     // ── MAINTENANCE DOSE (minimum-dose.ts): "keep strength from sliding, minimal time/cost". ───────
     // DESIGNED: low volume. Never read as a shortfall — spending less time IS the point.
     // SIGNAL: sliding, because holding is the single job this block has.
@@ -117,5 +134,18 @@ export function protocolExpectsE1rmToDip(protocolId?: string | null): boolean {
   const id = String(protocolId || '').toLowerCase();
   // Linear progression walks the load up until it stalls; hypertrophy and durability blocks suppress or
   // simply don't measure a 1RM. In all three a dipping estimate is the design, not a finding.
-  return id === 'five_by_five' || id === 'upper_aesthetics' || id === 'durability';
+  //
+  // ⛔ `strength_primary` ADDED 2026-07-30 — audit F3, and it is the strongest case in this list.
+  // 5/3/1 does not merely tolerate a dipping estimate, it PRESCRIBES one: each cycle runs 65/75/85 →
+  // 70/80/90 → 75/85/95 → 40/50/60% of a working number that is itself only 85-90% of the true max.
+  // Two weeks in four are deliberately sub-maximal and one is a deload, so on this protocol the
+  // estimate is largely a readout of the week number. The generic *"estimated one-rep maxes have been
+  // sliding — the one being built"* fired on exactly that, which is the Q-166 class of error: a true
+  // sentence about a number, and a false claim about the athlete.
+  //
+  // ⚠️ THE DOCSTRING ABOVE SAYS THE DEFAULT IS TRUE AND THE CODE SAYS FALSE. The code is what runs,
+  // and the contradiction is left standing on purpose: flipping the default would silence this claim
+  // for every plan with no protocol at all — a far larger behaviour change than this audit, and one
+  // that needs its own decision. Filed rather than smuggled in.
+  return id === 'five_by_five' || id === 'upper_aesthetics' || id === 'durability' || id === 'strength_primary';
 }

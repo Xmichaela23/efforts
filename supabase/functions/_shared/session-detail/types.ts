@@ -90,6 +90,37 @@ export type StrengthTestResultV1 = {
 
 export type SessionDetailV1 = {
   version: 1;
+  /**
+   * ⛔ WHAT BLOCK THIS SESSION BELONGED TO (Q-230 / audit F9). Resolved once by
+   * `_shared/block-identity.ts` — the same card the coach payload carries — so Performance and State
+   * cannot give different answers about the same session.
+   *
+   * ⚠️ Every field is nullable and null MEANS SOMETHING: the plan did not say. Render nothing.
+   * ⚠️ Present on sessions from FINISHED blocks too — this deliberately does not require an active
+   * plan, so history keeps its framing (Q-208).
+   */
+  /** ⛔ Schema version of the block card. Bump in `workout-detail` when adding a field, or stored
+   *  copies serve from cache forever and the new field never reaches a screen. */
+  block_v?: number;
+  block?: {
+    plan_id: string | null;
+    plan_name: string | null;
+    protocol_id: string | null;
+    protocol_known: boolean;
+    effort_read: 'amrap' | 'rir' | 'none';
+    goal_kind: 'race' | 'non_race' | 'unknown';
+    goal_focus: string | null;
+    week_index: number | null;
+    block_weeks: number | null;
+    phase: string | null;
+    cycle_kind: 'leader' | 'anchor' | null;
+    week_in_cycle: number | null;
+    is_deload_week: boolean | null;
+    has_all_out_set: boolean | null;
+    /** The 95% reading — the one that moves the working number. NOT every all-out set. */
+    is_measurement_week: boolean | null;
+    top_set_pct: number | null;
+  };
   generated_at: string;
   workout_id: string;
   date: string;
@@ -400,6 +431,34 @@ export type SessionDetailV1 = {
    *  instead of the training table + execution/volume/adherence — a measurement, not a session. */
   is_test?: boolean;
   test_result?: StrengthTestResultV1 | null;
+
+  /**
+   * ⛔ THE ALL-OUT SET, PER LIFT (2026-07-30). Present only on sessions that carried one — a leader
+   * cycle and every deload week have none, and that absence is correct, not a gap.
+   *
+   * ⛔ THE REP RECORD IS THE FINDING; THE ESTIMATE IS CONTEXT. Wendler p10 — the rep count at a fixed
+   * weight is what "stronger" means here, and it is EXACT. The estimated max is an equation's guess
+   * about a number nobody measured, and it is labelled untrusted above the rep ceiling.
+   */
+  strength_all_out?: Array<{
+    name: string;
+    weight: number;
+    reps: number;
+    /** Most reps done at THIS weight inside the window. Null = never lifted it here before. */
+    prior_best_reps_at_weight: number | null;
+    /** ⚠️ A null prior is NOT a record — nothing to beat is not the same as beating something. */
+    is_rep_record: boolean;
+    /** ⛔ How far back "best" looked. NOT all-time; never narrate it as a lifetime PR. */
+    rep_record_window_sessions: number;
+    /** Wendler's own formula (D-339), rounded to plate granularity. */
+    estimated_1rm: number;
+    /** False above 8 reps (5 on deadlift) — no equation holds up there. Label it; never cap the reps. */
+    estimate_trusted: boolean;
+    estimate_trusted_max_reps: number;
+  }> | null;
+
+  /** Why `strength_all_out` is empty. Present only when it is — an empty panel must say why. */
+  strength_all_out_reason?: 'no_planned_rows' | 'no_reps_on_all_out_set' | 'session_had_no_all_out_set';
 
   /** Strength only: per-exercise RIR verdict from analyzer. */
   strength_rir_summary?: Array<{

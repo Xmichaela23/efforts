@@ -216,6 +216,21 @@ Deno.serve(async (req: Request) => {
         plan_type: 'generated',
         config: {
           source: 'strength_primary',
+          // ⛔ THE PLAN SAYS WHICH PROTOCOL IT IS ON, IN THE KEY EVERYONE ALREADY READS (Q-230 Part A).
+          //
+          // This block is not produced by the run/tri protocol selector, so it never wrote this key —
+          // it said what it was in `source` instead. Two dialects for one fact, and the readers were
+          // split down the middle: `materialize-plan` knew both, `coach` knew only this one. So on
+          // every Strength Focus block the coach resolved a null protocol, which made
+          // `protocolExpectsE1rmToDip(null)` false and left the generic *"estimated one-rep maxes have
+          // been sliding"* line un-suppressed — on a block whose own prescription is the reason they
+          // dipped (audit F3). Fixed on the WRITE side, where one stamp ends it, rather than by
+          // teaching each reader a second dialect.
+          //
+          // ⚠️ `source` STAYS, and `block-identity.ts` still reads it as a fallback. Every block built
+          // before today — including live ones — identifies itself only that way, and rewriting a
+          // running plan's config to satisfy a reader is the wrong direction.
+          strength_protocol: 'strength_primary',
           plan_version: 'strength_531_v1',
           program: 'get_strong',
           strength_frequency: 4,          // SPEC §1 — four days, locked. No 3-day option in V1.

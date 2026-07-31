@@ -366,3 +366,96 @@ export function assistanceSubstitutionNote(
 // row above it already carries the real total. Shortened 2026-07-29 to fit the card without scroll.
 export const ASSISTANCE_GUIDANCE =
   'Split the reps however suits that day. Load by feel — about 7 out of 10, a few reps left. Going to failure costs the next main lift.';
+
+/**
+ * ⛔ THE SWAP OPTIONS FOR AN ASSISTANCE ROW ARE THE PLAN'S OWN, NOT THE EXERCISE LIBRARY'S.
+ *
+ * Michael, 2026-07-30: *"we need to work with the framework of the plan."*
+ *
+ * The generic swap sheet reasons about MOVEMENT PATTERN across all ~300 config entries, which is the
+ * right question for a main lift and the wrong one here. This block does not prescribe "a hip-hinge
+ * accessory" — it prescribes one of THREE SLOTS, each with a curated shortlist the athlete already
+ * chose from at build time. Offering something off that shortlist offers a movement the block never
+ * considered, at a rep total the slot was never scaled for.
+ *
+ * So the peers for an assistance row are the OTHER OPTIONS IN ITS OWN SLOT. Nothing new is invented
+ * here — this is the same list `ASSISTANCE_MENU` already shows in the build flow, read back.
+ *
+ * ⚠️ THE BALANCE POOL COUNTS TOO. When the athlete's pick collides with the day's main lift, the slot
+ * carries a balancing movement instead (Q-212) — a Face Pull on a press day is on no menu. Its peers
+ * are the rest of that pool, for the same reason: it is what the block reaches for in that situation.
+ *
+ * ⚠️ EQUIPMENT IS NOT FILTERED, deliberately and consistently. `resolveAssistance` has never gated on
+ * `requires`, and bands have no flag to gate on at all. Gating the swap sheet while the menu that
+ * produced the row stays ungated would be a half-rule that hides options the builder itself offered.
+ *
+ * @returns the peer movements, or `null` when this exercise is not part of the assistance framework
+ *   at all — in which case the caller keeps its own pattern-based logic. Null means "not mine",
+ *   never "none available".
+ */
+export function assistancePeersFor(
+  exerciseName: string,
+  /**
+   * ⛔ THE DAY'S MAIN LIFT — what makes this list SMART rather than merely correct.
+   *
+   * The block never offers a slot's raw menu. It checks the day first: on a bench day the push slot
+   * PULLS instead, on a squat day the single-leg slot HINGES (Q-212, Wendler p86 — the concurrent
+   * template is the one that crosses planes, and it is the one our athlete is running). A swap sheet
+   * that ignored this would hand back a Push Up on a bench day — precisely the option the builder
+   * would have replaced, offered as though the plan endorsed it.
+   *
+   * Absent → every option stands, which is the pre-Q-212 behaviour and the honest answer when the
+   * caller does not know the day's lift (§0h: unknown degrades to unchanged, never to a guess).
+   */
+  mainLiftName?: string | null,
+): string[] | null {
+  const want = String(exerciseName || '').trim().toLowerCase();
+  if (!want) return null;
+
+  let peers: string[] | null = null;
+  for (const menu of ASSISTANCE_MENU) {
+    if (menu.options.some((o) => o.name.toLowerCase() === want)) {
+      peers = menu.options.filter((o) => o.name.toLowerCase() !== want).map((o) => o.name);
+      break;
+    }
+  }
+  if (!peers) {
+    for (const pool of Object.values(BALANCE_POOL)) {
+      if (pool.some((n) => n.toLowerCase() === want)) {
+        peers = pool.filter((n) => n.toLowerCase() !== want);
+        break;
+      }
+    }
+  }
+  if (!peers) return null;
+
+  const main = String(mainLiftName || '').trim();
+  if (!main) return peers;
+
+  // ⛔ DROP WHAT THE DAY ALREADY LOADED. Same rule, same function, as the composer's collision check —
+  // not a second reading of it.
+  let usable = peers.filter((n) => !sharesMovementFamily(main, n));
+
+  // Every option in the slot is itself the thing the day loaded (a press day, a push slot). That is
+  // exactly the case the balance pool exists for.
+  if (usable.length === 0) {
+    const fam = getMovementFamily(main);
+    if (fam === 'push' || fam === 'pull' || fam === 'knee' || fam === 'hip') {
+      usable = BALANCE_POOL[fam].filter((n) => n.toLowerCase() !== want && !sharesMovementFamily(main, n));
+    }
+  }
+
+  // ⚠️ NEVER HAND BACK NOTHING. If no rule can find a clean option, show the slot's own list rather
+  // than an empty sheet — the athlete asked to swap, and refusing silently is worse than offering
+  // something the day already works. Same instinct as `resolveAssistance` keeping the pick.
+  if (usable.length === 0) return peers;
+
+  // ⛔ THE COMPLEMENT LEADS, it does not exclude. The composer PICKS the complementary plane; a swap
+  // sheet is the athlete choosing, so the plan's preference sets the ORDER and they still see the rest.
+  const want2 = complementFor(main);
+  if (!want2) return usable;
+  return [
+    ...usable.filter((n) => getExerciseConfig(n)?.pattern === want2),
+    ...usable.filter((n) => getExerciseConfig(n)?.pattern !== want2),
+  ];
+}

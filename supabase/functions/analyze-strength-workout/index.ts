@@ -685,7 +685,7 @@ async function getStrengthProgression(
   }
 }
 
-// D-189: canonical per-exercise e1RM trend from exercise_log (the single-source — brzycki1RM → exercise_log,
+// D-189: canonical per-exercise e1RM trend from exercise_log (the single-source — estimated1RM → exercise_log,
 // written by compute-facts). Current session's e1RM per lift + the most recent PRIOR session's e1RM →
 // a per-exercise trend. Returns [] gracefully on any error (honest blank — the narrative then states no
 // e1RM, never invents one). Never recomputes e1RM here; reads the canonical stored value.
@@ -1495,7 +1495,7 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   
   console.log(`📊 PROGRESSION: Analyzed ${Object.keys(progressionData).length} exercises`);
 
-  // D-189: canonical per-exercise e1RM trend from exercise_log.estimated_1rm (brzycki1RM → exercise_log,
+  // D-189: canonical per-exercise e1RM trend from exercise_log.estimated_1rm (estimated1RM → exercise_log,
   // the app's clean single-source — written by compute-facts before this analyzer runs). This is the
   // PREREQUISITE for the narrative-core strength migration: the prompt's "estimated-1RM trend" line had
   // NO data behind it (rule-6 fabrication vector) because the packet read raw strength_exercises, never

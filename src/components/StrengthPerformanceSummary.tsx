@@ -183,6 +183,10 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
   const plannedWorkoutId = (planned as any)?.id || (completed as any)?.planned_id;
   
   const rirSummary = sessionDetail?.strength_rir_summary ?? null;
+  // The all-out set + the block it belonged to — both server-computed, rendered verbatim.
+  const allOut = sessionDetail?.strength_all_out ?? null;
+  const allOutReason = sessionDetail?.strength_all_out_reason ?? null;
+  const block = sessionDetail?.block ?? null;
   const workoutId = sessionDetail?.workout_id ?? (completed as any)?.id ?? null;
   // D-095: per-exercise prior-session lookup populated by workout-detail.
   // Shape: { [normalizedExerciseName]: { date, days_ago, sets: [...] } }.
@@ -300,6 +304,92 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
           ))}
         </div>
       )}
+      {/* ⛔ RECOMPUTE LIVES AT THE TOP. It used to be hosted by the narrative header; deleting that
+          header for strength dropped it to the very bottom of a long table, below the fold, where
+          Michael read it as gone. A control the athlete reaches for when the screen looks wrong
+          cannot be the last thing on the screen. */}
+      {onRecompute && (
+        <div className="flex justify-end -mt-1 mb-2">
+          <button
+            onClick={onRecompute}
+            disabled={recomputing}
+            className="px-3 py-1.5 text-xs text-white/45 border border-white/12 rounded-full hover:bg-white/5 hover:text-white/70 transition-colors disabled:opacity-40"
+          >
+            {recomputing ? 'Recomputing…' : 'Recompute analysis'}
+          </button>
+        </div>
+      )}
+      {recomputeError && (
+        <p className="text-xs text-rose-400 mb-2">{recomputeError}</p>
+      )}
+      {/* ── THE ALL-OUT SET (2026-07-30) ─────────────────────────────────────────────────────────
+          ⛔ THE REP RECORD LEADS. Wendler p10: *"If your squat goes from 225x6 to 225x9, you've
+          gotten stronger. Don't get stuck just trying to increase your one rep max."* The rep count
+          at a fixed weight is EXACT; the estimated max is an equation's guess about a number nobody
+          measured. So the record is the headline and the estimate sits under it, quieter.
+
+          ⛔ SERVER-COMPUTED, RENDERED VERBATIM. Every value here — the record, the estimate, whether
+          the estimate is trustworthy — arrives on `session_detail_v1`. This component decides
+          nothing (Law 4), which is also why it cannot disagree with what State shows for the same
+          number: both read the one stored value.
+
+          ⚠️ ABSENT ON A LEADER CYCLE AND EVERY DELOAD WEEK, because those carry no all-out set at
+          all. Nothing renders, and that is correct rather than a gap. */}
+      {/* ⚠️ When the panel is empty it SAYS SO. Silence read as "no all-out set here" three times
+          while the real cause was a stale cache, a null plan link and a missing plan row. */}
+      {Array.isArray(allOut) && allOut.length === 0 && allOutReason && (
+        <div className="mt-3 mb-1 text-[12px] text-white/40">
+          {allOutReason === 'session_had_no_all_out_set'
+            ? 'No all-out set on this session.'
+            : allOutReason === 'no_reps_on_all_out_set'
+              ? 'The all-out set has no reps logged.'
+              : 'No planned session to read the all-out set from.'}
+        </div>
+      )}
+      {Array.isArray(allOut) && allOut.length > 0 && (
+        <div className="mt-3 mb-1 rounded-xl border border-white/12 bg-white/[0.04] p-3">
+          <div className="text-[11px] uppercase tracking-wider text-white/45 mb-2">All-out set</div>
+          {allOut.map((a: any, i: number) => (
+            <div key={i} className={i > 0 ? 'mt-3 pt-3 border-t border-white/10' : ''}>
+              <div className="text-sm text-white/90">
+                <span className="text-white/60">{a.name}</span>{' '}
+                <span className="tabular-nums font-semibold">{a.weight} lb × {a.reps}</span>
+              </div>
+              {/* The record line. ⚠️ A null prior is NOT a record — nothing to beat is not the same
+                  as beating something, so it says so plainly instead of implying a first-time PR. */}
+              <div className="text-[13px] mt-0.5">
+                {a.is_rep_record ? (
+                  <span className="text-emerald-300">
+                    Rep record at this weight — your best was {a.prior_best_reps_at_weight}.
+                  </span>
+                ) : a.prior_best_reps_at_weight != null ? (
+                  <span className="text-white/55">
+                    Your best at this weight is {a.prior_best_reps_at_weight}.
+                  </span>
+                ) : (
+                  <span className="text-white/45">First time at this weight.</span>
+                )}
+              </div>
+              {/* The estimate, second. ⚠️ Above the rep ceiling it is labelled rather than hidden or
+                  capped — a capped rep count would report a 15-rep set as a 10-rep one (D-339). */}
+              <div className="text-[12px] text-white/50 mt-1 tabular-nums">
+                Estimated max {a.estimated_1rm} lb
+                {!a.estimate_trusted && (
+                  <span className="text-white/40">
+                    {' '}· rough — over {a.estimate_trusted_max_reps} reps no formula holds up
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+          {/* The 95% week is the one that moves the bar, whatever else is on screen. */}
+          {block?.is_measurement_week === true && (
+            <p className="text-[12px] text-white/55 mt-2 leading-snug">
+              This is the set that sets your next cycle's weight.
+            </p>
+          )}
+        </div>
+      )}
       <StrengthCompareTable
         planned={plannedExercises}
         completed={completedExercises}
@@ -328,20 +418,6 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
             <div className="text-lg font-semibold text-white">{totals.volume.toLocaleString()}</div>
             <div className="text-xs text-white/50">Volume (lbs)</div>
           </div>
-        </div>
-      )}
-      {onRecompute && (
-        <div className="pt-1">
-          {recomputeError && (
-            <p className="text-xs text-rose-400 mb-2">{recomputeError}</p>
-          )}
-          <button
-            onClick={onRecompute}
-            disabled={recomputing}
-            className="w-full py-2 text-xs text-white/40 border border-white/10 rounded-lg hover:bg-white/5 hover:text-white/60 transition-colors disabled:opacity-40"
-          >
-            {recomputing ? 'Recomputing…' : 'Recompute analysis'}
-          </button>
         </div>
       )}
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (

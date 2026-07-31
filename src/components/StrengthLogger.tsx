@@ -12,11 +12,7 @@ import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-al
 import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
 import {
   getExerciseConfig,
-  getBaseline1RM,
   normalizeLiftKey,
-  resolveSwapSeedWeight,
-  calculatePrescribedWeight,
-  heaviestCompletedWeight,
 } from '@/lib/exercise-config';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
@@ -24,13 +20,12 @@ import CoreTimer from '@/components/CoreTimer';
 import { NumericKeypadSheet } from '@/components/ui/numeric-keypad-sheet';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import {
-  SET_DIFFICULTY_OPTIONS,
-  SET_DIFFICULTY_PROMPT,
   topSetIndex,
   type SetDifficulty,
 } from '@/lib/strength-focus-copy';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
+// The app's ONE 1RM formula — Wendler's own (D-339). `compute-facts` imports the same module.
 
 interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
@@ -105,6 +100,8 @@ interface LoggedExercise {
   // matched by name, so the planned lift read as a SKIP and the work read as an unplanned EXTRA.
   // Undefined on hand-added exercises — those were never prescribed, so they can never be a swap.
   planned_name?: string;
+  /** `false` = one of the block's assistance slots (never priced). Absent on every other row. */
+  load_prescribed?: boolean;
 }
 
 interface StrengthLoggerProps {
@@ -1148,94 +1145,93 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     };
   };
 
-  // Helper: estimate 1RM from an AMRAP set — CLUSTER Epley + Brzycki (they bracket the true max).
-  // Epley = w×(1+r/30), Brzycki = w/(1.0278−0.0278·r). Reps capped at 10: estimator accuracy degrades
-  // above ~10 reps and Brzycki diverges (denominator → 0), so a heavier/lower-rep test is more accurate
-  // [LeSuer et al. 1997, J Strength Cond Res 11(4):211–213]. A true single logs as itself.
-  const calculate1RM = (weight: number, reps: number): number => {
-    if (!weight || !reps || reps <= 0) return 0;
-    const r = Math.min(Math.round(reps), 10);
-    if (r === 1) return Math.round(weight);
-    const epley = weight * (1 + r / 30);
-    const brzycki = weight / (1.0278 - 0.0278 * r);
-    return Math.round((epley + brzycki) / 2); // cluster
-  };
+  // ⛔ THE 1RM MATH IS GONE FROM THIS FILE (2026-07-30). It lives in `save-baseline-test`.
+  //
+  // What used to be here: a cluster of Epley and Brzycki averaged together, reps capped at 10, whose
+  // result this component then wrote straight into `user_baselines.performance_numbers` — the number
+  // every prescribed weight in the next block derives from. It also picked the canonical lift key and
+  // decided which results auto-write. Four decisions and a stored fact, on the phone.
+  //
+  // The phone now collects weight and reps and sends them. That is all it knows.
 
   // State for baseline test results
+  // ⚠️ WEIGHT, REPS AND WHICH LIFT — nothing derived. The estimated max used to live in this state and
+  // be rendered live as you typed; it is now returned by the server after the save, because the value
+  // that gets STORED and the value the athlete READS have to be the same one.
   const [baselineTestResults, setBaselineTestResults] = useState<{
-    [exerciseId: string]: { weight: number; reps: number; estimated1RM: number; rounded1RM: number; baselineKey: string }
+    [exerciseId: string]: { weight: number; reps: number; baselineKey: string }
   }>({});
+  /** ⚠️ RENDERED — see the baseline-result block in the JSX. This was written and read by NOTHING for
+   *  the first hours of its life, which is the exact fault this day was spent removing. Caught in the
+   *  self-audit, not by a test: no test can see that a value is never displayed. */
+  /** The rematerializer's dry run: what the next cycles WOULD become. Null on an ordinary session. */
+  const [pendingRework, setPendingRework] = useState<any | null>(null);
+  const [applyingRework, setApplyingRework] = useState(false);
+
+  /** What the server computed and wrote, echoed back for display. Empty until a save returns. */
+  const [baselineServerResults, setBaselineServerResults] = useState<
+    Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number }>
+  >([]);
   const [savingBaseline, setSavingBaseline] = useState(false);
   // Down-write reconciliation (supersedes D-223 silent ratchet-hold): when a test result lands
   // BELOW the stored 1RM, the lower number may be the truth (a real near-max) OR a sub-max estimate
   // reading the athlete weak — the app can't know which, so it must ask instead of silently holding
   // OR silently overwriting. Holds the pending write while the athlete decides Keep vs Update per lift.
+  // ⚠️ THE PENDING WRITE NO LONGER LIVES HERE. It used to hold `basePerf` — the whole merged
+  // performance_numbers object, staged on the phone between the two taps. Now the server holds nothing
+  // and writes nothing until the decisions come back with the same sets, so there is no half-built
+  // baseline object sitting in component state waiting to be committed.
   const [downWriteReview, setDownWriteReview] = useState<null | {
-    userId: string;
-    hasRow: boolean;
-    basePerf: Record<string, any>; // currentPerf + all raises/first-times already applied
     downs: Array<{ key: string; lift: string; prior: number; next: number }>;
   }>(null);
   const [downDecisions, setDownDecisions] = useState<Record<string, 'keep' | 'update'>>({});
 
-  // Save baseline test results to user_baselines
+  /**
+   * ⛔ THE PHONE SENDS THE SET. THE SERVER COMPUTES, DECIDES AND WRITES (2026-07-30).
+   *
+   * This used to estimate the 1RM, canonicalise the lift key, partition raises from down-results and
+   * write `user_baselines.performance_numbers` itself — the number every prescribed weight in the next
+   * block derives from. All of that is now `save-baseline-test`.
+   *
+   * ⚠️ TWO-PHASE, AND NOTHING IS WRITTEN IN PHASE ONE. If any lift tested BELOW what is stored, the
+   * server writes nothing at all — not even the unambiguous raises — and returns what needs deciding.
+   * So abandoning the dialog cannot leave a half-applied save.
+   */
+  const postBaselineTest = async (decisions?: Record<string, 'keep' | 'update'>) => {
+    const lifts = Object.values(baselineTestResults).map((r) => ({
+      baselineKey: r.baselineKey,
+      weight: r.weight,
+      reps: r.reps,
+    }));
+    if (lifts.length === 0) return null;
+    const { data, error } = await supabase.functions.invoke('save-baseline-test', {
+      body: { lifts, ...(decisions ? { decisions } : {}) },
+    });
+    if (error) throw error;
+    if (data && data.success === false) throw new Error(data.reason || 'save_failed');
+    return data as {
+      written: boolean;
+      needs_decision?: Array<{ key: string; lift: string; prior: number; next: number }>;
+      computed?: Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number }>;
+    };
+  };
+
   const saveBaselineResults = async () => {
     try {
       setSavingBaseline(true);
-      const userId = getStoredUserId();
-      if (!userId) {
-        alert('You must be logged in to save baselines');
+      const res = await postBaselineTest();
+      if (!res) return;
+
+      if (!res.written && res.needs_decision?.length) {
+        // ⚠️ CONSENT STAYS ON THE PHONE, AND ONLY CONSENT. A lower test may be a real regression or a
+        // bad day, and only the athlete knows which — so it is asked, never silently held (D-223's
+        // ratchet-up-only) and never silently overwritten. The NUMBERS in the dialog are the server's.
+        setDownWriteReview({ downs: res.needs_decision });
+        setDownDecisions({});
         return;
       }
 
-      // Get current baselines
-      const { data: currentBaselines, error: fetchError } = await supabase
-        .from('user_baselines')
-        .select('performance_numbers')
-        .eq('user_id', userId)
-        .single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw fetchError;
-      }
-
-      // Merge new results into performance_numbers.
-      const currentPerf = (currentBaselines?.performance_numbers || {}) as any;
-      const updatedPerf = { ...currentPerf };
-      const hasRow = !!currentBaselines;
-
-      // OHP-key write guard (D-224): OHP has ONE canonical key, `overheadPress1RM` (what materialize reads).
-      // Never let a result land under an OHP variant (`overhead`/`ohp`/`overhead_press`) and drift into the void.
-      const canonKey = (k: string): string =>
-        (k === 'overhead' || k === 'ohp' || k === 'overhead_press') ? 'overheadPress1RM'
-        : (k === 'pullup' || k === 'pull_up' || k === 'pullups' || k === 'pullupmaxreps') ? 'pullupMaxReps'
-        : k;
-      const liftLabel = (k: string): string =>
-        ({ bench: 'Bench Press', squat: 'Squat', deadlift: 'Deadlift', overheadPress1RM: 'Overhead Press', pullupMaxReps: 'Pull ups' } as any)[k] || k;
-
-      // Partition results: a RAISE / first-time / equal auto-writes (an unambiguous improvement — no friction).
-      // A DOWN result (tested < stored) is NOT silently held (superseding D-223's ratchet-up-only) NOR silently
-      // overwritten — the athlete decides Keep vs Update, because only they know if the lower number is real.
-      const downs: Array<{ key: string; lift: string; prior: number; next: number }> = [];
-      Object.values(baselineTestResults).forEach(result => {
-        const key = canonKey(result.baselineKey);
-        const prior = Number(currentPerf[key]);
-        const next = Number(result.rounded1RM);
-        if (!(prior > 0) || next >= prior) {
-          updatedPerf[key] = result.rounded1RM; // raise / first-time / equal → auto-write
-        } else {
-          downs.push({ key, lift: liftLabel(key), prior, next }); // down → reconcile with the athlete
-        }
-      });
-
-      if (downs.length === 0) {
-        await commitPerformanceNumbers(updatedPerf, hasRow, userId, 'Baselines saved successfully!');
-        return;
-      }
-
-      // Hand off to the reconciliation dialog; the actual write happens in resolveDownWrites.
-      setDownWriteReview({ userId, hasRow, basePerf: updatedPerf, downs });
-      setDownDecisions({});
+      finishBaselineSave(res.computed ?? [], 'Baselines saved successfully!');
     } catch (error: any) {
       alert('Failed to save baselines: ' + (error.message || 'Unknown error'));
     } finally {
@@ -1243,50 +1239,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
   };
 
-  // Shared DB write for performance_numbers (update-or-insert) + success toast + reload signal.
-  const commitPerformanceNumbers = async (
-    updatedPerf: Record<string, any>, hasRow: boolean, userId: string, message: string
+  /** Shared post-write bookkeeping: show what the SERVER computed, clear the form, tell the app. */
+  const finishBaselineSave = (
+    computed: Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number }>,
+    message: string,
   ) => {
-    if (hasRow) {
-      const { error } = await supabase
-        .from('user_baselines')
-        .update({ performance_numbers: updatedPerf })
-        .eq('user_id', userId);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('user_baselines')
-        .insert([{ user_id: userId, performance_numbers: updatedPerf }]);
-      if (error) throw error;
-    }
+    setBaselineServerResults(computed);
     alert(message);
     setBaselineTestResults({});
-    // Dispatch event to notify TrainingBaselines to reload
     window.dispatchEvent(new CustomEvent('baseline:saved'));
   };
 
-  // Resolve the down-write reconciliation: apply each Keep/Update choice, then write once.
-  // Takes the decisions explicitly so a choice tap can auto-commit without waiting on async setState.
   const resolveDownWrites = async (decisions: Record<string, 'keep' | 'update'> = downDecisions) => {
     if (!downWriteReview) return;
-    const { userId, hasRow, basePerf, downs } = downWriteReview;
     try {
       setSavingBaseline(true);
-      const finalPerf = { ...basePerf }; // already holds prior values (Keep = leave as-is)
+      const { downs } = downWriteReview;
+      const res = await postBaselineTest(decisions);
       const updated: string[] = [];
       const kept: string[] = [];
-      downs.forEach(d => {
-        if (decisions[d.key] === 'update') {
-          finalPerf[d.key] = d.next;
-          updated.push(`${d.lift} → ${d.next}`);
-        } else {
-          kept.push(`${d.lift} stays ${d.prior}`);
-        }
+      downs.forEach((d) => {
+        if (decisions[d.key] === 'update') updated.push(`${d.lift} → ${d.next}`);
+        else kept.push(`${d.lift} stays ${d.prior}`);
       });
       const msg = 'Baselines saved.'
         + (updated.length ? ` Updated: ${updated.join(', ')}.` : '')
         + (kept.length ? ` Kept: ${kept.join(', ')}.` : '');
-      await commitPerformanceNumbers(finalPerf, hasRow, userId, msg);
+      finishBaselineSave(res?.computed ?? [], msg);
       setDownWriteReview(null);
       setDownDecisions({});
     } catch (error: any) {
@@ -1962,6 +1941,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             target_reps: targetReps, // Target reps from prescription (e.g. "4-6")
             planned_percent_1rm: plannedPct, // D-322: authored intensity, for the swap seed
             planned_name: name, // Q-181: remember what was PRESCRIBED, so a rename reads as a swap
+            // ⛔ IS THIS ROW ONE OF THE BLOCK'S ASSISTANCE SLOTS? The composer marks them
+            // `load_prescribed: false` — assistance in 5/3/1 is never priced off a percentage
+            // ("the engine prescribes NO weight for assistance work. Ever."). Carried through so the
+            // Swap sheet can offer the PLAN's shortlist for that slot instead of the whole library.
+            // ⚠️ Read as an explicit `false`, never as "falsy" — an absent field on a legacy row must
+            // not silently turn a main lift into an assistance row.
+            load_prescribed: s?.load_prescribed === false ? false : undefined,
           } as LoggedExercise;
         }
         // Per-set prescription when the row carries one; otherwise the row's single weight on every
@@ -3167,66 +3153,49 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return withPct?.planned_percent_1rm ?? 0.70;
   };
 
-  /** (a) — the lift's own measured 1RM, if compute-facts has one. */
-  const ownMeasured1RM = (name: string): number | null => {
-    const key = normalizeLiftKey(name).replace(/\s+/g, '_');
-    const v = Number(learnedStrength1rms?.[key]?.value);
-    return Number.isFinite(v) && v > 0 ? v : null;
-  };
-
   /**
-   * (b) — the last weight logged for THIS lift. Scoped deliberately: one indexed query for one
-   * exercise, fired only on an add, and only when (a) misses.
+   * ⛔ THE SERVER RESOLVES THE WEIGHT (2026-07-30). This replaced three functions that lived here:
+   * the lift's own measured max, a direct twenty-session query against `workouts` with its own
+   * name-matcher, and a baseline proxy — plus the 0.70 default that decided real load when none of
+   * them answered.
    *
-   * ⛔ SCOPING NOTE, and it is load-bearing. An earlier version of this widened the SHARED
-   * prior-session fetch from 10 to 40 sessions and built a map of every lift. That fetch was
-   * removed when swap history-seeding was reverted, and it silently took added-exercise prefill
-   * with it — nothing connected the two. This lookup owns its own query so a future revert of the
-   * swap work cannot reach it. Do not "consolidate" it back into the shared prefill effect.
+   * The formula was always shared with `materialize-plan`; the DECISIONS were not. A phone running a
+   * stale bundle could seed a different weight than the server would for the same lift on the same
+   * day, and nothing would ever say so out loud.
+   *
+   * ⚠️ ASYNC NOW, WHERE (a) AND (c) USED TO BE SYNCHRONOUS. The row is added instantly with a blank
+   * weight and the seed is patched in when it lands — the same shape the old (b) branch already had,
+   * so an empty box for a moment is existing behaviour, not new.
    */
-  const lastLoggedWeight = async (name: string): Promise<number | null> => {
+  const resolveSeedWeight = async (
+    name: string,
+    opts?: { previousName?: string; currentWeight?: number; targetReps?: number; plannedPercent?: number | null },
+  ): Promise<number | null> => {
     try {
-      const userId = getStoredUserId();
-      if (!userId) return null;
-      const todayDate = targetDate || getStrengthLoggerDateString();
-      const { data } = await supabase
-        .from('workouts')
-        .select('date,strength_exercises')
-        .eq('user_id', userId)
-        .in('type', ['strength', 'weight_training', 'weights'])
-        .lt('date', todayDate)
-        .order('date', { ascending: false })
-        .limit(20);
-      const want = normalizeLiftKey(name);
-      for (const w of (data || [])) {
-        let exs: any[] = [];
-        try {
-          const raw = (w as any).strength_exercises;
-          exs = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
-        } catch { exs = []; }
-        for (const ex of exs) {
-          if (normalizeLiftKey(ex?.name || '') !== want) continue;
-          const best = heaviestCompletedWeight(ex?.sets);
-          if (best != null) return best;   // rows are date-desc: first hit is the most recent
-        }
-      }
-    } catch { /* graceful: fall through to the proxy */ }
-    return null;
+      const { data, error } = await supabase.functions.invoke('resolve-exercise-weight', {
+        body: {
+          name,
+          // The percentage the ROW carried, read straight off the session on screen — reported, not derived.
+          planned_percent: opts?.plannedPercent ?? null,
+          previous_name: opts?.previousName ?? null,
+          current_weight: opts?.currentWeight ?? 0,
+          target_reps: opts?.targetReps,
+          date: targetDate || getStrengthLoggerDateString(),
+        },
+      });
+      if (error || !data?.success) return null;
+      const w = Number(data.weight);
+      return Number.isFinite(w) && w > 0 ? w : null;
+    } catch {
+      return null; // graceful: a blank weight box the athlete fills in beats a guessed one
+    }
   };
 
-  /** (a) and (c), both synchronous. Returns null when only (b) or blank can answer. */
-  const seedWeightForAdded = (name: string): number | null => {
-    const cfg = getExerciseConfig(name);
-    if (!cfg || cfg.displayFormat === 'bodyweight' || cfg.displayFormat === 'band') return null;
-    const pct = dayIntensity();
-    const own = ownMeasured1RM(name);
-    if (own != null) {
-      // Its OWN 1RM, so no cross-lift ratio applies — only the per-hand split, if any.
-      let w = own * pct;
-      if (cfg.displayFormat === 'perHand' && cfg.ratioIsTotal) w = w / 2;
-      return Math.max(5, Math.round(w / 5) * 5);
-    }
-    return calculatePrescribedWeight(name, pct, performanceNumbers, undefined, false).weight ?? null;
+  /** The percentage this session's rows carry, if any. Reading our own rows — no default applied here;
+   *  the server owns what happens when there is nothing to read. */
+  const plannedPercentOnScreen = (): number | null => {
+    const withPct = exercises.find((ex) => typeof ex.planned_percent_1rm === 'number' && ex.planned_percent_1rm > 0);
+    return withPct?.planned_percent_1rm ?? null;
   };
 
   const addExercise = (exerciseName?: string) => {
@@ -3259,9 +3228,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         }
       : {
           reps: 0,
-          // D-322 line 11: (a) or (c) of the chain, resolved synchronously. (b) — last logged —
-          // is applied just below, and only when this returned nothing.
-          weight: seedWeightForAdded(nameToAdd) ?? 0,
+          // ⚠️ Blank until the server answers — see the patch-in below. The whole chain (own measured
+          // max → last logged → baseline proxy) now resolves in one round trip instead of two branches
+          // split across a sync call and an async one.
+          weight: 0,
           barType: 'standard',
           rir: undefined,
           completed: false,
@@ -3279,7 +3249,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // asynchronously so the row appears instantly; the common case never waits on a query.
     if (!isDurationExercise && !(firstSet.weight! > 0)) {
       void (async () => {
-        const last = await lastLoggedWeight(nameToAdd);
+        const last = await resolveSeedWeight(nameToAdd, { plannedPercent: plannedPercentOnScreen() });
         if (last == null || !(last > 0)) return;
         setExercises((prev) => prev.map((ex) => ex.id !== newExercise.id ? ex : {
           ...ex,
@@ -3395,7 +3365,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // AMRAP baseline/retest sets are taken to ~RPE 9 (RIR ~1), so accept RIR 0–3 for them (tag-retest OR any
         // set flagged amrap). Named non-AMRAP baselines keep the 2–3 sub-max gate. (D-224)
         // Pull-up rep-max test: the clean-rep COUNT is the result — no weight, no e1RM, no RIR gate. 0 is a
-        // valid baseline ("goal: your first pull-up"). Stored via the same {rounded1RM,baselineKey} shape (value
+        // valid baseline ("goal: your first pull-up"). Stored via the same {reps,baselineKey} shape (value
         // = reps) so the ratchet-up / down-write write path treats "more reps = better" like "more weight = better". (Q-102)
         if ((updatedSet as any).repMaxTest === true && updatedSet.setType === 'working' && updatedSet.completed
             && typeof updatedSet.reps === 'number' && updatedSet.reps >= 0) {
@@ -3406,8 +3376,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               [exerciseId]: {
                 weight: 0,
                 reps: updatedSet.reps!,
-                estimated1RM: updatedSet.reps!,
-                rounded1RM: updatedSet.reps!, // rep count IS the stored value (no 5-lb rounding)
+                // ⚠️ The rep COUNT is the stored value for this lift — no formula, no 5-lb rounding,
+                // and 0 is legal. The server knows that (`isRepCountLift`); this side just reports reps.
                 baselineKey,
               },
             }));
@@ -3427,16 +3397,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (amrapReady || submaxReady) {
           const baselineKey = getBaselineKeyForExercise(exercise.name);
           if (baselineKey) {
-            const estimated1RM = calculate1RM(updatedSet.weight, updatedSet.reps);
-            const rounded1RM = Math.floor(estimated1RM / 5) * 5; // Round down to nearest 5
-
             setBaselineTestResults(prev => ({
               ...prev,
               [exerciseId]: {
                 weight: updatedSet.weight!,
                 reps: updatedSet.reps!,
-                estimated1RM,
-                rounded1RM,
                 baselineKey
               }
             }));
@@ -3643,7 +3608,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // ⛔ A DETERMINISTIC PROTOCOL RECORDS NO RIR. Strength Focus (5/3/1) fixes the weight and the
     // reps at plan creation; nothing in the engine reads a reserve estimate to decide anything, so
     // asking for one on a heavy set is cognitive load with no consumer. Worse, an auto-filled value
-    // is not inert: the learned 1RM is estimated as brzycki(weight, reps + rir), so a guessed
+    // is not inert: the learned 1RM is estimated as estimate1RM(weight, reps + rir) — Wendler's own
+  // formula since D-339 — so a guessed
     // reserve on a deliberately sub-maximal opener reads back as a heavier lift than happened.
     // Done just completes the set. `rir_tracked === false` is stamped by materialize off the
     // protocol profile — see `protocolUsesRir`. Every other protocol keeps the strip below.
@@ -3943,6 +3909,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Close notes modal if open
     setShowNotesModal(false);
     
+    // ⛔ THE ALL-OUT SET CHANGED WHAT COMES NEXT — SAY SO HERE (Q-226, 2026-07-30).
+    //
+    // Michael: *"people might not check either, could the logger give you a pop up when its changed?"*
+    // He is right that State and Performance are both places an athlete has to go looking. The moment
+    // the reps are worth something is the moment they are logged.
+    //
+    // ⚠️ DRY RUN. The server returns what WOULD change and writes nothing. Applying is the athlete's
+    // tap — the silent version of this was deleted for moving prescribed weight with no consent.
+    // ⚠️ Silent on an ordinary session: no all-out set, or nothing ahead moves, and no sheet appears.
+    try {
+      const { data: rm } = await supabase.functions.invoke('rematerialize-strength-block', { body: {} });
+      if (rm?.success && Array.isArray(rm.changes) && rm.changes.length > 0) {
+        // ⚠️ Carry the saved row with it — the sheet owns the close, and the navigation callback
+        // needs the workout it is navigating TO. Passing null here dropped the athlete nowhere.
+        setPendingRework({ ...rm, _saved: saved || completedWorkout });
+        return;   // the sheet owns the close from here
+      }
+    } catch { /* graceful: a supplier that cannot read must never block a saved workout */ }
+
     // Auto-close after showing success for 1.5 seconds
     saveTimeoutRef.current = setTimeout(() => {
       // Only proceed if component is still mounted
@@ -4520,6 +4505,29 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 const alts: AlternativeOption[] = getInSlotAlternatives(
                   exercise.planned_name || exercise.name,
                   strengthEquipment,
+                  // ⛔ WORK WITHIN THE PLAN'S FRAMEWORK (Michael, 2026-07-30). On an assistance row the
+                  // block already defined the shortlist — the three slots and their options, which the
+                  // athlete picked from at build time. Offering a movement off that list offers one
+                  // the block never considered, at a rep total the slot was never scaled for.
+                  {
+                    // ⛔ TWO SIGNALS, BECAUSE THE FIRST DOES NOT EXIST ON EXISTING PLANS.
+                    // `load_prescribed: false` is now carried through materialize — but every row
+                    // already written lacks it, including the block Michael is running today. The
+                    // second signal is on every assistance row ever authored: its prescription is a
+                    // rep TOTAL ("25 total"), because assistance states a movement and a total and
+                    // never a weight. A main lift always prescribes a number, never a total.
+                    assistanceRow: exercise.load_prescribed === false
+                      || /total/i.test(String(exercise.target_reps ?? '')),
+                    // ⛔ THE DAY'S MAIN LIFT, so the offer follows the block's own day rule: on a
+                    // bench day the push slot pulls, on a squat day the single-leg slot hinges
+                    // (Q-212 / p86). It is the row the block PRICED — assistance is never priced —
+                    // so an authored percentage is the marker, not a name list.
+                    mainLift: exercises.find((e) => e.load_prescribed !== false
+                      && typeof e.planned_percent_1rm === 'number' && e.planned_percent_1rm > 0)?.planned_name
+                      ?? exercises.find((e) => e.load_prescribed !== false
+                        && typeof e.planned_percent_1rm === 'number' && e.planned_percent_1rm > 0)?.name
+                      ?? null,
+                  },
                 );
                 return (
                   <div className="mt-2 mb-3 rounded-xl border-2 border-white/15 bg-white/[0.06] backdrop-blur-md p-3">
@@ -4581,25 +4589,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       // The authored % is the only intensity that isn't downstream of a rounding step,
                       // which is why it is the one we use. Inference survives ONLY as the legacy fallback
                       // for rows materialized before percent_1rm was carried.
+                      // ⛔ THE THREE-STEP INTENSITY DECISION MOVED TO THE SERVER (2026-07-30). What
+                      // stood here: the authored %, else a back-inference off the old lift's ratio,
+                      // else a hardcoded 0.70 — three branches choosing real load, on the phone. The
+                      // server owns all three now; this sends what the ROW says and what the athlete is
+                      // currently loading, which is reporting, not deriving.
+                      //
+                      // ⚠️ THE SWAP IS APPLIED IMMEDIATELY and the weight lands a beat later. The name
+                      // change is the athlete's gesture and must not wait on a network call — D-289
+                      // makes that rename the declaration that a swap happened, not a skip.
                       const applySwap = (altName: string) => {
-                        const oldCfg = getExerciseConfig(exercise.planned_name || exercise.name);
                         const curW = exercise.sets.find((s) => typeof s.weight === 'number' && s.weight > 0)?.weight ?? 0;
-                        const oldRef1RM = oldCfg ? getBaseline1RM(oldCfg, performanceNumbers) : null;
-
-                        // 1. The block's authored intensity, if the row carried one. Exact.
-                        let pct = exercise.planned_percent_1rm;
-                        // 2. Legacy rows only: back-infer, accepting the rounding inflation above as the
-                        //    lesser evil versus a flat default.
-                        if (!(typeof pct === 'number' && pct > 0)
-                          && oldRef1RM && (oldCfg?.ratio ?? 0) > 0 && curW > 0) {
-                          pct = Math.max(0.3, Math.min(0.95, curW / (oldRef1RM * (oldCfg!.ratio as number))));
-                        }
-                        // 3. Nothing to go on — the long-standing default.
-                        if (!(typeof pct === 'number' && pct > 0)) pct = 0.70;
-
                         const targetReps = exercise.sets.find((s) => typeof s.reps === 'number')?.reps;
-                        const seedRes = resolveSwapSeedWeight(altName, pct, performanceNumbers, targetReps);
-                        const seed = seedRes.weight ?? 0;
+                        const prevName = exercise.planned_name || exercise.name;
+                        void (async () => {
+                          const seed = await resolveSeedWeight(altName, {
+                            previousName: prevName,
+                            currentWeight: curW,
+                            targetReps,
+                            plannedPercent: typeof exercise.planned_percent_1rm === 'number' && exercise.planned_percent_1rm > 0
+                              ? exercise.planned_percent_1rm : null,
+                          });
+                          if (seed == null || !(seed > 0)) return;
+                          setExercises((prev) => prev.map((ex) => ex.id !== exercise.id ? ex : {
+                            ...ex,
+                            sets: ex.sets.map((st) => (st.completed ? st : { ...st, weight: seed })),
+                          }));
+                        })();
                         setExercises((prev) => prev.map((ex) =>
                           ex.id === exercise.id
                             ? {
@@ -4611,7 +4627,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 // report on the OLD lift and would read as a report on the new one.
                                 sets: ex.sets.map((st) => ({
                                   ...st,
-                                  weight: seed,
+                                  weight: 0,
                                   completed: false,
                                   rir: undefined,
                                   rir_autofilled: undefined,
@@ -5289,53 +5305,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </div>
                         );
                       })()}
-                    {(() => {
-                      // ── D-326 — THE DIFFICULTY TAP ───────────────────────────────────────────
-                      // Three words that MARK THE SET DONE. Michael, 2026-07-25: *"we have a
-                      // two-step process now — forced RIR pick and then hit done. This is
-                      // smoother."* The tap the athlete was already making becomes the answer.
-                      //
-                      // ⛔ TOP SET ONLY. Asking how a 65% opener felt is information-free — the
-                      // athlete was told to leave reps in the tank, so the answer is always "easy".
-                      // Four taps a session, two of them on the lower-body days that carry the cost.
-                      //
-                      // ⛔ SCOPED TO `rir_tracked === false` — i.e. exactly the deterministic
-                      // protocol (5/3/1) that lost RIR in D-324. Every other protocol keeps its RIR
-                      // strip and never sees this. Opt-OUT of RIR, opt-IN to difficulty, one flag.
-                      //
-                      // ⛔ AND THE PLAIN Done BUTTON STILL WORKS. Blank is a legal answer — this
-                      // offers a richer way to finish the set, it does not gate finishing it.
-                      // D-338: the same two cases that lose RIR gain the words — a deterministic
-                      // protocol (5/3/1, `rir_tracked === false`) and a FREESTYLE session, where
-                      // there is no prescription for RIR to be measured against. One language.
-                      if (exercise.rir_tracked !== false && sourcePlannedId) return null;
-                      if (isDurationBased || isBodyweightMove(exercise.name)) return null;
-                      if (set.completed) return null;
-                      // The top set is the HEAVIEST, not the last — robust to warm-ups being present
-                      // and to any future reordering. Ties resolve to the last, which is where 5/3/1
-                      // puts it (three ascending sets, the third is the top).
-                      const topIdx = topSetIndex(exercise.sets);
-                      if (topIdx < 0 || setIndex !== topIdx) return null;
-                      const pick = (value: SetDifficulty) => {
-                        updateSet(exercise.id, setIndex, { difficulty: value, completed: true });
-                        autoStartRestForSet(exercise.id, setIndex);
-                      };
-                      return (
-                        <div className="mt-3">
-                          <p className="text-white/70 text-xs mb-1.5">{SET_DIFFICULTY_PROMPT}</p>
-                          <div className="flex items-center gap-1.5" role="group" aria-label="How the set felt">
-                            {SET_DIFFICULTY_OPTIONS.map((o) => (
-                              <button
-                                key={o.value}
-                                type="button"
-                                onClick={() => pick(o.value)}
-                                className="flex-1 min-w-0 h-11 rounded-lg border border-white/15 bg-white/[0.04] text-white/85 text-sm hover:bg-white/[0.10] active:bg-white/[0.16] transition-colors"
-                              >{o.label}</button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    {/* ⛔ THE THREE WORDS ARE GONE (2026-07-30, Michael: *"lets kill it, i dont
+                        want any useless buttons"*). They shipped ONE DAY EARLIER as D-338's
+                        replacement for RIR, and they were right to replace it — but the verdict that
+                        moves the bar reads the REP COUNT, not the word. Wendler p30: you keep adding
+                        weight until you cannot hit the prescribed sets and reps, and the miss is the
+                        signal. Nothing on that path ever read `difficulty`.
+
+                        So it was a question asked every session whose answer changed nothing — the
+                        exact disease the rest of this day was spent clearing (a built reader with no
+                        input, or here, an input with no reader). Gating the weight on how it felt
+                        would be autoregulation, which belongs to a different programme: Boostcamp
+                        only exposes RPE/RIR on *Beyond 5/3/1* templates, not on core 5/3/1.
+
+                        ⚠️ The plain Done button always finished the set; this only offered a second
+                        way. Removing it takes nothing away.
+                        ⚠️ Sessions that already recorded a word still display it — the data is real,
+                        and deleting the render would erase what was honestly logged. */}
                     {(() => {
                       // Duration-based exercises don't need equipment selection (bodyweight)
                       if (isDurationBased) {
@@ -5435,11 +5421,34 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       return null;
                     })()}
                     
-                    {/* Baseline test 1RM result display */}
+                    {/* ⛔ THE LIVE ESTIMATE IS GONE, AND ITS ABSENCE IS THE POINT (2026-07-30).
+                        This line read "Estimated 1RM: X lbs → We'll use Y lbs" as you typed, off a
+                        formula running on the phone. The number it showed was the number it then wrote.
+                        The server owns that number now, so the set is CONFIRMED here and the result is
+                        shown after the save — one number, computed once, from the machine that stores it.
+                        Showing a phone-computed preview beside a server-computed truth is how two
+                        answers to one question get born. */}
+                    {/* What the SERVER computed and stored, shown after the save. The live preview that
+                        used to sit here was the phone's own arithmetic; this is the number that was
+                        actually written (D-342). */}
+                    {isBaselineTest && isWorking && baselineServerResults.length > 0 && (() => {
+                      const srv = baselineServerResults.find(
+                        (r) => r.lift.toLowerCase() === exercise.name.trim().toLowerCase(),
+                      );
+                      if (!srv) return null;
+                      return (
+                        <div className="mt-2 ml-8 p-3 bg-emerald-500/[0.06] border border-emerald-400/20 rounded-md">
+                          <div className="text-sm text-emerald-200/90">
+                            Saved: {srv.estimated1RM} lb
+                            <span className="text-white/45"> — from {srv.weight > 0 ? `${srv.weight} lb × ` : ''}{srv.reps} reps</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {isBaselineTest && isWorking && result && (
-                      <div className="mt-2 ml-8 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                        <div className="text-sm font-medium text-gray-900 mb-1">
-                          Estimated 1RM: {result.estimated1RM} lbs → We'll use {result.rounded1RM} lbs (rounded down)
+                      <div className="mt-2 ml-8 p-3 bg-white/[0.04] border border-white/15 rounded-md">
+                        <div className="text-sm text-white/70">
+                          Test set recorded: {result.weight > 0 ? `${result.weight} lb × ` : ''}{result.reps} reps
                         </div>
                       </div>
                     )}
@@ -5695,6 +5704,75 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       )}
 
       {/* Down-write reconciliation — a test result below the stored 1RM (supersedes D-223's silent hold) */}
+      {/* ── WHAT THE ALL-OUT SET BOUGHT (Q-226, 2026-07-30) ──────────────────────────────────────
+          ⛔ THE FACT IS THE CELEBRATION. Michael: *"my urges are to gamify but i also wanna be the
+          growup in the room."* The number going up IS the reward; "nice work" on top of it makes it
+          smaller, not bigger. No confetti, no streak, no praise word — the app keeps score honestly,
+          which is the only version that stays trustworthy when the number goes DOWN.
+
+          ⛔ AND A RESET IS NOT A PENALTY. Wendler p30: *"You keep on increasing the max you're working
+          from every four weeks until you can no longer hit the prescribed sets and reps."* The miss is
+          the SIGNAL and the reset is the mechanism — same tone, same sheet, no softening and no
+          apology. Naming it as the program working is accurate, not consolation. */}
+      {pendingRework && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-t-2xl border-t border-white/15 bg-[#141414] p-5 pb-8">
+            <p className="text-[11px] uppercase tracking-wider text-white/45 mb-3">Your next cycle changed</p>
+            <div className="space-y-2 mb-4">
+              {pendingRework.changes
+                .filter((c: any, i: number, arr: any[]) =>
+                  // One line per LIFT, not per week — the same step repeats across a cycle's weeks.
+                  arr.findIndex((x: any) => x.lift === c.lift) === i)
+                .map((c: any, i: number) => {
+                  const up = Number(c.to_top_set) > Number(c.from_top_set);
+                  return (
+                    <div key={i} className="text-sm text-white/85">
+                      <span className="text-white/60">{c.lift}</span>{' '}
+                      <span className="tabular-nums">{c.from_top_set} → {c.to_top_set} lb</span>
+                      <span className={`ml-2 text-[12px] ${up ? 'text-emerald-300/80' : 'text-white/45'}`}>
+                        {up ? 'earned the step' : 'resets, and the next cycle builds from there'}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+            <p className="text-[12px] text-white/45 mb-4 leading-snug">
+              Applies to weeks that have not started. Anything you have already done stays as it was.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={applyingRework}
+                onClick={async () => {
+                  setApplyingRework(true);
+                  try {
+                    await supabase.functions.invoke('rematerialize-strength-block', { body: { apply: true } });
+                  } catch { /* the sheet still closes; the plan is simply unchanged */ }
+                  setApplyingRework(false);
+                  setPendingRework(null);
+                  const done = pendingRework?._saved ?? null;
+                  if (onWorkoutSaved && done) onWorkoutSaved(done); else onClose();
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-white/90 text-black text-sm font-medium disabled:opacity-50"
+              >
+                {applyingRework ? 'Applying…' : 'Apply'}
+              </button>
+              <button
+                type="button"
+                disabled={applyingRework}
+                onClick={() => {
+                  setPendingRework(null);
+                  const done = pendingRework?._saved ?? null;
+                  if (onWorkoutSaved && done) onWorkoutSaved(done); else onClose();
+                }}
+                className="flex-1 py-2.5 rounded-xl border border-white/15 text-white/70 text-sm"
+              >
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {downWriteReview && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
           <div

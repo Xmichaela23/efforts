@@ -8,6 +8,38 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ▶ NEXT UP — THREE PROTOCOL-BLIND READS ON STATE (2026-08-01)
+**All three found by Michael reading his own screen at the end of 2026-07-30. Same family as everything
+that shipped that day: the reader does not know what the session was for.**
+- [ ] ⛔ **The per-lift row calls a prescribed dip a decline.** Bench reads "flat" with a dropping line
+      because week 1 of 5/3/1 is deliberately light. D-340 fixed the WEEK NARRATIVE, not these rows.
+      ⚠️ Decide the shape first — "show the number, claim no direction" vs a measurement-only series
+      (he has one measurement per cycle, too sparse for a 6-week trend).
+- [ ] **Cross-training compares a PARTIAL week to a whole-week target** — "9 of your 18-mile target",
+      read on a Thursday. `_shared/insights/cross-training-read.ts`, the `floorBreach` clause.
+- [ ] **The run narrative guessed the wrong session** — "Monday's lower-body session"; Monday was Bench.
+
+## ▶ ALSO NEXT — THE HEART-RATE STAMP (2026-08-01)
+- [ ] **"as of Jul 14" is the OLDEST contributor, by design.** The row rolls up run + bike and stamps
+      `Math.max(...ages)` so it cannot overstate freshness. His run is 3d old, his bike 16d.
+      ⚠️ It reads as "this whole reading is stale". **Fix the STAMP** — show the newest and let the
+      detail line name the stale contributor, which it already does. Do NOT "fix" the data path again.
+
+## ⛔ AWAITING MICHAEL — 2026-07-30 (a very long day; most of it deployed, the client not re-run)
+- [ ] **Run Xcode.** The last client commits — the weight-change sheet, the swap fixes, the removed
+      difficulty tap, Recompute moved to the top — were pushed and synced but not installed.
+- [ ] **The weight sheet will not fire until a week-3 session.** That is the 95% set that decides.
+- [x] ~~The all-out panel~~ — ✅ **SEEN 2026-07-30**: "Back Squat 75 lb × 15 · First time at this weight ·
+      Estimated max 110 lb · rough — over 8 reps no formula holds up."
+- [x] ~~Assistance swaps~~ — ✅ **SEEN**: Single Leg Hip Thrust → Reverse Lunge / Bulgarian Split Squat /
+      Hanging Leg Raise. Inverted Row → Dumbbell Row / Pull Up / Chin Up.
+- [ ] **Recompute your remaining sessions** so they carry Wendler's formula (per-session button).
+      Nothing is backfilled automatically — his call.
+- [ ] **`Single Leg Rdl` / `Single Leg Romanian Deadlift`** are the same movement listed twice in the
+      library swap list.
+- [ ] **Two stale failures in `src/lib/non-race-goal-seeds.test.ts`**, third session carrying it.
+- [ ] **`ios/debug.xcconfig` uncommitted**, five sessions running.
+
 ## ▶ NEXT UP — MAKE THE ALL-OUT REPS MOVE THE WEIGHT (2026-07-31)
 
 **The rematerializer (Q-226), now unblocked.** It was parked because its input did not exist; D-338 made the all-out rep count a saved fact. Read the ENGINE-STATE banner first — it names the seam.
