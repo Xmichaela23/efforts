@@ -2512,10 +2512,26 @@ Deno.serve(async (req) => {
         const excludedRun = hrResponseExcludedRunNote(latestSnapshot?.state_trends_v1, hrResp.contributors, 8, { runUnderTarget: runUpkeepHr });
         const bikeC = hrResp.contributors.find((c) => c.discipline === 'bike');
         const bikeStale = !!bikeC && bikeC.newestAgeDays != null && (bikeC.newestAgeDays as number) >= 5;
-        const bikeOpp = bikeStale ? ' A steady ride with power feeds the bike side.' : '';
-        // Base genuinely at risk only when the run is under target AND no bike is holding the aerobic base.
-        const aerobicAtRisk = runUpkeepHr && (!bikeC || (bikeC.newestAgeDays != null && (bikeC.newestAgeDays as number) > 14));
-        const baseSlip = aerobicAtRisk ? ' Keep the aerobic work this light and your base can slip.' : '';
+        // ⛔ FACTS AND AT BEST ESTIMATES — NO INSTRUCTION, NO DIAGNOSIS (Michael, 2026-07-31).
+        //
+        // Two clauses are deleted here, and both were saying something the screen already says better.
+        //
+        // 1. `bikeOpp` — "A steady ride with power feeds the bike side." An INSTRUCTION. The age is
+        //    already stated one clause earlier ("bike holding (16d ago)"); telling the athlete what to
+        //    log to refresh a number is the app asking to be fed.
+        //
+        // 2. `baseSlip` — "Keep the aerobic work this light and your base can slip." An imperative AND
+        //    a prediction, computed off `runUpkeepHr` (running under its declared target) — which is
+        //    the CROSS-TRAINING row's fact, not this row's. That row already says it, better and as a
+        //    statement: *"Running's at 10 of your 18-mile target — under what holds it"*, with the
+        //    mechanism underneath and no instruction anywhere in it.
+        //
+        // ⚠️ So this was the same subject told twice, and the worse telling sat on a row that does not
+        // own volume — hung off the decoupling verdict, which still counts hill sessions (D-346). One
+        // fact, one owner. The heart-rate row states its own reading and its contributors' ages, and
+        // stops there.
+        const bikeOpp = '';
+        const baseSlip = '';
         // TIGHT (Michael, 2026-07-21) — dropped the "From the spine / run=decoupling, bike=HR-at-power"
         // method legend + the swim-exclusion line; the nudges carry the meaning. Capitalise the lead.
         const lead = parts.join(' · ');
