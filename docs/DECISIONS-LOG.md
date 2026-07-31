@@ -2222,7 +2222,16 @@ His stall reset **re-estimates from a fresh rep max and takes 90% of that.** Our
 
 ---
 
-## D-338 — The three words replace RIR, the AMRAP is the measurement, and both finally reach the screens (2026-07-30)
+## D-338 — PARTIALLY SUPERSEDED
+
+> ⚠️ **SUPERSEDED IN PART BY [D-344] (2026-07-30, one day later): the three-word difficulty tap is
+> REMOVED.** The verdict that moves the bar reads the REP COUNT, and nothing ever read `difficulty` —
+> an input with no reader. **The rest of D-338 stands**: RIR abandoned for 5/3/1, the AMRAP captured as
+> a saved fact, and the deload exclusion. Everything below is history.
+>
+> ⚠️ **Also relevant: [D-339]** replaced the Brzycki estimate this entry's facts feed.
+
+## D-338 (original) — The three words replace RIR, the AMRAP is the measurement, and both finally reach the screens (2026-07-30)
 
 Michael: *"app will adopt this as our language to communicate how user handled load we abadon RIR — moved well worked for it or grind — this is the langauge of other stregnth apps. AMRAP determines whether to pump up beyond 1rm. none of this is seen or understood by performance or state."*
 
@@ -2264,3 +2273,285 @@ Michael: *"app will adopt this as our language to communicate how user handled l
 - **The calendar squat-day-not-done** is reverted and parked; the detail screen must stop treating a planned row as completed first.
 
 Audit: `docs/AUDIT-performance-state-2026-07-29.md`. Supersedes the RIR half of D-324/D-326 layer 1 for this protocol.
+
+---
+
+## D-339 — ONE 1RM FORMULA, AND IT IS WENDLER'S OWN (2026-07-30, SHIPPED + DEPLOYED)
+
+**Michael:** *"use wendler."*
+
+### The finding: THREE answers to one question
+
+| where | formula | rep cap |
+|---|---|---|
+| `compute-facts` — every logged session | Brzycki, `w × 36/(37 − reps)` | 30 |
+| `StrengthLogger` — the baseline TEST | a CLUSTER of Epley + Brzycki averaged | **10** |
+| 5/3/1 2nd edition p32 | `weight × reps × 0.0333 + weight` | none |
+
+**So the number that SET the working weights and the number that JUDGED the work against them came
+from different equations, on different machines.** That is a Law 1 violation on the most load-bearing
+number in the strength system, and it was invisible because each site looked reasonable alone.
+
+### Why switch, given `compute-facts` carried an explicit DO-NOT-SWITCH note
+
+That note's reasoning: *"Brzycki tends to UNDERESTIMATE and Epley to OVERESTIMATE, and for a number
+that sets an athlete's next working load, erring low is the safe direction."* Sound reasoning, **half-
+true premise** — it holds below ten reps and INVERTS above:
+
+| reps | Brzycki | Epley/Wendler | |
+|---|---|---|---|
+| 5 | ×1.125 | ×1.167 | Brzycki lower — the note's case holds |
+| **10** | ×1.333 | ×1.333 | ⛔ IDENTICAL |
+| 15 | ×1.636 | ×1.500 | Brzycki HIGHER — reverses |
+| 20 | ×2.118 | ×1.666 | Brzycki runs away |
+
+Brzycki has `37 − reps` in a denominator and climbs toward a singularity; Epley is linear. **The
+all-out set is the one place reps are deliberately open-ended**, so the high-rep range is exactly
+where this number lives — and there Brzycki is the AGGRESSIVE one. Switching therefore serves the old
+note's own stated goal.
+
+⚠️ **NOT AN ACCURACY CLAIM.** The literature conflicts by population and lift, and LeSuer et al. (1997,
+JSCR 11(4):211-213) found EVERY tested equation significantly underestimates a deadlift 1RM. This is a
+product decision about which way to be wrong, and whose arithmetic the athlete's own programme is
+written in.
+
+⚠️ **WENDLER'S 0.0333 IS EPLEY'S 1/30**, printed short — 0.1% below, so our estimate is a hair lower
+than textbook Epley. We keep the book's digits: the athlete can check our arithmetic against his own
+copy, and the gap is far below the 5 lb rounding. **He also TRUNCATES**: p32 prints 322 for 322.932.
+Both worked examples are pinned as fixtures.
+
+⚠️ **NO REP CAP ANY MORE.** The old server cap existed because Brzycki blows up; Wendler's is linear
+and cannot. The client's 10-rep cap was worse than useless — it reported a 15-rep set as a 10-rep one,
+silently understating a real effort. **Reliability above ~10 reps is carried as PROVENANCE**
+(`trustedMaxRepsFor` / `advance_untrusted`), never by rewriting the rep count.
+
+⛔ **NOT BACKFILLED.** Existing sessions keep their Brzycki numbers; recomputing is the athlete's call
+(per-session Recompute reruns `compute-facts`).
+
+**Home:** `src/lib/estimate-1rm.ts`, imported by both `compute-facts` and the client.
+**Verified:** 9 fixtures including both of the book's printed examples and the exact 10-rep crossover.
+
+---
+
+## D-340 — THE BLOCK IDENTITY CARD: one place says what block you are in (2026-07-30, SHIPPED + DEPLOYED)
+
+**Closes Q-230 Parts A and B. Closes audit F3, F4, F9 and F10.** *(`docs/AUDIT-performance-state-2026-07-29.md`)*
+
+**Michael:** *"the whole point is for this app to be smart to know everything."* The pattern behind
+every finding that day: **the app KNEW something and never told the next screen.**
+
+### The card
+
+`_shared/block-identity.ts` — given a plan and a DATE, answers once: which protocol, what the goal is,
+week, week-in-cycle, leader or anchor, deload, whether the week carries an all-out set, whether THIS
+is the 95% reading, and **how the block reads effort** (`amrap` | `rir` | `none`).
+
+- **Read-only by construction.** Nothing that consumes it may move a session or change a weight
+  (Law 4). Efforts is a hybrid app and the endurance/strength balance is a solved arrangement made at
+  build time; a read surface that starts steering it is a second builder.
+- **It READS the block shape the builder stored** (`config.phase_structure`) rather than re-deriving
+  it. The leader/anchor split depended on continuity and posture AT BUILD TIME; re-deriving now could
+  describe a structure that is not on the athlete's calendar. The only math it does is `setsForWeek`,
+  the same pure function the composer wrote the sets with.
+- **Unknown is silent, never a default.** `resolveProfile()` returns `durability` for ANY unrecognised
+  id, which made a missing entry and a deliberate choice indistinguishable and caused the same bug
+  twice (Q-192, then `strength_primary` in D-322). Every field here is nullable with its own
+  "do we know?" boolean.
+
+### The write side
+
+- `generate-strength-plan` now stamps `strength_protocol: 'strength_primary'`. It only ever said so in
+  `config.source`, which is why `coach` resolved a null protocol on every Strength Focus block.
+  **The `source` fallback STAYS** — every live block identifies itself that way.
+- `NonRaceBuilder` persists `goal_focus` **on the GOAL**, which owns what the athlete is chasing. It
+  was collapsed to `capacity`/`maintenance` at the builder and never recorded, so "build speed" and
+  "build endurance" both arrived as *"run: develop"*.
+
+### What changed on screen
+
+- **F3** — the generic *"estimated one-rep maxes have been sliding"* no longer fires on 5/3/1. That
+  block prescribes 40→95% by design; two weeks in four are deliberately sub-maximal.
+- **F4** — the Cross-training row can no longer prescribe *"easing the running"* off a dip the plan
+  caused. `verdictTrusted` gates the CEILING clause only; the floor and the trend line are untouched.
+- **And two readers that had NEVER FIRED on any protocol now can:** the coach fed `strengthProtocol`
+  3 of its 6 fields, so the deload suppression and the 5×5 ceiling clause were dead code.
+- **F10 / Q-208** — the per-session plan lookup no longer requires `plans.status = 'active'`, so a
+  session on a finished block keeps its framing instead of reading as unplanned.
+
+### ⛔ THE LESSON THAT COST FOUR ROUND TRIPS THROUGH MICHAEL
+
+The card shipped, deployed, and showed **nothing**, three times running:
+
+1. `workout-detail` has a session-detail **CACHE FAST PATH** — a stored copy that is not stale is
+   served verbatim and the pipeline never runs. Every copy written before that day lacked the new
+   fields, so correct deployed code was unreachable.
+2. The block lookup read `training_plan_id` off the planned row and stopped. A planned row can be
+   linked and carry no `training_plan_id` — the plan-context fetch twenty lines below has handled that
+   for months, with a log line saying so.
+3. The staleness rule that fixed (1) was `!block && !block_checked` — refresh once, then stop asking.
+   Twenty minutes later a new field shipped, and **every copy stamped by that first run was now
+   considered fresh.** The guard against an infinite refresh had become a guard against the fix.
+
+⛔ **A NEW FIELD ON `session_detail_v1` NEEDS A STALENESS RULE OR IT WILL NEVER APPEAR ON AN EXISTING
+SESSION. Deploying is not shipping here.** `BLOCK_CARD_VERSION` now versions it — bump on any addition.
+
+⛔ **AND AN EMPTY PANEL MUST SAY WHY.** All three failures looked identical to "this session had no
+all-out set". An invisible failure is indistinguishable from a correct absence, which is what turned a
+one-line bug into four screenshots.
+
+---
+
+## D-341 — THE ALL-OUT REPS MOVE THE WEIGHT (2026-07-30, SHIPPED + DEPLOYED)
+
+**Closes Q-226 and Q-223.**
+
+**The block advanced on the CALENDAR.** `workingNumberForCycle` steps +5 upper / +10 lower every four
+weeks and nothing could stop it — miss the reps and the bar climbed anyway, then the next all-out set
+measured that bar and wrote it back as the athlete's max. **The plan graded its own homework.**
+
+⛔ **NOTHING NEW WAS COMPUTED.** Four pieces, all built, all tested, none ever called:
+`verdictFrom95Set` · `groupSessionsByCycle` · `verdictsForBlock` · `workingNumberForCycles`.
+`rematerialize-strength-block` is the wire between them. **The reader could never live in the
+composer** — it authors twelve weeks up front, so no verdict CAN exist for weeks that have not
+happened. Something had to come back afterwards.
+
+- **It PROPOSES; it does not silently write.** The auto-progression that moved strength load on every
+  ingest was DELETED because it changed prescribed weight with no prompt and no consent — *"the
+  athlete opened the logger to a number they never agreed to."* Default is a dry run; `apply: true` is
+  the tap.
+- **Only weeks that have not started.** History is not editable and a session already logged keeps the
+  prescription it was judged against.
+- ⚠️ **`unknownMeans: 'hold'`, pinned.** With `'advance'` an empty block walks the bar up while
+  appearing to have earned it — the failure looks exactly like normal operation.
+
+**Where the athlete meets it:** the LOGGER, at save. Michael: *"people might not check either, could
+the logger give you a pop up when its changed?"* State and Performance are both places you have to go
+looking; the moment the reps are worth something is the moment they are logged.
+
+### ⛔ THE COPY DECISION — the fact is the celebration
+
+Michael: *"my urges are to gamify but i also wanna be the growup in the room."*
+
+**The game is already in the programme.** Wendler built rep records into it (p10: *"If your squat goes
+from 225x6 to 225x9, you've gotten stronger. Don't get stuck just trying to increase your one rep
+max."*). So **gamify the substance, not the tone.** No confetti, no streak, no praise word.
+
+- Up: *"Back Squat 90 → 95 lb. Earned the step."*
+- Down: *"Back Squat 90 → 80 lb. Resets, and the next cycle builds from there."*
+
+**A reset is not a penalty** — p30: you keep adding weight until you cannot hit the prescribed reps,
+and the miss is the SIGNAL. Same sheet, same tone, no apology. **An app that inflates the score on the
+way up cannot be trusted on the way down.**
+
+---
+
+## D-342 — NO CLIENT MATH: four decisions and two writes moved to the server (2026-07-30, SHIPPED + DEPLOYED)
+
+**Michael:** *"we are doing math in the client? … dumb client smart server."*
+
+### The audit (asked for by name, over the week's changed files)
+
+| what the phone decided | why it matters |
+|---|---|
+| the tested **1RM** from a baseline test, then WROTE it | the number a whole block's weights derive from |
+| the **weight** for an added or swapped lift, incl. a hardcoded **0.70** default and a 20-session query | it puts weight on the bar |
+| what counts as a **PR** | a verdict |
+| whether a planned lift was **done or skipped** | adherence |
+
+### The rule, for when it gets muddy
+
+**Does this number get SAVED, or shown as a FACT? → server.** Only affects how something LOOKS
+(rounding, pace strings, chart pixels) → the phone is fine.
+**Sharper test: if two screens both did this, could they disagree?** If yes, it belongs on the server.
+
+⚠️ **A SHARED PURE FUNCTION IN `src/lib` THAT BOTH SIDES IMPORT IS NOT CLIENT MATH** — it is one
+formula with two callers. `maintenance-volume-band.ts` and `exercise-config.ts` both work this way,
+correctly. **The violation is a phone-only DECISION or a phone-written FACT.**
+
+**New:** `save-baseline-test` (two-phase — nothing is written while any lift needs the athlete's
+Keep/Update call, so an abandoned dialog cannot leave a half-applied save) and
+`resolve-exercise-weight` (returns WHICH branch answered, so a derived number and a guessed one are
+never indistinguishable).
+
+⚠️ **THE COST, ACCEPTED:** the live "Estimated 1RM" preview while typing a baseline test is gone, and
+an added exercise's weight fills a beat later. One number, computed once, by the machine that stores it.
+
+---
+
+## D-343 — SWAPS FOLLOW THE PROGRAMME, NOT THE LIBRARY (2026-07-30, SHIPPED + DEPLOYED)
+
+**Michael:** *"we arent offering the right swaps for accessories, reads them as traditional lifts"* →
+*"we need to work with the framework of the plan"* → *"yeah it should be smart, no?"*
+
+Three faults, found in that order:
+
+1. **An accessory offered the main lifts.** Hip Thrust → Deadlift; Bulgarian Split Squat → Back Squat.
+   The uncurated fallback was `loadable ? 'direct' : 'lighter'` — SYMMETRIC — so every loadable lift
+   sharing a movement pattern was called a direct swap, sorted heaviest-first. **Measured before
+   fixing:** excluding main lifts empties 2 of 110 accessory lists, and both were an alias gap.
+   ⚠️ ONE-DIRECTIONAL: a main lift still offers accessories — swapping DOWN is a legitimate call.
+2. **An assistance row got the whole library instead of the plan's three-option shortlist.**
+   `materialize-plan` builds each planned exercise from a **WHITELIST** and `load_prescribed: false`
+   was not on it — the flag reached that function (it is read twenty lines earlier, to stop a weight
+   being derived) and died on the way out. ⚠️ **The fix alone would not have helped the live block**,
+   so the client reads a second signal present on every assistance row ever authored: the prescription
+   is a rep TOTAL, because assistance states a movement and a total and never a weight.
+3. **It did not know what day it was.** The block never offers a slot's raw menu — on a bench day the
+   push slot PULLS, on a squat day the single-leg slot HINGES (Q-212 / p86). Same function the
+   composer applies, not a second reading of it.
+
+⚠️ **OPT-IN VIA THE ROW.** The first cut keyed off the exercise NAME and broke five pinned tests: four
+menu movements (Pull Up, Push Up, Dumbbell Row, Bulgarian Split Squat) are ALSO ordinary library
+exercises. A Pull Up as a main vertical pull and a Pull Up filling the `pull` slot are the same name in
+two different jobs, **and only the ROW knows which.**
+
+---
+
+## D-344 — THE THREE WORDS ARE GONE; the count is the verdict (2026-07-30, SHIPPED)
+
+> **Supersedes D-338's difficulty tap after one day.** The rest of D-338 — RIR abandoned for 5/3/1,
+> the AMRAP captured as a fact, the deload exclusion — stands.
+
+**Michael:** *"lets kill it, i dont want any useless buttons."*
+
+Replacing RIR was right: a deterministic protocol has nothing for reps-in-reserve to decide. But **the
+verdict that moves the bar reads the REP COUNT** (p30), and nothing on that path ever read
+`difficulty`. A question asked every session whose answer changed nothing — **an input with no reader,
+which is the same disease as a reader with no input.**
+
+⚠️ **Gating weight on how it felt would be AUTOREGULATION, which belongs to a different programme.**
+Checked, not assumed: Boostcamp exposes RPE/RIR only on *Beyond 5/3/1* autoregulated templates, not on
+core 5/3/1.
+
+⚠️ **SESSION RPE STAYS** — `calculate-workload` reads it to score the session, which feeds ACWR.
+Checked before touching anything.
+
+⚠️ Nothing is lost: the plain Done button always finished the set. Sessions that already recorded a
+word still display it — deleting the render would erase what was honestly logged.
+
+---
+
+## D-345 — A RUN'S INTENT COMES FROM THE PLAN IT IS ATTACHED TO (2026-07-30, SHIPPED + DEPLOYED)
+
+**Michael, reading his own State screen:** *"heart rate drifting up? does it see the hill drills and
+not know what?"*
+
+**It saw nothing at all.** `state-trend/run.ts` restricts the efficiency and decoupling reads to steady
+aerobic efforts — correct, and the field standard: **TrainingPeaks requires a sustained steady effort
+over 20 minutes, fully aerobic, low variability**, or the number is not valid. But the gate is
+`isSteadyAerobic(workout_type)` and **nothing ever wrote `workout_type`.** `String(null)` is empty, the
+gate returns false, and EVERY run in his history was excluded. **His heart-rate row sat on a July 14
+reading, in red, for sixteen days.**
+
+⛔ **THE PLAN IS THE SOURCE, NOT THE DATE.** Verified: Intervals.icu does exactly this — *"When an
+activity is paired with a planned workout, any tags from the workout are added to the activity."*
+Keying off the LINK rather than the calendar is what makes it survive an athlete moving a session or a
+plan being rebuilt around them. **Both happened to Michael the same day.**
+
+Order: the plan's own words → the file's interval structure when nothing is attached → the athlete's
+title last (it is usually "Morning Run"). **A hill session run slowly is still a hill session; the plan
+knows that and the data does not.**
+
+⚠️ **`null` STAYS A REAL ANSWER.** An unattached, unstructured run is excluded from the steady read
+rather than guessed into it — the same failure direction the gate already chose.
+

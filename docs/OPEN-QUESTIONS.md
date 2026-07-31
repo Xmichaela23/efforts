@@ -2076,6 +2076,9 @@ The gap is not rounding. Our working number **starts** at `WORKING_NUMBER_PCT_OF
 
 ---
 
+> ✅ **CLOSED 2026-07-30 by [D-341].** The working number no longer advances on the calendar — a
+> cycle with no logged evidence resolves to `hold`, pinned by fixture. Everything below is history.
+
 ## Q-223 — The earned advance only runs on a rebuild, so a first block climbs on the calendar (2026-07-29, KNOWN — now DISCLOSED in the partner doc rather than fixed)
 
 `strength-primary-plan.ts` authors all twelve weeks **before a single set is performed**, so no logged evidence can exist for a fresh block. It passes `unknownMeans: 'advance'`, and every cycle resolves to a calendar step.
@@ -2135,6 +2138,10 @@ Michael, same day: *"thats why im down streaming it — we will ad a rematerialz
 ⛔ **BUILDING THIS AS A LIFTING-DAYS CONTROL WOULD BE THE FOURTH PLAN-MUTATION PATH IN THIS CODEBASE.** There are already three placement authorities (`ARCH-strength-spine.md` §0.6) and four plan generators, both from exactly this move — solving one instance of a general problem in its own file. Wait for the general surface.
 
 ---
+
+> ✅ **CLOSED 2026-07-30 by [D-341].** `rematerialize-strength-block` is the wire: it proposes, the
+> athlete taps, and only weeks that have not started are rewritten. The sheet lives in the LOGGER, at
+> save. Everything below is history.
 
 ## Q-226 — The rematerializer has TWO customers, and one of them closes Q-223 (2026-07-29, Michael's scoping — NOT built)
 
@@ -2241,6 +2248,13 @@ Free drag-and-drop would hand back a hand-edited week the engine never designed 
 ⚠️ **The cost is mobile drag on a scrolling list**, which is where this kind of feature normally eats its time — not in the logic.
 
 ---
+
+> ✅ **CLOSED 2026-07-30 by [D-340].** Both parts shipped. Part A: `generate-strength-plan` stamps
+> `strength_protocol`, one resolver (`_shared/block-identity.ts`) reads both dialects, unknown stays
+> silent. Part B: `NonRaceBuilder` persists `goal_focus` on the GOAL, and it ships WITH readers —
+> the coach payload's `plan.block` and `session_detail_v1.block`. Audit F9 closed with it.
+> ⚠️ Existing goals are NOT backfilled: their focus was never recorded, so they read `unknown`.
+> Everything below is history.
 
 ## Q-230 — The plan builder has to tell State what the block IS: one protocol answer, and the goal type (2026-07-30, unbuilt)
 
