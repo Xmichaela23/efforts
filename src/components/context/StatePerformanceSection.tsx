@@ -445,7 +445,7 @@ function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: nu
         </span>
       )}
       <span className="text-[10px] text-white/45 flex items-center justify-between">
-        <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? `each dot = one ${dotNoun} · ${recentLabel}` : `last 12 weeks · ${recentLabel} · tap to expand`)}</span>
+        <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? `each dot = one ${dotNoun} · ${recentLabel}` : `last ${spanWeeks} weeks · ${recentLabel} · tap to expand`)}</span>
         {/* Range only — the session COUNT lives on the lift's name line (the verdict window); repeating a
             different chart-window count here read as a contradiction (UX pass 2026-07-23). */}
         {/* ⚠️ Suppressed when there is no unit. The run chart plots the efficiency INDEX, so this

@@ -392,7 +392,15 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
         ? (runRoute.direction === 'still_learning' ? null : runRoute.pct)
         : runEfficiency.trend.pctChange,
       sampleCount: runRoute ? runRoute.points : runEfficiency.trend.sampleCount,
-      newestAgeDays: runEfficiency.trend.newestAgeDays,
+      // ⚠️ THE RECENCY STAMP COMES FROM THE VERDICT'S POOL TOO. Left on the old trend it reported
+      // "1d ago" off the polluted series while the verdict's newest run was today — a third label
+      // describing a different set of runs than the number beside it.
+      newestAgeDays: runRoute && (inp.runEffHistory?.length ?? 0) > 0
+        ? Math.max(0, Math.round(
+            (Date.parse(asOf + 'T12:00:00Z')
+              - Date.parse(String((inp.runEffHistory as any[])[inp.runEffHistory!.length - 1]?.date) + 'T12:00:00Z')
+            ) / 86_400_000))
+        : runEfficiency.trend.newestAgeDays,
       recentlyFlat: runEfficiency.trend.recentlyFlat,
       // ⛔ THE RECEIPT READS THE SAME POOL AS THE VERDICT (D-346, 2026-07-31).
       //
