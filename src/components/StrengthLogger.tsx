@@ -1161,6 +1161,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [baselineTestResults, setBaselineTestResults] = useState<{
     [exerciseId: string]: { weight: number; reps: number; baselineKey: string }
   }>({});
+  /** ⚠️ RENDERED — see the baseline-result block in the JSX. This was written and read by NOTHING for
+   *  the first hours of its life, which is the exact fault this day was spent removing. Caught in the
+   *  self-audit, not by a test: no test can see that a value is never displayed. */
   /** The rematerializer's dry run: what the next cycles WOULD become. Null on an ordinary session. */
   const [pendingRework, setPendingRework] = useState<any | null>(null);
   const [applyingRework, setApplyingRework] = useState(false);
@@ -3362,7 +3365,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // AMRAP baseline/retest sets are taken to ~RPE 9 (RIR ~1), so accept RIR 0–3 for them (tag-retest OR any
         // set flagged amrap). Named non-AMRAP baselines keep the 2–3 sub-max gate. (D-224)
         // Pull-up rep-max test: the clean-rep COUNT is the result — no weight, no e1RM, no RIR gate. 0 is a
-        // valid baseline ("goal: your first pull-up"). Stored via the same {rounded1RM,baselineKey} shape (value
+        // valid baseline ("goal: your first pull-up"). Stored via the same {reps,baselineKey} shape (value
         // = reps) so the ratchet-up / down-write write path treats "more reps = better" like "more weight = better". (Q-102)
         if ((updatedSet as any).repMaxTest === true && updatedSet.setType === 'working' && updatedSet.completed
             && typeof updatedSet.reps === 'number' && updatedSet.reps >= 0) {
@@ -3605,7 +3608,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // ⛔ A DETERMINISTIC PROTOCOL RECORDS NO RIR. Strength Focus (5/3/1) fixes the weight and the
     // reps at plan creation; nothing in the engine reads a reserve estimate to decide anything, so
     // asking for one on a heavy set is cognitive load with no consumer. Worse, an auto-filled value
-    // is not inert: the learned 1RM is estimated as brzycki(weight, reps + rir), so a guessed
+    // is not inert: the learned 1RM is estimated as estimate1RM(weight, reps + rir) — Wendler's own
+  // formula since D-339 — so a guessed
     // reserve on a deliberately sub-maximal opener reads back as a heavier lift than happened.
     // Done just completes the set. `rir_tracked === false` is stamped by materialize off the
     // protocol profile — see `protocolUsesRir`. Every other protocol keeps the strip below.
@@ -5424,6 +5428,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         shown after the save — one number, computed once, from the machine that stores it.
                         Showing a phone-computed preview beside a server-computed truth is how two
                         answers to one question get born. */}
+                    {/* What the SERVER computed and stored, shown after the save. The live preview that
+                        used to sit here was the phone's own arithmetic; this is the number that was
+                        actually written (D-342). */}
+                    {isBaselineTest && isWorking && baselineServerResults.length > 0 && (() => {
+                      const srv = baselineServerResults.find(
+                        (r) => r.lift.toLowerCase() === exercise.name.trim().toLowerCase(),
+                      );
+                      if (!srv) return null;
+                      return (
+                        <div className="mt-2 ml-8 p-3 bg-emerald-500/[0.06] border border-emerald-400/20 rounded-md">
+                          <div className="text-sm text-emerald-200/90">
+                            Saved: {srv.estimated1RM} lb
+                            <span className="text-white/45"> — from {srv.weight > 0 ? `${srv.weight} lb × ` : ''}{srv.reps} reps</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {isBaselineTest && isWorking && result && (
                       <div className="mt-2 ml-8 p-3 bg-white/[0.04] border border-white/15 rounded-md">
                         <div className="text-sm text-white/70">
