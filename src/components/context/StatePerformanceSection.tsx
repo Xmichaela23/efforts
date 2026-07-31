@@ -603,6 +603,18 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
       {Array.isArray(fitness.projections) && fitness.projections.length > 0 && (
         <span className="basis-full flex flex-col gap-1 mt-1.5">
           <span className="text-white/45 text-[11px] uppercase tracking-wider">projected race times</span>
+          {/* ⛔ THE BASIS, BESIDE THE NUMBER (D-346, 2026-07-31). These print to the SECOND off a
+              threshold pace that can rest on three runs — internally consistent, but a precision the
+              input does not support, and the last thing on this row without a receipt. Naming the
+              source and the sample count lets the reader weight it; it is the same move the verdict
+              and the chart already make. */}
+          {(fitness as any).projectionBasis && (
+            <span className="text-white/40 text-[11px]">
+              {(fitness as any).projectionBasis.source === 'observed'
+                ? `from your measured threshold pace${(fitness as any).projectionBasis.samples ? ` · ${(fitness as any).projectionBasis.samples} runs` : ''}`
+                : 'from your typed target pace — not measured yet'}
+            </span>
+          )}
           {/* 3-column grid: distance | finish time (right-aligned number column) | pace — so the times
               stack into one clean edge. Locked rows span the two value columns with a left-aligned note. */}
           {fitness.projections.map((p) => (

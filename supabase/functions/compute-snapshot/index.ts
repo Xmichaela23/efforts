@@ -1040,7 +1040,16 @@ serve(async (req: Request) => {
           let projSrc: 'observed' | 'plan_targets' = 'plan_targets';
           const lfTpRaw = ub?.learned_fitness?.run_threshold_pace_sec_per_km;
           const lfTp = lfTpRaw && typeof lfTpRaw === 'object' ? (lfTpRaw as any).value : lfTpRaw;
-          if (Number.isFinite(Number(lfTp)) && Number(lfTp) > 0) { projTp = Number(lfTp) * 1.60934; projSrc = 'observed'; }
+          // ⚠️ THE BASIS TRAVELS WITH THE NUMBER (D-346, 2026-07-31). These render as "5K 29:54" — to
+          // the second — off a threshold pace that can rest on three runs. The times are internally
+          // consistent (5K projects faster than threshold, as it should) but the PRECISION overstates
+          // the input, and it was the last thing on the run row with no receipt beside it.
+          let projSamples: number | null = null;
+          if (Number.isFinite(Number(lfTp)) && Number(lfTp) > 0) {
+            projTp = Number(lfTp) * 1.60934; projSrc = 'observed';
+            const sc = lfTpRaw && typeof lfTpRaw === 'object' ? Number((lfTpRaw as any).sample_count) : NaN;
+            projSamples = Number.isFinite(sc) && sc > 0 ? sc : null;
+          }
           else {
             const pnTp = ub?.performance_numbers?.threshold_pace ?? ub?.performance_numbers?.threshold_pace_sec_per_mi;
             if (Number.isFinite(Number(pnTp)) && Number(pnTp) > 0) { projTp = Number(pnTp); }
@@ -1053,7 +1062,12 @@ serve(async (req: Request) => {
             dataSource: projSrc,
             easyRunDecouplingPct: null,
           });
-          if (proj && result?.runFitness) (result.runFitness as any).projections = proj.projections;
+          if (proj && result?.runFitness) {
+            (result.runFitness as any).projections = proj.projections;
+            // The receipt: what the estimate rests on. `observed` = a measured threshold pace from N
+            // runs; `plan_targets` = the athlete's typed number, which is a goal, not a measurement.
+            (result.runFitness as any).projectionBasis = { source: projSrc, samples: projSamples };
+          }
         } catch (e: any) { console.log("⚠️ race projections (non-fatal):", e?.message || e); }
         stateTrendsV1 = toStateTrendsV1(result, asOf);
         // Carry the descent cause on the payload (JSONB, no schema change) so the coach's composer receives

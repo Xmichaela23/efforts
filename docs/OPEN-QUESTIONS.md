@@ -2321,3 +2321,57 @@ A Strava sync should erase the problem — most runners arrive with months of hi
 The floor holds without it: under 8 runs the athlete simply gets no verdict, and the chart fills as they train. This removes a placeholder constant and makes day one useful — **it is an onboarding improvement, not a correctness fix.**
 
 ⚠️ **AND IT IS WORTH MORE THAN IT LOOKS.** An athlete who syncs Strava and sees a full chart with their own learned heat coefficient on day one has been shown something no competitor gives them. An athlete who syncs and sees an empty row has been shown nothing.
+
+---
+
+## Q-232 — The durability read cannot be fixed the obvious way: a pinned regression forbids it (2026-07-31, ATTEMPTED AND REVERTED)
+
+**Michael:** *"fix em."* This one could not be fixed. Recording the attempt so the next session does not spend the same hour.
+
+### THE FAULT (real, measured)
+
+`isQualifyingDecouplingRow` gates on `isSteadyAerobic(workout_type)`, and `workout_type` reads
+`steady_state` on **all 25** of this athlete's logged runs — an 11-minute jog and a hill session
+included. It excludes nothing. His 2026-07-28 hill drills entered the durability trend at **24.9%**,
+which is what pushed the Friel band to `needs_work` and put *"pace fading on long efforts"* on screen.
+
+⚠️ The durability line is currently **silenced in the client** (`durWord = null`) rather than fixed.
+That is a render-level hack: the spine still computes a `needs_work` band from the polluted pool, and
+any other consumer still reads it.
+
+### ⛔ THE OBVIOUS FIX IS FORBIDDEN, BY A TEST WITH A BUG HISTORY
+
+The only per-run measurement of "was this a constant effort" is `decoupling_mixed_effort` — the
+variance gate (D-034/D-038), derived from pace CV on the grade-adjusted series, terrain and detected
+intervals. It is `true` on **9 of his last 12 runs**. Gating on it was tried, and it fails
+`session-detail/decoupling.test.ts:225`:
+
+> *"REGRESSION: a mixed-effort steady run still reaches the durability substrate … Before the split it
+> was deleted, and nothing said so on the screen."*
+
+That test pins the D-037 fix: forcing `basis='raw'` to mark low confidence collided with 'raw' already
+meaning terrain-confounded, the stamp read as a delete order, **3 of 3 runs were binned and the State
+durability trend froze 16 days out of date.** Excluding mixed-effort runs re-creates that outcome by a
+different route.
+
+⚠️ **AND THE DOCS DISAGREE WITH EACH OTHER HERE.** [D-034] says mixed-effort sessions ARE excluded from
+steady-effort comparison pools; `state-trend/run.ts` says the flag is *"A HEDGE, never a filter"*. The
+durability trend is a steady-effort comparison pool, so both readings are defensible. **That is a
+decision to be made, not a bug to be patched** — which is why this was reverted rather than argued
+through in code.
+
+### WHAT WOULD ACTUALLY RESOLVE IT
+
+1. **Supersede the regression deliberately** — exclude mixed-effort AND render the exclusion count, so
+   the failure the test protects against (silent deletion) cannot recur. On his data this leaves ~3
+   qualifying runs against a floor of 8, so the row reads "not enough clean steady runs" — honest, and
+   probably permanent for an athlete who runs hills.
+2. **Or drop decoupling from State entirely.** [D-346] already moved the fitness verdict to
+   speed-at-heart-rate, which is what the row was being asked for anyway; TrainingPeaks treats
+   decoupling as a per-workout diagnostic and never trends it. ⚠️ This is the option most consistent
+   with where the run row ended up.
+3. **Or find a steadiness signal the variance gate does not own.** Three were tried and rejected on
+   real data in [D-346] — HR variance (circular), pace scatter (penalises slow runners),
+   HR-speed correlation (does not separate). Do not retry those.
+
+⛔ **DO NOT "just fix the gate".** It has a regression test, a bug history, and two docs that disagree.
