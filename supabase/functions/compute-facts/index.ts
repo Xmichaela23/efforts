@@ -850,7 +850,20 @@ async function upsertRouteIntelligence(
       route_cluster_id: cluster.id,
       workout_id: w.id,
       metric_date: metricDate,
-      workout_intent: (w.computed as any)?.analysis?.heart_rate?.workout_type ?? null,
+      // ⛔ THE SAME LABEL, WRITTEN WHERE THE DECOUPLING READ ACTUALLY LOOKS (2026-07-30).
+      //
+      // `classifyRunIntent` fixed the EFFICIENCY series by writing `run_facts.workout_type`. The
+      // heart-rate response row reads a different substrate — `route_progress_metrics.workout_intent`
+      // — and this line sourced it from `computed.analysis.heart_rate.workout_type`, which is null on
+      // every run. So the efficiency chart came back to life and the heart-rate row stayed frozen on
+      // a July 14 reading, which is exactly what Michael saw ten minutes after the first fix shipped.
+      //
+      // ⚠️ ONE CLASSIFIER, TWO SUBSTRATES. Do not add a second rule here — if the intent needs to
+      // change, change `classifyRunIntent` and both follow.
+      workout_intent:
+        (w.computed as any)?.analysis?.heart_rate?.workout_type
+        ?? (runFacts as any)?.workout_type
+        ?? null,
       moving_time_s: Math.max(0, Math.round(durationMinutes(w) * 60)),
       elapsed_time_s: Math.max(0, Math.round(durationMinutes(w) * 60)),
       distance_m: features.distance_m,
