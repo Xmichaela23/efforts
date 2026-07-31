@@ -473,13 +473,12 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
   const eff = fitness.efficiency;
   const dur = fitness.decoupling;
   const [explainOpen, setExplainOpen] = React.useState(false);
-  // GAP toggle (Michael 2026-07-22) — default RAW (what the watch showed, field-standard); tap to grade-
-  // adjust. Only offered when a grade-adjusted twin exists AND it differs enough to be worth a toggle.
-  const [gapOn, setGapOn] = React.useState(false);
-  const rawPace = eff.recentPaceSecPerKm;
-  const gapPace = eff.recentGapPaceSecPerKm;
-  const canToggleGap = rawPace != null && gapPace != null && Math.abs(gapPace - rawPace) >= 3; // ≥3 s/km = ~5 s/mi
-  const shownPace = gapOn && canToggleGap ? gapPace : rawPace;
+  // ⛔ THE GAP TOGGLE IS GONE (D-346, 2026-07-31). It offered raw-vs-grade-adjusted pace, which made
+  // sense when the row's pace was the raw number the watch showed. The pace now comes from the
+  // verdict's own pool and is ALREADY grade-adjusted, so `recentGapPaceSecPerKm` is deliberately null
+  // and the toggle could never render. Left in place it was dead code advertising a distinction that
+  // no longer exists.
+  const shownPace = eff.recentPaceSecPerKm;
   const v = verdictLabel(eff.verdict, eff.recentlyFlat);
   // ⚠️ The conditions line: the temperature SPREAD across the plotted runs. Shown, never corrected —
   // it is what lets the athlete discount a hot month without the app claiming to have done it for them.
@@ -592,12 +591,6 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
       {hasTrend && shownPace != null && (
         <span className="basis-full inline-flex items-baseline gap-2 text-white/65 text-[12px]">
           <span>pace ~{formatPace(shownPace, useImperial)}{eff.recentHrAvg != null ? ` at ${eff.recentHrAvg} bpm` : ''}</span>
-          {canToggleGap && (
-            <button type="button" onClick={() => setGapOn((o) => !o)}
-              className={`text-[11px] px-1 rounded ${gapOn ? 'text-emerald-300/80 bg-emerald-400/10' : 'text-white/55'}`}>
-              {gapOn ? 'grade-adj' : 'GAP'}
-            </button>
-          )}
         </span>
       )}
       {/* durability — the SECONDARY read now (fatigue resistance within a run), quiet, only when real */}
@@ -639,10 +632,19 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
               {postureSentence}
             </p>
           )}
+          {/* ⛔ THE DEFINITION DESCRIBES THE POOL THAT IS ACTUALLY READ (D-346, 2026-07-31).
+              It said "on steady runs" — the verdict now reads EVERY run, with terrain handled by the
+              grade adjustment rather than by excluding sessions. And it said the change was "than 6
+              weeks ago", which was wrong twice over: the window is ~13 weeks, and the number is a
+              regression slope across all of it, not an endpoint comparison. The ⓘ is where an athlete
+              goes to check whether to believe the number — a stale explanation there is worse than none. */}
           <p className="basis-full text-[12px] text-white/55 leading-snug mt-1.5 max-w-[min(100%,340px)]">
-            Efficiency is your speed per heartbeat on steady runs, hill-adjusted — rising means faster at the same effort.
-            {eff.pctChange != null && (
-              <> The {verdictSignedPct(eff.verdict, eff.pctChange)} is about {Math.abs(eff.pctChange)}% {eff.pctChange < 0 ? 'less' : 'more'} than 6 weeks ago.</>
+            Efficiency is your speed per heartbeat, adjusted for hills and for heat — rising means faster at the same effort.
+            {eff.pctChange != null && eff.route?.spanDays != null && (
+              <> The {verdictSignedPct(eff.verdict, eff.pctChange)} is the trend across {Math.max(1, Math.round(eff.route.spanDays / 7))} weeks of running, not a comparison of two days.</>
+            )}
+            {eff.route?.ci && (
+              <> The range that fits your data is {eff.route.ci[0]}% to {eff.route.ci[1]}%.</>
             )}
           </p>
         </>

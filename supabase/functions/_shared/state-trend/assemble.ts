@@ -817,7 +817,28 @@ export interface HrResponseRollup {
  *  discipline whose HR is trustworthy. */
 export function rollupHrResponse(v1: StateTrendsV1 | null | undefined): HrResponseRollup {
   if (!v1) return { verdict: 'needs_data', contributors: [], asOfAgeDays: null, stalestAgeDays: null };
-  const runD = v1.run?.decoupling;
+  // ⛔ THE RUN SIDE READS EFFICIENCY, NOT DECOUPLING (D-346, 2026-07-31).
+  //
+  // Decoupling is still gated on `isSteadyAerobic(workout_type)` — the field that reads `steady_state`
+  // on every run ever logged — so this athlete's 24.9% hill session is in its pool. That is what made
+  // the BODY row say "drifting up — working harder to hold effort" in red, on the same screen where
+  // the RUN row had already been moved onto a clean read.
+  //
+  // ⛔ AND IT IS THE SAME QUESTION. "Heart-rate response" asks whether the athlete is working harder
+  // for the same output. Efficiency is speed PER HEARTBEAT, terrain-adjusted and heat-corrected — a
+  // direct answer. Decoupling asks something narrower (did you fade WITHIN one run) and needs a
+  // pristine steady effort to mean anything, which is exactly the input it cannot identify.
+  //
+  // ⚠️ DIRECTION IS PRESERVED, NOT COPIED. Efficiency is higher-is-better (`improving` = faster per
+  // beat = HR settling); the rollup's vocabulary is HR-shaped, where `improving` also means settling.
+  // They agree, so the verdict passes through unchanged — but if either flips, this mapping breaks
+  // silently, which is why it is written down rather than left as an equality.
+  //
+  // ⚠️ Falls back to decoupling when efficiency has no read, so a treadmill athlete keeps the row.
+  const runEff = v1.run?.efficiency as { verdict?: string; provisional?: boolean; newestAgeDays?: number | null; route?: unknown } | undefined;
+  const runD = (runEff && runEff.route && runEff.verdict && runEff.verdict !== 'needs_data' && runEff.verdict !== 'withheld')
+    ? runEff
+    : v1.run?.decoupling;
   const bikeE = v1.bike?.efficiency as (StateTrendsV1['bike']['efficiency'] & { newestAgeDays?: number | null }) | undefined;
   const all: Array<{ discipline: 'run' | 'bike'; verdict?: string; provisional: boolean; newestAgeDays: number | null }> = [];
   if (runD) all.push({ discipline: 'run', verdict: runD.verdict, provisional: !!runD.provisional, newestAgeDays: runD.newestAgeDays ?? null });
