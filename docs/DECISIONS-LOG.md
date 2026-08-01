@@ -195,6 +195,42 @@ The "do some research" report (2026-07-09, adversarially fact-checked) overturne
 
 The north star, made explicit and written to `docs/TARGET-ARCHITECTURE.md` (+ CLAUDE.md priming): a living, coherent, steerable training system — every fact computed once on the server (deterministic), delivered as a pre-built contract, rendered by a **dumb client** (no client math on truth); **living baselines** (one resolver per anchor, live/learned value can lead); **steerable plans** (per-discipline, any stage, one adaptation path); **history-aware plan builder**. **Template ratified from existing code:** RUN (spine `run.decoupling`, one authority, duplicate deleted D-239) + `session_detail_v1` (server-built display contract) — the strongest existing implementation; every discipline migrates to look like it. **Rejected:** inventing a new pattern — the foundation already exists; the work is *annexing* the client-compute mirrors (`useStateTrends`, `LoadBar`, `useCoachWeekContext`) + the strength/FTP forks + the 4 plan generators into it, one at a time behind Law 6. Gap map: `TRUTH-MAP.md`. Hardening backlog: `FOUNDATION-READINESS.md` (Q-150). Also this session: shipped **b2** (plan-primary execution surface, coach v73) + the BIKE efficiency-verdict fix; and **deleted** a prototype endurance per-session engine (built for a read that already existed — the vacuum antipattern this architecture exists to prevent). Verified by three adversarial audits (pattern inventory / scalability / commercial-readiness).
 
+## D-270 — Strength convergence (TRUTH-MAP fracture #1) (ratified 2026-07-10, commit `bdab1874`, coach v74 — **folded into the log 2026-07-31** from `docs/archive/DESIGN-strength-convergence.md`)
+
+> ⛔ **WRITTEN 21 DAYS LATE.** This entry was owed from 2026-07-10 (see the doc-debt note in D-271) and
+> was the only gap in the D-sequence — while five code sites cited it as law. Filed 2026-07-31 by
+> Michael; substance from the ratified design doc, not reconstructed from the diff.
+
+**Problem:** the State screen judged the same lift with **two competing verdicts reading two different
+tables** — `exercise_log.estimated_1rm` vs `learned_fitness.strength_1rms` — so they could disagree.
+And the per-lift *"getting stronger"* verdict was **dead**: `previous_e1rm` was null, so it always
+resolved to `stable`. Q-107 H2/H3.
+
+**Decision — two facts, one substrate:**
+- **Direction** (*"is e1RM improving"*, per lift) = **the spine's**, persisted per-lift
+  (`state_trends_v1.strength.per_lift`). Surfaces **read** it, never re-derive it.
+- **Prescription** (*"add weight / back off"*, per session) = **the coach's**, RIR-driven, and it
+  **reads the direction to frame itself**.
+- Both off `exercise_log.estimated_1rm`. Prescription renders **inside** the direction (*"getting
+  stronger — ease off today"*), never against it.
+
+**Why two, not one:** autoregulation science and every serious app model direction and dose as
+**distinct facts with a fixed relationship, never competing** — backing off a bad day protects a
+rising trend. Verified against current practice (2026-07-31): Strong/Hevy show a 1RM trend chart with
+working weight separate/manual; Juggernaut/RP run one feedback loop (performance in → direction +
+prescription out). **The contradiction was presentation, not real.** (RTS/Tuchscherer, JuggernautAI,
+RP, Zourdos/Helms.)
+
+**Respects** D-231, D-236 (pattern copied), D-239 (run = the model). **Annexes** Q-107 H2/H3;
+**advances** Q-106 step 5. **Finished workout-side** by the 2026-07-29 sweep (`b7715321`).
+
+**Later — display superseded (D-347, 2026-08-01):** the per-lift direction **chip** was removed from
+the State strength row — on a 5/3/1 block the once-per-cycle e1RM reflects the **prescribed weight**,
+not fitness, so a light week read as a decline. **The direction FACT stays live** (spine-owned, D-338
+deload-excluded): it guards the per-workout *"getting stronger"* narrative (fires only on a real
+trend) and keeps surfaces from contradicting each other. State shows number + block context + volume
+direction; the 12-week chart and the PR remain.
+
 ## D-271 — B1 auth boundary: identity from the VERIFIED JWT, never the request body (2026-07-10)
 
 **Problem (FOUNDATION-READINESS blocker B1):** ~15 user-facing edge functions trusted a `user_id` supplied in the request body while running under the service-role key (RLS bypassed) — a caller could pass *any* id and read/act on another user's data; ~7 were reachable with no login at all. Cross-user exposure; gates a second real user.
@@ -211,18 +247,19 @@ The north star, made explicit and written to `docs/TARGET-ARCHITECTURE.md` (+ CL
 
 **Rejected:** converting the webhook / edge-to-edge callers the same way — they present the service key or no token, so `requireUser` would 401 them and `resolveUser` treats the service key as trusted. **Still open:** Strava/Garmin **webhooks** need a shared-secret guard (not a JWT); **B4** (error monitoring) untouched.
 
-**Owed doc-debt (flagged, not fabricated):** D-270 (strength convergence, commit `bdab1874`) and FTP fracture #2 (commits `d278cadd` / `eae2d9aa` / `00dbc9f2`) are referenced in commit messages but still owe formal DECISIONS-LOG entries — write them from the commits next session.
+**Owed doc-debt (flagged, not fabricated):** ~~D-270 (strength convergence, commit `bdab1874`)~~ **[PAID 2026-07-31 — the entry is above]** and FTP fracture #2 (commits `d278cadd` / `eae2d9aa` / `00dbc9f2`, **still owed**) are referenced in commit messages but still owe formal DECISIONS-LOG entries — write them from the commits next session.
 
-> ⛔ **STILL UNPAID AS OF 2026-07-31 — 21 DAYS LATER. THIS IS THE ONLY NUMBERED DECISION THAT DOES NOT EXIST.** ⟨A31⟩
-> Verified by the doc audit: there is **no `D-270` heading anywhere** in `DECISIONS-LOG.md` or
-> `archive/DECISIONS-LOG-archive-D001-D239.md`, while **D-270 is cited as settled law in at least five
-> places** — `AUDIT-performance-state-2026-07-29.md:332`, `CONCEPT-adapt-plan-strength.md:105`, and three
-> times in this file (`:218`, `:224`). A reader who follows the citation finds nothing.
-> D-271 through D-352 are all present; **D-270 and Q-144 are the only gaps in either sequence.**
-> All four commits are still in the tree and readable — `git show bdab1874` etc.
-> ⚠️ **NOT WRITTEN BY THE AUDIT ON PURPOSE:** authoring a decision entry means stating *why* a choice was
-> made, and that is the architect's to say, not an auditor's to reconstruct. This is the "a decision that
-> lives only in a commit message does not exist" failure CLAUDE.md names, caught in the act.
+> ✅ **D-270 HALF PAID — 2026-07-31.** The entry now exists, in sequence, above D-271. It was filed by
+> Michael from the ratified design doc (`docs/archive/DESIGN-strength-convergence.md`), not
+> reconstructed from the diff — which is why the audit flagged it rather than writing it. The five
+> citations now resolve.
+>
+> ⚠️ **THE FTP FRACTURE #2 HALF IS STILL OWED** — commits `d278cadd` / `eae2d9aa` / `00dbc9f2` still
+> have no entry. Deliberately left; only the D-270 half was closed.
+>
+> *(Historical: this note sat unpaid for 21 days. D-270 was the only gap in the D-sequence while being
+> cited as settled law in five places. `Q-144` remains the only gap in the Q-sequence, and is believed
+> to be a skipped number rather than a lost entry — it is referenced nowhere.)*
 
 ## D-272 — State↔Performance fork sweep: the workout narrative reads the SPINE, never re-derives (2026-07-10/11)
 
@@ -2938,6 +2975,10 @@ BOTH ways in `workload-strength-bodyweight.test.ts`; the hazard case is a perman
 strength **8% -> 38%** of 28-day load. Known imprecisions: Q-233.
 
 ## D-347 — THE PER-LIFT TREND CHIP IS DELETED, AND THE SCREENS READ THE BLOCK CARD (2026-08-01, **PUSHED + DEPLOYED, not device-verified**)
+
+> ↩︎ **This removed [D-270]'s State-screen display.** D-270 made the per-lift direction a spine-owned
+> FACT and put a chip on the State strength row; this entry deletes **the chip, not the fact** — the
+> direction is still computed, still spine-owned, and still guards the per-workout narrative.
 
 > ⚠️ **STILL STANDS — BUT IT ONLY DELETED THE RENDERING, AND THE COMPUTATION LIVED ON (D-350, same
 > day).** The reasoning below is unchanged and correct. What it did not catch: `useExerciseLog.ts`

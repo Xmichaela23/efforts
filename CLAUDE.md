@@ -240,7 +240,7 @@ Type at `supabase/functions/_shared/session-detail/types.ts` (~732 lines, ~30 ne
 
 After the 2026-05-09 consolidation, `_shared/week-optimizer.ts` owns every "what day does X go on" decision. `generate-combined-plan/week-builder.ts` reads day assignments from `AthleteState` fields populated by `reconcile-athlete-state-week-optimizer.ts` and only generates session content (intervals, paces, durations, flavor by phase, brick targets, swim templates). The reconciler now runs unconditionally inside `generate-combined-plan/index.ts`; it self-short-circuits when `long_run_day` is missing, in which case the builder's minimal legacy strength fallback fires for that contained edge case.
 
-The same-day matrix is in `_shared/schedule-session-constraints.ts` (`ROWS` table at line 337; the separate `ADJACENCY_HOURS_ROWS` table at line 131) ⟨A31⟩; sequential rules + placement live in `week-optimizer.ts` (`sequentialOk`, `canPlaceWithModifier`, `deriveOptimalWeek`). Spec: `docs/SCHEDULING-RULES.md`. Descriptive snapshot of current code: `docs/SCHEDULING-RULES-EXTRACTED.md`.
+The same-day matrix is in `_shared/schedule-session-constraints.ts` (`ROWS` table at line 337; the separate `ADJACENCY_HOURS_ROWS` table at line 131) ⟨A31⟩; sequential rules + placement live in `week-optimizer.ts` (`sequentialOk`, `canPlaceWithModifier`, `deriveOptimalWeek`). Spec: `docs/SCHEDULING-RULES.md`. ⚠️ **`docs/SCHEDULING-RULES-EXTRACTED.md` is NOT a snapshot of current code** — its own banner reads *"SNAPSHOT OUTDATED — 2026-05-09 … Kept for historical reference only"*, because the consolidation pass removed the builder guards it describes. **Read the code, not that file.** ⟨A31⟩
 
 Other plan generators (`generate-run-plan`, `generate-triathlon-plan`, `generate-plan`) **do not yet route through the optimizer** — they are separate edge functions with their own pipelines. Wiring them is explicitly scoped out of the consolidation pass and is a follow-up.
 
@@ -264,7 +264,7 @@ Four generators with overlapping logic: `generate-combined-plan/` (multi-sport, 
 
 Audit details: `notes/docs-audit-2026-05-09.md`.
 
-- `docs/PLAN-CONTRACT.md` is **superseded** by `docs/SCHEDULING-RULES.md` (prescriptive) + `docs/SCHEDULING-RULES-EXTRACTED.md` (descriptive). Its §5 matrix disagrees with the code matrix on 4 cells; the new docs match the code. Don't rely on `PLAN-CONTRACT.md` for placement rules.
+- `docs/PLAN-CONTRACT.md` is **superseded** by `docs/SCHEDULING-RULES.md` (prescriptive). Its §5 matrix disagrees with the code matrix on 4 cells. Don't rely on `PLAN-CONTRACT.md` for placement rules. ⚠️ **The file itself says the opposite** — its header still calls itself *"the single source of truth … code conforms to this"* and carries no superseded banner. ⟨A31⟩ (`SCHEDULING-RULES-EXTRACTED.md` was named here as the descriptive half; it is a 2026-05-09 snapshot and self-declares as historical — see above.)
 - `APP_ARCHITECTURE.md` is broadly stale (Nov 2025): missing files, wrong function names, ~25 of 98 edge functions documented. **Verify before relying.**
 - `plans.sessions_by_week` is a top-level column, not nested under `config` (despite older docs).
 - `analyze-swimming-workout` doesn't exist; the function is `analyze-swim-workout`.
@@ -300,7 +300,7 @@ Read these before touching the corresponding subsystem:
 ## Reference docs
 
 - `docs/SCHEDULING-RULES.md` — **prescriptive scheduling spec** (what the engine should do, with confidence tags + override gates). Authoritative for placement rules.
-- `docs/SCHEDULING-RULES-EXTRACTED.md` — descriptive snapshot of what the code currently enforces, with file:line citations. Pair with the prescriptive doc when reasoning about a rule.
+- `docs/SCHEDULING-RULES-EXTRACTED.md` — ⚠️ **HISTORICAL, not current.** A 2026-05-09 snapshot taken *before* the consolidation pass; its own banner says so and says *"for current behavior, read the code directly."* Kept for the file:line citations only. ⟨A31⟩
 - `APP_ARCHITECTURE.md` — **stale Nov 2025; verify before relying**
 - `docs/PLAN-CONTRACT.md` — **superseded** by `SCHEDULING-RULES.md`; do not rely on its matrix or rules
 - `DETERMINISTIC_LAYER_ARCHITECTURE.md` — mostly accurate (workout_facts model)

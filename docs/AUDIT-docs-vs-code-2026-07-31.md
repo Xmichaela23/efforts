@@ -24,8 +24,9 @@ nothing". It is called. The plan no longer raises the bar on the calendar alone.
 any of those five and believed it would have spent a day rebuilding a shipped engine — which is the
 exact failure `CLAUDE.md`'s top banner exists to prevent.
 
-**The second headline: `D-270` does not exist.** It is cited as settled law in five places. There is no
-entry for it in `DECISIONS-LOG.md` or its archive. See §5.
+**The second headline: `D-270` did not exist.** It was cited as settled law in five places with no
+entry anywhere. ✅ **RESOLVED 2026-07-31 — Michael filed it** from the ratified design doc; the entry
+now sits in sequence above D-271 and the five citations resolve. See §5.1.
 
 ### What this cost, in the terms that matter
 
@@ -35,7 +36,7 @@ entry for it in `DECISIONS-LOG.md` or its archive. See §5.
 | Wrong | 189 (93 load-bearing, 96 rotted line references) |
 | Corrected in place | 189 — 187 mechanically, 2 by hand after the applier refused them as ambiguous |
 | Structural problems flagged for you, not patched | 2 (§5) |
-| Docs classified | 158 — **35 moved to `docs/archive/`**, 10 proposed-and-held, 99 kept (§6) |
+| Docs classified | 158 — **36 moved to `docs/archive/`**, 16 proposed-and-held, 99 kept + the 6 living docs (§6) |
 | Docs deleted | **0** — nothing was deleted, by instruction |
 | Code files changed | **0** |
 
@@ -43,7 +44,7 @@ entry for it in `DECISIONS-LOG.md` or its archive. See §5.
 
 ## 2. How to read this file
 
-Read §3 (the landmines), §5 (the two things that need you) and §7 (the splits I did **not** perform).
+Read §3 (the landmines), §5 (what needed your call) and §7 (the splits I did **not** perform).
 Everything else is evidence you can skip unless you want it.
 
 Three verdicts are used throughout:
@@ -171,29 +172,39 @@ client value is a floor, not an equality — so I did not touch it. The doc now 
 
 ---
 
-## 5. The two things that need you
+## 5. What needed your call
 
-### 5.1 `D-270` does not exist. It never did.
+### 5.1 `D-270` did not exist — ✅ **now filed** (2026-07-31)
 
-`DECISIONS-LOG.md:214` has said since 2026-07-10:
+`DECISIONS-LOG.md:214` had said since 2026-07-10:
 
 > *"Owed doc-debt (flagged, not fabricated): D-270 (strength convergence, commit `bdab1874`) ... still
 > owe formal DECISIONS-LOG entries — write them from the commits next session."*
 
-That was 21 days ago and it was never done. Meanwhile **D-270 is cited as settled law in five places**
+That was 21 days ago and it was never done, while **D-270 was cited as settled law in five places**
 (`AUDIT-performance-state-2026-07-29.md:332`, `CONCEPT-adapt-plan-strength.md:105`, and three times
-inside `DECISIONS-LOG.md` itself). Anyone following the citation finds nothing.
+inside `DECISIONS-LOG.md` itself). Anyone following the citation found nothing. It was the only gap in
+the D-sequence — `D-271` through `D-352` were all present.
 
-`D-271` through `D-352` are all present. **`D-270` and `Q-144` are the only gaps in either sequence** —
-so nothing else was lost, and this is not a botched-split symptom. It is the exact failure CLAUDE.md
-names: *"a decision that lives only in a commit message does not exist."*
+**The audit deliberately did not write it**: authoring a decision means stating *why* a choice was
+made, and that is the architect's to say, not an auditor's to reconstruct from a diff.
 
-All four owed commits are still readable: `bdab1874` (D-270), and `d278cadd` / `eae2d9aa` / `00dbc9f2`
-(FTP fracture #2).
+✅ **Michael filed it the same night**, from `DESIGN-strength-convergence.md` (the design ruling
+ratified 2026-07-10) rather than from the commit. The entry — strength convergence, TRUTH-MAP
+fracture #1: direction is the spine's, prescription is the coach's, both off
+`exercise_log.estimated_1rm`, prescription renders *inside* direction — now sits in sequence above
+D-271. Consequently:
 
-**I did not write the entry.** Authoring a decision means stating *why* a choice was made, and that is
-yours to say, not an auditor's to reconstruct from a diff. A loud marker has been added at the
-doc-debt line so it stops being invisible.
+- The doc-debt note is marked **half paid**. **FTP fracture #2 is still owed** (`d278cadd` /
+  `eae2d9aa` / `00dbc9f2`) and was deliberately left alone.
+- **D-347 gained a reciprocal back-pointer** — it removed D-270's State-screen *chip*, not the
+  direction *fact*. That is exactly the back-annotation `CLAUDE.md` says never happens, so it is worth
+  noting that it happened here.
+- `DESIGN-strength-convergence.md` moved to `docs/archive/`. The classifier had marked it KEEP with
+  the explicit condition *"this file is the only written record of the ruling; archive once D-270
+  exists."* That condition is now met.
+- **`Q-144` is the only remaining gap in either sequence**, and is believed to be a skipped number
+  rather than a lost entry — nothing anywhere references it.
 
 ### 5.2 `PLAN-CONTRACT.md` actively contradicts `CLAUDE.md`, and its own header is the lie
 
@@ -215,9 +226,11 @@ rule". The doc is right and CLAUDE.md is wrong.
 
 ---
 
-## 6. Every doc classified — 158 files, 123 left in `docs/`
+## 6. Every doc classified — 158 files, 122 left in `docs/`
 
-Every `.md` in `docs/` was read and called. **35 moved, 10 proposed-and-held, 99 kept.**
+Every `.md` in `docs/` was read and called. **36 moved, 16 proposed-and-held (§6.2 + §6.3), 99 kept.**
+Every live doc appears in exactly one table below, and every archive row is really in `docs/archive/` —
+checked, not asserted.
 Nothing was deleted.
 
 The rule applied, on top of what the readers proposed: **if one of the six living docs still points
@@ -231,7 +244,7 @@ D-285", having confused the run-pace **resolver** (which did ship) with the **gl
 surface** (which did not — `resolveRunPaceStack`, `run_pace_provenance` and `glassBox` have **zero
 hits** in the codebase and Q-171/Q-173 are still open). It stays.
 
-### 6.1 Moved to `docs/archive/` — 35
+### 6.1 Moved to `docs/archive/` — 36
 
 `git mv`, so every one is one `git revert` from coming back.
 
@@ -248,6 +261,7 @@ hits** in the codebase and Q-171/Q-173 are still open). It stays.
 | `DESIGN-endurance-per-session-response.md` | Own banner: PARKED 2026-07-09, prototype written then deleted as duplicative of the spine + carryover reads, 'kept only as a record'; zero living-doc references. |
 | `DESIGN-familiar-routes.md` | Own banner: '⛔ SUPERSEDED 2026-07-06 — DO NOT BUILD FROM THIS DOC. See DESIGN-segments.md' — the route-identity substrate it rests on was killed by the D-250 audit. **Substance verified present in D-250.** |
 | `DESIGN-soreness-input.md` | Built: src/components/SorenessScale.tsx exists and ENGINE-STATE.md:723 records the segmented-bar 1-7 popup shipped across all disciplines with the no-default guarantee fixtured. **Substance verified present in D-234.** |
+| `DESIGN-strength-convergence.md` | The ratified design ruling for TRUTH-MAP fracture #1. **Substance filed as D-270 on 2026-07-31** — the classifier had kept it with the explicit condition *"the only written record of the ruling; archive once D-270 exists"*, and that condition is now met. Its display half was later superseded by D-347. |
 | `GOALS_SYSTEM_BLUEPRINT.md` | Own banner: '⚠️ STALE — VERIFY-FIRST', its rolling-generation mechanism (generate-macro, advance-plan, macro_phases) is 'fiction relative to live code' and §4-§8 are marked do-not-build; zero living-doc references. |
 | `ISLAND-PROPOSAL.md` | Non-binding proposal; superseded as the strength-authority doc by ARCH-strength-spine.md (LIVING, 2026-07-25) and its Phase 0/1 landed (_shared/periodization/ exists, isRestedTerminal 15 code hits); livedocRefs=0. |
 | `PERF-COMPARISON-POOL-SPEC.md` | Shipped: DECISIONS-LOG.md:336 records the D-037/D-038 mixed-effort work as shipped, silently reverted, then restored; pool_intensity_filter has 23 code hits. **Substance verified present in D-038.** |
@@ -291,7 +305,22 @@ Each of these is still cited by one of the six living docs. That is evidence the
 | `SPEC-state-headline.md` | 2 | GAME-PLAN.md:248 states it outright: 'the code shipped; per the SPEC LIFECYCLE the substance folds into a D-NNN and the file dies' — the D-NNN still needs authoring (F13). |
 | `SPEC-state-screen-v2-performance.md` | 1 | AUDIT-state-screen-2026-07-02.md:59 states the 'not built' header is stale and it IS built (D-148); State has since moved to v3 (D-293/294/295), so the spec describes a superseded screen. |
 
-### 6.3 Kept — 99 (plus the 6 living docs and this report)
+### 6.3 Proposed for archive but NOT moved — 6 more, because the reader was not confident
+
+Different reason from §6.2: nothing points at these, but the reader that flagged them said so at **low
+confidence** and named what it could not settle. Low confidence is not a basis for moving a file
+overnight, so they stayed. Each one names its own next check.
+
+| doc | the case for archiving, and what to check first |
+|---|---|
+| `PLAN-CONTRACT.md` | Superseded per CLAUDE.md, but **its own header claims the opposite** and it is cited from 7 places. Needs your call — see §5.2. |
+| `SCHEDULING-RULES-EXTRACTED.md` | Self-declares *"SNAPSHOT OUTDATED — 2026-05-09 … historical reference only"*. **Two readers independently caught that `CLAUDE.md` was recommending it as current descriptive truth** — those three CLAUDE.md lines are now corrected ⟨A31⟩, so the doc is at least no longer mis-sold. Archive it whenever you like; it is harmless where it sits. |
+| `RUN-HR-DRIFT-SPEC.md` | Header says DRAFT / D-036 proposed, but `decoupling_basis` has ~40 code hits. **Check D-036's entry text before archiving** — the reader would not assert it shipped. |
+| `RUNNING-CYCLING-DELTA.md` | 2026-05-13 port-gap audit, nothing points at it; its one live item (migration divergence) already migrated to `MAINTENANCE-DEBT.md`. |
+| `SPEC-strength-performance-details.md` | Two readers split. Execution score IS built (`analyze-strength-workout/index.ts:2720`), but D-351's region deletes Execution % for strength, and two of its named dependency specs no longer exist. **Re-check after confirming the Wendler rebuild (D-303/D-322/D-324) covered the Details tab.** |
+| `STRENGTH-ANALYSIS.md` | "Draft — 2026-05-27", nothing points at it; overtaken by the shipped logger/Performance work. |
+
+### 6.4 Kept — 99 (plus the 6 living docs and this report)
 
 <details><summary>Full keep list with reasons</summary>
 
@@ -325,7 +354,6 @@ Each of these is still cited by one of the six living docs. That is evidence the
 | `DESIGN-best-efforts.md` | high | Genuinely unbuilt — no best-effort module, edge function, or migration in the repo (only cycling power-curve code); the run GAP wiring it specs does not exist. |
 | `DESIGN-load-system-extension.md` | high | Item 0 built (D-261, _shared/plan-phase.ts); Items 1-4 designed and not built, and it carries THE LAW (D-260) framing for all load work. |
 | `DESIGN-segments.md` | high | Not built — no segment table, migration, or matcher exists (only cycling-v1/segments.ts and course-segmentation.ts, unrelated); D-250 records it as SPEC and it is the named replacement for the killed… |
-| `DESIGN-strength-convergence.md` | high | Code shipped (coach payload v74 reads the spine per-lift direction) BUT DECISIONS-LOG.md:217 states there is no D-270 heading anywhere — this file is the only written record of the ruling; archive on… |
 | `DOCTRINE-aerobic-maintenance-run-only.md` | high | Doctrine (default KEEP) and still unbuilt in three places its own trace notes flag: no grade field, run_vo2_* token grammar cannot express short intervals, §2.2 pace anchors contradicted by materiali… |
 | `DOCTRINE-aerobic-maintenance.md` | high | Doctrine (default KEEP), 2026-07-26, companion to SPEC-week-solver; §5.2 cadence field is still the unbuilt load-bearing requirement and §9 is unresolved against D-325. |
 | `ENDURANCE-PROVENANCE.md` | medium | The debt it catalogs is explicitly still open — docs/archive/DECISIONS-LOG-archive-D001-D239.md:4536 names 'the endurance-number sourcing debt (ENDURANCE-PROVENANCE.md: 0 SOURCED — a separate, larger… |
@@ -401,7 +429,7 @@ Each of these is still cited by one of the six living docs. That is evidence the
 </details>
 
 
-### 6.4 What the moves left behind
+### 6.5 What the moves left behind
 
 **26 code comments still name a moved doc by its old path.** They were **not touched** — this was a
 docs-only run. The files still exist, one directory deeper. To repoint them all:
@@ -546,7 +574,8 @@ for n in $(seq 240 352); do grep -qrE "^#{2,3} D-$n\b" docs/ || echo "MISSING D-
 for n in $(seq 130 235); do grep -qrE "^#{2,3} Q-$n\b" docs/ || echo "MISSING Q-$n"; done
 ```
 
-Run today, that reports exactly two misses: `D-270` and `Q-144`. **Anything else the script prints
+Run today, that reports exactly one miss: `Q-144` (believed a skipped number — it is referenced
+nowhere). **Anything else the script prints
 after a split is something the split dropped.** That is your canary.
 
 ---
