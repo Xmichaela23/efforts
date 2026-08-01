@@ -1066,7 +1066,7 @@ export default function StateTab({
   const week = wsv.week;
   const load = wsv.load;
   const rm = ((data as any)?.response_model ?? (wsv as any)?.response_model) as {
-    visible_signals: Array<{ label: string; category?: string; trend: string; trend_tone: string; detail: string; samples: number; provenance?: string | null }>;
+    visible_signals: Array<{ label: string; category?: string; trend: string; trend_icon?: string; trend_tone: string; detail: string; samples: number; provenance?: string | null }>;
     overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
     strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean; last_session_date?: string | null }> };
     endurance: unknown;
@@ -1603,7 +1603,19 @@ export default function StateTab({
                   >
                     <span className="text-[13px] text-white/70 shrink-0 w-[104px]">{s.label}</span>
                     <div className="flex-1 flex items-start gap-2 min-w-0">
-                      <span className={`flex-1 text-[13px] text-left leading-snug ${cappedSignalColor(s.label, s.trend, s.trend_tone)}`}>{s.detail}</span>
+                      {/* ⛔ A ROLLUP SHOWS ITS DIRECTION, NOT A WORD FOR IT (2026-08-01, Michael).
+                          The standing decision — no verdict word on the fitness reads — named
+                          run/bike/BODY. This row kept a word ("Easing off") because its `detail` is
+                          composed server-side; the ARROW was already on the wire (`trend_icon`,
+                          coach/index.ts:2586) and simply had no client type to arrive through.
+                          ⚠️ NO NUMBER IS POSSIBLE HERE, and that is not an oversight. The row rolls up
+                          run efficiency and bike efficiency — different metrics, different units. There
+                          is no honest way to combine −15.2% and −0.4% into one figure, so the arrow is
+                          the whole claim. See Q-238: the arrow is a directional assertion its own two
+                          contributors do not currently agree on. */}
+                      <span className={`flex-1 text-[13px] text-left leading-snug ${cappedSignalColor(s.label, s.trend, s.trend_tone)}`}>
+                        {ROLLUP_SIGNALS.has(s.label) ? (s.trend_icon ?? s.detail) : s.detail}
+                      </span>
                       {s.provenance && <span className="text-white/50 text-[11px] shrink-0 mt-0.5">{expandedSignal === s.label ? '▾' : '▸'}</span>}
                     </div>
                   </button>
