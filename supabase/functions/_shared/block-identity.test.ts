@@ -166,6 +166,50 @@ Deno.test('cycle: a LEADER cycle never measures, at any week', () => {
   // surface waiting for one must not read its silence as a miss.
 });
 
+// ---------------------------------------------------------------------------
+// The phase WORD — what a screen is allowed to print
+// ---------------------------------------------------------------------------
+
+Deno.test('phase word: the internal cycle names never reach a screen', () => {
+  // ⛔ 'Leader' and 'Anchor' are Wendler's words for the two cycle kinds. They are correct, they are
+  // what the builder stores, and they mean nothing to an athlete looking at a fitness row. The card
+  // hands out a plain word so no screen has to keep its own translation table — the moment two do,
+  // they disagree, and a plan that is not 5/3/1 falls through whichever table's default it hits.
+  assertEquals(card(ALL_ANCHOR_12, '2026-07-29').phase, 'Anchor');   // stored
+  assertEquals(card(ALL_ANCHOR_12, '2026-07-29').phaseWord, 'build'); // printed
+  assertEquals(card(ALL_ANCHOR_12, '2026-08-19').phase, 'Deload');
+  assertEquals(card(ALL_ANCHOR_12, '2026-08-19').phaseWord, 'recovery');
+});
+
+Deno.test('phase word: a plan that already speaks plainly is passed through, not re-mapped', () => {
+  // The endurance vocabulary IS the display vocabulary — base/build/peak/taper/recovery. A run plan
+  // renders correctly through the same field with nothing 5/3/1-shaped involved.
+  const runPlan = {
+    strength_protocol: 'durability',
+    user_selected_start_date: '2026-07-27',
+    duration_weeks: 16,
+    phases: [
+      { name: 'base', start_week: 1 },
+      { name: 'build', start_week: 7 },
+      { name: 'taper', start_week: 15 },
+    ],
+  };
+  assertEquals(card(runPlan, '2026-08-12').phaseWord, 'base');
+  assertEquals(card(runPlan, '2026-09-23').phaseWord, 'build');
+  assertEquals(card(runPlan, '2026-11-11').phaseWord, 'taper');
+});
+
+Deno.test('phase word: an unplaceable week is NULL, and a screen then says only "week N of M"', () => {
+  // ⚠️ Null is the honest answer and it has to survive to the render: the fallback for "the plan did
+  // not say" is silence about the phase, never a default word. Q-192's whole failure mode was a
+  // default that looked exactly like a deliberate choice.
+  const noPhases = { source: 'strength_primary', user_selected_start_date: '2026-07-27', duration_weeks: 12 };
+  const c = card(noPhases, '2026-07-29');
+  assertEquals(c.weekIndex, 1);
+  assertEquals(c.phase, null);
+  assertEquals(c.phaseWord, null);
+});
+
 Deno.test('cycle: an ENDURANCE plan has phases but no cycles, and says so with null', () => {
   const runPlan = {
     strength_protocol: 'durability',

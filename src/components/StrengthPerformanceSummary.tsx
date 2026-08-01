@@ -187,6 +187,27 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
   const allOut = sessionDetail?.strength_all_out ?? null;
   const allOutReason = sessionDetail?.strength_all_out_reason ?? null;
   const block = sessionDetail?.block ?? null;
+  // ── WHAT BLOCK THIS SESSION BELONGED TO (Q-230 / D-339, wired 2026-08-01) ─────────────────────
+  //
+  // The card has ridden on `session_detail_v1` since 2026-07-30 and this screen read exactly one
+  // field of it — `is_measurement_week`, for the line under the all-out set. So the table below
+  // could show a session's numbers as under-plan without ever saying the week was a deload.
+  //
+  // ⚠️ THE WORD IS THE CARD'S, NOT THIS SCREEN'S. `block.phase` is the plan's own name and on a
+  // 5/3/1 block that is 'Leader' / 'Anchor' — internal vocabulary an athlete should never be shown.
+  // `phase_word` is the plain one, resolved server-side through the app's single phase vocabulary,
+  // so this screen and the State fitness rows print the same word for the same week by construction
+  // rather than by two tables agreeing for now.
+  // ⚠️ Every piece is optional: no plan link → no card → nothing renders. A week that the plan does
+  // not place prints "week 3 of 12" with no word, and a card with no block length prints "week 3".
+  const blockLine = (() => {
+    if (!block) return null;
+    const week = block.week_index ?? null;
+    if (week == null) return null;
+    const weeks = block.block_weeks ?? null;
+    const where = weeks != null && weeks > 0 ? `week ${week} of ${weeks}` : `week ${week}`;
+    return block.phase_word ? `${where} · ${block.phase_word}` : where;
+  })();
   const workoutId = sessionDetail?.workout_id ?? (completed as any)?.id ?? null;
   // D-095: per-exercise prior-session lookup populated by workout-detail.
   // Shape: { [normalizedExerciseName]: { date, days_ago, sets: [...] } }.
@@ -267,6 +288,16 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
 
   return (
     <div className="space-y-4">
+      {/* THE BLOCK THIS SESSION BELONGED TO — one quiet line above the numbers it frames, so a light
+          week reads as a light week instead of as an under-performed one.
+          ⚠️ Present on sessions from FINISHED blocks too (Q-208): the card is deliberately not gated
+          on the plan still being active, so history keeps its framing. That is why the plan NAME is
+          here — "week 3 of 12" on its own does not say which block, once there has been more than one. */}
+      {blockLine && (
+        <div className="text-[11px] text-white/40">
+          {block?.plan_name ? `${block.plan_name} · ${blockLine}` : blockLine}
+        </div>
+      )}
       {/* ═══ D-338 — NO EXECUTION PERCENTAGE ON A STRENGTH SESSION ═══════════════════════════════
           No strength app scores a session against its program. Adherence is an ENDURANCE idea —
           TrainingPeaks-style compliance against prescribed pace and duration — and it got borrowed

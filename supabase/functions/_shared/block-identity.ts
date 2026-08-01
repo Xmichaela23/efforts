@@ -48,6 +48,7 @@ import {
 } from './plan-phase.ts';
 import {
   PROTOCOL_PROFILES,
+  normalizePhaseKey,
   protocolEffortRead,
   type EffortReadMode,
   type StrengthProtocolId,
@@ -152,6 +153,26 @@ export type BlockIdentity = {
   blockWeeks: number | null;
   /** Raw phase NAME as the plan stored it ('Anchor' / 'Leader' / 'Deload' / 'base' / 'taper' / …). */
   phase: string | null;
+
+  /**
+   * ⛔ THE WORD A SCREEN MAY PRINT. Null whenever the plan's phase does not resolve — and a null
+   * here means the surface says nothing about the phase, not that it picks a default.
+   *
+   * `phase` above is the plan's OWN name, and half of those names are internal: 'Leader' and
+   * 'Anchor' are Wendler's words for a 5/3/1 cycle and mean nothing to an athlete reading a screen.
+   * A surface that wants a readable word must NOT translate one — the moment two screens each keep
+   * their own leader→"build" table they will disagree, and a non-5/3/1 plan (whose phases are
+   * already called base/build/peak/taper) gets whatever the table's fallback happens to be.
+   *
+   * ⚠️ THIS IS AN ACCESSOR OVER THE VOCABULARY THAT ALREADY EXISTS, NOT A SECOND ONE.
+   * `normalizePhaseKey` (D-322, `strength-profiles.ts`) already maps every phase name any composer
+   * emits onto five plain words — base / build / peak / taper / recovery — and
+   * `strength-phase-vocabulary.test.ts` fails if a composer ever emits a name it does not cover.
+   * Two questions, one table: that function answers *"which effort rule governs this week"*, and
+   * this field answers *"what do we call this week out loud"*. They must not drift apart, which is
+   * exactly why this reads through it rather than beside it.
+   */
+  phaseWord: string | null;
   /** Where the phase came from. `'unknown'` is a real signal, not a silent null. */
   phaseSource: PhaseSource;
   weekIntent: WeekIntent;
@@ -351,6 +372,7 @@ export function resolveBlockIdentity(input: BlockIdentityInput): BlockIdentity {
     weekIndex,
     blockWeeks,
     phase,
+    phaseWord: normalizePhaseKey(phase),
     phaseSource: phase_source,
     weekIntent,
     cycle,

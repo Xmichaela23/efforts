@@ -173,8 +173,11 @@ function stripResponseOnlySessionDetailFields(sd: Record<string, unknown> | null
  * session. Deploying is not shipping here.
  *   1 — block card + strength_all_out (2026-07-30)
  *   2 — strength_all_out_reason: an empty panel says why (2026-07-30)
+ *   3 — phase_word: the plain phase word the screen prints, so no surface translates 'Anchor' for
+ *       itself (2026-08-01). Every session stored at v2 carries a card with no word; without this
+ *       bump the block line on Performance would stay silent on them forever.
  */
-const BLOCK_CARD_VERSION = 2;
+const BLOCK_CARD_VERSION = 3;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 
@@ -1036,6 +1039,10 @@ async function runSessionDetailPipelineAndPersist(
         week_index: blockForSession.weekIndex,
         block_weeks: blockForSession.blockWeeks,
         phase: blockForSession.phase,
+        // The plain word for the week — the screen prints this one. `phase` above is the plan's own
+        // name and on a 5/3/1 block that is 'Leader' / 'Anchor', which is Wendler's word, not the
+        // athlete's. Translated once by the card so State and Performance cannot use two tables.
+        phase_word: blockForSession.phaseWord,
         cycle_kind: blockForSession.cycle?.kind ?? null,
         week_in_cycle: blockForSession.cycle?.weekInCycle ?? null,
         is_deload_week: blockForSession.cycle?.isDeload ?? null,

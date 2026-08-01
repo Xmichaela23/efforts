@@ -7,6 +7,7 @@
 
 import React from 'react';
 import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand, StrengthFitness, StateDisplayV1, SwimVolume, FitnessMode, FitnessAnchor } from '@shared/state-trend';
+import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
 import { useStateTrends } from '@/hooks/useStateTrends';
 import { useAppContext } from '@/contexts/AppContext';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
@@ -46,6 +47,31 @@ function verdictSignedPct(verdict: string, pct: number | null | undefined): stri
   if (verdict === 'improving') return `+${Math.abs(pct)}%`;
   if (verdict === 'sliding') return `−${Math.abs(pct)}%`;
   return `${pct > 0 ? '+' : ''}${pct}%`;
+}
+
+// ── THE BLOCK, STATED — read from the card, translated by nobody ──────────────────────────────────
+//
+// ⛔ THE ROOT WIRE (Q-230 / D-339, audit 2026-08-01). `_shared/block-identity.ts` has answered "what
+// block is this, on this date" since 2026-07-30 and the coach's own verdicts read it — which is why
+// "your one-rep maxes are sliding" stopped firing on a block whose prescription is the reason they
+// dipped. These rows never read it, so they kept judging a number without knowing what the week
+// asked for. This is that wire, and nothing more: every value below is rendered as it arrived.
+//
+// ⚠️ THE WORD COMES FROM THE CARD. `block.phase` is the plan's OWN name and half of those are
+// internal — 'Leader' and 'Anchor' are Wendler's words for a 5/3/1 cycle, not an athlete's. The card
+// carries `phase_word` (base / build / peak / taper / recovery) resolved through the one vocabulary
+// the effort rules already use, so this screen keeps no translation table of its own: a plan that is
+// not 5/3/1 renders through the identical path, and a plan that does not place the week says only
+// "week 3 of 12". Null anywhere here means the plan did not say — so the line shortens, never guesses.
+type BlockCard = NonNullable<CoachWeekContextV1['plan']['block']>;
+function blockContextLine(planWeek: number | null | undefined, block: BlockCard | null | undefined): string | null {
+  // No week number = no plan running (the server nulls it before a plan starts and after it ends).
+  // There is nothing honest to say about position, so the row says nothing rather than "week 1".
+  if (planWeek == null) return null;
+  const weeks = block?.block_weeks ?? null;
+  const where = weeks != null && weeks > 0 ? `week ${planWeek} of ${weeks}` : `week ${planWeek}`;
+  const word = block?.phase_word ?? null;
+  return word ? `${where} · ${word}` : where;
 }
 
 // One labelled signal ("Power: improving +2%") for the bike dual read.
@@ -154,26 +180,39 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
 
 // STRENGTH row — PER-LIFT estimated 1RM read (Strong/Hevy + RTS/RP, verified vs field + science 2026-07-19).
 // Supersedes the rolled-up "getting stronger" verdict + baseline dot. Commercial strength apps show each MAIN
-// LIFT's estimated 1RM, its trend, and a PR flag, referenced to YOUR OWN best — not a typed baseline (which the
-// field doesn't use and which pegged the dot dumb once you passed it). Each lift's direction is already
-// NOISE-GUARDED on the spine (computeStrengthState) so a single session can't fake up/down; the estimate itself
-// is RIR-adjusted + near-failure-weighted (compute-facts estimated1RM, Wendler's formula per D-339, + D-118), which is the science's own caveat.
+// LIFT's estimated 1RM and a PR flag, referenced to YOUR OWN best — not a typed baseline (which the
+// field doesn't use and which pegged the dot dumb once you passed it). The estimate is RIR-adjusted +
+// near-failure-weighted (compute-facts estimated1RM, Wendler's formula per D-339, + D-118), which is the science's own caveat.
 // Receipts kept PER LIFT (sessions · as of). The grinding/RIR fatigue line (D-302) stays below — a distinct
-// fatigue axis, not the number. planWeek/isDevelop/the develop word-map are gone with the rolled-up verdict.
+// fatigue axis, not the number.
+// ⚠️ 2026-08-01: the per-lift TREND CHIP was removed (D2 — see the note inside the component). The
+// noise guard it relied on is still on the spine and still correct; the data underneath it is simply
+// one reading per cycle, which is too sparse for any direction claim, guarded or not. `planWeek` is
+// back as a real input — it now carries the block position this row renders.
 // The big-4 lifts that get a 12-week e1RM sparkline (Michael 2026-07-23). Matches BIG_4_LIFTS in
 // assemble.ts — only these canonicals carry a `series` from the server.
 const BIG_4_CHART_LIFTS = new Set(['squat', 'bench_press', 'deadlift', 'overhead_press']);
-function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fatigue?: boolean }) {
+function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: StrengthFitness; fatigue?: boolean; planWeek?: number | null; block?: BlockCard | null }) {
   // Main lifts with a real e1RM number; primaries lead (squat/bench/deadlift/press — the field's "main lifts").
   const lifts = fitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null);
-  // Direction chip off the GUARDED per-lift verdict. Up = green, flat = neutral, down = amber (a single lift
-  // dipping is not an alarm). needs_data/withheld → a number with no trend yet ("new").
-  const dir = (l: (typeof lifts)[number]) => {
-    if (l.direction === 'improving') return { arr: '↑', text: verdictSignedPct('improving', l.pctChange) ?? 'up', cls: 'text-emerald-400' };
-    if (l.direction === 'sliding')   return { arr: '↓', text: verdictSignedPct('sliding', l.pctChange) ?? 'down', cls: 'text-amber-300' };
-    if (l.direction === 'holding')   return { arr: '→', text: 'flat', cls: 'text-white/65' };
-    return { arr: '', text: 'new', cls: 'text-white/55' };
-  };
+  const blockLine = blockContextLine(planWeek, block);
+  // ⛔ THE PER-LIFT DIRECTION IS GONE, AND ITS ABSENCE IS THE FIX (D2, 2026-08-01).
+  //
+  // This row used to print a direction chip per lift — "↓ −4%", "→ flat", "new" — off the 6-week
+  // e1RM trend. The number it judged is produced ONCE PER CYCLE: an e1RM comes off the top set, and
+  // a 5/3/1 cycle deliberately runs that set from 65% to 95% across its weeks. So the series it
+  // read was mostly the PRESCRIPTION moving, sampled about four times, and it called a week the
+  // athlete executed perfectly a decline. Michael, on his own screen: bench reading "flat" with a
+  // dropping line, on week 1 of a block that is light on purpose.
+  //
+  // ⚠️ DELETED, NOT SILENCED, AND NOT REPLACED BY A PROTOCOL-AWARE VERSION. Making the chip smarter
+  // was the trap — it keeps a directional claim alive on data too sparse to carry one, and every
+  // future protocol then owes it another exception. The number is a fact and stays; the 12-week
+  // chart still shows the shape; what the week was FOR is now stated instead of inferred.
+  //
+  // ⚠️ The spine still computes `direction` and still excludes deload weeks from it (D-338) — this
+  // row simply no longer renders it. Nothing upstream changed, so nothing else that reads that
+  // verdict moved.
   // ⛔ READ, NOT DECIDED (2026-07-30). This screen used to hold the PR rule itself — three conditions
   // over all-time best, all-time count and the latest estimate. Deciding what counts as a personal
   // record is a verdict, and verdicts are the spine's (Constitution Law 4). It now lives in
@@ -182,34 +221,34 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
   const isPR = (l: (typeof lifts)[number]) => (l as any).isPr === true;
   return (
     <Row label="strength">
+      {/* WHAT THE WEEK IS FOR, above the numbers it explains. Rendered even with no lifts logged yet —
+          the block is running whether or not this row has anything to show. */}
+      {blockLine && (
+        <span className="basis-full text-white/45 text-[11px] -mt-0.5">{blockLine}</span>
+      )}
       {lifts.length === 0 ? (
         <span className="text-white/60">needs 2+ logged lifts to trend</span>
       ) : (
         <>
-          <span className="basis-full text-white/50 text-[11px] uppercase tracking-wider">estimated 1-rep max · last 6 weeks</span>
+          {/* ⚠️ "· last 6 weeks" is gone with the direction it described. It named the trend window,
+              and a window label sitting over numbers that no longer carry a trend is the stale-label
+              fault this screen has already been caught on three times. */}
+          <span className="basis-full text-white/50 text-[11px] uppercase tracking-wider">estimated 1-rep max</span>
           {lifts.map((l) => {
-            const d = dir(l);
-            // "new" means no 6wk verdict yet. When a 12-week chart IS present (big-4 with ≥2 points), the
-            // chart carries the read — so drop the "new" chip rather than assert it over a visible trend line
-            // (UX pass 2026-07-23). Also suppressed next to a PR (the old PR·new bug). Non-charted lifts keep it.
-            const hasChart = BIG_4_CHART_LIFTS.has(l.canonical) && (l.series?.length ?? 0) >= 2;
-            const suppressNew = d.text === 'new' && (isPR(l) || hasChart);
             return (
               <React.Fragment key={l.canonical}>
-                {/* 3-column grid: name (fills) | e1RM value (right-aligned number column) | trend
-                    (fixed-width right-aligned column) — so the lb column and the trend column each stack
-                    into a clean vertical edge across lifts (tabular-nums makes the digits equal-width). */}
-                <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto_4.75rem] items-baseline gap-x-2">
+                {/* 2-column grid: name (fills) | e1RM value (right-aligned number column) — the third
+                    column held the direction chip and went with it, so the lb column now carries the
+                    right edge on its own (tabular-nums keeps the digits equal-width).
+                    ⚠️ PR STAYS. It is not a direction: it is an exact fact about one measured set
+                    against every previous one, decided on the spine (assemble.ts), not a trend. */}
+                <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2">
                   <span className="text-white/85 text-[14px] truncate inline-flex items-baseline gap-1.5">
                     {l.displayName}
                     {/* "~" marks it as an ESTIMATE, not a tested max — a projection off your logged sets. */}
                     {isPR(l) && <span className="text-emerald-300 text-[10px] uppercase tracking-wide font-semibold">PR</span>}
                   </span>
                   <span className="text-white/85 text-[14px] text-right">~{Math.round(l.latestE1rm as number)} lb</span>
-                  {/* A real PR carries "it went up" — suppress the bare "new" next to it (the PR·new bug). */}
-                  <span className={`text-[13px] text-right inline-flex items-baseline justify-end gap-0.5 ${suppressNew ? 'text-transparent' : d.cls}`}>
-                    {d.arr && <span>{d.arr}</span>}<span>{suppressNew ? '' : d.text}</span>
-                  </span>
                 </span>
                 <span className="basis-full text-white/50 text-[11px] -mt-0.5">
                   {l.sampleCount} session{l.sampleCount === 1 ? '' : 's'}{asOf(l.newestAgeDays) ? ` · ${asOf(l.newestAgeDays)}` : ''}{l.provisional ? ' · provisional' : ''}
@@ -224,6 +263,9 @@ function StrengthFitnessRow({ fitness, fatigue }: { fitness: StrengthFitness; fa
                     fmtVal={(v) => String(Math.round(v))}
                     unit=" lb"
                     minSpanFraction={0.25}
+                    // This lift's own reading history — NOT a position in the block. The block is
+                    // stated once, at the top of the row, from the card.
+                    buildingLabel={(w) => `${w} ${w === 1 ? 'week' : 'weeks'} of readings`}
                   />
                 )}
               </React.Fragment>
@@ -386,9 +428,19 @@ const RUN_TREND_MIN_RUNS = 8;
 // no line (can't imply a trend through one dot). Tap to expand. TP charts LOAD; this charts OUTPUT.
 // Generalized 2026-07-23 so the same visual serves run efficiency AND per-lift strength e1RM (Michael's
 // big-4 chart). Props default to the run row's exact look/copy; strength passes color + nouns + a lb formatter.
-function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, recentLabel = 'recent 6 in color', caption }: {
+function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, recentLabel = 'recent 6 in color', caption, buildingLabel = (w: number) => `building · ${w} of 12 weeks` }: {
   series?: Array<{ date: string; value: number; recent: boolean; tempF?: number | null }>;
   color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number; recentLabel?: string;
+  /**
+   * ⛔ THE COVERAGE LABEL, OVERRIDABLE AT THE CALL SITE (2026-08-01). "building · 3 of 12 weeks" is
+   * honest for run — it counts data coverage of a 12-week canvas. On a strength lift it lands two
+   * lines under "week 3 of 12" and reads as the same claim about the block, which it is not: it is a
+   * per-LIFT data span, so it differs lift to lift and says "3 of 12" on a lift first logged three
+   * weeks into a nine-month training history.
+   * ⚠️ Changed HERE and only here — this component is shared by run, bike and strength, and the
+   * default keeps the other two rendering exactly as they did.
+   */
+  buildingLabel?: (spanWeeks: number) => string;
   /** ⛔ CONDITIONS ARE SHOWN, NOT CORRECTED (D-346). Intervals.icu overlays weather so a reader can
    *  interpret a poor data point; nobody in the field adjusts an efficiency chart for heat, so neither
    *  do we. One line of context under the chart, and the athlete does the discounting. */
@@ -455,7 +507,7 @@ function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: nu
         </span>
       )}
       <span className="text-[10px] text-white/45 flex items-center justify-between">
-        <span>{building ? `building · ${spanWeeks} of 12 weeks` : (expanded ? `each dot = one ${dotNoun} · ${recentLabel}` : `last ${spanWeeksRaw} weeks · ${recentLabel} · tap to expand`)}</span>
+        <span>{building ? buildingLabel(spanWeeks) : (expanded ? `each dot = one ${dotNoun} · ${recentLabel}` : `last ${spanWeeksRaw} weeks · ${recentLabel} · tap to expand`)}</span>
         {/* Range only — the session COUNT lives on the lift's name line (the verdict window); repeating a
             different chart-window count here read as a contradiction (UX pass 2026-07-23). */}
         {/* ⚠️ Suppressed when there is no unit. The run chart plots the efficiency INDEX, so this
@@ -793,7 +845,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
 // always-visible week-execution trade sentence. (The old always-visible `PostureLine` — orphaned since
 // it was written, F10 — is removed 2026-07-24 now that the ⓘ carries this.)
 
-export default function StatePerformanceSection({ strengthDetail, stateDisplay, primaryDiscipline, planWeek, strengthFatigue }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; primaryDiscipline?: string | null; planWeek?: number | null; strengthFatigue?: boolean }) {
+export default function StatePerformanceSection({ strengthDetail, stateDisplay, primaryDiscipline, planWeek, block, strengthFatigue }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
   const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
@@ -847,7 +899,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} postureSentence={card.postureSentence} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
             if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
-            if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} fatigue={strengthFatigue} />{strengthDetail}</>;
+            if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} fatigue={strengthFatigue} planWeek={planWeek} block={block} />{strengthDetail}</>;
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
             return (card.discipline === 'strength' && strengthDetail) ? <>{row}{strengthDetail}</> : row;
           })();

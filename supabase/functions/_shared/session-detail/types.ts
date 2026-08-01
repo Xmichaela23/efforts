@@ -113,6 +113,12 @@ export type SessionDetailV1 = {
     week_index: number | null;
     block_weeks: number | null;
     phase: string | null;
+    /**
+     * ⛔ THE PHASE WORD A SCREEN MAY PRINT — 'base' | 'build' | 'peak' | 'taper' | 'recovery'.
+     * `phase` above is the plan's own name ('Leader' / 'Anchor' / 'Deload' on a 5/3/1 block), which
+     * is internal vocabulary. Null = the plan did not place this week; render the week number alone.
+     */
+    phase_word: string | null;
     cycle_kind: 'leader' | 'anchor' | null;
     week_in_cycle: number | null;
     is_deload_week: boolean | null;

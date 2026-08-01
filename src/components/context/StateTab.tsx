@@ -1708,7 +1708,11 @@ export default function StateTab({
         })()}
 
         {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
-        <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} strengthFatigue={strengthFatigue} />
+        {/* ⛔ `block` is the block-identity card the coach payload has carried since v150 — protocol,
+            goal, week-in-cycle, deload, the plain phase word. The fitness rows below RENDER it; they
+            do not re-derive any of it (Law 4). `planWeek` is the server's already-gated week number
+            (null before a plan starts and after it ends), so the two always agree. */}
+        <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} block={planRoot?.block ?? null} strengthFatigue={strengthFatigue} />
 
         {/* SWIM re-test nudge (D-200) — fires after ≥4 weeks + ≥4 honored swims; auto-clears when the
             threshold is updated/tested (lastUpdatedAt moves). Dismiss = 7-day snooze (shared pattern). */}

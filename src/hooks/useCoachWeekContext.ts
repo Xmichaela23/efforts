@@ -100,6 +100,35 @@ export type CoachWeekContextV1 = {
     week_focus_label: string | null;
     week_start_dow: string;
     athlete_context_for_week: string | null;
+    /**
+     * ⛔ WHAT BLOCK THIS IS — resolved once server-side by `_shared/block-identity.ts` and rendered
+     * verbatim (Q-230 / D-339). The server has sent this since coach payload v150; it was never
+     * described here, so the client threw it away and the State fitness rows stayed protocol-blind
+     * while the coach's own verdicts were already reading it.
+     *
+     * ⚠️ Every field is nullable and null MEANS SOMETHING: the plan did not say. Render nothing —
+     * never a default, never a guess.
+     */
+    block?: {
+      protocol_id: string | null;
+      /** False = an id this build does not recognise. Treat exactly like null. */
+      protocol_known: boolean;
+      effort_read: 'amrap' | 'rir' | 'none';
+      goal_kind: 'race' | 'non_race' | 'unknown';
+      goal_focus: string | null;
+      block_weeks: number | null;
+      /** The plan's OWN phase name — internal ('Leader' / 'Anchor'). Do not print this one. */
+      phase: string | null;
+      /** ⛔ THE WORD TO PRINT: 'base' | 'build' | 'peak' | 'taper' | 'recovery'. Null → say nothing. */
+      phase_word: string | null;
+      cycle_kind: 'leader' | 'anchor' | null;
+      week_in_cycle: number | null;
+      is_deload_week: boolean | null;
+      has_all_out_set: boolean | null;
+      /** The 95% reading — the one that moves the working number. NOT every all-out set. */
+      is_measurement_week: boolean | null;
+      top_set_pct: number | null;
+    };
     /** Same `config.distance` as Plan Wizard (coach root `plan`). */
     active_plans?: Array<{
       plan_id: string;

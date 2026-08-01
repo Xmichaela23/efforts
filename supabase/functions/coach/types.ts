@@ -186,6 +186,12 @@ export type CoachWeekContextResponseV1 = {
       goal_focus: string | null;
       block_weeks: number | null;
       phase: string | null;
+      /**
+       * ⛔ THE PHASE WORD A SCREEN MAY PRINT — 'base' | 'build' | 'peak' | 'taper' | 'recovery'.
+       * `phase` above is the plan's own name and half of those are internal ('Leader' / 'Anchor').
+       * Null = the plan did not place this week; render the week number alone, never a default word.
+       */
+      phase_word: string | null;
       cycle_kind: 'leader' | 'anchor' | null;
       week_in_cycle: number | null;
       is_deload_week: boolean | null;
