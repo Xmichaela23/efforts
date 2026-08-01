@@ -2647,6 +2647,33 @@ rather than guessed into it — the same failure direction the gate already chos
 3. ⛔ **Always pair a shown number with its cached confidence interval.** Every state that renders a
    number renders its uncertainty. **No exceptions** — that is the rule that makes the rest trustworthy.
 
+### AMENDMENT (same day) — the range is ALWAYS-VISIBLE; the tap-gated placement is SUPERSEDED
+
+⛔ **The original placement — "the range lives in the ⓘ expand" — is SUPERSEDED, not merely added to.**
+The range now renders on the always-visible receipt line directly under the headline:
+
+> `range −24% to −6% · over 12wk · 25 runs · 1d ago`
+
+**Why the first placement failed its own rule.** Rule 3 is *a shown number always shows its
+uncertainty*. The headline percent is on screen **without a tap** — so gating its interval behind one
+left the default view showing a **naked, precise-looking number**, which is the exact thing the rule
+exists to prevent. A range the athlete has to go looking for does not satisfy it.
+
+**It stays in the expand as well.** The expand carries the fuller *"why"* sentence; the visible line
+carries the number's own uncertainty, next to the number.
+
+⚠️ **THIS IS RECORDED BECAUSE A FUTURE CLEANUP WILL READ THE TWO AS REDUNDANT AND STRIP ONE.** They are
+not a duplication — they answer different questions in different places, and removing the visible one
+silently reinstates the naked number. **If you are about to delete one, delete neither.**
+
+**They cannot disagree:** both call the same `ciRange(eff.route.ci)` — one helper, one rounding, two
+call sites (`StatePerformanceSection.tsx:719` visible, `:814` expand). Printing two different intervals
+for the same number would have been worse than showing none.
+
+⚠️ **A `holding` range may straddle zero** (`−3% to +2%`). Shown deliberately — that is the honest
+picture of a verdict meaning *"no real change"*, and hiding it would make a flat read look more certain
+than it is.
+
 ### ⚠️ THIS PARTLY REVERSES A DECISION THAT WAS NEVER WRITTEN DOWN
 
 Earlier the same day, the fitness rows were stripped of verdict words entirely — *"arrow + number, no
