@@ -269,7 +269,12 @@ export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
   work_set: 'Every rep at the same speed as the first.',
   amrap: 'Slow rep = last rep.',
   rest: "Rest until the speed's back.",
-  deload: 'Nothing to prove. Move it fast anyway.',
+  // ⚠️ REWRITTEN 2026-08-01 (Michael), from "Nothing to prove. Move it fast anyway." The old line
+  // conceded something first ("nothing to prove", "anyway") and the concession is the part an
+  // athlete reads — it frames the session as a write-off rather than as a prescribed light day.
+  // The replacement states the FACT (the plan chose this weight) and then the instruction, which is
+  // the same shape every other line in this table uses.
+  deload: 'Light on purpose. Move it fast.',
   // The gate announces itself BEFORE the unrack, not after. It is the one set in the cycle whose
   // rep count changes the plan, and an athlete who finds that out afterwards was not given the
   // chance to treat it as the measurement it is.
@@ -278,6 +283,26 @@ export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
 
 /** The AMRAP's closing line — shown after the set, where `amrap` is shown before/during. */
 export const BAR_SPEED_AMRAP_AFTER = 'Stop when it slows, not when it fails.';
+
+/**
+ * ⛔ THE ASSISTANCE CUE — shown ONCE per accessory exercise, not per set.
+ *
+ * An assistance row prescribes a rep TOTAL ("25 total") and no weight, which is the block saying
+ * *"get this many, however you like."* Nothing on the card said so, so the number read as a single
+ * set — Michael, on his own plan: *"25 chin ups? lol i can do 5."* The prescription never asked for
+ * twenty-five in a row, and the row that carries it never mentioned that.
+ *
+ * **Basis: Wendler, 5/3/1 2nd ed.** Assistance is done across as many sets as it takes and is
+ * explicitly NOT taken to failure (p.24, p.102); doing too much assistance is named as the single
+ * most common mistake lifters make with the programme. Both halves of the line are his, in order.
+ *
+ * ⚠️ IT CONTAINS "as many" AND "failure", AND THAT IS NOT A LINT MISS. `bar-speed-copy.test.ts`
+ * bans those words on the BAR_SPEED_COPY lines because there they would mean rep-chasing on a
+ * prescribed set. Here "as many" governs SETS (the opposite of chasing reps in one) and "failure"
+ * appears as an explicit stop rule. Same words, inverted sense. **Do not widen that lint over this
+ * constant** — pin the intent instead, as `strength-accessory-copy.test.ts` does.
+ */
+export const ACCESSORY_SET_CUE = 'Split these into as many sets as you need. Leave a rep or two — never to failure.';
 
 /**
  * ⛔ GATED ON `verdictFrom95Set` BEING WIRED. Do not render until the composer reads the verdict

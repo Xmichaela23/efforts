@@ -21,8 +21,12 @@ import { NumericKeypadSheet } from '@/components/ui/numeric-keypad-sheet';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import {
   topSetIndex,
+  barSpeedLineFor,
+  ACCESSORY_SET_CUE,
   type SetDifficulty,
 } from '@/lib/strength-focus-copy';
+// D-208's role table — the app's one answer to "is this a main lift or assistance work".
+import { roleForExercise } from '@/lib/exercise-role';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 // The app's ONE 1RM formula — Wendler's own (D-339). `compute-facts` imports the same module.
@@ -1613,6 +1617,53 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // IRRELEVANT — and on a card that shows nothing else about reserve it reads as a target.
     if (rirTracked !== false && typeof p.rir === 'number') s += ` @ RIR ${p.rir >= 5 ? '5+' : p.rir}`;
     return s;
+  };
+
+  /**
+   * ⛔ IS THIS ROW ASSISTANCE WORK? Two signals, and the FIRST does not exist on older plans.
+   *
+   * `load_prescribed: false` is stamped by the Get Stronger composer on every assistance slot — the
+   * block's own declaration, and therefore authoritative when present. Every row written before it
+   * shipped lacks it, including blocks currently being run, so the second signal carries them: an
+   * assistance prescription is a rep TOTAL ("25 total"), because it states a movement and a total
+   * and never a weight. A main lift always prescribes a number, never a total. (Same pair the swap
+   * shortlist already keys on.)
+   *
+   * ⚠️ The role table is the LAST resort, for a hand-added exercise that has no prescription at all
+   * — a freeball accessory the athlete typed in. It classifies by NAME, so it must not outrank the
+   * block's own declaration: a plan is allowed to prescribe a "primary" movement as assistance.
+   */
+  const isAssistanceRow = (exercise: LoggedExercise): boolean => {
+    if (exercise?.load_prescribed === false) return true;
+    if (/total/i.test(String(exercise?.target_reps ?? ''))) return true;
+    if (exercise?.planned_name || exercise?.target_reps) return false; // prescribed, and not assistance
+    return roleForExercise(String(exercise?.name || '')) === 'accessory';
+  };
+
+  /**
+   * The bar-speed cue for one set. Built and specced on 2026-07-27 (D-326 era) and rendered NOWHERE
+   * until now — `barSpeedLineFor` was reachable only from its own test. Same starvation the engine
+   * banner warns about: the thing existed, was correct, was pinned, and never once reached a screen.
+   *
+   * ⛔ `isValiditySet` IS DELIBERATELY NEVER PASSED. Its line — "Five at ninety-five. This one
+   * decides the number." — is TRUE only once `verdictFrom95Set` is wired, and it is not. Until then
+   * the plan advances on the calendar, so telling an athlete this set decides their working number
+   * would be a promise the engine does not keep. Same gate as `STRENGTH_ADVANCE_COPY`. When that
+   * lands, pass the flag here and the copy is already written.
+   *
+   * ⚠️ Deload comes from the SESSION NAME, which is the tell the deload pill above already uses —
+   * one signal, not a second derivation that could disagree with the pill on the same screen.
+   */
+  const barSpeedCueFor = (exercise: LoggedExercise, set: LoggedSet): string | null => {
+    // Assistance work is not a bar-speed conversation — it has its own cue, once, above.
+    if (isAssistanceRow(exercise)) return null;
+    if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
+    return barSpeedLineFor({
+      isWarmup: set?.setType === 'warmup',
+      isAmrap: set?.amrap === true,
+      isDeload: /deload/i.test(String(scheduledWorkout?.name || '')),
+      // isValiditySet: intentionally omitted — see the note above.
+    });
   };
 
   const parseTimerInput = (raw: string): number | null => {
@@ -4587,6 +4638,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   </button>
                 )}
 
+              {/* ⛔ HOW ASSISTANCE IS MEANT TO BE PERFORMED — ONCE per exercise, not per set.
+                  An assistance row prescribes a rep TOTAL and no weight, which is the block saying
+                  "get this many, however you like". Nothing on the card said so, so "target 25 total"
+                  read as one set: Michael, on his own plan — "25 chin ups? lol i can do 5." The
+                  prescription never asked for twenty-five in a row.
+                  Basis is Wendler (5/3/1 2nd ed. p.24 / p.102): assistance runs across as many sets
+                  as it takes and is explicitly not taken to failure — doing too much of it is named
+                  as the most common mistake with the programme. See ACCESSORY_SET_CUE for why this
+                  line may contain words the bar-speed lint bans. */}
+              {isAssistanceRow(exercise) && !isBaselineTestWorkout(scheduledWorkout || {}) && (
+                <p className="w-full text-[10px] font-medium text-white/40 leading-snug px-1 pb-1 -mt-0.5">
+                  {ACCESSORY_SET_CUE}
+                </p>
+              )}
+
               {/* ── Q-181 — THE SWAP SHEET ────────────────────────────────────────────────────────
                   The app OFFERS the alternatives, filtered by MOVEMENT PATTERN + the athlete's
                   equipment — the field standard (Trainerize's filters are literally "Same muscle group
@@ -5354,6 +5420,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           <div className="flex items-start gap-2 mt-1">
                             <span className="w-9 shrink-0" aria-hidden="true" />
                             <span className="text-[10px] font-medium text-white/40 leading-none tabular-nums">{txt}</span>
+                          </div>
+                        );
+                      })()}
+                      {/* ⛔ THE BAR-SPEED CUE, FINALLY RENDERED. Written and pinned 2026-07-27,
+                          reachable only from its own test until 2026-08-01 — the line existed, was
+                          correct, and had never once reached a screen. Placed exactly like the
+                          "last:" anchor above it (same indent to the set-number leader, same
+                          weight) because it answers the same question: what is this set FOR.
+                          ⚠️ Speed on a prescribed set is a QUALITY CHECK; speed on an AMRAP is a
+                          STOP RULE. `barSpeedLineFor` keys on the set, never the week, so the two
+                          can't be swapped — and a prescribed set can never receive
+                          "slow rep = last rep". */}
+                      {(() => {
+                        const cue = barSpeedCueFor(exercise, set);
+                        if (!cue) return null;
+                        return (
+                          <div className="flex items-start gap-2 mt-1">
+                            <span className="w-9 shrink-0" aria-hidden="true" />
+                            <span className="text-[10px] font-medium text-white/35 leading-snug">{cue}</span>
                           </div>
                         );
                       })()}
