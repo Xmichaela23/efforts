@@ -609,7 +609,12 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
   const { useImperial } = useAppContext();
   const eff = fitness.efficiency;
   const dur = fitness.decoupling;
-  const [explainOpen, setExplainOpen] = React.useState(false);
+  // ⛔ TWO CUES, TWO ANSWERS (2026-08-01, Michael). ⓘ = *what is this metric*. "more" = *what is it
+  // saying about me right now*. They were one blob behind the metric word, so an athlete who
+  // wanted the definition got the whole read, and an athlete who wanted the read had to tap a
+  // glyph that promised a definition. Different questions, different cues, opened separately.
+  const [explainOpen, setExplainOpen] = React.useState(false);   // ⓘ — definition only
+  const [detailOpen, setDetailOpen] = React.useState(false);     // more — the read
   // ⛔ THE GAP TOGGLE IS GONE (D-346, 2026-07-31). It offered raw-vs-grade-adjusted pace, which made
   // sense when the row's pace was the raw number the watch showed. The pace now comes from the
   // verdict's own pool and is ALREADY grade-adjusted, so `recentGapPaceSecPerKm` is deliberately null
@@ -646,12 +651,39 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
     if (rounded < 5) return null;                        // below the rounding floor — nothing to say
     return `Heat costs you about ${rounded}s a mile per 10°F warmer, measured on your own runs.`;
   }, [eff.route, eff.recentPaceSecPerKm]);
+  // ⛔ "grade-adjusted" IS GONE FROM HERE (2026-08-01, Michael — jargon). The caption's job is the
+  // CONDITIONS the plotted runs were done in; the METHOD is now stated in a plain sentence beside the
+  // heat line, where the athlete is already being told what the number does and does not include.
+  // ⚠️ Sub-8°F spread returns null rather than a bare method word — with the jargon removed there was
+  // nothing left to say, and a caption that says nothing is worse than no caption.
   const routeCaption = React.useMemo(() => {
     const temps = (eff.route?.series ?? []).map((p) => p.tempF).filter((t): t is number => t != null);
     if (temps.length < 2) return null;
     const lo = Math.round(Math.min(...temps)), hi = Math.round(Math.max(...temps));
-    return hi - lo >= 8 ? `grade-adjusted · ${lo}–${hi}°F across these runs` : 'grade-adjusted';
+    return hi - lo >= 8 ? `${lo}–${hi}°F across these runs` : null;
   }, [eff.route]);
+  // ⛔ THE READ, HOISTED (2026-08-01). Lives here rather than inline so the "more" cue can be shown
+  // only when there IS something behind it — a cue that opens an empty panel is worse than no cue.
+  // Same numbers, same `ciRange`, same rounding as everywhere else on this row.
+  const trendDetail = React.useMemo(() => {
+    const wks = eff.route?.spanDays != null ? Math.max(1, Math.round(eff.route.spanDays / 7)) : null;
+    const over = wks != null ? ` over ${wks} weeks` : '';
+    const rng = ciRange(eff.route?.ci);
+    const mag = eff.pctChange != null ? Math.abs(Math.round(eff.pctChange)) : null;
+    if (eff.verdict === 'holding') return `No real change in speed-for-effort${over}.`;
+    if (eff.verdict === 'sliding' && eff.recentlyFlat) {
+      return mag == null
+        ? 'Dropped earlier, steady for the last few weeks.'
+        : `About ${mag}% less speed per heartbeat${over}${rng ? ` (${rng})` : ''} — most of that drop was earlier; the last few weeks have held steady.`;
+    }
+    if (eff.verdict === 'improving' && mag != null) return `About ${mag}% more speed per heartbeat${over}${rng ? ` (${rng})` : ''}.`;
+    // ⚠️ The SLIDING branch names the ordinary causes because a decline here is routinely correct, and
+    // a bare "slower" invites the athlete to read a problem the number cannot support. Possibilities,
+    // never a finding.
+    if (eff.verdict === 'sliding' && mag != null) return `About ${mag}% less speed per heartbeat${over}${rng ? ` (${rng})` : ''}. Heat, fatigue, or a base block can all cause this.`;
+    return null;
+  }, [eff.verdict, eff.recentlyFlat, eff.pctChange, eff.route]);
+  const hasDetail = !!(postureSentence || trendDetail);
   const hasTrend = eff.verdict !== 'needs_data' && eff.verdict !== 'withheld';
   // ⛔ THE WINDOW LABEL DESCRIBES THE POOL THAT WAS ACTUALLY READ (D-346, 2026-07-31).
   //
@@ -718,8 +750,46 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
       {hasTrend && (() => {
         const rng = ciRange(eff.route?.ci);
         const line = [rng, evidence].filter(Boolean).join(' · ');
-        return line ? <span className="basis-full text-white/55 text-[12px]">{line}</span> : null;
+        if (!line && !hasDetail) return null;
+        return (
+          <span className="basis-full flex items-baseline justify-between gap-2 text-white/55 text-[12px]">
+            <span>{line}</span>
+            {/* ⛔ THE SECOND CUE, AND IT IS DELIBERATELY A WORD NOT A GLYPH. ⓘ promises a definition;
+                "more" promises the read. Two glyphs would have been two mysteries. Gated on
+                `hasDetail` so it never opens an empty panel. */}
+            {hasDetail && (
+              <button type="button" onClick={() => setDetailOpen((o) => !o)} className="shrink-0 text-white/50">
+                {detailOpen ? 'less' : 'more'}
+              </button>
+            )}
+          </span>
+        );
       })()}
+      {/* THE READ — plan context first, then what the trend is saying. Opened by "more", never by ⓘ. */}
+      {detailOpen && (
+        <>
+          {postureSentence && (
+            <p className="basis-full text-[12px] text-white/80 leading-snug mt-1 max-w-[min(100%,340px)]">
+              {postureSentence}
+            </p>
+          )}
+          {trendDetail && (
+            <p className="basis-full text-[12px] text-white/55 leading-snug mt-1 max-w-[min(100%,340px)]">
+              {trendDetail}
+            </p>
+          )}
+        </>
+      )}
+      {/* ⛔ WHAT THE NUMBER ALREADY ACCOUNTS FOR, IN PLAIN WORDS (2026-08-01, Michael). This replaces
+          "grade-adjusted" in the chart caption — correct, and jargon. It sits beside the heat line
+          because the two answer the same question: what has already been taken out of this number, so
+          the athlete knows what NOT to explain away. Heat is stated as a COST (measured on their own
+          runs); hills are stated as REMOVED, because they are.
+          ⚠️ Gated on `eff.route` — the grade adjustment is the ROUTE engine's. On the non-route
+          fallback the claim would not be true, and it stays silent rather than overclaiming. */}
+      {hasTrend && eff.route && (
+        <span className="basis-full text-white/55 text-[12px]">Evened out for hills, so a hilly week doesn't read as slower.</span>
+      )}
       {heatCost && <span className="basis-full text-white/55 text-[12px]">{heatCost}</span>}
       {/* THE LONG VIEW — the arc behind the verdict.
           ⛔ WHEN A ROUTE VERDICT EXISTS THE CHART PLOTS **THE ROUTE'S OWN RUNS** (D-346, 2026-07-31).
@@ -781,60 +851,17 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
           ))}
         </span>
       )}
+      {/* ⓘ — THE DEFINITION, AND NOTHING ELSE (2026-08-01, Michael). It used to open the posture
+          sentence and the trend read as well, so the one cue that promises "what is this metric"
+          answered three questions at once. The read moved to "more" above.
+          ⛔ THE DEFINITION DESCRIBES THE POOL ACTUALLY READ (D-346): every run, terrain handled by the
+          grade adjustment rather than by excluding sessions — not "on steady runs", and not a
+          comparison against six weeks ago. The ⓘ is where an athlete checks whether to believe the
+          number; a stale explanation there is worse than none. */}
       {explainOpen && (
-        <>
-          {/* THE "WHY" LEADS — the athlete-specific diagnosis (server-minted from declared posture + how
-              much they've actually been running). Names ONLY the observable (intent + volume), never a
-              physiology cause (posture.ts no-cause law). Null when no posture declared → nothing here, and
-              the definition below stands alone. Trimmed from a 5-thing glossary to diagnosis + one
-              definition (Michael 2026-07-24, "word soup"). */}
-          {postureSentence && (
-            <p className="basis-full text-[12px] text-white/80 leading-snug mt-1 max-w-[min(100%,340px)]">
-              {postureSentence}
-            </p>
-          )}
-          {/* ⛔ THE DEFINITION DESCRIBES THE POOL THAT IS ACTUALLY READ (D-346, 2026-07-31).
-              It said "on steady runs" — the verdict now reads EVERY run, with terrain handled by the
-              grade adjustment rather than by excluding sessions. And it said the change was "than 6
-              weeks ago", which was wrong twice over: the window is ~13 weeks, and the number is a
-              regression slope across all of it, not an endpoint comparison. The ⓘ is where an athlete
-              goes to check whether to believe the number — a stale explanation there is worse than none. */}
-          {/* ⛔ THE DETAIL SAYS WHAT THE NUMBER MEANS, THEN HOW SURE IT IS (2026-08-01, Michael).
-              The magnitude is whole-percent — a tenth on a regression slope across three months is
-              false precision, and the CI is the honest statement of confidence. The range is
-              `route.ci`, already computed and already cached; nothing is recomputed here.
-              ⚠️ The SLIDING branch names the ordinary causes (heat, fatigue, a base block) because a
-              decline here is routinely correct, and a bare "slower" invites the athlete to read a
-              problem the number cannot support. It names them as possibilities, never as a finding. */}
-          <p className="basis-full text-[12px] text-white/55 leading-snug mt-1.5 max-w-[min(100%,340px)]">
-            Efficiency is your speed per heartbeat, adjusted for hills and for heat — rising means faster at the same effort.
-            {(() => {
-              const wks = eff.route?.spanDays != null ? Math.max(1, Math.round(eff.route.spanDays / 7)) : null;
-              const over = wks != null ? ` over ${wks} weeks` : '';
-              const rng = ciRange(eff.route?.ci);
-              const mag = eff.pctChange != null ? Math.abs(Math.round(eff.pctChange)) : null;
-              if (eff.verdict === 'holding') return <> No real change in speed-for-effort{over}.</>;
-              // ⛔ THE RANGE IS NOT OPTIONAL ON THIS STATE — IT IS MOST NEEDED HERE (Michael,
-              // 2026-08-01, overruling the first build). This row renders a FLAT arrow beside a
-              // precise-looking "−15%", which makes a NET figure over the whole window look settled
-              // and certain when its recent half is flat. Dropping the range here would have
-              // reintroduced exactly the false precision this change set out to kill, on the one
-              // state where it reads most confident. **Every state that shows a number shows its
-              // uncertainty. No exceptions** — that is the rule that makes the rest trustworthy.
-              if (eff.verdict === 'sliding' && eff.recentlyFlat) {
-                if (mag == null) return <> Dropped earlier, steady for the last few weeks.</>;
-                return <> About {mag}% less speed per heartbeat{over}{rng ? ` (${rng})` : ''} — most of that drop was earlier; the last few weeks have held steady.</>;
-              }
-              if (eff.verdict === 'improving' && mag != null) {
-                return <> About {mag}% more speed per heartbeat{over}{rng ? ` (${rng})` : ''}.</>;
-              }
-              if (eff.verdict === 'sliding' && mag != null) {
-                return <> About {mag}% less speed per heartbeat{over}{rng ? ` (${rng})` : ''}. Heat, fatigue, or a base block can all cause this.</>;
-              }
-              return null;
-            })()}
-          </p>
-        </>
+        <p className="basis-full text-[12px] text-white/55 leading-snug mt-1 max-w-[min(100%,340px)]">
+          Efficiency is your speed per heartbeat, adjusted for hills and for heat — rising means faster at the same effort.
+        </p>
       )}
     </Row>
   );
