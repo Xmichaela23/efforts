@@ -1,5 +1,11 @@
 # SPEC — E3b: budget-anchored volume (the hours budget sizes the week)
 
+> # ARCHIVED 2026-07-31 by the doc audit — BUILT, and its substance lives in **D-219**.
+> D-219 (`docs/archive/DECISIONS-LOG-archive-D001-D239.md:4554`) says so in its own words: *"Realizes
+> `SPEC-e3b-bottom-up-volume.md`"*, and carries the budget-anchored model in full. `e3b-budget.test.ts`
+> pins it. Kept, not deleted. ⟨A31⟩
+
+
 **Status: IMPLEMENTED 2026-06-28 (Part 1 + Part 2).** Committed + pushed (`4a9a63e8` budget-anchored legal fill + glass-box; `f7377311` strength-reservation basis + `rideHrs` contract), 20/20 tests, proven in the live Deno runtime via preview probe. **NOT yet deployed** (engine-first — deploy when the intake faders supply the budget). See **D-219**. — Originally REWRITTEN 2026-06-28 — the earlier "bottom-up from the long-run ramp, total emerges" model was **overturned**; the anchor is the **hours budget**, not the ramp. The ramp survives as the long-run *shape inside the budget*. Realizes SUB-DECISION B for `sustainable`. Companion: `SPEC-shared-endurance-model.md`, `SPEC-e3a-nonrace-zones.md`, `ISLANDS-ORIENTATION.md`, `non-race-goal-plan-contract.md` ADDENDUM.
 
 ---

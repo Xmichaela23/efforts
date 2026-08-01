@@ -23,7 +23,7 @@ Arc the single source every other surface reads from.
 > and it has two narrow consumers (`recompute-athlete-memory`: `taperSensitivity` + injury
 > flags). So "no time-series exists / orphaned for the engine" below is **inaccurate**. The
 > real dead-end is `arc-context.ts` not reading `avg_readiness`. Full corrected flow map +
-> options: **`SPEC-ATHLETE-STATE-CONTINUITY-OPTIONS.md`**. The original (flawed) summary is
+> options: **`archive/SPEC-ATHLETE-STATE-CONTINUITY-OPTIONS.md`**. The original (flawed) summary is
 > kept below for the record.
 
 - **Write — wired.** `handleReadinessSubmit` embeds `{energy, soreness, sleep}` into

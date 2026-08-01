@@ -203,10 +203,10 @@ This area gets workout data **into** the app from external providers and convert
 - **D-173** — Garmin per-discipline swim override; the webhook skip logic (`strava-webhook:180-204`, `garmin-webhook-activities:210-218`).
 - **D-184** — dedup auto-imported swims against same-day MANUAL entries (the second candidate path in `mergeSameSwimIfExists`).
 - **D-182** — swim pace + HR single-sourced to the raw-column scalar (`resolveSwimScalars`); reconciles the "compute-facts vs computed.overall" footgun for swims downstream of ingest.
-- **D-034 / D-035** — `is_mixed_effort` + unlinked-workout null adherence; relevant to what the analyzers do AFTER ingest attaches (or fails to attach) a planned workout. See `UNLINKED-WORKOUT-INTERPRETATION-SPEC.md`.
+- **D-034 / D-035** — `is_mixed_effort` + unlinked-workout null adherence; relevant to what the analyzers do AFTER ingest attaches (or fails to attach) a planned workout. See `archive/UNLINKED-WORKOUT-INTERPRETATION-SPEC.md`.
 - **Q-060** — HealthKit native swim enrichment deferred; the 60s-merge residual and the FORM→Apple pipe.
 - **Q-066** — historical Strava import ignored source preference (RESOLVED — gate ported into `import-strava-history`); documents that **runs/rides have no cross-source merge**.
 - **Q-067** — reverse-order manual swim bypasses the dedup gate (filed, not-fixed by decision).
 - **SPEC-swim-source-tiers.md** — the source→tier model, the three-layer "richest data wins" (matrix informs / preference chooses / merge protects), and the load-bearing merge footgun.
-- **CYCLING-INGEST-AUDIT.md** — the five-layer cycling ingest flow + FTP resolution; confirms the routing-synonym cleanup reflected at `ingest-activity:1612-1614`.
+- **archive/CYCLING-INGEST-AUDIT.md** — the five-layer cycling ingest flow + FTP resolution; confirms the routing-synonym cleanup reflected at `ingest-activity:1612-1614`.
 - **Other audit areas:** `02-analyzers.md` (what `analyze-{sport}-workout` does with the ingested row), `03-spine-snapshot.md` (`compute-snapshot` warmed by the post-import pipeline), `05-compute-contracts.md` (`compute-facts`/`compute-workout-summary` triggered by the fan-out), `07-baselines.md` (`learn-fitness-profile` + `athlete_identity` written by identity inference).

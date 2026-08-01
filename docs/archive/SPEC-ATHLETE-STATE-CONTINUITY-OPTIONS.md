@@ -1,5 +1,12 @@
 # OPTIONS — Athlete State Continuity (read-only prep for the check-in → Arc spec)
 
+> # ARCHIVED 2026-07-31 by the doc audit — its question was ANSWERED.
+> This was an options-for-review doc, not a build contract. The option taken shipped:
+> `readiness_checkins` exists (`supabase/migrations/20260612120000_create_readiness_checkins.sql`) and
+> `arc-context.ts` reads it. No D-NNN was written for it; the decision landed as Q-049 Phase 1.
+> Kept, not deleted. ⟨A31⟩
+
+
 **Status:** Investigation only · no code, no schema, no decisions · for review on return
 **For:** `SPEC-ATHLETE-STATE-CONTINUITY.md` / Q-049
 **Prepared:** 2026-06-12 (read-only, per the "investigate, don't build" handoff)

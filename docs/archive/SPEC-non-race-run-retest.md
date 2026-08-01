@@ -1,5 +1,11 @@
 # SPEC — Non-race RUN via generate-run-plan (retest head)
 
+> # ARCHIVED 2026-07-31 by the doc audit — BUILT, and its substance lives in **D-218**.
+> All three cuts shipped: `applyRetestTail` (`generate-run-plan/generators/base-generator.ts:436`, called
+> at `:425`), routing at `create-goal-and-materialize-plan/index.ts:2711`, tests `retest-tail.test.ts`.
+> D-218 records it as the `terminalShape: 'retest'` head. Kept, not deleted. ⟨A31⟩
+
+
 **Status:** APPROVED — implementing. The (b)-run fork from `SPEC-non-race-goal-plan-contract.md`: route single-sport **run** non-race goals to the working `generate-run-plan` engine with a **retest head** (no race/taper/peak), instead of the triathlon-shaped `buildCombinedPlan` (which can't produce a single-sport week — F-9/F-12).
 **Captured:** 2026-06-28. **Scope:** run-shaped non-race only. Tri non-race stays on `buildCombinedPlan` (works). Bike/swim/strength non-race stay `unsupported_sport` (F-10) — bike is the next build, against *this* proven pattern.
 

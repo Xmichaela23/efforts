@@ -1,7 +1,7 @@
 # AUDIT — Strength Frequency / Concurrent Matrix (the Q-088 prerequisite)
 
 **Date:** 2026-06-29
-**Why this exists:** Q-088 (raise the strength frequency cap from 2–3 to 4+, build a true upper/lower split) is filed as "touches every strength cell — needs the concurrent-matrix audit first to map the whole picture before deciding the frequency architecture." That audit was referenced (`OPEN-QUESTIONS.md:1154`, `ISLAND-PROPOSAL.md:179`) but never written. This is it.
+**Why this exists:** Q-088 (raise the strength frequency cap from 2–3 to 4+, build a true upper/lower split) is filed as "touches every strength cell — needs the concurrent-matrix audit first to map the whole picture before deciding the frequency architecture." That audit was referenced (`OPEN-QUESTIONS.md:1154`, `archive/ISLAND-PROPOSAL.md:179`) but never written. This is it.
 **Method:** three independent read-only code traces against `/Users/michaelambp/efforts`, cross-checked. No code changed. Load-bearing findings (the `strFreqForPhase` ceiling, the protocol-builder structural cap) were each confirmed by two independent traces and spot-verified by hand. Line numbers are as of this date — re-verify before editing; the engine drifts.
 **Scope note:** this maps the *current* state and the *blast radius* of raising the cap. It is a scoping sheet, not an implementation spec. The 4-day-split design decisions it surfaces are listed in §6 for a human call.
 
@@ -125,4 +125,4 @@ The audit validates the Q-088 fold-in proposal: **today the frequency cap is a `
 
 ---
 
-*Companion to: Q-088 (`OPEN-QUESTIONS.md`), `ROADMAP-strength-engine.md` Phase 2, `SPEC-non-race-goal-plan-contract.md` (Q-088 is its hard dependency), `SPEC-per-discipline-periodization.md §13.1`. Supersedes the "concurrent-matrix audit (in progress)" placeholder referenced in `OPEN-QUESTIONS.md:1154` and `ISLAND-PROPOSAL.md:179`.*
+*Companion to: Q-088 (`OPEN-QUESTIONS.md`), `ROADMAP-strength-engine.md` Phase 2, `SPEC-non-race-goal-plan-contract.md` (Q-088 is its hard dependency), `SPEC-per-discipline-periodization.md §13.1`. Supersedes the "concurrent-matrix audit (in progress)" placeholder referenced in `OPEN-QUESTIONS.md:1154` and `archive/ISLAND-PROPOSAL.md:179`.*

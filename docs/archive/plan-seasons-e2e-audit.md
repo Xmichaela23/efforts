@@ -182,7 +182,7 @@ If upstream **`session_kind`** / **`intensity_class`** are missing or legacy row
 
 ## 9. Related docs
 
-- `docs/plan-engine-contract-audit.md` — clause-by-clause vs **`PLAN-CONTRACT.md`**
+- `docs/archive/plan-engine-contract-audit.md` — clause-by-clause vs **`PLAN-CONTRACT.md`**
 - Workspace rule: Arc **`getArcContext()`** as single athlete truth — combined **`athlete_state`** currently under-ships that truth for physiology.
 
 ---

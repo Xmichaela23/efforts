@@ -69,7 +69,7 @@ The route foundation lied: "same route" was a **distance-bucket fingerprint** (2
 
 ### D-249 — Efficiency direction removed from the Performance route line; State owns efficiency trends (2026-07-06, DEPLOYED)
 
-The per-session same-route efficiency direction (raw pace-per-HR over 90 days) read **summer heat as "efficiency declining"** — same-route controls hills but NOT heat — AND **contradicted State's decoupling-led "Efficiency holding"** (scope + confound). **Removed it.** The Performance route line now shows **FAMILIARITY only** ("Same route · run 40× since 2025"), gated on the cluster total (`times_run`) not recent history (fixes the missing-line case: a route run a lot but not lately still shows). State owns efficiency trends (done carefully, decoupling-led). The honest heat-adjusted per-route trend is a REAL feature — specced separately in `DESIGN-familiar-routes.md` / Q-131, not the confounded raw version. Deployed `workout-detail` + client.
+The per-session same-route efficiency direction (raw pace-per-HR over 90 days) read **summer heat as "efficiency declining"** — same-route controls hills but NOT heat — AND **contradicted State's decoupling-led "Efficiency holding"** (scope + confound). **Removed it.** The Performance route line now shows **FAMILIARITY only** ("Same route · run 40× since 2025"), gated on the cluster total (`times_run`) not recent history (fixes the missing-line case: a route run a lot but not lately still shows). State owns efficiency trends (done carefully, decoupling-led). The honest heat-adjusted per-route trend is a REAL feature — specced separately in `archive/DESIGN-familiar-routes.md` / Q-131, not the confounded raw version. Deployed `workout-detail` + client.
 
 ### D-250 — Route-performance TREND can't rest on path-overlap route identity; adopt the SEGMENT model (2026-07-06, SPEC — `DESIGN-segments.md`; supersedes the Q-131 route-trend approach)
 
@@ -77,7 +77,7 @@ Built + deployed the honest heat-adjusted per-route trend (Q-131 / Familiar Rout
 
 ### D-251 — Heat variable = air TEMPERATURE, not dew point (dry-climate proof-out) (2026-07-06, in the parked engine)
 
-`DESIGN-familiar-routes.md` specced dew-point heat correction (dew point > temp/RH as the humidity-aware heat-stress signal — correct physiology). **Proved out on user 45d122e7's real data:** in his arid climate dew point barely clears the 55°F reference (`heatTerm` SD < 1.4°F on every route) while AIR TEMPERATURE swings 30–40°F (50→92°F, temp_sd 6–9). Dew-only made the feature a near-no-op and re-admitted the summer-decline lie. Switched the model's heat term to `max(0, temp_f − 60)` (`TEMP_REF_F=60`; endurance optima ~50–55°F). Dew point stays CAPTURED (`dewPointF`, stored) but DORMANT — the humid-climate refinement (WBGT proxy: temperature is the higher-value regressor when dew runs out of resolution, pre-registered). `k` stays HR-side (the PROHIBITION: pace-side coefficients like Vermeer's 0.025 are structurally invalid as a `k` source — only same-loop paired runs supply magnitude). Also decided: joint fit `efficiency ~ heatTerm + time` (Huber-IRLS), NOT residualize-then-trend (biased under dew/time correlation, Frisch–Waugh–Lovell).
+`archive/DESIGN-familiar-routes.md` specced dew-point heat correction (dew point > temp/RH as the humidity-aware heat-stress signal — correct physiology). **Proved out on user 45d122e7's real data:** in his arid climate dew point barely clears the 55°F reference (`heatTerm` SD < 1.4°F on every route) while AIR TEMPERATURE swings 30–40°F (50→92°F, temp_sd 6–9). Dew-only made the feature a near-no-op and re-admitted the summer-decline lie. Switched the model's heat term to `max(0, temp_f − 60)` (`TEMP_REF_F=60`; endurance optima ~50–55°F). Dew point stays CAPTURED (`dewPointF`, stored) but DORMANT — the humid-climate refinement (WBGT proxy: temperature is the higher-value regressor when dew runs out of resolution, pre-registered). `k` stays HR-side (the PROHIBITION: pace-side coefficients like Vermeer's 0.025 are structurally invalid as a `k` source — only same-loop paired runs supply magnitude). Also decided: joint fit `efficiency ~ heatTerm + time` (Huber-IRLS), NOT residualize-then-trend (biased under dew/time correlation, Frisch–Waugh–Lovell).
 
 ### D-252 — The fitness metric shown to users is SAME-EFFORT PACE (min/mi), never an abstract efficiency index (2026-07-06)
 
@@ -3018,7 +3018,7 @@ highlight the steady section by hand. Firstbeat mines the reliable segments of a
 HR-to-speed relationship — 95% accuracy (MAPE ~5%) across 2,690 freely-performed runs from 79 runners
 (`assets.firstbeat.com/firstbeat/uploads/2017/06/white_paper_VO2max_30.6.2017.pdf`).
 
-⛔ **AND WE ALREADY HAVE GARMIN'S SHAPE.** `_shared/heat-adjust.ts` + `docs/DESIGN-familiar-routes.md`:
+⛔ **AND WE ALREADY HAVE GARMIN'S SHAPE.** `_shared/heat-adjust.ts` + `docs/archive/DESIGN-familiar-routes.md`:
 same route (terrain cancels rather than being modelled), a heat coefficient **learned per route by
 regression**, and a confidence-interval gate that returns `still_learning` instead of asserting.
 **It is complete, tested, and wired only to the per-workout screen. State does not call it.**

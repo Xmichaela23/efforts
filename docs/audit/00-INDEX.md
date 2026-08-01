@@ -1,6 +1,6 @@
 # Feature Audit — Index & Status
 
-Reverse-documentation of what the Efforts app actually does, derived from code. See `WORKORDER-feature-audit.md` for the governing work order. **These docs are uncommitted — Michael reviews and commits.**
+Reverse-documentation of what the Efforts app actually does, derived from code. See `archive/WORKORDER-feature-audit.md` for the governing work order. **These docs are uncommitted — Michael reviews and commits.**
 
 Run started: overnight session, 2026-06-16.
 

@@ -1,6 +1,6 @@
 # RESEARCH — how the field interprets a training session (precedent survey)
 
-**Date:** 2026-07-09. **Method:** deep-research harness — 6 search angles, 25 primary sources fetched, 117 claims extracted, top 25 adversarially verified (3-vote), 25/25 auto-confirmed — **amended to 24/25 on human review (Michael, 2026-07-09); see Corrections below.** **Why it exists:** before building Efforts' per-session endurance interpretation (Load-System Item 3 / the "RESPONSE"), confirm we adopt precedent instead of inventing a scheme. See `docs/DESIGN-endurance-per-session-response.md` for what we do with it.
+**Date:** 2026-07-09. **Method:** deep-research harness — 6 search angles, 25 primary sources fetched, 117 claims extracted, top 25 adversarially verified (3-vote), 25/25 auto-confirmed — **amended to 24/25 on human review (Michael, 2026-07-09); see Corrections below.** **Why it exists:** before building Efforts' per-session endurance interpretation (Load-System Item 3 / the "RESPONSE"), confirm we adopt precedent instead of inventing a scheme. See `docs/archive/DESIGN-endurance-per-session-response.md` for what we do with it.
 
 ## Corrections (human review, 2026-07-09)
 1. **ACWR band conflation (was the one real error).** Decision 5 originally attributed "0.8–1.3 sweet spot / 1.3–1.5 alert / >1.5 overreaching" to **Polar**. Wrong — that fused Polar's *product* thresholds with **Gabbett's *research* thresholds**. The two are distinct (both corrected inline below):

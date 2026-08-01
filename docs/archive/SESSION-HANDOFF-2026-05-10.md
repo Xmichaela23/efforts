@@ -58,7 +58,7 @@ Frontend (Netlify) auto-deploys from `main` — wizard tier-card UI rolls out wi
 - **`docs/SCHEDULING-RULES.md`** — prescriptive scheduling spec with confidence tags. Authoritative for placement rules.
 - **`docs/SCHEDULING-RULES-EXTRACTED.md`** — descriptive snapshot of code state pre-2026-05-09 consolidation. Marked outdated at the top.
 - **`docs/SESSION-FREQUENCY-DEFAULTS.md`** — prescriptive spec for hours-derived session counts.
-- **`docs/PLAN-AUDIT-RESULTS.md`** — regenerated each audit run.
+- **`docs/archive/PLAN-AUDIT-RESULTS.md`** — regenerated each audit run.
 - **`CLAUDE.md`** — orientation map for future Claude Code sessions.
 - **`notes/docs-audit-2026-05-09.md`** — the docs audit that surfaced PLAN-CONTRACT.md drift.
 

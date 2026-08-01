@@ -1,6 +1,6 @@
 # AREA — Baselines & athlete records
 
-> Read-only reverse-documentation per `docs/WORKORDER-feature-audit.md`. Describes what the
+> Read-only reverse-documentation per `docs/archive/WORKORDER-feature-audit.md`. Describes what the
 > code does, not what it should do. Suspected problems live in **Discrepancies & flags** — not
 > fixed. "Unclear from code" is used where the code does not settle the question.
 

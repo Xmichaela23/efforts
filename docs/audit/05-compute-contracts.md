@@ -282,7 +282,7 @@ omitted if LLM/DB runs long (`:259-264`).
    resolver explicitly refuses to fabricate GAP from total elevation (`run-scalars.ts:70`). The
    `CompletedTab` elevation-based GAP approximation it warns against is a flagged prior bug — verify the
    client no longer does this (Area 6).
-6. **Reconciliation vs `docs/AUDIT-truth-reconciliation-2026-06-14.md`:** that audit found strength
+6. **Reconciliation vs `docs/archive/AUDIT-truth-reconciliation-2026-06-14.md`:** that audit found strength
    anchors triple-sourced (typed vs learned vs computed e1RM) with the plan reading typed baselines.
    compute-facts writes `learned_fitness.strength_1rms` and `workout_facts.strength_facts.*.estimated_1rm`;
    the divergence is a known unreconciled loop (their ❌ rows), not a bug in this layer's writes.
@@ -297,15 +297,15 @@ omitted if LLM/DB runs long (`:259-264`).
    flagged as a silent-failure surface.
 10. **Two `COMPUTED_VERSION` representations:** string `"v1.0.4"` (in the computed object) and int
     `1003` (RPC param). They must move together; nothing in code enforces they agree — flagged.
-11. **`vs. SMART_SERVER_DUMB_CLIENT_AUDIT.md`:** that doc lists several client-side build sites as
+11. **`vs. archive/SMART_SERVER_DUMB_CLIENT_AUDIT.md`:** that doc lists several client-side build sites as
     "✅ Fixed (workout-detail)". This audit confirms `session_detail_v1` is rendered verbatim, consistent
     with the doc, but `useWorkoutDetail` still merges base(cache)+remote (`:119-173`) — the doc itself
     marks that merge "Acceptable – not building from raw". No contradiction, noted for completeness.
 
 ## Cross-references
 
-- **Existing docs:** `docs/SMART_SERVER_DUMB_CLIENT_AUDIT.md` (verbatim-render invariant; this contract
-  is the canonical example), `docs/AUDIT-truth-reconciliation-2026-06-14.md` (strength/swim multi-source
+- **Existing docs:** `docs/archive/SMART_SERVER_DUMB_CLIENT_AUDIT.md` (verbatim-render invariant; this contract
+  is the canonical example), `docs/archive/AUDIT-truth-reconciliation-2026-06-14.md` (strength/swim multi-source
   divergence — flags 6–7), `docs/SPEC-per-session-performance-engine.md`,
   `docs/PERF-INTERVAL-INTERPRETATION-SPEC.md`, `docs/SPEC-adherence-performance-bridge.md`,
   `DETERMINISTIC_LAYER_ARCHITECTURE.md` (workout_facts model), `docs/ENGINE-STATE.md`,
