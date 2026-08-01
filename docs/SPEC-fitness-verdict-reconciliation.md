@@ -38,7 +38,20 @@ The high-value signal is the **disagreement** between them — "on-track for you
 ### Goal-predictor — block adaptation rate (mid-block slope)
 - `_shared/goal-predictor/index.ts:285` `buildBlockVerdict` — profile-weighted linear model on three block deltas (`aerobic_efficiency_improvement_pct`, `long_run_improvement_pct`, `strength_overall_gain_pct`), seeded 50, "on track" ≥60. Inputs from `block_adaptation_cache` via `getBlockAdaptation` (`_shared/block-adaptation/index.ts:265`), flattened in `generate-overall-context/index.ts:246-253`.
 - `block_verdict` is **runtime-only**; the substrate cache is persisted (24h TTL).
-- Read on **exactly one surface** — the Block Summary Tab (`BlockSummaryTab.tsx:387/408`, via `generate-overall-context`, the only caller that passes `block`).
+- ~~Read on **exactly one surface** — the Block Summary Tab (`BlockSummaryTab.tsx:387/408`, via `generate-overall-context`, the only caller that passes `block`).~~
+  > ⛔ **STALE — CORRECTED 2026-08-01 (D-350). `BlockSummaryTab.tsx` NO LONGER EXISTS.** It was
+  > orphaned on 2026-03-31 (`96db8469`) when the multi-tab Context screen collapsed to `StateTab`,
+  > sat unmounted for four months, and was deleted today.
+  >
+  > **This line was the documented reason not to delete it** — `AUDIT-state-screen-2026-07-02.md`
+  > said "⚠ Do NOT delete blindly: per D-212 it is the *only* surface that reads `block_verdict`."
+  > **That reason had already expired.** `block_verdict` is read on a LIVE surface:
+  > `StateTab.tsx:1805` passes `data.goal_prediction.block_verdict` into the race section, with the
+  > seeded-verdict honesty gate at `StateTab.tsx:694`. The signal has a mounted home; the unmounted
+  > one was removed.
+  >
+  > ⚠️ **The rest of this bullet still stands** — `block_verdict` remains runtime-only, and its
+  > substrate cache is still persisted with a 24h TTL. Only the *reader* changed.
 - **Its inputs are spine-family observed deltas, reweighted by goal profile** — so it is *downstream of the observed substrate*, not an independent sensor. Distinct axis (rate ≠ trend ≠ finish), non-independent source.
 
 ---

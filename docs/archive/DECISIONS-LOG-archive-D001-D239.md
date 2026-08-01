@@ -4420,6 +4420,24 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ## D-212 — Fitness-verdict reconciliation: three axes, N-way adjacency, none folded
 
+> ⚠️ **STILL STANDS — ONE CODE ANCHOR IS DEAD (back-annotated 2026-08-01, D-350).** Every decision
+> below is unchanged: three axes, N-way adjacency, nothing folded, and the trap in the bullet below
+> is still live and still the thing to check first.
+>
+> **What changed is only WHERE the third axis is read.** `SPEC-fitness-verdict-reconciliation.md:41`
+> recorded `block_verdict` as read on "exactly one surface" — `BlockSummaryTab.tsx`. That component
+> was orphaned on 2026-03-31 (`96db8469`), sat unmounted for four months, and was **deleted on
+> 2026-08-01**. `AUDIT-state-screen-2026-07-02.md` had flagged this entry as the reason not to delete
+> it ("the ONLY reader of `block_verdict` — extract that signal first"); by the time it was deleted
+> the signal already had a live home and no extraction was needed.
+>
+> **The live reader is `StateTab.tsx:1805`** — `data.goal_prediction.block_verdict`, passed into the
+> race section, with the seeded-verdict honesty gate at `StateTab.tsx:694` (an empty-drivers verdict
+> renders a muted "needs data" line, never a fake probability).
+>
+> ⛔ **Do not read the deletion as a demotion of the third axis.** It remains filed and gated behind
+> Piece 1, exactly as Decision 3 and the Scope bullet say.
+
 - **Date:** 2026-06-24
 - **Context:** The app computes fitness three independent ways that never cross-check: the **spine** (`state_trends_v1` — per-discipline trend, backward), the **projection/readiness** (race finish time vs target, forward), and the **goal-predictor** (`block_verdict` — block adaptation rate, mid-block). Full design + the build/file split + the code anchors: `docs/SPEC-fitness-verdict-reconciliation.md`. The fix is an **N-way meeting room**: each verdict sits as a sibling and a divergence read sits *above* them. This entry records ONLY the decisions a future session would re-litigate or silently violate.
 

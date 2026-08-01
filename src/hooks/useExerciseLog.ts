@@ -23,15 +23,28 @@ export interface LiftTrendEntry {
   best_reps: number;
   sets_completed: number;
 }
+/**
+ * ⛔ THIS HOOK NO LONGER COMPUTES A DIRECTION (D-350, 2026-08-01). DO NOT ADD ONE BACK.
+ *
+ * It used to carry `trend` — first point to last point across 12 weeks, as a percentage — plus
+ * `current1RM`, `peak1RM` and `latestRir`. Every one of them was read by exactly one surface,
+ * `BlockSummaryTab`, which had been unmounted since 2026-03-31 and is now deleted.
+ *
+ * ⚠️ AND `trend` WAS THE SAME LIE D-347 DELETED FROM THE STATE SCREEN, still breathing on a second
+ * surface. A 5/3/1 block prescribes its top set from ~65% up to ~95% of a training max, so an e1RM
+ * produced once per cycle moves with the PRESCRIPTION. First-to-last across that ramp reads a
+ * correctly-executed light week as a decline. D-347 removed the per-lift direction chip for exactly
+ * this reason; this copy survived only because nothing rendered it.
+ *
+ * What remains is what the live callers actually read: the per-session POINTS. `StateTab` takes the
+ * latest `best_weight` to prefill the adjust modal; `StrengthSummaryView` charts the entries. The
+ * DIRECTION question is the server's — the spine's `per_lift` verdicts already answer it, protocol-
+ * aware, which is the whole reason D-347 could delete the client's version.
+ */
 export interface LiftTrend {
   canonical: string;
   displayName: string;
   entries: LiftTrendEntry[];
-  current1RM: number;
-  peak1RM: number;
-  trend: number | null;
-  // Most-recent session RIR (null if not logged)
-  latestRir: number | null;
 }
 
 export function useExerciseLog(weeksBack: number = 12, enabled: boolean = true) {
@@ -91,25 +104,10 @@ export function useExerciseLog(weeksBack: number = 12, enabled: boolean = true) 
           best_reps: r.best_reps ?? 0,
           sets_completed: r.sets_completed ?? 0,
         }));
-        const current = entries[entries.length - 1].estimated_1rm;
-        const peak = Math.max(...entries.map(e => e.estimated_1rm));
-        const first = entries[0].estimated_1rm;
-        const trend = first > 0
-          ? Math.round(((current - first) / first) * 1000) / 10
-          : null;
-
-        // Latest session = last in sorted order
-        const latestRow = sorted[sorted.length - 1];
-        const latestRir = latestRow.avg_rir ?? null;
-
         return {
           canonical,
           displayName: rows[0].exercise_name,
           entries,
-          current1RM: current,
-          peak1RM: peak,
-          trend,
-          latestRir,
         };
       })
       .sort((a, b) => b.entries.length - a.entries.length);

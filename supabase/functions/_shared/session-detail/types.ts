@@ -486,6 +486,51 @@ export type SessionDetailV1 = {
     show_prompt: boolean;
   } | null;
 
+  /**
+   * ⛔ PER-EXERCISE VOLUME LOAD IN lb, PRICED BY THE ONE RULE (D-349, 2026-08-01).
+   *
+   * The compare table on Performance carried its OWN `calcVolume` — plain `weight × reps` — which is
+   * the pre-D-348 rule. So after bodyweight started counting (D-348), a chin-up contributed to the
+   * session's LOAD score and to `workout_facts.total_volume_lbs` while the lb column on the very same
+   * screen still read it as nothing. Two numbers about one session, disagreeing, which is precisely
+   * what D-348's "one set rule" was written to prevent — it just never reached this surface.
+   *
+   * ⛔ THE SHAPE IS DELIBERATE: TWO FLAT LISTS, NOT PRE-PAIRED ROWS.
+   *
+   * The obvious design — ship one row per exercise carrying both planned and completed lb — requires
+   * the SERVER to decide which planned lift pairs with which completed one. This file's own matcher
+   * (`matchPlannedToCompleted`, build.ts) is lowercase-exact, so "Barbell Back Squat" against a
+   * logged "Back Squat" pairs NOTHING. The client's table already pairs correctly through
+   * `canonicalize` plus declared swaps (audit F5, 2026-07-30). Pairing on the server would therefore
+   * REPLACE a working matcher with a worse one and silently re-open F5.
+   *
+   * ⚠️ AND THE TWO SIDES DO NOT SHARE A VOCABULARY. `_shared/canonicalize.ts` carries a curated
+   * synonym/plural/parenthetical ladder (Q-197 / Q-210); `src/lib/canonicalize.ts` is a small map plus
+   * a slugify. They agree on plain names and diverge on decorated ones, so a server-canonical KEY is
+   * not reliably a client-canonical key. Shipping the exercise's own `name` and letting the client
+   * re-key it with the same function it already pairs with makes the mismatch structurally impossible.
+   *
+   * **So the split is: the server prices, the client pairs.** Neither re-derives the other's job.
+   *
+   * ⚠️ `planned` is priced off the AUTHORED RAMP (`setPlan`) when present, exactly as the client
+   * renders it — D-338. Pricing the aggregate here instead would put a delta on screen that disagrees
+   * with the set rows above it, which is the bug D-338 fixed.
+   */
+  strength_volume?: {
+    /** One entry per PLANNED exercise, named as the prescription names it. */
+    planned: Array<{ name: string; volume_lb: number }>;
+    /** One entry per COMPLETED exercise, named as the log names it. Untouched prefills excluded (D-204). */
+    completed: Array<{ name: string; volume_lb: number }>;
+    planned_total_lb: number;
+    completed_total_lb: number;
+    /**
+     * The body weight used to price calisthenics, or null when the athlete has never recorded one.
+     * ⛔ NULL IS NOT ZERO AND IT IS NOT A GUESS — bodyweight sets then score exactly as they did
+     * before D-348. Surfaced so a screen can say WHY a chin-up reads zero instead of looking broken.
+     */
+    bodyweight_lb: number | null;
+  } | null;
+
   /** Structured assessment for all screens. Deterministic, no LLM. */
   session_interpretation?: SessionInterpretation | null;
 

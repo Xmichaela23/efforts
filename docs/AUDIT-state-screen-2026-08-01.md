@@ -236,12 +236,74 @@ are real builds; the rest is wiring, deleting, and trimming.
   `assemble.ts:501`, D-338, pinned test). What's still blind is the **ordinary light week** (week 1 <
   week 3, not a deload) — the direction chip reads that drop as a decline. Fix the stale line when in it.
 
-### STAGE 2 — Delete the client re-derivations (continuity + "no client math" in ONE move)
-**⏸ PARKED 2026-08-01 (Michael's call) — jumped to Stage 3. Not dropped: still the move that stops
-the screens disagreeing, and it gets cheaper now that Stage 1 has the block card wired.**
+### STAGE 2 — ✅ SHIPPED 2026-08-01 (D-349 / D-350) — and the original framing below was WRONG on all three targets
+
+> ⛔ **READ THIS BEFORE TRUSTING ANY "KILL THE CLIENT MATH" LINE IN THIS DOC.** Stage 2 was written as
+> *"kill `buildLoadHeadline`, the compare-table's own matcher + `calcVolume`, the block-summary
+> deltas — route them through `canonicalize` and the server's one number."* Traced before coding
+> (Michael: *"one stage, trace first, report before coding"*), **every one of those three was
+> mis-stated, and two of the three instructions would have caused a regression.** The corrected
+> shape is below. The original text is kept at the bottom because the *pattern* of the error is the
+> useful part: the audit named three "client re-derivations" without checking whether each was live,
+> reachable, or actually the weaker of the two implementations.
+
+**1. The compare table — `calcVolume` was real. THE MATCHER WAS ALREADY FIXED, and "route it through
+the server" would have BROKEN it.**
+- `calcVolume` was `weight × reps` — the pre-D-348 rule — so a chin-up counted toward the session's
+  LOAD score and read as **zero lb** in the table on that same session. Fixed: volume is now priced
+  server-side by `strengthSetVolume` and shipped on `session_detail_v1.strength_volume`.
+- ⛔ **The matcher was NOT a fracture.** It moved to `canonicalize` + declared swaps on 2026-07-30
+  (F5). This doc's "the 5th identity resolver, and the one that disagrees" was **stale when written.**
+- ⛔ **AND THE SERVER'S MATCHER IS THE WORSE ONE.** `session-detail/build.ts`'s
+  `matchPlannedToCompleted` is lowercase-exact — it pairs *nothing* for "Barbell Back Squat" against a
+  logged "Back Squat". Routing the client through it would have re-opened F5 exactly.
+- ⚠️ **And the two `canonicalize` functions are not the same rule.** `_shared/canonicalize.ts` carries
+  a curated synonym/plural/parenthetical ladder (Q-197/Q-210); `src/lib/canonicalize.ts` is a small map
+  plus a slugify. **A server-canonical key is not reliably a client-canonical key** — so the payload
+  ships each entry under the exercise's own NAME and the client re-keys with the function it already
+  pairs with. **The rule that came out of this: the server PRICES, the client PAIRS.**
+- ⚠️ **A fourth copy of the stale rule was found while in there** —
+  `StrengthPerformanceSummary`'s "Volume (lbs)" tile, inches under the table. Also now server-fed.
+- Pinned in `session-detail-strength-volume.test.ts` (10 tests), including the D-338 authored-ramp
+  parity and prescribed-==-performed reading a zero delta.
+
+**2. `buildLoadHeadline` — "kill it" was overstated. It formats; it does not re-decide.**
+- Every input is already a server verdict. What it does beyond formatting is a taper/peak override and
+  a silence rule — **both presentation, both kept.**
+- The one genuine holdout was a training THRESHOLD in a display file: `acwr < 1.0` → "you have
+  headroom". **It could not fire.** The headline returns early unless the load deviates, and that slot
+  only answered to `balanced`, which is never a deviating label. **Verified by exhaustion: 8,316
+  input combinations emitted it zero times.** Deleted, not moved — moving a dead branch to the server
+  would have bought a `COACH_PAYLOAD_VERSION` bump (24h of cache invalidation) for no visible change.
+  Guarded by a sweep test so it cannot come back quietly.
+- ⚠️ **`src/lib/load-headline.ts` is ALREADY SHARED** — `_shared/state-trend/state-screen-print.ts`
+  imports it. It is one copy, not a client second opinion. Do not "move it to the server" on the
+  strength of the F3 line in §CODE HYGIENE; that line overstated the problem.
+
+**3. `BlockSummaryTab` — not a re-derivation to rewire. DEAD, and now deleted.**
+- Unmounted since 2026-03-31 (`96db8469`), no importer anywhere in the repo, 1,184 lines.
+- ⚠️ **The stated blocker had already expired.** `AUDIT-state-screen-2026-07-02.md` said do not delete
+  it because per D-212 it was the only reader of `block_verdict`. **`StateTab.tsx:1805` reads it now**
+  (with the seeded-verdict honesty gate at `:694`). D-212 and
+  `SPEC-fitness-verdict-reconciliation.md:41` are back-annotated.
+- Its `useExerciseLog` fields went with it — `trend`, `current1RM`, `peak1RM`, `latestRir`. ⚠️ **`trend`
+  was the same lie D-347 deleted from State** (first-to-last across a 65%→95% ramp reads a
+  prescribed light week as a decline), still breathing on a second surface, invisible only because
+  nothing rendered it.
+
+**⚠️ FOUND AND FILED, NOT FIXED: [Q-234].** `StateTab.tsx:1311` gates a per-lift bar on `lt.peak1RM`,
+a **camelCase field on a snake_case server object** — always `undefined`, so it silently falls through
+to measuring against *last session × 1.1*. ⛔ **The obvious fix is a trap:** `per_lift` already carries
+`allTimeBestE1rm`, so renaming makes a *correct* number appear — which would then read "72% of your
+best" on a deliberately light week, i.e. D-347's bug in a new costume. **Shape decision first.**
+
+<details><summary>The original Stage 2 text, kept for the pattern of the error</summary>
+
 - **Kill `buildLoadHeadline`, the compare-table's own matcher + `calcVolume`, the block-summary deltas** —
   route them through `canonicalize` and the server's one number. This is where the screens stop
   disagreeing AND where the client-math cleanup lands. Same cut (F5 identity + the hygiene holdouts).
+
+</details>
 
 ### STAGE 3 — Ground the number facts (the first real build)
 - **Load split** (bodyweight scores zero) per D1. **✅ SHIPPED 2026-08-01 — deployed (9 fns), backfill
@@ -299,10 +361,19 @@ client renders) and largely realized — the residue is exactly the code causing
 disagreements.** Measured 2026-08-01.
 
 **Is it server-side / no client math?** Mostly, with named holdouts — and the holdouts ARE the bugs:
-- `buildLoadHeadline` — the LOAD verdict is composed **on the client** (`StateTab.tsx:1262`, F3).
-- `StrengthCompareTable` — its **own `calcVolume` + its own exercise matcher** on the client (the 5th of
-  the five identity resolvers, and the one that disagrees with the score above it).
-- `BlockSummaryTab` — e1RM deltas / sparkline computed client-side off `estimated_1rm`.
+- ~~`buildLoadHeadline` — the LOAD verdict is composed **on the client** (`StateTab.tsx:1262`, F3).~~
+  ⛔ **OVERSTATED — corrected 2026-08-01 (D-350).** The verdict is DECIDED by the reconciler and this
+  function only formats it. The file is also already shared with the server
+  (`state-trend/state-screen-print.ts` imports it), so it is one copy, not a second opinion. The one
+  real holdout — an `acwr < 1.0` threshold — was **unreachable** and is deleted. See Stage 2.
+- ~~`StrengthCompareTable` — its **own `calcVolume` + its own exercise matcher** on the client (the 5th of
+  the five identity resolvers, and the one that disagrees with the score above it).~~
+  ⛔ **HALF STALE — corrected 2026-08-01 (D-349).** `calcVolume` was real and is deleted (volume now
+  arrives priced from the server). **The matcher was already fixed on 2026-07-30 by F5** and is the
+  BETTER of the two — the server's own is lowercase-exact. It stays on the client deliberately:
+  **the server prices, the client pairs.**
+- ~~`BlockSummaryTab` — e1RM deltas / sparkline computed client-side off `estimated_1rm`.~~
+  ✅ **Moot — the component was unmounted since 2026-03-31 and was DELETED 2026-08-01 (D-350).**
 - **19 direct DB queries** across the analytics screens (CoachWeekTab 11, StateTab 6, CompareTable 2) —
   allowed for non-calendar reads by CLAUDE.md, but it's client reaching into tables.
 - The `smart-server-dumb-client` migration is **real and active** — many items already ✅ Fixed, D-342
@@ -329,10 +400,25 @@ disagreements.** Measured 2026-08-01.
 legitimate spine; the "crap" is the **duplication across them** — the client re-deriving what the server
 already computed.
 
-**The one-line read:** the mess isn't depth, it's **duplication + kept history + lying docs.** The fix
-for continuity and the fix for "no client math" are the same move — delete the client-side re-derivations
-(`buildLoadHeadline`, `CompareTable`'s matcher/volume, `BlockSummaryTab` deltas) and read the server's
-one number.
+**The one-line read:** the mess isn't depth, it's **duplication + kept history + lying docs.**
+
+> ⚠️ **AND THIS DOC WAS ONE OF THE LYING DOCS (2026-08-01).** The sentence that used to close this
+> section — *"delete the client-side re-derivations (`buildLoadHeadline`, `CompareTable`'s
+> matcher/volume, `BlockSummaryTab` deltas) and read the server's one number"* — named three targets
+> and got all three wrong: one was already fixed and was the stronger implementation, one was
+> unreachable dead code, and one was a component nothing had rendered in four months. **One of the
+> three instructions ("route the matcher through the server") would have re-opened the very fracture
+> this audit filed as F5.**
+>
+> **The lesson is the one this document opens with, turned on itself:** it warned that the dominant
+> fault is a built, correct thing starved of a wire — then listed three "client re-derivations"
+> without checking whether each was live, reachable, or actually the weaker of the two copies.
+> **Before deleting a "duplicate": confirm it renders, confirm the server's version is better, and
+> confirm which of the two the rest of the app already agrees with.** Duplication is only a fracture
+> when both copies are alive AND they disagree.
+
+The corrected version of that move is Stage 2 above, and the rule that came out of it is
+**the server prices, the client pairs.**
 
 ---
 

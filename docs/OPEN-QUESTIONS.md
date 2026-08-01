@@ -2324,6 +2324,53 @@ The floor holds without it: under 8 runs the athlete simply gets no verdict, and
 
 ---
 
+## Q-234 — The per-lift "% of peak" bar on State reads a field the server does not send, so it silently falls through to a different number (2026-08-01, VERIFIED IN CODE — not fixed)
+
+**`StateTab.tsx:1311`:**
+
+```
+const e1rmPct = lt.e1rm_current != null && lt.peak1RM > 0
+  ? Math.min(100, Math.round((lt.e1rm_current / lt.peak1RM) * 100))
+  : lt.e1rm_current != null && lt.e1rm_previous != null && lt.e1rm_previous > 0
+  ? Math.min(100, Math.round((lt.e1rm_current / (lt.e1rm_previous * 1.1)) * 100))
+  : null;
+```
+
+`lt` is a server `per_lift` row (`_shared/state-trend/assemble.ts:708`, `StrengthPerLift`). **Every field on
+it is snake_case** — `e1rm_current`, `e1rm_previous`, `best_weight`, `anchor_1rm`, `verdict_label`.
+`peak1RM` is camelCase and **is not a field on that type**. It is `undefined`, `undefined > 0` is `false`,
+so **the first branch has never once run.** Grep confirms `peak1RM` exists only in `useExerciseLog.ts`
+(the client hook, a different object) and in the unmounted `BlockSummaryTab`.
+
+**What actually renders** is the fallback: current e1RM as a percentage of *last session's e1RM × 1.1* —
+i.e. a bar measuring progress against an invented 10%-better-than-last-time target. That is a **different
+question** from "how close am I to my best", and it is the one on screen.
+
+⚠️ **This is not the D-347 direction chip.** That was deleted. This is the percentage feeding the per-lift
+row's bar inside the collapsed strength detail, and it survived.
+
+**Why it is filed rather than fixed (Michael's call, 2026-08-01 — "file it before you touch anything"):**
+the honest fix is a decision, not a rename. `per_lift` **already carries `allTimeBestE1rm`** (the real PR
+substrate, added 2026-07-21 — `strength-per-lift.test.ts:37`). So the choice is:
+
+1. Point the bar at `allTimeBestE1rm` — "% of your all-time best." Honest, and it is the number the PR
+   badge already trusts.
+2. Delete the bar. On one-measurement-per-cycle data a percentage-of-peak bar has the **same sparse-data
+   problem D2 retired the direction chip for** — a 5/3/1 block prescribes 65%→95%, so "72% of peak" on a
+   light week is reading the prescription, exactly the lie D-347 removed one row above.
+
+⛔ **Option 1 is the tempting one and it may be the wrong one.** Renaming the field makes a *correct*
+number appear where a *meaningless* one is today — and that correct number would then say "you are at 72%
+of your best" during a deliberately light week. **Fixing the field without settling the shape re-files
+D-347's bug in a new costume.** Decide the shape first.
+
+**Confidence:** the undefined-fallthrough is **verified in code** (type inspected, grep exhaustive). What
+is **unverified** is what the fallback bar looks like on a real device — it renders a plausible number, so
+it has never looked broken, which is why it survived. **Settles it:** open State → strength row → expand
+the per-lift detail, and compare the bar against the athlete's known best.
+
+---
+
 ## Q-233 — Two known imprecisions in the bodyweight load rule, both deliberate (2026-08-01, INTENTIONAL)
 
 Filed with D-348 so neither is rediscovered as a bug.

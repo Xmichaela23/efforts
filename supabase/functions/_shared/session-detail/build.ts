@@ -16,6 +16,10 @@ import type { SwimScalars } from '../swim/swim-scalars.ts';
 import { resolveRunGap, type RunScalars } from '../run/run-scalars.ts';
 import { routeHeadline } from '../heat-adjust.ts';
 import { frielBand, decouplingBandDisplay } from '../state-trend/run.ts';
+// D-349: the ONE set rule (D-348). Imported, never re-implemented — the whole point of this field is
+// that the lb on this screen and the lb in the load score come out of the same function.
+import { strengthSetVolume } from '../workload.ts';
+import { canonicalize, bandMeansAssistance } from '../canonicalize.ts';
 
 // Server-authored Tier-1 route readout (Familiar Routes, "arm of State"). The honest, effort-aware
 // headline the client renders VERBATIM — no client-side re-derivation. Heat is parked; this is the
@@ -154,6 +158,12 @@ export type SessionDetailInput = {
   plannedRowRaw?: { strength_exercises?: any[]; computed?: any } | null;
   /** Completed workout strength_exercises (for strength weight deviation) */
   completedStrengthExercises?: any[] | null;
+  /**
+   * D-349: the athlete's body weight in POUNDS, already resolved through `resolveBodyweightLb`
+   * (workout-detail is the DB reader; this builder only prices). Null when never recorded — and null
+   * is NOT zero and NOT a guess: bodyweight sets then score exactly as they did before D-348.
+   */
+  bodyweightLb?: number | null;
   observations: string[];
   workoutAnalysis: Record<string, unknown> | null;
   narrativeText: string | null;
@@ -284,6 +294,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     plannedSession,
     plannedRowRaw,
     completedStrengthExercises,
+    bodyweightLb,
     observations,
     workoutAnalysis,
     narrativeText,
@@ -371,6 +382,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
   const weightDev = computeStrengthWeightDeviation(type, plannedRowRaw, completedStrengthExercises);
   const volumeDev = computeStrengthVolumeDeviation(type, plannedRowRaw, completedStrengthExercises);
+  const strengthVolume = buildStrengthVolume(type, plannedRowRaw, completedStrengthExercises, bodyweightLb);
 
   // ── Interval rows (pre-resolved) ──────────────────────────────────────────
   const intervalDisplay = sessionState?.details?.interval_display || {};
@@ -972,6 +984,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
     strength_weight_deviation: weightDev,
     strength_volume_deviation: volumeDev,
+    strength_volume: strengthVolume,
     strength_rir_summary: (() => {
       const exerciseAdherence = (wa as any)?.detailed_analysis?.exercise_adherence;
       if (!Array.isArray(exerciseAdherence)) return null;
@@ -1886,6 +1899,87 @@ function matchPlannedToCompleted(plannedExs: any[], compEx: any): any | null {
   return plannedExs.find(
     (p: any) => normExName(p?.name) === normExName(compEx?.name),
   ) ?? null;
+}
+
+/**
+ * ⛔ PER-EXERCISE VOLUME LOAD (D-349). PRICES ONLY — IT DOES NOT PAIR. See `strength_volume` in
+ * types.ts for why pairing stays on the client.
+ *
+ * ⚠️ THE COMPLETED SET FILTER MUST MATCH `compute-facts` AND THE TABLE, or the footer total will not
+ * equal the rows above it. Both drop an untouched prefill (D-204: a prescription the athlete never
+ * engaged is not a receipt) and keep legacy sets that carry no flag.
+ */
+function isPerformedSet(s: any): boolean {
+  return s && typeof s === 'object'
+    && s.completed !== false
+    && !(s.completed !== true && s.prefilled === true);
+}
+
+function buildStrengthVolume(
+  type: string,
+  plannedRowRaw: { strength_exercises?: any[] } | null | undefined,
+  completedStrengthExercises: any[] | null | undefined,
+  bodyweightLb: number | null | undefined,
+): SessionDetailV1['strength_volume'] {
+  if (type !== 'strength' && type !== 'mobility') return null;
+  const plannedExs = Array.isArray(plannedRowRaw?.strength_exercises) ? plannedRowRaw!.strength_exercises! : [];
+  const compExs = Array.isArray(completedStrengthExercises) ? completedStrengthExercises : [];
+  if (plannedExs.length === 0 && compExs.length === 0) return null;
+
+  const bw = typeof bodyweightLb === 'number' && bodyweightLb > 0 ? bodyweightLb : null;
+
+  const completed = compExs.map((ex: any) => {
+    const bandIsAssistance = bandMeansAssistance(canonicalize(String(ex?.name ?? '')));
+    const setsArr = Array.isArray(ex?.sets) ? ex.sets : (Array.isArray(ex?.setsArray) ? ex.setsArray : []);
+    const volume_lb = setsArr.filter(isPerformedSet).reduce(
+      (sum: number, s: any) => sum + strengthSetVolume(s, { bodyweightLb: bw, bandIsAssistance }),
+      0,
+    );
+    return { name: String(ex?.name ?? ''), volume_lb: Math.round(volume_lb) };
+  });
+
+  const planned = plannedExs.map((ex: any) => {
+    const bandIsAssistance = bandMeansAssistance(canonicalize(String(ex?.name ?? '')));
+    // ⚠️ A PRESCRIPTION PUTS A WORD WHERE THE NUMBER GOES (D-094: "Bodyweight", "Band", "Heavy
+    // barbell"). `strengthSetVolume` reads a band off `resistance_level`, which only a LOGGED set
+    // has — so the prescribed dialect is translated into the logged one here, exactly as
+    // `calculatePlannedStrengthWorkload` does. Without this a prescribed band row prices as full
+    // bodyweight against a token on the completed side, and the two columns stop reconciling.
+    const plannedIsBand = /band/i.test(String(ex?.weight ?? ''));
+    const resistance_level = plannedIsBand ? 'band' : null;
+
+    // ⛔ THE AUTHORED RAMP WINS (D-338). On 5/3/1 the three sets are three DIFFERENT weights, and
+    // the client renders them that way. Pricing `sets × reps × topWeight` here would print a delta
+    // that disagrees with the set rows directly above it — the exact bug D-338 fixed.
+    const setPlan = Array.isArray(ex?.setPlan) ? ex.setPlan : null;
+    let volume_lb = 0;
+    if (setPlan?.length) {
+      for (const ap of setPlan) {
+        volume_lb += strengthSetVolume(
+          { weight: ap?.weight ?? ex?.weight, reps: ap?.reps, resistance_level },
+          { bodyweightLb: bw, bandIsAssistance },
+        );
+      }
+    } else {
+      const sets = Number(ex?.sets) || 0;
+      const reps = typeof ex?.reps === 'number' ? ex.reps : Number.parseInt(String(ex?.reps ?? ''), 10);
+      if (sets > 0 && Number.isFinite(reps) && reps > 0) {
+        volume_lb = sets * strengthSetVolume(
+          { weight: ex?.weight, reps, resistance_level },
+          { bodyweightLb: bw, bandIsAssistance },
+        );
+      }
+    }
+    return { name: String(ex?.name ?? ''), volume_lb: Math.round(volume_lb) };
+  });
+
+  return {
+    planned,
+    completed,
+    planned_total_lb: planned.reduce((s, e) => s + e.volume_lb, 0),
+    completed_total_lb: completed.reduce((s, e) => s + e.volume_lb, 0),
+    bodyweight_lb: bw,
+  };
 }
 
 function computeStrengthWeightDeviation(

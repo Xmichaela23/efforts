@@ -62,3 +62,39 @@ Deno.test('no load reading → null even if fitness is improving (fitness cannot
 Deno.test('neither → null (unchanged)', () => {
   assertEquals(buildLoadHeadline({ loadLabel: '—', readinessState: null, readinessLabel: null, fitnessDirection: null }), null);
 });
+
+// ── D-350: NO TRAINING THRESHOLD LIVES IN THIS FILE ──────────────────────────────────────────────
+// The deleted observation slot gated "you have headroom" on `acwr < 1.0` — a training threshold in a
+// file that otherwise only formats a verdict the reconciler already decided (D-260). It could not
+// fire: the headline returns early unless the load deviates, and the slot only answered to
+// 'balanced', which is never a deviating label.
+//
+// ⛔ THIS TEST IS THE GUARD, NOT THE RECORD. It sweeps the whole input space, so it fails the moment
+// anyone reinstates the branch OR relaxes the silence rule in a way that would let it speak again.
+// If a headroom reading is genuinely wanted, it belongs on the server beside the reconciler.
+Deno.test('the ACWR ratio never reaches the copy: no input combination emits an observation', () => {
+  const labels = ['build more', 'balanced', 'building on plan', 'a bit high', 'pull back', 'back off', 'rest now', '—', ''];
+  const readiness = ['fresh', 'adapting', 'fatigued', 'overreached', 'detrained', 'normal', null];
+  const chipLabels = ['LEGS LOADED', 'LEGS SORE', 'EFFORT UP', 'FATIGUED', 'ABSORBING', null];
+  const acwrs = [null, 0, 0.5, 0.79, 0.9, 0.99, 1.0, 1.1, 1.3, 1.6, 2.0];
+  let combos = 0;
+  for (const loadLabel of labels) {
+    for (const readinessState of readiness) {
+      for (const readinessLabel of chipLabels) {
+        for (const acwr of acwrs) {
+          for (const isTaperOrPeak of [true, false]) {
+            combos++;
+            const out = buildLoadHeadline({ loadLabel, readinessState, readinessLabel, acwr, isTaperOrPeak });
+            if (out && out.includes('—')) {
+              throw new Error(`observation clause emitted for ${JSON.stringify({ loadLabel, readinessState, acwr })}: ${out}`);
+            }
+            if (out && /headroom/i.test(out)) {
+              throw new Error(`headroom emitted for ${JSON.stringify({ loadLabel, readinessState, acwr })}: ${out}`);
+            }
+          }
+        }
+      }
+    }
+  }
+  assert(combos > 8000, `expected a full sweep, ran ${combos}`);
+});

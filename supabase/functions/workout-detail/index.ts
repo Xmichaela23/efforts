@@ -21,6 +21,9 @@ import {
 } from '../_shared/plan-context.ts';
 import { trySessionRaceReadinessLlm } from '../_shared/session-detail/race-readiness-llm.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
+// D-349: unit-aware, human-bounded body-weight resolver — the same one the load score and the
+// backfill use, so a session's lb column and its load score are priced off an identical number.
+import { resolveBodyweightLb } from '../_shared/workload.ts';
 // The app's one 1RM formula (D-339, Wendler's own) + the rep ceiling above which it stops holding.
 import { estimate1RMRounded } from '../../../src/lib/estimate-1rm.ts';
 import { trustedMaxRepsFor } from '../shared/strength-system/loading/wendler-531.ts';
@@ -137,6 +140,13 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_
   const bcv = Number((sessionDetail as any)?.block_v);
   if ((workoutRow as any)?.planned_id && (!Number.isFinite(bcv) || bcv < BLOCK_CARD_VERSION)) return true;
 
+  // D-349 — same rule, different gate: STRENGTH sessions, plan link or not. See the note on
+  // STRENGTH_VOLUME_VERSION for why the block card's `planned_id` gate is wrong for this field.
+  if (isStrengthLikePerfSession(workoutRow)) {
+    const svv = Number((sessionDetail as any)?.strength_volume_v);
+    if (!Number.isFinite(svv) || svv < STRENGTH_VOLUME_VERSION) return true;
+  }
+
   const writtenMs =
     msFromTimestampField(analysis.session_detail_updated_at) ??
     msFromTimestampField(analysis.updated_at);
@@ -178,6 +188,26 @@ function stripResponseOnlySessionDetailFields(sd: Record<string, unknown> | null
  *       bump the block line on Performance would stay silent on them forever.
  */
 const BLOCK_CARD_VERSION = 3;
+
+/**
+ * ⛔ THE VOLUME FIELD NEEDS ITS OWN STALENESS RULE, AND IT IS NOT THE BLOCK CARD'S (D-349, 2026-08-01).
+ *
+ * `strength_volume` rides the same cached contract, so the same trap applies verbatim: every copy
+ * written before today lacks the field, the cache fast path serves those copies untouched, and the
+ * new pricing would be live and unreachable on every session the athlete already has.
+ *
+ * ⚠️ **GATED ON THE SESSION BEING STRENGTH, NOT ON `planned_id`.** The block card's rule keys off a
+ * plan link because a block is only resolvable then. Volume is not: a completed strength session with
+ * no plan attached still has volume, and it is exactly the session whose chin-ups read zero. Reusing
+ * the block gate would have left every unattached strength session on the old number — the "built and
+ * starved" failure the note above describes, re-created by copying the wrong guard.
+ *
+ * ⚠️ And it must NOT be a bare presence check: `strength_volume` is legitimately null for a run, so
+ * "refresh until the field appears" would make every non-strength session refresh forever.
+ *
+ *   1 — per-exercise volume load priced by `strengthSetVolume`, both sides (2026-08-01)
+ */
+const STRENGTH_VOLUME_VERSION = 1;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 
@@ -577,6 +607,24 @@ async function runSessionDetailPipelineAndPersist(
     const compStrength = (detail as any).strength_exercises ?? row?.strength_exercises;
     const compStrengthArr = Array.isArray(compStrength) ? compStrength : (typeof compStrength === 'string' ? (() => { try { return JSON.parse(compStrength); } catch { return null; } })() : null);
 
+    // D-349 — body weight, for pricing calisthenics at the SAME rate the load score prices them.
+    // ⛔ Resolved through the one resolver (`resolveBodyweightLb`: unit-aware, human-bounded), never
+    // read raw — `weight` is free text, and 70 typed in kilograms is a person while 70 read as pounds
+    // is not. A failed read leaves null, and null is scored exactly as it was before D-348.
+    let bodyweightLb: number | null = null;
+    if (isStrengthLikePerfSession(row)) {
+      try {
+        const { data: ubRow } = await supabase
+          .from('user_baselines')
+          .select('weight, units')
+          .eq('user_id', userId)
+          .maybeSingle();
+        bodyweightLb = resolveBodyweightLb(ubRow as any);
+      } catch (bwErr) {
+        console.warn('[workout-detail] body weight read failed (non-fatal, prices as pre-D-348):', bwErr instanceof Error ? bwErr.message : bwErr);
+      }
+    }
+
     let nextPlanned = plannedRows
       .filter((p: any) => String(p?.date || '') > workoutDate)
       .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)))[0] ?? null;
@@ -776,6 +824,7 @@ async function runSessionDetailPipelineAndPersist(
       plannedSession,
       plannedRowRaw,
       completedStrengthExercises: Array.isArray(compStrengthArr) ? compStrengthArr : null,
+      bodyweightLb, // D-349 — the builder prices; this function is the DB reader (Law 4).
       observations,
       workoutAnalysis: wa,
       narrativeText,
@@ -1025,6 +1074,10 @@ async function runSessionDetailPipelineAndPersist(
     if (sessionDetailV1) {
       // Stamped whether or not a card resolved — see the staleness note above.
       (sessionDetailV1 as Record<string, unknown>).block_v = BLOCK_CARD_VERSION;
+      // D-349 — stamped whether or not volume resolved, for the same reason: an unstamped copy is
+      // indistinguishable from a pre-D-349 one, so a session that legitimately has no volume would
+      // refresh on every open forever.
+      (sessionDetailV1 as Record<string, unknown>).strength_volume_v = STRENGTH_VOLUME_VERSION;
     }
     if (sessionDetailV1 && blockForSession) {
       (sessionDetailV1 as Record<string, unknown>).block = {

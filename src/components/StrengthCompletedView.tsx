@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import StrengthCompareTable from './StrengthCompareTable';
+import StrengthCompareTable, { type StrengthVolumePayload } from './StrengthCompareTable';
 import { useAppContext } from '@/contexts/AppContext';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { getSessionRPE, getWorkoutNotes, getWorkoutReadiness } from '@/utils/workoutMetadata';
@@ -13,6 +13,8 @@ interface StrengthCompletedViewProps {
     stale_reason?: 'recomputing' | 'attach_pending' | 'analysis_missing';
     strength_weight_deviation?: { direction: string; message: string; show_prompt: boolean } | null;
     strength_volume_deviation?: { direction: string; message: string; show_prompt: boolean } | null;
+    /** D-349 — server-priced volume load, passed straight to the compare table. */
+    strength_volume?: StrengthVolumePayload | null;
   } | null;
 }
 
@@ -348,6 +350,9 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           <StrengthCompareTable
             planned={plannedExercises}
             completed={completedForTable}
+            // D-349 — server-priced volume load. Without it this table's lb column would simply be
+            // absent here; it is never re-derived on the client.
+            strengthVolume={session_detail_v1?.strength_volume ?? null}
           />
         );
       })() : (

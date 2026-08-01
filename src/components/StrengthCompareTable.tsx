@@ -27,6 +27,9 @@ export interface StrengthExercise {
   /** D-338: the REAL per-set prescription (5/3/1's three weights). When present it replaces the
    *  replicate-the-top-weight fallback below — see the comment at `plannedSets`. */
   setPlan?: Array<{ weight: number; reps: number; amrap?: boolean }>;
+  /** Q-181: stamped by the Swap action, naming the PLANNED exercise this one stands in for. The slot
+   *  is the unit of adherence, so a declared swap pairs to the slot it replaced, not to its own name. */
+  substituted_for?: string;
 }
 
 /**
@@ -62,16 +65,19 @@ function normalizeName(raw: string): string {
  */
 const lookupKey = (raw: unknown): string => canonicalize(String(raw || ''));
 
-function calcVolume(sets: StrengthSet[]): number {
-  return sets.filter(s => (s.reps && s.reps > 0) || (s.duration_seconds && s.duration_seconds > 0))
-    .reduce((sum, s) => {
-      // Duration-based: volume = duration_seconds * weight
-      // Rep-based: volume = reps * weight
-      const multiplier = s.duration_seconds || s.reps || 0;
-      return sum + multiplier * (s.weight || 0);
-    }, 0);
-}
-
+/**
+ * ⛔ `calcVolume` IS GONE (D-349, 2026-08-01). DO NOT BRING IT BACK.
+ *
+ * It was `reps × weight` — the pre-D-348 rule — so a chin-up, dip or box jump priced at zero here
+ * while the SAME session's load score and `total_volume_lbs` counted them. Two numbers about one
+ * session on one screen, disagreeing. Volume now arrives already priced on
+ * `session_detail_v1.strength_volume`, from `strengthSetVolume` — the one set rule.
+ *
+ * ⚠️ THE PAIRING STAYED HERE ON PURPOSE. The server ships two FLAT lists and this table pairs them
+ * with `keyOf` exactly as before. The server's own matcher is lowercase-exact and would miss
+ * "Barbell Back Squat" against a logged "Back Squat" — pairing there would have re-opened audit F5.
+ * The server prices; this file pairs. See `strength_volume` in `session-detail/types.ts`.
+ */
 function avg<T extends number>(vals: T[]): number { if (!vals.length) return 0; return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length); }
 
 export type RirSummaryEntry = {
@@ -89,6 +95,15 @@ export type PreviousStrengthByExercise = Record<string, {
   sets: StrengthSet[];
 }>;
 
+/** D-349: server-priced volume load. Two flat lists — this table does the pairing. */
+export type StrengthVolumePayload = {
+  planned: Array<{ name: string; volume_lb: number }>;
+  completed: Array<{ name: string; volume_lb: number }>;
+  planned_total_lb: number;
+  completed_total_lb: number;
+  bodyweight_lb: number | null;
+};
+
 interface StrengthCompareTableProps {
   planned: StrengthExercise[];
   completed: StrengthExercise[];
@@ -98,6 +113,8 @@ interface StrengthCompareTableProps {
   rirSummary?: RirSummaryEntry[] | null;
   previousByExercise?: PreviousStrengthByExercise | null;
   workoutId?: string | null;
+  /** `session_detail_v1.strength_volume`. Absent → the lb column is omitted, never re-derived. */
+  strengthVolume?: StrengthVolumePayload | null;
   onAdjustmentSaved?: () => void;
 }
 
@@ -112,7 +129,7 @@ function formatPrevDate(dateStr: string | null | undefined): string | null {
   return month ? `${month} ${parseInt(m[3], 10)}` : null;
 }
 
-export default function StrengthCompareTable({ planned, completed, completedWorkoutRaw, planId: initialPlanId, plannedWorkoutId, rirSummary, previousByExercise, workoutId, onAdjustmentSaved }: StrengthCompareTableProps){
+export default function StrengthCompareTable({ planned, completed, completedWorkoutRaw, planId: initialPlanId, plannedWorkoutId, rirSummary, previousByExercise, workoutId, strengthVolume, onAdjustmentSaved }: StrengthCompareTableProps){
   // editingSet: { exerciseName, setIndex } — which completed set is being edited inline
   const [editingSet, setEditingSet] = useState<{ exerciseName: string; setIndex: number } | null>(null);
   const [editFields, setEditFields] = useState<{ reps: string; weight: string; rir: string }>({ reps: '', weight: '', rir: '' });
@@ -234,13 +251,37 @@ export default function StrengthCompareTable({ planned, completed, completedWork
   const completedMap = new Map<string, StrengthExercise>();
   completed.forEach(c => {
     // The slot it was declared against wins; otherwise the exercise answers to its own name.
-    const declaredFor = (c as any)?.substituted_for;
+    const declaredFor = c?.substituted_for;
     completedMap.set(keyOf(declaredFor || c.name), c);
   });
 
   // Is there a prescription to compare against at all? Everything that grades, labels or totals
   // against the plan hangs off this — with no plan there is nothing to be measured against (D-035).
   const hasPlan = plannedMap.size > 0;
+
+  // ⛔ D-349 — the server's priced volume, re-keyed with THIS table's own pairing function.
+  //
+  // The payload ships each entry under the exercise's own NAME, not under a server-side key, and it
+  // is re-keyed here with the same `keyOf` the rows above are paired with. That is the point: the
+  // server's `canonicalize` carries a curated synonym/plural/parenthetical ladder (Q-197/Q-210) that
+  // the client's does not, so a server-canonical KEY is not reliably a client-canonical key — the
+  // lookup would miss on exactly the decorated names the ladder exists for, and a miss here renders
+  // as "no volume" rather than as a bug. Keying off the raw name makes that mismatch impossible.
+  const plannedVolByKey = new Map<string, number>();
+  (strengthVolume?.planned ?? []).forEach(e => plannedVolByKey.set(keyOf(e.name), e.volume_lb));
+  const completedVolByKey = new Map<string, number>();
+  (strengthVolume?.completed ?? []).forEach(e => completedVolByKey.set(keyOf(e.name), e.volume_lb));
+  // ⚠️ A DECLARED SWAP ANSWERS TO THE SLOT IT REPLACED — the same rule the row pairing uses above
+  // (Q-181: the slot is the unit of adherence, not the name). The server ships the volume under the
+  // exercise the athlete actually did; the table draws that work under the PLANNED slot. Without
+  // this re-home the row is drawn and its volume is filed under a key nothing renders.
+  completed.forEach(c => {
+    const declaredFor = c?.substituted_for;
+    if (!declaredFor) return;
+    const vol = completedVolByKey.get(keyOf(c.name));
+    if (vol != null) completedVolByKey.set(keyOf(declaredFor), vol);
+  });
+  const hasServerVolume = strengthVolume != null;
 
   const allKeys = Array.from(new Set([...plannedMap.keys(), ...completedMap.keys()]));
 
@@ -249,7 +290,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     const c = completedMap.get(k);
     // What the athlete ACTUALLY did, when it differs from what was asked. Drives the swap receipt
     // on the row — never a dock, just the trade named.
-    const swappedWith = (c as any)?.substituted_for && c?.name && keyOf(c.name) !== k ? String(c.name) : null;
+    const swappedWith = c?.substituted_for && c?.name && keyOf(c.name) !== k ? String(c.name) : null;
     // ⚠️ The row's DISPLAY name, and the legacy key derived from it. `k` is now a canonical slug
     // ("chin_up"), so anything that used to read the key as prose — the bodyweight regex below, and
     // the two lookups further down whose maps are still built with `normalizeName` — has to go
@@ -266,7 +307,6 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     const pDuration = (p?.duration_seconds || 0);
     const pW = (p?.weight || 0);
     const pWDisplay = (p as any)?.weight_display as string | undefined;
-    const pVol = pSets * (pDuration || pReps) * pW;
     const targetRir = p?.target_rir;
     const cSetsArrRaw = (c as any)?.setsArray as StrengthSet[] | undefined;
     const cSetsArr = Array.isArray(cSetsArrRaw)
@@ -279,7 +319,8 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     const cSets = Array.isArray(cSetsArr) ? cSetsArr.length : 0;
     const cRepsAvg = Array.isArray(cSetsArr) ? avg(cSetsArr.map(s=>s.reps||0)) : 0;
     const cWAvg = Array.isArray(cSetsArr) ? avg(cSetsArr.map(s=>s.weight||0)) : 0;
-    const cVol = Array.isArray(cSetsArr) ? calcVolume(cSetsArr) : 0;
+    // D-349: priced by the server's one set rule. 0 when the payload has no entry for this row.
+    const cVol = completedVolByKey.get(k) ?? 0;
     
     // Calculate actual RIR average from completed sets
     const rirValues = cSetsArr.filter(s => typeof s.rir === 'number').map(s => s.rir as number);
@@ -340,12 +381,12 @@ export default function StrengthCompareTable({ planned, completed, completedWork
       completed: completedSets[i],
       previous: previousSets[i],
     }));
-    // D-338: planned volume off the SETS WE ACTUALLY RENDER, so the delta line can never disagree
-    // with the column above it. Identical to the old `pSets × reps × weight` on the replicated path;
-    // on an authored ramp it is the real 170×5 + 180×5 + 190×5 instead of 190 three times.
-    const pVolFromSets = plannedSets.reduce(
-      (sum, st) => sum + ((Number(st.duration_seconds) || Number(st.reps) || 0) * (Number(st.weight) || 0)), 0,
-    );
+    // ⛔ D-349 — PLANNED VOLUME IS THE SERVER'S NUMBER NOW, and D-338 still holds because the server
+    // prices the AUTHORED RAMP (`setPlan`) — the same three weights this table renders — rather than
+    // replicating the top set. Pinned in `session-detail-strength-volume.test.ts`: an authored ramp
+    // prices as 170×5 + 180×5 + 190×5, not 190 three times, so the delta below can never disagree
+    // with the set rows above it. That parity is the whole reason this line may be a lookup.
+    const pVolFromSets = plannedVolByKey.get(k) ?? 0;
     // The word the athlete tapped on their heaviest set — 5/3/1's replacement for RIR (D-338).
     const topCompletedIdx = (() => {
       if (!cSetsArr.length) return -1;

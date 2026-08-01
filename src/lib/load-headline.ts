@@ -62,16 +62,24 @@ function stateSlot(loadLabel: string, readiness: string | null | undefined, read
   return null;
 }
 
-// Slot 3 — OBSERVATION: a state-implied direction only. Pure physiological reads off the spine.
-// Deliberately sparse: fires only where the state clearly implies one, omits otherwise (the state
-// slot already carries "Load running high" etc., so we don't double it).
-function observationSlot(loadLabel: string, readiness: string | null | undefined, acwr?: number | null): string | null {
-  // "headroom" read on balanced+fresh. D-268 Phase 5: only when load is GENUINELY light — acute below
-  // chronic (acwr < 1.0). Reads the server-computed acwr; never claims "headroom" while load is AT or
-  // ABOVE the athlete's own norm (the old bug: "headroom" at ACWR 1.3, above chronic).
-  if (loadLabel === 'balanced' && readiness === 'fresh' && acwr != null && acwr < 1.0) return 'you have headroom';
-  return null;
-}
+// ⛔ THE "OBSERVATION" SLOT IS DELETED (D-350, 2026-08-01). IT COULD NOT FIRE.
+//
+// It carried the app's last training THRESHOLD living in a display file — `acwr < 1.0` deciding
+// "you have headroom" (D-268 Phase 5). That threshold was the thing Stage 2 set out to move to the
+// server. It turned out there was nothing live to move:
+//
+//   · The slot only ever spoke on `loadLabel === 'balanced'`.
+//   · Since 2026-07-20 the headline RETURNS EARLY unless the load is 'a bit high' / 'pull back' /
+//     'back off' / 'rest now' (the silent-unless-it-deviates rule). 'balanced' is not one of them.
+//   · So every path that reached the slot had already excluded the only label it answers to.
+//
+// Verified by exhaustion, not by reading: 8,316 combinations of label × readiness × refined chip
+// label × acwr × taper flag emitted the string ZERO times.
+//
+// ⚠️ IF A "HEADROOM" READING IS EVER WANTED, IT IS A NEW FEATURE AND IT BELONGS ON THE SERVER —
+// beside the reconciler that already owns the load verdict (D-260, sole verdict authority). Do not
+// reinstate it here: a second place deciding what the load means is the fracture the reconciler exists
+// to prevent, and reviving this branch would put a threshold back in a file that only formats.
 
 export function buildLoadHeadline(opts: {
   loadLabel: string;                 // reconciled load_status verdict word
@@ -79,9 +87,15 @@ export function buildLoadHeadline(opts: {
   readinessLabel?: string | null;    // the refined chip label (LEGS LOADED / EFFORT UP / FATIGUED / …)
   fitnessDirection?: string | null;
   isTaperOrPeak?: boolean;
-  acwr?: number | null;              // D-268 Phase 5: gate the "headroom" observation on load being genuinely light
+  /**
+   * ⚠️ ACCEPTED AND UNUSED (D-350). Its only consumer was the deleted observation slot, which could
+   * not fire. Kept on the signature so the two call sites (StateTab, the State-screen printer) do
+   * not need editing in lockstep with this file — and so the next session sees, in one place, that
+   * the load RATIO does not enter this composer. The load VERDICT does, already reconciled.
+   */
+  acwr?: number | null;
 }): string | null {
-  const { loadLabel, readinessState, readinessLabel, isTaperOrPeak, acwr } = opts;
+  const { loadLabel, readinessState, readinessLabel, isTaperOrPeak } = opts;
   // In taper/peak, a "build more" reading is by-design low volume — don't lead the glance with it.
   const effLoad = isTaperOrPeak && loadLabel === 'build more' ? 'balanced' : loadLabel;
 
@@ -102,11 +116,10 @@ export function buildLoadHeadline(opts: {
   if (!notableLoad) return null;
 
   const state = stateSlot(effLoad, readinessState, readinessLabel);
-  const obs = state ? observationSlot(effLoad, readinessState, acwr) : null;
 
   // The headline reflects THE WEEK only (Michael 2026-07-04) — one clock. Fitness is a different clock
   // and is NOT rolled up here: it's handed to the individual discipline rows under PERFORMANCE, each
   // on its own 6–8wk window. No aggregate fitness verdict anywhere (it would have to lie about the clock).
   // No "This week:" frame — the read is rolling-7d, not the calendar week (Michael's rolling-week catch).
-  return state ? `${obs ? `${state} — ${obs}` : state}.` : null;
+  return state ? `${state}.` : null;
 }

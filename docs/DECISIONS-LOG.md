@@ -2576,6 +2576,116 @@ rather than guessed into it — the same failure direction the gate already chos
 
 ---
 
+## D-350 — TWO "CLIENT RE-DERIVATIONS" THAT WEREN'T: AN UNREACHABLE THRESHOLD AND A COMPONENT NOTHING RENDERED (2026-08-01, **NOT YET PUSHED**)
+
+**Context.** Stage 2 of `docs/AUDIT-state-screen-2026-08-01.md` named three client-side re-derivations
+to delete. Traced first, on Michael's instruction (*"one stage, trace first, report before coding"*).
+**Two of the three were not what the audit said, and the doc's own instruction for a third would have
+caused a regression** — that one is D-349. This entry records the two that turned out to be non-bugs,
+because "we deleted it and nothing changed" is exactly the finding a future session will re-litigate.
+
+- **Decision 1 — `buildLoadHeadline` STAYS. It formats; it does not decide.** The audit called it
+  "the LOAD verdict composed on the client" (F3). Every input is a server verdict: the reconciled
+  `load_status` word (D-260, sole verdict authority) plus the readiness chip label. What it adds is a
+  taper/peak override and a silence rule — **presentation, both kept.** ⚠️ **It is also already a
+  SHARED file:** `_shared/state-trend/state-screen-print.ts` imports `src/lib/load-headline.ts`. One
+  copy, not a client second opinion. **Why non-negotiable:** moving it server-side buys a
+  `COACH_PAYLOAD_VERSION` bump — 24h of cache invalidation on every athlete — to relocate string
+  formatting. The continuity law is *one source per fact*, and the fact already has one.
+
+- **Decision 2 — the `acwr < 1.0` "headroom" threshold is DELETED, not moved.** This was the one real
+  holdout: a training threshold living in a display file (D-268 Phase 5). **It could not fire.** Since
+  2026-07-20 the headline returns early unless the load deviates ('a bit high' / 'pull back' / 'back
+  off' / 'rest now'), and the observation slot only answered to `balanced` — never a deviating label.
+  **Verified by exhaustion, not by reading: 8,316 combinations of label × readiness × chip label ×
+  acwr × taper flag emitted the string zero times.** ⛔ **Why deleted rather than moved:** moving dead
+  code to the server creates a payload field nothing can use and still costs the version bump. **If a
+  headroom reading is ever wanted it is a NEW FEATURE and belongs beside the reconciler** — a sweep
+  test now fails if the branch returns or if the silence rule is relaxed enough to let it speak.
+
+- **Decision 3 — `BlockSummaryTab.tsx` is DELETED (1,184 lines), and its blocker had expired.**
+  Unmounted since 2026-03-31 (`96db8469`), no importer anywhere in the repo, cited as unmounted by
+  five separate docs. ⚠️ **`AUDIT-state-screen-2026-07-02.md` said do NOT delete it** — per D-212 it
+  was the only reader of `block_verdict`, the goal-predictor axis. **That reason was stale:**
+  `StateTab.tsx:1805` reads `goal_prediction.block_verdict` on a live surface, with the seeded-verdict
+  honesty gate at `:694`. D-212 and `SPEC-fitness-verdict-reconciliation.md:41` are back-annotated.
+
+- **Decision 4 — `useExerciseLog` no longer computes a direction.** `trend`, `current1RM`, `peak1RM`
+  and `latestRir` were read by the deleted component alone. ⛔ **`trend` was the same lie D-347
+  deleted from State**: first-point-to-last-point across a block that prescribes ~65%→95% of a
+  training max reads a correctly-executed light week as a decline. It survived only because nothing
+  rendered it. **Why it matters beyond the deletion:** D-347 removed the *rendering* of that
+  computation on one surface and left the *computation* alive on another. **Deleting a display is not
+  deleting a derivation** — the next session to mount a strength screen would have found a
+  ready-made, wrong direction sitting in a hook and rendered it.
+
+- **⚠️ Found and filed, NOT fixed: [Q-234].** `StateTab.tsx:1311` gates a per-lift bar on `lt.peak1RM`
+  — camelCase on a snake_case server object, so always `undefined`, silently falling through to
+  measuring against *last session × 1.1*. **The obvious fix is a trap** (`allTimeBestE1rm` exists, and
+  using it would print "72% of your best" on a deliberately light week — D-347's bug in new clothes).
+  Shape decision first; deliberately not touched in this pass.
+
+- **Cross-ref:** D-349 (the one target that WAS real), D-347 (the direction chip this finishes),
+  D-260/D-266 (the reconciler that owns the load verdict), D-212 + `SPEC-fitness-verdict-reconciliation.md`
+  (back-annotated), Q-234.
+
+---
+
+## D-349 — THE COMPARE TABLE'S lb COLUMN IS PRICED BY THE ONE SET RULE: THE SERVER PRICES, THE CLIENT PAIRS (2026-08-01, **NOT YET PUSHED**)
+
+**The bug.** D-348 made bodyweight count in ONE function (`strengthSetVolume`), shared by the load
+score, the planned score and `compute-facts`' `total_volume_lbs` — *"so the load number and the volume
+number on the same screen cannot disagree."* **It never reached the Performance screen.**
+`StrengthCompareTable` carried its own `calcVolume` (`weight × reps`, the pre-D-348 rule), so a chin-up
+counted toward the session's LOAD and read as **zero lb** in the table on that same session.
+`StrengthPerformanceSummary`'s "Volume (lbs)" tile — inches below the table — carried a **fourth copy**
+of the same stale rule. Volume now ships pre-priced on `session_detail_v1.strength_volume`.
+
+- **Decision 1 — the payload is TWO FLAT LISTS, not pre-paired rows. THE SERVER PRICES, THE CLIENT
+  PAIRS.** ⛔ **The audit's own instruction — "route the matcher through the server" — would have
+  caused a regression.** `session-detail/build.ts`'s `matchPlannedToCompleted` is lowercase-exact: it
+  pairs *nothing* for "Barbell Back Squat" against a logged "Back Squat". The client's table already
+  pairs correctly through `canonicalize` plus declared swaps (audit F5, 2026-07-30). **Pairing on the
+  server would have replaced the stronger matcher with the weaker one and silently re-opened F5** —
+  and a pairing miss renders as "no volume", not as an error. **Why non-negotiable:** the two jobs are
+  genuinely separate. Pricing is a rule (one place, server). Pairing is identity resolution (already
+  solved, client). Neither re-derives the other's job.
+
+- **Decision 2 — entries are keyed by the exercise's own NAME, not by a canonical key.** ⚠️ **The two
+  `canonicalize` functions are NOT the same rule.** `_shared/canonicalize.ts` carries a curated
+  synonym/plural/parenthetical ladder (Q-197/Q-210); `src/lib/canonicalize.ts` is a small map plus a
+  slugify. They agree on plain names and **diverge on exactly the decorated ones the ladder exists
+  for** — so a server-canonical key is not reliably a client-canonical key. Shipping the raw name and
+  letting the client re-key it with the function it already pairs with makes the mismatch
+  structurally impossible. **Why non-negotiable:** the existing Previous-column handshake already
+  depends on both sides keying identically, and its failure mode is silence.
+
+- **Decision 3 — PLANNED is priced off the AUTHORED RAMP (`setPlan`), not the aggregate.** 5/3/1
+  prescribes three different weights and the table renders three rows. Pricing
+  `sets × reps × topWeight` server-side would put a delta on screen that disagrees with the rows above
+  it — **the exact bug D-338 fixed**, and moving this number to the server is precisely how it would
+  return. Pinned both ways in `session-detail-strength-volume.test.ts`.
+
+- **Decision 4 — null body weight prices exactly as before D-348.** Carried through from D-348 rather
+  than re-decided: an athlete who never recorded a weight keeps today's scoring, because the
+  alternative is inventing a body weight for a real person. `bodyweight_lb` is surfaced on the payload
+  so a screen *can* say why a chin-up reads zero instead of looking broken.
+
+- **⚠️ The set filter must match `compute-facts`** (D-204: an untouched prefill is not a receipt), or
+  the footer total stops equalling the rows above it. Pinned.
+
+- **Q-233 is unchanged here:** an isometric hold still scores zero on this surface too — a per-rep
+  rule has nothing to multiply. Pinned so it is not rediscovered as a bug.
+
+- **⚠️ `_shared` DEPLOY TRAP APPLIES.** `session-detail/build.ts` and `workload.ts` are shared —
+  **every function importing them must be redeployed**, not just `workout-detail`.
+
+- **Cross-ref:** D-348 (the set rule), D-338 (the authored ramp), D-204 (prefills), F5 in
+  `AUDIT-state-screen-2026-07-20.md` (the matcher this deliberately did not touch), Q-197/Q-210
+  (the canonicalize ladder), D-350.
+
+---
+
 ## D-348 — BODYWEIGHT IS LOAD, AND RE-PRICING HISTORY IS PART OF THE CHANGE (2026-08-01, **PUSHED + DEPLOYED, measured on real data, NOT device-verified**)
 
 **The decision (D1 of `docs/AUDIT-state-screen-2026-08-01.md`).** Strength load stays **volume load** —
@@ -2610,6 +2720,21 @@ BOTH ways in `workload-strength-bodyweight.test.ts`; the hazard case is a perman
 strength **8% -> 38%** of 28-day load. Known imprecisions: Q-233.
 
 ## D-347 — THE PER-LIFT TREND CHIP IS DELETED, AND THE SCREENS READ THE BLOCK CARD (2026-08-01, **PUSHED + DEPLOYED, not device-verified**)
+
+> ⚠️ **STILL STANDS — BUT IT ONLY DELETED THE RENDERING, AND THE COMPUTATION LIVED ON (D-350, same
+> day).** The reasoning below is unchanged and correct. What it did not catch: `useExerciseLog.ts`
+> computed the SAME first-point-to-last-point direction across 12 weeks, in the client, and
+> `BlockSummaryTab` rendered it with an arrow and a percentage. That component had been unmounted
+> since 2026-03-31, so the wrong chip was invisible rather than absent. **Both are deleted now.**
+>
+> ⛔ **The general lesson, and it is why this back-annotation exists: deleting a display is not
+> deleting a derivation.** A future session mounting any strength screen would have found a
+> ready-made direction sitting in a hook, with no warning attached, and rendered it.
+>
+> ⚠️ **A THIRD copy of the same class is still live and is FILED, NOT FIXED — [Q-234].**
+> `StateTab.tsx:1311` gates a per-lift bar on `lt.peak1RM`, a field the server does not send, so it
+> silently measures against *last session × 1.1*. **Read Q-234 before "fixing" it** — the obvious
+> rename makes a correct number appear that would still read a prescribed light week as a shortfall.
 
 **Stage 1 of `docs/AUDIT-state-screen-2026-08-01.md`.** `_shared/block-identity.ts` has answered "what
 block is this, on this date" since 2026-07-30 (Q-230/D-339) and the coach's verdicts already read it —

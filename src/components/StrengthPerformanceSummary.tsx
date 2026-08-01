@@ -1,5 +1,5 @@
 import React from 'react';
-import StrengthCompareTable from './StrengthCompareTable';
+import StrengthCompareTable, { type StrengthVolumePayload } from './StrengthCompareTable';
 // THE app's exercise vocabulary — the same canonical keys exercise_log and the State trend group
 // on. Imported rather than re-implemented so this screen cannot disagree with them about what a
 // lift is called (audit F5: five separate name-matchers, and counting is not the place to add one).
@@ -183,6 +183,9 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
   const plannedWorkoutId = (planned as any)?.id || (completed as any)?.planned_id;
   
   const rirSummary = sessionDetail?.strength_rir_summary ?? null;
+  // D-349 — volume load, priced server-side by the one set rule. Feeds BOTH the table's lb column
+  // and the totals footer below, so the two cannot disagree with each other or with the load score.
+  const strengthVolume: StrengthVolumePayload | null = sessionDetail?.strength_volume ?? null;
   // The all-out set + the block it belonged to — both server-computed, rendered verbatim.
   const allOut = sessionDetail?.strength_all_out ?? null;
   const allOutReason = sessionDetail?.strength_all_out_reason ?? null;
@@ -269,22 +272,24 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
 
   // Session totals footer — ported from the (now-retired for strength) Details tab so killing
   // that tab loses nothing. Same counting rule as the D-205 fix: every set with reps>0 counts
-  // (bodyweight + band included); volume stays weight-gated (a 0 lb set contributes 0 anyway).
+  // (bodyweight + band included).
+  //
+  // ⛔ VOLUME IS NO LONGER COUNTED HERE (D-349). This reducer had its own weight-gated
+  // `w > 0 && r > 0 ? w * r : 0` — a FOURTH copy of the pre-D-348 rule, and the most visible one:
+  // it printed the "Volume" tile directly beneath a table that (after this change) prices chin-ups
+  // and dips properly. Two totals about one session, inches apart, disagreeing. It now reads the
+  // server's `completed_total_lb`, which is the sum of the very rows drawn above it.
   const totals = (completedExercises as Array<{ name: string; setsArray: any[] }>).reduce(
     (acc, ex) => {
       const sets = Array.isArray(ex.setsArray) ? ex.setsArray : [];
       const withReps = sets.filter((s) => (Number(s?.reps) || 0) > 0);
       acc.sets += withReps.length;
       acc.reps += withReps.reduce((sum, s) => sum + (Number(s?.reps) || 0), 0);
-      acc.volume += sets.reduce((sum, s) => {
-        const w = Number(s?.weight) || 0;
-        const r = Number(s?.reps) || 0;
-        return sum + (w > 0 && r > 0 ? w * r : 0);
-      }, 0);
       return acc;
     },
-    { sets: 0, reps: 0, volume: 0 },
+    { sets: 0, reps: 0 },
   );
+  const totalVolumeLb = strengthVolume?.completed_total_lb ?? 0;
 
   return (
     <div className="space-y-4">
@@ -430,12 +435,13 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
         rirSummary={rirSummary}
         previousByExercise={previousByExercise}
         workoutId={workoutId}
+        strengthVolume={strengthVolume}
         onAdjustmentSaved={() => {
           window.dispatchEvent(new CustomEvent('plan:adjusted'));
           onRecompute?.();
         }}
       />
-      {(totals.sets > 0 || totals.volume > 0) && (
+      {(totals.sets > 0 || totalVolumeLb > 0) && (
         <div className="grid grid-cols-3 gap-2 pt-3 mt-1 border-t border-white/10 text-center">
           <div>
             <div className="text-lg font-semibold text-white">{totals.sets}</div>
@@ -446,7 +452,7 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
             <div className="text-xs text-white/50">Total Reps</div>
           </div>
           <div>
-            <div className="text-lg font-semibold text-white">{totals.volume.toLocaleString()}</div>
+            <div className="text-lg font-semibold text-white">{totalVolumeLb.toLocaleString()}</div>
             <div className="text-xs text-white/50">Volume (lbs)</div>
           </div>
         </div>
