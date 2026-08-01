@@ -4,6 +4,22 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-01 — THE STATE-SCREEN PASS IS DONE, AND THE TRACK MOVED UPSTREAM INTO THE LOGGER.**
+> `AUDIT-state-screen-2026-08-01.md` Stages 0–3 and 5 shipped (D-347 … D-350): the screens read one
+> number and stopped disagreeing. Stage 2's own instructions turned out to be wrong on all three
+> targets and the doc is rewritten — **read its Stage 2 before trusting any "delete the client math"
+> line anywhere else.**
+>
+> The remaining faults were all UPSTREAM, in what the logger records — so that is where the day
+> ended (D-351 / D-352): bands carry a user-entered number, typed-but-unticked reps stop vanishing,
+> and the bar-speed cues render for the first time since they were written on 2026-07-25.
+>
+> ⛔ **NEXT IS `verdictFrom95Set`.** It is the largest starved engine left: written, correct, called
+> by nothing, while the composer advances the working number by calendar. Two pieces of copy
+> (`STRENGTH_ADVANCE_COPY`, the `validity_set` cue) are written and **gated off** waiting for it —
+> both call sites say exactly where to pass the flag. Until it lands the block's advance rule is a
+> calendar, not a measurement.
+
 > **2026-07-25/26 status — THE PLAN BUILDER IS THE ACTIVE TRACK, and it moved off the State screen.**
 > The roadmap order was State → **plan builder** → intro flow → freeballer. The State screen work paused
 > at "Adjust tab next"; **the plan builder is now what's being built**, because Strength Focus V1 shipped

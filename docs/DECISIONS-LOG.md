@@ -2576,7 +2576,88 @@ rather than guessed into it — the same failure direction the gate already chos
 
 ---
 
-## D-351 — THE BAND CARRIES A NUMBER THE ATHLETE ENTERED, AND TYPED REPS STOP VANISHING (2026-08-01, **NOT YET PUSHED**)
+## D-352 — THE IN-SESSION CUES: SURFACED, NARROWED, AND THE AMRAP RULE REVERSED (2026-08-01, **PUSHED, client-only, not device-verified**)
+
+**⛔ THE BAR-SPEED DOCTRINE HAD NO `D-NNN` UNTIL NOW.** It was written on 2026-07-25, argued in a
+long comment at the top of `src/lib/strength-focus-copy.ts`, pinned by `bar-speed-copy.test.ts`, and
+recorded nowhere a session would look. It was also **rendered by nothing for a week** — `barSpeedLineFor`
+was reachable only from its own test. Both halves of that are the failure this log exists to prevent:
+*a decision that lives only in a comment does not exist, and a capability that reaches no screen is
+starved, not built.*
+
+- **Decision 1 — the AMRAP ends SHORT OF FAILURE, not at the first slow rep. This reverses the
+  2026-07-25 rule deliberately.** The original was *"slow rep = last rep"* (Michael's own phrasing —
+  "the AMRAP terminator and the whole doctrine in four words"), justified as *"speed is the earliest
+  sign of form breakdown"*. **It was stricter than the source it cited.** Wendler's instruction for
+  the "+" set is to **grind it out, not to failure** (5/3/1 2nd ed. p.24). A grinding rep is a rep,
+  and the rep count off that set is what moves the training max — so a speed-stop **systematically
+  under-reports the number the whole block runs on.** Copy: `Grind it out. Stop before failure.`
+  ⚠️ **THE STOP RULE NEVER MOVED — only its position.** Not-to-failure is still the ceiling; it now
+  sits at the edge of failure rather than at the first sign of effort. `BAR_SPEED_AMRAP_AFTER` was
+  realigned for the same reason ("Not to failure — you train tomorrow"): the old closer carried the
+  retired speed-stop and would have argued with the new opener on the same set.
+
+- **Decision 2 — the cue renders on the FOUR MAIN LIFTS ONLY, gated by `isMain531Lift`.** The first
+  cut gated on "not an assistance row", which let it onto everything the block prescribes that is not
+  an accessory: Michael's **Box Jump** read *"Every rep at the same speed as the first"* — advice for
+  a barbell set under a percentage of a training max.
+  ⛔ **DELIBERATELY NOT `roleForExercise(x) === 'primary'`,** and this is the reusable part.
+  `primary` is wide on purpose (goblet squat, RDL, trap-bar deadlift, DB bench all qualify) **and it
+  DEFAULTS unmapped names to `primary`** so scoring never silently discounts. Gate a cue on a
+  permissive default and every exercise the library later gains inherits a 5/3/1 instruction — the
+  bug grows on its own. `isMain531Lift` is a curated set that **misses to FALSE**: no cue beats the
+  wrong cue. Not a containment test either — "Jump Squat" contains "squat" (same trap
+  `canonicalize.ts` documents for 1RM purposes).
+
+- **Decision 3 — plyometrics are their own equipment type and show reps only.** `getExerciseType`
+  gained `plyo`; box/broad/depth/tuck jumps, jump squats, skater hops, bounding and plyo push-ups
+  render **no weight column, no equipment strip, no plate calculator, no cue.** A jump has no
+  external load to record, and its intent is maximal every rep by definition, so a "keep every rep
+  the same speed" line describes a different kind of exercise.
+  ⛔ **CHECKED FIRST, ABOVE EVERY OTHER PATTERN — and that ordering IS the fix.** Box Jump fell
+  through every rule to the `barbell` DEFAULT, drawing a 45 lb bar and a plate calculator.
+  **That default has now caused three separate bugs**: the dumbbell Farmers Carry (Q-180), the
+  single-leg hip thrust (D-351 Decision 6), and this one. ⚠️ **Next session to touch
+  `getExerciseType`: consider whether the default should be "unknown → no equipment UI" rather than
+  "barbell".** Three strikes is a pattern, not a coincidence.
+
+- **Decision 4 — the assistance cue is a SECTION note, not a per-exercise property.** Rendered once
+  above the first assistance card. Two bugs came from getting this wrong on first attempt: placed in
+  the header's flex row it **took width from the exercise-name search box until the name was
+  invisible**, and rendered per card it repeated three times on one screen. Copy:
+  *"Split these into as many sets as you need. Leave a rep or two — never to failure."*
+  Basis: Wendler 5/3/1 2nd ed. p.24 / p.102 — assistance runs across as many sets as needed and is
+  explicitly not taken to failure; too much assistance is named as the most common mistake with the
+  programme.
+  ⚠️ It contains "as many" and "failure", which `bar-speed-copy.test.ts` bans on the PRESCRIBED-set
+  lines. **Not a lint miss:** there those words mean rep-chasing; here "as many" governs SETS and
+  "failure" is a stop rule. `strength-accessory-copy.test.ts` pins the intent so nobody widens that
+  lint over this constant.
+
+- **Decision 5 — the deload line stops conceding.** "Nothing to prove. Move it fast anyway." →
+  **"Light on purpose. Move it fast."** The concession was the part an athlete reads, and it framed a
+  prescribed light day as a write-off rather than as the plan working.
+
+- **Decision 6 — "all out" is displayed as "AMRAP".** The field's term; the strength surfaces are
+  meant to read as familiar to a Strong/Hevy lifter.
+
+- **⛔ `validity_set` REMAINS UNRENDERED, AND THIS IS THE ONE TO NOT "FIX".** Its line — *"Five at
+  ninety-five. This one decides the number."* — is true only once `verdictFrom95Set` is wired, and it
+  is not: the composer still advances the working number by cycle index
+  (`workingNumberForCycle`). Rendering it would describe an engine that is not running. The flag is
+  never passed and the call site says exactly when to pass it. Same gate as `STRENGTH_ADVANCE_COPY`.
+
+- **Verification:** 25 pins green across `bar-speed-copy`, `strength-accessory-copy` and the new
+  `exercise-role.main-lift` suites, including one that fails if `isMain531Lift` ever starts
+  defaulting true. **Not device-verified.**
+
+- **Cross-ref:** D-351 (the same pass's record fixes), D-326 (the difficulty tap, same logger),
+  D-324 (RIR removed from this protocol), Q-180 (the first `barbell`-default bug),
+  `exercise-role.ts` (D-208's table, which this deliberately does not reuse for the gate).
+
+---
+
+## D-351 — THE BAND CARRIES A NUMBER THE ATHLETE ENTERED, AND TYPED REPS STOP VANISHING (2026-08-01, **PUSHED + DEPLOYED, not device-verified**)
 
 **Context.** The screens were made honest first (D-347 / D-349 / D-350). What remained was upstream:
 the logger's *record* of what happened was lossy in two ways, and everything downstream — volume,

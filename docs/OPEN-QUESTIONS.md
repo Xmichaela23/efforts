@@ -757,6 +757,12 @@ Found by **opening a swim session and reading the "Next" card**, then comparing 
 
 ---
 
+> ⚠️ **THIS WAS THE FIRST OF THREE — see [Q-235] (2026-08-01).** The apostrophe fix below patched
+> one name; the underlying cause is that `getExerciseType` DEFAULTS an unmatched exercise to
+> `barbell`, so a miss is always resolved toward a bar and a plate calculator. It has since done the
+> same to the single-leg hip thrust and the box jump. Q-235 asks whether the default itself should
+> change; everything below is still accurate about this instance.
+
 ## Q-180 — THE LOGGER CANNOT RECORD A CARRY. The Hyrox station is prescribed in METRES; the logger has a timer and a reps box, and nothing else. The athlete's work is silently lost. (ENGINE + PRODUCT, 2026-07-13 — FOUND BY MICHAEL, from his own session)
 
 **This is the disease behind Q-178.** Q-178 fixed the analyzer (it must not fabricate work from a `completed` flag). **This is why the data was missing in the first place.**
@@ -2323,6 +2329,31 @@ The floor holds without it: under 8 runs the athlete simply gets no verdict, and
 ⚠️ **AND IT IS WORTH MORE THAN IT LOOKS.** An athlete who syncs Strava and sees a full chart with their own learned heat coefficient on day one has been shown something no competitor gives them. An athlete who syncs and sees an empty row has been shown nothing.
 
 ---
+
+## Q-235 — `getExerciseType`'s `barbell` default has now caused three separate bugs (2026-08-01, PATTERN — each instance fixed, the default is not)
+
+`getExerciseType` (`StrengthLogger.tsx:146`) ends with `return 'barbell'`, so any exercise no pattern
+matches is handed a 45 lb bar, a plate calculator and a per-set weight column. Three times now that
+has been the bug, and each was found by Michael looking at a screen rather than by a test:
+
+1. **Q-180 (2026-07-14)** — "Farmer's Carry" missed `farmers carry` on an apostrophe and got a barbell.
+2. **D-351 Decision 6 (2026-08-01)** — "Single Leg Hip Thrust" matched nothing and got a bar + plates.
+3. **D-352 Decision 3 (2026-08-01)** — "Box Jump" matched nothing, got a bar, plates **and** a
+   bar-speed cue written for a percentage-of-training-max set.
+
+Each fix added a pattern. **The default is still `barbell`,** so the fourth instance is already
+written — it is just waiting for an exercise nobody has typed yet.
+
+**The question to settle:** should an unmatched name return something like `unknown` that renders
+**no equipment UI at all**, instead of the most equipment-heavy option? The argument for the current
+default is that a barbell lift with no weight box is worse than a bodyweight lift with an unused one.
+The argument against is three bugs, all in the loud direction, all shipped to a device.
+
+⚠️ **Not a free change.** Every consumer of the return value assumes the five (now six) known values,
+and `['barbell','dumbbell','goblet'].includes(exType)` gates the weight steppers. Whoever takes this
+should also check whether `roleForExercise`'s mirror-image default (unmapped → `primary`, loudly)
+is the better pattern: **it defaults toward SCORING correctly and warns, rather than defaulting
+toward a UI guess and staying silent.**
 
 ## Q-234 — The per-lift "% of peak" bar on State reads a field the server does not send, so it silently falls through to a different number (2026-08-01, VERIFIED IN CODE — not fixed)
 

@@ -8,6 +8,58 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — DEPLOYED + ON THE PHONE, NOT YET SEEN (2026-08-01)
+
+**Everything below is pushed, deployed and synced to iOS. None of it has been seen on a device.**
+A green suite proves the code is right, not that it is doing the right thing on a screen. Tick these
+off in one pass through a strength session.
+
+**In the LOGGER (open a Get Stronger session):**
+- [ ] A **main lift** set card shows a bar-speed line under the "last:" anchor. Sets 1–2 read
+      "Every rep at the same speed as the first"; the top set reads **"Grind it out. Stop before
+      failure."** ⚠️ It should be legible, not grey-on-grey — that was the first complaint.
+- [ ] The open set reads **"AMRAP"**, not "all out" — placeholder and the "· 5 minimum" label.
+- [ ] **A Box Jump shows NO bar-speed cue**, no bar, no plate calculator, no weight box. Reps only.
+- [ ] **One** "Split these into as many sets as you need…" line sits **above** the accessory block —
+      not inside a card, not repeated per exercise, and the exercise NAME is visible.
+- [ ] A chin-up's band control is a numeric **Assist (lb)** box, not Light/Moderate/Heavy.
+- [ ] **Single Leg Hip Thrust**: plain weight box, no 45 lb bar, no plate calculator.
+- [ ] Type reps into a set, do NOT tap Done, hit save → a prompt names that set and offers
+      "Mark them done" / "Save without them".
+
+**In PERFORMANCE (open a completed strength session):**
+- [ ] Chin-ups and dips show **pounds**, not blanks.
+- [ ] The delta row reads **"vs plan"**, not "Totals" — it sits above the real "Volume (lbs)" total
+      and was being read as the session volume.
+- [ ] A strength session carries a grey line naming the plan and week.
+- [ ] The strength row on State reads "week N of M · build", with **no ↑/↓ chips per lift**.
+
+**MEASURED, NOT SEEN — worth a sanity glance:**
+- [ ] Log an assisted chin-up **with an assist number** → it should price BELOW a bodyweight set.
+- [ ] Log a chin-up **with added weight** → it should price ABOVE a bodyweight set.
+- [ ] ⚠️ First strength session opened after the deploy takes one extra beat while the cached
+      payload refreshes. If a number still looks wrong *after* that, it is real.
+
+---
+
+## ⚠️ THREE LIVING DOCS ARE OVER THE CAP (measured 2026-08-01)
+
+`CLAUDE.md`'s rule: **past ~150KB, move closed and superseded entries to the doc's `-ARCHIVE.md` and
+leave a pointer.** Nothing is deleted; it stops being loaded. The 2026-07 split was a rescue; this is
+the rule that was supposed to stop it recurring — and all three are past it again:
+
+- [ ] **`DECISIONS-LOG.md` — 397 KB** (2.6× the cap). Archive candidates: everything superseded or
+      closed below ~D-300.
+- [ ] **`OPEN-QUESTIONS.md` — 297 KB** (2×). Archive candidates: every Q marked closed/resolved.
+- [ ] **`ENGINE-STATE.md` — 192 KB.** Its Solid entries older than ~2026-07-20 belong in the archive
+      that already exists for them.
+
+⛔ **Do this as its own pass, not at the end of a session.** It is a bulk move across the three docs
+a fresh session trusts most, and a botched split is worse than an oversized file — the failure mode
+is a decision that silently stops existing. Grep-verify every `D-NNN`/`Q-NNN` still resolves after.
+
+---
+
 ## ▶ NEXT UP — THREE PROTOCOL-BLIND READS ON STATE (2026-08-01)
 **All three found by Michael reading his own screen at the end of 2026-07-30. Same family as everything
 that shipped that day: the reader does not know what the session was for.**

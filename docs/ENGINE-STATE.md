@@ -23,75 +23,76 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-01 — **strength load is fixed and re-priced; the State fitness rows read the block card. Your job is Stage 2, the client re-derivations.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-01 late — **the screens are honest and the LOGGER RECORD is fixed. Your job is the 95% verdict, or the punch list.**)
 
 ### WHAT SHIPPED TODAY — pushed AND deployed, do NOT re-litigate
 
-**Two stages of `docs/AUDIT-state-screen-2026-08-01.md`, which governs this stream and is now in git.**
+Two streams. The first finished `AUDIT-state-screen-2026-08-01.md`; the second went upstream into the
+logger, because that is where the remaining lies were being written.
 
-**STAGE 1 — the State fitness rows + the Performance table read `block-identity`.**
-- The card has existed since 2026-07-30 and the coach's verdicts already read it; the SCREENS did not.
-  The coach payload has carried it at `plan.block` since v150 — the client type simply never described
-  it, so the browser threw it away. That was the whole bug.
-- The card gained `phaseWord` (`_shared/block-identity.ts`) — the plain word a screen may print, via
-  `normalizePhaseKey` (D-322), the SAME table the effort rules use. **`phase` is the plan's own name and
-  is often internal ('Leader'/'Anchor', Wendler's words); never print it.** Null = the plan did not place
-  the week → render "week 3 of 12" alone.
-- **The per-lift direction chip is DELETED (D-347), not silenced.** It judged an e1RM produced once per
-  cycle off a top set the block runs from 65% to 95%, so it was reading the PRESCRIPTION and calling a
-  correctly-executed light week a decline. The number, the 12-week chart and the PR all stay.
-- Strength chart footer no longer says "building · N of 12 weeks" (it read as block progress); fixed at
-  the STRENGTH CALL SITE, so run and bike are byte-identical.
+**STREAM 1 — the screens stopped disagreeing (D-347 / D-349 / D-350).**
+- The State fitness rows and the Performance table read `block-identity`; the per-lift direction chip
+  is **deleted**, not silenced (D-347).
+- **Bodyweight counts as load** and history was re-priced (D-348) — strength went 8% → 38% of the
+  28-day load, ratio 0.83 → 1.05, still on target.
+- The compare table's lb column is **priced by the server's one set rule** (D-349). It carried its
+  own `weight × reps`, so a chin-up counted toward LOAD and read as zero on the same screen.
+  **A fourth copy of the stale rule was found in the "Volume (lbs)" tile inches below it.**
+- ⛔ **THE RULE THAT CAME OUT OF IT: THE SERVER PRICES, THE CLIENT PAIRS.** The audit told me to route
+  the matcher through the server; the server's matcher is lowercase-exact and would have **re-opened
+  audit F5.** Two `canonicalize` functions exist and are NOT the same rule — `_shared` has a curated
+  synonym ladder, `src/lib` is a small map. Never key a payload on one and read it with the other.
+- `BlockSummaryTab` (1,184 lines, unmounted since 2026-03-31) **deleted**; the `buildLoadHeadline`
+  "client math" finding was **overstated** — see Stage 2 of the audit doc, rewritten so it stops
+  being a trap.
 
-**STAGE 3 / D1 — bodyweight counts as load (D-348), and history was re-priced.**
-- ONE set rule: `strengthSetVolume` (`_shared/workload.ts`), used by the load score, the PLANNED score
-  and `compute-facts`' `total_volume_lbs` — so the load number and the volume number on the same screen
-  cannot disagree. Body weight from `user_baselines.weight` + `units`; **null → scored exactly as before,
-  never a guessed weight.**
-- **MEASURED ON HIS REAL DATA, after the backfill:** ratio **0.83 → 1.05, still `on_target`** in both
-  build and normal phases. Strength went from **8% → 38%** of his 28-day load (run 39, bike 16, swim 7).
-  Sessions: 30 Jul 10 → 75, 27 Jul 8 → 74, 28 Jul 6 → 47. All-barbell sessions correctly did not move.
-- `backfill-strength-load` re-prices BOTH sides (completed + planned). **It computes nothing itself** —
-  it invokes `calculate-workload` and `compute-facts`, then rebuilds the snapshot once.
+**STREAM 2 — the logger's RECORD (D-351 / D-352).** Everything downstream inherits this.
+- **Bands carry a NUMBER now**, user-entered: subtracts on chin-up/pull-up/dip, multiplies on
+  add-resistance. Reverses Q-233 #2 and D1's "flat token". Field-grounded (Hevy prices assisted work
+  as `(bodyweight − assist) × reps`; no tracker ships a colour→pounds table).
+- ⛔ **HISTORY IS NOT MIGRATED, DELIBERATELY.** `resistance_level` holds WORDS before today and
+  POUNDS after it, forever; `bandLoadLb` reads both. **This is a scoped exception to D-348's
+  "re-price history or the trend lies" law** (one week of data, one user). Do not "clean it up".
+- **Typed reps stop vanishing.** Sets with numbers that were never ticked Done saved, rendered under
+  "Completed", and scored zero. A prompt now names them at save. It **asks** — auto-ticking would
+  substitute the app's word for the athlete's and undo D-204.
+- **A weighted chin-up prices `(bodyweight + added) × reps`.** I filed this as unfixable ("blast
+  radius"); Michael pointed out the radius is a property of the GATE. `bandIsAssistance` covers
+  exactly {pullup, chinup, dip}. **Lesson: when a fix looks too wide, check whether an existing flag
+  already narrows it before deferring it.**
+- **The bar-speed cues render at all now** — built 2026-07-25, reachable only from their own test for
+  a week. Confined to the four main lifts (`isMain531Lift`), and **the AMRAP rule is REVERSED**:
+  "slow rep = last rep" was stricter than Wendler, who says grind it out, not to failure. A
+  speed-stop under-reports the count that moves the training max.
+- **New `plyo` exercise type** — reps only, no bar, no plates, no cue.
 
-### YOUR JOB — STAGE 2 of the audit doc (parked today, not dropped)
+### YOUR JOB — pick one, both are named and specced
 
-**Delete the client re-derivations and route them through the server's one number:** `buildLoadHeadline`
-(`StateTab.tsx:1262`), `StrengthCompareTable`'s own `calcVolume` + matcher (the 5th identity resolver),
-`BlockSummaryTab`'s e1RM deltas. This is where the screens stop disagreeing AND where "no client math"
-lands — one cut, per the audit doc's §CODE HYGIENE. **It got cheaper today: the block card is already
-threaded into both surfaces.**
+1. **⛔ WIRE `verdictFrom95Set`.** It and `applyVerdict` are written, correct, and **called by
+   nothing** (`wendler-531.ts:160-200`); the composer advances the working number by cycle index
+   unconditionally (`workingNumberForCycle:112`). Until it lands, **`STRENGTH_ADVANCE_COPY` and the
+   `validity_set` bar-speed line must stay unrendered** — the copy is written and gated at the call
+   site, which tells you exactly where to pass the flag. This is the largest remaining starved engine.
+2. **The punch list's NEXT UP** — the cross-training partial-week compare, and the run narrative
+   naming the wrong session.
 
 ### ⛔ WHAT IS NOT VERIFIED, AND WHAT WOULD SETTLE IT
 
-- **NOTHING TODAY HAS BEEN SEEN ON A DEVICE.** Every claim above is code-traced or measured off the
-  database — that is stronger than usual and it is still not a human looking at a screen. **Settle it:**
-  open State (strength row should read "week N of M · build", no ↑/↓ chips per lift) and open a strength
-  session in Performance (a grey line naming the plan and week).
-- **The coach payload caches 24h.** State may serve the pre-backfill load reading until it re-sources;
-  pull-to-refresh forces it. If the mix bar still says strength ~8%, that is the cache, not the fix.
-- **iOS is NOT installed.** `npm run ios` synced Stage 1 but was not run after Stage 3; nothing since is
-  on the phone.
+- **NOTHING TODAY HAS BEEN SEEN ON A DEVICE.** Everything is code-traced, fixture-pinned, or measured
+  off the database. iOS **was** synced (`npm run ios:open`), so it is on the phone awaiting a look.
+  **Settle it:** the acceptance list is in `POLISH-PUNCH-LIST.md` under AWAITING MICHAEL.
+- **Q-234 is filed and NOT fixed** — `StateTab.tsx:1311` gates a bar on `lt.peak1RM`, a camelCase
+  field on a snake_case server object, so it silently measures against *last session × 1.1*.
+  ⛔ **The obvious rename is a trap** — read Q-234 before touching it.
+- **The `getExerciseType` default has now caused THREE bugs** (Q-180 carry, single-leg hip thrust,
+  box jump). Consider making the default "no equipment UI" instead of `barbell`.
 
-### ⚠️ THE ONE THING THAT COST THREE RUNS TODAY — read before using the backfill
+### STILL OPEN, WITH THE REASON
 
-`backfill-strength-load` asked to do all 97 workouts in one invocation reported **37 failures, three
-times, at exactly the same count** — while every one of those calls succeeded when driven from outside,
-and chunks of 10 and 25 came back **97-for-97 clean**. It is a ceiling on a long-running edge invocation
-making chained sibling calls; it is NOT contention (it survived the switch to sequential) and NOT bad
-data. **The function now chunks by default (25) and returns `next_offset` — loop until it is null.**
-I first told Michael it was concurrency. That was wrong, and the correction is the useful part: a
-half-finished re-pricing is the exact mixed old/new window the pass exists to prevent.
-
-### STILL OPEN, WITH THE REASON (all in the audit doc)
-
-- **Isometric holds still score zero** (Q-233) — a plank is time with no reps, so a per-rep rule has
-  nothing to multiply. Deliberate; needs its own basis.
-- **A band-ASSISTED pull-up counts as full bodyweight** (Q-233) — the band cancels an unknown fraction
-  and inventing it would be a fabricated number. Over-counts, by less than zero under-counted.
-- **The HR "as of" stamp** shows the OLDEST contributor — fix the STAMP, not the data path (again).
+- **Isometric holds score zero** (Q-233 #1) — a plank is time with no reps; deliberate.
+- **Word-era assisted sets still price at full bodyweight** — deliberate, see D-351 Decision 3.
 - **Trap zone, unchanged:** bike power/efficiency split, run durability (Q-232, silenced on purpose),
-  the run row (rebuilt 2026-07-31).
+  the run row (rebuilt 2026-07-31), the HR "as of" stamp (fix the STAMP, not the data path).
 ---
 
 ## WHAT SHIPPED LAST NIGHT — client only, uncommitted, do NOT re-litigate
