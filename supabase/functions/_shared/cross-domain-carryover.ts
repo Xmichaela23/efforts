@@ -287,7 +287,7 @@ export function resolveCarriedInSoreness(
 export function resolveCurrentSoreness(
   entries: SorenessEntry[],
   opts?: { recentDays?: number; minBaseline?: number; asOf?: string },
-): { level: 'normal' | 'elevated' | null; recent: number | null; mean: number | null; z: number | null; baselineOk: boolean; logged: number; diag: string } {
+): { level: 'normal' | 'elevated' | null; recent: number | null; mean: number | null; z: number | null; baselineOk: boolean; logged: number; elevatedCount: number; countWindow: number; diag: string } {
   const recentDays = opts?.recentDays ?? 7;
   const minBaseline = opts?.minBaseline ?? 5;
   const now = opts?.asOf ? new Date(opts.asOf).getTime() : null;
@@ -297,7 +297,7 @@ export function resolveCurrentSoreness(
     .filter((x) => Number.isFinite(x.t))
     .sort((a, b) => b.t - a.t);
   const logged = rows.length;
-  if (logged === 0) return { level: null, recent: null, mean: null, z: null, baselineOk: false, logged: 0, diag: 'no soreness logged' };
+  if (logged === 0) return { level: null, recent: null, mean: null, z: null, baselineOk: false, logged: 0, elevatedCount: 0, countWindow: 0, diag: 'no soreness logged' };
 
   const newest = now ?? rows[0].t;
   const recentRows = rows.filter((x) => (newest - x.t) <= recentDays * 86400000).map((x) => x.e.soreness);
@@ -308,8 +308,8 @@ export function resolveCurrentSoreness(
   // partly normalise itself.
   const baseRows = rows.filter((x) => (newest - x.t) > recentDays * 86400000).map((x) => x.e.soreness);
   const baselineOk = baseRows.length >= minBaseline;
-  if (recent == null) return { level: null, recent: null, mean: null, z: null, baselineOk, logged, diag: `nothing logged in ${recentDays}d` };
-  if (!baselineOk) return { level: null, recent, mean: null, z: null, baselineOk: false, logged, diag: `baseline thin (${baseRows.length}/${minBaseline})` };
+  if (recent == null) return { level: null, recent: null, mean: null, z: null, baselineOk, logged, elevatedCount: 0, countWindow: 0, diag: `nothing logged in ${recentDays}d` };
+  if (!baselineOk) return { level: null, recent, mean: null, z: null, baselineOk: false, logged, elevatedCount: 0, countWindow: 0, diag: `baseline thin (${baseRows.length}/${minBaseline})` };
 
   const mean = baseRows.reduce((a, b) => a + b, 0) / baseRows.length;
   const sd = Math.sqrt(baseRows.reduce((a, b) => a + (b - mean) ** 2, 0) / baseRows.length) || 1;
@@ -317,5 +317,19 @@ export function resolveCurrentSoreness(
   // Same two-part gate as the carried-in read: above the athlete's own spread AND a real absolute step,
   // so a tight-variance athlete does not read "elevated" off a rounding difference.
   const level: 'normal' | 'elevated' = (z >= 1.0 && recent >= mean + 1) ? 'elevated' : 'normal';
-  return { level, recent, mean, z, baselineOk: true, logged, diag: `soreness ${recent.toFixed(1)} vs norm ${mean.toFixed(1)} (z ${z.toFixed(1)})` };
+
+  // ⛔ PERSISTENCE IS COUNTED PER SESSION, NOT INFERRED FROM THE WINDOW MEAN. An average can be dragged
+  // over the line by one very sore day, which is the thing a persistence gate exists to ignore. So the
+  // count asks the monitoring-standard question directly: how many of the last N sessions were above
+  // this athlete's own normal. `longitudinal-signals.ts` uses 4-of-6 with an ABSOLUTE floor and its own
+  // header says that floor should become baseline-relative once history exists — this is that shape.
+  const COUNT_WINDOW = 6;
+  const recentSix = rows.slice(0, COUNT_WINDOW).map((x) => x.e.soreness);
+  const highBar = mean + sd;   // above the athlete's own spread, not a fixed number
+  const elevatedCount = recentSix.filter((s) => s >= highBar).length;
+  return {
+    level, recent, mean, z, baselineOk: true, logged,
+    elevatedCount, countWindow: recentSix.length,
+    diag: `soreness ${recent.toFixed(1)} vs norm ${mean.toFixed(1)} (z ${z.toFixed(1)}); ${elevatedCount}/${recentSix.length} above norm`,
+  };
 }

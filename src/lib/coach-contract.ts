@@ -14,4 +14,4 @@
  * version-history notes in `coach/index.ts` warn about this trap four times, from the server side;
  * this is the client half they do not cover.
  */
-export const COACH_CLIENT_MIN_PAYLOAD_VERSION = 157;
+export const COACH_CLIENT_MIN_PAYLOAD_VERSION = 158;

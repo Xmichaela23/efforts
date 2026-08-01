@@ -1066,7 +1066,7 @@ export default function StateTab({
   const week = wsv.week;
   const load = wsv.load;
   const rm = ((data as any)?.response_model ?? (wsv as any)?.response_model) as {
-    visible_signals: Array<{ label: string; category?: string; trend: string; trend_icon?: string; trend_tone: string; detail: string; samples: number; provenance?: string | null }>;
+    visible_signals: Array<{ label: string; category?: string; trend: string; trend_icon?: string; trend_tone: string; detail: string; samples: number; provenance?: string | null; soreness_flag?: string | null }>;
     overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
     strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean; last_session_date?: string | null }> };
     endurance: unknown;
@@ -1618,6 +1618,22 @@ export default function StateTab({
                       {s.provenance && <span className="text-white/50 text-[11px] shrink-0 mt-0.5">{expandedSignal === s.label ? '▾' : '▸'}</span>}
                     </div>
                   </button>
+                  {/* ⛔ THE PERSISTENCE LINE POINTS AT A DOOR, IT DOES NOT OPEN ONE ITSELF (D-354).
+                      Soreness above this athlete's OWN normal for 4 of the last 6 sessions. It states
+                      the fact and offers the Adjust tab; nothing changes unless the athlete goes and
+                      changes it. ⚠️ Adjust is still a scaffold for endurance — strength steers work
+                      (in the logger), ease/push does not exist yet. Sending someone there is honest
+                      because that tab says so itself; it is not honest to pretend the line acts. */}
+                  {s.soreness_flag && (
+                    <button
+                      type="button"
+                      onClick={() => setStateLens('adjust')}
+                      className="w-full flex items-baseline gap-2 text-left pl-[116px] -mt-0.5 mb-1"
+                    >
+                      <span className="text-[12px] text-white/60 leading-snug">{s.soreness_flag}</span>
+                      <span className="text-[12px] text-white/40 shrink-0">Adjust ›</span>
+                    </button>
+                  )}
                   {/* Whoop pairing (verdict + its driver, together): the RPE driver — which session
                       moved the week — sits WITH the "how hard it feels" verdict, dim + always-visible.
                       RPE-clause only (server guarantees no non-RPE factor reaches this row). */}

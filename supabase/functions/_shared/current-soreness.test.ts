@@ -45,3 +45,25 @@ Deno.test('an un-migrated 1-10 value cannot corrupt the baseline', () => {
   assertEquals(r.mean, 2); // the 9 is dropped, not blended
   assertEquals(r.level, 'normal');
 });
+
+Deno.test('PERSISTENCE: 4 of the last 6 above the athlete own norm', () => {
+  // baseline 2s, then four sore sessions in the recent six
+  const hist = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => e(n, 2));
+  const recent = [24, 25, 26, 27].map((n) => e(n, 6)).concat([28, 29].map((n) => e(n, 2)));
+  const r = resolveCurrentSoreness([...hist, ...recent], { asOf: day(30) });
+  assertEquals(r.countWindow, 6);
+  assertEquals(r.elevatedCount, 4);
+});
+
+Deno.test('ONE bad day does not read as persistence', () => {
+  const hist = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => e(n, 2));
+  const recent = [24, 25, 26, 27, 28].map((n) => e(n, 2)).concat([e(29, 7)]);
+  const r = resolveCurrentSoreness([...hist, ...recent], { asOf: day(30) });
+  assertEquals(r.elevatedCount, 1);
+});
+
+Deno.test('a thin baseline reports no persistence count at all', () => {
+  const r = resolveCurrentSoreness([e(28, 7), e(29, 7)], { asOf: day(30) });
+  assertEquals(r.baselineOk, false);
+  assertEquals(r.elevatedCount, 0);
+});
