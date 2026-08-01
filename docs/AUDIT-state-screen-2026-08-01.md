@@ -205,7 +205,13 @@ are real builds; the rest is wiring, deleting, and trimming.
 - **D3 — Verdict words: NEUTRAL** — number + ↑/↓/→, no "easing off" / "balanced" this phase.
 - **D4 — One e1RM:** both screens read the **server's single e1RM**; delete the client-side computes.
 
-### STAGE 1 — Wire the one truth in (CLIENT-ONLY — traced 2026-08-01, even simpler than thought)
+### STAGE 1 — ✅ SHIPPED 2026-08-01 (deployed + seen on web; NOT yet on device/Xcode)
+> **DONE.** Strength row now shows "week N of M · {phase}" with the per-lift direction chips gone; a
+> strength session in Performance carries the plan/week line. Phase word comes from the card
+> (`block-identity`), protocol-agnostic — the client never knows "leader/anchor." Ended up a small
+> server touch (added `phase_label`), deployed across the card's readers. Verified on web; not on phone.
+> Everything below is the trace that led here.
+
 - **The card already reaches both screens' payloads; the client just never reads it.** No `_shared`, no
   edge function, no coach-version bump, nothing to redeploy.
   - **State:** coach payload carries it at `plan.block` (`coach/index.ts:5892`, live in v150 — it's what
@@ -238,11 +244,13 @@ the screens disagreeing, and it gets cheaper now that Stage 1 has the block card
   disagreeing AND where the client-math cleanup lands. Same cut (F5 identity + the hygiene holdouts).
 
 ### STAGE 3 — Ground the number facts (the first real build)
-- **Load split** (bodyweight scores zero) per D1. **✍️ WRITTEN + VERIFIED ON FIXTURES 2026-08-01 —
-  NOT YET DEPLOYED (awaiting Michael).** One set rule (`strengthSetVolume`, `_shared/workload.ts`)
+- **Load split** (bodyweight scores zero) per D1. **✅ SHIPPED 2026-08-01 — deployed (9 fns), backfill
+  ran clean (97/97 in 4 chunks), VERIFIED by measurement on real data (strength 8% → 38% of 28-day
+  load; ratio 0.83 → 1.05, still "on target" — no false spike) and seen on web (43% on rolling-7d,
+  "balanced"). Not yet on device/Xcode.** One set rule (`strengthSetVolume`, `_shared/workload.ts`)
   used by the load score, the planned score AND `compute-facts`' `total_volume_lbs`, so the two
   numbers on screen cannot disagree. Body weight from `user_baselines.weight` + `units`; **null →
-  scored exactly as before, never a guessed weight.**
+  scored exactly as before, never a guessed weight.** (D-347 / D-348 · imprecisions Q-233.)
   - ⛔ **THE RE-PRICING PASS IS THE DELIVERABLE, NOT THE FORMULA** —
     `supabase/functions/backfill-strength-load/` (dry-run by default, does BOTH the completed and
     the planned side). The verdict is a ratio of 7 days against 28 read from STORED scores: ship the
