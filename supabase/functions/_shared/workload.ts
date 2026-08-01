@@ -315,6 +315,8 @@ export type StrengthVolumeOpts = {
  *
  * The rule, in order:
  *   1. External weight on the bar → weight × reps. UNCHANGED, and it is most sets.
+ *   1b. External weight on an ASSIST-CAPABLE move (a weighted chin-up/pull-up/dip) with a known
+ *      body weight → (bodyweight + added) × reps. Scoped by `bandIsAssistance`; no other lift sees it.
  *   2. No weight, reps logged, body weight known → bodyweight × reps.
  *   3. No weight, reps logged, a band on a movement where the band IS the resistance → flat token.
  *   4. Anything else → 0.
@@ -349,11 +351,12 @@ export type StrengthVolumeOpts = {
  * ⚠️ A DURATION-ONLY SET STILL SCORES 0 — a plank has no reps for this to multiply. Known and left
  * (2026-08-01); scoring isometric time needs its own basis, not a fudge inside this one.
  *
- * ⚠️ NOT CHANGED HERE, AND IT IS NOW ASYMMETRIC: a LOADED chin-up prices `added × reps`, not
- * `(bodyweight + added) × reps`. The field says it should be the latter, and after this change
- * assistance subtracts from body weight while added weight does not add to it — so a +25 lb chin-up
- * prices below a bodyweight one. Left deliberately: rule 1 governs every weighted set in the app,
- * including every barbell lift, and changing it is a far wider blast radius than this pass. Filed.
+ * ⛔ AND THE MIRROR CASE IS HANDLED TOO — a LOADED chin-up prices `(bodyweight + added) × reps`.
+ * This was filed as unfixable in the first cut of D-351 ("rule 1 governs every weighted set,
+ * changing it is a far wider blast radius"). **That was wrong, and Michael caught it:** gate the
+ * clause on `bandIsAssistance` and the blast radius is exactly {pullup, chinup, dip}, because every
+ * other lift arrives with the flag false and falls through to rule 1 unchanged. Scoping the
+ * condition, not the formula, was the move.
  */
 
 /**
@@ -387,9 +390,29 @@ export function strengthSetVolume(
   if (reps <= 0) return 0;
 
   const weight = Number(set?.weight) || 0;
+  const bw = Number(opts.bodyweightLb) || 0;
+
+  // ⛔ A WEIGHTED CHIN-UP MOVES BODY WEIGHT *PLUS* THE BELT (D-351, scoped 2026-08-01).
+  //
+  // The first cut of D-351 left this asymmetric and filed it: assistance subtracted from body weight
+  // while added weight REPLACED it, so a +25 lb chin-up priced 25 × reps — LESS than the same
+  // athlete's bodyweight-only set. The stated reason was blast radius, and that reason was wrong.
+  //
+  // ⚠️ THE GATE IS WHAT MAKES IT SAFE, AND IT IS THE WHOLE POINT. `bandIsAssistance` comes from
+  // `bandMeansAssistance`, whose set is exactly {pullup, chinup, dip}. Every barbell and dumbbell
+  // lift in the app arrives here with the flag FALSE and falls through to rule 1 byte-identical —
+  // so this cannot move a squat, a bench, a press or a carry by a single pound. Three movements
+  // change; nothing else can.
+  //
+  // ⚠️ `bw > 0` IS REQUIRED, not incidental: with no recorded body weight there is nothing to add
+  // TO, and rule 1 still governs. The app does not invent an athlete in order to improve a number.
+  //
+  // Matches the field: Hevy and Strong both price weighted bodyweight work as
+  // `(bodyweight + added) × reps`, the mirror of the assisted formula below.
+  if (opts.bandIsAssistance && weight > 0 && bw > 0) return (bw + weight) * reps;
+
   if (weight > 0) return weight * reps;
 
-  const bw = Number(opts.bodyweightLb) || 0;
   const rl = set?.resistance_level;
   const banded = rl != null && String(rl).trim() !== '' && String(rl).trim().toLowerCase() !== 'none';
   const bandLb = bandLoadLb(rl);

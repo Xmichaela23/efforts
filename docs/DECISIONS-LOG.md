@@ -2653,12 +2653,22 @@ help.hevyapp.com "Exercise Performance Tracking"; strong.app.*
   not the Done button**, which writes `completed` and is untouched. Two fields for one idea, one of
   them dead, adjacent in the stored JSON, is how the next session fixes the wrong one.
 
-- **⚠️ KNOWN AND LEFT, NOW ASYMMETRIC:** a LOADED chin-up prices `added × reps`, not
-  `(bodyweight + added) × reps`. The field says the latter, and after this change assistance
-  subtracts from body weight while added weight does not add to it — so a +25 lb chin-up prices below
-  a bodyweight one. Left because rule 1 governs **every weighted set in the app**, including every
-  barbell lift, so changing it is a far wider blast radius than this pass. Filed here rather than
-  fixed quietly.
+- **Decision 8 — a WEIGHTED chin-up prices `(bodyweight + added) × reps`, and this reverses my own
+  "filed, not fixed" the same day.** The first cut left the mirror case asymmetric — assistance
+  subtracted from body weight while added weight REPLACED it, so a +25 lb chin-up priced *below* the
+  same athlete's bodyweight set — and filed it on the grounds that "rule 1 governs every weighted set
+  in the app, so changing it is a far wider blast radius than this pass."
+  ⛔ **That reasoning was wrong and Michael caught it.** The blast radius is a property of the GATE,
+  not of the formula. `bandIsAssistance` is true for exactly `{pullup, chinup, dip}`, so every
+  barbell and dumbbell lift arrives with it false and falls through to rule 1 **byte-identical**.
+  Three movements change; a squat cannot move by a pound. **The lesson worth keeping: when a fix
+  looks too wide, check whether an existing flag already narrows it before filing it as deferred.**
+  ⚠️ `bw > 0` is required — with no recorded body weight there is nothing to add TO, and rule 1 still
+  governs. Pinned both ways, including an explicit zero-blast-radius test that fails if the gate is
+  ever loosened.
+  ⚠️ This does change how a HISTORIC weighted chin-up prices on read paths. Michael has none logged
+  (every chin-up/dip in his history carries `weight: 0`), so nothing moved; noted because the
+  history-untouched promise in Decision 3 is about BANDS, not about this clause.
 
 - **Verification:** 9 new pins in `workload-strength-bodyweight.test.ts` (subtract, floor, word-era
   unchanged, blank assist, null bodyweight → 0, add-resistance with lb, blank band → token, external

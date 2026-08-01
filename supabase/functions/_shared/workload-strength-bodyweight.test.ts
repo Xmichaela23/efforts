@@ -291,6 +291,59 @@ Deno.test('D-351: an ADD-resistance band left BLANK keeps the flat token', () =>
   );
 });
 
-Deno.test('D-351: external weight still wins over everything (rule 1, untouched)', () => {
-  assertEquals(strengthSetVolume({ weight: 185, reps: 5, resistance_level: '60' }, { bodyweightLb: BW, bandIsAssistance: true }), 925);
+// ⚠️ REWRITTEN THE SAME DAY BY THE SCOPED FOLLOW-UP. This asserted 925 — external weight replacing
+// body weight even on an assist-capable move — which was the asymmetry Michael then had scoped away.
+// A set carrying BOTH a band and added weight cannot happen through the logger (the two controls
+// clear each other), so what this now pins is the precedence: added weight wins over the band, and
+// on an assist-capable move it ADDS to body weight.
+Deno.test('D-351: added weight beats the band, and adds to bodyweight on an assist-capable move', () => {
+  assertEquals(
+    strengthSetVolume({ weight: 185, reps: 5, resistance_level: '60' }, { bodyweightLb: BW, bandIsAssistance: true }),
+    (BW + 185) * 5,
+  );
+});
+
+// ── D-351 SCOPED FOLLOW-UP: the weighted chin-up (2026-08-01, Michael) ───────────────────────────
+// Filed as unfixable in the first cut ("rule 1 governs every weighted set"), then scoped: gating the
+// clause on `bandIsAssistance` limits it to {pullup, chinup, dip}. These pin BOTH halves — that the
+// three movements changed, and that nothing else did.
+
+Deno.test('D-351: a WEIGHTED chin-up moves bodyweight PLUS the belt', () => {
+  const v = strengthSetVolume({ weight: 25, reps: 6 }, { bodyweightLb: BW, bandIsAssistance: true });
+  assertEquals(v, (BW + 25) * 6);
+  // The bug this closes: it must be MORE than the same set done at bodyweight, not less.
+  const bodyweightOnly = strengthSetVolume({ weight: 0, reps: 6 }, { bodyweightLb: BW, bandIsAssistance: true });
+  assertEquals(v > bodyweightOnly, true);
+});
+
+Deno.test('⛔ D-351: ZERO BLAST RADIUS — a barbell lift is byte-identical to rule 1', () => {
+  // Every non-assist-capable movement arrives with bandIsAssistance false (or absent) and must be
+  // untouched. If this ever fails, the gate has been loosened and every squat in the app repriced.
+  for (const opts of [{ bodyweightLb: BW, bandIsAssistance: false }, { bodyweightLb: BW }, {}]) {
+    assertEquals(strengthSetVolume({ weight: 185, reps: 5 }, opts), 925);
+  }
+  assertEquals(strengthSetVolume({ weight: 45, reps: 10 }, { bodyweightLb: BW, bandIsAssistance: false }), 450);
+});
+
+Deno.test('D-351: a weighted chin-up with NO recorded body weight falls back to rule 1', () => {
+  // Nothing to add TO. The app does not invent an athlete to improve a number.
+  assertEquals(strengthSetVolume({ weight: 25, reps: 6 }, { bodyweightLb: null, bandIsAssistance: true }), 150);
+});
+
+Deno.test('D-351: prescribed == performed still reconciles for a WEIGHTED chin-up', () => {
+  // The planned side prices through the same function, so a +25 lb prescription performed exactly
+  // must read a zero delta — the invariant workload-strength-planned.test.ts guards one layer up.
+  // ⚠️ RIR is matched on both sides deliberately: the intensity term is derived from target RIR on
+  // the planned side and logged RIR on the actual side, so leaving it off makes the two scores
+  // differ for a reason that has nothing to do with volume.
+  const planned = calculatePlannedStrengthWorkload(
+    [{ name: 'Chin Up', sets: 3, reps: 6, weight: 25, target_rir: 3 }],
+    { bodyweightLb: BW },
+  );
+  const actual = calculateStrengthWorkload(
+    [{ name: 'Chin Up', sets: Array.from({ length: 3 }, () => ({ weight: 25, reps: 6, rir: 3, completed: true })) }],
+    undefined,
+    { bodyweightLb: BW },
+  );
+  assertEquals(planned, actual);
 });
