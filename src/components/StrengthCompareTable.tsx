@@ -622,25 +622,50 @@ export default function StrengthCompareTable({ planned, completed, completedWork
               })}
             </div>
             {/* Only show volume line when planned has volume to compare against */}
-            {r.pVol > 0 && (
+            {/* ⛔ A ROW THE PLAN NEVER PRICED STILL DID REAL WORK (D-349 follow-up, 2026-08-01).
+                This gate was `r.pVol > 0` — volume renders only if the PRESCRIPTION had a number.
+                Defensible while both sides were barbell tonnage; wrong the moment bodyweight started
+                counting, because it hid the number on exactly the work D-348/D-349 exist to surface.
+                ⚠️ An ASSISTANCE row is authored `sets: undefined` / `reps: "25 total"` /
+                `weight: "By feel"` (strength-primary-plan.ts:317, deliberate — Michael: *"25 chin ups?
+                lol i can do 5"* — so no surface renders a set count that was never prescribed). Planned
+                volume is therefore 0 by design, and every chin-up, dip and pull-up in a Get Stronger
+                block fell through this gate silently. */}
+            {(r.pVol > 0 || r.cVol > 0) && (
               <div className="text-xs border-t border-white/10 pt-1 flex items-center justify-end gap-2">
                 <span className="text-white/50">Vol:</span>
-                <span className="text-white/60">{r.pVol.toLocaleString()} lb</span>
-                <span className="text-white/40">→</span>
-                <span className="text-white/80">{r.cVol.toLocaleString()} lb</span>
-                <span className={(r.cVol - r.pVol)>=0 ? 'text-green-400' : 'text-rose-400'}>
-                  {(r.cVol - r.pVol >= 0 ? '+' : '-')}{Math.abs(r.cVol - r.pVol).toLocaleString()} lb
-                </span>
+                {r.pVol > 0 ? (
+                  <>
+                    <span className="text-white/60">{r.pVol.toLocaleString()} lb</span>
+                    <span className="text-white/40">→</span>
+                    <span className="text-white/80">{r.cVol.toLocaleString()} lb</span>
+                    <span className={(r.cVol - r.pVol)>=0 ? 'text-green-400' : 'text-rose-400'}>
+                      {(r.cVol - r.pVol >= 0 ? '+' : '-')}{Math.abs(r.cVol - r.pVol).toLocaleString()} lb
+                    </span>
+                  </>
+                ) : (
+                  // ⛔ NO DELTA AGAINST A PLAN THAT NEVER PRESCRIBED LOAD. Rendering "+1,400 lb" here
+                  // would read as massively over plan when the plan simply never priced the row —
+                  // a fabricated verdict on a number the athlete was never given. State the fact.
+                  <span className="text-white/80">{r.cVol.toLocaleString()} lb</span>
+                )}
               </div>
             )}
           </div>
         );
       })}
       {/* Only show totals when there's planned volume to compare */}
-      {totals.pVol > 0 && (
+      {/* Same rule as the per-row line: a session made entirely of rows the plan never priced still
+          has a total. The DELTA needs a prescription to be a delta, so it only appears when there was
+          one; otherwise the honest line is the work done. */}
+      {(totals.pVol > 0 || totals.cVol > 0) && (
         <div className="grid grid-cols-12 text-sm font-semibold border-t border-white/20 pt-2 text-white">
           <div className="col-span-7">Totals</div>
-          <div className="col-span-5 text-right text-white/80">{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()} lb</div>
+          <div className="col-span-5 text-right text-white/80">
+            {totals.pVol > 0
+              ? `${totals.cVol - totals.pVol >= 0 ? '+' : ''}${(totals.cVol - totals.pVol).toLocaleString()} lb`
+              : `${totals.cVol.toLocaleString()} lb`}
+          </div>
         </div>
       )}
       

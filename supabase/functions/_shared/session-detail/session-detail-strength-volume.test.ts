@@ -144,3 +144,41 @@ Deno.test('a non-strength session gets no volume block at all', () => {
   } as any);
   assertEquals(out.strength_volume, null);
 });
+
+// ── THE ASSISTANCE ROW (2026-08-01, found on Michael's own block the day this shipped) ────────────
+// A Get Stronger assistance row is authored `sets: undefined` / `reps: "25 total"` /
+// `weight: "By feel"` / `load_prescribed: false` (`strength-primary-plan.ts:317`) — deliberately, so
+// no surface renders a set count that was never prescribed. Its PLANNED volume is therefore 0, and
+// the compare table's old `pVol > 0` render gate hid the completed number behind it: every chin-up,
+// dip and pull-up in the block priced correctly and displayed nothing.
+//
+// ⛔ WHAT THIS PINS: the completed side must still carry a real number for such a row. The display
+// rule that consumes it (show the work done, and NO delta against a plan that never prescribed load)
+// lives in `StrengthCompareTable`; this is the server half it depends on.
+Deno.test('⛔ an ASSISTANCE row prices its completed work even though the plan never priced it', () => {
+  const planned = [{ name: 'Chin-ups', sets: undefined, reps: '25 total', weight: 'By feel', load_prescribed: false }];
+  const completed = [{
+    name: 'Chin-ups',
+    sets: Array.from({ length: 5 }, () => ({ weight: 0, reps: 5, resistance_level: 'Moderate', completed: true })),
+  }];
+  const v = build(planned, completed, BW);
+  assertEquals(v.planned[0].volume_lb, 0);          // the plan states a total, not a load — by design
+  assertEquals(v.completed[0].volume_lb, 25 * BW);  // the work is real and is priced
+  assertEquals(v.completed_total_lb, 4375);
+});
+
+Deno.test('a band-ASSISTED chin-up is full bodyweight, not a band token (Q-233, stated over-count)', () => {
+  // `resistance_level` is overloaded: on a pull-apart the band IS the load, on a chin-up it is HELP.
+  // Only the exercise disambiguates it. If this ever returns the small band token instead, the
+  // BAND_MEANS_ASSISTANCE set in canonicalize.ts has drifted from the logger's assist-capable list.
+  const assisted = build([], [{
+    name: 'Chin-ups',
+    sets: [{ weight: 0, reps: 8, resistance_level: 'Heavy', completed: true }],
+  }], BW);
+  const unassisted = build([], [{
+    name: 'Chin-ups',
+    sets: [{ weight: 0, reps: 8, completed: true }],
+  }], BW);
+  assertEquals(assisted.completed[0].volume_lb, unassisted.completed[0].volume_lb);
+  assertEquals(assisted.completed[0].volume_lb, 1400);
+});
