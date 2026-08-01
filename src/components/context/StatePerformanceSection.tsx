@@ -185,6 +185,12 @@ function asOf(ageDays: number | null | undefined): string | null {
 // efficiency basis carries the zone-band source (coggan_ftp = estimated; personal = from test).
 function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitness; showAxis?: boolean; mode: FitnessMode; anchor?: FitnessAnchor }) {
   const [powerInfoOpen, setPowerInfoOpen] = React.useState(false);
+  // ⛔ SAME RULE AS THE RUN ROW (2026-08-01, Michael): the headline and ONE receipt line stay
+  // visible; everything else goes behind "more". The CONTENTS differ because the rows have
+  // different material — run's detail is a read (plan context, trend, pace), bike's is extra
+  // provenance (FTP basis, as-of, anchor label, the power-trend note). Same rule, not same items.
+  // ⚠️ Bike keeps NO words and NO range — it still has no confidence interval (D-356).
+  const [detailOpen, setDetailOpen] = React.useState(false);
   const src = fitness.efficiency.basis === 'personal' ? 'personal'
     : fitness.efficiency.basis === 'coggan_ftp' ? 'est (FTP)' : null;
   // D-232 glass-box: the shared evidence tail (window · rides · recency) is the LEAD sub-trend's
@@ -207,16 +213,40 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
     <Row label="bike">
       {showDot ? (
         <FitnessDotBlock label={leadIsPower ? 'power' : 'efficiency'} range={range!} verdict={lead.verdict} pctChange={lead.pctChange} wordMap={NUMERIC} showAxis={showAxis} explain={leadIsPower
-          ? "Power = how your cycling power is trending versus your own baseline (from your ride power against your FTP). The dot is where it sits, the arrow the direction."
-          : "Efficiency = how much power you hold per heartbeat on steady rides. Rising means the same work at a lower heart rate — getting fitter. The dot is where it sits versus your baseline; the arrow is the direction."} />
+          // ⛔ THE ⓘ DEFINES THE METRIC AND STOPS (2026-08-01, Michael: "anything specific to where the
+          // user is needs to go to more; ⓘ simply shows what the metric is"). Both strings used to end
+          // with "the dot is where it sits versus your baseline; the arrow is the direction" — that is a
+          // legend for THIS athlete's position, not a definition of the measure. Moved to "more".
+          ? "Power = how much power you are producing on rides, measured against your FTP."
+          : "Efficiency = how much power you hold per heartbeat on steady rides. Rising means the same work at a lower heart rate — getting fitter."} />
       ) : (
         <Signal label={leadIsPower ? 'Power' : 'Efficiency'} sig={lead} />
       )}
-      {tail && <span className="text-white/55 text-[12px]">{tail}</span>}
-      {src && <span className="text-white/45 text-[12px]">{src}</span>}
-      {asOf(lead.newestAgeDays) && <span className="text-white/45 text-[12px]">· {asOf(lead.newestAgeDays)}</span>}
+      {/* The one receipt that stays: window · rides · recency. The "more" cue rides with it. */}
+      {(tail || src || asOf(lead.newestAgeDays) || (showDot && anchor?.label)) && (
+        <span className="basis-full flex items-baseline justify-between gap-2 text-white/55 text-[12px]">
+          <span>{tail}</span>
+          <button type="button" onClick={() => setDetailOpen((o) => !o)} className="shrink-0 text-white/50">
+            {detailOpen ? 'less' : 'more'}
+          </button>
+        </span>
+      )}
+      {/* ⚠️ THE EMPTY STATE STAYS VISIBLE. "no baseline set · accept your FTP to anchor" names an
+          upgrade path the athlete can act on — hiding an actionable gap behind a tap is how a missing
+          dot starts reading as a bug. */}
       {trendOnly && <NoBaselineTag hint={src === 'est (FTP)' ? 'accept your FTP to anchor' : undefined} />}
-      {showDot && anchor?.label && <span className="basis-full text-[11px] text-white/50">{anchor.label}</span>}
+      {/* WHERE THE NUMBER COMES FROM — basis, freshness, anchor. True and worth having, but three lines
+          of provenance stacked under a one-line verdict buried the verdict. */}
+      {detailOpen && (
+        <span className="basis-full flex flex-col gap-0.5 mt-0.5 text-[12px] text-white/45">
+          {/* WHERE YOU SIT — the dot/arrow legend, which is about this athlete rather than about the
+              metric, so it lives here rather than in the ⓘ. Only when there IS a dot to explain. */}
+          {showDot && <span>The dot is where you sit against your own baseline; the arrow is the direction.</span>}
+          {src && <span>{src === 'est (FTP)' ? 'Efficiency is measured against an ESTIMATED FTP, not one you confirmed.' : 'Measured against your own tested FTP.'}</span>}
+          {asOf(lead.newestAgeDays) && <span>Newest qualifying ride {asOf(lead.newestAgeDays)}.</span>}
+          {showDot && anchor?.label && <span>{anchor.label}</span>}
+        </span>
+      )}
       {/* THE LONG VIEW — 12-week power sparkline (the cyclist's e1RM/efficiency analog, 2026-07-23). Only when
           power LEADS (a real w20 verdict); the winning terrain bin's watts over 12 weeks, recent-8wk in color. */}
       {leadIsPower && (
@@ -232,7 +262,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
       )}
       {/* No power to chart yet (all-aerobic riding) — a tap-ⓘ that NAMES what unlocks the power trend, rather
           than silently omitting it. Fact-first + conditional, no imperative (copy voice). 2026-07-23. */}
-      {!leadIsPower && (
+      {!leadIsPower && detailOpen && (
         <>
           <button type="button" onClick={() => setPowerInfoOpen((o) => !o)} className="basis-full inline-flex items-baseline gap-1 text-white/45 text-[12px]">
             power trend <span className="text-white/40 text-[11px]">{powerInfoOpen ? '▾' : 'ⓘ'}</span>
@@ -683,7 +713,7 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
     if (eff.verdict === 'sliding' && mag != null) return `About ${mag}% less speed per heartbeat${over}${rng ? ` (${rng})` : ''}. Heat, fatigue, or a base block can all cause this.`;
     return null;
   }, [eff.verdict, eff.recentlyFlat, eff.pctChange, eff.route]);
-  const hasDetail = !!(postureSentence || trendDetail);
+  const hasDetail = !!(postureSentence || trendDetail || shownPace != null);
   const hasTrend = eff.verdict !== 'needs_data' && eff.verdict !== 'withheld';
   // ⛔ THE WINDOW LABEL DESCRIBES THE POOL THAT WAS ACTUALLY READ (D-346, 2026-07-31).
   //
@@ -778,6 +808,19 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
               {trendDetail}
             </p>
           )}
+          {/* ⛔ PACE MOVED UNDER "more" (2026-08-01, Michael: "just let it be what it is — speed per
+              heartbeat"). It was added as the "what" under the index's "why", back when the row led
+              with an efficiency INDEX that meant nothing to a human. The row no longer shows an index —
+              it shows a direction and a percent — so a pace-at-HR sitting on the always-visible line
+              was a second, more concrete-looking number competing with the one the row is actually
+              about. It is a translation of the metric, so it belongs with the explanation.
+              ⚠️ Still the verdict's OWN pool and already grade-adjusted — it cannot disagree with the
+              number above it. */}
+          {shownPace != null && (
+            <p className="basis-full text-[12px] text-white/55 leading-snug mt-1 max-w-[min(100%,340px)]">
+              Recently about {formatPace(shownPace, useImperial)}{eff.recentHrAvg != null ? ` at ${eff.recentHrAvg} bpm` : ''}.
+            </p>
+          )}
         </>
       )}
       {/* ⛔ WHAT THE NUMBER ALREADY ACCOUNTS FOR, IN PLAIN WORDS (2026-08-01, Michael). This replaces
@@ -807,13 +850,6 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
           caption={routeCaption}
         />
       ) : hasTrend ? <TrendSparkline series={eff.series} /> : null}
-      {/* THE "WHAT" under the index "why" (Michael 2026-07-22) — recent steady-run pace at the HR it took,
-          in units the runner feels. RAW by default (matches the watch); a GAP toggle grade-adjusts it. */}
-      {hasTrend && shownPace != null && (
-        <span className="basis-full inline-flex items-baseline gap-2 text-white/65 text-[12px]">
-          <span>pace ~{formatPace(shownPace, useImperial)}{eff.recentHrAvg != null ? ` at ${eff.recentHrAvg} bpm` : ''}</span>
-        </span>
-      )}
       {/* durability — the SECONDARY read now (fatigue resistance within a run), quiet, only when real */}
       {durWord && (
         <span className="basis-full text-[12px] text-white/55">{durWord}{dur.stale ? ` · last steady run ${dur.newestAgeDays}d ago` : ''}</span>
