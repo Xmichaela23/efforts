@@ -23,6 +23,38 @@ const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
   withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
 };
 
+// ── ARROW + NUMBER, NO WORD (2026-08-01, Michael from his own screen) ────────────────────────────
+//
+// The fitness rows state DIRECTION and MAGNITUDE and stop. The word is dropped, not softened: it was
+// the row's only editorial, and the detail lines underneath (window · count · age, the heat model,
+// pace-at-HR) plus the tap-to-expand already carry every bit of meaning the word was adding. So
+// "↓ −15.2%" replaces "↓ easing off −15.2%".
+//
+// ⛔ THE DOWN ARROW IS NEUTRAL-COLOURED, AND THAT IS THE POINT. Amber made a decline read as a
+// WARNING on a row that is only reporting a direction — and a decline is routinely correct (a
+// deload, a taper, a base block). Same reasoning that turned `holding` grey; this finishes it.
+// It matches `holding`'s `text-white/70` so the three states differ by ARROW, never by alarm.
+//
+// ⚠️ SCOPED TO RUN + BIKE. Swim (`DisciplineRow`) and the rest-fraction tag still use `VERDICT` and
+// still print words — they were not part of this call, and swim's read is Q-038-clouded, so leaving
+// its hedging language in place is deliberate, not an oversight.
+//
+// ⚠️ WHAT THIS COSTS, STATED: the "precise verdict words" split (2026-07-22) distinguished
+// `easing off` (still falling) from `settled lower` (fell, then levelled) — a distinction nobody
+// else draws. Wordless, that split now rests on the ARROW ALONE: `↓` still falling, `→` levelled,
+// with the signed number giving the size of the drop either way. So a settled-lower row reads
+// "→ −15.2%" — flat arrow, negative number — which is accurate but reads oddly at a glance.
+// If that pairing looks wrong on the screen, the fix is to give `settled lower` its own glyph, not
+// to bring the words back.
+const NUMERIC: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
+  improving: { word: '', cls: 'text-emerald-400', arr: '↑' },
+  holding: { word: '', cls: 'text-white/70', arr: '→' },
+  sliding: { word: '', cls: 'text-white/70', arr: '↓' },
+  // Not verdicts — these two say "there is no reading", which no arrow can express. Words stay.
+  needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
+  withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
+};
+
 // PRECISE VERDICT WORDS (2026-07-22, Michael — "all the words for every scenario has to be precise").
 // The trend engine's raw verdict is a NET early→recent direction; on its own it can't tell a metric
 // STILL falling from one that DROPPED then STEADIED. classifyTrend now carries `recentlyFlat` (the recent
@@ -33,9 +65,19 @@ const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
 //   settled lower — dropped, then levelled off (sliding + recentlyFlat)   ← the split nobody else draws
 // Only the sliding verdict splits; "sliding" as a bare word is retired everywhere in favour of "easing
 // off" (its non-alarming default). Falls back to VERDICT for improving/holding/needs_data/withheld.
-function verdictLabel(verdict: TrendVerdict, recentlyFlat?: boolean): { word: string; cls: string; arr: string } {
-  if (verdict === 'sliding' && recentlyFlat) return { word: 'settled lower', cls: 'text-white/55', arr: '→' };
-  return VERDICT[verdict];
+// `wordMap` selects the vocabulary: VERDICT keeps the words (swim, rest), NUMERIC drops them
+// (run, bike). The recentlyFlat SPLIT survives either way — it is the arrow that carries it.
+function verdictLabel(
+  verdict: TrendVerdict,
+  recentlyFlat?: boolean,
+  wordMap: Record<TrendVerdict, { word: string; cls: string; arr: string }> = VERDICT,
+): { word: string; cls: string; arr: string } {
+  if (verdict === 'sliding' && recentlyFlat) {
+    return wordMap === NUMERIC
+      ? { word: '', cls: 'text-white/70', arr: '→' }          // fell, then levelled — flat arrow, the number carries the drop
+      : { word: 'settled lower', cls: 'text-white/55', arr: '→' };
+  }
+  return wordMap[verdict];
 }
 
 // D-160: pctChange is the RAW metric delta (classify.ts keeps it raw so the UI knows real direction).
@@ -76,12 +118,12 @@ function blockContextLine(planWeek: number | null | undefined, block: BlockCard 
 
 // One labelled signal ("Power: improving +2%") for the bike dual read.
 function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
-  const v = VERDICT[sig.verdict];
+  const v = NUMERIC[sig.verdict];   // bike: arrow + number, no word
   return (
     <span className="inline-flex items-baseline gap-1">
       <span className="text-white/50">{label}</span>
       <span className={`inline-flex items-baseline gap-0.5 ${v.cls}`}>
-        {v.arr && <span>{v.arr}</span>}<span>{v.word}</span>
+        {v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}
       </span>
       {sig.pctChange != null && sig.verdict !== 'needs_data' && <span className="text-white/60">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
       {sig.provisional && <span className="text-white/50 text-[12px]">prov</span>}
@@ -124,7 +166,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
   return (
     <Row label="bike">
       {showDot ? (
-        <FitnessDotBlock label={leadIsPower ? 'power' : 'efficiency'} range={range!} verdict={lead.verdict} showAxis={showAxis} explain={leadIsPower
+        <FitnessDotBlock label={leadIsPower ? 'power' : 'efficiency'} range={range!} verdict={lead.verdict} pctChange={lead.pctChange} wordMap={NUMERIC} showAxis={showAxis} explain={leadIsPower
           ? "Power = how your cycling power is trending versus your own baseline (from your ride power against your FTP). The dot is where it sits, the arrow the direction."
           : "Efficiency = how much power you hold per heartbeat on steady rides. Rising means the same work at a lower heart rate — getting fitter. The dot is where it sits versus your baseline; the arrow is the direction."} />
       ) : (
@@ -357,10 +399,13 @@ function FitnessDot({ pct, confident, tickPct, overflow }: { pct: number; confid
 
 // Shared dot+arrow block: metric name + trend ARROW on top, the DOT (level in the 12wk range) below, the
 // relative-frame label under it. Used by bike/swim/strength; run has its own (adds an "i" explainer).
-function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT, showAxis = true, frame = 'vs your 12-week range', explain }: {
+function FitnessDotBlock({ label, range, verdict, pctChange, provisional, wordMap = VERDICT, showAxis = true, frame = 'vs your 12-week range', explain }: {
   label: string;
   range: { positionPct: number; confident: boolean };
   verdict: TrendVerdict;
+  // ⚠️ REQUIRED WHENEVER `wordMap` IS WORDLESS. Without a word this block would render a bare arrow
+  // and say nothing about size. Callers on the VERDICT map may omit it — the word carries them.
+  pctChange?: number | null;
   provisional?: boolean;
   wordMap?: Record<TrendVerdict, { word: string; cls: string; arr: string }>;
   showAxis?: boolean; // the "weaker / frame / stronger" grammar renders on the FIRST band only (item 7)
@@ -380,7 +425,7 @@ function FitnessDotBlock({ label, range, verdict, provisional, wordMap = VERDICT
           <span className="text-white/55 text-[13px]">{label}</span>
         )}
         {verdict !== 'needs_data' && (
-          <span className={`inline-flex items-baseline gap-0.5 text-[13px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}<span>{v.word}</span>{provisional && <span className="text-white/50 text-[12px] ml-1">provisional</span>}</span>
+          <span className={`inline-flex items-baseline gap-0.5 text-[13px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}{pctChange != null && <span className="text-white/60 ml-0.5">{verdictSignedPct(verdict, pctChange)}</span>}{provisional && <span className="text-white/50 text-[12px] ml-1">provisional</span>}</span>
         )}
       </span>
       <FitnessDot pct={range.positionPct} confident={range.confident} />
@@ -531,7 +576,7 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
   // and the toggle could never render. Left in place it was dead code advertising a distinction that
   // no longer exists.
   const shownPace = eff.recentPaceSecPerKm;
-  const v = verdictLabel(eff.verdict, eff.recentlyFlat);
+  const v = verdictLabel(eff.verdict, eff.recentlyFlat, NUMERIC);   // arrow + number, no word
   // ⚠️ The conditions line: the temperature SPREAD across the plotted runs. Shown, never corrected —
   // it is what lets the athlete discount a hot month without the app claiming to have done it for them.
   // ⛔ WHAT HEAT COSTS YOU, IN SECONDS PER MILE (D-346, 2026-07-31).
@@ -602,7 +647,7 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
         </button>
         {hasTrend ? (
           <span className={`inline-flex items-baseline gap-1 text-[13px] ${v.cls}`}>
-            {v.arr && <span>{v.arr}</span>}<span>{v.word}</span>
+            {v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}
             {eff.pctChange != null && <span className="text-white/60">{verdictSignedPct(eff.verdict, eff.pctChange)}</span>}
           </span>
         ) : (
