@@ -5593,156 +5593,22 @@ ${narrativeFacts.join('\n')}`;
         }),
         daily_load_7d,
         hr_drift_series,
-        cross_training_signal: (() => {
-          const byType = training_state.load_ramp.acute7_by_type || [];
-          const activeDisciplines = byType.filter((r: any) => Number(r.total_load || 0) > 0);
-
-          // ── HONEST CROSS-TRAINING READ (2026-07-21) — is pushing one thing COSTING another you care
-          //    about? Off OUTCOMES (spine verdicts) + per-discipline load, never HR. This is the honest
-          //    replacement for the retired interference alarm, and it fixes Garmin's "Unproductive":
-          //    building strength while running eases reads as a TRADE, not lost fitness. Fires only with
-          //    a declared FOCUS and a real trade/cost/room story; else falls through to the reassurance.
-          {
-            const stv: any = latestSnapshot?.state_trends_v1;
-            if (stv) {
-              const ctPosture: Record<string, string> = (() => {
-                const tp: any = (goalContext?.goals || []).map((g: any) => g?.training_prefs)
-                  .find((t: any) => t && t.per_discipline_posture)?.per_discipline_posture || {};
-                const out: Record<string, string> = {};
-                for (const [k, v] of Object.entries(tp)) {
-                  const p = String(v || '').toLowerCase();
-                  if (p === 'develop' || p === 'maintain' || p === 'dropped') out[k === 'bike' ? 'ride' : String(k).toLowerCase()] = p;
-                }
-                return out;
-              })();
-              const bikeV = stv.bike?.power?.verdict && stv.bike.power.verdict !== 'needs_data'
-                ? stv.bike.power.verdict : (stv.bike?.efficiency?.verdict ?? 'needs_data');
-              // TRAILING truth for run: is it UNDER its stored upkeep target over the 4-week block? This
-              // OVERRIDES a weekly acwr uptick so the cross-training read can't call running "pushed"
-              // while the upkeep line below says it's under for weeks (window mismatch, found on device).
-              // TRAILING run vs its DECLARED target — the FLOOR. perWk (actual) + tgtMi (target) feed the
-              // coach's-eye floor flag with the number, so it ABSORBS the upkeep line (one running voice).
-              const runFloor = (() => {
-                try {
-                  const upk: any = (goalContext?.goals || []).map((g: any) => g?.training_prefs).find((t: any) => t && t.per_discipline_posture) || null;
-                  const tgtMi = Number(upk?.target_weekly_miles);
-                  if (!(Number.isFinite(tgtMi) && tgtMi > 0)) return { under: false, actual: null as number | null, target: null as number | null };
-                  const KM_TO_MI = 0.621371;
-                  const runRows = completedRolling.filter((r: any) => ['run', 'running'].includes(String(r?.type || '').toLowerCase()));
-                  const perWk = runRows.reduce((s: number, r: any) => s + (Number(r?.distance) || 0) * KM_TO_MI, 0) / 4;
-                  return { under: perWk < tgtMi * 0.85, actual: perWk, target: tgtMi };
-                } catch { return { under: false, actual: null, target: null }; }
-              })();
-              // The ceiling COST signal — recovery/body degrading. Correlation only, never proof.
-              const readinessDeclining = readinessState === 'fatigued' || readinessState === 'overreached';
-              const ctStates = [
-                {
-                  discipline: 'strength',
-                  posture: ctPosture.strength || 'unknown',
-                  verdict: stv.strength?.verdict || 'needs_data',
-                  acwr: null,
-                  // ⛔ CAN THIS VERDICT CARRY A PRESCRIPTION? (audit F4.)
-                  //
-                  // The ceiling clause reads a sliding focus discipline and tells the athlete
-                  // *"easing the running is the lever"* — the only output on this screen that asks him
-                  // to change what he is doing. It was reading a protocol-blind e1RM verdict, so on a
-                  // block that prescribes 40-60% in week 4, or one that walks the load up by design,
-                  // a dip the PLAN caused could prescribe cutting his mileage.
-                  //
-                  // The trend line still renders. What it may no longer do is prescribe off a movement
-                  // the block designed.
-                  verdictTrusted: !protocolExpectsE1rmToDip(blockIdentity.protocolId) && blockIdentity.cycle?.isDeload !== true,
-                },
-                { discipline: 'run', posture: ctPosture.run || 'unknown', verdict: stv.run?.decoupling?.verdict || 'needs_data', acwr: runningAcwr ?? null, underTarget: runFloor.under, actualPerWeek: runFloor.actual, targetPerWeek: runFloor.target, unit: 'mile' },
-                { discipline: 'bike', posture: ctPosture.ride || 'unknown', verdict: bikeV, acwr: cyclingAcwr ?? null },
-              ];
-              const ctRead = composeCoachEye({ disciplines: ctStates as any, readinessDeclining });
-              if (ctRead) return { label: ctRead.headline, tone: ctRead.tone, detail: ctRead.detail, discipline: (ctRead as any).discipline ?? null, info: (ctRead as any).info ?? null };
-            }
-          }
-          if (activeDisciplines.length < 2) return null;
-
-          // Identify building disciplines among active ones
-          const buildingDiscs = activeDisciplines
-            .map((r: any) => {
-              const disc = String(r.type || 'other');
-              const dp = disciplineProfiles.find(p => p.discipline === disc || (disc === 'ride' && p.discipline === 'bike') || (disc === 'cycling' && p.discipline === 'bike'));
-              return dp && dp.maturity === 'building' ? dp : null;
-            })
-            .filter(Boolean) as typeof disciplineProfiles;
-
-          // If cross-training disciplines are all still building, show learning message
-          const nonRunActive = activeDisciplines.filter((r: any) => {
-            const d = String(r.type || '').toLowerCase();
-            return !d.includes('run');
-          });
-          const allCrossTrainingBuilding = nonRunActive.length > 0 && nonRunActive.every((r: any) => {
-            const disc = String(r.type || 'other');
-            const dp = disciplineProfiles.find(p => p.discipline === disc || (disc === 'ride' && p.discipline === 'bike') || (disc === 'cycling' && p.discipline === 'bike'));
-            return dp && dp.maturity === 'building';
-          });
-
-          if (allCrossTrainingBuilding && buildingDiscs.length > 0) {
-            const names = buildingDiscs.map(d => `${d.discipline} (${d.sessions_28d} sessions)`).join(', ');
-            return { label: `Building baseline: ${names}`, tone: 'info' as const };
-          }
-
-          const cd = weeklyResponseModel.cross_domain;
-          const endur = weeklyResponseModel.endurance;
-          const str = weeklyResponseModel.strength;
-          const assess = weeklyResponseModel.assessment;
-
-          // The strength↔endurance INTERFERENCE VERDICT is retired (2026-07-21, computeCrossDomain) —
-          // effect smaller than the measurement error, HR-at-pace inverts under real fatigue, and the
-          // plan already spaces the sessions that cause it. cd.interference_detected is now always false;
-          // the alarm branch that read post_strength_hr_elevated / post_strength_pace_reduced is gone.
-          // The row now only ever REASSURES (concurrent gains / handling load) or stays silent.
-
-          if (cd.patterns.some((p: any) => p.code === 'concurrent_gains')) {
-            if (buildingDiscs.length > 0) {
-              const names = buildingDiscs.map(d => d.discipline).join(', ');
-              return { label: `Adapting well — still learning ${names}`, tone: 'positive' as const };
-            }
-            return { label: 'Adapting well — no interference', tone: 'positive' as const };
-          }
-
-          const rpeRising = endur.rpe.sufficient && endur.rpe.trend === 'declining';
-          const driftWorsening = endur.hr_drift.sufficient && endur.hr_drift.trend === 'declining';
-          const strengthFading = str.overall.trend === 'declining';
-          const rirDropping = str.per_lift.some((l: any) =>
-            l.sufficient && l.rir_trend === 'declining' && l.rir_current != null && l.rir_current < 2
-          );
-          const bodyConcerned = assess.signals_concerning > 0;
-
-          const stressSignals = [rpeRising, driftWorsening, strengthFading, rirDropping, bodyConcerned].filter(Boolean).length;
-
-          // D-232 glass-box + D-236 Part C glance-tier dedup: fires on ≥2 stress
-          // signals and cites the DISTINCT factors, but SUPPRESSES the row when RPE
-          // is the sole distinct signal (the ≥2 met only via bodyConcerned double-
-          // counting RPE) — that receipt would just restate the "How hard it feels"
-          // row. Multi-factor / non-RPE-single unchanged. (Over-fire history: Q-111.)
-          const stressReceipt = crossTrainingStressReceipt({
-            rpeRising, driftWorsening, strengthFading, rirDropping, bodyConcerned,
-            rpe: { current: endur.rpe.current_avg, baseline: endur.rpe.baseline_avg },
-          });
-          if (stressReceipt) return stressReceipt;
-
-          if (stressSignals === 0 && assess.signals_concerning === 0) {
-            // F17 (2026-07-20): SCOPE THE CLAIM TO WHAT THIS ROW CHECKED. This gate only inspects the
-            // five INTERFERENCE/STRAIN signals (RPE, HR drift, strength fade, RIR, body-concern) — it
-            // never looks at volume, adherence, or upkeep. "Handling combined load well" read as a
-            // training all-clear and rendered in green two lines above a real run shortfall (the app
-            // arguing with itself). The row is labelled "Cross-training", so the honest fact is the one
-            // the branch two above already uses: no INTERFERENCE. Same word, one place.
-            if (buildingDiscs.length > 0) {
-              const names = buildingDiscs.map(d => `${d.discipline} (${d.sessions_28d} sessions)`).join(', ');
-              return { label: `No interference — still building ${names}`, tone: 'positive' as const };
-            }
-            return { label: 'No interference between disciplines', tone: 'positive' as const };
-          }
-
-          return null;
-        })(),
+        // ⛔ `cross_training_signal` (the BODY 'Cross-training' row) IS DELETED (D-354, Michael
+        // 2026-08-01). DO NOT REBUILD IT. BODY is now only what the athlete REPORTS — effort and
+        // soreness. This row measured declared targets against GPS mileage, which is not reporting,
+        // and Michael's call was that it earned nothing: *"people know if they are hitting their
+        // numbers."*
+        //
+        // ⚠️ WHAT IT WAS NOT, since the name invites a rebuild: it never detected INTERFERENCE
+        // between disciplines. That verdict was retired in v126 because the effect is smaller than
+        // the measurement error on e1RM, and the science doc is explicit — the app may comment on
+        // scheduling STRUCTURE and never on whether interference occurred. What survived was a
+        // floor/ceiling/room read against declared targets, which is the field-standard shape
+        // (show distribution against intent, do not diagnose the conflict) and is also exactly what
+        // the athlete already knows without being told.
+        //
+        // The upkeep FLOOR fact it absorbed (D-130/D-297) is not orphaned — it belongs to the
+        // per-discipline posture read, which still renders in the RUN row's tap-down.
       },
       trends: {
         fitness_direction: fitnessDirection,

@@ -1301,7 +1301,6 @@ export default function StateTab({
 
 
   // ── Cross-training signal (server-computed) ──────────────────────────────
-  const crossTrainingSignal = load.cross_training_signal ?? null;
 
   const hasUpcomingEvent = Boolean(pe || goalMeta || raceFinishProjection || raceReadiness);
   const isAimless = !wsv.plan.has_active_plan && !hasUpcomingEvent && !officialForRace && !postRaceUnofficial;
@@ -1633,56 +1632,9 @@ export default function StateTab({
                   )}
                 </div>
               ))}
-              {crossTrainingSignal && (() => {
-                // GLANCE + OPEN: the frank verdict (label) is always shown; the receipts (detail) reveal
-                // on tap, matching the BODY-row provenance pattern. Uses expandedSignal keyed on a
-                // sentinel so only one row is open at a time.
-                // Color the sentence by the DISCIPLINE it's about (Michael 2026-07-22), not a generic tone —
-                // blue collided with swim's own color. Warnings (CEILING) stay amber (it's a caution); the
-                // neutral/positive reads take the subject discipline's signature hue.
-                const ctDisc = (crossTrainingSignal as any).discipline as string | null;
-                const toneCls =
-                  crossTrainingSignal.tone === 'warning' ? 'text-amber-400/90' : 'text-white/85';
-                const toneStyle = crossTrainingSignal.tone !== 'warning' && ctDisc
-                  ? { color: getDisciplineColor(ctDisc) } : undefined;
-                const detail = crossTrainingSignal.detail ?? null;
-                const info = crossTrainingSignal.info ?? null; // the CEILING ⓘ — "you know your body"
-                const open = expandedSignal === '__cross_training__';
-                const infoOpen = expandedSignal === '__cross_training_info__';
-                return (
-                  <div className="pt-0.5">
-                    <button
-                      type="button"
-                      disabled={!detail}
-                      onClick={() => detail && setExpandedSignal(open ? null : '__cross_training__')}
-                      className="w-full flex items-start gap-3 text-left"
-                    >
-                      <span className="text-[13px] text-white/70 shrink-0 w-[104px]">Cross-training</span>
-                      <div className="flex-1 flex items-start gap-2 min-w-0">
-                        <span className={`flex-1 text-[13px] text-left leading-snug ${toneCls}`} style={toneStyle}>{crossTrainingSignal.label}</span>
-                        {detail && <span className="text-white/50 text-[11px] shrink-0 mt-0.5">{open ? '▾' : '▸'}</span>}
-                      </div>
-                    </button>
-                    {open && detail && (
-                      <p className="text-[12px] text-white/60 leading-snug mt-1 max-w-[min(100%,320px)]">{detail}</p>
-                    )}
-                    {info && (
-                      <button
-                        type="button"
-                        onClick={() => setExpandedSignal(infoOpen ? null : '__cross_training_info__')}
-                        className="mt-1 inline-flex items-center gap-1 text-[11px] text-white/50 hover:text-white/50"
-                        aria-label="What this is based on"
-                      >
-                        <span className="inline-flex items-center justify-center w-3 h-3 rounded-full border border-white/25 text-[8px]">i</span>
-                        what this is based on
-                      </button>
-                    )}
-                    {infoOpen && info && (
-                      <p className="text-[12px] text-white/60 leading-snug mt-1 max-w-[min(100%,320px)] italic">{info}</p>
-                    )}
-                  </div>
-                );
-              })()}
+              {/* The BODY 'Cross-training' row is DELETED (D-354). BODY is only what the athlete
+                  REPORTS — effort and soreness. This row compared declared targets against GPS
+                  mileage, which the athlete already knows. The server no longer sends the field. */}
             </div>
           </div>
         </div>
