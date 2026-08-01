@@ -2373,6 +2373,25 @@ the per-lift detail, and compare the bar against the athlete's known best.
 
 ## Q-233 — Two known imprecisions in the bodyweight load rule, both deliberate (2026-08-01, INTENTIONAL)
 
+> ⛔ **IMPRECISION #2 IS CLOSED — SAME DAY, BY D-351.** The band-assisted pull-up no longer counts as
+> full bodyweight. The logger now takes the assist as a NUMBER IN POUNDS and the pricing subtracts it:
+> `(bodyweight − assist) × reps`, floored at `MIN_ASSISTED_EFFECTIVE_LB`.
+>
+> **What was wrong with the reasoning below, precisely:** it was right that *we* must not invent the
+> fraction, and it treated "so it stays unmeasured" as the only alternative. The field's answer is a
+> third option — **ask the athlete.** Hevy prices an assisted set at `(bodyweight − assisted weight)
+> × reps` off a user-entered figure, Strong the same, and no major tracker ships a colour→pounds
+> table precisely *because* bands are not standardised. A number the athlete recorded is measurement.
+> A number we derived from the word "Heavy" would have been the fabrication this entry feared.
+>
+> ⚠️ **IMPRECISION #1 (isometric holds score zero) IS STILL OPEN AND STILL DELIBERATE.** Read it below
+> as written — D-351 changed nothing about it.
+>
+> ⚠️ **AND THE WORD-ERA ROWS STILL PRICE AT FULL BODYWEIGHT, ON PURPOSE.** History is not migrated
+> (one week of data, one user, no trend to break), so every set logged before 2026-08-01 keeps the
+> behaviour described below. That is a deliberate, scoped exception to D-348's "re-price history or
+> the trend lies" rule — see D-351 before reopening it.
+
 Filed with D-348 so neither is rediscovered as a bug.
 
 **1. An isometric hold scores zero.** A plank, wall-sit or dead hang is logged as TIME with no reps, and

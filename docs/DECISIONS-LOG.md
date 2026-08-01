@@ -2576,7 +2576,102 @@ rather than guessed into it — the same failure direction the gate already chos
 
 ---
 
-## D-350 — TWO "CLIENT RE-DERIVATIONS" THAT WEREN'T: AN UNREACHABLE THRESHOLD AND A COMPONENT NOTHING RENDERED (2026-08-01, **NOT YET PUSHED**)
+## D-351 — THE BAND CARRIES A NUMBER THE ATHLETE ENTERED, AND TYPED REPS STOP VANISHING (2026-08-01, **NOT YET PUSHED**)
+
+**Context.** The screens were made honest first (D-347 / D-349 / D-350). What remained was upstream:
+the logger's *record* of what happened was lossy in two ways, and everything downstream — volume,
+load, ACWR, the reconciler, the coach's verdicts — inherits whatever it writes.
+
+**⛔ FIELD GROUNDING, BECAUSE THIS REVERSES TWO OF OUR OWN DECISIONS.** Every major tracker computes
+volume as `weight × reps`, where "weight" is body weight for a plain bodyweight move, `(bodyweight +
+added)` when loaded, and `(bodyweight − assist)` when assisted. Hevy's assisted formula is literally
+`(bodyweight − assisted weight) × reps`, and it computes **no volume at all** when body weight is
+unset. Strong behaves the same. Two constants from the field decided the shape here:
+
+1. **The assist number is USER-ENTERED.** No tracker (Strong, Hevy, Jefit) maps a band colour or a
+   light/medium/heavy level to pounds, because no such table exists across manufacturers.
+2. **Assisted sets produce no 1RM or weight PR** — reps only. Efforts already enforces this
+   (`best_weight` moves only on external weight) and it is unchanged.
+
+*Sources: help.hevyapp.com "Assisted Bodyweight Exercises — How it Calculates Volume and PRs";
+help.hevyapp.com "Exercise Performance Tracking"; strong.app.*
+
+- **Decision 1 — bands go to NUMBERS, one rule, direction from the exercise.** A band carries a
+  pounds value. On an assist-capable move (`chinup`/`pullup`/`dip`) it SUBTRACTS; on an
+  add-resistance move it MULTIPLIES like any weighted set. The code already knew the direction —
+  `bandMeansAssistance` (D-348) — so this adds a magnitude to an axis that existed, not a new axis.
+  **Why non-negotiable:** a level cannot be subtracted from a body weight without us inventing the
+  pounds, which is the one thing the pricing rule refuses to do. Three levels could therefore only
+  ever be *recorded*, never *counted* — which is exactly what happened: a band-assisted chin-up
+  priced identically to an unassisted one, so the block's actual progression (walking the tension
+  down, Wendler's own instruction) was invisible to the score.
+
+- **Decision 2 — NO preloaded level→pounds table.** The field does not have one and neither do we.
+  A number the athlete recorded is measurement; a number derived from the word "Heavy" would be a
+  fabrication wearing measurement's clothes — the precise failure Q-233 was written to avoid, which
+  is why that entry's conclusion was wrong rather than its reasoning.
+
+- **Decision 3 — ⛔ HISTORY IS NOT MIGRATED, AND THIS IS A DELIBERATE EXCEPTION TO D-348.** D-348
+  established that shipping a pricing change without re-pricing history makes an identical week read
+  differently and the trend lie. **That rule is suspended here on purpose** (Michael): one week of
+  data, a single pre-launch user, no trend to break. So `resistance_level` holds WORDS on every row
+  written before today and POUNDS after it, forever. `bandLoadLb` (`_shared/workload.ts`) is the one
+  place that reads both encodings, and an unparseable value prices exactly as it did before.
+  **Why it is written down:** the next session will find two encodings in one column and read it as
+  rot. It is not rot; it is a decision. Do not "clean it up" with a migration.
+  ⚠️ The consequence, stated: a word-era assisted chin-up still over-counts at full bodyweight. That
+  is the old behaviour, deliberately preserved, not a bug.
+
+- **Decision 4 — an assisted set floors above zero** (`MIN_ASSISTED_EFFECTIVE_LB = 5`). A band that
+  cancels nearly all of an athlete's body weight still leaves a set that was performed, so it may not
+  price at zero — but the remainder is not measurable either. Same philosophy as
+  `BAND_SET_VOLUME_TOKEN`: visible, far too small to move a verdict.
+
+- **Decision 5 — the missed-Done prompt ASKS, it does not auto-tick.** Michael's 30 Jul session had
+  three hip-thrust sets with 10/5/10 reps typed and none ticked Done. They saved (the save filter
+  keeps any set carrying a number, `StrengthLogger.tsx:~3730`) and they RENDERED under "Completed" —
+  and the volume rule dropped all three, because it counts a set only when `completed !== false`.
+  **The gap is between two honest rules**: the save layer says a typed number is worth keeping; the
+  scoring layer says an unconfirmed set is not a receipt (D-204, and it is right — an untouched
+  PREFILL must never count). The athlete falls through the middle.
+  ⛔ **Auto-ticking on save was rejected.** It substitutes the app's word for the athlete's (Law 2),
+  and it would quietly undo D-204's protection the first time a prefill picked up an edit. The prompt
+  names the exact sets, states the consequence, and offers both answers. Prefills are excluded by
+  construction.
+  ⚠️ **Confirmed before building: the typed reps ARE persisted** — they were read back out of
+  `workouts.strength_exercises` for the 30 Jul session. Nothing was lost; it was uncounted.
+
+- **Decision 6 — a single-leg hip thrust is not a barbell lift.** `getExerciseType` matched no
+  pattern for it and hit the `barbell` default, so the logger drew a 45 lb bar and a plate calculator
+  over a movement loaded with one implement on the hip. Classified `goblet` — single weight, no bar,
+  no plate math, and **no `lb/hand` label**, which a `dumbbell` classification would have printed and
+  which is wrong in the other direction. Bilateral barbell hip thrusts are untouched. ⚠️ **Second
+  time the default has been the bug** (Q-180, the dumbbell carry that got a barbell).
+
+- **Decision 7 — the dead `done` field is deleted** (`StrengthLogger.tsx`). Written on every
+  prescribed set, read by nothing — verified across `src` and `supabase` before removal. ⛔ **It is
+  not the Done button**, which writes `completed` and is untouched. Two fields for one idea, one of
+  them dead, adjacent in the stored JSON, is how the next session fixes the wrong one.
+
+- **⚠️ KNOWN AND LEFT, NOW ASYMMETRIC:** a LOADED chin-up prices `added × reps`, not
+  `(bodyweight + added) × reps`. The field says the latter, and after this change assistance
+  subtracts from body weight while added weight does not add to it — so a +25 lb chin-up prices below
+  a bodyweight one. Left because rule 1 governs **every weighted set in the app**, including every
+  barbell lift, so changing it is a far wider blast radius than this pass. Filed here rather than
+  fixed quietly.
+
+- **Verification:** 9 new pins in `workload-strength-bodyweight.test.ts` (subtract, floor, word-era
+  unchanged, blank assist, null bodyweight → 0, add-resistance with lb, blank band → token, external
+  weight still wins). 36 green across the strength/volume suites. **No backfill was run — history is
+  intentionally untouched.**
+
+- **Cross-ref:** D-348 (the set rule + the re-pricing law this suspends), D-349 (the screen that
+  reads it), D-204 (prefills), Q-233 (imprecision #2 closed, #1 still open), Q-180 (the previous
+  exercise-type default bug), D1 of `AUDIT-state-screen-2026-08-01.md` (band clause superseded).
+
+---
+
+## D-350 — TWO "CLIENT RE-DERIVATIONS" THAT WEREN'T: AN UNREACHABLE THRESHOLD AND A COMPONENT NOTHING RENDERED (2026-08-01, **PUSHED + DEPLOYED, not device-verified**)
 
 **Context.** Stage 2 of `docs/AUDIT-state-screen-2026-08-01.md` named three client-side re-derivations
 to delete. Traced first, on Michael's instruction (*"one stage, trace first, report before coding"*).
@@ -2631,7 +2726,7 @@ because "we deleted it and nothing changed" is exactly the finding a future sess
 
 ---
 
-## D-349 — THE COMPARE TABLE'S lb COLUMN IS PRICED BY THE ONE SET RULE: THE SERVER PRICES, THE CLIENT PAIRS (2026-08-01, **NOT YET PUSHED**)
+## D-349 — THE COMPARE TABLE'S lb COLUMN IS PRICED BY THE ONE SET RULE: THE SERVER PRICES, THE CLIENT PAIRS (2026-08-01, **PUSHED + DEPLOYED, not device-verified**)
 
 **The bug.** D-348 made bodyweight count in ONE function (`strengthSetVolume`), shared by the load
 score, the planned score and `compute-facts`' `total_volume_lbs` — *"so the load number and the volume

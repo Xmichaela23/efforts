@@ -194,7 +194,26 @@ are real builds; the rest is wiring, deleting, and trimming.
     plans that no longer exist, which is arguably correct.
 - **REMAINING in Stage 0: settle D1–D4** (below). That is the only thing gating Stage 1.
 **✅ DECIDED 2026-08-01:**
-- **D1 — Load basis: VOLUME LOAD, bodyweight counts.** NOT time (logged-after-the-fact duration is
+- **D1 — Load basis: VOLUME LOAD, bodyweight counts.**
+  > ⛔ **THE BAND CLAUSE IS SUPERSEDED BY D-351 (2026-08-01, same day).** D1 said *"banded /
+  > assistance sets get a small flat per-set token (bands have no clean load; assistance is
+  > deliberately minor, so precision isn't worth it)"*. **Bands now carry a NUMBER the athlete
+  > enters** — it subtracts on an assist-capable move and multiplies on an add-resistance one. The
+  > flat token survives only as the blank fallback.
+  >
+  > **Why the original clause was wrong:** "bands have no clean load" is true and it argues for
+  > *asking*, not for *approximating*. Every major tracker reaches the same conclusion — Hevy prices
+  > assisted work as `(bodyweight − assisted weight) × reps` from a user-entered number, and none of
+  > them ship a colour→pounds table, because non-standardisation is exactly why the number has to
+  > come from the person who used the band. "Precision isn't worth it" also under-read the size: an
+  > assisted chin-up was priced identically to an unassisted one, so the block's actual progression —
+  > walking the band tension DOWN — was invisible to the score.
+  >
+  > ⚠️ **HISTORY IS NOT MIGRATED, DELIBERATELY.** Word-era rows keep pricing at full bodyweight. That
+  > is a scoped exception to this doc's own "re-price history or the trend lies" rule, taken because
+  > there is one week of data and one user. See D-351.
+
+  **Original text follows.** NOT time (logged-after-the-fact duration is
   garbage) and NOT per-set effort (only collected on the top/AMRAP set of the four main lifts, so it
   can't score the bodyweight accessories that read zero). Score = sets × reps × load, where **bodyweight
   fills in as the load** for calisthenics (chin-up/dip/box-jump ≈ bodyweight × reps), and **banded /

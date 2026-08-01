@@ -149,7 +149,18 @@ const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' 
   if (name.includes('band') || name.includes('banded') || name.includes('clamshell')) return 'band';
   
   // Goblet hold exercises (single weight, not per-hand)
+  // ⛔ A SINGLE-LEG HIP THRUST IS NOT A BARBELL LIFT (Michael, screenshot 2026-07-31). It matched no
+  // pattern below and fell through to the `barbell` default, so the logger drew a 45 lb bar and a
+  // plate calculator over a movement loaded with one dumbbell or plate on the hip — the same class of
+  // miss as the Farmers Carry above, and the second time the default has been the bug.
+  // ⚠️ `goblet`, NOT `dumbbell`: the load is ONE implement on the hip, so the per-hand label a
+  // dumbbell row prints ("lb/hand") would be wrong in the other direction. Goblet is this app's
+  // "single weight, no bar, no plate math" shape.
+  // ⚠️ SINGLE-LEG ONLY. A bilateral barbell hip thrust genuinely is a barbell lift and keeps the bar
+  // and the plate calculator — which is why this tests for the single-leg qualifier and not for
+  // "hip thrust".
   if (name.includes('lateral lunge') || name.includes('goblet squat')) return 'goblet';
+  if (/(single leg|singleleg|one leg|1 leg|unilateral)/.test(name) && name.includes('thrust')) return 'goblet';
   
   // Dumbbell exercises
   if (name.includes('dumbbell') || name.includes('db ')) return 'dumbbell';
@@ -745,7 +756,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [timerEditReadOnly, setTimerEditReadOnly] = useState(true);
   useEffect(() => { if (editingTimerKey) setTimerEditReadOnly(true); }, [editingTimerKey]);
   // Numeric keypad (bottom sheet) for fast, error-resistant input
-  type KeypadField = 'reps' | 'weight' | 'rir';
+  // D-351: `band` writes the BAND LOAD IN POUNDS onto `resistance_level` — the field that held
+  // "Light"/"Moderate"/"Heavy" until 2026-08-01. One field, two encodings, and the server's
+  // `bandLoadLb` is the single place that reads both (history is deliberately not migrated).
+  type KeypadField = 'reps' | 'weight' | 'rir' | 'band';
   const keypadCtxRef = useRef<{ exerciseId: string; setIndex: number; field: KeypadField; alsoComplete?: boolean } | null>(null);
   const [keypadOpen, setKeypadOpen] = useState(false);
   const [keypadTitle, setKeypadTitle] = useState<string>('');
@@ -875,7 +889,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
 
     const raw = String(rawOverride ?? keypadValue ?? '').trim();
-    const n = ctx.field === 'weight' ? parseFloat(raw) : parseInt(raw, 10);
+    const n = (ctx.field === 'weight' || ctx.field === 'band') ? parseFloat(raw) : parseInt(raw, 10);
     const isValidNumber = raw.length > 0 && Number.isFinite(n);
 
     if (ctx.field === 'reps') {
@@ -887,6 +901,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       updateSet(ctx.exerciseId, ctx.setIndex, { reps: isValidNumber ? Math.max(repFloor, Math.round(n)) : 0 });
     } else if (ctx.field === 'weight') {
       updateSet(ctx.exerciseId, ctx.setIndex, { weight: isValidNumber ? Math.max(0, n) : 0 });
+    } else if (ctx.field === 'band') {
+      // ⛔ BLANK IS A REAL ANSWER AND CLEARS THE FIELD. An athlete who used no band, or who does not
+      // know the band's rating, must be able to leave it empty — an empty assist prices at full
+      // bodyweight and an empty add-resistance band prices at the flat token, exactly as before
+      // D-351. Writing 0 instead of clearing would read as "a band worth nothing", which is a
+      // different claim and would price an assisted set at full bodyweight for the wrong reason.
+      // ⚠️ Mutually exclusive with added weight, the same rule the old dropdown enforced: a set is
+      // either assisted or loaded, never both.
+      const bandVal = isValidNumber && n > 0 ? String(Math.max(0, Math.round(n * 10) / 10)) : undefined;
+      updateSet(ctx.exerciseId, ctx.setIndex, { resistance_level: bandVal, weight: 0 });
     } else if (ctx.field === 'rir') {
       // Q-039: RIR scale is 0–5+; clamp manual entry to 0–5 (5 = "5+", far from failure).
       const rirVal = isValidNumber ? Math.max(0, Math.min(5, Math.round(n))) : undefined;
@@ -898,6 +922,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   
   // Session RPE prompt state
   const [showSessionRPE, setShowSessionRPE] = useState(false);
+  // D-351: sets carrying real typed numbers that were never ticked Done. See `untickedTypedSets`.
+  const [showUntickedWarn, setShowUntickedWarn] = useState(false);
   const [sessionRPE, setSessionRPE] = useState<number>(5);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -1960,10 +1986,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const setReps = p?.reps ?? reps;
           const setAmrap = p ? p.amrap : isAmrap === true;
           const baseSet: any = {
+            // ⛔ `done: false` WAS HERE AND IS DELETED (D-351, 2026-08-01). It was written on every
+            // prescribed set and READ BY NOTHING — verified across src and supabase before removal.
+            // ⚠️ It is NOT the Done button. The button writes `completed`, which is live, is the flag
+            // the volume rule gates on, and is untouched. Two fields for one idea, one of them dead,
+            // sitting next to each other in the stored JSON is precisely how the next session
+            // "fixes" the wrong one.
             weight: exerciseType === 'band' ? 0 : setWeight,
             resistance_level: resistanceLevel,
             rir: null,
-            done: false,
             amrap: setAmrap,
             prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
           };
@@ -3443,7 +3474,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           duration_seconds: lastSet?.duration_seconds, // Copy duration for duration-based exercises
           weight: lastSet?.weight || 0,
           barType: lastSet?.barType || 'standard',
-          resistance_level: exerciseType === 'band' ? (lastSet?.resistance_level || 'Light') : lastSet?.resistance_level,
+          // D-351: carry the previous set's band value forward, but never SEED one. The old default
+          // was the word 'Light'; a numeric default would be an invented load, and blank correctly
+          // prices at the flat token until the athlete says what the band is.
+          resistance_level: lastSet?.resistance_level,
           rir: undefined,
           completed: false
         };
@@ -3944,7 +3978,74 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }, 1500);
   };
 
+  /**
+   * ⛔ SETS THE ATHLETE FILLED IN AND NEVER TICKED (D-351, 2026-08-01).
+   *
+   * Michael's 30 Jul session: three Single Leg Hip Thrust sets with 10 / 5 / 10 reps typed, none
+   * marked Done. They SAVED (the save filter keeps any set carrying a number) and they RENDERED —
+   * the Performance screen prints them under "Completed" — and then the volume rule dropped every
+   * one of them, because it counts a set only when `completed !== false`. 25 reps of real work read
+   * as zero pounds, on the one screen that says how much you lifted.
+   *
+   * ⚠️ THE GAP IS BETWEEN TWO HONEST RULES, which is why neither side looked broken. The save layer
+   * says "a number the athlete typed is worth keeping". The scoring layer says "a set nobody
+   * confirmed is not a receipt" (D-204, and it is right — an untouched PREFILL must never count).
+   * The athlete falls through the middle.
+   *
+   * ⛔ SO THIS ASKS RATHER THAN ASSUMING. Law 2: we record what the athlete told us, we never infer.
+   * Auto-ticking these on save would put the app's word in place of theirs, and would quietly undo
+   * D-204's protection the first time a prefill picked up an edit. A prompt naming the exact sets is
+   * the athlete telling us — and it is also the only way they ever find out the work was dropped.
+   *
+   * ⚠️ PREFILLS ARE EXCLUDED BY CONSTRUCTION. `prefilled === true` means the number came from the
+   * plan or the prior session and was never engaged; that is exactly the set D-204 exists to ignore,
+   * and it must not be offered here.
+   */
+  const untickedTypedSets = (): Array<{ exerciseId: string; exerciseName: string; setIndex: number }> => {
+    const out: Array<{ exerciseId: string; exerciseName: string; setIndex: number }> = [];
+    for (const ex of exercises) {
+      if (!ex?.name?.trim() || !Array.isArray(ex.sets)) continue;
+      ex.sets.forEach((st: LoggedSet, i: number) => {
+        if (!st || st.completed === true) return;
+        if (st.prefilled === true) return; // untouched prescription — D-204, never counted, never offered
+        const hasRealEntry = (Number(st.reps) || 0) > 0
+          || (Number(st.duration_seconds) || 0) > 0
+          || (Number(st.weight) || 0) > 0;
+        if (hasRealEntry) out.push({ exerciseId: ex.id, exerciseName: ex.name, setIndex: i });
+      });
+    }
+    return out;
+  };
+
+  const markUntickedComplete = () => {
+    const pending = untickedTypedSets();
+    if (pending.length === 0) return;
+    const byExercise = new Map<string, Set<number>>();
+    for (const p of pending) {
+      if (!byExercise.has(p.exerciseId)) byExercise.set(p.exerciseId, new Set());
+      byExercise.get(p.exerciseId)!.add(p.setIndex);
+    }
+    const updated = exercises.map((ex) => {
+      const idxs = byExercise.get(ex.id);
+      if (!idxs) return ex;
+      return {
+        ...ex,
+        // `prefilled: false` rides along for the same reason Done does it: the set is now the
+        // athlete's own claim, not a prescription sitting untouched.
+        sets: ex.sets.map((st: LoggedSet, i: number) => (idxs.has(i) ? { ...st, completed: true, prefilled: false } : st)),
+      };
+    });
+    setExercises(updated);
+    saveSessionProgress(updated, attachedAddons, notesText, notesRpe);
+  };
+
   const saveWorkout = () => {
+    // D-351: warn BEFORE the RPE prompt — once the session is saved the volume is already lost, and
+    // the athlete has no way to find out it happened.
+    if (untickedTypedSets().length > 0) {
+      setShowUntickedWarn(true);
+      return;
+    }
     // Show session RPE prompt first
     setShowSessionRPE(true);
   };
@@ -4977,18 +5078,38 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // So assistance is the progression, and a row with nowhere to record it throws
                         // away the only thing that changes.
                         //
-                        // ⚠️ THREE LEVELS, PHRASED AS HELP — not four, and not band nomenclature. Band
-                        // colours are not standardised across manufacturers, and "heavy band" means MORE
-                        // help, i.e. an EASIER set: the inversion is the trap. Labelling the help removes
-                        // it. The fourth state is "none", which is the graduation and the point.
-                        // (Same granularity as the difficulty tap — nobody separates heavy from very
-                        // heavy consistently, exactly as nobody separates an RPE 8 from an 8.5.)
+                        // ⛔ A NUMBER, NOT A LEVEL (D-351, 2026-08-01) — THIS REVERSES THE PARAGRAPH THAT
+                        // STOOD HERE, and the reversal turns on one word.
                         //
-                        // Stored on the existing `resistance_level` field rather than a new one: a band
-                        // on a pull-up is only ever assistance, so the exercise already disambiguates it,
-                        // and the field is already persisted end to end.
+                        // The old note argued: band colours are not standardised across manufacturers, so
+                        // record the HELP as three levels instead. The premise is true and the conclusion
+                        // does not follow. Non-standardisation is exactly why no major tracker ships a
+                        // colour→pounds table — and their answer is not a level, it is a NUMBER THE
+                        // ATHLETE TYPES. Hevy prices an assisted set at `(bodyweight − assisted weight)
+                        // × reps` off a user-entered figure; Strong is the same. A level cannot be
+                        // subtracted from a body weight without us inventing the pounds, which is the one
+                        // thing the pricing rule refuses to do — so three levels could only ever be
+                        // recorded, never counted, and a band-assisted chin-up kept scoring as if it were
+                        // unassisted (Q-233, now closed).
+                        //
+                        // ⚠️ THE INVERSION THE OLD NOTE WARNED ABOUT IS HANDLED BY THE UNIT, not by
+                        // wording: "60 lb of help" cannot be misread as a harder set the way "heavy band"
+                        // could. The label says Assist and the value is pounds of help.
+                        //
+                        // Still stored on `resistance_level` rather than a new field: a band on a pull-up
+                        // is only ever assistance, so the exercise already disambiguates it, the column is
+                        // persisted end to end, and adding a second band field would leave the app with
+                        // two vocabularies for one fact. The word-era rows keep their words and keep
+                        // pricing as bodyweight — history is deliberately not migrated (D-351).
                         if (isAssistCapableMove(exercise.name)) {
-                          const assist = set.resistance_level || 'None';
+                          // The band load in POUNDS, or null when blank / a legacy word. A word-era row
+                          // renders an empty box rather than a number it cannot mean — the athlete
+                          // retypes it as pounds the next time they log, and nothing is rewritten behind
+                          // them.
+                          const assistRaw = set.resistance_level;
+                          const assistNum = assistRaw != null && String(assistRaw).trim() !== ''
+                            && Number.isFinite(Number(assistRaw)) && Number(assistRaw) > 0
+                              ? Number(assistRaw) : null;
                           const added = typeof set.weight === 'number' && set.weight > 0 ? set.weight : null;
                           return (
                             // ⛔ BOTH DIRECTIONS ON ONE DIAL, and they are mutually exclusive by construction.
@@ -5002,24 +5123,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             // applies and leaves the other alone.
                             <>
                               <div className="flex-[4] flex flex-col items-center gap-0.5">
-                                <Select
-                                  value={assist}
+                                <button
+                                  type="button"
                                   // Mutually exclusive by construction: nobody assists AND loads the same
-                                  // set, so picking help clears the added weight and vice versa. Otherwise
-                                  // the row can record a set that did not happen.
-                                  onValueChange={(value) => updateSet(exercise.id, setIndex, { resistance_level: value, weight: 0 })}
+                                  // set, so entering help clears the added weight and vice versa (the
+                                  // clearing lives in commitKeypad). Otherwise the row can record a set
+                                  // that did not happen.
+                                  onClick={() => openKeypadForSet({
+                                    exerciseId: exercise.id, setIndex, field: 'band', title: 'Assist (lb)',
+                                    initialValue: assistNum == null ? '' : String(assistNum),
+                                    allowDecimal: true,
+                                    hint: 'Pounds of help from the band or machine. Leave blank if none.',
+                                  })}
+                                  className="relative h-9 w-full text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
+                                  style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                                 >
-                                  <SelectTrigger className="h-9 w-full text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 focus:ring-0 focus:border-white/30 focus:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
-                                    <SelectValue placeholder="Assist" />
-                                  </SelectTrigger>
-                                  <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
-                                    <SelectItem value="None" className="hover:bg-white/[0.15]">No band</SelectItem>
-                                    <SelectItem value="Light" className="hover:bg-white/[0.15]">Light help</SelectItem>
-                                    <SelectItem value="Moderate" className="hover:bg-white/[0.15]">Moderate help</SelectItem>
-                                    <SelectItem value="Heavy" className="hover:bg-white/[0.15]">Heavy help</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <span className="text-[9px] text-white/50 font-medium">Band</span>
+                                  <span>{assistNum == null ? '' : `-${assistNum}`}</span>
+                                  <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
+                                </button>
+                                <span className="text-[9px] text-white/50 font-medium">Assist (lb)</span>
                               </div>
                               <div className="flex-[4] flex flex-col items-center gap-0.5">
                                 <button
@@ -5047,23 +5169,34 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         
                         const exerciseType = getExerciseType(exercise.name);
                         
-                        // Band exercises: Show resistance dropdown
+                        // ⛔ BAND AS THE LOAD: POUNDS, NOT A LEVEL (D-351, 2026-08-01). Same reversal as
+                        // the assist field above and the same reason — a level cannot be multiplied by
+                        // reps, so four levels priced every band set at one flat token regardless of what
+                        // the athlete actually pulled against. A number prices like any weighted set.
+                        // ⚠️ Blank is allowed and keeps the token: an athlete who does not know their
+                        // band's rating still gets credit for the work, just not a measurement of it.
                         if (exerciseType === 'band') {
+                          const bandNum = set.resistance_level != null && String(set.resistance_level).trim() !== ''
+                            && Number.isFinite(Number(set.resistance_level)) && Number(set.resistance_level) > 0
+                              ? Number(set.resistance_level) : null;
                           return (
-                            <Select
-                              value={set.resistance_level || 'Light'}
-                              onValueChange={(value) => updateSet(exercise.id, setIndex, { resistance_level: value, weight: 0 })}
-                            >
-                              <SelectTrigger className="h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 flex-[4] focus:ring-0 focus:border-white/30 focus:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
-                                <SelectValue placeholder="Resistance" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
-                                <SelectItem value="Light" className="hover:bg-white/[0.15]">Light</SelectItem>
-                                <SelectItem value="Medium" className="hover:bg-white/[0.15]">Medium</SelectItem>
-                                <SelectItem value="Heavy" className="hover:bg-white/[0.15]">Heavy</SelectItem>
-                                <SelectItem value="Extra Heavy" className="hover:bg-white/[0.15]">Extra Heavy</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <div className="flex-[4] flex flex-col items-center gap-0.5">
+                              <button
+                                type="button"
+                                onClick={() => openKeypadForSet({
+                                  exerciseId: exercise.id, setIndex, field: 'band', title: 'Band (lb)',
+                                  initialValue: bandNum == null ? '' : String(bandNum),
+                                  allowDecimal: true,
+                                  hint: 'The band\'s resistance in pounds. Leave blank if you don\'t know it.',
+                                })}
+                                className="relative h-9 w-full text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
+                                style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
+                              >
+                                <span>{bandNum == null ? '' : String(bandNum)}</span>
+                                <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
+                              </button>
+                              <span className="text-[9px] text-white/50 font-medium">Band (lb)</span>
+                            </div>
                           );
                         }
                         
@@ -5332,24 +5465,28 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         return null;
                       }
                       const exerciseType = getExerciseType(exercise.name);
-                      // Band exercises - show resistance selector
+                      // D-351: the equipment strip's band control, in pounds — the same field and the
+                      // same rule as the set row above. Two controls wrote this value in words; both
+                      // now write a number, or nothing.
                       if (exerciseType === 'band') {
+                        const bandNum = set.resistance_level != null && String(set.resistance_level).trim() !== ''
+                          && Number.isFinite(Number(set.resistance_level)) && Number(set.resistance_level) > 0
+                            ? Number(set.resistance_level) : null;
                         return (
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-amber-400/80">Band</span>
-                            <Select
-                              value={set.resistance_level || 'Light'}
-                              onValueChange={(value) => updateSet(exercise.id, setIndex, { resistance_level: value, weight: 0 })}
+                            <button
+                              type="button"
+                              onClick={() => openKeypadForSet({
+                                exerciseId: exercise.id, setIndex, field: 'band', title: 'Band (lb)',
+                                initialValue: bandNum == null ? '' : String(bandNum),
+                                allowDecimal: true,
+                                hint: 'The band\'s resistance in pounds. Leave blank if you don\'t know it.',
+                              })}
+                              className="h-6 text-xs bg-transparent p-0 m-0 text-white/70 hover:text-white/90 tabular-nums"
                             >
-                              <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-white/70 hover:text-white/90 gap-1 w-auto border-none">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
-                                <SelectItem value="Light" className="hover:bg-white/[0.15]">Light</SelectItem>
-                                <SelectItem value="Medium" className="hover:bg-white/[0.15]">Medium</SelectItem>
-                                <SelectItem value="Heavy" className="hover:bg-white/[0.15]">Heavy</SelectItem>
-                              </SelectContent>
-                            </Select>
+                              {bandNum == null ? 'set lb' : `${bandNum} lb`}
+                            </button>
                           </div>
                         );
                       }
@@ -5642,6 +5779,55 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         </div>
       </div>
 
+
+      {/* D-351 — MISSED-DONE PROMPT. Fires before the save prompt when sets carry typed numbers but
+          were never ticked. Copy is fact-first: it states what is there, what will happen, and the
+          consequence — no scolding, no imperative. See `untickedTypedSets` for why this asks instead
+          of auto-ticking. */}
+      {showUntickedWarn && (() => {
+        const pending = untickedTypedSets();
+        const shown = pending.slice(0, 4);
+        return (
+          <div className="fixed inset-0 z-[210] flex items-end sm:items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowUntickedWarn(false)} />
+            <div className="relative w-full sm:w-[460px] bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-t-2xl sm:rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-4 sm:p-6 z-10" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+              <h3 className="text-lg font-semibold mb-2 text-white/90">
+                {pending.length} {pending.length === 1 ? 'set has' : 'sets have'} numbers but {pending.length === 1 ? 'is' : 'are'} not marked done
+              </h3>
+              <p className="text-sm text-white/70 leading-snug">
+                Sets that aren't marked done are saved, but they don't count toward your volume or training load.
+              </p>
+              <ul className="mt-3 space-y-1 text-sm text-white/60">
+                {shown.map((p) => (
+                  <li key={`${p.exerciseId}-${p.setIndex}`} className="tabular-nums">
+                    {p.exerciseName} · set {p.setIndex + 1}
+                  </li>
+                ))}
+                {pending.length > shown.length && (
+                  <li className="text-white/40">and {pending.length - shown.length} more</li>
+                )}
+              </ul>
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowUntickedWarn(false); setShowSessionRPE(true); }}
+                  className="text-sm text-white/60 hover:text-white/80 px-2 py-1.5"
+                >
+                  Save without them
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { markUntickedComplete(); setShowUntickedWarn(false); setShowSessionRPE(true); }}
+                  className={`text-sm text-white ${themeColors.hoverText} rounded-full px-3 py-1.5 bg-white/[0.12] border-2 border-white/35 hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300`}
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  Mark {pending.length === 1 ? 'it' : 'them'} done
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Notes Modal */}
       {showNotesModal && (

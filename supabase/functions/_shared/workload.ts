@@ -319,18 +319,68 @@ export type StrengthVolumeOpts = {
  *   3. No weight, reps logged, a band on a movement where the band IS the resistance → flat token.
  *   4. Anything else → 0.
  *
- * ⚠️ ASSISTANCE IS NOT MODELLED, DELIBERATELY. A band-assisted chin-up counts as full bodyweight,
- * because the assistance cancels an unknown fraction of it and inventing that fraction would be a
- * fabricated number dressed as a measured one. It over-counts, and it over-counts far less than
- * zero under-counted. The same applies the other way: Strong counts a bodyweight exercise as full
- * body weight, while the biomechanics say a push-up is nearer two-thirds. One rule, stated, in the
- * direction the field already leans.
+ * ⛔ ASSISTANCE IS NOW MODELLED, FROM A NUMBER THE ATHLETE ENTERED (D-351, 2026-08-01).
+ * **This REVERSES the paragraph that stood here and Q-233's second imprecision.** The old rule
+ * counted a band-assisted chin-up as FULL bodyweight, reasoning that the band cancels an unknown
+ * fraction and inventing it would be fabrication. That reasoning was sound about *inventing* a
+ * number and wrong about the alternative: the field does not guess either — **it asks.** Hevy's
+ * assisted formula is literally `(bodyweight − assisted weight) × reps`, with the assist weight
+ * typed by the user; Strong is the same. No major tracker maps a band colour or a light/medium/heavy
+ * level to pounds, because no such table exists across manufacturers. So the honest fix was never a
+ * level→pounds guess — it was a numeric field. A number the athlete recorded is measurement; a
+ * number we derived from the word "Heavy" would have been the fabrication.
+ *
+ * ⚠️ AND THE WORD-ERA SETS STILL PRICE THE OLD WAY, BY DESIGN. `resistance_level` held
+ * "Light"/"Moderate"/"Heavy" before today and holds a pounds NUMBER after it. There is no migration
+ * and none is wanted (Michael: one week of data, one user, no trend to break) — so this function is
+ * the single place that reads both encodings, and an unparseable value means exactly what it always
+ * meant. **This is a deliberate, scoped exception to the "re-price history or the trend lies" rule
+ * that D-348 established; see D-351 before reopening it.**
+ *
+ * The rule, in order:
+ *   1. External weight on the bar → weight × reps. UNCHANGED, and it is most sets.
+ *   2. Assist-capable move (chin-up/pull-up/dip) → (bodyweight − assist) × reps when a number was
+ *      entered, floored so a heavily-assisted set never prices at or below zero; full bodyweight
+ *      when it was not.
+ *   3. Add-resistance band → band lb × reps when a number was entered; the flat token when not.
+ *   4. No weight, reps logged, body weight known → bodyweight × reps.
+ *   5. Anything else → 0.
  *
  * ⚠️ A DURATION-ONLY SET STILL SCORES 0 — a plank has no reps for this to multiply. Known and left
  * (2026-08-01); scoring isometric time needs its own basis, not a fudge inside this one.
+ *
+ * ⚠️ NOT CHANGED HERE, AND IT IS NOW ASYMMETRIC: a LOADED chin-up prices `added × reps`, not
+ * `(bodyweight + added) × reps`. The field says it should be the latter, and after this change
+ * assistance subtracts from body weight while added weight does not add to it — so a +25 lb chin-up
+ * prices below a bodyweight one. Left deliberately: rule 1 governs every weighted set in the app,
+ * including every barbell lift, and changing it is a far wider blast radius than this pass. Filed.
  */
+
+/**
+ * The floor on an assisted set's effective load, in lb. A band that cancels nearly all of an
+ * athlete's body weight still leaves a set that was performed, so it may not price at zero — but the
+ * remainder is not measurable either. Same philosophy as `BAND_SET_VOLUME_TOKEN`: visible, and far
+ * too small to move a verdict.
+ */
+export const MIN_ASSISTED_EFFECTIVE_LB = 5;
+
+/**
+ * The band as the athlete recorded it, in POUNDS — or null when they recorded a word, "none", or
+ * nothing. ⛔ THE ONE PLACE THAT READS BOTH ENCODINGS. `Number('Heavy')` is NaN and `Number('')` is
+ * 0, and both must come back null rather than a load of zero, or every word-era set silently
+ * reprices to nothing — which is the migration this change explicitly refuses to do.
+ */
+export function bandLoadLb(raw: unknown): number | null {
+  if (typeof raw === 'number') return Number.isFinite(raw) && raw > 0 ? raw : null;
+  if (typeof raw !== 'string') return null;
+  const s = raw.trim();
+  if (!s || s.toLowerCase() === 'none') return null;
+  const n = Number(s);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export function strengthSetVolume(
-  set: { weight?: number | string | null; reps?: number | string | null; resistance_level?: string | null },
+  set: { weight?: number | string | null; reps?: number | string | null; resistance_level?: string | number | null },
   opts: StrengthVolumeOpts = {},
 ): number {
   const reps = Number(set?.reps) || 0;
@@ -340,11 +390,20 @@ export function strengthSetVolume(
   if (weight > 0) return weight * reps;
 
   const bw = Number(opts.bodyweightLb) || 0;
-  const banded = typeof set?.resistance_level === 'string' && set.resistance_level.trim() !== ''
-    && set.resistance_level.trim().toLowerCase() !== 'none';
+  const rl = set?.resistance_level;
+  const banded = rl != null && String(rl).trim() !== '' && String(rl).trim().toLowerCase() !== 'none';
+  const bandLb = bandLoadLb(rl);
 
   // A band on a pull-up/chin-up/dip is HELP, not the load — the body is still what moved.
-  if (banded && !opts.bandIsAssistance) return BAND_SET_VOLUME_TOKEN;
+  if (opts.bandIsAssistance) {
+    // ⛔ NO BODY WEIGHT, NO SUBTRACTION AND NO GUESS. Hevy computes no volume at all for an assisted
+    // set without a recorded body weight, for the same reason: there is nothing to subtract FROM.
+    if (bw <= 0) return 0;
+    if (bandLb == null) return bw * reps; // a word, or no band recorded → unchanged
+    return Math.max(MIN_ASSISTED_EFFECTIVE_LB, bw - bandLb) * reps;
+  }
+
+  if (banded) return bandLb != null ? bandLb * reps : BAND_SET_VOLUME_TOKEN;
 
   return bw > 0 ? bw * reps : 0;
 }
