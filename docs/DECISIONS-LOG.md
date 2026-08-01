@@ -2637,6 +2637,52 @@ rather than guessed into it — the same failure direction the gate already chos
 
 ---
 
+## D-356 — A SHOWN NUMBER ALWAYS SHOWS ITS UNCERTAINTY: the run efficiency row gets plain words, a whole percent, and its CI (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
+
+**Three rules, and the third is the one that generalises:**
+1. **Lead with the direction in plain language.** *"Slower at the same effort"*, not a trend word.
+   Efficiency is speed per heartbeat, so the phrase says what the number means to a runner.
+2. **Round the headline magnitude to a whole percent.** A tenth of a percent on a regression slope
+   across three months is false precision.
+3. ⛔ **Always pair a shown number with its cached confidence interval.** Every state that renders a
+   number renders its uncertainty. **No exceptions** — that is the rule that makes the rest trustworthy.
+
+### ⚠️ THIS PARTLY REVERSES A DECISION THAT WAS NEVER WRITTEN DOWN
+
+Earlier the same day, the fitness rows were stripped of verdict words entirely — *"arrow + number, no
+word"*, applied to run and bike, with the down arrow recoloured from amber to neutral. **That call
+lives only in commit `6e6faf6a`.** It was never given a D-entry, which is the exact failure the
+overnight audit had just finished cataloguing (see [D-270]). Recording it here so the sequence is
+legible:
+
+- **REVERSED for the run row:** the words are back, as plain phrases rather than trend jargon.
+- **STILL STANDS:** the down arrow is **neutral, not amber** — a decline here is a direction, and heat
+  or a base block routinely cause it.
+- **STILL STANDS for the BIKE**, deliberately. Bike remains wordless **until it has a confidence
+  interval of its own**, which it does not. That is why the words went into a NEW `RUN_EFF_WORDS` map
+  rather than into the shared `NUMERIC` — adding them there would have silently changed the bike row.
+
+### The overrule, and it is the sharp part
+
+The first build left the range OFF the `sliding + recentlyFlat` state, keeping only *"dropped earlier,
+steady recently"*. **Michael overruled it, and the reasoning is the useful record:** that state renders
+a **flat arrow** beside a precise-looking −15%, which makes a **net figure over the whole window** look
+settled and certain when its recent half is flat. **It was the worst state to drop the range on, not
+the safest** — the false precision this change existed to kill, quietly reappearing on the one state
+that reads most confident.
+
+### The load-bearing verification
+
+**The range brackets the number actually shown**, which was the only way this could have quietly lied.
+`assemble.ts:391` sets `pctChange: runRoute.pct`; `heat-adjust.ts:203` documents `ci` as the 95% CI **of
+that same pct**. Same figure, not a sibling estimate. ⚠️ `ci` is **null** on the `linear_k` fallback and
+on the non-route path — those states show **no range rather than a fabricated one**.
+
+**Display only.** No computation moved; `eff.pctChange` stays raw on the object and rounding happens at
+the render call (`verdictSignedPct` gained an opt-in `dp`, so swim, rest and bike keep their decimal).
+The CI was already computed and already cached — and in fact was **already on screen**, phrased as a
+footnote. This makes it the confidence statement it always was.
+
 ## D-355 — THE CLIENT CACHE FLOOR MUST TRACK THE SERVER VERSION, OR DEPLOYS SILENTLY DO NOT LAND (2026-08-01, **PUSHED + DEPLOYED**)
 
 **Michael, on a screen that had not changed after a correct deploy:** *"still see heart rate response."*

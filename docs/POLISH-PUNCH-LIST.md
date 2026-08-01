@@ -21,8 +21,15 @@ written by Claude, and a verdict word was invented and shipped earlier today, so
 - [ ] **The persistence line probably will NOT show**, and that is correct: it needs 4 of your last 6
       sessions above your own normal. If it does show, it reads *"Soreness above your normal on 4 of
       your last 6 sessions. Adjust ›"* and tapping opens the **Adjust** tab.
-- [ ] **RUN row unchanged** — efficiency arrow + number, and `pace ~12:49/mi at 134 bpm` still there.
-      Heart rate stays with run.
+- [ ] **RUN row now reads in plain language** ([D-356]): *"↓ Slower at the same effort −15%"* — a
+      phrase, and a WHOLE percent (no tenths). `pace ~12:49/mi at 134 bpm` still there; heart rate
+      stays with run.
+- [ ] **Tap the ⓘ on the run row** → *"About 15% less speed per heartbeat over 13 weeks (range −24%
+      to −6%). Heat, fatigue, or a base block can all cause this."* ⚠️ **The range is the thing to
+      check** — it should appear on EVERY state that shows a number, including the flat-arrow
+      "Slower, now holding" one. If a number ever appears without a range, that is the bug.
+- [ ] **BIKE row is deliberately unchanged** — still wordless (arrow + number), because it has no
+      confidence interval yet. Not an oversight.
 
 **MEASURED, NOT SEEN:**
 - [ ] The first open after this deploy may take one extra beat while the cached payload refreshes.

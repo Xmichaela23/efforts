@@ -63,6 +63,12 @@ the row that got deleted. **Do not clean it up as dead code**; it is a rule wait
 **The docs were reconciled against code overnight** — 189 stale claims corrected, 36 docs archived,
 `D-270` finally written. Report: `docs/AUDIT-docs-vs-code-2026-07-31.md`. Corrections tagged `⟨A31⟩`.
 
+**The run efficiency row reads in plain language ([D-356]).** Words back (`RUN_EFF_WORDS` — a NEW map;
+`NUMERIC` stays wordless for the bike, which has no CI yet), whole-percent headline, and the cached
+`route.ci` rendered beside every number. **The rule to carry forward: a shown number always shows its
+uncertainty, no exceptions.** ⚠️ It partly reverses the morning's "arrow + number, no word" call,
+which had never been written down — D-356 records both.
+
 ### STILL UNVERIFIED — what would settle it
 
 - **⛔ NOTHING FROM TODAY HAS BEEN SEEN ON A DEVICE.** Every string in the new BODY row was written by
