@@ -60,7 +60,7 @@ import { protocolExpectsE1rmToDip } from '../_shared/insights/strength-protocol-
 import { buildReadinessWhy, buildCrossTrainingReceipt, crossTrainingStressReceipt, bodyRpeDriver } from '../_shared/response-model/readiness-receipts.ts';
 import { buildLoadedLegsDiagnosis, classifyFatigueLabel, type LoadedLegsDiagnosis } from '../_shared/response-model/loaded-legs.ts';
 import { detectNovelMovements, novelMovementsNames, type SessionMovement } from '../_shared/novel-movements.ts';
-import { classifyStrengthFocus } from '../_shared/cross-domain-carryover.ts';
+import { classifyStrengthFocus, resolveCurrentSoreness } from '../_shared/cross-domain-carryover.ts';
 import { buildStrengthSessionTypes7d } from '../_shared/strength-session-types.ts';
 import { buildSwimSessions7d } from '../_shared/swim-sessions.ts';
 import { runGuardedNarrative, type NarrativeContext, type DisciplineVerdict } from '../_shared/narrative-core/index.ts';
@@ -1797,6 +1797,10 @@ Deno.serve(async (req) => {
     const normExecution: number[] = [];
     const normDrift: number[] = [];
     const normRpe: number[] = [];
+    // BODY row (D-354): post-session soreness, collected in the SAME 28d pass as the RPE norms so the
+    // two halves of the row can never describe different windows. Read as ENTRIES, not an average —
+    // `resolveCurrentSoreness` needs timestamps to separate the recent window from the baseline.
+    const sorenessEntries: Array<{ workoutId: string; startTime: string; soreness: number }> = [];
     const normRir: number[] = [];
     for (const w of Array.isArray(normWorkouts) ? normWorkouts : []) {
       if (String((w as any)?.workout_status || '').toLowerCase() !== 'completed') continue;
@@ -1817,6 +1821,19 @@ Deno.serve(async (req) => {
       // session RPE
       const srpe = sessionRpeFromWorkout(w as any);
       if (srpe != null) normRpe.push(srpe);
+
+      // post-session soreness (workout_metadata.readiness.soreness, Hooper 1–7 per D-234/D-235)
+      {
+        const meta: any = parseJson((w as any)?.workout_metadata) || {};
+        const s = Number(meta?.readiness?.soreness);
+        if (Number.isFinite(s)) {
+          sorenessEntries.push({
+            workoutId: String((w as any)?.id ?? ''),
+            startTime: String((w as any)?.timestamp || ((w as any)?.date + 'T12:00:00Z')),
+            soreness: s,
+          });
+        }
+      }
 
       // strength RIR
       if (String((w as any)?.type || '').toLowerCase() === 'strength') {
@@ -2497,6 +2514,43 @@ Deno.serve(async (req) => {
     //
     // Within-session fading (decoupling) is a RUN signal, not a body signal — it is sport-specific and
     // confounded by heat, hills and hydration — and it already renders on the RUN row.
+
+    // ── BODY IS WHAT YOU LOGGED (D-354, Michael 2026-08-01) ──────────────────────────────────────
+    //
+    // Michael: *"body is simply how you've been reporting."* The section is now ONE row carrying the
+    // two things the athlete actually reports — effort and soreness — and nothing measured.
+    //
+    // ⛔ THE COVERAGE CLAUSE IS PROVENANCE, NOT A NUDGE. *"If we are clear that these numbers are the
+    // accumulation of what's logged, that will encourage people."* So it states what it counted and
+    // stops — no imperative, same grammar as "over 12wk · 25 runs" under the run row. The known
+    // weakness of subjective monitoring is compliance, and the post-session prompt does NOT force an
+    // answer (a skip writes nothing), so partial coverage is the normal case, not an error state.
+    //
+    // ⚠️ SORENESS IS AGAINST THE ATHLETE'S OWN BASELINE, never a population norm — a 3 means different
+    // things to different people. Silent until 5 prior entries exist: "normal" off two data points is
+    // a claim, not a reading.
+    {
+      const rpeRow = weeklyResponseModel.visible_signals.find((s: any) => s.label === 'How hard it feels');
+      if (rpeRow) {
+        const sore = resolveCurrentSoreness(sorenessEntries, { asOf: asOfDate });
+        rpeRow.label = "What you've logged";
+        const clauses: string[] = [];
+        // The RPE half keeps its verdict sentence; only the SCALE is added, so "3.6" stops being a
+        // number with no denominator (Michael: "and the range").
+        if (rpeRow.detail) clauses.push(String(rpeRow.detail).replace(/ avg /, ' of 10 avg '));
+        if (sore.level && sore.recent != null) {
+          clauses.push(sore.level === 'elevated'
+            ? `Soreness above your normal: ${sore.recent.toFixed(1)} of 7.`
+            : `Soreness normal for you: ${sore.recent.toFixed(1)} of 7.`);
+        } else if (sore.logged > 0 && !sore.baselineOk) {
+          // NO SILENT DROP — say what it needs, never what to do.
+          clauses.push(`Soreness needs 5 logged sessions to read a normal; ${sore.logged} so far.`);
+        }
+        const rated = (rpeRow as any).samples ?? null;
+        if (rated != null) clauses.push(`Logged on ${rated} session${rated === 1 ? '' : 's'}.`);
+        rpeRow.detail = clauses.join(' ');
+      }
+    }
 
     // ── D-267/D-268: plan-primary discipline + WTD strength adherence — resolved ONCE here (single
     // source, D-264) and read by every consumer below: the load reconciler, the off-plan banner, and
