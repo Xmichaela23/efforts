@@ -69,8 +69,8 @@ logger, because that is where the remaining lies were being written.
 ### YOUR JOB — pick one, both are named and specced
 
 1. **⛔ WIRE `verdictFrom95Set`.** It and `applyVerdict` are written, correct, and **called by
-   nothing** (`wendler-531.ts:160-200`); the composer advances the working number by cycle index
-   unconditionally (`workingNumberForCycle:112`). Until it lands, **`STRENGTH_ADVANCE_COPY` and the
+   WIRED via `loading/cycle-verdicts.ts:116` (`verdictFrom95Set` is at `wendler-531.ts:454`, `applyVerdict` at `:467`) ⟨A31⟩; the composer advances the working number by cycle index
+   only on the forecast path where `unknownMeans: 'advance'` (`workingNumberForCycle` is at `wendler-531.ts:210`; the composer passes `args.cycleVerdicts` at `strength-primary-plan.ts:1276`) ⟨A31⟩. Until it lands, **`STRENGTH_ADVANCE_COPY` and the
    `validity_set` bar-speed line must stay unrendered** — the copy is written and gated at the call
    site, which tells you exactly where to pass the flag. This is the largest remaining starved engine.
 2. **The punch list's NEXT UP** — the cross-training partial-week compare, and the run narrative
@@ -136,39 +136,60 @@ logger, because that is where the remaining lies were being written.
 > `create-goal` fetches them on a rebuild. It had zero suppliers when this section was written, which
 > was the whole point of the finding. See the banner for what proves it fired.
 
-- **D-325 — Session Cost Ledger + Penalty Scheduler** (`DECISIONS-LOG.md:1260`). Three ordinal axes 0–3,
+- **D-325 — Session Cost Ledger + Penalty Scheduler** (`DECISIONS-LOG.md:1267`) ⟨A31⟩. Three ordinal axes 0–3,
   ceilings from emphasis, placement by penalty score, **breach states cost and never refuses**, ledger
   **subordinate** to the reconciler. ⚠️ **Arrived labelled D-268 — that number was taken since 2026-07-09.**
   ⚠️ **Q-205: two of the three ceiling sets are UNVALIDATED** — assume wrong until summed against their
   own default weeks, the way `strength_led`'s mech ceiling had to move 12 → 14 the moment it was checked.
 - **D-326 — per-set difficulty.** ⛔ **Its three-failure table is the thing to read.** Layer 1 (the tap) is
-  built. **Layer 2 — `verdictFrom95Set` wired — and layer 3 — provenance rendered — are NOT.** *Shipping
+  built. **Layer 2 — `verdictFrom95Set` wired — is BUILT (`loading/cycle-verdicts.ts:116` → `strength-primary-plan.ts:1275`); layer 3 — provenance rendered — is NOT.** ⟨A31⟩ *Shipping
   the tap does not close the blindness*, and that misreading is the most likely thing to happen next.
 
 ---
 
-## ⚠️ THE FINDING THAT MATTERS MOST — the strength gauge is near-blind for 8 of 12 weeks
+## ⚠️ THE FINDING THAT MATTERED MOST — the strength gauge's blindness, and how much of it is left
 
-> ⚠️ **STILL TRUE, AND NOW HALF-ADDRESSED (2026-07-27).** The AMRAP is still weeks 9–11 only, so the
-> gauge is still blind for eight of twelve. What changed is that the engine no longer ADVANCES through
-> that blindness: the training max holds without evidence rather than climbing on the calendar, and it
-> can never exceed the 1RM it came from. The gauge is as blind as it was; the bar no longer moves on
-> nothing. See the banner, §THE LAW CHANGED.
+> ⛔ **RE-TRACED AGAINST CODE 2026-07-31 (doc audit). THIS SECTION WAS WRONG IN TWO WAYS AND IS NOW
+> CORRECTED. Everything below has been checked; read the two corrections before acting on it.** ⟨A31⟩
+>
+> **1. "8 of 12 weeks" is CONDITIONAL, not a constant.** It assumes a leader/leader/anchor block.
+> `leaderCount` (`wendler-531.ts:291`) returns **0 leaders** for a continuity-`continuous`,
+> posture-`develop`, sub-16-week block with no `highAerobicLoad` — every cycle is then an ANCHOR, so
+> the AMRAP fires in **9 of 12 weeks**, not 3. "8 of 12 blind" holds for the `unknown` / `detrained`
+> tiers (a first block), and for any ≥16-week or maintain-posture block. Live block shape is built at
+> `generate-strength-plan/index.ts:121`.
+>
+> **2. The verdict gate is WIRED. It was not, when this was written.** `verdictFrom95Set` is called at
+> `loading/cycle-verdicts.ts:116`, feeding `workingNumberForCycles` (`wendler-531.ts:519`), read live by
+> the composer at `strength-primary-plan.ts:1275` and by `rematerialize-strength-block/index.ts:167`,
+> which the client invokes on every logger save (`StrengthLogger.tsx:4022`, `:6053`). **That is D-341
+> (2026-07-30), which closed Q-223 and Q-226.** The bar no longer climbs on the calendar alone.
 
-Found by tracing, not guessing, and **nothing in the app says it:**
+Found by tracing, not guessing:
 
 - **AMRAPs exist only in the anchor cycle** — `wendler-531.ts:61`,
-  `amrap: kind === 'anchor' && !isDeload && i === 2`. In a 12-week block that is **weeks 9, 10, 11.**
-- **And a leader-week e1RM is the plan quoting itself.** `brzycki1RM` is `effectiveReps = reps + rir`
-  (`compute-facts:124`); with RIR scoped off by D-324, doing the prescribed 5 reps at the prescribed weight
-  yields `weight × 1.125` — **a pure function of the prescription.** It climbs every cycle because the plan
-  raises the bar. It carries athlete information **only on a miss.**
-- **`verdictFrom95Set` / `applyVerdict` are written, correct, and CALLED BY NOTHING**
-  (`wendler-531.ts:160-200`). Wendler's own rule — five reps at 95% or the number drops 10% — with week 3
-  of every cycle already being the 95% set. **The composer advances by cycle index, unconditionally**
-  (`workingNumberForCycle:112`). Wiring it is what stops the gauge grading its own homework.
-- **The missed-reps half already exists** — Q-193, the stall, `coach/index.ts:3903+`. Counts only sets at
+  `amrap: kind === 'anchor' && !isDeload && i === 2`. ✅ **Line ref re-verified exact, 2026-07-31.**
+  How many weeks that blinds depends on how many cycles are anchors — see correction 1 above.
+- **And a leader-week e1RM is the plan quoting itself.** The estimator is `estimated1RM`
+  (`compute-facts/index.ts:141`) — ⚠️ **no longer Brzycki; D-339 moved it to Wendler/Epley**
+  (`src/lib/estimate-1rm.ts:56`). With RIR scoped off by D-324, doing the prescribed 5 reps at the
+  prescribed weight yields **`weight × 1.167`** (was ×1.125 under Brzycki) — still **a pure function of
+  the prescription.** It carries athlete information **only on a miss.** ⟨A31⟩
+- **`verdictFrom95Set` / `applyVerdict` are written, correct, and NOW CALLED** — `wendler-531.ts:454`
+  and `:467`, via `loading/cycle-verdicts.ts:116`. Wendler's own rule — ⚠️ **and the threshold moved:**
+  `VALIDITY_CHECK_MIN_REPS` is **1**, not 5 (`wendler-531.ts:368`, "the prescribed `95% × 1+`, p23").
+  `null`→`hold`, `0`→`reset`, `1`–`8`→`advance`, `>8`→`advance_untrusted`. ⟨A31⟩
+- **`workingNumberForCycle` (`wendler-531.ts:210`) still advances by bare cycle index — but only on the
+  FORECAST path**, where the composer deliberately passes `unknownMeans: 'advance'` because no verdict
+  can exist for a week that has not happened (`strength-primary-plan.ts:1281-1285`). On every path that
+  reads logged work, the verdicts govern. ⟨A31⟩
+- **The missed-reps half already exists** — Q-193, the stall, `coach/index.ts:3975+` ⟨A31⟩. Counts only sets at
   or above prescribed load; a zero-rep set is "not performed", not a failure. **Do not rebuild it.**
+- ⚠️ **WHAT IS STILL OPEN:** layer 3 (provenance rendered to the athlete) is NOT built, and
+  `src/lib/strength-focus-copy.ts:324` still carries a `⛔ GATED ON verdictFrom95Set BEING WIRED` block
+  whose stated precondition is now met — that gate and its neighbouring comments at `:260-262` still
+  cite the old `wendler-531.ts:160-200` / `workingNumberForCycle:112` line refs. **Code comments, left
+  untouched by this docs-only audit — see the report.** ⟨A31⟩
 
 ---
 
@@ -224,9 +245,9 @@ exists.** A knowingly-taken debt; a test asserts the line is present to keep it 
 >
 > ### WHAT SHIPPED THIS SESSION — do NOT re-litigate (DEPLOYED + DEVICE-VERIFIED on Michael's WK3 screen):
 > - **D-317 — LOAD is multi-sport.** `body-response.ts` computed `load_status` from a **run-only** block (`running_acwr>1.3 → high`) → a strength week with a bunched maintenance run read "pull back". Now `computeTotalLoadStatus(totalAcwr, totalPct, phase)` (`body-response.ts:40`) reads TOTAL load, phase-aware, descriptive; goal-cost stays in the coach's eye. Necessary but not sufficient →
-> - **D-318 — STRAIN is multi-sport.** The **reconciler** (`load-status-reconcile.ts`, THE LAW, applied `coach/index.ts:3564`) re-escalated off run-brain strain: it counted **"RIR declining"** as strain (in a strength block that's the INTENT — a *systematic* false "a bit high" for any progressing strength athlete) and **"HR drift declining"** even when the absorption engine had excluded drift. `computeDecliningSignals(bodyTrends, opts{planPrimary,driftUsable})` drops both; threaded into escalation **and** safety floor; the absorption ledger is neutralized for strength-primary so `corroborated_strain` can't stay true off the same RIR signal. Result: WK3 → **"balanced" · ACWR 1.2** (was "pull back").
+> - **D-318 — STRAIN is multi-sport.** The **reconciler** (`load-status-reconcile.ts`, THE LAW, applied `coach/index.ts:3625` ⟨A31⟩) re-escalated off run-brain strain: it counted **"RIR declining"** as strain (in a strength block that's the INTENT — a *systematic* false "a bit high" for any progressing strength athlete) and **"HR drift declining"** even when the absorption engine had excluded drift. `computeDecliningSignals(bodyTrends, opts{planPrimary,driftUsable})` drops both; threaded into escalation **and** safety floor; the absorption ledger is neutralized for strength-primary so `corroborated_strain` can't stay true off the same RIR signal. Result: WK3 → **"balanced" · ACWR 1.2** (was "pull back").
 > - **v144 copy** — BODY HR-response "settling — HR easing…" → "settling — **lower HR** at the same effort" (killed the "easing" clash with the efficiency word "easing off").
-> - **Cache-floor trap (the "not budging" cause):** `COACH_CLIENT_MIN_PAYLOAD_VERSION` (`coach-contract.ts`) had drifted to **35** while the server was at 142 → the client served stale "pull back" rows. Now pinned WITH `COACH_PAYLOAD_VERSION` (144), "bump both" comment. **Deploy note:** `coach` is the ONLY importer of the touched shared files — no `_shared` fan-out.
+> - **Cache-floor trap (the "not budging" cause):** `COACH_CLIENT_MIN_PAYLOAD_VERSION` (`coach-contract.ts`) had drifted to **35** while the server was at 142 → the client served stale "pull back" rows. Now pinned WITH `COACH_PAYLOAD_VERSION` (144), "bump both" comment. ⚠️ **THEY HAVE DRIFTED AGAIN (re-verified 2026-07-31): server `COACH_PAYLOAD_VERSION = 155` (`coach/index.ts:137`) vs client `COACH_CLIENT_MIN_PAYLOAD_VERSION = 144` (`src/lib/coach-contract.ts:5`). The client value is a FLOOR, not an equality, so this is not necessarily the same bug — but the "bump both" habit the entry describes is not being kept.** ⟨A31⟩ **Deploy note:** `coach` is the ONLY importer of the touched shared files — no `_shared` fan-out.
 > - Tests: 4 new permanent regressions in `load-status-reconcile.test.ts` (incl. the "Michael WK3" bug case); +6 `computeTotalLoadStatus` in `body-response.test.ts`; all 60 prior pass.
 >
 > ### ⛔ STILL UNVERIFIED (carried from 2026-07-23, NOT closed this session — the session pivoted to the load bug before the strength-track client UI was device-seen):
@@ -300,7 +321,7 @@ exists.** A knowingly-taken debt; a test asserts the line is present to keep it 
 >
 > ### ⚠️ UNVERIFIED / WATCH:
 > - Cross-training discipline color needed the coach cache to re-source (v141) — confirm the line renders **gold** (run), not white, on device after a refresh.
-> - `bikeEfficiencyDisplay` (`bike-fitness.ts:103`) still tones holding=`warning`; the FITNESS bike verdict renders via the **client** VERDICT map (now gray), so it's fine there — but if bike "holding" shows amber on any *other* surface, that's the server path.
+> - `bikeEfficiencyDisplay` (`bike-fitness.ts:100`) ⟨A31⟩ still tones holding=`warning`; the FITNESS bike verdict renders via the **client** VERDICT map (now gray), so it's fine there — but if bike "holding" shows amber on any *other* surface, that's the server path.
 > - Chart data-depth is athlete-specific: Michael has ~12wk run efficiency (14 pts) but only ~5wk strength e1RM/lift. The "building" state handles this honestly.
 > - Two throwaway diagnostic scripts left on disk (`scripts/_trigger-snapshot.mjs`, `_check-run-pace.mjs`, `_chart-data-depth.mjs`) — read `.env` service key, no secrets in them; delete when convenient.
 >
@@ -326,25 +347,25 @@ exists.** A knowingly-taken debt; a test asserts the line is present to keep it 
 > ### ⚠️ DESIGN DECISION OWED (Michael, not you): **the paragraph is absent every Monday** and fills in as the week goes, because it reads calendar-week-to-date. Honest, possibly too quiet. Decide before "fixing" it.
 >
 > ### JOB #2 — THE ENDURANCE READ IS THE LAST DUMB HALF, and it should NOT be built.
-> `coach-week-insights.ts:~231` judges every endurance discipline by `acwr < 0.8`, full stop. **`getBlockAdaptation` already does this far better and the coach ALREADY CALLS IT at `coach/index.ts:2520`** — then keeps three raw percentages at `:2521` and throws away `adaptation_score`, `focus` and `drivers`. That score is focus-weighted, and its hybrid branch is a graded concurrent-training read ("don't rob Peter to pay Paul": strength −3% → ×0.75 coefficient, −10% → ×0.20; strength holding + aerobic improving → ×1.12 bonus) — where `compute-snapshot` has a binary interference flag off two diverging arrows (Q-191). ⚠️ It is called with **no focus**, and `deriveFocusFromCounts` can only return `hybrid`/`unknown`, so the `base`/`marathon_prep` weightings have **never run**. Wire the score + focus + drivers; delete the ratio.
+> `coach-week-insights.ts:~231` judges every endurance discipline by `acwr < 0.8`, full stop. **`getBlockAdaptation` already does this far better and the coach ALREADY CALLS IT at `coach/index.ts:2619` ⟨A31⟩** — then keeps three raw percentages at `:2521` and throws away `adaptation_score`, `focus` and `drivers`. That score is focus-weighted, and its hybrid branch is a graded concurrent-training read ("don't rob Peter to pay Paul": strength −3% → ×0.75 coefficient, −10% → ×0.20; strength holding + aerobic improving → ×1.12 bonus) — where `compute-snapshot` has a binary interference flag off two diverging arrows (Q-191). ⚠️ It is called with **no focus**, and `deriveFocusFromCounts` can only return `hybrid`/`unknown`, so the `base`/`marathon_prep` weightings have **never run**. Wire the score + focus + drivers; delete the ratio.
 >
 > ### JOB #3 — the last two LLM lines: `coaching.headline` and `next_session_guidance`. Then State computes end to end, and only then does the CLEANUP SWEEP unblock (`narrative-core` stays alive until the headline goes). Fold Q-194's SHARED voice enforcer in here.
 >
 > ### 👀 TWO THINGS SEEN ON THE Wk-3 SCREEN, NEITHER TRACED — leads, not findings:
-> - **The upkeep line reads "Running's at about 6 of your 18-mile upkeep" on a `Get stronger` plan.** If run posture is `maintain`, that is flagging a shortfall against a target the plan deliberately deprioritises — the Q-179 shape, on a DIFFERENT code path (`upkeepCandidate`, `week-accent.ts:233-279`) from the posture work. Trace before touching; it may be correct (6 of 18 is a real gap against a declared upkeep).
+> - **The upkeep line reads "Running's at about 6 of your 18-mile upkeep" on a `Get stronger` plan.** If run posture is `maintain`, that is flagging a shortfall against a target the plan deliberately deprioritises — the Q-179 shape, on a DIFFERENT code path (`upkeepCandidate`, `week-accent.ts:263+` ⟨A31⟩) from the posture work. Trace before touching; it may be correct (6 of 18 is a real gap against a declared upkeep).
 > - **Run durability anchor reads "auto · steady run · May 20"** on a 20 Jul screen. Inside the 12-week range so probably intended, but confirm it is not stale.
 >
 > ### WHAT SHIPPED TONIGHT — do NOT re-litigate:
 > - **D-306 + AMENDMENT** — the composer, the protocol layer (`strength-protocol-read.ts`), the stall signal, the calendar-week fix, the deleted mix sentence, the scoped all-clear. 30 deno tests.
 > - **`intent_summary` → position only** (v121 built a synopsis; v122 deleted it — `buildLoadHeadline` already renders one on the next line).
-> - **Q-189…Q-196 filed.** Q-196 was **filed wrong and corrected in place** — the LOAD row renders the RECONCILED verdict correctly (`LoadBar.tsx:71`); I asserted the client's behaviour from the server's code without opening the client.
+> - **Q-189…Q-196 filed.** Q-196 was **filed wrong and corrected in place** — the LOAD row renders the RECONCILED verdict correctly (`LoadBar.tsx:73`) ⟨A31⟩; I asserted the client's behaviour from the server's code without opening the client.
 > - `SCIENCE-concurrent-training-interference.md` has a 2026-07-19 addendum (Schumann 2022 contests §2/§3; adds the reverse direction + the measurement ceiling).
 >
 > ### ⚠️ STILL TRUE, DO NOT OVERSTATE:
 > - The composer is **fixture-verified (30 tests) and only partly device-verified.** Green tests proved the code did what it was told; **every real defect this session was found by looking at the rendered screen.** Render it and read it, next to whatever else that screen already says.
 > - The **stall code has never fired** — needs a session with missed reps at the prescribed load.
 > - **Protocol readings cover 5 of 7**; `triathlon` / `triathlon_performance` return null BY CHOICE (untraced intent), not by oversight.
-> - A **stale raw-ACWR `label`** survives at `coach/index.ts:5464` with `back off`/`rest now` — a ratio prescribing alone (the D-281 bug Q-166 reverted). No client consumer found. **Trace every consumer, then delete — do not reword in place.**
+> - A **stale raw-ACWR `label`** survives at `coach/index.ts:5593` ⟨A31⟩ with `back off`/`rest now` — a ratio prescribing alone (the D-281 bug Q-166 reverted). No client consumer found. **Trace every consumer, then delete — do not reword in place.**
 
 ---
 
@@ -504,7 +525,7 @@ exists.** A knowingly-taken debt; a test asserts the line is present to keep it 
 > - **`learn-fitness-profile`'s easy gate (`hr <= maxHR * 0.75`) excluded 0-of-22 runs** in its own 90d window → `run_easy_pace_sec_per_km` null forever → **the D-033 pace reconciler had NEVER RUN.** Fixed: threshold-anchored band (Friel Z2 ≤89% LTHR; %max 65-80% bootstrap). Proven: 0/22 → **5/22 qualify, learns 11:08/mi high-confidence, all 5 RPE-3.**
 > - **`compute-facts:1039` read a field path that has never existed** (`learned_fitness.running.threshold_hr`) → `pace_at_easy_hr` null on **0 of 147 runs**. Fixed. **D-239's null-write in compute-snapshot un-nulled** (it was correct — it treated the symptom; nobody went one level up).
 > - **`run_easy_hr = 122 "70% of observed max (estimated)", sample_count 0** — a fabrication shipped as a confident number. **Deleted** (Law 2).
-> - **The ACWR/load ladder was NEVER poisoned** — `calculate-workload:378` already hydrated the learned LTHR. The same read, forty lines away, in the files that forgot it. **The BIKE is untouched and correct** (running HR sits 5-10 bpm above cycling at the same effort — one %max band works for the bike and locks the run out; do NOT unify them).
+> - **The ACWR/load ladder was NEVER poisoned** — `calculate-workload:228-256` ⟨A31⟩ already hydrated the learned LTHR. The same read, forty lines away, in the files that forgot it. **The BIKE is untouched and correct** (running HR sits 5-10 bpm above cycling at the same effort — one %max band works for the bike and locks the run out; do NOT unify them).
 >
 > **REVERTED — READ BEFORE RE-ATTEMPTING:**
 > - **D-281 / Q-166 (the load verdict).** Shipped an ACWR-driven escalation → a live WK-1 card read **"pull back"** while every body row said the athlete was fine. **Reverted.** It violated D-266 ("ACWR never escalates"), Item 3's rule ("Load-high + body-fine → elevated max"), Q-137 ("do NOT patch the gauge") and Constitution Law 6. **THE RULE: the ratio DESCRIBES; the body PRESCRIBES.** Q-166 is **unproven** — filed on one WK-1 screen where the app declares its own ratio contaminated.
@@ -549,7 +570,7 @@ Data-verified on Michael's 27 real rides: the State bike-efficiency "improving �
 | **1** | **Q-176 — ONE LTHR** (+ `threshold_pace`, same pass) | **The ROOT.** Four chains, two inverted. Everything DERIVED from LTHR now agrees (D-286); the anchor itself does not. **Every later item sits on top of this number** — build the posture flag on four disagreeing LTHRs and you get a confident wrong answer, which is the one thing this codebase must never ship. | ✅ `SPEC-lthr-one-anchor.md` |
 | **2** | **THE POSTURE FLAG** — "you said maintain running; you've run once in 3 weeks" | **The product.** The app currently says the OPPOSITE (`off-plan-banner.ts:66-71` returns **"On plan"** to a Get-Stronger athlete who has stopped running). Every part exists and has never been introduced. It is the one thing Garmin structurally cannot do. **Read `PRODUCT-POSITIONING-v2-DRAFT.md` FIRST — the voice is a trade made visible, NOT a compliance cop.** | ✅ `SPEC-posture-flag.md` |
 | **3** | **Q-175 — the CLIENT stops re-deriving easy pace** (Law 4) | Cheap, bounded, and it closes the last easy-pace fracture. **The fix is the SERVER sending the resolved pace, NOT shipping the resolver client-side** (that would be a Law 4 violation with a nicer haircut). | Q-175 (sites listed) |
-| **4** | **Q-174 — the BIKE half of the athlete's choice** | ⚠ **A naive FTP precedence flip SHIPS A REGRESSION.** Three consumers gate on `source === 'learned'` (`infer-training-fitness:32`, `race-projections:376`, `materialize-plan:2654`) and would **silently kill bike race projections**. Fix those three FIRST. | Q-174 |
+| **4** | **Q-174 — the BIKE half of the athlete's choice** | ⚠ **A naive FTP precedence flip SHIPS A REGRESSION.** Three consumers gate on `source === 'learned'` (`infer-training-fitness:32`, `race-projections:376`, `materialize-plan:3165` — ⚠️ **which already accepts `'learned' || 'manual'`, so it is NOT one of the blockers; the count is TWO, not three (re-verified 2026-07-31)** ⟨A31⟩) and would **silently kill bike race projections**. Fix those three FIRST. | Q-174 |
 | **5** | **Q-172 — the outlier gate** (the rule D-275 *should* have been) | Not urgent, but a **−28.9% decoupling is in his substrate right now** and nothing catches it. Weather-agnostic. ⚠ Fit the statistic to the real distribution; do NOT improvise it (that is how D-250 died). | Q-172 |
 | **6** | **Q-173 — the summer-silence stamp**, and a **`SCIENCE-run-specificity.md`** | Q-173's `as_of` half shipped. The science doc is **owed before the posture flag's Tier-2 prose** — the app's only maintenance theory (*"aerobic detrains slower → low volume holds it"*) is **discipline-blind**, and that is the claim the posture flag qualifies. | Q-173 |
 
@@ -557,7 +578,7 @@ Data-verified on Michael's 27 real rides: the State bike-efficiency "improving �
 
 **WHAT IS OPEN, IN PRIORITY ORDER:**
 1. **Q-175** — the CLIENT still re-derives easy pace (Law 4). The fix is for the SERVER to send the resolved pace, **NOT** to ship the resolver client-side. Sites listed in the Q.
-2. **Q-174 (bike half)** — `resolveCurrentFtp` still ranks learned above a typed FTP. ⚠ **A naive flip SHIPS A REGRESSION**: three consumers gate on `source === 'learned'` (`infer-training-fitness:32`, `race-projections:376`, `materialize-plan:2654`) and would silently kill **bike race projections**. Fix those first.
+2. **Q-174 (bike half)** — `resolveCurrentFtp` still ranks learned above a typed FTP. ⚠ **A naive flip SHIPS A REGRESSION**: three consumers gate on `source === 'learned'` (`infer-training-fitness:32`, `race-projections:376`, `materialize-plan:3165` — ⚠️ **which already accepts `'learned' || 'manual'`, so it is NOT one of the blockers; the count is TWO, not three (re-verified 2026-07-31)** ⟨A31⟩) and would silently kill **bike race projections**. Fix those first.
 3. **THE POSTURE FLAG (the big product one, spec'd in conversation, not yet written).** `per_discipline_posture` (`develop`/`maintain`/`out`) is **WRITE-ONLY** — read once at plan-build, then by **zero** runtime surfaces. So: the app never checks whether the athlete did what they said they'd do. Worse, `_shared/off-plan-banner.ts:66-71` **actively tells a Get-Stronger athlete who has STOPPED RUNNING that they are "On plan"** (`computePrimaryAdherence` counts strength only — it has no notion of the maintained discipline). **Every piece exists** (posture, per-discipline planned-vs-done counts in `adherence.ts:49`, and the sentence *"Running behind plan — total load carried via easy cross-training"* three lines above the bug). They have never been introduced. See `PRODUCT-POSITIONING-v2-DRAFT.md` for the VOICE this must be built in — it is a **trade made visible**, not a compliance cop.
 4. **Q-172** (outlier gate — the rule D-275 *should* have been), **Q-173** (the summer silence), **Q-171** (closed).
 
@@ -577,7 +598,7 @@ Data-verified on Michael's 27 real rides: the State bike-efficiency "improving �
 - **A latent NaN bug** (`create-goal:2401` read the metric OBJECT, not `.value`) meant the Get Strong maintenance band had **never once fired**.
 
 **Q-174 — THE ATHLETE CHOOSES (Michael's ruling).** `performance_numbers.easy_pace_source: 'manual' | 'learned'`, via a two-option control in Baselines. `'manual'` wins **even over a high-confidence learned pace** (an assertion outranks an inference — Garmin/TrainingPeaks both honour a value you set). `'learned'` tracks the learner and **skips the manual tier**, so a declined number cannot resurface. **Absent = byte-identical to before.** Purely additive; fixtured.
-⚠ **BIKE IS THE OPEN HALF, and it is NOT a one-line flip** — three consumers gate on `source === 'learned'` (`infer-training-fitness:32`, `race-projections:376`, `materialize-plan:2654`); a naive FTP flip would **silently kill bike race projections** for anyone with a manual FTP. See Q-174.
+⚠ **BIKE IS THE OPEN HALF, and it is NOT a one-line flip** — three consumers gate on `source === 'learned'` (`infer-training-fitness:32`, `race-projections:376`, `materialize-plan:3165` — ⚠️ **which already accepts `'learned' || 'manual'`, so it is NOT one of the blockers; the count is TWO, not three (re-verified 2026-07-31)** ⟨A31⟩); a naive FTP flip would **silently kill bike race projections** for anyone with a manual FTP. See Q-174.
 
 **Live-verified against deployed code** (`scripts/verify-d285-live.mjs`): `as_of` stamps land, the basis string renders, and the choice defaults to today's behavior. **What the glass box immediately exposed:** `run_threshold_hr = 151, as_of 2026-05-21 (53 days old), n=2, medium` — the athlete's **entire zone table, easy band and every derived pace hangs off a 53-day-old number learned from two efforts.** That was always true; it was simply invisible. **A threshold test is the highest-leverage action on the board** (see SPEC §6 — his easy pace is 110% of threshold = Friel **Zone 3**; but the anchors are thin enough that "the anchors are underestimated" fits the data equally well, and only a test separates the two).
 
@@ -889,39 +910,39 @@ Behaviors that are demonstrably wrong but intentionally deferred. Don't propose 
 
 ### Import dates a workout off the PROVIDER's local time, not the USER's — lands on the adjacent day (2026-07-10, Q-154, REAL BUG, not fixed)
 
-A ride that happened on the user's local **7/7** was filed on **7/8**. `ingest-activity` `extractStravaLocalDate` (`:29-46`) + `import-strava-history` (`:585`) date the workout by splitting Strava's **`start_date_local`** — trusting the *provider's* timezone. When Strava's tz for the activity disagrees with the user's (travel / stale tz / near-local-midnight), the day is off by one. Compounded by a silent trap: delete-and-reimport does nothing because the `strava_activity_id` still exists under the wrong date → `import-strava-history:761` skips it with no error ("N skipped"). **Fix direction:** send the user's device timezone from the client and derive the day from UTC `start_date` in that tz (decide the traveled-activity tradeoff first). Root-caused, verification values not yet captured. Full detail + fix decision in **Q-154**.
+A ride that happened on the user's local **7/7** was filed on **7/8**. `ingest-activity` `extractStravaLocalDate` (`:29-46`) + `import-strava-history` (`:585`) date the workout by splitting Strava's **`start_date_local`** — trusting the *provider's* timezone. When Strava's tz for the activity disagrees with the user's (travel / stale tz / near-local-midnight), the day is off by one. Compounded by a silent trap: delete-and-reimport does nothing because the `strava_activity_id` still exists under the wrong date → `import-strava-history:755` skips it with no error ⟨A31⟩ ("N skipped"). **Fix direction:** send the user's device timezone from the client and derive the day from UTC `start_date` in that tz (decide the traveled-activity tradeoff first). Root-caused, verification values not yet captured. Full detail + fix decision in **Q-154**.
 
 ### Dead code — retire on next touch (do NOT build on these) — filed 2026-07-04 (D-239 arc)
 
 The threshold_hr / easy-HR thread turned out to be a tower of dead reads + formula fallbacks. RUN durability was moved to decoupling (D-239) instead. These are provably dead on real data; retire when a change next touches the file, don't wire anything new to them:
-- **`learned_fitness.running.threshold_hr` nested read-path** (`compute-facts:1144`) — dead. The learner writes flat `run_threshold_hr.value` (= 151 for the real user); `calculate-workload:229` reads the correct key. Only the `pace_at_easy_hr` guard used the dead nested path.
-- **compute-facts easy-HR block (`:1143–1158`) → `pace_at_easy_hr`** — never populates (needs the threshold the read-path can't see; and `easyMax = threshold×0.78 = 118` excludes the athlete's real easy runs at HR 133–141 anyway). Null on all 145 runs.
-- **`run_easy_pace_at_hr` aggregate (compute-snapshot) + `run_easy_pace_at_hr_trend` (longitudinal-signals `:52,85,144–163`)** — fed by the null field; the longitudinal signal emits a run-fitness claim off garbage. **Retired in the D-239 reconcile.**
-- **`run_easy_hr` 123 fallback** ("70% of observed max, 0 samples") — a formula, not learned; it undershoots the athlete's real easy HR by ~15 bpm.
+- ~~**`learned_fitness.running.threshold_hr` nested read-path**~~ — **FIXED (Q-169).** `compute-facts:1129-1132` now calls `resolveRunEasyHrBand(baselines?.learned_fitness, baselines?.performance_numbers?.threshold_heart_rate)` from `_shared/easy-hr.ts`; the dead nested lookup and its epitaph are written up at `compute-facts:1107-1127`. `calculate-workload:255-256` reads the flat `learned.run_threshold_hr.value`. ⟨A31⟩
+- ~~**compute-facts easy-HR block → `pace_at_easy_hr`**~~ — **REBUILT (Q-169 / Q-171).** The block is now `compute-facts:1128-1155`: the `×0.78` sample gate is replaced by the shared `resolveRunEasyHrBand` band (`_shared/easy-hr.ts`), and the WHOLE run must pass `runEasyPaceEligible` before a pace is written (plus `pace_at_easy_hr_anchor`/`_confidence` at `:1151-1152`). Whether it now populates on real rows is UNVERIFIED — needs a DB read. ⟨A31⟩
+- **`run_easy_pace_at_hr_trend` longitudinal SIGNAL** (`_shared/longitudinal-signals.ts:48-49` + `:141-144`) — **RETIRED in the D-239 reconcile**; the RUN aerobic read lives on `state_trends_v1.run.decoupling`. ⚠ The compute-snapshot AGGREGATE is *not* retired — still computed at `compute-snapshot:232`/`:456` and persisted at `:1129-1130`. Its "fed by a null field" premise is also dead: `pace_at_easy_hr` was un-starved by Q-169. ⟨A31⟩
+- ~~**`run_easy_hr` 123 fallback**~~ — **DELETED (Q-169).** `learn-fitness-profile/index.ts:664-673` now sets `easy_hr = null` when fewer than 3 easy runs are observed; the "70% of observed max (estimated)" fabrication is gone and the metric re-learns from an observed median (`:655-662`). ⟨A31⟩
 - **daily-ledger `session_rpe` first-preference (`:267`)** — null on all 40; harmlessly falls through to `rpe`. Dead preference, remove.
-- **`weekly.ts:594` "Total workload is above planned" (`wv > 120`)** — added 2026-07-05 to the dead list. `wv = load.week_vs_plan_pct` is **clamped to [0,100]** (`adherence-plan.ts:84` `Math.min(1, …)`), so `> 120` has NEVER fired. The `wv < 70` "below plan" branch IS live. Retire the dead branch on next touch. See Q-123.
-- **`avgReadiness.soreness` snapshot aggregate (`compute-snapshot:211`)** — aggregates the post-workout popup soreness but nothing reads it; readiness surfaces use the separate `readiness_checkins` daily track. Popup soreness is live via Axis-1 only. See Q-124. (Verify-then-retire, not proven-dead yet.)
+- ~~**`weekly.ts:594` "Total workload is above planned" (`wv > 120`)**~~ — **RETIRED.** Both the `wv > 120` and the `wv < 70` branches are gone from `weekly.ts`; the string "above planned" no longer exists anywhere in `supabase/` or `src/`. `week_vs_plan_pct` is now emitted at `weekly.ts:324` and read by nothing (its only other occurrence is the type at `response-model/types.ts:124`). The clamp at `adherence-plan.ts:84` `Math.min(1, …)` still stands. See Q-123. ⟨A31⟩
+- **`avgReadiness.soreness` snapshot aggregate (`compute-snapshot:227`, persisted via `avgReadinessForWeek` at `:1144`)** — aggregates the post-workout popup soreness but nothing reads it; **now PROVEN dead**: the only consumer of `avg_readiness` anywhere is `recompute-athlete-memory:409-410`, which reads `.energy` only. Readiness surfaces use the separate `readiness_checkins` daily track. Popup soreness is live via Axis-1 only. See Q-124. (Safe to retire.) ⟨A31⟩
 
 ### "Spine is truth" is ~6% enforced on the coach; capacity truth is forked (audited 2026-07-02, Q-106)
-- **Symptom (as audited 2026-07-02):** the coach engine reads the cached spine (`state_trends_v1`) for only `fitness_direction` (1 of ~17 verdict families) and recomputes the rest in parallel — even shadowing snapshot columns it fetches (`acwr`, `strength_volume_trend`, `body_response`, `strength_top_lifts`). And there was no canonical capacity truth: `materialize` prescribes load off the typed `performance_numbers` (150) while the coach judged off `learned_fitness.strength_1rms` (125). The athlete-visible face: the State screen's "Bench 125→115 · back off" (baseline-blind — **SINCE FIXED, D-231**), two contradictory strength rows (H3 — resolved cosmetic), FATIGUED triple-echo.
+- **Symptom (as audited 2026-07-02):** the coach engine read the cached spine (`state_trends_v1`) for only `fitness_direction` (1 of ~17 verdict families) and recomputed the rest in parallel — **materially outdated as of 2026-07-31:** the coach now also reads the spine for per-lift strength direction (`coach/index.ts:2288`, D-270), the e1RM verdict (`:3973`), HR response (`:2485`/`:5419`), the fitness roll-up (`:2891`), narrative validation (`:5069`), run-anchor descent (`:5418`) and the entire State display contract (`:5782`) ⟨A31⟩ — even shadowing snapshot columns it fetches (`acwr`, `strength_volume_trend`, `body_response`, `strength_top_lifts`). And there was no canonical capacity truth: `materialize` prescribes load off the typed `performance_numbers` (150) while the coach judged off `learned_fitness.strength_1rms` (125). The athlete-visible face: the State screen's "Bench 125→115 · back off" (baseline-blind — **SINCE FIXED, D-231**), two contradictory strength rows (H3 — resolved cosmetic), FATIGUED triple-echo.
 - **Not blocking:** the *voice* contracts (Arc, `session_detail_v1`) read the spine faithfully; endurance micro→macro continuity is finished (the proof the bet works). This is the strength/coach axis of the migration D-151 started and stopped.
-- **The fix — PARTIALLY DONE (reconciled 2026-07-04):** **step 1, the canonical capacity resolver, is BUILT + wired + acceptance-passed** (D-231, `capacity-resolver.ts`, called on both prescribe + judge paths) → Q-107 **H1 baseline-blindness FIXED** (the "125→115" row now cites the 150 anchor; the residual context-blind *tone* is **Q-111**). **Step 2 (move coach verdicts onto the spine) remains unbuilt, BLOCKED on Q-109**; D-236 has since advanced the **step-6 ACWR-conformance** piece (ACWR single-authority + `buildBodyResponse` reclassified) — ⚠ full satisfaction of Q-109's persisted-`body_response` bar not verified. Roadmap: Q-106 / D-230. State catalog: Q-107. Dead-layer cleanup: Q-108.
+- **The fix — PARTIALLY DONE (reconciled 2026-07-04):** **step 1, the canonical capacity resolver, is BUILT + wired + acceptance-passed** (D-231, `_shared/state-trend/capacity-resolver.ts` `resolveStrengthCapacity`) — ⚠ **JUDGE PATH ONLY.** The sole importer is `coach/index.ts` (calls at `:1903`, `:2319`). `materialize-plan` still prescribes off raw typed baselines via `getBaseline1RM` (`src/lib/exercise-config.ts:1530`, called at `materialize-plan/index.ts:163` and `:735`), which has no learned gap-fill — the prescribe side never sees the resolver ⟨A31⟩ → Q-107 **H1 baseline-blindness FIXED** (the "125→115" row now cites the 150 anchor; the residual context-blind *tone* is **Q-111**). **Step 2 (move coach verdicts onto the spine) remains unbuilt, BLOCKED on Q-109**; D-236 has since advanced the **step-6 ACWR-conformance** piece (ACWR single-authority + `buildBodyResponse` reclassified) — ⚠ full satisfaction of Q-109's persisted-`body_response` bar not verified. Roadmap: Q-106 / D-230. State catalog: Q-107. Dead-layer cleanup: Q-108.
 
 ### `limiter_sport` intensity-side handling not implemented
-- **Symptom:** spec at `docs/SESSION-FREQUENCY-DEFAULTS.md §4` says "Run limiter is handled through intensity, not frequency. Adding run sessions increases injury risk disproportionately. The engine addresses a run limiter by making existing run sessions more productive (longer long run, higher-quality intervals, strides on easy days) rather than adding a 4th session." Implementation today: frequency side is correctly a no-op for run limiter; intensity side has zero implementation. The +7% TSS allocation bump in `science.ts:268-278 getBaseDistribution()` is a percentage shift across all phases, not a per-session intensity boost.
+- **Symptom:** spec at `docs/SESSION-FREQUENCY-DEFAULTS.md §4` says "Run limiter is handled through intensity, not frequency. Adding run sessions increases injury risk disproportionately. The engine addresses a run limiter by making existing run sessions more productive (longer long run, higher-quality intervals, strides on easy days) rather than adding a 4th session." Implementation today: frequency side is correctly a no-op for run limiter; intensity side has zero implementation. The +7% TSS allocation bump in `science.ts:749 getBaseDistribution()` (the limiter shift itself is `:786-793`) ⟨A31⟩ is a percentage shift across all phases, not a per-session intensity boost.
 - **Files (where wiring would land):** `supabase/functions/generate-combined-plan/science.ts` (extend `brickRunTargetMiles()` and `longRunFloorMiles()` to accept `limiterSport` — note: the cycling mirror is `longRideFloorHours`; do not confuse), `session-factory.ts` (interval modulation), `week-builder.ts` (stride logic).
 - **Predicted effect:** ~+65-70 TSS/week for run-limiter athlete (long run +15-20%, quality run +1 tempo interval, strides on 1-2 easy runs).
 - **Why deferred:** multi-file medium-risk change; needs an architectural decision on whether the +7% TSS allocation stays additive with the new intensity dial or gets replaced by it. Documented in `docs/TICKET-B-WIRING-AUDIT.md` Field 2.
 
 ### "Run — Tempo" vs "Run Intervals 4×1000m" label divergence
-- **Symptom:** Same workout renders with two different titles across surfaces. Today's Efforts uses the workout's stored `name` directly. `AllPlansInterface.tsx:881-885` and `PlannedWorkoutSummary.tsx:34-66` both use regex against `description`/`tags` but with slightly different heuristics. Compounded by Monday-May-18 swim title case ("Swim — Drills" vs "Race-Specific Aerobic Swim") which suggests the surfaces also read different upstream data shapes.
+- **Symptom:** Same workout renders with two different titles across surfaces. **RESOLVED (kept as the was-broken record).** All three surfaces now delegate to one canonical helper, `deriveWorkoutTitle` (`src/lib/derive-workout-title.ts:88`): `AllPlansInterface.tsx:882`, `PlannedWorkoutSummary.tsx:39`, `TodaysEffort.tsx:1556`/`:1794`. Locked by `src/lib/derive-workout-title.test.ts`. The in-code comments state it verbatim: "Closes the ENGINE-STATE Known Broken label-divergence entry." ⟨A31⟩ Compounded by Monday-May-18 swim title case ("Swim — Drills" vs "Race-Specific Aerobic Swim") which suggests the surfaces also read different upstream data shapes.
 - **Files:** `src/components/PlannedWorkoutSummary.tsx:34-66`, `src/components/AllPlansInterface.tsx:881-885`, `src/components/TodaysEffort.tsx` (uses `workout.name` directly).
 - **Fix shape:** consolidate the title-derivation into a single shared utility — same architectural pattern as the `useStrengthOrderingPreference` consolidation. Solving at the data layer (one canonical session name per workout, derived once at materialize time) is cleaner than patching label-by-label downstream.
 - **Why deferred:** predates the universal fixes; cosmetic, not protocol-violating; queued behind higher-signal work.
 
 ### Cycling TREND dashed HR line never draws (historical `avg_hr` null)
 - **Symptom:** cycling TREND shows the power line + current-ride "· {bpm}" label but no dashed HR line.
-- **File:** `analyze-cycling-workout/index.ts:~2108` reads `r.computed.overall.avg_hr` (frequently null); SELECT at `:2077` omits the reliable `workouts.avg_heart_rate` column. → all historical TREND points `avg_hr: null` → `SessionNarrative.tsx` `TrendSparkline` `hasHr (≥3)` gate fails.
+- **File:** `analyze-cycling-workout/index.ts:~2261` (today's line; was `~2108`) reads `r.computed.overall.avg_hr` (frequently null); the SELECT — now `:2224`, was `:2077` — omitted the reliable `workouts.avg_heart_rate` column. ⟨A31⟩ → all historical TREND points `avg_hr: null` → `SessionNarrative.tsx` `TrendSparkline` `hasHr (≥3)` gate fails.
 - **Fix shape:** add `avg_heart_rate` to the SELECT; resolve `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`. Same projection/field-source footgun class as `cead4e9e`/`41d1582d`/`f9efb893`.
 - **RESOLVED (2026-05-17, `4177c05c`):** added `avg_heart_rate` to the loop SELECT; `hrH` resolves `computed.overall.avg_hr ?? fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate` (each candidate guarded). Wide backfill verified 26/26 rides-with-a-trend now have ≥3 HR points → dashed line draws. Kept here as the was-broken record (Known-broken doubles as the fix log, per the pwr20 precedent). Q-007 closed.
 
@@ -951,8 +972,8 @@ _All previously-listed entries verified 2026-05-20 and moved to Solid (Q-003 §6
 - **The morning-ride check (2026-07-04):** verifies the *popup* (appears, writes on tap, skips clean) — NOT a carryover fire (baseline too thin on log #1).
 
 ### Strength prefill-honoring stack (D-204 extension) — deterministic logic internally verified, ON-DEVICE test PENDING (2026-06-19, `a6b5f60d`)
-- **What shipped & is live:** the strength capture → facts → Details → analyzer chain now distinguishes a *performed* set from an *untouched plan prefill*. `isPerformedStrengthSet` (`analyze-strength-workout/index.ts:83`, 9 call sites — was 9 duplicated inline predicates, each counting untouched prefills as done) drops a set that is `completed !== true && prefilled === true`; `updateSet` (`StrengthLogger.tsx:2603-2611`) clears `prefilled` on any athlete edit/Done (mirrors `from_previous`); `workout-detail` carries `prefilled` through both set-map paths (`:220`, `:1289` — was stripped, "Bug B"); the Details receipts (`StrengthCompletedView.tsx:192/204`) drop untouched-prefill sets + exercises with no performed set. Plus the resume/data-loss hardening (`didComputedPrefillRef` + resume listener no longer minting new set objects) and the delete-restore revert-by-`completed_workout_id` (`e3884ec1`). Deployed `workout-detail` + `analyze-strength-workout`; client at `a6b5f60d`. See DECISIONS-LOG D-204 extension.
-- **Verified (internal, 2026-06-21):** build survived a workstation crash (HEAD `a6b5f60d`, tree clean, all 9 predicates collapsed). Deterministic logic tested with verbatim copies of all four pieces (`/tmp/d204-strength-test.mjs`, 16/16): untouched prefills not counted; Done/edited/legacy/timed sets counted; the "8→5 edit clears prefilled → counted as 5" path; skipped exercise vanishes from receipts; `workout-detail` preserves the flag; full-session count = 2 performed / 4 prefills dropped.
+- **What shipped & is live:** the strength capture → facts → Details → analyzer chain now distinguishes a *performed* set from an *untouched plan prefill*. `isPerformedStrengthSet` (now shared: `_shared/strength/performed-set.ts:47`, imported at `analyze-strength-workout/index.ts:13`, 11 call sites ⟨A31⟩ — was 9 duplicated inline predicates, each counting untouched prefills as done) drops a set that is `completed !== true && prefilled === true`; `updateSet` (`StrengthLogger.tsx:3428`, prefill clear at `:3450`) ⟨A31⟩ clears `prefilled` on any athlete edit/Done (mirrors `from_previous`); `workout-detail` carries `prefilled` through both set-map paths (`:291`, `:1633` — was stripped, "Bug B") ⟨A31⟩; the Details receipts (`StrengthCompletedView.tsx:192/204`) drop untouched-prefill sets + exercises with no performed set. Plus the resume/data-loss hardening (`didComputedPrefillRef` + resume listener no longer minting new set objects) and the delete-restore revert-by-`completed_workout_id` (`e3884ec1`). Deployed `workout-detail` + `analyze-strength-workout`; client at `a6b5f60d`. See DECISIONS-LOG D-204 extension.
+- **Verified (internal, 2026-06-21):** build survived a workstation crash (HEAD `a6b5f60d`, tree clean, all 9 predicates collapsed). Deterministic logic tested with verbatim copies of all four pieces (`/tmp/d204-strength-test.mjs`, 16/16 — that scratch file is gone; the durable equivalent is `supabase/functions/_shared/strength/performed-set.test.ts`) ⟨A31⟩: untouched prefills not counted; Done/edited/legacy/timed sets counted; the "8→5 edit clears prefilled → counted as 5" path; skipped exercise vanishes from receipts; `workout-detail` preserves the flag; full-session count = 2 performed / 4 prefills dropped.
 - **NOT yet verified (needs device, deferred to 2026-06-22):** (1) **Bug A** — the data-loss lifecycle race only reproduces by backgrounding the iOS app mid-edit; guard code reads sound but is not device-proven. (2) **Reported symptom (Q-076):** Michael reports a skipped exercise still rendering as "done"; screenshot was blank, so screen / build state / whether-freshly-logged are unknown — could be a stale on-device bundle, saved data lacking `prefilled`, or a read surface the filter doesn't cover. Read the DB row to localize (saved-data vs display) before changing code.
 - **Verification method when resumed:** log the June-19 session deviating (edit a set, skip an exercise, set RPE), background+return once, finish & save; then read the row — performed sets carry `completed:true`/edited values, skipped stays `prefilled`/uncounted; confirm Details volume + receipts honest and the narrative doesn't fabricate RIR.
 

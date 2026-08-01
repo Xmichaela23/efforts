@@ -1161,7 +1161,7 @@ Inherits the anchor's accuracy: the chart is relative to a TRUE 1RM, so a stale 
 > anything. Combined with §2's own finding that AMRAPs fire **only in the anchor cycle** (`wendler-531.ts:61`
 > — weeks 9/10/11 of twelve), **the strength gauge is near-blind for weeks 1–8 and nothing said so.**
 >
-> **D-326 is the replacement signal, not a reversal of this entry.** Per-set difficulty in three words,
+> **D-326 was the intended replacement signal — and it was BUILT (D-338) then DELETED (D-344, 2026-07-30). Per-set difficulty no longer exists.** The gauge's real fix landed as [D-341]: the AMRAP rep count now moves the working number (`loading/cycle-verdicts.ts:116` → `workingNumberForCycles`). Per-set difficulty in three words, ⟨A31⟩
 > feeding the body read, never the 1RM maths. §3's "RIR is OFF for `strength_primary`" **still stands and
 > must not be undone.** Everything below is unchanged and correct.
 
@@ -1781,7 +1781,15 @@ always in the same direction: under-costing.**
 
 ---
 
-## D-326 — Per-set difficulty replaces the RIR prompt on the barbell block: three words on the complete tap, feeding the BODY read and never the 1RM estimate (2026-07-25, SPEC — not built)
+## D-326 — SUPERSEDED: BUILT THEN REMOVED IN ONE DAY
+
+> ⛔ **BUILT by [D-338] (2026-07-30) and REMOVED by [D-344] the same day.** The three-word difficulty
+> tap no longer exists — `src/components/StrengthLogger.tsx:5556` carries the deletion note. Nothing on
+> the advance path ever read `difficulty`; the verdict that moves the bar reads the REP COUNT.
+> ⚠️ Layer 2 of the table below ("wire `verdictFrom95Set`") WAS built — see [D-341]. Everything below
+> is history; do not treat it as the current plan.
+
+## D-326 (original) — Per-set difficulty replaces the RIR prompt on the barbell block: three words on the complete tap, feeding the BODY read and never the 1RM estimate (2026-07-25, SPEC — not built) ⟨A31⟩
 
 ### The hole this fills, and it was found by tracing not guessing
 
@@ -1792,14 +1800,14 @@ Michael asked whether AMRAP sets give the app enough of a read on strength to ke
   anchor cycle, and not on its deload.** In a 12-week leader/leader/anchor block that is **weeks 9, 10 and
   11. Nothing in weeks 1–8.**
 - **And e1RM on a leader week is the plan quoting itself.** `brzycki1RM(weight, reps, rir)` is
-  `effectiveReps = reps + rir` (`compute-facts/index.ts:124`). With RIR scoped off by D-324, an athlete
+  `effectiveReps = reps + rir` (then `brzycki1RM`; the function is now `estimated1RM`, `compute-facts/index.ts:143`, and the formula became Wendler/Epley in D-339 — `src/lib/estimate-1rm.ts:56`, so the multiplier below is ×1.167 today, not ×1.125). With RIR scoped off by D-324, an athlete ⟨A31⟩
   who does the prescribed 5 reps at the prescribed weight yields `weight × 1.125` — **a pure function of
   the prescription.** It rises every cycle because the plan raises the bar, whether they are thriving or
   barely holding on. **It carries athlete information only when they MISS.**
 - The trend itself is session-to-session with a 2.5 lb dead band (`analyze-strength-workout.ts:688-727`) —
   no multi-point fit, and under 5/3/1's weekly percentage changes it swings by design.
 
-**So for eight of twelve weeks the strength gauge is close to blind, and nothing said so.**
+**So on a leader/leader/anchor block the strength gauge is close to blind for eight of twelve weeks, and nothing said so.** ⚠️ **NOT EVERY BLOCK IS THAT SHAPE** — `leaderCount` (`wendler-531.ts:291`) returns 0 leaders for a continuity-'continuous', 'develop', <16-week block, so every cycle is an anchor and AMRAPs land in 9 of 12 weeks. The 8-of-12 case is the 'unknown'/'detrained' tier, a 16-week block, a non-'develop' posture, or `highAerobicLoad`. ⟨A31⟩
 
 ### The decision
 
@@ -1812,7 +1820,7 @@ done."*
   in the tank, so the answer is always "easy". **Four taps a session**, two on the lower-body days that
   carry the real cost.
 - **It replaces a two-step flow with one.** Today completing a set opens a RIR prompt, then a confirm
-  (`StrengthLogger.tsx:3505-3535`). Michael: *"we have a two-step process now — forced RIR pick and then
+  (`StrengthLogger.tsx:827-831` state, `:3582` handlers). Michael: ⟨A31⟩ *"we have a two-step process now — forced RIR pick and then
   hit done. This is smoother."* **The tap the athlete was already making becomes the answer.**
 
 ### Why words, not a number — and this is field practice, not preference
@@ -1853,7 +1861,7 @@ was written: *"it'd be easy to ship the tap and feel like the blindness got solv
 | # | failure | fix | status |
 |---|---|---|---|
 | 1 | **No continuous signal.** Weeks 1-8 have no measured input at all. | **The tap** (this entry) — a weekly athlete-sourced reading from week one. | D-326 |
-| 2 | **The number issues itself.** `workingNumberForCycle:112` advances by cycle index, unconditionally. The plan raises the bar, then reports the bar back as fitness. | **Wire `verdictFrom95Set`** into the advance path (`wendler-531.ts:160-200` — written, correct, **called by nothing**). Five at 95% or the number comes down 10%. | NOT BUILT |
+| 2 | **The number issued itself.** `workingNumberForCycle` (`wendler-531.ts:210`) advances by cycle index. The plan raised the bar, then reported the bar back as fitness. | **Wire `verdictFrom95Set`** (`wendler-531.ts:454`, with `applyVerdict` at `:467`) into the advance path. Five at 95% or the number comes down 10%. | ✅ **BUILT — D-341 (2026-07-30).** Supplier: `loading/cycle-verdicts.ts:116`; consumer: `workingNumberForCycles` (`wendler-531.ts:519`) via `strength-primary-plan.ts:1275` and `rematerialize-strength-block/index.ts:167` | ⟨A31⟩
 | 3 | **The number hides its age.** Even once earned, between gates it is rendered as current with no fresh measurement behind it. | **Provenance on the surface** — *earned at week 3, unmeasured since* is true; a bare `325` is not. | NOT BUILT |
 
 **They are not interchangeable and they do not substitute for each other.**
@@ -1892,7 +1900,7 @@ week 3 of cycle 1 is the same *relative* load at a heavier absolute weight — w
 question worth asking, *is the working number still honest*. **And it lands on the same set as Wendler's
 95% gate**, so the two signals corroborate rather than compete.
 
-**3. The consumer is one boolean.** `coach/index.ts:5727` —
+**3. The consumer is one boolean.** `coach/index.ts:5824` — ⟨A31⟩
 `strength: { declining: weeklyResponseModel.strength.overall.trend === 'declining' }`. That feeds
 `BodyTrends.strength`, which `computeDecliningSignals` currently **excludes** for strength-primary
 (D-318). Re-including it is a one-line change **and must not happen until 1 and 2 are solved** — it would
@@ -2169,7 +2177,7 @@ Two questions, opposite answers, and **only the measurement one is in doubt.** H
 
 ### ⛔ AND A JUSTIFICATION IN `compute-facts` MAY HAVE BEEN BACKWARDS
 
-It read: *"Brzycki is more accurate than Epley at the low rep ranges (2-5)."* At that exact range some work puts **Epley and Wathen CLOSER** to a tested 1RM. Rewritten; **formula unchanged.** Brzycki underestimates and Epley overestimates, and for a number that sets an athlete's next working load with nobody watching, **erring low is the defensible direction.** That is a product decision about which way to be wrong, not an accuracy claim. Switching it needs its own entry.
+It read: *"Brzycki is more accurate than Epley at the low rep ranges (2-5)."* At that exact range some work puts **Epley and Wathen CLOSER** to a tested 1RM. Rewritten; **formula unchanged at the time.** ⛔ **IT CHANGED THE NEXT DAY — [D-339] IS THE ENTRY THIS ASKED FOR.** Brzycki is gone; the estimate is now Wendler's own (Epley), `src/lib/estimate-1rm.ts:56`. The "erring low" argument below is history, and the deadlift ceiling above no longer compounds with a Brzycki downward bias — `trustedMaxRepsFor` (`wendler-531.ts:461`) stands on the LeSuer finding alone. ⟨A31⟩
 
 ---
 
@@ -2195,7 +2203,12 @@ Still the best-evidenced claim in the domain, and still the one to lead with —
 
 ---
 
-## D-337 — Wendler HAS an estimated max, it is Epley, and our Brzycki is a stated deviation (2026-07-29, PUSHED `17301cdf` — VERIFIED AGAINST THE PRIMARY)
+## D-337 — Wendler HAS an estimated max, and it is Epley (2026-07-29, PUSHED `17301cdf` — VERIFIED AGAINST THE PRIMARY)
+
+> ⛔ **THE "OUR BRZYCKI IS A DEVIATION" HALF IS DEAD — [D-339] (2026-07-30) ADOPTED WENDLER'S OWN FORMULA.**
+> `src/lib/estimate-1rm.ts:56` (`WENDLER_EPLEY_COEFF = 0.0333`) is now the single source, imported by
+> `compute-facts` and the client baseline test. The primary-source verification below stands; the
+> statements that we use Brzycki, and that it is a stated deviation, do not. ⟨A31⟩
 
 ⛔ **A CLAIM IN OUR OWN DRAFT, STRUCK BEFORE PUBLICATION.** The protocol doc asserted *"5/3/1 has no estimated max of its own"* — that our whole e1RM layer filled a gap Wendler left. **It is wrong.** The 2nd-edition text was searched directly (Michael supplied the PDF; no copy had ever been in the repo, so the previous session's search could not be reproduced).
 
@@ -2267,7 +2280,7 @@ Michael: *"app will adopt this as our language to communicate how user handled l
 ### STILL OPEN — NOT DONE HERE
 
 - **State does not render difficulty yet.** The fact exists; the trend does not read it.
-- **`advance_untrusted` still has no reader** (D-335), and Wendler's `verdictFrom95Set` is still called by nothing — `measured` is the input that unblocks both.
+- ~~**`advance_untrusted` still has no reader** (D-335), and Wendler's `verdictFrom95Set` is still called by nothing~~ — ✅ **BOTH CLOSED BY [D-341] (2026-07-30).** `verdictFrom95Set` is called at `loading/cycle-verdicts.ts:116` and reaches the composer via `workingNumberForCycles` (`strength-primary-plan.ts:1275`, `rematerialize-strength-block/index.ts:167`); `advance_untrusted` is honoured at `wendler-531.ts:481` and allowlisted at `generate-strength-plan/index.ts:157`. ⟨A31⟩
 - **The freestyle default** (three words for a no-plan session instead of RIR) is unbuilt. ⚠️ This is the one recommendation that goes AGAINST common practice — other trackers do offer RIR there — argued on the grounds that RIR needs a target to mean anything.
 - **The five name-matchers** (audit F5) are untouched, so a lift can still appear twice.
 - **The calendar squat-day-not-done** is reverted and parked; the detail screen must stop treating a planned row as completed first.
@@ -2643,8 +2656,11 @@ starved, not built.*
 
 - **⛔ `validity_set` REMAINS UNRENDERED, AND THIS IS THE ONE TO NOT "FIX".** Its line — *"Five at
   ninety-five. This one decides the number."* — is true only once `verdictFrom95Set` is wired, and it
-  is not: the composer still advances the working number by cycle index
-  (`workingNumberForCycle`). Rendering it would describe an engine that is not running. The flag is
+  is WIRED as of D-341 — `loading/cycle-verdicts.ts:116` supplies the verdict and the composer reads it
+  (`strength-primary-plan.ts:1275`, verdicts from `generate-strength-plan/index.ts:149`). ⚠️ The bare
+  `workingNumberForCycle` (`wendler-531.ts:210`) still governs the FORECAST path, where
+  `unknownMeans: 'advance'` deliberately preserves old behaviour for weeks that have not happened. Re-check
+  this gate before leaving the line unrendered. ⟨A31⟩ The flag is
   never passed and the call site says exactly when to pass it. Same gate as `STRENGTH_ADVANCE_COPY`.
 
 - **Verification:** 25 pins green across `bar-speed-copy`, `strength-accessory-copy` and the new
@@ -2878,8 +2894,13 @@ of the same stale rule. Volume now ships pre-priced on `session_detail_v1.streng
 sets x reps x load, the basis Strong and Hevy score on — and **bodyweight fills in as the load** for
 calisthenics. Rejected: TIME (a bench session logged a 2-minute duration; logged-after-the-fact
 duration is garbage) and PER-SET EFFORT (only collected on the top/AMRAP set of the four main lifts, so
-it cannot score the accessories that read zero). Banded sets get a small flat per-set token — bands have
+it cannot score the accessories that read zero). Banded sets got a small flat per-set token — bands have
 no standardised tension, and assistance is deliberately minor, so precision is not worth buying.
+⛔ **REVERSED BY [D-351] (2026-08-01): a band now carries an athlete-entered POUNDS value** (`bandLoadLb`,
+`_shared/workload.ts:376`), subtracting on `{pullup, chinup, dip}` and multiplying elsewhere; the flat token
+survives only as the unparseable fallback (`:429`). ⚠️ **D-351 Decision 3 also SUSPENDS this entry's
+re-pricing law on purpose** — band history is NOT migrated, so `resistance_level` holds words before
+2026-08-01 and pounds after. Do not "clean it up" with a migration. ⟨A31⟩
 
 **The fault.** `calculateStrengthWorkload` summed `weight x reps`; a chin-up has weight 0. Measured on a
 real 13-set squat day: **10 points, against 61 for a 47-minute easy run** — on a strength block. Run 87%

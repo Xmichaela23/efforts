@@ -60,10 +60,10 @@ Every problem in this app is one of these three. **Name which one you're looking
 - **Run easy pace** — one resolver, universal on the server, athlete override honoured.
 
 **Fractured — LIVE on the only real account:**
-- 🔴 **The verdict engine is POSTURE-BLIND (Q-179).** `per_discipline_posture` appears **ZERO times** in the spine and **ZERO times** in the coach. The plan copy says *"maintenance only (held so strength leads)"* while State says *"aerobic base needs work"* — same discipline, same week, same athlete. **This is THE continuity fracture, and the posture flag is its fix, not a banner.**
+- ✅ **Q-179 posture is WIRED.** `_shared/state-trend/posture.ts` is the join (fed at `compute-snapshot/index.ts:859`); the coach reads posture at `coach/index.ts:5436-5437` and elsewhere; `postureSentence` renders in the State run row (`StatePerformanceSection.tsx:899` → `:692`). ⟨A31⟩ The plan copy says *"maintenance only (held so strength leads)"* while State says *"aerobic base needs work"* — same discipline, same week, same athlete. **This is THE continuity fracture, and the posture flag is its fix, not a banner.**
 - 🔴 **A skipped exercise counts as PERFORMED (Q-178).** `completed === true` outranks "zero reps". Live repro: zero Farmers Carries → `98% · Strong` → *"sets landed on target across all three lifts."* ⚠️ **The LLM wasn't lying — the fact packet was.** The guard validates prose against the facts, so **it cannot catch a lie already IN the facts.**
 - 🔴 **The Monday alarm (Q-177).** A partial-week SUM vs complete prior weeks → fires `concern` severity every Monday, forever. It measures *what day you looked*.
-- 🔴 **`adapt-plan` silently re-prices strength on every ingest** — skipping the fatigue gate the *suggest* path applies, while the path that **asks** you sits unmounted.
+- ✅ **CLOSED — `adapt-plan` no longer re-prices strength on ingest.** The silent auto-progression/auto-deload writes were deleted (`adapt-plan/index.ts:1119-1138`); the auto path now only re-lays-out the week (`maybeRelayoutStrengthForCurrentWeek`, `:820` called at `:1109`), and weight changes go through the athlete-gated `suggest` path + the State adjust modal. ⟨A31⟩
 - 🔴 **The RPE trend is a within-week ORDERING artifact** — and it is the required leg for the safety floor.
 - 🔴 **The ACWR band is bypassed 6×**; a taper week can read `elevated` and `optimal` in the same payload.
 - 🟡 **The fan-out awaits the wrong things** — facts are dropped silently, and the run durability trend is **always one workout behind, by construction.**
