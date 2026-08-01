@@ -139,3 +139,6 @@ export {
   type PerDisciplinePosture,
 } from './posture.ts';
 export { declaredSessionsPerWeek, MAINTAIN_SHORTFALL_BAND, type PostureBehaviour } from './posture.ts';
+
+// The severity cap — a rollup may never out-alarm its contributors (D-353).
+export { capRollupTone, severityOfVerdict, type Tone } from './severity.ts';

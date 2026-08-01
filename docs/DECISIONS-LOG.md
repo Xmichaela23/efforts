@@ -2637,6 +2637,61 @@ rather than guessed into it — the same failure direction the gate already chos
 
 ---
 
+## D-353 — A ROLLUP MAY NOT OUT-ALARM ITS OWN EVIDENCE: severity is capped at the contributors (2026-08-01, Michael — STEP 1 PUSHED + DEPLOYED, STEP 2 PUSHED, NOT DEPLOYED)
+
+**Found by Michael on his own screen.** The State BODY row said *"Running easing off (1d ago) · bike
+holding (17d ago)"* in **amber**. Two inches below, the RUN row said **"↓ −15.2%"** in neutral grey —
+the same measurement, rendered as a non-event.
+
+**⛔ THIS IS NOT A VOCABULARY MISMATCH, WHICH IS WHAT IT LOOKS LIKE.** The BODY row is a **pure
+rollup**: since D-346 its contributors ARE `run.efficiency` and `bike.efficiency`
+(`_shared/state-trend/assemble.ts:837-843`) — the very verdicts the RUN and BIKE rows render. Its
+verdict is derived from those and nothing else (`dirOf`, `assemble.ts:850-858`; **verified before
+implementing** — it computes no metric of its own). So the row was **manufacturing a severity its own
+evidence does not support.** Michael: *"Fixing the color as a one-off leaves the mechanism intact."*
+
+**How it got there, and why it was invisible:** the tone was a bare literal in the composer —
+`declining ? 'warning' : …` — carrying a comment that pinned it to a *different row's* appearance:
+*"WARNING, NOT DANGER — the RUN row renders the same movement in amber."* True when written. The RUN
+row went neutral on 2026-08-01 and the literal did not, and nothing could have caught it: **an
+assumption about another surface's rendering, hardcoded, with no link back to the thing it assumed.**
+
+### THE RULE
+
+> **A rollup row's severity may never exceed the maximum severity of its contributors.**
+> Less severe is legitimate aggregation. **More severe is invention.** If every contributor renders
+> neutral, the rollup renders neutral.
+
+Encoded as `capRollupTone` / `severityOfVerdict` (`_shared/state-trend/severity.ts`, **5 regression
+tests including the exact bug case**), applied **at the composer** so every rollup inherits it —
+present and future. `positive` ranks as severity 0: it is a *valence*, not an alarm, so the cap never
+flattens a green row. No contributors → capped at neutral, because a rollup of nothing should not be
+the loudest thing on the screen.
+
+**The companion decision, same place, different problem:** the contributor clause is **deleted**. It
+restated the two rows directly beneath it — the redundancy already killed in coach v119 (restating
+the LOAD bar) and v131 (the running story told twice). It only *became* redundancy when D-346 pointed
+this row at `run.efficiency`; before that the row had its own metric and naming its inputs was honest.
+**Glass-box is not weakened:** the evidence is rendered adjacent and tappable directly below, and
+glass-box requires evidence be *reachable*, not *restated*. The ages and the stale-half naming move to
+the provenance (one tap), so nothing is lost — only demoted.
+
+**Shipped in two pieces, deliberately** — *"I want the screen correct before the deploy lands."*
+- **STEP 1 (client, `c2d6df90`, PUSHED + DEPLOYED):** the cap enforced at the render edge
+  (`cappedSignalColor`, `StateTab.tsx`) + one minus glyph (`verdictSignedPct`'s holding branch printed
+  an ASCII hyphen beside the sliding branch's U+2212). ⚠️ **A STOPGAP, MARKED FOR DELETION** — it fixes
+  the screen, not the mechanism; anything else reading `trend_tone` still saw `warning`.
+  ⚠️ **The clamp had to cap DIRECTION as well as tone** — `trendColor` falls *through* a neutral tone
+  to `dir === 'declining' → amber`, so clamping tone alone was decorative. Caught in review, not on
+  the screen.
+- **STEP 2 (server, coach **v156**, PUSHED — ⛔ NOT DEPLOYED):** the cap at the composer + the clause
+  deleted + STEP 1's stopgap now removable. **Deploy owed:** `coach`, and — per the `_shared` trap —
+  the other three importers of `state-trend/index.ts` (`compute-snapshot`, `workout-detail`,
+  `analyze-cycling-workout`) whose bundled copy changed, though the added export is inert for them.
+
+**Supersedes** the tone literal introduced in coach v154. **Does not touch** the efficiency
+thresholds, the RUN/BIKE rows, or D-346's contributor wiring.
+
 ## D-352 — THE IN-SESSION CUES: SURFACED, NARROWED, AND THE AMRAP RULE REVERSED (2026-08-01, **PUSHED, client-only, not device-verified**)
 
 **⛔ THE BAR-SPEED DOCTRINE HAD NO `D-NNN` UNTIL NOW.** It was written on 2026-07-25, argued in a
