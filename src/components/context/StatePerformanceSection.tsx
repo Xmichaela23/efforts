@@ -65,17 +65,37 @@ const NUMERIC: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
 //   settled lower — dropped, then levelled off (sliding + recentlyFlat)   ← the split nobody else draws
 // Only the sliding verdict splits; "sliding" as a bare word is retired everywhere in favour of "easing
 // off" (its non-alarming default). Falls back to VERDICT for improving/holding/needs_data/withheld.
+// ── THE RUN EFFICIENCY ROW GETS ITS OWN WORDS BACK (2026-08-01, Michael) ─────────────────────────
+//
+// ⛔ A SEPARATE MAP, NOT WORDS ADDED TO `NUMERIC`. `NUMERIC` is shared with the bike `Signal`, and the
+// bike is deliberately staying wordless until it has a confidence interval of its own. Adding words
+// there would have silently changed the bike row too.
+//
+// The words are PLAIN-LANGUAGE, not trend jargon: efficiency is speed per heartbeat, so "faster at the
+// same effort" says what the number means to a runner. The arrow and the signed percent still ride
+// alongside — the word replaces nothing, it explains.
+const RUN_EFF_WORDS: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
+  improving: { word: 'Faster at the same effort', cls: 'text-emerald-400', arr: '↑' },
+  holding: { word: 'Holding steady', cls: 'text-white/70', arr: '→' },
+  // Neutral, not amber — a decline here is a direction, and heat or a base block routinely cause it.
+  sliding: { word: 'Slower at the same effort', cls: 'text-white/70', arr: '↓' },
+  needs_data: { word: 'Need a few more runs', cls: 'text-white/60', arr: '' },
+  withheld: { word: 'Too soon to tell', cls: 'text-white/60', arr: '' },
+};
+
 // `wordMap` selects the vocabulary: VERDICT keeps the words (swim, rest), NUMERIC drops them
-// (run, bike). The recentlyFlat SPLIT survives either way — it is the arrow that carries it.
+// (bike), RUN_EFF_WORDS spells them out (run efficiency). The recentlyFlat SPLIT survives all three —
+// it is the arrow that carries it, and on the run row it gets its own phrase.
 function verdictLabel(
   verdict: TrendVerdict,
   recentlyFlat?: boolean,
   wordMap: Record<TrendVerdict, { word: string; cls: string; arr: string }> = VERDICT,
 ): { word: string; cls: string; arr: string } {
   if (verdict === 'sliding' && recentlyFlat) {
-    return wordMap === NUMERIC
-      ? { word: '', cls: 'text-white/70', arr: '→' }          // fell, then levelled — flat arrow, the number carries the drop
-      : { word: 'settled lower', cls: 'text-white/55', arr: '→' };
+    if (wordMap === NUMERIC) return { word: '', cls: 'text-white/70', arr: '→' };  // bike: the number carries the drop
+    // "Dropped, then levelled" is the split nobody else draws — on the run row it gets said out loud.
+    if (wordMap === RUN_EFF_WORDS) return { word: 'Slower, now holding', cls: 'text-white/70', arr: '→' };
+    return { word: 'settled lower', cls: 'text-white/55', arr: '→' };
   }
   return wordMap[verdict];
 }
@@ -84,14 +104,31 @@ function verdictLabel(
 // For lower-is-better disciplines (swim/run pace) an improvement is a NEGATIVE delta — printing it
 // verbatim gives "↑ improving −34%". The verdict already encodes good/bad; sign the magnitude by the
 // verdict so the number and the arrow always agree. improving → +, sliding → −, holding → raw.
-function verdictSignedPct(verdict: string, pct: number | null | undefined): string | null {
+// `dp` is DISPLAY ONLY — `eff.pctChange` stays raw on the object. A tenth of a percent on a
+// regression slope over three months is false precision; the confidence interval is the honest
+// statement of how sure the number is, and it is now rendered beside it.
+function verdictSignedPct(verdict: string, pct: number | null | undefined, dp = 1): string | null {
   if (pct == null) return null;
+  const mag = (n: number) => Math.abs(n).toFixed(dp).replace(/\.0+$/, '');
   // ⚠️ ONE MINUS GLYPH, ALL THREE BRANCHES. The `holding` fallback used to print JS's own negative
   // ("-0.4%", ASCII hyphen U+002D) while the sliding branch printed a true minus ("−15.2%", U+2212).
   // Adjacent rows on one screen, two different characters at two different widths. 2026-08-01.
-  if (verdict === 'improving') return `+${Math.abs(pct)}%`;
-  if (verdict === 'sliding') return `−${Math.abs(pct)}%`;
-  return `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct)}%`;
+  if (verdict === 'improving') return `+${mag(pct)}%`;
+  if (verdict === 'sliding') return `−${mag(pct)}%`;
+  return `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${mag(pct)}%`;
+}
+
+// The 95% CI the verdict was gated on, in whole percent. `assemble.ts:473` carries it from
+// `routeTrend`, and `heat-adjust.ts:203` documents it as the CI **of pct** — the same number rendered
+// beside the arrow (`assemble.ts:391`: `pctChange: runRoute.pct`). So the range brackets the figure
+// shown, not a different estimate.
+//
+// ⚠️ NULL IS A REAL ANSWER. `ci` is null on the linear_k fallback and on the non-route path. Show
+// nothing rather than a fabricated interval — a made-up range is worse than no range.
+function ciRange(ci: [number, number] | null | undefined): string | null {
+  if (!ci || ci.length !== 2 || ci.some((n) => !Number.isFinite(n))) return null;
+  const fmt = (n: number) => `${n < 0 ? '−' : '+'}${Math.abs(Math.round(n))}%`;
+  return `range ${fmt(ci[0])} to ${fmt(ci[1])}`;
 }
 
 // ── THE BLOCK, STATED — read from the card, translated by nobody ──────────────────────────────────
@@ -579,7 +616,7 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
   // and the toggle could never render. Left in place it was dead code advertising a distinction that
   // no longer exists.
   const shownPace = eff.recentPaceSecPerKm;
-  const v = verdictLabel(eff.verdict, eff.recentlyFlat, NUMERIC);   // arrow + number, no word
+  const v = verdictLabel(eff.verdict, eff.recentlyFlat, RUN_EFF_WORDS);   // word + arrow + whole percent
   // ⚠️ The conditions line: the temperature SPREAD across the plotted runs. Shown, never corrected —
   // it is what lets the athlete discount a hot month without the app claiming to have done it for them.
   // ⛔ WHAT HEAT COSTS YOU, IN SECONDS PER MILE (D-346, 2026-07-31).
@@ -651,7 +688,7 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
         {hasTrend ? (
           <span className={`inline-flex items-baseline gap-1 text-[13px] ${v.cls}`}>
             {v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}
-            {eff.pctChange != null && <span className="text-white/60">{verdictSignedPct(eff.verdict, eff.pctChange)}</span>}
+            {eff.pctChange != null && <span className="text-white/60">{verdictSignedPct(eff.verdict, eff.pctChange, 0)}</span>}
           </span>
         ) : (
           // Honest: efficiency is a TREND, so one run can't read it. Say how close — not a confident dot.
@@ -663,9 +700,9 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
           // threshold that no longer decides anything, which is how a screen starts lying quietly.
           eff.route
             ? <span className="text-white/60 text-[12px]">
-                reading {eff.route.points} runs — not separated from the noise yet
+                Too soon to tell — reading {eff.route.points} runs, the trend isn't separated from the noise yet
               </span>
-            : <span className="text-white/60 text-[12px]">{eff.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs to read it</span>
+            : <span className="text-white/60 text-[12px]">Need a few more runs — {eff.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs to read a trend</span>
         )}
       </span>
       {hasTrend && evidence && <span className="basis-full text-white/55 text-[12px]">{evidence}</span>}
@@ -748,14 +785,40 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
               weeks ago", which was wrong twice over: the window is ~13 weeks, and the number is a
               regression slope across all of it, not an endpoint comparison. The ⓘ is where an athlete
               goes to check whether to believe the number — a stale explanation there is worse than none. */}
+          {/* ⛔ THE DETAIL SAYS WHAT THE NUMBER MEANS, THEN HOW SURE IT IS (2026-08-01, Michael).
+              The magnitude is whole-percent — a tenth on a regression slope across three months is
+              false precision, and the CI is the honest statement of confidence. The range is
+              `route.ci`, already computed and already cached; nothing is recomputed here.
+              ⚠️ The SLIDING branch names the ordinary causes (heat, fatigue, a base block) because a
+              decline here is routinely correct, and a bare "slower" invites the athlete to read a
+              problem the number cannot support. It names them as possibilities, never as a finding. */}
           <p className="basis-full text-[12px] text-white/55 leading-snug mt-1.5 max-w-[min(100%,340px)]">
             Efficiency is your speed per heartbeat, adjusted for hills and for heat — rising means faster at the same effort.
-            {eff.pctChange != null && eff.route?.spanDays != null && (
-              <> The {verdictSignedPct(eff.verdict, eff.pctChange)} is the trend across {Math.max(1, Math.round(eff.route.spanDays / 7))} weeks of running, not a comparison of two days.</>
-            )}
-            {eff.route?.ci && (
-              <> The range that fits your data is {eff.route.ci[0]}% to {eff.route.ci[1]}%.</>
-            )}
+            {(() => {
+              const wks = eff.route?.spanDays != null ? Math.max(1, Math.round(eff.route.spanDays / 7)) : null;
+              const over = wks != null ? ` over ${wks} weeks` : '';
+              const rng = ciRange(eff.route?.ci);
+              const mag = eff.pctChange != null ? Math.abs(Math.round(eff.pctChange)) : null;
+              if (eff.verdict === 'holding') return <> No real change in speed-for-effort{over}.</>;
+              // ⛔ THE RANGE IS NOT OPTIONAL ON THIS STATE — IT IS MOST NEEDED HERE (Michael,
+              // 2026-08-01, overruling the first build). This row renders a FLAT arrow beside a
+              // precise-looking "−15%", which makes a NET figure over the whole window look settled
+              // and certain when its recent half is flat. Dropping the range here would have
+              // reintroduced exactly the false precision this change set out to kill, on the one
+              // state where it reads most confident. **Every state that shows a number shows its
+              // uncertainty. No exceptions** — that is the rule that makes the rest trustworthy.
+              if (eff.verdict === 'sliding' && eff.recentlyFlat) {
+                if (mag == null) return <> Dropped earlier, steady for the last few weeks.</>;
+                return <> About {mag}% less speed per heartbeat{over}{rng ? ` (${rng})` : ''} — most of that drop was earlier; the last few weeks have held steady.</>;
+              }
+              if (eff.verdict === 'improving' && mag != null) {
+                return <> About {mag}% more speed per heartbeat{over}{rng ? ` (${rng})` : ''}.</>;
+              }
+              if (eff.verdict === 'sliding' && mag != null) {
+                return <> About {mag}% less speed per heartbeat{over}{rng ? ` (${rng})` : ''}. Heat, fatigue, or a base block can all cause this.</>;
+              }
+              return null;
+            })()}
           </p>
         </>
       )}
