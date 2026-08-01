@@ -35,7 +35,7 @@ entry for it in `DECISIONS-LOG.md` or its archive. See §5.
 | Wrong | 189 (93 load-bearing, 96 rotted line references) |
 | Corrected in place | 189 — 187 mechanically, 2 by hand after the applier refused them as ambiguous |
 | Structural problems flagged for you, not patched | 2 (§5) |
-| Docs moved to `docs/archive/` | see §6 |
+| Docs classified | 158 — **35 moved to `docs/archive/`**, 10 proposed-and-held, 99 kept (§6) |
 | Docs deleted | **0** — nothing was deleted, by instruction |
 | Code files changed | **0** |
 
@@ -215,52 +215,322 @@ rule". The doc is right and CLAUDE.md is wrong.
 
 ---
 
+## 6. Every doc classified — 158 files, 123 left in `docs/`
+
+Every `.md` in `docs/` was read and called. **35 moved, 10 proposed-and-held, 99 kept.**
+Nothing was deleted.
+
+The rule applied, on top of what the readers proposed: **if one of the six living docs still points
+at a doc, it stays** — unless the doc's own header declares itself dead. Being cited by a file that
+gets updated every session is evidence something is still load-bearing, and archiving one of those
+costs a morning while leaving it costs nothing.
+
+Where two readers disagreed (4 docs), the disagreement was resolved by hand against code, not by
+vote. The most useful catch: one reader wanted to archive `SPEC-run-pace-glass-box.md` as "shipped as
+D-285", having confused the run-pace **resolver** (which did ship) with the **glass-box provenance
+surface** (which did not — `resolveRunPaceStack`, `run_pace_provenance` and `glassBox` have **zero
+hits** in the codebase and Q-171/Q-173 are still open). It stays.
+
+### 6.1 Moved to `docs/archive/` — 35
+
+`git mv`, so every one is one `git revert` from coming back.
+
+| doc | why |
+|---|---|
+| `AUDIT-app-synthesis-2026-07-02.md` | Dated snapshot at the top of the 2026-07-02 audit stack; livedocRefs=0 and its ~6%-conformance scorecard is superseded by AUDIT-state-screen-2026-08-01.md plus TRUTH-MAP.md. |
+| `AUDIT-spine-conformance-2026-07-02.md` | Dated 2026-07-02 snapshot, livedocRefs=0; only inbound refs are AUDIT-app-synthesis-2026-07-02.md, SESSION-CONTEXT.md and archived logs. |
+| `AUDIT-swim-2026-06-14.md` | livedocRefs=0; superseded by AUDIT-swim-2026-06-17.md, which carries the whole-board severity map plus the 2026-06-18 close status (D-199). |
+| `AUDIT-truth-reconciliation-2026-06-14.md` | Its sign-offs were consumed by the spine build (BUILD-PLAN-top-down-spine-wiring.md frames off it); livedocRefs=0 and TRUTH-MAP.md is now the per-fact truth-authority doc. |
+| `BUILD-PLAN-top-down-spine-wiring.md` | 2026-06-14 master sequence for spine wiring that has since shipped (state_trends_v1 / compute-snapshot live); livedocRefs=0, only inbound ref is docs/audit/03-spine-snapshot.md. |
+| `BUILD-SEQUENCE-spine-foundation.md` | Status line says 'Plan only · not started' from 2026-06-14, but its Phase 0–2 spine foundation shipped; livedocRefs=0 and its only live pointer is BUILD-PLAN-top-down-spine-wiring.md, itself archive-bound. |
+| `COVERAGE-AUDIT-2026-05-13.md` | Dated one-off static audit of fixes shipped 2026-05-13; livedocRefs=0 and its only inbound ref is the archived OPEN-QUESTIONS-archive-Q001-Q129.md. |
+| `CYCLING-INGEST-AUDIT.md` | 2026-05-13 dated audit whose headline FTP finding is marked closed in-doc (resolveCurrentFtp, commit 76d94120); livedocRefs=0. |
+| `DESIGN-endurance-per-session-response.md` | Own banner: PARKED 2026-07-09, prototype written then deleted as duplicative of the spine + carryover reads, 'kept only as a record'; zero living-doc references. |
+| `DESIGN-familiar-routes.md` | Own banner: '⛔ SUPERSEDED 2026-07-06 — DO NOT BUILD FROM THIS DOC. See DESIGN-segments.md' — the route-identity substrate it rests on was killed by the D-250 audit. **Substance verified present in D-250.** |
+| `DESIGN-soreness-input.md` | Built: src/components/SorenessScale.tsx exists and ENGINE-STATE.md:723 records the segmented-bar 1-7 popup shipped across all disciplines with the no-default guarantee fixtured. **Substance verified present in D-234.** |
+| `GOALS_SYSTEM_BLUEPRINT.md` | Own banner: '⚠️ STALE — VERIFY-FIRST', its rolling-generation mechanism (generate-macro, advance-plan, macro_phases) is 'fiction relative to live code' and §4-§8 are marked do-not-build; zero living-doc references. |
+| `ISLAND-PROPOSAL.md` | Non-binding proposal; superseded as the strength-authority doc by ARCH-strength-spine.md (LIVING, 2026-07-25) and its Phase 0/1 landed (_shared/periodization/ exists, isRestedTerminal 15 code hits); livedocRefs=0. |
+| `PERF-COMPARISON-POOL-SPEC.md` | Shipped: DECISIONS-LOG.md:336 records the D-037/D-038 mixed-effort work as shipped, silently reverted, then restored; pool_intensity_filter has 23 code hits. **Substance verified present in D-038.** |
+| `PERFORMANCE_SCREEN_AUDIT.md` | 2026-03-02 read-only audit of MobileSummary; livedocRefs=0, totalRefs=2, and the strength/endurance Performance surfaces were redesigned since (DECISIONS-LOG.md:2285). |
+| `PHASE-0-ARC-CHANNEL-SPEC.md` | Built: PHASE-1-RUN-PACE-SPEC.md:329 states 'D-032 / Phase 0 (Arc channel) shipped at ad4102f8'; ArcChannelPayload has 10 code hits; livedocRefs=0. **Substance verified present in D-032.** |
+| `PLAN-AUDIT-RESULTS.md` | Dated 2026-05-10 script output snapshot from scripts/audit-plans.ts; livedocRefs=0, totalRefs=1 — regenerable, not a standing contract. |
+| `SESSION-CONTEXT.md` | Self-titled 'CURRENT HANDOFF — 2026-07-02'; superseded by the ENGINE-STATE.md banners and GAME-PLAN.md, livedocRefs=0. |
+| `SESSION-HANDOFF-2026-05-10.md` | Dated session snapshot of three landed commits; zero inbound references anywhere in the repo. |
+| `SMART_SERVER_DUMB_CLIENT_AUDIT.md` | 2026-02-25 audit whose table is now all '✅ Fixed'; superseded as doctrine by TARGET-ARCHITECTURE.md; livedocRefs=0. |
+| `SPEC-ATHLETE-STATE-CONTINUITY-OPTIONS.md` | Read-only "options for review on return" investigation whose question was answered — readiness_checkins shipped (supabase/migrations/20260612120000_create_readiness_checkins.sql) and arc-context.ts:265-288 now reads it; livedocRe… **Substance verified present in none found (options doc, not a spec — its decision landed as Q-049 Phase 1).** |
+| `SPEC-e3a-nonrace-zones.md` | Header says "not approved, not implemented" but it SHIPPED — sustainable.ts:16 imports hrZones/paceZonesFromVdot, e3a-zones.test.ts exists, and D-218 records commit 94f1c58f "E3a zones"; caution: code comments cite this path (gen… **Substance verified present in D-218.** |
+| `SPEC-e3b-bottom-up-volume.md` | Own banner says IMPLEMENTED 2026-06-28 Part 1+2 and D-219 carries the full substance; e3b-budget.test.ts confirms — caution: cited from generate-run-plan/types.ts and sustainable.ts comments, repoint before moving. **Substance verified present in D-219.** |
+| `SPEC-non-race-run-retest.md` | All three cuts are BUILT — applyRetestTail at generate-run-plan/generators/base-generator.ts:436 (called :425), routing at create-goal-and-materialize-plan/index.ts:2711, tests retest-tail.test.ts/retest-behavior.test.ts; D-218 r… **Substance verified present in D-218.** |
+| `SPEC-strength-island-phase1.md` | Fully built: _shared/periodization/index.ts:51 isRestedTerminal + canonicalizePhaseName + protocolPhaseName, consumed at generate-run-plan/strength-overlay.ts:22,276 with retest-behavior.test.ts covering the retest cases. **Substance verified present in the Strength-Island D-entry at docs/archive/DECISIONS-LOG-archive-D001-D239.md:4536.** |
+| `STATE-OF-BOARD.md` | Self-dated 'Captured: 2026-06-28' status snapshot with pinned edge-function versions; livedocRefs=0 and ENGINE-STATE/GAME-PLAN own live status. |
+| `STRENGTH-SCOUT-REPORT.md` | Read-only scout map, livedocRefs=0; its live pointers are ISLAND-PROPOSAL.md / SPEC-strength-island-phase1.md / STATE-OF-BOARD.md, all pre-dating the 2026-07-25 strength-spine reframe in ARCH-strength-spine.md. |
+| `UI-MAP.md` | Dated 2026-06-28 read-only audit of the two non-race builder UIs; livedocRefs=0, totalRefs=1, and SCREEN-INVENTORY/SCREEN-CONNECTIVITY are the maintained screen maps. |
+| `UNLINKED-WORKOUT-INTERPRETATION-SPEC.md` | Shipped: header says 'APPROVED 2026-05-23. D-035', and DECISIONS-LOG.md:2285 treats D-035 as a live standing law; livedocRefs=0. **Substance verified present in D-035.** |
+| `WORK-ORDER-narrative-core.md` | Header states ✅ COMPLETE (2026-06-16) with all five narrative paths migrated; substance already folded into D-187–D-192. **Substance verified present in D-187 through D-192.** |
+| `WORKORDER-feature-audit.md` | Its work landed — the docs/audit/ corpus (00-INDEX plus 01–09 area maps) it commissioned exists and is now the master reference; livedocRefs=0. |
+| `plan-engine-contract-audit.md` | May-2026 audit measured against PLAN-CONTRACT.md v1, which CLAUDE.md:267 declares superseded — the yardstick is gone; livedocRefs=0. |
+| `plan-engine-fix-backlog.md` | Backlog synthesized from the two superseded plan-engine audits and PLAN-CONTRACT v1; totalRefs=0 — POLISH-PUNCH-LIST is the live backlog. |
+| `plan-seasons-e2e-audit.md` | May-2026 dated e2e trace snapshot; livedocRefs=0, totalRefs=1, superseded by BUILDER-SWEEP-FINDINGS + the AUDIT-* series. |
+| `run-only-season-planner.md` | 'Status: Tabled', refs=0; the run-only non-race path was instead delivered via the retest head (generate-run-plan/types.ts:16) and the front door is locked by SPEC-product-shape. |
+
+### 6.2 Proposed for archive but NOT moved — 10
+
+Each of these is still cited by one of the six living docs. That is evidence they are not
+*clearly* superseded, and the instruction was to move only the clear ones. Your call.
+
+| doc | living-doc refs | the reader's case for archiving |
+|---|---|---|
+| `AUDIT-state-screen-2026-07-02.md` | 1 | Superseded twice over — AUDIT-state-screen-2026-07-20.md extends it and AUDIT-state-screen-2026-08-01.md maps the whole screen on top of both. |
+| `AUDIT-strength-frequency-concurrent-matrix-2026-06-29.md` | 1 | Q-088 has left the live OPEN-QUESTIONS.md and its successor spec was already retired to docs/archive/superseded-strength-2026-07-25/SPEC-q088-freq4-run-path.md, so this scoping sheet is history. |
+| `DESIGN-D267-plan-primary-load-verdict.md` | 1 | D-267 shipped and was extended by D-268; note DECISIONS-LOG.md:176 delegates 'full design + all amendments' to this file, so that pointer must be updated to the archive path. |
+| `DESIGN-cross-domain-carryover.md` | 1 | Built and wiring-verified per ENGINE-STATE.md:717-719 (_shared/cross-domain-carryover.ts + 57 fixtures + synthetic acceptance run); note ENGINE-STATE.md:719 links this file as 'Design:' — repoint before moving. |
+| `DESIGN-run-easy-pace-truth.md` | 1 | Q-169's starvation is fixed: ENGINE-STATE.md:918-921 marks the easy-HR band REBUILT, the nested threshold_hr read FIXED, and the run_easy_hr 123 fabrication DELETED. |
+| `HANDOFF-2026-07-09-load-plan-awareness.md` | 1 | Dated handoff whose substance already lives in D-267 and D-268 (and their DESIGN-* docs); it says everything but D-268 Phase 4 shipped 2026-07-09. |
+| `HANDOFF-2026-07-10-architecture-north-star.md` | 1 | Dated handoff; its 'first mission' S2 (retire client-side math) is recorded as shipped in my continuity notes and TARGET-ARCHITECTURE/TRUTH-MAP now carry the doctrine it points to. |
+| `ISLANDS-ORIENTATION.md` | 1 | 2026-06-28 orientation snapshot superseded by START-HERE.md (rewritten 2026-07-13 from a code audit) and ARCH-strength-spine.md; its 'nobody can reach it in the app yet' framing predates the non-race run retest head shi… |
+| `SPEC-state-headline.md` | 2 | GAME-PLAN.md:248 states it outright: 'the code shipped; per the SPEC LIFECYCLE the substance folds into a D-NNN and the file dies' — the D-NNN still needs authoring (F13). |
+| `SPEC-state-screen-v2-performance.md` | 1 | AUDIT-state-screen-2026-07-02.md:59 states the 'not built' header is stale and it IS built (D-148); State has since moved to v3 (D-293/294/295), so the spec describes a superseded screen. |
+
+### 6.3 Kept — 99 (plus the 6 living docs and this report)
+
+<details><summary>Full keep list with reasons</summary>
+
+| doc | conf | why it stays |
+|---|---|---|
+| `APP-FLOW.md` | medium | Self-declared living baseline for client structure/routing, cited by TRUTH-MAP; no successor doc covers the client shell map. |
+| `ARCH-strength-spine.md` | high | Header says LIVING DOC with OPEN sections; 4 living-doc refs and it is the 'where things live' authority the strength-spine build still runs against. |
+| `AUDIT-continuity-2026-06-16.md` | low | Its own banner says both fractures CLOSED (D-185/D-186), but ENGINE-STATE.md:827 still directs readers to it as the where-each-value-is-single-sourced map before adding any new computation. |
+| `AUDIT-fanout-ordering-2026-07-17.md` | high | Findings unlanded — doc states rulings owed on §3a/§3b/§3c and Q-185–Q-188 are still open in OPEN-QUESTIONS.md:128-140; 4 living-doc refs. |
+| `AUDIT-hr-congruence-2026-07-17.md` | high | Touched 2026-07-31 with a D-346 correction; the LTHR four-resolver fracture and max-HR scatter are still flagged open. |
+| `AUDIT-performance-state-2026-07-29.md` | high | Two days old, 2 living-doc refs, findings (five exercise-identity resolvers, content-blind strength auto-attach) are a map of unfixed work. |
+| `AUDIT-state-screen-2026-07-20.md` | high | Header says IN PROGRESS with load reconciler / race block / no-plan state still to trace, and AUDIT-state-screen-2026-08-01.md explicitly says it 'supersedes nothing' and sits on top of this doc's F1… |
+| `AUDIT-state-screen-2026-08-01.md` | high | Newest State map (touched 2026-07-31), 4 living-doc refs, and the root finding (StatePerformanceSection.tsx does not read _shared/block-identity.ts) is unfixed. |
+| `AUDIT-swim-2026-06-17.md` | medium | Cited by ENGINE-STATE.md:790 as the swim hole map and still carries unlanded ⏭ DEFERRED items (H2 best-efforts fit, H3 pace formula fork, H4 capture, M1, M3). |
+| `BRICK-PROTOCOL.md` | medium | Standing protocol reference for the brick cap matrix, peer to RUN-/SWIM-/STRENGTH-PROTOCOL and cited by both plus docs/audit/04-planning.md. |
+| `BUILD-ORDER-strength-spine.md` | medium | Header says LIVING DOC, mid-design, with OPEN sections explicitly not implementable; the strength-spine build has not landed and SPEC-get-stronger.md + ARCH-strength-spine.md both point at it. |
+| `BUILDER-SWEEP-FINDINGS.md` | high | Findings still open — ENGINE-STATE.md:758 states the non-race builder materializes 0/16 shapes (F-9/F-10/F-11/F-12) and names this doc as the findings register. |
+| `CANON-arc-inference-model.md` | high | Doctrine (CANON-*), 8 living-doc refs, and the yardstick CONSTITUTION.md consolidates from. |
+| `CONCEPT-adapt-plan-strength.md` | high | Server half shipped (D-315) but ENGINE-STATE.md:279 names its State-as-hub section as the NEXT JOB, designed and not yet built. |
+| `CONCEPT-plan-your-week.md` | medium | Scoping doc with no code written; the Schedule/drag half it sizes is still unbuilt and ENGINE-STATE.md:745 still cites it. |
+| `CONSOLIDATED-MODE.md` | low | Engine half is built (integration_mode at create-goal-and-materialize-plan/index.ts:1921 + consolidated-trade-off.test.ts) but §11 wizard research copy is still owed, and POLISH-PUNCH-LIST + CAPABILI… |
+| `CONSTITUTION.md` | high | Doctrine — the six laws and their violation tells; the audit yardstick, 17 total refs. |
+| `COPY-VOICE.md` | high | Doctrine — canonical voice contract enforced against _shared/state-trend/week-accent.ts voiceViolation(); 3 living-doc refs. |
+| `CYCLING-ANALYSIS-DESIGN.md` | medium | Design spec whose segment/GPS-matcher decision is still owed — ENGINE-STATE.md:958 defers to it for Q-009; 14 total refs. |
+| `CYCLING-PROTOCOL.md` | medium | Standing protocol reference describing shipped engine behavior with Phase 4 (limiter_sport='bike' intensity dial) still deferred; peer to RUN-/SWIM-/STRENGTH-PROTOCOL. |
+| `DAY-COUNT-GATES.md` | high | POLISH-PUNCH-LIST.md:301-302 is an open item pointing here: src/lib/day-count-gate.ts:237 is built with 30+ tests and ZERO importers; the wizard mount + copy remain, gated behind consolidated mode. |
+| `DEPLOY-OWED.md` | medium | ENGINE-STATE.md:758 actively directs readers to its 'Next-session pickup'; the post-deploy checks are still unrun (blocked on a clean test account). |
+| `DESIGN-D237-lint-guard.md` | low | Unbuilt design awaiting Michael's approval (no lint rule or CI guard exists) — orphan with zero references anywhere, but it is unbuilt scope, not dead scaffolding. |
+| `DESIGN-D268-plan-aware-everywhere.md` | high | Partly built — its own header records Phases 1-3+5 shipped (coach v291/v293) with Phase 4 still REMAINING (Q-149). |
+| `DESIGN-Q111-plan-history-aware-verdicts.md` | medium | Mixed state: §1 explicitly descoped, §2 novelty built (_shared/novel-movements.ts), §§3-10 unratified — and ENGINE-STATE.md:929 still cites Q-111 as the live open residual. |
+| `DESIGN-best-efforts.md` | high | Genuinely unbuilt — no best-effort module, edge function, or migration in the repo (only cycling power-curve code); the run GAP wiring it specs does not exist. |
+| `DESIGN-load-system-extension.md` | high | Item 0 built (D-261, _shared/plan-phase.ts); Items 1-4 designed and not built, and it carries THE LAW (D-260) framing for all load work. |
+| `DESIGN-segments.md` | high | Not built — no segment table, migration, or matcher exists (only cycling-v1/segments.ts and course-segmentation.ts, unrelated); D-250 records it as SPEC and it is the named replacement for the killed… |
+| `DESIGN-strength-convergence.md` | high | Code shipped (coach payload v74 reads the spine per-lift direction) BUT DECISIONS-LOG.md:217 states there is no D-270 heading anywhere — this file is the only written record of the ruling; archive on… |
+| `DOCTRINE-aerobic-maintenance-run-only.md` | high | Doctrine (default KEEP) and still unbuilt in three places its own trace notes flag: no grade field, run_vo2_* token grammar cannot express short intervals, §2.2 pace anchors contradicted by materiali… |
+| `DOCTRINE-aerobic-maintenance.md` | high | Doctrine (default KEEP), 2026-07-26, companion to SPEC-week-solver; §5.2 cadence field is still the unbuilt load-bearing requirement and §9 is unresolved against D-325. |
+| `ENDURANCE-PROVENANCE.md` | medium | The debt it catalogs is explicitly still open — docs/archive/DECISIONS-LOG-archive-D001-D239.md:4536 names 'the endurance-number sourcing debt (ENDURANCE-PROVENANCE.md: 0 SOURCED — a separate, larger… |
+| `FEEDBACK-LOOP-WORKORDER.md` | medium | Phase 0 (D-032) and Phase 1 (D-033) landed, but Phases 2/3/4 (D-034/D-035/D-036) are recorded as still queued and paused per user direction — unlanded findings mean KEEP. |
+| `FOUNDATION-READINESS.md` | high | Living severity-ranked hardening backlog referenced by 3 living docs; B1 shipped as D-271 but B4 (no error sink) and the S1-S5 scale items are still open. |
+| `FTP-COLD-START-SPEC.md` | high | Unbuilt by explicit ruling — SPEC-intensity-baselines.md:11,198,205 says it is 'spec-only, unimplemented' and must stay unimplemented unless explicitly requested. |
+| `LIFECYCLE.md` | high | Doctrine — the FROZEN-vs-LIVE boundary doc; livedocRefs=6 and CLAUDE.md points at it for adapt-plan behaviour. |
+| `MAINTENANCE-DEBT.md` | medium | Open-debt register with items still marked 'open, not blocking' (migration divergence, analyze-cycling type errors); totalRefs=13. |
+| `PACE-AT-HR-TREND-SPEC.md` | medium | Header: 'spec only … Not implemented. Do not ship without an explicit go-ahead' — unbuilt spec against still-open Q-025. |
+| `PERF-INTERVAL-INTERPRETATION-SPEC.md` | medium | 'DRAFT v2 — awaiting approval'; Bug A/B are still open pending repro artifacts, so the unbuilt remainder is live. |
+| `PHASE-1-RUN-PACE-SPEC.md` | low | Feature is BUILT (resolveRunEasyPace, 36 hits, 9 pin tests) so lifecycle says archive — but CLAUDE.md:12 and OPEN-QUESTIONS.md:471 cite this file as the anti-rebuild pointer for that exact function; … |
+| `PLAN-GENERATION-TEST-MATRIX.md` | low | Header: 'Not yet implemented' — design for a verification harness that does not exist; livedocRefs=0 but nothing supersedes it. |
+| `PRODUCT-POSITIONING-v2-DRAFT.md` | medium | Doctrine/positioning; livedocRefs=5 and SPEC-posture-flag.md:4 orders it read first as the voice source — still a live DRAFT with the v1-vs-v2 fork unresolved. |
+| `PRODUCT-POSITIONING.md` | medium | Doctrine; v1.1 but carries a newer 2026-07-18 North Star section than the v2 draft, so it is not cleanly superseded yet. |
+| `PROTOCOL-strength-focus-overview.md` | medium | Athlete-facing, source-tagged science overview of the shipped 12-week Strength Focus block; touched 2026-07-29, behaves like a SCIENCE doc not a status doc. |
+| `RACE-WEEK-PROTOCOL.md` | medium | Not a SPEC-*: §1–4 are declared 'the verified current contract' for race-week generation; totalRefs=9 and other protocol docs bind to it. |
+| `RESEARCH-session-interpretation-precedents-2026-07-09.md` | low | Citation source (precedent survey with human-verified corrections) backing DESIGN-endurance-per-session-response.md; SCIENCE-class doc, does not rot. |
+| `RUN-PROTOCOL.md` | medium | Prescriptive protocol; Phase 4 (limiter_sport='run' intensity dial) explicitly deferred and still blocked per ENGINE-STATE.md:935. |
+| `SCHEDULING-RULES.md` | high | Prescriptive scheduling law, confidence-tagged; totalRefs=22 and named by CLAUDE.md:267 as the doc that superseded PLAN-CONTRACT. |
+| `SCIENCE-5x5-linear-progression.md` | high | SCIENCE citation source for the five_by_five protocol (D-210); totalRefs=19. |
+| `SCIENCE-concurrent-training-interference.md` | high | SCIENCE citation source grounding SPEC-per-discipline-periodization Phase 2; totalRefs=20. |
+| `SCIENCE-durability-injury-prevention.md` | high | SCIENCE citation source for the durability protocol (foundation-durability.ts), which is still a live protocol module. |
+| `SCIENCE-glute-accessory-bias.md` | high | SCIENCE citation source for the glute accessory-bias add-on, which is shipped and selectable. |
+| `SCIENCE-hyrox-accessory-bias.md` | high | SCIENCE citation source for the Hyrox accessory bias, which is shipped and selectable (only the circuit-week hack is parked). |
+| `SCIENCE-minimum-dose-maintenance.md` | high | SCIENCE citation source for the minimum_dose protocol (minimum-dose.ts), a live protocol module. |
+| `SCIENCE-neural-speed-running-economy.md` | high | SCIENCE citation source for the neural_speed protocol (performance-neural.ts), a live protocol module. |
+| `SCIENCE-run-decoupling-durability.md` | high | SCIENCE citation source for the RUN State row's lead signal (_shared/state-trend/run.ts computeRunDecouplingState) — grounds a shipped, athlete-visible band. |
+| `SCIENCE-triathlon-strength-friel.md` | high | SCIENCE citation source for the triathlon protocol (triathlon.ts) referenced from STRENGTH-PROTOCOL.md §11. |
+| `SCIENCE-upkeep-maintenance.md` | high | SCIENCE citation source for the upkeep/maintenance POV feeding the coach's-eye upkeep line; touched 2026-07-18. |
+| `SCIENCE-upper-aesthetics-hypertrophy.md` | high | SCIENCE citation source for the upper_aesthetics protocol (upper-priority-hybrid.ts), a live protocol module. |
+| `SCREEN-CONNECTIVITY.md` | medium | Live wiring companion to SCREEN-INVENTORY + TRUTH-MAP; TRUTH-MAP.md:1 names it as one of the three screen docs. |
+| `SCREEN-INVENTORY.md` | medium | Live screen catalogue named as a companion by SCREEN-CONNECTIVITY.md:274 and TRUTH-MAP.md:1. |
+| `SELF-AWARENESS-MAP.md` | high | Doctrine — the authoritative definition of the self-awareness thesis; livedocRefs=4. |
+| `SESSION-FREQUENCY-DEFAULTS.md` | high | Not a session artifact — the prescriptive frequency contract implemented by _shared/session-frequency-defaults.ts, cited by 5 protocol docs and ENGINE-STATE.md:932. |
+| `SPEC-ATHLETE-STATE-CONTINUITY.md` | medium | Goals 1 and 3 are BUILT (arc-context.ts:265-288 reads readiness_checkins; migration 20260612120000 created the time-series), but goal 4 — the engine consulting readiness for target_rir/load — has no … |
+| `SPEC-PICK-PLANNED-RECONCILIATION.md` | medium | No code found for any of the three fixes (no out-of-order confirm, no Start-Fresh unlink honor); Q-050 is filed "not built" and the item still sits in POLISH-PUNCH-LIST. |
+| `SPEC-adherence-performance-bridge.md` | high | ENGINE-STATE.md:871 lists the adherence↔performance bridge as "specced-not-built"; no bridge code found — the unbuilt remainder is the whole doc. |
+| `SPEC-athlete-state-spine.md` | high | Still the cited descriptive-spine contract: ENGINE-STATE.md:860 sources the pctChange definition from it, and SPEC-fitness-verdict-reconciliation + SPEC-per-discipline-periodization both name it as r… |
+| `SPEC-fitness-verdict-reconciliation.md` | high | Header states "NOT built, no code"; actively maintained (last touched 2026-07-31 with a D-350 correction) and read-first for the spine↔projection room. |
+| `SPEC-get-stronger.md` | high | Explicit banner: shipped substance is in D-324, but §1b week-12 transition, the 8-week short option, and §2's opt-in quality session survive unbuilt — the file's own delete condition is unmet. |
+| `SPEC-honest-swim-inference.md` | high | It is the swim addendum + reference implementation under SPEC-universal-narrative-inference.md and the named check for any swim-narrative change (ENGINE-STATE.md:792, D-192); a guardrail does not die… |
+| `SPEC-intensity-baselines.md` | high | Layer A shipped as D-199, but Layers B/C (CSS-primary swim model) and item #5 (the null-honest RPE-degrade contract) are explicitly SPECCED-NOT-BUILT and are the executable remainder. |
+| `SPEC-non-race-goal-plan-contract.md` | medium | Only the (b)-run leg shipped (D-218); bike/swim/strength non-race are still unsupported_sport (F-10) and the co-headliner strength track (Q-088) is unbuilt, so the contract still holds live work. |
+| `SPEC-one-engine-two-shapes.md` | medium | Self-declared 'STANDARD / governing principle — not a feature spec'; doctrine guardrail against forking the plan engine. |
+| `SPEC-per-discipline-periodization.md` | high | Header states "NOT built, no code"; still the live architecture lock (totalRefs=17) and ENGINE-STATE.md:758 cites its §13.1 as the strength contract. |
+| `SPEC-per-session-performance-engine.md` | high | ENGINE-STATE.md:871 explicitly lists it as SPECCED-NOT-BUILT with Read-3 blocked on weather/route data (Q-055). |
+| `SPEC-personal-zones-outlier-detection.md` | high | Only the seam landed (_shared/state-trend/zones.ts:30 resolveZoneBand, consumed at analyze-cycling-workout/index.ts:2526) and zones.ts:1 names this doc as its spec; the athlete-override/provenance fe… |
+| `SPEC-posture-flag.md` | high | The bug it targets is still live — _shared/off-plan-banner.ts still returns STRENGTH_ON_PLAN_CARRIED on the planPrimary==='strength' branch with no maintained-discipline read; livedocRefs=6 including… |
+| `SPEC-product-shape.md` | medium | 'LOCKED 2026-06-29 (Michael). The authoritative product shape' — doctrine, not scaffolding. |
+| `SPEC-run-pace-glass-box.md` | high | Unbuilt: no resolveRunPaceStack / run_pace_provenance / glassBox symbol in supabase/ or src/ (0 hits each); Q-171/Q-173 still open. |
+| `SPEC-session-context-behavioral-trends.md` | medium | Layer 1 superseded by WORKORDER-deviation-reason (D-211) but Layers 2/3 are unbuilt — docs/audit/03-spine-snapshot.md:89 still notes the empty SessionContextTag awaits it. |
+| `SPEC-shared-endurance-model.md` | medium | Header 'not implemented' is STALE (supabase/functions/_shared/endurance/{hr-zones,pace-zones,volume,distribution}.ts exist, E1+E2), but the consumer-wiring remainder (SPEC-e3a non-race zones) is stil… |
+| `SPEC-state-fitness-band.md` | high | Core shipped into D-293/D-294/D-295, but its own banner says the 'file now holds only the parked remainder' — keep for that. |
+| `SPEC-strength-focus.md` | high | Accessory specialisation is still unbuilt and sign-off gated — DECISIONS-LOG.md:1217 keeps it as the reference for re-homing add-ons, OPEN-QUESTIONS.md:885 lists its open pre-build questions. |
+| `SPEC-swim-source-tiers.md` | medium | 'design locked, build pending' (2026-06-16) — unbuilt spec, and swim remains a parked-but-open area. |
+| `SPEC-universal-narrative-inference.md` | high | Standing cross-discipline standard the narrative-core validators enforce; totalRefs=13 and other live docs bind to its 7 rules. |
+| `SPEC-week-solver.md` | medium | Solver half is BUILT (CAPABILITY-MAP.md:137 'BUILT — SHIPPED', _shared/week-solver.ts) but the D-325 cost-ledger/penalty-scheduler remainder is not; OPEN-QUESTIONS.md:1195 still rules off §0a.1. |
+| `START-HERE.md` | high | Doctrine — the single orientation page, rewritten 2026-07-13 from a code audit; livedocRefs=6. |
+| `STATE-SOURCE-MAP.md` | high | Actively maintained (touched 2026-07-31, findings corrected inline at :36); livedocRefs=4 — the anti-silent-exclusion rule doc. |
+| `STATE-WEEK-EXECUTION.md` | low | 2026-07-14 voice audit AND build contract for the week-execution section, signed off in conversation; livedocRefs=1 — could not confirm the redesign shipped. |
+| `STRENGTH-PROTOCOL.md` | high | Prescriptive strength contract; totalRefs=45 and RACE-WEEK-PROTOCOL.md:104 binds to its §3.7/§7.4 as authoritative. |
+| `SWIM-PROTOCOL.md` | high | Prescriptive swim contract; totalRefs=11 and RACE-WEEK-PROTOCOL.md:105 binds to its §4.4. |
+| `TARGET-ARCHITECTURE.md` | high | Doctrine — the north-star architecture doc; livedocRefs=4. |
+| `TICKET-B-WIRING-AUDIT.md` | medium | Findings still open: ENGINE-STATE.md:935 defers the limiter_sport intensity dial and points at this file for the documented architectural decision. |
+| `TRUTH-MAP.md` | high | Doctrine — the per-fact authority + fracture map; touched 2026-07-31, livedocRefs=4. |
+| `WIZARD-AUDIT.md` | medium | Findings still open — POLISH-PUNCH-LIST.md:412 and :414 both cite it for unlanded items (wizard trade-offs at decision time; no data-flow audit exists). |
+| `WORKORDER-deviation-reason.md` | high | Status SPECCED, NOT BUILT; still referenced by ENGINE-STATE.md:835 and OPEN-QUESTIONS.md as a held work order chained through Q-061. |
+| `WORKORDER-device-test-batch.md` | medium | Status FILED, NOT STARTED; batches still-open device items (D-204 on-device test, Q-072, Q-076, execution-chip thresholds) that no other doc holds together. |
+| `WORKORDER-strength-logger.md` | medium | Status HELD with both items (rest-timer regression, lifecycle persistence) unresolved and still owed as the repro for WORKORDER-device-test-batch items 1–4. |
+| `WORKORDER-swim-cleanup.md` | high | Status SPECCED, NOT BUILT; ENGINE-STATE.md:835 lists it as a held work order and only Q-061's narrative half is done, the trend-substrate half remains. |
+| `adapt-plan-strength-relayout.md` | low | Server relayout contract is shipped (adapt-plan/index.ts:793 writes last_relayout_week) but the doc's one-time dismissible banner is still unbuilt — only src/types/planRelayoutBanner.ts exists, no co… |
+
+</details>
+
+
+### 6.4 What the moves left behind
+
+**26 code comments still name a moved doc by its old path.** They were **not touched** — this was a
+docs-only run. The files still exist, one directory deeper. To repoint them all:
+
+First see exactly which comments are affected — this prints every `docs/…md` path named in code that
+no longer resolves, and where it went:
+
+```bash
+grep -rhoE 'docs/[A-Za-z0-9._-]+\.md' src supabase --include='*.ts' --include='*.tsx' \
+  | sort -u | while read -r p; do
+      [ -f "$p" ] || echo "$p  ->  docs/archive/$(basename "$p")"
+    done
+```
+
+Then, if you want them repointed (macOS `sed`):
+
+```bash
+for f in docs/archive/*.md; do
+  n=$(basename "$f")
+  grep -rlZ "docs/$n" src supabase 2>/dev/null \
+    | xargs -0 -r sed -i '' "s|docs/$n|docs/archive/$n|g"
+done
+```
+
+⚠️ That touches source files. It changes only comment text, but it is **not** something this audit
+was authorised to do overnight, so it is written here rather than run.
+
+The 26, in full:
+
+| moved doc | still named in |
+|---|---|
+| `AUDIT-truth-reconciliation-2026-06-14.md` | `supabase/functions/_shared/state-trend/reconcile.ts` |
+| `AUDIT-truth-reconciliation-2026-06-14.md` | `supabase/functions/_shared/state-trend/thresholds.ts` |
+| `BUILD-PLAN-top-down-spine-wiring.md` | `supabase/functions/_shared/state-trend/thresholds.ts` |
+| `DESIGN-familiar-routes.md` | `supabase/functions/compute-facts/index.ts` |
+| `DESIGN-familiar-routes.md` | `supabase/functions/_shared/heat-adjust.ts` |
+| `DESIGN-familiar-routes.md` | `supabase/functions/_shared/heat-adjust.test.ts` |
+| `ISLAND-PROPOSAL.md` | `supabase/functions/_shared/periodization/index.ts` |
+| `PHASE-0-ARC-CHANNEL-SPEC.md` | `supabase/functions/create-goal-and-materialize-plan/index.ts` |
+| `PHASE-0-ARC-CHANNEL-SPEC.md` | `supabase/functions/generate-combined-plan/types.ts` |
+| `PHASE-0-ARC-CHANNEL-SPEC.md` | `supabase/functions/generate-combined-plan/week-builder.ts` |
+| `SESSION-CONTEXT.md` | `supabase/functions/_shared/session-detail/build.ts` |
+| `SPEC-e3a-nonrace-zones.md` | `supabase/functions/generate-run-plan/index.ts` |
+| `SPEC-e3b-bottom-up-volume.md` | `supabase/functions/generate-run-plan/types.ts` |
+| `SPEC-e3b-bottom-up-volume.md` | `supabase/functions/generate-run-plan/generators/sustainable.ts` |
+| `SPEC-non-race-run-retest.md` | `supabase/functions/create-goal-and-materialize-plan/index.ts` |
+| `SPEC-non-race-run-retest.md` | `supabase/functions/generate-run-plan/types.ts` |
+| `SPEC-non-race-run-retest.md` | `supabase/functions/generate-run-plan/generators/base-generator.ts` |
+| `SPEC-strength-island-phase1.md` | `supabase/functions/_shared/periodization/index.ts` |
+| `STRENGTH-SCOUT-REPORT.md` | `supabase/functions/_shared/endurance/volume.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/analyze-strength-workout/index.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/analyze-swim-workout/index.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/_shared/cycling-v1/ai-summary.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/_shared/athlete-snapshot/coaching.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/_shared/narrative-core/index.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/_shared/narrative-core/types.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/_shared/fact-packet/ai-summary.ts` |
+
+
+**Three `docs/*.md` links dangle, and this audit did not cause any of them:**
+`docs/FEEDBACK-LOOP-AUDIT.md` (never existed), `docs/SPEC-exercise-substitution.md` and
+`docs/SPEC-lthr-one-anchor.md`. The last two were **hard-deleted** by earlier sessions following the
+spec-lifecycle rule. Worth noting the divergence: that rule says *delete*, and this audit was told to
+*move*. Both are defensible; they are not the same policy, and right now the repo does both.
+
+---
+
 ## 7. PROPOSED ONLY — the three over-cap splits. **I did not perform these.**
 
 You were right to ring-fence this, and there is a second reason beyond the obvious one: **the split
 rule the punch list proposes does not actually get `DECISIONS-LOG` under the cap.** Moving only the
-superseded entries clears 92 KB of 392 KB. It needs a hybrid rule. Better to find that out here than
+superseded entries clears 92 KB of 401 KB. It needs a hybrid rule. Better to find that out here than
 halfway through a bulk move at 3am.
 
 `POLISH-PUNCH-LIST.md:51-59` already files this as a task. These are the exact boundaries for it.
 
-### 7.1 `ENGINE-STATE.md` — 194.6 KB → **135.8 KB**. The easiest one, and it is pure win.
+All sizes below are **bytes on disk** (what `ls` reports and what the punch-list numbers are quoted
+in), not character counts — the docs are full of multi-byte characters and the two differ by ~1.5%.
+The three files have grown slightly since the punch list measured them, partly from this audit's own
+correction notes.
+
+### 7.1 `ENGINE-STATE.md` — 199 KB → **139 KB**. The easiest one, and it is pure win.
 
 `CLAUDE.md`'s own end-of-session protocol says: *"One banner, dated; the old one gets deleted, not
-stacked."* **Eleven `NEXT SESSION — START HERE` banners are stacked in this file**, lines **219–541**.
-Ten are explicitly marked SUPERSEDED; the eleventh is a "roadmap as of 2026-07-13". That block is
-**58.8 KB** — 30% of the file — and it is entirely history.
+stacked."* **Twelve `NEXT SESSION — START HERE` banners are stacked in this file.** The historical
+eleven sit at lines **239–561** — ten explicitly marked SUPERSEDED, plus a "roadmap as of
+2026-07-13". That block is **59.6 KB**, 30% of the file, and it is entirely history.
 
-- **Move:** lines 219–541 → `docs/archive/ENGINE-STATE-archive.md` (which already exists), appended
-  under a dated heading.
+- **Move:** lines 239–561 → `docs/archive/ENGINE-STATE-archive.md` (already exists), appended under a
+  dated heading.
 - **Leave:** the live banner (line 26), Solid, Known broken, Questioned.
-- **Result: 135.8 KB.** Under the cap, in one move, with zero judgement calls.
+- **Result: 139.1 KB.** Under the cap, one move, zero judgement calls. Do this one first.
 
-### 7.2 `DECISIONS-LOG.md` — 392.2 KB, 115 entries → **149.1 KB, 34 entries**
+### 7.2 `DECISIONS-LOG.md` — 400.9 KB, 116 entries
 
-Superseded-only is not enough (92 KB). The rule that works:
+**Superseded-only is not enough** — that clears 92 KB of 401. It needs a hybrid:
 
-> **Archive an entry if it is marked superseded/reversed/reverted, OR its number is ≤ D-311.**
+> **Archive an entry if it is marked superseded / reversed / reverted, OR its number is ≤ D-315.**
 
-- Moves **81 entries, 243.1 KB** → `docs/archive/DECISIONS-LOG-archive-D240-D311.md`
-- Leaves **34 entries, 149.1 KB**: D-312, 313, 315, 317–322, 325–334, 336–343, 345–351
-- ⚠️ **Keep `D-338` and `D-345` whole.** Each is two headings — a `SUPERSEDED` banner plus an
-  `(original)` — and they must move or stay together. `D-326` now has the same shape, added by this
-  audit.
-- ⚠️ The condensed `### D-240`–`### D-268` summary block at the top (lines 16–193, 61.3 KB) is **h3, not
-  h2**. Any script that greps `^## D-` will silently miss all 29. That is precisely the "a decision
-  stops existing" failure mode — it nearly fooled me.
+| boundary | moves | leaves |
+|---|---|---|
+| ≤ D-311 | 83 entries / 251 KB | 33 entries / **150 KB** — exactly at the cap, no margin |
+| **≤ D-315** | **86 entries / 261 KB** | **30 entries / 140 KB** ← recommended |
+| ≤ D-320 | 90 entries / 271 KB | 26 entries / 130 KB |
 
-### 7.3 `OPEN-QUESTIONS.md` — 293.5 KB, 105 entries → **147.6 KB, 65 entries**
+Target `docs/archive/DECISIONS-LOG-archive-D240-D315.md`.
 
-> **Archive an entry if it is marked closed/resolved/superseded, OR its number is ≤ Q-139.**
+- ⚠️ **Keep `D-338`, `D-345` and `D-326` whole.** Each is *two* headings — a `SUPERSEDED` banner plus
+  an `(original)` — and the pair must move or stay together. D-326 gained that shape in this audit.
+- ⚠️ **The condensed `### D-240`–`### D-268` block at the top (lines 16–193, ~62 KB) is `h3`, not
+  `h2`.** Any script that greps `^## D-` silently misses all 29 of them. That is exactly the "a
+  decision stops existing" failure — it nearly fooled me during this audit.
 
-- Moves **40 entries, 146.0 KB** → `docs/archive/OPEN-QUESTIONS-archive-Q130-Q179.md`
-- Leaves **65 entries, 147.6 KB**
-- ⚠️ Entries are **not** in numeric order in this file (it opens at Q-196, then Q-194, Q-195, Q-189…).
-  Split by the rule, never by line position, or the order will scramble.
-- ⚠️ This audit closed several more (Q-220, Q-222, Q-225, Q-227), so the moved set will be slightly
-  larger than 40 by the time anyone runs it. That is fine — it only helps.
+### 7.3 `OPEN-QUESTIONS.md` — 299.4 KB, 105 entries
+
+> **Archive an entry if it is marked closed / resolved / superseded, OR its number is ≤ Q-145.**
+
+| boundary | moves | leaves |
+|---|---|---|
+| ≤ Q-139 | 41 entries / 151 KB | 64 entries / **148 KB** — almost no margin |
+| **≤ Q-145** | **46 entries / 158 KB** | **59 entries / 141 KB** ← recommended |
+| ≤ Q-150 | 50 entries / 164 KB | 55 entries / 136 KB |
+
+Target `docs/archive/OPEN-QUESTIONS-archive-Q130-Q145.md`.
+
+- ⚠️ **Entries are not in numeric order** in this file — it opens at Q-196, then Q-194, Q-195, Q-189.
+  Split by the rule, never by line position, or the order scrambles.
+- ⚠️ This audit closed several more (Q-220, Q-222, Q-225, Q-227), so the moved set will be a little
+  larger than the table says by the time anyone runs it. That only helps.
 
 ### 7.4 The assertion to run either side of any bulk move
 
@@ -335,7 +605,8 @@ grep -rn "⟨A31⟩" docs/ CLAUDE.md
 
 ## 11. Appendix — every claim checked
 
-Each row is one load-bearing claim, the verdict, and the `file:line` that settled it.
+**Reference only. You do not need to read this.** §1–§10 is the report; this is the evidence behind it,
+one row per claim: the claim, the verdict, and the `file:line` that settled it.
 
 ### STALE — 189
 

@@ -25,6 +25,26 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 ---
 ## 🧭 NEXT SESSION — START HERE (2026-08-01 late — **the screens are honest and the LOGGER RECORD is fixed. Your job is the 95% verdict, or the punch list.**)
 
+> ⛔ **READ THIS BEFORE THE BANNER BELOW — a docs-vs-code audit ran on 2026-07-31 and moved the ground
+> under it. Full report: `docs/AUDIT-docs-vs-code-2026-07-31.md`. Corrections are tagged `⟨A31⟩`.** ⟨A31⟩
+>
+> **"Your job is the 95% verdict" is half done, and this file was the thing saying otherwise.**
+> `verdictFrom95Set` **is wired** — `loading/cycle-verdicts.ts:116` → `workingNumberForCycles`
+> (`wendler-531.ts:519`) → `strength-primary-plan.ts:1275` and `rematerialize-strength-block:167`,
+> which the client invokes on every logger save (`StrengthLogger.tsx:4022`, `:6053`). **That is D-341,
+> 2026-07-30**, which closed Q-223 and Q-226. **Do not rebuild it.**
+>
+> **What is actually left of that job is LAYER 3 — the provenance the athlete sees.**
+> `src/lib/strength-focus-copy.ts:324` still carries a `⛔ GATED ON verdictFrom95Set BEING WIRED`
+> block whose precondition is now met. That gate, and the stale line refs beside it at `:260-262`,
+> are the only strength-gauge things this audit left standing. They are **code comments**, so a
+> docs-only run could not touch them.
+>
+> Also corrected across this file: `wendler-531.ts:160-200` and `workingNumberForCycle:112` were
+> **never right** (`:454`/`:467` and `:210`); `VALIDITY_CHECK_MIN_REPS` is **1**, not 5; the estimator
+> is **Wendler/Epley**, not Brzycki (D-339); and "blind for 8 of 12 weeks" is **conditional on block
+> shape**, not a constant. 189 stale claims were corrected in all.
+
 ### WHAT SHIPPED TODAY — pushed AND deployed, do NOT re-litigate
 
 Two streams. The first finished `AUDIT-state-screen-2026-08-01.md`; the second went upstream into the
