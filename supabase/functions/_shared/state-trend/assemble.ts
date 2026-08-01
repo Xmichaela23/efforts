@@ -49,6 +49,16 @@ export interface FitnessAnchor {
   overflow: 'better' | 'worse' | null;
   status: 'provisional' | 'confirmed';
   label: string;   // "auto · steady run · Jan 15" (provisional) | "steady run · Jan 15" (confirmed — no "auto")
+  // ⛔ THE ANCHOR NOW CARRIES ITS OWN NUMBER (2026-08-01, Michael: "every piece needs to know
+  // everything"). It always HAD one — `ActiveFitnessBaseline.value` is what the tick is placed from —
+  // but this object existed only to answer "where does the tick go", so for any row whose tick could
+  // not be placed (bike, swim: metric mismatch) the value was computed and then dropped one line
+  // later. Nothing had hidden it; nothing had asked for it.
+  // ⚠️ THIS IS THE NUMBER THE ROW'S READ WAS ACTUALLY COMPUTED AGAINST. That is the whole point of
+  // carrying it rather than letting a surface resolve its own: a client-resolved FTP is *probably*
+  // the same number, and "probably the same" is what the FTP-fracture work existed to remove.
+  value: number | null;
+  metric: string | null;   // 'ftp' | 'decoupling' | … — the unit the value is in
 }
 
 /** Format the anchor label: provisional gets the "auto ·" prefix; confirmed (any human touch) never does. */
@@ -591,13 +601,13 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const fitnessAnchors: Record<string, FitnessAnchor> = {};
   if (fb.run && runDecoupRange) {
     const p = placeAnchorOnBand(fb.run.value, runDecoupRange.low, runDecoupRange.high, !fb.run.lowerIsBetter);
-    fitnessAnchors.run = { tickPct: p.tickPct, overflow: p.overflow, status: fb.run.status, label: anchorLabel(fb.run) };
+    fitnessAnchors.run = { tickPct: p.tickPct, overflow: p.overflow, status: fb.run.status, label: anchorLabel(fb.run), value: fb.run.value ?? null, metric: fb.run.metric ?? null };
   }
   if (fb.bike) {
-    fitnessAnchors.bike = { tickPct: null, overflow: null, status: fb.bike.status, label: anchorLabel(fb.bike) };
+    fitnessAnchors.bike = { tickPct: null, overflow: null, status: fb.bike.status, label: anchorLabel(fb.bike), value: fb.bike.value ?? null, metric: fb.bike.metric ?? null };
   }
   if (fb.swim) {
-    fitnessAnchors.swim = { tickPct: null, overflow: null, status: fb.swim.status, label: anchorLabel(fb.swim) };
+    fitnessAnchors.swim = { tickPct: null, overflow: null, status: fb.swim.status, label: anchorLabel(fb.swim), value: fb.swim.value ?? null, metric: fb.swim.metric ?? null };
   }
 
   const perfByDisc: Record<string, PerfSummary | null> = {

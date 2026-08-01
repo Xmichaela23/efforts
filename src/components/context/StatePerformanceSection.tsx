@@ -242,7 +242,17 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
           {/* WHERE YOU SIT — the dot/arrow legend, which is about this athlete rather than about the
               metric, so it lives here rather than in the ⓘ. Only when there IS a dot to explain. */}
           {showDot && <span>The dot is where you sit against your own baseline; the arrow is the direction.</span>}
-          {src && <span>{src === 'est (FTP)' ? 'Efficiency is measured against an ESTIMATED FTP, not one you confirmed.' : 'Measured against your own tested FTP.'}</span>}
+          {/* ⛔ THE NUMBER THE READ WAS COMPUTED AGAINST, not one resolved here. It rides on the anchor
+              (`FitnessAnchor.value`) so the FTP shown and the FTP behind the verdict are the same
+              number by construction. Resolving it client-side would give one that is *probably* the
+              same — which is what the FTP-fracture work existed to remove. */}
+          {src && (() => {
+            const ftp = anchor?.metric === 'ftp' && anchor?.value != null ? Math.round(anchor.value) : null;
+            if (src === 'est (FTP)') {
+              return <span>Measured against an estimated FTP{ftp != null ? ` of ${ftp} W` : ''} — not one you confirmed.</span>;
+            }
+            return <span>Measured against your own tested FTP{ftp != null ? ` of ${ftp} W` : ''}.</span>;
+          })()}
           {asOf(lead.newestAgeDays) && <span>Newest qualifying ride {asOf(lead.newestAgeDays)}.</span>}
           {showDot && anchor?.label && <span>{anchor.label}</span>}
         </span>
