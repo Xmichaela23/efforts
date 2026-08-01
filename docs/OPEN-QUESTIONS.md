@@ -2553,3 +2553,63 @@ wrong place for it if the rule is meant to be general.
 **Where it would be fixed:** have `capRollupTone` return a nullable/`needs_data` signal for the empty
 case and make the composer drop the row, rather than resolving it to a tone. That is a signature
 change plus a caller change, which is why it was not folded into D-353's deploy.
+
+---
+
+## Q-238 — The rollup arrow asserts a DIRECTION its own contributors split on (2026-08-01, Michael, FILED — same underlying gap as [Q-236])
+
+**Michael, on the bare-arrow render:** *"Run is declining, bike is holding. `dirOf()` resolves to
+declining and the row renders ↓. One of two contributors doesn't support it."*
+
+**Legal under D-353, and that is exactly the point.** The severity cap limits how ALARMING a rollup
+may be; it says nothing about how CONFIDENT its direction may be. `dirOf`
+(`_shared/state-trend/assemble.ts:850-858`) resolves `[sliding, holding] → sliding`, so the row prints
+a single unqualified ↓ off a one-of-two split. **Same shape as D-353: a row with no metric of its own
+asserting more than its evidence carries** — just on the direction axis instead of the severity axis.
+
+**Group this with [Q-236].** Q-236 is the cap being one-directional (a rollup can assert `improving`
+over neutral contributors); this is the direction being unqualified (a rollup can assert `declining`
+over a split). **They are one gap seen twice:** D-353 fixed severity and left every other claim a
+rollup makes ungoverned. Whatever principle closes one should close both — probably *"a rollup states
+a claim only where its contributors agree, and qualifies or withholds where they split"*, which is a
+design decision, not a patch.
+
+⚠️ `dirOf` DOES already handle the genuinely-contradictory case — `improving` + `sliding` → `holding`,
+with a comment saying the contributors name the split. That comment is now **stale**: the contributors
+were dropped from the glance (D-353), so nothing on the row names anything. The half-measure that
+existed is no longer wired to a surface.
+
+**Do not fix by changing `dirOf`** — it is shared, and its two-way rule is deliberate. The question is
+what the ROLLUP renders, not what the spine computes.
+
+---
+
+## Q-239 — The rollup's single "as of" stamp CONCEALS its stale half (2026-08-01, Michael, FILED — the row's worst element, not its best)
+
+**Michael:** *"Run is 1d old, bike is 17d old. One stamp showing the freshest input conceals that half
+the rollup is two and a half weeks stale. A per-discipline age was honest; a single max-recency stamp
+is not."*
+
+**And it is a direct reversal of my own reading**, which called the shared freshness stamp the row's
+real job and the thing worth preserving if the row is deleted. It is the opposite: the one element
+that is actively misleading.
+
+**The mechanic:** `asOfAgeDays = Math.min(...ages)` — the NEWEST contributor
+(`_shared/state-trend/assemble.ts:861`). That was a deliberate 2026-07-31 change, and it fixed a real
+bug in the other direction: stamping a fresh reading with a 16-day-old bike date made current data
+read as *"nothing here is current"* and cost three sessions chasing a data-flow bug that did not
+exist.
+
+⚠️ **SO BOTH STAMPS ARE WRONG, AND THAT IS THE FINDING.** Oldest understates freshness; newest
+conceals staleness. **A single date cannot honestly summarise two inputs 16 days apart** — the fix is
+not to flip the constant back (that re-opens the bug it closed), it is to stop pretending one date
+describes the rollup. `stalestAgeDays` is already computed and carried on the rollup
+(`assemble.ts:862`) and is currently rendered nowhere.
+
+**What made it worse:** until D-353 the contributor clause named each age on the glance
+(*"bike holding (17d ago)"*), so the single stamp had a visible corrective beside it. Dropping the
+clause was right, and it removed that corrective. The ages now live one tap down in the provenance.
+
+**⛔ IF THE ROW IS DELETED (the queued "C" call), this does not resolve itself** — the per-discipline
+ages belong back on the RUN and BIKE rows, where each is accurate for exactly one metric. They are
+**not** replaced by anything at the rollup level, because there is nothing true to put there.
