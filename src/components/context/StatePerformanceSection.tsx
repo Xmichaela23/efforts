@@ -247,7 +247,12 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
               number by construction. Resolving it client-side would give one that is *probably* the
               same — which is what the FTP-fracture work existed to remove. */}
           {src && (() => {
-            const ftp = anchor?.metric === 'ftp' && anchor?.value != null ? Math.round(anchor.value) : null;
+            // ⚠️ NO METRIC-STRING GUARD. The first cut gated on `anchor.metric === 'ftp'` — a string
+            // that comes from the `fitness_baselines` row and was never verified to be that exact
+            // word. It silently rendered nothing. This branch is already inside `src`, which is
+            // derived from `efficiency.basis === 'coggan_ftp'`, so the bike anchor here IS the FTP;
+            // the value alone is the honest gate.
+            const ftp = anchor?.value != null && Number.isFinite(anchor.value) ? Math.round(anchor.value) : null;
             if (src === 'est (FTP)') {
               return <span>Measured against an estimated FTP{ftp != null ? ` of ${ftp} W` : ''} — not one you confirmed.</span>;
             }
