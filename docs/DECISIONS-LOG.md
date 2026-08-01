@@ -2637,6 +2637,35 @@ rather than guessed into it — the same failure direction the gate already chos
 
 ---
 
+## D-357 — TWO CUES, TWO ANSWERS: ⓘ is the definition, "more" is the read (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
+
+**On a fitness row, ⓘ and the read were one blob behind the metric word.** An athlete who wanted *"what
+is this metric"* got the whole diagnosis; an athlete who wanted the diagnosis had to tap a glyph that
+promises a definition. Two questions, one cue.
+
+- **ⓘ → the DEFINITION.** One sentence. *"Efficiency is your speed per heartbeat, adjusted for hills and
+  for heat — rising means faster at the same effort."* Nothing else.
+- **"more" → the READ.** Plan context first (the posture sentence), then what the trend is saying.
+
+**"more" is a WORD, not a glyph.** ⓘ already promises a definition; a second symbol would have been a
+second mystery. It sits at the right of the receipt line so the header keeps one cue, and it is **gated
+on there being something behind it** — a cue that opens an empty panel is worse than no cue.
+
+⛔ **BIKE IS DELIBERATELY UNCHANGED, AND SOMEONE WILL TRY TO "FIX" THAT.** The request was *"run + bike,
+same treatment"*, and the trace said otherwise: bike has **no blob to split**. `FitnessDotBlock` renders
+`explain` alone — already definition-only — and `postureSentence` is passed only to the run row
+(`StatePerformanceSection.tsx:1039`). Giving bike a "more" would mean **writing a read it does not
+have**, and its trend prose is precisely what [D-356] deferred until the bike has a confidence interval
+of its own. **The asymmetry is the correct state, not an oversight.**
+
+**Also this change, same row:** *"grade-adjusted"* is gone from the chart caption — accurate, and
+jargon. It is replaced by a plain sentence beside the heat line: *"Evened out for hills, so a hilly week
+doesn't read as slower."* The two sit together because they answer one question — **what has already
+been taken out of this number**, so the athlete knows what *not* to explain away. Heat is stated as a
+cost still carried; hills as removed, because they are. ⚠️ Gated on `eff.route` (the grade adjustment is
+the route engine's, so the claim is untrue on the fallback path), and the caption now renders nothing
+under an 8°F spread rather than falling back to the bare method word.
+
 ## D-356 — A SHOWN NUMBER ALWAYS SHOWS ITS UNCERTAINTY: the run efficiency row gets plain words, a whole percent, and its CI (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
 
 **Three rules, and the third is the one that generalises:**
