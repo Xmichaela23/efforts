@@ -2494,3 +2494,62 @@ through in code.
    HR-speed correlation (does not separate). Do not retry those.
 
 ⛔ **DO NOT "just fix the gate".** It has a regression test, a bug history, and two docs that disagree.
+
+---
+
+## Q-236 — The severity cap is ONE-DIRECTIONAL: a rollup can still assert `improving` on neutral evidence (2026-08-01, Michael, FILED — same class as D-353, opposite sign; NOT in D-353's scope)
+
+**Michael, on reviewing D-353's implementation:** *"Ranking positive as severity 0 is right for an
+alarm cap, and I don't want green rows flattened. But it means a rollup can still render 'improving'
+when every contributor is neutral. That is the same failure as D-353 pointed the other way: a rollup
+asserting something its evidence doesn't support."*
+
+**The mechanic.** `capRollupTone` (`_shared/state-trend/severity.ts`) ranks `positive` at severity
+**0**, deliberately — it is a *valence*, not an alarm, and the cap exists to remove unsupported
+alarm without flattening legitimate good news. The consequence is that the ceiling only ever bites
+on `warning` / `danger`. Nothing stops a rollup rendering `positive` over contributors that are all
+`holding`.
+
+**Why it is filed and not fixed.** Lower stakes by a wide margin: **nobody is misled into backing off
+training by false good news.** D-353's failure mode put an unearned amber on a screen and would have
+had an athlete respond to a concern the data did not carry. This one over-praises. Same class, real,
+much cheaper.
+
+⚠️ **It is NOT purely cosmetic, and that is the reason it is written down.** The whole D-353 argument
+is *a row with no metric of its own must not assert what its evidence cannot support* — and that
+argument does not have a sign. Fixing this means deciding what a rollup's positive claim must
+inherit, which is a real design question, not a one-line clamp.
+
+**Where it would be fixed:** `severityOfVerdict` / `capRollupTone`, same file, probably as a second
+ceiling on *valence* rather than severity. **Do not** simply rank `positive` above 0 — that flattens
+green rows, which is the thing Michael explicitly ruled out.
+
+---
+
+## Q-237 — A rollup with ZERO contributors renders `neutral`, and under glass-box it should render NOTHING (2026-08-01, Michael, FILED — currently UNREACHABLE for the only caller)
+
+**Michael:** *"Capping an empty rollup to neutral is better than capping it to amber, but neutral is
+still a verdict. Under glass-box a row with zero evidence should not render a verdict at all — it
+should be absent, or say it doesn't have enough data. 'Holding' with nothing behind it is a claim the
+screen can't support."*
+
+**Correct, and the reasoning generalises:** `needs_data` and `withheld` exist precisely because *"there
+is no reading"* is a different statement from *"the reading is flat"*. An empty rollup falling to
+`neutral` collapses that distinction — the one distinction the vocabulary was built to preserve.
+
+✅ **CURRENTLY UNREACHABLE — code-verified 2026-08-01, and this is why it is a Q and not a bug.**
+The only caller is gated: `coach/index.ts:2486` —
+`if (hrResp.verdict !== 'needs_data' && hrResp.contributors.length > 0)`. `rollupHrResponse` also
+returns `verdict: 'needs_data'` with `contributors: []` whenever the set is empty
+(`assemble.ts:819`, `:879`). So today the empty branch in `capRollupTone` is **defensive only** and
+nothing renders from it.
+
+⚠️ **THE RISK IS THE NEXT ROLLUP, NOT THIS ONE.** `capRollupTone` was written to be applied at the
+composer *for every rollup, present and future* (D-353). A future rollup without that
+`contributors.length > 0` guard would inherit the empty→`neutral` behaviour and silently render a
+verdict off nothing. The guard that saves us is in the **caller**, not the **rule** — which is the
+wrong place for it if the rule is meant to be general.
+
+**Where it would be fixed:** have `capRollupTone` return a nullable/`needs_data` signal for the empty
+case and make the composer drop the row, rather than resolving it to a tone. That is a signature
+change plus a caller change, which is why it was not folded into D-353's deploy.

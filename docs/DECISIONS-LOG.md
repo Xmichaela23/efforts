@@ -2692,6 +2692,16 @@ the provenance (one tap), so nothing is lost — only demoted.
 **Supersedes** the tone literal introduced in coach v154. **Does not touch** the efficiency
 thresholds, the RUN/BIKE rows, or D-346's contributor wiring.
 
+⚠️ **TWO GAPS IN THE CAP, FILED THE SAME DAY AND DELIBERATELY OUT OF SCOPE** — Michael, on reviewing
+the implementation. Both are the D-353 argument applied where D-353 did not reach:
+- **[Q-236]** — the cap is **one-directional**. `positive` ranks at severity 0 (so green rows are
+  never flattened), which means a rollup can still assert `improving` over all-neutral contributors.
+  Same class, opposite sign, far lower stakes — nobody backs off training over false good news.
+- **[Q-237]** — an **empty** rollup resolves to `neutral`, and neutral is still a verdict. Under
+  glass-box a row with zero evidence should render nothing, not "holding". Currently **unreachable**
+  (`coach/index.ts:2486` gates on `contributors.length > 0`), so the branch is defensive only — but
+  the guard lives in the CALLER, not the RULE, and the rule is meant to be general.
+
 ## D-352 — THE IN-SESSION CUES: SURFACED, NARROWED, AND THE AMRAP RULE REVERSED (2026-08-01, **PUSHED, client-only, not device-verified**)
 
 **⛔ THE BAR-SPEED DOCTRINE HAD NO `D-NNN` UNTIL NOW.** It was written on 2026-07-25, argued in a
