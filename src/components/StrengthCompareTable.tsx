@@ -660,7 +660,12 @@ export default function StrengthCompareTable({ planned, completed, completedWork
           one; otherwise the honest line is the work done. */}
       {(totals.pVol > 0 || totals.cVol > 0) && (
         <div className="grid grid-cols-12 text-sm font-semibold border-t border-white/20 pt-2 text-white">
-          <div className="col-span-7">Totals</div>
+          {/* ⛔ NOT "Totals" (Michael, 2026-07-31, on sight of his own screen). This row is a DELTA —
+              completed minus planned — and it sat directly above the real session total
+              ("Volume (lbs) 11,165") wearing the word that belongs to that number. He read "+7,640 lb"
+              as his volume, and said any lifter would. The label now names the comparison, so the two
+              numbers can't be confused for each other. */}
+          <div className="col-span-7">vs plan</div>
           <div className="col-span-5 text-right text-white/80">
             {totals.pVol > 0
               ? `${totals.cVol - totals.pVol >= 0 ? '+' : ''}${(totals.cVol - totals.pVol).toLocaleString()} lb`
