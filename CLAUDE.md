@@ -217,7 +217,7 @@ It first said the auto path was a no-op; that was false, so it was rewritten to 
 
 ⚠️ **There is a RACE.** `compute-facts` is *awaited* but reads `workouts.computed`, which is written by the two *fire-and-forget* calls above. When it loses, `time_in_zone`, `intervals_hit/total`, `hr_drift_pct` and `execution_score` are silently absent from that workout.
 
-⚠️ **Two ingest paths bypass all of this.** `ingest-phone-workout` and `save-imported-workout` fire **only** `compute-workout-summary` → no `workout_facts`, invisible to the spine, and **zero contribution to ACWR** while still counting toward `workload_total`.
+⚠️ **Two ingest paths USED TO bypass all of this — FIXED 2026-07-17, and this paragraph was still describing the bug.** ⟨A31⟩ `ingest-phone-workout` and `save-imported-workout` once fired **only** `compute-workout-summary` → no `workout_facts`, invisible to the spine, zero contribution to ACWR. **Both now route through the single ordered orchestrator** (`recompute-workout`, with `include_summary: true`): `ingest-phone-workout/index.ts:290-305`, `save-imported-workout/index.ts:200-212`. See `docs/AUDIT-fanout-ordering-2026-07-17.md`. **What is still true of them:** fire-and-forget, **forward-only (no historical backfill)**, and neither drives `adapt-plan`.
 
 Routing also exists in `recompute-workout/orchestrator-lib.ts:16` (`resolveAnalyzeEdgeFn`, called from `index.ts:105`) ⟨A31⟩ and `bulk-reanalyze-workouts/index.ts:40-50` — **three hand-maintained routing tables.** Any new cache or downstream system MUST register in all of them or it goes stale.
 
