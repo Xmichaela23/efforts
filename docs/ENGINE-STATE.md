@@ -23,97 +23,64 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-01 late — **the screens are honest and the LOGGER RECORD is fixed. Your job is the 95% verdict, or the punch list.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-01 evening — **BODY is rebuilt and the cache trap that hid three deploys is fixed. Your job is the ENDURANCE STEER.**)
 
-> ⛔ **READ THIS BEFORE THE BANNER BELOW — a docs-vs-code audit ran on 2026-07-31 and moved the ground
-> under it. Full report: `docs/AUDIT-docs-vs-code-2026-07-31.md`. Corrections are tagged `⟨A31⟩`.** ⟨A31⟩
->
-> **"Your job is the 95% verdict" is half done, and this file was the thing saying otherwise.**
-> `verdictFrom95Set` **is wired** — `loading/cycle-verdicts.ts:116` → `workingNumberForCycles`
-> (`wendler-531.ts:519`) → `strength-primary-plan.ts:1275` and `rematerialize-strength-block:167`,
-> which the client invokes on every logger save (`StrengthLogger.tsx:4022`, `:6053`). **That is D-341,
-> 2026-07-30**, which closed Q-223 and Q-226. **Do not rebuild it.**
->
-> **What is actually left of that job is LAYER 3 — the provenance the athlete sees.**
-> `src/lib/strength-focus-copy.ts:324` still carries a `⛔ GATED ON verdictFrom95Set BEING WIRED`
-> block whose precondition is now met. That gate, and the stale line refs beside it at `:260-262`,
-> are the only strength-gauge things this audit left standing. They are **code comments**, so a
-> docs-only run could not touch them.
->
-> Also corrected across this file: `wendler-531.ts:160-200` and `workingNumberForCycle:112` were
-> **never right** (`:454`/`:467` and `:210`); `VALIDITY_CHECK_MIN_REPS` is **1**, not 5; the estimator
-> is **Wendler/Epley**, not Brzycki (D-339); and "blind for 8 of 12 weeks" is **conditional on block
-> shape**, not a constant. 189 stale claims were corrected in all.
+### YOUR JOB
 
-### WHAT SHIPPED TODAY — pushed AND deployed, do NOT re-litigate
+**Build the endurance steer in the Adjust tab: "ease or push each discipline's load."** It is the one
+thing standing between a shipped soreness flag and a flag that can do something.
 
-Two streams. The first finished `AUDIT-state-screen-2026-08-01.md`; the second went upstream into the
-logger, because that is where the remaining lies were being written.
+Three facts to start from, traced today:
+- **`adapt-plan` cannot reduce endurance volume.** Its suggestion types are `strength_progression`,
+  `strength_deload`, `strength_relayout`, `endurance_pace_update`, `rematerialize`. Paces, yes; volume,
+  no. (`supabase/functions/adapt-plan/index.ts`)
+- **`StateAdjustLens.tsx` is a v0 scaffold** and says so: *"Nothing here changes your plan yet — no dead
+  buttons that pretend to work."* Strength steers work but live in the logger. The endurance section is
+  one sentence: *"Ease or push each discipline's load — coming next."*
+- ⚠️ **THIS WOULD BE THE FIFTH PLAN-MUTATION PATH,** and Q-225 explicitly held the line at four
+  (*"wait for the general surface"*). **Route it through the existing rematerialize path rather than
+  inventing another one** — that is the decision to make before writing code, not after.
 
-**STREAM 1 — the screens stopped disagreeing (D-347 / D-349 / D-350).**
-- The State fitness rows and the Performance table read `block-identity`; the per-lift direction chip
-  is **deleted**, not silenced (D-347).
-- **Bodyweight counts as load** and history was re-priced (D-348) — strength went 8% → 38% of the
-  28-day load, ratio 0.83 → 1.05, still on target.
-- The compare table's lb column is **priced by the server's one set rule** (D-349). It carried its
-  own `weight × reps`, so a chin-up counted toward LOAD and read as zero on the same screen.
-  **A fourth copy of the stale rule was found in the "Volume (lbs)" tile inches below it.**
-- ⛔ **THE RULE THAT CAME OUT OF IT: THE SERVER PRICES, THE CLIENT PAIRS.** The audit told me to route
-  the matcher through the server; the server's matcher is lowercase-exact and would have **re-opened
-  audit F5.** Two `canonicalize` functions exist and are NOT the same rule — `_shared` has a curated
-  synonym ladder, `src/lib` is a small map. Never key a payload on one and read it with the other.
-- `BlockSummaryTab` (1,184 lines, unmounted since 2026-03-31) **deleted**; the `buildLoadHeadline`
-  "client math" finding was **overstated** — see Stage 2 of the audit doc, rewritten so it stops
-  being a trap.
+### WHAT SHIPPED TODAY — do NOT re-litigate
 
-**STREAM 2 — the logger's RECORD (D-351 / D-352).** Everything downstream inherits this.
-- **Bands carry a NUMBER now**, user-entered: subtracts on chin-up/pull-up/dip, multiplies on
-  add-resistance. Reverses Q-233 #2 and D1's "flat token". Field-grounded (Hevy prices assisted work
-  as `(bodyweight − assist) × reps`; no tracker ships a colour→pounds table).
-- ⛔ **HISTORY IS NOT MIGRATED, DELIBERATELY.** `resistance_level` holds WORDS before today and
-  POUNDS after it, forever; `bandLoadLb` reads both. **This is a scoped exception to D-348's
-  "re-price history or the trend lies" law** (one week of data, one user). Do not "clean it up".
-- **Typed reps stop vanishing.** Sets with numbers that were never ticked Done saved, rendered under
-  "Completed", and scored zero. A prompt now names them at save. It **asks** — auto-ticking would
-  substitute the app's word for the athlete's and undo D-204.
-- **A weighted chin-up prices `(bodyweight + added) × reps`.** I filed this as unfixable ("blast
-  radius"); Michael pointed out the radius is a property of the GATE. `bandIsAssistance` covers
-  exactly {pullup, chinup, dip}. **Lesson: when a fix looks too wide, check whether an existing flag
-  already narrows it before deferring it.**
-- **The bar-speed cues render at all now** — built 2026-07-25, reachable only from their own test for
-  a week. Confined to the four main lifts (`isMain531Lift`), and **the AMRAP rule is REVERSED**:
-  "slow rep = last rep" was stricter than Wendler, who says grind it out, not to failure. A
-  speed-stop under-reports the count that moves the training max.
-- **New `plyo` exercise type** — reps only, no bar, no plates, no cue.
+**⛔ THE CACHE TRAP, and read this before you debug any deploy that "did not land" ([D-355]).** On a tab
+mount the client does **not** call `coach` — `useCoachWeekContext.ts:~699` reads `coach_cache` directly
+and gates on `COACH_CLIENT_MIN_PAYLOAD_VERSION`. That constant had drifted to **144** while the server
+was at **157**, so thirteen versions of server changes sat cached and unreachable and three deploys
+today looked like they had silently failed. **Both constants are now 158. BUMP BOTH, ALWAYS.** The
+~20 version notes saying "bump so cached rows re-source" are all describing only half the gate.
 
-### YOUR JOB — pick one, both are named and specced
+**BODY is one row ([D-354]).** The heart-rate rollup and the cross-training row are **deleted**, both
+with DO-NOT-REBUILD tombstones. BODY now reads what the athlete *reports*: effort and soreness, with
+their scales and what they were counted from. Soreness is measured against the athlete's **own**
+baseline (`resolveCurrentSoreness`, `_shared/cross-domain-carryover.ts`, 9 tests), silent until 5
+entries and saying so when silent. A persistence line fires at **4 of the last 6 above own normal** and
+points at Adjust — advisory only, it can never move the fitness read.
 
-1. **⛔ WIRE `verdictFrom95Set`.** It and `applyVerdict` are written, correct, and **called by
-   WIRED via `loading/cycle-verdicts.ts:116` (`verdictFrom95Set` is at `wendler-531.ts:454`, `applyVerdict` at `:467`) ⟨A31⟩; the composer advances the working number by cycle index
-   only on the forecast path where `unknownMeans: 'advance'` (`workingNumberForCycle` is at `wendler-531.ts:210`; the composer passes `args.cycleVerdicts` at `strength-primary-plan.ts:1276`) ⟨A31⟩. Until it lands, **`STRENGTH_ADVANCE_COPY` and the
-   `validity_set` bar-speed line must stay unrendered** — the copy is written and gated at the call
-   site, which tells you exactly where to pass the flag. This is the largest remaining starved engine.
-2. **The punch list's NEXT UP** — the cross-training partial-week compare, and the run narrative
-   naming the wrong session.
+**The severity cap ([D-353]) is live and currently has no caller** — the only rollup that used it was
+the row that got deleted. **Do not clean it up as dead code**; it is a rule waiting for the next rollup.
 
-### ⛔ WHAT IS NOT VERIFIED, AND WHAT WOULD SETTLE IT
+**The docs were reconciled against code overnight** — 189 stale claims corrected, 36 docs archived,
+`D-270` finally written. Report: `docs/AUDIT-docs-vs-code-2026-07-31.md`. Corrections tagged `⟨A31⟩`.
 
-- **NOTHING TODAY HAS BEEN SEEN ON A DEVICE.** Everything is code-traced, fixture-pinned, or measured
-  off the database. iOS **was** synced (`npm run ios:open`), so it is on the phone awaiting a look.
-  **Settle it:** the acceptance list is in `POLISH-PUNCH-LIST.md` under AWAITING MICHAEL.
-- **Q-234 is filed and NOT fixed** — `StateTab.tsx:1311` gates a bar on `lt.peak1RM`, a camelCase
-  field on a snake_case server object, so it silently measures against *last session × 1.1*.
-  ⛔ **The obvious rename is a trap** — read Q-234 before touching it.
-- **The `getExerciseType` default has now caused THREE bugs** (Q-180 carry, single-leg hip thrust,
-  box jump). Consider making the default "no equipment UI" instead of `barbell`.
+### STILL UNVERIFIED — what would settle it
 
-### STILL OPEN, WITH THE REASON
+- **⛔ NOTHING FROM TODAY HAS BEEN SEEN ON A DEVICE.** Every string in the new BODY row was written by
+  Claude, not Michael, and one copy misstep already happened today (a verdict word was invented and
+  shipped). **Treat all of it as draft.** Settled by: Michael opening State and reading the row.
+- **The persistence line has almost certainly never fired.** It needs 4 of 6 sessions above his own
+  normal plus a 5-entry baseline. Settled by: checking `resolveCurrentSoreness`'s `diag` on real data,
+  or waiting for a sore block.
+- **`cappedSignalColor` (`StateTab.tsx`) is a stopgap that is now doubly redundant** — the server fix
+  landed AND the row is gone. Safe to delete; left in only because it was never device-confirmed.
 
-- **Isometric holds score zero** (Q-233 #1) — a plank is time with no reps; deliberate.
-- **Word-era assisted sets still price at full bodyweight** — deliberate, see D-351 Decision 3.
-- **Trap zone, unchanged:** bike power/efficiency split, run durability (Q-232, silenced on purpose),
-  the run row (rebuilt 2026-07-31), the HR "as of" stamp (fix the STAMP, not the data path).
----
+### THE GAPS THIS OPENED, filed not fixed
+
+[Q-236] the severity cap is one-directional · [Q-237] an empty rollup renders a verdict · [Q-238] +
+[Q-239] moot but their reasoning is not. ⚠️ **Soreness now has prominent screen real estate and drives
+nothing** — the only soreness detector (`longitudinal-signals.ts`) still reads the DAILY CHECK-IN,
+which Michael said he may kill. Pointing it at post-workout soreness is the small piece; deciding what
+it may DO when it fires is the deferred one.
 
 ## WHAT SHIPPED LAST NIGHT — client only, uncommitted, do NOT re-litigate
 

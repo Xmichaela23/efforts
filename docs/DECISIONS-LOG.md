@@ -2637,7 +2637,111 @@ rather than guessed into it — the same failure direction the gate already chos
 
 ---
 
-## D-353 — A ROLLUP MAY NOT OUT-ALARM ITS OWN EVIDENCE: severity is capped at the contributors (2026-08-01, Michael — STEP 1 PUSHED + DEPLOYED, STEP 2 PUSHED, NOT DEPLOYED)
+## D-355 — THE CLIENT CACHE FLOOR MUST TRACK THE SERVER VERSION, OR DEPLOYS SILENTLY DO NOT LAND (2026-08-01, **PUSHED + DEPLOYED**)
+
+**Michael, on a screen that had not changed after a correct deploy:** *"still see heart rate response."*
+The code was right. The row was deleted, built, pushed and deployed. **It could not reach him.**
+
+**THE MECHANISM, and it invalidates a ritual this log repeats four times.** On a tab mount the client
+does **not** call the `coach` function. `useCoachWeekContext.ts:~699` reads the `coach_cache` row
+**directly** and gates it on `COACH_CLIENT_MIN_PAYLOAD_VERSION`, then returns. That constant sat at
+**144** while the server had reached **157**. A cached v156 row clears 144, renders, and the function
+that would have recomputed it is never invoked.
+
+So *"bump `COACH_PAYLOAD_VERSION` so cached rows re-source"* — the instruction in ~20 version notes —
+**only works when the edge function is the reader.** On mount it is not. **Thirteen versions of server
+changes could sit cached and unreachable, each deploy looking like it had silently failed.**
+
+**THE RULE: bump both, always.** `coach-contract.ts` already said *"must match / bump both"* and it
+drifted anyway, so the comment now explains **why** rather than asserting the rule — the next person
+will reason exactly the way I did below.
+
+⛔ **THE AUDIT FOUND THIS DRIFT THAT MORNING AND TALKED ITSELF OUT OF IT.** `AUDIT-docs-vs-code-2026-07-31.md`
+flagged server 155 vs client 144 and concluded: *"the client value is a FLOOR, not an equality, so this
+is not necessarily the same bug."* **It is the bug.** A floor below the server version is precisely a
+window in which corrected rows cannot reach a device. Filed here because the softening — not the
+drift — is what cost the session.
+
+---
+
+## D-354 — BODY IS WHAT YOU LOGGED: the heart-rate and cross-training rows are DELETED (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
+
+**Michael:** *"body is simply how you've been reporting."* The section is now **one row** carrying the
+two things the athlete reports — effort and soreness — and nothing measured.
+
+### Why the heart-rate row went
+
+It was a **pure rollup**: since D-346 its contributors were `run.efficiency` + `bike.efficiency`, the
+same two verdicts the RUN and BIKE rows render beneath it, with **no number of its own** (speed-per-
+heartbeat and watts-per-heartbeat cannot honestly be combined). It died in three steps, each removing
+something it could not support — it could not out-alarm the rows below (D-353), could not restate them
+(v156), could not use words (the no-verdict-word rule). What remained was an arrow duplicating the two
+rows under it, pointing a direction its own contributors **split on** (Q-238), stamped with a date that
+**hid its stale half** (Q-239).
+
+⛔ **THE DURABLE REASON IS THE INSTRUMENT, and it is why the tombstone says DO NOT REBUILD.**
+Overreached athletes show submaximal HR going **down** and HR recovery getting **faster** while RPE
+rises (`SCIENCE-concurrent-training-interference.md`) — an HR-based fatigue read can be **actively
+backwards in the exact case it is wanted.** Subjective measures outperform it (BJSM review, cited in
+`longitudinal-signals.ts`). That is the whole argument for BODY reading reported effort and soreness.
+Within-session fading is a **RUN** signal — sport-specific, confounded by heat and terrain — and
+already renders on the RUN row.
+
+### Why cross-training went
+
+*"People know if they are hitting their numbers."* It compared declared targets against GPS mileage —
+not reporting, and not something the athlete needs told. ⚠️ **It never detected interference between
+disciplines**; that verdict was retired in v126 because the effect is smaller than the measurement
+error on e1RM. The name invites a rebuild, so both deletions carry tombstones.
+
+### What the row says now
+
+> **What you've logged** — Effort about as usual: 3.6 of 10 avg vs 3.8 typical. Soreness normal for
+> you: 2.1 of 7. Logged on 4 sessions.
+
+- **Scales are shown** — "3.6" with no denominator is not a number anyone can read.
+- **Coverage is PROVENANCE, not a nudge.** *"If we are clear that these numbers are the accumulation of
+  what's logged, that will encourage people."* Compliance is the documented weakness of subjective
+  monitoring, and the post-session prompt does **not** force an answer, so partial coverage is normal.
+- **Soreness is against the athlete's OWN baseline** (`resolveCurrentSoreness`), never a population
+  norm — a 3 means different things to different people. Silent until 5 entries, and it **says so**
+  rather than dropping out.
+
+⚠️ **BUILT AS A SIBLING, NOT A SECOND BASELINE.** The plan was a soreness average on the 28-day norms
+beside RPE's. `resolveCarriedInSoreness` already did soreness as a Z-score against the athlete's own
+history, so that would have put a cruder baseline next to a better one — the "second vocabulary beside
+the first" pattern `CLAUDE.md` names. The new accessor sits next to it and shares its guards.
+
+### The persistence line
+
+Soreness above the athlete's own normal on **4 of the last 6** logged sessions →
+
+> Soreness above your normal on 4 of your last 6 sessions.   Adjust ›
+
+**It states a fact and points at a door.** No diagnosis, no cause — soreness clustering around lifting
+days is an observation; *"your lifting caused this"* is the causal claim v126's evidence bar rejects.
+**4-of-6 is the monitoring standard**, not a number chosen here; `longitudinal-signals.ts` uses that
+shape against an absolute floor and its header says the floor should become baseline-relative once
+history exists. This is that. **Counted per session, not from the window average** — a mean can be
+dragged over the line by one very sore day, which is what a persistence gate exists to ignore.
+**Advisory only:** it can never move the fitness read, or the honest reporting stops.
+
+⚠️ **THE LINE ONLY. The endurance steer behind Adjust is NOT built** — `adapt-plan` can progress/deload
+strength, re-lay-out a strength week and update paces, and has nothing that reduces endurance volume.
+Adjust is a scaffold for endurance; sending someone there is honest because that tab says so itself.
+A dead button would not have been.
+
+## D-353 — A ROLLUP MAY NOT OUT-ALARM ITS OWN EVIDENCE: severity is capped at the contributors (2026-08-01, Michael — SHIPPED; its subject row was deleted hours later)
+
+> ⚠️ **THE ROW THIS WAS WRITTEN ABOUT IS GONE — [D-354], same day.** The BODY heart-rate row was
+> deleted once it became clear it could not out-alarm the rows below it (this entry), could not
+> restate them, and could not use words. **THE RULE SURVIVES AND IS STILL LIVE:** `capRollupTone`
+> (`_shared/state-trend/severity.ts`, 5 tests) applies at the composer to every rollup, present and
+> future. ⚠️ It currently has **no caller** — the only rollup that used it was that row. Do not
+> delete it as dead code; it is a rule waiting for the next rollup, and its two known gaps are
+> filed as [Q-236] and [Q-237].
+> ⚠️ STEP 1's client stopgap (`cappedSignalColor`, `StateTab.tsx`) is now doubly redundant and can
+> be deleted whenever.
 
 **Found by Michael on his own screen.** The State BODY row said *"Running easing off (1d ago) · bike
 holding (17d ago)"* in **amber**. Two inches below, the RUN row said **"↓ −15.2%"** in neutral grey —
@@ -3085,6 +3189,12 @@ and bike, and its "building · N of 12 weeks" label is honest for run (data cove
 progress for a lift. Run and bike are byte-identical.
 
 ## D-346 — THE RUN ROW IS ON THE WRONG INSTRUMENT. Decoupling out, speed-at-heart-rate in (2026-07-31, **SHIPPED + DEPLOYED**)
+
+> ⚠️ **STILL CORRECT FOR THE RUN ROW. ITS SIDE EFFECT ON THE BODY ROW ENDED IN A DELETION ([D-354],
+> 2026-08-01).** Pointing the heart-rate rollup at `run.efficiency` was right — but it made that row
+> a restatement of the RUN row rather than a second reading, and one day later that was the argument
+> for deleting it. **The run-side change stands unchanged**; only the rollup that borrowed from it
+> is gone. Everything below is unaffected.
 
 > ✅ **BUILT AND DEPLOYED THE SAME DAY, after this entry was first written as a decision-only record.**
 > Thirteen commits (`de8b486d` … `7ea6170b`), 22 edge functions, coach payload 150 → 154. What shipped

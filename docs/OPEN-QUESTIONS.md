@@ -2558,6 +2558,15 @@ change plus a caller change, which is why it was not folded into D-353's deploy.
 
 ## Q-238 — The rollup arrow asserts a DIRECTION its own contributors split on (2026-08-01, Michael, FILED — same underlying gap as [Q-236])
 
+> ✅ **MOOT — THE ROW WAS DELETED THE SAME DAY ([D-354]).** Both of these were arguments about the
+> BODY heart-rate rollup, and both were part of the case for removing it: it pointed a direction
+> its contributors split on, and stamped a freshness date that hid its stale half. **Neither is
+> fixed — the surface they described is gone.** ⚠️ **They are NOT closed as reasoning.** If a
+> future rollup renders a direction or a freshness stamp over multiple contributors, both traps
+> are waiting, and neither is covered by D-353's severity cap — that governs how ALARMING a
+> rollup may be, not what it may CLAIM. Read with [Q-236]; the three are one gap seen three ways.
+> Everything below is history.
+
 **Michael, on the bare-arrow render:** *"Run is declining, bike is holding. `dirOf()` resolves to
 declining and the row renders ↓. One of two contributors doesn't support it."*
 
@@ -2585,6 +2594,15 @@ what the ROLLUP renders, not what the spine computes.
 ---
 
 ## Q-239 — The rollup's single "as of" stamp CONCEALS its stale half (2026-08-01, Michael, FILED — the row's worst element, not its best)
+
+> ✅ **MOOT — THE ROW WAS DELETED THE SAME DAY ([D-354]).** Both of these were arguments about the
+> BODY heart-rate rollup, and both were part of the case for removing it: it pointed a direction
+> its contributors split on, and stamped a freshness date that hid its stale half. **Neither is
+> fixed — the surface they described is gone.** ⚠️ **They are NOT closed as reasoning.** If a
+> future rollup renders a direction or a freshness stamp over multiple contributors, both traps
+> are waiting, and neither is covered by D-353's severity cap — that governs how ALARMING a
+> rollup may be, not what it may CLAIM. Read with [Q-236]; the three are one gap seen three ways.
+> Everything below is history.
 
 **Michael:** *"Run is 1d old, bike is 17d old. One stamp showing the freshest input conceals that half
 the rollup is two and a half weeks stale. A per-discipline age was honest; a single max-recency stamp
