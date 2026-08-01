@@ -261,3 +261,61 @@ export function resolveCarriedInSoreness(
   const elevated = z >= 1.0 && recent >= mean + 1; // above own norm (z≥1) AND a real absolute step
   return { elevated, recent, mean, z, baselineOk: true, diag: `soreness ${recent} vs norm ${mean.toFixed(1)} (z ${z.toFixed(1)})` };
 }
+
+/**
+ * ⛔ SIBLING OF `resolveCarriedInSoreness`, AND THE DIFFERENCE IS THE QUESTION, NOT THE MATH.
+ *
+ *   `resolveCarriedInSoreness` — *"what did I carry INTO this session?"* Needs a target workout, and
+ *      deliberately excludes anything logged at or after that workout started (D-234 provenance guard),
+ *      because a session's own post-log must never be allowed to trigger its own card.
+ *   `resolveCurrentSoreness`  — *"where is my soreness NOW, against my own normal?"* No target. This is
+ *      the STATE reading, and the most recent entry is the whole point rather than something to exclude.
+ *
+ * They share the scale guard, the baseline-sufficiency floor and the Z-score, because those are
+ * properties of the MEASUREMENT, not of either question. Written as a second accessor over the same
+ * vocabulary rather than a second baseline — a cruder 28-day soreness average alongside this would be
+ * two answers to one question, which is the pattern this codebase keeps having to undo.
+ *
+ * ⚠️ INDIVIDUAL BASELINE, NOT A POPULATION NORM, and that is deliberate. Soreness has no meaningful
+ * population value — a 3 means different things to different athletes. The monitoring consensus is
+ * acute-vs-chronic against the athlete's OWN history (median ± individual SD), which is also what
+ * `longitudinal-signals.ts` says its absolute floor should be replaced by once history exists.
+ *
+ * Returns `baselineOk: false` until `minBaseline` entries exist. **Callers must render nothing rather
+ * than a verdict in that state** — "normal" off two data points is a claim, not a reading.
+ */
+export function resolveCurrentSoreness(
+  entries: SorenessEntry[],
+  opts?: { recentDays?: number; minBaseline?: number; asOf?: string },
+): { level: 'normal' | 'elevated' | null; recent: number | null; mean: number | null; z: number | null; baselineOk: boolean; logged: number; diag: string } {
+  const recentDays = opts?.recentDays ?? 7;
+  const minBaseline = opts?.minBaseline ?? 5;
+  const now = opts?.asOf ? new Date(opts.asOf).getTime() : null;
+  const rows = entries
+    .filter((e) => e.soreness >= SORENESS_SCALE_MIN && e.soreness <= SORENESS_SCALE_MAX)  // 1–7 only
+    .map((e) => ({ e, t: new Date(e.startTime).getTime() }))
+    .filter((x) => Number.isFinite(x.t))
+    .sort((a, b) => b.t - a.t);
+  const logged = rows.length;
+  if (logged === 0) return { level: null, recent: null, mean: null, z: null, baselineOk: false, logged: 0, diag: 'no soreness logged' };
+
+  const newest = now ?? rows[0].t;
+  const recentRows = rows.filter((x) => (newest - x.t) <= recentDays * 86400000).map((x) => x.e.soreness);
+  const recent = recentRows.length ? recentRows.reduce((a, b) => a + b, 0) / recentRows.length : null;
+
+  // ⚠️ THE BASELINE EXCLUDES THE RECENT WINDOW. Leaving the last week inside its own comparison drags
+  // the mean toward the value being tested and quietly shrinks every deviation — a sore week would
+  // partly normalise itself.
+  const baseRows = rows.filter((x) => (newest - x.t) > recentDays * 86400000).map((x) => x.e.soreness);
+  const baselineOk = baseRows.length >= minBaseline;
+  if (recent == null) return { level: null, recent: null, mean: null, z: null, baselineOk, logged, diag: `nothing logged in ${recentDays}d` };
+  if (!baselineOk) return { level: null, recent, mean: null, z: null, baselineOk: false, logged, diag: `baseline thin (${baseRows.length}/${minBaseline})` };
+
+  const mean = baseRows.reduce((a, b) => a + b, 0) / baseRows.length;
+  const sd = Math.sqrt(baseRows.reduce((a, b) => a + (b - mean) ** 2, 0) / baseRows.length) || 1;
+  const z = (recent - mean) / sd;
+  // Same two-part gate as the carried-in read: above the athlete's own spread AND a real absolute step,
+  // so a tight-variance athlete does not read "elevated" off a rounding difference.
+  const level: 'normal' | 'elevated' = (z >= 1.0 && recent >= mean + 1) ? 'elevated' : 'normal';
+  return { level, recent, mean, z, baselineOk: true, logged, diag: `soreness ${recent.toFixed(1)} vs norm ${mean.toFixed(1)} (z ${z.toFixed(1)})` };
+}
