@@ -2637,6 +2637,33 @@ rather than guessed into it — the same failure direction the gate already chos
 
 ---
 
+### AMENDMENT (same day) — the sorting rule: DEFINITION vs POSITION
+
+**Michael:** *"anything specific to where the user is needs to go to more; ⓘ simply shows what the
+metric is."*
+
+⛔ **THE TEST, and every future addition to these rows has to pass it:** a sentence belongs in **ⓘ**
+only if it would be true for **an athlete who has never opened the app.** Anything measured *about this
+person* — their dot, their basis, their freshness, their trend, their pace — is **"more"**.
+
+**What that caught:**
+- **Both bike ⓘ strings** ended with *"the dot is where it sits versus your baseline; the arrow is the
+  direction"* — a legend for this athlete's position, not a definition. Moved to "more", rendered only
+  when there is a dot to explain.
+- **The bike POWER string went further:** *"how your cycling power is TRENDING VERSUS YOUR OWN
+  BASELINE"* is also position. It now says what power is and stops.
+- **The run ⓘ already passed** — metric only, unchanged.
+- **The run PACE line** (`pace ~12:49/mi at 134 bpm`) moved under "more". It was added in July as the
+  plain-English *"what"* beneath an efficiency INDEX, when the row led with `1.55`. The row now leads
+  with a direction and a percent, so the pace had stopped being a translation and become a second,
+  more concrete-looking number competing with the one the row is about.
+
+**The bike row was restructured to the same shape as run** — headline + one receipt line visible, the
+rest behind "more". ⚠️ **Contents differ because the material differs** (run's detail is a read; bike's
+is provenance) — the RULE is what is shared, not the items. ⚠️ **The empty state stays VISIBLE:**
+*"no baseline set · accept your FTP to anchor"* is actionable, and hiding an actionable gap behind a tap
+is how a missing dot starts reading as a bug.
+
 ## D-357 — TWO CUES, TWO ANSWERS: ⓘ is the definition, "more" is the read (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
 
 **On a fitness row, ⓘ and the read were one blob behind the metric word.** An athlete who wanted *"what
