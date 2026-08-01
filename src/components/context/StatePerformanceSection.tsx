@@ -705,7 +705,21 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
             : <span className="text-white/60 text-[12px]">Need a few more runs — {eff.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs to read a trend</span>
         )}
       </span>
-      {hasTrend && evidence && <span className="basis-full text-white/55 text-[12px]">{evidence}</span>}
+      {/* ⛔ THE RANGE IS ALWAYS-VISIBLE, NOT TAP-ONLY (2026-08-01, Michael — extends [D-356]).
+          "A shown number always shows its uncertainty" cannot be satisfied by a range the athlete has
+          to go looking for. The headline percent is on screen without a tap, so its interval is too.
+          It stays in the ⓘ expand as well — this ADDS a copy, it does not move it.
+          ⚠️ BOTH READ THE SAME `ciRange(eff.route.ci)`. One helper, one rounding, so the visible line
+          and the expand can never print different numbers for the same interval — which is the only
+          way this could go wrong, and would be worse than not showing it at all.
+          ⚠️ A `holding` range may straddle zero ("−3% to +2%"). That is shown deliberately: it is the
+          honest picture of a verdict that means "no real change", and hiding it would make a flat read
+          look more certain than it is. */}
+      {hasTrend && (() => {
+        const rng = ciRange(eff.route?.ci);
+        const line = [rng, evidence].filter(Boolean).join(' · ');
+        return line ? <span className="basis-full text-white/55 text-[12px]">{line}</span> : null;
+      })()}
       {heatCost && <span className="basis-full text-white/55 text-[12px]">{heatCost}</span>}
       {/* THE LONG VIEW — the arc behind the verdict.
           ⛔ WHEN A ROUTE VERDICT EXISTS THE CHART PLOTS **THE ROUTE'S OWN RUNS** (D-346, 2026-07-31).
