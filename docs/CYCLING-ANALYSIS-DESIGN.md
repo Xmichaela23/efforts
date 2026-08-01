@@ -145,7 +145,7 @@ Arc surfaces this into:
 
 ## Build Order
 
-> **Status (2026-05-16)** — see `docs/SESSION-CONTEXT.md` for commit hashes & open items.
+> **Status (2026-05-16)** — see `docs/archive/SESSION-CONTEXT.md` for commit hashes & open items.
 > - ✅ **Done & deployed:** #1 (`1c841615`/`82c68fe9`), #1b (`71e82dbb`), #2 (`7a2fed7f`), #3 (`a5947290`), #4 (`61851fba`), #5 (`61851fba`), #6 (`685987cb` + SELECT fix `41d1582d`), #7 (`a42331cc`), #9 (`66dad9d9` + `f2cb068c`). Plus the type-filtered TREND (`04eb2b52`) and VI-gate classifier (`d6832a6b`/`fd16ef5a`).
 > - ⚠️ **Done with known follow-ups:** #1b — HR line ships but historical `avg_hr` resolves null (wrong field/SELECT — open item #1 in SESSION-CONTEXT). Type-filtered TREND needs a historical re-analyze backfill to populate (open item #2). #9 — CTL/ATL exposed; power-curve-trend / HR-at-power-trend into Arc still pending.
 > - ⛔ **Blocked (documented dependency):** #8 — needs race-course GPX geometry extraction; not in the unblock decisions. Forward hook (`cycling_segment_history.race_course_relevant`) in place.

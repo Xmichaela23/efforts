@@ -376,8 +376,8 @@ genuinely-recomputed math — inventoried below.
 ## Cross-references
 
 - **Existing screen docs to reconcile (mostly consistent with this map):**
-  `docs/SMART_SERVER_DUMB_CLIENT_AUDIT.md`, `docs/PERFORMANCE_SCREEN_AUDIT.md`,
-  `docs/SPEC-state-screen-v2-performance.md`, `docs/PERF-COMPARISON-POOL-SPEC.md`,
+  `docs/archive/SMART_SERVER_DUMB_CLIENT_AUDIT.md`, `docs/archive/PERFORMANCE_SCREEN_AUDIT.md`,
+  `docs/SPEC-state-screen-v2-performance.md`, `docs/archive/PERF-COMPARISON-POOL-SPEC.md`,
   `docs/WIZARD-AUDIT.md`, `docs/SPEC-state-headline.md`, `docs/APP-FLOW.md`.
 - **Engine/decisions:** `docs/ENGINE-STATE.md` (run-title divergence now resolved by
   `derive-workout-title.ts`); `docs/DECISIONS-LOG.md` D-094 (reps-range/qualitative weight), D-109

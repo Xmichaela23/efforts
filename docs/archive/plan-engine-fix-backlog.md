@@ -1,6 +1,6 @@
 # Plan engine — stack-ranked fix backlog
 
-**Inputs.** This backlog synthesizes `docs/plan-engine-contract-audit.md`, `docs/plan-seasons-e2e-audit.md`, and **Plan Generation Contract v1 (May 2026)** (`docs/PLAN-CONTRACT.md` — **check in if missing**).
+**Inputs.** This backlog synthesizes `docs/archive/plan-engine-contract-audit.md`, `docs/archive/plan-seasons-e2e-audit.md`, and **Plan Generation Contract v1 (May 2026)** (`docs/PLAN-CONTRACT.md` — **check in if missing**).
 
 **Rules for execution.** Each row is ordered by **severity × leverage**: restore athlete trust first, then architectural integrity, then completeness/polish.
 

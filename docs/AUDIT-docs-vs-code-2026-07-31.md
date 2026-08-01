@@ -1,0 +1,910 @@
+# AUDIT — the docs against the code (2026-07-31, overnight, autonomous)
+
+**Branch `docs/audit-2026-07-31`. Nothing pushed. Nothing deployed. No code changed. Nothing deleted.**
+Everything here is a docs-only commit on a branch you can throw away with one command (§10).
+
+---
+
+## 1. The bottom line
+
+**257 load-bearing claims across the 9 docs a session actually reads were traced to code. 189 were
+wrong. All 189 are corrected in place.** Separately, two structural problems turned up that a text fix
+cannot honestly solve — they are flagged for you in §5, not patched over.
+
+Every correction is marked inline with `⟨A31⟩` — grep that tag to see exactly what this audit touched:
+
+```bash
+grep -rn "⟨A31⟩" docs/ CLAUDE.md | wc -l
+```
+
+**The headline: the docs have been telling every new session that the strength gauge's fix is unbuilt.
+It was built on 2026-07-30, as D-341.** Five separate docs — ENGINE-STATE, CAPABILITY-MAP,
+POLISH-PUNCH-LIST, OPEN-QUESTIONS and DECISIONS-LOG — still said `verdictFrom95Set` was "called by
+nothing". It is called. The plan no longer raises the bar on the calendar alone. A session that read
+any of those five and believed it would have spent a day rebuilding a shipped engine — which is the
+exact failure `CLAUDE.md`'s top banner exists to prevent.
+
+**The second headline: `D-270` did not exist.** It was cited as settled law in five places with no
+entry anywhere. ✅ **RESOLVED 2026-07-31 — Michael filed it** from the ratified design doc; the entry
+now sits in sequence above D-271 and the five citations resolve. See §5.1.
+
+### What this cost, in the terms that matter
+
+| | |
+|---|---|
+| Claims checked | 257 |
+| Wrong | 189 (93 load-bearing, 96 rotted line references) |
+| Corrected in place | 189 — 187 mechanically, 2 by hand after the applier refused them as ambiguous |
+| Structural problems flagged for you, not patched | 2 (§5) |
+| Docs classified | 158 — **36 moved to `docs/archive/`**, 16 proposed-and-held, 99 kept + the 6 living docs (§6) |
+| Docs deleted | **0** — nothing was deleted, by instruction |
+| Code files changed | **0** |
+
+---
+
+## 2. How to read this file
+
+Read §3 (the landmines), §5 (what needed your call) and §7 (the splits I did **not** perform).
+Everything else is evidence you can skip unless you want it.
+
+Three verdicts are used throughout:
+
+- **VERIFIED** — the doc was right. Left alone, sometimes with a "re-verified" note so the next session
+  stops re-checking it.
+- **STALE** — provably wrong, with a `file:line` that shows why. Corrected.
+- **UNVERIFIABLE** — could not be settled from code alone (needs a device or a DB query). Left alone
+  and listed, never guessed at.
+
+---
+
+## 3. The landmines you named
+
+### 3.1 The anchor-only AMRAP claim vs `wendler-531.ts:61` — **the line ref is RIGHT**
+
+`wendler-531.ts:61` really is `amrap: kind === 'anchor' && !isDeload && i === 2`. Exact, still true.
+It is now marked as re-verified in `ENGINE-STATE.md` so nobody spends a fourth session confirming it.
+
+### 3.2 "The gauge is near-blind for 8 of 12 weeks" — **CONDITIONAL, not a constant**
+
+This is the one that was quietly wrong, and it is wrong in the direction that matters: it made the
+problem look **bigger and more permanent than it is**.
+
+"8 of 12" assumes the block is leader / leader / anchor. It is not always that shape.
+`leaderCount` (`wendler-531.ts:291`) returns **zero leaders** when the athlete is continuity-tier
+`continuous`, posture `develop`, the block is under 16 weeks, and there is no `highAerobicLoad`. Zero
+leaders means **every cycle is an anchor**, which means the all-out set fires in **9 of 12 weeks**, not 3.
+
+So: "8 of 12 blind" is true for a **first** block (`unknown` tier) or a returning athlete
+(`detrained`), and for any 16-week or maintain-posture block. It is false for the ordinary case of
+someone who has been lifting continuously. Live block shape is assembled at
+`generate-strength-plan/index.ts:121`.
+
+The `ENGINE-STATE` section that led on this has been rewritten to say so.
+
+### 3.3 The live generator vs the module — **the gate is WIRED, and five docs said it wasn't**
+
+The chain, traced end to end:
+
+```
+verdictFrom95Set (wendler-531.ts:454)
+  ← called by loading/cycle-verdicts.ts:116
+      → workingNumberForCycles (wendler-531.ts:519, applies each verdict at :548)
+          → strength-primary-plan.ts:1275          (the composer)
+          → rematerialize-strength-block/index.ts:167
+              ← invoked by the client on every logger save
+                 StrengthLogger.tsx:4022 (dry run) and :6053 (apply)
+```
+
+That is **D-341 (2026-07-30, "THE ALL-OUT REPS MOVE THE WEIGHT")**, which closed Q-223 and Q-226.
+
+**The one nuance that is still true, and that the corrected docs now state precisely:**
+`workingNumberForCycle` (`wendler-531.ts:210`) does still step by bare cycle index — but **only on the
+forecast path**, where the composer deliberately passes `unknownMeans: 'advance'`
+(`strength-primary-plan.ts:1281-1285`) because no verdict *can* exist for a week that has not happened
+yet. On every path that reads logged work, the verdicts govern. The old docs collapsed that distinction
+into "unconditionally", which read as "nothing was done".
+
+Two more things moved underneath these claims and no doc had caught either:
+
+- **`VALIDITY_CHECK_MIN_REPS` is now `1`, not `5`** (`wendler-531.ts:368` — Wendler's prescribed
+  `95% × 1+`, p23). `Q-220` still quoted the old constant and the old one-line body.
+- **The 1RM estimator is no longer Brzycki.** `D-339` moved it to Wendler/Epley
+  (`src/lib/estimate-1rm.ts:56`). So the "a leader-week e1RM is the plan quoting itself" arithmetic is
+  `weight × 1.167`, not `× 1.125`. Three docs still had the Brzycki number.
+
+### 3.4 Every line reference of the form `wendler-531.ts:160-200` — **all wrong**
+
+The symbols are at `:454` (`verdictFrom95Set`) and `:467` (`applyVerdict`). `workingNumberForCycle` is
+at `:210`, not `:112`. Those two bad citations had been copied into ENGINE-STATE, CAPABILITY-MAP,
+POLISH-PUNCH-LIST, DECISIONS-LOG **and into two code comments** (`src/lib/strength-focus-copy.ts:260`
+and `:262`). The docs are fixed. **The code comments were left alone** — this was a docs-only run. See §9.
+
+### 3.5 The CAPABILITY-MAP rows known to be rotten
+
+CAPABILITY-MAP is the doc a new session is told to open first, so its rows are the most expensive
+place to be wrong. Its lead table — "The FIVE that are BUILT, TESTED, and have NEVER EXECUTED" — was
+**two-fifths wrong**:
+
+| row | claimed | actually |
+|---|---|---|
+| the 95% verdict gate | ZERO CALLERS | **WIRED** (§3.3) |
+| `place-week.ts` | ZERO IMPORTERS; `strength-primary-plan.ts` "still lays out a hardcoded Mon/Tue/Thu/Fri grid" | **imported at `strength-primary-plan.ts:62`, called at `:908`** as the fallback when `week-solver`'s `solve()` returns unsolvable. **The hardcoded grid is gone.** |
+| `day-count-gate.ts` | zero importers | **correct** — only its own test imports it |
+| `detect-cores` | zero callers | **correct** — no cron, no button, no script |
+| `integration_mode` | no wizard writes it | **correct** |
+
+61 CAPABILITY-MAP claims were checked in total; 50 rows were corrected. The rest of the rot was
+citation drift — roughly 35 `file:line` references that no longer point at the thing they name, plus
+the "11 empty directories" count, which is now **zero** (`analyze-workout/` does not exist any more, so
+CLAUDE.md's Topology section was naming a directory that is gone).
+
+---
+
+## 4. What else the trace turned up
+
+The full claim-by-claim tables are in §11. The findings worth your attention:
+
+**`CLAUDE.md` was describing a bug that was fixed six weeks ago.** Its Topology section said
+`ingest-phone-workout` and `save-imported-workout` "bypass all of this ... invisible to the spine ...
+zero contribution to ACWR". **Both have routed through the single orchestrator since 2026-07-17**
+(`ingest-phone-workout/index.ts:290-305`, `save-imported-workout/index.ts:200-212`). The parts that
+*are* still true — fire-and-forget, forward-only with no historical backfill, and neither drives
+`adapt-plan` — have been kept.
+
+**`START-HERE.md`'s two red flags are both closed.** Posture is wired
+(`_shared/state-trend/posture.ts`, fed at `compute-snapshot/index.ts:859`), and `adapt-plan` no longer
+silently re-prices strength on ingest — those writes were deleted
+(`adapt-plan/index.ts:1119-1138`).
+
+**Four of `TRUTH-MAP.md`'s fractures have healed.** State no longer recomputes trends on the client
+(`useStateTrends` is a pure renderer of the server contract), so the "live-vs-cached freshness fork"
+cannot happen by construction; and the heat-adjusted engine is wired to the spine, not just the
+per-workout screen.
+
+**`GAME-PLAN.md` was sending the next session to redo shipped work.** Six items were ticked off
+against code, including the two ingest paths above and the 16-day-stale durability read (D-291).
+
+**One thing got quietly worse, and is now flagged rather than fixed.** ENGINE-STATE said the coach
+payload version and the client's minimum were "pinned together, bump both". They have drifted apart
+again: server `COACH_PAYLOAD_VERSION = 155` (`coach/index.ts:137`) vs client
+`COACH_CLIENT_MIN_PAYLOAD_VERSION = 144` (`src/lib/coach-contract.ts:5`). **This may be fine** — the
+client value is a floor, not an equality — so I did not touch it. The doc now states both numbers.
+
+---
+
+## 5. What needed your call
+
+### 5.1 `D-270` did not exist — ✅ **now filed** (2026-07-31)
+
+`DECISIONS-LOG.md:214` had said since 2026-07-10:
+
+> *"Owed doc-debt (flagged, not fabricated): D-270 (strength convergence, commit `bdab1874`) ... still
+> owe formal DECISIONS-LOG entries — write them from the commits next session."*
+
+That was 21 days ago and it was never done, while **D-270 was cited as settled law in five places**
+(`AUDIT-performance-state-2026-07-29.md:332`, `CONCEPT-adapt-plan-strength.md:105`, and three times
+inside `DECISIONS-LOG.md` itself). Anyone following the citation found nothing. It was the only gap in
+the D-sequence — `D-271` through `D-352` were all present.
+
+**The audit deliberately did not write it**: authoring a decision means stating *why* a choice was
+made, and that is the architect's to say, not an auditor's to reconstruct from a diff.
+
+✅ **Michael filed it the same night**, from `DESIGN-strength-convergence.md` (the design ruling
+ratified 2026-07-10) rather than from the commit. The entry — strength convergence, TRUTH-MAP
+fracture #1: direction is the spine's, prescription is the coach's, both off
+`exercise_log.estimated_1rm`, prescription renders *inside* direction — now sits in sequence above
+D-271. Consequently:
+
+- The doc-debt note is marked **half paid**. **FTP fracture #2 is still owed** (`d278cadd` /
+  `eae2d9aa` / `00dbc9f2`) and was deliberately left alone.
+- **D-347 gained a reciprocal back-pointer** — it removed D-270's State-screen *chip*, not the
+  direction *fact*. That is exactly the back-annotation `CLAUDE.md` says never happens, so it is worth
+  noting that it happened here.
+- `DESIGN-strength-convergence.md` moved to `docs/archive/`. The classifier had marked it KEEP with
+  the explicit condition *"this file is the only written record of the ruling; archive once D-270
+  exists."* That condition is now met.
+- **`Q-144` is the only remaining gap in either sequence**, and is believed to be a skipped number
+  rather than a lost entry — nothing anywhere references it.
+
+### 5.2 `PLAN-CONTRACT.md` actively contradicts `CLAUDE.md`, and its own header is the lie
+
+`CLAUDE.md` says PLAN-CONTRACT is **superseded** and "do not rely on its matrix or rules". The file
+itself opens with:
+
+> *"The single source of truth for how training plans are built. This document is the spec. Code
+> conforms to this; this does not conform to code."*
+
+There is no superseded banner on it. A reader who opens the file is told the opposite of the truth.
+It is referenced from 7 places, so I have **not** moved it (see §6). **The call you need to make:**
+archive it, or give it a banner. I would give it the banner — it is still cited — but that is a
+one-line edit either way and I would rather you picked.
+
+Related, and lower stakes: `SCHEDULING-RULES-EXTRACTED.md` opens with *"SNAPSHOT OUTDATED — 2026-05-09
+... Kept for historical reference only"*, while `CLAUDE.md` lists it under Reference docs as a
+"descriptive snapshot of **current** code" to "pair with the prescriptive doc when reasoning about a
+rule". The doc is right and CLAUDE.md is wrong.
+
+---
+
+## 6. Every doc classified — 158 files, 122 left in `docs/`
+
+Every `.md` in `docs/` was read and called. **36 moved, 16 proposed-and-held (§6.2 + §6.3), 99 kept.**
+Every live doc appears in exactly one table below, and every archive row is really in `docs/archive/` —
+checked, not asserted.
+Nothing was deleted.
+
+The rule applied, on top of what the readers proposed: **if one of the six living docs still points
+at a doc, it stays** — unless the doc's own header declares itself dead. Being cited by a file that
+gets updated every session is evidence something is still load-bearing, and archiving one of those
+costs a morning while leaving it costs nothing.
+
+Where two readers disagreed (4 docs), the disagreement was resolved by hand against code, not by
+vote. The most useful catch: one reader wanted to archive `SPEC-run-pace-glass-box.md` as "shipped as
+D-285", having confused the run-pace **resolver** (which did ship) with the **glass-box provenance
+surface** (which did not — `resolveRunPaceStack`, `run_pace_provenance` and `glassBox` have **zero
+hits** in the codebase and Q-171/Q-173 are still open). It stays.
+
+### 6.1 Moved to `docs/archive/` — 36
+
+`git mv`, so every one is one `git revert` from coming back.
+
+| doc | why |
+|---|---|
+| `AUDIT-app-synthesis-2026-07-02.md` | Dated snapshot at the top of the 2026-07-02 audit stack; livedocRefs=0 and its ~6%-conformance scorecard is superseded by AUDIT-state-screen-2026-08-01.md plus TRUTH-MAP.md. |
+| `AUDIT-spine-conformance-2026-07-02.md` | Dated 2026-07-02 snapshot, livedocRefs=0; only inbound refs are AUDIT-app-synthesis-2026-07-02.md, SESSION-CONTEXT.md and archived logs. |
+| `AUDIT-swim-2026-06-14.md` | livedocRefs=0; superseded by AUDIT-swim-2026-06-17.md, which carries the whole-board severity map plus the 2026-06-18 close status (D-199). |
+| `AUDIT-truth-reconciliation-2026-06-14.md` | Its sign-offs were consumed by the spine build (BUILD-PLAN-top-down-spine-wiring.md frames off it); livedocRefs=0 and TRUTH-MAP.md is now the per-fact truth-authority doc. |
+| `BUILD-PLAN-top-down-spine-wiring.md` | 2026-06-14 master sequence for spine wiring that has since shipped (state_trends_v1 / compute-snapshot live); livedocRefs=0, only inbound ref is docs/audit/03-spine-snapshot.md. |
+| `BUILD-SEQUENCE-spine-foundation.md` | Status line says 'Plan only · not started' from 2026-06-14, but its Phase 0–2 spine foundation shipped; livedocRefs=0 and its only live pointer is BUILD-PLAN-top-down-spine-wiring.md, itself archive-bound. |
+| `COVERAGE-AUDIT-2026-05-13.md` | Dated one-off static audit of fixes shipped 2026-05-13; livedocRefs=0 and its only inbound ref is the archived OPEN-QUESTIONS-archive-Q001-Q129.md. |
+| `CYCLING-INGEST-AUDIT.md` | 2026-05-13 dated audit whose headline FTP finding is marked closed in-doc (resolveCurrentFtp, commit 76d94120); livedocRefs=0. |
+| `DESIGN-endurance-per-session-response.md` | Own banner: PARKED 2026-07-09, prototype written then deleted as duplicative of the spine + carryover reads, 'kept only as a record'; zero living-doc references. |
+| `DESIGN-familiar-routes.md` | Own banner: '⛔ SUPERSEDED 2026-07-06 — DO NOT BUILD FROM THIS DOC. See DESIGN-segments.md' — the route-identity substrate it rests on was killed by the D-250 audit. **Substance verified present in D-250.** |
+| `DESIGN-soreness-input.md` | Built: src/components/SorenessScale.tsx exists and ENGINE-STATE.md:723 records the segmented-bar 1-7 popup shipped across all disciplines with the no-default guarantee fixtured. **Substance verified present in D-234.** |
+| `DESIGN-strength-convergence.md` | The ratified design ruling for TRUTH-MAP fracture #1. **Substance filed as D-270 on 2026-07-31** — the classifier had kept it with the explicit condition *"the only written record of the ruling; archive once D-270 exists"*, and that condition is now met. Its display half was later superseded by D-347. |
+| `GOALS_SYSTEM_BLUEPRINT.md` | Own banner: '⚠️ STALE — VERIFY-FIRST', its rolling-generation mechanism (generate-macro, advance-plan, macro_phases) is 'fiction relative to live code' and §4-§8 are marked do-not-build; zero living-doc references. |
+| `ISLAND-PROPOSAL.md` | Non-binding proposal; superseded as the strength-authority doc by ARCH-strength-spine.md (LIVING, 2026-07-25) and its Phase 0/1 landed (_shared/periodization/ exists, isRestedTerminal 15 code hits); livedocRefs=0. |
+| `PERF-COMPARISON-POOL-SPEC.md` | Shipped: DECISIONS-LOG.md:336 records the D-037/D-038 mixed-effort work as shipped, silently reverted, then restored; pool_intensity_filter has 23 code hits. **Substance verified present in D-038.** |
+| `PERFORMANCE_SCREEN_AUDIT.md` | 2026-03-02 read-only audit of MobileSummary; livedocRefs=0, totalRefs=2, and the strength/endurance Performance surfaces were redesigned since (DECISIONS-LOG.md:2285). |
+| `PHASE-0-ARC-CHANNEL-SPEC.md` | Built: PHASE-1-RUN-PACE-SPEC.md:329 states 'D-032 / Phase 0 (Arc channel) shipped at ad4102f8'; ArcChannelPayload has 10 code hits; livedocRefs=0. **Substance verified present in D-032.** |
+| `PLAN-AUDIT-RESULTS.md` | Dated 2026-05-10 script output snapshot from scripts/audit-plans.ts; livedocRefs=0, totalRefs=1 — regenerable, not a standing contract. |
+| `SESSION-CONTEXT.md` | Self-titled 'CURRENT HANDOFF — 2026-07-02'; superseded by the ENGINE-STATE.md banners and GAME-PLAN.md, livedocRefs=0. |
+| `SESSION-HANDOFF-2026-05-10.md` | Dated session snapshot of three landed commits; zero inbound references anywhere in the repo. |
+| `SMART_SERVER_DUMB_CLIENT_AUDIT.md` | 2026-02-25 audit whose table is now all '✅ Fixed'; superseded as doctrine by TARGET-ARCHITECTURE.md; livedocRefs=0. |
+| `SPEC-ATHLETE-STATE-CONTINUITY-OPTIONS.md` | Read-only "options for review on return" investigation whose question was answered — readiness_checkins shipped (supabase/migrations/20260612120000_create_readiness_checkins.sql) and arc-context.ts:265-288 now reads it; livedocRe… **Substance verified present in none found (options doc, not a spec — its decision landed as Q-049 Phase 1).** |
+| `SPEC-e3a-nonrace-zones.md` | Header says "not approved, not implemented" but it SHIPPED — sustainable.ts:16 imports hrZones/paceZonesFromVdot, e3a-zones.test.ts exists, and D-218 records commit 94f1c58f "E3a zones"; caution: code comments cite this path (gen… **Substance verified present in D-218.** |
+| `SPEC-e3b-bottom-up-volume.md` | Own banner says IMPLEMENTED 2026-06-28 Part 1+2 and D-219 carries the full substance; e3b-budget.test.ts confirms — caution: cited from generate-run-plan/types.ts and sustainable.ts comments, repoint before moving. **Substance verified present in D-219.** |
+| `SPEC-non-race-run-retest.md` | All three cuts are BUILT — applyRetestTail at generate-run-plan/generators/base-generator.ts:436 (called :425), routing at create-goal-and-materialize-plan/index.ts:2711, tests retest-tail.test.ts/retest-behavior.test.ts; D-218 r… **Substance verified present in D-218.** |
+| `SPEC-strength-island-phase1.md` | Fully built: _shared/periodization/index.ts:51 isRestedTerminal + canonicalizePhaseName + protocolPhaseName, consumed at generate-run-plan/strength-overlay.ts:22,276 with retest-behavior.test.ts covering the retest cases. **Substance verified present in the Strength-Island D-entry at docs/archive/DECISIONS-LOG-archive-D001-D239.md:4536.** |
+| `STATE-OF-BOARD.md` | Self-dated 'Captured: 2026-06-28' status snapshot with pinned edge-function versions; livedocRefs=0 and ENGINE-STATE/GAME-PLAN own live status. |
+| `STRENGTH-SCOUT-REPORT.md` | Read-only scout map, livedocRefs=0; its live pointers are ISLAND-PROPOSAL.md / SPEC-strength-island-phase1.md / STATE-OF-BOARD.md, all pre-dating the 2026-07-25 strength-spine reframe in ARCH-strength-spine.md. |
+| `UI-MAP.md` | Dated 2026-06-28 read-only audit of the two non-race builder UIs; livedocRefs=0, totalRefs=1, and SCREEN-INVENTORY/SCREEN-CONNECTIVITY are the maintained screen maps. |
+| `UNLINKED-WORKOUT-INTERPRETATION-SPEC.md` | Shipped: header says 'APPROVED 2026-05-23. D-035', and DECISIONS-LOG.md:2285 treats D-035 as a live standing law; livedocRefs=0. **Substance verified present in D-035.** |
+| `WORK-ORDER-narrative-core.md` | Header states ✅ COMPLETE (2026-06-16) with all five narrative paths migrated; substance already folded into D-187–D-192. **Substance verified present in D-187 through D-192.** |
+| `WORKORDER-feature-audit.md` | Its work landed — the docs/audit/ corpus (00-INDEX plus 01–09 area maps) it commissioned exists and is now the master reference; livedocRefs=0. |
+| `plan-engine-contract-audit.md` | May-2026 audit measured against PLAN-CONTRACT.md v1, which CLAUDE.md:267 declares superseded — the yardstick is gone; livedocRefs=0. |
+| `plan-engine-fix-backlog.md` | Backlog synthesized from the two superseded plan-engine audits and PLAN-CONTRACT v1; totalRefs=0 — POLISH-PUNCH-LIST is the live backlog. |
+| `plan-seasons-e2e-audit.md` | May-2026 dated e2e trace snapshot; livedocRefs=0, totalRefs=1, superseded by BUILDER-SWEEP-FINDINGS + the AUDIT-* series. |
+| `run-only-season-planner.md` | 'Status: Tabled', refs=0; the run-only non-race path was instead delivered via the retest head (generate-run-plan/types.ts:16) and the front door is locked by SPEC-product-shape. |
+
+### 6.2 Proposed for archive but NOT moved — 10
+
+Each of these is still cited by one of the six living docs. That is evidence they are not
+*clearly* superseded, and the instruction was to move only the clear ones. Your call.
+
+| doc | living-doc refs | the reader's case for archiving |
+|---|---|---|
+| `AUDIT-state-screen-2026-07-02.md` | 1 | Superseded twice over — AUDIT-state-screen-2026-07-20.md extends it and AUDIT-state-screen-2026-08-01.md maps the whole screen on top of both. |
+| `AUDIT-strength-frequency-concurrent-matrix-2026-06-29.md` | 1 | Q-088 has left the live OPEN-QUESTIONS.md and its successor spec was already retired to docs/archive/superseded-strength-2026-07-25/SPEC-q088-freq4-run-path.md, so this scoping sheet is history. |
+| `DESIGN-D267-plan-primary-load-verdict.md` | 1 | D-267 shipped and was extended by D-268; note DECISIONS-LOG.md:176 delegates 'full design + all amendments' to this file, so that pointer must be updated to the archive path. |
+| `DESIGN-cross-domain-carryover.md` | 1 | Built and wiring-verified per ENGINE-STATE.md:717-719 (_shared/cross-domain-carryover.ts + 57 fixtures + synthetic acceptance run); note ENGINE-STATE.md:719 links this file as 'Design:' — repoint before moving. |
+| `DESIGN-run-easy-pace-truth.md` | 1 | Q-169's starvation is fixed: ENGINE-STATE.md:918-921 marks the easy-HR band REBUILT, the nested threshold_hr read FIXED, and the run_easy_hr 123 fabrication DELETED. |
+| `HANDOFF-2026-07-09-load-plan-awareness.md` | 1 | Dated handoff whose substance already lives in D-267 and D-268 (and their DESIGN-* docs); it says everything but D-268 Phase 4 shipped 2026-07-09. |
+| `HANDOFF-2026-07-10-architecture-north-star.md` | 1 | Dated handoff; its 'first mission' S2 (retire client-side math) is recorded as shipped in my continuity notes and TARGET-ARCHITECTURE/TRUTH-MAP now carry the doctrine it points to. |
+| `ISLANDS-ORIENTATION.md` | 1 | 2026-06-28 orientation snapshot superseded by START-HERE.md (rewritten 2026-07-13 from a code audit) and ARCH-strength-spine.md; its 'nobody can reach it in the app yet' framing predates the non-race run retest head shi… |
+| `SPEC-state-headline.md` | 2 | GAME-PLAN.md:248 states it outright: 'the code shipped; per the SPEC LIFECYCLE the substance folds into a D-NNN and the file dies' — the D-NNN still needs authoring (F13). |
+| `SPEC-state-screen-v2-performance.md` | 1 | AUDIT-state-screen-2026-07-02.md:59 states the 'not built' header is stale and it IS built (D-148); State has since moved to v3 (D-293/294/295), so the spec describes a superseded screen. |
+
+### 6.3 Proposed for archive but NOT moved — 6 more, because the reader was not confident
+
+Different reason from §6.2: nothing points at these, but the reader that flagged them said so at **low
+confidence** and named what it could not settle. Low confidence is not a basis for moving a file
+overnight, so they stayed. Each one names its own next check.
+
+| doc | the case for archiving, and what to check first |
+|---|---|
+| `PLAN-CONTRACT.md` | Superseded per CLAUDE.md, but **its own header claims the opposite** and it is cited from 7 places. Needs your call — see §5.2. |
+| `SCHEDULING-RULES-EXTRACTED.md` | Self-declares *"SNAPSHOT OUTDATED — 2026-05-09 … historical reference only"*. **Two readers independently caught that `CLAUDE.md` was recommending it as current descriptive truth** — those three CLAUDE.md lines are now corrected ⟨A31⟩, so the doc is at least no longer mis-sold. Archive it whenever you like; it is harmless where it sits. |
+| `RUN-HR-DRIFT-SPEC.md` | Header says DRAFT / D-036 proposed, but `decoupling_basis` has ~40 code hits. **Check D-036's entry text before archiving** — the reader would not assert it shipped. |
+| `RUNNING-CYCLING-DELTA.md` | 2026-05-13 port-gap audit, nothing points at it; its one live item (migration divergence) already migrated to `MAINTENANCE-DEBT.md`. |
+| `SPEC-strength-performance-details.md` | Two readers split. Execution score IS built (`analyze-strength-workout/index.ts:2720`), but D-351's region deletes Execution % for strength, and two of its named dependency specs no longer exist. **Re-check after confirming the Wendler rebuild (D-303/D-322/D-324) covered the Details tab.** |
+| `STRENGTH-ANALYSIS.md` | "Draft — 2026-05-27", nothing points at it; overtaken by the shipped logger/Performance work. |
+
+### 6.4 Kept — 99 (plus the 6 living docs and this report)
+
+<details><summary>Full keep list with reasons</summary>
+
+| doc | conf | why it stays |
+|---|---|---|
+| `APP-FLOW.md` | medium | Self-declared living baseline for client structure/routing, cited by TRUTH-MAP; no successor doc covers the client shell map. |
+| `ARCH-strength-spine.md` | high | Header says LIVING DOC with OPEN sections; 4 living-doc refs and it is the 'where things live' authority the strength-spine build still runs against. |
+| `AUDIT-continuity-2026-06-16.md` | low | Its own banner says both fractures CLOSED (D-185/D-186), but ENGINE-STATE.md:827 still directs readers to it as the where-each-value-is-single-sourced map before adding any new computation. |
+| `AUDIT-fanout-ordering-2026-07-17.md` | high | Findings unlanded — doc states rulings owed on §3a/§3b/§3c and Q-185–Q-188 are still open in OPEN-QUESTIONS.md:128-140; 4 living-doc refs. |
+| `AUDIT-hr-congruence-2026-07-17.md` | high | Touched 2026-07-31 with a D-346 correction; the LTHR four-resolver fracture and max-HR scatter are still flagged open. |
+| `AUDIT-performance-state-2026-07-29.md` | high | Two days old, 2 living-doc refs, findings (five exercise-identity resolvers, content-blind strength auto-attach) are a map of unfixed work. |
+| `AUDIT-state-screen-2026-07-20.md` | high | Header says IN PROGRESS with load reconciler / race block / no-plan state still to trace, and AUDIT-state-screen-2026-08-01.md explicitly says it 'supersedes nothing' and sits on top of this doc's F1… |
+| `AUDIT-state-screen-2026-08-01.md` | high | Newest State map (touched 2026-07-31), 4 living-doc refs, and the root finding (StatePerformanceSection.tsx does not read _shared/block-identity.ts) is unfixed. |
+| `AUDIT-swim-2026-06-17.md` | medium | Cited by ENGINE-STATE.md:790 as the swim hole map and still carries unlanded ⏭ DEFERRED items (H2 best-efforts fit, H3 pace formula fork, H4 capture, M1, M3). |
+| `BRICK-PROTOCOL.md` | medium | Standing protocol reference for the brick cap matrix, peer to RUN-/SWIM-/STRENGTH-PROTOCOL and cited by both plus docs/audit/04-planning.md. |
+| `BUILD-ORDER-strength-spine.md` | medium | Header says LIVING DOC, mid-design, with OPEN sections explicitly not implementable; the strength-spine build has not landed and SPEC-get-stronger.md + ARCH-strength-spine.md both point at it. |
+| `BUILDER-SWEEP-FINDINGS.md` | high | Findings still open — ENGINE-STATE.md:758 states the non-race builder materializes 0/16 shapes (F-9/F-10/F-11/F-12) and names this doc as the findings register. |
+| `CANON-arc-inference-model.md` | high | Doctrine (CANON-*), 8 living-doc refs, and the yardstick CONSTITUTION.md consolidates from. |
+| `CONCEPT-adapt-plan-strength.md` | high | Server half shipped (D-315) but ENGINE-STATE.md:279 names its State-as-hub section as the NEXT JOB, designed and not yet built. |
+| `CONCEPT-plan-your-week.md` | medium | Scoping doc with no code written; the Schedule/drag half it sizes is still unbuilt and ENGINE-STATE.md:745 still cites it. |
+| `CONSOLIDATED-MODE.md` | low | Engine half is built (integration_mode at create-goal-and-materialize-plan/index.ts:1921 + consolidated-trade-off.test.ts) but §11 wizard research copy is still owed, and POLISH-PUNCH-LIST + CAPABILI… |
+| `CONSTITUTION.md` | high | Doctrine — the six laws and their violation tells; the audit yardstick, 17 total refs. |
+| `COPY-VOICE.md` | high | Doctrine — canonical voice contract enforced against _shared/state-trend/week-accent.ts voiceViolation(); 3 living-doc refs. |
+| `CYCLING-ANALYSIS-DESIGN.md` | medium | Design spec whose segment/GPS-matcher decision is still owed — ENGINE-STATE.md:958 defers to it for Q-009; 14 total refs. |
+| `CYCLING-PROTOCOL.md` | medium | Standing protocol reference describing shipped engine behavior with Phase 4 (limiter_sport='bike' intensity dial) still deferred; peer to RUN-/SWIM-/STRENGTH-PROTOCOL. |
+| `DAY-COUNT-GATES.md` | high | POLISH-PUNCH-LIST.md:301-302 is an open item pointing here: src/lib/day-count-gate.ts:237 is built with 30+ tests and ZERO importers; the wizard mount + copy remain, gated behind consolidated mode. |
+| `DEPLOY-OWED.md` | medium | ENGINE-STATE.md:758 actively directs readers to its 'Next-session pickup'; the post-deploy checks are still unrun (blocked on a clean test account). |
+| `DESIGN-D237-lint-guard.md` | low | Unbuilt design awaiting Michael's approval (no lint rule or CI guard exists) — orphan with zero references anywhere, but it is unbuilt scope, not dead scaffolding. |
+| `DESIGN-D268-plan-aware-everywhere.md` | high | Partly built — its own header records Phases 1-3+5 shipped (coach v291/v293) with Phase 4 still REMAINING (Q-149). |
+| `DESIGN-Q111-plan-history-aware-verdicts.md` | medium | Mixed state: §1 explicitly descoped, §2 novelty built (_shared/novel-movements.ts), §§3-10 unratified — and ENGINE-STATE.md:929 still cites Q-111 as the live open residual. |
+| `DESIGN-best-efforts.md` | high | Genuinely unbuilt — no best-effort module, edge function, or migration in the repo (only cycling power-curve code); the run GAP wiring it specs does not exist. |
+| `DESIGN-load-system-extension.md` | high | Item 0 built (D-261, _shared/plan-phase.ts); Items 1-4 designed and not built, and it carries THE LAW (D-260) framing for all load work. |
+| `DESIGN-segments.md` | high | Not built — no segment table, migration, or matcher exists (only cycling-v1/segments.ts and course-segmentation.ts, unrelated); D-250 records it as SPEC and it is the named replacement for the killed… |
+| `DOCTRINE-aerobic-maintenance-run-only.md` | high | Doctrine (default KEEP) and still unbuilt in three places its own trace notes flag: no grade field, run_vo2_* token grammar cannot express short intervals, §2.2 pace anchors contradicted by materiali… |
+| `DOCTRINE-aerobic-maintenance.md` | high | Doctrine (default KEEP), 2026-07-26, companion to SPEC-week-solver; §5.2 cadence field is still the unbuilt load-bearing requirement and §9 is unresolved against D-325. |
+| `ENDURANCE-PROVENANCE.md` | medium | The debt it catalogs is explicitly still open — docs/archive/DECISIONS-LOG-archive-D001-D239.md:4536 names 'the endurance-number sourcing debt (ENDURANCE-PROVENANCE.md: 0 SOURCED — a separate, larger… |
+| `FEEDBACK-LOOP-WORKORDER.md` | medium | Phase 0 (D-032) and Phase 1 (D-033) landed, but Phases 2/3/4 (D-034/D-035/D-036) are recorded as still queued and paused per user direction — unlanded findings mean KEEP. |
+| `FOUNDATION-READINESS.md` | high | Living severity-ranked hardening backlog referenced by 3 living docs; B1 shipped as D-271 but B4 (no error sink) and the S1-S5 scale items are still open. |
+| `FTP-COLD-START-SPEC.md` | high | Unbuilt by explicit ruling — SPEC-intensity-baselines.md:11,198,205 says it is 'spec-only, unimplemented' and must stay unimplemented unless explicitly requested. |
+| `LIFECYCLE.md` | high | Doctrine — the FROZEN-vs-LIVE boundary doc; livedocRefs=6 and CLAUDE.md points at it for adapt-plan behaviour. |
+| `MAINTENANCE-DEBT.md` | medium | Open-debt register with items still marked 'open, not blocking' (migration divergence, analyze-cycling type errors); totalRefs=13. |
+| `PACE-AT-HR-TREND-SPEC.md` | medium | Header: 'spec only … Not implemented. Do not ship without an explicit go-ahead' — unbuilt spec against still-open Q-025. |
+| `PERF-INTERVAL-INTERPRETATION-SPEC.md` | medium | 'DRAFT v2 — awaiting approval'; Bug A/B are still open pending repro artifacts, so the unbuilt remainder is live. |
+| `PHASE-1-RUN-PACE-SPEC.md` | low | Feature is BUILT (resolveRunEasyPace, 36 hits, 9 pin tests) so lifecycle says archive — but CLAUDE.md:12 and OPEN-QUESTIONS.md:471 cite this file as the anti-rebuild pointer for that exact function; … |
+| `PLAN-GENERATION-TEST-MATRIX.md` | low | Header: 'Not yet implemented' — design for a verification harness that does not exist; livedocRefs=0 but nothing supersedes it. |
+| `PRODUCT-POSITIONING-v2-DRAFT.md` | medium | Doctrine/positioning; livedocRefs=5 and SPEC-posture-flag.md:4 orders it read first as the voice source — still a live DRAFT with the v1-vs-v2 fork unresolved. |
+| `PRODUCT-POSITIONING.md` | medium | Doctrine; v1.1 but carries a newer 2026-07-18 North Star section than the v2 draft, so it is not cleanly superseded yet. |
+| `PROTOCOL-strength-focus-overview.md` | medium | Athlete-facing, source-tagged science overview of the shipped 12-week Strength Focus block; touched 2026-07-29, behaves like a SCIENCE doc not a status doc. |
+| `RACE-WEEK-PROTOCOL.md` | medium | Not a SPEC-*: §1–4 are declared 'the verified current contract' for race-week generation; totalRefs=9 and other protocol docs bind to it. |
+| `RESEARCH-session-interpretation-precedents-2026-07-09.md` | low | Citation source (precedent survey with human-verified corrections) backing DESIGN-endurance-per-session-response.md; SCIENCE-class doc, does not rot. |
+| `RUN-PROTOCOL.md` | medium | Prescriptive protocol; Phase 4 (limiter_sport='run' intensity dial) explicitly deferred and still blocked per ENGINE-STATE.md:935. |
+| `SCHEDULING-RULES.md` | high | Prescriptive scheduling law, confidence-tagged; totalRefs=22 and named by CLAUDE.md:267 as the doc that superseded PLAN-CONTRACT. |
+| `SCIENCE-5x5-linear-progression.md` | high | SCIENCE citation source for the five_by_five protocol (D-210); totalRefs=19. |
+| `SCIENCE-concurrent-training-interference.md` | high | SCIENCE citation source grounding SPEC-per-discipline-periodization Phase 2; totalRefs=20. |
+| `SCIENCE-durability-injury-prevention.md` | high | SCIENCE citation source for the durability protocol (foundation-durability.ts), which is still a live protocol module. |
+| `SCIENCE-glute-accessory-bias.md` | high | SCIENCE citation source for the glute accessory-bias add-on, which is shipped and selectable. |
+| `SCIENCE-hyrox-accessory-bias.md` | high | SCIENCE citation source for the Hyrox accessory bias, which is shipped and selectable (only the circuit-week hack is parked). |
+| `SCIENCE-minimum-dose-maintenance.md` | high | SCIENCE citation source for the minimum_dose protocol (minimum-dose.ts), a live protocol module. |
+| `SCIENCE-neural-speed-running-economy.md` | high | SCIENCE citation source for the neural_speed protocol (performance-neural.ts), a live protocol module. |
+| `SCIENCE-run-decoupling-durability.md` | high | SCIENCE citation source for the RUN State row's lead signal (_shared/state-trend/run.ts computeRunDecouplingState) — grounds a shipped, athlete-visible band. |
+| `SCIENCE-triathlon-strength-friel.md` | high | SCIENCE citation source for the triathlon protocol (triathlon.ts) referenced from STRENGTH-PROTOCOL.md §11. |
+| `SCIENCE-upkeep-maintenance.md` | high | SCIENCE citation source for the upkeep/maintenance POV feeding the coach's-eye upkeep line; touched 2026-07-18. |
+| `SCIENCE-upper-aesthetics-hypertrophy.md` | high | SCIENCE citation source for the upper_aesthetics protocol (upper-priority-hybrid.ts), a live protocol module. |
+| `SCREEN-CONNECTIVITY.md` | medium | Live wiring companion to SCREEN-INVENTORY + TRUTH-MAP; TRUTH-MAP.md:1 names it as one of the three screen docs. |
+| `SCREEN-INVENTORY.md` | medium | Live screen catalogue named as a companion by SCREEN-CONNECTIVITY.md:274 and TRUTH-MAP.md:1. |
+| `SELF-AWARENESS-MAP.md` | high | Doctrine — the authoritative definition of the self-awareness thesis; livedocRefs=4. |
+| `SESSION-FREQUENCY-DEFAULTS.md` | high | Not a session artifact — the prescriptive frequency contract implemented by _shared/session-frequency-defaults.ts, cited by 5 protocol docs and ENGINE-STATE.md:932. |
+| `SPEC-ATHLETE-STATE-CONTINUITY.md` | medium | Goals 1 and 3 are BUILT (arc-context.ts:265-288 reads readiness_checkins; migration 20260612120000 created the time-series), but goal 4 — the engine consulting readiness for target_rir/load — has no … |
+| `SPEC-PICK-PLANNED-RECONCILIATION.md` | medium | No code found for any of the three fixes (no out-of-order confirm, no Start-Fresh unlink honor); Q-050 is filed "not built" and the item still sits in POLISH-PUNCH-LIST. |
+| `SPEC-adherence-performance-bridge.md` | high | ENGINE-STATE.md:871 lists the adherence↔performance bridge as "specced-not-built"; no bridge code found — the unbuilt remainder is the whole doc. |
+| `SPEC-athlete-state-spine.md` | high | Still the cited descriptive-spine contract: ENGINE-STATE.md:860 sources the pctChange definition from it, and SPEC-fitness-verdict-reconciliation + SPEC-per-discipline-periodization both name it as r… |
+| `SPEC-fitness-verdict-reconciliation.md` | high | Header states "NOT built, no code"; actively maintained (last touched 2026-07-31 with a D-350 correction) and read-first for the spine↔projection room. |
+| `SPEC-get-stronger.md` | high | Explicit banner: shipped substance is in D-324, but §1b week-12 transition, the 8-week short option, and §2's opt-in quality session survive unbuilt — the file's own delete condition is unmet. |
+| `SPEC-honest-swim-inference.md` | high | It is the swim addendum + reference implementation under SPEC-universal-narrative-inference.md and the named check for any swim-narrative change (ENGINE-STATE.md:792, D-192); a guardrail does not die… |
+| `SPEC-intensity-baselines.md` | high | Layer A shipped as D-199, but Layers B/C (CSS-primary swim model) and item #5 (the null-honest RPE-degrade contract) are explicitly SPECCED-NOT-BUILT and are the executable remainder. |
+| `SPEC-non-race-goal-plan-contract.md` | medium | Only the (b)-run leg shipped (D-218); bike/swim/strength non-race are still unsupported_sport (F-10) and the co-headliner strength track (Q-088) is unbuilt, so the contract still holds live work. |
+| `SPEC-one-engine-two-shapes.md` | medium | Self-declared 'STANDARD / governing principle — not a feature spec'; doctrine guardrail against forking the plan engine. |
+| `SPEC-per-discipline-periodization.md` | high | Header states "NOT built, no code"; still the live architecture lock (totalRefs=17) and ENGINE-STATE.md:758 cites its §13.1 as the strength contract. |
+| `SPEC-per-session-performance-engine.md` | high | ENGINE-STATE.md:871 explicitly lists it as SPECCED-NOT-BUILT with Read-3 blocked on weather/route data (Q-055). |
+| `SPEC-personal-zones-outlier-detection.md` | high | Only the seam landed (_shared/state-trend/zones.ts:30 resolveZoneBand, consumed at analyze-cycling-workout/index.ts:2526) and zones.ts:1 names this doc as its spec; the athlete-override/provenance fe… |
+| `SPEC-posture-flag.md` | high | The bug it targets is still live — _shared/off-plan-banner.ts still returns STRENGTH_ON_PLAN_CARRIED on the planPrimary==='strength' branch with no maintained-discipline read; livedocRefs=6 including… |
+| `SPEC-product-shape.md` | medium | 'LOCKED 2026-06-29 (Michael). The authoritative product shape' — doctrine, not scaffolding. |
+| `SPEC-run-pace-glass-box.md` | high | Unbuilt: no resolveRunPaceStack / run_pace_provenance / glassBox symbol in supabase/ or src/ (0 hits each); Q-171/Q-173 still open. |
+| `SPEC-session-context-behavioral-trends.md` | medium | Layer 1 superseded by WORKORDER-deviation-reason (D-211) but Layers 2/3 are unbuilt — docs/audit/03-spine-snapshot.md:89 still notes the empty SessionContextTag awaits it. |
+| `SPEC-shared-endurance-model.md` | medium | Header 'not implemented' is STALE (supabase/functions/_shared/endurance/{hr-zones,pace-zones,volume,distribution}.ts exist, E1+E2), but the consumer-wiring remainder (SPEC-e3a non-race zones) is stil… |
+| `SPEC-state-fitness-band.md` | high | Core shipped into D-293/D-294/D-295, but its own banner says the 'file now holds only the parked remainder' — keep for that. |
+| `SPEC-strength-focus.md` | high | Accessory specialisation is still unbuilt and sign-off gated — DECISIONS-LOG.md:1217 keeps it as the reference for re-homing add-ons, OPEN-QUESTIONS.md:885 lists its open pre-build questions. |
+| `SPEC-swim-source-tiers.md` | medium | 'design locked, build pending' (2026-06-16) — unbuilt spec, and swim remains a parked-but-open area. |
+| `SPEC-universal-narrative-inference.md` | high | Standing cross-discipline standard the narrative-core validators enforce; totalRefs=13 and other live docs bind to its 7 rules. |
+| `SPEC-week-solver.md` | medium | Solver half is BUILT (CAPABILITY-MAP.md:137 'BUILT — SHIPPED', _shared/week-solver.ts) but the D-325 cost-ledger/penalty-scheduler remainder is not; OPEN-QUESTIONS.md:1195 still rules off §0a.1. |
+| `START-HERE.md` | high | Doctrine — the single orientation page, rewritten 2026-07-13 from a code audit; livedocRefs=6. |
+| `STATE-SOURCE-MAP.md` | high | Actively maintained (touched 2026-07-31, findings corrected inline at :36); livedocRefs=4 — the anti-silent-exclusion rule doc. |
+| `STATE-WEEK-EXECUTION.md` | low | 2026-07-14 voice audit AND build contract for the week-execution section, signed off in conversation; livedocRefs=1 — could not confirm the redesign shipped. |
+| `STRENGTH-PROTOCOL.md` | high | Prescriptive strength contract; totalRefs=45 and RACE-WEEK-PROTOCOL.md:104 binds to its §3.7/§7.4 as authoritative. |
+| `SWIM-PROTOCOL.md` | high | Prescriptive swim contract; totalRefs=11 and RACE-WEEK-PROTOCOL.md:105 binds to its §4.4. |
+| `TARGET-ARCHITECTURE.md` | high | Doctrine — the north-star architecture doc; livedocRefs=4. |
+| `TICKET-B-WIRING-AUDIT.md` | medium | Findings still open: ENGINE-STATE.md:935 defers the limiter_sport intensity dial and points at this file for the documented architectural decision. |
+| `TRUTH-MAP.md` | high | Doctrine — the per-fact authority + fracture map; touched 2026-07-31, livedocRefs=4. |
+| `WIZARD-AUDIT.md` | medium | Findings still open — POLISH-PUNCH-LIST.md:412 and :414 both cite it for unlanded items (wizard trade-offs at decision time; no data-flow audit exists). |
+| `WORKORDER-deviation-reason.md` | high | Status SPECCED, NOT BUILT; still referenced by ENGINE-STATE.md:835 and OPEN-QUESTIONS.md as a held work order chained through Q-061. |
+| `WORKORDER-device-test-batch.md` | medium | Status FILED, NOT STARTED; batches still-open device items (D-204 on-device test, Q-072, Q-076, execution-chip thresholds) that no other doc holds together. |
+| `WORKORDER-strength-logger.md` | medium | Status HELD with both items (rest-timer regression, lifecycle persistence) unresolved and still owed as the repro for WORKORDER-device-test-batch items 1–4. |
+| `WORKORDER-swim-cleanup.md` | high | Status SPECCED, NOT BUILT; ENGINE-STATE.md:835 lists it as a held work order and only Q-061's narrative half is done, the trend-substrate half remains. |
+| `adapt-plan-strength-relayout.md` | low | Server relayout contract is shipped (adapt-plan/index.ts:793 writes last_relayout_week) but the doc's one-time dismissible banner is still unbuilt — only src/types/planRelayoutBanner.ts exists, no co… |
+
+</details>
+
+
+### 6.5 What the moves left behind
+
+**26 code comments still name a moved doc by its old path.** They were **not touched** — this was a
+docs-only run. The files still exist, one directory deeper. To repoint them all:
+
+First see exactly which comments are affected — this prints every `docs/…md` path named in code that
+no longer resolves, and where it went:
+
+```bash
+grep -rhoE 'docs/[A-Za-z0-9._-]+\.md' src supabase --include='*.ts' --include='*.tsx' \
+  | sort -u | while read -r p; do
+      [ -f "$p" ] || echo "$p  ->  docs/archive/$(basename "$p")"
+    done
+```
+
+Then, if you want them repointed (macOS `sed`):
+
+```bash
+for f in docs/archive/*.md; do
+  n=$(basename "$f")
+  grep -rlZ "docs/$n" src supabase 2>/dev/null \
+    | xargs -0 -r sed -i '' "s|docs/$n|docs/archive/$n|g"
+done
+```
+
+⚠️ That touches source files. It changes only comment text, but it is **not** something this audit
+was authorised to do overnight, so it is written here rather than run.
+
+The 26, in full:
+
+| moved doc | still named in |
+|---|---|
+| `AUDIT-truth-reconciliation-2026-06-14.md` | `supabase/functions/_shared/state-trend/reconcile.ts` |
+| `AUDIT-truth-reconciliation-2026-06-14.md` | `supabase/functions/_shared/state-trend/thresholds.ts` |
+| `BUILD-PLAN-top-down-spine-wiring.md` | `supabase/functions/_shared/state-trend/thresholds.ts` |
+| `DESIGN-familiar-routes.md` | `supabase/functions/compute-facts/index.ts` |
+| `DESIGN-familiar-routes.md` | `supabase/functions/_shared/heat-adjust.ts` |
+| `DESIGN-familiar-routes.md` | `supabase/functions/_shared/heat-adjust.test.ts` |
+| `ISLAND-PROPOSAL.md` | `supabase/functions/_shared/periodization/index.ts` |
+| `PHASE-0-ARC-CHANNEL-SPEC.md` | `supabase/functions/create-goal-and-materialize-plan/index.ts` |
+| `PHASE-0-ARC-CHANNEL-SPEC.md` | `supabase/functions/generate-combined-plan/types.ts` |
+| `PHASE-0-ARC-CHANNEL-SPEC.md` | `supabase/functions/generate-combined-plan/week-builder.ts` |
+| `SESSION-CONTEXT.md` | `supabase/functions/_shared/session-detail/build.ts` |
+| `SPEC-e3a-nonrace-zones.md` | `supabase/functions/generate-run-plan/index.ts` |
+| `SPEC-e3b-bottom-up-volume.md` | `supabase/functions/generate-run-plan/types.ts` |
+| `SPEC-e3b-bottom-up-volume.md` | `supabase/functions/generate-run-plan/generators/sustainable.ts` |
+| `SPEC-non-race-run-retest.md` | `supabase/functions/create-goal-and-materialize-plan/index.ts` |
+| `SPEC-non-race-run-retest.md` | `supabase/functions/generate-run-plan/types.ts` |
+| `SPEC-non-race-run-retest.md` | `supabase/functions/generate-run-plan/generators/base-generator.ts` |
+| `SPEC-strength-island-phase1.md` | `supabase/functions/_shared/periodization/index.ts` |
+| `STRENGTH-SCOUT-REPORT.md` | `supabase/functions/_shared/endurance/volume.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/analyze-strength-workout/index.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/analyze-swim-workout/index.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/_shared/cycling-v1/ai-summary.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/_shared/athlete-snapshot/coaching.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/_shared/narrative-core/index.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/_shared/narrative-core/types.ts` |
+| `WORK-ORDER-narrative-core.md` | `supabase/functions/_shared/fact-packet/ai-summary.ts` |
+
+
+**Three `docs/*.md` links dangle, and this audit did not cause any of them:**
+`docs/FEEDBACK-LOOP-AUDIT.md` (never existed), `docs/SPEC-exercise-substitution.md` and
+`docs/SPEC-lthr-one-anchor.md`. The last two were **hard-deleted** by earlier sessions following the
+spec-lifecycle rule. Worth noting the divergence: that rule says *delete*, and this audit was told to
+*move*. Both are defensible; they are not the same policy, and right now the repo does both.
+
+---
+
+## 7. PROPOSED ONLY — the three over-cap splits. **I did not perform these.**
+
+You were right to ring-fence this, and there is a second reason beyond the obvious one: **the split
+rule the punch list proposes does not actually get `DECISIONS-LOG` under the cap.** Moving only the
+superseded entries clears 92 KB of 401 KB. It needs a hybrid rule. Better to find that out here than
+halfway through a bulk move at 3am.
+
+`POLISH-PUNCH-LIST.md:51-59` already files this as a task. These are the exact boundaries for it.
+
+All sizes below are **bytes on disk** (what `ls` reports and what the punch-list numbers are quoted
+in), not character counts — the docs are full of multi-byte characters and the two differ by ~1.5%.
+The three files have grown slightly since the punch list measured them, partly from this audit's own
+correction notes.
+
+### 7.1 `ENGINE-STATE.md` — 199 KB → **139 KB**. The easiest one, and it is pure win.
+
+`CLAUDE.md`'s own end-of-session protocol says: *"One banner, dated; the old one gets deleted, not
+stacked."* **Twelve `NEXT SESSION — START HERE` banners are stacked in this file.** The historical
+eleven sit at lines **239–561** — ten explicitly marked SUPERSEDED, plus a "roadmap as of
+2026-07-13". That block is **59.6 KB**, 30% of the file, and it is entirely history.
+
+- **Move:** lines 239–561 → `docs/archive/ENGINE-STATE-archive.md` (already exists), appended under a
+  dated heading.
+- **Leave:** the live banner (line 26), Solid, Known broken, Questioned.
+- **Result: 139.1 KB.** Under the cap, one move, zero judgement calls. Do this one first.
+
+### 7.2 `DECISIONS-LOG.md` — 400.9 KB, 116 entries
+
+**Superseded-only is not enough** — that clears 92 KB of 401. It needs a hybrid:
+
+> **Archive an entry if it is marked superseded / reversed / reverted, OR its number is ≤ D-315.**
+
+| boundary | moves | leaves |
+|---|---|---|
+| ≤ D-311 | 83 entries / 251 KB | 33 entries / **150 KB** — exactly at the cap, no margin |
+| **≤ D-315** | **86 entries / 261 KB** | **30 entries / 140 KB** ← recommended |
+| ≤ D-320 | 90 entries / 271 KB | 26 entries / 130 KB |
+
+Target `docs/archive/DECISIONS-LOG-archive-D240-D315.md`.
+
+- ⚠️ **Keep `D-338`, `D-345` and `D-326` whole.** Each is *two* headings — a `SUPERSEDED` banner plus
+  an `(original)` — and the pair must move or stay together. D-326 gained that shape in this audit.
+- ⚠️ **The condensed `### D-240`–`### D-268` block at the top (lines 16–193, ~62 KB) is `h3`, not
+  `h2`.** Any script that greps `^## D-` silently misses all 29 of them. That is exactly the "a
+  decision stops existing" failure — it nearly fooled me during this audit.
+
+### 7.3 `OPEN-QUESTIONS.md` — 299.4 KB, 105 entries
+
+> **Archive an entry if it is marked closed / resolved / superseded, OR its number is ≤ Q-145.**
+
+| boundary | moves | leaves |
+|---|---|---|
+| ≤ Q-139 | 41 entries / 151 KB | 64 entries / **148 KB** — almost no margin |
+| **≤ Q-145** | **46 entries / 158 KB** | **59 entries / 141 KB** ← recommended |
+| ≤ Q-150 | 50 entries / 164 KB | 55 entries / 136 KB |
+
+Target `docs/archive/OPEN-QUESTIONS-archive-Q130-Q145.md`.
+
+- ⚠️ **Entries are not in numeric order** in this file — it opens at Q-196, then Q-194, Q-195, Q-189.
+  Split by the rule, never by line position, or the order scrambles.
+- ⚠️ This audit closed several more (Q-220, Q-222, Q-225, Q-227), so the moved set will be a little
+  larger than the table says by the time anyone runs it. That only helps.
+
+### 7.4 The assertion to run either side of any bulk move
+
+```bash
+# BEFORE
+git stash list >/dev/null
+grep -cE '^#{2,3} D-[0-9]+' docs/DECISIONS-LOG.md docs/archive/DECISIONS-LOG-archive-*.md
+grep -cE '^#{2,3} Q-[0-9]+' docs/OPEN-QUESTIONS.md docs/archive/OPEN-QUESTIONS-archive-*.md
+
+# AFTER — the SUM across live + archive must be identical, per sequence.
+# Then confirm no citation dangles:
+for n in $(seq 240 352); do grep -qrE "^#{2,3} D-$n\b" docs/ || echo "MISSING D-$n"; done
+for n in $(seq 130 235); do grep -qrE "^#{2,3} Q-$n\b" docs/ || echo "MISSING Q-$n"; done
+```
+
+Run today, that reports exactly one miss: `Q-144` (believed a skipped number — it is referenced
+nowhere). **Anything else the script prints
+after a split is something the split dropped.** That is your canary.
+
+---
+
+## 8. PROPOSED ONLY — delete candidates. **Nothing was deleted.**
+
+Per instruction, nothing has been hard-deleted and nothing is recommended for hard deletion tonight.
+Everything judged dead was **moved** to `docs/archive/`, which is a `git mv` and reverts in one command.
+
+The only genuine delete candidates found are not documents:
+
+- `docs/screens/20-state-tab.png .png` — a stray filename with a space and a doubled extension.
+- `docs/screens/obsolete screens/` — a directory that says what it is in its own name.
+
+Both are cosmetic. Neither was touched.
+
+---
+
+## 9. What this audit deliberately did NOT do
+
+- **No code was changed.** Not one line, not even a comment. Two code comments are now known-stale and
+  are left for you: `src/lib/strength-focus-copy.ts:260` and `:262` still cite
+  `wendler-531.ts:160-200` and `workingNumberForCycle:112`, and `:324` carries a
+  `⛔ GATED ON verdictFrom95Set BEING WIRED` block **whose stated precondition is now met**. That gate
+  is the layer-3 provenance render. Whether to open it is a product call, not a doc fix.
+- **No push, no deploy.** Branch `docs/audit-2026-07-31` only. `main` is untouched.
+- **No hard deletes.** Moves only.
+- **No decision entries authored.** See §5.1.
+- **The `AWAITING MICHAEL` block in `POLISH-PUNCH-LIST.md` was left alone entirely.** Every item in it
+  is "look at this on a device". Code tracing cannot settle those and pretending otherwise would erase
+  a real checklist.
+- **The four UNVERIFIABLE claims were left alone**, not guessed at. They are listed in §11.
+
+---
+
+## 10. How to undo any of this
+
+```bash
+git checkout main                       # the audit is nowhere near main
+git branch -D docs/audit-2026-07-31     # and now it is gone entirely
+```
+
+Or keep the claim fixes and drop the file moves — they are in separate commits:
+
+```bash
+git log --oneline main..docs/audit-2026-07-31
+```
+
+To see only what changed, and why, in one pass:
+
+```bash
+grep -rn "⟨A31⟩" docs/ CLAUDE.md
+```
+
+---
+
+## 11. Appendix — every claim checked
+
+**Reference only. You do not need to read this.** §1–§10 is the report; this is the evidence behind it,
+one row per claim: the claim, the verdict, and the `file:line` that settled it.
+
+### STALE — 189
+
+| doc:line | sev | claim | what the code says |
+|---|---|---|---|
+| `CLAUDE.md:196` | load-bearing | "`supabase/functions/analyze-workout/` is **empty** (one of 11 empty dirs — see `docs/CAPABILITY-MAP.md`)." | `ls supabase/functions/analyze-workout/` → "No such file or directory". `find supabase/functions -maxdepth 1 -type d -empty \| wc -l` → 0. The directory and the other empty stubs have been removed, so both the name and the count are wrong. |
+| `docs/CAPABILITY-MAP.md:12` | load-bearing | The FIVE that are BUILT, TESTED, and have NEVER EXECUTED | Two of the five listed rows are now reachable. place-week: strength-primary-plan.ts:62 (import) + :908 (call). The 95% verdict gate: cycle-verdicts.ts:116 → wendler-531.ts:519 → strength-primary-plan.ts:1275 / rematerialize-strength-block/index.ts:167. Only t… |
+| `docs/CAPABILITY-MAP.md:19` | load-bearing | place-week.ts has ZERO IMPORTERS; strength-primary-plan.ts still lays out a hardcoded Mon/Tue/Thu/Fri grid | supabase/functions/shared/strength-system/strength-primary-plan.ts:62 `  placeLiftingWeek,` (inside the `import {...} from './place-week.ts'` block opened at :57/closed at :63). Live call at strength-primary-plan.ts:908: `? placeLiftingWeek(MAIN_LIFTS.map((l)… |
+| `docs/CAPABILITY-MAP.md:20` | load-bearing | verdictFrom95Set and applyVerdict live at wendler-531.ts:160-200 | supabase/functions/shared/strength-system/loading/wendler-531.ts:454 `export function verdictFrom95Set(` and :467 `export function applyVerdict(`. Line 182 is a comment only. (Lead-agent fact F2.) |
+| `docs/CAPABILITY-MAP.md:20` | load-bearing | ZERO CALLERS. workingNumberForCycle:112 advances by cycle index, unconditionally — this is what makes the strength gauge circular | `verdictFrom95Set` is called at supabase/functions/shared/strength-system/loading/cycle-verdicts.ts:116, feeding `workingNumberForCycles` (wendler-531.ts:519, which applies verdicts at :548 `const r = applyVerdict(wn, verdicts?.[step] ?? unknown, ...)`), call… |
+| `docs/CAPABILITY-MAP.md:33` | load-bearing | _shared/week-optimizer.ts:1075 (deriveOptimalWeek) is the sole authority; the same-day matrix is _shared/schedule-session-constraints.ts:148 | supabase/functions/_shared/week-optimizer.ts:1103 `export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {` — :1075 is `          ) {`. The same-day matrix is schedule-session-constraints.ts:337 `const ROWS: Record<MatrixSessionKind, num… |
+| `docs/CAPABILITY-MAP.md:39` | load-bearing | The ingest fan-out. analyze-workout/ is an empty directory with the most guessable name in the repo. The real orchestrator is ingest-activity/index.ts:1345-1712 | `supabase/functions/analyze-workout/` does not exist (directory check false). `wc -l supabase/functions/ingest-activity/index.ts` = 1595, so the cited range :1345-1712 runs past EOF; the fan-out is now one call at :1499 `fetch(orchestrateUrl, ...)` to `recomp… |
+| `docs/CAPABILITY-MAP.md:53` | load-bearing | Two ingest paths never reach the spine — ingest-phone-workout and save-imported-workout fire only compute-workout-summary → no workout_facts, no session_load, invisible to snapshot/arc/coach | supabase/functions/ingest-phone-workout/index.ts:289-291 `// Fan-out ordering fix (2026-07-17): a phone-logged workout used to fire ONLY / compute-workout-summary — it never reached compute-facts ... Route through the single ordered orchestrator so it reaches… |
+| `docs/CAPABILITY-MAP.md:55` | load-bearing | A race in the fan-out — compute-facts is awaited (ingest-activity:1582) but reads workouts.computed, written by two fire-and-forget calls (:1508, :1521) | supabase/functions/ingest-activity/index.ts:1485-1496 `// ── FAN-OUT ORDERING FIX (2026-07-17). The scattered fire-and-forget block that used to live here ... had two data-dependency races: compute-facts read \`computed\` before summary/analysis had written i… |
+| `docs/CAPABILITY-MAP.md:78` | load-bearing | RPE / effort perception \| _shared/response-model/body-response.ts:369 | There is no `body-response.ts` under `_shared/response-model/` (dir contains block.ts, cross-domain.ts, index.ts, loaded-legs.ts, readiness-receipts.ts, types.ts, weekly.ts + tests). The file is supabase/functions/_shared/athlete-snapshot/body-response.ts, wh… |
+| `docs/CAPABILITY-MAP.md:106` | load-bearing | Phone-recorded workout ingest \| ingest-phone-workout/index.ts:292 \| PARTIAL \| fires only compute-workout-summary → no facts, no spine | supabase/functions/ingest-phone-workout/index.ts:297 `await fetch(\`${Deno.env.get('SUPABASE_URL')}/functions/v1/recompute-workout\`, {` with body `{ workout_id: workout.id, user_id: user.id, include_summary: true }` (:300). Block comment at :289-293 names th… |
+| `docs/CAPABILITY-MAP.md:107` | load-bearing | FIT-file import \| save-imported-workout/index.ts:195 \| PARTIAL \| same; still no compute-facts | supabase/functions/save-imported-workout/index.ts:201 `// compute-workout-summary — it never reached compute-facts, so it was invisible to the spine` and :206 `fetch(\`${baseUrl}/functions/v1/recompute-workout\`, {`. |
+| `docs/CAPABILITY-MAP.md:136` | load-bearing | Get Stronger only fires for commercial_gym (create-goal…:2390). Bodyweight athletes silently get the run-durability plan instead, with no message. | supabase/functions/create-goal-and-materialize-plan/index.ts:2440-2452: `// ⛔ THERE IS NO EQUIPMENT GATE, DELIBERATELY. Michael, 2026-07-25: all cards are / pickable ... A \`barbell_required\` refusal was written here and REMOVED the same day ... The \`resolv… |
+| `docs/CAPABILITY-MAP.md:142` | load-bearing | Hyrox accessory bias — UI NonRaceBuilder.tsx:395; engine strength-primary-plan.ts:193/402/485 — BUILT, SHIPPED, rides the Get Stronger path | `grep -rniI hyrox supabase/functions/shared/strength-system/strength-primary-plan.ts` returns nothing; so does grep for sled/farmer/sandbag. `HYROX_ROTATION` no longer exists anywhere in the repo (only a stale reference in StrengthLogger.tsx:186). supabase/fu… |
+| `docs/CAPABILITY-MAP.md:182` | load-bearing | Weekly coach payload (weekly_state_v1) \| coach/index.ts:5051 \| COACH_PAYLOAD_VERSION = 95 (:129) | supabase/functions/coach/index.ts:137 `const COACH_PAYLOAD_VERSION = 155; // 155: THE BLOCK CARD GAINS ITS PHASE WORD ...`. The payload object is built at :5490 `const weekly_state_v1: NonNullable<CoachWeekContextResponseV1['weekly_state_v1']> = {` and return… |
+| `docs/CAPABILITY-MAP.md:206` | load-bearing | DEAD list line refs: plan_adaptation_suggestions (coach:3329) · reaction (coach:1711) · training_state (:2683) · baseline_drift_suggestions (:1851) · marathon_readiness (:4849) · interferen… | Every one of the eight has drifted. supabase/functions/coach/index.ts:3424 `plan_adaptation_suggestions.push({ code, title, details });` (declared :3424→:3424, array at :3424; cited :3329 is `return Number(mg.target_time);`). :1753 `const reaction: CoachWeekC… |
+| `docs/CAPABILITY-MAP.md:244` | load-bearing | 100 directories under supabase/functions/ · 11 empty · 87 real functions · 24 dead | `ls -d supabase/functions/*/ \| wc -l` = 93. `for d in supabase/functions/*/; do [ $(ls -A $d \| wc -l) -eq 0 ] && echo $d; done` returns NOTHING — zero empty directories. `ls supabase/functions/*/index.ts \| wc -l` = 91. |
+| `docs/CAPABILITY-MAP.md:246` | load-bearing | Empty directories (11) — they have no files at all | All eleven named directories are gone from the working tree. Checked individually: `[ -d supabase/functions/analyze-workout ]` false, likewise analyze-workout-ai, analyze-weekly-ai, activity-details, batch-recalculate-workloads, garmin-webhook-activity-detail… |
+| `docs/CAPABILITY-MAP.md:280` | load-bearing | Per-set difficulty — CLIENT ONLY (D-326 layer 1). Nothing reads it. strength_facts has no difficulty field | supabase/functions/compute-facts/index.ts:1359 `  difficulty: SetDifficulty \| null;` (the strength_facts row type), :1438 `const difficulty = (topIdx >= 0 ? (completedSets[topIdx] as any)?.difficulty : null) ?? null;`, :1462 `      difficulty,`, :1492 `     … |
+| `docs/CAPABILITY-MAP.md:283` | load-bearing | The three words (how a set felt) — WIRED 2026-07-30 (D-338). Replaces RIR on 5/3/1 — one tap, heaviest set, optional. | The capture UI was deleted the same day. src/components/StrengthLogger.tsx:5556-5561 `{/* ⛔ THE THREE WORDS ARE GONE (2026-07-30, Michael: "lets kill it, i dont want any useless buttons"). They shipped ONE DAY EARLIER as D-338's replacement for RIR ... Nothin… |
+| `docs/CAPABILITY-MAP.md:284` | load-bearing | NOTHING ACTS ON IT. verdictFrom95Set is written and called by nothing; the bar still climbs by calendar. This is the next job. | `verdictFrom95Set` (wendler-531.ts:454) is called at loading/cycle-verdicts.ts:116; that feeds `workingNumberForCycles` (wendler-531.ts:519, applying verdicts at :548), called at strength-primary-plan.ts:1275 and rematerialize-strength-block/index.ts:167, whi… |
+| `docs/CAPABILITY-MAP.md:288` | load-bearing | TWO ANSWERS, AND THE COACH KNOWS ONLY ONE. materialize-plan handles both; coach does not, so State cannot identify a Strength Focus block. | supabase/functions/coach/index.ts:58 `import { resolveBlockIdentity } from '../_shared/block-identity.ts';`, payload built at :5893 `block: { protocol_id: blockIdentity.protocolId, ... }`. The resolver reads BOTH dialects: block-identity.ts:227 `const stamped… |
+| `docs/CAPABILITY-MAP.md:289` | load-bearing | Does State know the GOAL type? NO. goal_type exists on the goal and never reaches the payload's plan slice. | supabase/functions/_shared/block-identity.ts:245 `const rowGoalType = String(goalRow?.goal_type ?? '').toLowerCase();` feeding `goal: BlockGoal` (:149). The coach payload carries it: coach/index.ts:5897 `goal_kind: blockIdentity.goal.kind,` and :5898 `goal_fo… |
+| `docs/DECISIONS-LOG.md:1164` | load-bearing | D-324's amendment banner: "D-326 is the replacement signal, not a reversal of this entry. Per-set difficulty in three words, feeding the body read, never the 1RM maths" — and above it "the … | The named replacement no longer exists. D-344 (docs/DECISIONS-LOG.md:2510, 2026-07-30, SHIPPED) deleted the three-word tap one day after D-338 shipped it; src/components/StrengthLogger.tsx:5556 carries the deletion in code (`⛔ THE THREE WORDS ARE GONE`). So D… |
+| `docs/DECISIONS-LOG.md:1784` | load-bearing | D-326 heading: "Per-set difficulty replaces the RIR prompt on the barbell block: three words on the complete tap … (2026-07-25, SPEC — not built)" — presented as an unbuilt spec that is sti… | D-326 was BUILT by D-338 (docs/DECISIONS-LOG.md:2234, 2026-07-30) and then REMOVED by D-344 the next day (docs/DECISIONS-LOG.md:2510). The logger carries the removal in code: src/components/StrengthLogger.tsx:5556 `{/* ⛔ THE THREE WORDS ARE GONE (2026-07-30, … |
+| `docs/DECISIONS-LOG.md:1795` | load-bearing | "`brzycki1RM(weight, reps, rir)` is `effectiveReps = reps + rir` (`compute-facts/index.ts:124`) … an athlete who does the prescribed 5 reps at the prescribed weight yields `weight × 1.125`" | Wrong function, wrong line, wrong arithmetic. compute-facts/index.ts:124 is inside `distanceMeters` (`if (typeof compDist === "number" && compDist > 0) return compDist;`). The 1RM function is `estimated1RM` at compute-facts/index.ts:143-145 `function estimate… |
+| `docs/DECISIONS-LOG.md:1856` | load-bearing | D-326 layer 2: "`workingNumberForCycle:112` advances by cycle index, unconditionally … Wire `verdictFrom95Set` into the advance path (`wendler-531.ts:160-200` — written, correct, **called b… | Three separate errors on one line. (1) STATUS: it IS built. supabase/functions/shared/strength-system/loading/cycle-verdicts.ts:116 `return verdictFrom95Set(reps, liftName);` feeds `workingNumberForCycles` (wendler-531.ts:519), called live at strength-primary… |
+| `docs/DECISIONS-LOG.md:2172` | load-bearing | D-335: "Rewritten; **formula unchanged.** Brzycki underestimates and Epley overestimates … erring low is the defensible direction … Switching it needs its own entry." (and line 2164: the de… | The formula DID change the next day. D-339 (docs/DECISIONS-LOG.md:2279, 2026-07-30, SHIPPED + DEPLOYED) is the entry D-335 asked for, and it switched to Wendler/Epley: src/lib/estimate-1rm.ts:56 `export const WENDLER_EPLEY_COEFF = 0.0333;`, wired at supabase/… |
+| `docs/DECISIONS-LOG.md:2198` | load-bearing | D-337 heading "Wendler HAS an estimated max, it is Epley, and our Brzycki is a stated deviation", and its body at line 2208: "⛔ THAT IS EPLEY. `.0333` is 1/30. **We use Brzycki**, so our co… | We no longer use Brzycki. src/lib/estimate-1rm.ts:56 `export const WENDLER_EPLEY_COEFF = 0.0333;`, and supabase/functions/compute-facts/index.ts:129 states `⛔ WAS BRZYCKI, NOW WENDLER'S OWN (D-339, 2026-07-30)` with :144 `return estimate1RMRounded(weight, rep… |
+| `docs/DECISIONS-LOG.md:2270` | load-bearing | D-338 "STILL OPEN — NOT DONE HERE": "`advance_untrusted` still has no reader (D-335), and Wendler's `verdictFrom95Set` is still called by nothing — `measured` is the input that unblocks bot… | Both halves are now false. `verdictFrom95Set` (wendler-531.ts:454) is called at supabase/functions/shared/strength-system/loading/cycle-verdicts.ts:116 `return verdictFrom95Set(reps, liftName);`, whose output reaches the live composer at strength-primary-plan… |
+| `docs/DECISIONS-LOG.md:2645` | load-bearing | D-352: "`validity_set` … is true only once `verdictFrom95Set` is wired, and it is not: the composer still advances the working number by cycle index (`workingNumberForCycle`). Rendering it … | `verdictFrom95Set` IS wired, and the composer no longer advances by bare cycle index. supabase/functions/shared/strength-system/loading/cycle-verdicts.ts:116 `return verdictFrom95Set(reps, liftName);`; supabase/functions/shared/strength-system/strength-primar… |
+| `docs/DECISIONS-LOG.md:2881` | load-bearing | D-348: "Banded sets get a small flat per-set token — bands have no standardised tension, and assistance is deliberately minor, so precision is not worth buying." | D-351 Decision 1 (docs/DECISIONS-LOG.md:2147 region, entry heading at :2660, 2026-08-01, PUSHED + DEPLOYED) reversed this: bands now carry a pounds value. supabase/functions/_shared/workload.ts:376 `export function bandLoadLb(raw: unknown): number \| null {`;… |
+| `docs/ENGINE-STATE.md:72` | load-bearing | `verdictFrom95Set` and `applyVerdict` are "called by nothing" and live at `wendler-531.ts:160-200` | Symbols: `supabase/functions/shared/strength-system/loading/wendler-531.ts:454` `export function verdictFrom95Set(` and `:467` `export function applyVerdict(` — NOT 160-200 (line 182 is a comment mentioning the name). Callers: `loading/cycle-verdicts.ts:116` … |
+| `docs/ENGINE-STATE.md:73` | load-bearing | the composer advances the working number by cycle index unconditionally (`workingNumberForCycle:112`) | `supabase/functions/shared/strength-system/loading/wendler-531.ts:210` `export function workingNumberForCycle(` — line 112 is not this symbol. The composer no longer calls it unconditionally: `strength-primary-plan.ts:1275-1276` calls `workingNumberForCycles(… |
+| `docs/ENGINE-STATE.md:146` | load-bearing | "Layer 2 — `verdictFrom95Set` wired — and layer 3 — provenance rendered — are NOT." | Layer 2 is wired: `supabase/functions/shared/strength-system/loading/cycle-verdicts.ts:116` calls `verdictFrom95Set`; `strength-primary-plan.ts:1275` calls `workingNumberForCycles` with `args.cycleVerdicts`; `generate-strength-plan/index.ts:149` supplies `cyc… |
+| `docs/ENGINE-STATE.md:150` | load-bearing | "the strength gauge is near-blind for 8 of 12 weeks" | `wendler-531.ts:291` `export function leaderCount(...)` returns `0` for `continuityTier === 'continuous'` (line 302: `case 'continuous': return 0;   // every cycle measures`). With zero leaders every cycle is an anchor, so `cyclesForBlock` (`:309`) marks all … |
+| `docs/ENGINE-STATE.md:153` | load-bearing | "The AMRAP is still weeks 9–11 only, so the gauge is still blind for eight of twelve." | Conditional on block shape. `wendler-531.ts:291-307` `leaderCount` returns 0 leaders for continuity tier 'continuous', so `cyclesForBlock` (`:309-323`, `kind: index <= leaders ? 'leader' : 'anchor'`) makes every cycle an anchor and the AMRAP at `:61` lands in… |
+| `docs/ENGINE-STATE.md:163` | load-bearing | "`brzycki1RM` is `effectiveReps = reps + rir` (`compute-facts:124`)" and 5 prescribed reps yields `weight × 1.125` | There is no `brzycki1RM` in `supabase/functions/compute-facts/index.ts` (grep -rnI 'brzycki1RM' hits only two comments in `src/`). The function is `estimated1RM` at `compute-facts/index.ts:141`, and the header comment at `:130` reads "⛔ WAS BRZYCKI, NOW WENDL… |
+| `docs/ENGINE-STATE.md:164` | load-bearing | doing the prescribed 5 reps at the prescribed weight yields `weight × 1.125` | `src/lib/estimate-1rm.ts` (D-339, 2026-07-30) replaced Brzycki with Wendler/Epley `w × r × 0.0333 + w`. Its own comparison table in that file: `\| 5 \| Brzycki ×1.125 \| Epley/Wendler ×1.167 \|`. `compute-facts/index.ts:141-143` `function estimated1RM(...) { … |
+| `docs/ENGINE-STATE.md:167` | load-bearing | "`verdictFrom95Set` / `applyVerdict` are written, correct, and CALLED BY NOTHING" (`wendler-531.ts:160-200`) | Same trace as doc line 72: `wendler-531.ts:454` (`verdictFrom95Set`), `:467` (`applyVerdict`), called from `loading/cycle-verdicts.ts:116` and `wendler-531.ts:548`, reaching production through `strength-primary-plan.ts:1275` and `rematerialize-strength-block/… |
+| `docs/ENGINE-STATE.md:169` | load-bearing | "The composer advances by cycle index, unconditionally" (`workingNumberForCycle:112`) | `wendler-531.ts:210` `export function workingNumberForCycle(`. The unconditional-advance claim no longer holds on the live path: `strength-primary-plan.ts:1276` passes `args.cycleVerdicts?.[lift.ref]` into `workingNumberForCycles` (`wendler-531.ts:519`), whic… |
+| `docs/ENGINE-STATE.md:560` | load-bearing | "three consumers gate on `source === 'learned'` (`infer-training-fitness:32`, `race-projections:376`, `materialize-plan:2654`) and would silently kill bike race projections" | `materialize-plan` no longer gates on learned-only: `supabase/functions/materialize-plan/index.ts:3165` reads `if (ftpResolved.source === 'learned' \|\| ftpResolved.source === 'manual') { (baselines as any).ftp = ftpResolved.value; }` — a manual FTP is accept… |
+| `docs/ENGINE-STATE.md:897` | load-bearing | "**`learned_fitness.running.threshold_hr` nested read-path** (`compute-facts:1144`) — dead. … `calculate-workload:229` reads the correct key. Only the `pace_at_easy_hr` guard used the dead … | The dead nested read is gone — fixed under Q-169. `compute-facts/index.ts:1108-1112` is an explicit epitaph: "THE DEAD LOOKUP THIS FIXES. This block used to read `learned_fitness.running.threshold_hr` — a NESTED path that has never existed … So `thresholdHR` … |
+| `docs/ENGINE-STATE.md:898` | load-bearing | "**compute-facts easy-HR block (`:1143–1158`) → `pace_at_easy_hr`** — never populates (needs the threshold the read-path can't see; and `easyMax = threshold×0.78 = 118` excludes the athlete… | The block was rebuilt under Q-169/Q-171 and the `×0.78` gate is gone. `compute-facts/index.ts:1119-1121`: "The old sample gate was `thresholdHR * 0.78` (= 118 bpm for a 151 LTHR) — so even with the path fixed it would have captured only WARM-UP samples… the t… |
+| `docs/ENGINE-STATE.md:900` | load-bearing | "**`run_easy_hr` 123 fallback** (\"70% of observed max, 0 samples\") — a formula, not learned; it undershoots the athlete's real easy HR by ~15 bpm." | The fallback is deleted. `learn-fitness-profile/index.ts:664-673`: "// Q-169 / LAW 2 — THE FABRICATION IS DELETED. // This used to invent `70% of observed max (estimated)`, sample_count: 0, and ship it as a confident-looking number. On real data it produced `… |
+| `docs/ENGINE-STATE.md:902` | load-bearing | `weekly.ts:594` "Total workload is above planned" (`wv > 120`) is dead and should be retired on next touch; "The `wv < 70` 'below plan' branch IS live." | Both branches are already gone. `grep -rn "above planned" supabase/functions src` returns zero hits repo-wide. `grep -n "wv\b\|Total workload" supabase/functions/_shared/response-model/weekly.ts` returns nothing — `weekly.ts:594` is now inside a comment block… |
+| `docs/ENGINE-STATE.md:906` | load-bearing | "the coach engine reads the cached spine (`state_trends_v1`) for only `fitness_direction` (1 of ~17 verdict families) and recomputes the rest in parallel" | The coach now reads `state_trends_v1` for many verdict families, not one. `coach/index.ts:2244` comment: "D-270: the SPINE (state_trends_v1.strength.per_lift) is the single authority for each lift's…", read at `:2288` `const pl = latestSnapshot?.state_trends_… |
+| `docs/ENGINE-STATE.md:908` | load-bearing | "step 1, the canonical capacity resolver, is BUILT + wired + acceptance-passed (D-231, `capacity-resolver.ts`, called on both prescribe + judge paths)" | It is called on the JUDGE path only. `grep -rln "resolveStrengthCapacity" supabase/functions` returns exactly four files: `coach/index.ts`, `_shared/state-trend/capacity-resolver.ts` (the definition, `:125`), `_shared/state-trend/index.ts` (re-export, `:56`),… |
+| `docs/ENGINE-STATE.md:917` | load-bearing | "Run — Tempo" vs "Run Intervals 4×1000m" label divergence: "Today's Efforts uses the workout's stored `name` directly. `AllPlansInterface.tsx:881-885` and `PlannedWorkoutSummary.tsx:34-66` … | FIXED. A single canonical helper now owns title derivation: `src/lib/derive-workout-title.ts:88` `export function deriveWorkoutTitle(workout: WorkoutLike \| null \| undefined): string`. All three named surfaces delegate to it — `src/components/AllPlansInterfa… |
+| `docs/GAME-PLAN.md:18` | load-bearing | "⛔ NEXT IS verdictFrom95Set. It is the largest starved engine left: written, correct, called by nothing, while the composer advances the working number by calendar." | verdictFrom95Set is defined at supabase/functions/shared/strength-system/loading/wendler-531.ts:454 and IS called at loading/cycle-verdicts.ts:116, which feeds workingNumberForCycles (wendler-531.ts:519), called live at strength-primary-plan.ts:1275 and remat… |
+| `docs/GAME-PLAN.md:33` | load-bearing | "D-326 (the strength gauge is near-blind for 8 of 12 weeks; three failures, three fixes, only layer 1 built)" | Layer 2 is wired: loading/cycle-verdicts.ts:116 calls verdictFrom95Set → workingNumberForCycles (wendler-531.ts:519) → strength-primary-plan.ts:1275. Separately, "8 of 12 weeks" is conditional: leaderCount (wendler-531.ts:291) returns 0 leaders for continuity… |
+| `docs/GAME-PLAN.md:102` | load-bearing | "StateTab.tsx:174 WeekMixBar draws both on ONE scale with no partial-week guard and no numbers... The composer HAS a partialWeek flag for exactly this. Give the bar one." (F21, unticked) | The partial-week guard SHIPPED. src/components/context/StateTab.tsx:176 `function WeekMixBar({ counts, hasPlan, partialWeek })`; :192 `const doneLabel = !showPlanned ? 'this week' : partialWeek ? 'so far' : 'actual';` with an explicit "F21 (2026-07-20)" comme… |
+| `docs/GAME-PLAN.md:103` | load-bearing | "StateTab.tsx:1636 gates only on counts.length === 0 && !accent — no hasPlan check" (F26, unticked) | The hasPlan check SHIPPED. src/components/context/StateTab.tsx:1692 `const hasPlan = !!wsv.plan?.has_active_plan;`; :1699 `const showsPlanned = hasPlan && totalPlanned > 0;`; :1700 picks the section label off it; and inside the bar, :186 `const showPlanned = … |
+| `docs/GAME-PLAN.md:104` | load-bearing | "The upkeep sentence measures the bad news over 4 weeks and the good news over 0 days (F15). coach/index.ts:5300-5337: shortfall from a 28-day trailing window, but carriers is built from th… | Fixed and shipped. coach/index.ts:5457 `const carriers = resolveAerobicCarriers(disc, completedRolling);` with the comment at :5454-5456: "CARRIERS OVER THE SAME TRAILING WINDOW AS THE SHORTFALL (F15) — resolveAerobicCarriers reads `completedRolling`, not thi… |
+| `docs/GAME-PLAN.md:106` | load-bearing | "'Handling combined load well' over-claims what it checked (F17). coach/index.ts:5566 fires on five STRESS signals being absent... Renders in green two inches above the upkeep shortfall." (… | Fixed and shipped. coach/index.ts:5759-5769 now returns `{ label: 'No interference between disciplines', tone: 'positive' }` (and the buildingDiscs variant), with the comment at :5759-5764 headed "F17 (2026-07-20): SCOPE THE CLAIM TO WHAT THIS ROW CHECKED". C… |
+| `docs/GAME-PLAN.md:120` | load-bearing | "Two ingest paths never reach the spine. ingest-phone-workout and save-imported-workout fire only compute-workout-summary → no workout_facts, invisible to snapshot/arc/coach." (unticked) | Both now fire the ordered orchestrator. supabase/functions/ingest-phone-workout/index.ts:297 `await fetch(`${SUPABASE_URL}/functions/v1/recompute-workout`...)` and supabase/functions/save-imported-workout/index.ts:206 `fetch(`${baseUrl}/functions/v1/recompute… |
+| `docs/GAME-PLAN.md:121` | load-bearing | "workouts.workload_actual is starved. The ACWR substrate is written by one job called from two places. Anything ingested another way contributes zero to ACWR while still counting toward wor… | calculate-workload is now a step inside the single orchestrator every entry path fires: recompute-workout/index.ts:138-142 "── 3a. calculate-workload — ACWR substrate; must precede snapshot" → `invokeWithRetry(serviceClient, 'calculate-workload', { workout_id… |
+| `docs/GAME-PLAN.md:122` | load-bearing | "⚠️ UNEXPLAINED, needs a DB query, not a theory: the run durability read is as of Jun 27 — 16 days stale... Two theories have already been wrong today. Get the data." (unticked) | The doc contradicts itself: its own Phase 2 banner (docs/GAME-PLAN.md:114) and Phase 3 note (:134) both say "The stale '16-day durability' symptom (item 4) was a SEPARATE cause (D-291, the `basis='raw'` collision) already fixed". docs/DECISIONS-LOG.md:643 con… |
+| `docs/GAME-PLAN.md:172` | load-bearing | "FTP: route the 8 stragglers — incl. get-week:436 (week-view watts) and athlete-snapshot/identity.ts:67 → the LLM prompt (so the coach can speak a different FTP than the screens show)." (un… | Both named stragglers are routed. get-week/index.ts:439 `userFtp = resolveCurrentFtp({ learned_fitness: baselines?.learned_fitness, performance_numbers: baselines?.performance_numbers }).value;` with the comment at :437-438 "FTP via the resolver (learned-firs… |
+| `docs/GAME-PLAN.md:194` | load-bearing | "FIVE engines narrate the same week (F9). intent_summary (coach) · buildLoadHeadline (client) · coach.narrative (the composer) · overall_training_read.summary (response-model/weekly.ts:526)… | One of the five is gone — the doc says so itself two bullets below (GAME-PLAN.md:195, D-319, ticked). _shared/response-model/weekly.ts:784-787: "overall_training_read DELETED 2026-07-24 — its ~25-branch imperative fallback..." then `const overall_training_rea… |
+| `docs/GAME-PLAN.md:228` | load-bearing | "StatePerformanceSection.tsx:514 accepts primaryDiscipline and planWeek — neither is referenced. Order is hardcoded ORDER_IDX = { strength: 0, run: 1, swim: 2, bike: 3 } (:533)." (F18/F19, … | The F18 half shipped. src/components/context/StatePerformanceSection.tsx:848 is the component signature; :865-868 comment "GOAL-LED order (2026-07-21): the athlete's PRIMARY discipline leads... `primaryDiscipline` was already passed in from the payload and IG… |
+| `docs/GAME-PLAN.md:239` | load-bearing | "24 dead edge functions + 11 empty dirs. Two are dangerous decoys: analyze-workout/ (empty, the most guessable name in the repo) and generate-training-context/ (3.4k lines, dead twin of the… | `supabase/functions/analyze-workout` does not exist (`ls` → "No such file or directory"), and a scan of every directory under supabase/functions found ZERO empty dirs. The second decoy is real: supabase/functions/generate-training-context/index.ts is 3,423 li… |
+| `docs/GAME-PLAN.md:246` | load-bearing | "PostureLine (F10). StatePerformanceSection.tsx:503 — defined, never called. Carries a 12-line comment explaining the Q-179 bug it closes... the code and comment will convince the next sess… | PostureLine no longer exists. grep -rn "PostureLine" src supabase returns only two historical mentions: src/components/context/StatePerformanceSection.tsx:845 ("The old always-visible `PostureLine` — orphaned since...") and the coach payload v145 note at coac… |
+| `docs/OPEN-QUESTIONS.md:2000` | load-bearing | Q-220: "`verdictFrom95Set` resets anything under five reps, and there is no middle" — quoted as `return repsAchieved >= VALIDITY_CHECK_MIN_REPS ? 'advance' : 'reset';   // MIN_REPS = 5`, wi… | `supabase/functions/shared/strength-system/loading/wendler-531.ts:368`: `export const VALIDITY_CHECK_MIN_REPS = 1;` with the comment on :367 `/** The PRESCRIBED minimum at 95% — `1+`, from p23. Meeting it is a pass. */`. The function body is now wendler-531.t… |
+| `docs/OPEN-QUESTIONS.md:2081` | load-bearing | Q-222: "⚠️ Coupled to the fact that the reset path **only fires on a rebuild** — see Q-223. On a first block nothing resets at all." | The reset path now fires MID-BLOCK on a first block. `src/components/StrengthLogger.tsx:4021-4022` invokes `rematerialize-strength-block` on every workout save (comment at `:4012`: "⛔ THE ALL-OUT SET CHANGED WHAT COMES NEXT — SAY SO HERE (Q-226, 2026-07-30)")… |
+| `docs/OPEN-QUESTIONS.md:2144` | load-bearing | Q-225: "BUILDING THIS AS A LIFTING-DAYS CONTROL WOULD BE THE FOURTH PLAN-MUTATION PATH IN THIS CODEBASE … Wait for the general surface." — and at docLine 2142, "THE REMATERIALIZER WAS CANCE… | The general surface shipped. `supabase/functions/rematerialize-strength-block/index.ts` exists; its header (`:4-27`) reads "⛔ THE ALL-OUT REPS MOVE THE WEIGHT (Q-226, 2026-07-30) … IT PROPOSES. IT DOES NOT SILENTLY WRITE … IT ONLY EVER REWRITES WEEKS THAT HAV… |
+| `docs/OPEN-QUESTIONS.md:2193` | load-bearing | Q-227 finding 2: "THE DIFFICULTY TAP WRITES AND NOTHING READS … `strength_facts` still carries `avg_rir` and has **no difficulty field**. So *'how hard did it feel'* reaches the database an… | `supabase/functions/compute-facts/index.ts:1350-1359` — the `ExerciseFact` interface now carries the tap, under a header comment naming the exact problem this Q describes: "── THE THREE WORDS, AND THE MEASURING SET (D-338) ── … Both were being written to `wor… |
+| `docs/OPEN-QUESTIONS.md:2195` | load-bearing | Q-227 finding 3: "THE SERIES CANNOT TELL A MEASUREMENT FROM AN ORDINARY DAY … This is the blocker under the other three … and nothing carries it." Reinforced at docLine 2208: "WHERE I WOULD… | D-338 shipped exactly this. `supabase/functions/compute-facts/index.ts:1360-1364` on the `ExerciseFact` interface: `/** Reps completed on the all-out set. Null when this session had none. */ amrap_reps: number \| null;` and `/** True when an all-out set was a… |
+| `docs/POLISH-PUNCH-LIST.md:75` | load-bearing | "as of Jul 14" is the OLDEST contributor, by design. The row rolls up run + bike and stamps `Math.max(...ages)` so it cannot overstate freshness. | The stamp already shows the NEWEST. supabase/functions/_shared/state-trend/assemble.ts:860-863: `// ⛔ NEWEST, not oldest — see the note on asOfAgeDays. A one-day-old run half stamped with a sixteen-day-old bike half read as "nothing here is current" and cost … |
+| `docs/POLISH-PUNCH-LIST.md:122` | load-bearing | ⛔ `verdictFrom95Set` is written, correct, and called by NOTHING. Wire it. | supabase/functions/shared/strength-system/loading/cycle-verdicts.ts:116 `return verdictFrom95Set(reps, liftName);` — and cycle-verdicts.ts:17 imports it. That feeds `verdictsForBlock` (cycle-verdicts.ts:197), called at rematerialize-strength-block/index.ts:16… |
+| `docs/POLISH-PUNCH-LIST.md:123` | load-bearing | `workingNumberForCycles` ALREADY TAKES the verdicts. The seam is the parameter and it is already there. No verdicts → advance → today's behaviour, so this ships behind a behaviour-unchanged… | The verdicts are now SUPPLIED, not just accepted. strength-primary-plan.ts:184 declares `cycleVerdicts?:`; :1275-1276 passes `args.cycleVerdicts?.[lift.ref]` into `workingNumberForCycles`; generate-strength-plan/index.ts:149 populates `cycleVerdicts:`. remate… |
+| `docs/POLISH-PUNCH-LIST.md:124` | load-bearing | ⛔ The reader cannot live in the composer — it authors twelve weeks up front. Something must go back and rewrite the remaining weeks. | That something exists: supabase/functions/rematerialize-strength-block/index.ts (header at :2-15 describes exactly this job), reading verdicts at :161 and rewriting working numbers at :167. Invoked from src/components/StrengthLogger.tsx:4022 (preview) and :60… |
+| `docs/POLISH-PUNCH-LIST.md:147` | load-bearing | Petré 2021 is cited for a clearance rule it says nothing about. Five sites: `_shared/schedule-session-constraints.ts:28`, `_shared/week-optimizer.ts:484`, `:486`, `:657`, `shared/strength-s… | All corrected on 2026-07-26. schedule-session-constraints.ts:30-32 `⛔ CITATIONS CORRECTED 2026-07-26 … • Petré et al 2021 — a strength-development meta BY TRAINING STATUS; nothing on clearance windows.` week-optimizer.ts:490-492 `⛔ CITATIONS CORRECTED 2026-07… |
+| `docs/POLISH-PUNCH-LIST.md:148` | load-bearing | `place-week.ts:64-82` says 6h and 24h "performed the same as each other." … MIN_STACK_GAP_H = 6 does NOT change; the comment does. 24h is the target, 6h is the fallback. | Already corrected, in the exact words the item asked for. supabase/functions/shared/strength-system/place-week.ts:82-86: `⛔ CORRECTED 2026-07-26 — this comment said "six hours and twenty-four hours performed the same as each other." That is true for the STREN… |
+| `docs/POLISH-PUNCH-LIST.md:149` | load-bearing | `strength-primary-plan.ts:460` tells the athlete back-to-back is fine on a lift + easy-run day — that is Robineau's 0h arm … it is no longer sourced. Re-word or re-source. | supabase/functions/shared/strength-system/strength-primary-plan.ts:1421-1428: `⛔ CITATION REMOVED 2026-07-26 … The line is now stated as the reasoning it always was, with no source attached. ⚠️ The CLAIM is also narrower than it looked. Robineau 2016's 0h arm… |
+| `docs/POLISH-PUNCH-LIST.md:159` | load-bearing | Wire `verdictFrom95Set` into the advance path (D-326 layer 2). `wendler-531.ts:160-200` is written, correct and called by nothing; `workingNumberForCycle:112` advances by calendar. | supabase/functions/shared/strength-system/loading/wendler-531.ts:454 `export function verdictFrom95Set(` and :467 `applyVerdict` — not 160-200. wendler-531.ts:210 `export function workingNumberForCycle(` — not :112. And it is called: cycle-verdicts.ts:116, st… |
+| `docs/POLISH-PUNCH-LIST.md:162` | load-bearing | `quality_run` / `quality_bike` are collected and dropped. `create-goal-and-materialize-plan:~2465` forwards only `long_run` to the strength composer. | supabase/functions/create-goal-and-materialize-plan/index.ts:2589-2604: `⛔ THE SECOND PIN. Added 2026-07-26 — until now this block forwarded ONLY long_run out of preferred_days, so the hard day the athlete picked reached the goal row and stopped dead.` The II… |
+| `docs/POLISH-PUNCH-LIST.md:165` | load-bearing | A one-shot dialog on the SECOND hard conditioning day. The trigger already exists — `NonRaceBuilder.tsx` `hardDayCount === 2` renders `TWO_HARD_DAYS_LINE` inline today; the work is a once-p… | src/components/NonRaceBuilder.tsx:131 `// ⛔ REMOVED 2026-07-26 (D-327): `TWO_HARD_DAYS_LINE` and the "Mulholland" two-hard-days dialog.` A repo-wide grep for `TWO_HARD_DAYS_LINE` and `hardDayCount` returns only that comment — the trigger this item is built on… |
+| `docs/POLISH-PUNCH-LIST.md:200` | load-bearing | Q-194 — one SHARED banned-word enforcer. The voice check doesn't run on `intent_summary` (`coach/index.ts:5492`, live: "body is ready, stay consistent"). | `intent_summary` is built at coach/index.ts:5522 (not :5492, which is `week_execution_v1`). It is now POSITION ONLY: :5527-5533 compose plan name + `Week N of M`, and :5545 sets `const synopsis: string \| null = null;` with :5535 `⛔ NO SYNOPSIS HERE`. The v12… |
+| `docs/POLISH-PUNCH-LIST.md:331` | load-bearing | The proof is one grep: `per_discipline_posture` appears ZERO times in `_shared/state-trend/` and ZERO times in `coach/index.ts`. | supabase/functions/_shared/state-trend/posture.ts:5 and :37 read `goals.training_prefs.per_discipline_posture`; assemble.ts:196 documents it as the Q-179 field. In the coach: coach/index.ts:2523, :3959, :5436, :5437 all read `per_discipline_posture`. posture.… |
+| `docs/POLISH-PUNCH-LIST.md:334` | load-bearing | 🔴 Q-177 — THE "STRENGTH VOLUME DOWN" SIGNAL IS A PARTIAL-WEEK ARTIFACT. It fires at CONCERN severity every Monday, for every athlete, by construction. … `longitudinal-signals.ts:148` fires … | Both consumers are dead. supabase/functions/_shared/longitudinal-signals.ts:146 `// Q-178/Q-177 reconcile (2026-07-13): RETIRED the strength_volume_trend signals` and :169 `NOTE: strength_volume_trend is still WRITTEN by compute-snapshot and is now read by no… |
+| `docs/POLISH-PUNCH-LIST.md:339` | load-bearing | 🔴 Q-178 (= Q-076, ROOT-CAUSED) — A SKIPPED EXERCISE COUNTS AS PERFORMED … Root cause — `analyze-strength-workout:89` (`isPerformedStrengthSet`): `return s?.completed === true \|\| reps > 0 … | The predicate was extracted and the short-circuit removed. supabase/functions/_shared/strength/performed-set.ts:47-57: `if (s?.completed !== true && s?.prefilled === true) return false;` then `return (s?.reps != null && s.reps > 0) \|\| (s?.weight != null && … |
+| `docs/POLISH-PUNCH-LIST.md:344` | load-bearing | 🔴 STRENGTH WEIGHTS HAVE TWO WRITERS, AND ONLY ONE ASKS. `adapt-plan` action=auto silently re-prices the lifts on every ingest (`:1161/:1188` → `materialize-plan:1232`), skipping the Arc fat… | supabase/functions/adapt-plan/index.ts:1118 `// 2. Strength weights: THE APP NO LONGER AUTO-CHANGES THE ATHLETE'S WORKING WEIGHT (consent-first).` and :1160 `// ⛔ DO NOT RE-ADD AN AUTO-WRITE HERE. If a baseline should change, it goes through the suggestion li… |
+| `docs/POLISH-PUNCH-LIST.md:345` | load-bearing | 🔴 THE RPE TREND IS AN ORDERING ARTIFACT (Q-167). `makeTrend` (`_shared/response-model/body-response.ts:369`) splits this week's sessions in half by the order they happened. | The path does not exist — `_shared/response-model/body-response.ts` returns "No such file or directory". The real file is supabase/functions/_shared/athlete-snapshot/body-response.ts, where `function makeTrend(` sits at :323 (not :369). The same file is cited… |
+| `docs/POLISH-PUNCH-LIST.md:360` | load-bearing | 🟡 FTP bypasses the resolver in 8 places — … and `athlete-snapshot/identity.ts:67` → the LLM prompt, so the coach can *speak* a different FTP than the screens show. | supabase/functions/_shared/athlete-snapshot/identity.ts:69-71: `// FTP via the resolver (learned-first) so the LLM prompt speaks the SAME FTP as the screens — was manual-only perfNumbers.ftp, the "coach can voice a different FTP" straggler (CAPABILITY-MAP).` … |
+| `docs/POLISH-PUNCH-LIST.md:383` | load-bearing | The "learn from their own test" half is BUILT for strength — a Get Stronger plan drops in a `baselineTestWeek` (`strength-primary-plan.ts:526`) when it doesn't know the lifts. ⚠️ But it onl… | `baselineTestWeek` has ZERO hits anywhere in supabase/ or src/ (only `baselineTestResults`/`isBaselineTestWorkout` in the logger). create-goal-and-materialize-plan/index.ts:2455-2460 explicitly retires both halves of the claim: "FOUR lifts. Squat, bench, dead… |
+| `docs/POLISH-PUNCH-LIST.md:440` | load-bearing | 🔴 Q-181 — A SWAP IS NOT A SKIP … `matchExercises` (`analyze-strength-workout:520`) links planned↔executed by NAME only, and no substitution concept exists in the codebase (0 hits for any pr… | analyze-strength-workout/index.ts:15 `import { buildSubstitutionNote } from '../_shared/strength/substitution-note.ts';`; :483-484 `substituted_for matches the planned exercise it replaces, so the athlete is no longer docked twice for an honest substitution`;… |
+| `docs/START-HERE.md:63` | load-bearing | "The verdict engine is POSTURE-BLIND (Q-179). `per_discipline_posture` appears **ZERO times** in the spine and **ZERO times** in the coach." | Both halves are now false. SPINE: supabase/functions/_shared/state-trend/posture.ts exists and is the join — its header (:4-16) quotes the old "appeared ZERO times in the spine and ZERO times in the coach" line in the PAST tense and says "THIS FILE IS THE JOI… |
+| `docs/START-HERE.md:66` | load-bearing | "🔴 `adapt-plan` silently re-prices strength on every ingest — skipping the fatigue gate the *suggest* path applies, while the path that **asks** you sits unmounted." | The auto-write is deleted. supabase/functions/adapt-plan/index.ts:1119-1138 — "2. Strength weights: THE APP NO LONGER AUTO-CHANGES THE ATHLETE'S WORKING WEIGHT (consent-first). // DELETED: the silent auto-progression / auto-deload writes that lived here... //… |
+| `docs/TRUTH-MAP.md:30` | load-bearing | State reads "the spine recomputed LIVE (`useStateTrends` → `assembleStateTrends`)" for the Performance-section trends | src/hooks/useStateTrends.ts:1-6 — "useStateTrends — renders the STATE v2 per-discipline hybrid cards from the server-assembled display contract. The assembly itself lives on the SERVER: compute-snapshot runs `assembleStateTrends` and caches it as athlete_snap… |
+| `docs/TRUTH-MAP.md:64` | load-bearing | "The heat-de-confounded same-route engine (`_shared/heat-adjust.ts`) is complete, tested, and wired only to the per-workout screen; State does not call it." | The spine calls it. supabase/functions/_shared/state-trend/assemble.ts:24 — `import { routeTrend, type RouteTrend } from '../heat-adjust.ts';` — and invokes it at :345 — `const fitted = routeTrend((inp.runEffHistory ?? []) as any);` — producing `runRoute`, th… |
+| `docs/TRUTH-MAP.md:72` | load-bearing | volume / e1RM trend ← **client-live** `assembleStateTrends.strengthFitness` ... (`StatePerformanceSection.tsx:326`) | Not client-live: src/hooks/useStateTrends.ts:1-6 ("PURE RENDERER — it does zero verdict math. There is no client fallback assembly") and :83 returns `strengthFitness: displayContract.strengthFitness` straight from the server contract. Line ref also wrong: `st… |
+| `docs/TRUTH-MAP.md:86` | load-bearing | "⚠️ #4 — Live-vs-cached freshness fork (latent). State recomputes trends live; the Performance tab reads the cached `state_trends_v1`." | The live half no longer exists. src/hooks/useStateTrends.ts:95-96 — "No server contract yet → nothing to render. We do NOT recompute on the client (single source of truth: compute-snapshot owns assembly). Show the loading state until the coach payload carries… |
+| `CLAUDE.md:196` | minor | "Real fan-out lives in **`ingest-activity/index.ts:1345-1712`**." | `wc -l supabase/functions/ingest-activity/index.ts` → 1595 lines, so line 1712 does not exist. The actual fan-out spans roughly :1442 (`auto-attach-planned` URL) through :1566 (`runPostImportAthletePipeline` import), with the `adapt-plan` auto trigger at :151… |
+| `CLAUDE.md:210` | minor | "Read the comment at `adapt-plan/index.ts:~1094`" | The comment block is at supabase/functions/adapt-plan/index.ts:1119-1138, beginning "// 2. Strength weights: THE APP NO LONGER AUTO-CHANGES THE ATHLETE'S WORKING WEIGHT (consent-first)." Line 1094 is a `plan_adjustments` select inside the data-fetch step. The… |
+| `CLAUDE.md:222` | minor | "Routing also exists in `recompute-workout/index.ts:21-25`" | There is no routing table at recompute-workout/index.ts:21-25 — those lines are the tail of an import list and a `RecomputeStep` union type. The routing now lives in an extracted lib: supabase/functions/recompute-workout/orchestrator-lib.ts:16 — `export funct… |
+| `CLAUDE.md:237` | minor | "Type at `supabase/functions/_shared/session-detail/types.ts` (~377 lines, ~30 nested fields). Built by `workout-detail/index.ts:598` ... via `_shared/session-detail/build.ts` (1276 lines)." | All three numbers rotted. `wc -l` → types.ts is 732 lines, build.ts is 2102 lines. `buildSessionDetailV1` is imported at workout-detail/index.ts:9 and CALLED at workout-detail/index.ts:815 (`sessionDetailV1 = buildSessionDetailV1({`); line 598 is a `planned_w… |
+| `CLAUDE.md:243` | minor | "The same-day matrix is in `_shared/schedule-session-constraints.ts` (`ROWS` table around lines 47-58)" | supabase/functions/_shared/schedule-session-constraints.ts:337 — `const ROWS: Record<MatrixSessionKind, number[]> = {` — consumed at :354 (`const bits = ROWS[row];`). Lines 47-58 are prose comment. (A separate `ADJACENCY_HOURS_ROWS` table sits at :131.) |
+| `CLAUDE.md:249` | minor | "They share `PlanContractV1` (defined in `generate-run-plan/types.ts:184` despite the name)." | supabase/functions/generate-run-plan/types.ts:233 — `export interface PlanContractV1 {`. The "despite the name" observation is still correct; only the line number moved. |
+| `CLAUDE.md:253` | minor | Surfaces querying tables directly include `AthleticRecordPage.tsx:102` | src/components/AthleticRecordPage.tsx:102 is a `useState` declaration for `autoSaveStatus`. The direct queries are at :114, :122 (`supabase.from('user_baselines').select(...)`), :123, :196, :206, :235 (`supabase.from('goals').insert(...)`), :413. The companio… |
+| `CLAUDE.md:257` | minor | "`getArcContext()` (`_shared/arc-context.ts`, 1028 lines)" | `wc -l supabase/functions/_shared/arc-context.ts` → 1350 lines. |
+| `CLAUDE.md:275` | minor | "27 of 286 edge files opt out of type-checking" | `grep -rl "@ts-nocheck" supabase/functions \| wc -l` → 39. `find supabase/functions -name "*.ts" ! -name "*.test.ts" \| wc -l` → 394 (615 including tests). Both numbers have grown. The named files are still accurate as a class (get-week, ingest-activity, mate… |
+| `CLAUDE.md:286` | minor | "Plan token expansion → **`materialize-plan/index.ts:1123+` (its OWN inline expander)**" | materialize-plan/index.ts:1123 is inside the exercise-substitution block (`if (name.includes('leg curl') && !hasGymAccess)`), not token expansion. The inline expander is `expandTokensForRow` at :1840 (reading `row.steps_preset` at :1854), fed by `expandRunTok… |
+| `docs/CAPABILITY-MAP.md:16` | minor | No wizard writes integration_mode → create-goal…:1895 hardcodes 'separated' for everyone | supabase/functions/create-goal-and-materialize-plan/index.ts:1921-1924 `integration_mode: / (freshCombinedPrefs as Record<string, unknown>).integration_mode === 'consolidated' / ? 'consolidated' as const / : 'separated' as const,` — it is a conditional read, … |
+| `docs/CAPABILITY-MAP.md:19` | minor | place-week emits compromises[] at :123-127 | supabase/functions/shared/strength-system/place-week.ts:118-125 is `export type LiftSlot = {...}`. The compromises contract is at :151 `  compromises: string[];`, accumulator at :269 `const compromises: string[] = [];`, pushes at :299/:311/:359/:406, returned… |
+| `docs/CAPABILITY-MAP.md:31` | minor | src/lib/resolve-current-run-pace.ts:146 is THE one (client + edge import it) | src/lib/resolve-current-run-pace.ts:164 `export function resolveCurrentRunEasyPace(baselines: RunBaselinesLike): ResolvedRunPace {` and :274 `export function resolveCurrentRunThresholdPace(...)`. Line 146 is blank. The second same-named function is confirmed:… |
+| `docs/CAPABILITY-MAP.md:40` | minor | There is no _shared/cors.ts. All 87 functions hand-roll it. | `[ -f supabase/functions/_shared/cors.ts ]` is false — the 'genuinely missing' half is VERIFIED. The count is not: `ls supabase/functions/*/index.ts \| wc -l` = 91, not 87. |
+| `docs/CAPABILITY-MAP.md:41` | minor | _shared/require-user.ts adoption is 9 of 87 | `grep -rlI "require-user" supabase/functions --include=index.ts \| wc -l` = 13 out of 91 functions with an index.ts. `_shared/bearer-auth.ts:17 const json = JSON.parse(atob(b64 + pad)) as {` — the unverified second implementation still exists (VERIFIED). |
+| `docs/CAPABILITY-MAP.md:44` | minor | A plan-token expander. TWO exist: the live one inline in materialize-plan/index.ts:1123+ | supabase/functions/materialize-plan/index.ts:1123 is `      resultName = 'Nordic Curls';` — an exercise-substitution branch. The expanders are :1279 `function expandRunToken(tok: string, baselines: Baselines): any[] {`, :1676 `function expandBikeToken(...)`, … |
+| `docs/CAPABILITY-MAP.md:52` | minor | Its only reader is materialize-plan:2745 | supabase/functions/materialize-plan/index.ts:3246 `          const resolved = readAthleteSnapshotOrLive(` (imported :232). That is the sole non-test reader repo-wide. The rest of the bullet checks out: athlete-snapshot.ts:158 `export function buildAthleteSnap… |
+| `docs/CAPABILITY-MAP.md:70` | minor | run easy pace \| src/lib/resolve-current-run-pace.ts:146 | src/lib/resolve-current-run-pace.ts:164 `export function resolveCurrentRunEasyPace(baselines: RunBaselinesLike): ResolvedRunPace {`. Line 146 is blank. |
+| `docs/CAPABILITY-MAP.md:76` | minor | fitness direction \| _shared/state-trend/assemble.ts:335 (rollupFitness) | supabase/functions/_shared/state-trend/assemble.ts:750 `export function rollupFitness(v1: StateTrendsV1 \| null \| undefined): FitnessRollup {` (and `rollupFitnessDirection` at :785). Line 335 is a comment about `routeTrend`/heat. |
+| `docs/CAPABILITY-MAP.md:89` | minor | squat / bench / deadlift 1RM = 135 lb \| materialize-plan/index.ts:2699 / 2704 / 2714 | supabase/functions/materialize-plan/index.ts:3200 `        135,` (squat, inside `mergeAnchor1RmLb` at :3197), :3205 `        135,` (bench), :3215 `      if (dlMerged <= 0) dlMerged = 135;` (deadlift). Lines 2699/2704/2714 are unrelated step-builder code. The … |
+| `docs/CAPABILITY-MAP.md:90` | minor | overhead press 1RM = 95 lb \| materialize-plan/index.ts:2719 | supabase/functions/materialize-plan/index.ts:3219 `        95,` — the third arg to `mergeAnchor1RmLb` for `overheadPress1RM` (:3216-3220). Line 2719 is `   try {`. |
+| `docs/CAPABILITY-MAP.md:91` | minor | hip thrust = max(75, deadlift × 0.55) \| materialize-plan/index.ts:2726 | supabase/functions/materialize-plan/index.ts:3225 `        Math.max(75, Math.round(dlNum * 0.55)),`. Line 2726 is a pace-text comment. |
+| `docs/CAPABILITY-MAP.md:92` | minor | swim pace = 1:30/100 \| materialize-plan/index.ts:2352 | supabase/functions/materialize-plan/index.ts:2834 `        // Default fallback: 1:30/100 (90 seconds)` inside `swimPacePer100Sec` (:2815), used at :2863 `const calcDur = Math.round(dist100 * swimPacePer100Sec);`. Line 2352 is `baselineMissing = true;`. |
+| `docs/CAPABILITY-MAP.md:93` | minor | easy run pace = 10:00/mi \| strength-primary-plan.ts:370 \| volume_notes at :427, rendered GoalsScreen.tsx:1633 | supabase/functions/shared/strength-system/strength-primary-plan.ts:1185 `volume_notes = \`Run durations estimated at ${FALLBACK_EASY_MIN_PER_MILE}:00/mi until we learn your easy pace — they re-map once you log a few easy runs.\`` (constant imported at :30), e… |
+| `docs/CAPABILITY-MAP.md:95` | minor | marathon pace = easy − 30 · threshold = 5K + 20 \| materialize-plan/index.ts:555 / 561 | supabase/functions/materialize-plan/index.ts:682 `      if (easyPace) return easyPace - 30; // Marathon is faster than easy, typically ~30s/mi` and :685 `    if (fkp) return fkp + 20;` — both inside `secPerMiFromBaseline` (:612). Lines 555/561 are `    }`. |
+| `docs/CAPABILITY-MAP.md:105` | minor | Garmin/Strava ingest + the full fan-out (THE orchestrator) \| ingest-activity/index.ts:1345-1712 | supabase/functions/ingest-activity/index.ts is 1595 lines — the cited upper bound 1712 does not exist. The fan-out is a single delegation at :1499 `fetch(orchestrateUrl, {` where `orchestrateUrl` = `.../functions/v1/recompute-workout` (:1498). |
+| `docs/CAPABILITY-MAP.md:110` | minor | compute-workout-analysis does NOT write workout_analysis despite the name (:2044 says so) | supabase/functions/compute-workout-analysis/index.ts:2068 `        note: 'workout_analysis written by analyze-running-workout'`. Line 2044 is `details: rpcError.details,`. The substance is VERIFIED. |
+| `docs/CAPABILITY-MAP.md:132` | minor | THE wrapper — create-goal-and-materialize-plan/index.ts:2077, routing :2320 | supabase/functions/create-goal-and-materialize-plan/index.ts:2105 `Deno.serve(async (req: Request) => {` is the sole entry point (file is 3591 lines). Line 2077 is a `console.log(` inside a pre-serve helper; :2320 is a `resolvedGoal = { ...resolvedGoal, train… |
+| `docs/CAPABILITY-MAP.md:147` | minor | Materialize (tokens → steps, durations, weights) \| materialize-plan/index.ts:2536 \| has its own inline token expander at :1123 | supabase/functions/materialize-plan/index.ts:3018 `Deno.serve(async (req) => {` is the entry (file is 3504 lines). :2536 is `          }`. The expander dispatcher is :1840 `function expandTokensForRow(`; :1123 is an exercise-name substitution line. |
+| `docs/CAPABILITY-MAP.md:151` | minor | Week optimizer (sole day-placement authority) \| _shared/week-optimizer.ts:1075 | supabase/functions/_shared/week-optimizer.ts:1103 `export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {`. Line 1075 is mid-block `          ) {`. |
+| `docs/CAPABILITY-MAP.md:152` | minor | Same-day compatibility matrix \| _shared/schedule-session-constraints.ts:148 | supabase/functions/_shared/schedule-session-constraints.ts:337 `const ROWS: Record<MatrixSessionKind, number[]> = {`, exported as :362 `export const SAME_DAY_COMPATIBLE: Record<`. Line :148 is inside `ADJACENCY_HOURS_ROWS` (declared :131). |
+| `docs/CAPABILITY-MAP.md:180` | minor | state_trends_v1 is written only for the current week (:641) | supabase/functions/compute-snapshot/index.ts:641 is `    const rcSleep: number[] = [];` — unrelated to the spine write. `state_trends_v1` is assigned at :1103 `      state_trends_v1: stateTrendsV1,` (with the non-fatal guard logged at :1094). I could not loca… |
+| `docs/CAPABILITY-MAP.md:181` | minor | The spine (state_trends_v1) \| _shared/state-trend/assemble.ts:104 | supabase/functions/_shared/state-trend/assemble.ts:248 `export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {`. Line 104 is a comment ('Distance is honest regardless of equipment...'). |
+| `docs/CAPABILITY-MAP.md:183` | minor | Week narrative (LLM prose) \| coach/index.ts:4838 (runGuardedNarrative) | supabase/functions/coach/index.ts:5122 `          const result = await runGuardedNarrative({ surface: 'coach', ctx: coachCtx, generate });` (imported :66). Line 4838 is `if (s.trend === 'stable') continue;`. |
+| `docs/CAPABILITY-MAP.md:189` | minor | learn-fitness-profile on ingest-activity runs for Garmin only and is milestone-gated (:1685-1705) | supabase/functions/ingest-activity/index.ts is 1595 lines, so :1685-1705 is past EOF. The milestone gate is at :1562-1567 `const milestone = n === 1 \|\| n === 2 \|\| n === 5 \|\| n === 10; / const runPipeline = (milestone && n <= 10) \|\| (n > 10 && (needsWe… |
+| `docs/CAPABILITY-MAP.md:200` | minor | LLM entries: coach:3783 · coach:4822 (bypasses callLLM — raw fetch) · coach:5004 (marathon readiness — DEAD path) | supabase/functions/coach/index.ts:5102 `            const resp = await fetch('https://api.anthropic.com/v1/messages', {` is the raw-fetch bypass (cited as :4822). Marathon readiness is at :5131 `let marathon_readiness: CoachWeekContextResponseV1['marathon_rea… |
+| `docs/CAPABILITY-MAP.md:234` | minor | 9 of 87 functions import _shared/require-user.ts. 77 of 87 instantiate a service-role client. | `grep -rlI "require-user" supabase/functions --include=index.ts \| wc -l` = 13. `grep -rlI "SERVICE_ROLE_KEY" supabase/functions --include=index.ts \| wc -l` = 82. `ls supabase/functions/*/index.ts \| wc -l` = 91. |
+| `docs/CAPABILITY-MAP.md:279` | minor | Strength gain signal reads exercise_log.estimated_1rm ← compute-facts brzycki1RM | `brzycki1RM` no longer exists. supabase/functions/compute-facts/index.ts:130 `⛔ WAS BRZYCKI, NOW WENDLER'S OWN (D-339, 2026-07-30). The formula moved to \`src/lib/estimate-1rm.ts\`` and :35 `import { estimate1RMRounded } from "../../../src/lib/estimate-1rm.ts… |
+| `docs/DECISIONS-LOG.md:1802` | minor | "So for eight of twelve weeks the strength gauge is close to blind, and nothing said so." | Block shape is not fixed at leader/leader/anchor. `leaderCount` (supabase/functions/shared/strength-system/loading/wendler-531.ts:291) returns the `count - 1` fallback ONLY when posture is non-'develop', weeks >= 16, or `highAerobicLoad` (:297-299); for the o… |
+| `docs/DECISIONS-LOG.md:1815` | minor | "Today completing a set opens a RIR prompt, then a confirm (`StrengthLogger.tsx:3505-3535`)." | src/components/StrengthLogger.tsx:3500-3530 is the body of `updateSet` (rest-timer auto-calc) and the start of `addSet` at :3532 `const addSet = (exerciseId: string) => {` — no RIR prompt there. The RIR prompt now lives at :827-831 (`// RIR prompt state` / `c… |
+| `docs/DECISIONS-LOG.md:1895` | minor | "The consumer is one boolean. `coach/index.ts:5727` — `strength: { declining: weeklyResponseModel.strength.overall.trend === 'declining' }`" | The quoted expression is real but has moved ~97 lines: supabase/functions/coach/index.ts:5824 `strength: { declining: weeklyResponseModel.strength.overall.trend === 'declining' },`. Line 5725-5728 is now a comment block about the retired interference alarm (`… |
+| `docs/ENGINE-STATE.md:139` | minor | D-325 — Session Cost Ledger + Penalty Scheduler (`DECISIONS-LOG.md:1260`) | `docs/DECISIONS-LOG.md:1267` `## D-325 — The Session Cost Ledger + Penalty Scheduler: three ordinal axes...`. Line 1260 sits inside the tail of the previous entry ("### The thing that survives all of it"). |
+| `docs/ENGINE-STATE.md:170` | minor | the missed-reps stall half lives at `coach/index.ts:3903+` | `supabase/functions/coach/index.ts:3975` `// Q-193 — THE STALL. Missing reps at the prescribed load...`, with `let missedPrescribedReps = false;` at `:3980`. Line 3903 is inside the `generateCoaching(partialSnapshot, anthropicKey, {...})` LLM call — unrelated. |
+| `docs/ENGINE-STATE.md:227` | minor | the reconciler (`load-status-reconcile.ts`, THE LAW) is applied at `coach/index.ts:3564` | `supabase/functions/coach/index.ts:3625` `const reconciled = reconcileLoadStatus(`; imported at `:33`. Line 3564 is not the call site. |
+| `docs/ENGINE-STATE.md:229` | minor | `COACH_CLIENT_MIN_PAYLOAD_VERSION` is "Now pinned WITH `COACH_PAYLOAD_VERSION` (144)" | They have drifted apart again: `src/lib/coach-contract.ts:5` `export const COACH_CLIENT_MIN_PAYLOAD_VERSION = 144;` (its own comment at `:1-4` says "Must match `COACH_PAYLOAD_VERSION` ... Bump both") while `supabase/functions/coach/index.ts:137` reads `const … |
+| `docs/ENGINE-STATE.md:303` | minor | `bikeEfficiencyDisplay` (`bike-fitness.ts:103`) | `supabase/functions/_shared/state-trend/bike-fitness.ts:100` `export function bikeEfficiencyDisplay(verdict: string \| null \| undefined): ...` |
+| `docs/ENGINE-STATE.md:329` | minor | "`getBlockAdaptation` ... the coach ALREADY CALLS IT at `coach/index.ts:2520`" | `supabase/functions/coach/index.ts:2619` `const ba: any = await getBlockAdaptation(userId, blockStart, blockEnd, supabaseService);` (imported at `:70`, guarded comment at `:2608`, catch at `:2626`). Nothing at :2520. |
+| `docs/ENGINE-STATE.md:334` | minor | the upkeep line is on a different code path (`upkeepCandidate`, `week-accent.ts:233-279`) | `supabase/functions/_shared/state-trend/week-accent.ts:263` `export function upkeepCandidate(opts: {` — the function starts at 263, so the cited 233-279 range straddles its start rather than bounding it. |
+| `docs/ENGINE-STATE.md:340` | minor | the LOAD row renders the RECONCILED verdict correctly (`LoadBar.tsx:71`) | `src/components/LoadBar.tsx:73` `const verdict = statusVolumeLabel(loadStatus?.status);` (preceded at `:72` by `// Verdict = the reconciled two-key read (D-260 sole authority)`). Line 71 is blank. |
+| `docs/ENGINE-STATE.md:347` | minor | "A stale raw-ACWR `label` survives at `coach/index.ts:5464` with `back off`/`rest now`" | The label still exists, but at `supabase/functions/coach/index.ts:5593-5600`: `label: (() => { if (acwr == null) return null; if (acwr < 0.8) return 'build more'; if (acwr <= 1.3) return 'balanced'; if (acwr <= 1.5) return 'back off'; return 'rest now'; })(),… |
+| `docs/ENGINE-STATE.md:507` | minor | "`calculate-workload:378` already hydrated the learned LTHR" | The LTHR hydration is at `supabase/functions/calculate-workload/index.ts:228-256` (`// D-lthr-one-anchor ... captured to resolve the RUN threshold through the ONE resolver`, `runThresholdHr = Number(learned.run_threshold_hr.value)` at `:256`), with `resolveCu… |
+| `docs/ENGINE-STATE.md:892` | minor | "`import-strava-history:761` skips it with no error (\"N skipped\")" | The skip is at `supabase/functions/import-strava-history/index.ts:755` — `if (existing.has(a.id)) { skipped++; continue; }` (the only `existing.has(a.id)` in the file). Line 761 now sits inside the Q-066 Garmin-preference comment block. Related minor drift in… |
+| `docs/ENGINE-STATE.md:899` | minor | "**`run_easy_pace_at_hr` aggregate (compute-snapshot) + `run_easy_pace_at_hr_trend` (longitudinal-signals `:52,85,144–163`)** — fed by the null field … **Retired in the D-239 reconcile.**" | Two problems. (1) Line-ref rot: the longitudinal-signals retirement lives at `_shared/longitudinal-signals.ts:48-49` (`// run_easy_pace_at_hr_trend: RETIRED (D-239) — fed by the null pace_at_easy_hr; no longer read or emitted.`) and `:141-144` (`// D-239 reco… |
+| `docs/ENGINE-STATE.md:903` | minor | "**`avgReadiness.soreness` snapshot aggregate (`compute-snapshot:211`)** — aggregates the post-workout popup soreness but nothing reads it … (Verify-then-retire, not proven-dead yet.)" | The line ref is wrong twice over. The aggregate is built at `compute-snapshot/index.ts:224-229` (`avgReadiness: (readinessEnergy.length > 0 \|\| readinessSoreness.length > 0 …) ? { energy: avg(readinessEnergy), soreness: avg(readinessSoreness), sleep: avg(rea… |
+| `docs/ENGINE-STATE.md:911` | minor | "The +7% TSS allocation bump in `science.ts:268-278 getBaseDistribution()` is a percentage shift across all phases, not a per-session intensity boost." | `getBaseDistribution` is declared at `supabase/functions/generate-combined-plan/science.ts:749`, not `:268-278` (which is `estimateSessionTSS`/`weightedTSS`). The +7% limiter shift itself is at `science.ts:786-793`: `// §2.1 limiter shift: increase limiter sp… |
+| `docs/ENGINE-STATE.md:924` | minor | "`analyze-cycling-workout/index.ts:~2108` reads `r.computed.overall.avg_hr` (frequently null); SELECT at `:2077` omits the reliable `workouts.avg_heart_rate` column." | Both refs rotted ~150 lines. The SELECT is at `analyze-cycling-workout/index.ts:2224` `.select('id, date, computed, workout_analysis, avg_heart_rate')` — with the fix comment at `:2221-2222` ("avg_heart_rate is a REAL workouts column (compute-facts reads it)"… |
+| `docs/ENGINE-STATE.md:954` | minor | "`isPerformedStrengthSet` (`analyze-strength-workout/index.ts:83`, 9 call sites)" | The predicate was extracted to a shared module. Definition is `_shared/strength/performed-set.ts:47` `export function isPerformedStrengthSet(s: PerformedSetLike \| null \| undefined): boolean {`; `analyze-strength-workout/index.ts:13` `import { isPerformedStr… |
+| `docs/ENGINE-STATE.md:954` | minor | "`updateSet` (`StrengthLogger.tsx:2603-2611`) clears `prefilled` on any athlete edit/Done (mirrors `from_previous`)" | `updateSet` is declared at `src/components/StrengthLogger.tsx:3428` (`const updateSet = (exerciseId: string, setIndex: number, updates: Partial<LoggedSet>) => {`) and the prefill clear is at `:3448-3450` — `// D-204: any athlete edit/Done clears the prefill m… |
+| `docs/ENGINE-STATE.md:954` | minor | "`workout-detail` carries `prefilled` through both set-map paths (`:220`, `:1289` — was stripped, \"Bug B\")" | `grep -n "prefilled" supabase/functions/workout-detail/index.ts` returns exactly two hits and neither is at the cited lines: `:291` `prefilled: Boolean(set?.prefilled)` and `:1633` `prefilled: Boolean(set?.prefilled)`. The behaviour (both set-map paths carry … |
+| `docs/ENGINE-STATE.md:955` | minor | D-204 prefill stack: "Deterministic logic tested with verbatim copies of all four pieces (`/tmp/d204-strength-test.mjs`, 16/16)" | The cited verification artifact is a `/tmp` path from 2026-06-21 and is gone — it is not a repo file, so the receipt for "16/16" is unreproducible. A durable equivalent now exists in-repo and should be cited instead: `supabase/functions/_shared/strength/perfo… |
+| `docs/GAME-PLAN.md:91` | minor | "Q-178 — a skipped exercise counts as PERFORMED. analyze-strength-workout:89 — completed === true short-circuits" | The item is correctly ticked, but the citation now points at the fix, not the bug. supabase/functions/analyze-strength-workout/index.ts:88-90 is the comment "D-204 / Q-178: THE definition of a performed set now lives in `_shared/strength/performed-set.ts` (im… |
+| `docs/GAME-PLAN.md:102` | minor | "coach/index.ts:5223 counts the WHOLE week as planned; done is bounded to [weekStart, asOfDate] (:5219)" | coach/index.ts:5223 is `.select('date,type,total_duration_seconds,workload_planned')` inside a planned-RIDES query; :5219 is a comment. The real code is at :5357 `planned: plannedArr.filter((p: any) => normDisc(p?.type) === d).length` and :5352-5354 `const do… |
+| `docs/GAME-PLAN.md:103` | minor | "coach/index.ts:5227 keeps a discipline when planned > 0 \|\| done > 0" | coach/index.ts:5227 is blank/`let peakLongRideHr`. The filter is at coach/index.ts:5359 `})).filter((c) => c.planned > 0 \|\| c.done > 0);`. |
+| `docs/GAME-PLAN.md:160` | minor | "The 23 test files under _shared/state-trend/ and _shared/insights/ are good and they all go green" | There are 29, not 23: `ls supabase/functions/_shared/state-trend/*.test.ts \| wc -l` → 25, `ls supabase/functions/_shared/insights/*.test.ts \| wc -l` → 4. |
+| `docs/GAME-PLAN.md:162` | minor | "the logic that decides what the cards SAY together is written inline, in anonymous IIFEs, inside coach/index.ts — 5,771 lines, @ts-nocheck." | supabase/functions/coach/index.ts is 5,997 lines (wc -l), and grep -n "ts-nocheck" over that file returns nothing — the file has no @ts-nocheck directive (its first lines are `// Edge Function: coach`). The "anonymous IIFEs" half is real (e.g. coach/index.ts:… |
+| `docs/GAME-PLAN.md:197` | minor | "The coach computes the score every run and discards it (coach/index.ts:2521), keeping three raw percentages." (F7) | coach/index.ts:2521 is now `const runUpkeepHr = (() => {` (the HR-response upkeep nudge). The block-adaptation wiring is at coach/index.ts:70 `import { getBlockAdaptation } from '../_shared/block-adaptation/index.ts';` and :2605 "D-212 Piece 4 (wire-now) — fe… |
+| `docs/GAME-PLAN.md:207` | minor | "squat/bench/deadlift 135 lb, OHP 95 lb (materialize-plan:2699-2726), swim 1:30/100 (:2352)" | Both refs rotted (the file is 3,504 lines). The 135 lb defaults are at materialize-plan/index.ts:3200, :3205 and :3215 (`if (dlMerged <= 0) dlMerged = 135;`). The swim fallback is at :2834-2835 `// Default fallback: 1:30/100 (90 seconds)` / `console.log(\` 🏊 … |
+| `docs/GAME-PLAN.md:237` | minor | "a second, unsafe auth idiom next to the good one (require-user, adopted by 9 of 87)." | `grep -rln "require-user" supabase/functions --include=index.ts \| wc -l` → 13, and `ls supabase/functions \| wc -l` → 96. `_shared/bearer-auth.ts` still exists and still has exactly one importer (supabase/functions/fetch-strava-route/index.ts). |
+| `docs/GAME-PLAN.md:245` | minor | "The stale raw-ACWR label (F11). coach/index.ts:5460-5466 mints label from the bare ratio: back off / rest now... neither back off nor rest now appears anywhere in the client." | The line ref rotted: the mint is now at coach/index.ts:5594-5600 (`label: (() => { if (acwr == null) return null; if (acwr < 0.8) return 'build more'; ... if (acwr <= 1.5) return 'back off'; return 'rest now'; })()`); :5460 is now the upkeep `perWeek` gate. T… |
+| `docs/GAME-PLAN.md:251` | minor | "153 files in scripts/ (F27) — _d183-verify.mjs, _coach-dbg2.ts, _dbg-apr19.ts …" | `ls scripts \| wc -l` → 193. The three named files and the real harness all still exist (scripts/_d183-verify.mjs, scripts/_coach-dbg2.ts, scripts/_dbg-apr19.ts, scripts/fanout-audit.mjs). |
+| `docs/OPEN-QUESTIONS.md:1751` | minor | Q-214: "`_shared/week-solver.ts` `solve()` (`:388`) … exhaustive recursion over all 7 days per lift (`:470`) … The vector (`scoreKey:226`)" | `supabase/functions/_shared/week-solver.ts:402` is `export function solve(input: SolverInput): SolverResult {` — line `:388` is instead the middle of the score vector (`upperToNearestLiftPenalty, upperLowerShortfall, shapePenalty, orderPenalty,`) inside `scor… |
+| `docs/OPEN-QUESTIONS.md:1918` | minor | Q-217: "The paragraph (`strength-primary-plan.ts:996`) says: *'That is usually the number on file being out of date rather than a limit — a fresh test would let it keep climbing.'*" | `supabase/functions/shared/strength-system/strength-primary-plan.ts:996` is `const stackNoteFor = (l: typeof MAIN_LIFTS[number]): string => {` — an unrelated stacking-note helper. `grep -rnI "out of date rather than a limit" supabase src` returns ZERO hits in… |
+| `docs/OPEN-QUESTIONS.md:2374` | minor | Q-234: "Grep confirms `peak1RM` exists only in `useExerciseLog.ts` (the client hook, a different object) and in the unmounted `BlockSummaryTab`." | `grep -rnI "peak1RM" src supabase` returns exactly three hits: `src/components/context/StateTab.tsx:1311`, `:1312` (the broken read itself) and `src/hooks/useExerciseLog.ts:30` — and that last one is inside a comment, not a field. `useExerciseLog.ts:27-31` re… |
+| `docs/POLISH-PUNCH-LIST.md:116` | minor | `ios/debug.xcconfig` uncommitted, five sessions running. | `git ls-files ios/debug.xcconfig` returns the path (tracked), `git status --porcelain ios/` returns empty (clean), and `git log --oneline -- ios/debug.xcconfig` shows it landed in `16e320bf feat(load): bodyweight counts as load, history re-priced; State reads… |
+| `docs/POLISH-PUNCH-LIST.md:142` | minor | `ios/debug.xcconfig` uncommitted, four sessions running. | Same trace: `git ls-files ios/debug.xcconfig` returns the path, `git status --porcelain ios/` is empty, and the file was committed in `16e320bf`. This is the second instance of the same stale line (see also docLine 116). |
+| `docs/POLISH-PUNCH-LIST.md:299` | minor | But no wizard ever writes `integration_mode`, so `create-goal-and-materialize-plan/index.ts:1895` hardcodes `'separated'` for everyone. | supabase/functions/create-goal-and-materialize-plan/index.ts:1921-1923 `integration_mode: (freshCombinedPrefs as Record<string, unknown>).integration_mode === 'consolidated' ? 'consolidated' as const : 'separated' as const,` — it READS the prefs and defaults,… |
+| `docs/POLISH-PUNCH-LIST.md:306` | minor | `match-cores` (`compute-facts:1827`) and `compute-core-verdict` (`compute-snapshot:873`) have nothing to match, and `build.ts:928 segment_verdicts` is always `[]`. | All three line numbers rotted. supabase/functions/compute-facts/index.ts:1979 `const matchUrl = ${...}/functions/v1/match-cores`; supabase/functions/compute-snapshot/index.ts:1221 `const verdictUrl = ${...}/functions/v1/compute-core-verdict`; supabase/functio… |
+| `docs/POLISH-PUNCH-LIST.md:329` | minor | State: "Easy — aerobic base needs work" (`state-trend/run.ts:139`, pure decoupling >5%) | supabase/functions/_shared/state-trend/run.ts:186 `case 'needs_work': return { word: 'aerobic base needs work', tone: 'warning' };`. Line :139 is a bare `asOf,` property. |
+| `docs/POLISH-PUNCH-LIST.md:330` | minor | `off-plan-banner.ts:66-71`: "On plan — strength on track" — while he ran zero of two planned runs | supabase/functions/_shared/off-plan-banner.ts:33 `const STRENGTH_ON_PLAN_CARRIED = 'On plan — strength on track; endurance via cross-training.';` — the string is at :33, not :66-71. |
+| `docs/POLISH-PUNCH-LIST.md:346` | minor | the State headline has no `productive` branch (`load-headline.ts:63`) so a productive week silently drops the load slot. | The `stateSlot` label map runs src/lib/load-headline.ts:42-48 and indeed has no `'productive'` case; :63 is `if (u === 'EFFORT UP') return 'effort up';` inside a different function. (Note `'productive'` IS handled at :18 in a separate status→word map, which i… |
+| `docs/POLISH-PUNCH-LIST.md:372` | minor | squat / bench / deadlift 1RM = 135 lb, OHP = 95 lb, hip thrust = `max(75, deadlift × 0.55)` (`materialize-plan:2699-2726`) — console log only | The `135` invention now sits at supabase/functions/materialize-plan/index.ts:3200, :3205 and :3215 (`if (dlMerged <= 0) dlMerged = 135;`). Line :2699 is `if (kind === 'main_effort' \|\| kind === 'main') {`. Substance (the invention exists) is VERIFIED; only t… |
+| `docs/POLISH-PUNCH-LIST.md:378` | minor | the run-pace fallback tells the athlete: "Run durations estimated at 10:00/mi until we learn your easy pace" (`strength-primary-plan.ts:427` → `GoalsScreen.tsx:1633`) | supabase/functions/shared/strength-system/strength-primary-plan.ts:1185 `volume_notes = \`Run durations estimated at ${FALLBACK_EASY_MIN_PER_MILE}:00/mi until we learn your easy pace…\`` — not :427. The client read is at src/components/GoalsScreen.tsx:1643-16… |
+| `docs/POLISH-PUNCH-LIST.md:404` | minor | Q-133 peel-back — `buildRouteReadout` (`_shared/session-detail/build.ts:27`) is still called at `:921` and still emits `terrain.route`. `SessionNarrative.tsx:395` acknowledges the debt. | supabase/functions/_shared/session-detail/build.ts:34 `function buildRouteReadout(history: unknown): RouteReadout \| null {` and :965 `readout: buildRouteReadout(history),` — not :27 and :921. (SessionNarrative.tsx:395 is a comment block about deleted trend c… |
+| `docs/POLISH-PUNCH-LIST.md:405` | minor | `load-headline.ts:67` carries an unreachable `'building on plan'` branch for a label nothing can produce. | src/lib/load-headline.ts:45 `loadLabel === 'building on plan' ? 'Building on plan' : // Q-122: high ACWR but on-plan in a build week`. Line :67 is `if (u === 'FATIGUED') return 'fatigued';` inside `refinedReadinessPhrase`. The branch itself still exists, so o… |
+| `docs/POLISH-PUNCH-LIST.md:424` | minor | Q-038 — swim stays provisional. `StatePerformanceSection.tsx:136` hardcodes `PROVISIONAL_PERF = new Set(['swim'])`. | The file is at src/components/context/StatePerformanceSection.tsx (not src/components/), and `const PROVISIONAL_PERF = new Set(['swim']);` is at :291, consumed at :785. The substance is VERIFIED — the hardcode is still there. |
+| `docs/POLISH-PUNCH-LIST.md:443` | minor | Strength → endurance interference signals + `endurance_load_context` population (`analyze-strength-workout:2904`, still `null`). | supabase/functions/analyze-strength-workout/index.ts:2811 `endurance_load_context: null,` (with the explanatory comment at :2809-2810). Not :2904. The substance — still `null` — is VERIFIED. |
+| `docs/POLISH-PUNCH-LIST.md:457` | minor | STATE headline phrase bank — the bounded-composition half shipped (`src/lib/load-headline.ts:98`, tested). | src/lib/load-headline.ts:82 `export function buildLoadHeadline(opts: {`. Line :98 falls inside the D-350 comment block explaining the deleted "observation" slot, not the composer. |
+| `docs/TRUTH-MAP.md:22` | minor | The Arc reads the spine (`arc-context.ts:1146-1153`, "no computation, no write") | The quoted phrase is at supabase/functions/_shared/arc-context.ts:1188 — "// step 1). Descriptive only — no computation, no write." The read-only pass-through block runs :1185-1197 (`const stRaw = latest_snapshot ? (latest_snapshot as any).state_trends_v1 : n… |
+| `docs/TRUTH-MAP.md:43` | minor | Fitness direction authority = SPINE → `rollupFitnessDirection` (`assemble.ts:277`) | supabase/functions/_shared/state-trend/assemble.ts:785 — `export function rollupFitnessDirection(v1: StateTrendsV1 \| null \| undefined): FitnessDirection {`. Line 277 is unrelated. The authority claim itself is correct; only the citation has rotted. |
+| `docs/TRUTH-MAP.md:43` | minor | "✅ one authority; only **freshness** differs (live vs cached)" | There is no live read left. src/hooks/useStateTrends.ts:95-96 — "We do NOT recompute on the client (single source of truth: compute-snapshot owns assembly)." All three consumers (State, coach, workout-detail) now read the cached `state_trends_v1`, so freshnes… |
+| `docs/TRUTH-MAP.md:50` | minor | Per-session execution authority = `session_detail_v1.execution` (`build.ts:782`) | supabase/functions/_shared/session-detail/build.ts:837 — `execution: {` (followed by `execution_score`, `pace_adherence`, `power_adherence`, `duration_adherence`). Line 782 is inside the cycling prose composer (`const lead = ct ? ... : 'Ride';`). |
+| `docs/TRUTH-MAP.md:67` | minor | its plan-gen use is staged off (`planning-context.ts:237 SWIM_CSS_LIVE = false`) | supabase/functions/_shared/planning-context.ts:238 — `const SWIM_CSS_LIVE = false;`. Off by one. Substance VERIFIED: the gate is read at :294 (`if (SWIM_CSS_LIVE) {`) and the file documents at :284 "STAGED OFF (SWIM_CSS_LIVE=false): current behavior — learned… |
+| `docs/TRUTH-MAP.md:71` | minor | b2 7-day execution row ← coach `weekly_state_v1.strength_session_types_7d` (`StateTab.tsx:1152`) | `strength_session_types_7d` does not appear in src/components/context/StateTab.tsx at all. Its only client declarations are src/hooks/useCoachWeekContext.ts:266 and :451. StateTab.tsx:1152 is inside `handleStateCourseFile` (a goals fetch). |
+| `docs/TRUTH-MAP.md:73` | minor | per-lift verdict ← coach `response_model.strength.per_lift` (`StateTab.tsx:1133`) | src/components/context/StateTab.tsx:1224-1225 — `// ── STRENGTH row — server-computed per_lift from response_model ──` / `const perLift = (rm?.strength?.per_lift ?? []).filter((l: any) => l.sufficient).slice(0, 5);`. The type is declared at :1040. Line 1133 i… |
+| `docs/TRUTH-MAP.md:84` | minor | Baselines hardcodes `/mi` (`TrainingBaselines.tsx:1233`) | The hardcoded literal is at src/components/TrainingBaselines.tsx:1314 — `<span className="text-sm text-white/50">/mi</span>`. Two more hardcoded `/mi` suffixes sit in the formatters at :510 and :518. Line 1233 is a `Yes` button inside the 5K nudge. The compan… |
+| `docs/TRUTH-MAP.md:88` | minor | `arc-context.ts:351` copies race-readiness projection bands | The band copy is at supabase/functions/_shared/arc-context.ts:369 — "SINGLE-SOURCE CAVEAT: the projection-direction banding mirrors the AUTHORITATIVE..." — with the actual duplicated logic in `projectionDirectionFromDelta` at :392 and the type comment at :385… |
+
+### VERIFIED — 64
+
+| doc:line | sev | claim | what the code says |
+|---|---|---|---|
+| `docs/CAPABILITY-MAP.md:17` | load-bearing | day-count-gate: src/lib/day-count-gate.ts:237 · Zero importers. Nothing in the app calls it. | src/lib/day-count-gate.ts:237 `export function computeDayCountGate(input: DayCountGateInput): DayCountGateResult {` — exact line. `grep -rnI "day-count-gate\|computeDayCountGate" src supabase` returns only src/lib/day-count-gate.test.ts:17 `} from './day-coun… |
+| `docs/CAPABILITY-MAP.md:18` | load-bearing | detect-cores has ZERO callers. No cron, no button, no script. | `grep -rnI "detect-cores" src supabase scripts` returns only supabase/functions/detect-cores/index.ts:2 (its own header) and supabase/functions/_shared/core-detect.ts:15 (a comment naming it as the caller's job). No invoke, no cron. Directory exists with sour… |
+| `docs/CAPABILITY-MAP.md:34` | load-bearing | Five DEAD generator classes in generate-run-plan/generators/; simple-completion.ts:89 exports a class named SustainableGenerator identical to the live one in sustainable.ts:92 | supabase/functions/generate-run-plan/generators/simple-completion.ts:89 `export class SustainableGenerator extends BaseGenerator {` — exact line. supabase/functions/generate-run-plan/generators/sustainable.ts:92 `export class SustainableGenerator extends Base… |
+| `docs/CAPABILITY-MAP.md:36` | load-bearing | CoachWeekTab.tsx is fully built and unmounted; BlockSummaryTab.tsx was deleted 2026-08-01 (D-350); StateTab.tsx:1805 reads block_verdict on a live surface | src/components/context/CoachWeekTab.tsx exists (1147 lines) and `grep -rlI CoachWeekTab src` returns no importer outside the file itself. `find src -name BlockSummaryTab.tsx` returns nothing — deleted. src/components/context/StateTab.tsx:1805 `            blo… |
+| `docs/CAPABILITY-MAP.md:52` | load-bearing | buildAthleteSnapshot at _shared/athlete-snapshot.ts:158; 5 of its 8 categories hardcoded null (:178-182); generate-strength-plan never calls it | supabase/functions/_shared/athlete-snapshot.ts:158 `export function buildAthleteSnapshot(input: {` — exact. :178-182 are `    swim: null,` / `    equipment: null,` / `    intent: null,` / `    capacity: null,` / `    bio: null,` — exactly five, exactly on tho… |
+| `docs/CAPABILITY-MAP.md:137` | load-bearing | THE WEEK SOLVER — _shared/week-solver.ts (solve()); spec docs/SPEC-week-solver.md — BUILT, SHIPPED | supabase/functions/_shared/week-solver.ts:402 `export function solve(input: SolverInput): SolverResult {`; refusal codes typed at :113 `export type SolverRefusalCode =`. It is live: strength-primary-plan.ts:70-74 imports from it and calls `solveWeek(...)` at … |
+| `docs/CAPABILITY-MAP.md:222` | load-bearing | strava-refresh is DEAD + DEPLOYED + UNAUTHENTICATED — takes userId from the body, no auth check, returns the access token (:93) | supabase/functions/strava-refresh/index.ts:17 `    const { userId }: RefreshBody = await req.json();` and :93 `      return new Response(JSON.stringify({`. Zero in-repo callers (`grep` for 'strava-refresh' outside its own directory returns nothing). Live refr… |
+| `docs/CAPABILITY-MAP.md:228` | load-bearing | disconect-connection (misspelled) — no source in repo, called at Connections.tsx:495 | src/components/Connections.tsx:495 `                  const alt = await supabase.functions.invoke('disconect-connection', {`. No `supabase/functions/disconect-connection/` directory exists. The correctly-spelled sibling is verified too: disconnect-connection/… |
+| `docs/ENGINE-STATE.md:54` | load-bearing | `resistance_level` holds WORDS before today and POUNDS after it; `bandLoadLb` reads both | `supabase/functions/_shared/workload.ts:376` `export function bandLoadLb(raw: unknown): number \| null {`, consumed at `:418` `const bandLb = bandLoadLb(rl);` then branched on `opts.bandIsAssistance` at `:421`. Client note at `src/components/StrengthLogger.ts… |
+| `docs/ENGINE-STATE.md:60` | load-bearing | `bandIsAssistance` covers exactly {pullup, chinup, dip}, so a weighted chin-up prices `(bodyweight + added) × reps` | `supabase/functions/_shared/workload.ts:357` "clause on `bandIsAssistance` and the blast radius is exactly {pullup, chinup, dip}"; `:412` `if (opts.bandIsAssistance && weight > 0 && bw > 0) return (bw + weight) * reps;`. Gate is set from `bandMeansAssistance(… |
+| `docs/ENGINE-STATE.md:75` | load-bearing | `STRENGTH_ADVANCE_COPY` must stay unrendered — "the copy is written and gated at the call site" | `src/lib/strength-focus-copy.ts:328` `export const STRENGTH_ADVANCE_COPY = {` with the gate note at `:263` ("wired, `STRENGTH_ADVANCE_COPY` must not be rendered — it would describe an engine that is not…"). The only other repo-wide hit is a comment at `src/co… |
+| `docs/ENGINE-STATE.md:84` | load-bearing | Q-234 — `StateTab.tsx:1311` gates a bar on `lt.peak1RM`, a camelCase field on a snake_case server object, so it silently measures against last session × 1.1 | `src/components/context/StateTab.tsx:1311-1314`: `const e1rmPct = lt.e1rm_current != null && lt.peak1RM > 0 ? Math.min(100, Math.round((lt.e1rm_current / lt.peak1RM) * 100)) : lt.e1rm_current != null && lt.e1rm_previous != null && lt.e1rm_previous > 0 ? Math.… |
+| `docs/ENGINE-STATE.md:161` | load-bearing | AMRAPs exist only in the anchor cycle — `wendler-531.ts:61`, `amrap: kind === 'anchor' && !isDeload && i === 2` | `supabase/functions/shared/strength-system/loading/wendler-531.ts:61` reads exactly `amrap: kind === 'anchor' && !isDeload && i === 2,`. The line ref and the quoted predicate are both correct. (Only the "weeks 9, 10, 11" consequence on doc line 161 is shape-d… |
+| `docs/ENGINE-STATE.md:226` | load-bearing | D-317 — `computeTotalLoadStatus(totalAcwr, totalPct, phase)` (`body-response.ts:40`) reads TOTAL load | `supabase/functions/_shared/athlete-snapshot/body-response.ts:40` `export function computeTotalLoadStatus(`. Exact line. |
+| `docs/ENGINE-STATE.md:892` | load-bearing | "`ingest-activity` `extractStravaLocalDate` (`:29-46`) … trusting the *provider's* timezone" — the Q-154 import-date bug is REAL and not fixed. | Citation is exact and the bug is still live. `ingest-activity/index.ts:29` `function extractStravaLocalDate(startDateLocal: string \| null \| undefined, startDateUtc: string \| null \| undefined): string \| null {` closing at `:46`; the body splits `start_dat… |
+| `docs/ENGINE-STATE.md:911` | load-bearing | "frequency side is correctly a no-op for run limiter; intensity side has zero implementation" | Still true. `limiterSport` reaches `session-factory.ts` only as a strength-protocol context field — declared at `session-factory.ts:2404` inside `triathlonStrength()`'s options and consumed at `:2497` `triathlonContext: { limiterSport: options?.limiterSport ?… |
+| `docs/GAME-PLAN.md:105` | load-bearing | "_shared/load-status-reconcile.ts header still reads 'Gate 2 is inert until phase labeling is populated upstream'. That is no longer true... plan-phase.ts:141-143 confirms build/baseline ar… | The stale header is still there: supabase/functions/_shared/load-status-reconcile.ts:28-29 "...so 'unknown' is the live path and Gate 2 is / inert until phase labeling is populated upstream)." plan_phase IS populated: compute-snapshot/index.ts:586 comment "D-… |
+| `docs/GAME-PLAN.md:187` | load-bearing | "Durability still reads the broken gate — silenced, not fixed. [Q-232]: the obvious fix fails a pinned regression, and [D-034] vs state-trend/run.ts disagree. A decision, not a patch." | docs/OPEN-QUESTIONS.md:2444 "## Q-232 — The durability read cannot be fixed the obvious way: a pinned regression forbids it (2026-07-31, ATTEMPTED AND REVERTED)", and its body confirms both halves: `isQualifyingDecouplingRow` gates on `isSteadyAerobic(workout… |
+| `docs/GAME-PLAN.md:210` | load-bearing | "OnboardingProfilePage collects identity only and never asks for one performance number." | src/pages/OnboardingProfilePage.tsx is 121 lines and grep for `performance_numbers\|fiveK\|squat\|bench\|ftp\|TrainingBaselines` inside it returns zero hits — no performance input of any kind. |
+| `docs/GAME-PLAN.md:220` | load-bearing | "Consolidated strength mode... No wizard writes integration_mode → hardcoded 'separated' for everyone. Job: one wizard question + the payload leg." | Still true. supabase/functions/create-goal-and-materialize-plan/index.ts:1918-1924: comment "Theme B (CONSOLIDATED-MODE §9): unconditional default 'separated' — legacy / non-asking goals thread inert until the wizard step (Slice 4)", then `integration_mode: (… |
+| `docs/GAME-PLAN.md:221` | load-bearing | "The day-count gate — 260 lines, 30+ tests, own spec, ZERO importers. Job: mount it + write the warn/block copy." | Confirmed. src/lib/day-count-gate.ts is 253 lines with src/lib/day-count-gate.test.ts at 292 lines; the spec is docs/DAY-COUNT-GATES.md ("Status: SPEC DRAFT — 2026-05-20"). grep for "day-count-gate" across src and supabase returns only the module and its own … |
+| `docs/GAME-PLAN.md:222` | load-bearing | "The segment engine... detect-cores has zero callers → route_cores always empty → the whole feature produces nothing." | Confirmed. grep -rn "detect-cores" across supabase, src and scripts returns exactly two hits, both prose: supabase/functions/_shared/core-detect.ts:15 (a comment naming "the caller's job (detect-cores edge fn)") and supabase/functions/detect-cores/index.ts:2 … |
+| `docs/GAME-PLAN.md:226` | load-bearing | "_shared/swim/swim-scalars.ts:40 exposes avgHr. compute-facts/index.ts:1207 buildSwimFacts calls resolveSwimScalars (for rest_fraction) and never records the HR." | Substance confirmed. supabase/functions/_shared/swim/swim-scalars.ts:40 `avgHr: Number.isFinite(hr) && hr > 0 ? hr : null,` — exact line, correct. buildSwimFacts calls `resolveSwimScalars(w)` at compute-facts/index.ts:1328 and uses only `scalars.movingSeconds… |
+| `docs/GAME-PLAN.md:227` | load-bearing | "Server: coach/index.ts:5586 — OVERREACHED / LEGS LOADED /... Client: StateTab.tsx:1232 reads it and passes it to ONE place — buildLoadHeadline — where stateSlot discards it whenever a load… | Substance confirmed. src/lib/load-headline.ts:60 is exactly `if (l) return l;` — citation correct. src/components/context/StateTab.tsx:1245 `const readinessLabel = trends.readiness_label;` and its only other occurrence is :1265, inside the `buildLoadHeadline(… |
+| `docs/GAME-PLAN.md:229` | load-bearing | "Power counts climbing / threshold / sweet_spot / tempo; efficiency counts endurance / endurance_long / recovery (state-trend/bike-fitness.ts:21,33). group, vo2, anaerobic, sprint, over_und… | Citations are correct. supabase/functions/_shared/state-trend/bike-fitness.ts:20-23 `export const POWER_BINS = { climbing: new Set(['climbing']), flat_sustained: new Set(['threshold','sweet_spot','tempo']) };` (:21 is the climbing line); :33 `export const BIK… |
+| `docs/GAME-PLAN.md:230` | load-bearing | "The adaptation substrate is run-only (F4). compute-adaptation-metrics/index.ts:359 branches on run\|running\|walk\|hike; :407 on strength. No ride branch, no swim branch... (:91-98 can onl… | Both line refs are exact. supabase/functions/compute-adaptation-metrics/index.ts:359 `if (sport === 'run' \|\| sport === 'running' \|\| sport === 'walk' \|\| sport === 'hike') {` and :407 `if (sport === 'strength' \|\| sport === 'strength_training') {`. The f… |
+| `docs/GAME-PLAN.md:236` | load-bearing | "DELETE strava-refresh. Zero callers, deployed, no auth check — takes userId from the body and returns that user's Strava access token." | Confirmed. supabase/functions/strava-refresh/index.ts:10 `type RefreshBody = { userId: string };`, :17 `const { userId }: RefreshBody = await req.json();`, :28 `.eq('user_id', userId)` — no JWT/user verification anywhere in the file — and :95 `access_token: t… |
+| `docs/GAME-PLAN.md:241` | load-bearing | "9 coach outputs with no mounted surface — incl. reaction... Mount CoachWeekTab or delete it. Right now it is neither." | CoachWeekTab is still unmounted: `grep -rn "CoachWeekTab" src` outside its own file (src/components/context/CoachWeekTab.tsx) returns nothing — no import, no route, no render site. (The "9 outputs" count itself was not re-derived.) |
+| `docs/OPEN-QUESTIONS.md:2360` | load-bearing | Q-234: the per-lift "% of peak" bar at `StateTab.tsx:1311` reads `lt.peak1RM`, which is not a field on the server `per_lift` row, so the first branch never runs and the `e1rm_previous * 1.1… | `src/components/context/StateTab.tsx:1311-1315` matches the doc's quoted block character-for-character: `const e1rmPct = lt.e1rm_current != null && lt.peak1RM > 0 ? Math.min(100, Math.round((lt.e1rm_current / lt.peak1RM) * 100)) : lt.e1rm_current != null && l… |
+| `docs/OPEN-QUESTIONS.md:2464` | load-bearing | Q-232: the durability fix is forbidden by a pinned regression at `session-detail/decoupling.test.ts:225`, and the line is currently silenced client-side via `durWord = null`. | `supabase/functions/_shared/session-detail/decoupling.test.ts:225` is exactly `Deno.test('REGRESSION: a mixed-effort steady run still reaches the durability substrate', () => {`, preceded at `:223-224` by the quoted rationale "Before the split it was deleted,… |
+| `docs/POLISH-PUNCH-LIST.md:302` | load-bearing | The day-count gate: BUILT, 30+ TESTS, ZERO IMPORTERS. `src/lib/day-count-gate.ts:237 computeDayCountGate` is complete and nothing in the app imports it. | src/lib/day-count-gate.ts:237 `export function computeDayCountGate(input: DayCountGateInput): DayCountGateResult {` — line ref EXACT. A repo-wide grep for `computeDayCountGate` / `day-count-gate` outside node_modules returns only the module itself and `src/li… |
+| `docs/POLISH-PUNCH-LIST.md:306` | load-bearing | The segment engine: `detect-cores` has zero callers — no cron, no button, no script. | A repo-wide grep (excluding node_modules/.git) for `'detect-cores'`, `"detect-cores"` and `functions/v1/detect-cores` returns ZERO hits. The only references to the capability are inside supabase/functions/detect-cores/index.ts itself (219 lines) and `_shared/… |
+| `docs/TRUTH-MAP.md:48` | load-bearing | FTP fracture #2 CLOSED — all FTP reads route through `resolveCurrentFtp` | Single definition at src/lib/resolve-current-ftp.ts:62 — `export function resolveCurrentFtp(baselines: BaselinesLike): ResolvedFtp {`. Every FTP consumer imports it: analyze-cycling-workout/index.ts:15 → used :1562; coach/index.ts:34 → used :2128 and :4704 (w… |
+| `CLAUDE.md:222` | minor | "and `bulk-reanalyze-workouts/index.ts:40-50`" | supabase/functions/bulk-reanalyze-workouts/index.ts:36 — `function getAnalysisFunctionName(workoutType: string): string \| null {` — with the switch cases running :38-55 (`analyze-running-workout`, `analyze-strength-workout`, `analyze-cycling-workout`, `analy… |
+| `CLAUDE.md:269` | minor | "`plans.sessions_by_week` is a top-level column, not nested under `config`" | Selected as a sibling of `config` in every query, e.g. supabase/functions/adapt-plan/index.ts:190 — `.select('id,name,config,sessions_by_week,duration_weeks,current_week')` — and :1096 `.select('id, config, sessions_by_week, duration_weeks, current_week')`. T… |
+| `CLAUDE.md:270` | minor | "`analyze-swimming-workout` doesn't exist; the function is `analyze-swim-workout`." | `ls supabase/functions \| grep -i swim` → `analyze-swim-workout` and `swim-activity-details` only; no `analyze-swimming-workout`. Confirmed live in the routing table at bulk-reanalyze-workouts/index.ts:52-54 (`case 'swim': case 'swimming': return 'analyze-swi… |
+| `CLAUDE.md:271` | minor | "`.cursor/rules/lower-body-strength-pairing.mdc:13-16` lists easy run as an allowed lower-body partner" | .cursor/rules/lower-body-strength-pairing.mdc:10 — `## Same day as lower body — allowed`; :12 `- Easy bike`; :13 `- Easy run`; :14 `- Easy swim`; with the qualifying parenthetical at :16. The cited 13-16 window covers the easy-run bullet and the qualifier. Fi… |
+| `CLAUDE.md:288` | minor | Ingest fan-out → `ingest-activity/index.ts:~1430-1580` | supabase/functions/ingest-activity/index.ts:1442 (`auto-attach-planned` fnUrl), :1514-1539 (`adapt-plan` action=auto trigger + error handling), :1566 (`runPostImportAthletePipeline` dynamic import). File is 1595 lines, so the range is in bounds and correct. |
+| `docs/CAPABILITY-MAP.md:65` | minor | the dead _shared/endurance/hr-zones.ts:18 0.90 copy, used only by generate-run-plan/generators/sustainable.ts | supabase/functions/_shared/endurance/hr-zones.ts:18 `    { name: 'Z2', label: 'Aerobic',   min: Math.round(lthr * 0.85),  max: Math.round(lthr * 0.90) },` — exact. Its only reach into production is via `_shared/endurance/index.ts:9 export * from './hr-zones.t… |
+| `docs/CAPABILITY-MAP.md:250` | minor | Dead functions (zero callers): analyze-user-profile, arc-setup-chat, backfill-*, detect-cores, enrich-history, generate-plan, generate-training-context, import-connect-history, process-work… | Each directory still exists and a repo-wide grep for its name outside its own directory returns 0 hits for: analyze-user-profile, arc-setup-chat, backfill-facts, backfill-planned-workload, backfill-routes, backfill-week-summaries, detect-cores, enrich-history… |
+| `docs/CAPABILITY-MAP.md:254` | minor | supabase/functions/garmin-webhook-activities-working.ts — a stray 390-byte file at the functions root | `ls -la supabase/functions/garmin-webhook-activities-working.ts` → `-rw-r--r--@ 1 michaelambp staff 390 Sep 19 2025`. Exactly 390 bytes, still present, not a function directory. |
+| `docs/ENGINE-STATE.md:9` | minor | the real `resolveRunEasyPace()` sits in `generate-combined-plan/science.ts:110` | `supabase/functions/generate-combined-plan/science.ts:110` `export function resolveRunEasyPace(` (type doc for its return at `:41`). Exact line. |
+| `docs/ENGINE-STATE.md:45` | minor | `BlockSummaryTab` (1,184 lines, unmounted since 2026-03-31) deleted | No such file: `ls src/components/BlockSummaryTab.tsx` → "No such file or directory"; repo-wide grep finds only two comments referring to it in the past tense — `src/hooks/useExerciseLog.ts:31` ("`BlockSummaryTab`, which had been unmounted since 2026-03-31 and… |
+| `docs/ENGINE-STATE.md:190` | minor | The block description promises "speed and distance blocks unlock when this cycle closes" — neither exists; a test asserts the line is present to keep it visible | `supabase/functions/shared/strength-system/strength-primary-plan.test.ts:355` `assertEquals(/speed and distance blocks unlock/i.test(d), true, 'the unlock promise moved — the hand-off still owes it');` with the debt comment at `:351`; the same debt is flagged… |
+| `docs/ENGINE-STATE.md:206` | minor | Orphaned always-visible `PostureLine` (F10) DELETED | Repo-wide grep for `PostureLine` returns only historical mentions: `src/components/context/StatePerformanceSection.tsx:845` ("(The old always-visible `PostureLine` — orphaned since…") and the coach changelog comment at `supabase/functions/coach/index.ts:137` … |
+| `docs/ENGINE-STATE.md:208` | minor | `overall_training_read` "This week" fallback DELETED (F8) — client render + server function + emission gone; type nullable | `supabase/functions/_shared/response-model/weekly.ts:784-787` `// overall_training_read DELETED 2026-07-24 — its ~25-branch imperative fallback ...` then `const overall_training_read = null;` (still emitted as null at `:813`); type is nullable at `_shared/res… |
+| `docs/ENGINE-STATE.md:901` | minor | "**daily-ledger `session_rpe` first-preference (`:267`)** — null on all 40; harmlessly falls through to `rpe`. Dead preference, remove." | Exact. `supabase/functions/_shared/athlete-snapshot/daily-ledger.ts:267` — `rpe: Number(row?.session_rpe) \|\| Number(row?.rpe) \|\| null,`. It is the only `session_rpe` reference in the file, still un-retired. (Whether it is null on all 40 rows is a DB fact … |
+| `docs/ENGINE-STATE.md:936` | minor | "Forward hook `cycling_segment_history.race_course_relevant` is in place." (#8 race-course segment matching blocked on GPX) | The column exists and nothing reads or writes it, which is exactly what "forward hook, blocked" means. `grep -rn "race_course_relevant" supabase src` returns a single hit: `supabase/migrations/20260516_create_cycling_segment_history.sql:38` `race_course_relev… |
+| `docs/GAME-PLAN.md:95` | minor | "Q-164 — the dead 'Aerobic fitness' BODY row. coach:2131 cardiac_efficiency_current: null, sample_size: 0 → the render gate can never be true." | Substance confirmed: coach/index.ts:2175-2176 `cardiac_efficiency_current: null,` / `cardiac_efficiency_sample_size: 0,` — both still hardcoded. ⚠️ The ref is :2175, not :2131 (which is now an LTHR-resolver comment). |
+| `docs/GAME-PLAN.md:170` | minor | "Remaining: delete the dead _shared/endurance/hr-zones.ts 0.90 copy — DEFERRED (generate-run-plan/generators/sustainable.ts still refs its symbols; check live/dead first)." | The deferral reason still holds. supabase/functions/_shared/endurance/hr-zones.ts exists and still carries the 0.90 boundaries (:18-20, :33-34). generate-run-plan/generators/sustainable.ts:16 `import { hrZones, paceZonesFromVdot, ... } from '../../_shared/end… |
+| `docs/GAME-PLAN.md:240` | minor | "5 dead run-generator classes — and simple-completion.ts:89 exports a class named SustainableGenerator, identical to the live one." | Exact. supabase/functions/generate-run-plan/generators/simple-completion.ts:89 `export class SustainableGenerator extends BaseGenerator {`, and the live twin at generate-run-plan/generators/sustainable.ts:92 `export class SustainableGenerator extends BaseGene… |
+| `docs/GAME-PLAN.md:247` | minor | "readinessColor (F24). StateTab.tsx:1237 — five-branch colour map, zero references." | Substance confirmed: `grep -n "readinessColor" src/components/context/StateTab.tsx` returns exactly one hit — the definition. It is a five-branch map (fresh/adapting/overreached/fatigued/default). ⚠️ It is at StateTab.tsx:1250, not :1237. |
+| `docs/GAME-PLAN.md:248` | minor | "Two file headers claiming 'NOT YET SHIPPED — under review' (F12) on shipped, rendering code: StatePerformanceSection.tsx:5 and StateTab.tsx:1653." | Both stale headers still exist. src/components/context/StatePerformanceSection.tsx:5 `// NOT YET SHIPPED — under review. Run/swim performance is on PROVISIONAL thresholds and is` — exact line, correct. The second is at src/components/context/StateTab.tsx:1710… |
+| `docs/GAME-PLAN.md:250` | minor | "Three generations of the race projection renderer, all live (F29). StateTab.tsx:526 (grouped, current) → :544 (projection_facts, explicitly 'legacy flat list still supported') → :555 (mism… | All three renderers are still live, each with its own gate — but every line ref is ~11 off. src/components/context/StateTab.tsx:537 `{rr?.projection_display?.sections && rr.projection_display.sections.length > 0 && (` (grouped, current, preceded by the "legac… |
+| `docs/OPEN-QUESTIONS.md:2197` | minor | Q-227 finding 4: "`advance_untrusted` HAS NO READER … The State strength row cannot say so, so a shaky number renders identically to a clean one." | `grep -rnI "untrusted" src` returns ONE hit — `src/lib/estimate-1rm.ts:45`, a provenance comment, not a read. The verdict is produced at `supabase/functions/shared/strength-system/loading/wendler-531.ts:461` and honoured for LOAD at `:481`, and it survives th… |
+| `docs/OPEN-QUESTIONS.md:2335` | minor | Q-235: "`getExerciseType` (`StrengthLogger.tsx:146`) ends with `return 'barbell'`", and the three named instances (Q-180 carry, D-351 hip thrust, D-352 box jump) were each fixed by adding a… | `src/components/StrengthLogger.tsx:146` is exactly `const getExerciseType = (exerciseName: string): 'barbell' \| 'dumbbell' \| 'band' \| 'bodyweight' \| 'goblet' \| 'plyo' => {`, and the function's last statement is `:197` `return 'barbell';`. The pattern-by-… |
+| `docs/POLISH-PUNCH-LIST.md:113` | minor | `Single Leg Rdl` / `Single Leg Romanian Deadlift` are the same movement listed twice in the library swap list. | src/lib/exercise-config.ts:290 `'single leg rdl': {` and :298 `'single leg romanian deadlift': {` — two separate config entries for the same movement. src/lib/exercise-alternatives.test.ts:318-320 records the same duplicate showing up in a live swap sheet. St… |
+| `docs/POLISH-PUNCH-LIST.md:182` | minor | Delete throwaway scripts `scripts/_trigger-snapshot.mjs` / `_check-run-pace.mjs` / `_chart-data-depth.mjs`. | `ls scripts/_trigger-snapshot.mjs scripts/_check-run-pace.mjs scripts/_chart-data-depth.mjs` returns all three files present. Still open. |
+| `docs/POLISH-PUNCH-LIST.md:356` | minor | `_shared/endurance/hr-zones.ts:18` — Z2 ceiling 0.90 (→136 @ LTHR 151) vs the canon's 0.89 (→134). | supabase/functions/_shared/endurance/hr-zones.ts:18 `{ name: 'Z2', label: 'Aerobic',   min: Math.round(lthr * 0.85),  max: Math.round(lthr * 0.90) },` — line ref EXACT, coefficient 0.90 as claimed. Still open. |
+| `docs/POLISH-PUNCH-LIST.md:393` | minor | `disconect-connection` (misspelled) is a REAL deployed function with NO SOURCE in the repo, kept as a permanent fallback branch at `Connections.tsx:495`. | Connections.tsx:495 `const alt = await supabase.functions.invoke('disconect-connection', {` — line ref EXACT. No `supabase/functions/disconect-connection` directory exists. Still open. |
+| `docs/POLISH-PUNCH-LIST.md:453` | minor | `_shared/state-trend/zones.ts:30 resolveZoneBand` has a `'personal'` source with no writer. Everything resolves to `coggan_ftp`. | supabase/functions/_shared/state-trend/zones.ts:30 `export function resolveZoneBand(` — line ref EXACT; :17 declares `source: 'personal' \| 'coggan_ftp' \| 'none';` and :37 returns the `'personal'` branch only when a `personal` band is passed in. Still open. |
+| `docs/START-HERE.md:18` | minor | the real `resolveRunEasyPace()` sat in `generate-combined-plan/science.ts:110` with its own spec and 9 pin tests | supabase/functions/generate-combined-plan/science.ts:110 — `export function resolveRunEasyPace(`. Nine-scenario pin tests at supabase/functions/generate-combined-plan/run-pace-feedback.test.ts:5 — "Pin tests for `resolveRunEasyPace` covering all 9 scenarios f… |
+| `docs/START-HERE.md:112` | minor | "`TRUTH-MAP.md` (per-fact authority — ⚠️ partly stale...)" | Understated but correct. This audit found 12 rotted claims in TRUTH-MAP, four of them load-bearing (lines 30, 64, 72, 86 — all traced above with file:line). The warning label is accurate. |
+| `docs/TRUTH-MAP.md:88` | minor | client re-implements `FitnessVerdictDivergence` (D-212 mirror, `useCoachWeekContext.ts:70`) | src/hooks/useCoachWeekContext.ts:71 — `/** D-212 — client mirror of arc-context FitnessVerdictDivergence (src/ can't import supabase/functions). */` with the interface at :72 and :78. Server original at supabase/functions/_shared/arc-context.ts:372. Off by on… |
+
+### UNVERIFIABLE — 4
+
+| doc:line | sev | claim | what the code says |
+|---|---|---|---|
+| `docs/ENGINE-STATE.md:949` | load-bearing | Axis 1 carryover: "that it fires *correctly on Michael's real workouts*" is unverified — "Every real recompute so far is **correctly silent** — both declared baselines are empty (0 comparab… | The built half is confirmed in code: the detector is `supabase/functions/_shared/cross-domain-carryover.ts` with two suites beside it, `cross-domain-carryover.test.ts` and `cross-domain-carryover.synthetic.test.ts`. The unverified half — whether it has fired … |
+| `CLAUDE.md:267` | minor | `docs/PLAN-CONTRACT.md` is superseded by `docs/SCHEDULING-RULES.md` + `docs/SCHEDULING-RULES-EXTRACTED.md`; audit details in `notes/docs-audit-2026-05-09.md` | All four files exist (`ls docs/PLAN-CONTRACT.md docs/SCHEDULING-RULES.md docs/SCHEDULING-RULES-EXTRACTED.md notes/docs-audit-2026-05-09.md` → all present, plus `APP_ARCHITECTURE.md` for the next bullet). The supersession status and the "§5 matrix disagrees wi… |
+| `docs/ENGINE-STATE.md:193` | minor | 7 failures in `shared/strength-system/protocols/triathlon_performance.conformance.test.ts` (`vertical_pull` + "Band Pull-Aparts" naming), pre-existing | The file exists — `supabase/functions/shared/strength-system/protocols/triathlon_performance.conformance.test.ts` — but the failure COUNT can only be settled by running `deno test` against it, which I did not run (read-only audit). Nothing in the tree contrad… |
+| `docs/POLISH-PUNCH-LIST.md:70` | minor | Cross-training compares a PARTIAL week to a whole-week target — "9 of your 18-mile target", read on a Thursday. `_shared/insights/cross-training-read.ts`, the `floorBreach` clause. | The `floorBreach` clause exists (supabase/functions/_shared/insights/cross-training-read.ts:114, string built at :118) but it only RENDERS numbers handed to it. The number is computed in supabase/functions/coach/index.ts:5657-5660: `const perWk = runRows.redu… |

@@ -1,6 +1,6 @@
 # SPEC — Swim source tiers, tiered rendering, SWOLF, multi-source reconciliation + FORM→Apple nudge
 
-Status: **design locked, build pending** (2026-06-16). Investigation verified against the dev athlete's real data (177 Strava / 70 Garmin / 103 manual workouts; 10 Strava + 14 Garmin swims). Read `AUDIT-swim-2026-06-14.md` + the ENGINE-STATE "Swim sweep consolidation" entry first.
+Status: **design locked, build pending** (2026-06-16). Investigation verified against the dev athlete's real data (177 Strava / 70 Garmin / 103 manual workouts; 10 Strava + 14 Garmin swims). Read `archive/AUDIT-swim-2026-06-14.md` + the ENGINE-STATE "Swim sweep consolidation" entry first.
 
 ## The problem
 

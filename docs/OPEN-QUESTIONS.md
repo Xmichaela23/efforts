@@ -178,7 +178,7 @@ Found while building the State source map. All four verified in code; none block
 
 > **STATUS 2026-07-06 (later): SUPERSEDED by Q-132 / D-250.** This route-trend approach was BUILT + deployed, then proved structurally unsound (path-overlap route identity over-merges distances / fragments trailheads / double-matches → verdicts flip-flop). The honest version is the **segment model** (`DESIGN-segments.md`). Kept for institutional memory; do not build the route-trend version.
 
-**Strava-adjacent, the honest version.** An athlete has ~5 routes they run/ride a lot (user 45d122e7: 17–40× each); they want "am I getting faster on my usual loop." Strava shows raw clock times (condition-blind — a cool-day PR vs a hot slog aren't comparable). Efforts' edge: **same-route removes hills** (constant), **heat/humidity adjustment removes the rest**, read as **pace-per-HR not raw time** → true fitness with the weather taken out. **Foundation BUILT** (D-248 path identity + backfill; per-run metrics; temp/humidity in `weather_data`; `efficiency_index`). **Feature scoped, NOT built** — full design: `docs/DESIGN-familiar-routes.md`.
+**Strava-adjacent, the honest version.** An athlete has ~5 routes they run/ride a lot (user 45d122e7: 17–40× each); they want "am I getting faster on my usual loop." Strava shows raw clock times (condition-blind — a cool-day PR vs a hot slog aren't comparable). Efforts' edge: **same-route removes hills** (constant), **heat/humidity adjustment removes the rest**, read as **pace-per-HR not raw time** → true fitness with the weather taken out. **Foundation BUILT** (D-248 path identity + backfill; per-run metrics; temp/humidity in `weather_data`; `efficiency_index`). **Feature scoped, NOT built** — full design: `docs/archive/DESIGN-familiar-routes.md`.
 
 **Core engineering (from the design):** heat-adjust pace-per-HR via **dew point** (temp+humidity, better than temp alone) with a bespoke coefficient `k` (same class as Q-127 DOMS coeffs — population default, tune against own hot/cool same-route runs), OR a per-route **regression-residual** for high-N routes. One schema add: `temp_f`/`humidity_pct`/`dew_point_f` on `route_progress_metrics` (written in compute-facts from `weather_data`). Surfaces: a **Routes list + route detail** (a route TREND is macro → its own view, per the CONSTITUTION; the session line stays familiarity-only = the doorway, D-249). Honesty gates tied to the CONSTITUTION/CANON: glass-box the adjustment, hedge (directional not precise), confidence-gated, one-source-of-truth with State.
 
@@ -1748,7 +1748,7 @@ stored, no live reader — that is Q-211 again, with the value wrong on top.**
 
 ### Where the assignment happens, and what it scores on
 
-`_shared/week-solver.ts` `solve()` (`:388`). It is a **SEARCH, not a sequence of hard rules** — exhaustive recursion over all 7 days per lift (`:470`), pruned by the hard law, keeping the lexicographically smallest score vector. ✅ **So a new scored term is a genuine addition to an existing mechanism, not a restructuring.** The vector (`scoreKey:226`), in order:
+`_shared/week-solver.ts` `solve()` (`:402`). It is a **SEARCH, not a sequence of hard rules** — exhaustive recursion over all 7 days per lift (`:471`, day loop `:525`) ⟨A31⟩, pruned by the hard law, keeping the lexicographically smallest score vector. ✅ **So a new scored term is a genuine addition to an existing mechanism, not a restructuring.** The vector (`scoreKey:226`), in order:
 
 `restShortfall · breachPenalty · stackPenalty · stackHostPenalty · spreadPenalty(lower↔lower) · upperSpreadPenalty · upperLowerShortfall · shapePenalty · orderPenalty · preferredMissPenalty · canonicalAssignment`
 
@@ -1915,7 +1915,7 @@ The session note nevertheless reads *"leave 6h before the run"* as a flat instru
 
 > *"Copy written as an exception, firing as a rule, is a different kind of dishonest — it tells the athlete something unusual happened when nothing did."*
 
-The paragraph (`strength-primary-plan.ts:996`) says: *"That is usually the number on file being out of date rather than a limit — a fresh test would let it keep climbing."*
+The paragraph (`strength-primary-plan.ts:1683-1685`, the `kind: 'ceiling'` compromise at `:1649`) says: *"…reach 90% of the max on file and stop climbing. That usually means the record is out of date — a fresh test lets it keep going."* ⚠️ Tightened 2026-07-29 for length; the stale-max assertion this entry objects to survived the edit, and the code comment at `:1677-1678` says so. ⟨A31⟩
 
 ⛔ **FOR SOMEONE WHO JUST ENTERED ACCURATE MAXES AT SIGNUP, THAT SENTENCE IS FALSE.** They are pinned because 85% plus three increments reaches 90%, not because their record is stale. The engine cannot currently tell a stale max from an accurate one, so it asserts the more flattering of the two for everybody.
 
@@ -1997,7 +1997,9 @@ A throwaway athlete with **resistance bands and no cable** — the exact branch 
 
 > ✅ **RE-VERIFIED 2026-07-29 AGAINST THE BOOK ITSELF, by this session.** The 2nd-edition PDF was searched directly: the phrase *"always be able"* does not occur anywhere in the text, and no five-rep rule at 95% appears. Every prescription reads `95% x 1 or more reps`. ⚠️ **The earlier claim that "the full 134-page 2nd edition was searched" could not be reproduced** — no copy of the text had ever been in the repo, so that search was unverifiable until Michael supplied the PDF. The conclusion was right; the evidence for it was inherited. See D-337, which also found the OPPOSITE error in our own draft: Wendler DOES carry an estimated max, and it is Epley.
 
-⛔ **`verdictFrom95Set` resets anything under five reps**, and there is no middle:
+> ✅ **CLOSED.** `VALIDITY_CHECK_MIN_REPS` is now **1** (`wendler-531.ts:368`) — the prescribed `95% x 1+` from p23. `verdictFrom95Set` (`wendler-531.ts:454-462`) resolves `null`→`hold`, `0`→`reset`, `1`–`8`→`advance`, `>8`→`advance_untrusted`. Its docstring records the reason: *"The middle band is gone deliberately. It used to reset everything under five, which cut the working number 10% for a session the book calls a pass."* Everything below is history.
+
+⛔ **`verdictFrom95Set` USED TO reset anything under five reps**, with no middle: ⟨A31⟩
 
 ```
 return repsAchieved >= VALIDITY_CHECK_MIN_REPS ? 'advance' : 'reset';   // MIN_REPS = 5
@@ -2078,7 +2080,7 @@ The gap is not rounding. Our working number **starts** at `WORKING_NUMBER_PCT_OF
 
 ⛔ **DO NOT PATCH THIS.** It changes prescribed weight for real athletes. It needs a `D-NNN` with a stated position on whether the 85% buffer and the 10% reset are answering the same question twice.
 
-⚠️ Coupled to the fact that the reset path **only fires on a rebuild** — see Q-223. On a first block nothing resets at all.
+⚠️ **NO LONGER COUPLED TO A REBUILD.** Q-223 closed 2026-07-30 (D-341): `rematerialize-strength-block` runs on every logger save (`StrengthLogger.tsx:4022`) and applies `reset` verdicts to weeks that have not started (`rematerialize-strength-block/index.ts:161-172`, `unknownMeans: 'hold'`). So a first block CAN now reset mid-flight — which makes the 0.9 × 0.85 ≈ 0.72 double-charge reachable for a real athlete rather than theoretical. ⟨A31⟩
 
 ---
 
@@ -2141,7 +2143,7 @@ Michael, same day: *"thats why im down streaming it — we will ad a rematerialz
 
 ⚠️ **THE REMATERIALIZER WAS CANCELLED MID-SESSION ON 2026-07-29 AND IS DEFERRED, NOT DEAD.** Michael: *"lets let go of materilizer... i would rather get all the juggle math figured out and dieals all the acceroy dialed and make sure this plan is 100% sound for 4 out of 5 hybrid coaches."* That work is now largely done (D-332 through D-337), so the reason for the deferral has mostly been spent.
 
-⛔ **BUILDING THIS AS A LIFTING-DAYS CONTROL WOULD BE THE FOURTH PLAN-MUTATION PATH IN THIS CODEBASE.** There are already three placement authorities (`ARCH-strength-spine.md` §0.6) and four plan generators, both from exactly this move — solving one instance of a general problem in its own file. Wait for the general surface.
+⛔ **BUILDING THIS AS A LIFTING-DAYS CONTROL WOULD BE THE FOURTH PLAN-MUTATION PATH IN THIS CODEBASE.** There are already three placement authorities (`ARCH-strength-spine.md` §0.6) and four plan generators, both from exactly this move — solving one instance of a general problem in its own file. ⚠️ **THE GENERAL SURFACE SHIPPED 2026-07-30 (D-341).** `supabase/functions/rematerialize-strength-block` proposes a diff, the athlete taps, and only weeks that have not started are rewritten (`StrengthLogger.tsx:4022` / `:6053`). It re-authors **working numbers only** — it has no `lifting_days` input. So this is now an EXTENSION of that function, not a wait. ⟨A31⟩
 
 ---
 
@@ -2190,9 +2192,9 @@ Michael: *"this is how it reads the lifts to output gains — it was running on 
 
 1. **RIR IS STILL THE CONFIDENCE GATE, AND RIR IS NO LONGER COLLECTED.** `compute-facts/index.ts:~929-939` buckets each lift's e1RM by `avg_rir`: sessions at RIR ≥5 are "far from failure" and demoted to a low-confidence fallback (D-118 / Q-039 / Q-040). The barbell block's logger **no longer asks for RIR** (`strength-profiles.ts` `usesRir` — dropped because `brzycki(weight, reps + rir)` added phantom reps to a sub-maximal set). So the field arrives null, null falls into `preferred`, and **the gate is a no-op.** ⚠️ It fails SAFE — nothing is wrongly demoted — but it is a built system starved of its input, and anyone reading the code will believe a confidence check is running.
 
-2. **THE DIFFICULTY TAP WRITES AND NOTHING READS.** D-326 layer 1 persists the three words into `strength_exercises` (no migration, `topSetIndex`, 11 tests). `strength_facts` still carries `avg_rir` and has **no difficulty field**. So *"how hard did it feel"* reaches the database and stops.
+2. **THE DIFFICULTY TAP WRITES AND NOTHING READS.** D-326 layer 1 persists the three words into `strength_exercises` (no migration, `topSetIndex`, 11 tests). `strength_facts` now carries **`difficulty`** on each exercise fact alongside `avg_rir` (D-338 — `compute-facts/index.ts:1359`, populated `:1438`, serialised `:1492`). ⚠️ **The write half is closed; the read half is not.** No State or Performance surface branches on the field yet, so *"how hard did it feel"* now reaches the FACT and stops there instead of at the raw row. ⟨A31⟩
 
-3. **THE SERIES CANNOT TELL A MEASUREMENT FROM AN ORDINARY DAY.** Week 3's all-out set at 95% and a week-1 top set are the same kind of point on the trend. The one number in the block that IS a measurement gets averaged in with the rest. ⛔ **This is the blocker under the other three** — like-for-like comparison, provenance, and trusted-vs-not all need this distinction to exist first, and nothing carries it.
+3. **THE SERIES CANNOT TELL A MEASUREMENT FROM AN ORDINARY DAY.** Week 3's all-out set at 95% and a week-1 top set are the same kind of point on the trend. The one number in the block that IS a measurement gets averaged in with the rest. ⛔ **This is the blocker under the other three** — like-for-like comparison, provenance, and trusted-vs-not all need this distinction to exist first, and — as of D-338 — `strength_facts` DOES carry it: `measured` / `amrap_reps` on the exercise fact (`compute-facts/index.ts:1360-1364`), threaded into the per-lift series as `meta.measured` (`_shared/state-trend/assemble.ts:157-173`, pinned by `strength-deload-exclusion.test.ts:131-135`). ✅ **The "where I would start" below is BUILT.** What is still owed is a CONSUMER — no verdict or copy branches on `meta.measured` yet. ⟨A31⟩
 
 4. **`advance_untrusted` HAS NO READER.** Shipped 2026-07-29 (D-335): above 8 reps — 5 on deadlift — the bar advances and the estimate is flagged as taken outside the range the equation holds in. The State strength row cannot say so, so a shaky number renders identically to a clean one.
 
@@ -2371,7 +2373,7 @@ const e1rmPct = lt.e1rm_current != null && lt.peak1RM > 0
 it is snake_case** — `e1rm_current`, `e1rm_previous`, `best_weight`, `anchor_1rm`, `verdict_label`.
 `peak1RM` is camelCase and **is not a field on that type**. It is `undefined`, `undefined > 0` is `false`,
 so **the first branch has never once run.** Grep confirms `peak1RM` exists only in `useExerciseLog.ts`
-(the client hook, a different object) and in the unmounted `BlockSummaryTab`.
+— and only inside a COMMENT there. D-350 (2026-08-01) deleted the field along with `BlockSummaryTab`, its sole reader (`useExerciseLog.ts:27-31`), so `peak1RM` no longer exists as a field anywhere in the codebase. The first branch cannot ever run. ⟨A31⟩
 
 **What actually renders** is the fallback: current e1RM as a percentage of *last session's e1RM × 1.1* —
 i.e. a bar measuring progress against an invented 10%-better-than-last-time target. That is a **different

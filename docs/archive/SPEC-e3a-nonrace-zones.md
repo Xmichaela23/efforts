@@ -1,5 +1,12 @@
 # SPEC — E3a: non-race prescription gains HR + pace zones (first consumer of the shared spine)
 
+> # ARCHIVED 2026-07-31 by the doc audit — BUILT, and its substance lives in **D-218**.
+> Verified: `sustainable.ts:16` imports `hrZones`/`paceZonesFromVdot`, `e3a-zones.test.ts` exists, and
+> D-218 (`docs/archive/DECISIONS-LOG-archive-D001-D239.md:4541`) records the decision and the commit.
+> The file's own header still said "not approved, not implemented" — that was wrong, and is why it moved.
+> Kept, not deleted. ⟨A31⟩
+
+
 **Status: SPEC — review before cut. Not approved, not implemented.** First consumer wiring of the shared endurance model (`_shared/endurance/`, committed E1+E2 / `819d2ebf`). Implements the first half of SUB-DECISION A (approved). Companion: `SPEC-shared-endurance-model.md` §10. **Captured:** 2026-06-28.
 
 ---

@@ -193,7 +193,7 @@ This is the institutional-memory backbone. The next session reads what this sess
 
 ### Ingest is the orchestrator
 
-`supabase/functions/analyze-workout/` is **empty** (one of 11 empty dirs — see `docs/CAPABILITY-MAP.md`). Real fan-out lives in **`ingest-activity/index.ts:1345-1712`**. Per ingest, ~8 things happen:
+`supabase/functions/analyze-workout/` **no longer exists** (the empty stub dirs have been deleted — `find supabase/functions -maxdepth 1 -type d -empty` now returns none). ⟨A31⟩ Real fan-out lives in **`ingest-activity/index.ts:~1430-1580`** ⟨A31⟩. Per ingest, ~8 things happen:
 
 - `auto-attach-planned` (**awaited** — deliberate, for deterministic ordering)
 - `compute-workout-summary` + `compute-workout-analysis` (**fire-and-forget**)
@@ -207,7 +207,7 @@ This is the institutional-memory backbone. The next session reads what this sess
 
 ⚠️ **`adapt-plan` action=auto DOES NOT CHANGE STRENGTH WEIGHTS. Corrected 2026-07-29 — this paragraph has now been wrong in BOTH directions.**
 
-It first said the auto path was a no-op; that was false, so it was rewritten to say the path auto-progresses and auto-deloads strength loads off the `exercise_log` e1RM trend with the athlete never asked. **That block has since been deliberately DELETED, and this file kept describing it.** Read the comment at `adapt-plan/index.ts:~1094` — it is explicit: the silent auto-progression and auto-deload writes are gone, because they raised or dropped prescribed weight on every ingest with no prompt, no consent, and (unlike `suggest`) no Arc fatigue/taper gate. *"The athlete opened the logger to a number they never agreed to."*
+It first said the auto path was a no-op; that was false, so it was rewritten to say the path auto-progresses and auto-deloads strength loads off the `exercise_log` e1RM trend with the athlete never asked. **That block has since been deliberately DELETED, and this file kept describing it.** Read the comment at `adapt-plan/index.ts:1119-1138` ⟨A31⟩ — it is explicit: the silent auto-progression and auto-deload writes are gone, because they raised or dropped prescribed weight on every ingest with no prompt, no consent, and (unlike `suggest`) no Arc fatigue/taper gate. *"The athlete opened the logger to a number they never agreed to."*
 
 **What the auto path still does:** a strength **re-layout** of the current week (`maybeRelayoutStrengthForCurrentWeek`) plus the other ingest adaptations. It is not a no-op and it does not move load.
 
@@ -217,9 +217,9 @@ It first said the auto path was a no-op; that was false, so it was rewritten to 
 
 ⚠️ **There is a RACE.** `compute-facts` is *awaited* but reads `workouts.computed`, which is written by the two *fire-and-forget* calls above. When it loses, `time_in_zone`, `intervals_hit/total`, `hr_drift_pct` and `execution_score` are silently absent from that workout.
 
-⚠️ **Two ingest paths bypass all of this.** `ingest-phone-workout` and `save-imported-workout` fire **only** `compute-workout-summary` → no `workout_facts`, invisible to the spine, and **zero contribution to ACWR** while still counting toward `workload_total`.
+⚠️ **Two ingest paths USED TO bypass all of this — FIXED 2026-07-17, and this paragraph was still describing the bug.** ⟨A31⟩ `ingest-phone-workout` and `save-imported-workout` once fired **only** `compute-workout-summary` → no `workout_facts`, invisible to the spine, zero contribution to ACWR. **Both now route through the single ordered orchestrator** (`recompute-workout`, with `include_summary: true`): `ingest-phone-workout/index.ts:290-305`, `save-imported-workout/index.ts:200-212`. See `docs/AUDIT-fanout-ordering-2026-07-17.md`. **What is still true of them:** fire-and-forget, **forward-only (no historical backfill)**, and neither drives `adapt-plan`.
 
-Routing also exists in `recompute-workout/index.ts:21-25` and `bulk-reanalyze-workouts/index.ts:40-50` — **three hand-maintained routing tables.** Any new cache or downstream system MUST register in all of them or it goes stale.
+Routing also exists in `recompute-workout/orchestrator-lib.ts:16` (`resolveAnalyzeEdgeFn`, called from `index.ts:105`) ⟨A31⟩ and `bulk-reanalyze-workouts/index.ts:40-50` — **three hand-maintained routing tables.** Any new cache or downstream system MUST register in all of them or it goes stale.
 
 ### Four storage layers for "what we know about a workout"
 
@@ -234,27 +234,27 @@ Plus secondary state: `coach_cache`, `block_adaptation_cache`, `session_load`, `
 
 ### `session_detail_v1` is a fully pre-formatted display contract
 
-Type at `supabase/functions/_shared/session-detail/types.ts` (~377 lines, ~30 nested fields). Built by `workout-detail/index.ts:598` from an athlete-snapshot slice + `workout_analysis` via `_shared/session-detail/build.ts` (1276 lines). Client renders verbatim.
+Type at `supabase/functions/_shared/session-detail/types.ts` (~732 lines, ~30 nested fields). Built by `workout-detail/index.ts:815` from an athlete-snapshot slice + `workout_analysis` via `_shared/session-detail/build.ts` (2102 lines). ⟨A31⟩ Client renders verbatim.
 
 ### Scheduling: optimizer is the sole authority
 
 After the 2026-05-09 consolidation, `_shared/week-optimizer.ts` owns every "what day does X go on" decision. `generate-combined-plan/week-builder.ts` reads day assignments from `AthleteState` fields populated by `reconcile-athlete-state-week-optimizer.ts` and only generates session content (intervals, paces, durations, flavor by phase, brick targets, swim templates). The reconciler now runs unconditionally inside `generate-combined-plan/index.ts`; it self-short-circuits when `long_run_day` is missing, in which case the builder's minimal legacy strength fallback fires for that contained edge case.
 
-The same-day matrix is in `_shared/schedule-session-constraints.ts` (`ROWS` table around lines 47-58); sequential rules + placement live in `week-optimizer.ts` (`sequentialOk`, `canPlaceWithModifier`, `deriveOptimalWeek`). Spec: `docs/SCHEDULING-RULES.md`. Descriptive snapshot of current code: `docs/SCHEDULING-RULES-EXTRACTED.md`.
+The same-day matrix is in `_shared/schedule-session-constraints.ts` (`ROWS` table at line 337; the separate `ADJACENCY_HOURS_ROWS` table at line 131) ⟨A31⟩; sequential rules + placement live in `week-optimizer.ts` (`sequentialOk`, `canPlaceWithModifier`, `deriveOptimalWeek`). Spec: `docs/SCHEDULING-RULES.md`. ⚠️ **`docs/SCHEDULING-RULES-EXTRACTED.md` is NOT a snapshot of current code** — its own banner reads *"SNAPSHOT OUTDATED — 2026-05-09 … Kept for historical reference only"*, because the consolidation pass removed the builder guards it describes. **Read the code, not that file.** ⟨A31⟩
 
 Other plan generators (`generate-run-plan`, `generate-triathlon-plan`, `generate-plan`) **do not yet route through the optimizer** — they are separate edge functions with their own pipelines. Wiring them is explicitly scoped out of the consolidation pass and is a follow-up.
 
 ### Plan generation is fragmented
 
-Four generators with overlapping logic: `generate-combined-plan/` (multi-sport, the most active surface — has its own `phase-structure`, `week-builder`, `validator`, `validate-training-floors`, `science`, `swim-protocol-v21`), `generate-triathlon-plan`, `generate-run-plan`, `generate-plan`. Wrapper: `create-goal-and-materialize-plan`. They share `PlanContractV1` (defined in `generate-run-plan/types.ts:184` despite the name).
+Four generators with overlapping logic: `generate-combined-plan/` (multi-sport, the most active surface — has its own `phase-structure`, `week-builder`, `validator`, `validate-training-floors`, `science`, `swim-protocol-v21`), `generate-triathlon-plan`, `generate-run-plan`, `generate-plan`. Wrapper: `create-goal-and-materialize-plan`. They share `PlanContractV1` (defined in `generate-run-plan/types.ts:233` ⟨A31⟩ despite the name).
 
 ### "Smart server, dumb client" is a calendar invariant, not a universal rule
 
-`get-week` is the only path for calendar data — never query `planned_workouts` / `workouts` directly for calendar reads. Other surfaces DO query tables directly today (don't "fix" them without a reason): `useWorkouts.ts:231`, `usePlannedWorkouts.ts`, `usePlannedWorkoutLink.ts`, `AppContext.tsx:834`, `AthleticRecordPage.tsx:102`, `PostWorkoutFeedback.tsx`, `AssociatePlannedDialog.tsx`, `StrengthCompareTable.tsx`, `AllPlansInterface.tsx`. Treat the principle as: client never re-derives planned-vs-executed adherence; client never merges the two tables for the calendar.
+`get-week` is the only path for calendar data — never query `planned_workouts` / `workouts` directly for calendar reads. Other surfaces DO query tables directly today (don't "fix" them without a reason): `useWorkouts.ts:231`, `usePlannedWorkouts.ts`, `usePlannedWorkoutLink.ts`, `AppContext.tsx:834`, `AthleticRecordPage.tsx:114` ⟨A31⟩, `PostWorkoutFeedback.tsx`, `AssociatePlannedDialog.tsx`, `StrengthCompareTable.tsx`, `AllPlansInterface.tsx`. Treat the principle as: client never re-derives planned-vs-executed adherence; client never merges the two tables for the calendar.
 
 ### The Arc
 
-`getArcContext()` (`_shared/arc-context.ts`, 1028 lines) assembles goals + race courses + plan position + identity + learned fitness + memory + longitudinal signals + projections + gear. It reads from `athlete_snapshot` plus inferred layers. "Extending the Arc" usually means extending the snapshot AND `arc-context.ts` (and often a backfill).
+`getArcContext()` (`_shared/arc-context.ts`, 1350 lines) ⟨A31⟩ assembles goals + race courses + plan position + identity + learned fitness + memory + longitudinal signals + projections + gear. It reads from `athlete_snapshot` plus inferred layers. "Extending the Arc" usually means extending the snapshot AND `arc-context.ts` (and often a backfill).
 
 ### Pace-unit footgun
 
@@ -264,7 +264,7 @@ Four generators with overlapping logic: `generate-combined-plan/` (multi-sport, 
 
 Audit details: `notes/docs-audit-2026-05-09.md`.
 
-- `docs/PLAN-CONTRACT.md` is **superseded** by `docs/SCHEDULING-RULES.md` (prescriptive) + `docs/SCHEDULING-RULES-EXTRACTED.md` (descriptive). Its §5 matrix disagrees with the code matrix on 4 cells; the new docs match the code. Don't rely on `PLAN-CONTRACT.md` for placement rules.
+- `docs/PLAN-CONTRACT.md` is **superseded** by `docs/SCHEDULING-RULES.md` (prescriptive). Its §5 matrix disagrees with the code matrix on 4 cells. Don't rely on `PLAN-CONTRACT.md` for placement rules. ⚠️ **The file itself says the opposite** — its header still calls itself *"the single source of truth … code conforms to this"* and carries no superseded banner. ⟨A31⟩ (`SCHEDULING-RULES-EXTRACTED.md` was named here as the descriptive half; it is a 2026-05-09 snapshot and self-declares as historical — see above.)
 - `APP_ARCHITECTURE.md` is broadly stale (Nov 2025): missing files, wrong function names, ~25 of 98 edge functions documented. **Verify before relying.**
 - `plans.sessions_by_week` is a top-level column, not nested under `config` (despite older docs).
 - `analyze-swimming-workout` doesn't exist; the function is `analyze-swim-workout`.
@@ -272,7 +272,7 @@ Audit details: `notes/docs-audit-2026-05-09.md`.
 
 ## Critical paths use `@ts-nocheck`
 
-27 of 286 edge files opt out of type-checking, including `get-week`, `ingest-activity`, `materialize-plan`, `generate-combined-plan`. Type errors in these surface only at runtime. Don't assume tsc has your back here.
+39 of 394 edge files opt out of type-checking ⟨A31⟩, including `get-week`, `ingest-activity`, `materialize-plan`, `generate-combined-plan`. Type errors in these surface only at runtime. Don't assume tsc has your back here.
 
 ## Load-bearing code locations
 
@@ -283,7 +283,7 @@ Read these before touching the corresponding subsystem:
 - Arc / athlete state → `supabase/functions/_shared/arc-context.ts`, `_shared/athlete-snapshot/`, `compute-snapshot/`, `compute-facts/`
 - Coach (deterministic week-context engine, LLM on top) → `supabase/functions/coach/`, `coach/methodologies/`
 - Plan generation → `generate-combined-plan/`, `generate-run-plan/types.ts` (`PlanContractV1`)
-- Plan token expansion → **`materialize-plan/index.ts:1123+` (its OWN inline expander)**. ⚠️ `_shared/token-parser.ts` is a *different* thing — it serves the **analysis** path (`compute-workout-analysis`, `analyze-running-workout`), and `materialize-plan` does not import it. This file used to point at the wrong one.
+- Plan token expansion → **`materialize-plan/index.ts:1840` `expandTokensForRow` (its OWN inline expander; `expandRunToken`:1279, `expandBikeToken`:1676)** ⟨A31⟩. ⚠️ `_shared/token-parser.ts` is a *different* thing — it serves the **analysis** path (`compute-workout-analysis`, `analyze-running-workout`), and `materialize-plan` does not import it. This file used to point at the wrong one.
 - Workload → `_shared/workload.ts`, `calculate-workload/`
 - Ingest fan-out → `ingest-activity/index.ts:~1430-1580`
 
@@ -300,7 +300,7 @@ Read these before touching the corresponding subsystem:
 ## Reference docs
 
 - `docs/SCHEDULING-RULES.md` — **prescriptive scheduling spec** (what the engine should do, with confidence tags + override gates). Authoritative for placement rules.
-- `docs/SCHEDULING-RULES-EXTRACTED.md` — descriptive snapshot of what the code currently enforces, with file:line citations. Pair with the prescriptive doc when reasoning about a rule.
+- `docs/SCHEDULING-RULES-EXTRACTED.md` — ⚠️ **HISTORICAL, not current.** A 2026-05-09 snapshot taken *before* the consolidation pass; its own banner says so and says *"for current behavior, read the code directly."* Kept for the file:line citations only. ⟨A31⟩
 - `APP_ARCHITECTURE.md` — **stale Nov 2025; verify before relying**
 - `docs/PLAN-CONTRACT.md` — **superseded** by `SCHEDULING-RULES.md`; do not rely on its matrix or rules
 - `DETERMINISTIC_LAYER_ARCHITECTURE.md` — mostly accurate (workout_facts model)

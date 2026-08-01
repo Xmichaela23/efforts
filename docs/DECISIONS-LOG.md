@@ -69,7 +69,7 @@ The route foundation lied: "same route" was a **distance-bucket fingerprint** (2
 
 ### D-249 — Efficiency direction removed from the Performance route line; State owns efficiency trends (2026-07-06, DEPLOYED)
 
-The per-session same-route efficiency direction (raw pace-per-HR over 90 days) read **summer heat as "efficiency declining"** — same-route controls hills but NOT heat — AND **contradicted State's decoupling-led "Efficiency holding"** (scope + confound). **Removed it.** The Performance route line now shows **FAMILIARITY only** ("Same route · run 40× since 2025"), gated on the cluster total (`times_run`) not recent history (fixes the missing-line case: a route run a lot but not lately still shows). State owns efficiency trends (done carefully, decoupling-led). The honest heat-adjusted per-route trend is a REAL feature — specced separately in `DESIGN-familiar-routes.md` / Q-131, not the confounded raw version. Deployed `workout-detail` + client.
+The per-session same-route efficiency direction (raw pace-per-HR over 90 days) read **summer heat as "efficiency declining"** — same-route controls hills but NOT heat — AND **contradicted State's decoupling-led "Efficiency holding"** (scope + confound). **Removed it.** The Performance route line now shows **FAMILIARITY only** ("Same route · run 40× since 2025"), gated on the cluster total (`times_run`) not recent history (fixes the missing-line case: a route run a lot but not lately still shows). State owns efficiency trends (done carefully, decoupling-led). The honest heat-adjusted per-route trend is a REAL feature — specced separately in `archive/DESIGN-familiar-routes.md` / Q-131, not the confounded raw version. Deployed `workout-detail` + client.
 
 ### D-250 — Route-performance TREND can't rest on path-overlap route identity; adopt the SEGMENT model (2026-07-06, SPEC — `DESIGN-segments.md`; supersedes the Q-131 route-trend approach)
 
@@ -77,7 +77,7 @@ Built + deployed the honest heat-adjusted per-route trend (Q-131 / Familiar Rout
 
 ### D-251 — Heat variable = air TEMPERATURE, not dew point (dry-climate proof-out) (2026-07-06, in the parked engine)
 
-`DESIGN-familiar-routes.md` specced dew-point heat correction (dew point > temp/RH as the humidity-aware heat-stress signal — correct physiology). **Proved out on user 45d122e7's real data:** in his arid climate dew point barely clears the 55°F reference (`heatTerm` SD < 1.4°F on every route) while AIR TEMPERATURE swings 30–40°F (50→92°F, temp_sd 6–9). Dew-only made the feature a near-no-op and re-admitted the summer-decline lie. Switched the model's heat term to `max(0, temp_f − 60)` (`TEMP_REF_F=60`; endurance optima ~50–55°F). Dew point stays CAPTURED (`dewPointF`, stored) but DORMANT — the humid-climate refinement (WBGT proxy: temperature is the higher-value regressor when dew runs out of resolution, pre-registered). `k` stays HR-side (the PROHIBITION: pace-side coefficients like Vermeer's 0.025 are structurally invalid as a `k` source — only same-loop paired runs supply magnitude). Also decided: joint fit `efficiency ~ heatTerm + time` (Huber-IRLS), NOT residualize-then-trend (biased under dew/time correlation, Frisch–Waugh–Lovell).
+`archive/DESIGN-familiar-routes.md` specced dew-point heat correction (dew point > temp/RH as the humidity-aware heat-stress signal — correct physiology). **Proved out on user 45d122e7's real data:** in his arid climate dew point barely clears the 55°F reference (`heatTerm` SD < 1.4°F on every route) while AIR TEMPERATURE swings 30–40°F (50→92°F, temp_sd 6–9). Dew-only made the feature a near-no-op and re-admitted the summer-decline lie. Switched the model's heat term to `max(0, temp_f − 60)` (`TEMP_REF_F=60`; endurance optima ~50–55°F). Dew point stays CAPTURED (`dewPointF`, stored) but DORMANT — the humid-climate refinement (WBGT proxy: temperature is the higher-value regressor when dew runs out of resolution, pre-registered). `k` stays HR-side (the PROHIBITION: pace-side coefficients like Vermeer's 0.025 are structurally invalid as a `k` source — only same-loop paired runs supply magnitude). Also decided: joint fit `efficiency ~ heatTerm + time` (Huber-IRLS), NOT residualize-then-trend (biased under dew/time correlation, Frisch–Waugh–Lovell).
 
 ### D-252 — The fitness metric shown to users is SAME-EFFORT PACE (min/mi), never an abstract efficiency index (2026-07-06)
 
@@ -195,6 +195,42 @@ The "do some research" report (2026-07-09, adversarially fact-checked) overturne
 
 The north star, made explicit and written to `docs/TARGET-ARCHITECTURE.md` (+ CLAUDE.md priming): a living, coherent, steerable training system — every fact computed once on the server (deterministic), delivered as a pre-built contract, rendered by a **dumb client** (no client math on truth); **living baselines** (one resolver per anchor, live/learned value can lead); **steerable plans** (per-discipline, any stage, one adaptation path); **history-aware plan builder**. **Template ratified from existing code:** RUN (spine `run.decoupling`, one authority, duplicate deleted D-239) + `session_detail_v1` (server-built display contract) — the strongest existing implementation; every discipline migrates to look like it. **Rejected:** inventing a new pattern — the foundation already exists; the work is *annexing* the client-compute mirrors (`useStateTrends`, `LoadBar`, `useCoachWeekContext`) + the strength/FTP forks + the 4 plan generators into it, one at a time behind Law 6. Gap map: `TRUTH-MAP.md`. Hardening backlog: `FOUNDATION-READINESS.md` (Q-150). Also this session: shipped **b2** (plan-primary execution surface, coach v73) + the BIKE efficiency-verdict fix; and **deleted** a prototype endurance per-session engine (built for a read that already existed — the vacuum antipattern this architecture exists to prevent). Verified by three adversarial audits (pattern inventory / scalability / commercial-readiness).
 
+## D-270 — Strength convergence (TRUTH-MAP fracture #1) (ratified 2026-07-10, commit `bdab1874`, coach v74 — **folded into the log 2026-07-31** from `docs/archive/DESIGN-strength-convergence.md`)
+
+> ⛔ **WRITTEN 21 DAYS LATE.** This entry was owed from 2026-07-10 (see the doc-debt note in D-271) and
+> was the only gap in the D-sequence — while five code sites cited it as law. Filed 2026-07-31 by
+> Michael; substance from the ratified design doc, not reconstructed from the diff.
+
+**Problem:** the State screen judged the same lift with **two competing verdicts reading two different
+tables** — `exercise_log.estimated_1rm` vs `learned_fitness.strength_1rms` — so they could disagree.
+And the per-lift *"getting stronger"* verdict was **dead**: `previous_e1rm` was null, so it always
+resolved to `stable`. Q-107 H2/H3.
+
+**Decision — two facts, one substrate:**
+- **Direction** (*"is e1RM improving"*, per lift) = **the spine's**, persisted per-lift
+  (`state_trends_v1.strength.per_lift`). Surfaces **read** it, never re-derive it.
+- **Prescription** (*"add weight / back off"*, per session) = **the coach's**, RIR-driven, and it
+  **reads the direction to frame itself**.
+- Both off `exercise_log.estimated_1rm`. Prescription renders **inside** the direction (*"getting
+  stronger — ease off today"*), never against it.
+
+**Why two, not one:** autoregulation science and every serious app model direction and dose as
+**distinct facts with a fixed relationship, never competing** — backing off a bad day protects a
+rising trend. Verified against current practice (2026-07-31): Strong/Hevy show a 1RM trend chart with
+working weight separate/manual; Juggernaut/RP run one feedback loop (performance in → direction +
+prescription out). **The contradiction was presentation, not real.** (RTS/Tuchscherer, JuggernautAI,
+RP, Zourdos/Helms.)
+
+**Respects** D-231, D-236 (pattern copied), D-239 (run = the model). **Annexes** Q-107 H2/H3;
+**advances** Q-106 step 5. **Finished workout-side** by the 2026-07-29 sweep (`b7715321`).
+
+**Later — display superseded (D-347, 2026-08-01):** the per-lift direction **chip** was removed from
+the State strength row — on a 5/3/1 block the once-per-cycle e1RM reflects the **prescribed weight**,
+not fitness, so a light week read as a decline. **The direction FACT stays live** (spine-owned, D-338
+deload-excluded): it guards the per-workout *"getting stronger"* narrative (fires only on a real
+trend) and keeps surfaces from contradicting each other. State shows number + block context + volume
+direction; the 12-week chart and the PR remain.
+
 ## D-271 — B1 auth boundary: identity from the VERIFIED JWT, never the request body (2026-07-10)
 
 **Problem (FOUNDATION-READINESS blocker B1):** ~15 user-facing edge functions trusted a `user_id` supplied in the request body while running under the service-role key (RLS bypassed) — a caller could pass *any* id and read/act on another user's data; ~7 were reachable with no login at all. Cross-user exposure; gates a second real user.
@@ -211,7 +247,19 @@ The north star, made explicit and written to `docs/TARGET-ARCHITECTURE.md` (+ CL
 
 **Rejected:** converting the webhook / edge-to-edge callers the same way — they present the service key or no token, so `requireUser` would 401 them and `resolveUser` treats the service key as trusted. **Still open:** Strava/Garmin **webhooks** need a shared-secret guard (not a JWT); **B4** (error monitoring) untouched.
 
-**Owed doc-debt (flagged, not fabricated):** D-270 (strength convergence, commit `bdab1874`) and FTP fracture #2 (commits `d278cadd` / `eae2d9aa` / `00dbc9f2`) are referenced in commit messages but still owe formal DECISIONS-LOG entries — write them from the commits next session.
+**Owed doc-debt (flagged, not fabricated):** ~~D-270 (strength convergence, commit `bdab1874`)~~ **[PAID 2026-07-31 — the entry is above]** and FTP fracture #2 (commits `d278cadd` / `eae2d9aa` / `00dbc9f2`, **still owed**) are referenced in commit messages but still owe formal DECISIONS-LOG entries — write them from the commits next session.
+
+> ✅ **D-270 HALF PAID — 2026-07-31.** The entry now exists, in sequence, above D-271. It was filed by
+> Michael from the ratified design doc (`docs/archive/DESIGN-strength-convergence.md`), not
+> reconstructed from the diff — which is why the audit flagged it rather than writing it. The five
+> citations now resolve.
+>
+> ⚠️ **THE FTP FRACTURE #2 HALF IS STILL OWED** — commits `d278cadd` / `eae2d9aa` / `00dbc9f2` still
+> have no entry. Deliberately left; only the D-270 half was closed.
+>
+> *(Historical: this note sat unpaid for 21 days. D-270 was the only gap in the D-sequence while being
+> cited as settled law in five places. `Q-144` remains the only gap in the Q-sequence, and is believed
+> to be a skipped number rather than a lost entry — it is referenced nowhere.)*
 
 ## D-272 — State↔Performance fork sweep: the workout narrative reads the SPINE, never re-derives (2026-07-10/11)
 
@@ -1161,7 +1209,7 @@ Inherits the anchor's accuracy: the chart is relative to a TRUE 1RM, so a stale 
 > anything. Combined with §2's own finding that AMRAPs fire **only in the anchor cycle** (`wendler-531.ts:61`
 > — weeks 9/10/11 of twelve), **the strength gauge is near-blind for weeks 1–8 and nothing said so.**
 >
-> **D-326 is the replacement signal, not a reversal of this entry.** Per-set difficulty in three words,
+> **D-326 was the intended replacement signal — and it was BUILT (D-338) then DELETED (D-344, 2026-07-30). Per-set difficulty no longer exists.** The gauge's real fix landed as [D-341]: the AMRAP rep count now moves the working number (`loading/cycle-verdicts.ts:116` → `workingNumberForCycles`). Per-set difficulty in three words, ⟨A31⟩
 > feeding the body read, never the 1RM maths. §3's "RIR is OFF for `strength_primary`" **still stands and
 > must not be undone.** Everything below is unchanged and correct.
 
@@ -1781,7 +1829,15 @@ always in the same direction: under-costing.**
 
 ---
 
-## D-326 — Per-set difficulty replaces the RIR prompt on the barbell block: three words on the complete tap, feeding the BODY read and never the 1RM estimate (2026-07-25, SPEC — not built)
+## D-326 — SUPERSEDED: BUILT THEN REMOVED IN ONE DAY
+
+> ⛔ **BUILT by [D-338] (2026-07-30) and REMOVED by [D-344] the same day.** The three-word difficulty
+> tap no longer exists — `src/components/StrengthLogger.tsx:5556` carries the deletion note. Nothing on
+> the advance path ever read `difficulty`; the verdict that moves the bar reads the REP COUNT.
+> ⚠️ Layer 2 of the table below ("wire `verdictFrom95Set`") WAS built — see [D-341]. Everything below
+> is history; do not treat it as the current plan.
+
+## D-326 (original) — Per-set difficulty replaces the RIR prompt on the barbell block: three words on the complete tap, feeding the BODY read and never the 1RM estimate (2026-07-25, SPEC — not built) ⟨A31⟩
 
 ### The hole this fills, and it was found by tracing not guessing
 
@@ -1792,14 +1848,14 @@ Michael asked whether AMRAP sets give the app enough of a read on strength to ke
   anchor cycle, and not on its deload.** In a 12-week leader/leader/anchor block that is **weeks 9, 10 and
   11. Nothing in weeks 1–8.**
 - **And e1RM on a leader week is the plan quoting itself.** `brzycki1RM(weight, reps, rir)` is
-  `effectiveReps = reps + rir` (`compute-facts/index.ts:124`). With RIR scoped off by D-324, an athlete
+  `effectiveReps = reps + rir` (then `brzycki1RM`; the function is now `estimated1RM`, `compute-facts/index.ts:143`, and the formula became Wendler/Epley in D-339 — `src/lib/estimate-1rm.ts:56`, so the multiplier below is ×1.167 today, not ×1.125). With RIR scoped off by D-324, an athlete ⟨A31⟩
   who does the prescribed 5 reps at the prescribed weight yields `weight × 1.125` — **a pure function of
   the prescription.** It rises every cycle because the plan raises the bar, whether they are thriving or
   barely holding on. **It carries athlete information only when they MISS.**
 - The trend itself is session-to-session with a 2.5 lb dead band (`analyze-strength-workout.ts:688-727`) —
   no multi-point fit, and under 5/3/1's weekly percentage changes it swings by design.
 
-**So for eight of twelve weeks the strength gauge is close to blind, and nothing said so.**
+**So on a leader/leader/anchor block the strength gauge is close to blind for eight of twelve weeks, and nothing said so.** ⚠️ **NOT EVERY BLOCK IS THAT SHAPE** — `leaderCount` (`wendler-531.ts:291`) returns 0 leaders for a continuity-'continuous', 'develop', <16-week block, so every cycle is an anchor and AMRAPs land in 9 of 12 weeks. The 8-of-12 case is the 'unknown'/'detrained' tier, a 16-week block, a non-'develop' posture, or `highAerobicLoad`. ⟨A31⟩
 
 ### The decision
 
@@ -1812,7 +1868,7 @@ done."*
   in the tank, so the answer is always "easy". **Four taps a session**, two on the lower-body days that
   carry the real cost.
 - **It replaces a two-step flow with one.** Today completing a set opens a RIR prompt, then a confirm
-  (`StrengthLogger.tsx:3505-3535`). Michael: *"we have a two-step process now — forced RIR pick and then
+  (`StrengthLogger.tsx:827-831` state, `:3582` handlers). Michael: ⟨A31⟩ *"we have a two-step process now — forced RIR pick and then
   hit done. This is smoother."* **The tap the athlete was already making becomes the answer.**
 
 ### Why words, not a number — and this is field practice, not preference
@@ -1853,7 +1909,7 @@ was written: *"it'd be easy to ship the tap and feel like the blindness got solv
 | # | failure | fix | status |
 |---|---|---|---|
 | 1 | **No continuous signal.** Weeks 1-8 have no measured input at all. | **The tap** (this entry) — a weekly athlete-sourced reading from week one. | D-326 |
-| 2 | **The number issues itself.** `workingNumberForCycle:112` advances by cycle index, unconditionally. The plan raises the bar, then reports the bar back as fitness. | **Wire `verdictFrom95Set`** into the advance path (`wendler-531.ts:160-200` — written, correct, **called by nothing**). Five at 95% or the number comes down 10%. | NOT BUILT |
+| 2 | **The number issued itself.** `workingNumberForCycle` (`wendler-531.ts:210`) advances by cycle index. The plan raised the bar, then reported the bar back as fitness. | **Wire `verdictFrom95Set`** (`wendler-531.ts:454`, with `applyVerdict` at `:467`) into the advance path. Five at 95% or the number comes down 10%. | ✅ **BUILT — D-341 (2026-07-30).** Supplier: `loading/cycle-verdicts.ts:116`; consumer: `workingNumberForCycles` (`wendler-531.ts:519`) via `strength-primary-plan.ts:1275` and `rematerialize-strength-block/index.ts:167` | ⟨A31⟩
 | 3 | **The number hides its age.** Even once earned, between gates it is rendered as current with no fresh measurement behind it. | **Provenance on the surface** — *earned at week 3, unmeasured since* is true; a bare `325` is not. | NOT BUILT |
 
 **They are not interchangeable and they do not substitute for each other.**
@@ -1892,7 +1948,7 @@ week 3 of cycle 1 is the same *relative* load at a heavier absolute weight — w
 question worth asking, *is the working number still honest*. **And it lands on the same set as Wendler's
 95% gate**, so the two signals corroborate rather than compete.
 
-**3. The consumer is one boolean.** `coach/index.ts:5727` —
+**3. The consumer is one boolean.** `coach/index.ts:5824` — ⟨A31⟩
 `strength: { declining: weeklyResponseModel.strength.overall.trend === 'declining' }`. That feeds
 `BodyTrends.strength`, which `computeDecliningSignals` currently **excludes** for strength-primary
 (D-318). Re-including it is a one-line change **and must not happen until 1 and 2 are solved** — it would
@@ -2169,7 +2225,7 @@ Two questions, opposite answers, and **only the measurement one is in doubt.** H
 
 ### ⛔ AND A JUSTIFICATION IN `compute-facts` MAY HAVE BEEN BACKWARDS
 
-It read: *"Brzycki is more accurate than Epley at the low rep ranges (2-5)."* At that exact range some work puts **Epley and Wathen CLOSER** to a tested 1RM. Rewritten; **formula unchanged.** Brzycki underestimates and Epley overestimates, and for a number that sets an athlete's next working load with nobody watching, **erring low is the defensible direction.** That is a product decision about which way to be wrong, not an accuracy claim. Switching it needs its own entry.
+It read: *"Brzycki is more accurate than Epley at the low rep ranges (2-5)."* At that exact range some work puts **Epley and Wathen CLOSER** to a tested 1RM. Rewritten; **formula unchanged at the time.** ⛔ **IT CHANGED THE NEXT DAY — [D-339] IS THE ENTRY THIS ASKED FOR.** Brzycki is gone; the estimate is now Wendler's own (Epley), `src/lib/estimate-1rm.ts:56`. The "erring low" argument below is history, and the deadlift ceiling above no longer compounds with a Brzycki downward bias — `trustedMaxRepsFor` (`wendler-531.ts:461`) stands on the LeSuer finding alone. ⟨A31⟩
 
 ---
 
@@ -2195,7 +2251,12 @@ Still the best-evidenced claim in the domain, and still the one to lead with —
 
 ---
 
-## D-337 — Wendler HAS an estimated max, it is Epley, and our Brzycki is a stated deviation (2026-07-29, PUSHED `17301cdf` — VERIFIED AGAINST THE PRIMARY)
+## D-337 — Wendler HAS an estimated max, and it is Epley (2026-07-29, PUSHED `17301cdf` — VERIFIED AGAINST THE PRIMARY)
+
+> ⛔ **THE "OUR BRZYCKI IS A DEVIATION" HALF IS DEAD — [D-339] (2026-07-30) ADOPTED WENDLER'S OWN FORMULA.**
+> `src/lib/estimate-1rm.ts:56` (`WENDLER_EPLEY_COEFF = 0.0333`) is now the single source, imported by
+> `compute-facts` and the client baseline test. The primary-source verification below stands; the
+> statements that we use Brzycki, and that it is a stated deviation, do not. ⟨A31⟩
 
 ⛔ **A CLAIM IN OUR OWN DRAFT, STRUCK BEFORE PUBLICATION.** The protocol doc asserted *"5/3/1 has no estimated max of its own"* — that our whole e1RM layer filled a gap Wendler left. **It is wrong.** The 2nd-edition text was searched directly (Michael supplied the PDF; no copy had ever been in the repo, so the previous session's search could not be reproduced).
 
@@ -2267,7 +2328,7 @@ Michael: *"app will adopt this as our language to communicate how user handled l
 ### STILL OPEN — NOT DONE HERE
 
 - **State does not render difficulty yet.** The fact exists; the trend does not read it.
-- **`advance_untrusted` still has no reader** (D-335), and Wendler's `verdictFrom95Set` is still called by nothing — `measured` is the input that unblocks both.
+- ~~**`advance_untrusted` still has no reader** (D-335), and Wendler's `verdictFrom95Set` is still called by nothing~~ — ✅ **BOTH CLOSED BY [D-341] (2026-07-30).** `verdictFrom95Set` is called at `loading/cycle-verdicts.ts:116` and reaches the composer via `workingNumberForCycles` (`strength-primary-plan.ts:1275`, `rematerialize-strength-block/index.ts:167`); `advance_untrusted` is honoured at `wendler-531.ts:481` and allowlisted at `generate-strength-plan/index.ts:157`. ⟨A31⟩
 - **The freestyle default** (three words for a no-plan session instead of RIR) is unbuilt. ⚠️ This is the one recommendation that goes AGAINST common practice — other trackers do offer RIR there — argued on the grounds that RIR needs a target to mean anything.
 - **The five name-matchers** (audit F5) are untouched, so a lift can still appear twice.
 - **The calendar squat-day-not-done** is reverted and parked; the detail screen must stop treating a planned row as completed first.
@@ -2643,8 +2704,11 @@ starved, not built.*
 
 - **⛔ `validity_set` REMAINS UNRENDERED, AND THIS IS THE ONE TO NOT "FIX".** Its line — *"Five at
   ninety-five. This one decides the number."* — is true only once `verdictFrom95Set` is wired, and it
-  is not: the composer still advances the working number by cycle index
-  (`workingNumberForCycle`). Rendering it would describe an engine that is not running. The flag is
+  is WIRED as of D-341 — `loading/cycle-verdicts.ts:116` supplies the verdict and the composer reads it
+  (`strength-primary-plan.ts:1275`, verdicts from `generate-strength-plan/index.ts:149`). ⚠️ The bare
+  `workingNumberForCycle` (`wendler-531.ts:210`) still governs the FORECAST path, where
+  `unknownMeans: 'advance'` deliberately preserves old behaviour for weeks that have not happened. Re-check
+  this gate before leaving the line unrendered. ⟨A31⟩ The flag is
   never passed and the call site says exactly when to pass it. Same gate as `STRENGTH_ADVANCE_COPY`.
 
 - **Verification:** 25 pins green across `bar-speed-copy`, `strength-accessory-copy` and the new
@@ -2878,8 +2942,13 @@ of the same stale rule. Volume now ships pre-priced on `session_detail_v1.streng
 sets x reps x load, the basis Strong and Hevy score on — and **bodyweight fills in as the load** for
 calisthenics. Rejected: TIME (a bench session logged a 2-minute duration; logged-after-the-fact
 duration is garbage) and PER-SET EFFORT (only collected on the top/AMRAP set of the four main lifts, so
-it cannot score the accessories that read zero). Banded sets get a small flat per-set token — bands have
+it cannot score the accessories that read zero). Banded sets got a small flat per-set token — bands have
 no standardised tension, and assistance is deliberately minor, so precision is not worth buying.
+⛔ **REVERSED BY [D-351] (2026-08-01): a band now carries an athlete-entered POUNDS value** (`bandLoadLb`,
+`_shared/workload.ts:376`), subtracting on `{pullup, chinup, dip}` and multiplying elsewhere; the flat token
+survives only as the unparseable fallback (`:429`). ⚠️ **D-351 Decision 3 also SUSPENDS this entry's
+re-pricing law on purpose** — band history is NOT migrated, so `resistance_level` holds words before
+2026-08-01 and pounds after. Do not "clean it up" with a migration. ⟨A31⟩
 
 **The fault.** `calculateStrengthWorkload` summed `weight x reps`; a chin-up has weight 0. Measured on a
 real 13-set squat day: **10 points, against 61 for a 47-minute easy run** — on a strength block. Run 87%
@@ -2906,6 +2975,10 @@ BOTH ways in `workload-strength-bodyweight.test.ts`; the hazard case is a perman
 strength **8% -> 38%** of 28-day load. Known imprecisions: Q-233.
 
 ## D-347 — THE PER-LIFT TREND CHIP IS DELETED, AND THE SCREENS READ THE BLOCK CARD (2026-08-01, **PUSHED + DEPLOYED, not device-verified**)
+
+> ↩︎ **This removed [D-270]'s State-screen display.** D-270 made the per-lift direction a spine-owned
+> FACT and put a chip on the State strength row; this entry deletes **the chip, not the fact** — the
+> direction is still computed, still spine-owned, and still guards the per-workout narrative.
 
 > ⚠️ **STILL STANDS — BUT IT ONLY DELETED THE RENDERING, AND THE COMPUTATION LIVED ON (D-350, same
 > day).** The reasoning below is unchanged and correct. What it did not catch: `useExerciseLog.ts`
@@ -2986,7 +3059,7 @@ highlight the steady section by hand. Firstbeat mines the reliable segments of a
 HR-to-speed relationship — 95% accuracy (MAPE ~5%) across 2,690 freely-performed runs from 79 runners
 (`assets.firstbeat.com/firstbeat/uploads/2017/06/white_paper_VO2max_30.6.2017.pdf`).
 
-⛔ **AND WE ALREADY HAVE GARMIN'S SHAPE.** `_shared/heat-adjust.ts` + `docs/DESIGN-familiar-routes.md`:
+⛔ **AND WE ALREADY HAVE GARMIN'S SHAPE.** `_shared/heat-adjust.ts` + `docs/archive/DESIGN-familiar-routes.md`:
 same route (terrain cancels rather than being modelled), a heat coefficient **learned per route by
 regression**, and a confidence-interval gate that returns `still_learning` instead of asserting.
 **It is complete, tested, and wired only to the per-workout screen. State does not call it.**

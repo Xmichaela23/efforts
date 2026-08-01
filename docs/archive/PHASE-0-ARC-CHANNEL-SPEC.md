@@ -270,7 +270,7 @@ These properties must hold across Phase 0 and every subsequent phase:
 
 Following the same pattern as D-028/D-029/D-030/D-031:
 
-1. **This spec doc.** Commit `docs/PHASE-0-ARC-CHANNEL-SPEC.md`. (THIS COMMIT — pre-implementation.)
+1. **This spec doc.** Commit `docs/archive/PHASE-0-ARC-CHANNEL-SPEC.md`. (THIS COMMIT — pre-implementation.)
 2. **User reviews.** Gate.
 3. **Implementation commit.** Code + new test file. Single commit covering all four files.
 4. **Deploy.** `generate-combined-plan` (engine) + `create-goal-and-materialize-plan` (wrapper). Both functions.

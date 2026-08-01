@@ -76,7 +76,7 @@ Date: 2026-05-13. Read-only audit. Diff of running's implementation against cycl
 | %-baseline expansion | `secPerMiFromBaseline(baselines, 'fivek'/'easy'/'marathon'/'threshold')` (930-1250 expandRunToken) | `pctRange(lo, hi) = Math.round(lo*baselines.ftp)` (1254-1324 expandBikeToken) | partial (both read live, neither uses snapshot) |
 | Strength snapshot integration (reference pattern) | Pinned at gen, read at materialization with snapshot > live preference (2417-2439) | Same | strength is the working reference; running + cycling never landed |
 
-**Cross-cutting note (Surfaces 3+4):** The cycling FTP fragmentation traced in `docs/CYCLING-INGEST-AUDIT.md` is **structurally similar to running's**. Running has the same snapshot-pinning gap (`run: null` at line 165 vs `bike: null` at line 163) — both fields exist in the schema but the populator code was never written. Strength is the only sport with proper snapshot pinning today. The estimation-hierarchy asymmetry (running 2-tier pace vs cycling 4-tier FTP) is orthogonal to the pinning gap; both fields exist in `learned_fitness` regardless.
+**Cross-cutting note (Surfaces 3+4):** The cycling FTP fragmentation traced in `docs/archive/CYCLING-INGEST-AUDIT.md` is **structurally similar to running's**. Running has the same snapshot-pinning gap (`run: null` at line 165 vs `bike: null` at line 163) — both fields exist in the schema but the populator code was never written. Strength is the only sport with proper snapshot pinning today. The estimation-hierarchy asymmetry (running 2-tier pace vs cycling 4-tier FTP) is orthogonal to the pinning gap; both fields exist in `learned_fitness` regardless.
 
 ---
 
@@ -233,7 +233,7 @@ Ordered by **dependency** (items that block others go first). For each item, **D
    - Single helper `resolveCurrentFtp(baselines)` returning `{value, source}`. Probably learned (≥medium confidence) > manual > null.
    - Replace 8 ad-hoc fallbacks across `compute-facts`, `calculate-workload`, `send-workout-to-garmin`, `race-projections`, `infer-training-fitness`, `AthleticRecordPage`, `enrichArcGoalTrainingPrefs`, `materialize-plan`.
    - Unblocks: every downstream FTP read converges. Removes the dead `learned_fitness.cycling.ftp` fallback at `compute-facts:1115`.
-   - Cross-ref: `docs/CYCLING-INGEST-AUDIT.md` §6.
+   - Cross-ref: `docs/archive/CYCLING-INGEST-AUDIT.md` §6.
 
 ### Tier 2 — Snapshot aggregation parity (depends on Tier 1)
 
@@ -280,7 +280,7 @@ Ordered by **dependency** (items that block others go first). For each item, **D
 
 ### Tier 8 — Cross-sport asymmetries to resolve via product decision (no clear D/N)
 
-28. **TSS computation for cycling** *(N — currently absent from the cycling pipeline per `docs/CYCLING-INGEST-AUDIT.md`. Workload uses TRIMP/IF; explicit TSS would align with cycling-coach mental model. Product call.)*
+28. **TSS computation for cycling** *(N — currently absent from the cycling pipeline per `docs/archive/CYCLING-INGEST-AUDIT.md`. Workload uses TRIMP/IF; explicit TSS would align with cycling-coach mental model. Product call.)*
 29. **Race-spec quality intensity inversion** *(N — Surface 9 finding: run race-spec = race-pace, bike race-spec = VO2. Intentional or inconsistency? Product/coaching call.)*
 30. **Cycling sweet-spot for running** *(N — cycling has `sweetSpotBike()`; running has no sub-threshold sustained workout type. Probably intentional given run injury risk; worth confirming.)*
 31. **Sprint/openers for running** *(N — cycling has `bikeOpeners()`; running has no race-week sharpener equivalent. Probably intentional; worth confirming.)*

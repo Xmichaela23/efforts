@@ -1,5 +1,11 @@
 # DESIGN — Strength convergence (fracture #1): one direction, one substrate, subordinate prescription
 
+> # ARCHIVED 2026-07-31 — its substance is now **D-270** in `DECISIONS-LOG.md`.
+> This doc was the ratified design ruling; D-270 is the permanent record of what was decided and
+> why, filed 2026-07-31 from this file. Kept, not deleted. ⚠️ Its **display** half was later
+> superseded by **D-347** (the per-lift chip is deleted; the direction FACT stays live). ⟨A31⟩
+
+
 **What this is.** The design ruling for TRUTH-MAP fracture #1 (strength contradicts itself on the State screen). It settles the one decision that had to be locked before any code: **where "is e1RM improving" is computed, and how it relates to the per-session "add weight / back off" prescription.** Ratified as **D-270**. Annexes **Q-107 H2/H3** and advances **Q-106 step 5**.
 
 **Status:** design ratified 2026-07-10 (Michael). Build sequenced below; behavior-unchanged spine persistence is the first, contained step (Law 6).

@@ -1,6 +1,6 @@
 # DESIGN — Segments (the commercial-grade "am I getting faster on this stretch")
 
-Status: **spec, not built.** Supersedes the route-performance approach in `DESIGN-familiar-routes.md` (see §0). Authored 2026-07-06 after an audit + incumbent research proved the route-identity model can't carry an honest trend. This doc is self-contained: a fresh session should be able to build from it + the repo alone.
+Status: **spec, not built.** Supersedes the route-performance approach in `archive/DESIGN-familiar-routes.md` (see §0). Authored 2026-07-06 after an audit + incumbent research proved the route-identity model can't carry an honest trend. This doc is self-contained: a fresh session should be able to build from it + the repo alone.
 
 Cross-refs: `CONSTITUTION.md` (don't-lie, Laws 1–6), `CANON-arc-inference-model.md` (confidence ladder, abstain-not-fill), `_shared/route-intelligence.ts` (the current model being replaced), `_shared/heat-adjust.ts` (parked; see §7).
 
@@ -8,7 +8,7 @@ Cross-refs: `CONSTITUTION.md` (don't-lie, Laws 1–6), `CANON-arc-inference-mode
 
 ## 0. Why this exists — the audit that killed the route approach
 
-The prior feature (`DESIGN-familiar-routes.md`) trended per-**route** performance. It flip-flops on real data (says "improving" one week, "declining" the next) because the route-**identity** model is not commercial-grade. Audited 2026-07-06 (`route-intelligence.ts`, `route-match.ts`, `geohash.ts`):
+The prior feature (`archive/DESIGN-familiar-routes.md`) trended per-**route** performance. It flip-flops on real data (says "improving" one week, "declining" the next) because the route-**identity** model is not commercial-grade. Audited 2026-07-06 (`route-intelligence.ts`, `route-match.ts`, `geohash.ts`):
 
 1. **Over-merges different distances.** Matching is an *overlap coefficient* — shared cells ÷ the SMALLER run's cells (`route-match.ts:39`), threshold 0.6. Above 0.9 overlap the distance guard is **bypassed entirely** (`route-match.ts:66`); in the 0.6–0.9 band it only rejects >2.5× (`ROUTE_LENGTH_MAX_RATIO`). Real data: one cluster held runs from **2.9 to 5.0 miles**. No distance banding exists.
 2. **Fragments one trailhead into many clusters.** Identity is an *unordered set* of ~150m geohash cells (precision 7) with **no start/direction anchor** in the primary path. Different directions from one trailhead → near-disjoint sets → overlap <0.6 → separate clusters. Real data: **4 cluster IDs at 34.087,−118.181**.

@@ -102,11 +102,11 @@ The project's own written record still describes an **old path we abandoned for 
 
 **The one real edge:** reconciliation is `distance ÷ pace = time`, so it depends on the pace anchor. Pace has **no age-estimate tier** (you can't estimate pace from age). An athlete with no pace data has no VDOT → no distance↔time conversion. The budget model needs a defined fallback for that case (default pace band, or degrade to a time-only week). Decide it in the spec, don't discover it in prod.
 
-**The stale spec warning:** the E3b spec on disk (`SPEC-e3b-bottom-up-volume.md`) is written on the OLD model — "the long-run ramp drives the week, total emerges bottom-up." That was overturned this session. Do **not** cut it as written. The ramp logic survives, but as the long-run *shape inside the budget*, not the thing that sizes the week. Rewrite the spec to budget-anchored before treating it as a cut sheet.
+**The stale spec warning:** the E3b spec on disk (`archive/SPEC-e3b-bottom-up-volume.md`) is written on the OLD model — "the long-run ramp drives the week, total emerges bottom-up." That was overturned this session. Do **not** cut it as written. The ramp logic survives, but as the long-run *shape inside the budget*, not the thing that sizes the week. Rewrite the spec to budget-anchored before treating it as a cut sheet.
 
 ### The record correction owed
 
-The decision log says non-race routes through the combined "one engine." The shipped reality is the **run-engine fork** (deliberate: combined can't produce a single-sport week). The log still tells the old story. A superseding decision is owed — "run non-race runs on `generate-run-plan` by deliberate exception, here's why" — owed in `DECISIONS-LOG.md` against **D-213 / D-214**, and already flagged as open thread **T-3** in `STATE-OF-BOARD.md`. Or the next reader tries to route back through combined.
+The decision log says non-race routes through the combined "one engine." The shipped reality is the **run-engine fork** (deliberate: combined can't produce a single-sport week). The log still tells the old story. A superseding decision is owed — "run non-race runs on `generate-run-plan` by deliberate exception, here's why" — owed in `DECISIONS-LOG.md` against **D-213 / D-214**, and already flagged as open thread **T-3** in `archive/STATE-OF-BOARD.md`. Or the next reader tries to route back through combined.
 
 ### Engine-first vs. UI-first (decided)
 

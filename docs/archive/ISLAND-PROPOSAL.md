@@ -2,7 +2,7 @@
 
 **Status: PROPOSAL — approve before cutting. No code written. Non-binding.**
 
-Companion to `docs/STRENGTH-SCOUT-REPORT.md` (the map). That report shows strength periodization is
+Companion to `docs/archive/STRENGTH-SCOUT-REPORT.md` (the map). That report shows strength periodization is
 smeared across four engines and ~60 string-match sites, with `'Taper'` load-bearing at 30+ of them and
 the run-retest rename defeating all of them at once. This proposes where the authority should live and
 what each engine queries from it. It builds nothing.
@@ -186,5 +186,5 @@ run-path strength consolidation — fixing the SPA frequency story on top of a p
 
 ---
 
-*Proposal only. Nothing here is approved or implemented. — companion map: `docs/STRENGTH-SCOUT-REPORT.md`.*
+*Proposal only. Nothing here is approved or implemented. — companion map: `docs/archive/STRENGTH-SCOUT-REPORT.md`.*
 </content>

@@ -1,6 +1,6 @@
 # SPEC — Shared Endurance Model (zones as the spine; forgiving↔sharp as one intensity dial)
 
-**Status: SPEC — review before cut. Not approved, not implemented.** Companion to `ENDURANCE-PROVENANCE.md` (the placeholder audit), `RUN-PROTOCOL.md` (the cited run science), `SPEC-intensity-baselines.md` (the dual-anchor zone model), `ISLAND-PROPOSAL.md` (the periodization authority this lives beside). **Captured:** 2026-06-28.
+**Status: SPEC — review before cut. Not approved, not implemented.** Companion to `ENDURANCE-PROVENANCE.md` (the placeholder audit), `RUN-PROTOCOL.md` (the cited run science), `SPEC-intensity-baselines.md` (the dual-anchor zone model), `archive/ISLAND-PROPOSAL.md` (the periodization authority this lives beside). **Captured:** 2026-06-28.
 
 ---
 
@@ -125,5 +125,5 @@ Mirrors the strength island: build the shared module first (byte-identical, dead
 - The forgiving/sharp *split values* (tuned guardrails — a tuning decision, not part of the structural cut).
 - Migrating combined + tri + the future bike engine onto the shared model (the island endgame; incremental).
 - The phase-split ratio sourcing (the one thin layer — a small decision, flagged in §5).
-- Strength periodization (separate island; `ISLAND-PROPOSAL.md`).
+- Strength periodization (separate island; `archive/ISLAND-PROPOSAL.md`).
 </content>

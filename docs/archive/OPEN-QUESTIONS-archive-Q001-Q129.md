@@ -32,7 +32,7 @@ Split out of `OPEN-QUESTIONS.md` on **2026-07-13** (the live file had grown to 4
   - Either change the wizard to surface tier labels as **endurance** hours rather than total declared hours, OR
   - Refactor the matrix to use total-hours brackets and bake the deduction into per-cell prescriptions.
   - Both are wizard copy / UX decisions, not engine bugs.
-- **Cross-ref:** `docs/COVERAGE-AUDIT-2026-05-13.md` Profile 3 finding #1.
+- **Cross-ref:** `docs/archive/COVERAGE-AUDIT-2026-05-13.md` Profile 3 finding #1.
 
 ---
 
@@ -42,7 +42,7 @@ Split out of `OPEN-QUESTIONS.md` on **2026-07-13** (the live file had grown to 4
 - **What was verified:** `_shared/week-optimizer.ts:464-467` defines `isHigh(k)` as `k === 'long_ride' || k === 'long_run' || k === 'quality_bike' || k === 'quality_run' || k === 'lower_body_strength'`. The classifier is **unconditional** on lower_body_strength — it doesn't read `strength_protocol`, doesn't read `repProfile`, doesn't read load magnitude. Every `lower_body_strength` placement gets the §4.7 24h-pre / 48h-post adjacency protection.
 - **Implication:** durability MS phase Lower gets the **same** adjacency rules as Strength Build / M+P / Rebuild phase Lower. The implementation is MORE conservative than `STRENGTH-PROTOCOL.md §6.1`'s load-magnitude framing technically allows — the spec lets sub-maximal Hypertrophy / Deload Lower get relaxed adjacency, but the implementation doesn't apply that relaxation. Safe-conservative posture: zero risk of under-protecting heavy Lower at the cost of slightly less placement flexibility for light Lower.
 - **Verdict:** no fix required. The premise that "may scope to protocol names" was wrong; the classifier is intent-blind and load-blind by design. If a future need arises (e.g., real Deload-week placement complaints), the spec's load-magnitude relaxation is the natural extension — but no observed defect today.
-- **Cross-ref:** `_shared/week-optimizer.ts:464-467` (the `isHigh` classifier); `docs/COVERAGE-AUDIT-2026-05-13.md` Profile 1 question item; ENGINE-STATE.md "Solid" (moved from Questioned 2026-05-20).
+- **Cross-ref:** `_shared/week-optimizer.ts:464-467` (the `isHigh` classifier); `docs/archive/COVERAGE-AUDIT-2026-05-13.md` Profile 1 question item; ENGINE-STATE.md "Solid" (moved from Questioned 2026-05-20).
 
 ---
 
@@ -55,7 +55,7 @@ Split out of `OPEN-QUESTIONS.md` on **2026-07-13** (the live file had grown to 4
   - `slotsPlanned = slotsOrdered.slice(0, 1)` at `:1632` takes the first slot. By the optimizer's session_index convention, slot 0 is Upper — so Full IM race-spec realizes "1× upper-only" per §3.7.
 - **Partial verification — maintenance load:** §3.7 also prescribes the single race-spec session at maintenance load (halved power volume, no depth jumps). The maintenance `repProfile` is present in `triathlon_performance.ts:501/549/1408` and is the framework Full IM race-spec would consume. Exhaustive trace of `triathlonStrength()` → race_specific × Full IM → maintenance repProfile selection was outside the 30-min verification budget; the count enforcement is verified as the load-bearing constraint (over-prescribing volume is the original concern, and strFreq=1 prevents that regardless of which repProfile fires).
 - **Verdict:** no fix required. cf5867fa shipped what its message claimed. Per-session repProfile selection for Full IM race-spec is an "asserted-good-by-framework" residual that would need its own slice if a defect surfaces. None observed.
-- **Cross-ref:** `generate-combined-plan/week-builder.ts:108-128` (`strFreqForPhase`); `:1632` (slotsPlanned slice); commit `cf5867fa` (v2.1 close-out); `docs/COVERAGE-AUDIT-2026-05-13.md` Profile 4 question item; ENGINE-STATE.md "Solid" (moved from Questioned 2026-05-20).
+- **Cross-ref:** `generate-combined-plan/week-builder.ts:108-128` (`strFreqForPhase`); `:1632` (slotsPlanned slice); commit `cf5867fa` (v2.1 close-out); `docs/archive/COVERAGE-AUDIT-2026-05-13.md` Profile 4 question item; ENGINE-STATE.md "Solid" (moved from Questioned 2026-05-20).
 
 ---
 
@@ -85,7 +85,7 @@ Split out of `OPEN-QUESTIONS.md` on **2026-07-13** (the live file had grown to 4
 - **Status:** RESOLVED 2026-05-17 (`4177c05c`).
 - **Why it existed:** the `pwr20`/`np_trend` historical loop read only `r.computed.overall.avg_hr`, frequently null (set only from an `hr_bpm` sample series); the loop SELECT didn't fetch the reliable `workouts.avg_heart_rate` column. All historical TREND points got `avg_hr: null` → `TrendSparkline`'s `hasHr (≥3)` gate failed → the dashed HR line never drew (label still showed current-ride bpm).
 - **Resolution:** added `avg_heart_rate` to the loop SELECT; `hrH` now resolves `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate` (each candidate guarded individually so a stored 0/null falls through — `Number(null)===0`). Same SELECT-projection class as the `normalized_power_w`/`achievements`/`elevation_gain` fixes. Wide backfill verified: **26/26 rides with a TREND series now have ≥3 HR points** → the dashed line draws on every one.
-- **Cross-ref:** `docs/ENGINE-STATE.md` (resolved); `docs/SESSION-CONTEXT.md` §6.
+- **Cross-ref:** `docs/ENGINE-STATE.md` (resolved); `docs/archive/SESSION-CONTEXT.md` §6.
 
 ---
 
@@ -94,7 +94,7 @@ Split out of `OPEN-QUESTIONS.md` on **2026-07-13** (the live file had grown to 4
 - **Status:** RESOLVED 2026-05-17 — one-off script, run wide.
 - **Why it existed:** `pwr20_trend_v1` is filtered to rides whose **stored** `classified_type` matches the current ride's. After the VI-gate classifier change, recomputing one ride re-derives only that ride's type; historical rides keep their stale stored type until they too are re-analyzed. So a single recompute can't reach the ≥3-same-type threshold and the series stays null.
 - **Resolution:** one-off script over recent rides (not a triggered job). `scripts/verify-cycling-vi-if-fix.mjs --all` (committed `fae293e7`, `--all` mode `83d07fdb`) replays the full recompute chain via the service-role token, re-deriving every stored `classified_type`. Wide run 2026-05-17 (180 d, 30 rides, 0 failed, 26/26 cap-present consistent): 16 historical rides went `null → type`; post-backfill distribution = recovery 6 / threshold 6 / climbing 6 / endurance 5 / tempo 4 (all ≥3, pwr20-eligible) / vo2 2 / sweet_spot 1, **zero null**. vo2/sweet_spot below 3 only because the athlete logged few such rides — not a backfill gap.
-- **Cross-ref:** `docs/SESSION-CONTEXT.md` open item #2 (closed); D-015 (VI/IF-source) + D-016 (elevation-source), the classifier-input fixes this backfill propagated.
+- **Cross-ref:** `docs/archive/SESSION-CONTEXT.md` open item #2 (closed); D-015 (VI/IF-source) + D-016 (elevation-source), the classifier-input fixes this backfill propagated.
 
 ---
 
@@ -103,7 +103,7 @@ Split out of `OPEN-QUESTIONS.md` on **2026-07-13** (the live file had grown to 4
 - **Status:** blocked on a product decision (Build Order #8).
 - **Why it exists:** #8 needs course-segment geometry extracted from race-course GPX (Data-Dependency ❌); it was not among the decisions that unblocked #6. The doc itself flags the Garmin GPS-track matcher as the "highest-leverage open question." The forward hook (`cycling_segment_history.race_course_relevant`) is in place.
 - **Open question:** build the GPS-track matcher (universal, larger) or accept "segment intelligence is a Strava-connected feature" as a permanent product boundary? Decide before #8 proceeds — do not fabricate a name-match heuristic.
-- **Cross-ref:** `docs/CYCLING-ANALYSIS-DESIGN.md` Primary Constraint; `docs/SESSION-CONTEXT.md` open item #3.
+- **Cross-ref:** `docs/CYCLING-ANALYSIS-DESIGN.md` Primary Constraint; `docs/archive/SESSION-CONTEXT.md` open item #3.
 
 ---
 
@@ -114,7 +114,7 @@ Split out of `OPEN-QUESTIONS.md` on **2026-07-13** (the live file had grown to 4
 - **Why it exists:** the 2026-05-17 plain-language brief deliberately scoped the jargon translation to **INSIGHTS only**; the dashboard rows in `_shared/session-detail/build.ts` stay technical by design — POWER `"178W normalized power at IF 1.01"` (`build.ts:~474`), EFFICIENCY `"EF 1.214 · 1.3% HR decoupling"`. With INSIGHTS now plain-language, the rows read inconsistently beside it.
 - **Why not a bug:** product-confirmed dashboard rows may be more technical than the narrative; the values are correct — purely a stylistic inconsistency a future session might "fix" not knowing the INSIGHTS-only scope was a deliberate boundary.
 - **What "fixing" would require:** soften the POWER/EFFICIENCY row builders in `_shared/session-detail/build.ts` (terser than INSIGHTS — rows are scannable, not prose; e.g. "178 W · ~threshold", "HR held +1.3%"). workout-detail-only, no backfill (rows rebuild per request). Related minor polish: the INSIGHTS closing clause can hedge ("suggests you're in an active recovery or base-building phase rather than a formal taper") — an anti-speculation prompt line would tighten it; substantive, not a guard-worthy defect, so not added to the 3-guard stack.
-- **Cross-ref:** `docs/SESSION-CONTEXT.md` §6 (cosmetic-deferred); `docs/POLISH-PUNCH-LIST.md` cycling Open (P3).
+- **Cross-ref:** `docs/archive/SESSION-CONTEXT.md` §6 (cosmetic-deferred); `docs/POLISH-PUNCH-LIST.md` cycling Open (P3).
 
 ---
 
@@ -759,7 +759,7 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
   - **All three sliders now feed the spine:** energy (→ `taper_sensitivity`, pre-existing) + soreness (→ overreaching signal) + sleep (→ short-sleep note). `avg_readiness` already rolled up all three (`compute-snapshot:562`); the gap was purely downstream reads — now closed for soreness/sleep.
 - **STILL OPEN (Phase 1b / Phase 2):** the Arc `readiness` *object* (`ArcContext.readiness`, D-144) is still display-only (no logic keys off it); **autoregulation** (a bad check-in *lowers today's* prescribed load/RIR, soreness→sore-region, sleep→intensity-gate, or a concrete deload suggestion) is the deliberate next question — **advise first, automate later** (Michael, 2026-07-02). Running analysis still ignores the check-in.
 - Full spec: **`docs/SPEC-ATHLETE-STATE-CONTINUITY.md`**.
-- **Audit verdict (CORRECTED 2026-06-12 — first pass understated it):** write-wired (`workout_metadata.readiness`) → `workout_facts.readiness` → **`compute-snapshot` aggregates to `athlete_snapshot.avg_readiness` (a WEEKLY time-series, keyed user_id+week_start)** → consumed narrowly by `recompute-athlete-memory` (`taperSensitivity` energy-rebound + injury flags) and by the strength narrative. **A weekly time-series DOES exist** (the original "no time-series / fully orphaned" was wrong). The real gap: **`arc-context.ts` does NOT read `avg_readiness`** (the Arc dead-end), and nothing moves prescribed RIR/load. Read-only options doc (flow map + per-question tradeoffs, no decisions): **`docs/SPEC-ATHLETE-STATE-CONTINUITY-OPTIONS.md`**.
+- **Audit verdict (CORRECTED 2026-06-12 — first pass understated it):** write-wired (`workout_metadata.readiness`) → `workout_facts.readiness` → **`compute-snapshot` aggregates to `athlete_snapshot.avg_readiness` (a WEEKLY time-series, keyed user_id+week_start)** → consumed narrowly by `recompute-athlete-memory` (`taperSensitivity` energy-rebound + injury flags) and by the strength narrative. **A weekly time-series DOES exist** (the original "no time-series / fully orphaned" was wrong). The real gap: **`arc-context.ts` does NOT read `avg_readiness`** (the Arc dead-end), and nothing moves prescribed RIR/load. Read-only options doc (flow map + per-question tradeoffs, no decisions): **`docs/archive/SPEC-ATHLETE-STATE-CONTINUITY-OPTIONS.md`**.
 - **Done = ** (Phase 1) check-in → Arc as a structured readiness signal; Arc the single source every surface reads; a queryable readiness time-series (trends, not snapshots). (Phase 2, separate) autoregulation — let it *influence* RIR/load with a real model + guardrails.
 - **⚠ Naming trap:** NOT the server-computed `ReadinessSnapshotV1` (`session-detail/readiness-*`) — that's the muscular-load model, a different signal.
 - **Cross-ref:** D-126 (target_rir from plan), arc-context.ts, the open "adaptive plan adjustment" item.
@@ -784,7 +784,7 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 - **What it is:** `learned_fitness.swim_pace_per_100m` is **empty** for the test user despite 5+ swims with a computed `pace_per_100m` in `workout_facts` (188–209 s/100m). The per-workout swim pace is computed fine; it just never rolls up into the `learned_fitness` aggregate the plan reads (`planning-context.swimSecPer100YdFromArcSwimInputs` needs ≥3 learned samples). So the plan falls back to the typed baseline (2:30/100yd) while the athlete actually swims ~2:52–3:11/100yd → swim prescriptions too fast.
 - **Why it matters:** blocks swim truth-reconciliation (the spine can't compare computed-vs-baseline like-for-like when the computed aggregate is never built) and mis-seeds the swim plan.
 - **Likely cause (updated 2026-06-24 — Q-038 Layer 1 is FIXED):** the duration/unit corruption that originally clouded this is resolved (Q-038 Layer 1, 2026-06-14 — swim pace is now scalar-authoritative, `pace_per_100m` 188→135), so the input-corruption hypothesis is largely closed. The remaining likely cause is that **`learn-fitness-profile` simply doesn't aggregate swim pace at all** — trace its swim path directly. Q-038's still-open half (Layers 2–3: swim-native template + FORM `swim_data` ingest) is unrelated to this aggregation gap.
-- **Cross-ref:** Q-038 (swim ingest), `docs/AUDIT-truth-reconciliation-2026-06-14.md`.
+- **Cross-ref:** Q-038 (swim ingest), `docs/archive/AUDIT-truth-reconciliation-2026-06-14.md`.
 
 ---
 
@@ -796,7 +796,7 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
   - **HR reference band `[130,150]W`** (bike-fitness HR-at-power) → **per-rider** (% of FTP or the athlete's Z2 power); **no hardcoded watts**.
   - **Freshness windows (strength 14 / bike 21 / run 14 / swim 10d) + min-session gates (4/3/4/3)** → scale to each athlete's **per-discipline session frequency** (low-volume athletes would read perpetual stale/needs_data).
 - **Explicitly NOT to change (correctly scale-free):** trend **% thresholds** (±2.5/±2/±1.5) and **plausibility bands** (swim 40–240 s/100m, run GAP 150–750 s/km) — universal.
-- **Cross-ref:** D-146, D-148, `SPEC-bike-fitness-read`, `docs/AUDIT-truth-reconciliation-2026-06-14.md`.
+- **Cross-ref:** D-146, D-148, `SPEC-bike-fitness-read`, `docs/archive/AUDIT-truth-reconciliation-2026-06-14.md`.
 
 ---
 
@@ -805,7 +805,7 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 - **Status:** filed 2026-06-14 · **decision owed (Michael)** · xref Q-037
 - **What it is:** Efforts is internally consistent at **FTP 176W** (typed = learned-high = resolved = active-plan-pinned = displayed). Garmin's native auto-FTP is **~204W**; it has never been ingested (the ~28W gap is Q-037 — Strava power-stream smoothing vs native .fit). So the **active IRONMAN 70.3 plan is pinned ~28W under Garmin's number**, prescribing bike intensity off the lower Efforts estimate.
 - **The decision:** ingest Garmin native FTP (trust the external number), keep Efforts' computed 176 (trust own data), or surface both and let the athlete pick? Not a spine reconciliation (no internal contradiction) — a data-source trust decision.
-- **Cross-ref:** Q-037, `docs/AUDIT-truth-reconciliation-2026-06-14.md`.
+- **Cross-ref:** Q-037, `docs/archive/AUDIT-truth-reconciliation-2026-06-14.md`.
 
 ---
 
@@ -1186,7 +1186,7 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
   2. **Completion-race volume move (SPEC §7).** E3b is non-race only; the race path (`create-goal generateBody`) doesn't pass `weekly_hours`, so completion races still use the legacy table. Moving them is a thread + guard-test (D-216 pattern).
   3. **Budget-drives-day-count lever.** `EASY_SLOTS = 3` mirrors the Mon/Wed/Fri grid; a big budget trips the glass-box flag instead of adding days. "More hours → more days" is the real resolution — a later lever, deliberately not baked as fixed-forever.
   4. **Bike consumes `rideHrs`.** Computed + threaded now (run-only → 0); no bike engine yet.
-- **Cross-ref:** D-219, `SPEC-e3b-bottom-up-volume.md`, `ISLANDS-ORIENTATION.md`.
+- **Cross-ref:** D-219, `archive/SPEC-e3b-bottom-up-volume.md`, `ISLANDS-ORIENTATION.md`.
 
 ---
 
@@ -1328,7 +1328,7 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 
 ## Q-106 — "Spine is truth" is ~6% enforced on the coach + capacity truth is forked (the big next-work item)
 
-- **Status:** filed 2026-07-02 · **PARTIALLY BUILT (reconciled 2026-07-04).** **Step 1 (canonical capacity resolver) is BUILT + wired + acceptance-passed** — `_shared/state-trend/capacity-resolver.ts` (D-231), called on both the prescribe (`materialize-plan`) and judge (`coach/index.ts:2040`/`2346`) paths; this fixed Q-107 **H1**'s baseline-blindness. **Step 2 (move the coach's verdicts onto the spine) is genuinely unbuilt — BLOCKED on Q-109** (the "read the column you already fetch" premise fails for all 5 shadowed columns). D-236 has since advanced the **step-6 ACWR-conformance** piece (ACWR single-authority + `buildBodyResponse` reclassified as fact layer) — ⚠ *whether that fully satisfies Q-109's "read the persisted `body_response`" bar is not verified.* Full evidence: `AUDIT-spine-conformance-2026-07-02.md` (+ synthesis `AUDIT-app-synthesis-2026-07-02.md`).
+- **Status:** filed 2026-07-02 · **PARTIALLY BUILT (reconciled 2026-07-04).** **Step 1 (canonical capacity resolver) is BUILT + wired + acceptance-passed** — `_shared/state-trend/capacity-resolver.ts` (D-231), called on both the prescribe (`materialize-plan`) and judge (`coach/index.ts:2040`/`2346`) paths; this fixed Q-107 **H1**'s baseline-blindness. **Step 2 (move the coach's verdicts onto the spine) is genuinely unbuilt — BLOCKED on Q-109** (the "read the column you already fetch" premise fails for all 5 shadowed columns). D-236 has since advanced the **step-6 ACWR-conformance** piece (ACWR single-authority + `buildBodyResponse` reclassified as fact layer) — ⚠ *whether that fully satisfies Q-109's "read the persisted `body_response`" bar is not verified.* Full evidence: `archive/AUDIT-spine-conformance-2026-07-02.md` (+ synthesis `archive/AUDIT-app-synthesis-2026-07-02.md`).
 - **Finding:** the coach reads the cached spine (`state_trends_v1`) for exactly **1 of ~17 verdict families (`fitness_direction`)**; it recomputes readiness/strength/load/body_response/race/goal in parallel from raw data — even shadowing snapshot columns (`acwr`, `strength_volume_trend`, `body_response`, `strength_top_lifts`) it SELECTs and never reads. And there is **no canonical capacity truth:** `materialize` prescribes load off the typed `performance_numbers` (150) while the coach judges off `learned_fitness.strength_1rms` (125) — "train off one number, get judged off another."
 - **THE ROADMAP (sequenced, in the audit):** (1) **one canonical capacity resolver** — typed-anchored, learned feeds trend + reconcile-suggestion, raw never truth; both prescribe (materialize) + judge (coach) call it (collapses the 150-vs-125 fork app-wide + State H1/H3 + the sec/km-vs-sec/mi + key-alias footguns). (2) move coach readiness + strength verdicts onto the spine ("read the columns you already fetch, delete the parallel derivation" — the D-151 move). (3) finish Q-097 convergence (done). (4) collapse remaining coach verdicts + the vestigial scalar-trend vocabulary; add a shared capacity/pace type. (5) retire dead layers (Q-108).
 - **Concrete visible instance (2026-07-02 State walkthrough) — the headline seam:** the top-line headline "Balanced load, **fatigued** · **fitness climbing** — you're carrying fatigue" concatenates a *parallel-engine* readiness verdict (`fatigued`, coach `readiness_state`, `coach/index.ts:2767-2788`, self-computed ACWR) with the *one spine* verdict (`fitness climbing`, `rollupFitnessDirection(state_trends_v1)`). Coherent today, but nothing guarantees the two engines agree — when they diverge the headline says two contradictory things. This is the readiness-onto-spine move (roadmap step 2) made visible; fold into the same round.
@@ -1357,7 +1357,7 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
   - **`rpe_trend`, `run_easy_pace_at_hr_trend`, `strength_volume_trend`, `strength_top_lifts` — genuinely fetched-and-never-read, but not swappable.** The coach's corresponding signals are **differently shaped**: RPE is a *categorical* reaction model (`endur.rpe.trend` = 'declining'/'rising', 5024), strength is *per-lift* off `learned_fitness` (1969/2275) + self-built `strengthEntries`/`strengthLiftMaxes` (4100/3242) — not the snapshot's numeric pct-trend / top-lift-map shapes. "Read the column instead of recomputing" here means **rewiring the consuming verdict logic (categorical→numeric, per-lift→volume-scalar), which changes verdict semantics** — design work, not a mechanical deletion. (Overlaps Q-108's "vestigial scalar-trend columns" call.)
 - **The only strictly-safe mechanical action available now:** remove the 4 truly-dead columns from the SELECT (waste cleanup, not a conformance win). Everything else is a real rewire.
 - **Implication for sequencing:** step 4 as written (independent mechanical swap) is not viable. ACWR → fold into step 6. `strength_top_lifts`/strength verdict → fold into step 5 (the capacity resolver already owns "top lifts / how strong"). RPE + easy-pace trend → a genuine "move the endurance signal onto the spine" design task (new sub-item, not a deletion). **Awaiting a design call on whether to (a) do the SELECT-waste cleanup now + resequence the real migrations under steps 5/6, or (b) design the endurance-signal-onto-spine rewire as its own step.**
-- **Cross-ref:** Q-106 (roadmap step 2), Q-108 (vestigial trend columns), D-230, D-231, D-151; `AUDIT-spine-conformance-2026-07-02.md` §3/§5.
+- **Cross-ref:** Q-106 (roadmap step 2), Q-108 (vestigial trend columns), D-230, D-231, D-151; `archive/AUDIT-spine-conformance-2026-07-02.md` §3/§5.
 
 ## Q-110 — Move the coach's RPE-trend + easy-pace-trend signals onto the spine (shape-mismatch design task, split out of Q-109)
 
@@ -1367,7 +1367,7 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
   - **Easy-pace:** `run_easy_pace_at_hr_trend` is a **numeric pct** on the spine (lower = faster = improving, D-043); the coach has **no consumer at all** — it was purely a dead fetch. Wiring it is net-new signal design (what verdict should it drive, and where), not a migration of existing logic.
 - **What already happened (don't re-do):** both columns were **dropped from the coach SELECT** in the Q-109 step-4 cleanup (`coach/index.ts` ~2735) — that removed the dead fetch + projection footgun; it did **not** wire them. This Q is the wiring.
 - **Design questions owed:** (1) is the spine's numeric `rpe_trend`/pace-trend the intended source of truth, or does the coach's categorical reaction model become the spine's truth (like the ACWR call in Q-109 — richer derivation promoted to the spine, written once)? (2) if the columns win, what thresholds map pct → verdict without contradicting the reaction model? (3) does easy-pace-trend get a surfaced verdict or stay longitudinal-only (it overlaps `longitudinal_signals`, Q-108)?
-- **Cross-ref:** Q-109 (parent), Q-106 (roadmap), Q-108 (vestigial scalar-trend columns / `longitudinal_signals`), D-230, D-231, D-151; `AUDIT-spine-conformance-2026-07-02.md` §3/§5.
+- **Cross-ref:** Q-109 (parent), Q-106 (roadmap), Q-108 (vestigial scalar-trend columns / `longitudinal_signals`), D-230, D-231, D-151; `archive/AUDIT-spine-conformance-2026-07-02.md` §3/§5.
 
 ## Q-111 — Plan-aware, history-aware strength verdicts (tone must consult goal/plan + training history)
 
@@ -1398,7 +1398,7 @@ VIEWING-DATE semantic OR a genuine 2-day arithmetic bug. The
 - **The audit sweep (owed):** trace ALL narrative claims the coach LLM can make against their deterministic sources — plan phase/week, "N weeks into", completed/missed session framing, load/recovery language, race-week guidance, strength/endurance verdicts in prose — and gate each on a fact. Candidate systemic fixes: (1) fix `resolvePlanWeekIndex`'s pre-start clamp at the root (currently 5 consumers: coach, arc-context, generate-training-context, plan-context — blast radius deferred tonight); (2) a narrative-facts contract that the prompt can't exceed.
 - **✅ CONCRETE FIRST PIECE (2026-07-03) — the narrative-grounding GUARD is built + wired to the coach week narrative.** `_shared/response-model/narrative-guard.ts` (`validateNarrative` + `resolveGuardedNarrative`, 11 fixtures): rejects (1) a trend-state claim that **contradicts** the spine's per-discipline verdict ("run holding steady" when `state_trends_v1` says improving), and (2) a **recap** of a receipt number already on screen (the "+3.6%" class). On rejection: regenerate once (violation named in the prompt) → second failure drops the prose (honest empty > a lying narrative). Rejections are `console.warn`-logged (`[coach][narrative-guard]`) for this audit's data.
 - **CONTINUITY ROLLOUT (the "nothing siloed between spine and arc" goal) — the guard is SHARED by design** (takes `narrative` + `verdicts[]`, no coach coupling). Apply it to every LLM narrative so all prose is a validated descendant of the same spine: (a) **Performance-screen per-workout INSIGHTS** (`analyze-{running,cycling,strength,swim}-workout`) — currently siloed, each with its own guards (cycling has jargon/lede/numeric; others less), NOT grounded in `state_trends_v1`; (b) **Arc prose** (`arc-context` narrative). Each is wiring (pass that surface's spine verdicts to the shared guard), not a rebuild.
-- **Cross-ref:** D-232 (+ extension 2), `AUDIT-app-synthesis-2026-07-02.md` §7, `plan-week.ts` (`planHasStarted`/`buildPlanContextLine`), Q-106 (the coach-onto-spine work this rhymes with).
+- **Cross-ref:** D-232 (+ extension 2), `archive/AUDIT-app-synthesis-2026-07-02.md` §7, `plan-week.ts` (`planHasStarted`/`buildPlanContextLine`), Q-106 (the coach-onto-spine work this rhymes with).
 
 ---
 

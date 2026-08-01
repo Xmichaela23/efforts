@@ -19,7 +19,7 @@ The app is **one shell** switched by state flags, not routes (`SCREEN-INVENTORY.
 | **THE ARC** | The assembler that gathers everything AROUND the spine | goals, plan position, baselines, memory, projections, cycling CTL/ATL/TSB — and a **read-only pass-through of the spine** | `getArcContext` (reads, never writes the spine) | `_shared/arc-context.ts` |
 | **THE COACH PAYLOAD** | The State screen's data bundle | LOAD/ACWR + reconciled verdict, BODY/RPE, the week headline, the b2 execution rows, per-lift verdicts | `coach` (reads spine cached + snapshot + response_model) | `weekly_state_v1` · `coach/index.ts` |
 
-**The clean part:** the Arc **reads** the spine (`arc-context.ts:1146-1153`, "no computation, no write") — it does not mint a competing per-discipline verdict. Fitness direction, load, and RPE are each single-source. So the *core* of the app tells one story.
+**The clean part:** the Arc **reads** the spine (`arc-context.ts:1185-1197`, "no computation, no write") ⟨A31⟩ — it does not mint a competing per-discipline verdict. Fitness direction, load, and RPE are each single-source. So the *core* of the app tells one story.
 
 ---
 
@@ -27,7 +27,7 @@ The app is **one shell** switched by state flags, not routes (`SCREEN-INVENTORY.
 
 | Screen | Component | Reads |
 |---|---|---|
-| **State** | `context/StateTab.tsx` | Coach payload (`weekly_state_v1`) for LOAD/BODY/headline/b2/per-lift **+ the spine recomputed LIVE** (`useStateTrends` → `assembleStateTrends`) for the Performance-section trends **+ Arc** for readiness/longitudinal |
+| **State** | `context/StateTab.tsx` | Coach payload (`weekly_state_v1`) for LOAD/BODY/headline/b2/per-lift **+ the spine as assembled on the SERVER** (`useStateTrends` renders `weekly_state_v1.trends.display` verbatim — zero client math, no fallback assembly) for the Performance-section trends ⟨A31⟩ **+ Arc** for readiness/longitudinal |
 | **Baselines** | `TrainingBaselines.tsx` | `user_baselines` raw (the only screen that does) + Arc for suggestions |
 | **Workout · Performance tab** | `UnifiedWorkoutView`→`MobileSummary` | `session_detail_v1` (from `workout-detail`), which reads the spine **cached** |
 | **Workout · Details tab** | `CompletedTab` / `StrengthCompletedView` | same `session_detail_v1` contract, read-only |
@@ -40,14 +40,14 @@ For any fact, this says who owns it and whether the screens agree. **Before buil
 
 | Fact | Authority (single source of truth) | Read by | Coherent? |
 |---|---|---|---|
-| **Fitness direction** (improving/holding/sliding) | SPINE → `rollupFitnessDirection` (`assemble.ts:277`) | State (live), coach (cached), workout-detail (cached), analyzers (via Arc) | ✅ one authority; only **freshness** differs (live vs cached) |
+| **Fitness direction** (improving/holding/sliding) | SPINE → `rollupFitnessDirection` (`assemble.ts:785`) ⟨A31⟩ | State (cached), coach (cached), workout-detail (cached), analyzers (via Arc) | ✅ one authority, one cache — the client stopped recomputing (`useStateTrends.ts:95-96`) | ⟨A31⟩
 | **Load / ACWR / "balanced"** | one algorithm `_shared/acwr.ts:computeAcwr` (D-236); reconciled verdict = `load-status-reconcile.ts` (D-260) | State (from coach) | ✅ single-algorithm (dual-computed: snapshot persists, coach recomputes; equivalence-tested) |
 | **RPE / "how it feels"** | one object `response-model/weekly.ts` `endurance.rpe` | State header, BODY row, readiness — all deref the same object | ✅ cannot diverge within a payload |
 | **Run durability** (decoupling, Friel band) | SPINE `state_trends_v1.run.decoupling` | State (live), Performance tab (cached, but not currently rendered) | 🔴 **FRACTURED — corrected 2026-07-31 ([D-346]).** One authority, fed by a gate that discriminates nothing: `isSteadyAerobic(workout_type)` reads `heart_rate_summary.workoutType`, which is `steady_state` on **all 25** of this athlete's runs (an 11-minute jog and a hill session included). Hill drills reached the trend at 24.9% and State reported declining fitness. ⛔ **The "heat seam CLOSED (D-275)" claim below was FALSE for 18 days** — D-275 was reversed by D-283 and there is no heat filter. |
 | **1RM anchor** (per-lift) | `resolveStrengthCapacity` — **typed wins** (D-231) | coach, materialize, per-lift verdict | ✅ **the model the others should copy** |
 | **FTP** | `resolveCurrentFtp` (learned-first, ≥medium conf) | Baselines, Athletic Record, cycling analyzer — ALL through the resolver now | ✅ **CLOSED 2026-07-10/11** (was fracture #2 — see below) |
 | **Strength trend** (volume / e1RM) | — | see fracture #1 | 🔴 **FRACTURE** — three engines on one screen |
-| **Per-session execution** (exec % / analysis) | `session_detail_v1.execution` (`build.ts:782`) | Workout Performance/Details tabs | ✅ single-source (workout-only) |
+| **Per-session execution** (exec % / analysis) | `session_detail_v1.execution` (`build.ts:837`) ⟨A31⟩ | Workout Performance/Details tabs | ✅ single-source (workout-only) |
 | **Bike "how's the bike"** | split: spine `bike.power` trend vs Arc `cycling_fitness` {ctl,atl,tsb} | State / narrative | ⚠️ two adjacent reads, unreconciled (fracture #7) |
 
 ---
@@ -61,16 +61,16 @@ For any fact, this says who owns it and whether the screens agree. **Before buil
   > **Both halves were false.** (a) D-275 was **reversed by D-283**; there is no heat filter in the code, and this line kept presenting the dead decision as live. (b) The single authority is real but its **gate is a constant** — `isSteadyAerobic(workout_type)` reads a field that says `steady_state` on every run ever logged, so nothing is excluded and a hill session in 30°C heat lands on the durability trend as a clean steady measurement.
   >
   > ⛔ **THE COST OF THIS ONE LINE.** Fifteen decision entries touch this row (D-036 … D-345). A fresh session opens TRUTH-MAP, reads "RUN — CLEAN, the model the others should copy", concludes the symptom in front of it must come from somewhere new, and builds something new. Three separate sessions in three days wrote a run's intent into three different fields, none of which the gate reads. **A doc that says "clean" about a broken thing does not merely fail to help — it actively routes every future session away from the fault.**
-- **RUN — the real state (2026-07-31).** One authority, starved gate, and a substrate that is under-filled: on 164 `route_progress_metrics` rows, `temp_f` is present on 115, `decoupling_pct` on 83, and `effort_adjusted_pace_sec_per_km` — the one column that table owns — on **8**. The heat-de-confounded same-route engine (`_shared/heat-adjust.ts`) is complete, tested, and wired only to the per-workout screen; State does not call it.
+- **RUN — the real state (2026-07-31).** One authority, starved gate, and a substrate that is under-filled: on 164 `route_progress_metrics` rows, `temp_f` is present on 115, `decoupling_pct` on 83, and `effort_adjusted_pace_sec_per_km` — the one column that table owns — on **8**. The heat-de-confounded same-route engine (`_shared/heat-adjust.ts`) is complete, tested, and wired to BOTH surfaces: the per-workout screen (`routeHeadline` via `session-detail/build.ts:17`) and the spine (`routeTrend` via `state-trend/assemble.ts:24`, called at `:345`), which is what the State run efficiency row renders. ⟨A31⟩
 - **STRENGTH — CONTRADICTING (worst).** Three visible engines; the e1RM fact is computed from two different data trails (fracture #1).
 - **BIKE — MIXED.** Fitness *direction* is clean — one rendered authority; the CTL/ATL/TSB "form" second engine (Arc `cycling_fitness`) is **internal-only, never rendered** (and there's even a *third* CTL/ATL/TSB in `analyze-cycling-workout.fitness_v1`, prose-only). But **efficiency has two visible engines** on State — spine 56-day HR-at-power vs coach 7-day HR-drift — only saved from a naked clash by the scope labels ("last 7 days" vs "trends over recent weeks"). (The **FTP fracture #2 is now CLOSED** — all reads route through `resolveCurrentFtp`, fixed 2026-07-10/11; see below.)
-- **SWIM — BROKEN, not contradicting.** No two-engines-one-fact clash (rendered pace reads are single-sourced, D-182). The problems are: a single **provisional/`needs_data`** engine, **no swim-native display template** (falls through the endurance/run layout — Q-038 Layer 2, still open; the June duration-unit "2263% adherence" bug is FIXED), and the **CSS anchor is orphaned** — shown on Baselines but read by *nothing* in the swim session verdict, and even its plan-gen use is staged off (`planning-context.ts:237 SWIM_CSS_LIVE = false`). More disconnected than FTP.
+- **SWIM — BROKEN, not contradicting.** No two-engines-one-fact clash (rendered pace reads are single-sourced, D-182). The problems are: a single **provisional/`needs_data`** engine, **no swim-native display template** (falls through the endurance/run layout — Q-038 Layer 2, still open; the June duration-unit "2263% adherence" bug is FIXED), and the **CSS anchor is orphaned** — shown on Baselines but read by *nothing* in the swim session verdict, and even its plan-gen use is staged off (`planning-context.ts:238 SWIM_CSS_LIVE = false` ⟨A31⟩). More disconnected than FTP.
 
 
 **🔴 #1 — Strength contradicts itself on the State screen (LIVE, worst).** Three engines, three windows, one screen:
-- b2 7-day execution row ← coach `weekly_state_v1.strength_session_types_7d` (`StateTab.tsx:1152`)
-- volume / e1RM trend ← **client-live** `assembleStateTrends.strengthFitness` from `workout_facts.strength_facts` + `exercise_log.estimated_1rm` (`StatePerformanceSection.tsx:326`)
-- per-lift verdict ← coach `response_model.strength.per_lift` (`StateTab.tsx:1133`)
+- b2 7-day execution row ← coach `weekly_state_v1.strength_session_types_7d` (`useCoachWeekContext.ts:266`) ⟨A31⟩
+- volume / e1RM trend ← **server-assembled** `state_trends_v1.display.strengthFitness` from `workout_facts.strength_facts` + `exercise_log.estimated_1rm`, rendered verbatim (`StatePerformanceSection.tsx:851`) ⟨A31⟩
+- per-lift verdict ← coach `response_model.strength.per_lift` (`StateTab.tsx:1225`) ⟨A31⟩
 
 Nothing forces them to agree → "e1RM improving" can sit above a lift verdict that says decline. **Fix = converge on one strength authority** (the D-231 `resolveStrengthCapacity` pattern is the template).
 
@@ -81,11 +81,11 @@ Nothing forces them to agree → "e1RM improving" can sit above a lift verdict t
 
 **Still open (bike, separate):** efficiency has two *visible* engines on State (spine 56-day HR-at-power vs coach 7-day HR-drift) — contained by scope labels, lower priority. CTL/ATL/TSB triplication is latent (internal-only, never rendered). 1RMs use the same resolver pattern via `resolveStrengthCapacity`.
 
-**⚠️ #3 — Metric easy-pace unit mislabel (latent).** Baselines hardcodes `/mi` (`TrainingBaselines.tsx:1233`); AppContext stores `/km` for metric users (`AppContext.tsx:359`). Masked today only because the run analyzer is suffix-blind.
+**⚠️ #3 — Metric easy-pace unit mislabel (latent).** Baselines hardcodes `/mi` (`TrainingBaselines.tsx:1314`; the formatters at `:510` and `:518` hardcode it too) ⟨A31⟩; AppContext stores `/km` for metric users (`AppContext.tsx:359`). Masked today only because the run analyzer is suffix-blind.
 
-**⚠️ #4 — Live-vs-cached freshness fork (latent).** State recomputes trends live; the Performance tab reads the cached `state_trends_v1`. Same code path → agree only when the cache is fresh. Currently latent because the Performance-tab trend line isn't rendered (`MobileSummary.tsx:163`).
+**✅ #4 — Live-vs-cached freshness fork: CLOSED.** There is no live client recompute any more — `useStateTrends` is a pure renderer of the server-assembled `state_trends_v1` (`useStateTrends.ts:1-6, 95-96`), so State and the Performance tab read the same cached contract by construction. The Performance-tab trend line is also not rendered (`MobileSummary.tsx:163`). ⟨A31⟩
 
-**⚠️ #5–7 — drift risks (not visible contradictions):** client re-implements `FitnessVerdictDivergence` (D-212 mirror, `useCoachWeekContext.ts:70`); `arc-context.ts:351` copies race-readiness projection bands; spine bike-trend vs Arc `cycling_fitness` unreconciled.
+**⚠️ #5–7 — drift risks (not visible contradictions):** client re-implements `FitnessVerdictDivergence` (D-212 mirror, `useCoachWeekContext.ts:70`); `arc-context.ts:369-392` (`projectionDirectionFromDelta`) copies race-readiness projection bands ⟨A31⟩; spine bike-trend vs Arc `cycling_fitness` unreconciled.
 
 ---
 

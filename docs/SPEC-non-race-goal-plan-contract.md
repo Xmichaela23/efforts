@@ -42,7 +42,7 @@ A co-equal strength track requires **real strength frequency** — 3–4 days, t
 
 ## Why this spec exists (the immediate blocker)
 
-The non-race builder (D-213, Cuts A–G) defined goal **intent** (the 6-goal menu + per-discipline posture) but the engine was only taught to build **events/triathlon**. Per `GOALS_SYSTEM_BLUEPRINT.md:10`, "capacity + maintenance goal types exist as data shells only." The sweep proved it: **0 of 16 non-race combos materialize.** `computeSessionFrequencyDefaults` is triathlon-only; run/bike/hybrid are stubs that collapse the week to the long run (F-9). You can't populate those matrices without first deciding what each goal × shape prescribes — both tracks. That decision is this document.
+The non-race builder (D-213, Cuts A–G) defined goal **intent** (the 6-goal menu + per-discipline posture) but the engine was only taught to build **events/triathlon**. Per `archive/GOALS_SYSTEM_BLUEPRINT.md:10`, "capacity + maintenance goal types exist as data shells only." The sweep proved it: **0 of 16 non-race combos materialize.** `computeSessionFrequencyDefaults` is triathlon-only; run/bike/hybrid are stubs that collapse the week to the long run (F-9). You can't populate those matrices without first deciding what each goal × shape prescribes — both tracks. That decision is this document.
 
 ---
 
