@@ -4499,8 +4499,28 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           </div>
         )}
         {exercises.map((exercise, exerciseIndex) => (
+          <React.Fragment key={exercise.id}>
+          {/* ⛔ HOW ASSISTANCE IS MEANT TO BE PERFORMED — ONCE FOR THE WHOLE BLOCK, above the first
+              assistance card. It is a section note, not a property of any one exercise.
+              An assistance row prescribes a rep TOTAL and no weight — the block saying "get this
+              many, however you like" — and nothing said so, so "target 25 total" read as one set:
+              Michael, on his own plan, "25 chin ups? lol i can do 5."
+              ⚠️ FIRST-ROW GATE, and it is doing real work: printed per card this repeated on every
+              accessory (three times on Michael's screen) and, placed in the header flex row, it took
+              width from the exercise-name search box until the name was invisible. One line, above
+              the group, outside every card.
+              Basis: Wendler 5/3/1 2nd ed. p.24 / p.102 — assistance runs across as many sets as it
+              takes and is explicitly not taken to failure; too much of it is the most common mistake
+              with the programme. See ACCESSORY_SET_CUE for why this line may carry words the
+              bar-speed lint bans. */}
+          {!isBaselineTestWorkout(scheduledWorkout || {})
+            && isAssistanceRow(exercise)
+            && exercises.findIndex((e) => isAssistanceRow(e)) === exerciseIndex && (
+            <p className="mx-3 mb-1.5 mt-2 text-[11px] font-medium text-white/45 leading-snug">
+              {ACCESSORY_SET_CUE}
+            </p>
+          )}
           <div 
-            key={exercise.id} 
             className={`backdrop-blur-xl border-2 ${themeColors.border} rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(${themeColors.rgb},0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]`}
             style={{
               background: `linear-gradient(135deg, rgba(${themeColors.rgb},0.15) 0%, rgba(${themeColors.rgb},0.05) 50%, rgba(255,255,255,0.03) 100%)`
@@ -4638,20 +4658,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   </button>
                 )}
 
-              {/* ⛔ HOW ASSISTANCE IS MEANT TO BE PERFORMED — ONCE per exercise, not per set.
-                  An assistance row prescribes a rep TOTAL and no weight, which is the block saying
-                  "get this many, however you like". Nothing on the card said so, so "target 25 total"
-                  read as one set: Michael, on his own plan — "25 chin ups? lol i can do 5." The
-                  prescription never asked for twenty-five in a row.
-                  Basis is Wendler (5/3/1 2nd ed. p.24 / p.102): assistance runs across as many sets
-                  as it takes and is explicitly not taken to failure — doing too much of it is named
-                  as the most common mistake with the programme. See ACCESSORY_SET_CUE for why this
-                  line may contain words the bar-speed lint bans. */}
-              {isAssistanceRow(exercise) && !isBaselineTestWorkout(scheduledWorkout || {}) && (
-                <p className="w-full text-[10px] font-medium text-white/40 leading-snug px-1 pb-1 -mt-0.5">
-                  {ACCESSORY_SET_CUE}
-                </p>
-              )}
 
               {/* ── Q-181 — THE SWAP SHEET ────────────────────────────────────────────────────────
                   The app OFFERS the alternatives, filtered by MOVEMENT PATTERN + the athlete's
@@ -5811,6 +5817,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             </>
             )}
           </div>
+          </React.Fragment>
         ))}
 
         {/* Add new exercise input */}
