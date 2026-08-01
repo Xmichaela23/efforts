@@ -86,9 +86,12 @@ function verdictLabel(
 // verdict so the number and the arrow always agree. improving → +, sliding → −, holding → raw.
 function verdictSignedPct(verdict: string, pct: number | null | undefined): string | null {
   if (pct == null) return null;
+  // ⚠️ ONE MINUS GLYPH, ALL THREE BRANCHES. The `holding` fallback used to print JS's own negative
+  // ("-0.4%", ASCII hyphen U+002D) while the sliding branch printed a true minus ("−15.2%", U+2212).
+  // Adjacent rows on one screen, two different characters at two different widths. 2026-08-01.
   if (verdict === 'improving') return `+${Math.abs(pct)}%`;
   if (verdict === 'sliding') return `−${Math.abs(pct)}%`;
-  return `${pct > 0 ? '+' : ''}${pct}%`;
+  return `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct)}%`;
 }
 
 // ── THE BLOCK, STATED — read from the card, translated by nobody ──────────────────────────────────
