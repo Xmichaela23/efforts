@@ -213,6 +213,17 @@ The north star, made explicit and written to `docs/TARGET-ARCHITECTURE.md` (+ CL
 
 **Owed doc-debt (flagged, not fabricated):** D-270 (strength convergence, commit `bdab1874`) and FTP fracture #2 (commits `d278cadd` / `eae2d9aa` / `00dbc9f2`) are referenced in commit messages but still owe formal DECISIONS-LOG entries — write them from the commits next session.
 
+> ⛔ **STILL UNPAID AS OF 2026-07-31 — 21 DAYS LATER. THIS IS THE ONLY NUMBERED DECISION THAT DOES NOT EXIST.** ⟨A31⟩
+> Verified by the doc audit: there is **no `D-270` heading anywhere** in `DECISIONS-LOG.md` or
+> `archive/DECISIONS-LOG-archive-D001-D239.md`, while **D-270 is cited as settled law in at least five
+> places** — `AUDIT-performance-state-2026-07-29.md:332`, `CONCEPT-adapt-plan-strength.md:105`, and three
+> times in this file (`:218`, `:224`). A reader who follows the citation finds nothing.
+> D-271 through D-352 are all present; **D-270 and Q-144 are the only gaps in either sequence.**
+> All four commits are still in the tree and readable — `git show bdab1874` etc.
+> ⚠️ **NOT WRITTEN BY THE AUDIT ON PURPOSE:** authoring a decision entry means stating *why* a choice was
+> made, and that is the architect's to say, not an auditor's to reconstruct. This is the "a decision that
+> lives only in a commit message does not exist" failure CLAUDE.md names, caught in the act.
+
 ## D-272 — State↔Performance fork sweep: the workout narrative reads the SPINE, never re-derives (2026-07-10/11)
 
 **The pattern found (a sweep, code-traced across all 4 disciplines).** Every discipline's per-workout narrative had quietly grown its OWN trend classifier for a fact the State spine already owns — same class as D-239 (run decoupling) and D-270 (strength e1RM), just un-generalized. The two used cruder math (no staleness gate, no terrain match, wrong window) and could contradict State for the same fact on the same athlete. Root cause is the feature-by-feature accumulation this whole architecture arc exists to reverse (each surface minted its own calc). **The fix template, applied uniformly:** the per-session read is a RECEIPT (the workout's own numbers, this session vs prior); the multi-week DIRECTION/TREND is the SPINE's (State owns it); the workout either reads the spine or shares the spine's band. Two display *vocabularies* are allowed where they serve different surfaces (e.g. strength: workout DESCRIBES "too easy", State PRESCRIBES "add weight" — both standard autoregulation registers) but there is ONE threshold/authority underneath.
