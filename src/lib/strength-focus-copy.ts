@@ -232,10 +232,19 @@ export function strengthFocusDescription(opts: {
 
 // ─── BAR SPEED — the block's in-session doctrine ────────────────────────────────────────────────
 //
-// ⛔ SPEED IS THE AMRAP'S STOP RULE, NOT A SEPARATE SIGNAL. Wendler ends the "+" set on form
-// breakdown — bar path, depth, brace, lockout, control — and speed is the earliest of those to go.
-// Michael, 2026-07-25: *"slow rep = last rep. That's the AMRAP terminator and the whole doctrine in
-// four words."*
+// ⛔ THE AMRAP ENDS SHORT OF FAILURE — NOT AT THE FIRST SLOW REP. **CORRECTED 2026-08-01; the
+// paragraph that stood here was stricter than the source it cited.**
+//
+// It read: *"speed is the earliest sign of form breakdown, so slow rep = last rep"* (Michael,
+// 2026-07-25 — "the AMRAP terminator and the whole doctrine in four words"). Neat, and it stops the
+// set too early. Wendler's own instruction for the "+" set is to **grind it out, not to failure**
+// (5/3/1 2nd ed. p.24). A grinding rep is a rep — it is the slow ones at the end of an AMRAP that
+// make the set worth doing, and the count off that set is what moves the training max. A rule that
+// ends the set at the first slow rep systematically under-reports the number the block runs on.
+//
+// ⚠️ THE STOP RULE ITSELF IS UNCHANGED AND IS THE POINT: not to failure. What changed is WHERE it
+// sits — at the edge of failure, not at the first sign of effort. "Grind it out" gives the reps
+// their permission; "stop before failure" keeps the ceiling.
 //
 // ⛔ AND IT IS KEYED TO THE SET, WHICH IS THE WHOLE REASON THIS IS A FUNCTION AND NOT A CONSTANT.
 // AMRAPs exist ONLY in the anchor cycle and never on its deload (`wendler-531.ts:61` —
@@ -267,7 +276,9 @@ export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
   warmup: 'Light weight, heavy intent. Move it fast.',
   // ⛔ NO REP-CHASING LINE ANYWHERE NEAR A PRESCRIBED SET.
   work_set: 'Every rep at the same speed as the first.',
-  amrap: 'Slow rep = last rep.',
+  // ⚠️ REVERSED 2026-08-01 from "Slow rep = last rep." — see the doctrine note above. Grinding reps
+  // are real reps; the ceiling is failure, not slowness.
+  amrap: 'Grind it out. Stop before failure.',
   rest: "Rest until the speed's back.",
   // ⚠️ REWRITTEN 2026-08-01 (Michael), from "Nothing to prove. Move it fast anyway." The old line
   // conceded something first ("nothing to prove", "anyway") and the concession is the part an
@@ -281,8 +292,13 @@ export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
   validity_set: 'Five at ninety-five. This one decides the number.',
 };
 
-/** The AMRAP's closing line — shown after the set, where `amrap` is shown before/during. */
-export const BAR_SPEED_AMRAP_AFTER = 'Stop when it slows, not when it fails.';
+/**
+ * The AMRAP's closing line — shown after the set, where `amrap` is shown before/during.
+ * ⚠️ REALIGNED 2026-08-01 from "Stop when it slows, not when it fails." That sentence carried the
+ * speed-stop the doctrine note above retired, and it contradicted the new opener the moment the
+ * opener said to grind. Both lines now name the same ceiling, and this one says why it is there.
+ */
+export const BAR_SPEED_AMRAP_AFTER = 'Not to failure — you train tomorrow.';
 
 /**
  * ⛔ THE ASSISTANCE CUE — shown ONCE per accessory exercise, not per set.

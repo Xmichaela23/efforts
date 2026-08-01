@@ -26,7 +26,7 @@ import {
   type SetDifficulty,
 } from '@/lib/strength-focus-copy';
 // D-208's role table — the app's one answer to "is this a main lift or assistance work".
-import { roleForExercise } from '@/lib/exercise-role';
+import { roleForExercise, isMain531Lift } from '@/lib/exercise-role';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 // The app's ONE 1RM formula — Wendler's own (D-339). `compute-facts` imports the same module.
@@ -143,9 +143,18 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
 const normalizeExerciseNameForMatch = (name: string): string =>
   String(name || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
 
-const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' | 'bodyweight' | 'goblet' => {
+const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' | 'bodyweight' | 'goblet' | 'plyo' => {
   const name = normalizeExerciseNameForMatch(exerciseName);
-  
+
+  // ⛔ PLYOMETRICS ARE REPS AND NOTHING ELSE (2026-08-01, Michael: a Box Jump was being shown a bar,
+  // a plate calculator AND a bar-speed cue). A jump has no external load to record, no bar to load,
+  // and no bar-speed conversation — the intent is maximal every rep by definition, so a cue telling
+  // the athlete to keep the reps at one speed is describing a different kind of exercise.
+  // ⚠️ CHECKED FIRST, ABOVE EVERY OTHER PATTERN. "Jump Squat" contains "squat" and "Box Jump" fell
+  // through every rule below to the `barbell` DEFAULT — the third time that default has been the bug
+  // (Q-180 the dumbbell carry, then the single-leg hip thrust). Order is the fix.
+  if (/\b(jump|hop|bound|plyo|skater)\w*/.test(name)) return 'plyo';
+
   // Bodyweight / core exercises (no equipment needed)
   if (name.includes('core circuit') || name.includes('core work') || name.includes('calf raise')) return 'bodyweight';
   
@@ -1655,8 +1664,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
    * one signal, not a second derivation that could disagree with the pill on the same screen.
    */
   const barSpeedCueFor = (exercise: LoggedExercise, set: LoggedSet): string | null => {
-    // Assistance work is not a bar-speed conversation — it has its own cue, once, above.
-    if (isAssistanceRow(exercise)) return null;
+    // ⛔ THE FOUR MAIN LIFTS ONLY (2026-08-01). The first cut gated on "not assistance", which let
+    // the cue onto everything the block prescribes that is not an accessory — Michael's Box Jump
+    // read "Every rep at the same speed as the first", which is advice for a barbell set under a
+    // percentage of a training max, not for a jump. `isMain531Lift` is an explicit curated list and
+    // MISSES TO FALSE, so an unmapped lift gets no cue rather than the wrong one. Accessories get
+    // the section note above the block; plyos get nothing.
+    if (!isMain531Lift(exercise?.name || '')) return null;
+    if (getExerciseType(exercise?.name || '') === 'plyo') return null;
     if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
     return barSpeedLineFor({
       isWarmup: set?.setType === 'warmup',
@@ -5104,7 +5119,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 {(() => {
                                   const shown = set.reps === 0 ? '' : (set.reps ?? ((set.amrap || set.repMaxTest || isBaselineTestWorkout(scheduledWorkout || {})) ? '' : '—'));
                                   if (shown === '' && set.amrap && !set.completed) {
-                                    return <span className="text-amber-300/45 text-[11px] tracking-wide">all out</span>;
+                                    return <span className="text-amber-300/45 text-[11px] tracking-wide">AMRAP</span>;
                                   }
                                   return shown;
                                 })()}
@@ -5123,7 +5138,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 is the one whose count moves the training max (D-338), so it gets its
                                 own words rather than a shared string with a "+" on the end. */}
                             {set.amrap ? (
-                              <span className="text-[9px] font-medium text-amber-300/70 leading-none">all-out · {exercise.target_reps ? String(exercise.target_reps).replace(/\+$/, '') : '5'} minimum</span>
+                              <span className="text-[9px] font-medium text-amber-300/70 leading-none">AMRAP · {exercise.target_reps ? String(exercise.target_reps).replace(/\+$/, '') : '5'} minimum</span>
                             ) : exercise.target_reps ? (
                               <span className="text-[9px] font-medium text-white/45 leading-none">target {String(exercise.target_reps).replace(/\+$/, '')}</span>
                             ) : null}
@@ -5241,6 +5256,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         
                         const exerciseType = getExerciseType(exercise.name);
                         
+                        // ⛔ A PLYO HAS NO LOAD COLUMN AT ALL (2026-08-01). A box jump is reps; there is
+                        // no bar, no plate, no band and no belt to record. Checked before every other
+                        // shape so a jump can never inherit one of their inputs.
+                        if (exerciseType === 'plyo') return null;
+
                         // ⛔ BAND AS THE LOAD: POUNDS, NOT A LEVEL (D-351, 2026-08-01). Same reversal as
                         // the assist field above and the same reason — a level cannot be multiplied by
                         // reps, so four levels priced every band set at one flat token regardless of what
@@ -5444,7 +5464,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         return (
                           <div className="flex items-start gap-2 mt-1">
                             <span className="w-9 shrink-0" aria-hidden="true" />
-                            <span className="text-[10px] font-medium text-white/35 leading-snug">{cue}</span>
+                            {/* One step up from the "last:" anchor above (11px / white-55 vs 10px /
+                                white-40). At 10px/35 it read as disabled text rather than as a cue —
+                                it is an instruction for the set about to be performed, so it outranks
+                                the historical anchor it sits under. */}
+                            <span className="text-[11px] font-medium text-white/55 leading-snug">{cue}</span>
                           </div>
                         );
                       })()}
@@ -5556,6 +5580,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         return null;
                       }
                       const exerciseType = getExerciseType(exercise.name);
+                      // A plyo has no equipment to choose — no bar, no plates, no band.
+                      if (exerciseType === 'plyo') return null;
                       // D-351: the equipment strip's band control, in pounds — the same field and the
                       // same rule as the set row above. Two controls wrote this value in words; both
                       // now write a number, or nothing.

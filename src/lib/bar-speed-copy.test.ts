@@ -1,5 +1,5 @@
-import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { barSpeedLineFor, BAR_SPEED_COPY, topSetIndex } from './strength-focus-copy.ts';
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { barSpeedLineFor, BAR_SPEED_COPY, BAR_SPEED_AMRAP_AFTER, topSetIndex } from './strength-focus-copy.ts';
 import {
   setsForWeek,
   WEEKS_PER_CYCLE,
@@ -93,4 +93,45 @@ Deno.test('topSetIndex — nothing loaded suppresses the tap rather than guessin
   assertEquals(topSetIndex([]), -1);
   assertEquals(topSetIndex([{ weight: 0 }, { weight: 0 }]), -1);
   assertEquals(topSetIndex([{}, { weight: null }]), -1);
+});
+
+// ── THE AMRAP DOCTRINE, REVERSED 2026-08-01 ─────────────────────────────────────────────────────
+//
+// The original rule was "slow rep = last rep" — end the "+" set at the first slow rep, on the
+// reasoning that speed is the earliest sign of form breaking down. Stricter than the source it
+// cited: Wendler says to GRIND IT OUT, not to failure (5/3/1 2nd ed. p.24). A grinding rep is a
+// rep, and the count off that set is what moves the training max — so a speed-stop systematically
+// under-reports the number the block runs on.
+//
+// ⛔ THESE PIN THE REVERSAL SO IT CANNOT DRIFT BACK. The stop rule itself never moved: not to
+// failure. What moved is WHERE it sits — at the edge of failure, not at the first sign of effort.
+Deno.test('AMRAP — gives the grinding reps permission, and does NOT stop at the first slow one', () => {
+  const s = BAR_SPEED_COPY.amrap.toLowerCase();
+  assert(s.includes('grind'), `AMRAP line must invite the grind: ${BAR_SPEED_COPY.amrap}`);
+  assert(!s.includes('slow'), `AMRAP line must not reinstate the speed-stop: ${BAR_SPEED_COPY.amrap}`);
+});
+
+Deno.test('AMRAP — still names failure as the ceiling (the stop rule never moved)', () => {
+  assert(/before failure|not to failure|short of failure/.test(BAR_SPEED_COPY.amrap.toLowerCase()),
+    `AMRAP line must keep an explicit not-to-failure ceiling: ${BAR_SPEED_COPY.amrap}`);
+});
+
+Deno.test('AMRAP — the closing line agrees with the opener instead of contradicting it', () => {
+  // The old closer ("Stop when it slows, not when it fails.") carried the retired speed-stop and
+  // would have argued with the new opener on the same set.
+  const after = BAR_SPEED_AMRAP_AFTER.toLowerCase();
+  assert(after.includes('failure'), `closing line must name the ceiling: ${BAR_SPEED_AMRAP_AFTER}`);
+  assert(!after.includes('slow'), `closing line must not reinstate the speed-stop: ${BAR_SPEED_AMRAP_AFTER}`);
+});
+
+// ⛔ THE BANNED-WORD LINT DELIBERATELY DOES NOT COVER `amrap`, and now it matters more than before.
+// On a PRESCRIBED set "failure" would mean rep-chasing; on the AMRAP it is the ceiling. Same word,
+// opposite job — which is exactly why the lint above lists its four keys explicitly rather than
+// iterating the whole table.
+Deno.test('AMRAP is exempt from the rep-chasing lint, and the prescribed lines still are not', () => {
+  assert(BAR_SPEED_COPY.amrap.toLowerCase().includes('failure'));
+  for (const key of ['warmup', 'work_set', 'deload', 'validity_set'] as const) {
+    assert(!BAR_SPEED_COPY[key].toLowerCase().includes('failure'),
+      `${key} must not mention failure: ${BAR_SPEED_COPY[key]}`);
+  }
 });

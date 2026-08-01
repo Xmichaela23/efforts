@@ -176,6 +176,38 @@ export function roleForExercise(name: string): StrengthRole {
   return role;
 }
 
+/**
+ * ⛔ IS THIS ONE OF 5/3/1'S FOUR MAIN LIFTS? A NARROWER QUESTION THAN `roleForExercise`.
+ *
+ * `primary` answers "does skipping this cost full completion weight", and it is deliberately wide —
+ * a goblet squat, an RDL, a trap-bar deadlift and a DB bench are all `primary`. That is right for
+ * scoring and wrong for the bar-speed cue, which describes **the lift the block prescribes a
+ * percentage of a training max for**: squat, bench, deadlift, press. Wendler's four.
+ *
+ * ⚠️ WHY THIS IS NOT `roleForExercise(x) === 'primary'`. `roleForExercise` DEFAULTS to `primary` on
+ * an unmapped name (loudly, on purpose, so nothing is silently discounted). Gate a cue on it and
+ * every exercise the table has never heard of inherits a 5/3/1 instruction — the failure mode is a
+ * default, so it grows on its own as the library does.
+ *
+ * ⚠️ AND WHY IT IS NOT A CONTAINMENT TEST. "Jump Squat" contains "squat" and is not a squat here,
+ * exactly as `canonicalize.ts` warns for 1RM purposes. Every entry below must be an explicit,
+ * curated key — variants that genuinely ARE the main lift under another name (trap-bar deadlift as
+ * the deadlift slot, push press as the press slot) are listed; everything else is out.
+ *
+ * ⚠️ A MISS RETURNS FALSE, which is the safe direction: an unmapped lift gets no cue rather than the
+ * wrong one. The opposite default is what leaked the speed cue onto a box jump.
+ */
+const MAIN_531_LIFTS = new Set<string>([
+  'back squat', 'barbell back squat', 'squat', 'front squat',
+  'bench press', 'barbell bench press', 'close grip bench press',
+  'deadlift', 'conventional deadlift', 'trap bar deadlift', 'sumo deadlift',
+  'overhead press', 'standing barbell overhead press', 'press', 'military press', 'push press',
+]);
+
+export function isMain531Lift(name: string): boolean {
+  return MAIN_531_LIFTS.has(canonical(name));
+}
+
 export function weightForExercise(name: string): number {
   return ROLE_WEIGHT[roleForExercise(name)];
 }
