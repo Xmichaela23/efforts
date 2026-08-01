@@ -23,211 +23,75 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-01 — **the run row is fixed and the docs that hid the fault are corrected. Your job is the STRENGTH load bug, which is bigger than it looks.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-01 — **strength load is fixed and re-priced; the State fitness rows read the block card. Your job is Stage 2, the client re-derivations.**)
 
-### YOUR JOB
+### WHAT SHIPPED TODAY — pushed AND deployed, do NOT re-litigate
 
-⛔ **BODYWEIGHT WORK SCORES ZERO LOAD, AND IT IS DISTORTING THE WHOLE SCREEN.** Measured on his real
-week (`scripts/_tonnage.mjs`, still on disk):
+**Two stages of `docs/AUDIT-state-screen-2026-08-01.md`, which governs this stream and is now in git.**
 
-| his squat day, 2026-07-30 | |
-|---|---|
-| Box Jump 3 sets | **0 lb** |
-| Back Squat 3 sets | 1,725 lb |
-| Dips 3 sets | **0 lb** |
-| Chin Up 3 sets | **0 lb** |
-| Single Leg Hip Thrust | **0 lb** |
-| **session workload** | **10 points** |
+**STAGE 1 — the State fitness rows + the Performance table read `block-identity`.**
+- The card has existed since 2026-07-30 and the coach's verdicts already read it; the SCREENS did not.
+  The coach payload has carried it at `plan.block` since v150 — the client type simply never described
+  it, so the browser threw it away. That was the whole bug.
+- The card gained `phaseWord` (`_shared/block-identity.ts`) — the plain word a screen may print, via
+  `normalizePhaseKey` (D-322), the SAME table the effort rules use. **`phase` is the plan's own name and
+  is often internal ('Leader'/'Anchor', Wendler's words); never print it.** Null = the plan did not place
+  the week → render "week 3 of 12" alone.
+- **The per-lift direction chip is DELETED (D-347), not silenced.** It judged an e1RM produced once per
+  cycle off a top set the block runs from 65% to 95%, so it was reading the PRESCRIPTION and calling a
+  correctly-executed light week a decline. The number, the 12-week chart and the PR all stay.
+- Strength chart footer no longer says "building · N of 12 weeks" (it read as block progress); fixed at
+  the STRENGTH CALL SITE, so run and bike are byte-identical.
 
-`calculateStrengthWorkload` (`_shared/workload.ts:249`) sums `weight × reps`. A chin-up has weight 0,
-so it contributes nothing — **13 sets scored 10 points, against 61 for a 47-minute easy run.** Result:
-**run 87% / strength 8%** of his load, on a strength-focused block, feeding ACWR, the "balanced"
-verdict and the reconciler.
+**STAGE 3 / D1 — bodyweight counts as load (D-348), and history was re-priced.**
+- ONE set rule: `strengthSetVolume` (`_shared/workload.ts`), used by the load score, the PLANNED score
+  and `compute-facts`' `total_volume_lbs` — so the load number and the volume number on the same screen
+  cannot disagree. Body weight from `user_baselines.weight` + `units`; **null → scored exactly as before,
+  never a guessed weight.**
+- **MEASURED ON HIS REAL DATA, after the backfill:** ratio **0.83 → 1.05, still `on_target`** in both
+  build and normal phases. Strength went from **8% → 38%** of his 28-day load (run 39, bike 16, swim 7).
+  Sessions: 30 Jul 10 → 75, 27 Jul 8 → 74, 28 Jul 6 → 47. All-barbell sessions correctly did not move.
+- `backfill-strength-load` re-prices BOTH sides (completed + planned). **It computes nothing itself** —
+  it invokes `calculate-workload` and `compute-facts`, then rebuilds the snapshot once.
 
-⚠️ **NO DECISION ENTRY DEFENDS THIS AND NO COMMENT EXPLAINS IT** — it is mechanical, not chosen. But
-tonnage-only may still be a defensible basis (some platforms use session RPE × duration), so **decide
-before you patch.** Two other facts fell out of the same read: his bench session recorded a **2-minute
-duration**, and strength sessions carry **no session RPE** while every run does, so the intensity term
-falls to a 0.75 default.
+### YOUR JOB — STAGE 2 of the audit doc (parked today, not dropped)
 
-⛔ **AND HEED THE PATTERN BEFORE YOU START** — Michael, watching it happen four times yesterday:
-*"the pattern is, you look, say its wrong, fix it, then break it, then see it was right, and then see
-there is a lot of code happening there."* This touches ACWR, load status and the reconciler, each with
-its own history. **Trace all three before changing one line.**
+**Delete the client re-derivations and route them through the server's one number:** `buildLoadHeadline`
+(`StateTab.tsx:1262`), `StrengthCompareTable`'s own `calcVolume` + matcher (the 5th identity resolver),
+`BlockSummaryTab`'s e1RM deltas. This is where the screens stop disagreeing AND where "no client math"
+lands — one cut, per the audit doc's §CODE HYGIENE. **It got cheaper today: the block card is already
+threaded into both surfaces.**
 
-### ⛔ WHAT SHIPPED 2026-07-31 — do NOT re-litigate any of it
+### ⛔ WHAT IS NOT VERIFIED, AND WHAT WOULD SETTLE IT
 
-**Thirteen commits (`de8b486d` … `7ea6170b`), 22 edge functions, coach payload 150 → 154. One decision
-([D-346]), two questions ([Q-231], [Q-232]).**
+- **NOTHING TODAY HAS BEEN SEEN ON A DEVICE.** Every claim above is code-traced or measured off the
+  database — that is stronger than usual and it is still not a human looking at a screen. **Settle it:**
+  open State (strength row should read "week N of M · build", no ↑/↓ chips per lift) and open a strength
+  session in Performance (a grey line naming the plan and week).
+- **The coach payload caches 24h.** State may serve the pre-backfill load reading until it re-sources;
+  pull-to-refresh forces it. If the mix bar still says strength ~8%, that is the cache, not the fix.
+- **iOS is NOT installed.** `npm run ios` synced Stage 1 but was not run after Stage 3; nothing since is
+  on the phone.
 
-| what | state |
-|---|---|
-| **The run verdict is speed-at-heart-rate**, every run, grade-adjusted, heat coefficient FITTED PER ATHLETE and removed | DEPLOYED ([D-346]) |
-| His read: **−15.2% over 26 runs / 13 weeks**, CI clears zero, heat **−0.28 %/°F** (literature: ~−0.22) | VERIFIED against real data |
-| **"Heat costs you about 20s a mile per 10°F warmer, measured on your own runs."** No competitor states the size | DEPLOYED |
-| The chart plots the SAME rows the verdict read; conditions captioned, never corrected | DEPLOYED |
-| The heart-rate row reads the same number, in the SHARED trend words, amber not red | DEPLOYED |
-| "as of" stamp = NEWEST contributor, not oldest | DEPLOYED |
-| `get-weather` backfills the route row's conditions (49 of 164 were null — a documented race) | DEPLOYED |
-| **Race projections HIDDEN below 8 threshold readings** (he has 3) | DEPLOYED |
-| Durability line SILENCED — see [Q-232], it is a decision not a patch | client |
+### ⚠️ THE ONE THING THAT COST THREE RUNS TODAY — read before using the backfill
 
-### ⛔ FIVE DOCS SAID THIS AREA WAS HEALTHY. THAT IS WHY IT WAS REBUILT FIFTEEN TIMES.
+`backfill-strength-load` asked to do all 97 workouts in one invocation reported **37 failures, three
+times, at exactly the same count** — while every one of those calls succeeded when driven from outside,
+and chunks of 10 and 25 came back **97-for-97 clean**. It is a ceiling on a long-running edge invocation
+making chained sibling calls; it is NOT contention (it survived the switch to sequential) and NOT bad
+data. **The function now chunks by default (25) and returns `next_offset` — loop until it is null.**
+I first told Michael it was concurrency. That was wrong, and the correction is the useful part: a
+half-finished re-pricing is the exact mixed old/new window the pass exists to prevent.
 
-`TRUTH-MAP` called RUN *"CLEAN … the model the others should copy"*. `AUDIT-hr-congruence` marked it
-clean. `CAPABILITY-MAP` said D-345 had fixed the intent. `STATE-SOURCE-MAP` described a substrate that
-had moved ten days earlier. `session-detail/build.ts` claims in a comment that it uses *"the SAME metric
-State uses"* — it does not. **All five corrected, each carrying what it used to claim and why it was
-wrong.** ⛔ A doc that says "clean" about a broken thing does not merely fail to help — it routes every
-future session away from the fault.
+### STILL OPEN, WITH THE REASON (all in the audit doc)
 
-### ⛔ THE LESSON THAT COST THE MOST YESTERDAY
-
-**After moving a data source, SWEEP the surface once against the new pool — every label, date, unit and
-claim — instead of shipping and waiting to be told.** Three stale labels shipped and were each caught
-by Michael on a screenshot: `over 6wk` (hardcoded 42 days), `last 12 weeks` (clamped), `1d ago` (from
-the replaced pool). Same cause every time: **the data moved and a hardcoded number stayed.** The sweep
-that was finally done found three more in one pass.
-
-⚠️ **AND A COPY CHANGE IN `coach/` NEEDS `COACH_PAYLOAD_VERSION` BUMPED** or the cache serves the old
-text for 24h. That file warns about this three times in its own notes; it was walked into anyway.
-
-### ⛔ WHAT IS STILL OPEN
-
-- **The strength load bug above.** That is the job.
-- **[Q-232] — durability.** The gate reads a field that says `steady_state` on every run, so hill
-  sessions count. ⛔ The obvious fix (gate on `decoupling_mixed_effort`) **fails a pinned regression
-  test with its own bug history**, and [D-034] and `state-trend/run.ts` disagree about whether that flag
-  may filter. **A decision, not a patch.** Q-232 lists three resolutions — including dropping decoupling
-  from State entirely, which is where D-346 already pointed the verdict.
-- **[Q-231] — a Strava sync lands runs but no analysis**, so a new athlete starts with no verdict.
-  `bulk-reanalyze-workouts` already does that pass and is not wired to the import.
-- **Two stale failures in `src/lib/non-race-goal-seeds.test.ts`** — fourth session carrying this line.
-
-### ⛔ THE SELF-AUDIT, AND WHAT IT CORRECTED (late 2026-07-30)
-
-Michael: *"im worried about the overall quality of your work right now, so whatever you touched deep
-dive into how it works and if you did it right."* Everything below was verified against his REAL
-stored data, not asserted.
-
-**TWO DEFECTS FOUND IN THE DAY'S OWN WORK, both fixed:**
-1. ⛔ `baselineServerResults` was **set and rendered by NOTHING** — the tested 1RM moved to the server
-   (D-342), the athlete was told the number would appear after saving, and it never did. **An input
-   with no reader, introduced by the session that spent all day removing them.** No test can see that
-   a value is never displayed. Now rendered after the save.
-2. Two comments went stale the moment D-339/D-344 shipped (`brzycki(weight, reps + rir)`, the
-   `{rounded1RM}` pull-up shape). A comment that lies is how every doc here rotted.
-
-**⛔ A DIAGNOSIS THAT WAS WRONG TWICE, AND THE CORRECTION MATTERS MORE THAN THE FIXES:**
-The *"Heart-rate response — as of Jul 14"* row is **NOT stale data and was never broken.** It is a
-ROLLUP of run + bike, and `rollupHrResponse` stamps it with `Math.max(...ages)` — **the OLDEST
-contributor, deliberately, so the stamp cannot overstate freshness** (pinned in
-`rollup-hr-response.test.ts`). His run side is 3 days old; his bike is 16 (last ride 2026-07-20).
-⚠️ **Two `compute-facts` fixes were aimed at a non-problem.** The missing `workout_type` was a genuine
-gap — the efficiency series went from frozen to 9 samples, newest 3 days — so the changes are not
-harmful, but they did not cause the symptom he was pointing at. **The real fix is the STAMP**: show
-the newest input and let the detail line name the stale contributor, which it already does.
-
-**VERIFIED CORRECT against his real data:**
-- The rematerializer's cycle reconstruction from `config.phase_structure`: three anchor cycles,
-  weeks 1-4 / 5-8 / 9-12. **Matches his calendar exactly.**
-- Simulated on his real working numbers (squat TM 90 / 1RM 110): all hits `90→95→95`, nothing logged
-  `90→90→90`, a miss `90→80→85`. **The case that must not be wrong holds.**
-- `classifyRunIntent` on his real planned names: Easy Run→easy, Hill Repeats→interval, Long Run→easy,
-  unattached+untitled→null.
-- Client `functions.invoke` + `requireUser` is a proven pair (`detach-planned`), so the three new
-  functions authenticate.
-- No new type errors and no new lint errors in any file touched.
-
-**⚠️ TWO FACTS ABOUT HIS BLOCK THAT THE AUDIT SURFACED:**
-- His stored squat 1RM is **110** (not the ~106 an earlier back-calculation claimed). Working numbers:
-  squat 90, bench 125, deadlift 125, OHP 85.
-- ⛔ **His squat and OHP hit the D-325 ceiling after ONE step** — the ceiling is 90% of the max on
-  file, so squat can only reach 95 and OHP 90. He did 15 reps at 75 lb on 2026-07-30, so the stored
-  max is well behind what he is demonstrating. **The progression will stall in cycle 2 against a
-  stale number** unless the max is retested or raised. Not a bug; the ceiling doing its job on old data.
-
-⚠️ **A PROCESS ERROR WORTH RECORDING:** a mis-quoted `git stash push` silently failed, and the
-following `git stash pop` restored an UNRELATED old stash into the working tree, conflicting
-`auto-attach-planned`. Recovered with `git checkout HEAD --` on the two files; nothing lost and the
-stash is still in the list. **Do not use `git stash` to compare states — use `git show <ref>:<path>`.**
-
-### ⛔ WHAT IS STILL OPEN
-
-- **The three State reads above.** That is the job.
-- ⚠️ **`Single Leg Rdl` and `Single Leg Romanian Deadlift` are the same movement, offered twice** in
-  the library swap list. Only surfaces on non-assistance rows now.
-- **Runs have no attach content-check.** Strength now requires a shared main lift ([D-338]); any run
-  can still claim any run. [D-345] makes the intent matter, which raises the cost of a wrong link.
-- **Two stale failures in `src/lib/non-race-goal-seeds.test.ts`** — left over from the 2026-07-29
-  "no prefilled days" change; the test still expects seeded Monday/Thursday. **Third session carrying
-  this line.**
-- **Not backfilled by choice:** existing sessions keep their Brzycki e1RM until recomputed
-  (per-session Recompute reruns `compute-facts`); existing goals have no `goal_focus`; existing
-  planned rows have no `load_prescribed`.
-- **Audit F7, F8, F11** — untouched (`docs/AUDIT-performance-state-2026-07-29.md`).
-- ⚠️ **`DECISIONS-LOG.md` is past 380KB** against the ~150KB cap. **Sixth session carrying this line.**
-- ⚠️ **`ios/debug.xcconfig` uncommitted, five sessions running.**
-
-### ⛔ AWAITING A DEVICE — the client changed late and was not re-run
-
-The last three client commits (the logger sheet, the swap fixes, the removed difficulty tap, Recompute
-moved to the top) were pushed and synced but **the phone was not re-run after them.** He will not see
-the weight-change sheet until a week-3 session in any case.
-
-### ⛔ HOW TO TALK TO MICHAEL — this got worse today, not better
-
-*"honestly i cant read past a couple of sentences with you."* And, on a question with its reasoning
-attached: *"you do undertand what a sentence like this wastes tokens, my time and my bandwidth right?"*
-
-⛔ **ASK THE QUESTION. DO NOT EXPLAIN WHY YOU ARE ASKING.** *"Did you rebuild in Xcode?"* is the whole
-message. Justification and "before I go hunting" narration are pure cost.
-⛔ **2-4 short sentences.** A status update after a chunk of work is three lines. A question is one.
-⛔ He does not know what ANY engineering word means. Describe what he would SEE.
-
-⚠️ **AND HE IS RIGHT MORE OFTEN THAN THE CONFIDENT ANSWER.** On 2026-07-30 he caught, by reading
-screens: the accessory swaps offering main lifts, the assistance shortlist being ignored, the
-protocol-blind bench row, the stale heart-rate reading, and a wrong body-region guess. **Five real
-bugs, all from "this looks off."** Check before answering.
-
-⚠️ **AND VERIFY THE FIELD BEFORE CLAIMING IT.** Twice today a confident answer about "what other apps
-do" was wrong until checked — the e1RM display gating (Boostcamp shows it continuously) and the run
-intent source (Intervals.icu inherits planned-workout tags). **He asks "is this a sound approach" and
-he means it. Search first.**
-
-### ⛔ THE LAW, AS IT STANDS — carried from 2026-07-27, still live
-
-**This section has survived three banner rolls. Read it before touching scheduling, workload, or Wendler loading.**
-
-| what | where | why it matters to you |
-|---|---|---|
-| **`lower_body_strength × long_ride` clearance 48h → 0h** | `_shared/schedule-session-constraints.ts` | The matrix always said they could share a day; a 48h clearance beside it was a contradiction |
-| **`upper_body_strength × long_ride` and `× long_run` → ✓** | same | The matrix forbade the exact stack the engine mandates. Bench on a long day is legal, and it is the free pair |
-| **The adjacency table exists** | same — `ADJACENCY_HOURS` | Replaces `LEG_QUALITY_KINDS`/`LEG_LONG_KINDS`, both **deleted**. Symmetric, asserted at module load. ⛔ Do not add a list beside it |
-| **The long-run workload factor never matched** | `_shared/workload.ts` | `longrun_easypace: 0.70` matched no real token, so **every long run was priced as an easy run**. Fixed at the matching. Unmatched tokens now warn |
-| **Wendler: TM ≤ 90% of 1RM, and the step TRUNCATES** | `loading/wendler-531.ts` | The 6% increment cap STANDS and is derived. The cap is the ASYMPTOTE, not the rail. ⚠️ The START is 85%, not 90% — see Q-222 |
-| **One lift per day is still enforced** | `week-solver.ts:527` | D-332 did NOT relax it. Three-day weeks pass ONE paired upper slot. **Do not "fix" the solver to allow two lifts on a day** |
-| ⛔ **NEW: the ceiling compromise is `kind: 'ceiling'`** | `strength-primary-plan.ts` → `strength-focus-copy.ts` | The plan description drops it because the ceiling paragraph already says it. **Filter on the kind, never on the text** — a prose filter is how it double-printed |
-
-## ⛔ READ `ARCH-strength-spine.md` §0 BEFORE ANY ARCHITECTURE CALL — it was rewritten last night
-
-**The frame: the barbell block is the BODY; a goal is a TUNING of it.** Marathon, triathlon and Strength
-Focus are the same body at three settings, not three programs that happen to include lifting.
-`PRODUCT-POSITIONING.md:188` already said it in product terms; §0 makes it structural.
-
-- **§0.1 — the spine must YIELD.** Present always, priority *sometimes*. Twelve weeks from a marathon the
-  long run wins and the lifting bends. Build it as "four fixed lifting days" and it can never taper.
-- **§0.2 — two rhythms do not agree.** 5/3/1 deloads every 4th week on its own clock; a race plan waves on
-  another. Endurance rows are emitted **identically every week, deload or not** (`:455-465`). Benign now,
-  not benign when a race plan hosts the block at a real endurance dose. **OPEN.**
-- **§0.3 — the session survey.** Four places author sessions. `generate-combined-plan/session-factory.ts`
-  is **the original** (42 constructors, only one covering the bike). `tri-generator.ts` is the same work
-  written longhand. `generate-run-plan` is a narrower copy, no intervals. **`generate-plan/index.ts` is 71
-  lines, dated 2024, dead — delete it.**
-- **§0.6 — THREE PLACEMENT AUTHORITIES.** `week-optimizer.ts` (declared sole authority, strength path does
-  not use it), `place-week.ts` (built, 12 tests, **imported by nothing**), and the hardcoded
-  Mon/Tue/Thu/Fri grid that wins by default. **They agree today only because nothing has stressed them.**
-
+- **Isometric holds still score zero** (Q-233) — a plank is time with no reps, so a per-rep rule has
+  nothing to multiply. Deliberate; needs its own basis.
+- **A band-ASSISTED pull-up counts as full bodyweight** (Q-233) — the band cancels an unknown fraction
+  and inventing it would be a fabricated number. Over-counts, by less than zero under-counted.
+- **The HR "as of" stamp** shows the OLDEST contributor — fix the STAMP, not the data path (again).
+- **Trap zone, unchanged:** bike power/efficiency split, run durability (Q-232, silenced on purpose),
+  the run row (rebuilt 2026-07-31).
 ---
 
 ## WHAT SHIPPED LAST NIGHT — client only, uncommitted, do NOT re-litigate

@@ -11,10 +11,10 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 ## ▶ NEXT UP — THREE PROTOCOL-BLIND READS ON STATE (2026-08-01)
 **All three found by Michael reading his own screen at the end of 2026-07-30. Same family as everything
 that shipped that day: the reader does not know what the session was for.**
-- [ ] ⛔ **The per-lift row calls a prescribed dip a decline.** Bench reads "flat" with a dropping line
-      because week 1 of 5/3/1 is deliberately light. D-340 fixed the WEEK NARRATIVE, not these rows.
-      ⚠️ Decide the shape first — "show the number, claim no direction" vs a measurement-only series
-      (he has one measurement per cycle, too sparse for a 6-week trend).
+- [x] ⛔ ~~**The per-lift row calls a prescribed dip a decline.**~~ ✅ **PUSHED + DEPLOYED 2026-08-01
+      (D-347).** The chip is DELETED, not made protocol-aware — one measurement per cycle is too sparse
+      to carry a direction. The row now states the block instead ("week 1 of 12 · build"), read from
+      `block-identity`. ⚠️ Not device-verified.
 - [ ] **Cross-training compares a PARTIAL week to a whole-week target** — "9 of your 18-mile target",
       read on a Thursday. `_shared/insights/cross-training-read.ts`, the `floorBreach` clause.
 - [ ] **The run narrative guessed the wrong session** — "Monday's lower-body session"; Monday was Bench.
@@ -24,6 +24,20 @@ that shipped that day: the reader does not know what the session was for.**
       `Math.max(...ages)` so it cannot overstate freshness. His run is 3d old, his bike 16d.
       ⚠️ It reads as "this whole reading is stale". **Fix the STAMP** — show the newest and let the
       detail line name the stale contributor, which it already does. Do NOT "fix" the data path again.
+
+## ⛔ AWAITING MICHAEL — 2026-08-01 (Stage 1 + Stage 3 of the State audit: PUSHED + DEPLOYED, **none of it seen on a device**)
+- [ ] **Open State and look at the strength row.** Expect "week N of M · build" above the lifts, each
+      lift showing name + number + any PR, and **no ↑/↓ chip per lift**. Chart footer should read
+      "N weeks of readings", not "building · N of 12 weeks".
+- [ ] **Open a strength session in Performance.** Expect one grey line at the top naming the plan and
+      the week ("Strength Focus · week 1 of 12 · build").
+- [ ] **Check the load mix.** Strength should now be a real share of the week (measured: 8% → 38% over
+      28 days). ⚠️ **The coach payload caches 24h** — if it still reads ~8%, pull to refresh; that is
+      the cache, not the fix.
+- [ ] **Run Xcode.** `npm run ios` synced Stage 1 but was NOT re-run after Stage 3 — nothing from the
+      load work is on the phone.
+- [ ] **`docs/AUDIT-state-screen-2026-08-01.md` is now committed** (it governed this stream untracked
+      for two sessions).
 
 ## ⛔ AWAITING MICHAEL — 2026-07-31 (run row: DEPLOYED + seen on device by Michael during the session)
 - [x] **The RUN row** — verdict, heat line, chart, pace line, labels. Michael reviewed it on screen four

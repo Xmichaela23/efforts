@@ -30,6 +30,7 @@ import {
   mapRPEToIntensity,
   getStrengthIntensity,
   calculateStrengthWorkload,
+  resolveBodyweightLb,
   getMobilityIntensity,
   calculateMobilityWorkload,
   calculatePilatesYogaWorkload,
@@ -72,9 +73,11 @@ interface WorkoutData {
  *   - Performance inference (HR/power/pace → intensity) which needs full workout data
  *   - TRIMP routing for cardio with HR
  */
-function calculateWorkload(workout: WorkoutData, sessionRPE?: number): number {
+function calculateWorkload(workout: WorkoutData, sessionRPE?: number, bodyweightLb: number | null = null): number {
   if (workout.type === 'strength' && workout.strength_exercises && workout.strength_exercises.length > 0) {
-    return calculateStrengthWorkload(workout.strength_exercises, sessionRPE);
+    // D1 (2026-08-01): a calisthenic set is priced at the athlete's own body weight instead of
+    // scoring zero. Null (never recorded) → unchanged from today.
+    return calculateStrengthWorkload(workout.strength_exercises, sessionRPE, { bodyweightLb });
   }
 
   if (workout.type === 'mobility') {
@@ -218,6 +221,7 @@ serve(async (req) => {
     }
 
     // Fetch user's FTP, threshold HR, max HR, resting HR from user_baselines (including learned_fitness)
+    let bodyweightLb: number | null = null;
     let userFtp: number | null = null;
     let userThresholdHr: number | null = null;
     let runThresholdHr: number | null = null;
@@ -232,10 +236,13 @@ serve(async (req) => {
       try {
         const { data: baseline } = await supabaseClient
           .from('user_baselines')
-          .select('performance_numbers, learned_fitness')
+          // D1: `weight` + `units` price the athlete's bodyweight sets. Same row, no extra query.
+          .select('performance_numbers, learned_fitness, weight, units')
           .eq('user_id', userId)
           .maybeSingle();
         
+        bodyweightLb = resolveBodyweightLb(baseline as any);
+
         // Priority 1: Use learned_fitness thresholds (more accurate, data-driven)
         if (baseline?.learned_fitness) {
           const learned = typeof baseline.learned_fitness === 'string' 
@@ -439,7 +446,7 @@ serve(async (req) => {
       : undefined;
     
     // Calculate workload (all math happens server-side)
-    const workload = calculateWorkload(finalWorkoutData, sessionRPE)
+    const workload = calculateWorkload(finalWorkoutData, sessionRPE, bodyweightLb)
     const intensity = getSessionIntensity(finalWorkoutData, sessionRPE)
 
     // D-237: classify HOW this workload was derived so an ESTIMATED load (default

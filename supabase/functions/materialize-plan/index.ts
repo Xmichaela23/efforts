@@ -16,7 +16,7 @@ import {
   resolveStrengthEquipmentTypeForPlan,
 } from '../_shared/strength-equipment-tier.ts';
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
-import { calculatePlannedStrengthWorkload } from '../_shared/workload.ts';
+import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup, resolveSwapSeedWeight } from '../../../src/lib/exercise-config.ts';
 import { resolveProfile, getTargetRir, protocolUsesRir } from '../_shared/strength-profiles.ts';
 import { resolvePlanPhase } from '../_shared/plan-phase.ts';
@@ -3062,9 +3062,14 @@ Deno.serve(async (req) => {
 
     // Load baselines for user inferred from first row
     const userId = rows[0]?.user_id;
+    // D1: null when never recorded — planned bodyweight sets then score exactly as they do today.
+    let plannedBodyweightLb: number | null = null;
     let baselines: Baselines = {};
     try {
-      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, equipment, effort_paces, effort_score, effort_paces_source, units').eq('user_id', userId).maybeSingle();
+      // `weight` rides along for D1 — planned bodyweight sets are priced at the athlete's own body
+      // weight, exactly as the completed side prices them, or the two stop reconciling.
+      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, equipment, effort_paces, effort_score, effort_paces_source, units, weight').eq('user_id', userId).maybeSingle();
+      plannedBodyweightLb = resolveBodyweightLb(ub as any);
 
       // Audit: strength tier + raw baselines (generate-combined-plan uses effectiveProtocolTier; materialize uses equipment list for substitutions)
       const strengthEquipArr = Array.isArray(ub?.equipment?.strength) ? (ub.equipment.strength as string[]) : [];
@@ -3470,8 +3475,10 @@ Deno.serve(async (req) => {
           if (row.type === 'strength') {
             const strengthEx = steps
               .filter((st:any) => st?.kind === 'strength' && st?.strength && typeof st.strength === 'object')
-              .map((st:any) => ({ sets: st.strength.sets, reps: st.strength.reps, weight: st.strength.weight, target_rir: st.strength.target_rir }));
-            const plannedLoad = calculatePlannedStrengthWorkload(strengthEx);
+              // ⚠️ `name` now rides along: pricing a set has to ask the exercise whether a band on
+              // it is the load or is assistance (D1), and the name is the only way to ask.
+              .map((st:any) => ({ name: st.strength.name, sets: st.strength.sets, reps: st.strength.reps, weight: st.strength.weight, target_rir: st.strength.target_rir }));
+            const plannedLoad = calculatePlannedStrengthWorkload(strengthEx, { bodyweightLb: plannedBodyweightLb });
             if (plannedLoad > 0) update.workload_planned = plannedLoad;
           }
 

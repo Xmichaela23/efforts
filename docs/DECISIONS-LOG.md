@@ -2576,6 +2576,65 @@ rather than guessed into it — the same failure direction the gate already chos
 
 ---
 
+## D-348 — BODYWEIGHT IS LOAD, AND RE-PRICING HISTORY IS PART OF THE CHANGE (2026-08-01, **PUSHED + DEPLOYED, measured on real data, NOT device-verified**)
+
+**The decision (D1 of `docs/AUDIT-state-screen-2026-08-01.md`).** Strength load stays **volume load** —
+sets x reps x load, the basis Strong and Hevy score on — and **bodyweight fills in as the load** for
+calisthenics. Rejected: TIME (a bench session logged a 2-minute duration; logged-after-the-fact
+duration is garbage) and PER-SET EFFORT (only collected on the top/AMRAP set of the four main lifts, so
+it cannot score the accessories that read zero). Banded sets get a small flat per-set token — bands have
+no standardised tension, and assistance is deliberately minor, so precision is not worth buying.
+
+**The fault.** `calculateStrengthWorkload` summed `weight x reps`; a chin-up has weight 0. Measured on a
+real 13-set squat day: **10 points, against 61 for a 47-minute easy run** — on a strength block. Run 87%
+/ strength 8% of his load, feeding ACWR, the load verdict and the reconciler.
+
+**One rule, one file.** `strengthSetVolume` (`_shared/workload.ts`) is used by the load score, the
+PLANNED score (`calculatePlannedStrengthWorkload`) and `compute-facts`' `total_volume_lbs`. All three or
+none: fixing the completed side alone makes every session read heavier than planned (pinned by
+`workload-strength-planned.test.ts`), and fixing load without facts puts two numbers about the same
+session on one screen disagreeing.
+
+**Body weight from `user_baselines.weight` + `units`. NULL SCORES AS BEFORE.** An athlete who never
+recorded a weight keeps today's behaviour rather than having one invented for them (Law 2). The
+effort multiplier was deliberately NOT touched — changing the basis and the damping together would make
+the movement unattributable.
+
+**⛔ THE BACKFILL IS THE DELIVERABLE, NOT THE FORMULA.** Scores are STORED and the verdict is a ratio of
+7 days against 28. Ship the pricing without re-pricing history and an identical week reads **1.00 ->
+1.47, "total load building"** — the fix manufacturing the false alarm it was written to remove. Pinned
+BOTH ways in `workload-strength-bodyweight.test.ts`; the hazard case is a permanent regression fixture.
+`backfill-strength-load` re-prices both sides and computes nothing itself.
+
+**Measured after the pass, his real data:** ratio **0.83 -> 1.05, still `on_target`** (build and normal);
+strength **8% -> 38%** of 28-day load. Known imprecisions: Q-233.
+
+## D-347 — THE PER-LIFT TREND CHIP IS DELETED, AND THE SCREENS READ THE BLOCK CARD (2026-08-01, **PUSHED + DEPLOYED, not device-verified**)
+
+**Stage 1 of `docs/AUDIT-state-screen-2026-08-01.md`.** `_shared/block-identity.ts` has answered "what
+block is this, on this date" since 2026-07-30 (Q-230/D-339) and the coach's verdicts already read it —
+**the State fitness rows and the Performance table did not.** The coach payload has carried the card at
+`plan.block` since v150; the client type never described it, so the browser discarded it. A wire, not a
+build.
+
+**The card supplies the WORD (`phaseWord`).** `phase` is the plan's own name and half of those are
+internal — 'Leader' and 'Anchor' are Wendler's, and mean nothing to an athlete. The word is resolved
+through `normalizePhaseKey` (D-322) — **the same table the effort rules already use, asked a second
+question rather than copied** — so no screen keeps a translation table, a non-5/3/1 plan renders through
+the identical path, and an unplaceable week renders "week 3 of 12" with no word.
+
+**The per-lift direction chip is DELETED, not made protocol-aware.** It read an e1RM produced ONCE PER
+CYCLE, off a top set a 5/3/1 block deliberately runs from 65% to 95% — so it was mostly reading the
+PRESCRIPTION, sampled ~4 times, and called a correctly-executed light week a decline (bench "flat" with
+a dropping line, week 1). A smarter chip keeps a directional claim alive on data too sparse to carry
+one, and every future protocol then owes it an exception. **The number, the 12-week chart and the PR
+stay** (a PR is a measured fact, not a trend). The spine still computes the direction and still excludes
+deloads (D-338); this row simply no longer renders it.
+
+**Fixed at the strength CALL SITE, never in the shared component** — `TrendSparkline` is shared with run
+and bike, and its "building · N of 12 weeks" label is honest for run (data coverage) and reads as block
+progress for a lift. Run and bike are byte-identical.
+
 ## D-346 — THE RUN ROW IS ON THE WRONG INSTRUMENT. Decoupling out, speed-at-heart-rate in (2026-07-31, **SHIPPED + DEPLOYED**)
 
 > ✅ **BUILT AND DEPLOYED THE SAME DAY, after this entry was first written as a decision-only record.**

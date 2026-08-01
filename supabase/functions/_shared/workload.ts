@@ -8,6 +8,11 @@
  * All formulas live here. Callers adapt their data shapes before calling in.
  */
 
+// THE app's exercise vocabulary. Pricing a set has to know whether a band on the row is the LOAD or
+// is HELP, and only the exercise says which — so this asks the one vocabulary rather than matching
+// names again (audit F5: five name-matchers already).
+import { canonicalize, bandMeansAssistance } from './canonicalize.ts';
+
 // ---------------------------------------------------------------------------
 // Intensity factor tables
 // ---------------------------------------------------------------------------
@@ -246,15 +251,115 @@ export function getStrengthIntensity(exercises: any[], sessionRPE?: number): num
   return intensities.reduce((a: number, b: number) => a + b, 0) / intensities.length;
 }
 
-export function calculateStrengthWorkload(exercises: any[], sessionRPE?: number): number {
+// ---------------------------------------------------------------------------
+// WHAT A SET IS WORTH — the one rule, D1 (2026-08-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * ⛔ THE FLAT TOKEN FOR A BAND SET. A band has no clean load: manufacturers do not standardise
+ * colours or tensions, and the same "Medium" is a different force at the top of the rep than the
+ * bottom. D1: assistance work is deliberately minor, so precision here is not worth buying.
+ *
+ * ⚠️ THE MAGNITUDE IS THE WHOLE DESIGN. It has to be non-zero — band work that scores nothing is
+ * the bug this change exists to fix — and small enough that it can never move a verdict. In the
+ * units below (lb × reps) 100 is worth 0.01 of a volume factor: about 0.6 points at the default
+ * effort multiplier, so TEN band sets are worth ~6 points against a 47-minute easy run's 61. It is
+ * a floor that makes the work visible, not an attempt to measure it.
+ */
+export const BAND_SET_VOLUME_TOKEN = 100;
+
+/**
+ * ⛔ THE ATHLETE'S BODY WEIGHT IN POUNDS, FROM THE ONE PLACE IT IS STORED — or null.
+ *
+ * `user_baselines.weight` is the number the athlete typed in Training Baselines, and
+ * `user_baselines.units` says which scale it is on ('metric' → kilograms). Three functions now need
+ * it to price a calisthenic set, so the read of that pair lives here rather than three times.
+ *
+ * ⚠️ NULL IS A REAL ANSWER. Absent, unparseable, or outside a sane human range → null, and every
+ * caller then scores bodyweight work exactly as it does today. The guard rails are there because a
+ * body weight is free text: 70 typed by someone in kilograms is a person, 70 read as pounds is not,
+ * and a mis-scaled weight would silently multiply every calisthenic set in the athlete's history.
+ */
+export function resolveBodyweightLb(row: { weight?: unknown; units?: unknown } | null | undefined): number | null {
+  const raw = Number((row as any)?.weight);
+  if (!Number.isFinite(raw) || raw <= 0) return null;
+  const metric = String((row as any)?.units ?? '').toLowerCase() === 'metric';
+  const lb = metric ? raw * 2.20462 : raw;
+  // A human adult, generously bounded. Outside it, the number is not a body weight we can price.
+  if (lb < 60 || lb > 600) return null;
+  return Math.round(lb * 10) / 10;
+}
+
+export type StrengthVolumeOpts = {
+  /**
+   * The athlete's body weight in POUNDS, or null when it was never recorded.
+   *
+   * ⛔ NULL IS NOT ZERO AND IT IS NOT A GUESS. An athlete who never filled in their weight keeps
+   * exactly today's scoring — bodyweight sets contribute nothing — because the alternative is
+   * inventing a body weight for a real person and pricing their training off it. Law 2: the app
+   * does not fill a gap with a confident number.
+   */
+  bodyweightLb?: number | null;
+  /** `bandMeansAssistance(canonical)` for the exercise this set belongs to. */
+  bandIsAssistance?: boolean;
+};
+
+/**
+ * ⛔ WHAT ONE SET CONTRIBUTED, IN lb × reps. THE ONE PLACE THAT DECIDES (D1).
+ *
+ * Volume load — sets × reps × load — is the basis every strength app scores on (Strong, Hevy), and
+ * it is what this function has always computed for a barbell. The hole it closes: `weight` is 0 on
+ * every calisthenic set, so a chin-up, a dip, a box jump and a bodyweight hip thrust each scored
+ * exactly nothing. Measured on a real 13-set squat day: 10 points, against 61 for a 47-minute easy
+ * run — on a strength block. The work was done and the app could not see it.
+ *
+ * The rule, in order:
+ *   1. External weight on the bar → weight × reps. UNCHANGED, and it is most sets.
+ *   2. No weight, reps logged, body weight known → bodyweight × reps.
+ *   3. No weight, reps logged, a band on a movement where the band IS the resistance → flat token.
+ *   4. Anything else → 0.
+ *
+ * ⚠️ ASSISTANCE IS NOT MODELLED, DELIBERATELY. A band-assisted chin-up counts as full bodyweight,
+ * because the assistance cancels an unknown fraction of it and inventing that fraction would be a
+ * fabricated number dressed as a measured one. It over-counts, and it over-counts far less than
+ * zero under-counted. The same applies the other way: Strong counts a bodyweight exercise as full
+ * body weight, while the biomechanics say a push-up is nearer two-thirds. One rule, stated, in the
+ * direction the field already leans.
+ *
+ * ⚠️ A DURATION-ONLY SET STILL SCORES 0 — a plank has no reps for this to multiply. Known and left
+ * (2026-08-01); scoring isometric time needs its own basis, not a fudge inside this one.
+ */
+export function strengthSetVolume(
+  set: { weight?: number | string | null; reps?: number | string | null; resistance_level?: string | null },
+  opts: StrengthVolumeOpts = {},
+): number {
+  const reps = Number(set?.reps) || 0;
+  if (reps <= 0) return 0;
+
+  const weight = Number(set?.weight) || 0;
+  if (weight > 0) return weight * reps;
+
+  const bw = Number(opts.bodyweightLb) || 0;
+  const banded = typeof set?.resistance_level === 'string' && set.resistance_level.trim() !== ''
+    && set.resistance_level.trim().toLowerCase() !== 'none';
+
+  // A band on a pull-up/chin-up/dip is HELP, not the load — the body is still what moved.
+  if (banded && !opts.bandIsAssistance) return BAND_SET_VOLUME_TOKEN;
+
+  return bw > 0 ? bw * reps : 0;
+}
+
+export function calculateStrengthWorkload(exercises: any[], sessionRPE?: number, opts: StrengthVolumeOpts = {}): number {
   if (!Array.isArray(exercises) || exercises.length === 0) return 0;
 
   let totalVolume = 0;
   exercises.forEach(ex => {
     if (Array.isArray(ex.sets) && ex.sets.length > 0) {
+      // Asked once per EXERCISE, not per set — a band means the same thing on every set of a row.
+      const bandIsAssistance = bandMeansAssistance(canonicalize(String(ex?.name ?? '')));
       ex.sets.forEach((set: any) => {
         if (set.completed !== false) {
-          totalVolume += (Number(set.weight) || 0) * (Number(set.reps) || 0);
+          totalVolume += strengthSetVolume(set, { ...opts, bandIsAssistance });
         }
       });
     }
@@ -292,7 +397,8 @@ export function rirToStrengthIntensity(rir: number): number {
  * Intensity mirrors actual's method: band each exercise's target RIR, then average the bands.
  */
 export function calculatePlannedStrengthWorkload(
-  exercises: Array<{ sets?: number | any[]; reps?: number | string; weight?: number | string | null; target_rir?: number | null }>,
+  exercises: Array<{ name?: string | null; sets?: number | any[]; reps?: number | string; weight?: number | string | null; target_rir?: number | null }>,
+  opts: StrengthVolumeOpts = {},
 ): number {
   if (!Array.isArray(exercises) || exercises.length === 0) return 0;
   let totalVolume = 0;
@@ -300,9 +406,27 @@ export function calculatePlannedStrengthWorkload(
   for (const ex of exercises) {
     const sets = Number(ex.sets) || 0; // materialized prescription: sets is a COUNT
     const reps = typeof ex.reps === 'number' ? ex.reps : Number.parseInt(String(ex.reps ?? ''), 10);
-    const weight = Number(ex.weight) || 0; // resolved lb; 0 for bodyweight/carry/unresolved → no tonnage
-    if (sets > 0 && Number.isFinite(reps) && reps > 0 && weight > 0) {
-      totalVolume += sets * reps * weight;
+    // ⛔ THE SAME SET RULE AS ACTUAL, OR THE TWO SIDES STOP RECONCILING (D1, 2026-08-01).
+    //
+    // This function exists because planned and actual once used different bases and a session read
+    // 56 planned / 25 done for identical work. Bodyweight scoring landed the app right back there:
+    // if the completed chin-ups start counting and the prescribed ones do not, every strength
+    // session on every screen reads as heavier than planned — and `workload-strength-planned.test.ts`
+    // pins prescribed == performed, so it fails the moment one side moves alone. One rule, priced
+    // per set here exactly as it is priced per set there.
+    if (sets > 0 && Number.isFinite(reps) && reps > 0) {
+      const bandIsAssistance = bandMeansAssistance(canonicalize(String(ex?.name ?? '')));
+      // ⚠️ THE TWO SIDES SPEAK DIFFERENT DIALECTS ABOUT A BAND, and this is where they are made to
+      // agree. A logged set names the band in `resistance_level`; a PRESCRIPTION has no such field —
+      // it puts a word where the number goes ("Band", "Bodyweight", "Heavy barbell", D-094). So a
+      // prescribed band row is translated into the same shape the actual side reads. Without this it
+      // resolves to "no weight, no band" and gets priced as full bodyweight, against a token on the
+      // completed side — the mismatch this function was written to end, re-created one layer down.
+      const plannedIsBand = /band/i.test(String(ex.weight ?? ''));
+      totalVolume += sets * strengthSetVolume(
+        { weight: ex.weight, reps, resistance_level: plannedIsBand ? 'band' : null },
+        { ...opts, bandIsAssistance },
+      );
     }
     if (typeof ex.target_rir === 'number' && ex.target_rir >= 0) intensities.push(rirToStrengthIntensity(ex.target_rir));
   }

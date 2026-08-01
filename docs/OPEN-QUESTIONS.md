@@ -2324,6 +2324,26 @@ The floor holds without it: under 8 runs the athlete simply gets no verdict, and
 
 ---
 
+## Q-233 — Two known imprecisions in the bodyweight load rule, both deliberate (2026-08-01, INTENTIONAL)
+
+Filed with D-348 so neither is rediscovered as a bug.
+
+**1. An isometric hold scores zero.** A plank, wall-sit or dead hang is logged as TIME with no reps, and
+the rule is per-rep — there is nothing to multiply. Michael, 2026-08-01: *"planks/holds staying zero is
+fine — flag it."* Scoring isometric time honestly needs its own basis (time x bodyweight x a position
+factor), not a fudge inside a per-rep rule. **Not a bug. Do not "fix" it by giving holds a fake rep count.**
+
+**2. A band-ASSISTED pull-up counts as FULL bodyweight.** The band cancels an unknown fraction of the
+load; inventing that fraction would be a fabricated number travelling as a measured one. It over-counts
+— by considerably less than zero under-counted, and in the direction that is visible rather than silent.
+The same leaning applies to a push-up: Strong counts a bodyweight exercise as full body weight while the
+biomechanics say nearer two-thirds. **One stated rule, leaning where the field already leans.**
+
+⚠️ If either is ever revisited, the constraint is `strengthSetVolume` in `_shared/workload.ts` — ONE set
+rule shared by the load score, the planned score and `total_volume_lbs`. A per-exercise bodyweight
+FRACTION table would be the honest upgrade, and it belongs beside `muscleGroup` in `canonicalize.ts` as
+another question over the one vocabulary, never as a sixth exercise taxonomy.
+
 ## Q-232 — The durability read cannot be fixed the obvious way: a pinned regression forbids it (2026-07-31, ATTEMPTED AND REVERTED)
 
 **Michael:** *"fix em."* This one could not be fixed. Recording the attempt so the next session does not spend the same hour.

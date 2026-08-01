@@ -19,6 +19,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   calculateStrengthWorkload,
+  strengthSetVolume,
+  resolveBodyweightLb,
   calculateMobilityWorkload,
   calculatePilatesYogaWorkload,
   inferIntensityFromPerformance,
@@ -31,7 +33,7 @@ import { assessHrPlausibility, resolveMaxHrCeiling } from "../_shared/hr-plausib
 // ⛔ ONE FORMULA FOR THE WHOLE APP (D-339). The client's baseline test imports this same module, so
 // the number that SETS the working weights and the number that JUDGES the work now agree.
 import { estimate1RMRounded } from "../../../src/lib/estimate-1rm.ts";
-import { canonicalize, muscleGroup, bigFourLift } from "../_shared/canonicalize.ts";
+import { canonicalize, muscleGroup, bigFourLift, bandMeansAssistance } from "../_shared/canonicalize.ts";
 // THE SAME top-set rule the logger stamps the difficulty tap with — heaviest set, ties to the last.
 // Imported, not re-derived: if the two ever disagree the word lands on a different set than the one
 // the athlete answered about. (`strength-focus-copy.ts` documents that both runtimes import it.)
@@ -1363,7 +1365,7 @@ interface ExerciseFact {
   measured: boolean;
 }
 
-function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null): {
+function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null, bodyweightLb: number | null): {
   strength_facts: Record<string, any>;
   exercises: ExerciseFact[];
 } {
@@ -1401,10 +1403,16 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null): {
     let bestReps = 0;
     const rirValues: number[] = [];
 
+    // ⛔ THE SAME SET RULE THE LOAD SCORE USES (D1, 2026-08-01). This loop had its own `w * r`, so
+    // `total_volume_lbs` — the number the State strength VOLUME row and the per-muscle split are
+    // drawn from — carried the identical bodyweight blindness as the load score. Fixing one and not
+    // the other would have put two numbers about the same session on the same screen disagreeing.
+    // Priced by `strengthSetVolume`, so there is one rule and it lives in one file.
+    const bandIsAssistance = bandMeansAssistance(canon);
     for (const s of completedSets) {
       const w = Number(s.weight) || 0;
       const r = Number(s.reps) || 0;
-      exVolume += w * r;
+      exVolume += strengthSetVolume(s, { bodyweightLb, bandIsAssistance });
       if (w > bestWeight) { bestWeight = w; bestReps = r; }
       if (w === bestWeight && r > bestReps) { bestReps = r; }
       // D-203/provenance: exclude auto-filled RIR (the suggested target echoed back by
@@ -1554,7 +1562,7 @@ function computeAdherence(w: WorkoutRow, planned: PlannedRow | null): Record<str
 // Workload computation (uses shared formulas)
 // ---------------------------------------------------------------------------
 
-function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt = false): number {
+function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt = false, bodyweightLb: number | null = null): number {
   // When HR is rejected as corrupt (D-237), do NOT reuse a workload_actual that was computed
   // from that bad HR (calculate-workload's TRIMP) — recompute on the estimate path instead.
   if (!hrCorrupt && w.workload_actual && w.workload_actual > 0) return w.workload_actual;
@@ -1565,7 +1573,8 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt =
   const sessionRPE = meta.session_rpe;
 
   if (type === "strength") {
-    return calculateStrengthWorkload(w.strength_exercises ?? [], sessionRPE);
+    // D1: bodyweight sets are priced at the athlete's own weight. Null → today's behaviour.
+    return calculateStrengthWorkload(w.strength_exercises ?? [], sessionRPE, { bodyweightLb });
   }
   if (type === "mobility") {
     return calculateMobilityWorkload(w.mobility_exercises ?? []);
@@ -1658,10 +1667,14 @@ serve(async (req: Request) => {
     // -----------------------------------------------------------------------
     const { data: baselinesRow } = await supabase
       .from("user_baselines")
-      .select("performance_numbers, learned_fitness, age")
+      // `weight` + `units` ride along for D1: a calisthenic set is priced at the athlete's own body
+      // weight, and `units` is the only thing that says whether that number is pounds or kilograms.
+      .select("performance_numbers, learned_fitness, age, weight, units")
       .eq("user_id", w.user_id)
       .maybeSingle();
     const baselines = (baselinesRow as Baselines | null) ?? null;
+    // Null when never recorded — bodyweight sets then score exactly as they do today (D1).
+    const bodyweightLb = resolveBodyweightLb(baselinesRow as any);
 
     // -----------------------------------------------------------------------
     // 3. Read planned workout (if linked)
@@ -1709,7 +1722,7 @@ serve(async (req: Request) => {
     // -----------------------------------------------------------------------
     // 6. Compute universal metrics
     // -----------------------------------------------------------------------
-    const workload = computeWorkload(w, baselines, hrCorrupt);
+    const workload = computeWorkload(w, baselines, hrCorrupt, bodyweightLb);
     const sessionRPE = w.workout_metadata?.session_rpe ?? null;
     const readiness = w.workout_metadata?.readiness ?? null;
 
@@ -1754,7 +1767,7 @@ serve(async (req: Request) => {
         swimFacts = buildSwimFacts(w);
         break;
       case "strength": {
-        const result = buildStrengthFacts(w, planned);
+        const result = buildStrengthFacts(w, planned, bodyweightLb);
         strengthFacts = result.strength_facts;
         exerciseRows = result.exercises;
         break;

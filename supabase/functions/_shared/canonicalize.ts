@@ -287,6 +287,30 @@ export function muscleGroup(canonical: string): string {
 }
 
 /**
+ * ⛔ ON THIS MOVEMENT, DOES A BAND MEAN *HELP* RATHER THAN *RESISTANCE*?
+ *
+ * A NEW QUESTION OVER THE EXISTING VOCABULARY, NOT A NEW VOCABULARY. `muscleGroup` above answers
+ * "what does this train"; this answers "what does a band on this row mean". They are different
+ * questions about the same keys, and they belong beside each other — the alternative is a second
+ * exercise taxonomy, which this codebase already has five of (audit F5).
+ *
+ * ⚠️ WHY IT HAS TO BE ASKED AT ALL. `resistance_level` on a logged set is DELIBERATELY overloaded
+ * (StrengthLogger: *"a band on a pull-up is only ever assistance, so the exercise already
+ * disambiguates it"*). On a band pull-apart the band IS the load. On a chin-up the band CANCELS
+ * part of the load. Same field, opposite meanings, and only the exercise says which — so anything
+ * pricing a set has to ask the exercise, exactly as the logger does when it draws the row.
+ *
+ * Mirrors `isAssistCapableMove` in `src/components/StrengthLogger.tsx`, which is where the athlete's
+ * assist input is offered. Same three movements: if the logger ever offers assistance on a fourth,
+ * this list gains it, or a set of assisted reps starts getting priced as band-only work.
+ */
+const BAND_MEANS_ASSISTANCE = new Set(['pullup', 'chinup', 'dip']);
+
+export function bandMeansAssistance(canonical: string): boolean {
+  return BAND_MEANS_ASSISTANCE.has(canonical);
+}
+
+/**
  * Clean, unambiguous display label for a canonical lift — so a lift logged under many raw
  * names ("Barbell Back Squat", "back squat", "Squat") always shows ONE clear label. Explicit
  * entries handle abbreviations/hyphenation/variant-clarity that title-case can't; everything
