@@ -290,7 +290,12 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
   // says "from N easy rides", and the same number twice on consecutive lines reads as two facts. Window
   // and recency stay: nothing else on the row states them. The threshold read keeps the count, because
   // there it IS the only place the count appears.
-  const tail = (lead.sampleCount != null && lead.windowDays != null)
+  // ⛔ NO RECEIPT IN THE BUILDING STATE. `lead` falls back to POWER when neither signal can assert, so
+  // the tail cited power's pool — and for a rider with six easy rides and no hard ones that rendered
+  // "over 8wk · 0 rides" directly under "6 rides in 8 weeks". Two counts, one row, flatly contradicting
+  // each other, and the 0 was the more authoritative-looking of the two. The building headline already
+  // states the count and the window, so there is nothing left for a receipt to add.
+  const tail = (!building && lead.sampleCount != null && lead.windowDays != null)
     ? trendEvidence({ windowDays: lead.windowDays, sampleCount: lead.sampleCount, newestAgeDays: lead.newestAgeDays, discipline: 'bike', omitCount: aerobicLead })
     : null;
   // Qualifying rides we can see — the larger of the two pools (they count different things: power
@@ -420,8 +425,11 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
             // ⚠️ So the sentence states the FTP ON RECORD and says the basis is an estimate. Both are
             // true independently. Naming the number the measurement used would need that number
             // carried through per ride — a real question, not a copy fix.
-            if (!leadIsPower) {
-              // AEROBIC read: the FTP is the band's definition, not the measurement.
+            // The threshold wording belongs to a REAL power read. `leadIsPower` alone is true in the
+            // building state too (lead 'none' falls back to power), which put "Your estimated FTP is
+            // 176 W" under a row that had made no measurement at all.
+            if (!(leadIsPower && assertsLead)) {
+              // AEROBIC or BUILDING: the FTP is the band's definition, not the measurement.
               if (src === 'est (FTP)') {
                 return <span>{ftp != null ? `Easy power is set from your estimated FTP of ${ftp} W` : 'Easy power is set from an estimated FTP'} — not one you confirmed.</span>;
               }
