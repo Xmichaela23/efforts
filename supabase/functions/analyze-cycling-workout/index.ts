@@ -1522,7 +1522,7 @@ Deno.serve(async (req) => {
       .select(`
         id, type, sensor_data, computed, time_series_data, garmin_data,
         planned_id, user_id, date, moving_time, duration, distance, elevation_gain, workout_status, workload_actual, workload_planned,
-        achievements, weather_data
+        achievements, weather_data, rpe
       `)
       .eq('id', workout_id)
       .single();
@@ -2677,10 +2677,13 @@ Deno.serve(async (req) => {
         return Number.isFinite(n) ? n : null;
       };
       const _elevM = _num((workout as any)?.elevation_gain);
-      // ⛔ RPE IS DELIBERATELY NOT PASSED YET. `workouts.rpe` is also absent from the SELECT above, and
-      // adding it would feed the cross-domain carryover gauge (`thisRpe`, ~line 2700) which has
-      // therefore NEVER RUN — switching a dormant card on inside a verification batch would make it
-      // impossible to tell which change moved the screen. Filed, not done.
+      // ⛔ RPE, AND WHY IT ARRIVED SEPARATELY FROM THE GAUGE THAT ALSO WANTS IT.
+      // `workouts.rpe` was absent from this function's SELECT entirely, so the run's "carried it at
+      // RPE 2" clause had no bike equivalent — the athlete's own report of how hard it felt, which is
+      // the ONE signal that separates "the conditions cost me" from "I pushed". It is now selected and
+      // passed to the insight. The cross-domain carryover gauge below reads the same column and has
+      // NEVER RUN because of the missing SELECT; it stays off behind an explicit flag rather than
+      // switching itself on as a side effect of this change. See CARRYOVER_RPE_GAUGE_ENABLED.
       const _bikePrescription = (!hasGradedPower && easyRead && easyCeiling.ceiling != null)
         ? {
             easy: true,
@@ -2705,6 +2708,7 @@ Deno.serve(async (req) => {
           elevationGainFt: _elevM != null ? _elevM * 3.28084 : null,
         } : null,
         prescription: _bikePrescription,
+        rpe: _num((workout as any)?.rpe),
       }));
       if (ai_summary) ai_summary_generated_at = new Date().toISOString();
       void generateCyclingAISummaryV1; void cyclingFlagsV1; void cyclingVsSimilar; void cyclingPRs; void npTrendV1; void pwr20TrendV1; void spineBikeTrend; void bike_spine_verdict; void cyclingLimiter; void _varGateRide; void plannedWorkout; void aiSummaryDebug; // dead LLM-path refs, retained for the cleanup sweep
@@ -2745,7 +2749,14 @@ Deno.serve(async (req) => {
           // Two-way RPE gauge: this ride's RPE vs the athlete's OWN baseline RPE for comparable-INTENSITY
           // rides (IF ±0.1). Above expected → carryover trigger (catches easy rides the objective misses);
           // below → veto. Requires ≥3 comparable rides (solid baseline) or the gap is noise → gauge disabled.
-          const thisRpe = Number((workout as any)?.rpe);
+          // ⛔ OFF UNTIL REVIEWED (2026-08-02). This gauge is built, commented and tested-by-eye, and it
+          // has never executed once: `workouts.rpe` was not in this function's SELECT, so `thisRpe` was
+          // Number(undefined) and every branch below it was dead. Adding the column for the insight
+          // clause would have switched a dormant card on silently, mid-verification — the athlete
+          // meeting a reading nobody had ever seen the output of. It stays gated until its behaviour is
+          // reviewed on its own. Flip this one constant to enable; nothing else needs to change.
+          const CARRYOVER_RPE_GAUGE_ENABLED = false;
+          const thisRpe = CARRYOVER_RPE_GAUGE_ENABLED ? Number((workout as any)?.rpe) : NaN;
           const thisIF = Number((cyclingFactPacketV1 as any)?.facts?.intensity_factor);
           let declaredRpeGap: number | null = null;
           let declaredBaselineOk = false;

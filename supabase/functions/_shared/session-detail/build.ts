@@ -1375,16 +1375,21 @@ export function formatCyclingPacingRow(
   const f = Number(halves?.first_w);
   const sec = Number(halves?.second_w);
   if (!Number.isFinite(f) || !Number.isFinite(sec) || f <= 0 || sec <= 0) return null;
-  const deltaPct = ((sec - f) / f) * 100;
-  // 5% is the boundary the ride classifier already treats as meaningful drift; below it, two halves of
-  // an ordinary ride differ for reasons that are not fade, and calling that a fade would be noise.
-  if (Math.abs(deltaPct) < 5) {
-    return { label: 'Pacing', value: `Power held across the halves (${Math.round(f)}W → ${Math.round(sec)}W)` };
-  }
-  const dir = deltaPct < 0 ? 'faded' : 'rose';
+  // ⛔ NO FADE THRESHOLD (corrected 2026-08-02, Michael: *"ensuring you are not tuning any of this"*).
+  //
+  // The first version called a drop of 5% or more a "fade" and anything less "held", and justified 5%
+  // as the boundary "the ride classifier already treats as meaningful drift". THAT WAS BORROWED FROM A
+  // DIFFERENT IDEA: 5% is Friel's aerobic-DECOUPLING line (heart rate versus power), which is not a
+  // statement about power falling. There is no published power-fade threshold in TrainingPeaks, Garmin
+  // or Strava — so any number here is one we made up, and it would decide whether an athlete is told
+  // they faded.
+  //
+  // The two watts are the fact. State them, in order, and let the reader see the size of the gap —
+  // the same call made for the Easy chip this morning and for the temperature range: report, do not
+  // grade. A verdict word can come back the day the field supplies a bar for it.
   return {
     label: 'Pacing',
-    value: `Power ${dir} ${Math.abs(Math.round(deltaPct))}% in the second half (${Math.round(f)}W → ${Math.round(sec)}W)`,
+    value: `Power ${Math.round(f)}W → ${Math.round(sec)}W across the halves`,
   };
 }
 

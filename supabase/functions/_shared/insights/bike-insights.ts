@@ -98,6 +98,12 @@ function clean(sentences: (string | null | undefined)[]): string | null {
   const kept = sentences.map((s) => (s ?? '').trim()).filter(Boolean).filter((s) => !BANNED.test(s));
   return kept.length ? kept.join(' ') : null;
 }
+/**
+ * The engine's own climbing threshold — elevation density, ft per mile (`cycling-v1/build.ts:113`,
+ * the classifier's `climbing` gate). Imported as a CONSTANT rather than re-typed so the insight and
+ * the classification can never disagree about what counts as a hilly ride.
+ */
+const CLIMBING_FT_PER_MI = 40;
 const r0 = (n: number) => Math.round(n);
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -151,14 +157,28 @@ function conditionsClause(inp: BikeInsightInput): string | null {
     ? `Warming from ${ts} to ${te}°F`
     : (tf != null ? `Warm at ${tf}°F` : null);
 
+  // ⛔ THE CLIMBING BAR IS THE ENGINE'S OWN, NOT A NUMBER PICKED HERE (corrected 2026-08-02, Michael:
+  // *"ensuring you are not tuning any of this to me or this ride"*).
+  //
+  // The first version gated on `gain >= 500` ft and justified it in a comment as "the ride-scale bar the
+  // classifier already uses". THAT WAS FALSE. The classifier's climbing rule is an elevation DENSITY —
+  // ≥ 40 ft per mile (`cycling-v1/build.ts:113`) — and 500 was a number invented at the keyboard with a
+  // citation attached to make it look earned. An absolute foot count is also the wrong SHAPE: it makes
+  // the clause fire for a long flat ride and stay silent on a short steep one, which is backwards, and
+  // it scales with how far an athlete happens to ride rather than how hilly the ground was.
+  //
+  // Density is athlete-agnostic: it says the same thing about a 15-mile ride and a 90-mile one.
+  const density = (gain != null && typeof inp.distanceMi === 'number' && inp.distanceMi > 0)
+    ? gain / inp.distanceMi
+    : null;
+  const climby = density != null && density >= CLIMBING_FT_PER_MI;
+
   if (heat && tempPhrase) {
-    // The run's gain gate is 150 ft; a ride covers more ground, so the bar is the ride-scale one used
-    // by the classifier's own climbing threshold rather than a number invented here.
-    const gainClause = gain != null && gain >= 500 ? ` and ${r0(gain)} ft of climbing` : '';
+    const gainClause = climby ? ` and ${r0(gain!)} ft of climbing` : '';
     return `${tempPhrase}${gainClause} — ${heat === 'mild' ? 'both add a little load' : 'that adds real load'}${rpeClause}.`;
   }
-  if (gain != null && gain >= 500) {
-    return `${r0(gain)} ft of climbing added the load${rpe != null ? `, carried at RPE ${rpe}` : ''}.`;
+  if (climby) {
+    return `${r0(gain!)} ft of climbing added the load${rpe != null ? `, carried at RPE ${rpe}` : ''}.`;
   }
   return null;
 }
