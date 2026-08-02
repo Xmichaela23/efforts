@@ -2708,6 +2708,20 @@ someone re-adds it later thinking it is an improvement.
 *(Incidentally: Michael's typed and learned FTP are both 176 W, so no discrepancy was live on his
 screen. The rule stands regardless — it was luck, not correctness.)*
 
+### ⚠️ AND IT SHIPPED BROKEN FIRST, FOR THE SAME REASON
+
+The first cut rendered **nothing**. I gated the value on `anchor.metric === 'ftp'` — a string that
+comes straight from the `fitness_baselines` row, **which I never checked**. Wrong guess, silent
+failure, a sentence with a hole in it that reached Michael's screen.
+
+⛔ **SAME ROOT AS THE OVERCLAIM ABOVE, one hour apart: acting on an assumed value instead of a traced
+one.** The overclaim asserted something unverified and sounded confident; this asserted something
+unverified and rendered blank. **One of those is louder, neither is safer.**
+
+The guard is gone. That branch already sits inside `src`, which is derived from
+`efficiency.basis === 'coggan_ftp'`, so the anchor in scope IS the FTP — the value being present is the
+honest gate, and the string was guessing at a fact that was one query away.
+
 ### The client fallback, and why it only became honest afterwards
 
 `fitnessAnchors` is written by `compute-snapshot` and only rewritten on an **ingest**; the coach
