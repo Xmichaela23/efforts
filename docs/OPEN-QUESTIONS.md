@@ -2634,7 +2634,16 @@ ages belong back on the RUN and BIKE rows, where each is accurate for exactly on
 
 ---
 
-## Q-240 — Cycling FTP has a DELETE button where running has a CHOICE (2026-08-01, Michael, FILED — parked deliberately; wider blast radius than it looks)
+## Q-240 — Cycling FTP has a DELETE button where running has a CHOICE (2026-08-01, Michael, ✅ **CLOSED same day — see [D-360]**)
+
+> ✅ **CLOSED 2026-08-01, device-verified. [D-360] holds the substance.** `resolveCurrentFtp` gained a
+> TIER 0 that honours `performance_numbers.ftp_source`; Baselines shows two pills when both numbers
+> exist. **Absent a choice, behaviour is byte-identical** — which is what let a resolver this
+> load-bearing be changed in one sitting.
+> ⚠️ **The blast-radius warning below was right and still applies to the NEXT change here.**
+> ⚠️ **It also missed a bug sitting on top of it:** the FTP field could not be edited at all — it
+> rendered the LEARNED value, so clearing it snapped back. The parity gap was real; it was also not the
+> only thing wrong with that control. Everything below is history.
 
 **Michael, comparing the two Baselines screens:** running's easy pace offers *"Use my runs 12:35/mi"*
 vs *"Use my number 11:30/mi"*. Cycling's FTP offers **"Clear entry"**.
@@ -2666,7 +2675,17 @@ read), the `performance_numbers` shape, and the FTP block in `TrainingBaselines.
 
 ---
 
-## Q-241 — BIKE is the only discipline whose direction is NOT checked against its own noise — and that is what blocks it earning words (2026-08-01, Michael, FILED — code-verified, the smallest unlock on the board)
+## Q-241 — BIKE is the only discipline whose direction is NOT checked against its own noise — and that is what blocks it earning words (2026-08-01, Michael, ✅ **CLOSED same day — see [D-359]**)
+
+> ✅ **CLOSED 2026-08-01 — gate, floor and language all shipped. [D-359] holds the substance.**
+> ⛔ **AND THIS ENTRY NAMED THE WRONG FILE — read that before trusting any other Q's file:line.**
+> `bike.ts:78` is the SESSION-detail direction (`analyze-cycling-workout`). The STATE row — the screen
+> this ticket was written from — reads `bike-fitness.ts` (terrain-binned power, with HR-at-power
+> efficiency leading when power is thin). **Both were ungated.** Passing the flag only where this entry
+> said would have left the screen exactly as wrong and the ticket reading as closed.
+> **A Q-entry is a LEAD. Trace the surface; do not trust the line number.**
+> What this entry got RIGHT, and it was the load-bearing part: the honest bar for a directional word is
+> "the move beats the metric's own scatter", NOT a confidence interval. Everything below is history.
 
 **Michael:** *"bike should have FTP gains and losses language if the data is there."* Correct — and the
 data is not currently gated well enough to say.

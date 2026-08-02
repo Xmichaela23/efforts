@@ -4,6 +4,15 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-01 (late) — THE BIKE ROW IS FINISHED, AND THE NEXT JOB IS UPSTREAM OF THE SCREEN.**
+> Gate + floor + three reads ([D-359]) and the FTP choice ([D-360], closes Q-240) all shipped and
+> deployed. The bike row now refuses to assert a direction it cannot support, and names WHY when it
+> cannot — the pattern to carry to swim and strength, once Michael rules on it.
+>
+> ⛔ **NEXT IS THE ATTACH FAILURE, not another row.** Tonight's ride did not attach to the planned Long
+> Ride, so it has no planned-vs-executed and drops out of adherence. A screen that reads a broken loop
+> honestly is still reading a broken loop. See the ENGINE-STATE banner for the entry points.
+
 > **2026-08-01 — THE STATE-SCREEN PASS IS DONE, AND THE TRACK MOVED UPSTREAM INTO THE LOGGER.**
 > `AUDIT-state-screen-2026-08-01.md` Stages 0–3 and 5 shipped (D-347 … D-350): the screens read one
 > number and stopped disagreeing. Stage 2's own instructions turned out to be wrong on all three

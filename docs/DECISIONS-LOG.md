@@ -2664,6 +2664,163 @@ is provenance) — the RULE is what is shared, not the items. ⚠️ **The empty
 *"no baseline set · accept your FTP to anchor"* is actionable, and hiding an actionable gap behind a tap
 is how a missing dot starts reading as a bug.
 
+## D-360 — CYCLING FTP: THE ATHLETE CHOOSES, AND THEIR CHOICE WINS (2026-08-01, Michael — **PUSHED + DEPLOYED + VERIFIED ON DEVICE**)
+
+**Closes [Q-240].** Bike was the only baseline where the app decided and the athlete could not answer
+back. `resolveCurrentFtp` read learned-first, confidence-gated, so a confident estimate outranked the
+number the athlete typed — and their only lever was **"Clear entry"**, which deletes their number
+without giving them the one they wanted. Michael, comparing our 176 W against Garmin's 181 W:
+*"yes choose auto or your entry need to add."*
+
+**Running has had this since [Q-174]** (`easy_pace_source`), with the principle in its own comment: an
+assertion beats an inference, and Garmin and TrainingPeaks both honour a value you set. This is that
+pattern **copied, not reinvented** — one stored preference, honoured by the one resolver.
+
+**TIER 0** in `src/lib/resolve-current-ftp.ts`: `performance_numbers.ftp_source` (`'learned' | 'manual'`)
+outranks all existing tiers. Two pills on Baselines when both numbers exist — *Use my rides 176 W* /
+*Use my number 181 W* — replacing the Clear-entry line, above a line stating that the choice sets power
+zones and plan targets.
+
+### The three properties that are pinned by tests, in order of what they'd cost
+
+1. ⛔ **NO CHOICE IS BYTE-IDENTICAL TO BEFORE.** This resolver feeds the coach, the analyzers, the plan
+   generators and every power-zone calculation — including the **56–75% aerobic band the bike's
+   heart-rate read is taken in** ([D-359]). A moved default would move all of them for every athlete at
+   once, silently.
+2. **A preference with no value behind it falls THROUGH, never to null.** Choosing "my number" and then
+   clearing the field must mean "nothing to prefer", not "this athlete has no FTP" — returning null
+   would strip power zones and plan targets app-wide.
+3. **Choosing "auto" does not launder a low-confidence estimate.** The `source` label still reports
+   confidence (`learned-low`), so quality-gated consumers (race projections, plan materialization) can
+   still refuse it. The preference selects WHICH number, not what it is worth.
+
+### ⛔ THE FIELD COULD NOT BE EDITED, AND THAT BUG PREDATES THIS TICKET
+
+Michael: *"it won't let me change my number."* Correct. `TrainingBaselines.tsx` had:
+
+```
+value={manualFtp || learnedFtp || ''}
+onChange={... ftp: parseInt(e.target.value) || undefined}
+```
+
+Clearing the box parsed to `NaN` → `ftp` removed → **the value prop instantly re-rendered the LEARNED
+number**. Backspacing snapped back to 176, so the field was only editable by overwriting it in one
+gesture without ever passing through empty. The learned number is now the **placeholder**; the field
+edits the typed anchor only, which is what its own comment already claimed it did.
+
+**And typing now sets `ftp_source: 'manual'`.** An athlete who enters a number has asserted it;
+requiring them to type it AND tap a pill before it counts is the same "the app decided" complaint one
+step later. Reversible — the pills stay. Clearing the field drops the preference with the value.
+
+⚠️ **VERIFIED ON DEVICE (2026-08-01, Michael):** typed 181 → "Use my number" became active → Z2 moved
+from 97–132 W to 100–136 W. Switched back to "Use my rides" → zones returned. The choice reaches the
+zone maths.
+
+⚠️ **WHAT IT DOES NOT DO — and this is the part to state before someone reads it as a bug.** Each
+ride's HR-at-band was recorded against the FTP in force **when that ride was analysed**. Changing the
+preference does NOT re-price history: the bike read stays mixed until the window fills with rides
+priced the new way. Retroactive correctness would mean a re-analysis pass, which was not attempted.
+
+## D-359 — THE BIKE DIRECTION IS GATED AND FLOORED, AND THE ROW NAMES WHAT IT CAN READ (2026-08-01, Michael — **PUSHED + DEPLOYED; the BUILDING state device-verified, the other two unseen**)
+
+**Closes [Q-241]** — and ⛔ **Q-241 NAMED THE WRONG FILE.** It pointed at `bike.ts:78`, which is the
+SESSION-detail direction (`analyze-cycling-workout`). The STATE row reads `bike-fitness.ts` —
+terrain-binned power, with HR-at-power efficiency leading whenever power is thin. **Both were ungated.**
+Fixing only the filed line would have left the screen exactly as wrong and the ticket reading as closed.
+*(The lesson is the standing one: a Q-entry is a LEAD. Trace the surface, don't trust the line number.)*
+
+### 1. THE GATE — a direction must beat the metric's own scatter
+
+Bike was the only discipline whose direction was never checked against its own noise; run durability
+(`run.ts:299`) and strength e1RM (`strength.ts:191`) both require the early→recent shift to clear ~1
+within-window SD. `noiseGuardStdev: 1.0` now passes at all three bike sites. **1.0, not a bike-specific
+number** — a second constant would be a second definition of "beats its own noise".
+
+**The evidence, checked rather than recalled.** A 20-min TT repeated a week apart by trained,
+familiarised cyclists **in a lab** has a CV of ~**2.9%** (IJSPP 2019, n=8: TEM 4.6 W, ICC 0.99; a second
+study, n=25: CV 2.9%, ICC 0.97). Our substrate is the best 20-min inside an **ordinary ride** — pacing,
+motivation, drafting, heat and terrain ride on top. Our verdict band is **±2.0%**. So a band-clearing
+move was evidence of nothing.
+⚠️ **An earlier draft of the code comment attributed "±5%" to Coggan. That was from memory and could not
+be verified; it was replaced, not softened.** A fake citation in a comment becomes the next session's fact.
+
+### 2. THE FLOOR — 8 qualifying rides, and it is DERIVED
+
+Below `STATE_TREND_WINDOWS.bikeDirectionMinRides` (8) the direction is `withheld`.
+
+- The verdict compares the mean of the 2 oldest points to the mean of the 2 newest. Typical error of a
+  mean falls with **√n** (Hopkins), so the error on that comparison is TE × √(2/n) per end.
+- At TE 3%: **n=2 per end → ±3.0%, WIDER than the entire ±2.0% band.** n=3 → ±2.45%. **n=4 → ±2.12%**,
+  the first point where a band-clearing move is at least the size of its own error. 4 × 2 ends = **8**.
+- It lands on run's floor of 8 from unrelated reasoning — a check, not a coincidence.
+- Coaching practice agrees from the other end: FTP is re-tested every 4–8 weeks because a threshold
+  change needs a block to appear. 8 rides across the 56d window ≈ 1/wk in that bin.
+
+**What the field does NOT give us is a published count**, and that is not for want of looking: Strava
+and TrainingPeaks draw a curve and never assert a direction (nothing to gate), and **Garmin gates on
+RECENCY** — 1–2 weeks of history with ~2 qualifying sessions a week, else "No Status". We already have
+Garmin's half (the 21d staleness decay). **The count is ours because the CLAIM is ours.**
+
+⚠️ **The number still soft is the ±2.0% BAND, not this floor** — it sits at or below the measurement
+error of its own substrate. Filed as the honest next question, not fixed here.
+
+**Selection rule added with it:** a QUALIFIED terrain bin outranks a FRESHER under-floor one (one climb
+yesterday must not mute eight flat rides), and a `withheld` power read no longer hides a usable
+efficiency read.
+
+### 3. THE THREE READS — name the reason, never report the absence
+
+Michael: *"a user focusing on strength may never hit that 20 minutes — so a user may joy ride. FTP is
+the north star for serious riders, they don't care about heart rate like runners. But those zone 2
+rides?"* Two athletes read one row and only one of them will ever produce a threshold effort. The other
+would have seen **"too few to read" forever** — the app reporting its own failure at someone training
+perfectly well, just not hard.
+
+| state | what it says |
+|---|---|
+| THRESHOLD | `212 W threshold ↑ +3%` — watts and a direction |
+| AEROBIC | `142 bpm at easy power → Holding steady`, + *"No hard efforts yet, so there is no threshold read"* |
+| BUILDING | `6 rides in 8 weeks · newest today` + *"A few more and this reads your aerobic fitness"* |
+
+⛔ **"No hard efforts yet" is a fact about HOW THEY RIDE. "Too few to read" is the app failing.** Same
+data, one of them true. There are two silent reasons (`no_hard_efforts` vs `too_few_rides`) and they
+must not collapse into one string.
+
+**This is the endurance-app standard for that athlete, not an invention:** heart rate at a given power
+is the efficiency-factor / aerobic-decoupling family (Friel's *Training Bible*, built into
+TrainingPeaks) — the ordinary zone 2 ride **is** the test, no testing required.
+
+### 4. ⛔ THE BIKE ROW NOW CARRIES WORDS — THIS REVERSES PART OF [D-356]
+
+D-356 kept `NUMERIC` wordless for bike *"which has no confidence interval yet"*. **The CI was the wrong
+bar.** Run durability and strength carry words with no CI because they clear the noise guard instead —
+and bike now clears it. `BIKE_AEROBIC_WORDS` is a SEPARATE map (like `RUN_EFF_WORDS`); the POWER read
+stays wordless, so D-356's rule is intact where it applies.
+
+### 5. CONTINUITY — the server decides, both screens render
+
+- `BikeFitness` gains `lead` / `powerSilent` / `hardRideCount`, and `BikeSignal` gains `recentValue`.
+  **Both screens were re-deriving "is power leading" from `power.verdict !== 'needs_data'`** — a second
+  copy of a rule that went wrong the moment `withheld` existed. They read the server's answer now.
+- `recentValue` comes off the SAME series as the direction, so the number and the arrow cannot disagree.
+- **Performance's per-ride block was renamed to State's words** ("Heart rate at easy power") and says
+  *"Counts toward your bike read on State"*. It was already the exact value State trends; only the
+  vocabulary diverged, which is enough to make one measurement look like two.
+
+### What the live screen then caught, in order
+
+1. **"over 8wk · 0 rides" under "6 rides in 8 weeks"** — `lead` falls back to POWER when neither signal
+   asserts, so the receipt cited the empty hard-ride pool. Two counts contradicting each other, the
+   wrong one looking official. Receipt dropped in that state.
+2. **Dropping the whole receipt was an over-correction** — Michael: *"this include today?"*, which the
+   row could no longer answer. Recency is back (`newest today` / `newest 3d ago`); only the count is gone.
+3. **The FTP line was pulled from the aerobic read, then put back.** The first reasoning ("FTP has
+   nothing to do with a heart-rate verdict") was wrong: the aerobic band **is** 56–75% of FTP, so the FTP
+   is what "easy power" MEANS. The sentence changes with the read instead — *"Easy power is set from your
+   estimated FTP of 176 W"* — stating a definition, not implying a measurement.
+
+⚠️ **Payload 159 → 160, BOTH constants** ([D-355]).
+
 ## D-358 — THE BIKE ROW NAMES ITS FTP, AND SAYS ONLY WHAT IT CAN PROVE (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
 
 The bike row said `est (FTP)` and never said *which* FTP. It now reads:
@@ -2769,6 +2926,12 @@ the route engine's, so the claim is untrue on the fallback path), and the captio
 under an 8°F spread rather than falling back to the bare method word.
 
 ## D-356 — A SHOWN NUMBER ALWAYS SHOWS ITS UNCERTAINTY: the run efficiency row gets plain words, a whole percent, and its CI (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
+
+> ⚠️ **PARTLY REVERSED SAME DAY — the BIKE clause only ([D-359]).** This entry kept `NUMERIC` wordless
+> for the bike *"which has no confidence interval yet"*. **The CI was the wrong bar**: run durability
+> and strength carry words with no CI because they clear the noise guard instead, and bike now clears
+> it too (`bike-fitness.ts`). The bike's AEROBIC read has words via a separate `BIKE_AEROBIC_WORDS`
+> map; its POWER read is still wordless. **Rules 1–3 below are untouched and still govern the run row.**
 
 **Three rules, and the third is the one that generalises:**
 1. **Lead with the direction in plain language.** *"Slower at the same effort"*, not a trend word.

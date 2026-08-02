@@ -23,97 +23,64 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-01 evening — **BODY is rebuilt and the cache trap that hid three deploys is fixed. Your job is the ENDURANCE STEER.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-01 late — **the bike is finished: gated, floored, and it says what it can read. Your job is the ATTACH FAILURE.**)
 
-### YOUR JOB — BIKE CLEANUP + BASE-WEEK COMMUNICATION
+### YOUR JOB — WHY TONIGHT'S RIDE DID NOT ATTACH TO THE PLANNED LONG RIDE
 
-**Not the endurance steer.** That was the previous banner's call and Michael has re-ordered it — the
-steer stays filed (see below), it is simply not next.
+Michael, on the ride detail for **Evening Ride, Sat 2026-08-01 19:54** (Strava, via Edge 1040): *"bike
+is kind of a mess — didn't attach to planned workout."* The screen shows an **Attach** button, meaning
+`auto-attach-planned` did not claim it, and `Sat 8/1 Long Ride` was on the plan (the State NEXT line
+names it).
 
-**1. BIKE CLEANUP.** Two items are already traced and filed; anything Michael saw on the device on
-2026-08-01 evening belongs with them:
-- **[Q-241] — the gate, and it comes FIRST.** Bike is the only discipline whose direction is not checked
-  against its own scatter (`bike.ts:78` has no `noiseGuardStdev`, while `run.ts:299` and
-  `strength.ts:191` both do). ⛔ **Gate first, language second** — words on an ungated direction are the
-  "sounds more certain than it is" failure the whole 2026-08-01 pass existed to remove. One option flag,
-  but it is a COMPUTATION change: some bike arrows become `holding`, fixtures move, payload bumps.
-- **[Q-240]** — cycling FTP offers a DELETE button where running offers a CHOICE. Fixing it means
-  teaching `resolveCurrentFtp` to respect a preference, and the coach, analyzers, plan generators and
-  zone maths all read that resolver.
+⛔ **This is the loop breaking, not a display bug.** An unattached ride has no planned-vs-executed
+comparison and drops out of adherence — so the week reads as missed work that was actually done.
 
-**2. BASE-WEEK COMMUNICATION.** ⚠️ **NOT SPECIFIED IN THE DOCS YET — get it from Michael before
-building.** He named it as the next job on 2026-08-01 evening; the substance was not captured, and
-nothing in this repo records what the base-week display should say or why. **Do not infer it from the
-code.** A [Q-NNN] is owed as soon as he states it.
+**Start at** `ingest-activity/index.ts:~1430-1580` (the fan-out; `auto-attach-planned` is the one call
+deliberately AWAITED) and then `auto-attach-planned` itself. **Do not assume it is absent** — it is
+wired and awaited, so this is a matching failure, not a missing feature: the date, the discipline, the
+window, or a Strava-path field the Garmin path supplies. ⚠️ **Michael's account only — do not query
+prod without asking.**
 
-*(A deadlift number discrepancy was briefly listed here as owed. **Raised in error and withdrawn
-2026-08-01 — there is no finding.** Noted only so it is not re-raised from the git history.)*
+### THEN, IN ORDER
+
+1. **`Workload 86` reads as TSS** on the ride screen (Garmin showed TSS 66.3 alongside). Different unit
+   entirely, sitting in a grid of power numbers where a cyclist will read it as TSS. Label problem.
+2. **Swim and strength probably have the bike's old disease** — reporting an absence instead of naming
+   a reason ([D-359] §3). Michael has NOT ruled on this; ask before building.
+3. **BASE-WEEK COMMUNICATION** — ⚠️ still not specified anywhere in this repo. He named it 2026-08-01
+   morning and the substance was never captured. **Get it from him. Do not infer it from the code.**
 
 ### WHAT SHIPPED TODAY — do NOT re-litigate
 
-**⛔ THE CACHE TRAP, and read this before you debug any deploy that "did not land" ([D-355]).** On a tab
-mount the client does **not** call `coach` — `useCoachWeekContext.ts:~699` reads `coach_cache` directly
-and gates on `COACH_CLIENT_MIN_PAYLOAD_VERSION`. That constant had drifted to **144** while the server
-was at **157**, so thirteen versions of server changes sat cached and unreachable and three deploys
-today looked like they had silently failed. **Both constants are now 158. BUMP BOTH, ALWAYS.** The
-~20 version notes saying "bump so cached rows re-source" are all describing only half the gate.
+**THE BIKE ROW IS DONE ([D-359], [D-360]).** Direction gated against its own scatter (bike was the only
+discipline without it), an 8-ride floor that is DERIVED not felt (the derivation is in D-359 §2 — read
+it before touching the number), and three reads that name the reason instead of reporting an absence:
+threshold / aerobic / building. **The bike now carries WORDS on its aerobic read — that reverses part
+of [D-356]**, and the reasoning is in D-359 §4: the noise guard, not a confidence interval, is the bar.
 
-**BODY is one row ([D-354]).** The heart-rate rollup and the cross-training row are **deleted**, both
-with DO-NOT-REBUILD tombstones. BODY now reads what the athlete *reports*: effort and soreness, with
-their scales and what they were counted from. Soreness is measured against the athlete's **own**
-baseline (`resolveCurrentSoreness`, `_shared/cross-domain-carryover.ts`, 9 tests), silent until 5
-entries and saying so when silent. A persistence line fires at **4 of the last 6 above own normal** and
-points at Adjust — advisory only, it can never move the fitness read.
+**FTP is a CHOICE now ([D-360], closes Q-240)** — two pills, `ftp_source`, honoured by the one resolver.
+⛔ **Absent a choice it is byte-identical to before, deliberately** — that resolver feeds the coach, the
+analyzers, the plan generators and every power zone. Do not "simplify" it. The FTP field also could not
+be edited at all (it rendered the learned value); fixed.
 
-**The severity cap ([D-353]) is live and currently has no caller** — the only rollup that used it was
-the row that got deleted. **Do not clean it up as dead code**; it is a rule waiting for the next rollup.
+**[Q-241] named the wrong file and [D-359] explains how.** It pointed at `bike.ts`; the STATE row reads
+`bike-fitness.ts`. Fixing only the filed line would have left the screen wrong and the ticket closed.
 
-**The docs were reconciled against code overnight** — 189 stale claims corrected, 36 docs archived,
-`D-270` finally written. Report: `docs/AUDIT-docs-vs-code-2026-07-31.md`. Corrections tagged `⟨A31⟩`.
-
-**The run efficiency row reads in plain language ([D-356]).** Words back (`RUN_EFF_WORDS` — a NEW map;
-`NUMERIC` stays wordless for the bike, which has no CI yet), whole-percent headline, and the cached
-`route.ci` rendered beside every number. **The rule to carry forward: a shown number always shows its
-uncertainty, no exceptions.** ⚠️ It partly reverses the morning's "arrow + number, no word" call,
-which had never been written down — D-356 records both.
-
-**The bike row names its FTP ([D-358]).** `FitnessAnchor` now carries `value` + `metric` for run,
-bike and swim — the number was always computed and dropped, the third "not absent, just never routed"
-finding of the day. ⛔ **Read the correction in D-358 before touching that sentence:** a stronger
-version ("measured against an estimated FTP of X") shipped, was wrong, and was walked back — and
-nothing in the code shows that, which is how it gets re-added as an improvement.
-**[Q-240] filed:** cycling FTP has a delete button where running has a choice; fixing it means
-changing `resolveCurrentFtp`, which the coach, analyzers, plan generators and zone maths all read.
-
-**[Q-241] — the smallest unlock on the board.** BIKE is the ONLY discipline whose direction is not
-checked against its own scatter (`bike.ts:78` — no `noiseGuardStdev`, while `run.ts:299` and
-`strength.ts:191` both have it). That, not a missing confidence interval, is what stops the bike row
-carrying words. Gate first, language second.
+**The strength logger is device-verified** (2026-08-01, Michael: "it works") — [D-352], and the LOGGER
+half of [D-351]. **The PERFORMANCE half of D-351 is still unseen.**
 
 ### STILL UNVERIFIED — what would settle it
 
-- ✅ **THE STATE WORK IS DEVICE-VERIFIED (2026-08-01 evening, Michael).** BODY, the run row and the bike
-  row were seen and accepted; the punch-list block is moved to VERIFIED. ⚠️ The copy was still all
-  Claude-written and one invented verdict word shipped earlier that day, so "seen and accepted" is the
-  claim — not "reviewed line by line".
-- ✅ **THE STRENGTH LOGGER IS ALSO DEVICE-VERIFIED (2026-08-01, Michael: "it works")** — bar-speed
-  lines, AMRAP wording, the bare Box Jump, the Assist (lb) box, the Single Leg Hip Thrust weight box
-  and the typed-but-unticked reps prompt ([D-351] logger half, [D-352]). ⚠️ **The PERFORMANCE side of
-  [D-351] was NOT in that pass** — chin-ups/dips in pounds, and assisted pricing below / loaded above
-  a bodyweight set, are still unseen and stay in the punch-list awaiting block.
-- **The persistence line has almost certainly never fired.** It needs 4 of 6 sessions above his own
-  normal plus a 5-entry baseline. Settled by: checking `resolveCurrentSoreness`'s `diag` on real data,
-  or waiting for a sore block.
-- **`cappedSignalColor` (`StateTab.tsx`) is a stopgap that is now doubly redundant** — the server fix
-  landed AND the row is gone. Safe to delete; left in only because it was never device-confirmed.
-
-### THE GAPS THIS OPENED, filed not fixed
-
-[Q-236] the severity cap is one-directional · [Q-237] an empty rollup renders a verdict · [Q-238] +
-[Q-239] moot but their reasoning is not. ⚠️ **Soreness now has prominent screen real estate and drives
-nothing** — the only soreness detector (`longitudinal-signals.ts`) still reads the DAILY CHECK-IN,
-which Michael said he may kill. Pointing it at post-workout soreness is the small piece; deciding what
-it may DO when it fires is the deferred one.
+- **Only the BUILDING bike state has been seen** (`6 rides in 8 weeks`, which is the floor working —
+  he has 6 easy rides and no hard efforts). **The AEROBIC and THRESHOLD states have never rendered**
+  for anyone. Settled by: 2 more qualifying easy rides (aerobic), or any threshold/sweet-spot/tempo/
+  climbing ride (threshold).
+- **Performance's renamed per-ride block** ("Heart rate at easy power") — deployed, unseen.
+- **Our power numbers are ~1.5% under Garmin's** on the same ride: avg 113 vs 115 W, NP 141 vs 143 W.
+  Max power matches exactly (424 W), so it is the same file read slightly differently — likely
+  start-of-ride or zero-sample handling. **Filed here, not investigated.**
+- **176 vs 181 W is NOT an error** — ours is 95% of the athlete's best 20 min, Garmin's is its own
+  estimate. Two estimators, not a truth and a bug.
 
 ## WHAT SHIPPED LAST NIGHT — client only, uncommitted, do NOT re-litigate
 

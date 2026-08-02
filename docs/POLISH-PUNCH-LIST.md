@@ -59,6 +59,44 @@ Claude-written — "seen and accepted", not a line-by-line copy review.
 
 ---
 
+## ✅ VERIFIED ON DEVICE — THE FTP CHOICE (2026-08-01 late, Michael)
+
+- [x] **Two pills under the FTP field** — *Use my rides 176 W* / *Use my number 181 W* ([D-360], closes
+      [Q-240]). Typed 181, "Use my number" went active, **Z2 moved 97–132 W → 100–136 W**; switching back
+      returned it. The choice reaches the zone maths.
+- [x] **The FTP field is editable.** It used to render the LEARNED value, so backspacing snapped back.
+
+## ⏳ AWAITING MICHAEL — THE BIKE ROW'S OTHER TWO STATES (2026-08-01 late)
+
+**Only the BUILDING state has ever rendered** — `6 rides in 8 weeks · newest today`, which is the new
+8-ride floor working as designed, not a fault. The other two need data that does not exist yet.
+
+- [ ] **AEROBIC state** — needs 2 more qualifying easy rides (≥10 min in the Z2 band, no threshold-level
+      effort in them). Should read `142 bpm at easy power → Holding steady`, with
+      *"No hard efforts yet, so there is no threshold read"* under it — **tappable**, revealing which ride
+      types record a 20-min max.
+- [ ] **THRESHOLD state** — needs any threshold / sweet-spot / tempo / climbing ride, then 8 of them.
+      Should read `212 W threshold ↑ +3%`.
+- [ ] **Performance, on a completed ride:** the block reads **"Heart rate at easy power"** (was "Aerobic
+      efficiency") and carries *"Counts toward your bike read on State"*.
+- [ ] ⚠️ **If any bike row shows a number with no range or a direction off fewer than 8 rides**, the
+      payload did not refresh — that is the [D-355] cache trap, not a copy problem.
+
+## ▶ FILED TONIGHT, NOT INVESTIGATED (2026-08-01)
+
+- [ ] ⛔ **THE ATTACH FAILURE — the next session's job.** Evening Ride 2026-08-01 19:54 did not attach to
+      the planned Long Ride; the detail screen offers **Attach**. Unattached = no planned-vs-executed and
+      it drops out of adherence. See the ENGINE-STATE banner.
+- [ ] **`Workload 86` reads as TSS** on the ride readouts (Garmin showed TSS 66.3 for the same ride).
+      Different unit, sitting in a grid of power numbers. Label problem, not a maths problem.
+- [ ] **Our power is ~1.5% under Garmin's on the same ride** — avg 113 vs 115 W, NP 141 vs 143 W, while
+      max power matches EXACTLY (424 W). Same file, slightly different handling — likely the start of the
+      ride or zero-power samples.
+- [ ] **The ±2.0% bike verdict band is the soft number now**, not the floor — it sits at or below the
+      measurement error of its own substrate ([D-359] §2).
+- [ ] **Swim and strength may report absences the way bike used to** ([D-359] §3). ⚠️ Michael has not
+      ruled on this — ask before building.
+
 ## ⏳ AWAITING MICHAEL — DEPLOYED + ON THE PHONE, NOT YET SEEN (2026-08-01)
 
 **Everything below is pushed, deployed and synced to iOS. None of it has been seen on a device.**
