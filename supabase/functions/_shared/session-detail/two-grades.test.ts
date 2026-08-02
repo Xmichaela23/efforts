@@ -50,3 +50,25 @@ Deno.test('a session with no plan has no volume grade — never a ratio against 
   const guarded = plan > 0 ? volumeRatioPct(plan, 35 * 60) : null;
   assertEquals(guarded, null);
 });
+
+// ── The planned length must reach the contract, not just the analyzer ────────
+import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
+
+Deno.test('⛔ an unstructured session states its length in the `duration` COLUMN only', () => {
+  // The real 2026-08-01 planned Long Ride: no steps, empty `computed`, length only in `duration: 108`.
+  // D-361 fixed three readers of this fact; `buildPlannedTotals` was a fourth and was missed — so the
+  // analyzer scored 59% duration adherence correctly while `planned_totals.duration_s` came back null
+  // and the Duration chip could not say "64 of 108 min".
+  const plannedRow = { duration: 108, computed: {} };
+  assertEquals(resolvePlannedDurationSeconds(plannedRow), 108 * 60);
+});
+
+Deno.test('steps still win over the column when a session has them', () => {
+  const structured = { duration: 108, computed: { steps: [{ seconds: 600 }, { seconds: 900 }] } };
+  assertEquals(resolvePlannedDurationSeconds(structured), 1500);
+});
+
+Deno.test('a session that never stated a length resolves to null, not zero', () => {
+  assertEquals(resolvePlannedDurationSeconds({ computed: {} }), null);
+  assertEquals(resolvePlannedDurationSeconds(null), null);
+});

@@ -3,6 +3,7 @@
 // =============================================================================
 
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
+import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import type { VerdictDirection } from '../core-verdict.ts';
 import type { ArcPerformanceBridgeV1 } from './arc-performance-bridge.ts';
 import { mergeArcPerformanceNarrative } from './arc-performance-bridge.ts';
@@ -1215,7 +1216,21 @@ function buildPlannedTotals(
     for (const st of steps) {
       sum += Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0) || 0;
     }
-    return sum > 0 ? sum : fin(plannedSession?.duration_seconds);
+    if (sum > 0) return sum;
+    const fromSession = fin(plannedSession?.duration_seconds);
+    if (fromSession != null && fromSession > 0) return fromSession;
+    // ⛔ THE FOURTH READER OF "HOW LONG WAS THIS PLANNED" (2026-08-02).
+    //
+    // D-361 found three surfaces each answering this in one place, so an unstructured session —
+    // "~108 min easy", no steps, length stated only in the `duration` COLUMN — was invisible to the
+    // attach matcher and scored 0% by the cycling analyzer. `resolvePlannedDurationSeconds` became
+    // the one answer. This function was never wired to it and is the same bug's fourth face: the ride
+    // resolved 59% duration adherence correctly through the shared resolver while `planned_totals`
+    // came back null, so the Duration chip could not say "64 of 108 min" and fell back to a percentage.
+    //
+    // ⚠️ `duration` is MINUTES; the resolver owns that conversion. Do not re-derive it here — that is
+    // exactly how a fifth answer gets written.
+    return fin(resolvePlannedDurationSeconds(plannedRowRaw));
   })();
   const distM = (() => {
     let m = 0;
