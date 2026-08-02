@@ -1447,7 +1447,58 @@ return (
                                         </button>
                                       </span>
                                     )}
-                                    {manualFtp && !learnedImproved && (
+                                    {/* ⛔ Q-240 — THE ATHLETE CHOOSES, AND THEIR CHOICE WINS (2026-08-01).
+                                        Cycling was the only baseline where the app decided: a confident
+                                        learned estimate outranked the typed number, and the only lever was
+                                        "Clear entry" — which deletes your number without giving you the one
+                                        you wanted. Running has had this control since Q-174; this is the same
+                                        pattern, the same stored-preference shape, honoured by the same single
+                                        resolver. Absent a choice, nothing changes for anyone.
+                                        Shown only when BOTH numbers exist — with one there is nothing to
+                                        choose between, and the lines below still say where it came from. */}
+                                    {manualFtp && learnedFtp && (
+                                      <div className="flex flex-col gap-1.5 mt-0.5 w-[17rem] max-w-full">
+                                        <div className="flex items-stretch gap-1.5">
+                                          {([
+                                            { key: 'learned', label: 'Use my rides', val: `${learnedFtp} W` },
+                                            { key: 'manual', label: 'Use my number', val: `${manualFtp} W` },
+                                          ] as const).map(({ key, label, val }) => {
+                                            // Absent choice === 'learned' (the historical precedence).
+                                            const chosen = (data.performanceNumbers as any)?.ftp_source ?? 'learned';
+                                            const active = chosen === key;
+                                            return (
+                                              <button
+                                                key={key}
+                                                type="button"
+                                                onClick={() => setData(prev => ({
+                                                  ...prev,
+                                                  performanceNumbers: { ...prev.performanceNumbers, ftp_source: key },
+                                                }))}
+                                                className={`flex-1 min-h-[2.75rem] px-2.5 py-1.5 rounded-lg text-[11px] leading-tight border transition-colors text-left ${
+                                                  active
+                                                    ? 'bg-teal-500/15 border-teal-500/50 text-white'
+                                                    : 'bg-white/[0.04] border-white/10 text-white/45 hover:text-white/70'
+                                                }`}
+                                                title={key === 'manual'
+                                                  ? 'Your entered FTP is used, even if your rides estimate a different one.'
+                                                  : 'Tracks what your hard rides estimate, and keeps updating.'}
+                                              >
+                                                <span className="block">{label}</span>
+                                                <span className="block tabular-nums text-white/50">{val}</span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                        {/* ⚠️ NAMES THE BLAST RADIUS. This is not a display toggle: the same
+                                            resolver feeds the coach, the analyzers, the plan generators and
+                                            every power zone. The athlete deserves to know the choice moves
+                                            all of them. */}
+                                        <span className="text-[10px] text-white/35 leading-snug">
+                                          Sets your power zones and the targets in your plan.
+                                        </span>
+                                      </div>
+                                    )}
+                                    {manualFtp && !learnedFtp && !learnedImproved && (
                                       <span className="flex items-center gap-1">
                                         <span>Manual</span>
                                         {learnedFtp && (
@@ -1461,20 +1512,6 @@ return (
                                             • Clear to use auto-learned ({learnedFtp}W)
                                           </button>
                                         )}
-                                      </span>
-                                    )}
-                                    {manualFtp && learnedImproved && (
-                                      <span className="text-teal-400/70 flex items-center gap-1">
-                                        <span>Using learned {learnedFtp}W from your rides · your entry {manualFtp}W is the anchor</span>
-                                        <button
-                                          onClick={() => setData(prev => {
-                                            const { ftp, ...rest } = prev.performanceNumbers as any;
-                                            return { ...prev, performanceNumbers: rest };
-                                          })}
-                                          className="underline hover:text-teal-300"
-                                        >
-                                          • Clear entry
-                                        </button>
                                       </span>
                                     )}
                                   </div>
